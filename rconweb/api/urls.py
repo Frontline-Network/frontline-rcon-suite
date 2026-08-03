@@ -128,6 +128,10 @@ endpoints: list[tuple[str, Callable]] = [
         autobalancer.get_autobalancer_round_archive,
     ),
     (
+        "get_autobalancer_history_dashboard",
+        autobalancer.get_autobalancer_history_dashboard,
+    ),
+    (
         "review_autobalancer_shadow_decision",
         autobalancer.review_autobalancer_shadow_decision,
     ),

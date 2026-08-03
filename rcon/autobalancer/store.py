@@ -119,6 +119,16 @@ class AutobalancerStore:
                 samples.append(sample)
         return samples
 
+    def claim_snapshot_slot(self, ttl: int = 30) -> bool:
+        return bool(
+            self.red.set(self.key("snapshot_persist_gate"), "1", nx=True, ex=ttl)
+        )
+
+    def claim_snapshot_prune(self, ttl: int = 24 * 3600) -> bool:
+        return bool(
+            self.red.set(self.key("snapshot_prune_gate"), "1", nx=True, ex=ttl)
+        )
+
     def set_active(self, active: bool) -> None:
         if active:
             self.red.set(self.key("active"), "1", ex=30)

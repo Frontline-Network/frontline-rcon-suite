@@ -130,7 +130,10 @@ const HistoricalAnalysis = ({ analysis, targetDifference }) => {
       : analysis.status === "unbalanced"
       ? { label: "ZEITWEISE UNAUSGEGLICHEN", color: "error" }
       : analysis.status === "transient"
-      ? { label: "KURZ ÜBER DER GRENZE · KEIN BALANCE-VORFALL", color: "warning" }
+      ? {
+          label: "KURZ ÜBER DER GRENZE · KEIN BALANCE-VORFALL",
+          color: "warning",
+        }
       : { label: "NICHT ZUVERLÄSSIG REKONSTRUIERBAR", color: "warning" };
 
   return (
@@ -188,7 +191,7 @@ const HistoricalAnalysis = ({ analysis, targetDifference }) => {
       </Stack>
       {!quality.reliable && (
         <Alert severity="warning" sx={{ mt: 2 }}>
-          Zu wenige oder widersprüchliche Teamwechsel-Ereignisse für eine
+          Zu wenige eindeutige Teamhinweise oder zu viele Widersprüche für eine
           belastbare Bewertung. Der Graph bleibt zur Fehlersuche sichtbar.
         </Alert>
       )}
@@ -197,7 +200,14 @@ const HistoricalAnalysis = ({ analysis, targetDifference }) => {
         targetDifference={targetDifference}
       />
       <Typography variant="caption" color="text.secondary">
-        Rekonstruiert aus {quality.valid_events || 0} Teamwechsel-Ereignissen.
+        Datenquelle:{" "}
+        {quality.source === "live_snapshots"
+          ? "exakte Live-Snapshots"
+          : "historische Logs"}
+        {` · Qualität ${quality.level || "niedrig"} (${Math.round(
+          (quality.score || 0) * 100
+        )} %)`}
+        {` · ${quality.valid_events || 0} verwertbare Messungen/Ereignisse.`}
         Alte Logs enthalten keine vollständigen Squad-Snapshots; deshalb werden
         rückwirkend keine Spieler als Wechselkandidaten bewertet.
       </Typography>
