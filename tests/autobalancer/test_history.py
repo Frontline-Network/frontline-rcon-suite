@@ -1,7 +1,11 @@
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
+from rcon.autobalancer import history as history_module
 from rcon.autobalancer.history import (
+    RoundHistoryRepository,
+    _snapshot_player,
     analyze_snapshot_timeline,
     reconstruct_round_timeline,
     summarize_rating_quality,
@@ -301,3 +305,94 @@ def test_candidate_what_if_is_only_built_from_exact_roster_snapshots():
         what_if["strategies"]["balanced-v2"]["candidates"][0]["player_id"]
         == "candidate"
     )
+
+
+def test_legacy_numeric_snapshot_rating_is_normalized_and_confidence_is_capped():
+    player = _snapshot_player(
+        {
+            "player_id": "legacy-player",
+            "name": "Legacy",
+            "team": "allies",
+            "rating": 67.5,
+            "rating_confidence": 0.9,
+        }
+    )
+
+    assert player is not None
+    assert player.rating.version == "legacy"
+    assert player.rating.value == 67.5
+    assert player.rating.raw_value == 67.5
+    assert player.rating.confidence == 0.4
+    assert player.rating.role_family == "legacy"
+
+
+class _QueryResult:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def all(self):
+        return self.rows
+
+
+class _DashboardSession:
+    def __init__(self, rows_by_query):
+        self.rows_by_query = list(rows_by_query)
+
+    def execute(self, _query):
+        return _QueryResult(self.rows_by_query.pop(0))
+
+
+def test_dashboard_materializes_rows_before_database_sessions_close(monkeypatch):
+    start = datetime(2026, 8, 3, 18, 0, tzinfo=timezone.utc)
+    end = start + timedelta(minutes=20)
+    game = SimpleNamespace(
+        id=7,
+        start=start,
+        end=end,
+        server_number=1,
+        map_name="Carentan",
+    )
+    analysis = reconstruct_round_timeline(
+        start,
+        end,
+        team_events(start, 41, 40),
+        target_difference=2,
+        minimum_players=40,
+        round_start_protection_seconds=0,
+        round_end_protection_seconds=0,
+        stable_difference_seconds=45,
+    )
+    analysis["round"] = {
+        "map_id": 7,
+        "round_id": f"{int(start.timestamp())}:Carentan",
+        "map_name": "Carentan",
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+    }
+    sessions = [
+        _DashboardSession([[game]]),
+        _DashboardSession([[(7, analysis)]]),
+        _DashboardSession([[], []]),
+    ]
+
+    @contextmanager
+    def fake_enter_session():
+        yield sessions.pop(0)
+
+    monkeypatch.setattr(history_module, "enter_session", fake_enter_session)
+
+    result = RoundHistoryRepository(1).dashboard(
+        target_difference=2,
+        minimum_players=40,
+        round_start_protection_seconds=0,
+        round_end_protection_seconds=0,
+        stable_difference_seconds=45,
+    )
+
+    assert result["backfill"] == {
+        "requested_rounds": 1,
+        "analyzed_rounds": 1,
+        "remaining_rounds": 0,
+        "complete": True,
+    }
+    assert sessions == []
