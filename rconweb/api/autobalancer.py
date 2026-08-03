@@ -26,6 +26,7 @@ SHADOW_REJECTION_CATEGORIES = {
     "wrong_team_counts",
     "other",
 }
+SHADOW_STRATEGIES = {"squad-first", "balanced-v2", "skill-first"}
 
 
 def validate_shadow_review(data):
@@ -33,6 +34,12 @@ def validate_shadow_review(data):
     verdict = str(data.get("verdict") or "").strip().lower()
     category = str(data.get("category") or "").strip() or None
     comment = str(data.get("comment") or "").strip() or None
+    preferred_strategy = (
+        str(data.get("preferred_strategy") or "").strip() or None
+    )
+    preferred_player_id = (
+        str(data.get("preferred_player_id") or "").strip() or None
+    )
     if not decision_id:
         raise ValueError("decision_id fehlt")
     if verdict not in {"accepted", "rejected"}:
@@ -43,7 +50,18 @@ def validate_shadow_review(data):
         raise ValueError("Für eine Ablehnung ist ein gültiger Grund erforderlich")
     if comment and len(comment) > 1000:
         raise ValueError("Der Kommentar darf höchstens 1000 Zeichen lang sein")
-    return decision_id, verdict, category, comment
+    if preferred_strategy not in SHADOW_STRATEGIES | {None}:
+        raise ValueError("preferred_strategy ist ungültig")
+    if preferred_player_id and len(preferred_player_id) > 128:
+        raise ValueError("preferred_player_id ist zu lang")
+    return (
+        decision_id,
+        verdict,
+        category,
+        comment,
+        preferred_strategy,
+        preferred_player_id,
+    )
 
 
 def _repository() -> DecisionRepository:
@@ -315,6 +333,11 @@ def get_autobalancer_round_archive(request):
             round_start_protection_seconds=config.map_start_grace_minutes * 60,
             round_end_protection_seconds=config.map_end_guard_minutes * 60,
             stable_difference_seconds=config.stable_difference_seconds,
+            connection_grace_seconds=config.connection_grace_seconds,
+            max_switches_per_incident=config.max_switches_per_incident,
+            skill_gap_soft_limit=config.skill_gap_soft_limit,
+            skill_gap_hard_warning=config.skill_gap_hard_warning,
+            skill_gap_min_improvement=config.skill_gap_min_improvement,
         )
         if result["analysis"] is None:
             return api_response(
@@ -371,6 +394,11 @@ def get_autobalancer_history_dashboard(request):
         round_start_protection_seconds=config.map_start_grace_minutes * 60,
         round_end_protection_seconds=config.map_end_guard_minutes * 60,
         stable_difference_seconds=stable_difference_seconds,
+        connection_grace_seconds=config.connection_grace_seconds,
+        max_switches_per_incident=config.max_switches_per_incident,
+        skill_gap_soft_limit=config.skill_gap_soft_limit,
+        skill_gap_hard_warning=config.skill_gap_hard_warning,
+        skill_gap_min_improvement=config.skill_gap_min_improvement,
         days=days,
         search=str(data.get("search") or "").strip() or None,
         limit=limit,
@@ -389,9 +417,14 @@ def get_autobalancer_history_dashboard(request):
 @require_http_methods(["POST"])
 def review_autobalancer_shadow_decision(request):
     try:
-        decision_id, verdict, category, comment = validate_shadow_review(
-            _get_data(request)
-        )
+        (
+            decision_id,
+            verdict,
+            category,
+            comment,
+            preferred_strategy,
+            preferred_player_id,
+        ) = validate_shadow_review(_get_data(request))
     except ValueError as error:
         return api_response(
             result=None,
@@ -405,6 +438,8 @@ def review_autobalancer_shadow_decision(request):
         category=category,
         comment=comment,
         reviewed_by=request.user.username,
+        preferred_strategy=preferred_strategy,
+        preferred_player_id=preferred_player_id,
     )
     if result is None:
         return api_response(

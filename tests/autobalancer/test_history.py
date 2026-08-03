@@ -1,7 +1,10 @@
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 from rcon.autobalancer.history import (
+    analyze_snapshot_timeline,
     reconstruct_round_timeline,
+    summarize_rating_quality,
     summarize_round_analyses,
 )
 
@@ -147,3 +150,156 @@ def test_summary_excludes_unmeasurable_rounds_from_balance_rate():
     assert summary["measurable_rounds"] == 1
     assert summary["coverage_ratio"] == 0.5
     assert summary["balanced_time_ratio"] == 1
+
+
+def test_rating_quality_uses_only_valid_exact_snapshots_and_compares_strategies():
+    start = datetime(2026, 8, 4, 18, 0, tzinfo=timezone.utc)
+    game = SimpleNamespace(
+        start=start,
+        end=start + timedelta(minutes=20),
+        map_name="Carentan",
+    )
+    round_id = f"{int(start.timestamp())}:Carentan"
+    snapshots = []
+    for index in range(38):
+        snapshots.append(
+            SimpleNamespace(
+                round_id=round_id,
+                captured_at=start + timedelta(seconds=index * 30),
+                counts_match=True,
+                fail_count=0,
+                stable_map=True,
+                allies_count=50,
+                axis_count=47,
+                rating_model_version="role-aware-v2",
+                players=[
+                    {
+                        "rating": {
+                            "confidence": 0.7,
+                            "role_family": "support",
+                        }
+                    },
+                    {
+                        "rating": {
+                            "confidence": 0.5,
+                            "role_family": "combat_infantry",
+                        }
+                    },
+                ],
+            )
+        )
+    snapshots.append(
+        SimpleNamespace(
+            round_id=round_id,
+            captured_at=start + timedelta(seconds=120),
+            counts_match=False,
+            fail_count=0,
+            stable_map=True,
+            allies_count=50,
+            axis_count=47,
+            rating_model_version="role-aware-v2",
+            players=[],
+        )
+    )
+    decision = SimpleNamespace(
+        reason={
+            "plan": {
+                "rating_gap_before": 6.0,
+                "projected_rating_gap": 4.0,
+            },
+            "strategies": {
+                strategy: {
+                    "projected_rating_gap": gap,
+                    "candidates": [{"player_id": "same-player"}],
+                }
+                for strategy, gap in (
+                    ("squad-first", 5.0),
+                    ("balanced-v2", 4.0),
+                    ("skill-first", 2.0),
+                )
+            },
+        }
+    )
+
+    quality = summarize_rating_quality(
+        [game],
+        snapshots,
+        [decision],
+        round_start_protection_seconds=0,
+        round_end_protection_seconds=0,
+    )
+
+    assert quality["expected_snapshots"] == 40
+    assert quality["valid_snapshots"] == 38
+    assert quality["snapshot_coverage"] == 0.95
+    assert quality["exact_rounds"] == 1
+    assert quality["median_rating_confidence"] == 0.6
+    assert quality["strategy_agreement_rate"] == 1.0
+    assert quality["gap_guardrail_rate"] == 1.0
+    assert quality["model_versions"] == {"role-aware-v2": 38}
+    role_confidence = {
+        row["role_family"]: row for row in quality["role_confidence"]
+    }
+    assert role_confidence["support"]["median_confidence"] == 0.7
+    assert role_confidence["combat_infantry"]["median_confidence"] == 0.5
+
+
+def test_candidate_what_if_is_only_built_from_exact_roster_snapshots():
+    start = datetime(2026, 8, 4, 18, 0, tzinfo=timezone.utc)
+    players = [
+        {
+            "player_id": "candidate",
+            "name": "Candidate",
+            "team": "allies",
+            "connected_seconds": 600,
+            "rating": {"value": 45, "confidence": 0.8},
+        },
+        {
+            "player_id": "axis",
+            "name": "Axis",
+            "team": "axis",
+            "connected_seconds": 600,
+            "unit_id": "dog",
+            "unit_name": "Dog",
+            "unit_size": 3,
+            "rating": {"value": 55, "confidence": 0.8},
+        },
+    ]
+    snapshots = [
+        SimpleNamespace(
+            round_id=f"{int(start.timestamp())}:Carentan",
+            captured_at=start + timedelta(seconds=index * 30),
+            map_name="Carentan",
+            map_elapsed_seconds=index * 30,
+            time_remaining_seconds=3600 - index * 30,
+            allies_count=50,
+            axis_count=47,
+            counts_match=True,
+            fail_count=0,
+            stable_map=True,
+            players=players,
+            rating_model_version="role-aware-v2",
+        )
+        for index in range(4)
+    ]
+    analysis = analyze_snapshot_timeline(
+        start,
+        start + timedelta(minutes=20),
+        snapshots,
+        target_difference=2,
+        minimum_players=40,
+        round_start_protection_seconds=0,
+        round_end_protection_seconds=0,
+        stable_difference_seconds=45,
+    )
+    what_if = analysis["candidate_what_if"]
+    assert what_if["rating_model_version"] == "role-aware-v2"
+    assert set(what_if["strategies"]) == {
+        "squad-first",
+        "balanced-v2",
+        "skill-first",
+    }
+    assert (
+        what_if["strategies"]["balanced-v2"]["candidates"][0]["player_id"]
+        == "candidate"
+    )

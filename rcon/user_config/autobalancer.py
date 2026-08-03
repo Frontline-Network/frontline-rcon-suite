@@ -211,6 +211,56 @@ class AutobalancerUserConfig(BaseUserConfig):
             "Stärkeschätzung verwendet werden dürfen. Für FLN: 1 und 2."
         ),
     )
+    skill_strategy: Literal["balanced-v2", "squad-first"] = Field(
+        default="balanced-v2",
+        title="Shadow-Auswahlstrategie",
+        description=(
+            "balanced-v2 schützt Squads zuerst, darf bei einer groben "
+            "Stärkeschieflage aber höchstens eine Schutzstufe eskalieren. "
+            "squad-first bildet die bisherige Referenzstrategie ab."
+        ),
+    )
+    skill_gap_soft_limit: float = Field(
+        default=8.0,
+        ge=0,
+        le=100,
+        title="Weiches Stärke-Limit",
+        description=(
+            "Oberhalb dieser projizierten durchschnittlichen Ratingdifferenz "
+            "darf balanced-v2 eine um höchstens eine Stufe stärker geschützte "
+            "Alternative prüfen."
+        ),
+    )
+    skill_gap_hard_warning: float = Field(
+        default=12.0,
+        ge=0,
+        le=100,
+        title="Warnschwelle für Stärke",
+        description=(
+            "Ab dieser projizierten Ratingdifferenz erscheint eine deutliche "
+            "Adminwarnung. Die Warnung umgeht keine Schutzregel."
+        ),
+    )
+    skill_gap_min_improvement: float = Field(
+        default=2.5,
+        ge=0,
+        le=100,
+        title="Mindestverbesserung für Eskalation",
+        description=(
+            "Eine stärker geschützte Alternative wird nur empfohlen, wenn sie "
+            "die projizierte Ratingdifferenz mindestens um diesen Wert senkt."
+        ),
+    )
+    history_half_life_days: int = Field(
+        default=30,
+        ge=1,
+        le=365,
+        title="Halbwertszeit historischer Leistung",
+        description=(
+            "Leistungsdaten verlieren über diesen Zeitraum die Hälfte ihres "
+            "Gewichts. Die 90-Tage- und 20-Karten-Grenzen gelten zusätzlich."
+        ),
+    )
     volunteer_command: str = Field(
         default="!balance",
         min_length=2,
@@ -244,6 +294,10 @@ class AutobalancerUserConfig(BaseUserConfig):
             raise ValueError("target_difference must be non-negative")
         if self.max_switches_per_incident < 1:
             raise ValueError("max_switches_per_incident must be at least one")
+        if self.skill_gap_hard_warning < self.skill_gap_soft_limit:
+            raise ValueError(
+                "skill_gap_hard_warning must be greater than or equal to the soft limit"
+            )
         return self
 
     @staticmethod

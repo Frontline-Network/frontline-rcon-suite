@@ -140,6 +140,15 @@ def test_shadow_creates_audit_proposal_without_messages_or_rcon(monkeypatch):
     status = instance.tick(config, make_snapshot(later), later)
     assert status["phase"] == Phase.PROPOSED
     assert instance.repository.created[0]["status"] == "shadow"
+    assert instance.repository.created[0]["rating_model_version"] == "role-aware-v2"
+    assert instance.repository.created[0]["strategy_version"] == "balanced-v2"
+    assert set(instance.repository.created[0]["reason"]["strategies"]) == {
+        "squad-first",
+        "balanced-v2",
+        "skill-first",
+    }
+    assert status["rating_model_version"] == "role-aware-v2"
+    assert status["strategy"] == "balanced-v2"
     assert instance.rcon.messages == []
     assert instance.rcon.switches == []
 

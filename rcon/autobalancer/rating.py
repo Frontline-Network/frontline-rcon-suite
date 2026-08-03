@@ -1,12 +1,36 @@
 from __future__ import annotations
 
 import math
+from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Iterable, Mapping
 
 from .models import PlayerSnapshot, SkillRating
 
 NEUTRAL_RATING = 50.0
+RATING_MODEL_VERSION = "role-aware-v2"
+ROLE_COHORT_MIN_SIZE = 8
+
+COMMANDER_ROLES = {"armycommander", "commander"}
+LEADER_ROLES = {"officer", "squadleader"}
+SUPPORT_ROLES = {"support", "engineer", "medic"}
+SPECIAL_ROLE_FAMILIES = {
+    "tankcommander": "specialist",
+    "crewman": "specialist",
+    "tankcrew": "specialist",
+    "spotter": "specialist",
+    "sniper": "specialist",
+    "artilleryobserver": "specialist",
+}
+SPECIAL_UNITS = {"armor", "armour", "recon", "artillery"}
+ROLE_WEIGHTS = {
+    "combat_infantry": (0.60, 0.40),
+    "support": (0.35, 0.65),
+    "leader": (0.35, 0.65),
+    "specialist": (0.65, 0.35),
+    "commander": (0.0, 0.0),
+}
 
 
 @dataclass(slots=True)
@@ -17,6 +41,12 @@ class HistoricalSample:
     offense: int
     defense: int
     support: int
+    deaths: int = 0
+    teamkills: int = 0
+    role_family: str = "legacy"
+    map_key: str = ""
+    observed_at: datetime | None = None
+    exact: bool = False
 
 
 def _finite(value: object, default: float = 0.0) -> float:
@@ -25,6 +55,26 @@ def _finite(value: object, default: float = 0.0) -> float:
     except (TypeError, ValueError):
         return default
     return number if math.isfinite(number) else default
+
+
+def role_family(player: PlayerSnapshot | Mapping[str, object]) -> str:
+    def value(name: str, default: object = "") -> object:
+        if isinstance(player, Mapping):
+            return player.get(name, default)
+        return getattr(player, name, default)
+
+    role = str(value("role") or "").replace(" ", "").lower()
+    unit_type = str(value("unit_type") or "").lower()
+    is_leader = bool(value("is_leader", False))
+    if role in COMMANDER_ROLES or unit_type == "commander":
+        return "commander"
+    if unit_type in SPECIAL_UNITS or role in SPECIAL_ROLE_FAMILIES:
+        return "specialist"
+    if is_leader or role in LEADER_ROLES:
+        return "leader"
+    if role in SUPPORT_ROLES:
+        return "support"
+    return "combat_infantry"
 
 
 def percentile(values: list[float], quantile: float) -> float:
@@ -44,11 +94,13 @@ def percentile(values: list[float], quantile: float) -> float:
 
 
 def normalized_percentiles(values: Mapping[str, float | None]) -> dict[str, float]:
-    present = {
-        key: _finite(value)
-        for key, value in values.items()
-        if value is not None and math.isfinite(_finite(value))
-    }
+    present: dict[str, float] = {}
+    for key, value in values.items():
+        if value is None:
+            continue
+        number = _finite(value, math.nan)
+        if math.isfinite(number):
+            present[key] = number
     if not present:
         return {key: NEUTRAL_RATING for key in values}
     low = percentile(list(present.values()), 0.05)
@@ -72,36 +124,140 @@ def normalized_percentiles(values: Mapping[str, float | None]) -> dict[str, floa
     return {key: scaled.get(key, NEUTRAL_RATING) for key in values}
 
 
-def _rates(samples: Iterable[HistoricalSample]) -> tuple[dict[str, float], int]:
+def role_normalized_percentiles(
+    values: Mapping[str, float | None], families: Mapping[str, str]
+) -> dict[str, float]:
+    """Blend small role cohorts with the online population instead of overfitting."""
+    global_scores = normalized_percentiles(values)
+    family_members: dict[str, list[str]] = defaultdict(list)
+    for player_id, family in families.items():
+        if family != "commander":
+            family_members[family].append(player_id)
+    result = dict(global_scores)
+    for family, members in family_members.items():
+        subset = {player_id: values.get(player_id) for player_id in members}
+        family_scores = normalized_percentiles(subset)
+        blend = min(1.0, len(members) / ROLE_COHORT_MIN_SIZE)
+        for player_id in members:
+            result[player_id] = round(
+                blend * family_scores[player_id]
+                + (1.0 - blend) * global_scores[player_id],
+                10,
+            )
+    for player_id, family in families.items():
+        if family == "commander":
+            result[player_id] = NEUTRAL_RATING
+    return result
+
+
+def _age_days(value: datetime | None, now: datetime) -> float:
+    if value is None:
+        return 0.0
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    return max(0.0, (now - value).total_seconds() / 86400.0)
+
+
+def _rates(
+    samples: Iterable[HistoricalSample],
+    now: datetime,
+    half_life_days: int,
+) -> tuple[dict[str, float], int, int]:
     samples = list(samples)
     seconds = sum(max(0, sample.time_seconds) for sample in samples)
-    if seconds <= 0:
-        return {}, 0
-    minutes = seconds / 60.0
-    return (
-        {
-            "kills": sum(sample.kills for sample in samples) / minutes,
-            "combat": sum(sample.combat for sample in samples) / minutes,
-            "team": sum(
-                sample.offense + sample.defense + sample.support for sample in samples
-            )
-            / minutes,
-        },
-        seconds,
+    maps = len({sample.map_key or str(index) for index, sample in enumerate(samples)})
+    weighted_seconds = 0.0
+    totals = {"kills": 0.0, "combat": 0.0, "team": 0.0}
+    for sample in samples:
+        sample_seconds = max(0, sample.time_seconds)
+        if not sample_seconds:
+            continue
+        weight = math.pow(0.5, _age_days(sample.observed_at, now) / half_life_days)
+        weighted_seconds += sample_seconds * weight
+        totals["kills"] += sample.kills * weight
+        totals["combat"] += sample.combat * weight
+        totals["team"] += (
+            sample.offense + sample.defense + sample.support
+        ) * weight
+    if weighted_seconds <= 0:
+        return {}, seconds, maps
+    minutes = weighted_seconds / 60.0
+    return ({key: value / minutes for key, value in totals.items()}, seconds, maps)
+
+
+def _history_for_player(
+    samples: Iterable[HistoricalSample],
+    family: str,
+    now: datetime,
+    half_life_days: int,
+) -> tuple[dict[str, float], int, int, float, str]:
+    samples = list(samples)
+    exact = [
+        sample
+        for sample in samples
+        if sample.exact and sample.role_family == family
+    ]
+    legacy = [sample for sample in samples if not sample.exact]
+    exact_rates, exact_seconds, exact_maps = _rates(exact, now, half_life_days)
+    legacy_rates, legacy_seconds, legacy_maps = _rates(legacy, now, half_life_days)
+    exact_confidence = min(
+        1.0,
+        exact_seconds / (5 * 3600),
+        exact_maps / 5 if exact_maps else 0.0,
     )
+    legacy_confidence = min(
+        0.4,
+        legacy_seconds / (5 * 3600),
+        legacy_maps / 5 if legacy_maps else 0.0,
+    )
+    if exact_rates and exact_confidence >= legacy_confidence:
+        return (
+            exact_rates,
+            exact_seconds,
+            exact_maps,
+            exact_confidence,
+            "exact_role",
+        )
+    if legacy_rates:
+        return (
+            legacy_rates,
+            legacy_seconds,
+            legacy_maps,
+            legacy_confidence,
+            "legacy",
+        )
+    return {}, 0, 0, 0.0, "none"
+
+
+def _component(
+    player_id: str,
+    family: str,
+    kills: Mapping[str, float],
+    combat: Mapping[str, float],
+    team: Mapping[str, float],
+) -> float:
+    if family == "commander":
+        return NEUTRAL_RATING
+    combat_weight, team_weight = ROLE_WEIGHTS[family]
+    combat_component = (kills[player_id] + combat[player_id]) / 2.0
+    return combat_weight * combat_component + team_weight * team[player_id]
 
 
 def calculate_ratings(
     players: list[PlayerSnapshot],
     history: Mapping[str, Iterable[HistoricalSample]] | None = None,
+    *,
+    now: datetime | None = None,
+    half_life_days: int = 30,
 ) -> dict[str, SkillRating]:
-    """Rate the online cohort and shrink sparse evidence back towards 50.
-
-    Historical maps are filtered by the repository adapter. This pure function only
-    aggregates the supplied last-20 samples and applies the documented weighting.
-    """
+    """Calculate transparent role-aware ratings and reliability-adjust them."""
     history = history or {}
+    now = now or datetime.now(timezone.utc)
+    half_life_days = max(1, int(half_life_days))
     ids = [player.player_id for player in players]
+    families = {player.player_id: role_family(player) for player in players}
     levels = normalized_percentiles(
         {
             player.player_id: float(player.level) if player.level is not None else None
@@ -111,19 +267,33 @@ def calculate_ratings(
 
     history_rates: dict[str, dict[str, float]] = {}
     history_seconds: dict[str, int] = {}
+    history_maps: dict[str, int] = {}
+    history_confidence: dict[str, float] = {}
+    history_source: dict[str, str] = {}
     for player_id in ids:
-        rates, seconds = _rates(history.get(player_id, []))
+        rates, seconds, maps, confidence, source = _history_for_player(
+            history.get(player_id, []),
+            families[player_id],
+            now,
+            half_life_days,
+        )
         history_rates[player_id] = rates
         history_seconds[player_id] = seconds
+        history_maps[player_id] = maps
+        history_confidence[player_id] = confidence
+        history_source[player_id] = source
 
-    history_kills = normalized_percentiles(
-        {player_id: history_rates[player_id].get("kills") for player_id in ids}
+    history_kills = role_normalized_percentiles(
+        {player_id: history_rates[player_id].get("kills") for player_id in ids},
+        families,
     )
-    history_combat = normalized_percentiles(
-        {player_id: history_rates[player_id].get("combat") for player_id in ids}
+    history_combat = role_normalized_percentiles(
+        {player_id: history_rates[player_id].get("combat") for player_id in ids},
+        families,
     )
-    history_team = normalized_percentiles(
-        {player_id: history_rates[player_id].get("team") for player_id in ids}
+    history_team = role_normalized_percentiles(
+        {player_id: history_rates[player_id].get("team") for player_id in ids},
+        families,
     )
 
     live_rates: dict[str, dict[str, float] | None] = {}
@@ -137,52 +307,70 @@ def calculate_ratings(
             "combat": player.combat / minutes,
             "team": (player.offense + player.defense + player.support) / minutes,
         }
-    live_kills = normalized_percentiles(
-        {player_id: (live_rates[player_id] or {}).get("kills") for player_id in ids}
+    live_kills = role_normalized_percentiles(
+        {player_id: (live_rates[player_id] or {}).get("kills") for player_id in ids},
+        families,
     )
-    live_combat = normalized_percentiles(
-        {player_id: (live_rates[player_id] or {}).get("combat") for player_id in ids}
+    live_combat = role_normalized_percentiles(
+        {player_id: (live_rates[player_id] or {}).get("combat") for player_id in ids},
+        families,
     )
-    live_team = normalized_percentiles(
-        {player_id: (live_rates[player_id] or {}).get("team") for player_id in ids}
+    live_team = role_normalized_percentiles(
+        {player_id: (live_rates[player_id] or {}).get("team") for player_id in ids},
+        families,
     )
 
     ratings: dict[str, SkillRating] = {}
     for player in players:
         player_id = player.player_id
-        history_raw = (
-            0.65 * ((history_kills[player_id] + history_combat[player_id]) / 2.0)
-            + 0.35 * history_team[player_id]
+        family = families[player_id]
+        if family == "commander":
+            ratings[player_id] = SkillRating(
+                version=RATING_MODEL_VERSION,
+                role_family=family,
+            )
+            continue
+        history_component = _component(
+            player_id,
+            family,
+            history_kills,
+            history_combat,
+            history_team,
         )
-        history_confidence = min(1.0, history_seconds[player_id] / (5 * 3600))
-        history_component = NEUTRAL_RATING + history_confidence * (
-            history_raw - NEUTRAL_RATING
-        )
-
-        live_raw = (
-            0.65 * ((live_kills[player_id] + live_combat[player_id]) / 2.0)
-            + 0.35 * live_team[player_id]
+        live_component = _component(
+            player_id,
+            family,
+            live_kills,
+            live_combat,
+            live_team,
         )
         live_confidence = min(1.0, player.map_playtime_seconds / (30 * 60))
         if live_rates[player_id] is None:
             live_confidence = 0.0
-        live_component = NEUTRAL_RATING + live_confidence * (live_raw - NEUTRAL_RATING)
-
         level_present = player.level is not None
         level_component = levels[player_id] if level_present else NEUTRAL_RATING
-        value = (
-            0.25 * level_component + 0.60 * history_component + 0.15 * live_component
+        raw_value = (
+            0.15 * level_component
+            + 0.70 * history_component
+            + 0.15 * live_component
         )
         confidence = (
-            0.25 * (1.0 if level_present else 0.0)
-            + 0.60 * history_confidence
+            0.15 * (1.0 if level_present else 0.0)
+            + 0.70 * history_confidence[player_id]
             + 0.15 * live_confidence
         )
+        value = NEUTRAL_RATING + confidence * (raw_value - NEUTRAL_RATING)
         ratings[player_id] = SkillRating(
+            version=RATING_MODEL_VERSION,
             value=round(min(100.0, max(0.0, value)), 4),
+            raw_value=round(min(100.0, max(0.0, raw_value)), 4),
             confidence=round(min(1.0, max(0.0, confidence)), 4),
+            role_family=family,
             level_component=round(level_component, 4),
             history_component=round(history_component, 4),
             live_component=round(live_component, 4),
+            history_seconds=history_seconds[player_id],
+            history_maps=history_maps[player_id],
+            history_source=history_source[player_id],
         )
     return ratings

@@ -5,7 +5,7 @@ import json
 import re
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
-from statistics import mean
+from statistics import mean, median
 from typing import Any, Iterable
 
 from sqlalchemy import func, or_, select
@@ -14,6 +14,7 @@ from sqlalchemy.orm import aliased
 
 from rcon.models import (
     AutobalanceDecision,
+    AutobalancePlayerRoleStats,
     AutobalanceRoundAnalysis,
     AutobalanceSnapshot,
     LogLine,
@@ -23,6 +24,8 @@ from rcon.models import (
     enter_session,
 )
 
+from .models import BalanceSnapshot, PlayerSnapshot, SkillRating
+from .planner import build_strategy_plans
 from .rating import HistoricalSample
 
 
@@ -35,8 +38,8 @@ def load_history(
     if not player_ids:
         return {}
     now = now or datetime.utcnow()
-    query = (
-        select(PlayerID.player_id, PlayerStats, Maps.start)
+    legacy_query = (
+        select(PlayerID.player_id, PlayerStats, Maps.id, Maps.start)
         .join(PlayerStats, PlayerStats.player_id_id == PlayerID.id)
         .join(Maps, Maps.id == PlayerStats.map_id)
         .where(
@@ -48,20 +51,72 @@ def load_history(
         .order_by(PlayerID.player_id, Maps.start.desc())
     )
     if server_numbers:
-        query = query.where(Maps.server_number.in_(server_numbers))
+        legacy_query = legacy_query.where(Maps.server_number.in_(server_numbers))
     result: dict[str, list[HistoricalSample]] = defaultdict(list)
     with enter_session() as session:
-        for player_id, stats, _ in session.execute(query):
-            if len(result[player_id]) >= map_limit:
+        exact_query = (
+            select(AutobalancePlayerRoleStats)
+            .where(
+                AutobalancePlayerRoleStats.player_id.in_(player_ids),
+                AutobalancePlayerRoleStats.last_seen >= now - timedelta(days=90),
+            )
+            .order_by(
+                AutobalancePlayerRoleStats.player_id,
+                AutobalancePlayerRoleStats.last_seen.desc(),
+            )
+        )
+        if server_numbers:
+            exact_query = exact_query.where(
+                AutobalancePlayerRoleStats.server_number.in_(server_numbers)
+            )
+        exact_rows = session.scalars(exact_query).all()
+        exact_by_player_round: dict[tuple[str, str], list[Any]] = defaultdict(list)
+        for row in exact_rows:
+            exact_by_player_round[(row.player_id, row.round_id)].append(row)
+        exact_rounds: dict[str, int] = defaultdict(int)
+        for (player_id, round_id), rows in exact_by_player_round.items():
+            if exact_rounds[player_id] >= map_limit:
                 continue
+            if sum(max(0, row.time_seconds) for row in rows) < 10 * 60:
+                continue
+            exact_rounds[player_id] += 1
+            for row in rows:
+                result[player_id].append(
+                    HistoricalSample(
+                        time_seconds=row.time_seconds,
+                        kills=row.kills,
+                        deaths=row.deaths,
+                        teamkills=row.teamkills,
+                        combat=row.combat,
+                        offense=row.offense,
+                        defense=row.defense,
+                        support=row.support,
+                        role_family=row.role_family,
+                        map_key=round_id,
+                        observed_at=row.last_seen,
+                        exact=True,
+                    )
+                )
+
+        legacy_counts: dict[str, int] = defaultdict(int)
+        for player_id, stats, map_id, map_start in session.execute(legacy_query):
+            if legacy_counts[player_id] >= map_limit:
+                continue
+            legacy_counts[player_id] += 1
             result[player_id].append(
                 HistoricalSample(
                     time_seconds=stats.time_seconds,
                     kills=stats.kills,
+                    deaths=stats.deaths,
+                    teamkills=stats.teamkills,
                     combat=stats.combat,
                     offense=stats.offense,
                     defense=stats.defense,
                     support=stats.support,
+                    role_family="legacy",
+                    map_key=f"map:{map_id}",
+                    observed_at=map_start,
+                    exact=False,
                 )
             )
     return dict(result)
@@ -69,7 +124,7 @@ def load_history(
 
 TEAM_CHANGE = re.compile(r"\((None|Allies|Axis)\s*>\s*(None|Allies|Axis)\)")
 TEAM_IN_PLAYER = re.compile(r"\((Allies|Axis)/[^)]*\)")
-ANALYSIS_VERSION = "history-v2"
+ANALYSIS_VERSION = "history-v3-role-aware"
 
 
 def _utc_iso(value: datetime | None) -> str | None:
@@ -106,17 +161,27 @@ def _config_values(
     round_start_protection_seconds: int,
     round_end_protection_seconds: int,
     stable_difference_seconds: int,
-) -> dict[str, int]:
+    connection_grace_seconds: int = 120,
+    max_switches_per_incident: int = 3,
+    skill_gap_soft_limit: float = 8.0,
+    skill_gap_hard_warning: float = 12.0,
+    skill_gap_min_improvement: float = 2.5,
+) -> dict[str, int | float]:
     return {
         "target_difference": int(target_difference),
         "minimum_players": int(minimum_players),
         "round_start_protection_seconds": int(round_start_protection_seconds),
         "round_end_protection_seconds": int(round_end_protection_seconds),
         "stable_difference_seconds": int(stable_difference_seconds),
+        "connection_grace_seconds": int(connection_grace_seconds),
+        "max_switches_per_incident": int(max_switches_per_incident),
+        "skill_gap_soft_limit": float(skill_gap_soft_limit),
+        "skill_gap_hard_warning": float(skill_gap_hard_warning),
+        "skill_gap_min_improvement": float(skill_gap_min_improvement),
     }
 
 
-def _config_hash(values: dict[str, int]) -> str:
+def _config_hash(values: dict[str, int | float]) -> str:
     canonical = json.dumps(values, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:20]
 
@@ -420,6 +485,125 @@ def reconstruct_round_timeline(
     )
 
 
+def _snapshot_player(payload: dict[str, Any]) -> PlayerSnapshot | None:
+    player_id = str(payload.get("player_id") or "")
+    team = str(payload.get("team") or "").lower()
+    if not player_id or team not in {"allies", "axis"}:
+        return None
+    stored_rating = payload.get("rating") or {}
+    rating_fields = {
+        field: stored_rating[field]
+        for field in SkillRating.__dataclass_fields__
+        if field in stored_rating
+    }
+    return PlayerSnapshot(
+        player_id=player_id,
+        name=str(payload.get("name") or player_id),
+        team=team,
+        role=str(payload.get("role") or ""),
+        level=payload.get("level"),
+        unit_id=payload.get("unit_id"),
+        unit_name=payload.get("unit_name"),
+        unit_type=payload.get("unit_type"),
+        unit_size=int(payload.get("unit_size") or 0),
+        is_leader=bool(payload.get("is_leader")),
+        connected_seconds=int(payload.get("connected_seconds") or 0),
+        squad_seconds=int(payload.get("squad_seconds") or 0),
+        map_playtime_seconds=int(payload.get("map_playtime_seconds") or 0),
+        kills=int(payload.get("kills") or 0),
+        deaths=int(payload.get("deaths") or 0),
+        teamkills=int(payload.get("teamkills") or 0),
+        combat=int(payload.get("combat") or 0),
+        offense=int(payload.get("offense") or 0),
+        defense=int(payload.get("defense") or 0),
+        support=int(payload.get("support") or 0),
+        rating=SkillRating(**rating_fields),
+    )
+
+
+def _snapshot_candidate_what_if(
+    start: datetime,
+    end: datetime,
+    rows: list[AutobalanceSnapshot],
+    *,
+    target_difference: int,
+    minimum_players: int,
+    round_start_protection_seconds: int,
+    round_end_protection_seconds: int,
+    connection_grace_seconds: int,
+    max_switches_per_incident: int,
+    skill_gap_soft_limit: float,
+    skill_gap_hard_warning: float,
+    skill_gap_min_improvement: float,
+) -> dict[str, Any] | None:
+    eligible_start = _as_utc(start) + timedelta(
+        seconds=round_start_protection_seconds
+    )
+    eligible_end = _as_utc(end) - timedelta(seconds=round_end_protection_seconds)
+    eligible = [
+        row
+        for row in rows
+        if row.counts_match
+        and row.fail_count == 0
+        and row.stable_map
+        and row.players
+        and row.allies_count + row.axis_count >= minimum_players
+        and abs(row.allies_count - row.axis_count) > target_difference
+        and eligible_start <= _as_utc(row.captured_at) <= eligible_end
+    ]
+    if not eligible:
+        return None
+    row = max(
+        eligible,
+        key=lambda item: (
+            abs(item.allies_count - item.axis_count),
+            -_as_utc(item.captured_at).timestamp(),
+        ),
+    )
+    players = [
+        player
+        for player in (_snapshot_player(payload) for payload in row.players)
+        if player is not None
+    ]
+    snapshot = BalanceSnapshot(
+        round_id=row.round_id,
+        captured_at=_as_utc(row.captured_at),
+        map_name=row.map_name,
+        map_elapsed_seconds=row.map_elapsed_seconds,
+        time_remaining_seconds=row.time_remaining_seconds,
+        allies_count=row.allies_count,
+        axis_count=row.axis_count,
+        players=players,
+        fail_count=row.fail_count,
+        counts_match=row.counts_match,
+        stable_map=row.stable_map,
+    )
+    plans = build_strategy_plans(
+        snapshot,
+        target_difference=target_difference,
+        connection_grace_seconds=connection_grace_seconds,
+        max_switches=max_switches_per_incident,
+        skill_gap_soft_limit=skill_gap_soft_limit,
+        skill_gap_hard_warning=skill_gap_hard_warning,
+        skill_gap_min_improvement=skill_gap_min_improvement,
+    )
+    return {
+        "captured_at": _utc_iso(row.captured_at),
+        "allies_count": row.allies_count,
+        "axis_count": row.axis_count,
+        "rating_model_version": row.rating_model_version or "legacy",
+        "strategies": {
+            name: plan.public_dict() if plan is not None else None
+            for name, plan in plans.items()
+        },
+        "limitations": (
+            "Exakter Snapshot; historische Freiwilligkeit, aktive Vormerkungen "
+            "und eine eventuell bereits laufende Drei-Karten-Schutzfrist sind "
+            "nicht rückwirkend ableitbar."
+        ),
+    }
+
+
 def analyze_snapshot_timeline(
     start: datetime,
     end: datetime,
@@ -430,6 +614,11 @@ def analyze_snapshot_timeline(
     round_start_protection_seconds: int,
     round_end_protection_seconds: int,
     stable_difference_seconds: int,
+    connection_grace_seconds: int = 120,
+    max_switches_per_incident: int = 3,
+    skill_gap_soft_limit: float = 8.0,
+    skill_gap_hard_warning: float = 12.0,
+    skill_gap_min_improvement: float = 2.5,
 ) -> dict[str, Any]:
     start = _as_utc(start)
     end = _as_utc(end)
@@ -483,7 +672,7 @@ def analyze_snapshot_timeline(
         ),
         "roster_snapshots": sum(bool(row.players) for row in rows),
     }
-    return _evaluate_timeline(
+    result = _evaluate_timeline(
         start,
         end,
         points,
@@ -495,6 +684,21 @@ def analyze_snapshot_timeline(
         stable_difference_seconds=stable_difference_seconds,
         sample_seconds=sample_seconds,
     )
+    result["candidate_what_if"] = _snapshot_candidate_what_if(
+        start,
+        end,
+        rows,
+        target_difference=target_difference,
+        minimum_players=minimum_players,
+        round_start_protection_seconds=round_start_protection_seconds,
+        round_end_protection_seconds=round_end_protection_seconds,
+        connection_grace_seconds=connection_grace_seconds,
+        max_switches_per_incident=max_switches_per_incident,
+        skill_gap_soft_limit=skill_gap_soft_limit,
+        skill_gap_hard_warning=skill_gap_hard_warning,
+        skill_gap_min_improvement=skill_gap_min_improvement,
+    )
+    return result
 
 
 def reanalyze_timeline(
@@ -505,6 +709,11 @@ def reanalyze_timeline(
     round_start_protection_seconds: int,
     round_end_protection_seconds: int,
     stable_difference_seconds: int,
+    connection_grace_seconds: int = 120,
+    max_switches_per_incident: int = 3,
+    skill_gap_soft_limit: float = 8.0,
+    skill_gap_hard_warning: float = 12.0,
+    skill_gap_min_improvement: float = 2.5,
 ) -> dict[str, Any]:
     round_data = analysis["round"]
     points = analysis.get("timeline") or []
@@ -533,6 +742,7 @@ def reanalyze_timeline(
         sample_seconds=sample_seconds,
     )
     result["round"] = round_data
+    result["candidate_what_if"] = analysis.get("candidate_what_if")
     return result
 
 
@@ -639,6 +849,185 @@ def summarize_round_analyses(analyses: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def summarize_rating_quality(
+    games: Iterable[Any],
+    snapshots: Iterable[AutobalanceSnapshot],
+    decisions: Iterable[AutobalanceDecision],
+    *,
+    round_start_protection_seconds: int,
+    round_end_protection_seconds: int,
+    minimum_players: int = 40,
+) -> dict[str, Any]:
+    """Summarize only exact snapshot evidence; legacy logs never imply skill data."""
+    games = list(games)
+    snapshots = list(snapshots)
+    decisions = list(decisions)
+    games_by_round = {_round_id(game): game for game in games}
+    expected_by_round: dict[str, int] = {}
+    valid_snapshots = []
+    valid_by_round: Counter[str] = Counter()
+    confidences: list[float] = []
+    role_observations: Counter[str] = Counter()
+    role_confidences: dict[str, list[float]] = defaultdict(list)
+    confidence_buckets: Counter[str] = Counter()
+    model_versions: Counter[str] = Counter()
+    well_attended_rounds = {
+        snapshot.round_id
+        for snapshot in snapshots
+        if snapshot.allies_count + snapshot.axis_count >= minimum_players
+    }
+    for game in games:
+        round_id = _round_id(game)
+        if round_id not in well_attended_rounds:
+            continue
+        eligible_seconds = max(
+            0,
+            int((game.end - game.start).total_seconds())
+            - round_start_protection_seconds
+            - round_end_protection_seconds,
+        )
+        expected_by_round[round_id] = (eligible_seconds + 29) // 30
+    expected_snapshots = sum(expected_by_round.values())
+    for snapshot in snapshots:
+        if snapshot.round_id not in expected_by_round:
+            continue
+        game = games_by_round.get(snapshot.round_id)
+        if game is None:
+            continue
+        eligible_start = game.start + timedelta(
+            seconds=round_start_protection_seconds
+        )
+        eligible_end = game.end - timedelta(seconds=round_end_protection_seconds)
+        if not eligible_start <= snapshot.captured_at <= eligible_end:
+            continue
+        if (
+            not snapshot.counts_match
+            or snapshot.fail_count
+            or not snapshot.stable_map
+        ):
+            continue
+        valid_snapshots.append(snapshot)
+        valid_by_round[snapshot.round_id] += 1
+        model_versions[snapshot.rating_model_version or "legacy"] += 1
+        for player in snapshot.players or []:
+            rating = player.get("rating") or {}
+            confidence = rating.get("confidence")
+            if confidence is not None and rating.get("role_family") != "commander":
+                confidence_value = max(0.0, min(1.0, float(confidence)))
+                confidences.append(confidence_value)
+            family = (
+                player.get("role_family")
+                or rating.get("role_family")
+                or "legacy"
+            )
+            if family != "commander":
+                role_observations[str(family)] += 1
+                if confidence is not None:
+                    role_confidences[str(family)].append(confidence_value)
+                    bucket = (
+                        "0–20 %"
+                        if confidence_value < 0.2
+                        else "20–40 %"
+                        if confidence_value < 0.4
+                        else "40–60 %"
+                        if confidence_value < 0.6
+                        else "60–80 %"
+                        if confidence_value < 0.8
+                        else "80–100 %"
+                    )
+                    confidence_buckets[bucket] += 1
+
+    strategy_rows: dict[str, dict[str, Any]] = defaultdict(
+        lambda: {"proposals": 0, "projected_gaps": []}
+    )
+    strategy_agreements = 0
+    strategy_proposals = 0
+    gap_guardrail_passes = 0
+    gap_guardrail_total = 0
+    for decision in decisions:
+        reason = decision.reason or {}
+        plans = reason.get("strategies") or {}
+        candidate_ids = []
+        for strategy, plan in plans.items():
+            if not plan or not plan.get("candidates"):
+                continue
+            first = plan["candidates"][0]
+            candidate_ids.append(first.get("player_id"))
+            strategy_rows[strategy]["proposals"] += 1
+            gap = plan.get("projected_rating_gap")
+            if gap is not None:
+                strategy_rows[strategy]["projected_gaps"].append(float(gap))
+        if candidate_ids:
+            strategy_proposals += 1
+            strategy_agreements += len(set(candidate_ids)) == 1
+        active_plan = reason.get("plan") or {}
+        before = active_plan.get("rating_gap_before")
+        after = active_plan.get("projected_rating_gap")
+        if before is not None and after is not None:
+            gap_guardrail_total += 1
+            gap_guardrail_passes += float(after) <= float(before) + 2.0
+
+    fully_captured_rounds = sum(
+        expected > 0 and valid_by_round[round_id] / expected >= 0.95
+        for round_id, expected in expected_by_round.items()
+    )
+    return {
+        "expected_snapshots": expected_snapshots,
+        "valid_snapshots": len(valid_snapshots),
+        "snapshot_coverage": min(
+            1.0,
+            len(valid_snapshots) / expected_snapshots if expected_snapshots else 0.0,
+        ),
+        "well_attended_rounds": len(expected_by_round),
+        "exact_rounds": fully_captured_rounds,
+        "fully_captured_rounds": fully_captured_rounds,
+        "median_rating_confidence": median(confidences) if confidences else None,
+        "role_observations": dict(role_observations.most_common()),
+        "role_confidence": [
+            {
+                "role_family": family,
+                "observations": role_observations[family],
+                "median_confidence": median(values),
+            }
+            for family, values in sorted(role_confidences.items())
+        ],
+        "confidence_distribution": [
+            {"bucket": bucket, "observations": confidence_buckets[bucket]}
+            for bucket in (
+                "0–20 %",
+                "20–40 %",
+                "40–60 %",
+                "60–80 %",
+                "80–100 %",
+            )
+        ],
+        "model_versions": dict(model_versions.most_common()),
+        "latest_snapshot": _utc_iso(
+            max((snapshot.captured_at for snapshot in valid_snapshots), default=None)
+        ),
+        "strategy_agreement_rate": (
+            strategy_agreements / strategy_proposals if strategy_proposals else None
+        ),
+        "gap_guardrail_rate": (
+            gap_guardrail_passes / gap_guardrail_total
+            if gap_guardrail_total
+            else None
+        ),
+        "strategies": [
+            {
+                "strategy": strategy,
+                "proposals": values["proposals"],
+                "average_projected_gap": (
+                    mean(values["projected_gaps"])
+                    if values["projected_gaps"]
+                    else None
+                ),
+            }
+            for strategy, values in sorted(strategy_rows.items())
+        ],
+    }
+
+
 class RoundHistoryRepository:
     def __init__(self, server_number: int):
         self.server_number = server_number
@@ -731,6 +1120,11 @@ class RoundHistoryRepository:
         round_start_protection_seconds: int,
         round_end_protection_seconds: int,
         stable_difference_seconds: int,
+        connection_grace_seconds: int = 120,
+        max_switches_per_incident: int = 3,
+        skill_gap_soft_limit: float = 8.0,
+        skill_gap_hard_warning: float = 12.0,
+        skill_gap_min_improvement: float = 2.5,
     ) -> dict[str, Any] | None:
         config = _config_values(
             target_difference=target_difference,
@@ -738,6 +1132,11 @@ class RoundHistoryRepository:
             round_start_protection_seconds=round_start_protection_seconds,
             round_end_protection_seconds=round_end_protection_seconds,
             stable_difference_seconds=stable_difference_seconds,
+            connection_grace_seconds=connection_grace_seconds,
+            max_switches_per_incident=max_switches_per_incident,
+            skill_gap_soft_limit=skill_gap_soft_limit,
+            skill_gap_hard_warning=skill_gap_hard_warning,
+            skill_gap_min_improvement=skill_gap_min_improvement,
         )
         config_hash = _config_hash(config)
         with enter_session() as session:
@@ -830,7 +1229,16 @@ class RoundHistoryRepository:
                     game.start,
                     game.end,
                     events,
-                    **config,
+                    **{
+                        key: config[key]
+                        for key in (
+                            "target_difference",
+                            "minimum_players",
+                            "round_start_protection_seconds",
+                            "round_end_protection_seconds",
+                            "stable_difference_seconds",
+                        )
+                    },
                 )
             analysis["round"] = {
                 "map_id": game.id,
@@ -873,6 +1281,11 @@ class RoundHistoryRepository:
         round_start_protection_seconds: int,
         round_end_protection_seconds: int,
         stable_difference_seconds: int,
+        connection_grace_seconds: int = 120,
+        max_switches_per_incident: int = 3,
+        skill_gap_soft_limit: float = 8.0,
+        skill_gap_hard_warning: float = 12.0,
+        skill_gap_min_improvement: float = 2.5,
         days: int = 90,
         search: str | None = None,
         limit: int = 100,
@@ -888,12 +1301,13 @@ class RoundHistoryRepository:
         if search:
             filters.append(Maps.map_name.ilike(f"%{search.strip()}%"))
         with enter_session() as session:
-            map_ids = session.scalars(
-                select(Maps.id)
+            games = session.scalars(
+                select(Maps)
                 .where(*filters)
                 .order_by(Maps.start.desc())
                 .limit(limit)
             ).all()
+            map_ids = [game.id for game in games]
 
         base_config = _config_values(
             target_difference=target_difference,
@@ -901,6 +1315,11 @@ class RoundHistoryRepository:
             round_start_protection_seconds=round_start_protection_seconds,
             round_end_protection_seconds=round_end_protection_seconds,
             stable_difference_seconds=stable_difference_seconds,
+            connection_grace_seconds=connection_grace_seconds,
+            max_switches_per_incident=max_switches_per_incident,
+            skill_gap_soft_limit=skill_gap_soft_limit,
+            skill_gap_hard_warning=skill_gap_hard_warning,
+            skill_gap_min_improvement=skill_gap_min_improvement,
         )
         config_hash = _config_hash(base_config)
         with enter_session() as session:
@@ -958,6 +1377,39 @@ class RoundHistoryRepository:
             analysis.get("quality", {}).get("source", "unknown")
             for analysis in analyses
         )
+        round_ids = [_round_id(game) for game in games]
+        with enter_session() as session:
+            snapshots = (
+                session.scalars(
+                    select(AutobalanceSnapshot)
+                    .where(
+                        AutobalanceSnapshot.server_number == self.server_number,
+                        AutobalanceSnapshot.round_id.in_(round_ids),
+                    )
+                    .order_by(AutobalanceSnapshot.captured_at)
+                ).all()
+                if round_ids
+                else []
+            )
+            decisions = (
+                session.scalars(
+                    select(AutobalanceDecision).where(
+                        AutobalanceDecision.server_number == self.server_number,
+                        AutobalanceDecision.round_id.in_(round_ids),
+                        AutobalanceDecision.mode == "shadow",
+                    )
+                ).all()
+                if round_ids
+                else []
+            )
+        rating_quality = summarize_rating_quality(
+            games,
+            snapshots,
+            decisions,
+            round_start_protection_seconds=round_start_protection_seconds,
+            round_end_protection_seconds=round_end_protection_seconds,
+            minimum_players=minimum_players,
+        )
         return {
             "generated_at": _utc_iso(datetime.utcnow()),
             "server_number": self.server_number,
@@ -976,4 +1428,5 @@ class RoundHistoryRepository:
             "source_counts": dict(source_counts),
             "summary": summarize_round_analyses(analyses),
             "what_if": what_if,
+            "rating_quality": rating_quality,
         }

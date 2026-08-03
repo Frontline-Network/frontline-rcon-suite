@@ -967,6 +967,12 @@ class AutobalanceDecision(Base):
     protection_tier: Mapped[int | None] = mapped_column(nullable=True)
     rating: Mapped[float | None] = mapped_column(nullable=True)
     rating_confidence: Mapped[float | None] = mapped_column(nullable=True)
+    rating_model_version: Mapped[str] = mapped_column(
+        String, nullable=False, default="legacy"
+    )
+    strategy_version: Mapped[str] = mapped_column(
+        String, nullable=False, default="legacy"
+    )
     reason: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     before_snapshot: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, default=dict
@@ -979,6 +985,12 @@ class AutobalanceDecision(Base):
     review_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     reviewed_by: Mapped[str | None] = mapped_column(String, nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP, nullable=True)
+    review_preferred_strategy: Mapped[str | None] = mapped_column(
+        String, nullable=True
+    )
+    review_preferred_player_id: Mapped[str | None] = mapped_column(
+        String, nullable=True
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -999,6 +1011,8 @@ class AutobalanceDecision(Base):
             "protection_tier": self.protection_tier,
             "rating": self.rating,
             "rating_confidence": self.rating_confidence,
+            "rating_model_version": self.rating_model_version,
+            "strategy_version": self.strategy_version,
             "reason": self.reason,
             "before_snapshot": self.before_snapshot,
             "after_snapshot": self.after_snapshot,
@@ -1009,6 +1023,8 @@ class AutobalanceDecision(Base):
             "review_comment": self.review_comment,
             "reviewed_by": self.reviewed_by,
             "reviewed_at": self.reviewed_at,
+            "review_preferred_strategy": self.review_preferred_strategy,
+            "review_preferred_player_id": self.review_preferred_player_id,
         }
 
 
@@ -1040,8 +1056,49 @@ class AutobalanceSnapshot(Base):
     fail_count: Mapped[int] = mapped_column(nullable=False)
     stable_map: Mapped[bool] = mapped_column(nullable=False)
     rating_confidence: Mapped[float | None] = mapped_column(nullable=True)
+    rating_model_version: Mapped[str] = mapped_column(
+        String, nullable=False, default="legacy", index=True
+    )
     players: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, nullable=False, default=list
+    )
+
+
+class AutobalancePlayerRoleStats(Base):
+    """Exact role-aware score deltas derived from durable live snapshots."""
+
+    __tablename__ = "autobalance_player_role_stats"
+    __table_args__ = (
+        UniqueConstraint(
+            "server_number",
+            "round_id",
+            "player_id",
+            "role_family",
+            name="unique_autobalance_player_role_stats",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    server_number: Mapped[int] = mapped_column(nullable=False, index=True)
+    round_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    map_name: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    player_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    role_family: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    first_seen: Mapped[datetime] = mapped_column(TIMESTAMP, nullable=False)
+    last_seen: Mapped[datetime] = mapped_column(TIMESTAMP, nullable=False, index=True)
+    time_seconds: Mapped[int] = mapped_column(nullable=False, default=0)
+    kills: Mapped[int] = mapped_column(nullable=False, default=0)
+    deaths: Mapped[int] = mapped_column(nullable=False, default=0)
+    teamkills: Mapped[int] = mapped_column(nullable=False, default=0)
+    combat: Mapped[int] = mapped_column(nullable=False, default=0)
+    offense: Mapped[int] = mapped_column(nullable=False, default=0)
+    defense: Mapped[int] = mapped_column(nullable=False, default=0)
+    support: Mapped[int] = mapped_column(nullable=False, default=0)
+    valid_intervals: Mapped[int] = mapped_column(nullable=False, default=0)
+    ambiguous_intervals: Mapped[int] = mapped_column(nullable=False, default=0)
+    invalid_intervals: Mapped[int] = mapped_column(nullable=False, default=0)
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP, nullable=False, default=datetime.utcnow
     )
 
 
