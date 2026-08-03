@@ -27,6 +27,11 @@ return 0
 """
 
 
+def _decode_redis_text(value: Any) -> Any:
+    """Normalize values when CRCON's shared Redis pool was opened in byte mode."""
+    return value.decode("utf-8") if isinstance(value, bytes) else value
+
+
 class AutobalancerStore:
     """Namespaced Redis state shared by log hooks, API workers and the leader."""
 
@@ -90,7 +95,8 @@ class AutobalancerStore:
             self.red.delete(self.key("armed_player"))
 
     def is_armed_player(self, player_id: str | None) -> bool:
-        return bool(player_id and self.red.get(self.key("armed_player")) == player_id)
+        armed_player = _decode_redis_text(self.red.get(self.key("armed_player")))
+        return bool(player_id and armed_player == player_id)
 
     def acquire_leader(self, token: str, ttl: int = 30) -> bool:
         return bool(self.red.set(self.key("leader"), token, nx=True, ex=ttl))
@@ -132,8 +138,28 @@ class AutobalancerStore:
         result: list[dict[str, Any]] = []
         for _, entries in streams:
             for stream_id, fields in entries:
-                payload = json.loads(fields["payload"])
-                payload["type"] = fields["type"]
+                stream_id = _decode_redis_text(stream_id)
+                raw_payload = fields.get("payload", fields.get(b"payload"))
+                event_type = fields.get("type", fields.get(b"type"))
+                if raw_payload is None or event_type is None:
+                    logger.warning(
+                        "Skipping malformed autobalancer event %s with fields %s",
+                        stream_id,
+                        sorted(str(_decode_redis_text(key)) for key in fields),
+                    )
+                    result.append({"type": "invalid", "stream_id": stream_id})
+                    cursor = stream_id
+                    continue
+                try:
+                    payload = json.loads(_decode_redis_text(raw_payload))
+                except (json.JSONDecodeError, TypeError, UnicodeDecodeError):
+                    logger.warning(
+                        "Skipping malformed autobalancer event payload %s", stream_id
+                    )
+                    result.append({"type": "invalid", "stream_id": stream_id})
+                    cursor = stream_id
+                    continue
+                payload["type"] = _decode_redis_text(event_type)
                 payload["stream_id"] = stream_id
                 result.append(payload)
                 cursor = stream_id
