@@ -16,6 +16,7 @@ import rcon.user_config
 import rcon.user_config.utils
 import rcon.watch_killrate
 from rcon import auto_settings, broadcast, routines
+from rcon.autobalancer import service as autobalancer_service
 from rcon.automods import automod
 from rcon.blacklist import BlacklistCommandHandler
 from rcon.cache_utils import RedisCached, get_redis_pool, invalidates
@@ -59,6 +60,17 @@ def run_stats_loop():
         sys.exit(0)
     except:
         logger.exception("Stats loop stopped")
+        sys.exit(1)
+
+
+@cli.command(name="autobalancer")
+def run_autobalancer():
+    try:
+        autobalancer_service.run()
+    except KeyboardInterrupt:
+        sys.exit(0)
+    except Exception:
+        logger.exception("Autobalancer stopped")
         sys.exit(1)
 
 

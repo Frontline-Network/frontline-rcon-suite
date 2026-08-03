@@ -476,4 +476,13 @@ class RconUser(User):
                 "can_change_watch_killrate_config",
                 "Can change the Watch KillRate config",
             ),
+            ("can_view_autobalancer", "Can view autobalancer status and history"),
+            (
+                "can_change_autobalancer_config",
+                "Can change the autobalancer configuration",
+            ),
+            (
+                "can_execute_autobalancer",
+                "Can approve or cancel autobalancer incidents",
+            ),
         )

@@ -26,6 +26,7 @@ import StickyContainer from "@/components/shared/StickyContainer";
 import DisbandSquadDialog from "@/features/player-action/DisbandSquad";
 import { DebouncedSearchInput } from "@/components/shared/DebouncedSearchInput";
 import MessageAllDialog from "@/features/player-action/MessageAll";
+import AutobalancerCard from "./autobalancer-card";
 
 const TeamViewPage = () => {
   const { data: teams, isFetching } = useQuery({
@@ -274,6 +275,7 @@ const TeamViewPage = () => {
       ) : (
         <OverviewSkeleton />
       )}
+      <AutobalancerCard />
       <StickyContainer
         sx={{
           mb: 1,

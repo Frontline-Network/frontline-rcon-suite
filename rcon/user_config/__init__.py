@@ -10,6 +10,7 @@ if not os.getenv("HLL_MAINTENANCE_CONTAINER") and not os.getenv(
     # for exporting settings through the CLI
     from . import (
         auto_broadcast,
+        autobalancer,
         auto_kick,
         auto_mod_level,
         auto_mod_no_leader,

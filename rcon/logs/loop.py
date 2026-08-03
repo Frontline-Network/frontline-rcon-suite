@@ -67,6 +67,11 @@ def on_tk(func):
     return func
 
 
+def on_team_switch(func):
+    HOOKS[AllLogTypes.team_switch.value].append(func)
+    return func
+
+
 def on_chat(func):
     HOOKS[AllLogTypes.chat.value].append(func)
     HOOKS[AllLogTypes.axis_chat.value].append(func)

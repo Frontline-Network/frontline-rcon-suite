@@ -6,6 +6,7 @@ from django.urls import path
 from django.views.decorators.csrf import csrf_exempt
 
 from . import (
+    autobalancer,
     audit_log,
     auth,
     auto_settings,
@@ -89,6 +90,20 @@ endpoints: list[tuple[str, Callable]] = [
     ("login", auth.do_login),
     ("logout", auth.do_logout),
     ("get_historical_logs_csv", history.get_historical_logs_csv),
+    ("describe_autobalancer_config", autobalancer.describe_autobalancer_config),
+    ("get_autobalancer_config", autobalancer.get_autobalancer_config),
+    ("validate_autobalancer_config", autobalancer.validate_autobalancer_config),
+    ("set_autobalancer_config", autobalancer.set_autobalancer_config),
+    ("get_autobalancer_status", autobalancer.get_autobalancer_status),
+    (
+        "approve_autobalancer_proposal",
+        autobalancer.approve_autobalancer_proposal,
+    ),
+    (
+        "cancel_autobalancer_incident",
+        autobalancer.cancel_autobalancer_incident,
+    ),
+    ("get_autobalancer_history", autobalancer.get_autobalancer_history),
     ("is_logged_in", auth.is_logged_in),
     ("get_own_user_permissions", auth.get_own_user_permissions),
     ("get_services", services.get_services),
