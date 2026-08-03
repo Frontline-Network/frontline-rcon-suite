@@ -1,16 +1,31 @@
 const autobalancerNotes = `
-The fair autobalancer corrects persistent team-size differences while protecting
-commanders, recent joins and established squads. The native HLL autobalancer remains
-unchanged and should stay enabled as the first line of defence.
+Zweck
+Der faire Autobalancer korrigiert ein dauerhaftes Ungleichgewicht der Spielerzahlen.
+Er führt keine reinen Stärkewechsel durch, wenn die Spielerzahlen bereits ausgeglichen
+sind. Commander sind immer ausgeschlossen. Bestehende Squads werden möglichst geschützt.
 
-Modes:
-- disabled: no planning or messages (upstream default)
-- shadow: records proposals without messages or RCON actions (recommended pilot start)
-- manual: asks for volunteers and requires an admin approval
-- auto: asks for volunteers, then arms the selected player for a switch after death
+Betriebsarten
+- disabled: Der Dienst ist ausgeschaltet.
+- shadow: Nur beobachten und protokollieren. Keine Nachrichten und keine Teamwechsel.
+- manual: Freiwillige werden gesucht. Danach muss ein Admin den Vorschlag freigeben.
+- auto: Freiwillige werden gesucht. Danach wird automatisch ein Spieler ausgewählt.
+  Der tatsächliche Wechsel erfolgt trotzdem erst nach dessen nächstem Tod.
 
-For the FLN pilot set mode to "shadow" and configure history_server_numbers with all
-FLN server numbers whose completed-map statistics may be used.
+Wann beginnt ein Vorfall?
+Die erlaubte Teamdifferenz muss dauerhaft überschritten sein, die Mindestspielerzahl
+muss erreicht sein und die Runde muss außerhalb der Schutzzeit am Kartenanfang und
+Kartenende liegen. Ein einzelner Wechsel verändert die Teamdifferenz um zwei Spieler.
+
+Sicherheitsregeln
+- Niemals Commander automatisch verschieben.
+- Neu verbundene und kürzlich verschobene Spieler schützen.
+- Pro Vorfall nur die konfigurierte Höchstzahl an Wechseln.
+- Nach jedem Wechsel Teamzahlen und Kandidaten vollständig neu berechnen.
+- Der native HLL-Autobalancer bleibt unverändert und sollte eingeschaltet bleiben.
+
+FLN-Pilot
+Empfohlen ist zunächst mode = "shadow". history_server_numbers sollte [1, 2] enthalten.
+Vorschläge und Blockierungsgründe sind in der Teamansicht sichtbar.
 `;
 
 export default autobalancerNotes;

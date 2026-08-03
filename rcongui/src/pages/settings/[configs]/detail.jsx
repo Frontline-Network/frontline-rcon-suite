@@ -24,6 +24,7 @@ import { customRenderers } from "@/pages/settings/[configs]/renderer/renderer";
 import { isFakeMode } from "@/mirage/demo-data";
 import { useTranslation } from "react-i18next";
 import i18n from "@/i18n";
+import AutobalancerHelp from "@/pages/settings/[configs]/autobalancer-help";
 
 const Editor = lazy(() => import("@monaco-editor/react"));
 
@@ -166,6 +167,7 @@ const ConfigPage = () => {
   const actionData = useActionData();
   const submit = useSubmit();
   const theme = useTheme();
+  const isAutobalancer = command === "autobalancer_config";
 
   useEffect(() => {
     setEditorContent(JSON.stringify(data, null, 2));
@@ -222,13 +224,13 @@ const ConfigPage = () => {
               variant={mode === "visual" ? "contained" : "outlined"}
               onClick={() => updateMode("visual")}
             >
-              {t("settings.config.visual")}
+              {isAutobalancer ? "Einfache Ansicht" : t("settings.config.visual")}
             </Button>
             <Button
               variant={mode === "code" ? "contained" : "outlined"}
               onClick={() => updateMode("code")}
             >
-              {t("settings.config.code")}
+              {isAutobalancer ? "Erweitert (JSON)" : t("settings.config.code")}
             </Button>
           </ButtonGroup>
         </Stack>
@@ -243,6 +245,9 @@ const ConfigPage = () => {
                 customStyle={{ border: `2px solid ${red["600"]}` }}
               />
             </Box>
+          )}
+          {isAutobalancer && (
+            <AutobalancerHelp config={jsonData} />
           )}
           {mode === "visual" ? (
             <Box sx={{
@@ -281,17 +286,19 @@ const ConfigPage = () => {
           )}
           <Stack direction={"row"} spacing={1}>
             <Button variant={"outlined"} onClick={handleRefresh}>
-              {t("common.refresh")}
+              {isAutobalancer ? "Neu laden" : t("common.refresh")}
             </Button>
             <Button variant={"contained"} type="submit">
-              {t("settings.config.submit")}
+              {isAutobalancer ? "Einstellungen speichern" : "Submit"}
             </Button>
           </Stack>
         </Stack>
       </Form>
       {mode === "code" ? (
         <>
-          <Typography variant="h4">{t("settings.config.documentation")}</Typography>
+          <Typography variant="h4">
+            {isAutobalancer ? "Erklärung" : t("settings.config.documentation")}
+          </Typography>
           <CopyBlock
             wrapLongLines
             text={note}
@@ -299,7 +306,9 @@ const ConfigPage = () => {
             wrapLines
             theme={theme.palette.mode === "dark" ? a11yDark : a11yLight}
           />
-          <Typography variant="h4">{t("settings.config.modelSchema")}</Typography>
+          <Typography variant="h4">
+            {isAutobalancer ? "Technisches Schema" : t("settings.config.modelSchema")}
+          </Typography>
           <CopyBlock
             wrapLongLines
             text={JSON.stringify(schema, null, 2)}
