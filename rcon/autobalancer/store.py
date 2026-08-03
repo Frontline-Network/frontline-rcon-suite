@@ -12,6 +12,10 @@ from rcon.utils import get_server_number
 
 logger = logging.getLogger(__name__)
 
+STATUS_HISTORY_SAMPLE_SECONDS = 30
+STATUS_HISTORY_MAX_SAMPLES = 2880
+STATUS_HISTORY_TTL_SECONDS = 48 * 3600
+
 RENEW_LEADER_SCRIPT = """
 if redis.call('get', KEYS[1]) == ARGV[1] then
     return redis.call('expire', KEYS[1], ARGV[2])
@@ -64,6 +68,27 @@ class AutobalancerStore:
 
     def save_status(self, status: dict[str, Any]) -> None:
         self.red.set(self.key("status"), json.dumps(status, default=str), ex=60)
+        if self.red.set(
+            self.key("status_history_gate"),
+            "1",
+            nx=True,
+            ex=STATUS_HISTORY_SAMPLE_SECONDS,
+        ):
+            sample = {
+                "updated_at": status.get("updated_at")
+                or datetime.utcnow().isoformat(),
+                "round_id": status.get("round_id"),
+                "mode": status.get("mode"),
+                "phase": status.get("phase"),
+                "team_counts": status.get("team_counts"),
+                "team_difference": status.get("team_difference"),
+                "required_switches": status.get("required_switches"),
+                "block_reasons": status.get("block_reasons") or [],
+            }
+            history_key = self.key("status_history")
+            self.red.lpush(history_key, json.dumps(sample, default=str))
+            self.red.ltrim(history_key, 0, STATUS_HISTORY_MAX_SAMPLES - 1)
+            self.red.expire(history_key, STATUS_HISTORY_TTL_SECONDS)
 
     def load_status(self) -> dict[str, Any]:
         raw = self.red.get(self.key("status"))
@@ -78,6 +103,21 @@ class AutobalancerStore:
                 ],
             }
         )
+
+    def load_status_history(self, limit: int = 720) -> list[dict[str, Any]]:
+        raw_samples = self.red.lrange(
+            self.key("status_history"), 0, min(max(1, limit), 2880) - 1
+        )
+        samples: list[dict[str, Any]] = []
+        for raw_sample in reversed(raw_samples):
+            try:
+                sample = json.loads(_decode_redis_text(raw_sample))
+            except (json.JSONDecodeError, TypeError, UnicodeDecodeError):
+                logger.warning("Skipping malformed autobalancer status history sample")
+                continue
+            if isinstance(sample.get("team_difference"), int):
+                samples.append(sample)
+        return samples
 
     def set_active(self, active: bool) -> None:
         if active:

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, time, timedelta, timezone
 
 from django.views.decorators.csrf import csrf_exempt
 
+from rcon.autobalancer.history import RoundHistoryRepository
 from rcon.autobalancer.models import Phase
 from rcon.autobalancer.repository import DecisionRepository
 from rcon.autobalancer.store import AutobalancerStore
@@ -47,6 +48,19 @@ def validate_shadow_review(data):
 
 def _repository() -> DecisionRepository:
     return DecisionRepository(int(get_server_number()))
+
+
+def _history_date(value, *, end_of_day: bool = False):
+    if not value:
+        return None
+    parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    if len(str(value)) == 10:
+        parsed = datetime.combine(parsed.date(), time.min)
+        if end_of_day:
+            parsed += timedelta(days=1)
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    return parsed
 
 
 @csrf_exempt
@@ -249,9 +263,70 @@ def get_autobalancer_shadow_overview(request):
         limit=limit,
         round_id=data.get("round_id") or None,
     )
+    try:
+        timeline_limit = int(data.get("timeline_limit") or 720)
+    except (TypeError, ValueError):
+        timeline_limit = 720
+    store = AutobalancerStore()
+    result["live_status"] = store.load_status()
+    result["timeline"] = store.load_status_history(limit=timeline_limit)
     return api_response(
         result=result,
         command="get_autobalancer_shadow_overview",
+        failed=False,
+    )
+
+
+@csrf_exempt
+@login_required()
+@permission_required("api.can_view_autobalancer", raise_exception=True)
+@require_http_methods(["GET"])
+def get_autobalancer_round_archive(request):
+    data = _get_data(request)
+    try:
+        page = int(data.get("page") or 1)
+        limit = int(data.get("limit") or 12)
+        map_id = int(data["map_id"]) if data.get("map_id") else None
+        date_from = _history_date(data.get("date_from"))
+        date_to = _history_date(data.get("date_to"), end_of_day=True)
+    except (TypeError, ValueError):
+        return api_response(
+            result=None,
+            command="get_autobalancer_round_archive",
+            failed=True,
+            error="Ungültige Suchparameter",
+        )
+
+    repository = RoundHistoryRepository(int(get_server_number()))
+    result = repository.search(
+        page=page,
+        limit=limit,
+        search=str(data.get("search") or "").strip() or None,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    result["analysis"] = None
+    if map_id is not None:
+        config = AutobalancerUserConfig.load_from_db()
+        result["analysis"] = repository.analyze(
+            map_id,
+            target_difference=config.target_difference,
+            minimum_players=config.minimum_players,
+            round_start_protection_seconds=config.map_start_grace_minutes * 60,
+            round_end_protection_seconds=config.map_end_guard_minutes * 60,
+            stable_difference_seconds=config.stable_difference_seconds,
+        )
+        if result["analysis"] is None:
+            return api_response(
+                result=None,
+                command="get_autobalancer_round_archive",
+                failed=True,
+                error="Runde wurde auf diesem Server nicht gefunden",
+            )
+
+    return api_response(
+        result=result,
+        command="get_autobalancer_round_archive",
         failed=False,
     )
 
