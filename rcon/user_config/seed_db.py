@@ -3,6 +3,7 @@ import logging
 from rcon.models import enter_session
 from rcon.user_config import auto_settings
 from rcon.user_config.auto_broadcast import AutoBroadcastUserConfig
+from rcon.user_config.autobalancer import AutobalancerUserConfig
 from rcon.user_config.auto_kick import AutoVoteKickUserConfig
 from rcon.user_config.auto_mod_level import AutoModLevelUserConfig
 from rcon.user_config.auto_mod_no_leader import AutoModNoLeaderUserConfig
@@ -51,6 +52,7 @@ def seed_default_config():
             AdminPingWebhooksUserConfig.seed_db(sess)
             AuditWebhooksUserConfig.seed_db(sess)
             AutoBroadcastUserConfig.seed_db(sess)
+            AutobalancerUserConfig.seed_db(sess)
             AutoModLevelUserConfig.seed_db(sess)
             AutoModNoLeaderUserConfig.seed_db(sess)
             AutoModNoSoloTankUserConfig.seed_db(sess)

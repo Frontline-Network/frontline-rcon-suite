@@ -48,6 +48,7 @@ import DvrIcon from "@mui/icons-material/Dvr";
 import OndemandVideoIcon from "@mui/icons-material/OndemandVideo";
 import MilitaryTechIcon from "@mui/icons-material/MilitaryTech";
 import SearchIcon from "@mui/icons-material/Search";
+import BalanceIcon from "@mui/icons-material/Balance";
 
 const rawNavMenus = [
   {
@@ -264,6 +265,11 @@ const rawNavMenus = [
     name: "Others",
     icon: <MiscellaneousServicesIcon />,
     links: [
+      {
+        name: "Fair Autobalancer",
+        to: "/settings/others/autobalancer",
+        icon: <BalanceIcon />,
+      },
       {
         name: "Seeder VIP Reward",
         to: "/settings/others/seed-vip",

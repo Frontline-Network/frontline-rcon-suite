@@ -937,6 +937,71 @@ class PlayerStats(Base):
         }
 
 
+class AutobalanceDecision(Base):
+    """Append-friendly audit record for every autobalancer proposal and outcome."""
+
+    __tablename__ = "autobalance_decisions"
+    __table_args__ = (
+        UniqueConstraint("decision_id", name="unique_autobalance_decision_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    decision_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    incident_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    server_number: Mapped[int] = mapped_column(nullable=False, index=True)
+    round_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    round_started_at: Mapped[datetime] = mapped_column(TIMESTAMP, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP, nullable=False, default=datetime.utcnow, index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP, nullable=False, default=datetime.utcnow
+    )
+    mode: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    source_team: Mapped[str] = mapped_column(String, nullable=False)
+    target_team: Mapped[str] = mapped_column(String, nullable=False)
+    player_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    player_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    volunteer: Mapped[bool] = mapped_column(nullable=False, default=False)
+    protection_tier: Mapped[int | None] = mapped_column(nullable=True)
+    rating: Mapped[float | None] = mapped_column(nullable=True)
+    rating_confidence: Mapped[float | None] = mapped_column(nullable=True)
+    reason: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    before_snapshot: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, default=dict
+    )
+    after_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    approved_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    executed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP, nullable=True)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "decision_id": self.decision_id,
+            "incident_id": self.incident_id,
+            "server_number": self.server_number,
+            "round_id": self.round_id,
+            "round_started_at": self.round_started_at,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "mode": self.mode,
+            "status": self.status,
+            "source_team": self.source_team,
+            "target_team": self.target_team,
+            "player_id": self.player_id,
+            "player_name": self.player_name,
+            "volunteer": self.volunteer,
+            "protection_tier": self.protection_tier,
+            "rating": self.rating,
+            "rating_confidence": self.rating_confidence,
+            "reason": self.reason,
+            "before_snapshot": self.before_snapshot,
+            "after_snapshot": self.after_snapshot,
+            "approved_by": self.approved_by,
+            "executed_at": self.executed_at,
+        }
+
+
 class PlayerComment(Base):
     __tablename__ = "player_comments"
     id: Mapped[int] = mapped_column(primary_key=True)

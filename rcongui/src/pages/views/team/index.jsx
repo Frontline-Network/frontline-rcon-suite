@@ -29,6 +29,7 @@ import MessageAllDialog from "@/features/player-action/MessageAll";
 import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/shared/PageHeader";
 import { demoGameState, isFakeMode } from "@/mirage/demo-data";
+import AutobalancerCard from "./autobalancer-card";
 
 const TeamViewPage = () => {
   const { t } = useTranslation();
@@ -283,6 +284,7 @@ const TeamViewPage = () => {
       ) : (
         <OverviewSkeleton />
       )}
+      <AutobalancerCard />
       <StickyContainer
         sx={{
           mb: 1,

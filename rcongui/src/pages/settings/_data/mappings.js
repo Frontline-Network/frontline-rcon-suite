@@ -72,6 +72,11 @@ export const automods = [
 
 export const others = [
   {
+    path: "/settings/others/autobalancer",
+    command: "autobalancer_config",
+    name: "Fair Autobalancer",
+  },
+  {
     path: "/settings/others/seed-vip",
     command: "seed_vip_config",
     name: "Seeder VIP Reward",
