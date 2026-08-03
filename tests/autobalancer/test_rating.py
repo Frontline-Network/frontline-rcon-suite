@@ -18,7 +18,6 @@ from rcon.autobalancer.rating import (
     role_normalized_percentiles,
 )
 
-
 NOW = datetime(2026, 8, 4, tzinfo=timezone.utc)
 
 
@@ -65,7 +64,10 @@ def test_percentile_and_five_ninety_five_winsorization():
 @pytest.mark.parametrize(
     "player,expected",
     [
-        (PlayerSnapshot("rifle", "Rifle", "allies", role="rifleman"), "combat_infantry"),
+        (
+            PlayerSnapshot("rifle", "Rifle", "allies", role="rifleman"),
+            "combat_infantry",
+        ),
         (PlayerSnapshot("support", "Support", "allies", role="support"), "support"),
         (PlayerSnapshot("engineer", "Engineer", "allies", role="engineer"), "support"),
         (PlayerSnapshot("medic", "Medic", "allies", role="medic"), "support"),
@@ -73,7 +75,10 @@ def test_percentile_and_five_ninety_five_winsorization():
         (PlayerSnapshot("tank", "Tank", "allies", unit_type="armor"), "specialist"),
         (PlayerSnapshot("recon", "Recon", "allies", role="sniper"), "specialist"),
         (PlayerSnapshot("arty", "Arty", "allies", unit_type="artillery"), "specialist"),
-        (PlayerSnapshot("commander", "Commander", "allies", role="armycommander"), "commander"),
+        (
+            PlayerSnapshot("commander", "Commander", "allies", role="armycommander"),
+            "commander",
+        ),
     ],
 )
 def test_role_family_mapping(player, expected):

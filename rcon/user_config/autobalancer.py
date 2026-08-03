@@ -189,9 +189,7 @@ class AutobalancerUserConfig(BaseUserConfig):
         ge=1,
         le=30,
         title="Maximales Alter eines Todesereignisses (Sekunden)",
-        description=(
-            "Nur ein frischer Tod darf einen vorgemerkten Wechsel auslösen."
-        ),
+        description=("Nur ein frischer Tod darf einen vorgemerkten Wechsel auslösen."),
     )
     switch_confirmation_timeout_seconds: int = Field(
         default=15,

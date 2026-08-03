@@ -151,17 +151,13 @@ def summarize_shadow_decisions(
     """Build a compact, privacy-conscious dashboard payload from audit records."""
     items = [_shadow_decision_summary(decision) for decision in decisions]
     reviewed = [
-        item
-        for item in items
-        if item["review_verdict"] in {"accepted", "rejected"}
+        item for item in items if item["review_verdict"] in {"accepted", "rejected"}
     ]
     accepted = sum(item["review_verdict"] == "accepted" for item in reviewed)
     rejected = len(reviewed) - accepted
     acceptance_rate = accepted / len(reviewed) if reviewed else None
     round_ids = {item["round_id"] for item in items if item["round_id"]}
-    reviewed_round_ids = {
-        item["round_id"] for item in reviewed if item["round_id"]
-    }
+    reviewed_round_ids = {item["round_id"] for item in reviewed if item["round_id"]}
     tier_counts = Counter(
         str(item["protection_tier"])
         for item in items
@@ -188,14 +184,11 @@ def summarize_shadow_decisions(
         and item["projected_rating_gap"] is not None
     ]
     gap_guardrail_passes = sum(
-        float(item["projected_rating_gap"])
-        <= float(item["rating_gap_before"]) + 2.0
+        float(item["projected_rating_gap"]) <= float(item["rating_gap_before"]) + 2.0
         for item in gap_guardrail_items
     )
     gap_guardrail_rate = (
-        gap_guardrail_passes / len(gap_guardrail_items)
-        if gap_guardrail_items
-        else None
+        gap_guardrail_passes / len(gap_guardrail_items) if gap_guardrail_items else None
     )
     median_confidence = median(confidences) if confidences else None
     goals = {
@@ -206,8 +199,7 @@ def summarize_shadow_decisions(
         "gap_guardrail_target": 0.95,
         "reviewed_rounds_met": len(reviewed_round_ids) >= 10,
         "reviewed_proposals_met": len(reviewed) >= 20,
-        "acceptance_rate_met": acceptance_rate is not None
-        and acceptance_rate >= 0.9,
+        "acceptance_rate_met": acceptance_rate is not None and acceptance_rate >= 0.9,
         "rating_confidence_met": median_confidence is not None
         and median_confidence >= 0.6,
         "gap_guardrail_met": gap_guardrail_rate is not None
@@ -241,9 +233,7 @@ def summarize_shadow_decisions(
             ),
             "median_rating_confidence": median_confidence,
             "strategy_agreement_rate": (
-                strategy_agreements / len(strategy_items)
-                if strategy_items
-                else None
+                strategy_agreements / len(strategy_items) if strategy_items else None
             ),
             "gap_guardrail_rate": gap_guardrail_rate,
             "rule_warning_proposals": rule_warning_proposals,

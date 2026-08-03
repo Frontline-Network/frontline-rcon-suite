@@ -188,7 +188,9 @@ class AutobalancerService:
             and now.timestamp() - cache["loaded_at"] < 60
         ):
             return cache["value"]
-        value = load_history(list(player_ids), history_servers, now=now.replace(tzinfo=None))
+        value = load_history(
+            list(player_ids), history_servers, now=now.replace(tzinfo=None)
+        )
         self._history_cache = {
             "player_ids": player_ids,
             "servers": tuple(history_servers),
@@ -507,8 +509,7 @@ class AutobalancerService:
                             and snapshot.stable_map
                         ),
                         "simulated_difference_after_first": abs(
-                            snapshot.difference
-                            - (2 if snapshot.difference > 0 else -2)
+                            snapshot.difference - (2 if snapshot.difference > 0 else -2)
                         ),
                     },
                     "strategies": {
