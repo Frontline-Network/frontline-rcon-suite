@@ -126,7 +126,9 @@ def service():
 
 def test_shadow_creates_audit_proposal_without_messages_or_rcon(monkeypatch):
     instance = service()
-    monkeypatch.setattr("rcon.autobalancer.service.load_history", lambda *args: {})
+    monkeypatch.setattr(
+        "rcon.autobalancer.service.load_history", lambda *args, **kwargs: {}
+    )
     config = AutobalancerUserConfig(
         mode="shadow",
         minimum_players=0,
@@ -275,7 +277,9 @@ def test_commander_role_change_cancels_armed_candidate():
 
 def test_incomplete_snapshot_blocks_all_actions(monkeypatch):
     instance = service()
-    monkeypatch.setattr("rcon.autobalancer.service.load_history", lambda *args: {})
+    monkeypatch.setattr(
+        "rcon.autobalancer.service.load_history", lambda *args, **kwargs: {}
+    )
     config = AutobalancerUserConfig(
         mode="auto",
         minimum_players=0,
@@ -339,7 +343,9 @@ def test_candidate_timeout_aborts_without_rcon_action():
 
 def test_direction_change_invalidates_existing_incident(monkeypatch):
     instance = service()
-    monkeypatch.setattr("rcon.autobalancer.service.load_history", lambda *args: {})
+    monkeypatch.setattr(
+        "rcon.autobalancer.service.load_history", lambda *args, **kwargs: {}
+    )
     now = datetime.fromtimestamp(3000, timezone.utc)
     instance.store.state = {
         "phase": Phase.ARMED,
@@ -366,7 +372,9 @@ def test_direction_change_invalidates_existing_incident(monkeypatch):
 
 def test_map_change_invalidates_existing_incident(monkeypatch):
     instance = service()
-    monkeypatch.setattr("rcon.autobalancer.service.load_history", lambda *args: {})
+    monkeypatch.setattr(
+        "rcon.autobalancer.service.load_history", lambda *args, **kwargs: {}
+    )
     now = datetime.fromtimestamp(3000, timezone.utc)
     instance.store.state = {
         "phase": Phase.PROPOSED,
