@@ -6,9 +6,18 @@ import {
   useRevalidator,
   useSubmit,
 } from "react-router-dom";
-import {lazy, Suspense, useEffect, useState} from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { execute, get, handleHttpError } from "@/utils/fetchUtils";
-import { Box, Button, Stack, Typography, useTheme } from "@mui/material";
+import {
+  Box,
+  Button,
+  Collapse,
+  Stack,
+  Typography,
+  useTheme,
+} from "@mui/material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import SettingsIcon from "@mui/icons-material/Settings";
 import { a11yDark, a11yLight, CopyBlock } from "react-code-blocks";
 import { toast } from "react-toastify";
 import { red } from "@mui/material/colors";
@@ -144,6 +153,7 @@ const ConfigPage = () => {
   const [jsonData, setJsonData] = useState(data);
   const [editorContent, setEditorContent] = useState("");
   const [mode, setMode] = useState("visual");
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const revalidator = useRevalidator();
   const actionData = useActionData();
   const submit = useSubmit();
@@ -197,116 +207,146 @@ const ConfigPage = () => {
 
   return (
     <Stack direction={"column"} spacing={4}>
+      {isAutobalancer && <AutobalancerShadowOverview config={jsonData} />}
       {isAutobalancer && (
-        <AutobalancerShadowOverview config={jsonData} />
+        <Button
+          fullWidth
+          size="large"
+          variant="outlined"
+          startIcon={<SettingsIcon />}
+          endIcon={<ExpandMoreIcon />}
+          onClick={() => setSettingsOpen((open) => !open)}
+          sx={{
+            justifyContent: "flex-start",
+            py: 1.5,
+            "& .MuiButton-endIcon": {
+              ml: "auto",
+              transform: settingsOpen ? "rotate(180deg)" : "rotate(0deg)",
+              transition: "transform 160ms ease",
+            },
+          }}
+        >
+          {settingsOpen
+            ? "Einstellungen schließen"
+            : `Einstellungen öffnen · Modus ${jsonData?.mode || "unbekannt"}`}
+        </Button>
       )}
-      <Form method="post" onSubmit={handleSubmit}>
-        <Stack direction={"row"} justifyContent={"space-between"}>
-          <Typography variant="h3">{name}</Typography>
-          <ButtonGroup variant="outlined">
-            <Button
-              variant={mode === "visual" ? "contained" : "outlined"}
-              onClick={() => updateMode("visual")}
-            >
-              {isAutobalancer ? "Einfache Ansicht" : "Visual"}
-            </Button>
-            <Button
-              variant={mode === "code" ? "contained" : "outlined"}
-              onClick={() => updateMode("code")}
-            >
-              {isAutobalancer ? "Erweitert (JSON)" : "Code"}
-            </Button>
-          </ButtonGroup>
-        </Stack>
-        <Stack spacing={2} direction={"column"}>
-          {validationErrors && (
-            <Box sx={{ mb: 2 }}>
+      <Collapse
+        in={!isAutobalancer || settingsOpen}
+        timeout="auto"
+        unmountOnExit={isAutobalancer}
+      >
+        <Stack spacing={4}>
+          <Form method="post" onSubmit={handleSubmit}>
+            <Stack direction={"row"} justifyContent={"space-between"}>
+              <Typography variant="h3">{name}</Typography>
+              <ButtonGroup variant="outlined">
+                <Button
+                  variant={mode === "visual" ? "contained" : "outlined"}
+                  onClick={() => updateMode("visual")}
+                >
+                  {isAutobalancer ? "Einfache Ansicht" : "Visual"}
+                </Button>
+                <Button
+                  variant={mode === "code" ? "contained" : "outlined"}
+                  onClick={() => updateMode("code")}
+                >
+                  {isAutobalancer ? "Erweitert (JSON)" : "Code"}
+                </Button>
+              </ButtonGroup>
+            </Stack>
+            <Stack spacing={2} direction={"column"}>
+              {validationErrors && (
+                <Box sx={{ mb: 2 }}>
+                  <CopyBlock
+                    wrapLongLines
+                    text={JSON.stringify(validationErrors, null, 2)}
+                    language="json"
+                    theme={theme.palette.mode === "dark" ? a11yDark : a11yLight}
+                    customStyle={{ border: `2px solid ${red["600"]}` }}
+                  />
+                </Box>
+              )}
+              {isAutobalancer && <AutobalancerHelp config={jsonData} />}
+              {mode === "visual" ? (
+                <Box
+                  sx={{
+                    "& .MuiFormControl-root": {
+                      marginTop: "14px",
+                    },
+                  }}
+                >
+                  <JsonForms
+                    data={jsonData}
+                    onChange={({ data }) => {
+                      setEditorContent(JSON.stringify(data, null, 2));
+                      setJsonData(data);
+                    }}
+                    sx={{
+                      "& .jfa-label": {
+                        fontSize: "14px",
+                      },
+                    }}
+                    schema={schema}
+                    uischema={Generate.uiSchema(schema)}
+                    renderers={[...customRenderers, ...materialRenderers]}
+                    cells={materialCells}
+                  />
+                </Box>
+              ) : (
+                <Suspense>
+                  <Editor
+                    height="70vh"
+                    defaultLanguage="json"
+                    value={editorContent}
+                    defaultValue=""
+                    theme={
+                      theme.palette.mode === "dark" ? "vs-dark" : "vs-light"
+                    }
+                    onChange={(value) => setEditorContent(value)}
+                  />
+                </Suspense>
+              )}
+              <Stack direction={"row"} spacing={1}>
+                <Button variant={"outlined"} onClick={handleRefresh}>
+                  {isAutobalancer ? "Neu laden" : "Refresh"}
+                </Button>
+                <Button variant={"contained"} type="submit">
+                  {isAutobalancer ? "Einstellungen speichern" : "Submit"}
+                </Button>
+              </Stack>
+            </Stack>
+          </Form>
+          {mode === "code" ? (
+            <>
+              <Typography variant="h4">
+                {isAutobalancer ? "Erklärung" : "Documentation"}
+              </Typography>
               <CopyBlock
                 wrapLongLines
-                text={JSON.stringify(validationErrors, null, 2)}
+                text={note}
                 language="json"
+                wrapLines
                 theme={theme.palette.mode === "dark" ? a11yDark : a11yLight}
-                customStyle={{ border: `2px solid ${red["600"]}` }}
               />
-            </Box>
-          )}
-          {isAutobalancer && (
-            <AutobalancerHelp config={jsonData} />
-          )}
-          {mode === "visual" ? (
-            <Box sx={{
-              "& .MuiFormControl-root": {
-                marginTop: "14px",
-              },
-            }}>
-              <JsonForms
-              data={jsonData}
-              onChange={({ data }) => {
-                setEditorContent(JSON.stringify(data, null, 2));
-                setJsonData(data);
-              }}
-              sx={{
-                "& .jfa-label": {
-                  fontSize: "14px",
-                },
-              }}
-              schema={schema}
-              uischema={Generate.uiSchema(schema)}
-              renderers={[...customRenderers, ...materialRenderers]}
-              cells={materialCells}
-            />
-            </Box>
+              <Typography variant="h4">
+                {isAutobalancer ? "Technisches Schema" : "Model Schema"}
+              </Typography>
+              <CopyBlock
+                wrapLongLines
+                text={JSON.stringify(schema, null, 2)}
+                language="json"
+                wrapLines
+                theme={theme.palette.mode === "dark" ? a11yDark : a11yLight}
+              />
+            </>
           ) : (
-            <Suspense>
-              <Editor
-                height="70vh"
-                defaultLanguage="json"
-                value={editorContent}
-                defaultValue=""
-                theme={theme.palette.mode === "dark" ? "vs-dark" : "vs-light"}
-                onChange={(value) => setEditorContent(value)}
-              />
-            </Suspense>
+            <></>
           )}
-          <Stack direction={"row"} spacing={1}>
-            <Button variant={"outlined"} onClick={handleRefresh}>
-              {isAutobalancer ? "Neu laden" : "Refresh"}
-            </Button>
-            <Button variant={"contained"} type="submit">
-              {isAutobalancer ? "Einstellungen speichern" : "Submit"}
-            </Button>
-          </Stack>
         </Stack>
-      </Form>
-      {mode === "code" ? (
-        <>
-          <Typography variant="h4">
-            {isAutobalancer ? "Erklärung" : "Documentation"}
-          </Typography>
-          <CopyBlock
-            wrapLongLines
-            text={note}
-            language="json"
-            wrapLines
-            theme={theme.palette.mode === "dark" ? a11yDark : a11yLight}
-          />
-          <Typography variant="h4">
-            {isAutobalancer ? "Technisches Schema" : "Model Schema"}
-          </Typography>
-          <CopyBlock
-            wrapLongLines
-            text={JSON.stringify(schema, null, 2)}
-            language="json"
-            wrapLines
-            theme={theme.palette.mode === "dark" ? a11yDark : a11yLight}
-          />
-        </>
-      ) : (
-        <></>
-      )}
+      </Collapse>
     </Stack>
   );
 };
-
 
 export default ConfigPage;

@@ -328,186 +328,211 @@ const AutobalancerShadowOverview = ({ config }) => {
           </AccordionDetails>
         </Accordion>
 
-        <Typography variant="h5" sx={{ mt: 3, mb: 0.5 }}>
-          Einzelne Vorschläge prüfen
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          Aufklappen, Kandidat prüfen und bewerten.
-        </Typography>
+        <Accordion sx={{ mt: 2 }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1}
+              alignItems={{ sm: "center" }}
+            >
+              <Typography sx={{ fontWeight: 700 }}>
+                Einzelne Shadow-Vorschläge prüfen
+              </Typography>
+              <Chip
+                size="small"
+                label={`${summary.pending_review ?? 0} offen · ${
+                  summary.proposals ?? 0
+                } gesamt`}
+              />
+            </Stack>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              Nur öffnen, wenn Kandidaten im Detail geprüft oder bewertet werden
+              sollen.
+            </Typography>
 
-        {!decisions.length && (
-          <Alert severity="info">
-            Es gibt noch keinen Shadow-Vorschlag. Ein Eintrag entsteht erst,
-            wenn mindestens 40 Spieler online sind, die Teamdifferenz größer als
-            2 ist und 45 Sekunden stabil bleibt – außerhalb der Schutzzeiten am
-            Kartenanfang und Kartenende.
-          </Alert>
-        )}
+            {!decisions.length && (
+              <Alert severity="info">
+                Es gibt noch keinen Shadow-Vorschlag. Ein Eintrag entsteht erst,
+                wenn mindestens 40 Spieler online sind, die Teamdifferenz größer
+                als 2 ist und 45 Sekunden stabil bleibt – außerhalb der
+                Schutzzeiten am Kartenanfang und Kartenende.
+              </Alert>
+            )}
 
-        {decisions.map((decision) => {
-          const verdict = decision.review_verdict;
-          return (
-            <Accordion key={decision.decision_id} disableGutters>
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Stack
-                  direction={{ xs: "column", md: "row" }}
-                  spacing={{ xs: 0.25, md: 1 }}
-                  alignItems={{ md: "center" }}
-                  sx={{ width: "100%", pr: 1 }}
-                >
-                  <Typography variant="body2" color="text.secondary">
-                    {formatDate(decision.created_at)}
-                  </Typography>
-                  <Typography sx={{ fontWeight: 700 }}>
-                    {decision.map_name || "Unbekannte Karte"} · Allies{" "}
-                    {decision.allies_count ?? "–"}:{decision.axis_count ?? "–"}{" "}
-                    Axis
-                  </Typography>
-                  <Typography sx={{ flexGrow: 1 }}>
-                    Kandidat: {decision.player_name || "unbekannt"}
-                  </Typography>
-                  <Chip
-                    size="small"
-                    color={
-                      verdict === "accepted"
-                        ? "success"
-                        : verdict === "rejected"
-                        ? "warning"
-                        : "default"
-                    }
-                    label={
-                      verdict === "accepted"
-                        ? "Akzeptabel"
-                        : verdict === "rejected"
-                        ? "Nicht akzeptabel"
-                        : "Offen"
-                    }
-                  />
-                </Stack>
-              </AccordionSummary>
-              <AccordionDetails>
-                <Box
-                  sx={{
-                    display: "grid",
-                    gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-                    gap: 2,
-                  }}
-                >
-                  <Box>
-                    <Typography variant="subtitle2">Ausgangslage</Typography>
-                    <Typography variant="body2">
-                      Differenz {decision.difference ?? "–"}; geplant waren{" "}
-                      {decision.required_switches ?? "–"} Wechsel von{" "}
-                      {TEAM_LABELS[decision.source_team] ||
-                        decision.source_team}{" "}
-                      zu{" "}
-                      {TEAM_LABELS[decision.target_team] ||
-                        decision.target_team}
-                      .
-                    </Typography>
-                    <Typography variant="body2" sx={{ mt: 1 }}>
-                      <strong>Auswahlgrund:</strong>{" "}
-                      {decision.selection_reason || "nicht gespeichert"}
-                    </Typography>
-                    <Typography variant="body2">
-                      <strong>Schutz:</strong>{" "}
-                      {TIER_LABELS[decision.protection_tier] ||
-                        `Stufe ${decision.protection_tier ?? "–"}`}
-                      {decision.volunteer ? " · freiwillig" : ""}
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="subtitle2">
-                      Kandidat im Snapshot
-                    </Typography>
-                    <Typography variant="body2">
-                      Squad {decision.unit_name || "nicht zugewiesen"} ·{" "}
-                      {decision.unit_type || "unbekannter Typ"} ·{" "}
-                      {decision.unit_size ?? "?"} Spieler
-                    </Typography>
-                    <Typography variant="body2">
-                      Rolle {decision.role || "unbekannt"}
-                      {decision.is_leader ? " · Squad Leader" : ""} · verbunden
-                      seit {formatMinutes(decision.connected_seconds)} · im
-                      Squad seit {formatMinutes(decision.squad_seconds)}
-                    </Typography>
-                    <Typography variant="body2" sx={{ mt: 1 }}>
-                      Stärke {Math.round(decision.rating ?? 50)}/100 · Vertrauen{" "}
-                      {formatPercent(decision.rating_confidence)} · projizierte
-                      Ratingdifferenz {decision.projected_rating_gap ?? "–"}
-                    </Typography>
-                  </Box>
-                </Box>
-
-                {(decision.audit_warnings || []).map((warning) => (
-                  <Alert key={warning} severity="error" sx={{ mt: 1 }}>
-                    Automatische Regelwarnung: {warning}
-                  </Alert>
-                ))}
-
-                {verdict && (
-                  <Alert
-                    severity={verdict === "accepted" ? "success" : "warning"}
-                    sx={{ mt: 1.5 }}
-                  >
-                    Bewertung von {decision.reviewed_by || "Admin"} am{" "}
-                    {formatDate(decision.reviewed_at)}:{" "}
-                    {verdict === "accepted"
-                      ? "Kandidat war akzeptabel."
-                      : REJECTION_LABELS[decision.review_category] ||
-                        "Nicht akzeptabel."}
-                    {decision.review_comment
-                      ? ` – ${decision.review_comment}`
-                      : ""}
-                  </Alert>
-                )}
-
-                {canReview ? (
-                  <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
-                    <Button
-                      size="small"
-                      variant={
-                        verdict === "accepted" ? "contained" : "outlined"
-                      }
-                      color="success"
-                      disabled={review.isPending}
-                      onClick={() =>
-                        review.mutate({
-                          decisionId: decision.decision_id,
-                          verdict: "accepted",
-                          reasonCategory: null,
-                          reviewComment: null,
-                        })
-                      }
+            {decisions.map((decision) => {
+              const verdict = decision.review_verdict;
+              return (
+                <Accordion key={decision.decision_id} disableGutters>
+                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Stack
+                      direction={{ xs: "column", md: "row" }}
+                      spacing={{ xs: 0.25, md: 1 }}
+                      alignItems={{ md: "center" }}
+                      sx={{ width: "100%", pr: 1 }}
                     >
-                      Kandidat akzeptabel
-                    </Button>
-                    <Button
-                      size="small"
-                      variant={
-                        verdict === "rejected" ? "contained" : "outlined"
-                      }
-                      color="warning"
-                      disabled={review.isPending}
-                      onClick={() => {
-                        setReviewTarget(decision);
-                        setCategory(decision.review_category || "");
-                        setComment(decision.review_comment || "");
+                      <Typography variant="body2" color="text.secondary">
+                        {formatDate(decision.created_at)}
+                      </Typography>
+                      <Typography sx={{ fontWeight: 700 }}>
+                        {decision.map_name || "Unbekannte Karte"} · Allies{" "}
+                        {decision.allies_count ?? "–"}:
+                        {decision.axis_count ?? "–"} Axis
+                      </Typography>
+                      <Typography sx={{ flexGrow: 1 }}>
+                        Kandidat: {decision.player_name || "unbekannt"}
+                      </Typography>
+                      <Chip
+                        size="small"
+                        color={
+                          verdict === "accepted"
+                            ? "success"
+                            : verdict === "rejected"
+                            ? "warning"
+                            : "default"
+                        }
+                        label={
+                          verdict === "accepted"
+                            ? "Akzeptabel"
+                            : verdict === "rejected"
+                            ? "Nicht akzeptabel"
+                            : "Offen"
+                        }
+                      />
+                    </Stack>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    <Box
+                      sx={{
+                        display: "grid",
+                        gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                        gap: 2,
                       }}
                     >
-                      Nicht akzeptabel
-                    </Button>
-                  </Stack>
-                ) : (
-                  <Typography variant="caption" color="text.secondary">
-                    Zum Bewerten ist die Berechtigung „Autobalancer ausführen“
-                    erforderlich.
-                  </Typography>
-                )}
-              </AccordionDetails>
-            </Accordion>
-          );
-        })}
+                      <Box>
+                        <Typography variant="subtitle2">
+                          Ausgangslage
+                        </Typography>
+                        <Typography variant="body2">
+                          Differenz {decision.difference ?? "–"}; geplant waren{" "}
+                          {decision.required_switches ?? "–"} Wechsel von{" "}
+                          {TEAM_LABELS[decision.source_team] ||
+                            decision.source_team}{" "}
+                          zu{" "}
+                          {TEAM_LABELS[decision.target_team] ||
+                            decision.target_team}
+                          .
+                        </Typography>
+                        <Typography variant="body2" sx={{ mt: 1 }}>
+                          <strong>Auswahlgrund:</strong>{" "}
+                          {decision.selection_reason || "nicht gespeichert"}
+                        </Typography>
+                        <Typography variant="body2">
+                          <strong>Schutz:</strong>{" "}
+                          {TIER_LABELS[decision.protection_tier] ||
+                            `Stufe ${decision.protection_tier ?? "–"}`}
+                          {decision.volunteer ? " · freiwillig" : ""}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="subtitle2">
+                          Kandidat im Snapshot
+                        </Typography>
+                        <Typography variant="body2">
+                          Squad {decision.unit_name || "nicht zugewiesen"} ·{" "}
+                          {decision.unit_type || "unbekannter Typ"} ·{" "}
+                          {decision.unit_size ?? "?"} Spieler
+                        </Typography>
+                        <Typography variant="body2">
+                          Rolle {decision.role || "unbekannt"}
+                          {decision.is_leader ? " · Squad Leader" : ""} ·
+                          verbunden seit{" "}
+                          {formatMinutes(decision.connected_seconds)} · im Squad
+                          seit {formatMinutes(decision.squad_seconds)}
+                        </Typography>
+                        <Typography variant="body2" sx={{ mt: 1 }}>
+                          Stärke {Math.round(decision.rating ?? 50)}/100 ·
+                          Vertrauen {formatPercent(decision.rating_confidence)}{" "}
+                          · projizierte Ratingdifferenz{" "}
+                          {decision.projected_rating_gap ?? "–"}
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    {(decision.audit_warnings || []).map((warning) => (
+                      <Alert key={warning} severity="error" sx={{ mt: 1 }}>
+                        Automatische Regelwarnung: {warning}
+                      </Alert>
+                    ))}
+
+                    {verdict && (
+                      <Alert
+                        severity={
+                          verdict === "accepted" ? "success" : "warning"
+                        }
+                        sx={{ mt: 1.5 }}
+                      >
+                        Bewertung von {decision.reviewed_by || "Admin"} am{" "}
+                        {formatDate(decision.reviewed_at)}:{" "}
+                        {verdict === "accepted"
+                          ? "Kandidat war akzeptabel."
+                          : REJECTION_LABELS[decision.review_category] ||
+                            "Nicht akzeptabel."}
+                        {decision.review_comment
+                          ? ` – ${decision.review_comment}`
+                          : ""}
+                      </Alert>
+                    )}
+
+                    {canReview ? (
+                      <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
+                        <Button
+                          size="small"
+                          variant={
+                            verdict === "accepted" ? "contained" : "outlined"
+                          }
+                          color="success"
+                          disabled={review.isPending}
+                          onClick={() =>
+                            review.mutate({
+                              decisionId: decision.decision_id,
+                              verdict: "accepted",
+                              reasonCategory: null,
+                              reviewComment: null,
+                            })
+                          }
+                        >
+                          Kandidat akzeptabel
+                        </Button>
+                        <Button
+                          size="small"
+                          variant={
+                            verdict === "rejected" ? "contained" : "outlined"
+                          }
+                          color="warning"
+                          disabled={review.isPending}
+                          onClick={() => {
+                            setReviewTarget(decision);
+                            setCategory(decision.review_category || "");
+                            setComment(decision.review_comment || "");
+                          }}
+                        >
+                          Nicht akzeptabel
+                        </Button>
+                      </Stack>
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">
+                        Zum Bewerten ist die Berechtigung „Autobalancer
+                        ausführen“ erforderlich.
+                      </Typography>
+                    )}
+                  </AccordionDetails>
+                </Accordion>
+              );
+            })}
+          </AccordionDetails>
+        </Accordion>
       </CardContent>
 
       <Dialog
