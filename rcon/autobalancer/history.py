@@ -483,12 +483,34 @@ def reconstruct_round_timeline(
     )
 
 
+def _stored_snapshot_rating(payload: dict[str, Any]) -> dict[str, Any]:
+    stored_rating = payload.get("rating")
+    if isinstance(stored_rating, dict):
+        return stored_rating
+    if isinstance(stored_rating, (int, float)) and not isinstance(stored_rating, bool):
+        confidence = payload.get("rating_confidence")
+        try:
+            confidence = max(0.0, min(0.4, float(confidence)))
+        except (TypeError, ValueError):
+            confidence = 0.0
+        value = float(stored_rating)
+        return {
+            "version": "legacy",
+            "value": value,
+            "raw_value": value,
+            "confidence": confidence,
+            "role_family": "legacy",
+            "history_source": "legacy_snapshot",
+        }
+    return {}
+
+
 def _snapshot_player(payload: dict[str, Any]) -> PlayerSnapshot | None:
     player_id = str(payload.get("player_id") or "")
     team = str(payload.get("team") or "").lower()
     if not player_id or team not in {"allies", "axis"}:
         return None
-    stored_rating = payload.get("rating") or {}
+    stored_rating = _stored_snapshot_rating(payload)
     rating_fields = {
         field: stored_rating[field]
         for field in SkillRating.__dataclass_fields__
@@ -906,7 +928,7 @@ def summarize_rating_quality(
         valid_by_round[snapshot.round_id] += 1
         model_versions[snapshot.rating_model_version or "legacy"] += 1
         for player in snapshot.players or []:
-            rating = player.get("rating") or {}
+            rating = _stored_snapshot_rating(player)
             confidence = rating.get("confidence")
             if confidence is not None and rating.get("role_family") != "commander":
                 confidence_value = max(0.0, min(1.0, float(confidence)))
@@ -1291,8 +1313,17 @@ class RoundHistoryRepository:
         if search:
             filters.append(Maps.map_name.ilike(f"%{search.strip()}%"))
         with enter_session() as session:
-            games = session.scalars(
-                select(Maps).where(*filters).order_by(Maps.start.desc()).limit(limit)
+            games = session.execute(
+                select(
+                    Maps.id.label("id"),
+                    Maps.start.label("start"),
+                    Maps.end.label("end"),
+                    Maps.server_number.label("server_number"),
+                    Maps.map_name.label("map_name"),
+                )
+                .where(*filters)
+                .order_by(Maps.start.desc())
+                .limit(limit)
             ).all()
             map_ids = [game.id for game in games]
 
@@ -1366,8 +1397,20 @@ class RoundHistoryRepository:
         round_ids = [_round_id(game) for game in games]
         with enter_session() as session:
             snapshots = (
-                session.scalars(
-                    select(AutobalanceSnapshot)
+                session.execute(
+                    select(
+                        AutobalanceSnapshot.round_id.label("round_id"),
+                        AutobalanceSnapshot.captured_at.label("captured_at"),
+                        AutobalanceSnapshot.allies_count.label("allies_count"),
+                        AutobalanceSnapshot.axis_count.label("axis_count"),
+                        AutobalanceSnapshot.counts_match.label("counts_match"),
+                        AutobalanceSnapshot.fail_count.label("fail_count"),
+                        AutobalanceSnapshot.stable_map.label("stable_map"),
+                        AutobalanceSnapshot.rating_model_version.label(
+                            "rating_model_version"
+                        ),
+                        AutobalanceSnapshot.players.label("players"),
+                    )
                     .where(
                         AutobalanceSnapshot.server_number == self.server_number,
                         AutobalanceSnapshot.round_id.in_(round_ids),
@@ -1378,8 +1421,8 @@ class RoundHistoryRepository:
                 else []
             )
             decisions = (
-                session.scalars(
-                    select(AutobalanceDecision).where(
+                session.execute(
+                    select(AutobalanceDecision.reason.label("reason")).where(
                         AutobalanceDecision.server_number == self.server_number,
                         AutobalanceDecision.round_id.in_(round_ids),
                         AutobalanceDecision.mode == "shadow",
