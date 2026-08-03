@@ -25,6 +25,7 @@ import { isFakeMode } from "@/mirage/demo-data";
 import { useTranslation } from "react-i18next";
 import i18n from "@/i18n";
 import AutobalancerHelp from "@/pages/settings/[configs]/autobalancer-help";
+import AutobalancerShadowOverview from "@/pages/settings/[configs]/autobalancer-shadow-overview";
 
 const Editor = lazy(() => import("@monaco-editor/react"));
 
@@ -294,6 +295,9 @@ const ConfigPage = () => {
           </Stack>
         </Stack>
       </Form>
+      {isAutobalancer && (
+        <AutobalancerShadowOverview mode={jsonData?.mode} />
+      )}
       {mode === "code" ? (
         <>
           <Typography variant="h4">
