@@ -13,10 +13,10 @@ import httpx
 import orjson
 import pydantic
 import redis
+import redis.exceptions
 from discord_webhook import AsyncDiscordWebhook, DiscordWebhookDict
 from pydantic import BaseModel, Field
 
-import redis.exceptions
 from rcon.cache_utils import construct_redis_url, get_redis_client
 from rcon.utils import get_server_number
 
@@ -133,6 +133,31 @@ def clear_queue_by_message_id(red: redis.StrictRedis, queue_id: str, message_id:
         message = unpack_message(raw_message=raw_message)
         if message_id == message.payload["message_id"]:
             red.lrem(queue_id, 0, raw_message)
+
+
+def handle_webhook_not_found(
+    red: redis.StrictRedis,
+    queue_id: str,
+    payload: DiscordWebhookDict,
+    webhook_type: "WebhookType",
+    webhook_id: str,
+) -> None:
+    """Record a Discord 404 without assuming this was an edit request."""
+    message_id = payload.get("message_id")
+    if message_id:
+        set_message_edit_404_failure(red=red, message_id=message_id)
+        clear_queue_by_message_id(
+            red=red,
+            queue_id=queue_id,
+            message_id=message_id,
+        )
+
+    set_webhook_error(
+        red=red,
+        webhook_id=webhook_id,
+        webhook_type=webhook_type,
+        _404=True,
+    )
 
 
 def get_shared_lock() -> asyncio.Lock:
@@ -628,19 +653,12 @@ async def dequeue_message(
             logger.error(
                 f"Received HTTP 404 from the webhook with webhook ID: {message.payload.get('webhook_id')} message ID: {message.payload.get('message_id')} purging the queue for this message ID"
             )
-            # Mark this specific message ID as a 404 failure
-            set_message_edit_404_failure(
-                red=red, message_id=message.payload["message_id"]
-            )
-            clear_queue_by_message_id(
-                red=red, queue_id=queue_id, message_id=message.payload["message_id"]
-            )
-            # Flag this webhook as having an error
-            set_webhook_error(
+            handle_webhook_not_found(
                 red=red,
-                webhook_id=wh.webhook_id,
+                queue_id=queue_id,
+                payload=message.payload,
                 webhook_type=message.webhook_type,
-                _404=True,
+                webhook_id=wh.webhook_id,
             )
 
             return
