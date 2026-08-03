@@ -237,9 +237,7 @@ def test_rating_quality_uses_only_valid_exact_snapshots_and_compares_strategies(
     assert quality["strategy_agreement_rate"] == 1.0
     assert quality["gap_guardrail_rate"] == 1.0
     assert quality["model_versions"] == {"role-aware-v2": 38}
-    role_confidence = {
-        row["role_family"]: row for row in quality["role_confidence"]
-    }
+    role_confidence = {row["role_family"]: row for row in quality["role_confidence"]}
     assert role_confidence["support"]["median_confidence"] == 0.7
     assert role_confidence["combat_infantry"]["median_confidence"] == 0.5
 

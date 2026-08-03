@@ -27,12 +27,8 @@ def validate_shadow_review(data: dict[str, Any]) -> tuple[
     verdict = str(data.get("verdict") or "").strip().lower()
     category = str(data.get("category") or "").strip() or None
     comment = str(data.get("comment") or "").strip() or None
-    preferred_strategy = (
-        str(data.get("preferred_strategy") or "").strip() or None
-    )
-    preferred_player_id = (
-        str(data.get("preferred_player_id") or "").strip() or None
-    )
+    preferred_strategy = str(data.get("preferred_strategy") or "").strip() or None
+    preferred_player_id = str(data.get("preferred_player_id") or "").strip() or None
     if not decision_id:
         raise ValueError("decision_id fehlt")
     if verdict not in {"accepted", "rejected"}:

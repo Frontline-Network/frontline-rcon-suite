@@ -79,12 +79,8 @@ def snapshot_role_deltas(
         before = previous.get(player_id)
         if not player_id or before is None:
             continue
-        current_family = str(
-            current.get("role_family") or role_family(current)
-        )
-        previous_family = str(
-            before.get("role_family") or role_family(before)
-        )
+        current_family = str(current.get("role_family") or role_family(current))
+        previous_family = str(before.get("role_family") or role_family(before))
         row = {
             "player_id": player_id,
             "role_family": current_family,
@@ -168,9 +164,7 @@ def _upsert_role_delta(
 
 def persist_snapshot(server_number: int, snapshot: BalanceSnapshot) -> None:
     confidences = [
-        player.rating.confidence
-        for player in snapshot.players
-        if player.player_id
+        player.rating.confidence for player in snapshot.players if player.player_id
     ]
     players = [
         _player_payload(player) for player in snapshot.players if player.player_id
@@ -225,9 +219,7 @@ def prune_snapshots(now: datetime | None = None) -> None:
     cutoff = _database_time(now - timedelta(days=SNAPSHOT_RETENTION_DAYS))
     with enter_session() as session:
         session.execute(
-            delete(AutobalanceSnapshot).where(
-                AutobalanceSnapshot.captured_at < cutoff
-            )
+            delete(AutobalanceSnapshot).where(AutobalanceSnapshot.captured_at < cutoff)
         )
         session.execute(
             delete(AutobalancePlayerRoleStats).where(

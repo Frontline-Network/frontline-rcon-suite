@@ -228,9 +228,7 @@ def _evaluate_timeline(
 
     eligible = [point for point in points if is_eligible(point)]
     unbalanced = [
-        point
-        for point in eligible
-        if abs(point["team_difference"]) > target_difference
+        point for point in eligible if abs(point["team_difference"]) > target_difference
     ]
 
     longest_run = 0
@@ -337,12 +335,8 @@ def reconstruct_round_timeline(
         event["event_time"] = _as_utc(event["event_time"])
         action = str(event.get("action") or "")
         event["action"] = action
-        event["key1"] = identity(
-            event.get("player1_id"), event.get("player1_name")
-        )
-        event["key2"] = identity(
-            event.get("player2_id"), event.get("player2_name")
-        )
+        event["key1"] = identity(event.get("player1_id"), event.get("player1_name"))
+        event["key2"] = identity(event.get("player2_id"), event.get("player2_name"))
         if action in {"CONNECTED", "DISCONNECTED"}:
             if not event["key1"]:
                 invalid_events += 1
@@ -460,7 +454,11 @@ def reconstruct_round_timeline(
     )
     quality = {
         "source": "historical_logs",
-        "level": "high" if quality_score >= 0.85 else "medium" if quality_score >= 0.6 else "low",
+        "level": (
+            "high"
+            if quality_score >= 0.85
+            else "medium" if quality_score >= 0.6 else "low"
+        ),
         "score": round(quality_score, 4),
         "reliable": reliable,
         "valid_events": len(normalized_events),
@@ -536,9 +534,7 @@ def _snapshot_candidate_what_if(
     skill_gap_hard_warning: float,
     skill_gap_min_improvement: float,
 ) -> dict[str, Any] | None:
-    eligible_start = _as_utc(start) + timedelta(
-        seconds=round_start_protection_seconds
-    )
+    eligible_start = _as_utc(start) + timedelta(seconds=round_start_protection_seconds)
     eligible_end = _as_utc(end) - timedelta(seconds=round_end_protection_seconds)
     eligible = [
         row
@@ -628,8 +624,7 @@ def analyze_snapshot_timeline(
             1,
             int(
                 (
-                    _as_utc(current.captured_at)
-                    - _as_utc(previous.captured_at)
+                    _as_utc(current.captured_at) - _as_utc(previous.captured_at)
                 ).total_seconds()
             ),
         )
@@ -764,8 +759,7 @@ def summarize_round_analyses(analyses: list[dict[str, Any]]) -> dict[str, Any]:
         analysis["metrics"].get("incident_count", 0) for analysis in measurable
     )
     switches = sum(
-        analysis["metrics"].get("estimated_switches", 0)
-        for analysis in measurable
+        analysis["metrics"].get("estimated_switches", 0) for analysis in measurable
     )
     maximum_differences = [
         analysis["metrics"].get("maximum_difference")
@@ -796,7 +790,13 @@ def summarize_round_analyses(analyses: list[dict[str, Any]]) -> dict[str, Any]:
         map_name = analysis["round"].get("map_name") or "unknown"
         map_row = maps.setdefault(
             map_name,
-            {"map_name": map_name, "rounds": 0, "eligible": 0, "balanced": 0, "incidents": 0},
+            {
+                "map_name": map_name,
+                "rounds": 0,
+                "eligible": 0,
+                "balanced": 0,
+                "incidents": 0,
+            },
         )
         for row in (week_row, map_row):
             row["rounds"] += 1
@@ -810,9 +810,11 @@ def summarize_round_analyses(analyses: list[dict[str, Any]]) -> dict[str, Any]:
             result.append(
                 {
                     **row,
-                    "balanced_ratio": round(row["balanced"] / row["eligible"], 4)
-                    if row["eligible"]
-                    else None,
+                    "balanced_ratio": (
+                        round(row["balanced"] / row["eligible"], 4)
+                        if row["eligible"]
+                        else None
+                    ),
                 }
             )
         return result
@@ -820,22 +822,22 @@ def summarize_round_analyses(analyses: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "rounds_analyzed": len(analyses),
         "measurable_rounds": len(measurable),
-        "coverage_ratio": round(len(measurable) / len(analyses), 4)
-        if analyses
-        else 0.0,
+        "coverage_ratio": (
+            round(len(measurable) / len(analyses), 4) if analyses else 0.0
+        ),
         "statuses": dict(statuses),
         "quality_levels": dict(quality_levels),
-        "balanced_time_ratio": round(balanced_samples / eligible_samples, 4)
-        if eligible_samples
-        else None,
+        "balanced_time_ratio": (
+            round(balanced_samples / eligible_samples, 4) if eligible_samples else None
+        ),
         "incident_count": incidents,
-        "incidents_per_10_rounds": round(incidents / len(measurable) * 10, 2)
-        if measurable
-        else None,
+        "incidents_per_10_rounds": (
+            round(incidents / len(measurable) * 10, 2) if measurable else None
+        ),
         "estimated_switches": switches,
-        "switches_per_round": round(switches / len(measurable), 2)
-        if measurable
-        else None,
+        "switches_per_round": (
+            round(switches / len(measurable), 2) if measurable else None
+        ),
         "maximum_difference": max(maximum_differences, default=None),
         "difference_distribution": [
             {"bucket": bucket, "rounds": count}
@@ -894,17 +896,11 @@ def summarize_rating_quality(
         game = games_by_round.get(snapshot.round_id)
         if game is None:
             continue
-        eligible_start = game.start + timedelta(
-            seconds=round_start_protection_seconds
-        )
+        eligible_start = game.start + timedelta(seconds=round_start_protection_seconds)
         eligible_end = game.end - timedelta(seconds=round_end_protection_seconds)
         if not eligible_start <= snapshot.captured_at <= eligible_end:
             continue
-        if (
-            not snapshot.counts_match
-            or snapshot.fail_count
-            or not snapshot.stable_map
-        ):
+        if not snapshot.counts_match or snapshot.fail_count or not snapshot.stable_map:
             continue
         valid_snapshots.append(snapshot)
         valid_by_round[snapshot.round_id] += 1
@@ -915,11 +911,7 @@ def summarize_rating_quality(
             if confidence is not None and rating.get("role_family") != "commander":
                 confidence_value = max(0.0, min(1.0, float(confidence)))
                 confidences.append(confidence_value)
-            family = (
-                player.get("role_family")
-                or rating.get("role_family")
-                or "legacy"
-            )
+            family = player.get("role_family") or rating.get("role_family") or "legacy"
             if family != "commander":
                 role_observations[str(family)] += 1
                 if confidence is not None:
@@ -927,13 +919,15 @@ def summarize_rating_quality(
                     bucket = (
                         "0–20 %"
                         if confidence_value < 0.2
-                        else "20–40 %"
-                        if confidence_value < 0.4
-                        else "40–60 %"
-                        if confidence_value < 0.6
-                        else "60–80 %"
-                        if confidence_value < 0.8
-                        else "80–100 %"
+                        else (
+                            "20–40 %"
+                            if confidence_value < 0.4
+                            else (
+                                "40–60 %"
+                                if confidence_value < 0.6
+                                else "60–80 %" if confidence_value < 0.8 else "80–100 %"
+                            )
+                        )
                     )
                     confidence_buckets[bucket] += 1
 
@@ -1009,18 +1003,14 @@ def summarize_rating_quality(
             strategy_agreements / strategy_proposals if strategy_proposals else None
         ),
         "gap_guardrail_rate": (
-            gap_guardrail_passes / gap_guardrail_total
-            if gap_guardrail_total
-            else None
+            gap_guardrail_passes / gap_guardrail_total if gap_guardrail_total else None
         ),
         "strategies": [
             {
                 "strategy": strategy,
                 "proposals": values["proposals"],
                 "average_projected_gap": (
-                    mean(values["projected_gaps"])
-                    if values["projected_gaps"]
-                    else None
+                    mean(values["projected_gaps"]) if values["projected_gaps"] else None
                 ),
             }
             for strategy, values in sorted(strategy_rows.items())
@@ -1302,10 +1292,7 @@ class RoundHistoryRepository:
             filters.append(Maps.map_name.ilike(f"%{search.strip()}%"))
         with enter_session() as session:
             games = session.scalars(
-                select(Maps)
-                .where(*filters)
-                .order_by(Maps.start.desc())
-                .limit(limit)
+                select(Maps).where(*filters).order_by(Maps.start.desc()).limit(limit)
             ).all()
             map_ids = [game.id for game in games]
 
@@ -1335,15 +1322,15 @@ class RoundHistoryRepository:
                 )
             ).all()
         analyses_by_map = {map_id: analysis for map_id, analysis in cached_rows}
-        missing_map_ids = [map_id for map_id in map_ids if map_id not in analyses_by_map]
+        missing_map_ids = [
+            map_id for map_id in map_ids if map_id not in analyses_by_map
+        ]
         for map_id in missing_map_ids[:15]:
             analysis = self.analyze(map_id, **base_config)
             if analysis is not None:
                 analyses_by_map[map_id] = analysis
         analyses = [
-            analyses_by_map[map_id]
-            for map_id in map_ids
-            if map_id in analyses_by_map
+            analyses_by_map[map_id] for map_id in map_ids if map_id in analyses_by_map
         ]
         remaining = max(0, len(map_ids) - len(analyses))
         variants = [
@@ -1362,8 +1349,7 @@ class RoundHistoryRepository:
         what_if = []
         for label, variant_config in variants:
             variant_analyses = [
-                reanalyze_timeline(analysis, **variant_config)
-                for analysis in analyses
+                reanalyze_timeline(analysis, **variant_config) for analysis in analyses
             ]
             what_if.append(
                 {

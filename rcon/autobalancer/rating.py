@@ -178,9 +178,7 @@ def _rates(
         weighted_seconds += sample_seconds * weight
         totals["kills"] += sample.kills * weight
         totals["combat"] += sample.combat * weight
-        totals["team"] += (
-            sample.offense + sample.defense + sample.support
-        ) * weight
+        totals["team"] += (sample.offense + sample.defense + sample.support) * weight
     if weighted_seconds <= 0:
         return {}, seconds, maps
     minutes = weighted_seconds / 60.0
@@ -195,9 +193,7 @@ def _history_for_player(
 ) -> tuple[dict[str, float], int, int, float, str]:
     samples = list(samples)
     exact = [
-        sample
-        for sample in samples
-        if sample.exact and sample.role_family == family
+        sample for sample in samples if sample.exact and sample.role_family == family
     ]
     legacy = [sample for sample in samples if not sample.exact]
     exact_rates, exact_seconds, exact_maps = _rates(exact, now, half_life_days)
@@ -350,9 +346,7 @@ def calculate_ratings(
         level_present = player.level is not None
         level_component = levels[player_id] if level_present else NEUTRAL_RATING
         raw_value = (
-            0.15 * level_component
-            + 0.70 * history_component
-            + 0.15 * live_component
+            0.15 * level_component + 0.70 * history_component + 0.15 * live_component
         )
         confidence = (
             0.15 * (1.0 if level_present else 0.0)

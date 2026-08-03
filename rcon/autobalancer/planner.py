@@ -216,10 +216,7 @@ def _choose_combo(
         combo
         for combo in combos
         if max(choice.effective_tier for choice in combo) <= base_max_tier + 1
-        and (
-            base_uses_special
-            or not any(choice.base_tier == 5 for choice in combo)
-        )
+        and (base_uses_special or not any(choice.base_tier == 5 for choice in combo))
     ]
     if not alternatives:
         return squad_combo
@@ -342,7 +339,10 @@ def build_plan(
     projected_gap = (
         selected[-1].projected_rating_gap
         if selected
-        else abs(team_rating(snapshot.players, source) - team_rating(snapshot.players, target))
+        else abs(
+            team_rating(snapshot.players, source)
+            - team_rating(snapshot.players, target)
+        )
     )
     warnings: list[str] = []
     if projected_gap >= skill_gap_hard_warning:
@@ -359,7 +359,8 @@ def build_plan(
         blocked_reasons=blocked,
         strategy=strategy,
         rating_gap_before=abs(
-            team_rating(snapshot.players, source) - team_rating(snapshot.players, target)
+            team_rating(snapshot.players, source)
+            - team_rating(snapshot.players, target)
         ),
         projected_rating_gap=projected_gap,
         warnings=warnings,
