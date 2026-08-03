@@ -53,6 +53,35 @@ class FakeRedis:
         return [(key, entries[:count])] if entries else []
 
 
+class ByteStreamRedis(FakeRedis):
+    def get(self, key):
+        value = super().get(key)
+        return value.encode("utf-8") if isinstance(value, str) else value
+
+    def xread(self, streams, count=100, block=1):
+        streams = {
+            key: value.decode("utf-8") if isinstance(value, bytes) else value
+            for key, value in streams.items()
+        }
+        result = super().xread(streams, count=count, block=block)
+        return [
+            (
+                stream.encode("utf-8"),
+                [
+                    (
+                        stream_id.encode("utf-8"),
+                        {
+                            key.encode("utf-8"): value.encode("utf-8")
+                            for key, value in fields.items()
+                        },
+                    )
+                    for stream_id, fields in entries
+                ],
+            )
+            for stream, entries in result
+        ]
+
+
 def test_duplicate_events_are_idempotent():
     store = AutobalancerStore(FakeRedis(), server_number=1)
     payload = {"event_id": "same-log-line", "player_id": "victim"}
@@ -60,6 +89,27 @@ def test_duplicate_events_are_idempotent():
     assert store.publish_event("death", payload) is None
     events = store.read_events()
     assert len(events) == 1
+    store.acknowledge_events(events)
+    assert store.read_events() == []
+
+
+def test_byte_mode_redis_streams_and_armed_player_are_supported():
+    store = AutobalancerStore(ByteStreamRedis(), server_number=1)
+    store.arm_player("victim")
+    assert store.is_armed_player("victim") is True
+
+    payload = {"event_id": "byte-event", "player_id": "victim"}
+    assert store.publish_event("death", payload) is not None
+    events = store.read_events()
+
+    assert events == [
+        {
+            "event_id": "byte-event",
+            "player_id": "victim",
+            "type": "death",
+            "stream_id": "1-0",
+        }
+    ]
     store.acknowledge_events(events)
     assert store.read_events() == []
 
