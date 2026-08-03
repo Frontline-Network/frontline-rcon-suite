@@ -190,3 +190,12 @@ def test_status_history_is_sampled_and_returned_in_chronological_order():
         1,
         -3,
     ]
+
+
+def test_only_one_live_snapshot_is_claimed_per_sampling_window():
+    store = AutobalancerStore(FakeRedis(), server_number=1)
+
+    assert store.claim_snapshot_slot() is True
+    assert store.claim_snapshot_slot() is False
+    assert store.claim_snapshot_prune() is True
+    assert store.claim_snapshot_prune() is False

@@ -333,6 +333,57 @@ def get_autobalancer_round_archive(request):
 
 @csrf_exempt
 @login_required()
+@permission_required("api.can_view_autobalancer", raise_exception=True)
+@require_http_methods(["GET"])
+def get_autobalancer_history_dashboard(request):
+    data = _get_data(request)
+    config = AutobalancerUserConfig.load_from_db()
+    try:
+        days = int(data.get("days") or 90)
+        limit = int(data.get("limit") or 100)
+        target_difference = int(
+            data.get("target_difference")
+            if data.get("target_difference") not in {None, ""}
+            else config.target_difference
+        )
+        stable_difference_seconds = int(
+            data.get("stable_difference_seconds")
+            if data.get("stable_difference_seconds") not in {None, ""}
+            else config.stable_difference_seconds
+        )
+    except (TypeError, ValueError):
+        return api_response(
+            result=None,
+            command="get_autobalancer_history_dashboard",
+            failed=True,
+            error="Ungültige Analyseparameter",
+        )
+    if not 0 <= target_difference <= 10 or not 15 <= stable_difference_seconds <= 300:
+        return api_response(
+            result=None,
+            command="get_autobalancer_history_dashboard",
+            failed=True,
+            error="Zieldifferenz oder Stabilitätsdauer liegt außerhalb des gültigen Bereichs",
+        )
+    result = RoundHistoryRepository(int(get_server_number())).dashboard(
+        target_difference=target_difference,
+        minimum_players=config.minimum_players,
+        round_start_protection_seconds=config.map_start_grace_minutes * 60,
+        round_end_protection_seconds=config.map_end_guard_minutes * 60,
+        stable_difference_seconds=stable_difference_seconds,
+        days=days,
+        search=str(data.get("search") or "").strip() or None,
+        limit=limit,
+    )
+    return api_response(
+        result=result,
+        command="get_autobalancer_history_dashboard",
+        failed=False,
+    )
+
+
+@csrf_exempt
+@login_required()
 @permission_required("api.can_execute_autobalancer", raise_exception=True)
 @record_audit
 @require_http_methods(["POST"])

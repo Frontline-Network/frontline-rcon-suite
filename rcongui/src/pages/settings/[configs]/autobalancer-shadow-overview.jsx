@@ -31,6 +31,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { cmd } from "@/utils/fetchUtils";
 import AutobalancerShadowCharts from "@/pages/settings/[configs]/autobalancer-shadow-charts";
 import AutobalancerRoundHistory from "@/pages/settings/[configs]/autobalancer-round-history";
+import AutobalancerHistoryDashboard from "@/pages/settings/[configs]/autobalancer-history-dashboard";
 
 const TIER_LABELS = {
   0: "0 · kaum Squad-Bindung",
@@ -230,6 +231,8 @@ const AutobalancerShadowOverview = ({ config }) => {
           summary={summary}
           config={config}
         />
+
+        <AutobalancerHistoryDashboard config={config} />
 
         <AutobalancerRoundHistory config={config} />
 

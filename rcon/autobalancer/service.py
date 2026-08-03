@@ -17,6 +17,7 @@ from .rating import calculate_ratings
 from .repository import DecisionRepository
 from .snapshot import build_snapshot
 from .store import AutobalancerStore, new_instance_token
+from .telemetry import persist_snapshot, prune_snapshots
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +96,17 @@ class AutobalancerService:
         ratings = calculate_ratings(snapshot.players, historical)
         for player in snapshot.players:
             player.rating = ratings[player.player_id]
+
+        if getattr(self.store, "claim_snapshot_slot", lambda: False)():
+            try:
+                persist_snapshot(self.server_number, snapshot)
+            except Exception:
+                logger.exception("Unable to persist autobalancer live snapshot")
+        if getattr(self.store, "claim_snapshot_prune", lambda: False)():
+            try:
+                prune_snapshots(now)
+            except Exception:
+                logger.exception("Unable to prune old autobalancer snapshots")
 
         state = self.store.load_state()
         events = self.store.read_events()

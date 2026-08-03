@@ -1011,6 +1011,73 @@ class AutobalanceDecision(Base):
         }
 
 
+class AutobalanceSnapshot(Base):
+    """Durable, reviewable live team/squad evidence for future backtests."""
+
+    __tablename__ = "autobalance_snapshots"
+    __table_args__ = (
+        UniqueConstraint(
+            "server_number",
+            "round_id",
+            "captured_at",
+            name="unique_autobalance_snapshot",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    server_number: Mapped[int] = mapped_column(nullable=False, index=True)
+    round_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    captured_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP, nullable=False, index=True
+    )
+    map_name: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    map_elapsed_seconds: Mapped[int] = mapped_column(nullable=False)
+    time_remaining_seconds: Mapped[int] = mapped_column(nullable=False)
+    allies_count: Mapped[int] = mapped_column(nullable=False)
+    axis_count: Mapped[int] = mapped_column(nullable=False)
+    counts_match: Mapped[bool] = mapped_column(nullable=False)
+    fail_count: Mapped[int] = mapped_column(nullable=False)
+    stable_map: Mapped[bool] = mapped_column(nullable=False)
+    rating_confidence: Mapped[float | None] = mapped_column(nullable=True)
+    players: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=False, default=list
+    )
+
+
+class AutobalanceRoundAnalysis(Base):
+    """Versioned cached aggregate derived from raw logs or exact snapshots."""
+
+    __tablename__ = "autobalance_round_analyses"
+    __table_args__ = (
+        UniqueConstraint(
+            "server_number",
+            "map_id",
+            "algorithm_version",
+            "config_hash",
+            name="unique_autobalance_round_analysis",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    server_number: Mapped[int] = mapped_column(nullable=False, index=True)
+    map_id: Mapped[int] = mapped_column(
+        ForeignKey("map_history.id"), nullable=False, index=True
+    )
+    algorithm_version: Mapped[str] = mapped_column(
+        String, nullable=False, index=True
+    )
+    config_hash: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    analyzed_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP, nullable=False, default=datetime.utcnow, index=True
+    )
+    source: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    quality_score: Mapped[float] = mapped_column(nullable=False)
+    analysis: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, default=dict
+    )
+
+
 class PlayerComment(Base):
     __tablename__ = "player_comments"
     id: Mapped[int] = mapped_column(primary_key=True)

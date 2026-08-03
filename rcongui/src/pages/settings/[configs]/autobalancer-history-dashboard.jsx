@@ -1,0 +1,482 @@
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  CircularProgress,
+  LinearProgress,
+  MenuItem,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
+import { BarChart } from "@mui/x-charts/BarChart";
+import { LineChart } from "@mui/x-charts/LineChart";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { cmd } from "@/utils/fetchUtils";
+
+const percent = (value) =>
+  value == null ? "–" : `${Math.round(value * 100)} %`;
+
+const formatMap = (value) =>
+  (value || "Unbekannte Karte")
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+const Metric = ({ label, value, caption, color = "text.primary" }) => (
+  <Card variant="outlined">
+    <CardContent>
+      <Typography variant="caption" color="text.secondary">
+        {label}
+      </Typography>
+      <Typography variant="h4" color={color} sx={{ fontWeight: 800, mt: 0.5 }}>
+        {value}
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+        {caption}
+      </Typography>
+    </CardContent>
+  </Card>
+);
+
+const ChartShell = ({ title, subtitle, children }) => (
+  <Card variant="outlined" sx={{ minWidth: 0 }}>
+    <CardContent>
+      <Typography variant="h6" sx={{ fontWeight: 700 }}>
+        {title}
+      </Typography>
+      <Typography variant="caption" color="text.secondary">
+        {subtitle}
+      </Typography>
+      <Box sx={{ mt: 1 }}>{children}</Box>
+    </CardContent>
+  </Card>
+);
+
+const WeeklyBalanceChart = ({ weekly }) => {
+  const rows = (weekly || []).filter((row) => row.balanced_ratio != null);
+  if (rows.length < 2) {
+    return <Alert severity="info">Noch zu wenige messbare Wochen.</Alert>;
+  }
+  return (
+    <LineChart
+      height={280}
+      xAxis={[
+        {
+          scaleType: "time",
+          data: rows.map((row) => new Date(row.week)),
+          valueFormatter: (value) =>
+            new Intl.DateTimeFormat("de-DE", {
+              day: "2-digit",
+              month: "2-digit",
+            }).format(value),
+        },
+      ]}
+      yAxis={[
+        {
+          min: 0,
+          max: 100,
+          valueFormatter: (value) => `${value} %`,
+        },
+      ]}
+      series={[
+        {
+          label: "Zeit im Zielbereich",
+          data: rows.map((row) => Math.round(row.balanced_ratio * 100)),
+          color: "#0f766e",
+          showMark: rows.length < 16,
+          valueFormatter: (value) => `${value} %`,
+        },
+      ]}
+      grid={{ horizontal: true }}
+    />
+  );
+};
+
+const WhatIfCharts = ({ rows }) => {
+  if (!rows?.length) return null;
+  const labels = rows.map((row) => row.label);
+  return (
+    <Box
+      sx={{
+        display: "grid",
+        gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" },
+        gap: 2,
+      }}
+    >
+      <ChartShell
+        title="Was wäre ausgeglichen gewesen?"
+        subtitle="Anteil der messbaren Spielzeit innerhalb der jeweiligen Zieldifferenz."
+      >
+        <BarChart
+          height={280}
+          xAxis={[{ scaleType: "band", data: labels }]}
+          yAxis={[
+            { min: 0, max: 100, valueFormatter: (value) => `${value} %` },
+          ]}
+          series={[
+            {
+              label: "Balancezeit",
+              data: rows.map((row) =>
+                row.balanced_time_ratio == null
+                  ? null
+                  : Math.round(row.balanced_time_ratio * 100)
+              ),
+              color: "#0f766e",
+              valueFormatter: (value) =>
+                value == null ? "nicht messbar" : `${value} %`,
+            },
+          ]}
+          grid={{ horizontal: true }}
+        />
+      </ChartShell>
+      <ChartShell
+        title="Kosten der Varianten"
+        subtitle="Geschätzte notwendige Teamwechsel pro messbarer Runde; weniger ist ruhiger."
+      >
+        <BarChart
+          height={280}
+          xAxis={[{ scaleType: "band", data: labels }]}
+          yAxis={[{ min: 0 }]}
+          series={[
+            {
+              label: "Wechsel je Runde",
+              data: rows.map((row) => row.switches_per_round),
+              color: "#d97706",
+              valueFormatter: (value) =>
+                value == null ? "nicht messbar" : `${value} Wechsel/Runde`,
+            },
+          ]}
+          grid={{ horizontal: true }}
+        />
+      </ChartShell>
+    </Box>
+  );
+};
+
+const BreakdownCharts = ({ summary }) => {
+  const quality = Object.entries(summary?.quality_levels || {});
+  const differences = summary?.difference_distribution || [];
+  const maps = (summary?.maps || [])
+    .filter((row) => row.balanced_ratio != null)
+    .slice(0, 8);
+  return (
+    <Box
+      sx={{
+        display: "grid",
+        gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" },
+        gap: 2,
+      }}
+    >
+      <ChartShell
+        title="Datenqualität"
+        subtitle="Exakt stammt aus neuen Live-Snapshots; hoch/mittel/niedrig aus rekonstruierten Logs."
+      >
+        <BarChart
+          height={250}
+          xAxis={[{ scaleType: "band", data: quality.map(([level]) => level) }]}
+          yAxis={[{ min: 0, tickMinStep: 1 }]}
+          series={[
+            {
+              label: "Runden",
+              data: quality.map(([, count]) => count),
+              color: "#2563eb",
+              valueFormatter: (value) => `${value} Runden`,
+            },
+          ]}
+          grid={{ horizontal: true }}
+        />
+      </ChartShell>
+      <ChartShell
+        title="Größte Teamdifferenz je Runde"
+        subtitle="Nur messbare Zeitfenster mit mindestens der konfigurierten Spielerzahl."
+      >
+        <BarChart
+          height={250}
+          xAxis={[
+            {
+              scaleType: "band",
+              data: differences.map((row) => row.bucket),
+            },
+          ]}
+          yAxis={[{ min: 0, tickMinStep: 1 }]}
+          series={[
+            {
+              label: "Runden",
+              data: differences.map((row) => row.rounds),
+              color: "#7c3aed",
+              valueFormatter: (value) => `${value} Runden`,
+            },
+          ]}
+          grid={{ horizontal: true }}
+        />
+      </ChartShell>
+      {maps.length > 0 && (
+        <Box sx={{ gridColumn: { lg: "1 / -1" } }}>
+          <ChartShell
+            title="Balancezeit nach Karte"
+            subtitle="Die meistgespielten Karten im gewählten Zeitraum; nur messbare Runden."
+          >
+            <BarChart
+              layout="horizontal"
+              height={Math.max(280, maps.length * 42)}
+              yAxis={[
+                {
+                  scaleType: "band",
+                  data: maps.map((row) => formatMap(row.map_name)),
+                },
+              ]}
+              xAxis={[
+                { min: 0, max: 100, valueFormatter: (value) => `${value} %` },
+              ]}
+              series={[
+                {
+                  label: "Zeit im Zielbereich",
+                  data: maps.map((row) => Math.round(row.balanced_ratio * 100)),
+                  color: "#0f766e",
+                  valueFormatter: (value) => `${value} %`,
+                },
+              ]}
+              grid={{ vertical: true }}
+            />
+          </ChartShell>
+        </Box>
+      )}
+    </Box>
+  );
+};
+
+const AutobalancerHistoryDashboard = ({ config }) => {
+  const initial = {
+    days: 90,
+    search: "",
+    targetDifference: config?.target_difference ?? 2,
+    stableSeconds: config?.stable_difference_seconds ?? 45,
+  };
+  const [draft, setDraft] = useState(initial);
+  const [filters, setFilters] = useState(initial);
+  const { data, isLoading, isFetching, isError } = useQuery({
+    queryKey: [
+      {
+        queryIdentifier: "get_autobalancer_history_dashboard",
+        filters,
+      },
+    ],
+    queryFn: () =>
+      cmd.GET_AUTOBALANCER_HISTORY_DASHBOARD({
+        params: {
+          days: filters.days,
+          search: filters.search,
+          target_difference: filters.targetDifference,
+          stable_difference_seconds: filters.stableSeconds,
+          limit: 100,
+        },
+      }),
+    retry: false,
+    staleTime: 10 * 60 * 1000,
+    refetchInterval: (query) =>
+      query.state.data?.backfill?.complete ? false : 15_000,
+  });
+  const summary = data?.summary;
+  const sources = data?.source_counts || {};
+
+  return (
+    <Box sx={{ mt: 2 }}>
+      <Stack
+        direction={{ xs: "column", lg: "row" }}
+        justifyContent="space-between"
+        spacing={1}
+      >
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 800 }}>
+            Historische Balance-Auswertung
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Vergleicht echte FLN-Runden mit den aktuellen und alternativen
+            Balancer-Einstellungen.
+          </Typography>
+        </Box>
+        <Stack direction="row" gap={1} flexWrap="wrap" alignItems="center">
+          <Chip
+            size="small"
+            variant="outlined"
+            label={`${sources.live_snapshots || 0} exakt`}
+          />
+          <Chip
+            size="small"
+            variant="outlined"
+            label={`${sources.historical_logs || 0} rekonstruiert`}
+          />
+          {data?.generated_at && (
+            <Typography variant="caption" color="text.secondary">
+              Stand {new Date(data.generated_at).toLocaleString("de-DE")}
+            </Typography>
+          )}
+        </Stack>
+      </Stack>
+
+      <Card variant="outlined" sx={{ mt: 1.5 }}>
+        <CardContent>
+          <Stack
+            direction={{ xs: "column", md: "row" }}
+            gap={1.5}
+            alignItems={{ md: "center" }}
+          >
+            <TextField
+              select
+              size="small"
+              label="Zeitraum"
+              value={draft.days}
+              onChange={(event) =>
+                setDraft({ ...draft, days: Number(event.target.value) })
+              }
+              sx={{ minWidth: 150 }}
+            >
+              <MenuItem value={30}>30 Tage</MenuItem>
+              <MenuItem value={90}>90 Tage</MenuItem>
+              <MenuItem value={180}>180 Tage</MenuItem>
+              <MenuItem value={365}>1 Jahr</MenuItem>
+            </TextField>
+            <TextField
+              size="small"
+              label="Karte optional"
+              placeholder="z. B. Carentan"
+              value={draft.search}
+              onChange={(event) =>
+                setDraft({ ...draft, search: event.target.value })
+              }
+            />
+            <TextField
+              select
+              size="small"
+              label="Erlaubte Differenz"
+              value={draft.targetDifference}
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  targetDifference: Number(event.target.value),
+                })
+              }
+              sx={{ minWidth: 170 }}
+            >
+              {[1, 2, 3].map((value) => (
+                <MenuItem key={value} value={value}>
+                  {value} Spieler
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              select
+              size="small"
+              label="Muss stabil sein"
+              value={draft.stableSeconds}
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  stableSeconds: Number(event.target.value),
+                })
+              }
+              sx={{ minWidth: 165 }}
+            >
+              {[30, 45, 60, 90].map((value) => (
+                <MenuItem key={value} value={value}>
+                  {value} Sekunden
+                </MenuItem>
+              ))}
+            </TextField>
+            <Button
+              variant="contained"
+              disabled={isFetching}
+              onClick={() => setFilters({ ...draft })}
+            >
+              Auswerten
+            </Button>
+          </Stack>
+          {isFetching && <LinearProgress sx={{ mt: 1.5 }} />}
+        </CardContent>
+      </Card>
+
+      {isLoading && (
+        <Stack alignItems="center" sx={{ py: 6 }}>
+          <CircularProgress />
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Historische Runden werden ausgewertet …
+          </Typography>
+        </Stack>
+      )}
+      {isError && (
+        <Alert severity="error" sx={{ mt: 2 }}>
+          Die historische Sammelauswertung konnte nicht geladen werden.
+        </Alert>
+      )}
+      {!isLoading && !isError && summary && (
+        <Stack spacing={2} sx={{ mt: 2 }}>
+          {!data.backfill?.complete && (
+            <Alert severity="info">
+              Historische Auswertung wird im Hintergrund aufgebaut:{" "}
+              {data.backfill?.analyzed_rounds || 0}/
+              {data.backfill?.requested_rounds || 0} Runden fertig. Die Seite
+              aktualisiert sich automatisch.
+            </Alert>
+          )}
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+                sm: "repeat(2, minmax(0, 1fr))",
+                xl: "repeat(4, minmax(0, 1fr))",
+              },
+              gap: 1.5,
+            }}
+          >
+            <Metric
+              label="Messbare Runden"
+              value={`${summary.measurable_rounds}/${summary.rounds_analyzed}`}
+              caption={`${percent(summary.coverage_ratio)} Datenabdeckung`}
+              color={
+                summary.coverage_ratio >= 0.7 ? "success.main" : "warning.main"
+              }
+            />
+            <Metric
+              label="Zeit im Zielbereich"
+              value={percent(summary.balanced_time_ratio)}
+              caption={`Differenz höchstens ${filters.targetDifference}`}
+            />
+            <Metric
+              label="Balance-Vorfälle"
+              value={summary.incidents_per_10_rounds ?? "–"}
+              caption="pro 10 messbare Runden"
+            />
+            <Metric
+              label="Geschätzte Eingriffe"
+              value={summary.switches_per_round ?? "–"}
+              caption="notwendige Wechsel je messbarer Runde"
+            />
+          </Box>
+          {summary.coverage_ratio < 0.5 && (
+            <Alert severity="warning">
+              Weniger als die Hälfte der gewählten Runden ist zuverlässig
+              messbar. Die Ergebnisgraphen verwenden ausschließlich belastbare
+              Zeitfenster; nicht messbare Runden bleiben in der
+              Datenqualitätsanzeige sichtbar.
+            </Alert>
+          )}
+          <ChartShell
+            title="Balancezeit im Wochenverlauf"
+            subtitle="Anteil der messbaren Zeit innerhalb der gewählten Teamdifferenz."
+          >
+            <WeeklyBalanceChart weekly={summary.weekly} />
+          </ChartShell>
+          <WhatIfCharts rows={data.what_if} />
+          <BreakdownCharts summary={summary} />
+        </Stack>
+      )}
+    </Box>
+  );
+};
+
+export default AutobalancerHistoryDashboard;
