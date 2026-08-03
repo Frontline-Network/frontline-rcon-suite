@@ -1,16 +1,8 @@
 import os
-import sys
-from pathlib import Path
-
-import django
 import pytest
 
 os.environ.setdefault("HLL_MAINTENANCE_CONTAINER", "1")
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "rconweb.settings")
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "rconweb"))
-django.setup()
-
-from api.autobalancer import validate_shadow_review
+from rcon.autobalancer.review import validate_shadow_review
 
 
 def test_shadow_review_accepts_preferred_strategy_and_player():
