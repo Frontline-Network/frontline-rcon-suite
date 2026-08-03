@@ -21,6 +21,7 @@ import { Generate } from "@jsonforms/core";
 import ButtonGroup from "@mui/material/ButtonGroup";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { customRenderers } from "@/pages/settings/[configs]/renderer/renderer";
+import AutobalancerHelp from "@/pages/settings/[configs]/autobalancer-help";
 
 const Editor = lazy(() => import("@monaco-editor/react"));
 
@@ -146,6 +147,7 @@ const ConfigPage = () => {
   const actionData = useActionData();
   const submit = useSubmit();
   const theme = useTheme();
+  const isAutobalancer = command === "autobalancer_config";
 
   useEffect(() => {
     setEditorContent(JSON.stringify(data, null, 2));
@@ -202,13 +204,13 @@ const ConfigPage = () => {
               variant={mode === "visual" ? "contained" : "outlined"}
               onClick={() => updateMode("visual")}
             >
-              Visual
+              {isAutobalancer ? "Einfache Ansicht" : "Visual"}
             </Button>
             <Button
               variant={mode === "code" ? "contained" : "outlined"}
               onClick={() => updateMode("code")}
             >
-              Code
+              {isAutobalancer ? "Erweitert (JSON)" : "Code"}
             </Button>
           </ButtonGroup>
         </Stack>
@@ -223,6 +225,9 @@ const ConfigPage = () => {
                 customStyle={{ border: `2px solid ${red["600"]}` }}
               />
             </Box>
+          )}
+          {isAutobalancer && (
+            <AutobalancerHelp config={jsonData} />
           )}
           {mode === "visual" ? (
             <Box sx={{
@@ -261,17 +266,19 @@ const ConfigPage = () => {
           )}
           <Stack direction={"row"} spacing={1}>
             <Button variant={"outlined"} onClick={handleRefresh}>
-              Refresh
+              {isAutobalancer ? "Neu laden" : "Refresh"}
             </Button>
             <Button variant={"contained"} type="submit">
-              Submit
+              {isAutobalancer ? "Einstellungen speichern" : "Submit"}
             </Button>
           </Stack>
         </Stack>
       </Form>
       {mode === "code" ? (
         <>
-          <Typography variant="h4">Documentation</Typography>
+          <Typography variant="h4">
+            {isAutobalancer ? "Erklärung" : "Documentation"}
+          </Typography>
           <CopyBlock
             wrapLongLines
             text={note}
@@ -279,7 +286,9 @@ const ConfigPage = () => {
             wrapLines
             theme={theme.palette.mode === "dark" ? a11yDark : a11yLight}
           />
-          <Typography variant="h4">Model Schema</Typography>
+          <Typography variant="h4">
+            {isAutobalancer ? "Technisches Schema" : "Model Schema"}
+          </Typography>
           <CopyBlock
             wrapLongLines
             text={JSON.stringify(schema, null, 2)}

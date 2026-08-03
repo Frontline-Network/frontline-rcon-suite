@@ -12,24 +12,42 @@ class AutobalancerMessages(BaseModel):
         default=(
             "Die Teams sind unausgeglichen. Freiwilliger Wechsel zu {target_team}: "
             "Schreibe innerhalb von {seconds} Sekunden !balance."
-        )
+        ),
+        title="Aufruf für Freiwillige",
+        description=(
+            "Direktnachricht an geeignete Spieler des größeren Teams. "
+            "Erlaubte Platzhalter: {target_team} und {seconds}. Im Shadow-Modus "
+            "werden keine Nachrichten gesendet."
+        ),
     )
     volunteer_registered: str = Field(
-        default="Danke! Deine freiwillige Meldung gilt für diesen Balance-Vorfall."
+        default="Danke! Deine freiwillige Meldung gilt für diesen Balance-Vorfall.",
+        title="Bestätigung für Freiwillige",
+        description="Antwort an einen Spieler, nachdem !balance akzeptiert wurde.",
     )
     candidate_selected: str = Field(
         default=(
             "Du wurdest für den Teamausgleich zu {target_team} ausgewählt. "
             "Der Wechsel erfolgt nach deinem nächsten Tod; danach bist du "
             "{cooldown_maps} Karten geschützt."
-        )
+        ),
+        title="Ankündigung der Auswahl",
+        description=(
+            "Nachricht an den ausgewählten Spieler. Erlaubte Platzhalter: "
+            "{target_team} und {cooldown_maps}."
+        ),
     )
     switch_completed: str = Field(
         default=(
             "Danke für deine Mithilfe. Du wurdest zu {target_team} verschoben und "
             "bist nun {cooldown_maps} Karten vor einem weiteren "
             "Autobalance-Wechsel geschützt."
-        )
+        ),
+        title="Bestätigung nach dem Wechsel",
+        description=(
+            "Nachricht nach einem bestätigten Wechsel. Erlaubte Platzhalter: "
+            "{target_team} und {cooldown_maps}."
+        ),
     )
 
     @model_validator(mode="after")
@@ -47,25 +65,170 @@ class AutobalancerMessages(BaseModel):
 class AutobalancerUserConfig(BaseUserConfig):
     mode: Literal["disabled", "shadow", "manual", "auto"] = Field(
         default="disabled",
-        description="disabled, shadow, manual or auto. Upstream defaults to disabled.",
+        title="Betriebsart",
+        description=(
+            "disabled = aus; shadow = nur beobachten und protokollieren; "
+            "manual = Vorschlag muss von einem Admin freigegeben werden; "
+            "auto = nach der Freiwilligenphase automatisch auswählen. "
+            "Auch auto wechselt ausschließlich nach dem Tod."
+        ),
     )
-    poll_interval_seconds: int = Field(default=5, ge=2, le=60)
-    target_difference: int = Field(default=2, ge=0, le=10)
-    minimum_players: int = Field(default=40, ge=0, le=100)
-    stable_difference_seconds: int = Field(default=45, ge=5, le=600)
-    volunteer_phase_seconds: int = Field(default=30, ge=0, le=300)
-    map_start_grace_minutes: int = Field(default=5, ge=0, le=60)
-    map_end_guard_minutes: int = Field(default=10, ge=0, le=60)
-    candidate_timeout_seconds: int = Field(default=180, ge=15, le=900)
-    manual_proposal_timeout_seconds: int = Field(default=120, ge=15, le=900)
-    connection_grace_seconds: int = Field(default=120, ge=0, le=1800)
-    cooldown_maps: int = Field(default=3, ge=0, le=20)
-    max_switches_per_incident: int = Field(default=3, ge=1, le=10)
-    death_event_max_age_seconds: int = Field(default=5, ge=1, le=30)
-    switch_confirmation_timeout_seconds: int = Field(default=15, ge=5, le=60)
-    history_server_numbers: list[int] = Field(default_factory=list)
-    volunteer_command: str = Field(default="!balance", min_length=2, max_length=32)
-    messages: AutobalancerMessages = Field(default_factory=AutobalancerMessages)
+    poll_interval_seconds: int = Field(
+        default=5,
+        ge=2,
+        le=60,
+        title="Prüfintervall (Sekunden)",
+        description="Wie oft Teamzahlen und Kandidatenbedingungen neu geprüft werden.",
+    )
+    target_difference: int = Field(
+        default=2,
+        ge=0,
+        le=10,
+        title="Erlaubte Teamdifferenz",
+        description=(
+            "Bis zu dieser Differenz greift der Balancer nicht ein. Bei 2 sind "
+            "beispielsweise 50:48 und 49:47 noch zulässig."
+        ),
+    )
+    minimum_players: int = Field(
+        default=40,
+        ge=0,
+        le=100,
+        title="Mindestanzahl Spieler",
+        description=(
+            "Unterhalb dieser Gesamtspielerzahl beginnt kein Balance-Vorfall. "
+            "So bleibt Seeding unberührt."
+        ),
+    )
+    stable_difference_seconds: int = Field(
+        default=45,
+        ge=5,
+        le=600,
+        title="Ungleichgewicht muss bestehen (Sekunden)",
+        description=(
+            "Die Teamdifferenz muss so lange ohne Richtungswechsel über dem "
+            "Grenzwert liegen, bevor ein Vorfall beginnt."
+        ),
+    )
+    volunteer_phase_seconds: int = Field(
+        default=30,
+        ge=0,
+        le=300,
+        title="Freiwilligenphase (Sekunden)",
+        description=(
+            "Zeit für !balance, bevor ein Kandidat gewählt wird. Gilt nur in "
+            "manual und auto; shadow sendet keine Nachrichten."
+        ),
+    )
+    map_start_grace_minutes: int = Field(
+        default=5,
+        ge=0,
+        le=60,
+        title="Schutz nach Kartenstart (Minuten)",
+        description="In den ersten Minuten einer Karte wird niemand ausgewählt.",
+    )
+    map_end_guard_minutes: int = Field(
+        default=10,
+        ge=0,
+        le=60,
+        title="Schutz vor Kartenende (Minuten)",
+        description=(
+            "In den letzten Minuten der Runde wird kein neuer Wechsel geplant."
+        ),
+    )
+    candidate_timeout_seconds: int = Field(
+        default=180,
+        ge=15,
+        le=900,
+        title="Timeout für ausgewählten Spieler (Sekunden)",
+        description=(
+            "Wartezeit auf den nächsten Tod. Danach wird die Auswahl verworfen "
+            "und vollständig neu geplant."
+        ),
+    )
+    manual_proposal_timeout_seconds: int = Field(
+        default=120,
+        ge=15,
+        le=900,
+        title="Timeout für Admin-Freigabe (Sekunden)",
+        description=(
+            "So lange bleibt ein Vorschlag im Modus manual zur Freigabe offen."
+        ),
+    )
+    connection_grace_seconds: int = Field(
+        default=120,
+        ge=0,
+        le=1800,
+        title="Schutz nach Verbindung (Sekunden)",
+        description=(
+            "Neu verbundene Spieler sind für diese Zeit von der Auswahl ausgeschlossen."
+        ),
+    )
+    cooldown_maps: int = Field(
+        default=3,
+        ge=0,
+        le=20,
+        title="Schutz nach Wechsel (Karten)",
+        description=(
+            "Ein bereits automatisch verschobener Spieler wird so viele Karten "
+            "lang nicht erneut ausgewählt."
+        ),
+    )
+    max_switches_per_incident: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        title="Maximale Wechsel pro Vorfall",
+        description=(
+            "Sicherheitsgrenze. Nach jedem einzelnen Wechsel werden alle Daten "
+            "neu geprüft und der übrige Plan verworfen."
+        ),
+    )
+    death_event_max_age_seconds: int = Field(
+        default=5,
+        ge=1,
+        le=30,
+        title="Maximales Alter eines Todesereignisses (Sekunden)",
+        description=(
+            "Nur ein frischer Tod darf einen vorgemerkten Wechsel auslösen."
+        ),
+    )
+    switch_confirmation_timeout_seconds: int = Field(
+        default=15,
+        ge=5,
+        le=60,
+        title="Bestätigung des Teamwechsels (Sekunden)",
+        description=(
+            "Zeitfenster, in dem Teamwechsel-Log und neuer Snapshot den Wechsel "
+            "bestätigen müssen."
+        ),
+    )
+    history_server_numbers: list[int] = Field(
+        default_factory=list,
+        title="Servernummern für Spielstärke-Historie",
+        description=(
+            "CRCON-Servernummern, deren abgeschlossene Karten für die sekundäre "
+            "Stärkeschätzung verwendet werden dürfen. Für FLN: 1 und 2."
+        ),
+    )
+    volunteer_command: str = Field(
+        default="!balance",
+        min_length=2,
+        max_length=32,
+        title="Chatbefehl für Freiwillige",
+        description=(
+            "Gilt nur während der aktuellen Freiwilligenphase und nur für Spieler "
+            "im größeren Team."
+        ),
+    )
+    messages: AutobalancerMessages = Field(
+        default_factory=AutobalancerMessages,
+        title="Spielernachrichten",
+        description=(
+            "Nachrichten für Freiwillige, Auswahl und bestätigten Wechsel. Im "
+            "Shadow-Modus werden keine Nachrichten gesendet."
+        ),
+    )
 
     @field_validator("volunteer_command")
     @classmethod

@@ -23,6 +23,20 @@ const PHASE_LABELS = {
   blocked: "Blockiert",
 };
 
+const MODE_LABELS = {
+  disabled: "Aus",
+  shadow: "Shadow – nur beobachten",
+  manual: "Manuell",
+  auto: "Automatisch",
+};
+
+const MODE_EXPLANATIONS = {
+  disabled: "Der Autobalancer ist ausgeschaltet.",
+  shadow: "Testbetrieb: Es werden nur Vorschläge protokolliert. Niemand erhält Nachrichten oder wird verschoben.",
+  manual: "Ein Vorschlag muss von einem Admin freigegeben werden. Der Wechsel erfolgt anschließend nach dem Tod.",
+  auto: "Nach der Freiwilligenphase wird automatisch ausgewählt. Der Wechsel erfolgt nach dem Tod.",
+};
+
 const AutobalancerCard = () => {
   const queryClient = useQueryClient();
   const { data: status, isError } = useQuery({
@@ -67,7 +81,7 @@ const AutobalancerCard = () => {
           <Typography variant="h6">Fair Autobalancer</Typography>
           <Chip
             size="small"
-            label={status.mode}
+            label={MODE_LABELS[status.mode] || status.mode}
             color={status.mode === "auto" ? "success" : "default"}
           />
           <Chip
@@ -79,6 +93,9 @@ const AutobalancerCard = () => {
             {status.required_switches ?? 0} Wechsel nötig
           </Typography>
         </Stack>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          {MODE_EXPLANATIONS[status.mode]}
+        </Typography>
         {proposal && (
           <Box sx={{ mt: 1 }}>
             <Typography variant="body2">
