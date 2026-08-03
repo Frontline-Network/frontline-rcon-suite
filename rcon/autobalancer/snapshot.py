@@ -110,6 +110,8 @@ def build_snapshot(
                 offense=_as_int(player.get("offense")),
                 defense=_as_int(player.get("defense")),
                 support=_as_int(player.get("support")),
+                deaths=_as_int(player.get("deaths")),
+                teamkills=_as_int(player.get("teamkills")),
             )
         )
 

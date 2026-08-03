@@ -8,6 +8,7 @@ os.environ.setdefault("HLL_MAINTENANCE_CONTAINER", "1")
 from rcon.autobalancer.models import BalanceSnapshot, PlayerSnapshot, SkillRating
 from rcon.autobalancer.planner import (
     build_plan,
+    build_strategy_plans,
     protection_tier,
     required_switches,
 )
@@ -150,3 +151,92 @@ def test_skill_only_balance_never_creates_a_plan():
         player("weak", team="axis", rating=0),
     ]
     assert build_plan(snapshot(players, allies_count=40, axis_count=40)) is None
+
+
+def test_odd_one_player_difference_never_creates_an_overshooting_candidate():
+    plan = build_plan(
+        snapshot([player("candidate")], allies_count=41, axis_count=40),
+        target_difference=0,
+    )
+    assert plan is not None
+    assert plan.candidates == []
+    assert "nicht reduzieren" in plan.blocked_reasons[0]
+
+
+def test_balanced_v2_may_use_exactly_one_higher_tier_for_clear_improvement():
+    players = [
+        player("low-tier", unit=None, size=0, rating=0),
+        player("higher-tier", size=4, squad_seconds=299, rating=100),
+        player(
+            "fixed",
+            role="armycommander",
+            unit_type="commander",
+            rating=100,
+        ),
+        player("axis", team="axis", rating=50),
+    ]
+    plans = build_strategy_plans(
+        snapshot(players, allies_count=50, axis_count=47),
+        skill_gap_soft_limit=8,
+        skill_gap_min_improvement=2.5,
+    )
+    assert plans["squad-first"].candidates[0].player.player_id == "low-tier"
+    assert plans["balanced-v2"].candidates[0].player.player_id == "higher-tier"
+    assert plans["skill-first"].candidates[0].player.player_id == "higher-tier"
+
+
+def test_balanced_v2_does_not_escalate_to_specialist_only_for_rating():
+    players = [
+        player("leader", role="officer", leader=True, rating=0),
+        player("armor", role="crewman", unit_type="armor", rating=100),
+        player(
+            "fixed",
+            role="armycommander",
+            unit_type="commander",
+            rating=100,
+        ),
+        player("axis", team="axis", rating=50),
+    ]
+    balanced = build_plan(
+        snapshot(players, allies_count=50, axis_count=47),
+        strategy="balanced-v2",
+    )
+    assert balanced.candidates[0].player.player_id == "leader"
+
+
+def test_specialist_is_used_when_required_count_is_not_reachable_without_one():
+    players = [
+        player("leader", role="officer", leader=True, rating=40),
+        player("armor", role="crewman", unit_type="armor", rating=60),
+        player("axis", team="axis", rating=50),
+    ]
+    balanced = build_plan(
+        snapshot(players, allies_count=50, axis_count=44),
+        strategy="balanced-v2",
+        max_switches=3,
+    )
+    assert {item.player.player_id for item in balanced.candidates} == {
+        "leader",
+        "armor",
+    }
+
+
+def test_hard_rating_warning_is_recorded_but_does_not_block_plan():
+    players = [
+        player("candidate", unit=None, rating=100),
+        player(
+            "fixed",
+            role="armycommander",
+            unit_type="commander",
+            rating=100,
+        ),
+        player("axis", team="axis", rating=0),
+    ]
+    plan = build_plan(
+        snapshot(players, allies_count=50, axis_count=47),
+        strategy="balanced-v2",
+        skill_gap_hard_warning=12,
+    )
+    assert plan.candidates
+    assert plan.projected_rating_gap >= 12
+    assert plan.warnings

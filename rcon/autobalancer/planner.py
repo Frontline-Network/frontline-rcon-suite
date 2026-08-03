@@ -11,7 +11,7 @@ from .models import BalancePlan, BalanceSnapshot, Candidate, PlayerSnapshot
 COMMANDER_ROLES = {"armycommander", "commander"}
 LEADER_ROLES = {"officer", "tankcommander", "spotter", "artilleryobserver"}
 SPECIAL_UNITS = {"armor", "armour", "recon", "artillery"}
-INFANTRY_UNITS = {"infantry", "offense", "defense", "support"}
+STRATEGIES = ("squad-first", "balanced-v2", "skill-first")
 
 
 def required_switches(difference: int, target_difference: int = 2) -> int:
@@ -103,7 +103,6 @@ def eligible_players(
     pending_player_ids: Collection[str] = (),
     connection_grace_seconds: int = 120,
 ) -> list[PlayerSnapshot]:
-    """Return everyone on the larger team who may legally volunteer."""
     if snapshot.larger_team is None:
         return []
     choices, _ = _eligible_choices(
@@ -146,74 +145,114 @@ def _projected_gap(
     return abs(source_rating - target_rating)
 
 
-def build_plan(
+def _combo_details(
+    combo: tuple[_Choice, ...],
     snapshot: BalanceSnapshot,
-    target_difference: int = 2,
-    volunteers: Collection[str] = (),
-    cooldown_player_ids: Collection[str] = (),
-    pending_player_ids: Collection[str] = (),
-    connection_grace_seconds: int = 120,
-    max_switches: int = 3,
-) -> BalancePlan | None:
-    count = required_switches(snapshot.difference, target_difference)
-    if not count or snapshot.larger_team is None or snapshot.smaller_team is None:
-        return None
-    source, target = snapshot.larger_team, snapshot.smaller_team
-    choices, blocked = _eligible_choices(
-        snapshot,
+    source: str,
+    target: str,
+) -> tuple[tuple[int, ...], int, float, float, tuple[str, ...]]:
+    squad_counts = Counter(
+        choice.player.squad_key
+        for choice in combo
+        if choice.player.squad_key is not None
+    )
+    repeated_squads = sum(max(0, amount - 1) for amount in squad_counts.values())
+    tier_profile = tuple(
+        sorted((choice.effective_tier for choice in combo), reverse=True)
+    )
+    gap = _projected_gap(
+        snapshot.players,
         source,
-        volunteers,
-        cooldown_player_ids,
-        pending_player_ids,
-        connection_grace_seconds,
+        target,
+        [choice.player for choice in combo],
+    )
+    return (
+        tier_profile,
+        repeated_squads,
+        gap,
+        -sum(choice.player.rating.confidence for choice in combo),
+        tuple(sorted(choice.player.player_id for choice in combo)),
     )
 
-    planned_count = min(count, max_switches, len(choices))
-    selected_choices: list[_Choice] = []
-    if planned_count:
 
-        def combination_score(combo: tuple[_Choice, ...]):
-            squad_counts = Counter(
-                choice.player.squad_key
-                for choice in combo
-                if choice.player.squad_key is not None
-            )
-            repeated_squads = sum(
-                max(0, amount - 1) for amount in squad_counts.values()
-            )
-            tier_profile = tuple(
-                sorted((choice.effective_tier for choice in combo), reverse=True)
-            )
-            return (
-                tier_profile,
-                repeated_squads,
-                _projected_gap(
-                    snapshot.players,
-                    source,
-                    target,
-                    [choice.player for choice in combo],
-                ),
-                -sum(choice.player.rating.confidence for choice in combo),
-                tuple(sorted(choice.player.player_id for choice in combo)),
-            )
+def _choose_combo(
+    choices: list[_Choice],
+    planned_count: int,
+    snapshot: BalanceSnapshot,
+    source: str,
+    target: str,
+    strategy: str,
+    soft_limit: float,
+    min_improvement: float,
+) -> tuple[_Choice, ...]:
+    combos = list(combinations(choices, planned_count))
+    if not combos:
+        return ()
 
-        selected_choices = list(
-            min(combinations(choices, planned_count), key=combination_score)
+    def details(combo: tuple[_Choice, ...]):
+        return _combo_details(combo, snapshot, source, target)
+
+    squad_combo = min(combos, key=lambda combo: details(combo))
+    if strategy == "squad-first":
+        return squad_combo
+    if strategy == "skill-first":
+        return min(
+            combos,
+            key=lambda combo: (
+                details(combo)[2],
+                details(combo)[0],
+                details(combo)[1],
+                details(combo)[3],
+                details(combo)[4],
+            ),
         )
 
+    squad_details = details(squad_combo)
+    if squad_details[2] <= soft_limit:
+        return squad_combo
+    base_max_tier = max(choice.effective_tier for choice in squad_combo)
+    base_uses_special = any(choice.base_tier == 5 for choice in squad_combo)
+    alternatives = [
+        combo
+        for combo in combos
+        if max(choice.effective_tier for choice in combo) <= base_max_tier + 1
+        and (
+            base_uses_special
+            or not any(choice.base_tier == 5 for choice in combo)
+        )
+    ]
+    if not alternatives:
+        return squad_combo
+    best_gap_combo = min(
+        alternatives,
+        key=lambda combo: (
+            details(combo)[2],
+            details(combo)[0],
+            details(combo)[1],
+            details(combo)[3],
+            details(combo)[4],
+        ),
+    )
+    if squad_details[2] - details(best_gap_combo)[2] >= min_improvement:
+        return best_gap_combo
+    return squad_combo
+
+
+def _order_choices(
+    selected_choices: tuple[_Choice, ...],
+    snapshot: BalanceSnapshot,
+    source: str,
+    target: str,
+) -> list[Candidate]:
+    remaining = list(selected_choices)
     selected: list[Candidate] = []
     moved: list[PlayerSnapshot] = []
     used_squads: Counter[str] = Counter()
-    while selected_choices:
-        lowest_tier = min(choice.effective_tier for choice in selected_choices)
-        tier_choices = [
-            choice
-            for choice in selected_choices
-            if choice.effective_tier == lowest_tier
-        ]
+    while remaining:
         ranked = sorted(
-            tier_choices,
+            remaining,
             key=lambda choice: (
+                choice.effective_tier,
                 bool(choice.player.squad_key and used_squads[choice.player.squad_key]),
                 _projected_gap(
                     snapshot.players, source, target, moved + [choice.player]
@@ -223,7 +262,7 @@ def build_plan(
             ),
         )
         choice = ranked[0]
-        selected_choices.remove(choice)
+        remaining.remove(choice)
         moved.append(choice.player)
         if choice.player.squad_key:
             used_squads[choice.player.squad_key] += 1
@@ -239,7 +278,77 @@ def build_plan(
                 reason=choice.reason,
             )
         )
+    return selected
 
+
+def build_plan(
+    snapshot: BalanceSnapshot,
+    target_difference: int = 2,
+    volunteers: Collection[str] = (),
+    cooldown_player_ids: Collection[str] = (),
+    pending_player_ids: Collection[str] = (),
+    connection_grace_seconds: int = 120,
+    max_switches: int = 3,
+    *,
+    strategy: str = "squad-first",
+    skill_gap_soft_limit: float = 8.0,
+    skill_gap_hard_warning: float = 12.0,
+    skill_gap_min_improvement: float = 2.5,
+) -> BalancePlan | None:
+    if strategy not in STRATEGIES:
+        raise ValueError(f"Unknown autobalancer strategy: {strategy}")
+    count = required_switches(snapshot.difference, target_difference)
+    if not count or snapshot.larger_team is None or snapshot.smaller_team is None:
+        return None
+    source, target = snapshot.larger_team, snapshot.smaller_team
+    simulated_first_difference = abs(
+        snapshot.difference - (2 if snapshot.difference > 0 else -2)
+    )
+    if simulated_first_difference >= abs(snapshot.difference):
+        return BalancePlan(
+            source_team=source,
+            target_team=target,
+            required_switches=count,
+            candidates=[],
+            blocked_reasons=[
+                "Ein einzelner Teamwechsel würde die Spielerzahldifferenz nicht reduzieren"
+            ],
+            strategy=strategy,
+            rating_gap_before=abs(
+                team_rating(snapshot.players, source)
+                - team_rating(snapshot.players, target)
+            ),
+        )
+    choices, blocked = _eligible_choices(
+        snapshot,
+        source,
+        volunteers,
+        cooldown_player_ids,
+        pending_player_ids,
+        connection_grace_seconds,
+    )
+    planned_count = min(count, max_switches, len(choices))
+    combo = _choose_combo(
+        choices,
+        planned_count,
+        snapshot,
+        source,
+        target,
+        strategy,
+        skill_gap_soft_limit,
+        skill_gap_min_improvement,
+    )
+    selected = _order_choices(combo, snapshot, source, target)
+    projected_gap = (
+        selected[-1].projected_rating_gap
+        if selected
+        else abs(team_rating(snapshot.players, source) - team_rating(snapshot.players, target))
+    )
+    warnings: list[str] = []
+    if projected_gap >= skill_gap_hard_warning:
+        warnings.append(
+            "Projizierte Teamstärke bleibt oberhalb der konfigurierten Warnschwelle"
+        )
     if len(selected) < min(count, max_switches):
         blocked.append("Nicht genügend zulässige Kandidaten")
     return BalancePlan(
@@ -248,4 +357,20 @@ def build_plan(
         required_switches=count,
         candidates=selected,
         blocked_reasons=blocked,
+        strategy=strategy,
+        rating_gap_before=abs(
+            team_rating(snapshot.players, source) - team_rating(snapshot.players, target)
+        ),
+        projected_rating_gap=projected_gap,
+        warnings=warnings,
     )
+
+
+def build_strategy_plans(
+    snapshot: BalanceSnapshot,
+    **kwargs,
+) -> dict[str, BalancePlan | None]:
+    return {
+        strategy: build_plan(snapshot, strategy=strategy, **kwargs)
+        for strategy in STRATEGIES
+    }

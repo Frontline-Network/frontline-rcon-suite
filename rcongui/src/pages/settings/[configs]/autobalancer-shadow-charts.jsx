@@ -40,6 +40,12 @@ const REJECTION_LABELS = {
   other: "Anderer Grund",
 };
 
+const STRATEGY_LABELS = {
+  "squad-first": "Squad zuerst",
+  "balanced-v2": "Ausgewogen V2",
+  "skill-first": "Stärke zuerst (Diagnose)",
+};
+
 const ChartShell = ({ title, subtitle, children }) => (
   <Card variant="outlined" sx={{ minWidth: 0 }}>
     <CardContent>
@@ -190,6 +196,43 @@ const LiveBalance = ({ status, targetDifference, minimumPlayers }) => {
           </Box>
         </Box>
       )}
+
+      {status?.team_ratings && (
+        <Stack direction="row" gap={1} flexWrap="wrap" sx={{ mt: 1.5 }}>
+          <Chip
+            size="small"
+            variant="outlined"
+            label={`Teamrating Allies ${
+              status.team_ratings.allies ?? "–"
+            } · Axis ${status.team_ratings.axis ?? "–"}`}
+          />
+          <Chip
+            size="small"
+            variant="outlined"
+            label={`Datenvertrauen ${Math.round(
+              (status.data_confidence || 0) * 100
+            )} %`}
+          />
+          <Chip
+            size="small"
+            variant="outlined"
+            label={`Strategie ${
+              STRATEGY_LABELS[status.strategy] || status.strategy || "–"
+            }`}
+          />
+          <Chip
+            size="small"
+            variant="outlined"
+            label={`Ratingmodell ${status.rating_model_version || "legacy"}`}
+          />
+        </Stack>
+      )}
+
+      {(status?.warnings || []).map((warning) => (
+        <Alert key={warning} severity="warning" sx={{ mt: 1 }}>
+          {warning}
+        </Alert>
+      ))}
 
       {unreliable && (
         <Stack direction="row" gap={1} flexWrap="wrap" sx={{ mt: 1.5 }}>

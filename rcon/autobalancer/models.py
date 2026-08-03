@@ -26,13 +26,19 @@ class Phase(StrEnum):
 
 @dataclass(slots=True)
 class SkillRating:
+    version: str = "legacy"
     value: float = 50.0
+    raw_value: float = 50.0
     confidence: float = 0.0
+    role_family: str = "combat_infantry"
     level_component: float = 50.0
     history_component: float = 50.0
     live_component: float = 50.0
+    history_seconds: int = 0
+    history_maps: int = 0
+    history_source: str = "none"
 
-    def asdict(self) -> dict[str, float]:
+    def asdict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -56,6 +62,8 @@ class PlayerSnapshot:
     offense: int = 0
     defense: int = 0
     support: int = 0
+    deaths: int = 0
+    teamkills: int = 0
     rating: SkillRating = field(default_factory=SkillRating)
 
     @property
@@ -140,6 +148,13 @@ class BalanceSnapshot:
                     "connected_seconds": player.connected_seconds,
                     "squad_seconds": player.squad_seconds,
                     "map_playtime_seconds": player.map_playtime_seconds,
+                    "kills": player.kills,
+                    "deaths": player.deaths,
+                    "teamkills": player.teamkills,
+                    "combat": player.combat,
+                    "offense": player.offense,
+                    "defense": player.defense,
+                    "support": player.support,
                     "rating": player.rating.asdict(),
                 }
                 for player in self.players
@@ -180,6 +195,10 @@ class BalancePlan:
     required_switches: int
     candidates: list[Candidate]
     blocked_reasons: list[str] = field(default_factory=list)
+    strategy: str = "squad-first"
+    rating_gap_before: float = 0.0
+    projected_rating_gap: float = 0.0
+    warnings: list[str] = field(default_factory=list)
 
     def public_dict(self) -> dict[str, Any]:
         return {
@@ -188,6 +207,10 @@ class BalancePlan:
             "required_switches": self.required_switches,
             "candidates": [candidate.public_dict() for candidate in self.candidates],
             "blocked_reasons": self.blocked_reasons,
+            "strategy": self.strategy,
+            "rating_gap_before": round(self.rating_gap_before, 2),
+            "projected_rating_gap": round(self.projected_rating_gap, 2),
+            "warnings": self.warnings,
         }
 
 

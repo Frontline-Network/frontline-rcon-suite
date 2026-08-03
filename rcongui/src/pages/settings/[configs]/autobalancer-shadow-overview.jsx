@@ -53,6 +53,18 @@ const REJECTION_LABELS = {
 };
 
 const TEAM_LABELS = { allies: "Allies", axis: "Axis" };
+const STRATEGY_LABELS = {
+  "squad-first": "Squad zuerst",
+  "balanced-v2": "Ausgewogen V2 (empfohlen)",
+  "skill-first": "Stärke zuerst (nur Diagnose)",
+};
+
+const ROLE_FAMILY_LABELS = {
+  combat_infantry: "Combat Infantry",
+  support: "Support / Engineer / Medic",
+  leader: "Squad Leader",
+  specialist: "Armor / Recon / Artillery",
+};
 
 const formatPercent = (value) =>
   value === null || value === undefined
@@ -120,6 +132,72 @@ const Goal = ({ label, value, target, met, progress, explanation }) => (
   </Box>
 );
 
+const StrategyComparison = ({ decision }) => {
+  const strategies = Object.entries(decision.strategy_plans || {});
+  if (!strategies.length) return null;
+  return (
+    <Box sx={{ mt: 1.5 }}>
+      <Typography variant="subtitle2" sx={{ mb: 1 }}>
+        Drei Shadow-Strategien – gleiche Ausgangslage
+      </Typography>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", lg: "repeat(3, 1fr)" },
+          gap: 1,
+        }}
+      >
+        {strategies.map(([name, plan]) => (
+          <Card
+            key={name}
+            variant="outlined"
+            sx={{
+              borderColor:
+                name === decision.strategy_version ? "primary.main" : "divider",
+            }}
+          >
+            <CardContent>
+              <Stack direction="row" gap={0.75} flexWrap="wrap">
+                <Chip
+                  size="small"
+                  color={name === "balanced-v2" ? "primary" : "default"}
+                  label={STRATEGY_LABELS[name] || name}
+                />
+                {name === decision.strategy_version && (
+                  <Chip size="small" variant="outlined" label="verwendet" />
+                )}
+              </Stack>
+              <Typography sx={{ fontWeight: 700, mt: 1 }}>
+                {plan.player_name || "Kein Kandidat"}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Schutzstufe {plan.effective_tier ?? "–"} · Ratingdifferenz{" "}
+                {plan.rating_gap_before ?? decision.rating_gap_before ?? "–"} →{" "}
+                {plan.projected_rating_gap ?? "–"}
+              </Typography>
+              {(plan.warnings || []).map((warning) => (
+                <Typography
+                  key={warning}
+                  variant="caption"
+                  color="warning.main"
+                  sx={{ display: "block", mt: 0.5 }}
+                >
+                  {warning}
+                </Typography>
+              ))}
+            </CardContent>
+          </Card>
+        ))}
+      </Box>
+      <Typography variant="caption" color="text.secondary">
+        {decision.strategies_agree
+          ? "Alle Strategien wählen denselben ersten Kandidaten."
+          : "Die Strategien wählen unterschiedliche Kandidaten. Genau solche Fälle sind für die Kalibrierung besonders wichtig."}
+      </Typography>
+    </Box>
+  );
+};
+
 const AutobalancerShadowOverview = ({ config }) => {
   const queryClient = useQueryClient();
   const { permissions } = useAuth();
@@ -127,6 +205,8 @@ const AutobalancerShadowOverview = ({ config }) => {
   const [reviewTarget, setReviewTarget] = useState(null);
   const [category, setCategory] = useState("");
   const [comment, setComment] = useState("");
+  const [preferredStrategy, setPreferredStrategy] = useState("");
+  const [preferredPlayerId, setPreferredPlayerId] = useState("");
   const queryKey = [{ queryIdentifier: "get_autobalancer_shadow_overview" }];
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey,
@@ -150,6 +230,8 @@ const AutobalancerShadowOverview = ({ config }) => {
       verdict,
       reasonCategory,
       reviewComment,
+      preferredStrategy: selectedStrategy,
+      preferredPlayerId: selectedPlayer,
     }) => {
       const response = await cmd.REVIEW_AUTOBALANCER_SHADOW_DECISION({
         payload: {
@@ -157,6 +239,8 @@ const AutobalancerShadowOverview = ({ config }) => {
           verdict,
           category: reasonCategory,
           comment: reviewComment,
+          preferred_strategy: selectedStrategy || null,
+          preferred_player_id: selectedPlayer || null,
         },
       });
       if (response?.failed) throw new Error(response.error);
@@ -167,6 +251,8 @@ const AutobalancerShadowOverview = ({ config }) => {
       setReviewTarget(null);
       setCategory("");
       setComment("");
+      setPreferredStrategy("");
+      setPreferredPlayerId("");
       queryClient.invalidateQueries({ queryKey });
     },
     onError: (error) =>
@@ -232,7 +318,11 @@ const AutobalancerShadowOverview = ({ config }) => {
           config={config}
         />
 
-        <AutobalancerHistoryDashboard config={config} />
+        <AutobalancerHistoryDashboard
+          config={config}
+          shadowSummary={summary}
+          pilotGoals={goals}
+        />
 
         <AutobalancerRoundHistory config={config} />
 
@@ -252,17 +342,17 @@ const AutobalancerShadowOverview = ({ config }) => {
               alignItems={{ sm: "center" }}
             >
               <Typography sx={{ fontWeight: 700 }}>
-                Pilotziele und genaue Kennzahlen
+                Adminbewertungen und Auditwerte
               </Typography>
               <Chip
                 size="small"
                 color={goals.ready_for_manual ? "success" : "default"}
                 label={
                   goals.ready_for_manual
-                    ? "Pilotziel erreicht"
+                    ? "Admin-Teilziele erreicht"
                     : `${
-                        summary.reviewed_rounds ?? 0
-                      }/10 Karten · ${formatPercent(acceptance)}`
+                        summary.reviewed ?? 0
+                      }/20 Bewertungen · ${formatPercent(acceptance)}`
                 }
               />
             </Stack>
@@ -320,12 +410,40 @@ const AutobalancerShadowOverview = ({ config }) => {
                 explanation="Eine Karte zählt, sobald mindestens ein Vorschlag daraus bewertet wurde."
               />
               <Goal
+                label="Bewertete Vorschläge"
+                value={summary.reviewed ?? 0}
+                target={goals.reviewed_proposals_target ?? 20}
+                met={goals.reviewed_proposals_met}
+                progress={
+                  ((summary.reviewed ?? 0) /
+                    (goals.reviewed_proposals_target || 20)) *
+                  100
+                }
+                explanation="Wenn nach zehn Karten noch keine 20 Vorschläge bewertet sind, läuft Shadow weiter."
+              />
+              <Goal
                 label="Akzeptable Vorschläge"
                 value={formatPercent(acceptance)}
                 target={formatPercent(goals.acceptance_rate_target ?? 0.9)}
                 met={goals.acceptance_rate_met}
                 progress={(acceptance ?? 0) * 100}
                 explanation="Ziel für manual: mindestens 90 % der bewerteten Vorschläge. Es erfolgt keine automatische Umschaltung."
+              />
+              <Goal
+                label="Mediane Ratingkonfidenz"
+                value={formatPercent(summary.median_rating_confidence)}
+                target={formatPercent(goals.rating_confidence_target ?? 0.6)}
+                met={goals.rating_confidence_met}
+                progress={(summary.median_rating_confidence ?? 0) * 100}
+                explanation="Das effektive Rating wird bei geringer Konfidenz automatisch zum neutralen Wert 50 zurückgeführt."
+              />
+              <Goal
+                label="Ratingdifferenz-Guardrail"
+                value={formatPercent(summary.gap_guardrail_rate)}
+                target={formatPercent(goals.gap_guardrail_target ?? 0.95)}
+                met={goals.gap_guardrail_met}
+                progress={(summary.gap_guardrail_rate ?? 0) * 100}
+                explanation="Mindestens 95 % der Empfehlungen dürfen die Ratingdifferenz um höchstens zwei Punkte verschlechtern."
               />
             </Stack>
           </AccordionDetails>
@@ -455,13 +573,37 @@ const AutobalancerShadowOverview = ({ config }) => {
                           seit {formatMinutes(decision.squad_seconds)}
                         </Typography>
                         <Typography variant="body2" sx={{ mt: 1 }}>
-                          Stärke {Math.round(decision.rating ?? 50)}/100 ·
-                          Vertrauen {formatPercent(decision.rating_confidence)}{" "}
-                          · projizierte Ratingdifferenz{" "}
-                          {decision.projected_rating_gap ?? "–"}
+                          Effektives Rating {Math.round(decision.rating ?? 50)}
+                          /100
+                          {decision.rating_raw != null
+                            ? ` · Rohwert ${Math.round(
+                                decision.rating_raw
+                              )}/100`
+                            : ""}
+                          {" · "}Vertrauen{" "}
+                          {formatPercent(decision.rating_confidence)}
+                        </Typography>
+                        <Typography variant="body2">
+                          Rollenfamilie{" "}
+                          {ROLE_FAMILY_LABELS[decision.rating_role_family] ||
+                            decision.rating_role_family ||
+                            "Legacy"}
+                          {" · "}Historie{" "}
+                          {decision.rating_history_source || "legacy"}
+                          {" · "}Modell{" "}
+                          {decision.rating_model_version || "legacy"}
+                        </Typography>
+                        <Typography variant="body2">
+                          Ratingdifferenz {decision.rating_gap_before ?? "–"} →{" "}
+                          {decision.projected_rating_gap ?? "–"} · Strategie{" "}
+                          {STRATEGY_LABELS[decision.strategy_version] ||
+                            decision.strategy_version ||
+                            "legacy"}
                         </Typography>
                       </Box>
                     </Box>
+
+                    <StrategyComparison decision={decision} />
 
                     {(decision.audit_warnings || []).map((warning) => (
                       <Alert key={warning} severity="error" sx={{ mt: 1 }}>
@@ -485,6 +627,13 @@ const AutobalancerShadowOverview = ({ config }) => {
                         {decision.review_comment
                           ? ` – ${decision.review_comment}`
                           : ""}
+                        {decision.review_preferred_strategy
+                          ? ` Bevorzugte Strategie: ${
+                              STRATEGY_LABELS[
+                                decision.review_preferred_strategy
+                              ] || decision.review_preferred_strategy
+                            }.`
+                          : ""}
                       </Alert>
                     )}
 
@@ -503,6 +652,9 @@ const AutobalancerShadowOverview = ({ config }) => {
                               verdict: "accepted",
                               reasonCategory: null,
                               reviewComment: null,
+                              preferredStrategy:
+                                decision.strategy_version || "balanced-v2",
+                              preferredPlayerId: decision.player_id || null,
                             })
                           }
                         >
@@ -519,6 +671,12 @@ const AutobalancerShadowOverview = ({ config }) => {
                             setReviewTarget(decision);
                             setCategory(decision.review_category || "");
                             setComment(decision.review_comment || "");
+                            setPreferredStrategy(
+                              decision.review_preferred_strategy || ""
+                            );
+                            setPreferredPlayerId(
+                              decision.review_preferred_player_id || ""
+                            );
                           }}
                         >
                           Nicht akzeptabel
@@ -565,6 +723,61 @@ const AutobalancerShadowOverview = ({ config }) => {
               ))}
             </Select>
           </FormControl>
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel id="shadow-preferred-strategy-label">
+              Welche Strategie wäre besser? (optional)
+            </InputLabel>
+            <Select
+              labelId="shadow-preferred-strategy-label"
+              label="Welche Strategie wäre besser? (optional)"
+              value={preferredStrategy}
+              onChange={(event) => {
+                const value = event.target.value;
+                setPreferredStrategy(value);
+                setPreferredPlayerId(
+                  reviewTarget?.strategy_plans?.[value]?.player_id || ""
+                );
+              }}
+            >
+              <MenuItem value="">Keine Angabe</MenuItem>
+              {Object.keys(reviewTarget?.strategy_plans || {}).map((value) => (
+                <MenuItem key={value} value={value}>
+                  {STRATEGY_LABELS[value] || value}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel id="shadow-preferred-player-label">
+              Besserer Kandidat (optional)
+            </InputLabel>
+            <Select
+              labelId="shadow-preferred-player-label"
+              label="Besserer Kandidat (optional)"
+              value={preferredPlayerId}
+              onChange={(event) => setPreferredPlayerId(event.target.value)}
+            >
+              <MenuItem value="">Keine Angabe</MenuItem>
+              {Array.from(
+                new Map(
+                  Object.entries(reviewTarget?.strategy_plans || {})
+                    .filter(([, plan]) => plan.player_id)
+                    .map(([strategy, plan]) => [
+                      plan.player_id,
+                      {
+                        ...plan,
+                        strategy,
+                      },
+                    ])
+                ).values()
+              ).map((plan) => (
+                <MenuItem key={plan.player_id} value={plan.player_id}>
+                  {plan.player_name || plan.player_id} ·{" "}
+                  {STRATEGY_LABELS[plan.strategy] || plan.strategy}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <TextField
             fullWidth
             multiline
@@ -594,6 +807,8 @@ const AutobalancerShadowOverview = ({ config }) => {
                 verdict: "rejected",
                 reasonCategory: category,
                 reviewComment: comment,
+                preferredStrategy,
+                preferredPlayerId,
               })
             }
           >

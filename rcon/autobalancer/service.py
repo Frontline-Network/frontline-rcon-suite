@@ -4,6 +4,7 @@ import logging
 import time
 import uuid
 from datetime import datetime, timezone
+from statistics import median
 from typing import Any
 
 from rcon.rcon import get_rcon
@@ -12,8 +13,14 @@ from rcon.utils import get_server_number
 
 from .history import load_history
 from .models import BalancePlan, BalanceSnapshot, Phase
-from .planner import build_plan, eligible_players, protection_tier, team_rating
-from .rating import calculate_ratings
+from .planner import (
+    build_plan,
+    build_strategy_plans,
+    eligible_players,
+    protection_tier,
+    team_rating,
+)
+from .rating import RATING_MODEL_VERSION, calculate_ratings
 from .repository import DecisionRepository
 from .snapshot import build_snapshot
 from .store import AutobalancerStore, new_instance_token
@@ -93,7 +100,12 @@ class AutobalancerService:
         snapshot = snapshot or build_snapshot(self.rcon, self.store, now=now)
         history_servers = config.history_server_numbers or [self.server_number]
         historical = self._load_history(snapshot, history_servers, now)
-        ratings = calculate_ratings(snapshot.players, historical)
+        ratings = calculate_ratings(
+            snapshot.players,
+            historical,
+            now=now,
+            half_life_days=config.history_half_life_days,
+        )
         for player in snapshot.players:
             player.rating = ratings[player.player_id]
 
@@ -176,7 +188,7 @@ class AutobalancerService:
             and now.timestamp() - cache["loaded_at"] < 60
         ):
             return cache["value"]
-        value = load_history(list(player_ids), history_servers)
+        value = load_history(list(player_ids), history_servers, now=now.replace(tzinfo=None))
         self._history_cache = {
             "player_ids": player_ids,
             "servers": tuple(history_servers),
@@ -219,6 +231,15 @@ class AutobalancerService:
         if snapshot.native_autobalance_enabled is None:
             warnings.append(
                 "Native Autobalance-Konfiguration konnte nicht gelesen werden"
+            )
+        confidences = [
+            player.rating.confidence
+            for player in snapshot.players
+            if player.rating.role_family != "commander"
+        ]
+        if confidences and median(confidences) < 0.6:
+            warnings.append(
+                "Die mediane Ratingkonfidenz liegt noch unter dem Pilotziel von 60 %"
             )
         return warnings
 
@@ -389,6 +410,40 @@ class AutobalancerService:
                 0,
                 config.max_switches_per_incident - int(state.get("executed_count", 0)),
             ),
+            strategy=config.skill_strategy,
+            skill_gap_soft_limit=config.skill_gap_soft_limit,
+            skill_gap_hard_warning=config.skill_gap_hard_warning,
+            skill_gap_min_improvement=config.skill_gap_min_improvement,
+        )
+
+    def _strategy_plans(
+        self,
+        state: dict[str, Any],
+        snapshot: BalanceSnapshot,
+        config: AutobalancerUserConfig,
+        cooldown_player_ids: set[str] | None = None,
+    ) -> dict[str, BalancePlan | None]:
+        cooldown_player_ids = (
+            self._cooldown_ids(snapshot, config)
+            if cooldown_player_ids is None
+            else cooldown_player_ids
+        )
+        return build_strategy_plans(
+            snapshot,
+            target_difference=config.target_difference,
+            volunteers=state.get("volunteers") or [],
+            cooldown_player_ids=cooldown_player_ids,
+            pending_player_ids=(
+                [state["candidate"]["player_id"]] if state.get("candidate") else []
+            ),
+            connection_grace_seconds=config.connection_grace_seconds,
+            max_switches=max(
+                0,
+                config.max_switches_per_incident - int(state.get("executed_count", 0)),
+            ),
+            skill_gap_soft_limit=config.skill_gap_soft_limit,
+            skill_gap_hard_warning=config.skill_gap_hard_warning,
+            skill_gap_min_improvement=config.skill_gap_min_improvement,
         )
 
     def _propose(
@@ -398,7 +453,14 @@ class AutobalancerService:
         config: AutobalancerUserConfig,
         now: datetime,
     ) -> dict[str, Any]:
-        plan = self._plan(state, snapshot, config)
+        cooldown_player_ids = self._cooldown_ids(snapshot, config)
+        strategy_plans = self._strategy_plans(
+            state,
+            snapshot,
+            config,
+            cooldown_player_ids=cooldown_player_ids,
+        )
+        plan = strategy_plans.get(config.skill_strategy)
         if plan is None or not plan.candidates:
             state["phase"] = Phase.BLOCKED
             state["block_reasons"] = (
@@ -427,9 +489,32 @@ class AutobalancerService:
                 "protection_tier": candidate.base_tier,
                 "rating": candidate.player.rating.value,
                 "rating_confidence": candidate.player.rating.confidence,
+                "rating_model_version": RATING_MODEL_VERSION,
+                "strategy_version": config.skill_strategy,
                 "reason": {
                     "selection": candidate.reason,
                     "plan": plan.public_dict(),
+                    "safety": {
+                        "candidate_in_cooldown": (
+                            candidate.player.player_id in cooldown_player_ids
+                        ),
+                        "candidate_is_commander": (
+                            candidate.player.rating.role_family == "commander"
+                        ),
+                        "snapshot_complete": bool(
+                            snapshot.counts_match
+                            and snapshot.fail_count == 0
+                            and snapshot.stable_map
+                        ),
+                        "simulated_difference_after_first": abs(
+                            snapshot.difference
+                            - (2 if snapshot.difference > 0 else -2)
+                        ),
+                    },
+                    "strategies": {
+                        name: candidate_plan.public_dict() if candidate_plan else None
+                        for name, candidate_plan in strategy_plans.items()
+                    },
                 },
                 "before_snapshot": snapshot.audit_dict(),
             }
@@ -440,6 +525,10 @@ class AutobalancerService:
                 "decision_id": decision_id,
                 "candidate": candidate.public_dict(),
                 "plan": plan.public_dict(),
+                "strategy_plans": {
+                    name: candidate_plan.public_dict() if candidate_plan else None
+                    for name, candidate_plan in strategy_plans.items()
+                },
                 "proposal_expires_at": now.timestamp()
                 + config.manual_proposal_timeout_seconds,
             }
@@ -710,6 +799,7 @@ class AutobalancerService:
                     "abort_reason": reason,
                     "selection": (state.get("candidate") or {}).get("reason"),
                     "plan": state.get("plan"),
+                    "strategies": state.get("strategy_plans"),
                 },
             )
 
@@ -721,7 +811,19 @@ class AutobalancerService:
         hard_blocks: list[str],
         warnings: list[str],
     ) -> dict[str, Any]:
-        confidences = [player.rating.confidence for player in snapshot.players]
+        confidences = [
+            player.rating.confidence
+            for player in snapshot.players
+            if player.rating.role_family != "commander"
+        ]
+        team_confidences = {
+            team: [
+                player.rating.confidence
+                for player in snapshot.players
+                if player.team == team and player.rating.role_family != "commander"
+            ]
+            for team in ("allies", "axis")
+        }
         return {
             "mode": config.mode,
             "phase": state.get("phase", Phase.IDLE),
@@ -738,12 +840,22 @@ class AutobalancerService:
                 "allies": round(team_rating(snapshot.players, "allies"), 2),
                 "axis": round(team_rating(snapshot.players, "axis"), 2),
             },
+            "team_rating_confidence": {
+                team: round(
+                    sum(values) / len(values) if values else 0.0,
+                    3,
+                )
+                for team, values in team_confidences.items()
+            },
+            "rating_model_version": RATING_MODEL_VERSION,
+            "strategy": config.skill_strategy,
             "data_confidence": round(
                 sum(confidences) / len(confidences) if confidences else 0.0, 3
             ),
             "volunteers": state.get("volunteers") or [],
             "proposal": state.get("candidate"),
             "plan": state.get("plan"),
+            "strategy_plans": state.get("strategy_plans"),
             "block_reasons": hard_blocks + (state.get("block_reasons") or []),
             "warnings": warnings,
             "native_autobalance": {

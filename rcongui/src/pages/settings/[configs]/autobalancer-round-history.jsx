@@ -45,6 +45,84 @@ const formatDuration = (seconds) => {
   )} h`;
 };
 
+const STRATEGY_LABELS = {
+  "squad-first": "Squad zuerst",
+  "balanced-v2": "Ausgewogen V2",
+  "skill-first": "Stärke zuerst (Diagnose)",
+};
+
+const CandidateWhatIf = ({ analysis }) => {
+  const whatIf = analysis?.candidate_what_if;
+  if (analysis?.quality?.source !== "live_snapshots") {
+    return (
+      <Alert severity="info" sx={{ mt: 1 }}>
+        Keine Kandidaten-Rückrechnung: Alte Logrunden enthalten keine exakten
+        Rollen-, Squad- und Rating-Snapshots. Teamgrößen und Zeitfenster bleiben
+        trotzdem auswertbar.
+      </Alert>
+    );
+  }
+  if (!whatIf) {
+    return (
+      <Alert severity="success" sx={{ mt: 1 }}>
+        In den vollständigen sicheren Snapshots dieser Runde gab es keinen
+        auswertbaren Balance-Vorfall für einen Kandidatenvergleich.
+      </Alert>
+    );
+  }
+  return (
+    <Box sx={{ mt: 2 }}>
+      <Typography variant="h6" sx={{ fontWeight: 700 }}>
+        Kandidaten-What-if aus exaktem Snapshot
+      </Typography>
+      <Typography variant="body2" color="text.secondary">
+        Stand {formatDate(whatIf.captured_at)} · Allies {whatIf.allies_count}:
+        {whatIf.axis_count} Axis · Modell {whatIf.rating_model_version}
+      </Typography>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", lg: "repeat(3, 1fr)" },
+          gap: 1,
+          mt: 1,
+        }}
+      >
+        {Object.entries(whatIf.strategies || {}).map(([strategy, plan]) => {
+          const candidate = plan?.candidates?.[0];
+          return (
+            <Box
+              key={strategy}
+              sx={{
+                p: 1.5,
+                border: 1,
+                borderColor: "divider",
+                borderRadius: 1,
+              }}
+            >
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                {STRATEGY_LABELS[strategy] || strategy}
+              </Typography>
+              <Typography variant="body1" sx={{ mt: 0.5 }}>
+                {candidate?.player_name ||
+                  candidate?.player_id ||
+                  "Kein Kandidat"}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Schutzstufe {candidate?.effective_tier ?? "–"} · Ratingdifferenz{" "}
+                {plan?.rating_gap_before ?? "–"} →{" "}
+                {plan?.projected_rating_gap ?? "–"}
+              </Typography>
+            </Box>
+          );
+        })}
+      </Box>
+      <Typography variant="caption" color="text.secondary">
+        {whatIf.limitations}
+      </Typography>
+    </Box>
+  );
+};
+
 const HistoricalChart = ({ analysis, targetDifference }) => {
   const points = (analysis?.timeline || [])
     .map((sample) => ({
@@ -199,6 +277,7 @@ const HistoricalAnalysis = ({ analysis, targetDifference }) => {
         analysis={analysis}
         targetDifference={targetDifference}
       />
+      <CandidateWhatIf analysis={analysis} />
       <Typography variant="caption" color="text.secondary">
         Datenquelle:{" "}
         {quality.source === "live_snapshots"
@@ -208,8 +287,8 @@ const HistoricalAnalysis = ({ analysis, targetDifference }) => {
           (quality.score || 0) * 100
         )} %)`}
         {` · ${quality.valid_events || 0} verwertbare Messungen/Ereignisse.`}
-        Alte Logs enthalten keine vollständigen Squad-Snapshots; deshalb werden
-        rückwirkend keine Spieler als Wechselkandidaten bewertet.
+        Rekonstruierte Logs werden rückwirkend niemals zur Kandidatenauswahl
+        verwendet.
       </Typography>
     </Box>
   );

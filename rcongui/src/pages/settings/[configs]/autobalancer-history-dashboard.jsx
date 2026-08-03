@@ -26,6 +26,20 @@ const formatMap = (value) =>
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 
+const ROLE_LABELS = {
+  combat_infantry: "Combat Infantry",
+  support: "Support / Engineer / Medic",
+  leader: "Squad Leader",
+  specialist: "Armor / Recon / Artillery",
+  legacy: "Legacy ohne Rollenbezug",
+};
+
+const STRATEGY_LABELS = {
+  "squad-first": "Squad zuerst",
+  "balanced-v2": "Ausgewogen V2",
+  "skill-first": "Stärke zuerst (Diagnose)",
+};
+
 const Metric = ({ label, value, caption, color = "text.primary" }) => (
   <Card variant="outlined">
     <CardContent>
@@ -249,7 +263,131 @@ const BreakdownCharts = ({ summary }) => {
   );
 };
 
-const AutobalancerHistoryDashboard = ({ config }) => {
+const CalibrationCharts = ({ quality }) => {
+  const roles = quality?.role_confidence || [];
+  const confidence = quality?.confidence_distribution || [];
+  const strategies = quality?.strategies || [];
+  if (!roles.length && !strategies.length) {
+    return (
+      <Alert severity="info">
+        Rollenrating und Strategievergleich sammeln erst mit den neuen exakten
+        30-Sekunden-Snapshots belastbare Daten. Rekonstruierte Altrunden werden
+        hierfür bewusst nicht verwendet.
+      </Alert>
+    );
+  }
+  return (
+    <Box
+      sx={{
+        display: "grid",
+        gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" },
+        gap: 2,
+      }}
+    >
+      <ChartShell
+        title="Ratingvertrauen nach Rollenfamilie"
+        subtitle="Median je Rollenfamilie. 60 % ist das Pilot-Mindestziel; mehr Beobachtungen machen das Rating stabiler."
+      >
+        {roles.length ? (
+          <BarChart
+            height={300}
+            xAxis={[
+              {
+                scaleType: "band",
+                data: roles.map(
+                  (row) => ROLE_LABELS[row.role_family] || row.role_family
+                ),
+              },
+            ]}
+            yAxis={[
+              { min: 0, max: 100, valueFormatter: (value) => `${value} %` },
+            ]}
+            series={[
+              {
+                label: "Medianes Vertrauen",
+                data: roles.map((row) =>
+                  Math.round((row.median_confidence || 0) * 100)
+                ),
+                color: "#2563eb",
+                valueFormatter: (value) => `${value} %`,
+              },
+            ]}
+            grid={{ horizontal: true }}
+          />
+        ) : (
+          <Alert severity="info">Noch keine exakten Rollendaten.</Alert>
+        )}
+      </ChartShell>
+      <ChartShell
+        title="Verteilung der Ratingkonfidenz"
+        subtitle="Anzahl Spielerbeobachtungen je Vertrauensbereich; Ziel ist eine Verschiebung in die Bereiche ab 60 %."
+      >
+        {confidence.some((row) => row.observations) ? (
+          <BarChart
+            height={300}
+            xAxis={[
+              {
+                scaleType: "band",
+                data: confidence.map((row) => row.bucket),
+              },
+            ]}
+            yAxis={[{ min: 0, tickMinStep: 1 }]}
+            series={[
+              {
+                label: "Beobachtungen",
+                data: confidence.map((row) => row.observations),
+                color: "#7c3aed",
+                valueFormatter: (value) => `${value} Beobachtungen`,
+              },
+            ]}
+            grid={{ horizontal: true }}
+          />
+        ) : (
+          <Alert severity="info">Noch keine Konfidenzdaten.</Alert>
+        )}
+      </ChartShell>
+      <Box sx={{ gridColumn: { lg: "1 / -1" } }}>
+        <ChartShell
+          title="Shadow-Strategien im direkten Vergleich"
+          subtitle="Durchschnittliche projizierte Ratingdifferenz nach dem ersten Kandidaten. Niedriger ist statistisch ausgeglichener; Squad-Schutz bleibt bei Ausgewogen V2 vorrangig."
+        >
+          {strategies.length ? (
+            <BarChart
+              height={300}
+              xAxis={[
+                {
+                  scaleType: "band",
+                  data: strategies.map(
+                    (row) => STRATEGY_LABELS[row.strategy] || row.strategy
+                  ),
+                },
+              ]}
+              yAxis={[{ min: 0 }]}
+              series={[
+                {
+                  label: "Ø projizierte Ratingdifferenz",
+                  data: strategies.map((row) => row.average_projected_gap),
+                  color: "#0f766e",
+                  valueFormatter: (value) =>
+                    value == null ? "noch keine Daten" : value.toFixed(1),
+                },
+              ]}
+              grid={{ horizontal: true }}
+            />
+          ) : (
+            <Alert severity="info">Noch kein V2-Strategievergleich.</Alert>
+          )}
+        </ChartShell>
+      </Box>
+    </Box>
+  );
+};
+
+const AutobalancerHistoryDashboard = ({
+  config,
+  shadowSummary = {},
+  pilotGoals = {},
+}) => {
   const initial = {
     days: 90,
     search: "",
@@ -282,6 +420,48 @@ const AutobalancerHistoryDashboard = ({ config }) => {
   });
   const summary = data?.summary;
   const sources = data?.source_counts || {};
+  const quality = data?.rating_quality || {};
+  const ratingConfidence =
+    quality.median_rating_confidence ?? shadowSummary.median_rating_confidence;
+  const criteria = [
+    {
+      label: `${quality.fully_captured_rounds || 0}/10 vollständige Runden`,
+      met: (quality.fully_captured_rounds || 0) >= 10,
+    },
+    {
+      label: `${percent(quality.snapshot_coverage)} exakte Abdeckung`,
+      met: quality.snapshot_coverage >= 0.95,
+    },
+    {
+      label: `${shadowSummary.reviewed || 0}/20 Bewertungen`,
+      met: (shadowSummary.reviewed || 0) >= 20,
+    },
+    {
+      label: `${percent(shadowSummary.acceptance_rate)} akzeptiert`,
+      met: shadowSummary.acceptance_rate >= 0.9,
+    },
+    {
+      label: `${percent(ratingConfidence)} Ratingvertrauen`,
+      met: ratingConfidence >= 0.6,
+    },
+    {
+      label: `${percent(
+        shadowSummary.gap_guardrail_rate ?? quality.gap_guardrail_rate
+      )} Rating-Guardrail`,
+      met:
+        (shadowSummary.gap_guardrail_rate ?? quality.gap_guardrail_rate) >=
+        0.95,
+    },
+    {
+      label: `${shadowSummary.rule_warning_proposals || 0} harte Verletzungen`,
+      met: (shadowSummary.rule_warning_proposals || 0) === 0,
+    },
+    {
+      label: `${shadowSummary.size_overshoot_proposals || 0} Überschwinger`,
+      met: (shadowSummary.size_overshoot_proposals || 0) === 0,
+    },
+  ];
+  const calibrationReady = criteria.every((criterion) => criterion.met);
 
   return (
     <Box sx={{ mt: 2 }}>
@@ -317,6 +497,103 @@ const AutobalancerHistoryDashboard = ({ config }) => {
           )}
         </Stack>
       </Stack>
+
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "repeat(2, minmax(0, 1fr))",
+            xl: "repeat(5, minmax(0, 1fr))",
+          },
+          gap: 1.5,
+          mt: 1.5,
+        }}
+      >
+        <Metric
+          label="Exakte Datenabdeckung"
+          value={percent(quality.snapshot_coverage)}
+          caption={`Ziel ${percent(0.95)} · nur gültige 30-Sekunden-Snapshots`}
+          color={
+            quality.snapshot_coverage >= 0.95 ? "success.main" : "warning.main"
+          }
+        />
+        <Metric
+          label="Mediane Ratingkonfidenz"
+          value={percent(
+            quality.median_rating_confidence ??
+              shadowSummary.median_rating_confidence
+          )}
+          caption={`Ziel ${percent(
+            pilotGoals.rating_confidence_target ?? 0.6
+          )} · role-aware-v2`}
+          color={
+            (quality.median_rating_confidence ??
+              shadowSummary.median_rating_confidence) >= 0.6
+              ? "success.main"
+              : "warning.main"
+          }
+        />
+        <Metric
+          label="Bewertete Vorschläge"
+          value={shadowSummary.reviewed ?? 0}
+          caption={`Ziel ${
+            pilotGoals.reviewed_proposals_target ?? 20
+          } · Adminbewertungen`}
+          color={
+            (shadowSummary.reviewed ?? 0) >=
+            (pilotGoals.reviewed_proposals_target ?? 20)
+              ? "success.main"
+              : "text.primary"
+          }
+        />
+        <Metric
+          label="Admin-Akzeptanzrate"
+          value={percent(shadowSummary.acceptance_rate)}
+          caption={`Ziel ${percent(
+            pilotGoals.acceptance_rate_target ?? 0.9
+          )} · nur bewertete Vorschläge`}
+          color={
+            shadowSummary.acceptance_rate >=
+            (pilotGoals.acceptance_rate_target ?? 0.9)
+              ? "success.main"
+              : "warning.main"
+          }
+        />
+        <Metric
+          label="Harte Regelverletzungen"
+          value={shadowSummary.rule_warning_proposals ?? 0}
+          caption="Ziel 0 · Commander, Cooldown, Snapshot und Teamrichtung"
+          color={
+            (shadowSummary.rule_warning_proposals ?? 0) === 0
+              ? "success.main"
+              : "error.main"
+          }
+        />
+      </Box>
+
+      <Alert severity={calibrationReady ? "success" : "info"} sx={{ mt: 1.5 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.75 }}>
+          {calibrationReady
+            ? "Alle messbaren V2-Freigabekriterien sind erfüllt"
+            : "Shadow-Kalibrierung läuft – manual bleibt gesperrt"}
+        </Typography>
+        <Stack direction="row" gap={0.75} flexWrap="wrap">
+          {criteria.map((criterion) => (
+            <Chip
+              key={criterion.label}
+              size="small"
+              color={criterion.met ? "success" : "default"}
+              variant={criterion.met ? "filled" : "outlined"}
+              label={criterion.label}
+            />
+          ))}
+        </Stack>
+        <Typography variant="caption" sx={{ display: "block", mt: 0.75 }}>
+          Auch bei erfüllten Kriterien erfolgt kein automatischer Moduswechsel;
+          der Kalibrierungsbericht wird gemeinsam geprüft.
+        </Typography>
+      </Alert>
 
       <Card variant="outlined" sx={{ mt: 1.5 }}>
         <CardContent>
@@ -465,6 +742,7 @@ const AutobalancerHistoryDashboard = ({ config }) => {
               Datenqualitätsanzeige sichtbar.
             </Alert>
           )}
+          <CalibrationCharts quality={quality} />
           <ChartShell
             title="Balancezeit im Wochenverlauf"
             subtitle="Anteil der messbaren Zeit innerhalb der gewählten Teamdifferenz."
