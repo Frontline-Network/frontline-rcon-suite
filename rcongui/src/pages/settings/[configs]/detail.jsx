@@ -22,6 +22,7 @@ import ButtonGroup from "@mui/material/ButtonGroup";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { customRenderers } from "@/pages/settings/[configs]/renderer/renderer";
 import AutobalancerHelp from "@/pages/settings/[configs]/autobalancer-help";
+import AutobalancerShadowOverview from "@/pages/settings/[configs]/autobalancer-shadow-overview";
 
 const Editor = lazy(() => import("@monaco-editor/react"));
 
@@ -274,6 +275,9 @@ const ConfigPage = () => {
           </Stack>
         </Stack>
       </Form>
+      {isAutobalancer && (
+        <AutobalancerShadowOverview mode={jsonData?.mode} />
+      )}
       {mode === "code" ? (
         <>
           <Typography variant="h4">

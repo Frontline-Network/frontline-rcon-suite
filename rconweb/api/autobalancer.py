@@ -16,6 +16,35 @@ from .decorators import permission_required, require_http_methods
 from .utils import _get_data
 
 
+SHADOW_REJECTION_CATEGORIES = {
+    "squad_should_stay",
+    "critical_role",
+    "recent_join_or_move",
+    "better_candidate",
+    "skill_balance",
+    "wrong_team_counts",
+    "other",
+}
+
+
+def validate_shadow_review(data):
+    decision_id = str(data.get("decision_id") or "").strip()
+    verdict = str(data.get("verdict") or "").strip().lower()
+    category = str(data.get("category") or "").strip() or None
+    comment = str(data.get("comment") or "").strip() or None
+    if not decision_id:
+        raise ValueError("decision_id fehlt")
+    if verdict not in {"accepted", "rejected"}:
+        raise ValueError("verdict muss accepted oder rejected sein")
+    if verdict == "accepted":
+        category = None
+    elif category not in SHADOW_REJECTION_CATEGORIES:
+        raise ValueError("Für eine Ablehnung ist ein gültiger Grund erforderlich")
+    if comment and len(comment) > 1000:
+        raise ValueError("Der Kommentar darf höchstens 1000 Zeichen lang sein")
+    return decision_id, verdict, category, comment
+
+
 def _repository() -> DecisionRepository:
     return DecisionRepository(int(get_server_number()))
 
@@ -202,5 +231,64 @@ def get_autobalancer_history(request):
     return api_response(
         result=result,
         command="get_autobalancer_history",
+        failed=False,
+    )
+
+
+@csrf_exempt
+@login_required()
+@permission_required("api.can_view_autobalancer", raise_exception=True)
+@require_http_methods(["GET"])
+def get_autobalancer_shadow_overview(request):
+    data = _get_data(request)
+    try:
+        limit = int(data.get("limit") or 200)
+    except (TypeError, ValueError):
+        limit = 200
+    result = _repository().shadow_overview(
+        limit=limit,
+        round_id=data.get("round_id") or None,
+    )
+    return api_response(
+        result=result,
+        command="get_autobalancer_shadow_overview",
+        failed=False,
+    )
+
+
+@csrf_exempt
+@login_required()
+@permission_required("api.can_execute_autobalancer", raise_exception=True)
+@record_audit
+@require_http_methods(["POST"])
+def review_autobalancer_shadow_decision(request):
+    try:
+        decision_id, verdict, category, comment = validate_shadow_review(
+            _get_data(request)
+        )
+    except ValueError as error:
+        return api_response(
+            result=None,
+            command="review_autobalancer_shadow_decision",
+            failed=True,
+            error=str(error),
+        )
+    result = _repository().review_shadow_decision(
+        decision_id=decision_id,
+        verdict=verdict,
+        category=category,
+        comment=comment,
+        reviewed_by=request.user.username,
+    )
+    if result is None:
+        return api_response(
+            result=None,
+            command="review_autobalancer_shadow_decision",
+            failed=True,
+            error="Shadow-Vorschlag wurde nicht gefunden",
+        )
+    return api_response(
+        result=result,
+        command="review_autobalancer_shadow_decision",
         failed=False,
     )

@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import Any, Generator, List, Literal, Optional, Sequence, overload
 
 import pydantic
-from sqlalchemy import TIMESTAMP, Enum, ForeignKey, String, create_engine, select, text, JSON, Engine, NullPool, Pool
+from sqlalchemy import TIMESTAMP, Enum, ForeignKey, String, Text, create_engine, select, text, JSON, Engine, NullPool, Pool
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import InvalidRequestError, ProgrammingError
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -973,6 +973,11 @@ class AutobalanceDecision(Base):
     after_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     approved_by: Mapped[str | None] = mapped_column(String, nullable=True)
     executed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP, nullable=True)
+    review_verdict: Mapped[str | None] = mapped_column(String, nullable=True)
+    review_category: Mapped[str | None] = mapped_column(String, nullable=True)
+    review_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reviewed_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP, nullable=True)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -998,6 +1003,11 @@ class AutobalanceDecision(Base):
             "after_snapshot": self.after_snapshot,
             "approved_by": self.approved_by,
             "executed_at": self.executed_at,
+            "review_verdict": self.review_verdict,
+            "review_category": self.review_category,
+            "review_comment": self.review_comment,
+            "reviewed_by": self.reviewed_by,
+            "reviewed_at": self.reviewed_at,
         }
 
 

@@ -104,6 +104,14 @@ endpoints: list[tuple[str, Callable]] = [
         autobalancer.cancel_autobalancer_incident,
     ),
     ("get_autobalancer_history", autobalancer.get_autobalancer_history),
+    (
+        "get_autobalancer_shadow_overview",
+        autobalancer.get_autobalancer_shadow_overview,
+    ),
+    (
+        "review_autobalancer_shadow_decision",
+        autobalancer.review_autobalancer_shadow_decision,
+    ),
     ("is_logged_in", auth.is_logged_in),
     ("get_own_user_permissions", auth.get_own_user_permissions),
     ("get_services", services.get_services),
