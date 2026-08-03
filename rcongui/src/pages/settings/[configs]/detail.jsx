@@ -197,6 +197,9 @@ const ConfigPage = () => {
 
   return (
     <Stack direction={"column"} spacing={4}>
+      {isAutobalancer && (
+        <AutobalancerShadowOverview config={jsonData} />
+      )}
       <Form method="post" onSubmit={handleSubmit}>
         <Stack direction={"row"} justifyContent={"space-between"}>
           <Typography variant="h3">{name}</Typography>
@@ -275,9 +278,6 @@ const ConfigPage = () => {
           </Stack>
         </Stack>
       </Form>
-      {isAutobalancer && (
-        <AutobalancerShadowOverview mode={jsonData?.mode} />
-      )}
       {mode === "code" ? (
         <>
           <Typography variant="h4">

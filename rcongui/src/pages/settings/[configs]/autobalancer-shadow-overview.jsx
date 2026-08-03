@@ -29,6 +29,8 @@ import { useState } from "react";
 import { toast } from "react-toastify";
 import { useAuth } from "@/hooks/useAuth";
 import { cmd } from "@/utils/fetchUtils";
+import AutobalancerShadowCharts from "@/pages/settings/[configs]/autobalancer-shadow-charts";
+import AutobalancerRoundHistory from "@/pages/settings/[configs]/autobalancer-round-history";
 
 const TIER_LABELS = {
   0: "0 · kaum Squad-Bindung",
@@ -117,7 +119,7 @@ const Goal = ({ label, value, target, met, progress, explanation }) => (
   </Box>
 );
 
-const AutobalancerShadowOverview = ({ mode }) => {
+const AutobalancerShadowOverview = ({ config }) => {
   const queryClient = useQueryClient();
   const { permissions } = useAuth();
   const canReview = permissionGranted(permissions, "can_execute_autobalancer");
@@ -128,8 +130,16 @@ const AutobalancerShadowOverview = ({ mode }) => {
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey,
     queryFn: () =>
-      cmd.GET_AUTOBALANCER_SHADOW_OVERVIEW({ params: { limit: 500 } }),
+      cmd.GET_AUTOBALANCER_SHADOW_OVERVIEW({
+        params: { limit: 500, timeline_limit: 720 },
+      }),
     refetchInterval: 30_000,
+    retry: false,
+  });
+  const { data: liveStatus } = useQuery({
+    queryKey: [{ queryIdentifier: "get_autobalancer_status" }],
+    queryFn: cmd.GET_AUTOBALANCER_STATUS,
+    refetchInterval: 5_000,
     retry: false,
   });
 
@@ -186,6 +196,7 @@ const AutobalancerShadowOverview = ({ mode }) => {
   const goals = data.pilot_goals || {};
   const decisions = data.decisions || [];
   const acceptance = summary.acceptance_rate;
+  const mode = config?.mode;
 
   return (
     <Card variant="outlined">
@@ -197,11 +208,10 @@ const AutobalancerShadowOverview = ({ mode }) => {
           spacing={1}
         >
           <Box>
-            <Typography variant="h4">Shadow-Auswertung</Typography>
+            <Typography variant="h4">Autobalancer Live-Dashboard</Typography>
             <Typography variant="body2" color="text.secondary">
-              Hier bewertet ihr, ob der Algorithmus in derselben Situation einen
-              fairen Kandidaten gewählt hätte. Grundlage sind höchstens die
-              letzten 500 gespeicherten Shadow-Vorschläge dieses Servers.
+              Der aktuelle Serverzustand aktualisiert sich automatisch.
+              Shadow-Auswertungen folgen darunter.
             </Typography>
           </Box>
           <Button
@@ -214,6 +224,15 @@ const AutobalancerShadowOverview = ({ mode }) => {
           </Button>
         </Stack>
 
+        <AutobalancerShadowCharts
+          status={liveStatus || data.live_status}
+          timeline={data.timeline}
+          summary={summary}
+          config={config}
+        />
+
+        <AutobalancerRoundHistory config={config} />
+
         {mode !== "shadow" && (
           <Alert severity="info" sx={{ mt: 2 }}>
             Aktueller Modus: <strong>{mode}</strong>. Die Übersicht zeigt
@@ -222,134 +241,98 @@ const AutobalancerShadowOverview = ({ mode }) => {
           </Alert>
         )}
 
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: {
-              xs: "1fr",
-              sm: "repeat(2, minmax(0, 1fr))",
-              lg: "repeat(4, minmax(0, 1fr))",
-            },
-            gap: 1.5,
-            mt: 2,
-          }}
-        >
-          <Metric
-            label="Vorschläge"
-            value={summary.proposals ?? 0}
-            explanation={`${summary.rounds_observed ?? 0} Karten mit Vorschlag`}
-          />
-          <Metric
-            label="Bewertet"
-            value={summary.reviewed ?? 0}
-            explanation={`${
-              summary.pending_review ?? 0
-            } Bewertungen sind noch offen`}
-          />
-          <Metric
-            label="Akzeptanzquote"
-            value={formatPercent(acceptance)}
-            explanation={`${summary.accepted ?? 0} akzeptabel · ${
-              summary.rejected ?? 0
-            } nicht akzeptabel`}
-          />
-          <Metric
-            label="Automatische Regelwarnungen"
-            value={summary.rule_warning_proposals ?? 0}
-            explanation="Commander-, Snapshot-, Team- oder Zuordnungsfehler"
-          />
-        </Box>
-
-        <Alert
-          severity={goals.ready_for_manual ? "success" : "info"}
-          sx={{ mt: 2 }}
-        >
-          <strong>
-            {goals.ready_for_manual
-              ? "Die messbaren Pilotziele sind erreicht."
-              : "Der Shadow-Pilot sammelt noch Nachweise."}
-          </strong>{" "}
-          Das ist eine Entscheidungshilfe und schaltet den Modus niemals
-          automatisch auf „manual“ um.
-        </Alert>
-
-        <Stack spacing={2} sx={{ mt: 2 }}>
-          <Goal
-            label="Bewertete Karten"
-            value={summary.reviewed_rounds ?? 0}
-            target={goals.reviewed_rounds_target ?? 10}
-            met={goals.reviewed_rounds_met}
-            progress={
-              ((summary.reviewed_rounds ?? 0) /
-                (goals.reviewed_rounds_target || 10)) *
-              100
-            }
-            explanation="Eine Karte zählt, sobald mindestens ein Vorschlag daraus von einem Admin bewertet wurde."
-          />
-          <Goal
-            label="Als akzeptabel bewertete Vorschläge"
-            value={formatPercent(acceptance)}
-            target={formatPercent(goals.acceptance_rate_target ?? 0.9)}
-            met={goals.acceptance_rate_met}
-            progress={(acceptance ?? 0) * 100}
-            explanation="Ziel für den Wechsel in den manuellen Pilotbetrieb: mindestens 90 % der bewerteten Vorschläge."
-          />
-        </Stack>
-
-        <Box sx={{ mt: 2 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-            Welche Schutzstufen werden ausgewählt?
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            Niedrige Zahlen bedeuten weniger Eingriff in bestehende Squads. Hohe
-            Stufen sollten nur vorkommen, wenn kein fairer Kandidat der
-            niedrigeren Stufen verfügbar war.
-          </Typography>
-          <Stack direction="row" gap={1} flexWrap="wrap" sx={{ mt: 1 }}>
-            {Object.entries(summary.protection_tiers || {}).map(
-              ([tier, count]) => (
-                <Chip
-                  key={tier}
-                  label={`${TIER_LABELS[tier] || `Stufe ${tier}`}: ${count}`}
-                  size="small"
-                />
-              )
-            )}
-            {!Object.keys(summary.protection_tiers || {}).length && (
-              <Typography variant="body2">
-                Noch keine Vorschläge vorhanden.
+        <Accordion sx={{ mt: 2 }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1}
+              alignItems={{ sm: "center" }}
+            >
+              <Typography sx={{ fontWeight: 700 }}>
+                Pilotziele und genaue Kennzahlen
               </Typography>
-            )}
-          </Stack>
-        </Box>
-
-        {Object.keys(summary.rejection_categories || {}).length > 0 && (
-          <Box sx={{ mt: 2 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-              Warum wurden Vorschläge abgelehnt?
-            </Typography>
-            <Stack direction="row" gap={1} flexWrap="wrap" sx={{ mt: 1 }}>
-              {Object.entries(summary.rejection_categories).map(
-                ([reason, count]) => (
-                  <Chip
-                    key={reason}
-                    color="warning"
-                    size="small"
-                    label={`${REJECTION_LABELS[reason] || reason}: ${count}`}
-                  />
-                )
-              )}
+              <Chip
+                size="small"
+                color={goals.ready_for_manual ? "success" : "default"}
+                label={
+                  goals.ready_for_manual
+                    ? "Pilotziel erreicht"
+                    : `${
+                        summary.reviewed_rounds ?? 0
+                      }/10 Karten · ${formatPercent(acceptance)}`
+                }
+              />
             </Stack>
-          </Box>
-        )}
+          </AccordionSummary>
+          <AccordionDetails>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  sm: "repeat(2, minmax(0, 1fr))",
+                  lg: "repeat(4, minmax(0, 1fr))",
+                },
+                gap: 1.5,
+              }}
+            >
+              <Metric
+                label="Vorschläge"
+                value={summary.proposals ?? 0}
+                explanation={`${
+                  summary.rounds_observed ?? 0
+                } Karten mit Vorschlag`}
+              />
+              <Metric
+                label="Bewertet"
+                value={summary.reviewed ?? 0}
+                explanation={`${
+                  summary.pending_review ?? 0
+                } Bewertungen sind noch offen`}
+              />
+              <Metric
+                label="Akzeptanzquote"
+                value={formatPercent(acceptance)}
+                explanation={`${summary.accepted ?? 0} akzeptabel · ${
+                  summary.rejected ?? 0
+                } nicht akzeptabel`}
+              />
+              <Metric
+                label="Regelwarnungen"
+                value={summary.rule_warning_proposals ?? 0}
+                explanation="Commander-, Snapshot-, Team- oder Zuordnungsfehler"
+              />
+            </Box>
+            <Stack spacing={2} sx={{ mt: 2 }}>
+              <Goal
+                label="Bewertete Karten"
+                value={summary.reviewed_rounds ?? 0}
+                target={goals.reviewed_rounds_target ?? 10}
+                met={goals.reviewed_rounds_met}
+                progress={
+                  ((summary.reviewed_rounds ?? 0) /
+                    (goals.reviewed_rounds_target || 10)) *
+                  100
+                }
+                explanation="Eine Karte zählt, sobald mindestens ein Vorschlag daraus bewertet wurde."
+              />
+              <Goal
+                label="Akzeptable Vorschläge"
+                value={formatPercent(acceptance)}
+                target={formatPercent(goals.acceptance_rate_target ?? 0.9)}
+                met={goals.acceptance_rate_met}
+                progress={(acceptance ?? 0) * 100}
+                explanation="Ziel für manual: mindestens 90 % der bewerteten Vorschläge. Es erfolgt keine automatische Umschaltung."
+              />
+            </Stack>
+          </AccordionDetails>
+        </Accordion>
 
         <Typography variant="h5" sx={{ mt: 3, mb: 0.5 }}>
           Einzelne Vorschläge prüfen
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          Prüft vor allem Squad, Rolle und mögliche bessere Kandidaten. Der
-          numerische Stärkewert ist nur ein Tie-Breaker innerhalb der
-          niedrigsten nutzbaren Schutzstufe und kein Urteil über den Spieler.
+          Aufklappen, Kandidat prüfen und bewerten.
         </Typography>
 
         {!decisions.length && (

@@ -120,6 +120,7 @@ export const cmd = {
   GET_AUTOSETTINGS: (params) => requestFactory({ method: "GET", cmd: "get_auto_settings", ...params }),
   GET_AUTOBALANCER_STATUS: (params) => requestFactory({ method: "GET", cmd: "get_autobalancer_status", ...params }),
   GET_AUTOBALANCER_SHADOW_OVERVIEW: (params) => requestFactory({ method: "GET", cmd: "get_autobalancer_shadow_overview", ...params }),
+  GET_AUTOBALANCER_ROUND_ARCHIVE: (params) => requestFactory({ method: "GET", cmd: "get_autobalancer_round_archive", ...params }),
   GET_BANS: (params) => requestFactory({ method: "GET", cmd: "get_bans", ...params }),
   GET_BLACKLISTS: (params) => requestFactory({ method: "GET", cmd: "get_blacklists", ...params }),
   GET_BROADCAST_CONFIG: (params) => requestFactory({ method: "GET", cmd: "get_auto_broadcasts_config", ...params }),

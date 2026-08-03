@@ -8,6 +8,7 @@ from rcon.autobalancer.store import AutobalancerStore
 class FakeRedis:
     def __init__(self):
         self.values = {}
+        self.lists = {}
         self.stream = []
         self.sequence = 0
 
@@ -29,6 +30,16 @@ class FakeRedis:
     def delete(self, *keys):
         for key in keys:
             self.values.pop(key, None)
+            self.lists.pop(key, None)
+
+    def lpush(self, key, value):
+        self.lists.setdefault(key, []).insert(0, value)
+
+    def ltrim(self, key, start, end):
+        self.lists[key] = self.lists.get(key, [])[start : end + 1]
+
+    def lrange(self, key, start, end):
+        return self.lists.get(key, [])[start : end + 1]
 
     def eval(self, script, key_count, key, token, *args):
         if self.values.get(key) != token:
@@ -144,3 +155,38 @@ def test_only_one_switch_execution_can_be_active_per_server():
     assert redis.values[first.key("execution")] == "first"
     first.release_execution("first")
     assert second.acquire_execution("second") is True
+
+
+def test_status_history_is_sampled_and_returned_in_chronological_order():
+    redis = FakeRedis()
+    store = AutobalancerStore(redis, server_number=1)
+    first = {
+        "updated_at": "2026-08-03T20:00:00+00:00",
+        "mode": "shadow",
+        "phase": "idle",
+        "team_counts": {"allies": 48, "axis": 47},
+        "team_difference": 1,
+        "required_switches": 0,
+    }
+    store.save_status(first)
+    store.save_status({**first, "team_difference": 4})
+
+    assert store.load_status_history() == [
+        {
+            **first,
+            "round_id": None,
+            "block_reasons": [],
+        }
+    ]
+
+    redis.values.pop(store.key("status_history_gate"))
+    second = {
+        **first,
+        "updated_at": "2026-08-03T20:00:30+00:00",
+        "team_difference": -3,
+    }
+    store.save_status(second)
+    assert [sample["team_difference"] for sample in store.load_status_history()] == [
+        1,
+        -3,
+    ]
