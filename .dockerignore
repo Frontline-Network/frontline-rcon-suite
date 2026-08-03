@@ -9,6 +9,9 @@ docker-templates/
 events/
 *.tar
 *.gz
+*.dump
+*.bundle
+compose*.yaml
 db_data_bu/
 config/
 
