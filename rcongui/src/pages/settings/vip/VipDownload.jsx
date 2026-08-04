@@ -10,8 +10,10 @@ import {
   InputAdornment,
 } from "@mui/material";
 import { FileDownload } from "@mui/icons-material";
+import { useTranslation } from "react-i18next";
 
 const VipDownload = () => {
+  const { t } = useTranslation();
   const [downloadEnabled, setDownloadEnabled] = useState(false);
   const [downloadCompleted, setDownloadCompleted] = useState(false);
   const [filename, setFilename] = useState("hll_vips");
@@ -74,18 +76,18 @@ const VipDownload = () => {
           disabled={isDownloadingVipFile}
           onClick={() => setDownloadEnabled(true)}
         >
-          Get VIP file
+          {t("records.vips.getFile")}
         </Button>
       )}
       {isDownloadingVipFileError && (
-        <Alert severity="error">Error downloading VIP file</Alert>
+        <Alert severity="error">{t("records.vips.downloadError")}</Alert>
       )}
       {isDownloadingVipFileSuccess && downloadCompleted && (
           <>
           <TextField
             value={filename}
             onChange={(e) => setFilename(e.target.value)}
-            helperText={`${numLines} VIP records found.`}
+            helperText={t("records.vips.recordsFound", { count: numLines })}
             slotProps={{
               input: {
                 endAdornment: (
@@ -95,7 +97,7 @@ const VipDownload = () => {
             }}
           />
           <Stack direction="row" spacing={1}>
-            <Button fullWidth variant="outlined" color="error" onClick={handleClear}>Cancel</Button>
+            <Button fullWidth variant="outlined" color="error" onClick={handleClear}>{t("common.cancel")}</Button>
             <Button
             fullWidth
             LinkComponent={"a"}
@@ -104,7 +106,7 @@ const VipDownload = () => {
             download={fullFilename}
             variant="contained"
           >
-            Save
+            {t("common.save")}
             </Button>
           </Stack>
         </>

@@ -17,8 +17,10 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import { useState } from "react";
 import { getAllRoles, getRoleLabel } from "@/constants/roles";
+import { useTranslation } from "react-i18next";
 
 const LevelThresholdsRenderer = (props) => {
+  const { t } = useTranslation();
   const { data, handleChange, path, label, description, errors } = props;
   const [selectedRole, setSelectedRole] = useState("");
 
@@ -86,14 +88,14 @@ const LevelThresholdsRenderer = (props) => {
                   <Stack spacing={1}>
                     <TextField
                       fullWidth
-                      label="Label"
+                      label={t("settings.config.label")}
                       value={roleConfig.label || ""}
                       onChange={(e) => handleUpdateRole(roleKey, "label", e.target.value)}
                       size="small"
                     />
                     <Stack direction="row" spacing={1}>
                       <TextField
-                        label="Min Players"
+                        label={t("settings.config.minPlayers")}
                         type="number"
                         value={roleConfig.min_players ?? 0}
                         onChange={(e) => handleUpdateRole(roleKey, "min_players", e.target.value)}
@@ -102,7 +104,7 @@ const LevelThresholdsRenderer = (props) => {
                         sx={{ flex: 1 }}
                       />
                       <TextField
-                        label="Min Level"
+                        label={t("settings.config.minLevel")}
                         type="number"
                         value={roleConfig.min_level ?? 0}
                         onChange={(e) => handleUpdateRole(roleKey, "min_level", e.target.value)}
@@ -116,7 +118,7 @@ const LevelThresholdsRenderer = (props) => {
                 <IconButton
                   size="small"
                   onClick={() => handleRemoveRole(roleKey)}
-                  aria-label={`Remove ${roleLabel}`}
+                  aria-label={t("settings.config.removeRole", { role: roleLabel })}
                   sx={{ mt: 0.5 }}
                 >
                   <DeleteIcon fontSize="small" />
@@ -136,7 +138,7 @@ const LevelThresholdsRenderer = (props) => {
               sx={{ minWidth: 200 }}
             >
               <MenuItem value="" disabled>
-                Select role...
+                {t("settings.config.selectRole")}
               </MenuItem>
               {availableRolesToAdd.map((role) => (
                 <MenuItem key={role.value} value={role.value}>
@@ -151,7 +153,7 @@ const LevelThresholdsRenderer = (props) => {
               disabled={!selectedRole}
               size="small"
             >
-              Add
+              {t("settings.config.addRole")}
             </Button>
           </Stack>
         )}

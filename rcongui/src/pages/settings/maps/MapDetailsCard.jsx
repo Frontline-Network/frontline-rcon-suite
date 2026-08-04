@@ -3,8 +3,12 @@
 import { Typography, Box, Stack } from "@mui/material";
 import CopyableText from "@/components/shared/CopyableText";
 import { getMapLayerImageSrc, unifiedGamemodeName } from "./objectives/helpers";
+import { useTranslation } from "react-i18next";
+import { getMapEnvironmentLabel, getMapModeLabel } from "@/utils/mapLabels";
 
 export function MapDetailsCard({ mapLayer }) {
+  const { t } = useTranslation();
+  const mode = unifiedGamemodeName(mapLayer.game_mode);
   return (
     <Box
       sx={{
@@ -48,8 +52,8 @@ export function MapDetailsCard({ mapLayer }) {
               color="text.secondary"
               sx={{ textTransform: "uppercase", fontSize: 12 }}
             >
-              {unifiedGamemodeName(mapLayer.game_mode)}{" "}
-              {unifiedGamemodeName(mapLayer.game_mode) === "offensive" &&
+              {getMapModeLabel(t, mode)}{" "}
+              {mode === "offensive" &&
                 `(${mapLayer.attackers})`}
             </Typography>
           </Stack>
@@ -64,7 +68,7 @@ export function MapDetailsCard({ mapLayer }) {
               color="text.secondary"
               sx={{ textTransform: "uppercase", fontSize: 12 }}
             >
-              {mapLayer.environment}
+              {getMapEnvironmentLabel(t, mapLayer.environment)}
             </Typography>
           </Stack>
         </Stack>
@@ -74,6 +78,8 @@ export function MapDetailsCard({ mapLayer }) {
 }
 
 export function MapDetailsCardCompact({ mapLayer }) {
+  const { t } = useTranslation();
+  const mode = unifiedGamemodeName(mapLayer.game_mode);
   return (
     <Box
       sx={{
@@ -100,12 +106,12 @@ export function MapDetailsCardCompact({ mapLayer }) {
         </Typography>
         <Stack direction={"row"} gap={2}>
           <Typography variant="body2" color="text.secondary" fontSize={12}>
-            {unifiedGamemodeName(mapLayer.game_mode)}{" "}
-            {unifiedGamemodeName(mapLayer.game_mode) === "offensive" &&
+            {getMapModeLabel(t, mode)}{" "}
+            {mode === "offensive" &&
               `(${mapLayer.attackers})`}
           </Typography>
           <Typography variant="body2" color="text.secondary" fontSize={12}>
-            {mapLayer.environment}
+            {getMapEnvironmentLabel(t, mapLayer.environment)}
           </Typography>
         </Stack>
       </Stack>

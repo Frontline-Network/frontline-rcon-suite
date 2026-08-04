@@ -118,3 +118,33 @@ services:
       resources:
         limits:
           cpus: '1.0'
+  mobile_push_worker:
+    profiles: ["mobile"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${BACKEND_DOCKER_REPOSITORY}:${TAGGED_VERSION}
+    command: mobile_push_worker
+    restart: unless-stopped
+    environment:
+      SERVER_NUMBER: 1
+      LOGGING_PATH: /logs/
+      HLL_DB_USER: ${HLL_DB_USER}
+      HLL_DB_PASSWORD: ${HLL_DB_PASSWORD}
+      HLL_DB_NAME: ${HLL_DB_NAME}
+      HLL_DB_HOST: ${HLL_DB_HOST}
+      HLL_DB_HOST_PORT: ${HLL_DB_HOST_PORT}
+      HLL_DB_URL: postgresql://${HLL_DB_USER}:${HLL_DB_PASSWORD}@${HLL_DB_HOST}:${HLL_DB_HOST_PORT}/${HLL_DB_NAME}
+      HLL_REDIS_URL: redis://${HLL_REDIS_HOST}:${HLL_REDIS_HOST_PORT}/0
+      RCONWEB_API_SECRET: ${RCONWEB_API_SECRET}
+      MOBILE_INTEGRATION_ENABLED: ${MOBILE_INTEGRATION_ENABLED}
+      MOBILE_PUBLIC_BASE_URL: ${MOBILE_PUBLIC_BASE_URL}
+      MOBILE_INSTALLATION_ID: ${MOBILE_INSTALLATION_ID}
+      MOBILE_PUSH_RELAY_URL: ${MOBILE_PUSH_RELAY_URL}
+    depends_on:
+      maintenance:
+        condition: service_healthy
+    volumes:
+      - ./logs:/logs/
+    networks:
+      - common

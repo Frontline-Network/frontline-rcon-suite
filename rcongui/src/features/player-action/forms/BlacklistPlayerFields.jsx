@@ -5,6 +5,7 @@ import { Alert, Box, Button, Stack } from "@mui/material";
 import dayjs from "dayjs";
 import { ControlledSelect } from "@/components/form/core/ControlledSelect";
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 
 const presetTimes = [
   [2, "hours"],
@@ -22,6 +23,7 @@ export const BlacklistPlayerFormFields = ({
   setError,
   contextError,
 }) => {
+  const { t } = useTranslation();
   const expiresAt = getValues()?.expires_at;
   
   useEffect(() => {
@@ -36,7 +38,7 @@ export const BlacklistPlayerFormFields = ({
         control={control}
         errors={errors}
         name={"blacklist_id"}
-        label={"Blacklist"}
+        label={t("records.blacklists.list")}
         required={true}
         defaultValue={contextData?.blacklists?.length ? "0" : ""} // there is always the Default blacklist with id 0
         options={
@@ -51,7 +53,7 @@ export const BlacklistPlayerFormFields = ({
       ) : (
         <>
           <Alert severity="info">
-            Selected players will be blacklisted indefinitely.
+            {t("records.blacklists.indefiniteNotice")}
           </Alert>
           <input type="hidden" name="expires_at" value={null} />
         </>
@@ -85,10 +87,10 @@ export const BlacklistPlayerFormFields = ({
             })
           }
         >
-          Never expires
+          {t("records.blacklists.neverExpires")}
         </Button>
       </Box>
-      <ReasonField control={control} errors={errors} setValue={setValue} helperText="The message displayed to the player. Available variables: {player_id}, {player_name}, {banned_at}, {banned_until}, {expires_at}, {duration}, {expires}, {ban_id}, {blacklist_name}"/>
+      <ReasonField control={control} errors={errors} setValue={setValue} helperText={t("fields.blacklistReasonHelp")}/>
     </Stack>
   );
 };

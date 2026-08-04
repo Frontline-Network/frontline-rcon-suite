@@ -16,6 +16,7 @@ import dayjs from 'dayjs';
 import { DesktopDateTimePicker } from '@mui/x-date-pickers/DesktopDateTimePicker';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { useTranslation } from "react-i18next";
 
 const presetTimes = [
   [2, "hours"],
@@ -25,6 +26,7 @@ const presetTimes = [
 ];
 
 function BlacklistServerWarning({ blacklist, currentServer }) {
+  const { t } = useTranslation();
   const affectsAllServers = blacklist.servers === null;
 
   if (affectsAllServers) {
@@ -39,16 +41,11 @@ function BlacklistServerWarning({ blacklist, currentServer }) {
     !blacklist.servers.includes(currentServer?.server_number ?? -1);
 
   if (affectsNone) {
-    text = "This blacklist does not affect any servers!";
+    text = t("records.blacklists.warningNoServers");
   } else if (failedToLoadCurrentServer) {
-    text = `Failed to load current server information!\n`;
-    text += `This blacklist MAY NOT affect THIS server. Affected servers: [${blacklist.servers.join(
-      ", "
-    )}]`;
+    text = t("records.blacklists.warningUnknownServer", { servers: blacklist.servers.join(", ") });
   } else if (affectsOnlyOtherServers) {
-    text = `This blacklist DOES NOT affect THIS server! Affected servers: [${blacklist.servers.join(
-      ", "
-    )}]`;
+    text = t("records.blacklists.warningOtherServers", { servers: blacklist.servers.join(", ") });
   }
 
   return (
@@ -64,11 +61,12 @@ export default function BlacklistRecordCreateDialog({
   blacklists,
   onSubmit,
   initialValues,
-  titleText = "Blacklist Player",
-  submitText = "Blacklist Player",
+  titleText,
+  submitText,
   disablePlayerId,
   hasManyIDs = false,
 }) {
+  const { t, i18n } = useTranslation();
   const [blacklist, setBlacklist] = useState("");
   const [playerId, setPlayerId] = useState("");
   const [expiresAt, setExpiresAt] = useState(dayjs());
@@ -152,15 +150,14 @@ export default function BlacklistRecordCreateDialog({
         },
       }}
     >
-      <DialogTitle>{titleText}</DialogTitle>
+      <DialogTitle>{titleText || t("records.blacklists.blacklistPlayer")}</DialogTitle>
       <DialogContent>
         <DialogContentText>
-          By blacklisting a player you are revoking their access to one or more
-          servers.
+          {t("records.blacklists.dialogDescription")}
         </DialogContentText>
 
         <FormControl required fullWidth>
-          <InputLabel>Blacklist</InputLabel>
+          <InputLabel>{t("records.blacklists.list")}</InputLabel>
           <Select
             value={blacklist}
             onChange={(e) => setBlacklist(e.target.value)}
@@ -185,7 +182,7 @@ export default function BlacklistRecordCreateDialog({
               margin="dense"
               id="playerId"
               name="playerId"
-              label="Player ID"
+              label={t("records.blacklists.playerId")}
               type="text"
               value={playerId}
               onChange={(e) => setPlayerId(e.target.value)}
@@ -198,7 +195,10 @@ export default function BlacklistRecordCreateDialog({
             <Grid container spacing={2} alignItems="center">
               <Grid size={12}>
               {expiresAt !== null ? (
-                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <LocalizationProvider
+                  dateAdapter={AdapterDayjs}
+                  adapterLocale={i18n.resolvedLanguage === "en" ? "en" : "de"}
+                >
                   <DesktopDateTimePicker
                     onChange={(value) => setExpiresAt(value)}
                     value={expiresAt}
@@ -208,8 +208,12 @@ export default function BlacklistRecordCreateDialog({
                     ampm={false}
                     slotProps={{
                       textField: {
-                        helperText: 'The date this action will expire.',
+                        helperText: t("records.blacklists.expirationHelp"),
                         fullWidth: true,
+                      },
+                      openPickerButton: {
+                        "aria-label": t("common.chooseDate"),
+                        title: t("common.chooseDate"),
                       },
                     }}
                     maxDate={dayjs("3000-01-01T00:00:00+00:00")}
@@ -219,7 +223,7 @@ export default function BlacklistRecordCreateDialog({
               ) : (
                 <>
                   <Alert severity="info">
-                    Selected players will be blacklisted indefinitely.
+                    {t("records.blacklists.indefiniteNotice")}
                   </Alert>
                   <input type="hidden" name="expiresAt" value={null} />
                 </>
@@ -243,7 +247,7 @@ export default function BlacklistRecordCreateDialog({
                 style={{ display: "block", width: "100%" }}
                 onClick={() => setExpiresAt(null)}
               >
-                Never expires
+                {t("records.blacklists.neverExpires")}
               </Button>
             </Grid>
             {/* REASON */}
@@ -255,15 +259,13 @@ export default function BlacklistRecordCreateDialog({
                   margin="dense"
                   id="reason"
                   name="reason"
-                  label="Reason"
+                  label={t("records.blacklists.reason")}
                   type="reason"
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   fullWidth
                   variant="standard"
-                  helperText="Available variables:
-              {player_id}, {player_name}, {banned_at}, {banned_until}, {expires_at},
-              {duration}, {expires}, {ban_id}, {blacklist_name}"
+                  helperText={`${t("records.blacklists.availableVariables")}: {player_id}, {player_name}, {banned_at}, {banned_until}, {expires_at}, {duration}, {expires}, {ban_id}, {blacklist_name}`}
                 />
               </Grid>
               <Grid size={4}>
@@ -271,12 +273,12 @@ export default function BlacklistRecordCreateDialog({
                   id="saved-messages-select"
                   value={selectedMessage}
                   onChange={handlePunishMessageChange}
-                  inputProps={{ "aria-label": "Saved Messages" }}
+                  inputProps={{ "aria-label": t("records.blacklists.savedMessages") }}
                   fullWidth
                   displayEmpty
                 >
                   <MenuItem value="">
-                    <em>Saved Messages</em>
+                    <em>{t("records.blacklists.savedMessages")}</em>
                   </MenuItem>
                   {punishMessages.map((message, i) => {
                     let label = message.substring(0, 16);
@@ -296,9 +298,9 @@ export default function BlacklistRecordCreateDialog({
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={handleClose}>Cancel</Button>
+        <Button onClick={handleClose}>{t("common.cancel")}</Button>
         <Button type="submit" disabled={blacklist === ""}>
-          {submitText}
+          {submitText || t("records.blacklists.blacklistPlayer")}
         </Button>
       </DialogActions>
     </Dialog>)

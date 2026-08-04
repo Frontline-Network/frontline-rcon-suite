@@ -7,8 +7,10 @@ import { RankSelectionMenu } from "@/components/table/selection/RankSelectionMen
 import { levelToRank } from "@/utils/lib";
 import TableAddons from "@/components/table/TableAddons";
 import { useThemedImages } from "@/hooks/useThemedImages";
+import { useTranslation } from "react-i18next";
 
 export const TeamSelectionToolbar = ({ table, teamData }) => {
+  const { t } = useTranslation();
   // handleGenericSelect is a generic function that allows for the selection of a row based on a key and value.
   // It is used to select rows based on the team, unit, country, role, and rank.
   const themedImg = useThemedImages()
@@ -129,7 +131,7 @@ export const TeamSelectionToolbar = ({ table, teamData }) => {
 
   return (
     <TableAddons>
-      <Tooltip title="Select Axis">
+      <Tooltip title={t("views.team.selectAxis")}>
         <Button onClick={() => handleTeamSelect("axis")}>
           <img
             src={themedImg.getFactionIconSrc("ger")}
@@ -139,7 +141,7 @@ export const TeamSelectionToolbar = ({ table, teamData }) => {
           />
         </Button>
       </Tooltip>
-      <Tooltip title="Select Allies">
+      <Tooltip title={t("views.team.selectAllies")}>
         <Button onClick={() => handleTeamSelect("allies")}>
           <img
             src={themedImg.getFactionIconSrc("us")}

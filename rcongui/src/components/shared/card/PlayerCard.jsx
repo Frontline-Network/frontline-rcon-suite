@@ -13,12 +13,14 @@ import FlagList from "@/components/player/profile/FlagList";
 import ActionList from "@/components/player/profile/ActionList";
 import ProfileActions from "@/components/player/profile/Actions";
 import { useMemo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 
 export default function PlayerCard({
   player: playerProfile,
   onSelect,
   selected,
 }) {
+  const { t, i18n } = useTranslation();
   const actionList = useMemo(
     () =>
       generatePlayerActions({
@@ -54,9 +56,7 @@ export default function PlayerCard({
     "???";
   const avatar = playerProfile?.steaminfo?.profile?.avatar ?? name;
   const penalties = playerProfile?.penalty_count;
-  const firstSeen = dayjs(playerProfile.first_seen_timestamp_ms).format(
-    "MMM DD, YYYY"
-  );
+  const firstSeen = dayjs(playerProfile.first_seen_timestamp_ms).locale(i18n.language).format("L");
   const lastSeen = dayjs(playerProfile.last_seen_timestamp_ms).fromNow();
   const country =
     playerProfile?.country ??
@@ -95,7 +95,7 @@ export default function PlayerCard({
         >
           <div>
             <Typography variant="body2" color="text.secondary">
-              Created
+              {t("records.players.created")}
             </Typography>
             <Typography
               variant="caption"
@@ -107,19 +107,19 @@ export default function PlayerCard({
           </div>
           <div>
             <Typography variant="body2" color="text.secondary">
-              Total Playtime
+              {t("records.players.totalPlaytime")}
             </Typography>
             <Typography
               variant="caption"
               fontWeight={500}
               color="text.secondary"
             >
-              {totalPlaytime} hours
+              {totalPlaytime} {t("records.players.hours")}
             </Typography>
           </div>
           <div>
             <Typography variant="body2" color="text.secondary">
-              Last Seen
+              {t("records.players.lastSeen")}
             </Typography>
             <Typography
               variant="caption"
@@ -139,25 +139,25 @@ export default function PlayerCard({
           sx={{ p: 1 }}
         >
           <Typography variant="caption" color="text.secondary">
-            PUNISH:{" "}
+            {t("actions.types.PUNISH")}:{" "}
             <Typography variant="caption" color="text.primary">
               {penalties?.PUNISH ?? 0}
             </Typography>
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            KICK:{" "}
+            {t("actions.types.KICK")}:{" "}
             <Typography variant="caption" color="text.primary">
               {penalties?.KICK ?? 0}
             </Typography>
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            TEMPBAN:{" "}
+            {t("actions.types.TEMPBAN")}:{" "}
             <Typography variant="caption" color="text.primary">
               {penalties?.TEMPBAN ?? 0}
             </Typography>
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            PERMABAN:{" "}
+            {t("actions.types.PERMABAN")}:{" "}
             <Typography variant="caption" color="text.primary">
               {penalties?.PERMABAN ?? 0}
             </Typography>

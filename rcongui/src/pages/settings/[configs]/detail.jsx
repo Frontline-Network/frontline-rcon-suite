@@ -21,6 +21,9 @@ import { Generate } from "@jsonforms/core";
 import ButtonGroup from "@mui/material/ButtonGroup";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { customRenderers } from "@/pages/settings/[configs]/renderer/renderer";
+import { isFakeMode } from "@/mirage/demo-data";
+import { useTranslation } from "react-i18next";
+import i18n from "@/i18n";
 
 const Editor = lazy(() => import("@monaco-editor/react"));
 
@@ -44,7 +47,7 @@ export const loader = async ({ params }) => {
   } catch (error) {
     throw json(
       {
-        message: "This config is not known.",
+        message: i18n.t("errors.configUnknown"),
         error: error?.message,
         command: error?.command,
       },
@@ -57,12 +60,27 @@ export const loader = async ({ params }) => {
   } catch (error) {
     throw json(
       {
-        message: "Unable to locate the documentation file.",
+        message: i18n.t("errors.configDocumentationUnavailable"),
         error: error?.message,
         command: error?.command,
       },
       { status: 404 }
     );
+  }
+
+  if (isFakeMode()) {
+    return {
+      note: note.default,
+      data: { enabled: true, discord_webhook_url: "https://discord.example/frontline" },
+      schema: {
+        type: "object",
+        properties: {
+          enabled: { type: "boolean", title: "Aktiviert" },
+          discord_webhook_url: { type: "string", title: "Discord-Webhook-URL" },
+        },
+      },
+      ...details,
+    };
   }
 
   let response;
@@ -74,14 +92,14 @@ export const loader = async ({ params }) => {
 
   data = await response.json();
   if (!data || data.failed)
-    throw new Response("Could not load config data", { status: 400 });
+    throw new Response(i18n.t("errors.configLoadFailed"), { status: 400 });
 
   try {
     response = await get(`describe_${details.command}`);
     schema = await response.json();
     if (!schema || schema.failed) throw new Error();
   } catch (error) {
-    throw new Response("Could not load schema data", { status: 400 });
+    throw new Response(i18n.t("errors.configSchemaFailed"), { status: 400 });
   }
 
   return {
@@ -99,7 +117,7 @@ export const action = async ({ request }) => {
   let error = null;
   let response;
 
-  if (!(name && config)) return { ok: false, error: "Missing parameters" };
+  if (!(name && config)) return { ok: false, error: i18n.t("errors.missingParameters") };
 
   config = JSON.parse(config);
 
@@ -117,7 +135,7 @@ export const action = async ({ request }) => {
   if (!data || data.failed) {
     throw json(
       {
-        message: "Server failed to validate config data.",
+        message: i18n.t("errors.configValidationFailed"),
         error: data?.error,
         command: data?.command,
       },
@@ -137,7 +155,9 @@ export const action = async ({ request }) => {
 };
 
 const ConfigPage = () => {
-  const { note, command, name, data, schema } = useLoaderData();
+  const { t } = useTranslation();
+  const { note, command, name, nameKey, data, schema } = useLoaderData();
+  const displayName = nameKey ? t(nameKey) : name;
   const [validationErrors, setValidationErrors] = useState(null);
   const [jsonData, setJsonData] = useState(data);
   const [editorContent, setEditorContent] = useState("");
@@ -155,12 +175,12 @@ const ConfigPage = () => {
   useEffect(() => {
     if (actionData && actionData.ok === false) {
       setValidationErrors(actionData.error);
-      toast.error(name + " config saving failed!");
+      toast.error(t("settings.config.saveFailed", { name: displayName }));
     } else if (actionData && actionData.ok) {
       setValidationErrors(null);
-      toast.success(name + " config saved!");
+      toast.success(t("settings.config.saved", { name: displayName }));
     }
-  }, [actionData]);
+  }, [actionData, displayName, t]);
 
   useEffect(() => {
     setValidationErrors(null);
@@ -184,7 +204,7 @@ const ConfigPage = () => {
       try {
         setJsonData(JSON.parse(editorContent));
       } catch (e) {
-        setValidationErrors("Invalid JSON: " + e);
+        setValidationErrors(t("settings.config.invalidJson", { error: e }));
       }
     } else if (jsonData) {
       setEditorContent(JSON.stringify(jsonData, null, 2));
@@ -196,19 +216,19 @@ const ConfigPage = () => {
     <Stack direction={"column"} spacing={4}>
       <Form method="post" onSubmit={handleSubmit}>
         <Stack direction={"row"} justifyContent={"space-between"}>
-          <Typography variant="h3">{name}</Typography>
+          <Typography variant="h3">{displayName}</Typography>
           <ButtonGroup variant="outlined">
             <Button
               variant={mode === "visual" ? "contained" : "outlined"}
               onClick={() => updateMode("visual")}
             >
-              Visual
+              {t("settings.config.visual")}
             </Button>
             <Button
               variant={mode === "code" ? "contained" : "outlined"}
               onClick={() => updateMode("code")}
             >
-              Code
+              {t("settings.config.code")}
             </Button>
           </ButtonGroup>
         </Stack>
@@ -261,17 +281,17 @@ const ConfigPage = () => {
           )}
           <Stack direction={"row"} spacing={1}>
             <Button variant={"outlined"} onClick={handleRefresh}>
-              Refresh
+              {t("common.refresh")}
             </Button>
             <Button variant={"contained"} type="submit">
-              Submit
+              {t("settings.config.submit")}
             </Button>
           </Stack>
         </Stack>
       </Form>
       {mode === "code" ? (
         <>
-          <Typography variant="h4">Documentation</Typography>
+          <Typography variant="h4">{t("settings.config.documentation")}</Typography>
           <CopyBlock
             wrapLongLines
             text={note}
@@ -279,7 +299,7 @@ const ConfigPage = () => {
             wrapLines
             theme={theme.palette.mode === "dark" ? a11yDark : a11yLight}
           />
-          <Typography variant="h4">Model Schema</Typography>
+          <Typography variant="h4">{t("settings.config.modelSchema")}</Typography>
           <CopyBlock
             wrapLongLines
             text={JSON.stringify(schema, null, 2)}

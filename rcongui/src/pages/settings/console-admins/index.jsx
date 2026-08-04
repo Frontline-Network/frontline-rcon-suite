@@ -29,6 +29,9 @@ import { InputFileUpload } from "@/components/shared/InputFileUpload";
 import exportFile from "@/utils/exportFile";
 import { usePlayerSidebar } from "@/hooks/usePlayerSidebar";
 import PlayerAutocompletion from "@/components/form/custom/PlayerAutocompletion";
+import { useTranslation } from "react-i18next";
+import PageHeader from "@/components/shared/PageHeader";
+import { isFakeMode } from "@/mirage/demo-data";
 
 const INTENT = {
   ADD_ADMIN: "add_admin",
@@ -36,6 +39,15 @@ const INTENT = {
 };
 
 export const loader = async () => {
+  if (isFakeMode()) {
+    return {
+      admins: [
+        { player_id: "76561198000000001", name: "FLN_Raven", role: "senior" },
+        { player_id: "76561198000000002", name: "FLN_Wolf", role: "spectator" },
+      ],
+      adminGroups: ["spectator", "junior", "senior"],
+    };
+  }
   const admins = await cmd.GET_CONSOLE_ADMINS();
   const adminGroups = await cmd.GET_CONSOLE_ADMIN_GROUPS();
   return { admins, adminGroups };
@@ -68,6 +80,7 @@ export const action = async ({ request }) => {
 
 const ConsoleAdminsPage = () => {
   const { admins: serverAdmins, adminGroups } = useLoaderData();
+  const { t } = useTranslation();
 
   const initialAdmin = {
     player_id: "",
@@ -242,6 +255,11 @@ const ConsoleAdminsPage = () => {
         maxWidth: (theme) => theme.breakpoints.values.md,
       }}
     >
+      <PageHeader
+        eyebrow={t("settings.consoleAdmins.eyebrow")}
+        title={t("settings.consoleAdmins.title")}
+        subtitle={t("settings.consoleAdmins.subtitle")}
+      />
       <Stack
         component={Paper}
         direction={"row"}
@@ -251,7 +269,7 @@ const ConsoleAdminsPage = () => {
         gap={1}
       >
         <InputFileUpload
-          text={"Upload"}
+          text={t("settings.consoleAdmins.upload")}
           color={"secondary"}
           onChange={handleFileUpload}
           accept={".txt"}
@@ -261,14 +279,14 @@ const ConsoleAdminsPage = () => {
           variant="contained"
           color="secondary"
         >
-          Download
+          {t("settings.consoleAdmins.download")}
         </Button>
         <Button
           onClick={submitChanges}
           disabled={!hasChanges}
           variant="contained"
         >
-          Apply
+          {t("settings.consoleAdmins.apply")}
         </Button>
       </Stack>
       <Stack
@@ -280,7 +298,7 @@ const ConsoleAdminsPage = () => {
           padding: 1,
         }}
       >
-        <Stack direction={"row"} gap={1} sx={{ mb: 1, p: 0.5 }}>
+        <Stack direction={{ xs: "column", md: "row" }} gap={1} sx={{ mb: 1, p: 0.5 }}>
           <PlayerAutocompletion player={newAdmin} setPlayer={setNewAdmin}/>
           <TextField
             autoComplete={"off"}
@@ -291,12 +309,12 @@ const ConsoleAdminsPage = () => {
             label={"ID"}
           />
           <FormControl fullWidth>
-            <InputLabel id="admin-role-input">Role</InputLabel>
+            <InputLabel id="admin-role-input">{t("settings.consoleAdmins.role")}</InputLabel>
             <Select
               labelId="admin-role-input"
               id="admin-role"
               value={newAdmin.role}
-              label="Role"
+              label={t("settings.consoleAdmins.role")}
               name={"role"}
               onChange={handleInputChange}
             >
@@ -312,7 +330,7 @@ const ConsoleAdminsPage = () => {
             disabled={!isValidAdminInput}
             variant="contained"
           >
-            Add
+            {t("settings.consoleAdmins.add")}
           </Button>
         </Stack>
         <Stack
@@ -324,7 +342,7 @@ const ConsoleAdminsPage = () => {
         >
           <FormControlLabel
             sx={{ px: 0.25 }}
-            label="Select"
+            label={t("settings.consoleAdmins.select")}
             control={
               <Checkbox
                 sx={{ mr: 1, "& .MuiSvgIcon-root": { fontSize: 16 } }}
@@ -342,7 +360,7 @@ const ConsoleAdminsPage = () => {
           <Divider orientation="vertical" flexItem />
           <SearchInput
             onChange={onSearchedChange}
-            placeholder="Search console admin"
+            placeholder={t("settings.consoleAdmins.search")}
           />
           <Divider orientation="vertical" flexItem />
           <Button
@@ -352,7 +370,7 @@ const ConsoleAdminsPage = () => {
             disabled={!checked.size}
             sx={{ minWidth: "fit-content" }}
           >
-            Delete selected
+            {t("settings.consoleAdmins.deleteSelected")}
           </Button>
         </Stack>
         <Divider orientation="horizontal" />

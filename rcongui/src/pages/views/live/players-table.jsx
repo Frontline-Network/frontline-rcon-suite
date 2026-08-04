@@ -12,8 +12,10 @@ import { generatePlayerActions } from "@/features/player-action/actions";
 import TableColumnSelection from "@/components/table/TableColumnSelection";
 import { TableToolbar } from "@/components/table/TableToolbar";
 import { usePlayersTableStore } from "@/stores/table-config";
+import { useTranslation } from "react-i18next";
 
 const PlayersTable = ({ table, teamData, selectedPlayers, onColumnVisibilityChange, isFetching }) => {
+  const { t } = useTranslation();
   const [tableConfigDrawerOpen, setTableConfigDrawerOpen] = useState(false);
   
   const tableConfig = usePlayersTableStore();
@@ -47,7 +49,7 @@ const PlayersTable = ({ table, teamData, selectedPlayers, onColumnVisibilityChan
             }}
           />
           <DebouncedSearchInput
-            placeholder={"Search player"}
+            placeholder={t("views.team.searchPlayer")}
             initialValue={table.getColumn("name")?.getFilterValue() ?? ""}
             onChange={(value) => {
               table.getColumn("name")?.setFilterValue(value);
@@ -57,11 +59,11 @@ const PlayersTable = ({ table, teamData, selectedPlayers, onColumnVisibilityChan
           <Divider flexItem orientation="vertical" sx={{ marginLeft: 0, marginRight: 0 }} />
           <IconButton
             size="small"
-            aria-label={tableConfig.expandedView ? "Collapse" : "Expand"}
+            aria-label={tableConfig.expandedView ? t("common.collapse") : t("common.expand")}
             aria-description={
               tableConfig.expandedView
-                ? "Hide extra details"
-                : "Show extra details"
+                ? t("views.table.collapseDetails")
+                : t("views.table.expandDetails")
             }
             sx={{ p: 0.5, borderRadius: 0 }}
             onClick={() => {
@@ -77,8 +79,8 @@ const PlayersTable = ({ table, teamData, selectedPlayers, onColumnVisibilityChan
           <TableColumnSelection table={table} onColumnVisibilityChange={onColumnVisibilityChange} />
           <IconButton
             size="small"
-            aria-label="Table settings"
-            aria-description="Configure the table"
+            aria-label={t("common.settings")}
+            aria-description={t("common.settings")}
             sx={{ p: 0.5, borderRadius: 0 }}
             onClick={handleTableConfigClick}
           >
@@ -88,7 +90,7 @@ const PlayersTable = ({ table, teamData, selectedPlayers, onColumnVisibilityChan
         <Table table={table} config={tableConfig} isFetching={isFetching} />
       </Stack>
       <TableConfigDrawer
-        name={"Players"}
+        name={t("views.live.players")}
         open={tableConfigDrawerOpen}
         onClose={(config) => {
           setTableConfigDrawerOpen(false);

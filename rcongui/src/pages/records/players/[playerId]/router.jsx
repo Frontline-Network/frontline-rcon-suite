@@ -1,21 +1,19 @@
-import {
-    get,
-    execute,
-  } from "@/utils/fetchUtils";
+import { cmd, execute } from "@/utils/fetchUtils";
   import {  toast } from "react-toastify";
   import { defer } from "react-router-dom";
+import i18n from "@/i18n";
+import { demoPlayerRecords, isFakeMode } from "@/mirage/demo-data";
+import { normalizePlayerProfile } from "@/utils/lib";
 import PlayerProfilePage from './index';
 import PlayerDetailView from './[detail]';
 
-const fetchResource = async (url, errorMessage) => {
+const fetchResource = async (request, errorMessage) => {
     try {
-      const response = await get(url);
-      if (!response.ok) throw new Response(errorMessage, { status: 404 });
-      const data = await response.json();
-      if (!data.result) throw new Response(errorMessage, { status: 404 });
-      return data.result;
+      const data = await request();
+      if (!data) throw new Response(errorMessage, { status: 404 });
+      return data;
     } catch (error) {
-      console.warn(`Failed to fetch ${url}:`, error);
+      console.warn("Failed to fetch player data:", error);
       return null; // Return null if any request fails
     }
   };
@@ -26,13 +24,19 @@ const fetchResource = async (url, errorMessage) => {
     const numSessions = url.searchParams.get('num_sessions') || 10;
   
     // Use the fetchResource function for each API call
-    const fetchPlayer = fetchResource(
-      `get_player_profile?player_id=${playerId}&num_sessions=${numSessions}`,
-      "Player not found"
-    );
+  const fetchPlayer = isFakeMode()
+    ? Promise.resolve(normalizePlayerProfile(
+        demoPlayerRecords.find((player) => player.player_id === playerId)
+      ))
+    : fetchResource(
+        () => cmd.GET_PLAYER({
+          params: { player_id: playerId, num_sessions: numSessions },
+        }),
+        "Player not found"
+      ).then((profile) => profile ? normalizePlayerProfile(profile) : null);
   
-    const fetchMessages = fetchResource(
-      `get_player_messages?player_id=${playerId}`,
+  const fetchMessages = isFakeMode() ? Promise.resolve([]) : fetchResource(
+      () => cmd.GET_PLAYER_MESSAGES({ params: { player_id: playerId } }),
       "Messages not found"
     );
   
@@ -73,7 +77,7 @@ const fetchResource = async (url, errorMessage) => {
       // Return success and maintain current path
       return { ok: true, currentPath };
     } catch (error) {
-      toast.error('Failed to save the comment.')
+      toast.error(i18n.t("errors.commentSaveFailed"))
       return { ok: false, error }
     }
   };

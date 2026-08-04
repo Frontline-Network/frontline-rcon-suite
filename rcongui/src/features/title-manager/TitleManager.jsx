@@ -4,6 +4,7 @@ import { useGlobalStore } from "@/stores/global-state";
 import { gameQueryOptions } from "@/queries/game-query";
 import { useQuery } from "@tanstack/react-query";
 import { cmd } from "@/utils/fetchUtils";
+import { useTranslation } from "react-i18next";
 
 const icons = {
   idle: "⚫",
@@ -18,6 +19,7 @@ const numberOfBlinks = 3;
 const blinkInterval = 500;
 
 const TitleManager = () => {
+  const { t } = useTranslation();
   const {
     data: gameState,
     isLoading: isGameLoading,
@@ -50,7 +52,7 @@ const TitleManager = () => {
 
   const [pendingTitleIcon, setPendingTitleIcon] = useState("");
   const [titleIcon, setTitleIcon] = useState(icons.loading);
-  const [titleText, setTitleText] = useState("Loading...");
+  const [titleText, setTitleText] = useState(t("common.loading"));
   const titleTimeoutRef = useRef(null);
 
   useEffect(() => {
@@ -58,8 +60,11 @@ const TitleManager = () => {
     let icon = icons.normal;
 
     if (isGameLoading || isServerLoading) {
-      text = "Loading...";
+      text = t("common.loading");
       icon = icons.loading;
+    } else if (!serverState || !gameState?.current_map) {
+      text = t("errors.sectionUnavailable");
+      icon = icons.error;
     } else {
       const serverName = serverState.short_name;
       const numCurrentPlayers = serverState.current_players;
@@ -83,7 +88,7 @@ const TitleManager = () => {
 
     setTitleText(text);
     setPendingTitleIcon(icon);
-  }, [serverState, gameState]);
+  }, [serverState, gameState, isGameLoading, isServerLoading, t]);
 
   useEffect(() => {
     let counter = 0;

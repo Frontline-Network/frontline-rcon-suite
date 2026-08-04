@@ -19,6 +19,7 @@ import { useLoaderData } from "react-router-dom";
 import { cmd } from "@/utils/fetchUtils";
 import { toast } from "react-toastify";
 import { ToggleInput } from "../components";
+import { useTranslation } from "react-i18next";
 
 const ADMIN_CAM_KEY = {
   broadcast: "broadcast",
@@ -26,6 +27,7 @@ const ADMIN_CAM_KEY = {
 };
 
 function AdminCamSettings() {
+  const { t } = useTranslation();
   const loaderData = useLoaderData();
   const queryClient = useQueryClient();
 
@@ -42,10 +44,10 @@ function AdminCamSettings() {
       queryClient.invalidateQueries({
         queryKey: [{ queryIdentifier: "get_camera_notification_config" }],
       });
-      toast.success("Admin camera notifications updated successfully!");
+      toast.success(t("settings.adminCam.updated"));
     },
     onError: (error) => {
-      toast.error(`Failed to update admin camera notifications: ${error.message}`);
+      toast.error(t("settings.adminCam.updateFailed", { message: error.message }));
     },
   });
 
@@ -73,8 +75,8 @@ function AdminCamSettings() {
         <Card elevation={2}>
           <CardHeader
             avatar={<VideoCamIcon color="primary" />}
-            title="Admin Camera Notifications"
-            subheader="Choose how to notify players when admins enter camera mode"
+            title={t("settings.adminCam.title")}
+            subheader={t("settings.adminCam.subtitle")}
             action={
               <Button
                 type="submit"
@@ -84,7 +86,7 @@ function AdminCamSettings() {
                 startIcon={<SaveIcon />}
                 disabled={form.formState.isSubmitting || isPending}
               >
-                {isPending ? "Saving..." : "Save"}
+                {isPending ? t("common.processing") : t("common.save")}
               </Button>
             }
           />
@@ -93,18 +95,12 @@ function AdminCamSettings() {
             <Box component="form" id="admin-cam-form" onSubmit={onSubmit}>
               <Stack gap={2}>
                 <Typography variant="body1" color="text.secondary">
-                  This feature will notify players whenever an admin enters Admin Camera
-                  mode.
-                  You can choose to send a broadcast message or change the Welcome
-                  message. However, it is not recommended to change the Welcome message,
-                  as doing so will display the camera message first, followed by the
-                  default text a few seconds later. This will obscure the left side of
-                  all players' screens twice with each camera entrance.
+                  {t("settings.adminCam.description")}
                 </Typography>
 
                 <ToggleInput
                   keyName={ADMIN_CAM_KEY.broadcast}
-                  title={"Notify by Broadcast Message"}
+                  title={t("settings.adminCam.broadcast")}
                   value={form.watch(ADMIN_CAM_KEY.broadcast)}
                   onChange={(checked) =>
                     form.setValue(ADMIN_CAM_KEY.broadcast, checked)
@@ -113,7 +109,7 @@ function AdminCamSettings() {
 
                 <ToggleInput
                   keyName={ADMIN_CAM_KEY.welcome}
-                  title={"Notify by Welcome Message"}
+                  title={t("settings.adminCam.welcome")}
                   value={form.watch(ADMIN_CAM_KEY.welcome)}
                   onChange={(checked) =>
                     form.setValue(ADMIN_CAM_KEY.welcome, checked)

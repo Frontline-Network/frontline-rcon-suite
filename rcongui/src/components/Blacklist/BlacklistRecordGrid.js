@@ -22,10 +22,12 @@ import makePlayerProfileUrl from "../../utils/makePlayerProfileUrl";
 import { getCountry } from "../PlayersHistory/PlayerTile/PlayerHeader";
 import { List } from "immutable";
 import moment from "moment";
+import "moment/locale/de";
 import BlacklistRecordActionRow from "./BlacklistRecordActionRow";
 import BlacklistRecordCreateDialog from "./BlacklistRecordCreateDialog";
 import { handle_http_errors, postData, showResponse } from "@/utils/fetchUtils";
 import {Fragment, useState} from "react";
+import { useTranslation } from "react-i18next";
 
 const BlacklistRecordTile = ({
   record,
@@ -33,6 +35,15 @@ const BlacklistRecordTile = ({
   onExpire,
   onDelete,
 }) => {
+  const { t, i18n } = useTranslation();
+  const formatDuration = (milliseconds) => {
+    const totalHours = Math.max(1, Math.round(Math.abs(milliseconds) / 3600000));
+    if (totalHours >= 48) {
+      const days = Math.round(totalHours / 24);
+      return `${days} ${t(`common.timeUnits.${days === 1 ? "day" : "days"}`)}`;
+    }
+    return `${totalHours} ${t(`common.timeUnits.${totalHours === 1 ? "hour" : "hours"}`)}`;
+  };
   const [showAll, setShowAll] = useState(false);
   const expiresAt = record.get("expires_at") ? moment(record.get("expires_at")) : null
   const isExpired = !record.get("is_active")
@@ -56,10 +67,10 @@ const BlacklistRecordTile = ({
 
   function getReportTemplate() {
     const template =
-      `Name: ${firstName || ""
-      }\nPlayer ID: ${player.get("player_id")
-      }\nSteam URL: ${makePlayerProfileUrl(player.get("player_id"), firstName) || "Unknown"
-      }\nType of issue:\nDescription:\nEvidence:`;
+      `${t("records.blacklists.reportName")}: ${firstName || ""
+      }\n${t("records.blacklists.playerId")}: ${player.get("player_id")
+      }\nSteam URL: ${makePlayerProfileUrl(player.get("player_id"), firstName) || t("common.unknown")
+      }\n${t("records.blacklists.issueType")}:\n${t("records.blacklists.description")}:\n${t("records.blacklists.evidence")}:`;
     return template;
   }
 
@@ -131,14 +142,14 @@ const BlacklistRecordTile = ({
             }
           />
           <ListItemSecondaryAction>
-            <Tooltip title="Copy Player ID to clipboard">
+            <Tooltip title={t("records.blacklists.copyPlayerId")}>
               <Typography variant="body2">
                 <IconButton
                   size="small"
                   style={{ cursor: "pointer" }}
                   onClick={() => {
                     if (navigator.clipboard === undefined) {
-                      alert("This feature only works if your rcon uses HTTPS");
+                      alert(t("records.blacklists.clipboardHttps"));
                       return;
                     }
                     var text = player.get("player_id");
@@ -156,7 +167,7 @@ const BlacklistRecordTile = ({
                 </IconButton>
               </Typography>
             </Tooltip>
-            <Tooltip title="Copy report template to clipboard">
+            <Tooltip title={t("records.blacklists.copyReport")}>
               <Typography variant="body2">
                 <IconButton
                   size="small"
@@ -164,7 +175,7 @@ const BlacklistRecordTile = ({
                   onClick={() => {
                     const text = getReportTemplate();
                     if (navigator.clipboard === undefined) {
-                      alert(`This feature only works if your rcon uses HTTPS.`);
+                      alert(t("records.blacklists.clipboardHttps"));
                     } else {
                       navigator.clipboard.writeText(text).then(
                         function () {
@@ -206,21 +217,23 @@ const BlacklistRecordTile = ({
           <Grid>
             <Tooltip title={createdAt.format("LLLL")} arrow>
               <small>
-                Banned {moment.duration(now.diff(createdAt)).humanize()} ago
-                {record.get("admin_name") ? ` by ${record.get("admin_name")}` : ""}
+                {t("records.blacklists.bannedAgo", {
+                  duration: formatDuration(now.diff(createdAt)),
+                  admin: record.get("admin_name") || t("common.unknown"),
+                })}
               </small>
             </Tooltip>
           </Grid>
           <Grid>
-            <Tooltip title={expiresAt ? expiresAt.format("LLLL") : "Permanent"} arrow>
+            <Tooltip title={expiresAt ? expiresAt.locale(i18n.resolvedLanguage).format("LLLL") : t("records.blacklists.permanent")} arrow>
               <small>
                 {expiresAt
                   ? (
                     now.isBefore(expiresAt)
-                      ? `Expires in ${moment.duration(now.diff(expiresAt)).humanize()}`
-                      : `Expired ${moment.duration(now.diff(expiresAt)).humanize()} ago`
+                      ? t("records.blacklists.expiresIn", { duration: formatDuration(now.diff(expiresAt)) })
+                      : t("records.blacklists.expiredAgo", { duration: formatDuration(now.diff(expiresAt)) })
                   )
-                  : `Never expires`
+                  : t("records.blacklists.neverExpires")
                 }
               </small>
             </Tooltip>
@@ -244,6 +257,7 @@ const BlacklistRecordGrid = ({
     records,
     onRefresh,
   }) => {
+    const { t } = useTranslation();
     const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [editDialogInitialValues, setEditDialogInitialValues] = useState();
 
@@ -309,7 +323,11 @@ const BlacklistRecordGrid = ({
       (<Fragment>
         <Grid container>
           <Grid size={12}>
-              <ImageList cols={size} spacing={12}>
+              <ImageList
+                cols={size}
+                spacing={12}
+                sx={{ gridTemplateColumns: { xs: "1fr !important", md: "repeat(2, 1fr) !important" } }}
+              >
               {records.map((record) => {
                 return (
                   <ImageListItem
@@ -334,8 +352,8 @@ const BlacklistRecordGrid = ({
           blacklists={blacklists}
           initialValues={editDialogInitialValues}
           onSubmit={onEditDialogSubmit}
-          titleText="Edit Blacklist Record"
-          submitText="Save"
+          titleText={t("records.blacklists.editRecord")}
+          submitText={t("common.save")}
           disablePlayerId
         />
       </Fragment>)

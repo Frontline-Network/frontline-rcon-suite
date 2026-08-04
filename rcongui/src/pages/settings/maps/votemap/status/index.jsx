@@ -20,6 +20,7 @@ import PowerIcon from "@mui/icons-material/Power";
 import AutorenewIcon from "@mui/icons-material/Autorenew";
 import { useLoaderData } from "react-router-dom";
 import { toast } from "react-toastify";
+import { useTranslation } from "react-i18next";
 
 const MapListContainer = styled(Box)(({ theme }) => ({
   width: "100%",
@@ -38,6 +39,7 @@ const ActionsContainer = styled(Box)(({ theme }) => ({
 }));
 
 function VotemapStatusPage() {
+  const { t } = useTranslation();
   const loaderData = useLoaderData();
   const queryClient = useQueryClient();
 
@@ -56,6 +58,10 @@ function VotemapStatusPage() {
     staleTime: 5_000,
     refetchOnMount: false,
   });
+  const normalizedMapListStatus = Array.isArray(mapListStatus)
+    ? mapListStatus
+    : [];
+  const isVotemapEnabled = Boolean(config?.enabled);
 
   const { mutate: toggleVotemap, isPending: isToggling } = useMutation({
     ...mapsManagerMutationOptions.setVotemapConfig,
@@ -65,7 +71,7 @@ function VotemapStatusPage() {
         mapsManagerQueryKeys.voteMapConfig,
         mapsManagerQueryKeys.votemapStatus,
       ]);
-      toast.success(`Votemap has been ${enabled ? "enabled" : "disabled"}.`);
+      toast.success(t("maps.votemapUpdated", { state: enabled ? t("common.enabled") : t("common.disabled") }));
     },
     onError: (error) => {
       toast.error(
@@ -83,7 +89,7 @@ function VotemapStatusPage() {
       queryClient.invalidateQueries({
         queryKey: mapsManagerQueryKeys.votemapStatus,
       });
-      toast.success(`Votemap has been reset.`);
+      toast.success(t("maps.votemapReset"));
     },
     onError: (error) => {
       toast.error(
@@ -98,7 +104,7 @@ function VotemapStatusPage() {
   const handleVotemapToggle = () => {
     toggleVotemap({
       ...config,
-      enabled: !config.enabled,
+      enabled: !isVotemapEnabled,
     });
   };
 
@@ -106,26 +112,26 @@ function VotemapStatusPage() {
     <Stack direction={{ xs: "column-reverse", md: "row" }} spacing={1}>
       <MapListContainer>
         <MapList
-          maps={mapListStatus.map((s) => s.map)}
+          maps={normalizedMapListStatus.map((s) => s.map)}
           sort={false}
           renderItem={(mapLayer, index) => (
             <MapVotemapListItem
               key={mapLayer.id}
               mapLayer={mapLayer}
-              voters={mapListStatus[index].voters}
+              voters={normalizedMapListStatus[index].voters}
             />
           )}
         />
       </MapListContainer>
       <ActionsContainer>
         <Typography variant="subtitle2" component={"div"}>
-          Status: {config.enabled ? `🟢 ENABLED` : `🔴 DISABLED`}
+          {t("maps.status")}: {isVotemapEnabled ? `🟢 ${t("common.enabled")}` : `🔴 ${t("common.disabled")}`}
         </Typography>
         <Typography variant="subtitle2" component={"div"}>
-          Next map:{" "}
-          {config.enabled
-            ? mapListStatus[0]?.map?.pretty_name ?? "Unknown"
-            : "N/A"}
+          {t("maps.next")}:{" "}
+          {isVotemapEnabled
+            ? normalizedMapListStatus[0]?.map?.pretty_name ?? t("common.unknown")
+            : "–"}
         </Typography>
         <Divider orientation="horizontal" sx={{ my: 1 }} />
         <Stack direction="row" spacing={1} alignItems={"center"}>
@@ -134,7 +140,7 @@ function VotemapStatusPage() {
             startIcon={
               isToggling ? (
                 <CircularProgress size={20} />
-              ) : config.enabled ? (
+              ) : isVotemapEnabled ? (
                 <PowerOffIcon />
               ) : (
                 <PowerIcon />
@@ -142,16 +148,16 @@ function VotemapStatusPage() {
             }
             variant="contained"
             disabled={isToggling}
-            color={config.enabled ? "error" : "success"}
+            color={isVotemapEnabled ? "error" : "success"}
             sx={{ minWidth: 120 }}
             size="small"
           >
-            {config.enabled ? "Disable" : "Enable"}
+            {isVotemapEnabled ? t("maps.disableVotemap") : t("maps.enableVotemap")}
           </Button>
           <Typography variant="caption">
-            {config.enabled
-              ? "votemap and decide the maps based on map rotation"
-              : "votemap and decide maps dynamically on vote count or other conditions"}
+            {isVotemapEnabled
+              ? t("maps.disableVotemapDescription")
+              : t("maps.enableVotemapDescription")}
           </Typography>
         </Stack>
         <Divider flexItem orientation="horizontal" sx={{ my: 1 }} />
@@ -167,10 +173,10 @@ function VotemapStatusPage() {
             sx={{ minWidth: 120 }}
             size="small"
           >
-            Reset
+            {t("maps.resetVotemap")}
           </Button>
           <Typography variant="caption">
-            the current vote counts and generate new map pool
+            {t("maps.resetVotemapDescription")}
           </Typography>
         </Stack>
       </ActionsContainer>

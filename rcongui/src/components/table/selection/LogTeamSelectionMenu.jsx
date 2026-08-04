@@ -8,9 +8,11 @@ import {
 import { PopoverMenu } from "@/components/shared/PopoverMenu";
 import Groups2Icon from "@mui/icons-material/Groups2";
 import { useThemedImages } from "@/hooks/useThemedImages";
+import { useTranslation } from "react-i18next";
 
 export const LogTeamSelectionMenu = ({ selectedTeams, onTeamSelect }) => {
   const themedImg = useThemedImages()
+  const { t } = useTranslation();
   const hasSelected = selectedTeams.length > 0;
 
   const handleTeamToggle = (team) => {
@@ -20,11 +22,11 @@ export const LogTeamSelectionMenu = ({ selectedTeams, onTeamSelect }) => {
   return (
     <PopoverMenu
       id="log-team-picker"
-      description="Filter logs by team"
+      description={t("selection.logTeamDescription")}
       sx={{ width: 200 }}
       renderButton={(props) => (
         <Button {...props}>
-          <Tooltip title="Filter by team">
+          <Tooltip title={t("selection.logTeam")}>
             <Badge
               color="secondary"
               variant="dot"
@@ -40,7 +42,7 @@ export const LogTeamSelectionMenu = ({ selectedTeams, onTeamSelect }) => {
       <ToggleButtonGroup
         value={selectedTeams}
         onChange={(e, value) => {}}
-        aria-label="team selection"
+        aria-label={t("selection.logTeam")}
         sx={{
           display: "flex",
           flexDirection: "column",
@@ -63,9 +65,9 @@ export const LogTeamSelectionMenu = ({ selectedTeams, onTeamSelect }) => {
             src={themedImg.getFactionIconSrc("us")}
             width={16}
             height={16}
-            alt="Allies"
+            alt={t("views.team.allies")}
           />
-          Allies
+          {t("views.team.allies")}
         </ToggleButton>
         <ToggleButton
           value="Axis"
@@ -82,9 +84,9 @@ export const LogTeamSelectionMenu = ({ selectedTeams, onTeamSelect }) => {
             src={themedImg.getFactionIconSrc("ger")}
             width={16}
             height={16}
-            alt="Axis"
+            alt={t("views.team.axis")}
           />
-          Axis
+          {t("views.team.axis")}
         </ToggleButton>
       </ToggleButtonGroup>
     </PopoverMenu>

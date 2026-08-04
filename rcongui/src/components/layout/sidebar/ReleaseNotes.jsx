@@ -3,6 +3,7 @@ import { Box, Typography, Link, Button } from '@mui/material';
 import Skeleton from '@mui/material/Skeleton';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useTranslation } from "react-i18next";
 
 // Only lazy load ReactMarkdown if needed, but keep remarkGfm as regular import
 const MarkdownContent = ({ content }) => {
@@ -62,16 +63,17 @@ const MarkdownContent = ({ content }) => {
 };
 
 export const ReleaseNotes = ({ release }) => {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
   return (
     <>
         <Button variant='contained' color='primary' size='small' onClick={() => setOpen(!open)}>
-            {open ? 'Hide Release Notes' : 'Show Release Notes'}
+            {open ? t("sidebar.hideReleaseNotes") : t("sidebar.showReleaseNotes")}
         </Button>
         {open && (
             <Box component='section' id='latest-release' sx={{ wordWrap: 'break-word' }}>
-                <Typography variant='h6'>Latest Release Notes</Typography>
+                <Typography variant='h6'>{t("sidebar.latestReleaseNotes")}</Typography>
                 <MarkdownContent content={release.body} />
             </Box>
         )}

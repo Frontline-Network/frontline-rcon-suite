@@ -16,6 +16,7 @@ import {
   import WatchlistList from "./WatchlistList";
   import VipList from "./VipList";
 import CopyableText from "@/components/shared/CopyableText";
+import { useTranslation } from "react-i18next";
 
 const PlayerProfileSummary = ({
   firstSeen,
@@ -28,7 +29,9 @@ const PlayerProfileSummary = ({
   names,
   watchlist,
   eosId,
+  player,
 }) => {
+  const { t } = useTranslation();
   return (
     <Stack spacing={3}>
       <Box component="section">
@@ -36,9 +39,9 @@ const PlayerProfileSummary = ({
           variant="h6"
           sx={{ mb: 1, display: "flex", alignItems: "center", gap: 1 }}
         >
-          <FlagIcon /> Flags
+          <FlagIcon /> {t("playerDrawer.summary.flags")}
         </Typography>
-        <FlagList flags={flags} />
+        <FlagList player={player} flags={flags} />
       </Box>
 
       <Divider />
@@ -48,14 +51,14 @@ const PlayerProfileSummary = ({
           variant="h6"
           sx={{ mb: 1, display: "flex", alignItems: "center", gap: 1 }}
         >
-          <CalendarTodayIcon /> Activity
+          <CalendarTodayIcon /> {t("playerDrawer.summary.activity")}
         </Typography>
         <Stack spacing={0.5}>
-          <Typography>First Seen: {dayjs(firstSeen).format("LLL")}</Typography>
-          <Typography>Last Seen: {dayjs(lastSeen).format("LLL")}</Typography>
-          <Typography>Visits: {sessionCount}</Typography>
+          <Typography>{t("playerDrawer.summary.firstSeen")}: {dayjs(firstSeen).format("LLL")}</Typography>
+          <Typography>{t("playerDrawer.summary.lastSeen")}: {dayjs(lastSeen).format("LLL")}</Typography>
+          <Typography>{t("playerDrawer.summary.visits")}: {sessionCount}</Typography>
           <Typography>
-            Playtime: {Math.floor(totalPlaytime / 3600)} hours
+            {t("playerDrawer.summary.playtime")}: {Math.floor(totalPlaytime / 3600)} {t("playerDrawer.summary.hours")}
           </Typography>
         </Stack>
       </Box>
@@ -67,7 +70,7 @@ const PlayerProfileSummary = ({
           variant="h6"
           sx={{ mb: 1, display: "flex", alignItems: "center", gap: 1 }}
         >
-          <WorkspacePremiumIcon /> VIP Status
+          <WorkspacePremiumIcon /> {t("playerDrawer.summary.vipStatus")}
         </Typography>
         <VipList vip={vip} otherVips={otherVips} />
       </Box>
@@ -79,7 +82,7 @@ const PlayerProfileSummary = ({
           variant="h6"
           sx={{ mb: 1, display: "flex", alignItems: "center", gap: 1 }}
         >
-          <VisibilityIcon /> Watchlist
+          <VisibilityIcon /> {t("playerDrawer.summary.watchlist")}
         </Typography>
         <WatchlistList watchlist={watchlist} />
       </Box>
@@ -91,7 +94,7 @@ const PlayerProfileSummary = ({
           variant="h6"
           sx={{ mb: 1, display: "flex", alignItems: "center", gap: 1 }}
         >
-          <PersonIcon /> Also known as
+          <PersonIcon /> {t("playerDrawer.summary.aliases")}
         </Typography>
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
           {names?.map((nameObj) => (
@@ -115,7 +118,7 @@ const PlayerProfileSummary = ({
           <EmergencyIcon /> EOS ID
         </Typography>
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-          <CopyableText label={eosId ?? "Unset"} text={eosId} />
+          <CopyableText label={eosId ?? t("playerDrawer.summary.unset")} text={eosId} />
         </Box>
       </Box>
     </Stack>

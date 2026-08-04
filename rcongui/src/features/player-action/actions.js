@@ -58,6 +58,7 @@ const executeAction = (command) => async (payload) => {
 
 // Define each action
 export const messageAction = {
+  translationKey: "actions.sendMessage",
   name: "Send Message",
   description: "Show message in top right corner of game interface.",
   component: MessageFormFields,
@@ -67,6 +68,7 @@ export const messageAction = {
 };
 
 export const watchAction = {
+  translationKey: "actions.addWatch",
   name: "Add Watch",
   description:
     "Send Discord message upon player connection (using webhook config).",
@@ -77,6 +79,7 @@ export const watchAction = {
 };
 
 export const removeWatchAction = {
+  translationKey: "actions.removeWatch",
   name: "Remove Watch",
   description: "Remove from Watchlist.",
   component: ConfirmationOnly,
@@ -86,6 +89,7 @@ export const removeWatchAction = {
 };
 
 export const vipAction = {
+  translationKey: "actions.addVip",
   name: "Add VIP",
   description: "Add or Update VIP.",
   component: AddVipFormFields,
@@ -95,6 +99,7 @@ export const vipAction = {
 };
 
 export const removeVipAction = {
+  translationKey: "actions.removeVip",
   name: "Remove VIP",
   description: "Remove VIP.",
   component: RemoveVipFormFields,
@@ -104,6 +109,7 @@ export const removeVipAction = {
 };
 
 export const switchAction = {
+  translationKey: "actions.switchPlayer",
   name: "Switch player",
   description: "Move player to opposite team.",
   component: ConfirmationOnly,
@@ -113,6 +119,7 @@ export const switchAction = {
 };
 
 export const switchOnDeathAction = {
+  translationKey: "actions.switchOnDeath",
   name: "Switch Player On Death",
   description: "Move player to opposite team upon death.",
   component: ConfirmationOnly,
@@ -122,6 +129,7 @@ export const switchOnDeathAction = {
 };
 
 export const punishAction = {
+  translationKey: "actions.punish",
   name: "Punish player",
   description: "Kill player in-game if alive.",
   component: PunishFormFields,
@@ -131,6 +139,7 @@ export const punishAction = {
 };
 
 export const kickAction = {
+  translationKey: "actions.kick",
   name: "Kick player",
   description: "Remove player from server.",
   component: PunishFormFields,
@@ -140,6 +149,7 @@ export const kickAction = {
 };
 
 export const tempBanAction = {
+  translationKey: "actions.tempBan",
   name: "Temp Ban",
   description: "Issue immediate temporary ban to player.",
   component: TempBanFormFields,
@@ -152,6 +162,7 @@ export const tempBanAction = {
 };
 
 export const removeBanAction = {
+  translationKey: "actions.removeBans",
   name: "Remove bans",
   description: "Remove all bans associated with the player account.",
   component: ConfirmationOnly,
@@ -161,6 +172,7 @@ export const removeBanAction = {
 };
 
 export const permaBanAction = {
+  translationKey: "actions.permaBan",
   name: "Perma Ban",
   description: "Initiate immediate indefinite ban to player.",
   component: PermaBanFormFields,
@@ -173,6 +185,7 @@ export const permaBanAction = {
 };
 
 export const blacklistAction = {
+  translationKey: "actions.blacklist",
   name: "Add Blacklist",
   description: "Add player to a blacklist.",
   component: BlacklistPlayerFormFields,
@@ -191,6 +204,7 @@ export const blacklistAction = {
 };
 
 export const flagAction = {
+  translationKey: "actions.addFlag",
   name: "Add Flag",
   description: "Assign a flag to the player.",
   component: AddFlagFormFields,
@@ -200,6 +214,7 @@ export const flagAction = {
 };
 
 export const removeFlagsAction = {
+  translationKey: "actions.removeFlags",
   name: "Remove Flags",
   description: "Remove a flag from the player.",
   component: RemoveFlagFormFields,
@@ -219,6 +234,7 @@ export const removeFlagsAction = {
 };
 
 export const removeFlagAction = {
+  translationKey: "actions.removeFlags",
   name: "Remove Flag",
   description: "Remove a flag from the player.",
   component: ConfirmationOnly,
@@ -228,6 +244,7 @@ export const removeFlagAction = {
 };
 
 export const commentAction = {
+  translationKey: "actions.addComment",
   name: "Add Comment",
   description: "Add a comment to the player profile.",
   component: AddCommentFormFields,
@@ -237,6 +254,7 @@ export const commentAction = {
 };
 
 export const clearAccountAction = {
+  translationKey: "actions.removeBans",
   name: "Clear Bans",
   description: "Remove all bans associated with the player account.",
   component: ConfirmationOnly,
@@ -246,6 +264,7 @@ export const clearAccountAction = {
 };
 
 export const addConsoleAdminAction = {
+  translationKey: "actions.addAdmin",
   name: "Add Admin",
   description: "Add a console admin to the player.",
   component: AddConsoleAdminFormFields,
@@ -264,6 +283,7 @@ export const addConsoleAdminAction = {
 };
 
 export const removeFromSquadAction = {
+  translationKey: "actions.removeFromSquad",
   name: "Remove from a squad",
   description: "Redeploys and moves a player from his current squad.",
   component: PunishFormFields,

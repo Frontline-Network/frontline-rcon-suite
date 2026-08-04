@@ -7,8 +7,10 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import TableConfigDrawer from "@/components/table/TableConfigDrawer";
 import NavPagination from "./nav-pagination";
 import { useGameListTableStore } from "@/stores/table-config";
+import { useTranslation } from "react-i18next";
 
 export function GameListTable({ table, maxPages, page }) {
+  const { t } = useTranslation();
   const [tableConfigDrawerOpen, setTableConfigDrawerOpen] = useState(false);
   const tableConfig = useGameListTableStore();
   const setConfig = useGameListTableStore(state => state.setConfig);
@@ -22,7 +24,7 @@ export function GameListTable({ table, maxPages, page }) {
     <Box>
       <TableToolbar>
         <DebouncedSearchInput
-          placeholder={"Search games"}
+          placeholder={t("stats.games.search")}
           onChange={(value) => {
             // set global filter
             table.getColumn("map").setFilterValue(String(value));
@@ -41,7 +43,7 @@ export function GameListTable({ table, maxPages, page }) {
       </TableToolbar>
       <Table table={table} config={tableConfig} />
       <TableConfigDrawer
-        name="Games List"
+        name={t("stats.games.listSettings")}
         open={tableConfigDrawerOpen}
         onClose={(config) => {
           setTableConfigDrawerOpen(false);

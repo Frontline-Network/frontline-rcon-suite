@@ -1,10 +1,11 @@
 import { cmd } from "@/utils/fetchUtils";
 import {
   ListItem,
-  ListItemText,
   Tooltip,
   Stack,
   Typography,
+  Box,
+  LinearProgress,
 } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -14,115 +15,46 @@ import {
   faMemory,
 } from "@fortawesome/free-solid-svg-icons";
 import { byUsage } from "./utils";
+import { useTranslation } from "react-i18next";
+import { demoSystemUsage, isFakeMode } from "@/mirage/demo-data";
 
 const SystemUsage = () => {
+  const { t } = useTranslation();
   const { data: system, isLoading } = useQuery({
     queryKey: [{ queryIdentified: "get_system_usage" }],
-    queryFn: cmd.GET_SYSTEM_USAGE,
+    queryFn: isFakeMode() ? () => Promise.resolve(demoSystemUsage) : cmd.GET_SYSTEM_USAGE,
     refetchInterval: 15 * 1000,
   });
 
-  if (isLoading || !system || !system.cpu_usage || !system.ram_usage || !system.disk_usage)
-    return (
-      <ListItem
-        sx={{
-          height: 20,
-          "& .MuiListItemText-root .MuiListItemText-primary": {
-            fontSize: "0.75rem",
-          },
-        }}
-      >
-        <ListItemText
-          sx={{ marginLeft: -0.5 }}
-          primary={
-            <Stack direction={"row"} justifyContent={"space-between"}>
-              <FontAwesomeIcon icon={faMicrochip} />
-              <FontAwesomeIcon icon={faMemory} />
-              <FontAwesomeIcon icon={faHardDrive} />
-            </Stack>
-          }
-        />
-      </ListItem>
-    );
+  const metrics = system ? [
+    { key: "CPU", icon: faMicrochip, value: system.cpu_usage?.percent, tooltip: `CPU: ${system.cpu_usage?.percent ?? 0}%` },
+    { key: "RAM", icon: faMemory, value: system.ram_usage?.percent, tooltip: `RAM: ${system.ram_usage?.percent ?? 0}%` },
+    { key: "SSD", icon: faHardDrive, value: system.disk_usage?.percent, tooltip: `SSD: ${system.disk_usage?.percent ?? 0}%` },
+  ] : [];
 
   return (
-    <ListItem
-      sx={{
-        height: 20,
-        "& .MuiListItemText-root .MuiListItemText-primary": {
-          fontSize: "0.75rem",
-        },
-      }}
-    >
-      <ListItemText
-        sx={{ marginLeft: -0.5 }}
-        primary={
-          <Stack direction={"row"} justifyContent={"space-between"}>
-            <Tooltip
-              enterDelay={500}
-              enterNextDelay={500}
-              title={`CPU Usage: ${system.cpu_usage.percent}% on a system with ${system.cpu_usage.cores} cores running ${system.cpu_usage.process_count} processes [CRCON environment]`}
-            >
-              <Stack
-                direction={"row"}
-                justifyContent={"start"}
-                alignItems={"center"}
-                gap={0.5}
-              >
-                <FontAwesomeIcon
-                  icon={faMicrochip}
-                  color={byUsage(system.cpu_usage.percent)}
+    <ListItem disableGutters sx={{ display: "block", pb: 1.25 }}>
+      <Typography variant="caption" color="primary.light" sx={{ display: "block", mb: 0.75, textTransform: "uppercase" }}>
+        {t("sidebar.system")}
+      </Typography>
+      <Stack spacing={0.8}>
+        {(isLoading ? ["CPU", "RAM", "SSD"].map((key) => ({ key, value: 0 })) : metrics).map((metric) => (
+          <Tooltip key={metric.key} title={metric.tooltip || t("common.loading")} placement="right">
+            <Box>
+              <Stack direction="row" alignItems="center" spacing={0.8}>
+                {metric.icon && <FontAwesomeIcon icon={metric.icon} color={byUsage(metric.value || 0)} />}
+                <Typography variant="caption" sx={{ width: 28 }}>{metric.key}</Typography>
+                <LinearProgress
+                  variant="determinate"
+                  value={metric.value || 0}
+                  sx={{ flexGrow: 1, height: 4, bgcolor: "grey.800", "& .MuiLinearProgress-bar": { bgcolor: "secondary.main" } }}
                 />
-                <div>{`${system.cpu_usage.percent}%`}</div>
+                <Typography variant="caption" sx={{ width: 32, textAlign: "right" }}>{Math.round(metric.value || 0)}%</Typography>
               </Stack>
-            </Tooltip>
-            <Tooltip
-              enterDelay={500}
-              enterNextDelay={500}
-              title={`RAM Usage: ${system.ram_usage.percent}% (${Number(
-                system.ram_usage.used
-              ).toFixed(1)} used GB out of ${Number(
-                system.ram_usage.total
-              ).toFixed(1)} GB of total CRCON environment)`}
-            >
-              <Stack
-                direction={"row"}
-                justifyContent={"start"}
-                alignItems={"center"}
-                gap={0.5}
-              >
-                <FontAwesomeIcon
-                  icon={faMemory}
-                  color={byUsage(system.ram_usage.percent)}
-                />
-                <div>{`${system.ram_usage.percent}%`}</div>
-              </Stack>
-            </Tooltip>
-            <Tooltip
-              enterDelay={500}
-              enterNextDelay={500}
-              title={`Storage Usage: ${system.disk_usage.percent}% (${Number(
-                system.disk_usage.used
-              ).toFixed(1)} GB used out of ${Number(
-                system.disk_usage.total
-              ).toFixed(1)} GB of total CRCON environment)`}
-            >
-              <Stack
-                direction={"row"}
-                justifyContent={"start"}
-                alignItems={"center"}
-                gap={0.5}
-              >
-                <FontAwesomeIcon
-                  icon={faHardDrive}
-                  color={byUsage(system.disk_usage.percent)}
-                />
-                <div>{`${system.disk_usage.percent}%`}</div>
-              </Stack>
-            </Tooltip>
-          </Stack>
-        }
-      />
+            </Box>
+          </Tooltip>
+        ))}
+      </Stack>
     </ListItem>
   );
 };

@@ -11,17 +11,19 @@ import {
   IconButton,
 } from "@mui/material";
 import ViewColumnIcon from "@mui/icons-material/ViewColumn";
+import { useTranslation } from "react-i18next";
 
 const TableColumnSelection = ({ table, onColumnVisibilityChange }) => {
+  const { t } = useTranslation();
   const columns = table.getAllColumns().filter((col) => col.getCanHide());
 
   return (
     <PopoverMenu
       id="column-picker"
-      description="Select columns to display"
+      description={t("selection.columnsDescription")}
       renderButton={(props) => (
         <IconButton {...props} size="small" sx={{ borderRadius: 0 }}>
-          <Tooltip title="Select columns">
+          <Tooltip title={t("selection.columns")}>
             <ViewColumnIcon sx={{ fontSize: 16 }} />
           </Tooltip>
         </IconButton>

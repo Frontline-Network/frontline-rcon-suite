@@ -1,10 +1,12 @@
 import { Stack, Typography, Chip, Divider } from "@mui/material";
 import dayjs from "dayjs";
 import WarningIcon from "@mui/icons-material/Warning";
+import { useTranslation } from "react-i18next";
 
 const VipList = ({ vip, otherVips }) => {
+  const { t } = useTranslation();
   if (!vip && otherVips.length === 0) {
-    return <Typography>No VIP records found</Typography>;
+    return <Typography>{t("playerDrawer.summary.noVip")}</Typography>;
   }
 
   return (
@@ -23,6 +25,7 @@ const VipList = ({ vip, otherVips }) => {
 };
 
 const VipEntry = ({ vip }) => {
+  const { t } = useTranslation();
   // vip.expiration is null if the VIP expiration is set indefinitely
   const expiration = dayjs(vip.expiration);
   const isActive = expiration === null ? true : expiration.isAfter(dayjs());
@@ -32,18 +35,18 @@ const VipEntry = ({ vip }) => {
   return (
     <Stack direction="row" alignItems="center" spacing={1}>
       <Typography variant="body2" component="span">
-        Server #{vip.server_number}
+        {t("playerDrawer.summary.server", { number: vip.server_number })}
       </Typography>
       <div>
         <Chip
-          label={isActive ? "VIP" : "Expired"}
+          label={isActive ? "VIP" : t("playerDrawer.summary.expired")}
           color={isActive ? "primary" : "error"}
           variant={isActive ? "filled" : "outlined"}
           icon={isNotCreatedByCrcon ? <WarningIcon /> : null}
         />
       </div>
       <Typography variant="body2" component="span">
-        {isActive ? "until" : "from"} {dayjs(vip.expiration).format("LLL")}
+        {isActive ? t("playerDrawer.summary.validUntil") : t("playerDrawer.summary.expiredSince")} {dayjs(vip.expiration).format("LLL")}
       </Typography>
     </Stack>
   );

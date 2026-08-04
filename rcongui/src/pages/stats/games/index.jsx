@@ -1,6 +1,6 @@
 import { useReactTable } from "@tanstack/react-table";
 import { GameListTable } from "./game-list-table";
-import { columns } from "./game-list-columns";
+import { createGameListColumns } from "./game-list-columns";
 import { cmd } from "@/utils/fetchUtils";
 import { useLoaderData, useSearchParams } from "react-router-dom";
 import {
@@ -10,12 +10,19 @@ import {
 } from "@tanstack/react-table";
 import { gameQueryOptions } from "@/queries/game-query";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+import { useMemo } from "react";
+import PageHeader from "@/components/shared/PageHeader";
+import { demoGames, isFakeMode } from "@/mirage/demo-data";
 
 export const loader = async () => {
+  if (isFakeMode()) return { maps: demoGames, total: demoGames.length };
   return await cmd.GET_COMPLETED_GAMES();
 };
 
-export const GamesList = ({ columns }) => {
+export const GamesList = () => {
+  const { t } = useTranslation();
+  const columns = useMemo(() => createGameListColumns(t), [t]);
   const data = useLoaderData();
 
   const [searchParams] = useSearchParams();
@@ -45,14 +52,18 @@ export const GamesList = ({ columns }) => {
 
   return (
     <div>
-      <h1>Games</h1>
+      <PageHeader
+        eyebrow={t("stats.games.eyebrow")}
+        title={t("stats.games.title")}
+        subtitle={t("stats.games.subtitle")}
+      />
       <GameListTable table={table} page={page} maxPages={maxPages} />
     </div>
   );
 };
 
 const GamesPage = () => {
-  return <GamesList columns={columns} />;
+  return <GamesList />;
 };
 
 export default GamesPage;

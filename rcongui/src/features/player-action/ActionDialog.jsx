@@ -17,12 +17,15 @@ import { useActionDialog } from "@/hooks/useActionDialog";
 import CloseIcon from "@mui/icons-material/Close";
 import { ClientError } from "@/components/shared/ClientError";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 export const ActionDialog = () => {
+  const { t } = useTranslation();
   const { state, closeDialog } = useActionDialog();
   const submitRef = useRef();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down("md"));
   const { open, action, recipients } = state;
@@ -33,6 +36,7 @@ export const ActionDialog = () => {
 
   const handleClose = () => {
     setError(null);
+    setSuccess(false);
     setLoading(false);
     closeDialog();
   };
@@ -50,6 +54,7 @@ export const ActionDialog = () => {
   const actionHandlers = {
     submitRef,
     setError,
+    setSuccess,
     setLoading: handleLoading,
     closeDialog: handleClose,
   };
@@ -71,12 +76,12 @@ export const ActionDialog = () => {
             edge="start"
             color="inherit"
             onClick={handleClose}
-            aria-label="close"
+            aria-label={t("common.close")}
           >
             <CloseIcon />
           </IconButton>
           <Typography sx={{ ml: 2, flex: 1 }} variant="h6" component="div">
-            {action.name}
+            {action.translationKey ? t(`${action.translationKey}.name`) : action.name}
           </Typography>
           <Button
             variant="outlined"
@@ -85,26 +90,32 @@ export const ActionDialog = () => {
             onClick={handleConfirm}
             autoFocus
           >
-            {loading ? "Processing..." : "Confirm"}
+            {loading ? t("common.processing") : t("common.confirm")}
           </Button>
         </Toolbar>
       </AppBar>
       <DialogContent dividers>
         {error && <ClientError error={error} />}
+        {success && (
+          <Alert severity="success" sx={{ mb: 1 }}>
+            <AlertTitle>{t("common.success")}</AlertTitle>
+            {t("actions.actionSucceeded")}
+          </Alert>
+        )}
         {action.deprecated && (
           <Alert severity="warning" sx={{ mb: 1 }}>
-            <AlertTitle>Action deprecated</AlertTitle>
-            {action.deprecationNote}
+            <AlertTitle>{t("actions.deprecated")}</AlertTitle>
+            {t("actions.deprecatedNote")}
           </Alert>
         )}
         <Typography variant="subtitle1" sx={{ mb: 1 }}>
-          {action.description}
+          {action.translationKey ? t(`${action.translationKey}.description`) : action.description}
         </Typography>
         <ActionForm actionHandlers={actionHandlers} state={state} />
       </DialogContent>
       <DialogActions>
         <Button variant="outlined" color="secondary" onClick={handleClose}>
-          Cancel
+          {t("common.cancel")}
         </Button>
         <Button
           variant="outlined"
@@ -113,7 +124,7 @@ export const ActionDialog = () => {
           onClick={handleConfirm}
           autoFocus
         >
-          {loading ? "Processing..." : "Confirm"}
+          {loading ? t("common.processing") : t("common.confirm")}
         </Button>
       </DialogActions>
     </Dialog>

@@ -2,6 +2,7 @@ import { InputBase, Box, styled, IconButton } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import CloseIcon from "@mui/icons-material/Close";
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 const SearchWrapper = styled(Box)({
   display: "flex",
@@ -21,6 +22,7 @@ const StyledInput = styled(InputBase)(({theme}) => ({
 }))
 
 export const SearchInput = React.forwardRef(({ ...props }, ref) => {
+  const { t } = useTranslation();
   const { sx, onClear, ...rest } = props;
   return (
     <SearchWrapper sx={sx}>
@@ -29,11 +31,11 @@ export const SearchInput = React.forwardRef(({ ...props }, ref) => {
       </Box>
       <StyledInput
         inputRef={ref}
-        placeholder={props.placeholder ?? "Search"}
+        placeholder={props.placeholder ?? t("common.search")}
         inputProps={{
-          "aria-label": props.placeholder?.toLowerCase() ?? "search",
+          "aria-label": props.placeholder?.toLowerCase() ?? t("common.search"),
         }}
-        endAdornment={onClear ? <IconButton onClick={onClear} aria-label="clear" size="small"><CloseIcon /></IconButton> : null}
+        endAdornment={onClear ? <IconButton onClick={onClear} aria-label={t("common.clearSelection")} size="small"><CloseIcon /></IconButton> : null}
         {...rest}
       />
     </SearchWrapper>

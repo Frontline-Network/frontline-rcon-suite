@@ -15,7 +15,7 @@ const shapeStyles = {
 // Styled component for the neutral rectangle
 const NeutralBox = styled(Box)({
   ...shapeStyles,
-  backgroundColor: '#e5e5e5', // neutral-200 equivalent
+  backgroundColor: '#3d433c',
   clipPath: 'polygon(0% 0%, 100% 0, 95% 50%, 100% 100%, 0% 100%, 5% 50%)',
 })
 
@@ -33,14 +33,14 @@ export function Arrow({ team, highlighted, mode, order, direction, ...props }) {
             ? 'polygon(0% 0%, 95% 0%, 100% 50%, 95% 100%, 0% 100%, 5% 50%)'
             : 'polygon(5% 0%, 100% 0, 95% 50%, 100% 100%, 5% 100%, 0% 50%)',
         borderTop: highlighted ? 'none' : '4px solid',
-        borderColor: team === 'axis' ? '#ef4444' : '#3b82f6', // red-500 : blue-500
+        borderColor: team === 'axis' ? '#c55f51' : '#6f9ea3',
         backgroundColor: highlighted
           ? team === 'axis'
-            ? '#ef4444'
-            : '#3b82f6'
+            ? '#a63f34'
+            : '#466d72'
           : team === 'axis'
-          ? '#fca5a5'
-          : '#93c5fd', // red-300 : blue-300
+          ? '#5f2923'
+          : '#294d52',
         opacity: highlighted ? 1 : undefined,
       }}
       {...props}
@@ -71,8 +71,8 @@ export const ArrowsContainer = styled(Box)({
   width: '100%',
   display: 'flex',
   flexDirection: 'row',
-  paddingLeft: '16px',
-  paddingRight: '16px',
+  overflow: 'hidden',
+  borderRadius: 4,
   marginBottom: '8px',
   height: {
     xs: '1rem',

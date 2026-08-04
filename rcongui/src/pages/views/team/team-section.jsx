@@ -11,7 +11,7 @@ import {
   PlayerRow,
   SquadHeader,
 } from "./styled";
-import { Box, Typography, IconButton, Checkbox } from "@mui/material";
+import { Box, Typography, IconButton, Checkbox, Tooltip } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import PersonOffIcon from "@mui/icons-material/PersonOff";
@@ -23,6 +23,7 @@ import { ActionMenuButton } from "@/features/player-action/ActionMenu";
 import { generatePlayerActions } from "@/features/player-action/actions";
 import { TextButton } from "@/components/table/styles";
 import { useThemedImages } from "@/hooks/useThemedImages";
+import { useTranslation } from "react-i18next";
 
 export const UNASSIGNED = "unassigned";
 
@@ -150,6 +151,16 @@ const UnassignedStats = ({ players }) => (
   </Box>
 );
 
+const StatHeader = ({ label, shortLabel, iconSrc }) => (
+  <Tooltip title={label} placement="top" arrow>
+    <Box component="span" className="metric-header" aria-label={label}>
+      {iconSrc ? (
+        <Box component="img" src={iconSrc} alt="" aria-hidden sx={{ width: 16, height: 16 }} />
+      ) : shortLabel}
+    </Box>
+  </Tooltip>
+);
+
 const SquadGroupHeader = ({ type }) => (
   <Typography
     variant="subtitle2"
@@ -171,6 +182,7 @@ const SquadGroupHeader = ({ type }) => (
 
 const SquadNameInfo = ({ squad, showIcon = true }) => {
   const themedImg = useThemedImages();
+  const { t } = useTranslation();
   return (
     <Box className="squad-name-container">
       {showIcon && squad.type && (
@@ -197,8 +209,8 @@ const SquadNameInfo = ({ squad, showIcon = true }) => {
       {!squad.has_leader && (
         <img
           src="/icons/ping.webp"
-          alt="No Leader"
-          title="Unit has no leader"
+          alt={t("views.team.noLeader")}
+          title={t("views.team.noLeader")}
           width={16}
           height={16}
           style={{ opacity: 0.7 }}
@@ -253,6 +265,8 @@ export const TeamSection = ({
   onTeamExpand,
   onTeamCollapse,
 }) => {
+  const { t } = useTranslation();
+  const themedImg = useThemedImages();
   const isLobby = team.name === "lobby";
 
   const { commander, squadGroups, unassignedPlayers, allPlayers } =
@@ -346,7 +360,7 @@ export const TeamSection = ({
                   textOverflow: "ellipsis",
                 }}
               >
-                {isLobby ? "Lobby" : "No Platoon"} ({players.length})
+                {isLobby ? t("views.live.lobby") : t("views.team.noPlatoon")} ({players.length})
               </Typography>
             </Box>
           </Box>
@@ -417,13 +431,10 @@ export const TeamSection = ({
             }}
           >
             {!allPlayers.some((p) => selectedPlayers.has(p.player_id))
-              ? "Select all"
+              ? t("common.selectAll")
               : allPlayers.every((p) => selectedPlayers.has(p.player_id))
-              ? "All selected"
-              : `${
-                  allPlayers.filter((p) => selectedPlayers.has(p.player_id))
-                    .length
-                } selected`}
+              ? t("views.team.allSelected")
+              : t("views.team.selected", { count: allPlayers.filter((p) => selectedPlayers.has(p.player_id)).length })}
           </Typography>
         </Box>
         <Typography
@@ -455,19 +466,40 @@ export const TeamSection = ({
             <>
               <HeaderRow>
                 <Box>LVL</Box>
-                <Box>Name</Box>
-                <Box>Kills</Box>
-                <Box>Deaths</Box>
-                <Box>Combat</Box>
-                <Box>Offense</Box>
-                <Box>Defense</Box>
-                <Box>Support</Box>
-                <Box>Time</Box>
+                <Box>{t("views.table.name")}</Box>
+                <StatHeader
+                  label={t("views.table.kills")}
+                  iconSrc={themedImg.getMetricIconSrc("kills")}
+                />
+                <StatHeader
+                  label={t("views.table.deaths")}
+                  iconSrc={themedImg.getMetricIconSrc("deaths")}
+                />
+                <StatHeader
+                  label={t("views.table.combat")}
+                  iconSrc={themedImg.getMetricIconSrc("combat")}
+                />
+                <StatHeader
+                  label={t("views.table.offense")}
+                  iconSrc={themedImg.getMetricIconSrc("offense")}
+                />
+                <StatHeader
+                  label={t("views.table.defense")}
+                  iconSrc={themedImg.getMetricIconSrc("defense")}
+                />
+                <StatHeader
+                  label={t("views.table.support")}
+                  iconSrc={themedImg.getMetricIconSrc("support")}
+                />
+                <StatHeader
+                  label={t("views.table.time")}
+                  shortLabel={t("views.team.statsShort.time")}
+                />
               </HeaderRow>
               <TeamHeaderRow>
                 <Box>∅ {team.avg_level}</Box>
                 <Box style={{ textAlign: "center" }}>
-                  Total ({team.count} players)
+                  {t("views.team.totalPlayers", { count: team.count })}
                 </Box>
                 <Box className="stat">{team?.kills || 0}</Box>
                 <Box className="stat">{team?.deaths || 0}</Box>
@@ -491,7 +523,7 @@ export const TeamSection = ({
                   <Box className="player-info">
                     <Box className="no-commander">
                       <PersonOffIcon sx={{ fontSize: 16 }} />
-                      <Typography>No Commander</Typography>
+                      <Typography>{t("views.team.noCommander")}</Typography>
                     </Box>
                   </Box>
                   <PlayerStats player={{}} />

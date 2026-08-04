@@ -1,12 +1,9 @@
-import Avatar from "@mui/material/Avatar";
 import Button from "@mui/material/Button";
 import CssBaseline from "@mui/material/CssBaseline";
 import TextField from "@mui/material/TextField";
 import Box from "@mui/material/Box";
-import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import Typography from "@mui/material/Typography";
 import Container from "@mui/material/Container";
-import Footer from "./footer";
 import { Alert, Stack } from "@mui/material";
 import {
   Form,
@@ -15,11 +12,13 @@ import {
   useLoaderData,
 } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
-import { createTheme, ThemeProvider, styled } from "@mui/material/styles";
+import { styled } from "@mui/material/styles";
 import { redirect } from "react-router-dom";
 import { cmd } from "@/utils/fetchUtils";
 import {useEffect, useState} from "react";
-import getDefaultTheme from "@/themes/default/getDefaultTheme";
+import { useTranslation } from "react-i18next";
+import FrontlineBrand from "@/components/layout/FrontlineBrand";
+import LanguageSelector from "@/components/layout/LanguageSelector";
 
 export const loader = async ({ request }) => {
   let user;
@@ -33,20 +32,20 @@ export const loader = async ({ request }) => {
     if (error.status === 401) {
       return {
         error: error.name,
-        message: "Invalid login credentials. Try it again.",
+        messageKey: "login.invalid",
       };
     }
 
     if (error.status === 500) {
       return {
         error: error.name,
-        message: "Server side CRCON application is not responding.",
+        messageKey: "login.unavailable",
       };
     }
 
     return {
       error: error,
-      message: `Unknown error. Open the developer's tool in your browser, navigate to Network tab, record your activity and let us know about it.`,
+      messageKey: "login.unknownError",
     };
   }
 
@@ -76,21 +75,21 @@ export const action = async ({ request }) => {
     if (error.status === 401) {
       return {
         error: error.name,
-        message: "Invalid login credentials. Try it again.",
+        messageKey: "login.invalid",
       };
     }
 
     if (error.status === 500) {
       return {
         error: error.name,
-        message: "Server side CRCON application is not responding.",
+        messageKey: "login.unavailable",
       };
     }
 
     console.error(error)
     return {
       error: error,
-      message: `Unknown error. Open the developer's tool in your browser, navigate to Network tab, record your activity and let us know about it.`,
+      messageKey: "login.unknownError",
     };
   }
 
@@ -125,6 +124,7 @@ const HeroImage = styled("img")(({ theme }) => ({
   objectFit: "cover",
   width: "100%",
   height: "33%",
+  filter: "saturate(0.72) contrast(1.08) brightness(0.72)",
   [theme.breakpoints.up("md")]: {
     height: "100%",
     width: "60%",
@@ -133,12 +133,15 @@ const HeroImage = styled("img")(({ theme }) => ({
 
 const MainWrapper = styled(Stack)(({ theme }) => ({
   flexBasis: "67vh",
+  position: "relative",
+  backgroundColor: theme.palette.background.default,
   [theme.breakpoints.up("md")]: {
     flexBasis: "40%",
   },
 }));
 
 export default function Login() {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
 
   const {
@@ -166,11 +169,31 @@ export default function Login() {
   };
 
   return (
-    <ThemeProvider theme={createTheme(getDefaultTheme())}>
-      <HeroImage src="/login_banner.webp" alt="" />
+    <>
+      <HeroImage src="/frontline-ops-night.png" alt="" />
       <Wrapper>
-        <HeroImageWrapper></HeroImageWrapper>
+        <HeroImageWrapper>
+          <Stack
+            sx={{
+              display: { xs: "none", md: "flex" },
+              position: "absolute",
+              left: "clamp(28px, 5vw, 80px)",
+              bottom: "clamp(36px, 7vh, 90px)",
+              maxWidth: 460,
+              zIndex: 1,
+            }}
+            spacing={1.5}
+          >
+            <Typography variant="caption" color="primary.light" sx={{ textTransform: "uppercase" }}>{t("login.eyebrow")}</Typography>
+            <Typography variant="h2" sx={{ textTransform: "uppercase" }}>Frontline Network</Typography>
+            <Typography color="text.secondary" sx={{ maxWidth: 420 }}>{t("login.intro")}</Typography>
+          </Stack>
+        </HeroImageWrapper>
         <MainWrapper>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ p: 2 }}>
+            <FrontlineBrand compact />
+            <LanguageSelector />
+          </Stack>
           <Container
             component="main"
             maxWidth="xs"
@@ -185,19 +208,16 @@ export default function Login() {
                 justifyContent: "center",
               }}
             >
-              <Avatar sx={{ m: 1, bgcolor: "secondary.main" }}>
-                <LockOutlinedIcon />
-              </Avatar>
-              <Typography component="h1" variant="h5">
-                Sign in
+              <Typography component="h1" variant="h3" sx={{ alignSelf: "stretch", textTransform: "uppercase" }}>
+                {t("login.title")}
               </Typography>
               {data.error ? (
                 <Box sx={{ py: 2, width: "100%" }}>
-                  <Alert severity="error">{data.message}</Alert>
+                  <Alert severity="error">{t(data.messageKey || "login.unknownError")}</Alert>
                 </Box>
               ) : authError && !loading ? (
                 <Box sx={{ py: 2, width: "100%" }}>
-                  <Alert severity="error">{authError.message}</Alert>
+                  <Alert severity="error">{t(authError.messageKey || "login.unknownError")}</Alert>
                 </Box>
               ) : null}
               <Form method="POST" onSubmit={handleSubmit(onSubmit)}>
@@ -205,7 +225,7 @@ export default function Login() {
                 <Controller
                   control={control}
                   name={"username"}
-                  rules={{ required: "Username is required." }}
+                  rules={{ required: t("login.usernameRequired") }}
                   render={({ field }) => (
                     <TextField
                       onChange={field.onChange}
@@ -214,7 +234,7 @@ export default function Login() {
                       name={field.name}
                       inputRef={field.ref}
                       id="username"
-                      label="Username"
+                      label={t("login.username")}
                       margin="normal"
                       helperText={errors["username"]?.message}
                       error={!!errors["username"]}
@@ -226,7 +246,7 @@ export default function Login() {
                 <Controller
                   control={control}
                   name={"password"}
-                  rules={{ required: "Password is required." }}
+                  rules={{ required: t("login.passwordRequired") }}
                   render={({ field }) => (
                     <TextField
                       onChange={field.onChange}
@@ -236,7 +256,7 @@ export default function Login() {
                       inputRef={field.ref}
                       id="password"
                       type="password"
-                      label="Password"
+                      label={t("login.password")}
                       margin="normal"
                       helperText={errors["password"]?.message}
                       error={!!errors["password"]}
@@ -252,16 +272,16 @@ export default function Login() {
                   variant="contained"
                   sx={{ mt: 3, mb: 2 }}
                 >
-                  {loading ? "Authenticating..." : "Sign In"}
+                  {loading ? t("login.submitting") : t("login.submit")}
                 </Button>
               </Form>
             </Box>
           </Container>
-          <Stack justifyContent={"end"} sx={{ p: 3 }}>
-            <Footer />
+          <Stack justifyContent={"end"} sx={{ px: 3, pb: 2 }}>
+            <Typography variant="caption" color="text.secondary">Frontline Network · CRCON</Typography>
           </Stack>
         </MainWrapper>
       </Wrapper>
-    </ThemeProvider>
+    </>
   );
 }

@@ -7,9 +7,9 @@ import {
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
-import { SYNC_METHODS } from "./BlacklistListCreateDialog";
 import Grid from "@mui/material/Grid2";
 import {Fragment} from "react";
+import { useTranslation } from "react-i18next";
 
 
 const BlacklistListTile = ({
@@ -18,6 +18,7 @@ const BlacklistListTile = ({
   onEdit,
   onDelete,
 }) => {
+  const { t } = useTranslation();
 
   function serverNumberToName(serverNumber) {
     return servers[serverNumber] || serverNumber.toString();
@@ -35,19 +36,19 @@ const BlacklistListTile = ({
           <Typography variant="h6" color="textSecondary">#{blacklist.id}</Typography>
         </Grid>
         <Grid size={2}>
-          <InputLabel align="left">Blacklist Name</InputLabel>
+          <InputLabel align="left">{t("records.blacklists.listName")}</InputLabel>
           <Typography align="left">
             {blacklist.name}
           </Typography>
         </Grid>
 
         <Grid size={6}>
-          <InputLabel align="left">Servers</InputLabel>
+          <InputLabel align="left">{t("records.blacklists.servers")}</InputLabel>
           {
             blacklist.servers === null
-            ? <Typography align="left">All</Typography>
+            ? <Typography align="left">{t("records.blacklists.allServers")}</Typography>
             : blacklist.servers.length === 0
-            ? <Typography align="left">None</Typography>
+            ? <Typography align="left">{t("records.blacklists.noServers")}</Typography>
             : <Fragment>
               {blacklist.servers.map((num) => (
                 <Typography key={num} align="left" noWrap>
@@ -59,17 +60,17 @@ const BlacklistListTile = ({
         </Grid>
         
         <Grid size={2}>
-          <InputLabel align="left">Sync Method</InputLabel>
-          <Typography align="left">{SYNC_METHODS[blacklist.sync]}</Typography>
+          <InputLabel align="left">{t("records.blacklists.syncMethod")}</InputLabel>
+          <Typography align="left">{t(`records.blacklists.syncMethods.${blacklist.sync}`)}</Typography>
         </Grid>
         
         <Grid>
-          <Tooltip title="Edit">
+          <Tooltip title={t("common.edit")}>
             <IconButton onClick={() => onEdit(blacklist)} size="large">
               <EditIcon/>
             </IconButton>
           </Tooltip>
-          <Tooltip title="Delete">
+          <Tooltip title={t("common.delete")}>
             <span>
               <IconButton
                 onClick={() => onDelete(blacklist)}

@@ -7,6 +7,8 @@ import {
 import { DebouncedSearchInput } from "@/components/shared/DebouncedSearchInput";
 import { useState, useEffect, useMemo } from "react";
 import { unifiedGamemodeName } from "./objectives/helpers";
+import { useTranslation } from "react-i18next";
+import { getMapEnvironmentLabel, getMapModeLabel } from "@/utils/mapLabels";
 
 const ITEM_HEIGHT = 48;
 const ITEM_PADDING_TOP = 8;
@@ -38,6 +40,7 @@ const MenuProps = {
  * @returns {JSX.Element} The rendered component
  */
 export const MapFilter = ({ maps, onFilterChange }) => {
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedModes, setSelectedModes] = useState(["warfare"]);
   const [selectedWeathers, setSelectedWeathers] = useState([]);
@@ -108,7 +111,7 @@ export const MapFilter = ({ maps, onFilterChange }) => {
     >
       <DebouncedSearchInput
         size="small"
-        placeholder="Search maps..."
+        placeholder={t("maps.filter")}
         onChange={setSearchTerm}
       />
 
@@ -119,7 +122,7 @@ export const MapFilter = ({ maps, onFilterChange }) => {
             fontSize={10}
             sx={{ textTransform: "uppercase", width: 70 }}
           >
-            Game Mode
+            {t("maps.gameMode")}
           </Typography>
           <Stack direction={"row"} flexWrap={"wrap"}>
             {allModes.map((mode) => (
@@ -135,7 +138,7 @@ export const MapFilter = ({ maps, onFilterChange }) => {
                     }}
                   />
                 }
-                label={unifiedGamemodeName(mode)}
+                label={getMapModeLabel(t, mode)}
                 sx={{ textTransform: "uppercase", '& .MuiFormControlLabel-label': { fontSize: 10 } }}
               />
             ))}
@@ -148,7 +151,7 @@ export const MapFilter = ({ maps, onFilterChange }) => {
             fontSize={10}
             sx={{ textTransform: "uppercase", width: 70 }}
           >
-            Weather
+            {t("maps.weather")}
           </Typography>
           <Stack direction={"row"} flexWrap={"wrap"}>
             {allWeather.map((weather) => (
@@ -164,7 +167,7 @@ export const MapFilter = ({ maps, onFilterChange }) => {
                     }}
                   />
                 }
-                label={weather}
+                label={getMapEnvironmentLabel(t, weather)}
                 sx={{ textTransform: "uppercase", '& .MuiFormControlLabel-label': { fontSize: 10 } }}
               />
             ))}

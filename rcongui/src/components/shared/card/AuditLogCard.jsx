@@ -8,6 +8,7 @@ import {
 } from "@mui/material";
 import dayjs from "dayjs";
 import { CodeBlock } from "@/components/shared/CodeBlock";
+import { useTranslation } from "react-i18next";
 
 /**
  * @typedef {Object} AuditLog
@@ -31,6 +32,7 @@ import { CodeBlock } from "@/components/shared/CodeBlock";
  * @returns {JSX.Element} The AuditLogCard component
  */
 export const AuditLogCard = ({ auditLog, ...props }) => {
+  const { t } = useTranslation();
 
   const prettyLine = (label, value) => {
     return (
@@ -44,22 +46,22 @@ export const AuditLogCard = ({ auditLog, ...props }) => {
 
   return (
     <Card {...props}>
-      <CardHeader title={"Audit Log Details"} sx={{ mb: 2 }} />
+      <CardHeader title={t("records.auditLogs.details")} sx={{ mb: 2 }} />
       <CardContent>
         {auditLog ? (
           <Stack spacing={1}>
             {prettyLine("ID", auditLog.id)}
-            {prettyLine("Action", auditLog.command)}
-            {prettyLine("User", auditLog.username)}
-            {prettyLine("Time", dayjs(auditLog.creation_time).format("lll"))}
-            {prettyLine("UTC Time", dayjs(auditLog.creation_time).utc().format("lll"))}
-            <Typography variant="h6">Arguments</Typography>
+            {prettyLine(t("records.auditLogs.actionColumn"), auditLog.command)}
+            {prettyLine(t("records.auditLogs.userColumn"), auditLog.username)}
+            {prettyLine(t("records.auditLogs.time"), dayjs(auditLog.creation_time).format("lll"))}
+            {prettyLine(t("records.auditLogs.utcTime"), dayjs(auditLog.creation_time).utc().format("lll"))}
+            <Typography variant="h6">{t("records.auditLogs.arguments")}</Typography>
             <CodeBlock text={auditLog.command_arguments} />
-            <Typography variant="h6">Result</Typography>
+            <Typography variant="h6">{t("records.auditLogs.result")}</Typography>
             <CodeBlock text={auditLog.command_result} />
           </Stack>
         ) : (
-          <Typography>Select an audit log to view details</Typography>
+          <Typography>{t("records.auditLogs.selectRow")}</Typography>
         )}
       </CardContent>
     </Card>

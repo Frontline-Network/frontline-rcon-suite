@@ -17,6 +17,7 @@ import { DesktopDateTimePicker } from "@mui/x-date-pickers";
 import dayjs from "dayjs";
 import Padlock from "@/components/shared/Padlock";
 import { TimePickerButtons } from "@/components/shared/TimePickerButtons";
+import { useTranslation } from "react-i18next";
 
 const INDEFINITE_EXPIRATION = "3000-01-01T00:00:00+00:00";
 
@@ -32,6 +33,7 @@ export const VipBulkEditDialog = ({
   onConfirm,
   selectedCount,
 }) => {
+  const { t, i18n } = useTranslation();
   const [tab, setTab] = useState(0);
   const [expiration, setExpiration] = useState(dayjs().add(5, "minutes"));
   const [indefinitely, setIndefinitely] = useState(false);
@@ -60,24 +62,34 @@ export const VipBulkEditDialog = ({
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Edit VIP Expiration ({selectedCount} selected)</DialogTitle>
+      <DialogTitle>{t("records.vips.bulkEditTitle", { count: selectedCount })}</DialogTitle>
       <DialogContent>
         <Tabs value={tab} onChange={handleTabChange}>
-          <Tab label="Set Expiration" />
-          <Tab label="Extend Time" />
+          <Tab label={t("records.vips.setExpiration")} />
+          <Tab label={t("records.vips.extendTime")} />
         </Tabs>
 
         <TabPanel value={tab} index={0}>
           <Stack spacing={2}>
-            <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <LocalizationProvider
+              dateAdapter={AdapterDayjs}
+              adapterLocale={i18n.resolvedLanguage === "en" ? "en" : "de"}
+              localeText={{ fieldOpenPickerLabel: t("common.chooseDate") }}
+            >
               <DesktopDateTimePicker
-                label="Expiration"
+                label={t("records.vips.expiration")}
                 value={expiration}
                 onChange={setExpiration}
                 format="LLL"
                 maxDateTime={dayjs(INDEFINITE_EXPIRATION)}
                 disabled={indefinitely}
                 disablePast={true}
+                slotProps={{
+                  openPickerButton: {
+                    "aria-label": t("common.chooseDate"),
+                    title: t("common.chooseDate"),
+                  },
+                }}
               />
             </LocalizationProvider>
             <Stack>
@@ -106,7 +118,7 @@ export const VipBulkEditDialog = ({
             <Padlock
               checked={indefinitely}
               handleChange={setIndefinitely}
-              label="Never expires"
+              label={t("records.vips.neverExpires")}
             />
           </Stack>
         </TabPanel>
@@ -121,9 +133,11 @@ export const VipBulkEditDialog = ({
                   color: extensionDiff > 0 ? "success.main" : "warning.main",
                 }}
               >
-                {extensionDiff > 0 ? "Extend " : "Reduce "}
+                {extensionDiff > 0
+                  ? t("records.vips.extend")
+                  : t("records.vips.reduce")}
               </Box>
-              {`expiration time for all selected VIPs by: `}
+              {t("records.vips.expirationChangeBy")}
               <Box
                 component="span"
                 fontWeight="bold"
@@ -134,10 +148,9 @@ export const VipBulkEditDialog = ({
                 {dayjs.duration(extensionDiff).humanize()}
               </Box>
               <Typography variant="caption" color="text.secondary">
-                {` (${dayjs
-                  .duration(extensionDiff)
-                  .asHours()
-                  .toFixed(0)} hours)`}
+                {t("records.vips.hoursValue", {
+                  count: dayjs.duration(extensionDiff).asHours().toFixed(0),
+                })}
               </Typography>
             </Typography>
             <Stack>
@@ -167,13 +180,13 @@ export const VipBulkEditDialog = ({
         </TabPanel>
       </DialogContent>
       <DialogActions>
-        <Button onClick={handleClose}>Cancel</Button>
+        <Button onClick={handleClose}>{t("common.cancel")}</Button>
         <Button
           variant="contained"
           color="primary"
           onClick={() => handleConfirm()}
         >
-          Apply
+          {t("records.vips.apply")}
         </Button>
       </DialogActions>
     </Dialog>

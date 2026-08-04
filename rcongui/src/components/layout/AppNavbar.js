@@ -11,6 +11,7 @@ import { useMediaQuery, useTheme } from "@mui/system";
 import ServerStatus from "../Header/server-status";
 import { Box } from "@mui/material";
 import { useAppStore } from "@/stores/app-state";
+import FrontlineBrand from "./FrontlineBrand";
 
 const Toolbar = styled(MuiToolbar)({
   width: "100%",
@@ -53,7 +54,8 @@ const AppNavbarBase = ({ toggleDrawer, open, isSmallScreen }) => {
           <MenuButton aria-label="menu" onClick={toggleDrawer}>
             <MenuRoundedIcon />
           </MenuButton>
-          <Box sx={{ overflow: "hidden" }}>
+          <FrontlineBrand compact />
+          <Box sx={{ overflow: "hidden", display: { xs: "none", sm: "block" } }}>
             {isSmallScreen && <ServerStatus compact={isSmallScreen || !open} />}
           </Box>
           <Stack

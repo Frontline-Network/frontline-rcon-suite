@@ -1,27 +1,29 @@
 import { Stack, Typography, Chip } from "@mui/material";
 import dayjs from "dayjs";
+import { useTranslation } from "react-i18next";
 
 const WatchlistList = ({ watchlist }) => {
+    const { t } = useTranslation();
     if (!watchlist) {
-      return <Typography>No watchlist records found</Typography>;
+      return <Typography>{t("playerDrawer.summary.noWatchlist")}</Typography>;
     }
   
     const isActive = watchlist.is_watched;
   
     return (
       <Stack spacing={1}>
-        <Typography>{watchlist.reason || "[no reason]"}</Typography>
+        <Typography>{watchlist.reason || t("playerDrawer.summary.noReason")}</Typography>
         <Chip
-          label={isActive ? "Active" : "Inactive"}
+          label={isActive ? t("common.active") : t("common.disabled")}
           color={isActive ? "primary" : "error"}
           variant={isActive ? "filled" : "outlined"}
           sx={{ width: "fit-content" }}
         />
-        <Typography>Visits since: {watchlist.count}</Typography>
-        <Typography>By: {watchlist.by}</Typography>
+        <Typography>{t("playerDrawer.summary.visitsSince")}: {watchlist.count}</Typography>
+        <Typography>{t("playerDrawer.summary.by")}: {watchlist.by}</Typography>
         {isActive && (
           <Typography>
-            Modified: {dayjs(watchlist.modified).format("LLL")}
+            {t("playerDrawer.summary.modified")}: {dayjs(watchlist.modified).format("LLL")}
           </Typography>
         )}
       </Stack>

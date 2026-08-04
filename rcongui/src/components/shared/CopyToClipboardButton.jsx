@@ -10,6 +10,7 @@ import {
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DoneAllIcon from "@mui/icons-material/DoneAll";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 export default function CopyToClipboardButton({
   text,
@@ -17,6 +18,7 @@ export default function CopyToClipboardButton({
   iconOnly = false,
   ...props
 }) {
+  const { t } = useTranslation();
   const { isClipboardAvailable, isCopied, copyToClipboard } = useClipboard();
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -30,7 +32,7 @@ export default function CopyToClipboardButton({
 
   return (
     <>
-      <Tooltip title={isCopied ? "Copied!" : (title ?? null)}>
+      <Tooltip title={isCopied ? t("common.copied") : (title ?? t("common.copy"))}>
         {iconOnly ? (
           <IconButton
             variant="outlined"
@@ -48,13 +50,13 @@ export default function CopyToClipboardButton({
             startIcon={isCopied ? <DoneAllIcon /> : <ContentCopyIcon />}
             {...props}
           >
-            {isCopied ? "Copied!" : "Copy"}
+            {isCopied ? t("common.copied") : t("common.copy")}
           </Button>
         )}
       </Tooltip>
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)}>
         <DialogContent>
-          <Typography>Copy to Clipboard only available with HTTPS</Typography>
+          <Typography>{t("common.clipboardHttps")}</Typography>
         </DialogContent>
         <DialogContent>
           <Typography>{text}</Typography>

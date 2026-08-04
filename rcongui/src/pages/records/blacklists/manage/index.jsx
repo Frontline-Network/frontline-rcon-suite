@@ -20,8 +20,12 @@ import BlacklistListCreateDialog, {
 } from "@/components/Blacklist/BlacklistListCreateDialog";
 import { Link } from "react-router-dom";
 import {Fragment, useEffect, useState} from "react";
+import { useTranslation } from "react-i18next";
+import PageHeader from "@/components/shared/PageHeader";
+import { demoBlacklists, demoServerConnection, isFakeMode } from "@/mirage/demo-data";
 
 const BlacklistLists = () => {
+  const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
   const [blacklists, setBlacklists] = useState([]);
   const [servers, setServers] = useState({});
@@ -44,6 +48,10 @@ const BlacklistLists = () => {
   }
 
   function loadServers() {
+    if (isFakeMode()) {
+      setServers({ [demoServerConnection.server_number]: demoServerConnection.name });
+      return Promise.resolve();
+    }
     return Promise.all([
       get("get_connection_info")
         .then((response) =>
@@ -76,6 +84,10 @@ const BlacklistLists = () => {
   }
 
   function loadBlacklists() {
+    if (isFakeMode()) {
+      setBlacklists(demoBlacklists);
+      return Promise.resolve();
+    }
     return get("get_blacklists")
       .then((response) => showResponse(response, "get_blacklists", false))
       .then((data) => {
@@ -87,6 +99,13 @@ const BlacklistLists = () => {
   }
 
   function onBlacklistCreate(data) {
+    if (isFakeMode()) {
+      setBlacklists((current) => [
+        ...current,
+        { id: Date.now(), name: data.name, servers: data.servers, sync: data.syncMethod },
+      ]);
+      return;
+    }
     postData(`${process.env.REACT_APP_API_URL}create_blacklist`, {
       name: data.name,
       servers: data.servers,
@@ -111,6 +130,12 @@ const BlacklistLists = () => {
 
   function onEditDialogSubmit(data) {
     const blacklistId = editDialogInitialValues.id;
+    if (isFakeMode()) {
+      setBlacklists((current) => current.map((item) => item.id === blacklistId
+        ? { ...item, name: data.name, servers: data.servers, sync: data.syncMethod }
+        : item));
+      return;
+    }
     postData(`${process.env.REACT_APP_API_URL}edit_blacklist`, {
       blacklist_id: blacklistId,
       name: data.name,
@@ -125,6 +150,10 @@ const BlacklistLists = () => {
   }
 
   function deleteBlacklist(blacklist) {
+    if (isFakeMode()) {
+      setBlacklists((current) => current.filter((item) => item.id !== blacklist.id));
+      return;
+    }
     postData(`${process.env.REACT_APP_API_URL}delete_blacklist`, {
       blacklist_id: blacklist.id,
     })
@@ -144,6 +173,11 @@ const BlacklistLists = () => {
 
   return (
     <Fragment>
+      <PageHeader
+        eyebrow={t("records.blacklists.eyebrow")}
+        title={t("records.blacklists.manageTitle")}
+        subtitle={t("records.blacklists.manageSubtitle")}
+      />
       <Grid container spacing={3} direction="column" justifyContent="center">
         <Grid>
           {isLoading ? <LinearProgress color="secondary" /> : ""}
@@ -179,7 +213,7 @@ const BlacklistLists = () => {
                 color="primary"
                 size="large"
               >
-                Back To Records
+                {t("records.blacklists.backToRecords")}
               </Button>
             </Grid>
           </Grid>
@@ -201,21 +235,20 @@ const BlacklistLists = () => {
       >
         <DialogTitle id="alert-dialog-title">
           {selectedBlacklist
-            ? `Delete blacklist "${selectedBlacklist?.name}"?`
-            : "Loading..."}
+            ? t("records.blacklists.deleteListTitle", { name: selectedBlacklist?.name })
+            : t("common.loading")}
         </DialogTitle>
         <DialogContent>
           <DialogContentText id="alert-dialog-description">
-            Are you certain you want to permanently delete the blacklist and all
-            associated records?
+            {t("records.blacklists.deleteListDescription")}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDeleteDialog} color="primary">
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={handleBlacklistDelete} color="secondary" autoFocus>
-            Delete
+            {t("common.delete")}
           </Button>
         </DialogActions>
       </Dialog>

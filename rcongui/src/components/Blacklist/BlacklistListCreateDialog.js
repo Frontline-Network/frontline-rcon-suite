@@ -8,17 +8,12 @@ import DialogTitle from '@mui/material/DialogTitle';
 import { Checkbox, FormControl, FormControlLabel, FormGroup, InputLabel, MenuItem, Select, Switch, Typography } from '@mui/material';
 import Grid from "@mui/material/Grid2";
 import {Fragment, useEffect, useState} from "react";
+import { useTranslation } from "react-i18next";
 
 export const SYNC_METHODS = {
   kick_only: "Kick Only",
   ban_on_connect: "Ban On Connect",
   ban_immediately: "Ban Immediately",
-}
-
-const SYNC_METHOD_DESCRIPTIONS = {
-  kick_only: "Players are kicked every time they join. They can see the reason but have to wait in queue.",
-  ban_on_connect: "Players can see the blacklist reason once. After that, they get banned.",
-  ban_immediately: "Players will only see the blacklist reason if they are online when blacklisted.",
 }
 
 export default function BlacklistListCreateDialog({
@@ -27,9 +22,10 @@ export default function BlacklistListCreateDialog({
   servers,
   onSubmit,
   initialValues,
-  titleText="Edit Blacklist",
-  submitText="Save",
+  titleText,
+  submitText,
 }) {
+  const { t } = useTranslation();
   const [name, setName] = useState("");
   const [serverNumbers, setServerNumbers] = useState(null);
   const [syncMethod, setSyncMethod] = useState("");
@@ -85,11 +81,10 @@ export default function BlacklistListCreateDialog({
           },
         }}
       >
-      <DialogTitle>{titleText}</DialogTitle>
+      <DialogTitle>{titleText || t("records.blacklists.editList")}</DialogTitle>
       <DialogContent>
         <DialogContentText>
-          Blacklists are collections of ban-like records to provide both greater flexibility and
-          scalability than regular bans.
+          {t("records.blacklists.listDescription")}
         </DialogContentText>
 
         <Grid container justifyContent="space-between" spacing={4}>
@@ -98,7 +93,7 @@ export default function BlacklistListCreateDialog({
               required
               id="name"
               name="name"
-              label="Name"
+              label={t("records.blacklists.listName")}
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -108,24 +103,24 @@ export default function BlacklistListCreateDialog({
           </Grid>
           <Grid size={6}>
             <FormControl required fullWidth>
-              <InputLabel>Sync Method</InputLabel>
+              <InputLabel>{t("records.blacklists.syncMethod")}</InputLabel>
               <Select
-                label="Sync Method"
+                label={t("records.blacklists.syncMethod")}
                 value={syncMethod}
                 onChange={(e) => setSyncMethod(e.target.value)}
               >
-                {Object.entries(SYNC_METHODS).map(([value, name]) => (
-                  <MenuItem key={value} value={value}>{name}</MenuItem>
+                {Object.keys(SYNC_METHODS).map((value) => (
+                  <MenuItem key={value} value={value}>{t(`records.blacklists.syncMethods.${value}`)}</MenuItem>
                 ))}
               </Select>
             </FormControl>
           </Grid>
         </Grid>
           <Typography variant="caption">
-            {SYNC_METHOD_DESCRIPTIONS[syncMethod]}
+            {syncMethod ? t(`records.blacklists.syncDescriptions.${syncMethod}`) : ""}
           </Typography>
         <br/>
-        <Typography variant="h6">Servers</Typography>
+        <Typography variant="h6">{t("records.blacklists.servers")}</Typography>
 
         <Grid container alignContent="flex-start">
           <Grid size={6}>
@@ -143,7 +138,7 @@ export default function BlacklistListCreateDialog({
           </Grid>
           <Grid size={6}>
             <FormControlLabel
-              label="Enable on all servers"
+              label={t("records.blacklists.enableAllServers")}
               control={
               <Switch
                 checked={serverNumbers === null}
@@ -155,8 +150,8 @@ export default function BlacklistListCreateDialog({
 
       </DialogContent>
       <DialogActions>
-        <Button onClick={handleClose}>Cancel</Button>
-        <Button type="submit" disabled={name === "" || syncMethod === ""}>{submitText}</Button>
+        <Button onClick={handleClose}>{t("common.cancel")}</Button>
+        <Button type="submit" disabled={name === "" || syncMethod === ""}>{submitText || t("common.save")}</Button>
       </DialogActions>
     </Dialog>)
   );
@@ -167,6 +162,7 @@ export function BlacklistListCreateButton({
   onSubmit,
   initialValues,
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
   const handleClickOpen = () => {
@@ -181,7 +177,7 @@ export function BlacklistListCreateButton({
         size="large"
         onClick={handleClickOpen}
       >
-        Create New List
+        {t("records.blacklists.createList")}
       </Button>
       <BlacklistListCreateDialog
         open={open}
@@ -189,8 +185,8 @@ export function BlacklistListCreateButton({
         servers={servers}
         onSubmit={onSubmit}
         initialValues={initialValues}
-        titleText="Create Blacklist"
-        submitText="Create List"
+        titleText={t("records.blacklists.createListTitle")}
+        submitText={t("records.blacklists.createList")}
       />
     </Fragment>
   )

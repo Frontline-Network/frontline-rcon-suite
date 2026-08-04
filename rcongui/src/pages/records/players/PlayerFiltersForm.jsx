@@ -13,7 +13,7 @@ import {
 import { Form, useNavigation, useSubmit } from "react-router-dom";
 import { Autocomplete } from "@mui/material";
 import { CountryFlag } from "@/components/shared/CountryFlag";
-import { useState, Suspense, lazy } from "react";
+import { useMemo, useState, Suspense, lazy } from "react";
 import countries from "country-list";
 import emojiData from "@emoji-mart/data/sets/15/twitter.json";
 import Emoji from "@/components/shared/Emoji";
@@ -22,16 +22,15 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
 import dayjs from "dayjs";
+import { useTranslation } from "react-i18next";
 
 const EmojiPicker = lazy(() => import("@emoji-mart/react"));
 
 // Get all countries for autocomplete
-const countryOptions = countries.getCodes().map((code) => ({
-  code: code.toLowerCase(),
-  name: countries.getName(code),
-}));
+const countryCodes = countries.getCodes();
 
 export default function PlayerFiltersForm({ fields }) {
+  const { t, i18n } = useTranslation();
   const submit = useSubmit();
   const navigation = useNavigation();
   const [formFields, setFormFields] = useState({
@@ -48,6 +47,14 @@ export default function PlayerFiltersForm({ fields }) {
   const [selectedEmoji, setSelectedEmoji] = useState(fields.flags);
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
+  const countryOptions = useMemo(() => {
+    const language = i18n.resolvedLanguage === "en" ? "en" : "de";
+    const displayNames = new Intl.DisplayNames([language], { type: "region" });
+    return countryCodes.map((code) => ({
+      code: code.toLowerCase(),
+      name: displayNames.of(code) || countries.getName(code),
+    }));
+  }, [i18n.resolvedLanguage]);
 
   const handleEmojiButtonClick = (event) => {
     setAnchorEl(event.currentTarget);
@@ -87,7 +94,7 @@ export default function PlayerFiltersForm({ fields }) {
         <TextField
           value={formFields.player_name}
           onChange={handleInputChange}
-          label="Player Name"
+          label={t("records.players.playerName")}
           name="player_name"
           fullWidth
         />
@@ -95,12 +102,16 @@ export default function PlayerFiltersForm({ fields }) {
         <TextField
           value={formFields.player_id}
           onChange={handleInputChange}
-          label="Player ID"
+          label={t("records.players.playerId")}
           name="player_id"
           fullWidth
         />
 
         <Autocomplete
+          openText={t("common.openOptions")}
+          closeText={t("common.closeOptions")}
+          clearText={t("common.clearSelection")}
+          noOptionsText={t("common.noResults")}
           options={countryOptions}
           getOptionLabel={(option) => option.name}
           value={
@@ -119,7 +130,7 @@ export default function PlayerFiltersForm({ fields }) {
           )}
           renderInput={({ key, ...params }) => (
             <>
-              <TextField key={key} {...params} label="Country" fullWidth />
+              <TextField key={key} {...params} label={t("records.players.country")} fullWidth />
               {/* A hacky way to submit the country code but display the country name */}
               <input
                 type="hidden"
@@ -166,11 +177,14 @@ export default function PlayerFiltersForm({ fields }) {
                 variant="body"
                 color="text.secondary"
               >
-                Filter by flags
+                {t("records.players.filterFlags")}
               </Typography>
             )}
           </Stack>
-          <IconButton onClick={handleEmojiButtonClick}>
+          <IconButton
+            onClick={handleEmojiButtonClick}
+            aria-label={t("records.players.addFlagFilter")}
+          >
             <AddReactionIcon />
           </IconButton>
         </Stack>
@@ -207,6 +221,7 @@ export default function PlayerFiltersForm({ fields }) {
 
         <LocalizationProvider dateAdapter={AdapterDayjs}>
           <DateTimePicker
+            localeText={{ openDatePickerDialogue: () => t("common.chooseDate") }}
             value={formFields.last_seen_from}
             onChange={(newValue) =>
               setFormFields((prev) => ({
@@ -214,9 +229,9 @@ export default function PlayerFiltersForm({ fields }) {
                 last_seen_from: newValue,
               }))
             }
-            label="Last seen from"
+            label={t("records.players.lastSeenFrom")}
             name="last_seen_from"
-            format="MMMM DD, YYYY HH:mm"
+            format="DD.MM.YYYY HH:mm"
             ampm={false}
             slotProps={{
               textField: { fullWidth: true },
@@ -226,6 +241,7 @@ export default function PlayerFiltersForm({ fields }) {
 
         <LocalizationProvider dateAdapter={AdapterDayjs}>
           <DateTimePicker
+            localeText={{ openDatePickerDialogue: () => t("common.chooseDate") }}
             value={formFields.last_seen_till}
             onChange={(newValue) =>
               setFormFields((prev) => ({
@@ -233,9 +249,9 @@ export default function PlayerFiltersForm({ fields }) {
                 last_seen_till: newValue,
               }))
             }
-            label="Last seen till"
+            label={t("records.players.lastSeenUntil")}
             name="last_seen_till"
-            format="MMMM DD, YYYY HH:mm"
+            format="DD.MM.YYYY HH:mm"
             ampm={false}
             slotProps={{
               textField: { fullWidth: true },
@@ -251,7 +267,7 @@ export default function PlayerFiltersForm({ fields }) {
               onChange={handleInputChange}
             />
           }
-          label="Blacklisted only"
+          label={t("records.players.blacklistedOnly")}
         />
 
         <FormControlLabel
@@ -262,7 +278,7 @@ export default function PlayerFiltersForm({ fields }) {
               onChange={handleInputChange}
             />
           }
-          label="Exact name match"
+          label={t("records.players.exactName")}
         />
 
         <FormControlLabel
@@ -273,7 +289,7 @@ export default function PlayerFiltersForm({ fields }) {
               onChange={handleInputChange}
             />
           }
-          label="Ignore accent"
+          label={t("records.players.ignoreAccent")}
         />
 
         <FormControlLabel
@@ -284,7 +300,7 @@ export default function PlayerFiltersForm({ fields }) {
               onChange={handleInputChange}
             />
           }
-          label="Watched only"
+          label={t("records.players.watchedOnly")}
         />
       </Stack>
 
@@ -296,7 +312,7 @@ export default function PlayerFiltersForm({ fields }) {
           onClick={handleReset}
           disabled={navigation.state === "loading"}
         >
-          Reset
+          {t("records.players.reset")}
         </Button>
 
         <Button
@@ -306,7 +322,7 @@ export default function PlayerFiltersForm({ fields }) {
           sx={{ mt: 2 }}
           disabled={navigation.state === "loading"}
         >
-          Search
+          {t("common.search")}
         </Button>
       </Stack>
     </Form>

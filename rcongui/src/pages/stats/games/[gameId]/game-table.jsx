@@ -12,30 +12,31 @@ import { TableToolbar } from "@/components/table/TableToolbar";
 import { Box, Typography } from "@mui/material";
 import {downloadGame} from "@/features/download-game";
 import { useGameDetailsTableStore } from "@/stores/table-config";
+import { useTranslation } from "react-i18next";
 
-const renderSubComponent = ({ row }) => {
+const renderSubComponent = ({ row }, t) => {
   // Create a custom component that renders the player's stats
   const statCategories = {
     combat: [
-      { label: "Kills", value: row.original.kills },
-      { label: "Deaths", value: row.original.deaths },
+      { label: t("stats.gameDetails.metrics.kills"), value: row.original.kills },
+      { label: t("stats.gameDetails.deaths"), value: row.original.deaths },
       {
         label: "K/D",
         value: (row.original.kills / Math.max(row.original.deaths, 1)).toFixed(
           2
         ),
       },
-      { label: "K/M", value: row.original.kills_per_minute?.toFixed(2) },
+      { label: t("stats.gameDetails.killsPerMinute"), value: row.original.kills_per_minute?.toFixed(2) },
     ],
     teamwork: [
-      { label: "Team Kills", value: row.original.teamkills },
-      { label: "TK Streak", value: row.original.teamkills_streak },
-      { label: "Deaths by TK", value: row.original.deaths_by_tk },
-      { label: "TD Streak", value: row.original.deaths_by_tk_streak },
+      { label: t("stats.gameDetails.teamKills"), value: row.original.teamkills },
+      { label: t("stats.gameDetails.teamKillStreak"), value: row.original.teamkills_streak },
+      { label: t("stats.gameDetails.deathsByTeamKill"), value: row.original.deaths_by_tk },
+      { label: t("stats.gameDetails.teamDeathStreak"), value: row.original.deaths_by_tk_streak },
     ],
     offense: [
-      { label: "Offensive Kills", value: row.original.offensive_kills },
-      { label: "Defensive Kills", value: row.original.defensive_kills },
+      { label: t("stats.gameDetails.offensiveKills"), value: row.original.offensive_kills },
+      { label: t("stats.gameDetails.defensiveKills"), value: row.original.defensive_kills },
     ],
   };
 
@@ -124,9 +125,9 @@ const renderSubComponent = ({ row }) => {
           mb: 4,
         }}
       >
-        <StatSection title="Combat Stats" stats={statCategories.combat} />
-        <StatSection title="Teamwork Stats" stats={statCategories.teamwork} />
-        <StatSection title="Objective Stats" stats={statCategories.offense} />
+        <StatSection title={t("stats.gameDetails.combatStats")} stats={statCategories.combat} />
+        <StatSection title={t("stats.gameDetails.teamworkStats")} stats={statCategories.teamwork} />
+        <StatSection title={t("stats.gameDetails.objectiveStats")} stats={statCategories.offense} />
       </Box>
 
       <Box
@@ -134,25 +135,25 @@ const renderSubComponent = ({ row }) => {
       >
         <Box>
             <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                Kills by Player
+                {t("stats.gameDetails.killsByPlayer")}
             </Typography>
             {players}
         </Box>
         <Box>
           <Typography variant="subtitle2" sx={{ mb: 1 }}>
-            Kills by Weapon
+            {t("stats.gameDetails.killsByWeapon")}
           </Typography>
           {weapons}
         </Box>
         <Box>
           <Typography variant="subtitle2" sx={{ mb: 1 }}>
-            Deaths by Weapon
+            {t("stats.gameDetails.deathsByWeapon")}
           </Typography>
           {deathsByWeapon}
         </Box>
         <Box>
           <Typography variant="subtitle2" sx={{ mb: 1 }}>
-            Deaths by Player
+            {t("stats.gameDetails.deathsByPlayer")}
           </Typography>
           {deathsByPlayer}
         </Box>
@@ -162,6 +163,7 @@ const renderSubComponent = ({ row }) => {
 };
 
 const PlayersTable = ({ table, selectedPlayers }) => {
+  const { t } = useTranslation();
   const [tableConfigDrawerOpen, setTableConfigDrawerOpen] = useState(false);
   const tableConfig = useGameDetailsTableStore();
   const setConfig = useGameDetailsTableStore(state => state.setConfig);
@@ -190,7 +192,7 @@ const PlayersTable = ({ table, selectedPlayers }) => {
           }}
         />
         <DebouncedSearchInput
-          placeholder={"Search player"}
+          placeholder={t("stats.liveSessions.searchPlayer")}
           initialValue={table.getColumn("name")?.getFilterValue() ?? ""}
           onChange={(value) => {
             table.getColumn("name")?.setFilterValue(value);
@@ -202,13 +204,21 @@ const PlayersTable = ({ table, selectedPlayers }) => {
         <IconButton
           size="small"
           sx={{ p: 0.5, borderRadius: 0 }}
-          onClick={() => downloadGame(table.options.data)}
+          aria-label={t("stats.gameDetails.download")}
+          onClick={() => downloadGame(table.options.data, [
+            t("stats.gameDetails.csv.playerId"), t("stats.gameDetails.csv.name"), t("stats.gameDetails.metrics.kills"), t("stats.gameDetails.deaths"), "K/D",
+            t("stats.gameDetails.csv.maxKillStreak"), t("stats.gameDetails.csv.killsPerMinute"), t("stats.gameDetails.csv.deathsPerMinute"), t("stats.gameDetails.csv.maxDeathStreak"), t("stats.gameDetails.csv.maxTeamKillStreak"),
+            t("stats.gameDetails.csv.deathByTeamKill"), t("stats.gameDetails.csv.deathByTeamKillStreak"), t("stats.gameDetails.csv.longestLife"), t("stats.gameDetails.csv.shortestLife"),
+            t("stats.gameDetails.csv.nemesis"), t("stats.gameDetails.csv.victim"), t("stats.gameDetails.csv.combat"), t("stats.gameDetails.csv.support"), t("stats.gameDetails.csv.defense"), t("stats.gameDetails.csv.offense"),
+            t("stats.gameDetails.csv.weapons"), t("stats.gameDetails.csv.deathByWeapons"),
+          ])}
         >
           <DownloadIcon sx={{ fontSize: 16 }} />
         </IconButton>
         <IconButton
           size="small"
           sx={{ p: 0.5, borderRadius: 0 }}
+          aria-label={t("common.settings")}
           onClick={handleTableConfigClick}
         >
           <SettingsIcon sx={{ fontSize: 16 }} />
@@ -217,10 +227,10 @@ const PlayersTable = ({ table, selectedPlayers }) => {
       <Table
         table={table}
         config={tableConfig}
-        renderSubComponent={renderSubComponent}
+        renderSubComponent={(props) => renderSubComponent(props, t)}
       />
       <TableConfigDrawer
-        name="Game Details"
+        name={t("stats.gameDetails.title")}
         open={tableConfigDrawerOpen}
         onClose={(config) => {
           setTableConfigDrawerOpen(false);

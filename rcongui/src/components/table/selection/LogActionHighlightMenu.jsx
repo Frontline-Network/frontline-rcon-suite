@@ -17,6 +17,7 @@ import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import { logActions } from "@/utils/lib";
 import { useSelectionMenu } from "@/hooks/useSelectionMenu";
 import { SearchInput } from "@/components/shared/SearchInput";
+import { useTranslation } from "react-i18next";
 
 function fromValue(v) {
   return v === true ? "on" : "off";
@@ -36,6 +37,7 @@ export const LogActionHighlightMenu = ({
   onToggle,
   toggleValue,
 }) => {
+  const { t } = useTranslation();
   const {
     search,
     setSearch,
@@ -48,12 +50,12 @@ export const LogActionHighlightMenu = ({
   return (
     <PopoverMenu
       id="log-action-highlight-picker"
-      description="Pick an action to highlight its logs"
+      description={t("selection.logHighlightDescription")}
       onOpen={onOpen}
       onClose={onClose}
       renderButton={(props) => (
       <Button {...props}>
-        <Tooltip title="Highlight action">
+        <Tooltip title={t("selection.logHighlight")}>
           <Badge
             color="secondary"
             variant="dot"
@@ -73,20 +75,20 @@ export const LogActionHighlightMenu = ({
       onChange={(e, value) => {
         onToggle(value === null ? fromValue(toggleValue) : value);
       }}
-      aria-label="logs table highlight change"
+      aria-label={t("selection.logHighlight")}
       fullWidth
     >
       <ToggleButton
         sx={{ borderRadius: 0 }}
         value="on"
-        aria-label="highlighted table"
+        aria-label={t("selection.logHighlightOn")}
       >
         ON
       </ToggleButton>
       <ToggleButton
         sx={{ borderRadius: 0 }}
         value="off"
-        aria-label="normal table"
+        aria-label={t("selection.logHighlightOff")}
       >
         OFF
       </ToggleButton>
@@ -94,7 +96,7 @@ export const LogActionHighlightMenu = ({
     <SearchInput
       value={search}
       onChange={(e) => setSearch(e.target.value)}
-      placeholder="Search actions"
+      placeholder={t("selection.searchActions")}
       ref={searchInputRef}
     />
     <List

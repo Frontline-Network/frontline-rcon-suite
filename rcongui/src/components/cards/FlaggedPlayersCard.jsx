@@ -3,8 +3,10 @@ import { useMemo } from "react";
 import OnlineUsersCard from "@/components/shared/card/UsersCard";
 import { Stack, Typography } from "@mui/material";
 import Emoji from "@/components/shared/Emoji";
+import { useTranslation } from "react-i18next";
 
 const FlaggedPlayersCard = () => {
+  const { t } = useTranslation();
   const onlinePlayers = useGlobalStore((state) => state.onlinePlayers);
 
   const playersGroupedByFlags = useMemo(() => {
@@ -32,10 +34,10 @@ const FlaggedPlayersCard = () => {
 
   return (
     <OnlineUsersCard 
-      title="Flagged" 
+      title={t("dashboard.flagged")}
       onlineUsers={playersGroupedByFlags} 
     />
   );
 };
 
-export default FlaggedPlayersCard; 
+export default FlaggedPlayersCard;

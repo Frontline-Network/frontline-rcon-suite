@@ -1,3 +1,5 @@
+import uuid
+
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.db import models
@@ -38,6 +40,104 @@ class SteamPlayer(models.Model):
     default_permissions = ()
 
 
+class MobileDevice(models.Model):
+    """A revocable mobile credential owned by exactly one CRCON user."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="mobile_devices"
+    )
+    name = models.CharField(max_length=128)
+    platform = models.CharField(max_length=32)
+    app_version = models.CharField(max_length=32, blank=True, default="")
+    refresh_token_digest = models.CharField(
+        max_length=64, unique=True, null=True, blank=True
+    )
+    refresh_expires_at = models.DateTimeField(null=True, blank=True)
+    absolute_expires_at = models.DateTimeField(null=True, blank=True)
+    push_handle = models.CharField(max_length=255, blank=True, default="")
+    # Capability is only sent by CRCON to the relay and is never serialized.
+    push_capability = models.CharField(max_length=255, blank=True, default="")
+    notifications_enabled = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        default_permissions = ()
+        permissions = (
+            (
+                "can_manage_own_mobile_devices",
+                "Can pair and revoke own mobile devices",
+            ),
+            (
+                "can_manage_all_mobile_devices",
+                "Can inspect and revoke all mobile devices",
+            ),
+            ("can_view_admin_incidents", "Can view mobile admin incidents"),
+            ("can_create_admin_incidents", "Can create mobile admin incidents"),
+            ("can_claim_admin_incidents", "Can claim mobile admin incidents"),
+            ("can_resolve_admin_incidents", "Can resolve mobile admin incidents"),
+            (
+                "can_reassign_admin_incidents",
+                "Can reassign mobile admin incidents",
+            ),
+        )
+
+
+class MobilePairing(models.Model):
+    class State(models.TextChoices):
+        PENDING = "pending", "Pending"
+        SCANNED = "scanned", "Scanned"
+        APPROVED = "approved", "Approved"
+        DENIED = "denied", "Denied"
+        CONSUMED = "consumed", "Consumed"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="mobile_pairings"
+    )
+    secret_digest = models.CharField(max_length=64, unique=True)
+    exchange_token_digest = models.CharField(
+        max_length=64, unique=True, null=True, blank=True
+    )
+    verification_code = models.CharField(max_length=6, blank=True, default="")
+    state = models.CharField(
+        max_length=16, choices=State.choices, default=State.PENDING
+    )
+    device_name = models.CharField(max_length=128, blank=True, default="")
+    platform = models.CharField(max_length=32, blank=True, default="")
+    app_version = models.CharField(max_length=32, blank=True, default="")
+    push_handle = models.CharField(max_length=255, blank=True, default="")
+    push_capability = models.CharField(max_length=255, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    scanned_at = models.DateTimeField(null=True, blank=True)
+    approved_at = models.DateTimeField(null=True, blank=True)
+    consumed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        default_permissions = ()
+
+
+class MobileAccessToken(models.Model):
+    """Short-lived opaque access token. Only the deterministic digest is stored."""
+
+    id = models.BigAutoField(primary_key=True)
+    token_digest = models.CharField(max_length=64, unique=True, db_index=True)
+    device = models.ForeignKey(
+        MobileDevice, on_delete=models.CASCADE, related_name="access_tokens"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ("-created_at",)
+        default_permissions = ()
+
+
 class RconUser(User):
     """api_rconuser table"""
 
@@ -52,7 +152,10 @@ class RconUser(User):
             ("can_set_match_timer", "Can change the match timer"),
             ("can_remove_match_timer", "Can remove the custom match timer"),
             ("can_remove_warmup_timer", "Can remove the custom warmup timer"),
-            ("can_set_dynamic_weather_enabled", "Can enable or disable dynamic weather"),
+            (
+                "can_set_dynamic_weather_enabled",
+                "Can enable or disable dynamic weather",
+            ),
             ("can_add_admin_roles", "Can add HLL game server admin roles to players"),
             ("can_add_map_to_rotation", "Can add a map to the rotation"),
             ("can_add_map_to_whitelist", "Can add a map to the votemap whitelist"),

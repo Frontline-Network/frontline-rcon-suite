@@ -1,4 +1,4 @@
-import { Box, Typography, Stack, Tooltip, IconButton } from "@mui/material";
+import { Box, Typography, Stack, Tooltip, IconButton, Divider } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import SaveIcon from "@mui/icons-material/Save";
 import {
@@ -19,6 +19,7 @@ import { arrayMove } from "@dnd-kit/sortable";
 import SortableRotationItem from "./SortableRotationItem";
 import CopyToClipboardButton from "@/components/shared/CopyToClipboardButton";
 import ReplayIcon from "@mui/icons-material/Replay";
+import { useTranslation } from "react-i18next";
 
 export function SortableRotationList({
   maps,
@@ -32,6 +33,7 @@ export function SortableRotationList({
   actions,
   params,
 }) {
+  const { t } = useTranslation();
   // Set up DnD sensors
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -82,7 +84,7 @@ export function SortableRotationList({
           alignItems={{ sx: "flex-start", md: "center" }}
           justifyContent={"space-between"}
         >
-          <Typography variant="h6">Rotation ({maps.length})</Typography>
+          <Typography variant="h6">{t("maps.rotation")} ({maps.length})</Typography>
           <Stack
             direction="row"
             spacing={1}
@@ -110,7 +112,7 @@ export function SortableRotationList({
                 gap: 1,
               }}
             >
-              <Tooltip title="Reset changes">
+              <Tooltip title={t("maps.resetChanges")}>
                 <IconButton
                   variant="outlined"
                   size={"small"}
@@ -120,7 +122,7 @@ export function SortableRotationList({
                   <ReplayIcon />
                 </IconButton>
               </Tooltip>
-              <Tooltip title="Clear">
+              <Tooltip title={t("common.clearSelection")}>
                 <IconButton
                   variant="outlined"
                   size={"small"}
@@ -135,9 +137,9 @@ export function SortableRotationList({
                 title={
                   <div>
                     <div>
-                      Copy the list of selected map ids to the clipboard.
+                      {t("maps.copySelectedMapIds")}
                     </div>
-                    <div>Useful for autosettings.</div>
+                    <div>{t("maps.copyMapIdsHint")}</div>
                   </div>
                 }
                 text={JSON.stringify(
@@ -147,7 +149,7 @@ export function SortableRotationList({
                 )}
                 size={"small"}
               />
-              <Tooltip title="Save">
+              <Tooltip title={t("common.save")}>
                 <IconButton
                   variant="contained"
                   size={"small"}

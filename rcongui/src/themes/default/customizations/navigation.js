@@ -10,6 +10,45 @@ import {forwardRef} from "react";
 
 /* eslint-disable import/prefer-default-export */
 export const navigationCustomizations = ({ gray, brand }) => ({
+  MuiButton: {
+    styleOverrides: {
+      root: ({ theme }) => ({
+        borderRadius: theme.shape.borderRadius,
+        minHeight: 38,
+        boxShadow: 'none',
+        '&:hover': { boxShadow: 'none' },
+      }),
+      containedPrimary: {
+        color: gray[900],
+        backgroundColor: brand[300],
+        '&:hover': { backgroundColor: brand[200] },
+      },
+      outlined: ({ theme }) => ({
+        borderColor: theme.palette.divider,
+      }),
+    },
+  },
+  MuiIconButton: {
+    styleOverrides: {
+      root: ({ theme }) => ({
+        borderRadius: theme.shape.borderRadius,
+        color: theme.palette.text.secondary,
+        '&:hover': {
+          color: theme.palette.primary.light,
+          backgroundColor: theme.palette.action.hover,
+        },
+      }),
+    },
+  },
+  MuiListItemIcon: {
+    styleOverrides: {
+      root: ({ theme }) => ({
+        minWidth: 34,
+        color: 'inherit',
+        '& svg': { fontSize: 19 },
+      }),
+    },
+  },
   MuiMenuItem: {
     styleOverrides: {
       root: ({ theme }) => ({
@@ -66,11 +105,11 @@ export const navigationCustomizations = ({ gray, brand }) => ({
         borderRadius: theme.shape.borderRadius,
         border: '1px solid',
         borderColor: gray[200],
-        backgroundColor: theme.palette.background.paper,
+        backgroundColor: gray[900],
         boxShadow: `inset 0 1px 0 1px hsla(220, 0%, 100%, 0.6), inset 0 -1px 0 1px hsla(220, 35%, 90%, 0.5)`,
         '&:hover': {
           borderColor: gray[300],
-          backgroundColor: theme.palette.background.paper,
+          backgroundColor: gray[900],
           boxShadow: 'none',
         },
         [`&.${selectClasses.focused}`]: {
@@ -83,7 +122,7 @@ export const navigationCustomizations = ({ gray, brand }) => ({
         ...theme.applyStyles('dark', {
           borderRadius: theme.shape.borderRadius,
           borderColor: gray[700],
-          backgroundColor: theme.palette.background.paper,
+          backgroundColor: gray[900],
           boxShadow: `inset 0 1px 0 1px ${alpha(gray[700], 0.15)}, inset 0 -1px 0 1px hsla(220, 0%, 0%, 0.7)`,
           '&:hover': {
             borderColor: alpha(gray[700], 0.7),

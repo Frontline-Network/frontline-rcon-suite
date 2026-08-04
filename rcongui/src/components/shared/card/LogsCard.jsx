@@ -4,6 +4,7 @@ import { usePlayerSidebar } from "@/hooks/usePlayerSidebar";
 import dayjs from "dayjs";
 import { logActions } from "@/utils/lib";
 import {Fragment, useState} from "react";
+import { useTranslation } from "react-i18next";
 
 // Styled components
 const StyledCard = styled(Card)({
@@ -54,6 +55,7 @@ const StyledListItem = styled(ListItem)(({ theme }) => ({
  * @returns {JSX.Element} - Rendered component
  */
 const LogsCard = ({ logs }) => {
+  const { t } = useTranslation();
   const sortedLogs = [...logs].sort((a, b) => a.group.localeCompare(b.group));
   const [selectedTab, setSelectedTab] = useState(0);
 
@@ -96,7 +98,7 @@ const LogsCard = ({ logs }) => {
   return (
     <StyledCard>
       <CardHeader 
-        title="Logs" 
+        title={t("dashboard.logs")}
         titleTypographyProps={{ variant: "h6" }} 
       />
       <Tabs

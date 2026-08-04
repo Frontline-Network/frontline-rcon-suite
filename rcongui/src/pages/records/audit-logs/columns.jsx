@@ -3,9 +3,9 @@ import { TextButton } from "@/components/table/styles";
 import { usePlayerSidebar } from "@/hooks/usePlayerSidebar";
 import dayjs from "dayjs";
 
-export const auditLogsColumns = [
+export const getAuditLogsColumns = (t) => [
   {
-    header: "Time",
+    header: t("records.auditLogs.time"),
     accessorKey: "creation_time",
     cell: ({ row }) => {
       return dayjs(row.original.creation_time).format("lll");
@@ -15,15 +15,15 @@ export const auditLogsColumns = [
     },
   },
   {
-    header: "User",
+    header: t("records.auditLogs.userColumn"),
     accessorKey: "username",
   },
   {
-    header: "Action",
+    header: t("records.auditLogs.actionColumn"),
     accessorKey: "command",
   },
   {
-    header: "Player",
+    header: t("records.auditLogs.player"),
     cell: ({ row }) => {
       const { openWithId } = usePlayerSidebar();
       let args, player, playerId;
@@ -52,7 +52,7 @@ export const auditLogsColumns = [
     },
   },
   {
-    header: "Player ID",
+    header: t("records.auditLogs.playerId"),
     cell: ({ row }) => {
       let args, playerId;
       try {

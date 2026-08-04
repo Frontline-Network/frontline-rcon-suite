@@ -5,8 +5,10 @@ import Autocomplete from "@mui/material/Autocomplete";
 import Typography from "@mui/material/Typography";
 import { Avatar, Box } from "@mui/material";
 import TextField from "@mui/material/TextField";
+import { useTranslation } from "react-i18next";
 
 export default function PlayerAutocompletion({ player, setPlayer }) {
+  const { t } = useTranslation();
   const [suggestions, setSuggestions] = useState([]);
 
   const nameRef = useRef(player.name);
@@ -82,7 +84,7 @@ export default function PlayerAutocompletion({ player, setPlayer }) {
         setPlayer((prev) => ({ ...prev, name: value }))
       }
       renderInput={(params) => (
-        <TextField {...params} value={player.name} label={"Name"} type="text" />
+        <TextField {...params} value={player.name} label={t("records.players.playerName")} type="text" />
       )}
     />
   );

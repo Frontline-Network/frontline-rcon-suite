@@ -15,13 +15,19 @@ import { useMemo } from "react";
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import WebhookIcon from '@mui/icons-material/Webhook';
+import { useTranslation } from "react-i18next";
+import { isFakeMode } from "@/mirage/demo-data";
+
+const loadConfig = (request, demo) =>
+  isFakeMode() ? Promise.resolve(demo) : request();
 
 const AutomodsCard = () => {
+  const { t } = useTranslation();
   // Fetch all automod settings
   const { data: seeding } = useQuery({
     queryKey: ["settings", "automods", "seeding"],
     queryFn: async () => {
-      const result = await cmd.GET_SEEDING_CONFIG();
+      const result = await loadConfig(cmd.GET_SEEDING_CONFIG, { enabled: true, discord_webhook_url: "https://discord.example/frontline" });
       return result;
     },
   });
@@ -29,7 +35,7 @@ const AutomodsCard = () => {
   const { data: noLeader } = useQuery({
     queryKey: ["settings", "automods", "no-leader"],
     queryFn: async () => {
-      const result = await cmd.GET_NO_LEADER_CONFIG();
+      const result = await loadConfig(cmd.GET_NO_LEADER_CONFIG, { enabled: true });
       return result;
     },
   });
@@ -37,7 +43,7 @@ const AutomodsCard = () => {
   const { data: noSoloTank } = useQuery({
     queryKey: ["settings", "automods", "no-solo-tank"],
     queryFn: async () => {
-      const result = await cmd.GET_NO_SOLO_TANK_CONFIG();
+      const result = await loadConfig(cmd.GET_NO_SOLO_TANK_CONFIG, { enabled: false });
       return result;
     },
   });
@@ -45,7 +51,7 @@ const AutomodsCard = () => {
   const { data: level } = useQuery({
     queryKey: ["settings", "automods", "level"],
     queryFn: async () => {
-      const result = await cmd.GET_LEVEL_CONFIG();
+      const result = await loadConfig(cmd.GET_LEVEL_CONFIG, { enabled: true });
       return result;
     },
   });
@@ -53,7 +59,7 @@ const AutomodsCard = () => {
   const { data: nameKicks } = useQuery({
     queryKey: ["settings", "others", "name-kicks"],
     queryFn: async () => {
-      const result = await cmd.GET_NAME_KICKS_CONFIG();
+      const result = await loadConfig(cmd.GET_NAME_KICKS_CONFIG, { enabled: false });
       return result;
     },
   });
@@ -61,7 +67,7 @@ const AutomodsCard = () => {
   const { data: vacBans } = useQuery({
     queryKey: ["settings", "others", "vac-bans"],
     queryFn: async () => {
-      const result = await cmd.GET_VAC_CONFIG();
+      const result = await loadConfig(cmd.GET_VAC_CONFIG, { enabled: true });
       return result;
     },
   });
@@ -69,7 +75,7 @@ const AutomodsCard = () => {
   const { data: seedingReward } = useQuery({
     queryKey: ["settings", "automods", "seeding-reward"],
     queryFn: async () => {
-      const result = await cmd.GET_SEEDING_REWARD_CONFIG();
+      const result = await loadConfig(cmd.GET_SEEDING_REWARD_CONFIG, { enabled: true });
       return result;
     },
   });
@@ -77,7 +83,7 @@ const AutomodsCard = () => {
   const { data: chatCommands } = useQuery({
     queryKey: ["settings", "others", "chat-commands"],
     queryFn: async () => {
-      const result = await cmd.GET_CHAT_COMMANDS_CONFIG();
+      const result = await loadConfig(cmd.GET_CHAT_COMMANDS_CONFIG, { enabled: true });
       return result;
     },
   });
@@ -85,7 +91,7 @@ const AutomodsCard = () => {
   const { data: rconCommands } = useQuery({
     queryKey: ["settings", "others", "rcon-commands"],
     queryFn: async () => {
-      const result = await cmd.GET_RCON_CHAT_COMMANDS_CONFIG();
+      const result = await loadConfig(cmd.GET_RCON_CHAT_COMMANDS_CONFIG, { enabled: false });
       return result;
     },
   });
@@ -93,7 +99,7 @@ const AutomodsCard = () => {
   const automodSettings = [
     { 
       key: 'seeding', 
-      label: 'Seeding', 
+      label: t('navigation.links.seeding'),
       value: seeding?.enabled,
       webhook: seeding?.discord_webhook_url,
       category: 'Automods',
@@ -101,7 +107,7 @@ const AutomodsCard = () => {
     },
     { 
       key: 'seeding_reward', 
-      label: 'Seed VIP Reward', 
+      label: t('navigation.links.seedVip'),
       value: seedingReward?.enabled,
       webhook: seedingReward?.discord_webhook_url,
       category: 'Others',
@@ -109,7 +115,7 @@ const AutomodsCard = () => {
     },
     { 
       key: 'no_leader', 
-      label: 'No Leader', 
+      label: t('navigation.links.noLeader'),
       value: noLeader?.enabled,
       webhook: noLeader?.discord_webhook_url,
       category: 'Automods',
@@ -117,7 +123,7 @@ const AutomodsCard = () => {
     },
     { 
       key: 'no_solo_tank', 
-      label: 'No Solo Tank', 
+      label: t('navigation.links.noSoloTank'),
       value: noSoloTank?.enabled,
       webhook: noSoloTank?.discord_webhook_url,
       category: 'Automods',
@@ -125,7 +131,7 @@ const AutomodsCard = () => {
     },
     { 
       key: 'level', 
-      label: 'Level', 
+      label: t('navigation.links.level'),
       value: level?.enabled,
       webhook: level?.discord_webhook_url,
       category: 'Automods',
@@ -133,7 +139,7 @@ const AutomodsCard = () => {
     },
     { 
       key: 'chat_commands', 
-      label: 'Chat Commands', 
+      label: t('navigation.links.chatCommands'),
       value: chatCommands?.enabled,
       webhook: chatCommands?.discord_webhook_url,
       category: 'Others',
@@ -141,7 +147,7 @@ const AutomodsCard = () => {
     },
     { 
       key: 'rcon_commands', 
-      label: 'RCON Commands', 
+      label: t('navigation.links.rconCommands'),
       value: rconCommands?.enabled,
       webhook: rconCommands?.discord_webhook_url,
       category: 'Others',
@@ -211,7 +217,7 @@ const AutomodsCard = () => {
         {automod.label}
       </Typography>
       {automod.webhook && (
-        <Tooltip title="Webhook configured">
+        <Tooltip title={t("common.webhookConfigured")}>
           <WebhookIcon sx={{ fontSize: '1rem', color: 'primary.main' }} />
         </Tooltip>
       )}
@@ -231,7 +237,7 @@ const AutomodsCard = () => {
         }}
       >
         <StatusIcon status={status} />
-        {status} ({automods.length})
+        {status === "ENABLED" ? t("dashboard.enabled") : t("common.disabled")} ({automods.length})
       </Typography>
       <Stack spacing={0.25}>
         {automods.map(automod => (
@@ -243,7 +249,7 @@ const AutomodsCard = () => {
 
   return (
     <Card sx={{ height: "100%" }}>
-      <CardHeader title="Automods" />
+      <CardHeader title={t("dashboard.automodsServices")} />
       <CardContent>
         <Grid container spacing={2}>
           {Object.entries(groupedAutomods).map(([status, automodsList]) => (
@@ -257,4 +263,4 @@ const AutomodsCard = () => {
   );
 };
 
-export default AutomodsCard; 
+export default AutomodsCard;

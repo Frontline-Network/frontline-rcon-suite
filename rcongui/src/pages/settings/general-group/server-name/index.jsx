@@ -21,8 +21,10 @@ import React from "react";
 import { useForm } from "react-hook-form";
 import { useLoaderData } from "react-router-dom";
 import { toast } from "react-toastify";
+import { useTranslation } from "react-i18next";
 
 function ServerNameSettings() {
+  const { t } = useTranslation();
   const loaderData = useLoaderData();
   const queryClient = useQueryClient();
 
@@ -48,12 +50,12 @@ function ServerNameSettings() {
       queryClient.invalidateQueries({
         queryKey: [{ queryIdentifier: "get_server_name" }],
       });
-      toast.success("Server name updated successfully!");
+      toast.success(t("settings.serverName.updated"));
     },
     onError: (error) => {
       toast.error(
         <div>
-          <strong>Failed to update server name</strong>
+          <strong>{t("settings.serverName.updateFailed")}</strong>
           <p>{error.message}</p>
         </div>
       );
@@ -68,12 +70,12 @@ function ServerNameSettings() {
       queryClient.invalidateQueries({
         queryKey: [{ queryIdentifier: "get_server_name_change_config" }],
       });
-      toast.success("Server configuration updated successfully!");
+      toast.success(t("settings.serverName.configUpdated"));
     },
     onError: (error) => {
       toast.error(
         <div>
-          <strong>Failed to update configuration</strong>
+          <strong>{t("settings.serverName.configFailed")}</strong>
           <p>{error.message}</p>
         </div>
       );
@@ -127,22 +129,21 @@ function ServerNameSettings() {
       <Grid size={12}>
 
         <Typography color="text.secondary">
-          If your game server is hosted on GTX or another compatible provider that supports SFTP access,
-          you can update the server name without requiring an HLL server restart.
+          {t("settings.serverName.intro")}
         </Typography>
 
         <Typography variant="body2" color="text.secondary" component="div">
-          <strong>Setup Requirements:</strong>
+          <strong>{t("settings.serverName.requirements")}</strong>
           <ul style={{ margin: '8px 0', paddingLeft: '20px' }}>
-            <li>Configure SFTP credentials in your .env file
+            <li>{t("settings.serverName.configureCredentials")}
               <ul>
                 <li>GTX_SERVER_NAME_CHANGE_USERNAME</li>
                 <li>GTX_SERVER_NAME_CHANGE_PASSWORD</li>
               </ul>
             </li>
-            <li>Provide game server SFTP IP address and port below</li>
+            <li>{t("settings.serverName.provideHost")}</li>
           </ul>
-          <em>Note: The updated name will appear only after a map change.</em>
+          <em>{t("settings.serverName.changeNote")}</em>
         </Typography>
       </Grid>
 
@@ -151,8 +152,8 @@ function ServerNameSettings() {
         <Card elevation={2} component={"fieldset"} form="server-name-form">
           <CardHeader
             avatar={<ServerIcon color="primary" />}
-            title="Server Name"
-            subheader="Current display name of your game server"
+            title={t("settings.serverName.title")}
+            subheader={t("settings.serverName.subtitle")}
             action={
               <Button
                 type="submit"
@@ -163,7 +164,7 @@ function ServerNameSettings() {
                 disabled={isNameSubmitting || serverNameMutation.isPending}
                 sx={{ mr: 1 }}
               >
-                {serverNameMutation.isPending ? "Saving..." : "Save"}
+                {serverNameMutation.isPending ? t("playerEditor.updating") : t("common.save")}
               </Button>
             }
           />
@@ -172,12 +173,12 @@ function ServerNameSettings() {
             <Box component="form" id="server-name-form" onSubmit={handleSubmitName(onSubmitName)}>
               <TextField
                 {...registerName("serverName")}
-                label="Server Name"
-                placeholder="Enter your server name"
+                label={t("settings.serverName.title")}
+                placeholder={t("settings.serverName.placeholder")}
                 fullWidth
                 size="small"
                 variant="outlined"
-                helperText="This name will be displayed in the server browser"
+                helperText={t("settings.serverName.helper")}
               />
             </Box>
           </CardContent>
@@ -189,8 +190,8 @@ function ServerNameSettings() {
         <Card elevation={2} component={"fieldset"} form="config-form">
           <CardHeader
             avatar={<SettingsIcon color="primary" />}
-            title="SFTP Configuration"
-            subheader="Automated server name change settings"
+            title={t("settings.serverName.sftpTitle")}
+            subheader={t("settings.serverName.sftpSubtitle")}
             action={
               <Button
                 type="submit"
@@ -200,7 +201,7 @@ function ServerNameSettings() {
                 startIcon={<CloudIcon />}
                 disabled={isConfigSubmitting || configMutation.isPending}
               >
-                {configMutation.isPending ? "Saving..." : "Save Config"}
+                {configMutation.isPending ? t("playerEditor.updating") : t("settings.serverName.saveConfig")}
               </Button>
             }
           />
@@ -211,7 +212,7 @@ function ServerNameSettings() {
                   <Grid size={8}>
                     <TextField
                       {...registerConfig("ip")}
-                      label="SFTP Host"
+                      label={t("settings.serverName.sftpHost")}
                       placeholder="168.10.0.1"
                       fullWidth
                       size="small"

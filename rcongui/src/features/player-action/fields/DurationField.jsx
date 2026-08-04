@@ -1,6 +1,8 @@
 import { ControlledTextInput } from '@/components/form/core/ControlledTextInput';
+import { useTranslation } from "react-i18next";
 
 export const DurationField = ({ control, errors, ...props }) => {
+  const { t } = useTranslation();
   const error = errors['duration'];
   const hasError = !!error;
 
@@ -10,10 +12,10 @@ export const DurationField = ({ control, errors, ...props }) => {
       type={'number'}
       error={hasError}
       name={'duration_hours'}
-      label={'Duration'}
+      label={t("fields.duration")}
       control={control}
-      rules={{ required: 'Duration is required', valueAsNumber: true, min: { value: 1, message: "Must be at least 1." } }}
-      helperText={hasError ? error.message : 'The duration for the ban in hours.'}
+      rules={{ required: t("fields.durationRequired"), valueAsNumber: true, min: { value: 1, message: t("fields.durationMin") } }}
+      helperText={hasError ? error.message : t("fields.durationHelp")}
       fullWidth
       {...props}
     />

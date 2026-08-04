@@ -11,12 +11,14 @@ import MoreVertRoundedIcon from '@mui/icons-material/MoreVertRounded';
 import MenuButton from './MenuButton';
 import {useSubmit} from 'react-router-dom';
 import {Fragment, useState} from "react";
+import { useTranslation } from "react-i18next";
 
 const MenuItem = styled(MuiMenuItem)({
   margin: '2px 0',
 });
 
 export default function OptionsMenu() {
+  const { t } = useTranslation();
   const [anchorEl, setAnchorEl] = useState(null);
   const submit = useSubmit();
   const open = Boolean(anchorEl);
@@ -38,7 +40,7 @@ export default function OptionsMenu() {
   return (
     <Fragment>
       <MenuButton
-        aria-label="Open menu"
+        aria-label={t("common.actions")}
         onClick={handleClick}
         sx={{ borderColor: 'transparent' }}
       >
@@ -73,7 +75,7 @@ export default function OptionsMenu() {
             },
           }}
         >
-          <ListItemText>Change password</ListItemText>
+          <ListItemText>{t("sidebar.changePassword")}</ListItemText>
         </MenuItem>
         <MenuItem
           onClick={handleLogout}
@@ -84,7 +86,7 @@ export default function OptionsMenu() {
             },
           }}
         >
-          <ListItemText>Logout</ListItemText>
+          <ListItemText>{t("sidebar.logout")}</ListItemText>
           <ListItemIcon>
             <LogoutRoundedIcon fontSize="small" />
           </ListItemIcon>

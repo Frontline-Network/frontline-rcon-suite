@@ -2,8 +2,10 @@ import { ControlledTextInput } from "@/components/form/core/ControlledTextInput"
 import { MenuItem, Select } from "@mui/material";
 import { useTemplates } from "@/hooks/useTemplates";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
-export const ReasonField = ({ control, errors, setValue, helperText="The message displayed to the player.", ...props }) => {
+export const ReasonField = ({ control, errors, setValue, helperText, ...props }) => {
+  const { t } = useTranslation();
   const templates = useTemplates("reason");
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const error = errors["reason"];
@@ -25,11 +27,11 @@ export const ReasonField = ({ control, errors, setValue, helperText="The message
       <ControlledTextInput
         error={hasError}
         name={"reason"}
-        label={"Reason"}
+        label={t("fields.reason")}
         control={control}
-        rules={{ required: "Reason is required" }}
+        rules={{ required: t("fields.reasonRequired") }}
         helperText={
-          hasError ? error.message : helperText
+          hasError ? error.message : (helperText ?? t("fields.messageHelp"))
         }
         multiline
         minRows={5}
@@ -39,12 +41,12 @@ export const ReasonField = ({ control, errors, setValue, helperText="The message
         id="saved-reasons-select"
         value={selectedTemplate}
         onChange={handleOnSelectChange}
-        inputProps={{ "aria-label": "Saved Reasons" }}
+        inputProps={{ "aria-label": t("fields.savedReasons") }}
         fullWidth
         displayEmpty
       >
         <MenuItem value="">
-          <em>Saved Reasons</em>
+          <em>{t("fields.savedReasons")}</em>
         </MenuItem>
         {templates.map((template, i) => {
           return (

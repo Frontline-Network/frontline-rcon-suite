@@ -1,7 +1,9 @@
 import { useRouteError, NavLink } from "react-router-dom";
 import { Stack, Typography, Button, Paper } from "@mui/material";
+import { useTranslation } from "react-i18next";
 
 export default function RouteError() {
+  const { t } = useTranslation();
   const error = useRouteError();
   const isSkirmishMode =
     error.message === "skirmish" ||
@@ -21,16 +23,16 @@ export default function RouteError() {
         width: (theme) => theme.breakpoints.values.sm,
       }}
     >
-      <Typography variant="h1">Unsupported mode</Typography>
+      <Typography variant="h1">{t("maps.unsupportedMode")}</Typography>
       <Typography variant="h2">
-        Changing objectives is not supported in Skirmish mode.
+        {t("maps.objectivesSkirmish")}
       </Typography>
       <Button
         variant="contained"
         LinkComponent={NavLink}
         to={"/settings/maps/change"}
       >
-        Change map
+        {t("maps.changeMap")}
       </Button>
     </Stack>
   );

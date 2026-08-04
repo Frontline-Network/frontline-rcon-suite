@@ -14,6 +14,7 @@ import { Tooltip, Button, ToggleButton, ToggleButtonGroup } from "@mui/material"
 import { logActions } from "@/utils/lib";
 import { useSelectionMenu } from "@/hooks/useSelectionMenu";
 import { SearchInput } from "@/components/shared/SearchInput";
+import { useTranslation } from "react-i18next";
 
 function fromValue(v) {
   return v === true ? "on" : "off";
@@ -33,6 +34,7 @@ export const LogActionSelectionMenu = ({
   onToggle,
   toggleValue,
 }) => {
+  const { t } = useTranslation();
   const {
     search,
     setSearch,
@@ -50,12 +52,12 @@ export const LogActionSelectionMenu = ({
   return (
     <PopoverMenu
       id="log-action-picker"
-      description="Pick an action to filter the logs"
+      description={t("selection.logActionDescription")}
       onOpen={handleOpen}
       onClose={onClose}
       renderButton={(props) => (
         <Button {...props}>
-          <Tooltip title="Filter by action">
+          <Tooltip title={t("selection.logAction")}>
             <Badge
               color="secondary"
               variant="dot"
@@ -75,20 +77,20 @@ export const LogActionSelectionMenu = ({
         onChange={(e, value) => {
           onToggle(value === null ? fromValue(toggleValue) : value);
         }}
-        aria-label="logs table filter by action"
+        aria-label={t("selection.logAction")}
         fullWidth
       >
         <ToggleButton
           sx={{ borderRadius: 0 }}
           value="on"
-          aria-label="filter by action"
+          aria-label={t("selection.logAction")}
         >
           ON
         </ToggleButton>
         <ToggleButton
           sx={{ borderRadius: 0 }}
           value="off"
-          aria-label="filter by action"
+          aria-label={t("selection.logAction")}
         >
           OFF
         </ToggleButton>

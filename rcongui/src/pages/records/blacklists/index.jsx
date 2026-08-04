@@ -18,6 +18,9 @@ import { BlacklistRecordCreateButton } from "@/components/Blacklist/BlacklistRec
 import { Skeleton } from '@mui/material';
 import { Link } from "react-router-dom";
 import {useEffect, useState} from "react";
+import { useTranslation } from "react-i18next";
+import PageHeader from "@/components/shared/PageHeader";
+import { demoBlacklists, demoBlacklistRecords, isFakeMode } from "@/mirage/demo-data";
 
 async function getBlacklistRecords(searchParams) {
   let path = "get_blacklist_records?" + new URLSearchParams(
@@ -28,7 +31,7 @@ async function getBlacklistRecords(searchParams) {
   return showResponse(response, "get_blacklist_records")
 }
 
-const MyPagination = ({ pageSize, total, page, setPage }) => (
+const MyPagination = ({ pageSize, total, page, setPage, t }) => (
   <Pagination
     count={Math.ceil(total / pageSize)}
     page={page}
@@ -37,10 +40,16 @@ const MyPagination = ({ pageSize, total, page, setPage }) => (
     color="standard"
     showFirstButton
     showLastButton
+    getItemAriaLabel={(type, itemPage) =>
+      type === "page"
+        ? t("common.pagination.pageAria", { page: itemPage })
+        : t(`common.pagination.${type}`)
+    }
   />
 );
 
 const BlacklistRecords = () => {
+  const { t } = useTranslation();
   // inital state, first render
   const [isLoading, setIsLoading] = useState(true);
   // when fetching loading records
@@ -65,12 +74,23 @@ const BlacklistRecords = () => {
   }, [searchQuery, page]);
 
   async function loadBlacklists() {
+    if (isFakeMode()) {
+      setBlacklists(demoBlacklists);
+      return;
+    }
     setBlacklists(await getBlacklists());
   }
 
   async function loadRecords() {
     setIsFetching(true);
     try {
+      if (isFakeMode()) {
+        setRecords(fromJS(demoBlacklistRecords));
+        setTotalRecords(demoBlacklistRecords.length);
+        setIsFetching(false);
+        setIsLoading(false);
+        return;
+      }
       const data = await getBlacklistRecords({ ...searchQuery, page });
       const records = data.result;
       if (records) {
@@ -87,6 +107,23 @@ const BlacklistRecords = () => {
   }
 
   async function createRecord(recordDetails) {
+    if (isFakeMode()) {
+      const selectedList = demoBlacklists.find((item) => item.id === recordDetails.blacklistId) || demoBlacklists[0];
+      const demoRecord = {
+        id: Date.now(),
+        blacklist: selectedList,
+        player: { player_id: recordDetails.playerId, names: [{ name: recordDetails.playerId }], steaminfo: null },
+        reason: recordDetails.reason,
+        formatted_reason: recordDetails.reason,
+        created_at: new Date().toISOString(),
+        expires_at: recordDetails.expiresAt?.toISOString?.() || null,
+        is_active: true,
+        admin_name: "Frontline Admin",
+      };
+      setRecords((current) => current.unshift(fromJS(demoRecord)));
+      setTotalRecords((current) => current + 1);
+      return;
+    }
     await addPlayerToBlacklist(recordDetails);
     loadRecords();
   }
@@ -94,7 +131,13 @@ const BlacklistRecords = () => {
   // If you don't like the loading skeletons, just return `null`
   if (isLoading) {
     return (
-      (<Grid container spacing={4} justifyContent="center">
+      <>
+      <PageHeader
+        eyebrow={t("records.blacklists.eyebrow")}
+        title={t("records.blacklists.title")}
+        subtitle={t("records.blacklists.subtitle")}
+      />
+      <Grid container spacing={4} justifyContent="center">
         <Grid
           size={{
             xl: 6,
@@ -150,12 +193,19 @@ const BlacklistRecords = () => {
             style={{ margin: "0 auto" }}
           />
         </Grid>
-      </Grid>)
+      </Grid>
+      </>
     );
   }
 
   return (
-    (<Grid container spacing={4} justifyContent="center">
+    <>
+    <PageHeader
+      eyebrow={t("records.blacklists.eyebrow")}
+      title={t("records.blacklists.title")}
+      subtitle={t("records.blacklists.subtitle")}
+    />
+    <Grid container spacing={3} justifyContent="center" sx={{ mt: 1 }}>
       <Grid
         size={{
           xl: 6,
@@ -187,7 +237,7 @@ const BlacklistRecords = () => {
               blacklists={blacklists}
               onSubmit={createRecord}
             >
-              Create New Record
+              {t("records.blacklists.createRecord")}
             </BlacklistRecordCreateButton>
           </Grid>
           <Grid size={{
@@ -200,7 +250,7 @@ const BlacklistRecords = () => {
               color="primary"
               size="large"
             >
-              Manage Lists
+              {t("records.blacklists.manageLists")}
             </Button>
           </Grid>
         </Grid>
@@ -211,6 +261,7 @@ const BlacklistRecords = () => {
           page={page}
           setPage={setPage}
           total={totalRecords}
+          t={t}
         />
       </Grid>
       <Grid size={12}>
@@ -227,9 +278,11 @@ const BlacklistRecords = () => {
           page={page}
           setPage={setPage}
           total={totalRecords}
+          t={t}
         />
       </Grid>
-    </Grid>)
+    </Grid>
+    </>
   );
 }
 

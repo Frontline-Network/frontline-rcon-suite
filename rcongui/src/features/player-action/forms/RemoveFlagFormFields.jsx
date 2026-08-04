@@ -12,8 +12,10 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import { useQueryClient } from "@tanstack/react-query";
 import { cmd } from "@/utils/fetchUtils";
 import Emoji from "@/components/shared/Emoji";
+import { useTranslation } from "react-i18next";
 
 export const RemoveFlagFormFields = ({ contextData, action, recipients }) => {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [flags, setFlags] = useState([]);
 
@@ -33,8 +35,8 @@ export const RemoveFlagFormFields = ({ contextData, action, recipients }) => {
               secondaryAction={
                 <IconButton
                   edge="end"
-                  aria-label="delete"
-                  title="Remove Flag"
+                  aria-label={t("actions.removeFlags.name")}
+                  title={t("actions.removeFlags.name")}
                   onClick={async () => {
                     const result = await cmd.UNFLAG_PLAYER({
                       payload: { flag_id: flag.id },
@@ -59,7 +61,7 @@ export const RemoveFlagFormFields = ({ contextData, action, recipients }) => {
             </ListItem>
           </Fragment>
         ))}
-        {flags.length === 0 && <ListItem>This player has no flags</ListItem>}
+        {flags.length === 0 && <ListItem>{t("actions.noFlags")}</ListItem>}
       </List>
     </Stack>
   );

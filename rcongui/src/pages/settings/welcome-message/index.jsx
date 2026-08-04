@@ -15,6 +15,8 @@ import "@fontsource/montserrat";
 import SplitButton from "@/components/shared/SplitButton";
 import AddCommentIcon from "@mui/icons-material/AddComment";
 import { TEMPLATE_CATEGORY } from "@/utils/lib";
+import { isFakeMode } from "@/mirage/demo-data";
+import { useTranslation } from "react-i18next";
 
 const INTENT = {
   APPLY_SINGLE: 0,
@@ -22,6 +24,9 @@ const INTENT = {
 };
 
 export const loader = async () => {
+  if (isFakeMode()) {
+    return defer({ message: "Willkommen beim Frontline Network. Bitte beachte unsere Serverregeln.", templates: Promise.resolve([{ id: 1, title: "FLN Willkommen", content: "Willkommen beim Frontline Network.", updated_at: new Date().toISOString(), updated_by: "Frontline Admin" }]) });
+  }
   const message = await cmd.GET_WELCOME_MESSAGE();
   const templates = cmd.GET_MESSAGE_TEMPLATES({
     params: { category: TEMPLATE_CATEGORY.WELCOME },
@@ -38,6 +43,7 @@ export const action = async ({ request }) => {
 const TemplateSkeleton = () => <Skeleton height={80} />;
 
 const WelcomeMessagePage = () => {
+  const { t } = useTranslation();
   const data = useLoaderData();
   const submit = useSubmit();
   const [message, setMessage] = useState(data.message);
@@ -88,20 +94,20 @@ const WelcomeMessagePage = () => {
           variant="contained"
           to={"/settings/templates/" + TEMPLATE_CATEGORY.WELCOME.toLowerCase()}
         >
-          Create Template
+          {t("settings.broadcast.createTemplate")}
         </Button>
         <SplitButton
           disabled={applyDisabled}
           options={[
             {
-              name: loading ? "Loading" : "Apply",
+              name: loading ? t("common.loading") : t("settings.welcome.apply"),
               buttonProps: {
                 disabled: applyDisabled,
                 onClick: handleApplyClick(INTENT.APPLY_SINGLE),
               },
             },
             {
-              name: loading ? "Loading" : "Apply all servers",
+              name: loading ? t("common.loading") : t("settings.welcome.applyAllServers"),
               buttonProps: {
                 disabled: applyDisabled,
                 onClick: handleApplyClick(INTENT.APPLY_ALL),
@@ -115,7 +121,7 @@ const WelcomeMessagePage = () => {
           name="message"
           value={message ?? ""}
           onChange={handleOnChange}
-          placeholder="Message content"
+          placeholder={t("settings.templates.messageContent")}
           multiline
           minRows={16}
           fullWidth
@@ -126,7 +132,7 @@ const WelcomeMessagePage = () => {
       <Suspense fallback={<TemplateSkeleton />}>
         <Await
           resolve={data.templates}
-          errorElement={<AsyncClientError title={"Welcome Templates"} />}
+          errorElement={<AsyncClientError title={t("settings.welcome.templates")} />}
         >
           {(templates) => {
             return (
@@ -148,7 +154,7 @@ const WelcomeMessagePage = () => {
                 renderInput={(params) => (
                   <TextField
                     {...params}
-                    label="Choose a template"
+                    label={t("settings.templates.select")}
                     slotProps={{
                       htmlInput: {
                         ...params.inputProps,

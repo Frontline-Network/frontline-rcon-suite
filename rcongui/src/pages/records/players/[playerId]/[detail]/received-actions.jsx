@@ -3,12 +3,14 @@ import { FilterSection, ScrollableContent, ListItem } from "../styled";
 import { TextField, MenuItem, Typography } from "@mui/material";
 import dayjs from "dayjs";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 const formatDate = (dateString) => {
   return dayjs(dateString).format("lll");
 };
 
 const ReceivedActions = () => {
+  const { t } = useTranslation();
   const { profile } = useLoaderData();
   const [filters, setFilters] = useState({
     actions: {
@@ -33,7 +35,7 @@ const ReceivedActions = () => {
     <div>
       <FilterSection>
         <TextField
-          label="Search actions"
+          label={t("records.playerDetails.searchActions")}
           value={filters.actions.search}
           onChange={(e) =>
             handleFilterChange("actions", "search", e.target.value)
@@ -42,29 +44,31 @@ const ReceivedActions = () => {
         />
         <TextField
           select
-          label="Action Type"
+          label={t("records.playerDetails.actionType")}
           value={filters.actions.type}
           onChange={(e) =>
             handleFilterChange("actions", "type", e.target.value)
           }
           size="small"
         >
-          <MenuItem value="">All</MenuItem>
-          <MenuItem value="TEMPBAN">TEMPBAN</MenuItem>
-          <MenuItem value="PERMABAN">PERMABAN</MenuItem>
-          <MenuItem value="PUNISH">PUNISH</MenuItem>
-          <MenuItem value="KICK">KICK</MenuItem>
-          <MenuItem value="MESSAGE">MESSAGE</MenuItem>
+          <MenuItem value="">{t("common.all")}</MenuItem>
+          <MenuItem value="TEMPBAN">{t("actions.types.TEMPBAN")}</MenuItem>
+          <MenuItem value="PERMABAN">{t("actions.types.PERMABAN")}</MenuItem>
+          <MenuItem value="PUNISH">{t("actions.types.PUNISH")}</MenuItem>
+          <MenuItem value="KICK">{t("actions.types.KICK")}</MenuItem>
+          <MenuItem value="MESSAGE">{t("actions.types.MESSAGE")}</MenuItem>
         </TextField>
       </FilterSection>
       <ScrollableContent>
         {filteredActions.map(
           (action, index) => (
             <ListItem key={index}>
-              <Typography variant="subtitle1">{action.action_type}</Typography>
-              <Typography>Reason: {action.reason}</Typography>
-              <Typography>By: {action.by}</Typography>
-              <Typography>Time: {formatDate(action.time)}</Typography>
+              <Typography variant="subtitle1">
+                {t(`actions.types.${action.action_type}`, { defaultValue: action.action_type })}
+              </Typography>
+              <Typography>{t("records.playerDetails.reason")}: {action.reason}</Typography>
+              <Typography>{t("records.playerDetails.by")}: {action.by}</Typography>
+              <Typography>{t("records.playerDetails.time")}: {formatDate(action.time)}</Typography>
             </ListItem>
           )
         )}

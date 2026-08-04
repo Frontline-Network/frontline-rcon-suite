@@ -4,6 +4,7 @@ import { Tooltip, Button } from "@mui/material";
 import MilitaryTechIcon from '@mui/icons-material/MilitaryTech';
 import { sortByRank } from "@/utils/lib";
 import { RankIcon } from "../../shared/RankIcon";
+import { useTranslation } from "react-i18next";
 
 /**
  * @typedef {Object} RankOption
@@ -17,13 +18,14 @@ import { RankIcon } from "../../shared/RankIcon";
  * @param {Function} props.onRankSelect
  * @returns {JSX.Element}
  */
-export const RankSelectionMenu = ({ rankOptions, onRankSelect }) => (
-  <PopoverMenu
+export const RankSelectionMenu = ({ rankOptions, onRankSelect }) => {
+  const { t } = useTranslation();
+  return <PopoverMenu
     id="rank-picker"
-    description="Pick a rank to select all players with it"
+    description={t("selection.rankDescription")}
     renderButton={(props) => (
       <Button {...props}>
-        <Tooltip title="Select by rank">
+        <Tooltip title={t("selection.rank")}>
           <MilitaryTechIcon />
         </Tooltip>
       </Button>
@@ -60,5 +62,5 @@ export const RankSelectionMenu = ({ rankOptions, onRankSelect }) => (
         </ListItem>
       ))}
     </List>
-  </PopoverMenu>
-);
+  </PopoverMenu>;
+};

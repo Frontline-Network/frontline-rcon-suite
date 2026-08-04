@@ -3,6 +3,12 @@ import { cmd } from "@/utils/fetchUtils";
 import { queryOptions, useQueries, useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { create } from "zustand";
+import {
+  demoGameState,
+  demoServerConnection,
+  demoServerStatus,
+  isFakeMode,
+} from "@/mirage/demo-data";
 
 // Create the Zustand store
 export const useGlobalStore = create((set) => ({
@@ -34,7 +40,9 @@ const globalQueries = [
     queryFn: async () => {
       let result;
       try {
-        result = await cmd.GET_GAME_SERVER_STATUS()
+        result = isFakeMode()
+          ? demoServerStatus
+          : await cmd.GET_GAME_SERVER_STATUS()
         useGlobalStore.setState((state) => ({ status: result }));
       } catch (error) {
         useGlobalStore.setState((state) => ({ status: null }));
@@ -45,7 +53,7 @@ const globalQueries = [
   }),
   queryOptions({
     queryKey: [{ queryIdentifier: "get_gamestate" }],
-    queryFn: cmd.GET_GAME_STATE,
+    queryFn: isFakeMode() ? () => Promise.resolve(demoGameState) : cmd.GET_GAME_STATE,
     select: (data) => {
       useGlobalStore.setState((state) => ({ gameState: data }));
       return data;
@@ -53,7 +61,7 @@ const globalQueries = [
   }),
   queryOptions({
     queryKey: [{ queryIdentifier: "get_server_list" }],
-    queryFn: cmd.GET_GAME_SERVER_LIST,
+    queryFn: isFakeMode() ? () => Promise.resolve([]) : cmd.GET_GAME_SERVER_LIST,
     select: (data) => {
       useGlobalStore.setState((state) => ({ servers: data }));
       return data;
@@ -61,7 +69,7 @@ const globalQueries = [
   }),
   queryOptions({
     queryKey: [{ queryIdentifier: "get_ingame_mods" }],
-    queryFn: cmd.GET_INGAME_MODS,
+    queryFn: isFakeMode() ? () => Promise.resolve([]) : cmd.GET_INGAME_MODS,
     select: (data) => {
       useGlobalStore.setState((state) => ({ onlineIngameMods: data }));
       return data;
@@ -69,7 +77,7 @@ const globalQueries = [
   }),
   queryOptions({
     queryKey: [{ queryIdentifier: "get_online_mods" }],
-    queryFn: cmd.GET_CRCON_MODS,
+    queryFn: isFakeMode() ? () => Promise.resolve([]) : cmd.GET_CRCON_MODS,
     select: (data) => {
       useGlobalStore.setState((state) => ({ onlineCrconMods: data }));
       return data;
@@ -81,7 +89,9 @@ const globalQueries = [
 export const GlobalState = () => {
   const { data, isSuccess: isCrconConnected } = useQuery({
     queryKey: [{ queryIdentifier: "get_connection_info" }],
-    queryFn: cmd.GET_CRCON_SERVER_CONNECTION,
+    queryFn: isFakeMode()
+      ? () => Promise.resolve(demoServerConnection)
+      : cmd.GET_CRCON_SERVER_CONNECTION,
     refetchInterval,
     retry: 1,
   });
@@ -104,4 +114,4 @@ export const GlobalState = () => {
   });
 
   return null;
-}; 
+};

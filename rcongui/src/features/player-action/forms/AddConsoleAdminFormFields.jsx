@@ -1,6 +1,7 @@
 import { ControlledSelect } from "@/components/form/core/ControlledSelect";
 import { Stack } from "@mui/material";
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 
 export const AddConsoleAdminFormFields = ({
   contextData,
@@ -8,6 +9,7 @@ export const AddConsoleAdminFormFields = ({
   setError,
   contextError,
 }) => {
+  const { t } = useTranslation();
   useEffect(() => {
     if (contextError) {
       setError("role", { message: contextError.message });
@@ -19,7 +21,7 @@ export const AddConsoleAdminFormFields = ({
       <ControlledSelect
         control={control}
         name="role"
-        label="Admin Groups"
+        label={t("fields.adminGroups")}
         rules={{ required: true }}
         options={contextData?.admin_groups?.map((groupName) => ({
           label: groupName,

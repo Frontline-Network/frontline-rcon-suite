@@ -77,6 +77,21 @@ def get_api_documentation(request):
 
         api_docs.append(item)
 
+    from .mobile_urls import MOBILE_API_DOCUMENTATION
+
+    for item in MOBILE_API_DOCUMENTATION:
+        api_docs.append(
+            {
+                "endpoint": item["endpoint"],
+                "arguments": {},
+                "return_type": "RconResponse",
+                "doc_string": item["description"],
+                "auto_settings_capable": False,
+                "permissions_required": item["permissions_required"],
+                "allowed_http_methods": item["allowed_http_methods"],
+            }
+        )
+
     return api_response(
         result=sorted(api_docs, key=lambda x: x["endpoint"]),
         command="get_api_documentation",
