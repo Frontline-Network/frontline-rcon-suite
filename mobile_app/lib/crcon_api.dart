@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -66,7 +67,7 @@ class CrconApi {
         'secret': payload.secret,
         'device_name': deviceName,
         'platform': platform,
-        'app_version': '0.1.0',
+        'app_version': '0.1.1',
         'push_handle': pushHandle,
         'push_capability': pushCapability,
       },
@@ -74,7 +75,7 @@ class CrconApi {
         validateStatus: (status) => status != null && status < 500,
       ),
     );
-    final result = _unwrap(response);
+    final result = decodeCrconResponse(response);
     return PairingSession(
       payload: payload,
       exchangeToken: result['exchange_token'].toString(),
@@ -95,7 +96,7 @@ class CrconApi {
       ),
     );
     if (response.statusCode == HttpStatus.accepted) return null;
-    final result = _unwrap(response);
+    final result = decodeCrconResponse(response);
     final profile = ConnectionProfile(
       id: result['installation_id'].toString(),
       baseUrl: session.payload.baseUrl,
@@ -294,7 +295,7 @@ class CrconApi {
     bool refreshed = false,
   }) async {
     final token = await store.accessToken(profile.id);
-    final response = await _dio.request<Map<String, dynamic>>(
+    final response = await _dio.request<dynamic>(
       path,
       data: data,
       queryParameters: queryParameters,
@@ -314,7 +315,7 @@ class CrconApi {
         refreshed: true,
       );
     }
-    return _unwrap(response);
+    return decodeCrconResponse(response);
   }
 
   Future<void> _refresh() async {
@@ -323,24 +324,44 @@ class CrconApi {
       'tokens/refresh',
       data: {'device_id': profile.deviceId, 'refresh_token': refreshToken},
     );
-    final result = _unwrap(response);
+    final result = decodeCrconResponse(response);
     await store.replaceTokens(
       profile.id,
       accessToken: result['access_token'].toString(),
       refreshToken: result['refresh_token'].toString(),
     );
   }
+}
 
-  static dynamic _unwrap(Response<Map<String, dynamic>> response) {
-    final envelope = response.data ?? const {};
-    if (response.statusCode == null ||
-        response.statusCode! >= 400 ||
-        envelope['failed'] == true) {
+dynamic decodeCrconResponse(Response<dynamic> response) {
+  dynamic payload = response.data;
+  if (payload is String) {
+    try {
+      payload = jsonDecode(payload);
+    } on FormatException {
+      final status = response.statusCode;
       throw CrconApiException(
-        envelope['error']?.toString() ?? 'CRCON request failed',
-        statusCode: response.statusCode,
+        status == HttpStatus.notFound
+            ? 'CRCON Mobile API ist noch nicht auf dem benötigten Stand.'
+            : 'CRCON hat eine ungültige Antwort geliefert${status == null ? '' : ' (HTTP $status)'}.',
+        statusCode: status,
       );
     }
-    return envelope['result'];
   }
+  if (payload is! Map) {
+    throw CrconApiException(
+      'CRCON hat ein unerwartetes Antwortformat geliefert.',
+      statusCode: response.statusCode,
+    );
+  }
+  final envelope = Map<String, dynamic>.from(payload);
+  if (response.statusCode == null ||
+      response.statusCode! >= 400 ||
+      envelope['failed'] == true) {
+    throw CrconApiException(
+      envelope['error']?.toString() ?? 'CRCON request failed',
+      statusCode: response.statusCode,
+    );
+  }
+  return envelope['result'];
 }
