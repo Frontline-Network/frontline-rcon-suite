@@ -523,7 +523,7 @@ class ConnectionsScreen extends ConsumerWidget {
     final profiles = ref.watch(connectionsProvider);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('CRCON connections'),
+        title: Text(context.tr('CRCON-Verbindungen', 'CRCON connections')),
         actions: [
           IconButton(
             tooltip: context.tr('Diagnoseprotokoll', 'Diagnostics log'),
@@ -535,13 +535,20 @@ class ConnectionsScreen extends ConsumerWidget {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/pair'),
         icon: const Icon(Icons.qr_code_scanner),
-        label: const Text('Pair CRCON'),
+        label: Text(context.tr('CRCON koppeln', 'Pair CRCON')),
       ),
       body: profiles.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => _ErrorView(message: error.toString()),
         data: (items) => items.isEmpty
-            ? const Center(child: Text('Pair your first CRCON installation.'))
+            ? Center(
+                child: Text(
+                  context.tr(
+                    'Kopple zuerst eine CRCON-Installation.',
+                    'Pair your first CRCON installation.',
+                  ),
+                ),
+              )
             : ListView.separated(
                 padding: const EdgeInsets.all(16),
                 itemCount: items.length,
@@ -611,18 +618,21 @@ class _ConnectionCardState extends ConsumerState<_ConnectionCard> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Revoke this device?'),
-        content: const Text(
-          'CRCON will invalidate its access and refresh tokens immediately.',
+        title: Text(context.tr('Gerät widerrufen?', 'Revoke this device?')),
+        content: Text(
+          context.tr(
+            'CRCON entwertet Zugriffs- und Erneuerungstoken sofort.',
+            'CRCON will invalidate its access and refresh tokens immediately.',
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.tr('Abbrechen', 'Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Revoke'),
+            child: Text(context.tr('Widerrufen', 'Revoke')),
           ),
         ],
       ),
@@ -665,7 +675,9 @@ class _ConnectionCardState extends ConsumerState<_ConnectionCard> {
         ),
         if (_notifications != null)
           SwitchListTile(
-            title: const Text('Incident notifications'),
+            title: Text(
+              context.tr('Vorfallbenachrichtigungen', 'Incident notifications'),
+            ),
             value: _notifications!,
             onChanged: _busy ? null : _setNotifications,
           ),
@@ -760,7 +772,7 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Pair CRCON')),
+    appBar: AppBar(title: Text(context.tr('CRCON koppeln', 'Pair CRCON'))),
     body: _session == null
         ? Stack(
             children: [
@@ -778,7 +790,10 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
                   color: Colors.black87,
                   child: Text(
                     _error ??
-                        'Open Mobile App in CRCON, create a QR code, then scan it here.',
+                        context.tr(
+                          'Öffne in CRCON die Mobile App, erstelle einen QR-Code und scanne ihn hier.',
+                          'Open Mobile App in CRCON, create a QR code, then scan it here.',
+                        ),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -793,7 +808,12 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
                 children: [
                   const Icon(Icons.phonelink_lock, size: 64),
                   const SizedBox(height: 20),
-                  const Text('Compare this code with CRCON'),
+                  Text(
+                    context.tr(
+                      'Vergleiche diesen Code mit CRCON',
+                      'Compare this code with CRCON',
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   Text(
                     _session!.verificationCode,
@@ -802,8 +822,11 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
                     ).textTheme.displayMedium?.copyWith(letterSpacing: 8),
                   ),
                   const SizedBox(height: 12),
-                  const Text(
-                    'Approve the phone in the CRCON browser to finish pairing.',
+                  Text(
+                    context.tr(
+                      'Bestätige das Telefon im CRCON-Browser, um die Kopplung abzuschließen.',
+                      'Approve the phone in the CRCON browser to finish pairing.',
+                    ),
                   ),
                   if (_error != null)
                     Padding(
@@ -2262,18 +2285,22 @@ class _LinkTargetDialogState extends State<_LinkTargetDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: const Text('Link target player'),
+    title: Text(context.tr('Spielerziel verknüpfen', 'Link target player')),
     content: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         TextField(
           controller: _name,
           autofocus: true,
-          decoration: const InputDecoration(labelText: 'Player name'),
+          decoration: InputDecoration(
+            labelText: context.tr('Spielername', 'Player name'),
+          ),
         ),
         TextField(
           controller: _id,
-          decoration: const InputDecoration(labelText: 'Player ID'),
+          decoration: InputDecoration(
+            labelText: context.tr('Spieler-ID', 'Player ID'),
+          ),
         ),
       ],
     ),
@@ -2287,7 +2314,7 @@ class _LinkTargetDialogState extends State<_LinkTargetDialog> {
           'player_id': _id.text.trim(),
           'player_name': _name.text.trim(),
         }),
-        child: const Text('Link'),
+        child: Text(context.tr('Verknüpfen', 'Link')),
       ),
     ],
   );
@@ -2476,10 +2503,10 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
           _ => action,
         },
         label: action == 'message'
-            ? 'Message'
+            ? context.tr('Nachricht', 'Message')
             : action == 'comment'
-            ? 'Admin comment'
-            : 'Required reason',
+            ? context.tr('Admin-Kommentar', 'Admin comment')
+            : context.tr('Pflichtgrund', 'Required reason'),
         confirmLabel: context.tr('Bestätigen', 'Confirm'),
         maxLines: 3,
       ),
