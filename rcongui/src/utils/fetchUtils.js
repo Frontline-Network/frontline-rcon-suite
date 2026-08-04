@@ -33,8 +33,8 @@ async function requestFactory({
     referrerPolicy: "origin",
   };
 
-  // Add body for POST requests
-  if (method === "POST") {
+  // Add a body for all mutating JSON requests.
+  if (method !== "GET" && method !== "HEAD") {
     requestOptions.body =
       headers["Content-Type"] === "application/json"
         ? JSON.stringify(payload)
@@ -511,6 +511,32 @@ export const cmd = {
   GET_UPLOAD_VIP_FILE_RESPONSE: (params) =>
     requestFactory({ method: "GET", cmd: "upload_vips_result", ...params }),
 };
+
+export async function mobileRequest(path, { method = "GET", payload } = {}) {
+  const apiBase = new URL(CRCON_API, document.location.origin);
+  const url = new URL(`mobile/v1/${path}`, apiBase);
+  const response = await fetch(url, {
+    method,
+    mode: "cors",
+    cache: "no-store",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    redirect: "follow",
+    referrerPolicy: "origin",
+    ...(method !== "GET" && method !== "HEAD"
+      ? { body: JSON.stringify(payload ?? {}) }
+      : {}),
+  });
+  const envelope = await parseJsonResponse(response);
+  if (!response.ok || envelope.failed) {
+    throw new APIError(
+      envelope.error || "Mobile API request failed",
+      path,
+      response.status
+    );
+  }
+  return envelope.result;
+}
 
 export function execute(command, data) {
   return postData(CRCON_API + command, data);

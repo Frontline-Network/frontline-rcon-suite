@@ -1,0 +1,54 @@
+# Production override for the combined Frontline Autobalancer + Mobile Admin build.
+# Apply together with the installation's generated compose.yaml:
+#   docker compose -f compose.yaml -f compose.mobile-admin.yaml up -d
+
+x-frontline-backend: &frontline-backend
+  image: frontline/hll_rcon_tool:mobile-admin-autobalancer-v11.11.1
+  build:
+    context: .
+    dockerfile: Dockerfile
+
+x-mobile-environment: &mobile-environment
+  MOBILE_INTEGRATION_ENABLED: ${MOBILE_INTEGRATION_ENABLED:-false}
+  MOBILE_PUBLIC_BASE_URL: ${MOBILE_PUBLIC_BASE_URL:-}
+  MOBILE_INSTALLATION_ID: ${MOBILE_INSTALLATION_ID:-}
+  MOBILE_INCIDENT_TRIGGERS: ${MOBILE_INCIDENT_TRIGGERS:-}
+  MOBILE_INCIDENT_RETENTION_DAYS: ${MOBILE_INCIDENT_RETENTION_DAYS:-90}
+  MOBILE_PUSH_RELAY_URL: ${MOBILE_PUSH_RELAY_URL:-}
+
+x-frontline-frontend: &frontline-frontend
+  image: frontline/hll_rcon_tool_frontend:mobile-admin-autobalancer-v11.11.1
+  build:
+    context: .
+    dockerfile: Dockerfile-frontend
+
+services:
+  maintenance:
+    <<: *frontline-backend
+    environment: *mobile-environment
+
+  webhook_service:
+    <<: *frontline-backend
+    environment: *mobile-environment
+
+  backend_1:
+    <<: *frontline-backend
+    environment: *mobile-environment
+
+  supervisor_1:
+    <<: *frontline-backend
+    environment: *mobile-environment
+
+  backend_2:
+    <<: *frontline-backend
+    environment: *mobile-environment
+
+  supervisor_2:
+    <<: *frontline-backend
+    environment: *mobile-environment
+
+  frontend_1:
+    <<: *frontline-frontend
+
+  frontend_2:
+    <<: *frontline-frontend

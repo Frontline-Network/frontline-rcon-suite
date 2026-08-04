@@ -29,6 +29,12 @@ then
   LOGGING_PATH=/logs/ LOGGING_FILENAME=webhook_service.log python -m rcon.webhook_service
 fi
 
+if [ "$1" == 'mobile_push_worker' ]
+then
+  cd rconweb
+  exec python manage.py mobile_push_worker
+fi
+
 # Check if we're in a backend container
 if [ "$1" == 'web' ]
 then
@@ -47,6 +53,7 @@ then
   # TODO: Temporarily handle converting users old scorebot URLs to the new format; remove in a few releases
   SERVER_NUMBER=${SERVER_NUMBER} LOGGING_PATH=/logs/ LOGGING_FILENAME=api_${SERVER_NUMBER}.log python -m rcon.cli port_legacy_scorebot_urls
   SERVER_NUMBER=${SERVER_NUMBER} LOGGING_PATH=/logs/ LOGGING_FILENAME=api_${SERVER_NUMBER}.log python -m rcon.cli remove_orphaned_map_ids
+  SERVER_NUMBER=${SERVER_NUMBER} LOGGING_PATH=/logs/ LOGGING_FILENAME=api_${SERVER_NUMBER}.log python -m rcon.cli clear_maps_cache
   ./manage.py register_api
   cd rconweb
   ./manage.py collectstatic --noinput

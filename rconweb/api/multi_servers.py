@@ -7,12 +7,66 @@ import requests
 from django.http import QueryDict
 from django.views.decorators.csrf import csrf_exempt
 
-from rcon.utils import ApiKey
+from rcon.utils import ApiKey, get_server_number
 
 from .auth import AUTHORIZATION, api_response, login_required
 from .decorators import permission_required, require_http_methods
 
 logger = logging.getLogger("rcon")
+
+
+def mobile_server_list(request, local_name: str) -> list[dict]:
+    """Return the reachable game-server backends represented by this installation."""
+
+    servers = [
+        {
+            "server_number": int(get_server_number()),
+            "name": local_name,
+            "available": True,
+        }
+    ]
+    if not request.user.has_perm("api.can_view_other_crcon_servers"):
+        return servers
+
+    try:
+        api_key = ApiKey()
+        keys = api_key.get_all_keys()
+        my_key = api_key.get_key()
+    except Exception:
+        logger.warning("Multi-server discovery is unavailable", exc_info=True)
+        return servers
+    auth_header = request.headers.get(AUTHORIZATION)
+    headers = {"AUTHORIZATION": auth_header} if auth_header else {}
+    cookies = (
+        {"sessionid": request.COOKIES["sessionid"]}
+        if request.COOKIES.get("sessionid")
+        else {}
+    )
+    for host, key in keys.items():
+        if key == my_key:
+            continue
+        try:
+            response = requests.get(
+                f"http://{host}/api/get_connection_info",
+                timeout=3,
+                headers=headers,
+                cookies=cookies,
+            )
+            response.raise_for_status()
+            info = response.json().get("result") or {}
+            server_number = int(info["server_number"])
+            if any(item["server_number"] == server_number for item in servers):
+                continue
+            servers.append(
+                {
+                    "server_number": server_number,
+                    "name": str(info.get("name") or f"Server {server_number}"),
+                    "available": True,
+                }
+            )
+        except (KeyError, TypeError, ValueError, requests.RequestException):
+            logger.warning("Unable to discover mobile CRCON server at %s", host)
+    return sorted(servers, key=lambda item: item["server_number"])
 
 
 @login_required()
@@ -168,3 +222,48 @@ def forward_command(
             logger.warning("Unable to connect with %s: %s", host, e)
 
     return results
+
+
+def forward_mobile_request_to_server(
+    request, server_number: int, path: str, data: dict
+):
+    """Forward one mobile command to exactly one CRCON game-server backend."""
+
+    if int(get_server_number()) == int(server_number):
+        return None
+
+    try:
+        api_key = ApiKey()
+        keys = api_key.get_all_keys()
+        my_key = api_key.get_key()
+    except Exception as exc:
+        raise ValueError("CRCON multi-server discovery is unavailable") from exc
+    auth_header = request.headers.get(AUTHORIZATION)
+    headers = {"AUTHORIZATION": auth_header} if auth_header else {}
+
+    for host, key in keys.items():
+        if key == my_key:
+            continue
+        try:
+            connection_response = requests.get(
+                f"http://{host}/api/get_connection_info",
+                timeout=5,
+                headers=headers,
+            )
+            if not connection_response.ok:
+                continue
+            connection_info = connection_response.json().get("result") or {}
+            if int(connection_info.get("server_number", -1)) != int(server_number):
+                continue
+            payload = deepcopy(data)
+            payload["forwarded"] = True
+            return requests.post(
+                f"http://{host}{path}",
+                json=payload,
+                timeout=10,
+                headers=headers,
+            )
+        except (requests.RequestException, TypeError, ValueError):
+            logger.exception("Unable to forward mobile request to %s", host)
+
+    raise ValueError(f"CRCON server {server_number} is unavailable")

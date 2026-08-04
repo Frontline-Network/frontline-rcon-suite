@@ -1,4 +1,5 @@
 import logging
+import os
 import re
 from datetime import datetime
 from functools import lru_cache
@@ -7,7 +8,6 @@ from typing import Iterable
 from discord_webhook import DiscordEmbed, DiscordWebhook
 
 import discord.utils
-from rcon.utils import get_server_number
 from rcon.cache_utils import ttl_cache
 from rcon.discord import make_hook
 from rcon.logs.loop import on_chat, on_kill, on_tk
@@ -19,11 +19,12 @@ from rcon.user_config.webhooks import (
     DiscordWebhook,
     KillsWebhooksUserConfig,
 )
+from rcon.utils import get_server_number
 from rcon.webhook_service import (
-    enqueue_message,
     WebhookMessage,
-    WebhookType,
     WebhookMessageType,
+    WebhookType,
+    enqueue_message,
 )
 
 STEAM_PROFILE_URL = "http://steamcommunity.com/profiles/{id64}"
@@ -277,6 +278,37 @@ def get_handler():
 @on_chat
 def handle_on_chat(rcon, log):
     get_handler().send_chat_message(log)
+    if os.getenv("MOBILE_INTEGRATION_ENABLED", "false").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        try:
+            from rcon.admin_incidents import create_incident_from_chat
+
+            configured_triggers = os.getenv("MOBILE_INCIDENT_TRIGGERS", "").strip()
+            if configured_triggers:
+                triggers = tuple(
+                    word.strip().lower()
+                    for word in configured_triggers.split(",")
+                    if word.strip()
+                )
+            else:
+                triggers = tuple(
+                    word.strip().lower()
+                    for word in AdminPingWebhooksUserConfig.load_from_db().trigger_words
+                    if word.strip()
+                ) or ("!admin",)
+            create_incident_from_chat(
+                log,
+                current_players=rcon.get_players(),
+                trigger_words=triggers,
+            )
+        except Exception:
+            # Incident persistence must never interrupt the game log loop or
+            # existing Discord notifications.
+            logger.exception("Unable to create mobile admin incident")
 
 
 @on_kill

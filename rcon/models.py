@@ -2,13 +2,28 @@ import logging
 import os
 import re
 import sys
+import uuid
 from collections import defaultdict
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any, Generator, List, Literal, Optional, Sequence, overload
 
 import pydantic
-from sqlalchemy import TIMESTAMP, Enum, ForeignKey, String, Text, create_engine, select, text, JSON, Engine, NullPool, Pool
+from sqlalchemy import (
+    JSON,
+    TIMESTAMP,
+    CheckConstraint,
+    Engine,
+    Enum,
+    ForeignKey,
+    NullPool,
+    Pool,
+    String,
+    Text,
+    create_engine,
+    select,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import InvalidRequestError, ProgrammingError
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -1278,6 +1293,137 @@ class AuditLog(Base):
             "command_arguments": self.command_arguments,
             "command_result": self.command_result,
         }
+
+
+class AdminIncident(Base):
+    """A durable, cross-server admin report used by the mobile incident inbox."""
+
+    __tablename__ = "admin_incident"
+    __table_args__ = (
+        CheckConstraint(
+            "source IN ('chat', 'manual')", name="ck_admin_incident_source"
+        ),
+        CheckConstraint(
+            "status IN ('new', 'claimed', 'resolved', 'dismissed')",
+            name="ck_admin_incident_status",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    server_number: Mapped[int] = mapped_column(nullable=False, index=True)
+    source: Mapped[str] = mapped_column(String(16), nullable=False, default="manual")
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="new", index=True
+    )
+    reporter_id: Mapped[str | None] = mapped_column(String(100), index=True)
+    reporter_name: Mapped[str | None] = mapped_column(String(255))
+    target_id: Mapped[str | None] = mapped_column(String(100), index=True)
+    target_name: Mapped[str | None] = mapped_column(String(255))
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    raw_message: Mapped[str | None] = mapped_column(Text)
+    assigned_to: Mapped[str | None] = mapped_column(String(150), index=True)
+    dedupe_key: Mapped[str | None] = mapped_column(String(64), index=True)
+    revision: Mapped[int] = mapped_column(nullable=False, default=1)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        default=lambda: datetime.now(tz=timezone.utc),
+        index=True,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        default=lambda: datetime.now(tz=timezone.utc),
+        onupdate=lambda: datetime.now(tz=timezone.utc),
+        index=True,
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
+
+    events: Mapped[list["AdminIncidentEvent"]] = relationship(
+        back_populates="incident",
+        cascade="all, delete-orphan",
+        order_by="AdminIncidentEvent.created_at",
+    )
+
+    def to_dict(self, include_events: bool = False) -> dict[str, Any]:
+        result = {
+            "id": self.id,
+            "server_number": self.server_number,
+            "source": self.source,
+            "status": self.status,
+            "reporter_id": self.reporter_id,
+            "reporter_name": self.reporter_name,
+            "target_id": self.target_id,
+            "target_name": self.target_name,
+            "reason": self.reason,
+            "raw_message": self.raw_message,
+            "assigned_to": self.assigned_to,
+            "revision": self.revision,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "resolved_at": self.resolved_at,
+        }
+        if include_events:
+            result["events"] = [event.to_dict() for event in self.events]
+        return result
+
+
+class AdminIncidentEvent(Base):
+    __tablename__ = "admin_incident_event"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    incident_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("admin_incident.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    actor: Mapped[str] = mapped_column(String(150), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    idempotency_key: Mapped[str | None] = mapped_column(
+        String(64), unique=True, index=True
+    )
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        default=lambda: datetime.now(tz=timezone.utc),
+        index=True,
+    )
+
+    incident: Mapped[AdminIncident] = relationship(back_populates="events")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "incident_id": self.incident_id,
+            "actor": self.actor,
+            "event_type": self.event_type,
+            "idempotency_key": self.idempotency_key,
+            "payload": self.payload,
+            "created_at": self.created_at,
+        }
+
+
+class AdminIncidentPushDelivery(Base):
+    """Local receipt for a privacy-preserving relay notification."""
+
+    __tablename__ = "admin_incident_push_delivery"
+    __table_args__ = (
+        UniqueConstraint("event_id", "device_id", name="unique_push_event_device"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    event_id: Mapped[int] = mapped_column(
+        ForeignKey("admin_incident_event.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    device_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    delivered_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
+    error: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), default=lambda: datetime.now(tz=timezone.utc)
+    )
 
 
 class Blacklist(Base):

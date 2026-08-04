@@ -1,0 +1,13 @@
+services:
+  relay:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8080:8080"
+    volumes:
+      - relay_data:/data
+      - ./firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
+
+volumes:
+  relay_data:
