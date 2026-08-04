@@ -78,7 +78,7 @@ product final result: passed
 ## Vergleich
 
 - Referenz: `C:/Users/chris/AppData/Local/Temp/codex-clipboard-1811d14f-368b-4a1c-8836-2c4304611d8c.png` (853x1844)
-- Implementierung: `leitstelle-device-final3.png` (1080x2340, Samsung S25, Android)
+- Implementierung: `mobile_app/leitstelle-device-v016-final.png` (1080x2340, Samsung S25, Android, APK 0.1.6+7)
 
 Die Implementierung wurde auf demselben mobilen Seitenverhältnis geprüft. Die Live-Daten unterscheiden sich erwartungsgemäß von der Referenz; deshalb wurden Inhalte und Statuswerte nicht als Layoutfehler bewertet.
 
@@ -90,8 +90,9 @@ Die Implementierung wurde auf demselben mobilen Seitenverhältnis geprüft. Die 
 - Gemeinsame Inbox-Karte mit Überschrift und Sortierung
 - Meldungskarten mit Dringlichkeit/Zeit/CRCON links, Meldung und Zielen mittig sowie Status/Aktion rechts
 - Vollständig lesbare Status- und Meldungstitel auf 432 px Gerätebreite
+- Responsive Aktionszeile ohne `LayoutBuilder` innerhalb von `IntrinsicHeight`
 - Keine sichtbaren Render-Overflow-Markierungen
-- Kein relevanter `RenderFlex`, `TextEditingController`, `Duplicate GlobalKeys`- oder Build-Scope-Fehler im ADB-Log nach dem Start
+- Kein relevanter `RenderFlex`, `IntrinsicHeight`, `TextEditingController`, `Duplicate GlobalKeys`- oder Build-Scope-Fehler im ADB-Log nach dem Start
 
 ## Ergebnis
 

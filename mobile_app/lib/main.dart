@@ -1493,6 +1493,30 @@ class _IncidentRow extends StatelessWidget {
         ? context.tr('Spielermeldung', 'Player report')
         : context.tr('Allgemeine Meldung', 'General report');
     final displayConnection = connectionName ?? 'CRCON';
+    final compactCard = MediaQuery.sizeOf(context).width < 520;
+    final title = Text(
+      subjectTitle,
+      maxLines: compactCard ? 2 : 1,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+    );
+    final action = isNew
+        ? OutlinedButton(
+            onPressed: claiming ? null : onClaim,
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              minimumSize: Size.zero,
+            ),
+            child: Text(
+              claiming
+                  ? context.tr('…', '…')
+                  : context.tr('Übernehmen', 'Claim'),
+            ),
+          )
+        : Text(
+            context.incidentStatus(item.status),
+            style: const TextStyle(color: FrontlineTheme.muted, fontSize: 11),
+          );
 
     return InkWell(
       onTap: () => context.push('/incidents/${item.connectionId}/${item.id}'),
@@ -1561,66 +1585,27 @@ class _IncidentRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final compact = constraints.maxWidth < 360;
-                        final title = Text(
-                          subjectTitle,
-                          maxLines: compact ? 2 : 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
+                    if (compactCard)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          title,
+                          const SizedBox(height: 6),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: action,
                           ),
-                        );
-                        final action = isNew
-                            ? OutlinedButton(
-                                onPressed: claiming ? null : onClaim,
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 8,
-                                  ),
-                                  minimumSize: Size.zero,
-                                ),
-                                child: Text(
-                                  claiming
-                                      ? context.tr('…', '…')
-                                      : context.tr('Übernehmen', 'Claim'),
-                                ),
-                              )
-                            : Text(
-                                context.incidentStatus(item.status),
-                                style: const TextStyle(
-                                  color: FrontlineTheme.muted,
-                                  fontSize: 11,
-                                ),
-                              );
-
-                        if (compact) {
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              title,
-                              const SizedBox(height: 6),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: action,
-                              ),
-                            ],
-                          );
-                        }
-
-                        return Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(child: title),
-                            const SizedBox(width: 8),
-                            action,
-                          ],
-                        );
-                      },
-                    ),
+                        ],
+                      )
+                    else
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: title),
+                          const SizedBox(width: 8),
+                          action,
+                        ],
+                      ),
                     const SizedBox(height: 8),
                     Text(
                       item.reason,
