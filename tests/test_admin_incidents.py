@@ -495,3 +495,116 @@ def test_action_target_must_belong_to_confirmed_subject(incident_database):
     assert subject["kind"] == "squad"
     with pytest.raises(ValueError):
         incidents.confirmed_action_subject(incident, player_id="outsider")
+
+
+def test_end_to_end_chat_report_to_resolved_incident(incident_database, monkeypatch):
+    monkeypatch.setenv("MOBILE_CONTEXT_V2", "enabled")
+    players = [
+        {
+            "player_id": "reporter-id",
+            "name": "Reporter",
+            "team": "Allies",
+            "unit_name": "Charlie",
+            "role": "rifleman",
+        },
+        {
+            "player_id": "target-id",
+            "name": "Biene",
+            "team": "Allies",
+            "unit_name": "Charlie",
+            "role": "officer",
+        },
+    ]
+    squads = [
+        {
+            "name": "Charlie",
+            "team": "Allies",
+            "type": "infantry",
+            "has_leader": True,
+            "leader": {"player_id": "target-id", "name": "Biene"},
+            "players": players[1:],
+        }
+    ]
+
+    incident, created = incidents.create_incident_from_chat(
+        {
+            "player_id_1": "reporter-id",
+            "player_name_1": "Reporter",
+            "sub_content": "!admin Charlie Biene meldet Teamkill",
+        },
+        current_players=players,
+        current_squads=squads,
+    )
+
+    assert created is True
+    assert incident["source"] == "chat"
+    assert incident["reporter_context"]["unit_name"] == "Charlie"
+    assert {(subject["kind"], subject["state"]) for subject in incident["subjects"]} == {
+        ("squad", "confirmed"),
+        ("player", "confirmed"),
+    }
+
+    claimed = incidents.mutate_incident(
+        incident["id"],
+        actor="mobile-admin",
+        expected_revision=incident["revision"],
+        operation="claim",
+        idempotency_key="e2e-claim",
+    )
+    player_subject = next(
+        subject
+        for subject in claimed["subjects"]
+        if subject["kind"] == "player"
+    )
+    target = incidents.confirmed_action_subject(
+        claimed,
+        player_id="target-id",
+        subject_id=player_subject["id"],
+    )
+    assert target["display_name"] == "Biene"
+
+    reservation, first_action = incidents.reserve_incident_action(
+        incident["id"],
+        actor="mobile-admin",
+        action="temp_ban",
+        arguments={
+            "player_id": "target-id",
+            "subject_id": target["id"],
+            "reason": "Teamkill",
+            "duration_hours": 2,
+            "confirmed": True,
+        },
+        idempotency_key="e2e-tempban",
+    )
+    assert first_action is True
+    completed = incidents.complete_incident_action(
+        "e2e-tempban", result={"ok": True, "action": "temp_ban"}
+    )
+    retry, retry_created = incidents.reserve_incident_action(
+        incident["id"],
+        actor="mobile-admin",
+        action="temp_ban",
+        arguments={"player_id": "target-id"},
+        idempotency_key="e2e-tempban",
+    )
+    assert retry_created is False
+    assert retry["event_type"] == "action"
+    assert retry["payload"]["idempotency_key"] == "e2e-tempban"
+    assert completed["revision"] == claimed["revision"] + 2
+
+    resolved = incidents.mutate_incident(
+        incident["id"],
+        actor="mobile-admin",
+        expected_revision=completed["revision"],
+        operation="resolved",
+        payload={"note": "Tempban ausgeführt und geprüft"},
+        idempotency_key="e2e-resolve",
+    )
+    assert resolved["status"] == "resolved"
+    assert {event["event_type"] for event in resolved["events"]} >= {
+        "created",
+        "claim",
+        "action_started",
+        "action",
+        "resolved",
+    }
