@@ -86,6 +86,14 @@ extension FrontlineCopy on BuildContext {
       };
 }
 
+Map<String, dynamic> _mapValue(Object? value) =>
+    value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};
+
+Map<String, dynamic>? _nullableMapValue(Object? value) =>
+    value is Map ? Map<String, dynamic>.from(value) : null;
+
+List<Object?> _listValue(Object? value) => value is List ? value : const [];
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppLogger.instance.initialize();
@@ -571,7 +579,7 @@ class _ConnectionCardState extends ConsumerState<_ConnectionCard> {
   Future<void> _load() async {
     try {
       final bootstrap = await _api.bootstrap();
-      final device = Map<String, dynamic>.from(bootstrap['device'] as Map);
+      final device = _mapValue(bootstrap['device']);
       if (mounted) {
         setState(
           () => _notifications = device['notifications_enabled'] == true,
@@ -966,8 +974,9 @@ Future<void> _createManualIncident(BuildContext context, WidgetRef ref) async {
         profile,
         ref.read(secureStoreProvider),
       ).bootstrap();
-      servers[profile.id] = (bootstrap['servers'] as List<dynamic>? ?? const [])
-          .map((item) => Map<String, dynamic>.from(item as Map))
+      servers[profile.id] = _listValue(bootstrap['servers'])
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
           .toList();
     }
   } catch (error) {
@@ -1552,52 +1561,66 @@ class _IncidentRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            subjectTitle,
-                            maxLines: 1,
-                            softWrap: false,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        if (isNew)
-                          OutlinedButton(
-                            onPressed: claiming ? null : onClaim,
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                              minimumSize: Size.zero,
-                            ),
-                            child: Text(
-                              claiming
-                                  ? context.tr('…', '…')
-                                  : context.tr('Übernehmen', 'Claim'),
-                            ),
-                          )
-                        else
-                          const SizedBox.shrink(),
-                      ],
-                    ),
-                    if (!isNew)
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                          context.incidentStatus(item.status),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final compact = constraints.maxWidth < 360;
+                        final title = Text(
+                          subjectTitle,
+                          maxLines: compact ? 2 : 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: FrontlineTheme.muted,
-                            fontSize: 11,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
                           ),
-                        ),
-                      ),
+                        );
+                        final action = isNew
+                            ? OutlinedButton(
+                                onPressed: claiming ? null : onClaim,
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                  minimumSize: Size.zero,
+                                ),
+                                child: Text(
+                                  claiming
+                                      ? context.tr('…', '…')
+                                      : context.tr('Übernehmen', 'Claim'),
+                                ),
+                              )
+                            : Text(
+                                context.incidentStatus(item.status),
+                                style: const TextStyle(
+                                  color: FrontlineTheme.muted,
+                                  fontSize: 11,
+                                ),
+                              );
+
+                        if (compact) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              title,
+                              const SizedBox(height: 6),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: action,
+                              ),
+                            ],
+                          );
+                        }
+
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: title),
+                            const SizedBox(width: 8),
+                            action,
+                          ],
+                        );
+                      },
+                    ),
                     const SizedBox(height: 8),
                     Text(
                       item.reason,
@@ -1879,19 +1902,13 @@ class PlayerProfileScreen extends ConsumerWidget {
           return _ErrorView(message: snapshot.error.toString());
         }
         final dossier = snapshot.data!;
-        final profile = Map<String, dynamic>.from(
-          dossier['history'] as Map? ?? const {},
-        );
-        final capabilities = Map<String, dynamic>.from(
-          dossier['capabilities'] as Map? ?? const {},
-        );
-        final bans = profile['bans'] as List<dynamic>? ?? const [];
-        final comments = profile['comments'] as List<dynamic>? ?? const [];
-        final sessions = profile['sessions'] as List<dynamic>? ?? const [];
-        final aliases = profile['aliases'] as List<dynamic>? ?? const [];
-        final live = dossier['live'] == null
-            ? null
-            : Map<String, dynamic>.from(dossier['live'] as Map);
+        final profile = _mapValue(dossier['history']);
+        final capabilities = _mapValue(dossier['capabilities']);
+        final bans = _listValue(profile['bans']);
+        final comments = _listValue(profile['comments']);
+        final sessions = _listValue(profile['sessions']);
+        final aliases = _listValue(profile['aliases']);
+        final live = _nullableMapValue(dossier['live']);
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -2095,7 +2112,7 @@ class SquadScreen extends ConsumerWidget {
           return _ErrorView(message: snapshot.error.toString());
         }
         final squad = snapshot.data!;
-        final players = squad['players'] as List<dynamic>? ?? const [];
+        final players = _listValue(squad['players']);
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -2152,7 +2169,7 @@ class SquadScreen extends ConsumerWidget {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             ...players.map((value) {
-              final player = Map<String, dynamic>.from(value as Map);
+              final player = _mapValue(value);
               final playerId = player['player_id']?.toString() ?? '';
               return Card(
                 child: ListTile(
@@ -2514,8 +2531,9 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
   );
 
   Map<String, dynamic>? _liveSubject(IncidentSubject subject) {
-    final subjects = _incident?.liveContext['subjects'] as Map?;
-    final value = subjects?[subject.id];
+    final subjects = _incident?.liveContext['subjects'];
+    final subjectMap = subjects is Map ? subjects : const <dynamic, dynamic>{};
+    final value = subjectMap[subject.id];
     return value is Map ? Map<String, dynamic>.from(value) : null;
   }
 
@@ -2779,18 +2797,18 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
           ),
         ...squads.map((subject) {
           final snapshot = subject.snapshot;
-          final oldPlayers = snapshot['players'] as List<dynamic>? ?? const [];
+          final oldPlayers = _listValue(snapshot['players']);
           final live = _liveSubject(subject);
-          final livePlayers = live?['players'] as List<dynamic>? ?? const [];
+          final livePlayers = _listValue(live?['players']);
           final liveIds = livePlayers
-              .map((player) => (player as Map)['player_id']?.toString())
+              .map((player) => _mapValue(player)['player_id']?.toString())
               .toSet();
           final oldIds = oldPlayers
-              .map((player) => (player as Map)['player_id']?.toString())
+              .map((player) => _mapValue(player)['player_id']?.toString())
               .toSet();
           final joinedPlayers = livePlayers.where(
             (player) =>
-                !oldIds.contains((player as Map)['player_id']?.toString()),
+                !oldIds.contains(_mapValue(player)['player_id']?.toString()),
           );
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2810,7 +2828,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                 ),
               ),
               ...oldPlayers.map((value) {
-                final player = Map<String, dynamic>.from(value as Map);
+                final player = _mapValue(value);
                 final playerId = player['player_id']?.toString() ?? '';
                 final onlineInSquad = liveIds.contains(playerId);
                 return ListTile(
@@ -2877,7 +2895,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                 );
               }),
               ...joinedPlayers.map((value) {
-                final player = Map<String, dynamic>.from(value as Map);
+                final player = _mapValue(value);
                 final playerId = player['player_id']?.toString() ?? '';
                 return ListTile(
                   leading: const Icon(
@@ -2918,7 +2936,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
               [
                 event['actor']?.toString() ?? 'system',
                 if (event['event_type'] == 'note')
-                  (event['payload'] as Map?)?['note']?.toString() ?? '',
+                  _mapValue(event['payload'])['note']?.toString() ?? '',
               ].where((value) => value.isNotEmpty).join(' · '),
             ),
           ),

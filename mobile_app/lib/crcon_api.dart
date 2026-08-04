@@ -73,7 +73,7 @@ class CrconApi {
         'secret': payload.secret,
         'device_name': deviceName,
         'platform': platform,
-        'app_version': '0.1.5',
+        'app_version': '0.1.6',
         'push_handle': pushHandle,
         'push_capability': pushCapability,
       },
@@ -257,40 +257,61 @@ class CrconApi {
       'players/search',
       queryParameters: {'q': query, 'server_number': ?serverNumber},
     );
-    return (result as List<dynamic>? ?? const [])
-        .map((item) => Map<String, dynamic>.from(item as Map))
+    final values = result is List
+        ? result
+        : result is Map
+        ? result.values.toList()
+        : const <dynamic>[];
+    return values
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
         .toList();
   }
 
   Future<Map<String, dynamic>> playerProfile(
     String playerId, {
     int? serverNumber,
-  }) async => Map<String, dynamic>.from(
-    await _authorized(
-          'GET',
-          'players/$playerId',
-          queryParameters: {'server_number': ?serverNumber},
-        )
-        as Map,
-  );
-
-  Future<Map<String, dynamic>> roster(int serverNumber) async =>
-      Map<String, dynamic>.from(
-        await _authorized('GET', 'servers/$serverNumber/roster') as Map,
+  }) async {
+    final result = await _authorized(
+      'GET',
+      'players/$playerId',
+      queryParameters: {'server_number': ?serverNumber},
+    );
+    if (result is! Map) {
+      throw const CrconApiException(
+        'CRCON hat kein gültiges Spielerprofil geliefert.',
       );
+    }
+    return Map<String, dynamic>.from(result);
+  }
+
+  Future<Map<String, dynamic>> roster(int serverNumber) async {
+    final result = await _authorized('GET', 'servers/$serverNumber/roster');
+    if (result is! Map) {
+      throw const CrconApiException(
+        'CRCON hat keinen gültigen Spielerkader geliefert.',
+      );
+    }
+    return Map<String, dynamic>.from(result);
+  }
 
   Future<Map<String, dynamic>> squad(
     int serverNumber,
     String team,
     String squadName,
-  ) async => Map<String, dynamic>.from(
-    await _authorized(
-          'GET',
-          'servers/$serverNumber/squads/'
-              '${Uri.encodeComponent(team)}/${Uri.encodeComponent(squadName)}',
-        )
-        as Map,
-  );
+  ) async {
+    final result = await _authorized(
+      'GET',
+      'servers/$serverNumber/squads/'
+          '${Uri.encodeComponent(team)}/${Uri.encodeComponent(squadName)}',
+    );
+    if (result is! Map) {
+      throw const CrconApiException(
+        'CRCON hat keine gültigen Squad-Daten geliefert.',
+      );
+    }
+    return Map<String, dynamic>.from(result);
+  }
 
   Future<dynamic> _authorized(
     String method,

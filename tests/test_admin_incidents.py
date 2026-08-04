@@ -129,7 +129,24 @@ def test_parser_recognizes_reporter_team_squad_and_captures_members():
     assert len(subject["snapshot"]["players"]) == 2
 
 
-@pytest.mark.parametrize("squad_name", ["Able", "Baker", "Charlie", "George", "Item"])
+@pytest.mark.parametrize(
+    "squad_name",
+    [
+        "Able",
+        "Baker",
+        "Charlie",
+        "Dog",
+        "Easy",
+        "Fox",
+        "George",
+        "How",
+        "Item",
+        "Jig",
+        "King",
+        "Love",
+        "Mike",
+    ],
+)
 def test_parser_recognizes_every_squad_from_live_team_view(squad_name):
     current_squads = incidents.flatten_team_view(
         {
@@ -240,6 +257,49 @@ def test_fuzzy_player_is_never_confirmed_automatically():
     assert parsed["target_id"] is None
     assert parsed["subjects"][0]["state"] == "suggested"
     assert parsed["subjects"][0]["match_method"] == "fuzzy"
+
+
+def test_fuzzy_squad_is_never_confirmed_or_action_target():
+    parsed = incidents.parse_chat_report(
+        "!admin Bakre spricht nicht",
+        reporter_context={"team": "Allies"},
+        current_squads=[
+            {
+                "name": "Baker",
+                "team": "Allies",
+                "type": "infantry",
+                "has_leader": False,
+                "players": [],
+            }
+        ],
+    )
+    assert parsed["target_id"] is None
+    assert parsed["subjects"][0]["kind"] == "squad"
+    assert parsed["subjects"][0]["state"] == "suggested"
+    assert parsed["subjects"][0]["match_method"] == "squad_fuzzy"
+
+
+def test_player_and_squad_name_collision_keeps_both_contexts():
+    parsed = incidents.parse_chat_report(
+        "!admin Able meldet einen Vorfall",
+        reporter_context={"team": "Allies"},
+        current_players=[
+            {"name": "Able", "player_id": "able-player", "team": "Allies"}
+        ],
+        current_squads=[
+            {
+                "name": "Able",
+                "team": "Allies",
+                "type": "infantry",
+                "has_leader": False,
+                "players": [],
+            }
+        ],
+    )
+    assert {(subject["kind"], subject["state"]) for subject in parsed["subjects"]} == {
+        ("player", "confirmed"),
+        ("squad", "confirmed"),
+    }
 
 
 def test_duplicate_chat_report_is_collapsed_for_sixty_seconds(incident_database):
