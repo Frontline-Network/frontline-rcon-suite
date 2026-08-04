@@ -305,6 +305,65 @@ class MobileContextTests(TestCase):
         self.assertEqual(response.json()["result"]["squad_name"], "Item")
         self.assertEqual(len(response.json()["result"]["players"]), 1)
 
+    @patch.dict("os.environ", {"MOBILE_CONTEXT_V2": "enabled"})
+    @patch("api.mobile_incidents.record_mobile_audit")
+    @patch("api.mobile_incidents.create_incident")
+    @patch("api.mobile_incidents._rcon_api")
+    def test_manual_incident_resolves_dynamic_squad_and_player(
+        self, get_rcon_api, create_incident, _audit
+    ):
+        get_rcon_api.return_value.get_detailed_players.return_value = {
+            "players": {
+                "biene-id": {
+                    "player_id": "biene-id",
+                    "name": "Biene",
+                    "team": "Allies",
+                    "unit_name": "George",
+                }
+            }
+        }
+        get_rcon_api.return_value.get_team_view.return_value = {
+            "Allies": {
+                "squads": {
+                    "George": {
+                        "type": "infantry",
+                        "has_leader": False,
+                        "players": [
+                            {
+                                "player_id": "biene-id",
+                                "name": "Biene",
+                                "team": "Allies",
+                                "unit_name": "George",
+                            }
+                        ],
+                    }
+                }
+            },
+            "Axis": {"squads": {}},
+            "fail_count": 0,
+        }
+        create_incident.return_value = (
+            {"id": "incident-id", "server_number": 1, "revision": 1},
+            True,
+        )
+
+        response = self.client.post(
+            "/api/mobile/v1/incidents",
+            data=json.dumps({"server_number": 1, "reason": "George meldet Biene"}),
+            content_type="application/json",
+            HTTP_IDEMPOTENCY_KEY="manual-context-1",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        arguments = create_incident.call_args.kwargs
+        subjects = arguments["subjects"]
+        self.assertEqual(
+            {(subject["kind"], subject["display_name"]) for subject in subjects},
+            {("squad", "George"), ("player", "Biene")},
+        )
+        self.assertTrue(all(subject["state"] == "confirmed" for subject in subjects))
+        self.assertEqual(arguments["raw_message"], "George meldet Biene")
+
     @patch("api.mobile_incidents.record_mobile_audit")
     @patch("api.mobile_incidents.mutate_incident_subject")
     def test_subject_confirmation_uses_revision_and_idempotency(

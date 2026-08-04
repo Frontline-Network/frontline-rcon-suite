@@ -1,3 +1,5 @@
+import logging
+import os
 from datetime import datetime
 
 from django.contrib.auth.models import User
@@ -11,10 +13,12 @@ from rcon.admin_incidents import (
     complete_incident_action,
     confirmed_action_subject,
     create_incident,
+    flatten_team_view,
     get_incident,
     list_incidents,
     mutate_incident,
     mutate_incident_subject,
+    parse_chat_report,
     reserve_incident_action,
 )
 from rcon.utils import get_server_number
@@ -23,8 +27,10 @@ from .auth import api_response, login_required
 from .decorators import require_http_methods
 from .mobile import _error, _json_body, _require_enabled
 from .mobile_audit import record_mobile_audit
-from .mobile_context import incident_live_context
+from .mobile_context import _rcon_api, incident_live_context
 from .multi_servers import forward_mobile_request_to_server
+
+logger = logging.getLogger("rconweb")
 
 ACTION_PERMISSIONS = {
     "message": "api.can_message_players",
@@ -43,6 +49,36 @@ def _parse_datetime(value: str | None):
     if not value:
         return None
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def _manual_incident_context(reason: str) -> dict:
+    context_mode = os.getenv("MOBILE_CONTEXT_V2", "disabled").strip().lower()
+    if context_mode in {"1", "true", "on", "enabled"}:
+        context_mode = "enabled"
+    elif context_mode != "shadow":
+        return {"subjects": [], "target_id": None, "target_name": None}
+    try:
+        api = _rcon_api()
+        detailed = api.get_detailed_players()
+        players = list((detailed.get("players") or {}).values())
+        squads = flatten_team_view(api.get_team_view())
+        parsed = parse_chat_report(
+            f"!admin {reason}",
+            current_players=players,
+            current_squads=squads,
+            reporter_context={},
+            context_mode=context_mode,
+        )
+        if parsed:
+            return {
+                "subjects": parsed["subjects"],
+                "target_id": parsed["target_id"],
+                "target_name": parsed["target_name"],
+            }
+    except Exception:
+        # A temporary RCON failure must not prevent a manual general incident.
+        logger.exception("Unable to resolve context for manual mobile incident")
+    return {"subjects": [], "target_id": None, "target_name": None}
 
 
 @csrf_exempt
@@ -73,15 +109,36 @@ def incidents(request):
         return _error(command, "Missing incident create permission", 403)
     try:
         data = _json_body(request)
+        server_number = int(data.get("server_number", get_server_number()))
+        if server_number != int(get_server_number()) and not data.get("forwarded"):
+            try:
+                response = forward_mobile_request_to_server(
+                    request,
+                    server_number,
+                    request.path,
+                    data=data,
+                    method="POST",
+                )
+            except ValueError as exc:
+                return _error(command, str(exc), 503)
+            return HttpResponse(
+                content=response.content,
+                status=response.status_code,
+                content_type=response.headers.get("content-type", "application/json"),
+            )
+        reason = str(data["reason"])
+        context = _manual_incident_context(reason)
         result, created = create_incident(
-            server_number=int(data.get("server_number", get_server_number())),
+            server_number=server_number,
             source="manual",
-            reason=str(data["reason"]),
+            reason=reason,
+            raw_message=reason,
             actor=request.user.username,
             reporter_id=data.get("reporter_id"),
             reporter_name=data.get("reporter_name"),
-            target_id=data.get("target_id"),
-            target_name=data.get("target_name"),
+            target_id=data.get("target_id") or context["target_id"],
+            target_name=data.get("target_name") or context["target_name"],
+            subjects=context["subjects"],
             idempotency_key=request.headers.get("Idempotency-Key", ""),
         )
     except (KeyError, TypeError, ValueError) as exc:
