@@ -1,14 +1,18 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:share_plus/share_plus.dart';
 
+import 'app_logger.dart';
 import 'crcon_api.dart';
 import 'frontline_theme.dart';
 import 'live_updates.dart';
@@ -25,10 +29,35 @@ extension FrontlineCopy on BuildContext {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppLogger.instance.initialize();
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    AppLogger.instance.error(
+      'flutter',
+      details.exception,
+      message: details.context?.toDescription(),
+      stackTrace: details.stack,
+    );
+  };
+  PlatformDispatcher.instance.onError = (error, stackTrace) {
+    AppLogger.instance.error(
+      'platform',
+      error,
+      message: 'Unhandled asynchronous error',
+      stackTrace: stackTrace,
+    );
+    return false;
+  };
+  AppLogger.instance.info('app', 'Application started');
   try {
     await Firebase.initializeApp();
     await FirebaseMessaging.instance.requestPermission();
-  } catch (_) {
+  } catch (error) {
+    AppLogger.instance.warning(
+      'push',
+      'Firebase is not configured; push remains optional',
+      error: error,
+    );
     // Push remains optional until a deployment supplies its Firebase config.
   }
   runApp(const ProviderScope(child: CrconMobileApp()));
@@ -41,6 +70,7 @@ final _router = GoRouter(
     GoRoute(path: '/pair', builder: (_, _) => const PairingScreen()),
     GoRoute(path: '/inbox', builder: (_, _) => const InboxScreen()),
     GoRoute(path: '/players', builder: (_, _) => const PlayerSearchScreen()),
+    GoRoute(path: '/diagnostics', builder: (_, _) => const DiagnosticsScreen()),
     GoRoute(
       path: '/players/:connectionId/:playerId',
       builder: (_, state) => PlayerProfileScreen(
@@ -101,7 +131,12 @@ class _CrconMobileAppState extends ConsumerState<CrconMobileApp> {
         (_) => _rotatePushIdentity(),
       );
       unawaited(_rotatePushIdentity());
-    } catch (_) {
+    } catch (error) {
+      AppLogger.instance.warning(
+        'push',
+        'Firebase listeners are unavailable',
+        error: error,
+      );
       // No-op in self-hosted builds without Firebase configuration.
     }
   }
@@ -123,11 +158,21 @@ class _CrconMobileAppState extends ConsumerState<CrconMobileApp> {
             profile,
             ref.read(secureStoreProvider),
           ).updatePushIdentity(identity.handle, identity.capability);
-        } catch (_) {
+        } catch (error) {
+          AppLogger.instance.warning(
+            'push',
+            'Could not update push identity for ${profile.baseUrl}',
+            error: error,
+          );
           // One unavailable CRCON connection must not block the others.
         }
       }
-    } catch (_) {
+    } catch (error) {
+      AppLogger.instance.warning(
+        'push',
+        'Push identity rotation failed',
+        error: error,
+      );
       // Push remains optional; no write is queued for a later automatic retry.
     }
   }
@@ -222,6 +267,179 @@ class _LanguageButton extends ConsumerWidget {
   );
 }
 
+class DiagnosticsScreen extends StatelessWidget {
+  const DiagnosticsScreen({super.key});
+
+  Future<void> _copy(BuildContext context) async {
+    await Clipboard.setData(
+      ClipboardData(text: AppLogger.instance.exportText()),
+    );
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.tr('Diagnoseprotokoll kopiert.', 'Diagnostics log copied.'),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _share(BuildContext context) async {
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          subject: 'Frontline CRCON Admin diagnostics',
+          text: AppLogger.instance.exportText(),
+        ),
+      );
+    } catch (error, stackTrace) {
+      AppLogger.instance.error(
+        'diagnostics',
+        error,
+        message: 'Sharing the diagnostics failed',
+        stackTrace: stackTrace,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    }
+  }
+
+  Future<void> _clear(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(context.tr('Protokoll löschen?', 'Clear diagnostics?')),
+        content: Text(
+          context.tr(
+            'Alle lokal gespeicherten Diagnoseeinträge werden entfernt.',
+            'All locally stored diagnostic entries will be removed.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(context.tr('Abbrechen', 'Cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(context.tr('Löschen', 'Clear')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await AppLogger.instance.clear();
+  }
+
+  Color _levelColor(AppLogLevel level) => switch (level) {
+    AppLogLevel.info => FrontlineTheme.muted,
+    AppLogLevel.warning => FrontlineTheme.warning,
+    AppLogLevel.error => const Color(0xffe06f65),
+  };
+
+  IconData _levelIcon(AppLogLevel level) => switch (level) {
+    AppLogLevel.info => Icons.info_outline,
+    AppLogLevel.warning => Icons.warning_amber_outlined,
+    AppLogLevel.error => Icons.error_outline,
+  };
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: Text(context.tr('Diagnoseprotokoll', 'Diagnostics log')),
+      actions: [
+        IconButton(
+          tooltip: context.tr('Kopieren', 'Copy'),
+          onPressed: () => _copy(context),
+          icon: const Icon(Icons.copy_outlined),
+        ),
+        IconButton(
+          tooltip: context.tr('Teilen', 'Share'),
+          onPressed: () => _share(context),
+          icon: const Icon(Icons.share_outlined),
+        ),
+        IconButton(
+          tooltip: context.tr('Löschen', 'Clear'),
+          onPressed: () => _clear(context),
+          icon: const Icon(Icons.delete_outline),
+        ),
+      ],
+    ),
+    body: AnimatedBuilder(
+      animation: AppLogger.instance.revision,
+      builder: (context, _) {
+        final entries = AppLogger.instance.entries;
+        return Column(
+          children: [
+            Container(
+              width: double.infinity,
+              color: FrontlineTheme.surfaceHigh,
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                context.tr(
+                  'Enthält lokale App-, Netzwerk- und Fehlerereignisse. Zugangsdaten und Pairing-Geheimnisse werden automatisch geschwärzt.',
+                  'Contains local app, network and error events. Credentials and pairing secrets are automatically redacted.',
+                ),
+                style: const TextStyle(color: FrontlineTheme.muted),
+              ),
+            ),
+            Expanded(
+              child: entries.isEmpty
+                  ? Center(
+                      child: Text(
+                        context.tr(
+                          'Noch keine Diagnoseeinträge.',
+                          'No diagnostic entries yet.',
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(12),
+                      itemCount: entries.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 6),
+                      itemBuilder: (context, index) {
+                        final entry = entries[index];
+                        final time = TimeOfDay.fromDateTime(
+                          entry.timestamp.toLocal(),
+                        ).format(context);
+                        return Card(
+                          child: ExpansionTile(
+                            leading: Icon(
+                              _levelIcon(entry.level),
+                              color: _levelColor(entry.level),
+                            ),
+                            title: Text(
+                              entry.message,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text('$time · ${entry.category}'),
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  0,
+                                  16,
+                                  16,
+                                ),
+                                child: SelectableText(entry.formatted),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+}
+
 class ConnectionsScreen extends ConsumerWidget {
   const ConnectionsScreen({super.key});
 
@@ -229,7 +447,16 @@ class ConnectionsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profiles = ref.watch(connectionsProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('CRCON connections')),
+      appBar: AppBar(
+        title: const Text('CRCON connections'),
+        actions: [
+          IconButton(
+            tooltip: context.tr('Diagnoseprotokoll', 'Diagnostics log'),
+            onPressed: () => context.push('/diagnostics'),
+            icon: const Icon(Icons.bug_report_outlined),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/pair'),
         icon: const Icon(Icons.qr_code_scanner),
@@ -739,6 +966,11 @@ class InboxScreen extends ConsumerWidget {
           IconButton(
             onPressed: () => context.push('/connections'),
             icon: const Icon(Icons.dns),
+          ),
+          IconButton(
+            tooltip: context.tr('Diagnoseprotokoll', 'Diagnostics log'),
+            onPressed: () => context.push('/diagnostics'),
+            icon: const Icon(Icons.bug_report_outlined),
           ),
         ],
       ),

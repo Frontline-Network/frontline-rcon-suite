@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
+import 'app_logger.dart';
 import 'models.dart';
 import 'secure_store.dart';
 
@@ -30,7 +31,7 @@ class PairingSession {
 
 class CrconApi {
   CrconApi(this.profile, this.store)
-    : _dio = Dio(
+    : _dio = _diagnosticDio(
         BaseOptions(
           baseUrl: '${profile.baseUrl}/api/mobile/v1/',
           connectTimeout: const Duration(seconds: 8),
@@ -61,13 +62,13 @@ class CrconApi {
     String pushCapability = '',
   }) async {
     validateProductionUrl(payload.baseUrl);
-    final response = await Dio().post<Map<String, dynamic>>(
+    final response = await _diagnosticDio().post<Map<String, dynamic>>(
       '${payload.baseUrl}/api/mobile/v1/pairings/${payload.pairingId}/scan',
       data: {
         'secret': payload.secret,
         'device_name': deviceName,
         'platform': platform,
-        'app_version': '0.1.1',
+        'app_version': '0.1.2',
         'push_handle': pushHandle,
         'push_capability': pushCapability,
       },
@@ -87,7 +88,7 @@ class CrconApi {
     PairingSession session,
     SecureConnectionStore store,
   ) async {
-    final response = await Dio().post<Map<String, dynamic>>(
+    final response = await _diagnosticDio().post<Map<String, dynamic>>(
       '${session.payload.baseUrl}/api/mobile/v1/pairings/'
       '${session.payload.pairingId}/exchange',
       data: {'exchange_token': session.exchangeToken},
@@ -340,6 +341,11 @@ dynamic decodeCrconResponse(Response<dynamic> response) {
       payload = jsonDecode(payload);
     } on FormatException {
       final status = response.statusCode;
+      AppLogger.instance.warning(
+        'api',
+        'CRCON returned non-JSON data for ${response.requestOptions.method} '
+            '${response.requestOptions.uri.path} (HTTP ${status ?? 'unknown'})',
+      );
       throw CrconApiException(
         status == HttpStatus.notFound
             ? 'CRCON Mobile API ist noch nicht auf dem benötigten Stand.'
@@ -349,6 +355,11 @@ dynamic decodeCrconResponse(Response<dynamic> response) {
     }
   }
   if (payload is! Map) {
+    AppLogger.instance.warning(
+      'api',
+      'CRCON returned ${payload.runtimeType} instead of an envelope for '
+          '${response.requestOptions.method} ${response.requestOptions.uri.path}',
+    );
     throw CrconApiException(
       'CRCON hat ein unerwartetes Antwortformat geliefert.',
       statusCode: response.statusCode,
@@ -364,4 +375,61 @@ dynamic decodeCrconResponse(Response<dynamic> response) {
     );
   }
   return envelope['result'];
+}
+
+Dio _diagnosticDio([BaseOptions? options]) {
+  final dio = Dio(options);
+  dio.interceptors.add(_DiagnosticInterceptor());
+  return dio;
+}
+
+class _DiagnosticInterceptor extends Interceptor {
+  static const _startedAtKey = 'diagnostics_started_at';
+
+  String _requestLabel(RequestOptions options) =>
+      '${options.method.toUpperCase()} ${options.uri.host}${options.uri.path}';
+
+  int? _elapsedMilliseconds(RequestOptions options) {
+    final startedAt = options.extra[_startedAtKey];
+    return startedAt is int
+        ? DateTime.now().millisecondsSinceEpoch - startedAt
+        : null;
+  }
+
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    options.extra[_startedAtKey] = DateTime.now().millisecondsSinceEpoch;
+    AppLogger.instance.info('api', '${_requestLabel(options)} started');
+    handler.next(options);
+  }
+
+  @override
+  void onResponse(
+    Response<dynamic> response,
+    ResponseInterceptorHandler handler,
+  ) {
+    final elapsed = _elapsedMilliseconds(response.requestOptions);
+    AppLogger.instance.info(
+      'api',
+      '${_requestLabel(response.requestOptions)} -> '
+          'HTTP ${response.statusCode ?? 'unknown'}'
+          '${elapsed == null ? '' : ' in ${elapsed}ms'}',
+    );
+    handler.next(response);
+  }
+
+  @override
+  void onError(DioException error, ErrorInterceptorHandler handler) {
+    final elapsed = _elapsedMilliseconds(error.requestOptions);
+    AppLogger.instance.error(
+      'api',
+      error.type,
+      message:
+          '${_requestLabel(error.requestOptions)} failed'
+          '${error.response?.statusCode == null ? '' : ' with HTTP ${error.response!.statusCode}'}'
+          '${elapsed == null ? '' : ' after ${elapsed}ms'}',
+      stackTrace: error.stackTrace,
+    );
+    handler.next(error);
+  }
 }
