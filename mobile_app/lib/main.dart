@@ -21,10 +21,69 @@ import 'providers.dart';
 import 'push_relay.dart';
 
 final localeProvider = StateProvider<Locale>((ref) => const Locale('de'));
+bool _firebaseAvailable = false;
 
 extension FrontlineCopy on BuildContext {
   bool get isGerman => Localizations.localeOf(this).languageCode == 'de';
   String tr(String german, String english) => isGerman ? german : english;
+
+  String incidentStatus(String value) => switch (value.toLowerCase()) {
+    'new' => tr('Neu', 'New'),
+    'claimed' => tr('Übernommen', 'Claimed'),
+    'resolved' => tr('Erledigt', 'Resolved'),
+    'dismissed' => tr('Abgewiesen', 'Dismissed'),
+    _ => value,
+  };
+
+  String subjectState(String value) => switch (value.toLowerCase()) {
+    'suggested' => tr('Vorschlag', 'Suggested'),
+    'confirmed' => tr('Bestätigt', 'Confirmed'),
+    'rejected' => tr('Verworfen', 'Rejected'),
+    _ => value,
+  };
+
+  String teamName(String? value) => switch (value?.toLowerCase()) {
+    'allies' || 'allied' => tr('Alliierte', 'Allies'),
+    'axis' => tr('Achsenmächte', 'Axis'),
+    _ => value ?? '—',
+  };
+
+  String squadTypeName(String? value) =>
+      switch (value?.replaceAll(RegExp(r'[_ -]'), '').toLowerCase()) {
+        'infantry' => tr('Infanterie', 'Infantry'),
+        'recon' => tr('Aufklärung', 'Recon'),
+        'armor' || 'armour' => tr('Panzer', 'Armor'),
+        'commander' => tr('Kommandant', 'Commander'),
+        'artillery' => tr('Artillerie', 'Artillery'),
+        'squad' => tr('Squad', 'Squad'),
+        _ => value ?? tr('Squad', 'Squad'),
+      };
+
+  String squadName(String? value) {
+    final squad = value?.trim();
+    if (squad == null || squad.isEmpty) return '—';
+    return RegExp(r'^[a-z]+$').hasMatch(squad)
+        ? '${squad[0].toUpperCase()}${squad.substring(1)}'
+        : squad;
+  }
+
+  String roleName(String? value) =>
+      switch (value?.replaceAll(RegExp(r'[_ -]'), '').toLowerCase()) {
+        'officer' => tr('Squadleader', 'Squad leader'),
+        'tankcommander' => tr('Panzerkommandant', 'Tank commander'),
+        'spotter' => tr('Späher', 'Spotter'),
+        'commander' => tr('Kommandant', 'Commander'),
+        'rifleman' => tr('Schütze', 'Rifleman'),
+        'assault' => tr('Sturmtrupp', 'Assault'),
+        'automaticrifleman' => tr('MG-Schütze', 'Automatic rifleman'),
+        'machinegunner' => tr('MG-Schütze', 'Machine gunner'),
+        'medic' => tr('Sanitäter', 'Medic'),
+        'support' => tr('Unterstützung', 'Support'),
+        'engineer' => tr('Pionier', 'Engineer'),
+        'antitank' => tr('Panzerabwehr', 'Anti-tank'),
+        'crewman' => tr('Panzerbesatzung', 'Crewman'),
+        _ => value ?? '—',
+      };
 }
 
 Future<void> main() async {
@@ -49,16 +108,23 @@ Future<void> main() async {
     return false;
   };
   AppLogger.instance.info('app', 'Application started');
-  try {
-    await Firebase.initializeApp();
-    await FirebaseMessaging.instance.requestPermission();
-  } catch (error) {
-    AppLogger.instance.warning(
+  if (PushRelay.baseUrl.isNotEmpty) {
+    try {
+      await Firebase.initializeApp();
+      await FirebaseMessaging.instance.requestPermission();
+      _firebaseAvailable = true;
+    } catch (error) {
+      AppLogger.instance.warning(
+        'push',
+        'Push relay is configured but Firebase could not start',
+        error: error,
+      );
+    }
+  } else {
+    AppLogger.instance.info(
       'push',
-      'Firebase is not configured; push remains optional',
-      error: error,
+      'Push is disabled for this build; no relay URL is configured',
     );
-    // Push remains optional until a deployment supplies its Firebase config.
   }
   runApp(const ProviderScope(child: CrconMobileApp()));
 }
@@ -117,6 +183,7 @@ class _CrconMobileAppState extends ConsumerState<CrconMobileApp> {
   void initState() {
     super.initState();
     unawaited(_restoreLanguage());
+    if (!_firebaseAvailable) return;
     try {
       _foregroundMessages = FirebaseMessaging.onMessage.listen(_openIncident);
       _openedMessages = FirebaseMessaging.onMessageOpenedApp.listen(
@@ -981,9 +1048,13 @@ class InboxScreen extends ConsumerWidget {
           onRefresh: () async => ref.refresh(inboxProvider.future),
           child: items.isEmpty
               ? ListView(
-                  children: const [
-                    SizedBox(height: 220),
-                    Center(child: Text('No incidents.')),
+                  children: [
+                    const SizedBox(height: 220),
+                    Center(
+                      child: Text(
+                        context.tr('Keine Vorfälle.', 'No incidents.'),
+                      ),
+                    ),
                   ],
                 )
               : ListView.builder(
@@ -1026,7 +1097,7 @@ class InboxScreen extends ConsumerWidget {
                                   if (item.stale)
                                     const Icon(Icons.cloud_off, size: 18)
                                   else
-                                    Text(item.status),
+                                    Text(context.incidentStatus(item.status)),
                                 ],
                               ),
                               const SizedBox(height: 10),
@@ -1047,14 +1118,30 @@ class InboxScreen extends ConsumerWidget {
                                       size: 17,
                                     ),
                                     label: Text(
-                                      primary?.displayName ??
-                                          context.tr('Allgemein', 'General'),
+                                      primary?.kind == 'squad'
+                                          ? context.squadName(
+                                              primary?.squadName ??
+                                                  primary?.displayName,
+                                            )
+                                          : primary?.displayName ??
+                                                context.tr(
+                                                  'Allgemein',
+                                                  'General',
+                                                ),
                                     ),
                                   ),
                                   if (primary?.team != null)
-                                    Chip(label: Text(primary!.team!)),
+                                    Chip(
+                                      label: Text(
+                                        context.teamName(primary!.team),
+                                      ),
+                                    ),
                                   if (primary?.squadName != null)
-                                    Chip(label: Text(primary!.squadName!)),
+                                    Chip(
+                                      label: Text(
+                                        context.squadName(primary!.squadName),
+                                      ),
+                                    ),
                                   if (item.subjects.length > 1)
                                     Chip(
                                       label: Text(
@@ -1217,7 +1304,7 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
                       player['online'] == true
                           ? context.tr('online', 'online')
                           : context.tr('historisch', 'history'),
-                      player['team']?.toString(),
+                      context.teamName(player['team']?.toString()),
                       player['unit_name']?.toString(),
                     ].whereType<String>().join(' · '),
                   ),
@@ -1312,9 +1399,9 @@ class PlayerProfileScreen extends ConsumerWidget {
                     ? null
                     : Text(
                         [
-                              live['team']?.toString(),
+                              context.teamName(live['team']?.toString()),
                               live['unit_name']?.toString(),
-                              live['role']?.toString(),
+                              context.roleName(live['role']?.toString()),
                               if (live['level'] != null) 'Lvl ${live['level']}',
                             ]
                             .whereType<String>()
@@ -1378,9 +1465,16 @@ class PlayerProfileScreen extends ConsumerWidget {
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.comment_outlined),
                       title: Text(
-                        (comment as Map)['comment']?.toString() ??
-                            comment.toString(),
+                        _commentText(comment).isEmpty
+                            ? context.tr(
+                                'Kein Kommentartext',
+                                'No comment text',
+                              )
+                            : _commentText(comment),
                       ),
+                      subtitle: _commentMeta(comment).isEmpty
+                          ? null
+                          : Text(_commentMeta(comment)),
                     ),
                   ),
             ],
@@ -1401,6 +1495,32 @@ class _MetricChip extends StatelessWidget {
     label: Text('$label ${value ?? '—'}'),
     side: BorderSide(color: Theme.of(context).colorScheme.outline),
   );
+}
+
+String _commentText(Object? value) {
+  if (value is! Map) return value?.toString().trim() ?? '';
+  final comment = Map<String, dynamic>.from(value);
+  return (comment['content'] ?? comment['comment'] ?? comment['message'] ?? '')
+      .toString()
+      .trim();
+}
+
+String _commentMeta(Object? value) {
+  if (value is! Map) return '';
+  final comment = Map<String, dynamic>.from(value);
+  final author = (comment['by'] ?? comment['author'] ?? '').toString().trim();
+  final rawTime = (comment['creation_time'] ?? comment['created_at'] ?? '')
+      .toString()
+      .trim();
+  final timestamp = DateTime.tryParse(rawTime)?.toLocal();
+  final formattedTime = timestamp == null
+      ? rawTime
+      : '${timestamp.day.toString().padLeft(2, '0')}.'
+            '${timestamp.month.toString().padLeft(2, '0')}.'
+            '${timestamp.year} '
+            '${timestamp.hour.toString().padLeft(2, '0')}:'
+            '${timestamp.minute.toString().padLeft(2, '0')}';
+  return [formattedTime, author].where((part) => part.isNotEmpty).join(' · ');
 }
 
 class _ProfileCount extends StatelessWidget {
@@ -1440,7 +1560,11 @@ class SquadScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-    appBar: AppBar(title: Text('$team · $squadName')),
+    appBar: AppBar(
+      title: Text(
+        '${context.teamName(team)} · ${context.squadName(squadName)}',
+      ),
+    ),
     body: FutureBuilder<Map<String, dynamic>>(
       future: _load(ref),
       builder: (context, snapshot) {
@@ -1462,12 +1586,15 @@ class SquadScreen extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      squad['squad_name']?.toString() ?? squadName,
+                      context.squadName(
+                        squad['squad_name']?.toString() ?? squadName,
+                      ),
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '${squad['team'] ?? team} · ${squad['type'] ?? 'infantry'} · '
+                      '${context.teamName(squad['team']?.toString() ?? team)} · '
+                      '${context.squadTypeName(squad['type']?.toString())} · '
                       '${players.length} ${context.tr('Mitglieder', 'members')}',
                     ),
                     const SizedBox(height: 8),
@@ -1517,7 +1644,7 @@ class SquadScreen extends ConsumerWidget {
                   title: Text(player['name']?.toString() ?? playerId),
                   subtitle: Text(
                     [
-                      player['role']?.toString(),
+                      context.roleName(player['role']?.toString()),
                       if (player['level'] != null) 'Lvl ${player['level']}',
                       'K ${player['kills'] ?? '—'} / D ${player['deaths'] ?? '—'}',
                     ].whereType<String>().join(' · '),
@@ -1851,11 +1978,15 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
     return value is Map ? Map<String, dynamic>.from(value) : null;
   }
 
-  String _contextLine(Map<String, dynamic> value) => [
-    value['team']?.toString(),
-    value['unit_name']?.toString() ?? value['squad_name']?.toString(),
-    value['role']?.toString(),
-  ].whereType<String>().where((item) => item.isNotEmpty).join(' · ');
+  String _contextLine(Map<String, dynamic> value) =>
+      [
+            context.teamName(value['team']?.toString()),
+            value['unit_name']?.toString() ?? value['squad_name']?.toString(),
+            context.roleName(value['role']?.toString()),
+          ]
+          .whereType<String>()
+          .where((item) => item.isNotEmpty && item != '—')
+          .join(' · ');
 
   Widget _workflow(AdminIncident incident) => Wrap(
     spacing: 8,
@@ -1977,9 +2108,9 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
         final thenLine = subject.kind == 'player'
             ? _contextLine(subject.snapshot)
             : [
-                subject.team,
-                subject.squadName,
-                subject.squadType,
+                context.teamName(subject.team),
+                context.squadName(subject.squadName),
+                context.squadTypeName(subject.squadType),
               ].whereType<String>().join(' · ');
         final nowLine = live == null ? '' : _contextLine(live);
         final percent = subject.confidence == null
@@ -2001,13 +2132,19 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                         ? Theme.of(context).disabledColor
                         : FrontlineTheme.warning,
                   ),
-                  title: Text(subject.displayName),
+                  title: Text(
+                    subject.kind == 'squad'
+                        ? context.squadName(
+                            subject.squadName ?? subject.displayName,
+                          )
+                        : subject.displayName,
+                  ),
                   subtitle: Text(
                     [
                       subject.kind == 'squad'
                           ? context.tr('Squad', 'Squad')
                           : context.tr('Spieler', 'Player'),
-                      subject.state,
+                      context.subjectState(subject.state),
                       subject.matchMethod,
                       if (percent != null) '$percent %',
                     ].whereType<String>().join(' · '),
@@ -2120,9 +2257,12 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
               Card(
                 child: ListTile(
                   leading: const Icon(Icons.groups_2),
-                  title: Text('${subject.team ?? '—'} · ${subject.squadName}'),
+                  title: Text(
+                    '${context.teamName(subject.team)} · '
+                    '${context.squadName(subject.squadName)}',
+                  ),
                   subtitle: Text(
-                    '${subject.squadType ?? 'squad'} · '
+                    '${context.squadTypeName(subject.squadType)} · '
                     '${oldPlayers.length} ${context.tr('damals', 'then')} · '
                     '${livePlayers.length} ${context.tr('jetzt', 'now')}',
                   ),
@@ -2140,7 +2280,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                   ),
                   title: Text(player['name']?.toString() ?? playerId),
                   subtitle: Text(
-                    '${player['role'] ?? '—'} · '
+                    '${context.roleName(player['role']?.toString())} · '
                     '${onlineInSquad ? context.tr('unverändert', 'unchanged') : context.tr('offline/gewechselt', 'offline/moved')}',
                   ),
                   trailing: subject.state != 'confirmed' || playerId.isEmpty
@@ -2205,7 +2345,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                   ),
                   title: Text(player['name']?.toString() ?? playerId),
                   subtitle: Text(
-                    '${player['role'] ?? '—'} · '
+                    '${context.roleName(player['role']?.toString())} · '
                     '${context.tr('seit der Meldung beigetreten', 'joined since report')}',
                   ),
                   trailing: playerId.isEmpty
@@ -2380,7 +2520,11 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                                     'Server ${incident.serverNumber}',
                                   ),
                                 ),
-                                Chip(label: Text(incident.status)),
+                                Chip(
+                                  label: Text(
+                                    context.incidentStatus(incident.status),
+                                  ),
+                                ),
                                 if (incident.primarySubject != null)
                                   Chip(
                                     avatar: Icon(
@@ -2390,7 +2534,18 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                                       size: 18,
                                     ),
                                     label: Text(
-                                      incident.primarySubject!.displayName,
+                                      incident.primarySubject!.kind == 'squad'
+                                          ? context.squadName(
+                                              incident
+                                                      .primarySubject!
+                                                      .squadName ??
+                                                  incident
+                                                      .primarySubject!
+                                                      .displayName,
+                                            )
+                                          : incident
+                                                .primarySubject!
+                                                .displayName,
                                     ),
                                   ),
                                 if (incident.suggestedCount > 0)

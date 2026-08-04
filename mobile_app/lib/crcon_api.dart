@@ -43,6 +43,7 @@ class CrconApi {
   final ConnectionProfile profile;
   final SecureConnectionStore store;
   final Dio _dio;
+  static final Map<String, Future<void>> _refreshes = {};
 
   static void validateProductionUrl(String baseUrl) {
     final uri = Uri.parse(baseUrl);
@@ -68,7 +69,7 @@ class CrconApi {
         'secret': payload.secret,
         'device_name': deviceName,
         'platform': platform,
-        'app_version': '0.1.2',
+        'app_version': '0.1.4',
         'push_handle': pushHandle,
         'push_capability': pushCapability,
       },
@@ -320,6 +321,20 @@ class CrconApi {
   }
 
   Future<void> _refresh() async {
+    final inFlight = _refreshes[profile.id];
+    if (inFlight != null) return inFlight;
+    final refresh = _refreshTokens();
+    _refreshes[profile.id] = refresh;
+    try {
+      await refresh;
+    } finally {
+      if (identical(_refreshes[profile.id], refresh)) {
+        _refreshes.remove(profile.id);
+      }
+    }
+  }
+
+  Future<void> _refreshTokens() async {
     final refreshToken = await store.refreshToken(profile.id);
     final response = await _dio.post<Map<String, dynamic>>(
       'tokens/refresh',
@@ -421,15 +436,22 @@ class _DiagnosticInterceptor extends Interceptor {
   @override
   void onError(DioException error, ErrorInterceptorHandler handler) {
     final elapsed = _elapsedMilliseconds(error.requestOptions);
-    AppLogger.instance.error(
-      'api',
-      error.type,
-      message:
-          '${_requestLabel(error.requestOptions)} failed'
-          '${error.response?.statusCode == null ? '' : ' with HTTP ${error.response!.statusCode}'}'
-          '${elapsed == null ? '' : ' after ${elapsed}ms'}',
-      stackTrace: error.stackTrace,
-    );
+    final message =
+        '${_requestLabel(error.requestOptions)} failed'
+        '${error.response?.statusCode == null ? '' : ' with HTTP ${error.response!.statusCode}'}'
+        '${elapsed == null ? '' : ' after ${elapsed}ms'}';
+    if (error.type == DioExceptionType.connectionError ||
+        error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.receiveTimeout) {
+      AppLogger.instance.warning('api', '$message (network unavailable)');
+    } else {
+      AppLogger.instance.error(
+        'api',
+        error.type,
+        message: message,
+        stackTrace: error.stackTrace,
+      );
+    }
     handler.next(error);
   }
 }

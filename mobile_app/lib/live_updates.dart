@@ -68,14 +68,23 @@ class CrconLiveUpdates {
         }
       } catch (error, stackTrace) {
         if (_stopped) return;
-        AppLogger.instance.error(
-          'websocket',
-          error,
-          message:
-              'Live updates for ${Uri.parse(profile.baseUrl).host} failed; '
-              'retrying in ${retrySeconds}s',
-          stackTrace: stackTrace,
-        );
+        final message =
+            'Live updates for ${Uri.parse(profile.baseUrl).host} failed; '
+            'retrying in ${retrySeconds}s';
+        if (error is SocketException ||
+            error.toString().contains('Failed host lookup')) {
+          AppLogger.instance.warning(
+            'websocket',
+            '$message (network unavailable)',
+          );
+        } else {
+          AppLogger.instance.error(
+            'websocket',
+            error,
+            message: message,
+            stackTrace: stackTrace,
+          );
+        }
       } finally {
         _socket = null;
       }
