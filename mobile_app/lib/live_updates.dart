@@ -68,6 +68,14 @@ class CrconLiveUpdates {
         }
       } catch (error, stackTrace) {
         if (_stopped) return;
+        if (error is CrconAuthException) {
+          AppLogger.instance.warning(
+            'websocket',
+            'Live updates for ${Uri.parse(profile.baseUrl).host} stopped; '
+                'device pairing is no longer valid',
+          );
+          return;
+        }
         final message =
             'Live updates for ${Uri.parse(profile.baseUrl).host} failed; '
             'retrying in ${retrySeconds}s';

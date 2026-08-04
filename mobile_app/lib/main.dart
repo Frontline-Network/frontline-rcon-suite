@@ -1036,33 +1036,39 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
       ref.invalidate(inboxProvider);
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
     } finally {
       if (mounted) setState(() => _claimingIncidentId = null);
     }
   }
 
-  List<AdminIncident> _filtered(List<AdminIncident> items) => items.where((item) {
-    if (_connectionId != null && item.connectionId != _connectionId) {
-      return false;
-    }
-    return switch (_scope) {
-      _InboxScope.all => true,
-      _InboxScope.players => item.subjects.any((subject) => subject.kind == 'player'),
-      _InboxScope.squads => item.subjects.any((subject) => subject.kind == 'squad'),
-    };
-  }).toList();
+  List<AdminIncident> _filtered(List<AdminIncident> items) =>
+      items.where((item) {
+        if (_connectionId != null && item.connectionId != _connectionId) {
+          return false;
+        }
+        return switch (_scope) {
+          _InboxScope.all => true,
+          _InboxScope.players => item.subjects.any(
+            (subject) => subject.kind == 'player',
+          ),
+          _InboxScope.squads => item.subjects.any(
+            (subject) => subject.kind == 'squad',
+          ),
+        };
+      }).toList();
 
   @override
   Widget build(BuildContext context) {
     final inbox = ref.watch(inboxProvider);
     final profiles = ref.watch(connectionsProvider).valueOrNull ?? const [];
-    final selectedProfile = profiles.where(
-      (profile) => profile.id == _connectionId,
-    ).firstOrNull;
-    final selectedName = selectedProfile?.name ?? context.tr('Alle CRCONs', 'All CRCONs');
+    final selectedProfile = profiles
+        .where((profile) => profile.id == _connectionId)
+        .firstOrNull;
+    final selectedName =
+        selectedProfile?.name ?? context.tr('Alle CRCONs', 'All CRCONs');
 
     return Scaffold(
       appBar: AppBar(
@@ -1090,7 +1096,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
             itemBuilder: (context) => [
               PopupMenuItem(
                 value: 'connections',
-                child: Text(context.tr('CRCON-Verbindungen', 'CRCON connections')),
+                child: Text(
+                  context.tr('CRCON-Verbindungen', 'CRCON connections'),
+                ),
               ),
               PopupMenuItem(
                 value: 'diagnostics',
@@ -1131,7 +1139,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
           final openCount = items
               .where((item) => !{'resolved', 'dismissed'}.contains(item.status))
               .length;
-          final claimedCount = items.where((item) => item.status == 'claimed').length;
+          final claimedCount = items
+              .where((item) => item.status == 'claimed')
+              .length;
           return RefreshIndicator(
             onRefresh: () async => ref.refresh(inboxProvider.future),
             child: ListView(
@@ -1139,7 +1149,13 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
               children: [
                 Row(
                   children: [
-                    Expanded(child: _connectionSelector(context, profiles, selectedName)),
+                    Expanded(
+                      child: _connectionSelector(
+                        context,
+                        profiles,
+                        selectedName,
+                      ),
+                    ),
                     const SizedBox(width: 10),
                     _OnlineBadge(label: context.tr('Online', 'Online')),
                   ],
@@ -1183,45 +1199,85 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                     ),
                   ],
                   selected: {_scope},
-                  onSelectionChanged: (selected) => setState(() => _scope = selected.first),
+                  onSelectionChanged: (selected) =>
+                      setState(() => _scope = selected.first),
                   showSelectedIcon: false,
                 ),
                 const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        context.tr('Eingehende Meldungen', 'Incoming reports'),
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
+                Container(
+                  decoration: BoxDecoration(
+                    color: FrontlineTheme.surface,
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outline,
                     ),
-                    Text(
-                      context.tr('Neueste zuerst', 'Newest first'),
-                      style: const TextStyle(color: FrontlineTheme.muted),
-                    ),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.sort, size: 18, color: FrontlineTheme.muted),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                if (filtered.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 80),
-                    child: Center(
-                      child: Text(
-                        items.isEmpty
-                            ? context.tr('Keine Vorfälle.', 'No incidents.')
-                            : context.tr('Keine Meldungen in diesem Filter.', 'No reports in this filter.'),
-                      ),
-                    ),
-                  )
-                else
-                  _IncidentList(
-                    items: filtered,
-                    profiles: profiles,
-                    claimingIncidentId: _claimingIncidentId,
-                    onClaim: _claim,
+                    borderRadius: BorderRadius.circular(8),
                   ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 14, 14),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                context.tr(
+                                  'Eingehende Meldungen',
+                                  'Incoming reports',
+                                ),
+                                maxLines: 1,
+                                softWrap: false,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              context.tr('Neueste zuerst', 'Newest first'),
+                              style: const TextStyle(
+                                color: FrontlineTheme.muted,
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.sort,
+                              size: 18,
+                              color: FrontlineTheme.muted,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      if (filtered.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 80),
+                          child: Center(
+                            child: Text(
+                              items.isEmpty
+                                  ? context.tr(
+                                      'Keine Vorfälle.',
+                                      'No incidents.',
+                                    )
+                                  : context.tr(
+                                      'Keine Meldungen in diesem Filter.',
+                                      'No reports in this filter.',
+                                    ),
+                            ),
+                          ),
+                        )
+                      else
+                        _IncidentList(
+                          items: filtered,
+                          profiles: profiles,
+                          claimingIncidentId: _claimingIncidentId,
+                          onClaim: _claim,
+                        ),
+                    ],
+                  ),
+                ),
               ],
             ),
           );
@@ -1235,14 +1291,16 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     List<ConnectionProfile> profiles,
     String selectedName,
   ) => PopupMenuButton<String>(
-    onSelected: (value) => setState(() => _connectionId = value.isEmpty ? null : value),
+    onSelected: (value) =>
+        setState(() => _connectionId = value.isEmpty ? null : value),
     itemBuilder: (context) => [
       PopupMenuItem(
         value: '',
         child: Text(context.tr('Alle CRCONs', 'All CRCONs')),
       ),
       ...profiles.map(
-        (profile) => PopupMenuItem(value: profile.id, child: Text(profile.name)),
+        (profile) =>
+            PopupMenuItem(value: profile.id, child: Text(profile.name)),
       ),
     ],
     child: Container(
@@ -1251,12 +1309,19 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
       decoration: BoxDecoration(
         color: FrontlineTheme.surfaceHigh,
         border: Border.all(color: Theme.of(context).colorScheme.outline),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
           const Icon(Icons.dns_outlined, size: 20),
           const SizedBox(width: 8),
-          Expanded(child: Text(selectedName, maxLines: 1, overflow: TextOverflow.ellipsis)),
+          Expanded(
+            child: Text(
+              selectedName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
           const Icon(Icons.expand_more),
         ],
       ),
@@ -1275,6 +1340,7 @@ class _OnlineBadge extends StatelessWidget {
     decoration: BoxDecoration(
       color: FrontlineTheme.surfaceHigh,
       border: Border.all(color: Theme.of(context).colorScheme.outline),
+      borderRadius: BorderRadius.circular(8),
     ),
     child: Row(
       mainAxisSize: MainAxisSize.min,
@@ -1301,23 +1367,50 @@ class _SummaryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    height: 88,
-    padding: const EdgeInsets.all(12),
+    height: 104,
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
     decoration: BoxDecoration(
       color: FrontlineTheme.surface,
       border: Border.all(color: Theme.of(context).colorScheme.outline),
+      borderRadius: BorderRadius.circular(8),
     ),
     child: Row(
       children: [
-        Icon(icon, color: accent, size: 26),
+        Container(
+          width: 54,
+          height: 54,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: accent, width: 3),
+          ),
+          child: Icon(icon, color: accent, size: 28),
+        ),
         const SizedBox(width: 10),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(value, style: Theme.of(context).textTheme.headlineSmall),
-            Text(label, style: const TextStyle(color: FrontlineTheme.muted)),
-          ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    color: FrontlineTheme.muted,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     ),
@@ -1338,10 +1431,7 @@ class _IncidentList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(
-      color: FrontlineTheme.surface,
-      border: Border.all(color: Theme.of(context).colorScheme.outline),
-    ),
+    color: FrontlineTheme.surface,
     child: Column(
       children: [
         for (var index = 0; index < items.length; index++) ...[
@@ -1388,6 +1478,13 @@ class _IncidentRow extends StatelessWidget {
         ? context.tr('MITTEL', 'MEDIUM')
         : context.tr('NIEDRIG', 'LOW');
 
+    final subjectTitle = primary?.kind == 'squad'
+        ? context.tr('Squadmeldung', 'Squad report')
+        : primary?.kind == 'player'
+        ? context.tr('Spielermeldung', 'Player report')
+        : context.tr('Allgemeine Meldung', 'General report');
+    final displayConnection = connectionName ?? 'CRCON';
+
     return InkWell(
       onTap: () => context.push('/incidents/${item.connectionId}/${item.id}'),
       child: IntrinsicHeight(
@@ -1395,97 +1492,139 @@ class _IncidentRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(width: isNew ? 5 : 2, color: urgencyColor),
-            Expanded(
+            SizedBox(
+              width: 102,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
+                padding: const EdgeInsets.fromLTRB(12, 18, 8, 18),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
                         Icon(Icons.circle, size: 10, color: urgencyColor),
-                        const SizedBox(width: 7),
-                        Text(
-                          urgency,
-                          style: TextStyle(color: urgencyColor, fontWeight: FontWeight.w600),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            urgency,
+                            style: TextStyle(
+                              color: urgencyColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
-                        const SizedBox(width: 10),
-                        Text(
-                          _relativeInboxTime(context, item.updatedAt),
-                          style: const TextStyle(color: FrontlineTheme.muted),
-                        ),
-                        const Spacer(),
-                        if (item.stale)
-                          const Icon(Icons.cloud_off, size: 16, color: FrontlineTheme.muted)
-                        else
-                          Text(context.incidentStatus(item.status)),
                       ],
                     ),
-                    const SizedBox(height: 9),
+                    const SizedBox(height: 18),
+                    Text(
+                      _relativeInboxTime(context, item.updatedAt),
+                      style: const TextStyle(
+                        color: FrontlineTheme.muted,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.dns_outlined,
+                          size: 16,
+                          color: FrontlineTheme.chalk,
+                        ),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            displayConnection,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const VerticalDivider(width: 1, thickness: 1),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 16, 12, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(
-                          primary?.kind == 'squad'
-                              ? Icons.groups_2
-                              : primary == null
-                              ? Icons.support_agent
-                              : Icons.person,
-                          size: 20,
-                          color: FrontlineTheme.chalk,
-                        ),
-                        const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            item.reason,
-                            maxLines: 3,
+                            subjectTitle,
+                            maxLines: 1,
+                            softWrap: false,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleMedium,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                         if (isNew)
                           OutlinedButton(
                             onPressed: claiming ? null : onClaim,
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              minimumSize: Size.zero,
+                            ),
                             child: Text(
                               claiming
                                   ? context.tr('…', '…')
                                   : context.tr('Übernehmen', 'Claim'),
                             ),
-                          ),
+                          )
+                        else
+                          const SizedBox.shrink(),
                       ],
+                    ),
+                    if (!isNew)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          context.incidentStatus(item.status),
+                          style: const TextStyle(
+                            color: FrontlineTheme.muted,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 8),
+                    Text(
+                      item.reason,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 16, height: 1.35),
                     ),
                     const SizedBox(height: 10),
                     Wrap(
                       spacing: 6,
                       runSpacing: 6,
                       children: [
-                        _ContextChip(
-                          icon: Icons.dns_outlined,
-                          label: 'Server ${item.serverNumber}',
-                        ),
-                        if (connectionName != null)
+                        for (final subject in item.subjects.take(3))
                           _ContextChip(
-                            icon: Icons.storage_outlined,
-                            label: connectionName!,
-                          ),
-                        if (primary != null)
-                          _ContextChip(
-                            icon: primary.kind == 'squad'
+                            icon: subject.kind == 'squad'
                                 ? Icons.groups_2
                                 : Icons.person,
-                            label: primary.kind == 'squad'
-                                ? context.squadName(primary.squadName ?? primary.displayName)
-                                : primary.displayName,
+                            label: subject.kind == 'squad'
+                                ? context.squadName(
+                                    subject.squadName ?? subject.displayName,
+                                  )
+                                : subject.displayName,
                           ),
-                        if (primary?.team != null)
-                          _ContextChip(
-                            icon: Icons.flag_outlined,
-                            label: context.teamName(primary!.team),
-                          ),
-                        if (item.subjects.length > 1)
+                        if (item.subjects.length > 3)
                           _ContextChip(
                             icon: Icons.more_horiz,
-                            label: '+${item.subjects.length - 1}',
+                            label: '+${item.subjects.length - 3}',
                           ),
                         if (item.suggestedCount > 0)
                           _ContextChip(
@@ -1495,11 +1634,14 @@ class _IncidentRow extends StatelessWidget {
                           ),
                       ],
                     ),
-                    const SizedBox(height: 7),
+                    const SizedBox(height: 8),
                     Text(
                       '${item.reporterName ?? context.tr('manuell', 'manual')}'
                       '${item.assignedTo == null ? '' : ' · ${item.assignedTo}'}',
-                      style: const TextStyle(color: FrontlineTheme.muted),
+                      style: const TextStyle(
+                        color: FrontlineTheme.muted,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
@@ -1513,11 +1655,7 @@ class _IncidentRow extends StatelessWidget {
 }
 
 class _ContextChip extends StatelessWidget {
-  const _ContextChip({
-    required this.icon,
-    required this.label,
-    this.accent,
-  });
+  const _ContextChip({required this.icon, required this.label, this.accent});
   final IconData icon;
   final String label;
   final Color? accent;
@@ -1528,6 +1666,7 @@ class _ContextChip extends StatelessWidget {
     decoration: BoxDecoration(
       color: FrontlineTheme.surfaceHigh,
       border: Border.all(color: Theme.of(context).colorScheme.outline),
+      borderRadius: BorderRadius.circular(5),
     ),
     child: Row(
       mainAxisSize: MainAxisSize.min,
@@ -1544,12 +1683,21 @@ String _relativeInboxTime(BuildContext context, DateTime value) {
   final difference = DateTime.now().difference(value);
   if (difference.inMinutes < 1) return context.tr('gerade eben', 'just now');
   if (difference.inMinutes < 60) {
-    return context.tr('vor ${difference.inMinutes} Min.', '${difference.inMinutes}m ago');
+    return context.tr(
+      'vor ${difference.inMinutes} Min.',
+      '${difference.inMinutes}m ago',
+    );
   }
   if (difference.inHours < 24) {
-    return context.tr('vor ${difference.inHours} Std.', '${difference.inHours}h ago');
+    return context.tr(
+      'vor ${difference.inHours} Std.',
+      '${difference.inHours}h ago',
+    );
   }
-  return context.tr('vor ${difference.inDays} Tg.', '${difference.inDays}d ago');
+  return context.tr(
+    'vor ${difference.inDays} Tg.',
+    '${difference.inDays}d ago',
+  );
 }
 
 class PlayerSearchScreen extends ConsumerStatefulWidget {
@@ -2044,6 +2192,105 @@ bool _isSquadLeader(String? role) => {
   'spotter',
 }.contains(role?.replaceAll(' ', '').toLowerCase());
 
+class _TextInputDialog extends StatefulWidget {
+  const _TextInputDialog({
+    required this.title,
+    required this.label,
+    required this.confirmLabel,
+    this.maxLines = 1,
+  });
+
+  final String title;
+  final String label;
+  final String confirmLabel;
+  final int maxLines;
+
+  @override
+  State<_TextInputDialog> createState() => _TextInputDialogState();
+}
+
+class _TextInputDialogState extends State<_TextInputDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text(widget.title),
+    content: TextField(
+      controller: _controller,
+      autofocus: true,
+      maxLines: widget.maxLines,
+      decoration: InputDecoration(labelText: widget.label),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: Text(context.tr('Abbrechen', 'Cancel')),
+      ),
+      FilledButton(
+        onPressed: () => Navigator.pop(context, _controller.text.trim()),
+        child: Text(widget.confirmLabel),
+      ),
+    ],
+  );
+}
+
+class _LinkTargetDialog extends StatefulWidget {
+  const _LinkTargetDialog();
+
+  @override
+  State<_LinkTargetDialog> createState() => _LinkTargetDialogState();
+}
+
+class _LinkTargetDialogState extends State<_LinkTargetDialog> {
+  final _id = TextEditingController();
+  final _name = TextEditingController();
+
+  @override
+  void dispose() {
+    _id.dispose();
+    _name.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Link target player'),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextField(
+          controller: _name,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Player name'),
+        ),
+        TextField(
+          controller: _id,
+          decoration: const InputDecoration(labelText: 'Player ID'),
+        ),
+      ],
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: Text(context.tr('Abbrechen', 'Cancel')),
+      ),
+      FilledButton(
+        onPressed: () => Navigator.pop(context, {
+          'player_id': _id.text.trim(),
+          'player_name': _name.text.trim(),
+        }),
+        child: const Text('Link'),
+      ),
+    ],
+  );
+}
+
 class IncidentScreen extends ConsumerStatefulWidget {
   const IncidentScreen({
     super.key,
@@ -2144,38 +2391,22 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
   Future<void> _addNote() async {
     final incident = _incident;
     if (incident == null || _busy) return;
-    final controller = TextEditingController();
-    final submit = await showDialog<bool>(
+    final note = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add private admin note'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLines: 4,
-          decoration: const InputDecoration(labelText: 'Note'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Save'),
-          ),
-        ],
+      builder: (_) => const _TextInputDialog(
+        title: 'Add private admin note',
+        label: 'Note',
+        confirmLabel: 'Save',
+        maxLines: 4,
       ),
     );
-    final note = controller.text.trim();
-    controller.dispose();
-    if (submit != true || note.isEmpty) return;
+    if (note == null || note.trim().isEmpty) return;
     setState(() => _busy = true);
     try {
       final payload = await (await _api()).addNote(
         incident.id,
         revision: incident.revision,
-        note: note,
+        note: note.trim(),
       );
       setState(
         () => _incident = AdminIncident.fromJson(payload, widget.connectionId),
@@ -2189,43 +2420,13 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
   }
 
   Future<void> _linkTarget() async {
-    final id = TextEditingController();
-    final name = TextEditingController();
-    final submit = await showDialog<bool>(
+    final result = await showDialog<Map<String, String>>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Link target player'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: name,
-              autofocus: true,
-              decoration: const InputDecoration(labelText: 'Player name'),
-            ),
-            TextField(
-              controller: id,
-              decoration: const InputDecoration(labelText: 'Player ID'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Link'),
-          ),
-        ],
-      ),
+      builder: (_) => const _LinkTargetDialog(),
     );
-    final playerId = id.text.trim();
-    final playerName = name.text.trim();
-    id.dispose();
-    name.dispose();
-    if (submit != true || playerId.isEmpty || playerName.isEmpty) return;
+    final playerId = result?['player_id']?.trim() ?? '';
+    final playerName = result?['player_name']?.trim() ?? '';
+    if (playerId.isEmpty || playerName.isEmpty) return;
     await _mutate('link_target', {
       'target_id': playerId,
       'target_name': playerName,
@@ -2233,32 +2434,16 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
   }
 
   Future<void> _reassign() async {
-    final controller = TextEditingController();
-    final submit = await showDialog<bool>(
+    final username = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reassign incident'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'CRCON username'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Reassign'),
-          ),
-        ],
+      builder: (_) => const _TextInputDialog(
+        title: 'Reassign incident',
+        label: 'CRCON username',
+        confirmLabel: 'Reassign',
       ),
     );
-    final username = controller.text.trim();
-    controller.dispose();
-    if (submit != true || username.isEmpty) return;
-    await _mutate('reassign', {'assigned_to': username});
+    if (username == null || username.trim().isEmpty) return;
+    await _mutate('reassign', {'assigned_to': username.trim()});
   }
 
   Future<void> _action(
@@ -2276,11 +2461,10 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
             ? subject?.displayName
             : subject?.leaderName);
     if (incident == null || subject == null || playerId == null) return;
-    final controller = TextEditingController();
-    final confirmed = await showDialog<bool>(
+    final reason = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(switch (action) {
+      builder: (_) => _TextInputDialog(
+        title: switch (action) {
           'temp_ban' => context.tr('Temporäre Sperre', 'Temporary ban'),
           'perma_ban' => context.tr('Permanente Sperre', 'Permanent ban'),
           'kick' => context.tr('Spieler kicken', 'Kick player'),
@@ -2288,32 +2472,17 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
           'message' => context.tr('Nachricht senden', 'Send message'),
           'comment' => context.tr('Admin-Kommentar', 'Admin comment'),
           _ => action,
-        }),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(
-            labelText: action == 'message'
-                ? 'Message'
-                : action == 'comment'
-                ? 'Admin comment'
-                : 'Required reason',
-          ),
-          maxLines: 3,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Confirm'),
-          ),
-        ],
+        },
+        label: action == 'message'
+            ? 'Message'
+            : action == 'comment'
+            ? 'Admin comment'
+            : 'Required reason',
+        confirmLabel: context.tr('Bestätigen', 'Confirm'),
+        maxLines: 3,
       ),
     );
-    if (confirmed != true || controller.text.trim().isEmpty) return;
+    if (reason == null || reason.trim().isEmpty) return;
     setState(() => _busy = true);
     try {
       await (await _api()).runAction(incident.id, {
@@ -2325,7 +2494,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
             ? 'message'
             : action == 'comment'
             ? 'comment'
-            : 'reason': controller.text
+            : 'reason': reason
             .trim(),
         if (action == 'kick' || action == 'temp_ban' || action == 'perma_ban')
           'confirmed': true,

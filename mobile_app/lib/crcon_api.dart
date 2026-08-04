@@ -18,6 +18,10 @@ class CrconApiException implements Exception {
   String toString() => message;
 }
 
+class CrconAuthException extends CrconApiException {
+  const CrconAuthException(super.message, {super.statusCode});
+}
+
 class PairingSession {
   const PairingSession({
     required this.payload,
@@ -336,16 +340,26 @@ class CrconApi {
 
   Future<void> _refreshTokens() async {
     final refreshToken = await store.refreshToken(profile.id);
-    final response = await _dio.post<Map<String, dynamic>>(
-      'tokens/refresh',
-      data: {'device_id': profile.deviceId, 'refresh_token': refreshToken},
-    );
-    final result = decodeCrconResponse(response);
-    await store.replaceTokens(
-      profile.id,
-      accessToken: result['access_token'].toString(),
-      refreshToken: result['refresh_token'].toString(),
-    );
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        'tokens/refresh',
+        data: {'device_id': profile.deviceId, 'refresh_token': refreshToken},
+      );
+      final result = decodeCrconResponse(response);
+      await store.replaceTokens(
+        profile.id,
+        accessToken: result['access_token'].toString(),
+        refreshToken: result['refresh_token'].toString(),
+      );
+    } on CrconApiException catch (error) {
+      if (error.statusCode == HttpStatus.unauthorized) {
+        throw CrconAuthException(
+          'Die CRCON-Kopplung ist abgelaufen. Bitte dieses Gerät neu koppeln.',
+          statusCode: error.statusCode,
+        );
+      }
+      rethrow;
+    }
   }
 }
 
