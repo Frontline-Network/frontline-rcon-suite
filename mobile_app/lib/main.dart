@@ -1006,178 +1006,550 @@ Future<void> _createManualIncident(BuildContext context, WidgetRef ref) async {
   }
 }
 
-class InboxScreen extends ConsumerWidget {
+enum _InboxScope { all, players, squads }
+
+class InboxScreen extends ConsumerStatefulWidget {
   const InboxScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<InboxScreen> createState() => _InboxScreenState();
+}
+
+class _InboxScreenState extends ConsumerState<InboxScreen> {
+  _InboxScope _scope = _InboxScope.all;
+  String? _connectionId;
+  String? _claimingIncidentId;
+
+  Future<void> _claim(AdminIncident incident) async {
+    if (_claimingIncidentId != null) return;
+    setState(() => _claimingIncidentId = incident.id);
+    try {
+      final profiles = await ref.read(connectionsProvider.future);
+      final profile = profiles.firstWhere(
+        (item) => item.id == incident.connectionId,
+      );
+      await CrconApi(profile, ref.read(secureStoreProvider)).mutateIncident(
+        incident.id,
+        operation: 'claim',
+        revision: incident.revision,
+      );
+      ref.invalidate(inboxProvider);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    } finally {
+      if (mounted) setState(() => _claimingIncidentId = null);
+    }
+  }
+
+  List<AdminIncident> _filtered(List<AdminIncident> items) => items.where((item) {
+    if (_connectionId != null && item.connectionId != _connectionId) {
+      return false;
+    }
+    return switch (_scope) {
+      _InboxScope.all => true,
+      _InboxScope.players => item.subjects.any((subject) => subject.kind == 'player'),
+      _InboxScope.squads => item.subjects.any((subject) => subject.kind == 'squad'),
+    };
+  }).toList();
+
+  @override
+  Widget build(BuildContext context) {
     final inbox = ref.watch(inboxProvider);
+    final profiles = ref.watch(connectionsProvider).valueOrNull ?? const [];
+    final selectedProfile = profiles.where(
+      (profile) => profile.id == _connectionId,
+    ).firstOrNull;
+    final selectedName = selectedProfile?.name ?? context.tr('Alle CRCONs', 'All CRCONs');
+
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _createManualIncident(context, ref),
-        icon: const Icon(Icons.add_alert),
-        label: Text(context.tr('Neuer Vorfall', 'New incident')),
-      ),
       appBar: AppBar(
-        title: Text(context.tr('Vorfall-Inbox', 'Incident inbox')),
+        titleSpacing: 16,
+        title: Row(
+          children: [
+            Image.asset('assets/fln_logo.png', width: 34, height: 34),
+            const SizedBox(width: 10),
+            Text(context.tr('Leitstelle', 'Command center')),
+          ],
+        ),
         actions: [
+          IconButton(
+            tooltip: context.tr('Neuer Vorfall', 'New incident'),
+            onPressed: () => _createManualIncident(context, ref),
+            icon: const Icon(Icons.add_alert_outlined),
+          ),
           const _LanguageButton(),
-          IconButton(
-            onPressed: () => ref.invalidate(inboxProvider),
-            icon: const Icon(Icons.refresh),
+          PopupMenuButton<String>(
+            tooltip: context.tr('Weitere Bereiche', 'More areas'),
+            onSelected: (value) {
+              if (value == 'connections') context.push('/connections');
+              if (value == 'diagnostics') context.push('/diagnostics');
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'connections',
+                child: Text(context.tr('CRCON-Verbindungen', 'CRCON connections')),
+              ),
+              PopupMenuItem(
+                value: 'diagnostics',
+                child: Text(context.tr('Diagnoseprotokoll', 'Diagnostics log')),
+              ),
+            ],
           ),
-          IconButton(
-            onPressed: () => context.push('/players'),
-            icon: const Icon(Icons.person_search),
+        ],
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: 0,
+        onDestinationSelected: (index) {
+          if (index == 1) context.go('/players');
+          if (index == 2) context.go('/connections');
+        },
+        destinations: [
+          NavigationDestination(
+            icon: const Icon(Icons.inbox_outlined),
+            selectedIcon: const Icon(Icons.inbox),
+            label: context.tr('Inbox', 'Inbox'),
           ),
-          IconButton(
-            onPressed: () => context.push('/connections'),
-            icon: const Icon(Icons.dns),
+          NavigationDestination(
+            icon: const Icon(Icons.person_outline),
+            selectedIcon: const Icon(Icons.person),
+            label: context.tr('Spieler', 'Players'),
           ),
-          IconButton(
-            tooltip: context.tr('Diagnoseprotokoll', 'Diagnostics log'),
-            onPressed: () => context.push('/diagnostics'),
-            icon: const Icon(Icons.bug_report_outlined),
+          NavigationDestination(
+            icon: const Icon(Icons.more_horiz),
+            label: context.tr('Mehr', 'More'),
           ),
         ],
       ),
       body: inbox.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => _ErrorView(message: error.toString()),
-        data: (items) => RefreshIndicator(
-          onRefresh: () async => ref.refresh(inboxProvider.future),
-          child: items.isEmpty
-              ? ListView(
+        data: (items) {
+          final filtered = _filtered(items);
+          final openCount = items
+              .where((item) => !{'resolved', 'dismissed'}.contains(item.status))
+              .length;
+          final claimedCount = items.where((item) => item.status == 'claimed').length;
+          return RefreshIndicator(
+            onRefresh: () async => ref.refresh(inboxProvider.future),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+              children: [
+                Row(
                   children: [
-                    const SizedBox(height: 220),
-                    Center(
-                      child: Text(
-                        context.tr('Keine Vorfälle.', 'No incidents.'),
+                    Expanded(child: _connectionSelector(context, profiles, selectedName)),
+                    const SizedBox(width: 10),
+                    _OnlineBadge(label: context.tr('Online', 'Online')),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _SummaryTile(
+                        icon: Icons.priority_high,
+                        value: '$openCount',
+                        label: context.tr('offen', 'open'),
+                        accent: FrontlineTheme.gold,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _SummaryTile(
+                        icon: Icons.check,
+                        value: '$claimedCount',
+                        label: context.tr('übernommen', 'claimed'),
+                        accent: FrontlineTheme.muted,
                       ),
                     ),
                   ],
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: items.length,
-                  itemBuilder: (context, index) {
-                    final item = items[index];
-                    final primary = item.primarySubject;
-                    return Card(
-                      child: InkWell(
-                        onTap: () => context.push(
-                          '/incidents/${item.connectionId}/${item.id}',
+                ),
+                const SizedBox(height: 16),
+                SegmentedButton<_InboxScope>(
+                  segments: [
+                    ButtonSegment(
+                      value: _InboxScope.all,
+                      label: Text(context.tr('Alle', 'All')),
+                    ),
+                    ButtonSegment(
+                      value: _InboxScope.players,
+                      label: Text(context.tr('Spieler', 'Players')),
+                    ),
+                    ButtonSegment(
+                      value: _InboxScope.squads,
+                      label: Text(context.tr('Squads', 'Squads')),
+                    ),
+                  ],
+                  selected: {_scope},
+                  onSelectionChanged: (selected) => setState(() => _scope = selected.first),
+                  showSelectedIcon: false,
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        context.tr('Eingehende Meldungen', 'Incoming reports'),
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    Text(
+                      context.tr('Neueste zuerst', 'Newest first'),
+                      style: const TextStyle(color: FrontlineTheme.muted),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.sort, size: 18, color: FrontlineTheme.muted),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (filtered.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 80),
+                    child: Center(
+                      child: Text(
+                        items.isEmpty
+                            ? context.tr('Keine Vorfälle.', 'No incidents.')
+                            : context.tr('Keine Meldungen in diesem Filter.', 'No reports in this filter.'),
+                      ),
+                    ),
+                  )
+                else
+                  _IncidentList(
+                    items: filtered,
+                    profiles: profiles,
+                    claimingIncidentId: _claimingIncidentId,
+                    onClaim: _claim,
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _connectionSelector(
+    BuildContext context,
+    List<ConnectionProfile> profiles,
+    String selectedName,
+  ) => PopupMenuButton<String>(
+    onSelected: (value) => setState(() => _connectionId = value.isEmpty ? null : value),
+    itemBuilder: (context) => [
+      PopupMenuItem(
+        value: '',
+        child: Text(context.tr('Alle CRCONs', 'All CRCONs')),
+      ),
+      ...profiles.map(
+        (profile) => PopupMenuItem(value: profile.id, child: Text(profile.name)),
+      ),
+    ],
+    child: Container(
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: FrontlineTheme.surfaceHigh,
+        border: Border.all(color: Theme.of(context).colorScheme.outline),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.dns_outlined, size: 20),
+          const SizedBox(width: 8),
+          Expanded(child: Text(selectedName, maxLines: 1, overflow: TextOverflow.ellipsis)),
+          const Icon(Icons.expand_more),
+        ],
+      ),
+    ),
+  );
+}
+
+class _OnlineBadge extends StatelessWidget {
+  const _OnlineBadge({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: 48,
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+    decoration: BoxDecoration(
+      color: FrontlineTheme.surfaceHigh,
+      border: Border.all(color: Theme.of(context).colorScheme.outline),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.circle, size: 10, color: FrontlineTheme.success),
+        const SizedBox(width: 7),
+        Text(label),
+      ],
+    ),
+  );
+}
+
+class _SummaryTile extends StatelessWidget {
+  const _SummaryTile({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.accent,
+  });
+  final IconData icon;
+  final String value;
+  final String label;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: 88,
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: FrontlineTheme.surface,
+      border: Border.all(color: Theme.of(context).colorScheme.outline),
+    ),
+    child: Row(
+      children: [
+        Icon(icon, color: accent, size: 26),
+        const SizedBox(width: 10),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(value, style: Theme.of(context).textTheme.headlineSmall),
+            Text(label, style: const TextStyle(color: FrontlineTheme.muted)),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+class _IncidentList extends StatelessWidget {
+  const _IncidentList({
+    required this.items,
+    required this.profiles,
+    required this.claimingIncidentId,
+    required this.onClaim,
+  });
+  final List<AdminIncident> items;
+  final List<ConnectionProfile> profiles;
+  final String? claimingIncidentId;
+  final Future<void> Function(AdminIncident incident) onClaim;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: FrontlineTheme.surface,
+      border: Border.all(color: Theme.of(context).colorScheme.outline),
+    ),
+    child: Column(
+      children: [
+        for (var index = 0; index < items.length; index++) ...[
+          _IncidentRow(
+            item: items[index],
+            connectionName: profiles
+                .where((profile) => profile.id == items[index].connectionId)
+                .firstOrNull
+                ?.name,
+            claiming: claimingIncidentId == items[index].id,
+            onClaim: () => onClaim(items[index]),
+          ),
+          if (index < items.length - 1) const Divider(height: 1),
+        ],
+      ],
+    ),
+  );
+}
+
+class _IncidentRow extends StatelessWidget {
+  const _IncidentRow({
+    required this.item,
+    required this.connectionName,
+    required this.claiming,
+    required this.onClaim,
+  });
+  final AdminIncident item;
+  final String? connectionName;
+  final bool claiming;
+  final VoidCallback onClaim;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = item.primarySubject;
+    final isNew = item.status == 'new';
+    final urgencyColor = isNew
+        ? FrontlineTheme.gold
+        : item.status == 'claimed'
+        ? FrontlineTheme.warning
+        : FrontlineTheme.muted;
+    final urgency = isNew
+        ? context.tr('HOCH', 'HIGH')
+        : item.status == 'claimed'
+        ? context.tr('MITTEL', 'MEDIUM')
+        : context.tr('NIEDRIG', 'LOW');
+
+    return InkWell(
+      onTap: () => context.push('/incidents/${item.connectionId}/${item.id}'),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(width: isNew ? 5 : 2, color: urgencyColor),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.circle, size: 10, color: urgencyColor),
+                        const SizedBox(width: 7),
+                        Text(
+                          urgency,
+                          style: TextStyle(color: urgencyColor, fontWeight: FontWeight.w600),
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    item.status == 'new'
-                                        ? Icons.notification_important
-                                        : Icons.assignment_ind,
-                                    color: item.status == 'new'
-                                        ? FrontlineTheme.warning
-                                        : null,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      item.reason,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.titleMedium,
-                                    ),
-                                  ),
-                                  if (item.stale)
-                                    const Icon(Icons.cloud_off, size: 18)
-                                  else
-                                    Text(context.incidentStatus(item.status)),
-                                ],
-                              ),
-                              const SizedBox(height: 10),
-                              Wrap(
-                                spacing: 6,
-                                runSpacing: 6,
-                                children: [
-                                  Chip(
-                                    label: Text('Server ${item.serverNumber}'),
-                                  ),
-                                  Chip(
-                                    avatar: Icon(
-                                      primary?.kind == 'squad'
-                                          ? Icons.groups_2
-                                          : primary == null
-                                          ? Icons.support_agent
-                                          : Icons.person,
-                                      size: 17,
-                                    ),
-                                    label: Text(
-                                      primary?.kind == 'squad'
-                                          ? context.squadName(
-                                              primary?.squadName ??
-                                                  primary?.displayName,
-                                            )
-                                          : primary?.displayName ??
-                                                context.tr(
-                                                  'Allgemein',
-                                                  'General',
-                                                ),
-                                    ),
-                                  ),
-                                  if (primary?.team != null)
-                                    Chip(
-                                      label: Text(
-                                        context.teamName(primary!.team),
-                                      ),
-                                    ),
-                                  if (primary?.squadName != null)
-                                    Chip(
-                                      label: Text(
-                                        context.squadName(primary!.squadName),
-                                      ),
-                                    ),
-                                  if (item.subjects.length > 1)
-                                    Chip(
-                                      label: Text(
-                                        '+${item.subjects.length - 1}',
-                                      ),
-                                    ),
-                                  if (item.suggestedCount > 0)
-                                    Chip(
-                                      avatar: const Icon(
-                                        Icons.help_outline,
-                                        color: FrontlineTheme.warning,
-                                        size: 17,
-                                      ),
-                                      label: Text('${item.suggestedCount}'),
-                                    ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                '${item.reporterName ?? context.tr('manuell', 'manual')}'
-                                '${item.assignedTo == null ? '' : ' · ${item.assignedTo}'}',
-                                style: const TextStyle(
-                                  color: FrontlineTheme.muted,
-                                ),
-                              ),
-                            ],
+                        const SizedBox(width: 10),
+                        Text(
+                          _relativeInboxTime(context, item.updatedAt),
+                          style: const TextStyle(color: FrontlineTheme.muted),
+                        ),
+                        const Spacer(),
+                        if (item.stale)
+                          const Icon(Icons.cloud_off, size: 16, color: FrontlineTheme.muted)
+                        else
+                          Text(context.incidentStatus(item.status)),
+                      ],
+                    ),
+                    const SizedBox(height: 9),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          primary?.kind == 'squad'
+                              ? Icons.groups_2
+                              : primary == null
+                              ? Icons.support_agent
+                              : Icons.person,
+                          size: 20,
+                          color: FrontlineTheme.chalk,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            item.reason,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleMedium,
                           ),
                         ),
-                      ),
-                    );
-                  },
+                        if (isNew)
+                          OutlinedButton(
+                            onPressed: claiming ? null : onClaim,
+                            child: Text(
+                              claiming
+                                  ? context.tr('…', '…')
+                                  : context.tr('Übernehmen', 'Claim'),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        _ContextChip(
+                          icon: Icons.dns_outlined,
+                          label: 'Server ${item.serverNumber}',
+                        ),
+                        if (connectionName != null)
+                          _ContextChip(
+                            icon: Icons.storage_outlined,
+                            label: connectionName!,
+                          ),
+                        if (primary != null)
+                          _ContextChip(
+                            icon: primary.kind == 'squad'
+                                ? Icons.groups_2
+                                : Icons.person,
+                            label: primary.kind == 'squad'
+                                ? context.squadName(primary.squadName ?? primary.displayName)
+                                : primary.displayName,
+                          ),
+                        if (primary?.team != null)
+                          _ContextChip(
+                            icon: Icons.flag_outlined,
+                            label: context.teamName(primary!.team),
+                          ),
+                        if (item.subjects.length > 1)
+                          _ContextChip(
+                            icon: Icons.more_horiz,
+                            label: '+${item.subjects.length - 1}',
+                          ),
+                        if (item.suggestedCount > 0)
+                          _ContextChip(
+                            icon: Icons.help_outline,
+                            label: '${item.suggestedCount}',
+                            accent: FrontlineTheme.warning,
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 7),
+                    Text(
+                      '${item.reporterName ?? context.tr('manuell', 'manual')}'
+                      '${item.assignedTo == null ? '' : ' · ${item.assignedTo}'}',
+                      style: const TextStyle(color: FrontlineTheme.muted),
+                    ),
+                  ],
                 ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
+}
+
+class _ContextChip extends StatelessWidget {
+  const _ContextChip({
+    required this.icon,
+    required this.label,
+    this.accent,
+  });
+  final IconData icon;
+  final String label;
+  final Color? accent;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+    decoration: BoxDecoration(
+      color: FrontlineTheme.surfaceHigh,
+      border: Border.all(color: Theme.of(context).colorScheme.outline),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 15, color: accent ?? FrontlineTheme.chalk),
+        const SizedBox(width: 5),
+        Text(label, style: TextStyle(color: accent)),
+      ],
+    ),
+  );
+}
+
+String _relativeInboxTime(BuildContext context, DateTime value) {
+  final difference = DateTime.now().difference(value);
+  if (difference.inMinutes < 1) return context.tr('gerade eben', 'just now');
+  if (difference.inMinutes < 60) {
+    return context.tr('vor ${difference.inMinutes} Min.', '${difference.inMinutes}m ago');
+  }
+  if (difference.inHours < 24) {
+    return context.tr('vor ${difference.inHours} Std.', '${difference.inHours}h ago');
+  }
+  return context.tr('vor ${difference.inDays} Tg.', '${difference.inDays}d ago');
 }
 
 class PlayerSearchScreen extends ConsumerStatefulWidget {

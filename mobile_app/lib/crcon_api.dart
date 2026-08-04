@@ -69,7 +69,7 @@ class CrconApi {
         'secret': payload.secret,
         'device_name': deviceName,
         'platform': platform,
-        'app_version': '0.1.4',
+        'app_version': '0.1.5',
         'push_handle': pushHandle,
         'push_capability': pushCapability,
       },
