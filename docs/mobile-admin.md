@@ -97,3 +97,38 @@ and Android push builds must supply their own Firebase project and APNs setup.
   Drift cache uses a separate 256-bit key from the same OS keystore.
 - Kick and temporary ban require a reason and explicit confirmation. Mobile
   writes are never queued or retried offline.
+
+## Beta end-to-end verification
+
+The repository includes a gated runner at
+`scripts/mobile_admin_beta_e2e.py`. It operates on an incident that was
+created by an in-game report and is safe by default: it bootstraps the
+connection, reads the incident, claims it, optionally adds a note, and
+resolves it. It never executes a player action unless the operator supplies
+`--allow-action` plus an explicit confirmed player and subject.
+
+After sending a unique test report in-game, run the safe workflow with a
+dedicated mobile access token:
+
+```bash
+export CRCON_BASE_URL=https://crcon.example.org
+export CRCON_ACCESS_TOKEN='opaque-access-token'
+export CRCON_TEST_INCIDENT_ID='incident-uuid-from-the-inbox'
+python scripts/mobile_admin_beta_e2e.py --note 'Beta E2E: context and workflow verified'
+```
+
+For an authorized action test, use a dedicated test player and copy the
+confirmed player subject id from the incident response. The explicit gate is
+required for every action, including a temporary ban:
+
+```bash
+python scripts/mobile_admin_beta_e2e.py \
+  --allow-action --action temp_ban \
+  --player-id 7656119... --subject-id subject-uuid \
+  --reason 'CRCON mobile beta test' --duration-hours 1
+```
+
+The runner creates a fresh idempotency key for each write, checks that the
+player belongs to a confirmed subject, and aborts before any action when the
+gate or context is incomplete. Do not use a production player or a shared
+administrator token for this check.
