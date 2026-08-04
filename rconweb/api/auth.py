@@ -17,16 +17,17 @@ from django.contrib.sessions.backends.db import SessionStore
 from django.core.exceptions import PermissionDenied
 from django.db.models.signals import post_delete, post_save
 from django.http import HttpResponse, QueryDict, parse_cookie
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
 from rcon.audit import heartbeat, set_registered_mods
-from rcon.cache_utils import ttl_cache, invalidates
+from rcon.cache_utils import invalidates, ttl_cache
 from rcon.types import DjangoGroup, DjangoPermission, DjangoUserPermissions
 from rcon.user_config.rcon_server_settings import RconServerSettingsUserConfig
 from rconweb.settings import SECRET_KEY, TAG_VERSION
 
-
 from .decorators import require_content_type, require_http_methods
+from .mobile_tokens import authenticate_mobile_access_token
 from .models import DjangoAPIKey, SteamPlayer
 
 logger = logging.getLogger("rconweb")
@@ -48,15 +49,51 @@ post_save.connect(update_mods, sender=SteamPlayer)
 post_delete.connect(update_mods, sender=SteamPlayer)
 
 
+def authenticate_bearer_token(raw_api_key: str | None):
+    """Authenticate legacy API keys and revocable mobile access tokens."""
+
+    mobile_identity = authenticate_mobile_access_token(raw_api_key)
+    if mobile_identity:
+        return mobile_identity
+
+    hashed_api_key = make_password(raw_api_key, salt=SECRET_KEY.replace("$", ""))
+    api_key = DjangoAPIKey.objects.select_related("user").get(api_key=hashed_api_key)
+    return api_key.user, None
+
+
 @database_sync_to_async
-def get_user(api_key) -> User:
-    user = DjangoAPIKey.objects.get(api_key=api_key)
-    return user.user
+def get_user(raw_api_key) -> tuple[User, object | None]:
+    return authenticate_bearer_token(raw_api_key)
 
 
 @database_sync_to_async
 def has_perms(scope, perms: tuple[str, ...]) -> bool:
-    return scope["user"].has_perms(perms)
+    user = scope.get("user")
+    if not user:
+        return False
+    try:
+        user = User.objects.get(pk=user.pk)
+    except User.DoesNotExist:
+        return False
+    scope["user"] = user
+    if not user.is_active:
+        return False
+    device = scope.get("mobile_device")
+    if device is not None:
+        try:
+            device.refresh_from_db(
+                fields=("revoked_at", "absolute_expires_at", "user_id")
+            )
+        except device.__class__.DoesNotExist:
+            return False
+        if (
+            device.revoked_at is not None
+            or device.user_id != user.pk
+            or not device.absolute_expires_at
+            or device.absolute_expires_at <= timezone.now()
+        ):
+            return False
+    return user.has_perms(perms)
 
 
 class APITokenAuthMiddleware:
@@ -108,14 +145,10 @@ class APITokenAuthMiddleware:
                 logger.info(f"Couldn't parse API key {raw_api_key=}")
 
             try:
-                # If we don't include the salt, the hasher generates its own
-                # and it will generate different hashed values every time
-                hashed_api_key = make_password(raw_api_key, salt=SECRET_KEY)
-
                 # Retrieve the user to use the normal authentication system
-                # to include their permissions
-                scope["user"] = await get_user(hashed_api_key)
-            except DjangoAPIKey.DoesNotExist:
+                # to include their permissions.
+                scope["user"], scope["mobile_device"] = await get_user(raw_api_key)
+            except (DjangoAPIKey.DoesNotExist, ValueError, TypeError):
                 scope["user"] = None
                 logger.info(
                     "API key not associated with a user, denying connection to %s",
@@ -277,14 +310,9 @@ def check_api_key(request):
         raw_api_key = None
 
     try:
-        # If we don't include the salt, the hasher generates its own
-        # and it will generate different hashed values every time
-        hashed_api_key = make_password(raw_api_key, salt=SECRET_KEY.replace("$", ""))
-        api_key_model = DjangoAPIKey.objects.get(api_key=hashed_api_key)
-
-        # Retrieve the user to use the normal authentication system
-        # to include their permissions
-        request.user = api_key_model.user
+        # Retrieve the user to use the normal authentication system and keep
+        # a device reference for mobile audit records.
+        request.user, request.mobile_device = authenticate_bearer_token(raw_api_key)
     except DjangoAPIKey.DoesNotExist:
         pass
 

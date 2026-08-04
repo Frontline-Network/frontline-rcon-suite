@@ -29,6 +29,12 @@ then
   LOGGING_PATH=/logs/ LOGGING_FILENAME=webhook_service.log python -m rcon.webhook_service
 fi
 
+if [ "$1" == 'mobile_push_worker' ]
+then
+  cd rconweb
+  exec python manage.py mobile_push_worker
+fi
+
 # Check if we're in a backend container
 if [ "$1" == 'web' ]
 then

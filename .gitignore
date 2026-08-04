@@ -154,3 +154,11 @@ supervisor_data/
 
 # Logs
 logs/
+
+# Mobile push relay runtime secrets and state
+push_relay/*.sqlite
+push_relay/firebase-service-account.json
+
+# The upstream Python rule ignores every directory named `lib`; keep Flutter sources.
+!mobile_app/lib/
+!mobile_app/lib/**

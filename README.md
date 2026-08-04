@@ -13,6 +13,17 @@ An extended RCON tool for [Hell Let Loose](https://www.hellletloose.com/), meant
 
 ![Live view](images/README_Views_Live_2024-12-27.png)
 
+## Mobile Admin integration
+
+This fork contains an opt-in CRCON Mobile Admin MVP: per-admin QR pairing,
+revocable device tokens, a cross-server incident inbox, a Flutter client and a
+privacy-minimal self-hostable push relay. The integration remains disabled by
+default and does not change existing sessions, API keys or CRCON permissions.
+
+Deployment, security and build instructions are in
+[docs/mobile-admin.md](docs/mobile-admin.md). The app lives in `mobile_app/`
+and the independent relay component in `push_relay/`.
+
 ## Documentation
 
 <table>

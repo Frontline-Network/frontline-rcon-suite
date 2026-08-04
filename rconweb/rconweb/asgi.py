@@ -16,11 +16,13 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "rconweb.settings")
 django_asgi_app = get_asgi_application()
 
 # This has to be imported *after* setting DJANGO_SETTINGS_MODULE
-from api import barricade, log_stream
+from api import barricade, log_stream, mobile_stream
 
 application = ProtocolTypeRouter(
     {
         "http": django_asgi_app,
-        "websocket": URLRouter(log_stream.urlpatterns + barricade.urlpatterns),
+        "websocket": URLRouter(
+            log_stream.urlpatterns + barricade.urlpatterns + mobile_stream.urlpatterns
+        ),
     }
 )

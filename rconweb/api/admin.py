@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 
 from rconweb.settings import SECRET_KEY
 
-from .models import DjangoAPIKey, SteamPlayer
+from .models import DjangoAPIKey, MobileDevice, SteamPlayer
 
 
 # Define an inline admin descriptor for Employee model
@@ -66,6 +66,35 @@ class DjangoAPIKeyAdmin(admin.ModelAdmin):
         return form
 
     form = DjangoAPIKeyAdminForm
+
+
+@admin.register(MobileDevice)
+class MobileDeviceAdmin(admin.ModelAdmin):
+    list_display = (
+        "name",
+        "user",
+        "platform",
+        "created_at",
+        "last_seen_at",
+        "revoked_at",
+    )
+    list_filter = ("platform", "notifications_enabled", "revoked_at")
+    search_fields = ("name", "user__username")
+    readonly_fields = (
+        "id",
+        "user",
+        "platform",
+        "app_version",
+        "created_at",
+        "last_seen_at",
+        "revoked_at",
+        "refresh_expires_at",
+        "absolute_expires_at",
+    )
+    exclude = ("refresh_token_digest", "push_handle", "push_capability")
+
+    def has_add_permission(self, request):
+        return False
 
 
 # Re-register UserAdmin
