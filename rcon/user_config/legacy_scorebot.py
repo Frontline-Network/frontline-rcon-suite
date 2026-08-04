@@ -60,10 +60,35 @@ WHAT_IS_A_BREAK = "WHAT IS A BREAK?\n*ingame time*"
 SURVIVORS = ":clock1: SURVIVORS\n*longest life (min.)*"
 U_R_STILL_A_MAN = "U'R STILL A MAN\n*shortest life (min.)*"
 
+LEGACY_STAT_TYPE_MAP = {
+    "TOP_KILLERS": PlayerStatsEnum.KILLS,
+    "TOP_RATIO": PlayerStatsEnum.KILL_DEATH_RATIO,
+    "TOP_PERFORMANCE": PlayerStatsEnum.KILLS_PER_MINUTE,
+    "TRY_HARDERS": PlayerStatsEnum.DEATHS_PER_MINUTE,
+    "TOP_STAMINA": PlayerStatsEnum.DEATHS,
+    "TOP_KILL_STREAK": PlayerStatsEnum.KILLS_STREAK,
+    "I_NEVER_GIVE_UP": PlayerStatsEnum.DEATHS_WITHOUT_KILL_STREAK,
+    "MOST_PATIENT": PlayerStatsEnum.DEATHS_BY_TK,
+    "I_M_CLUMSY": PlayerStatsEnum.TEAMKILLS,
+    "IM_CLUMSY": PlayerStatsEnum.TEAMKILLS,
+    "I_NEED_GLASSES": PlayerStatsEnum.TEAMKILLS_STREAK,
+    "I_LOVE_VOTING": PlayerStatsEnum.NB_VOTE_STARTED,
+    "WHAT_IS_A_BREAK": PlayerStatsEnum.TIME_SECONDS,
+    "SURVIVORS": PlayerStatsEnum.LONGEST_LIFE_SECS,
+    "U_R_STILL_A_MAN": PlayerStatsEnum.SHORTEST_LIFE_SECS,
+}
+
 
 class StatDisplay(BaseModel):
     type: PlayerStatsEnum
     display_format: str
+
+    @field_validator("type", mode="before")
+    @classmethod
+    def normalize_legacy_type(cls, value):
+        if isinstance(value, str):
+            return LEGACY_STAT_TYPE_MAP.get(value.upper(), value)
+        return value
 
 
 class ScorebotConfigType(TypedDict):

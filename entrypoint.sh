@@ -3,7 +3,6 @@
 set -e
 set -x
 
-env
 # Only run the database migrations in the maintenance container
 if [ "$1" == 'maintenance' ]
 then
