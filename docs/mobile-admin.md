@@ -13,6 +13,8 @@ MOBILE_INTEGRATION_ENABLED=true
 MOBILE_PUBLIC_BASE_URL=https://crcon.example.org
 MOBILE_INCIDENT_TRIGGERS=!admin
 MOBILE_INCIDENT_RETENTION_DAYS=90
+MOBILE_CONTEXT_V2=shadow
+MOBILE_CONTEXT_FUZZY_THRESHOLD=0.74
 ```
 
 Run both Django and Alembic migrations during the normal maintenance startup.
@@ -33,6 +35,28 @@ the same player and server are deduplicated for 60 seconds.
 
 If `MOBILE_INCIDENT_TRIGGERS` is left empty, CRCON inherits the existing Admin
 Ping trigger words and falls back to `!admin` when none are configured.
+
+### Player and squad context v2
+
+`MOBILE_CONTEXT_V2` controls the richer resolver independently from pairing:
+
+- `disabled` keeps the original single-player prefix resolver.
+- `shadow` stores detected player and squad candidates as suggestions only.
+- `enabled` automatically confirms only unique exact matches. Fuzzy matches
+  remain suggestions and can never be used as an action target until an admin
+  confirms them.
+
+Incidents retain immutable reporter and subject snapshots while the app shows
+the current server state alongside them. A single incident can contain several
+player and squad subjects. Squad members must always be selected individually;
+there are no squad-wide actions and a squad leader is never selected
+implicitly. Existing `target_id` and `target_name` clients continue to receive
+the primary confirmed player, or the confirmed squad leader for compatibility.
+
+The mobile API adds permission-aware player search and dossiers, live rosters,
+squad details, and revision/idempotency-protected subject mutations under
+`/api/mobile/v1`. Missing CRCON permissions omit or lock the affected dossier
+sections rather than broadening access.
 
 Schedule retention cleanup once per day:
 

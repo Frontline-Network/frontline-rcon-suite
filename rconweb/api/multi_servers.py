@@ -225,7 +225,13 @@ def forward_command(
 
 
 def forward_mobile_request_to_server(
-    request, server_number: int, path: str, data: dict
+    request,
+    server_number: int,
+    path: str,
+    data: dict | None = None,
+    *,
+    method: str = "POST",
+    params: dict | None = None,
 ):
     """Forward one mobile command to exactly one CRCON game-server backend."""
 
@@ -255,11 +261,22 @@ def forward_mobile_request_to_server(
             connection_info = connection_response.json().get("result") or {}
             if int(connection_info.get("server_number", -1)) != int(server_number):
                 continue
-            payload = deepcopy(data)
+            payload = deepcopy(data) or {}
+            query = deepcopy(params) or {}
+            if method.upper() == "GET":
+                query["forwarded"] = "1"
+                return requests.get(
+                    f"http://{host}{path}",
+                    params=query,
+                    timeout=10,
+                    headers=headers,
+                )
             payload["forwarded"] = True
-            return requests.post(
+            return requests.request(
+                method.upper(),
                 f"http://{host}{path}",
                 json=payload,
+                params=query,
                 timeout=10,
                 headers=headers,
             )

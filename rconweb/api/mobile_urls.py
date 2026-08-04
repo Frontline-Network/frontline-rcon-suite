@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import mobile, mobile_incidents
+from . import mobile, mobile_context, mobile_incidents
 
 MOBILE_API_DOCUMENTATION = [
     {
@@ -88,6 +88,42 @@ MOBILE_API_DOCUMENTATION = [
         "description": "Run a permission-checked, idempotent mobile player action.",
     },
     {
+        "endpoint": "mobile/v1/incidents/{id}/subjects",
+        "allowed_http_methods": ["POST"],
+        "permissions_required": ["api.can_create_admin_incidents"],
+        "description": "Add a confirmed player or squad subject to an incident.",
+    },
+    {
+        "endpoint": "mobile/v1/incidents/{id}/subjects/{subject_id}",
+        "allowed_http_methods": ["PATCH"],
+        "permissions_required": ["api.can_create_admin_incidents"],
+        "description": "Confirm, reject, or prioritize an incident subject.",
+    },
+    {
+        "endpoint": "mobile/v1/players/search",
+        "allowed_http_methods": ["GET"],
+        "permissions_required": [],
+        "description": "Search permission-filtered historical and online players.",
+    },
+    {
+        "endpoint": "mobile/v1/players/{player_id}",
+        "allowed_http_methods": ["GET"],
+        "permissions_required": [],
+        "description": "Load a permission-filtered player dossier and live context.",
+    },
+    {
+        "endpoint": "mobile/v1/servers/{server_number}/roster",
+        "allowed_http_methods": ["GET"],
+        "permissions_required": ["api.can_view_team_view"],
+        "description": "Load the current team and squad roster.",
+    },
+    {
+        "endpoint": "mobile/v1/servers/{server_number}/squads/{team}/{squad}",
+        "allowed_http_methods": ["GET"],
+        "permissions_required": ["api.can_view_team_view"],
+        "description": "Load one live squad and its members.",
+    },
+    {
         "endpoint": "ws/mobile/v1/incidents",
         "allowed_http_methods": ["WEBSOCKET"],
         "permissions_required": ["api.can_view_admin_incidents"],
@@ -138,5 +174,31 @@ urlpatterns = [
         "incidents/<uuid:incident_id>/actions",
         mobile_incidents.incident_actions,
         name="mobile-incident-actions",
+    ),
+    path(
+        "incidents/<uuid:incident_id>/subjects",
+        mobile_incidents.incident_subjects,
+        name="mobile-incident-subjects",
+    ),
+    path(
+        "incidents/<uuid:incident_id>/subjects/<uuid:subject_id>",
+        mobile_incidents.incident_subject_detail,
+        name="mobile-incident-subject-detail",
+    ),
+    path("players/search", mobile_context.players_search, name="mobile-player-search"),
+    path(
+        "players/<str:player_id>",
+        mobile_context.player_detail,
+        name="mobile-player-detail",
+    ),
+    path(
+        "servers/<int:server_number>/roster",
+        mobile_context.roster,
+        name="mobile-server-roster",
+    ),
+    path(
+        "servers/<int:server_number>/squads/<str:team>/<str:squad>",
+        mobile_context.squad_detail,
+        name="mobile-squad-detail",
     ),
 ]

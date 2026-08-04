@@ -10,7 +10,7 @@ os.environ.setdefault("SERVER_NUMBER", "1")
 os.environ.setdefault("DEBUG", "1")
 
 import rcon.admin_incidents as incidents
-from rcon.models import AdminIncident, AdminIncidentEvent
+from rcon.models import AdminIncident, AdminIncidentEvent, AdminIncidentSubject
 
 
 @pytest.fixture
@@ -21,6 +21,7 @@ def incident_database(monkeypatch):
         poolclass=StaticPool,
     )
     AdminIncident.__table__.create(engine)
+    AdminIncidentSubject.__table__.create(engine)
     AdminIncidentEvent.__table__.create(engine)
     sessions = sessionmaker(engine, expire_on_commit=False)
 
@@ -52,6 +53,19 @@ def test_trigger_parser_links_only_a_unique_longest_player_name():
     assert parsed["reason"] == "team killing at HQ"
 
 
+def test_disabled_context_keeps_legacy_prefix_matching():
+    players = [{"name": "Bob", "player_id": "bob"}]
+    prefixed = incidents.parse_chat_report(
+        "!admin Bob team killing", current_players=players, context_mode="disabled"
+    )
+    embedded = incidents.parse_chat_report(
+        "!admin please inspect Bob", current_players=players, context_mode="disabled"
+    )
+    assert prefixed["target_id"] == "bob"
+    assert prefixed["subjects"] == []
+    assert embedded["target_id"] is None
+
+
 def test_trigger_parser_leaves_ambiguous_player_unlinked():
     parsed = incidents.parse_chat_report(
         "!admin Bob team killing",
@@ -62,6 +76,67 @@ def test_trigger_parser_leaves_ambiguous_player_unlinked():
     )
     assert parsed["target_id"] is None
     assert parsed["target_name"] is None
+    assert {subject["state"] for subject in parsed["subjects"]} == {"suggested"}
+
+
+def test_parser_recognizes_multiple_players_anywhere_in_message():
+    parsed = incidents.parse_chat_report(
+        "!admin Charlie is griefing and Easy Company Bob is helping",
+        current_players=[
+            {"name": "Charlie", "player_id": "charlie", "team": "Allies"},
+            {
+                "name": "Easy Company Bob",
+                "player_id": "bob",
+                "team": "Allies",
+            },
+        ],
+    )
+    assert [subject["player_id"] for subject in parsed["subjects"]] == [
+        "charlie",
+        "bob",
+    ]
+    assert parsed["subjects"][0]["is_primary"] is True
+    assert parsed["target_id"] == "charlie"
+
+
+def test_parser_recognizes_reporter_team_squad_and_captures_members():
+    parsed = incidents.parse_chat_report(
+        "!admin Item keine Kommunikation",
+        reporter_context={"team": "Allies"},
+        current_squads=[
+            {
+                "name": "Item",
+                "team": "Allies",
+                "type": "infantry",
+                "has_leader": True,
+                "leader": {
+                    "name": "Leader",
+                    "player_id": "leader",
+                    "role": "Officer",
+                },
+                "players": [
+                    {"name": "Leader", "player_id": "leader", "role": "Officer"},
+                    {"name": "Member", "player_id": "member", "role": "Rifleman"},
+                ],
+            },
+            {"name": "Item", "team": "Axis", "players": []},
+        ],
+    )
+    subject = parsed["subjects"][0]
+    assert subject["kind"] == "squad"
+    assert subject["state"] == "confirmed"
+    assert subject["leader_player_id"] == "leader"
+    assert len(subject["snapshot"]["players"]) == 2
+
+
+def test_fuzzy_player_is_never_confirmed_automatically():
+    parsed = incidents.parse_chat_report(
+        "!admin Eazy Company Bob team killing",
+        current_players=[{"name": "Easy Company Bob", "player_id": "bob"}],
+    )
+    assert parsed["target_id"] is None
+    assert parsed["subjects"][0]["state"] == "suggested"
+    assert parsed["subjects"][0]["match_method"] == "fuzzy"
 
 
 def test_duplicate_chat_report_is_collapsed_for_sixty_seconds(incident_database):
@@ -197,3 +272,63 @@ def test_mutation_idempotency_survives_response_retry(incident_database):
     )
     assert second["revision"] == first["revision"]
     assert second["assigned_to"] == "alice"
+
+
+def test_subject_confirmation_and_primary_target_use_revision(incident_database):
+    incident, _ = incidents.create_incident(
+        server_number=1,
+        source="chat",
+        reason="possible team killing",
+        actor="system:chat",
+        subjects=[
+            {
+                "kind": "player",
+                "state": "suggested",
+                "display_name": "Bob",
+                "player_id": "bob",
+                "confidence": 0.8,
+                "match_method": "fuzzy",
+            }
+        ],
+    )
+    subject_id = incident["subjects"][0]["id"]
+    confirmed = incidents.mutate_incident_subject(
+        incident["id"],
+        actor="alice",
+        expected_revision=incident["revision"],
+        operation="confirm",
+        payload={},
+        subject_id=subject_id,
+        idempotency_key="confirm-subject-1",
+    )
+    assert confirmed["target_id"] == "bob"
+    assert confirmed["primary_subject"]["id"] == subject_id
+    assert confirmed["subjects"][0]["confirmed_by"] == "alice"
+
+
+def test_action_target_must_belong_to_confirmed_subject(incident_database):
+    incident, _ = incidents.create_incident(
+        server_number=1,
+        source="chat",
+        reason="squad report",
+        actor="system:chat",
+        subjects=[
+            {
+                "kind": "squad",
+                "state": "confirmed",
+                "is_primary": True,
+                "display_name": "Item",
+                "squad_name": "Item",
+                "snapshot": {
+                    "players": [
+                        {"name": "Leader", "player_id": "leader"},
+                        {"name": "Member", "player_id": "member"},
+                    ]
+                },
+            }
+        ],
+    )
+    subject = incidents.confirmed_action_subject(incident, player_id="member")
+    assert subject["kind"] == "squad"
+    with pytest.raises(ValueError):
+        incidents.confirmed_action_subject(incident, player_id="outsider")

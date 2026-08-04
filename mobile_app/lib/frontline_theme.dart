@@ -7,6 +7,8 @@ abstract final class FrontlineTheme {
   static const gold = Color(0xffc6a15b);
   static const chalk = Color(0xffebe7db);
   static const muted = Color(0xffa6a696);
+  static const success = Color(0xff88a66a);
+  static const warning = Color(0xffd69b4c);
 
   static ThemeData get dark {
     final scheme =

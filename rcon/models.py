@@ -27,8 +27,6 @@ from sqlalchemy.schema import UniqueConstraint
 from rcon.maps import Team
 from rcon.types import (
     AuditLogType,
-    GetDetailedPlayer,
-    MessageTemplateType,
     BlacklistRecordType,
     BlacklistRecordWithBlacklistType,
     BlacklistRecordWithPlayerType,
@@ -36,7 +34,11 @@ from rcon.types import (
     BlacklistType,
     BlacklistWithRecordsType,
     DBLogLineType,
+    GameLayout,
+    GetDetailedPlayer,
     MapsType,
+    MessageTemplateCategory,
+    MessageTemplateType,
     PenaltyCountType,
     PlayerAccountType,
     PlayerActionState,
@@ -50,6 +52,8 @@ from rcon.types import (
     PlayerSessionType,
     PlayerSoldierType,
     PlayerStatsType,
+    PlayerTeamAssociation,
+    PlayerTeamConfidence,
     PlayerVIPType,
     ServerCountType,
     SteamBansType,
@@ -57,7 +61,6 @@ from rcon.types import (
     SteamPlayerSummaryType,
     StructuredLogLineWithMetaData,
     WatchListType,
-    MessageTemplateCategory, PlayerTeamAssociation, PlayerTeamConfidence, GameLayout,
 )
 from rcon.utils import (
     SafeStringFormat,
@@ -66,7 +69,7 @@ from rcon.utils import (
     mask_to_server_numbers,
     server_numbers_to_mask,
 )
-from rcon.weapons import WEAPON_SIDE_MAP, ALL_WEAPONS, WeaponType
+from rcon.weapons import ALL_WEAPONS, WEAPON_SIDE_MAP, WeaponType
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +88,7 @@ def _connection_name() -> str:
     :return: str
     """
     args = sys.argv
-    name = 'CRCon Generic'
+    name = "CRCon Generic"
     if "manage.py" not in args[0]:
         # stuff like daphne, gunicorn (backend) etc
         name = args[0]
@@ -114,7 +117,12 @@ def get_engine():
     if os.getenv("HLL_DB_DISABLE_CONNECTION_POOL") is not None:
         pool = NullPool
 
-    _ENGINE = create_engine(url, poolclass=pool, echo=False, connect_args={"application_name":_connection_name()})
+    _ENGINE = create_engine(
+        url,
+        poolclass=pool,
+        echo=False,
+        connect_args={"application_name": _connection_name()},
+    )
     return _ENGINE
 
 
@@ -259,6 +267,7 @@ class PlayerID(Base):
         aka = " | ".join([n.name for n in self.names])
         return f"{self.player_id} {aka}"
 
+
 class PlayerSoldier(Base):
     __tablename__ = "player_soldier"
 
@@ -280,7 +289,7 @@ class PlayerSoldier(Base):
     updated: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
         default=lambda: datetime.now(tz=timezone.utc),
-        onupdate=lambda: datetime.now(tz=timezone.utc)
+        onupdate=lambda: datetime.now(tz=timezone.utc),
     )
 
     @classmethod
@@ -288,36 +297,39 @@ class PlayerSoldier(Base):
         logger.debug("Updating soldier %s" % player["name"])
         with enter_session() as sess:
             # Retrieve the PlayerID instance to get its ID for foreign key reference
-            player_id_stmt = select(PlayerID).where(PlayerID.player_id == player["player_id"])
+            player_id_stmt = select(PlayerID).where(
+                PlayerID.player_id == player["player_id"]
+            )
             player_id_record = sess.execute(player_id_stmt).scalars().one_or_none()
-            
+
             if not player_id_record:
                 # Handle case where PlayerID does not exist
-                logger.exception("PlayerID not found for player_id: %s" % player['player_id'])
+                logger.exception(
+                    "PlayerID not found for player_id: %s" % player["player_id"]
+                )
                 return
-            
+
             player_id_fk = player_id_record.id
-            
+
             # Query for existing PlayerSoldier
-            profile_stmt = (
-                select(cls)
-                .where(cls.player_id_id == player_id_fk)  # Direct filter on FK; join optional here
-            )
+            profile_stmt = select(cls).where(
+                cls.player_id_id == player_id_fk
+            )  # Direct filter on FK; join optional here
             profile = sess.execute(profile_stmt).scalars().one_or_none()
             if not profile:
                 # Create new instance
                 profile = cls(player_id_id=player_id_fk)
                 sess.add(profile)
-            
+
             # Proceed with updates
             profile.eos_id = player["eos_id"]
             profile.name = player["name"]
             profile.platform = player["platform"]
             profile.clan_tag = player["clan_tag"]
-            
+
             if player["level"] > profile.level:
                 profile.level = player["level"]
-            
+
             sess.commit()
 
     @classmethod
@@ -337,20 +349,24 @@ class PlayerSoldier(Base):
         Returns the updated PlayerSoldier instance or None if PlayerID not found.
         """
         # Look up PlayerID
-        player_db = sess.execute(
-            select(PlayerID).where(PlayerID.player_id == player_id)
-        ).scalars().one_or_none()
+        player_db = (
+            sess.execute(select(PlayerID).where(PlayerID.player_id == player_id))
+            .scalars()
+            .one_or_none()
+        )
         if not player_db:
             return None, False
-        
+
         # Look up or create PlayerSoldier
-        soldier_db = sess.execute(
-            select(cls).where(cls.player_id_id == player_db.id)
-        ).scalars().one_or_none()
+        soldier_db = (
+            sess.execute(select(cls).where(cls.player_id_id == player_db.id))
+            .scalars()
+            .one_or_none()
+        )
         if not soldier_db:
             soldier_db = cls(player_id_id=player_db.id)
             sess.add(soldier_db)
-        
+
         # Update only None fields
         changed = False
         if soldier_db.eos_id is None and eos_id is not None:
@@ -368,10 +384,10 @@ class PlayerSoldier(Base):
         if soldier_db.clan_tag is None and clan_tag is not None:
             soldier_db.clan_tag = clan_tag
             changed = True
-        
+
         if changed:
             sess.commit()
-        
+
         return soldier_db, changed
 
     def to_dict(self) -> PlayerSoldierType:
@@ -383,6 +399,7 @@ class PlayerSoldier(Base):
             "clan_tag": self.clan_tag,
             "updated": self.updated,
         }
+
 
 class PlayerAccount(Base):
     __tablename__ = "player_account"
@@ -403,11 +420,11 @@ class PlayerAccount(Base):
     country: Mapped[str | None] = mapped_column(String(2))
     # ISO 639-1
     lang: Mapped[str] = mapped_column(String(2), default="en")
-    
+
     updated: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
         default=lambda: datetime.now(tz=timezone.utc),
-        onupdate=lambda: datetime.now(tz=timezone.utc)
+        onupdate=lambda: datetime.now(tz=timezone.utc),
     )
 
     @classmethod
@@ -427,27 +444,31 @@ class PlayerAccount(Base):
         Returns (updated PlayerAccount instance, changed flag) or None if PlayerID not found.
         """
         # Look up PlayerID
-        player_db = sess.execute(
-            select(PlayerID).where(PlayerID.player_id == player_id)
-        ).scalars().one_or_none()
+        player_db = (
+            sess.execute(select(PlayerID).where(PlayerID.player_id == player_id))
+            .scalars()
+            .one_or_none()
+        )
         if not player_db:
             return None
-        
+
         # Look up or create PlayerAccount
-        account_db = sess.execute(
-            select(cls).where(cls.player_id_id == player_db.id)
-        ).scalars().one_or_none()
+        account_db = (
+            sess.execute(select(cls).where(cls.player_id_id == player_db.id))
+            .scalars()
+            .one_or_none()
+        )
         if not account_db:
             account_db = cls(player_id_id=player_db.id)
             sess.add(account_db)
-        
+
         account_db.name = name
         account_db.discord_id = discord_id
         account_db.is_member = is_member
         account_db.country = country.upper() if country else None
         account_db.lang = lang.lower() if lang else "en"
         sess.commit()
-        
+
         return account_db
 
     def to_dict(self) -> PlayerAccountType:
@@ -459,6 +480,7 @@ class PlayerAccount(Base):
             "lang": self.lang,
             "updated": self.updated,
         }
+
 
 class SteamInfo(Base):
     __tablename__ = "steam_info"
@@ -761,7 +783,9 @@ class Maps(Base):
     map_name: Mapped[str] = mapped_column(nullable=False, index=True)
     # A dict with the result of the game mapped as Axis=int, Allied=int
     result: Mapped[dict[str, int]] = mapped_column(nullable=True)
-    game_layout: Mapped["GameLayout"] = mapped_column(JSON, nullable=False, default=GameLayout)
+    game_layout: Mapped["GameLayout"] = mapped_column(
+        JSON, nullable=False, default=GameLayout
+    )
 
     player_stats: Mapped[list["PlayerStats"]] = relationship(back_populates="map")
 
@@ -799,6 +823,7 @@ def calc_weapon_type_usage(weapons: dict[str, int]) -> dict[WeaponType, int]:
             kills_by_type[weapon_type.value] += count
 
     return dict(kills_by_type)
+
 
 class PlayerStats(Base):
     __tablename__ = "player_stats"
@@ -860,10 +885,16 @@ class PlayerStats(Base):
                     axis_count += weapon[1]
 
         if len(self.death_by_weapons) > 0:
-            for weapon in sorted(self.death_by_weapons.items(), key=get_value, reverse=True):
+            for weapon in sorted(
+                self.death_by_weapons.items(), key=get_value, reverse=True
+            ):
                 if WEAPON_SIDE_MAP.get(weapon[0]) is None:
                     continue
-                op = Team.AXIS if WEAPON_SIDE_MAP.get(weapon[0]) == Team.ALLIES else Team.ALLIES
+                op = (
+                    Team.AXIS
+                    if WEAPON_SIDE_MAP.get(weapon[0]) == Team.ALLIES
+                    else Team.ALLIES
+                )
                 if op == Team.ALLIES:
                     allies_count += weapon[1]
                 elif op == Team.AXIS:
@@ -871,7 +902,9 @@ class PlayerStats(Base):
 
         assoc: PlayerTeamAssociation
         if axis_count == 0 and allies_count == 0:
-            return PlayerTeamAssociation(side=Team.UNKNOWN, confidence=PlayerTeamConfidence.STRONG, ratio=0)
+            return PlayerTeamAssociation(
+                side=Team.UNKNOWN, confidence=PlayerTeamConfidence.STRONG, ratio=0
+            )
         elif axis_count > allies_count:
             assoc = PlayerTeamAssociation(
                 side=Team.AXIS,
@@ -890,7 +923,11 @@ class PlayerStats(Base):
                 confidence=PlayerTeamConfidence.MIXED,
                 ratio=50,
             )
-        assoc['confidence'] = PlayerTeamConfidence.STRONG if assoc['ratio'] > 85 else PlayerTeamConfidence.MIXED
+        assoc["confidence"] = (
+            PlayerTeamConfidence.STRONG
+            if assoc["ratio"] > 85
+            else PlayerTeamConfidence.MIXED
+        )
         return assoc
 
     def to_dict(self) -> PlayerStatsType:
@@ -985,9 +1022,7 @@ class AutobalanceDecision(Base):
     review_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     reviewed_by: Mapped[str | None] = mapped_column(String, nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP, nullable=True)
-    review_preferred_strategy: Mapped[str | None] = mapped_column(
-        String, nullable=True
-    )
+    review_preferred_strategy: Mapped[str | None] = mapped_column(String, nullable=True)
     review_preferred_player_id: Mapped[str | None] = mapped_column(
         String, nullable=True
     )
@@ -1044,9 +1079,7 @@ class AutobalanceSnapshot(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     server_number: Mapped[int] = mapped_column(nullable=False, index=True)
     round_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
-    captured_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP, nullable=False, index=True
-    )
+    captured_at: Mapped[datetime] = mapped_column(TIMESTAMP, nullable=False, index=True)
     map_name: Mapped[str] = mapped_column(String, nullable=False, index=True)
     map_elapsed_seconds: Mapped[int] = mapped_column(nullable=False)
     time_remaining_seconds: Mapped[int] = mapped_column(nullable=False)
@@ -1121,9 +1154,7 @@ class AutobalanceRoundAnalysis(Base):
     map_id: Mapped[int] = mapped_column(
         ForeignKey("map_history.id"), nullable=False, index=True
     )
-    algorithm_version: Mapped[str] = mapped_column(
-        String, nullable=False, index=True
-    )
+    algorithm_version: Mapped[str] = mapped_column(String, nullable=False, index=True)
     config_hash: Mapped[str] = mapped_column(String, nullable=False, index=True)
     analyzed_at: Mapped[datetime] = mapped_column(
         TIMESTAMP, nullable=False, default=datetime.utcnow, index=True
@@ -1305,6 +1336,9 @@ class AdminIncident(Base):
     )
     reporter_id: Mapped[str | None] = mapped_column(String(100), index=True)
     reporter_name: Mapped[str | None] = mapped_column(String(255))
+    reporter_context: Mapped[dict[str, Any]] = mapped_column(
+        JSON, nullable=False, default=dict
+    )
     target_id: Mapped[str | None] = mapped_column(String(100), index=True)
     target_name: Mapped[str | None] = mapped_column(String(255))
     reason: Mapped[str] = mapped_column(Text, nullable=False)
@@ -1330,6 +1364,11 @@ class AdminIncident(Base):
         cascade="all, delete-orphan",
         order_by="AdminIncidentEvent.created_at",
     )
+    subjects: Mapped[list["AdminIncidentSubject"]] = relationship(
+        back_populates="incident",
+        cascade="all, delete-orphan",
+        order_by="AdminIncidentSubject.created_at",
+    )
 
     def to_dict(self, include_events: bool = False) -> dict[str, Any]:
         result = {
@@ -1339,6 +1378,7 @@ class AdminIncident(Base):
             "status": self.status,
             "reporter_id": self.reporter_id,
             "reporter_name": self.reporter_name,
+            "reporter_context": self.reporter_context or {},
             "target_id": self.target_id,
             "target_name": self.target_name,
             "reason": self.reason,
@@ -1348,10 +1388,100 @@ class AdminIncident(Base):
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "resolved_at": self.resolved_at,
+            "subjects": [subject.to_dict() for subject in self.subjects],
         }
+        result["primary_subject"] = next(
+            (
+                subject.to_dict()
+                for subject in self.subjects
+                if subject.is_primary and subject.state == "confirmed"
+            ),
+            None,
+        )
         if include_events:
             result["events"] = [event.to_dict() for event in self.events]
         return result
+
+
+class AdminIncidentSubject(Base):
+    """A player or squad mentioned by an admin incident report."""
+
+    __tablename__ = "admin_incident_subject"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('player', 'squad')", name="ck_admin_incident_subject_kind"
+        ),
+        CheckConstraint(
+            "state IN ('suggested', 'confirmed', 'rejected')",
+            name="ck_admin_incident_subject_state",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    incident_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("admin_incident.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    state: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="suggested", index=True
+    )
+    is_primary: Mapped[bool] = mapped_column(nullable=False, default=False)
+    display_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    player_id: Mapped[str | None] = mapped_column(String(100), index=True)
+    team: Mapped[str | None] = mapped_column(String(100))
+    squad_name: Mapped[str | None] = mapped_column(String(100))
+    squad_id: Mapped[str | None] = mapped_column(String(100))
+    squad_type: Mapped[str | None] = mapped_column(String(32))
+    role: Mapped[str | None] = mapped_column(String(100))
+    leader_player_id: Mapped[str | None] = mapped_column(String(100))
+    leader_name: Mapped[str | None] = mapped_column(String(255))
+    confidence: Mapped[float | None] = mapped_column()
+    match_method: Mapped[str | None] = mapped_column(String(64))
+    matched_text: Mapped[str | None] = mapped_column(String(255))
+    parser_version: Mapped[str | None] = mapped_column(String(32))
+    snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    confirmed_by: Mapped[str | None] = mapped_column(String(150))
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), default=lambda: datetime.now(tz=timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        default=lambda: datetime.now(tz=timezone.utc),
+        onupdate=lambda: datetime.now(tz=timezone.utc),
+    )
+
+    incident: Mapped[AdminIncident] = relationship(back_populates="subjects")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "incident_id": self.incident_id,
+            "kind": self.kind,
+            "state": self.state,
+            "is_primary": self.is_primary,
+            "display_name": self.display_name,
+            "player_id": self.player_id,
+            "team": self.team,
+            "squad_name": self.squad_name,
+            "squad_id": self.squad_id,
+            "squad_type": self.squad_type,
+            "role": self.role,
+            "leader_player_id": self.leader_player_id,
+            "leader_name": self.leader_name,
+            "confidence": self.confidence,
+            "match_method": self.match_method,
+            "matched_text": self.matched_text,
+            "parser_version": self.parser_version,
+            "snapshot": self.snapshot or {},
+            "confirmed_by": self.confirmed_by,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
 
 
 class AdminIncidentEvent(Base):
@@ -1504,7 +1634,9 @@ class BlacklistRecord(Base):
                 else "forever"
             ),
             "expires_at": (
-                self.expires_at.strftime("%b %d %Y %H:%M") if self.expires_at else "never"
+                self.expires_at.strftime("%b %d %Y %H:%M")
+                if self.expires_at
+                else "never"
             ),
             "duration": (
                 humanize_timedelta(self.expires_at - self.created_at)

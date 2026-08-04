@@ -181,6 +181,46 @@ class CrconApi {
         as Map,
   );
 
+  Future<Map<String, dynamic>> addIncidentSubject(
+    String incidentId, {
+    required int revision,
+    required String kind,
+    required String displayName,
+    String? playerId,
+    String? team,
+    String? squadName,
+  }) async => Map<String, dynamic>.from(
+    await _authorized(
+          'POST',
+          'incidents/$incidentId/subjects',
+          data: {
+            'revision': revision,
+            'kind': kind,
+            'display_name': displayName,
+            'player_id': ?playerId,
+            'team': ?team,
+            'squad_name': ?squadName,
+          },
+          headers: {'Idempotency-Key': const Uuid().v4()},
+        )
+        as Map,
+  );
+
+  Future<Map<String, dynamic>> mutateIncidentSubject(
+    String incidentId,
+    String subjectId, {
+    required int revision,
+    required String operation,
+  }) async => Map<String, dynamic>.from(
+    await _authorized(
+          'PATCH',
+          'incidents/$incidentId/subjects/$subjectId',
+          data: {'revision': revision, 'operation': operation},
+          headers: {'Idempotency-Key': const Uuid().v4()},
+        )
+        as Map,
+  );
+
   Future<void> updatePushIdentity(String handle, String capability) async {
     await _authorized(
       'PATCH',
@@ -201,91 +241,63 @@ class CrconApi {
     await _authorized('DELETE', 'devices/${profile.deviceId}');
   }
 
-  Future<List<Map<String, dynamic>>> searchPlayers(String query) async {
-    final result = Map<String, dynamic>.from(
-      await _legacyAuthorized(
-            'POST',
-            'get_players_history',
-            data: {'player_name': query, 'page': 1, 'page_size': 50},
-          )
-          as Map,
+  Future<List<Map<String, dynamic>>> searchPlayers(
+    String query, {
+    int? serverNumber,
+  }) async {
+    final result = await _authorized(
+      'GET',
+      'players/search',
+      queryParameters: {'q': query, 'server_number': ?serverNumber},
     );
-    return (result['players'] as List<dynamic>? ?? const [])
+    return (result as List<dynamic>? ?? const [])
         .map((item) => Map<String, dynamic>.from(item as Map))
         .toList();
   }
 
-  Future<Map<String, dynamic>> playerProfile(String playerId) async {
-    final history = Map<String, dynamic>.from(
-      await _legacyAuthorized(
-            'GET',
-            'get_player_profile',
-            queryParameters: {'player_id': playerId},
-          )
-          as Map,
-    );
-    try {
-      history['live'] = Map<String, dynamic>.from(
-        await _legacyAuthorized(
-              'GET',
-              'get_detailed_player_info',
-              queryParameters: {'player_id': playerId},
-            )
-            as Map,
-      );
-    } catch (_) {
-      history['live'] = null;
-    }
-    return history;
-  }
+  Future<Map<String, dynamic>> playerProfile(
+    String playerId, {
+    int? serverNumber,
+  }) async => Map<String, dynamic>.from(
+    await _authorized(
+          'GET',
+          'players/$playerId',
+          queryParameters: {'server_number': ?serverNumber},
+        )
+        as Map,
+  );
 
-  Future<dynamic> _legacyAuthorized(
-    String method,
-    String path, {
-    Object? data,
-    Map<String, dynamic>? queryParameters,
-    bool refreshed = false,
-  }) async {
-    final token = await store.accessToken(profile.id);
-    final response =
-        await Dio(
-          BaseOptions(
-            baseUrl: '${profile.baseUrl}/api/',
-            validateStatus: (status) => status != null && status < 500,
-          ),
-        ).request<Map<String, dynamic>>(
-          path,
-          data: data,
-          queryParameters: queryParameters,
-          options: Options(
-            method: method,
-            headers: {'Authorization': 'Bearer $token'},
-          ),
-        );
-    if (response.statusCode == 401 && !refreshed) {
-      await _refresh();
-      return _legacyAuthorized(
-        method,
-        path,
-        data: data,
-        queryParameters: queryParameters,
-        refreshed: true,
+  Future<Map<String, dynamic>> roster(int serverNumber) async =>
+      Map<String, dynamic>.from(
+        await _authorized('GET', 'servers/$serverNumber/roster') as Map,
       );
-    }
-    return _unwrap(response);
-  }
+
+  Future<Map<String, dynamic>> squad(
+    int serverNumber,
+    String team,
+    String squadName,
+  ) async => Map<String, dynamic>.from(
+    await _authorized(
+          'GET',
+          'servers/$serverNumber/squads/'
+              '${Uri.encodeComponent(team)}/${Uri.encodeComponent(squadName)}',
+        )
+        as Map,
+  );
 
   Future<dynamic> _authorized(
     String method,
     String path, {
     Object? data,
     Map<String, dynamic>? headers,
+    Map<String, dynamic>? queryParameters,
     bool refreshed = false,
   }) async {
     final token = await store.accessToken(profile.id);
     final response = await _dio.request<Map<String, dynamic>>(
       path,
       data: data,
+      queryParameters: queryParameters,
       options: Options(
         method: method,
         headers: {...?headers, 'Authorization': 'Bearer $token'},
@@ -298,6 +310,7 @@ class CrconApi {
         path,
         data: data,
         headers: headers,
+        queryParameters: queryParameters,
         refreshed: true,
       );
     }
