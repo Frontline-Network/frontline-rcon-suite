@@ -37,6 +37,7 @@ ACTION_PERMISSIONS = {
     "punish": "api.can_punish_players",
     "kick": "api.can_kick_players",
     "temp_ban": "api.can_temp_ban_players",
+    "perma_ban": "api.can_perma_ban_players",
     "comment": "api.can_add_player_comments",
 }
 
@@ -397,7 +398,7 @@ def _execute_action(action: str, data: dict, user_name: str, incident: dict):
             save_message=True,
             player_name=player_name or None,
         )
-    if action in {"punish", "kick", "temp_ban"}:
+    if action in {"punish", "kick", "temp_ban", "perma_ban"}:
         reason = str(data.get("reason") or "").strip()
         if not reason:
             raise ValueError("A reason is required")
@@ -409,6 +410,12 @@ def _execute_action(action: str, data: dict, user_name: str, incident: dict):
             if data.get("confirmed") is not True:
                 raise ValueError("Kick requires explicit confirmation")
             return views.rcon_api.kick(
+                player_id, reason=reason, by=user_name, player_name=player_name or None
+            )
+        if action == "perma_ban":
+            if data.get("confirmed") is not True:
+                raise ValueError("Permanent ban requires explicit confirmation")
+            return views.rcon_api.perma_ban(
                 player_id, reason=reason, by=user_name, player_name=player_name or None
             )
         duration_hours = int(data.get("duration_hours", 2))

@@ -1,6 +1,8 @@
 import json
+import sys
 from datetime import timedelta
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 from urllib.parse import parse_qs, urlparse
 
 from django.contrib.auth.models import Group, User
@@ -392,4 +394,45 @@ class MobileContextTests(TestCase):
             payload={"revision": 3, "operation": "confirm"},
             subject_id=subject_id,
             idempotency_key="subject-confirm-1",
+        )
+
+    @patch("api.mobile_incidents.confirmed_action_subject")
+    def test_permanent_ban_requires_confirmation_and_uses_existing_permission_path(
+        self, confirmed_subject
+    ):
+        from api.mobile_incidents import _execute_action
+
+        confirmed_subject.return_value = {
+            "display_name": "Biene",
+            "player_id": "biene-id",
+        }
+        incident = {"target_id": "biene-id", "target_name": "Biene"}
+        perma_ban = MagicMock()
+        fake_views = SimpleNamespace(rcon_api=SimpleNamespace(perma_ban=perma_ban))
+
+        with patch.dict(sys.modules, {"api.views": fake_views}):
+            with self.assertRaisesRegex(ValueError, "explicit confirmation"):
+                _execute_action(
+                    "perma_ban",
+                    {"player_id": "biene-id", "reason": "Repeated abuse"},
+                    "context-admin",
+                    incident,
+                )
+
+            _execute_action(
+                "perma_ban",
+                {
+                    "player_id": "biene-id",
+                    "reason": "Repeated abuse",
+                    "confirmed": True,
+                },
+                "context-admin",
+                incident,
+            )
+
+        perma_ban.assert_called_once_with(
+            "biene-id",
+            reason="Repeated abuse",
+            by="context-admin",
+            player_name="Biene",
         )

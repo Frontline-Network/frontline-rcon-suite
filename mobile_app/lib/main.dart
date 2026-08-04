@@ -1781,7 +1781,15 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(action == 'temp_ban' ? 'Temporary ban' : action),
+        title: Text(switch (action) {
+          'temp_ban' => context.tr('Temporäre Sperre', 'Temporary ban'),
+          'perma_ban' => context.tr('Permanente Sperre', 'Permanent ban'),
+          'kick' => context.tr('Spieler kicken', 'Kick player'),
+          'punish' => context.tr('Spieler bestrafen', 'Punish player'),
+          'message' => context.tr('Nachricht senden', 'Send message'),
+          'comment' => context.tr('Admin-Kommentar', 'Admin comment'),
+          _ => action,
+        }),
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -1820,7 +1828,8 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
             ? 'comment'
             : 'reason': controller.text
             .trim(),
-        if (action == 'kick' || action == 'temp_ban') 'confirmed': true,
+        if (action == 'kick' || action == 'temp_ban' || action == 'perma_ban')
+          'confirmed': true,
         if (action == 'temp_ban') 'duration_hours': 2,
       });
       await _load();
@@ -2173,6 +2182,15 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                                 context.tr('Temporär sperren', 'Temporary ban'),
                               ),
                             ),
+                            PopupMenuItem(
+                              value: 'perma_ban',
+                              child: Text(
+                                context.tr(
+                                  'Permanent sperren',
+                                  'Permanent ban',
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                 );
@@ -2290,6 +2308,10 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                 PopupMenuItem(
                   value: 'temp_ban',
                   child: Text(context.tr('Temporär sperren', 'Temporary ban')),
+                ),
+                PopupMenuItem(
+                  value: 'perma_ban',
+                  child: Text(context.tr('Permanent sperren', 'Permanent ban')),
                 ),
               ],
             ),
