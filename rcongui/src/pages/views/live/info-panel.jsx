@@ -1,17 +1,24 @@
 import { extractTeamState } from "@/utils/extractPlayers";
 import { Box, Divider, Stack, Typography } from "@mui/material";
 import WarningIcon from "@mui/icons-material/Warning";
+import { useTranslation } from "react-i18next";
 
 const UNASSIGNED = "unassigned"
 
 const InfoPanel = ({ gameData, playersData }) => {
+  const { t } = useTranslation();
   const content = [];
+  const teamLabel = (team) => {
+    if (team === "axis") return t("views.team.axis");
+    if (team === "allies") return t("views.team.allies");
+    return t("views.live.lobby");
+  };
 
   const vipsCount = playersData.filter((player) => player.is_vip).length;
   if (vipsCount > 0) {
     content.push({
       type: "info",
-      label: "VIPs",
+      label: t("views.live.vips"),
       value: vipsCount,
     });
   }
@@ -20,7 +27,7 @@ const InfoPanel = ({ gameData, playersData }) => {
   if (watchedCount > 0) {
     content.push({
       type: "info",
-      label: "Watched",
+      label: t("views.live.watched"),
       value: watchedCount,
     });
   }
@@ -35,15 +42,15 @@ const InfoPanel = ({ gameData, playersData }) => {
     if (team !== "lobby" && playersData.length > 0 && teamStates[team] && !teamStates[team].commander) {
       content.push({
         type: "warning",
-        label: `${team.charAt(0).toUpperCase() + team.slice(1)}`,
-        value: "No Commander",
+        label: teamLabel(team),
+        value: t("views.live.noCommander"),
       });
     }
 
     if (team !== "lobby" && playersData.length > 0 && teamStates[team] && teamStates[team].no_sl_squads.length > 0) {
       content.push({
         type: "warning",
-        label: `${team.charAt(0).toUpperCase() + team.slice(1)} No SL`,
+        label: `${teamLabel(team)} · ${t("views.live.noSquadLeader")}`,
         value: teamStates[team].no_sl_squads.map((squad) => squad.toUpperCase()).join(", "),
       });
     }
@@ -51,7 +58,7 @@ const InfoPanel = ({ gameData, playersData }) => {
     if (teamStates[team] && teamStates[team].players_in_lobby.length > 0) {
       content.push({
         type: "info",
-        label: team !== "lobby" ? `${team.charAt(0).toUpperCase() + team.slice(1)} Lobby` : "All Lobby",
+        label: team !== "lobby" ? `${teamLabel(team)} · ${t("views.live.lobby")}` : t("views.live.allLobby"),
         value: teamStates[team].players_in_lobby.length,
       });
     }
@@ -59,8 +66,8 @@ const InfoPanel = ({ gameData, playersData }) => {
 
   content.push({
     type: "info",
-    label: "Next Map",
-    value: gameData?.next_map.pretty_name,
+    label: t("views.live.nextMap"),
+    value: gameData?.next_map?.pretty_name ?? "–",
   });
 
   return (

@@ -1,6 +1,6 @@
-export function downloadGame(player_stats) {
+export function downloadGame(player_stats, headers) {
   const data = [
-    [
+    headers ?? [
       "Player ID",
       "Name",
       "Kills",

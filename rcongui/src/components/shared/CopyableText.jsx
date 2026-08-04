@@ -2,6 +2,7 @@ import { Stack, IconButton, Tooltip } from "@mui/material";
 import React, { useState, useEffect } from "react";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DoneAllIcon from "@mui/icons-material/DoneAll";
+import { useTranslation } from "react-i18next";
 
 export default function CopyableText({
   text,
@@ -10,6 +11,7 @@ export default function CopyableText({
   position = "end",
   ...props
 }) {
+  const { t } = useTranslation();
   const [isClipboardAvailable, setIsClipboardAvailable] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
 
@@ -36,7 +38,7 @@ export default function CopyableText({
   };
 
   const icon = isClipboardAvailable ? (
-    <Tooltip title={isCopied ? "Copied!" : "Copy"}>
+    <Tooltip title={isCopied ? t("common.copied") : t("common.copy")}>
       <IconButton
         onClick={handleCopy}
         className="copyable-text-icon-button"

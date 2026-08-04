@@ -11,11 +11,14 @@ import { Link } from "react-router-dom";
 import dayjs from "dayjs";
 import PlayCircleIcon from "@mui/icons-material/PlayCircle";
 import StopCircleIcon from "@mui/icons-material/StopCircle";
+import { useTranslation } from "react-i18next";
+import { getMapModeLabel } from "@/utils/mapLabels";
 
 const GamesCard = ({ games }) => {
+  const { t } = useTranslation();
   return (
     <Card>
-      <CardHeader title="Last 15 Games" />
+      <CardHeader title={t("dashboard.lastGames")} />
       <CardContent>
         <List dense sx={{ minWidth: 300 }}>
           {games.map((game) => {
@@ -72,8 +75,7 @@ const GamesCard = ({ games }) => {
                           lineHeight: 1,
                         }}
                       >
-                        {matchMap.game_mode[0].toUpperCase() +
-                          matchMap.game_mode.slice(1)}{" "}
+                        {getMapModeLabel(t, matchMap.game_mode)}
                       </Typography>
                     </Box>
                   </Box>
@@ -155,7 +157,7 @@ const GamesCard = ({ games }) => {
                           width: "70px",
                         }}
                       >
-                        {duration ? `${duration} min` : "In Progress"}
+                        {duration ? `${duration} min` : t("dashboard.inProgress")}
                       </Typography>
                     </Box>
                   </Box>

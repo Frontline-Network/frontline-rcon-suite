@@ -159,6 +159,12 @@ logs/
 push_relay/*.sqlite
 push_relay/firebase-service-account.json
 
+# Local Codex work data and distributable test artifacts
+.codex-home/
+.codex-remote-attachments/
+.codex-worktrees/
+CRCON-Mobile-Admin-*-test.apk
+
 # The upstream Python rule ignores every directory named `lib`; keep Flutter sources.
 !mobile_app/lib/
 !mobile_app/lib/**

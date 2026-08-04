@@ -2,17 +2,19 @@ import { NavLinkTab } from "@/components/shared/NavLinkTab";
 import { Alert, Box, Tabs } from "@mui/material";
 import { useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 function SettingsPage() {
+  const { t } = useTranslation();
   const [showAlert, setShowAlert] = useState(true);
   // Get active tab
   const location = useLocation();
   const tabs = [
-    { label: "General", href: "/settings/general" },
-    { label: "Game", href: "/settings/game" },
-    { label: "Server Name", href: "/settings/server-name" },
-    { label: "Admin Cam", href: "/settings/admin-cam-notifications" },
-    { label: "CRCON APP", href: "/settings/crcon" },
+    { label: t("settings.generalTabs.general"), href: "/settings/general" },
+    { label: t("settings.generalTabs.game"), href: "/settings/game" },
+    { label: t("settings.generalTabs.serverName"), href: "/settings/server-name" },
+    { label: t("settings.generalTabs.adminCam"), href: "/settings/admin-cam-notifications" },
+    { label: t("settings.generalTabs.crcon"), href: "/settings/crcon" },
   ];
   const activeTab = tabs.findIndex(({ href }) =>
     location.pathname.endsWith(href)
@@ -37,9 +39,7 @@ function SettingsPage() {
             onClose={() => setShowAlert(false)}
             sx={{ mb: 4 }}
           >
-            Displayed values may not match the current server settings, as the
-            HLL server doesn't provide this data as of version U18. You can
-            still adjust settings. This will be fixed in a future update.
+            {t("settings.generalTabs.notice")}
           </Alert>
         )}
         <Outlet />

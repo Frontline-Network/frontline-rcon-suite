@@ -1,11 +1,13 @@
 import { Paper, Tooltip, Chip, Typography } from "@mui/material";
 import { styled } from "@mui/material/styles";
+import { useTranslation } from "react-i18next";
 
 const ListItem = styled("li")(({ theme }) => ({
   margin: theme.spacing(0.5),
 }));
 
 export const BadgeList = ({ recipients, onDelete }) => {
+  const { t } = useTranslation();
   const handleDelete = (player) => () => {
     onDelete(player);
   };
@@ -30,7 +32,7 @@ export const BadgeList = ({ recipients, onDelete }) => {
         component="ul"
       >
         {isEmpty && (
-          <Typography color="textDisabled">No recipients selected</Typography>
+          <Typography color="textDisabled">{t("actions.noRecipients")}</Typography>
         )}
         {recipients.map(({ recipient, status, label }) => {
           return (

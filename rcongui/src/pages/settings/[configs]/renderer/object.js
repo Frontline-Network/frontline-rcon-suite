@@ -1,12 +1,14 @@
 import {InputLabel} from "@mui/material";
+import { useTranslation } from "react-i18next";
 
 const objectRenderer = (props) => {
+  const { t } = useTranslation();
   const name = props.uischema.scope.replace('#/properties/', '');
 
   return (
     <>
       <InputLabel>{name}</InputLabel>
-      The property <code>{name}</code> is not yet supported in the visual editor. To edit it, please use the code editor.
+      {t("settings.config.objectUnsupported", { name })}
     </>
   );
 }

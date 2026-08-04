@@ -12,8 +12,10 @@ import { MapWhitelistList } from "../../MapList";
 import { MapBuilderListItem } from "../../MapListItem";
 import MapListBuilder from "../../MapListBuilder";
 import RestoreIcon from "@mui/icons-material/Restore";
+import { useTranslation } from "react-i18next";
 
 function VotemapBuilderPage() {
+  const { t } = useTranslation();
   const { maps } = useRouteLoaderData("maps");
   const loaderData = useLoaderData();
   const queryClient = useQueryClient();
@@ -32,7 +34,7 @@ function VotemapBuilderPage() {
       queryClient.invalidateQueries({
         queryKey: mapsManagerQueryKeys.votemapWhitelist,
       });
-      toast.success("Votemap whitelist saved!");
+      toast.success(t("maps.votemapWhitelistSaved"));
     },
     onError: (error) => {
       toast.error(
@@ -50,7 +52,7 @@ function VotemapBuilderPage() {
       queryClient.invalidateQueries({
         queryKey: mapsManagerQueryKeys.votemapWhitelist,
       });
-      toast.success("Votemap has been reset!");
+      toast.success(t("maps.votemapWhitelistReset"));
     },
     onError: (error) => {
       toast.error(
@@ -63,8 +65,8 @@ function VotemapBuilderPage() {
   });
 
   const whitelistMaps = useMemo(
-    () => whitelist.map((mapId) => maps.find((map) => map.id === mapId)),
-    [whitelist]
+    () => (whitelist ?? []).map((mapId) => maps.find((map) => map.id === mapId)).filter(Boolean),
+    [whitelist, maps]
   );
 
   const handleWhitelistSave = (mapIds) => {
@@ -85,15 +87,15 @@ function VotemapBuilderPage() {
       });
       if (invalidMapIds.length) {
         toast.error(
-          `Some maps in your whitelist have been deleted or renamed: ${invalidMapIds.join(
-            ", "
-          )}. Reset the whitelist or changed your auto settings.`
+          t("maps.votemapWhitelistOutdated", {
+            maps: invalidMapIds.join(", "),
+          })
         );
       }
     }
   };
 
-  useEffect(checkForOutdatedMapIds, [whitelist]);
+  useEffect(checkForOutdatedMapIds, [whitelist, maps, t]);
 
   return (
     <>
@@ -120,8 +122,8 @@ function VotemapBuilderPage() {
           MapListItem: MapBuilderListItem,
         }}
         actions={
-          <Tooltip title="Apply defaults - Reset whitelist to all available maps">
-            <IconButton onClick={resetWhitelist} size="small" color="warning">
+          <Tooltip title={t("maps.resetVotemapWhitelist")}>
+            <IconButton onClick={resetWhitelist} size="small" color="warning" disabled={isResetWhitelist}>
               <RestoreIcon />
             </IconButton>
           </Tooltip>

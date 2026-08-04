@@ -1,5 +1,5 @@
 import { cmd } from "@/utils/fetchUtils";
-import { columns } from "../games/[gameId]/game-columns";
+import { createGameColumns } from "../games/[gameId]/game-columns";
 import { useLoaderData } from "react-router-dom";
 import {
   Stack,
@@ -16,14 +16,26 @@ import { useQuery } from "@tanstack/react-query";
 import { Board } from "@/components/game/Board";
 import dayjs from "dayjs";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import { useTranslation } from "react-i18next";
+import { useMemo } from "react";
+import PageHeader from "@/components/shared/PageHeader";
+import { demoMapLayers, demoScorePlayers, isFakeMode } from "@/mirage/demo-data";
 
 export const loader = async () => {
+  if (isFakeMode()) {
+    return {
+      stats: { stats: demoScorePlayers },
+      game: { time_remaining: 3427, score: { allied: 3, axis: 2 }, current_map: demoMapLayers[0], player_count_by_team: { allied: 43, axis: 43 } },
+    };
+  }
   const stats = await cmd.GET_LIVE_GAME();
   const game = await cmd.GET_PUBLIC_GAME_STATE();
   return { stats, game };
 };
 
 const LiveGamePage = () => {
+  const { t } = useTranslation();
+  const columns = useMemo(() => createGameColumns(t), [t]);
   const initialData = useLoaderData();
 
   const {
@@ -40,11 +52,16 @@ const LiveGamePage = () => {
   });
 
   if (statsIsLoading || gameIsLoading) {
-    return <div>Loading...</div>;
+    return <div>{t("common.loading")}</div>;
   }
 
   return (
     <Stack gap={3}>
+      <PageHeader
+        eyebrow={t("stats.liveGame.eyebrow")}
+        title={t("stats.liveGame.title")}
+        subtitle={t("stats.liveGame.subtitle")}
+      />
       <section id="game-board">
         <Board
           data={{
@@ -54,7 +71,7 @@ const LiveGamePage = () => {
               .format("HH:mm:ss"),
             allied_score: game.score.allied,
             axis_score: game.score.axis,
-            current_map: game.current_map.map,
+            current_map: game.current_map,
             num_allied_players: game.player_count_by_team.allied,
             num_axis_players: game.player_count_by_team.axis,
           }}
@@ -63,7 +80,7 @@ const LiveGamePage = () => {
 
       <Accordion>
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <Typography>Player Statistics</Typography>
+          <Typography>{t("stats.liveGame.playerStatistics")}</Typography>
         </AccordionSummary>
         <AccordionDetails>
           <Grid container spacing={3} sx={{ mb: 4 }}>

@@ -27,6 +27,8 @@ import debounce from "lodash/debounce";
 import { BroadcastFields } from "@/components/shared/BroadcastFields";
 import { parseBroadcastMessages, unpackBroadcastMessage } from "@/utils/lib";
 import { useTheme } from "@mui/material/styles";
+import { isFakeMode } from "@/mirage/demo-data";
+import { useTranslation } from "react-i18next";
 
 const Editor = lazy(() => import("@monaco-editor/react"));
 
@@ -51,6 +53,9 @@ const initialState = {
 
 export const loader = async ({ params }) => {
   const { category } = params;
+  if (isFakeMode()) {
+    return { category, messages: [{ id: 1, title: "Frontline Standard", content: "Willkommen beim Frontline Network.", updated_at: new Date().toISOString(), updated_by: "Frontline Admin" }] };
+  }
   const messages = await cmd.GET_MESSAGE_TEMPLATES({ params });
   messages.reverse(); // sort desc by updated_by
   return {
@@ -147,6 +152,7 @@ const StyledTextField = styled(TextField)((theme) => ({
 }));
 
 function EditorActions({ editor, actions }) {
+  const { t } = useTranslation();
   const canBeSaved = editor.title.trim() && editor.content.trim();
 
   return (
@@ -162,13 +168,13 @@ function EditorActions({ editor, actions }) {
       <Box sx={{ flexGrow: 1 }} />
       {editor.mode === MODE.READ && editor.id !== 0 && (
         <Button onClick={actions.update} startIcon={<EditIcon />}>
-          Edit
+          {t("common.edit")}
         </Button>
       )}
       {editor.mode === MODE.CREATE && (
         <>
           <Button onClick={actions.cancelCreate} startIcon={<CancelIcon />}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             type="submit"
@@ -177,14 +183,14 @@ function EditorActions({ editor, actions }) {
             startIcon={<SaveIcon />}
             disabled={!canBeSaved}
           >
-            Save
+            {t("common.save")}
           </Button>
         </>
       )}
       {editor.mode === MODE.EDIT && (
         <>
           <Button onClick={actions.cancelEdit} startIcon={<CancelIcon />}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             type="submit"
@@ -193,7 +199,7 @@ function EditorActions({ editor, actions }) {
             startIcon={<SaveIcon />}
             disabled={!canBeSaved}
           >
-            Save
+            {t("common.save")}
           </Button>
           <Button
             type="submit"
@@ -202,7 +208,7 @@ function EditorActions({ editor, actions }) {
             startIcon={<SaveAsIcon />}
             disabled={!canBeSaved}
           >
-            Save As New
+            {t("settings.templates.saveAsNew")}
           </Button>
         </>
       )}
@@ -215,14 +221,14 @@ function EditorActions({ editor, actions }) {
             value={INTENT.DELETE}
             startIcon={<DeleteIcon />}
           >
-            Delete
+            {t("common.delete")}
           </Button>
         </>
       )}
       {editor.mode === MODE.READ && (
         <>
           <Button onClick={actions.create} startIcon={<AddIcon />}>
-            Create New
+            {t("settings.templates.createNew")}
           </Button>
         </>
       )}
@@ -231,6 +237,7 @@ function EditorActions({ editor, actions }) {
 }
 
 function EditorFields({ editor, category, setEditor }) {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   const handleOnInputChange = (event) => {
@@ -263,7 +270,7 @@ function EditorFields({ editor, category, setEditor }) {
         name="title"
         value={editor.title}
         onChange={handleOnInputChange}
-        placeholder="Message title"
+        placeholder={t("settings.templates.messageTitle")}
         fullWidth
         required
         disabled={editor.mode === MODE.READ}
@@ -302,7 +309,7 @@ function EditorFields({ editor, category, setEditor }) {
           name="content"
           value={editor.content}
           onChange={handleOnInputChange}
-          placeholder="Message content"
+          placeholder={t("settings.templates.messageContent")}
           multiline
           minRows={16}
           fullWidth
@@ -315,6 +322,7 @@ function EditorFields({ editor, category, setEditor }) {
 }
 
 function MessageList({ messages, onMessageClick, selected }) {
+  const { t } = useTranslation();
   return (
     <Paper
       sx={{
@@ -341,9 +349,10 @@ function MessageList({ messages, onMessageClick, selected }) {
                     whiteSpace: "nowrap",
                   }}
                   primary={`#${message.id} - ${message.title}`}
-                  secondary={`Last update ${dayjs(message.updated_at).format(
-                    "LL"
-                  )} by ${message.updated_by}`}
+                  secondary={t("settings.templates.lastUpdated", {
+                    date: dayjs(message.updated_at).format("LL"),
+                    user: message.updated_by,
+                  })}
                 />
               </ListItemButton>
             </ListItem>
@@ -356,7 +365,7 @@ function MessageList({ messages, onMessageClick, selected }) {
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
               }}
-              primary={"No messages"}
+              primary={t("settings.templates.noMessages")}
             />
           </ListItem>
         )}
@@ -366,6 +375,7 @@ function MessageList({ messages, onMessageClick, selected }) {
 }
 
 const MessagesDetailPage = () => {
+  const { t } = useTranslation();
   const { category, messages } = useLoaderData();
   const action = useActionData();
   const [editor, setEditor] = useState(initialState);
@@ -462,8 +472,8 @@ const MessagesDetailPage = () => {
             </Box>
             <InputBase
               sx={{ ml: 1 }}
-              placeholder="Search message"
-              inputProps={{ "aria-label": "search message" }}
+              placeholder={t("settings.templates.search")}
+              inputProps={{ "aria-label": t("settings.templates.search") }}
               onChange={handleSearchChange}
             />
           </SearchWrapper>

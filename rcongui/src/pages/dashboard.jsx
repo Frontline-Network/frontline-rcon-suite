@@ -12,6 +12,10 @@ import ModeratorsCard from "@/components/cards/ModeratorsCard";
 import GamesCard from "@/components/cards/GamesCard";
 import MapStatsCard from "@/components/cards/MapStatsCard";
 import AutomodsCard from "@/components/cards/AutomodsCard";
+import BattleOverview from "@/components/dashboard/BattleOverview";
+import { Box, Stack, Typography } from "@mui/material";
+import { useTranslation } from "react-i18next";
+import dayjs from "dayjs";
 
 const SMALL_CARD_SIZE = {
   xs: 12,
@@ -29,6 +33,7 @@ const LARGE_CARD_SIZE = {
 };
 
 const Dashboard = () => {
+  const { t, i18n } = useTranslation();
   const status = useGlobalStore((state) => state.status);
 
   const { data: logs = [] } = useQuery({
@@ -110,7 +115,20 @@ const Dashboard = () => {
   });
 
   return (
-    <Grid container sx={{ overflow: "hidden" }} spacing={2}>
+    <Box sx={{ py: { xs: 2, md: 2.5 } }}>
+      <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ sm: "end" }} sx={{ mb: 2 }}>
+        <Box>
+          <Typography variant="h3" sx={{ textTransform: "uppercase" }}>{t("dashboard.title")}</Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase" }}>{t("dashboard.subtitle")}</Typography>
+        </Box>
+        <Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase", mt: { xs: 1, sm: 0 } }}>
+          {dayjs().locale(i18n.resolvedLanguage || "de").format("dddd, D. MMMM YYYY")}
+        </Typography>
+      </Stack>
+
+      <BattleOverview />
+
+      <Grid container sx={{ overflow: "hidden", mt: 2 }} spacing={2}>
       <Grid size={SMALL_CARD_SIZE}>
         <ServerSettingsCard />
       </Grid>
@@ -150,7 +168,8 @@ const Dashboard = () => {
       <Grid size={MEDIUM_CARD_SIZE}>
         <MapStatsCard games={games} />
       </Grid>
-    </Grid>
+      </Grid>
+    </Box>
   );
 };
 

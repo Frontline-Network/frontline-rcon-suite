@@ -19,8 +19,8 @@ import {
   IconButton,
   Divider,
 } from "@mui/material";
-import { useState } from "react";
-import { auditLogsColumns } from "./columns";
+import { useMemo, useState } from "react";
+import { getAuditLogsColumns } from "./columns";
 import Table from "@/components/table/Table";
 import {
   useReactTable,
@@ -34,6 +34,9 @@ import NavPagination from "@/pages/stats/games/nav-pagination";
 import { TablePageSizeSelect } from "@/components/table/TablePageSizeSelect";
 import DownloadIcon from "@mui/icons-material/Download";
 import downloadLogs from "./download";
+import { useTranslation } from "react-i18next";
+import PageHeader from "@/components/shared/PageHeader";
+import { demoAuditData, isFakeMode } from "@/mirage/demo-data";
 
 /**
  * @typedef {Object} AuditLogResponse
@@ -122,8 +125,10 @@ export const loader = async ({ request }) => {
     }
   });
 
-  const auditLogsResult = await cmd.GET_AUDIT_LOGS({ params });
-  const autocompleteOptions = await cmd.GET_AUDIT_LOGS_AUTOCOMPLETE();
+  const auditLogsResult = isFakeMode() ? demoAuditData : await cmd.GET_AUDIT_LOGS({ params });
+  const autocompleteOptions = isFakeMode()
+    ? { usernames: ["Frontline Admin", "Leitstelle"], commands: ["message_player", "set_map"] }
+    : await cmd.GET_AUDIT_LOGS_AUTOCOMPLETE();
 
   return {
     data: auditLogsResult,
@@ -133,7 +138,9 @@ export const loader = async ({ request }) => {
 };
 
 const AuditLogsPage = () => {
+  const { t } = useTranslation();
   const { data, fields, autocompleteOptions } = useLoaderData();
+  const auditLogsColumns = useMemo(() => getAuditLogsColumns(t), [t]);
 
   const { audit_logs, total_pages, page, page_size } = data;
 
@@ -208,9 +215,18 @@ const AuditLogsPage = () => {
 
   return (
     <Stack direction={{ xs: "column" }} spacing={1} sx={{ mt: 2 }}>
+      <PageHeader
+        eyebrow={t("records.auditLogs.eyebrow")}
+        title={t("records.auditLogs.title")}
+        subtitle={t("records.auditLogs.subtitle")}
+      />
       <Form method="GET" onSubmit={handleSubmit}>
         <Stack spacing={2} direction={{ xs: "column", lg: "row" }}>
           <Autocomplete
+            openText={t("common.openOptions")}
+            closeText={t("common.closeOptions")}
+            clearText={t("common.clearSelection")}
+            noOptionsText={t("common.noResults")}
             multiple
             sx={{ width: { xs: "100%", lg: "25%" } }}
             clearOnEscape
@@ -229,12 +245,16 @@ const AuditLogsPage = () => {
               <TextField
                 {...params}
                 variant="outlined"
-                label="Search by user"
+                label={t("records.auditLogs.user")}
                 fullWidth
               />
             )}
           />
           <Autocomplete
+            openText={t("common.openOptions")}
+            closeText={t("common.closeOptions")}
+            clearText={t("common.clearSelection")}
+            noOptionsText={t("common.noResults")}
             multiple
             sx={{ width: { xs: "100%", lg: "25%" } }}
             clearOnEscape
@@ -254,7 +274,7 @@ const AuditLogsPage = () => {
                 {...params}
                 variant="outlined"
                 name="commands"
-                label="Search by action"
+                label={t("records.auditLogs.action")}
                 fullWidth
               />
             )}
@@ -264,20 +284,20 @@ const AuditLogsPage = () => {
             sx={{ width: { xs: "100%", lg: "25%" } }}
             value={formFields.parameters}
             onChange={handleInputChange}
-            label="Search by parameters"
+            label={t("records.auditLogs.parameters")}
           />
           <FormControl sx={{ width: { xs: "100%", lg: "15%" } }}>
-            <InputLabel id="time-sort-label">Sort by time</InputLabel>
+            <InputLabel id="time-sort-label">{t("records.auditLogs.sort")}</InputLabel>
             <Select
               labelId="time-sort-label"
               name="time_sort"
               value={formFields.time_sort}
               onChange={handleInputChange}
-              label="Sort by time"
+              label={t("records.auditLogs.sort")}
               fullWidth
             >
-              <MenuItem value="desc">From newest</MenuItem>
-              <MenuItem value="asc">From oldest</MenuItem>
+              <MenuItem value="desc">{t("records.auditLogs.newest")}</MenuItem>
+              <MenuItem value="asc">{t("records.auditLogs.oldest")}</MenuItem>
             </Select>
           </FormControl>
 
@@ -289,7 +309,7 @@ const AuditLogsPage = () => {
             disabled={navigation.state === "loading"}
             onClick={handleSubmit}
           >
-            Search
+            {t("common.search")}
           </Button>
         </Stack>
       </Form>
@@ -318,6 +338,8 @@ const AuditLogsPage = () => {
                 },
               }}
               onClick={handleDownload}
+              aria-label={t("records.auditLogs.download")}
+              title={t("records.auditLogs.download")}
             >
               <DownloadIcon />
             </IconButton>

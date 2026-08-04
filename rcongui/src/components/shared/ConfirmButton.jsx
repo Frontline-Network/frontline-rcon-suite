@@ -7,18 +7,20 @@ import {
   DialogTitle,
 } from "@mui/material";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 const ConfirmButton = ({
   onConfirm,
   title,
   description,
   buttonText,
-  confirmText = "Confirm",
-  cancelText = "Cancel",
+  confirmText,
+  cancelText,
   buttonProps = {},
   disabled = false,
 }) => {
   const [open, setOpen] = useState(false);
+  const { t } = useTranslation();
 
   const handleConfirm = () => {
     onConfirm();
@@ -48,10 +50,10 @@ const ConfirmButton = ({
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpen(false)} color="warning">
-            {cancelText}
+            {cancelText ?? t("common.cancel")}
           </Button>
           <Button onClick={handleConfirm} color="primary" autoFocus>
-            {confirmText}
+            {confirmText ?? t("common.confirm")}
           </Button>
         </DialogActions>
       </Dialog>
@@ -59,4 +61,4 @@ const ConfirmButton = ({
   );
 };
 
-export default ConfirmButton; 
+export default ConfirmButton;

@@ -25,7 +25,7 @@ import {
   useNavigation,
   useSubmit,
 } from "react-router-dom";
-import { logsColumns } from "./columns";
+import { getLogsColumns } from "./columns";
 import {
   getCoreRowModel,
   getPaginationRowModel,
@@ -44,6 +44,9 @@ import DownloadIcon from "@mui/icons-material/Download";
 import { logActions } from "@/utils/lib";
 import timezonePlugin from "dayjs/plugin/timezone";
 import utcPlugin from "dayjs/plugin/utc";
+import { useTranslation } from "react-i18next";
+import PageHeader from "@/components/shared/PageHeader";
+import { demoHistoricalLogs, isFakeMode } from "@/mirage/demo-data";
 
 dayjs.extend(timezonePlugin);
 dayjs.extend(utcPlugin);
@@ -139,7 +142,9 @@ export const loader = async ({ request }) => {
     server_filter,
   };
 
-  const response = await cmd.GET_HISTORICAL_LOGS({ payload: fields });
+  const response = isFakeMode()
+    ? { result: demoHistoricalLogs }
+    : await cmd.GET_HISTORICAL_LOGS({ payload: fields });
 
   const logs = response.result;
 
@@ -150,8 +155,10 @@ export const loader = async ({ request }) => {
 };
 
 const GameLogsPage = () => {
+  const { t } = useTranslation();
   const { logs, fields } = useLoaderData();
   const submit = useSubmit();
+  const logsColumns = useMemo(() => getLogsColumns(t), [t]);
 
   const table = useReactTable({
     data: logs ?? [],
@@ -186,12 +193,18 @@ const GameLogsPage = () => {
   };
 
   return (
-    <Stack direction={{ xs: "column", lg: "row" }} spacing={1} sx={{ mt: 2 }}>
+    <Stack spacing={1} sx={{ mt: 2 }}>
+      <PageHeader
+        eyebrow={t("records.gameLogs.eyebrow")}
+        title={t("records.gameLogs.title")}
+        subtitle={t("records.gameLogs.subtitle")}
+      />
+      <Stack direction={{ xs: "column", lg: "row" }} spacing={1}>
       <GameLogsForm fields={fields} onSubmit={handleSubmit} />
       <Stack sx={{ flexGrow: 1 }}>
         <TableToolbar>
           <DebouncedSearchInput
-            placeholder={"Search logs"}
+            placeholder={t("records.gameLogs.searchLogs")}
             onChange={(value) => {
               table.getColumn("content")?.setFilterValue(value);
             }}
@@ -210,6 +223,8 @@ const GameLogsPage = () => {
               },
             }}
             onClick={handleDownload}
+            aria-label={t("records.gameLogs.download")}
+            title={t("records.gameLogs.download")}
           >
             <DownloadIcon />
           </IconButton>
@@ -227,11 +242,13 @@ const GameLogsPage = () => {
           <TablePagination table={table} />
         </TableToolbar>
       </Stack>
+      </Stack>
     </Stack>
   );
 };
 
 const GameLogsForm = ({ fields, onSubmit }) => {
+  const { t } = useTranslation();
   const navigation = useNavigation();
   const server = useGlobalStore((state) => state.serverState);
   const otherServers = useGlobalStore((state) => state.servers);
@@ -316,7 +333,7 @@ const GameLogsForm = ({ fields, onSubmit }) => {
           <Stack spacing={2} sx={{ p: 2 }}>
             <TextField
               fullWidth
-              label="Player ID"
+              label={t("records.gameLogs.playerId")}
               name="player_id"
               value={formFields.player_id}
               onChange={handleInputChange}
@@ -324,7 +341,7 @@ const GameLogsForm = ({ fields, onSubmit }) => {
             <Stack direction="row" alignItems="center" spacing={1}>
               <TextField
                 fullWidth
-                label="Name"
+                label={t("records.gameLogs.name")}
                 name="player_name"
                 value={formFields.player_name}
                 onChange={handleInputChange}
@@ -338,13 +355,17 @@ const GameLogsForm = ({ fields, onSubmit }) => {
                     color="primary"
                   />
                 }
-                label="Exact"
+                label={t("records.gameLogs.exact")}
                 labelPlacement="end"
               />
             </Stack>
 
             <Stack direction="row" alignItems="center" spacing={1}>
               <Autocomplete
+                openText={t("common.openOptions")}
+                closeText={t("common.closeOptions")}
+                clearText={t("common.clearSelection")}
+                noOptionsText={t("common.noResults")}
                 aria-labelledby="action_label"
                 fullWidth
                 freeSolo
@@ -365,7 +386,7 @@ const GameLogsForm = ({ fields, onSubmit }) => {
                   setActionInputValue(newValue);
                 }}
                 renderInput={(params) => (
-                  <TextField name="action" {...params} label="Action" />
+                  <TextField name="action" {...params} label={t("records.gameLogs.action")} />
                 )}
               />
               <FormControlLabel
@@ -377,21 +398,21 @@ const GameLogsForm = ({ fields, onSubmit }) => {
                     color="primary"
                   />
                 }
-                label="Exact"
+                label={t("records.gameLogs.exact")}
                 labelPlacement="end"
               />
             </Stack>
 
             <FormControl fullWidth>
-              <InputLabel id="server_filter_label">Server filter</InputLabel>
+              <InputLabel id="server_filter_label">{t("records.gameLogs.server")}</InputLabel>
               <Select
                 labelId="server_filter_label"
                 name="server_filter"
                 value={formFields.server_filter}
                 onChange={handleInputChange}
-                label="Server filter"
+                label={t("records.gameLogs.server")}
               >
-                <MenuItem value={0}>All servers</MenuItem>
+                <MenuItem value={0}>{t("records.gameLogs.allServers")}</MenuItem>
                 {serverOptions.map((option) => (
                   <MenuItem key={option.value} value={option.value}>
                     {option.label}
@@ -402,7 +423,7 @@ const GameLogsForm = ({ fields, onSubmit }) => {
 
             <TextField
               fullWidth
-              label="Limit"
+                label={t("records.gameLogs.limit")}
               name="limit"
               type="number"
               value={formFields.limit}
@@ -411,8 +432,9 @@ const GameLogsForm = ({ fields, onSubmit }) => {
 
             <LocalizationProvider dateAdapter={AdapterDayjs}>
               <DesktopDateTimePicker
+                localeText={{ openDatePickerDialogue: () => t("common.chooseDate") }}
                 value={formFields?.from}
-                label="From time"
+                label={t("records.gameLogs.from")}
                 name="from"
                 onChange={handleDateChange("from")}
                 format="YYYY/MM/DD HH:mm"
@@ -423,7 +445,8 @@ const GameLogsForm = ({ fields, onSubmit }) => {
 
             <LocalizationProvider dateAdapter={AdapterDayjs}>
               <DesktopDateTimePicker
-                label="Till time"
+                localeText={{ openDatePickerDialogue: () => t("common.chooseDate") }}
+                label={t("records.gameLogs.until")}
                 name="till"
                 onChange={handleDateChange("till")}
                 format="YYYY/MM/DD HH:mm"
@@ -434,15 +457,15 @@ const GameLogsForm = ({ fields, onSubmit }) => {
             </LocalizationProvider>
 
             <FormControl fullWidth>
-              <InputLabel id="time_sort_label">Time sort</InputLabel>
+              <InputLabel id="time_sort_label">{t("records.gameLogs.sort")}</InputLabel>
               <Select
                 labelId="time_sort_label"
                 name="time_sort"
                 value={formFields.time_sort}
                 onChange={handleInputChange}
               >
-                <MenuItem value={"desc"}>From newest</MenuItem>
-                <MenuItem value={"asc"}>From oldest</MenuItem>
+                <MenuItem value={"desc"}>{t("records.gameLogs.newest")}</MenuItem>
+                <MenuItem value={"asc"}>{t("records.gameLogs.oldest")}</MenuItem>
               </Select>
             </FormControl>
 
@@ -452,7 +475,7 @@ const GameLogsForm = ({ fields, onSubmit }) => {
               color="error"
               size="large"
             >
-              Clear
+              {t("records.gameLogs.clear")}
             </Button>
 
             <Button
@@ -463,7 +486,7 @@ const GameLogsForm = ({ fields, onSubmit }) => {
               type="submit"
               disabled={navigation.state === "loading"}
             >
-              Search
+              {t("common.search")}
             </Button>
           </Stack>
         </Form>

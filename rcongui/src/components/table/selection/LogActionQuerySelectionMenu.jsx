@@ -12,6 +12,7 @@ import { PopoverMenu } from "@/components/shared/PopoverMenu";
 import { logActions } from "@/utils/lib";
 import { SearchInput } from "@/components/shared/SearchInput";
 import { useSelectionMenu } from "@/hooks/useSelectionMenu";
+import { useTranslation } from "react-i18next";
 
 function fromValue(v) {
   return v === true ? "on" : "off";
@@ -30,6 +31,7 @@ export const LogActionQuerySelectionMenu = ({
   onToggle,
   toggleValue,
 }) => {
+  const { t } = useTranslation();
 
   const {
     search,
@@ -57,32 +59,32 @@ export const LogActionQuerySelectionMenu = ({
           }
           onToggle(value === "on" ? true : false);
         }}
-        aria-label="logs table filter by action"
+        aria-label={t("selection.logAction")}
         fullWidth
       >
         <ToggleButton
           sx={{ borderRadius: 0 }}
           value="on"
-          aria-label="filter by action"
+          aria-label={t("selection.logAction")}
         >
           ON
         </ToggleButton>
         <ToggleButton
           sx={{ borderRadius: 0 }}
           value="off"
-          aria-label="filter by action"
+          aria-label={t("selection.logAction")}
         >
           OFF
         </ToggleButton>
       </ToggleButtonGroup>
       <PopoverMenu
         id="log-action-query-picker"
-        description="Pick an action to filter the logs query"
+        description={t("selection.logActionQueryDescription")}
         onOpen={handleOpen}
         onClose={onClose}
         renderButton={(props) => (
           <Button variant="outlined" fullWidth disableRipple color="inherit" {...props}>
-            Open Selection
+            {t("common.openSelection")}
           </Button>
         )} 
       >

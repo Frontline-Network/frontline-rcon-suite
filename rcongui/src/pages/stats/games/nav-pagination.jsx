@@ -6,6 +6,7 @@ import KeyboardArrowLeftIcon from "@mui/icons-material/KeyboardArrowLeft";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import CheckIcon from "@mui/icons-material/Check";
 import { green } from "@mui/material/colors";
+import { useTranslation } from "react-i18next";
 
 const PaginationItem = styled((props) => (
   <Button size="small" component={Link} {...props} />
@@ -48,6 +49,7 @@ const PaginationEllipsis = styled((props) => (
 });
 
 export default function NavPagination({ page, maxPages, disabled, ...props }) {
+  const { t } = useTranslation();
   const [insertCustom, setInsertCustom] = useState(false);
   const [customPageValue, setCustomPageValue] = useState(page);
   const search = useLocation().search;
@@ -83,7 +85,12 @@ export default function NavPagination({ page, maxPages, disabled, ...props }) {
       gap={0.5}      
       {...props}
     >
-      {page > 1 && <PaginationPrevious to={goToPage(page - 1)} />}
+      {page > 1 && (
+        <PaginationPrevious
+          to={goToPage(page - 1)}
+          aria-label={t("common.pagination.previous")}
+        />
+      )}
       <PaginationItem
         variant={page === 1 ? "contained" : "outlined"}
         to={goToPage(1)}
@@ -112,11 +119,15 @@ export default function NavPagination({ page, maxPages, disabled, ...props }) {
       {page !== maxPages - 1 && page !== maxPages && (
         <div>
           {!insertCustom ? (
-              <PaginationEllipsis onClick={() => setInsertCustom(true)} />
+              <PaginationEllipsis
+                aria-label={t("common.pagination.goToPage")}
+                onClick={() => setInsertCustom(true)}
+              />
           ) : (
             <Stack direction={"row"} gap={0.5} alignItems={"center"} sx={{ px: 2 }}>
               <Input
                 placeholder={"..."}
+                aria-label={t("common.pagination.pageNumber")}
                 value={customPageValue}
                 onChange={handleCustomValueChange}
                 type="number"
@@ -138,6 +149,7 @@ export default function NavPagination({ page, maxPages, disabled, ...props }) {
                 to={goToPage(customPageValue)}
                 onClick={handleConfirmCustomClick}
                 disabled={disabled}
+                aria-label={t("common.confirm")}
               >
                 <CheckIcon size={16} />
               </Button>
@@ -155,7 +167,11 @@ export default function NavPagination({ page, maxPages, disabled, ...props }) {
         </PaginationItem>
       )}
       {page < maxPages && (
-        <PaginationNext to={goToPage(page + 1)} disabled={disabled} />
+        <PaginationNext
+          to={goToPage(page + 1)}
+          disabled={disabled}
+          aria-label={t("common.pagination.next")}
+        />
       )}
     </Stack>
   );

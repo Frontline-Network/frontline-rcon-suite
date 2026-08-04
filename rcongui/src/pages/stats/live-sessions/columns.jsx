@@ -46,7 +46,7 @@ const Center = styled(Box)(() => ({
   alignContent: "center",
 }));
 
-export const columns = [
+export const createLiveSessionColumns = (t) => [
   {
     id: "select",
     header: ({ table }) => (
@@ -81,7 +81,7 @@ export const columns = [
   {
     accessorKey: "team",
     id: "team",
-    header: SortableHeader("T", "Team"),
+    header: SortableHeader("T", t("stats.liveSessions.team")),
     cell: ({ row }) => {
       return (
         <Center>
@@ -105,7 +105,7 @@ export const columns = [
   },
   {
     id: "unit",
-    header: SortableHeader("U","Unit"),
+    header: SortableHeader("U", t("stats.liveSessions.unit")),
     accessorKey: "unit_name",
     // Group by unit name and team
     // getGroupingValue: (row) => `${row.original.unit_name ?? "-"}-${row.original.team}`,
@@ -126,7 +126,7 @@ export const columns = [
   },
   {
     id: "role",
-    header: SortableHeader("R","Role"),
+    header: SortableHeader("R", t("stats.liveSessions.role")),
     accessorKey: "role",
     cell: ({ row }) => {
       const themedImg = useThemedImages();
@@ -152,7 +152,7 @@ export const columns = [
   },
   {
     id: "level",
-    header: SortableHeader("LVL","Level"),
+    header: SortableHeader("LVL", t("stats.liveSessions.level")),
     accessorKey: "level",
     aggregationFn: "mean",
     cell: ({ row }) => {
@@ -168,7 +168,7 @@ export const columns = [
   },
   {
     id: "actions",
-    header: <span title="Actions">🛠️</span>,
+    header: <span title={t("common.actions")}>🛠️</span>,
     accessorKey: "actions",
     cell: ({ row }) => {
       if (row.getCanExpand()) return (
@@ -203,7 +203,7 @@ export const columns = [
   },
   {
     id: "name",
-    header: SortableHeader("Name","Name"),
+    header: SortableHeader(t("stats.liveSessions.name"), t("stats.liveSessions.name")),
     accessorKey: "name",
     cell: ({ row }) => {
       return (
@@ -222,7 +222,7 @@ export const columns = [
   },
   {
     id: "kills",
-    header: SortableHeader("K","Kills"),
+    header: SortableHeader("K", t("stats.liveSessions.kills")),
     accessorKey: "kills",
     aggregationFn: "sum",
     cell: ({ row }) => {
@@ -238,7 +238,7 @@ export const columns = [
   },
   {
     id: "deaths",
-    header: SortableHeader("D","Deaths"),
+    header: SortableHeader("D", t("stats.liveSessions.deaths")),
     accessorKey: "deaths",
     aggregationFn: "sum",
     cell: ({ row }) => {
@@ -254,7 +254,7 @@ export const columns = [
   },
   {
     id: "combat",
-    header: SortableHeader("C","Combat Score"),
+    header: SortableHeader("C", t("stats.liveSessions.combatScore")),
     accessorKey: "combat",
     aggregationFn: "sum",
     cell: ({ row }) => {
@@ -270,7 +270,7 @@ export const columns = [
   },
   {
     id: "offense",
-    header: SortableHeader("O", "Offense Score"),
+    header: SortableHeader("O", t("stats.liveSessions.offenseScore")),
     accessorKey: "offense",
     aggregationFn: "sum",
     cell: ({ row }) => {
@@ -286,7 +286,7 @@ export const columns = [
   },
   {
     id: "defense",
-    header: SortableHeader("D", "Defense Score"),
+    header: SortableHeader("D", t("stats.liveSessions.defenseScore")),
     accessorKey: "defense",
     aggregationFn: "sum",
     cell: ({ row }) => {
@@ -302,7 +302,7 @@ export const columns = [
   },
   {
     id: "support",
-    header: SortableHeader("S", "Support Score"),
+    header: SortableHeader("S", t("stats.liveSessions.supportScore")),
     accessorKey: "support",
     aggregationFn: "sum",
     cell: ({ row }) => {
@@ -318,7 +318,7 @@ export const columns = [
   },
   {
     id: "time",
-    header: SortableHeader("Time", "Current Playtime"),
+    header: SortableHeader(t("records.playerDetails.time"), t("stats.liveSessions.currentPlaytime")),
     accessorKey: "profile.current_playtime_seconds",
     aggregationFn: "mean",
     cell: ({ row }) => {

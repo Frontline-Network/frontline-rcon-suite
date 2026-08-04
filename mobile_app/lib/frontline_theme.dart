@@ -29,6 +29,7 @@ abstract final class FrontlineTheme {
       colorScheme: scheme,
       scaffoldBackgroundColor: background,
       useMaterial3: true,
+      fontFamily: 'Roboto',
       appBarTheme: const AppBarTheme(
         backgroundColor: background,
         foregroundColor: chalk,

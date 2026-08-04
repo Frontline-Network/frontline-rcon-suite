@@ -1,16 +1,17 @@
 import App from "./App";
 import "./index.css";
+import "./i18n";
 import * as serviceWorker from "./serviceWorker";
 import { createRoot } from "react-dom/client";
-import '@fontsource/roboto/300.css';
-import '@fontsource/roboto/400.css';
-import '@fontsource/roboto/500.css';
-import '@fontsource/roboto/700.css';
 import { makeServer } from "./mirage";
 
 const app = document.getElementById('root');
 
 const root = createRoot(app);
+
+if (import.meta.env.MODE === "fake") {
+  makeServer({ environment: "development" });
+}
 
 root.render(<App />);
 
@@ -18,7 +19,3 @@ root.render(<App />);
 // unregister() to register() below. Note this comes with some pitfalls.
 // Learn more about service workers: https://bit.ly/CRA-PWA
 serviceWorker.unregister();
-
-if (import.meta.env.MODE === "fake" && import.meta.env.DEV) {
-  makeServer({ environment: "development" });
-}

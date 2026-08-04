@@ -10,10 +10,12 @@ import { lazy, Suspense } from "react";
 import { Controller } from "react-hook-form";
 import emojiData from "@emoji-mart/data/sets/15/twitter.json";
 import Emoji from "@/components/shared/Emoji";
+import { useTranslation } from "react-i18next";
 
 const EmojiPicker = lazy(() => import("@emoji-mart/react"));
 
 export const AddFlagFormFields = ({ control, errors, setValue }) => {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   // It is called 'comment' at the backend but it is really a 'note' for the flag
@@ -28,7 +30,7 @@ export const AddFlagFormFields = ({ control, errors, setValue }) => {
       <Stack direction={"row"} spacing={1}>
         <Controller
           defaultValue={""}
-          rules={{ required: "Flag is required." }}
+          rules={{ required: t("fields.flagRequired") }}
           name={"flag"}
           control={control}
           render={({ field }) => (
@@ -49,13 +51,13 @@ export const AddFlagFormFields = ({ control, errors, setValue }) => {
                         : theme.palette.grey[500],
                   }}
                 >
-                  {field.value ? <Emoji emoji={field.value} size={24} /> : "Flag"}
+                  {field.value ? <Emoji emoji={field.value} size={24} /> : t("fields.flag")}
                 </Box>
                 <Typography
                   variant="caption"
                   sx={{ color: (theme) => hasFlagError ? theme.palette.error.main : theme.palette.grey[400], px: 1 }}
                 >
-                  {hasFlagError ? flagError.message : "Emoji"}
+                  {hasFlagError ? flagError.message : t("fields.emoji")}
                 </Typography>
               </Stack>
               <input
@@ -72,10 +74,10 @@ export const AddFlagFormFields = ({ control, errors, setValue }) => {
           control={control}
           error={hasNoteError}
           rows={1}
-          label={"Note"}
+          label={t("fields.note")}
           name={"comment"}
           helperText={
-            hasNoteError ? noteError.message : "Your note for this flag."
+            hasNoteError ? noteError.message : t("fields.noteHelp")
           }
           sx={{ flexGrow: 1 }}
           defaultValue={""}

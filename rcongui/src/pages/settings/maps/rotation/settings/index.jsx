@@ -8,8 +8,10 @@ import Padlock from "@/components/shared/Padlock";
 import { Typography } from "@mui/material";
 import { toast } from "react-toastify";
 import { useLoaderData } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 function MapRotationSettings() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const loaderData = useLoaderData()
   
@@ -26,7 +28,7 @@ function MapRotationSettings() {
       queryClient.invalidateQueries({
         queryKey: mapsManagerQueryKeys.mapRotationShuffle,
       });
-      toast.success(`Map rotation shuffle is now ${enabled ? "enabled" : "disabled"}`);
+      toast.success(t("maps.rotationShuffleUpdated", { state: t(enabled ? "common.enabled" : "common.disabled") }));
     },
     onError: (error) => {
       toast.error(
@@ -48,9 +50,9 @@ function MapRotationSettings() {
             flexDirection: "column",
           }}
         >
-          <Typography variant={"body"}>Shuffle map rotation</Typography>
+          <Typography variant={"body"}>{t("maps.rotationShuffle")}</Typography>
           <Typography variant={"caption"}>
-            This should randomly shuffle your map rotation.
+            {t("maps.rotationShuffleDescription")}
           </Typography>
         </div>
       }

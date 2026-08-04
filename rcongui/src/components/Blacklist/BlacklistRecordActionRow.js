@@ -4,6 +4,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import TimerOffIcon from "@mui/icons-material/TimerOff";
 import DeleteIcon from "@mui/icons-material/Delete";
 import Grid from "@mui/material/Grid2";
+import { useTranslation } from "react-i18next";
 
 
 const BlacklistRecordActionRow = ({
@@ -12,28 +13,29 @@ const BlacklistRecordActionRow = ({
   onExpire,
   onDelete,
 }) => {
+  const { t } = useTranslation();
   return (
     (<Grid container justifyContent="center">
       <Grid>
         <ButtonGroup size="small" variant="text">
-          <Button>
+          <Button onClick={onEdit} aria-label={t("records.blacklists.editRecord")}>
             <Tooltip
-              title="Edit this record"
+              title={t("records.blacklists.editRecord")}
               arrow
             >
-              <EditIcon size="small" onClick={onEdit} />
+              <EditIcon size="small" />
             </Tooltip>
           </Button>
 
-          <Button disabled={isExpired}>
-            <Tooltip title="Expire this record" arrow>
-              <TimerOffIcon size="small" onClick={onExpire} />
+          <Button disabled={isExpired} onClick={onExpire} aria-label={t("records.blacklists.expireRecord")}>
+            <Tooltip title={t("records.blacklists.expireRecord")} arrow>
+              <TimerOffIcon size="small" />
             </Tooltip>
           </Button>
 
-          <Button>
-            <Tooltip title="Delete this record" arrow>
-              <DeleteIcon size="small" onClick={onDelete} />
+          <Button onClick={onDelete} aria-label={t("records.blacklists.deleteRecord")}>
+            <Tooltip title={t("records.blacklists.deleteRecord")} arrow>
+              <DeleteIcon size="small" />
             </Tooltip>
           </Button>
         </ButtonGroup>

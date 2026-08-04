@@ -8,7 +8,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { getCoreRowModel } from "@tanstack/react-table";
-import { columns } from "./columns";
+import { createLiveSessionColumns } from "./columns";
 import Table from "@/components/table/Table";
 import { isLeader, normalizePlayerProfile } from "@/utils/lib";
 import { extractPlayers } from "@/utils/extractPlayers";
@@ -19,9 +19,13 @@ import { generatePlayerActions } from "@/features/player-action/actions";
 import { useLiveSessionsTableStore } from "@/stores/table-config";
 import TableConfigDrawer from "@/components/table/TableConfigDrawer";
 import SettingsIcon from "@mui/icons-material/Settings";
+import { useTranslation } from "react-i18next";
+import PageHeader from "@/components/shared/PageHeader";
 
 const LiveSessionsPage = () => {
+  const { t } = useTranslation();
   const { data } = teamsLiveQuery({ refetchInterval: 15 * 1000 });
+  const columns = useMemo(() => createLiveSessionColumns(t), [t]);
 
   const tableConfig = useLiveSessionsTableStore();
   const [tableConfigDrawerOpen, setTableConfigDrawerOpen] = useState(false);
@@ -69,7 +73,7 @@ const LiveSessionsPage = () => {
 
         const unitLeader = unit.leader ?? {
           profile: normalizePlayerProfile({}),
-          name: unit.teamName === "neutral" ? "Unassigned" : "No Leader",
+          name: unit.teamName === "neutral" ? t("stats.liveSessions.unassigned") : t("stats.liveSessions.noLeader"),
           unit_name: unit.unitName,
           team: unit.teamName,
           role: "",
@@ -86,7 +90,7 @@ const LiveSessionsPage = () => {
     );
 
     return teamsRows.reduce((acc, team) => [...acc, ...team], []);
-  }, [data]);
+  }, [data, t]);
 
   const table = useReactTable({
     data: playersData,
@@ -100,6 +104,11 @@ const LiveSessionsPage = () => {
 
   return (
     <Box>
+      <PageHeader
+        eyebrow={t("stats.liveSessions.eyebrow")}
+        title={t("stats.liveSessions.title")}
+        subtitle={t("stats.liveSessions.subtitle")}
+      />
       <TableToolbar table={table}>
         <ActionMenuButton
           actions={generatePlayerActions({
@@ -118,7 +127,7 @@ const LiveSessionsPage = () => {
           }}
         />
         <DebouncedSearchInput
-          placeholder={"Search player"}
+          placeholder={t("stats.liveSessions.searchPlayer")}
           initialValue={table.getColumn("name")?.getFilterValue() ?? ""}
           onChange={(value) => {
             table.getColumn("name")?.setFilterValue(value);
@@ -137,7 +146,7 @@ const LiveSessionsPage = () => {
       </TableToolbar>
       <Table table={table} config={tableConfig} />
       <TableConfigDrawer
-        name="Live Sessions"
+        name={t("stats.liveSessions.tableSettings")}
         open={tableConfigDrawerOpen}
         onClose={(config) => {
           setTableConfigDrawerOpen(false);

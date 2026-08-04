@@ -75,31 +75,10 @@ export const getMarks = (key) => {
   }
 };
 
-export const getHelpText = (key) => {
-  switch (key) {
-    case "autobalance_threshold":
-      return "0 means the teams must match exactly";
-    case "autobalance_enabled":
-      return "Autobalance will automatically move players around to balance the teams.";
-    case "queue_length":
-      return "Recommended value: 6";
-    case "vip_slots_num":
-      return "Recommended value: 1-2";
-    case "match_warfare_timer":
-      return "Default is 90 minutes";
-    case "match_offensive_timer":
-      return "Default is 30 minutes";
-    case "match_skirmish_timer":
-      return "Default is 30 minutes";
-    case "warmup_warfare_timer":
-    case "warmup_skirmish_timer":
-      return "Default is 3 minutes";
-    case "votekick_thresholds":
-      return "Set the number of votes required to kick a player based on the number of players in the team. The first field defines the minimum number of players in the team, and the second field defines the number of votes required. Reasonable values are [0, 1], [10, 5], [25, 12], [50, 20].";
-    default:
-      return "0 to disable";
-  }
-};
+export const getHelpText = (key, t) =>
+  t(`settings.general.help.${key}`, {
+    defaultValue: t("settings.general.help.default"),
+  });
 
 export const getStep = (key) => {
   switch (key) {

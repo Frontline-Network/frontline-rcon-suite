@@ -8,6 +8,7 @@ import Popper from '@mui/material/Popper';
 import MenuItem from '@mui/material/MenuItem';
 import MenuList from '@mui/material/MenuList';
 import {Fragment, useRef, useState} from "react";
+import { useTranslation } from "react-i18next";
 
 /**
  * 
@@ -15,6 +16,7 @@ import {Fragment, useRef, useState} from "react";
  * @returns 
  */
 export default function SplitButton({ options, disabled, color, variant }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const anchorRef = useRef(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -44,7 +46,7 @@ export default function SplitButton({ options, disabled, color, variant }) {
         variant={variant ?? "contained"}
         color={color ?? "primary"}
         ref={anchorRef}
-        aria-label="Button group with a nested menu"
+        aria-label={t("common.optionMenu")}
       >
         <Button {...(selectedOption.buttonProps ?? {})}>
           {selectedOption.name}
@@ -53,7 +55,7 @@ export default function SplitButton({ options, disabled, color, variant }) {
           size="small"
           aria-controls={open ? 'split-button-menu' : undefined}
           aria-expanded={open ? 'true' : undefined}
-          aria-label="select merge strategy"
+          aria-label={t("common.selectOption")}
           aria-haspopup="menu"
           onClick={handleToggle}
           disabled={disabled ?? false}

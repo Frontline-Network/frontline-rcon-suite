@@ -29,7 +29,7 @@ const Center = styled(Box)(() => ({
   alignContent: "center",
 }));
 
-export const columns = [
+export const createGameColumns = (t) => [
   {
     id: "select",
     header: ({ table }) => (
@@ -63,7 +63,7 @@ export const columns = [
   },
   {
     id: "country",
-    header: SortableHeader("🌎", "Country"),
+    header: SortableHeader("🌎", t("records.players.country")),
     accessorKey: "steaminfo.country",
     cell: ({ row }) => {
       return row.original.steaminfo?.country && row.original.steaminfo?.country !== "private" ? (
@@ -76,7 +76,7 @@ export const columns = [
   },
   {
     id: "actions",
-    header: <span title="Actions">🛠️</span>,
+    header: <span title={t("common.actions")}>🛠️</span>,
     accessorKey: "actions",
     cell: ({ row }) => {
       return (
@@ -98,7 +98,7 @@ export const columns = [
   },
   {
     id: "name",
-    header: SortableHeader("Name", "Name"),
+    header: SortableHeader(t("stats.gameDetails.csv.name"), t("stats.gameDetails.csv.name")),
     accessorKey: "player",
     cell: ({ row }) => {
       return (
@@ -137,7 +137,7 @@ export const columns = [
   },
   {
     id: "kd",
-    header: SortableHeader("K/D","Kills/Deaths"),
+    header: SortableHeader("K/D", `${t("stats.gameDetails.metrics.kills")} / ${t("stats.gameDetails.deaths")}`),
     accessorKey: "kill_death_ratio",
     cell: ({ row }) => {
       return <>{row.original.kill_death_ratio}</>;
@@ -148,7 +148,7 @@ export const columns = [
   },
   {
     id: "kpm",
-    header: SortableHeader("K/M","Kills/Minute"),
+    header: SortableHeader("K/M", t("stats.gameDetails.killsPerMinute")),
     accessorKey: "kills_per_minute",
     cell: ({ row }) => {
       return <>{row.original.kills_per_minute}</>;
@@ -159,7 +159,7 @@ export const columns = [
   },
   {
     id: "kills",
-    header: SortableHeader("Kills","Kills"),
+    header: SortableHeader(t("stats.gameDetails.metrics.kills"), t("stats.gameDetails.metrics.kills")),
     accessorKey: "kills",
     cell: ({ row }) => {
       return <>{row.original.kills}</>;
@@ -170,7 +170,7 @@ export const columns = [
   },
   {
     id: "deaths",
-    header: SortableHeader("Deaths","Deaths"),
+    header: SortableHeader(t("stats.gameDetails.deaths"), t("stats.gameDetails.deaths")),
     accessorKey: "deaths",
     cell: ({ row }) => {
       return <>{row.original.deaths}</>;
@@ -181,7 +181,7 @@ export const columns = [
   },
   {
     id: "tk",
-    header: SortableHeader("TKs","Team Kills"),
+    header: SortableHeader("TKs", t("stats.gameDetails.teamKills")),
     accessorKey: "teamkills",
     cell: ({ row }) => {
       return <>{row.original.teamkills}</>;
@@ -192,7 +192,7 @@ export const columns = [
   },
   {
     id: "tk_streak",
-    header: SortableHeader("TK Streak","Team Kills Streak"),
+    header: SortableHeader("TK-Serie", t("stats.gameDetails.teamKillStreak")),
     accessorKey: "teamkills_streak",
     cell: ({ row }) => {
       return <>{row.original.teamkills_streak}</>;
@@ -203,7 +203,7 @@ export const columns = [
   },
   {
     id: "td",
-    header: SortableHeader("TDs","Deaths by Teammates"),
+    header: SortableHeader("TT", t("stats.gameDetails.deathsByTeamKill")),
     accessorKey: "deaths_by_tk",
     cell: ({ row }) => {
       return <>{row.original.deaths_by_tk}</>;
@@ -214,7 +214,7 @@ export const columns = [
   },
   {
     id: "td_streak",
-    header: SortableHeader("TD Streak","Deaths by Teammates Streak"),
+    header: SortableHeader("TT-Serie", t("stats.gameDetails.teamDeathStreak")),
     accessorKey: "deaths_by_tk_streak",
     cell: ({ row }) => {
       return <>{row.original.deaths_by_tk_streak}</>;
@@ -225,14 +225,17 @@ export const columns = [
   },
   {
     id: "time",
-    header: SortableHeader("Time","Time Played"),
-    accessorKey: "time_seconds",
+    header: SortableHeader(t("records.playerDetails.time"), t("stats.gameDetails.duration")),
+    accessorFn: (row) => row.time_seconds ?? row.time ?? 0,
     aggregationFn: "mean",
     cell: ({ row }) => {
+      const seconds = Number(
+        row.original.time_seconds ?? row.original.time ?? 0,
+      );
       return (
         <>
           {dayjs
-            .duration(row.original.time_seconds, "seconds")
+            .duration(Number.isFinite(seconds) && seconds >= 0 ? seconds : 0, "seconds")
             .format("H:mm")}
         </>
       );
@@ -243,7 +246,7 @@ export const columns = [
   },
   {
     id: "player_id",
-    header: "Player ID",
+    header: t("stats.gameDetails.csv.playerId"),
     accessorKey: "player_id",
     cell: ({ row }) => {
       return <>{row.original.player_id}</>;

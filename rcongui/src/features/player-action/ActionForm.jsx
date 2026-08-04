@@ -43,7 +43,7 @@ export const ActionForm = ({ state: actionState, actionHandlers }) => {
     },
   });
   const { recipients, action, params } = actionState;
-  const { submitRef, closeDialog, setLoading, setError } = actionHandlers;
+  const { submitRef, closeDialog, setLoading, setError, setSuccess } = actionHandlers;
   const [recipientStates, setRecipientStates] = useState(
     initRecipients(recipients)
   );
@@ -63,6 +63,8 @@ export const ActionForm = ({ state: actionState, actionHandlers }) => {
       const getPlayerId = (recipient) =>
         recipient.player_id ?? recipient?.profile?.player_id;
       let allSuccess = true;
+      setError(null);
+      setSuccess(false);
       setLoading(true);
       // get list of all selected players and ids
       const steamIds = recipientStates.map(({ recipient }) =>
@@ -140,7 +142,8 @@ export const ActionForm = ({ state: actionState, actionHandlers }) => {
       });
 
       if (allSuccess) {
-        setTimeout(closeDialog, 1000);
+        setSuccess(true);
+        setTimeout(closeDialog, 1800);
       } else {
         setLoading(false);
       }

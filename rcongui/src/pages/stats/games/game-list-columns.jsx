@@ -1,13 +1,12 @@
 import dayjs from "dayjs";
-import LocalizedFormat from "dayjs/plugin/localizedFormat";
 import { Link } from "react-router-dom";
 import { Box, Button, Typography } from "@mui/material";
 import { getGameDuration } from "@/utils/lib";
 import { SortableHeader } from "@/components/table/styles";
+import { getMapEnvironmentLabel, getMapModeLabel } from "@/utils/mapLabels";
 
-dayjs.extend(LocalizedFormat);
-
-export const gameIdColumn = {
+export const createGameListColumns = (t) => [
+{
   accessorKey: "id",
   header: "ID",
   cell: ({ cell }) => {
@@ -21,10 +20,10 @@ export const gameIdColumn = {
   meta: {
     variant: "short",
   },
-};
+},
 
-export const mapColumn = {
-  header: SortableHeader("Map"),
+{
+  header: SortableHeader(t("stats.games.map")),
   id: "map",
   accessorKey: "map",
   minSize: 200,
@@ -58,10 +57,9 @@ export const mapColumn = {
             sx={{ display: "flex", flexDirection: "row", fontWeight: 400 }}
           >
             <Box component="span" sx={{ paddingRight: 0.5 }}>
-              {matchMap.game_mode[0].toUpperCase() +
-                matchMap.game_mode.slice(1)}
+              {getMapModeLabel(t, matchMap.game_mode)}
             </Box>
-            <Box component="span">{matchMap.environment}</Box>
+            <Box component="span">{getMapEnvironmentLabel(t, matchMap.environment)}</Box>
           </Typography>
         </Box>
       </Box>
@@ -70,37 +68,30 @@ export const mapColumn = {
   meta: {
     variant: "content",
   },
-};
+},
 
-export const resultColumn = {
-  header: "Result",
+{
+  header: t("stats.games.result"),
   id: "result",
   accessorFn: (row) =>
     `${row.result?.allied ?? "?"} - ${row.result?.axis ?? "?"}`,
   meta: {
     variant: "short",
   },
-};
+},
 
-export const startColumn = {
-  header: SortableHeader("Start"),
+{
+  header: SortableHeader(t("stats.games.start")),
   accessorKey: "start",
   cell: ({ cell }) => dayjs(cell.getValue()).format("L LT"),
   meta: {
     variant: "name",
   },
-};
+},
 
-export const durationColumn = {
-  header: SortableHeader("Duration"),
+{
+  header: SortableHeader(t("stats.games.duration")),
   accessorKey: "duration",
   cell: ({ row }) => getGameDuration(row.original.start, row.original.end),
-};
-
-export const columns = [
-  gameIdColumn,
-  mapColumn,
-  resultColumn,
-  startColumn,
-  durationColumn,
+},
 ];

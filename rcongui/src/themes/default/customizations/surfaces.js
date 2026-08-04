@@ -1,7 +1,7 @@
 import { alpha } from '@mui/material/styles';
 
 /* eslint-disable import/prefer-default-export */
-export const surfacesCustomizations = ({ gray }) => ({
+export const surfacesCustomizations = ({ gray, brand }) => ({
   MuiAccordion: {
     defaultProps: {
       elevation: 0,
@@ -58,15 +58,15 @@ export const surfacesCustomizations = ({ gray }) => ({
     styleOverrides: {
       root: ({ theme }) => {
         return {
-          padding: 16,
-          gap: 16,
+          padding: 14,
+          gap: 14,
           transition: 'all 100ms ease',
-          backgroundColor: gray[50],
+          backgroundColor: alpha(gray[900], 0.9),
           borderRadius: theme.shape.borderRadius,
-          border: `1px solid ${theme.palette.divider}`,
+          border: `1px solid ${alpha(brand[300], 0.2)}`,
           boxShadow: 'none',
           ...theme.applyStyles('dark', {
-            backgroundColor: gray[800],
+            backgroundColor: alpha(gray[900], 0.9),
           }),
           variants: [
             {
@@ -76,9 +76,9 @@ export const surfacesCustomizations = ({ gray }) => ({
               style: {
                 border: `1px solid ${theme.palette.divider}`,
                 boxShadow: 'none',
-                background: 'hsl(0, 0%, 100%)',
+                background: alpha(gray[900], 0.78),
                 ...theme.applyStyles('dark', {
-                  background: alpha(gray[900], 0.4),
+                  background: alpha(gray[900], 0.78),
                 }),
               },
             },
@@ -97,9 +97,15 @@ export const surfacesCustomizations = ({ gray }) => ({
   },
   MuiCardHeader: {
     styleOverrides: {
-      root: {
+      root: ({ theme }) => ({
         padding: 0,
-      },
+        paddingBottom: 10,
+        marginBottom: 10,
+        borderBottom: `1px solid ${theme.palette.divider}`,
+        '& .MuiCardHeader-title': {
+          color: theme.palette.primary.light,
+        },
+      }),
     },
   },
   MuiCardActions: {

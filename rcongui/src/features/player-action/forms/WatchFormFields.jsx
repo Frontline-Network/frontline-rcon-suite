@@ -1,7 +1,9 @@
 import { ReasonField } from '../fields/ReasonField'
+import { useTranslation } from "react-i18next";
 
 export const WatchFormFields = (props) => {
+  const { t } = useTranslation();
   return (
-    <ReasonField helperText="The reason shown in the discord message upon player connection." {...props} />
+    <ReasonField helperText={t("fields.watchReasonHelp")} {...props} />
   )
 };

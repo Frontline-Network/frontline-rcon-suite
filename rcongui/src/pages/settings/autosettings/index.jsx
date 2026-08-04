@@ -6,6 +6,8 @@ import {Alert, Autocomplete, Box, Button, Paper, Skeleton, TextField, Stack, use
 import {lazy, Suspense, useEffect, useState} from "react";
 import {Await, defer, json, useActionData, useLoaderData, useSubmit,} from "react-router-dom";
 import {AsyncClientError} from "@/components/shared/AsyncClientError";
+import { isFakeMode } from "@/mirage/demo-data";
+import { useTranslation } from "react-i18next";
 
 const Editor = lazy(() => import("@monaco-editor/react"));
 
@@ -16,6 +18,9 @@ const INTENT = {
 };
 
 export const loader = async () => {
+  if (isFakeMode()) {
+    return defer({ service: { name: "auto_settings", statename: "RUNNING" }, autosettings: { version: 1, enabled: true, rules: [] }, templates: Promise.resolve([]) });
+  }
   const autosettings = await cmd.GET_AUTOSETTINGS();
   const services = await cmd.GET_SERVICES();
   const templates = cmd.GET_MESSAGE_TEMPLATES({
@@ -67,6 +72,7 @@ const isRunning = (service) => service.statename === "RUNNING";
 const TemplateSkeleton = () => <Skeleton height={80}/>;
 
 const Autosettings = () => {
+  const { t } = useTranslation();
   const data = useLoaderData();
   const [editorContent, setEditorContent] = useState("");
   const [error, setError] = useState(null);
@@ -123,7 +129,7 @@ const Autosettings = () => {
         gap={1}
       >
         <Padlock
-          label={isRunning(data.service) ? "ON" : "OFF"}
+          label={t(isRunning(data.service) ? "common.enabled" : "common.disabled")}
           checked={isRunning(data.service)}
           handleChange={handleToggleService}
         />
@@ -134,20 +140,20 @@ const Autosettings = () => {
             href="https://github.com/MarechJ/hll_rcon_tool/wiki/User-Guide-%E2%80%90-Main-interface-%E2%80%90-Settings-%E2%80%90-Autosettings"
             component={"a"}
           >
-            Read docs
+            {t("settings.autosettings.readDocs")}
           </Button>
           <SplitButton
             disabled={submitting}
             options={[
               {
-                name: submitting ? "Submitting..." : "Apply",
+                name: submitting ? t("common.processing") : t("settings.autosettings.apply"),
                 buttonProps: {
                   onClick: handleApplyClick(INTENT.APPLY_SINGLE),
                   disabled: submitting,
                 },
               },
               {
-                name: submitting ? "Submitting..." : "Apply all servers",
+                name: submitting ? t("common.processing") : t("settings.autosettings.applyAllServers"),
                 buttonProps: {
                   onClick: handleApplyClick(INTENT.APPLY_ALL),
                   disabled: submitting,
@@ -171,7 +177,7 @@ const Autosettings = () => {
       <Suspense fallback={<TemplateSkeleton/>}>
         <Await
           resolve={data.templates}
-          errorElement={<AsyncClientError title={"Autosettings Templates"}/>}
+          errorElement={<AsyncClientError title={t("settings.autosettings.templates")}/>}
         >
           {(templates) => {
             return (
@@ -193,7 +199,7 @@ const Autosettings = () => {
                 renderInput={(params) => (
                   <TextField
                     {...params}
-                    label="Choose a template"
+                    label={t("settings.templates.select")}
                     slotProps={{
                       htmlInput: {
                         ...params.inputProps,

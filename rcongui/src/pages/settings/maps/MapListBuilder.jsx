@@ -11,6 +11,7 @@ import { MapFilter } from "./MapFilter";
 import { MapList } from "./MapList";
 import { styled, useTheme } from "@mui/material";
 import _ from "lodash";
+import { useTranslation } from "react-i18next";
 
 const MobileToggleGroup = styled(Grid)(({ theme }) => ({
   display: "block",
@@ -41,6 +42,7 @@ export function MapListBuilder({
   actions,
   params = {},
 }) {
+  const { t } = useTranslation();
   const [mapSelection, setMapSelection] = useState(
     selectedMaps.map(withSelectionId)
   );
@@ -122,11 +124,11 @@ export function MapListBuilder({
             value={view}
             exclusive
             onChange={handleViewChange}
-            aria-label="View"
+            aria-label={t("maps.mobileView")}
           >
-            <ToggleButton value="map-list">Map List</ToggleButton>
+            <ToggleButton value="map-list">{t("maps.mapList")}</ToggleButton>
             <ToggleButton value="map-selection">
-              Map Selection
+              {t("maps.mapSelection")}
               <Badge
                 sx={{ pl: 2 }}
                 showZero
@@ -157,7 +159,7 @@ export function MapListBuilder({
               >
                 <MapList
                   maps={filteredMapOptions}
-                  emptyListMessage={"There are no more maps to add."}
+                  emptyListMessage={t("maps.noMoreMaps")}
                   renderItem={(mapLayer) => (
                     <slots.MapListItem
                       key={mapLayer.id}

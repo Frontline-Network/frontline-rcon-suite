@@ -11,6 +11,7 @@ import {
 } from "@mui/material";
 import { useMemo } from "react";
 import dayjs from "dayjs";
+import { useTranslation } from "react-i18next";
 
 const isValidGame = (game) => {
   const MIN_GAME_DURATION = 10 * 60 * 1000;
@@ -27,6 +28,7 @@ const isValidGame = (game) => {
 }
 
 const MapStatsCard = ({ games }) => {
+  const { t } = useTranslation();
   const mapStats = useMemo(() => {
     const invalidGames = [];
     const validGames = games.filter((game) => {
@@ -139,11 +141,11 @@ const MapStatsCard = ({ games }) => {
   return (
     <Card>
       <CardHeader 
-        title="Map Statistics" 
+        title={t("dashboard.mapStatistics")}
         subheader={
           <Stack spacing={0.5}>
             <Typography variant="caption" component="div">
-              Games per day:
+              {t("dashboard.gamesPerDay")}:
               {mapStats.dailyStats.map(stat => (
                 <Box key={stat.date} component="span" sx={{ ml: 1 }}>
                   {stat.dayOfWeek} ({stat.formattedDate}):
@@ -162,7 +164,7 @@ const MapStatsCard = ({ games }) => {
               ))}
             </Typography>
             <Typography variant="caption" component="div">
-              Game modes:
+              {t("dashboard.gameModes")}:
               {mapStats.modeStats.map(stat => (
                 <Box key={stat.mode} component="span" sx={{ ml: 1 }}>
                   {stat.mode}:
@@ -216,7 +218,7 @@ const MapStatsCard = ({ games }) => {
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <Typography variant="caption" color="text.secondary">
-                      avg:
+                      {t("dashboard.average")}:
                     </Typography>
                     <Typography 
                       variant="caption" 
@@ -241,7 +243,7 @@ const MapStatsCard = ({ games }) => {
               }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <Typography variant="caption" color="text.secondary">
-                    Played:
+                    {t("dashboard.played")}:
                   </Typography>
                   <Typography variant="body2" sx={{ fontWeight: 500 }}>
                     {stat.totalGames}
@@ -260,7 +262,7 @@ const MapStatsCard = ({ games }) => {
                   }
                 }}>
                   <Box className="team">
-                    <Typography variant="caption">Allies:</Typography>
+                    <Typography variant="caption">{t("dashboard.allies")}:</Typography>
                     <Typography 
                       variant="body2" 
                       sx={{ 
@@ -272,7 +274,7 @@ const MapStatsCard = ({ games }) => {
                     </Typography>
                   </Box>
                   <Box className="team">
-                    <Typography variant="caption">Axis:</Typography>
+                    <Typography variant="caption">{t("dashboard.axis")}:</Typography>
                     <Typography 
                       variant="body2" 
                       sx={{ 
@@ -298,18 +300,14 @@ const MapStatsCard = ({ games }) => {
           <Stack spacing={0.5}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <Typography variant="caption">
-                Based on {mapStats.totalValidGames} valid games since {
-                  mapStats.oldestGame ? dayjs(mapStats.oldestGame).format('ddd, MMM D') : 'N/A'
-                }
+                {t("dashboard.basedOnGames", {
+                  count: mapStats.totalValidGames,
+                  date: mapStats.oldestGame ? dayjs(mapStats.oldestGame).format("ddd, D. MMM") : "–",
+                })}
               </Typography>
               <Tooltip title={
                 <Typography variant="caption">
-                  A valid game must:
-                  <ul style={{ margin: '4px 0', paddingLeft: '16px' }}>
-                    <li>Have a duration between 10 and 200 minutes</li>
-                    <li>Have a final score that adds up to exactly 5 except for Skirmish</li>
-                    <li>Have complete data for both teams</li>
-                  </ul>
+                  {t("dashboard.validGameRules")}
                 </Typography>
               }>
                 <Box component="span" 
@@ -325,7 +323,7 @@ const MapStatsCard = ({ games }) => {
             </Box>
             {mapStats.discardedGames > 0 && 
               <Typography variant="caption">
-                {mapStats.discardedGames} invalid games excluded
+                {t("dashboard.invalidGamesExcluded", { count: mapStats.discardedGames })}
               </Typography>
             }
           </Stack>
@@ -335,4 +333,4 @@ const MapStatsCard = ({ games }) => {
   );
 };
 
-export default MapStatsCard; 
+export default MapStatsCard;

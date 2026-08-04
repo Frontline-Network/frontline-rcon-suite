@@ -43,9 +43,9 @@ const teamFilter = (row, columnId, filterValue = []) => {
 };
 
 // Column definitions for the log table
-export const logsColumns = [
+export const getLogsColumns = (t) => [
   {
-    header: SortableHeader("Time"),
+    header: SortableHeader(t("views.table.time")),
     accessorKey: "timestamp_ms",
     cell: ({ row }) => {
       return dayjs(row.original.timestamp_ms).format(TIME_FORMAT);
@@ -55,7 +55,7 @@ export const logsColumns = [
     },
   },
   {
-    header: SortableHeader("Team"),
+    header: SortableHeader(t("views.table.team")),
     id: "team",
     accessorFn: (log) => getLogTeam(log),
     filterFn: teamFilter,
@@ -83,7 +83,7 @@ export const logsColumns = [
     },
   },
   {
-    header: "This Player",
+    header: t("views.table.thisPlayer"),
     accessorKey: "player_name_1",
     cell: ({ row }) => {
       return row.original.player_name_1 && row.original.player_id_1 ? (
@@ -111,7 +111,7 @@ export const logsColumns = [
     },
   },
   {
-    header: "Action",
+    header: t("views.table.action"),
     accessorKey: "action",
     id: "action",
     cell: ({ row }) => {
@@ -123,7 +123,7 @@ export const logsColumns = [
     },
   },
   {
-    header: "That Player",
+    header: t("views.table.otherPlayer"),
     accessorKey: "player_name_2",
     filterFn: playerNameFilter,
     cell: ({ row }) => {
@@ -151,7 +151,7 @@ export const logsColumns = [
     },
   },
   {
-    header: "Message",
+    header: t("views.table.message"),
     id: "message_with_id",
     accessorKey: "message",
     cell: ({ row }) => {
@@ -159,7 +159,7 @@ export const logsColumns = [
     },
   },
   {
-    header: "Message",
+    header: t("views.table.message"),
     id: "message",
     accessorKey: "message",
     cell: ({ row }) => {
@@ -167,7 +167,7 @@ export const logsColumns = [
     },
   },
   {
-    header: "Full Message",
+    header: t("views.table.fullMessage"),
     id: "full_message",
     accessorKey: "message",
     meta: {
@@ -176,7 +176,7 @@ export const logsColumns = [
     },
   },
   {
-    header: "Short Message",
+    header: t("views.table.shortMessage"),
     id: "short_message",
     accessorKey: "message",
     cell: ({ row }) => {

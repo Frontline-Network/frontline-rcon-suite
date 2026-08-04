@@ -10,8 +10,12 @@ import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import KeyboardArrowLeftIcon from "@mui/icons-material/KeyboardArrowLeft";
 import KeyboardDoubleArrowLeftIcon from "@mui/icons-material/KeyboardDoubleArrowLeft";
 import KeyboardDoubleArrowRightIcon from "@mui/icons-material/KeyboardDoubleArrowRight";
+import { useTranslation } from "react-i18next";
 
-export const TablePagination = ({ table }) => (
+export const TablePagination = ({ table }) => {
+  const { t } = useTranslation();
+
+  return (
   <Stack
     direction={"row"}
     justifyContent={"end"}
@@ -19,6 +23,7 @@ export const TablePagination = ({ table }) => (
     gap={0.25}
   >
     <IconButton
+      aria-label={t("common.pagination.first")}
       onClick={() => table.firstPage()}
       disabled={!table.getCanPreviousPage()}
       size="small"
@@ -27,6 +32,7 @@ export const TablePagination = ({ table }) => (
       <KeyboardDoubleArrowLeftIcon />
     </IconButton>
     <IconButton
+      aria-label={t("common.pagination.previous")}
       onClick={() => table.previousPage()}
       disabled={!table.getCanPreviousPage()}
       size="small"
@@ -35,10 +41,13 @@ export const TablePagination = ({ table }) => (
       <KeyboardArrowLeftIcon />
     </IconButton>
     <Box sx={{ textWrap: "nowrap", alignSelf: "center", mx: 0.5 }}>
-      {table.getState().pagination.pageIndex + 1} of{" "}
-      {table.getPageCount().toLocaleString()}
+      {t("common.pagination.page", {
+        current: table.getState().pagination.pageIndex + 1,
+        total: table.getPageCount().toLocaleString(),
+      })}
     </Box>
     <IconButton
+      aria-label={t("common.pagination.next")}
       onClick={() => table.nextPage()}
       disabled={!table.getCanNextPage()}
       size="small"
@@ -47,6 +56,7 @@ export const TablePagination = ({ table }) => (
       <KeyboardArrowRightIcon />
     </IconButton>
     <IconButton
+      aria-label={t("common.pagination.last")}
       onClick={() => table.lastPage()}
       disabled={!table.getCanNextPage()}
       size="small"
@@ -61,14 +71,15 @@ export const TablePagination = ({ table }) => (
         onChange={(e) => table.setPageSize(e.target.value)}
         size="small"
         sx={{ borderRadius: 0 }}
-        aria-label="Page size"
+        aria-label={t("common.pagination.pageSize")}
       >
         {[50, 100, 150, 250, 500].map((pageSize) => (
           <MenuItem key={pageSize} value={pageSize}>
-            Show {pageSize}
+            {t("common.pagination.show", { count: pageSize })}
           </MenuItem>
         ))}
       </Select>
     </Box>
   </Stack>
-);
+  );
+};

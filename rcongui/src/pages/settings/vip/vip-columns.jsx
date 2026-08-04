@@ -11,7 +11,7 @@ const isIndefinite = (expiration) =>
 const isActive = (expiration) =>
   expiration === null || dayjs(expiration).isAfter(dayjs());
 
-const vipColumns = [
+const getVipColumns = (t) => [
   {
     id: "select",
     header: ({ table }) => (
@@ -46,7 +46,7 @@ const vipColumns = [
   {
     id: "name",
     accessorKey: "name",
-    header: SortableHeader("Name"),
+    header: SortableHeader(t("records.vips.name")),
     filterFn: "includesString",
     cell: ({ row }) => {
       const { openWithId } = usePlayerSidebar();
@@ -79,18 +79,18 @@ const vipColumns = [
     id: "status",
     accessorFn: (row) => {
       if (isActive(row.vip_expiration)) {
-        return "Active";
+        return "active";
       } else {
-        return "Expired";
+        return "expired";
       }
     },
-    header: SortableHeader("Status"),
+    header: SortableHeader(t("records.vips.status")),
     cell: ({ getValue }) => {
       const status = getValue();
       return (
         <Chip
-          label={status}
-          color={status === "Active" ? "success" : "error"}
+          label={t(`records.vips.${status}`)}
+          color={status === "active" ? "success" : "error"}
         />
       );
     },
@@ -98,10 +98,10 @@ const vipColumns = [
   {
     id: "expires_in_from_now",
     accessorKey: "vip_expiration",
-    header: "Expires In/From Now",
+    header: t("records.vips.relativeExpiration"),
     cell: ({ row }) => {
       if (isIndefinite(row.original.vip_expiration)) {
-        return "Never";
+        return t("records.vips.never");
       }
       return dayjs(row.original.vip_expiration).fromNow();
     },
@@ -109,7 +109,7 @@ const vipColumns = [
   {
     id: "player_id",
     accessorKey: "player_id",
-    header: "Player ID",
+    header: t("records.vips.playerId"),
     filterFn: "includesString",
   },
   {
@@ -120,14 +120,14 @@ const vipColumns = [
       }
       return new Date(row.vip_expiration).getTime();
     },
-    header: SortableHeader("Expiration"),
+    header: SortableHeader(t("records.vips.expiration")),
     cell: ({ row }) => {
       if (isIndefinite(row.original.vip_expiration)) {
-        return "Indefinite";
+        return t("records.vips.indefinite");
       }
       return dayjs(row.original.vip_expiration).format("LLL");
     },
   },
 ];
 
-export default vipColumns;
+export default getVipColumns;

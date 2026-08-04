@@ -1,10 +1,12 @@
 import { Button } from "@mui/material";
+import { useTranslation } from "react-i18next";
 
 export function VotemapChangeNotification({ closeToast, data }) {
+  const { t } = useTranslation();
   const acceptChanges = true;
   return (
     <div>
-      <div>Config has changed</div>
+      <div>{t("maps.votemapConfigChanged")}</div>
       <ul>
         {data.changes.map((key) => (
           <li key={key}>{key}</li>
@@ -15,14 +17,14 @@ export function VotemapChangeNotification({ closeToast, data }) {
         color="primary"
         onClick={() => closeToast(acceptChanges)}
       >
-        Accept
+        {t("common.confirm")}
       </Button>
       <Button
         size="small"
         color="secondary"
         onClick={() => closeToast(!acceptChanges)}
       >
-        Ignore
+        {t("maps.ignoreChanges")}
       </Button>
     </div>
   );

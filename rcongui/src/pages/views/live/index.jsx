@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 import { cmd } from "@/utils/fetchUtils";
-import { columns as playersColumns } from "./players-columns";
+import { getColumns as getPlayersColumns } from "./players-columns";
 import { Header } from "@/components/game/Header";
 import { extractPlayers, extractTeamState } from "@/utils/extractPlayers";
 import { useLoaderData } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import PlayersTable from "./players-table";
 import LogsTable from "./logs-table";
-import { logsColumns } from "./logs-columns";
+import { getLogsColumns } from "./logs-columns";
 import { useLogsSearchStore, usePlayersTableStore, useLogsTableStore } from "@/stores/table-config";
 import { teamsLiveQueryOptions } from "@/queries/teams-live-query";
 import { normalizePlayerProfile } from "@/utils/lib";
@@ -27,11 +27,21 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 import { DebouncedSearchInput } from "@/components/shared/DebouncedSearchInput";
 import DisbandSquadDialog from "@/features/player-action/DisbandSquad";
 import MessageAllDialog from "@/features/player-action/MessageAll";
+import { useTranslation } from "react-i18next";
+import PageHeader from "@/components/shared/PageHeader";
+import { demoGameState, isFakeMode } from "@/mirage/demo-data";
 
 const interval = 15 * 1000; // 15 seconds
 const UNASSIGNED = "unassigned"
 
 export const loader = async () => {
+  if (import.meta.env.MODE === "fake") {
+    return {
+      initialLogsView: {
+        result: { actions: [], players: [], logs: [] },
+      },
+    };
+  }
   const response = await cmd.GET_LIVE_LOGS({
     payload: {
       end: 250,
@@ -45,8 +55,11 @@ export const loader = async () => {
 };
 
 const Live = () => {
+  const { t } = useTranslation();
   // ---------------- VIEW STATE -----------------
   const { initialLogsView } = useLoaderData();
+  const playersColumns = useMemo(() => getPlayersColumns(t), [t]);
+  const logsColumns = useMemo(() => getLogsColumns(t), [t]);
   const [globalFilter, setGlobalFilter] = useState([]);
 
   // ---------------- PLAYERS DATA -----------------
@@ -98,7 +111,7 @@ const Live = () => {
   // ---------------- GAME HEADER DATA -----------------
   const { data: gameState } = useQuery({
     queryKey: ["game", "state"],
-    queryFn: cmd.GET_GAME_STATE,
+    queryFn: isFakeMode() ? () => Promise.resolve(demoGameState) : cmd.GET_GAME_STATE,
     staleTime: 5 * 1000,
     refetchInterval: 10 * 1000,
   });
@@ -232,19 +245,24 @@ const Live = () => {
   };
 
   return (
-      
+    <>
+      <PageHeader
+        eyebrow={t("views.live.eyebrow")}
+        title={t("views.live.title")}
+        subtitle={t("views.live.subtitle")}
+      />
       <Grid container spacing={1}>
 
         <Grid size={12} sx={{ bgcolor: 'background.paper' }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
             <DebouncedSearchInput
-              placeholder="Global Search"
+              placeholder={t("views.live.globalSearch")}
               onChange={handleSearch}
             />
             <ToggleButtonGroup
                 value={visibleElements}
                 onChange={handleVisibility}
-                aria-label="visible elements"
+                aria-label={t("common.show")}
                 multiple
                 size="small"
                 sx={{ 
@@ -259,21 +277,21 @@ const Live = () => {
                   }
                 }}
               >
-                <Tooltip title={visibleElements.includes('players') ? 'Hide Players' : 'Show Players'}>
+                <Tooltip title={visibleElements.includes('players') ? t("views.live.hidePlayers") : t("views.live.showPlayers")}>
                   <span>
                     <ToggleButton value="players">
                       <TableChartIcon sx={{ fontSize: { xs: '1rem', lg: '1.25rem' } }} />
                     </ToggleButton>
                   </span>
                 </Tooltip>
-                <Tooltip title={visibleElements.includes('logs') ? 'Hide Logs' : 'Show Logs'}>
+                <Tooltip title={visibleElements.includes('logs') ? t("views.live.hideLogs") : t("views.live.showLogs")}>
                   <span>
                     <ToggleButton value="logs">
                       <AssessmentIcon sx={{ fontSize: { xs: '1rem', lg: '1.25rem' } }} />
                     </ToggleButton>
                   </span>
                 </Tooltip>
-                <Tooltip title={visibleElements.includes('header') ? 'Hide Header' : 'Show Header'}>
+                <Tooltip title={visibleElements.includes('header') ? t("views.live.hideHeader") : t("views.live.showHeader")}>
                   <span>
                     <ToggleButton value="header">
                       <ScoreboardIcon sx={{ fontSize: { xs: '1rem', lg: '1.25rem' } }} />
@@ -330,7 +348,7 @@ const Live = () => {
           </Grid>
         )}
       </Grid>
-
+    </>
   );
 };
 

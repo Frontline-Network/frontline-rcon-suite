@@ -4,10 +4,12 @@ import { Box, CircularProgress, Typography } from "@mui/material";
 import SettingsIcon from "@mui/icons-material/Settings";
 import { AuthError, cmd } from "@/utils/fetchUtils";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -65,7 +67,7 @@ export const AuthProvider = ({ children }) => {
       >
         <SettingsIcon sx={{ fontSize: 50 }} />
         <Typography variant="h5" gutterBottom>
-          Setting up your CRCON app
+          {t("auth.preparing")}
         </Typography>
         <CircularProgress sx={{ mt: 2 }} />
       </Box>

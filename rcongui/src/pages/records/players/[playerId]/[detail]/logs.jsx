@@ -30,13 +30,15 @@ import {
   getFilteredRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { logsColumns } from "@/pages/records/game-logs/columns";
+import { getLogsColumns } from "@/pages/records/game-logs/columns";
 import { logActions } from "@/utils/lib";
 import downloadLogs from "@/pages/records/game-logs/download";
 import DownloadIcon from "@mui/icons-material/Download";
 import { DetailCard } from "../styled";
 import { cmd } from "@/utils/fetchUtils";
 import { useGlobalStore } from "@/stores/global-state";
+import { useTranslation } from "react-i18next";
+import { demoHistoricalLogs, isFakeMode } from "@/mirage/demo-data";
 
 const actionOptions = Object.keys(logActions).map((option) => ({
   label: logActions[option],
@@ -56,11 +58,14 @@ export const loader = async ({ request, params }) => {
     server_filter: url.searchParams.get("server_filter") ?? "",
   };
 
-  const response = await cmd.GET_HISTORICAL_LOGS({ payload: fields });
+  const response = isFakeMode()
+    ? { result: demoHistoricalLogs.filter((log) => log.player1_id === params.playerId) }
+    : await cmd.GET_HISTORICAL_LOGS({ payload: fields });
   return { logs: response.result };
 };
 
 export default function PlayerLogs() {
+  const { t } = useTranslation();
   const { logs: initialLogs } = useLoaderData();
   const { profile } = useOutletContext();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -68,6 +73,7 @@ export default function PlayerLogs() {
   const server = useGlobalStore((state) => state.serverState);
   const otherServers = useGlobalStore((state) => state.servers);
   const [logs, setLogs] = useState(initialLogs);
+  const logsColumns = useMemo(() => getLogsColumns(t), [t]);
 
   useEffect(() => {
     setLogs(initialLogs);
@@ -186,6 +192,10 @@ export default function PlayerLogs() {
             <Grid item size={{ xs: 12, sm: 6 }}>
               <Stack direction="row" alignItems="center" spacing={1}>
                 <Autocomplete
+                  openText={t("common.openOptions")}
+                  closeText={t("common.closeOptions")}
+                  clearText={t("common.clearSelection")}
+                  noOptionsText={t("common.noResults")}
                   aria-labelledby="action_label"
                   fullWidth
                   freeSolo
@@ -204,7 +214,7 @@ export default function PlayerLogs() {
                   }
                   onChange={handleActionChange}
                   renderInput={(params) => (
-                    <TextField name="action" {...params} label="Action" />
+                    <TextField name="action" {...params} label={t("records.gameLogs.action")} />
                   )}
                 />
                 <FormControlLabel
@@ -216,7 +226,7 @@ export default function PlayerLogs() {
                       color="primary"
                     />
                   }
-                  label="Exact"
+                  label={t("records.gameLogs.exact")}
                   labelPlacement="end"
                 />
               </Stack>
@@ -225,15 +235,15 @@ export default function PlayerLogs() {
             {/* Server Filter */}
             <Grid item size={{ xs: 12, sm: 6 }}>
               <FormControl fullWidth>
-                <InputLabel id="server_filter_label">Server filter</InputLabel>
+                <InputLabel id="server_filter_label">{t("records.gameLogs.server")}</InputLabel>
                 <Select
                   labelId="server_filter_label"
                   name="server_filter"
                   value={formFields.server_filter}
                   onChange={handleInputChange}
-                  label="Server filter"
+                  label={t("records.gameLogs.server")}
                 >
-                  <MenuItem value={0}>All servers</MenuItem>
+                  <MenuItem value={0}>{t("records.gameLogs.allServers")}</MenuItem>
                   {serverOptions.map((option) => (
                     <MenuItem key={option.value} value={option.value}>
                       {option.label}
@@ -247,7 +257,7 @@ export default function PlayerLogs() {
             <Grid item size={{ xs: 12, sm: 6 }}>
               <TextField
                 fullWidth
-                label="Limit"
+                label={t("records.gameLogs.limit")}
                 name="limit"
                 type="number"
                 value={formFields.limit}
@@ -258,15 +268,15 @@ export default function PlayerLogs() {
             {/* Time Sort */}
             <Grid item size={{ xs: 12, sm: 6 }}>
               <FormControl fullWidth>
-                <InputLabel id="time_sort_label">Time sort</InputLabel>
+                <InputLabel id="time_sort_label">{t("records.gameLogs.sort")}</InputLabel>
                 <Select
                   labelId="time_sort_label"
                   name="time_sort"
                   value={formFields.time_sort}
                   onChange={handleInputChange}
                 >
-                  <MenuItem value={"desc"}>From newest</MenuItem>
-                  <MenuItem value={"asc"}>From oldest</MenuItem>
+                  <MenuItem value={"desc"}>{t("records.gameLogs.newest")}</MenuItem>
+                  <MenuItem value={"asc"}>{t("records.gameLogs.oldest")}</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
@@ -275,8 +285,9 @@ export default function PlayerLogs() {
             <Grid item size={{ xs: 12, sm: 6 }}>
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <DesktopDateTimePicker
+                  localeText={{ openDatePickerDialogue: () => t("common.chooseDate") }}
                   value={formFields.from}
-                  label="From time"
+                  label={t("records.gameLogs.from")}
                   name="from"
                   onChange={(value) => handleDateChange('from', value)}
                   format="YYYY/MM/DD HH:mm"
@@ -288,7 +299,8 @@ export default function PlayerLogs() {
             <Grid item size={{ xs: 12, sm: 6 }}>
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <DesktopDateTimePicker
-                  label="Till time"
+                  localeText={{ openDatePickerDialogue: () => t("common.chooseDate") }}
+                  label={t("records.gameLogs.until")}
                   name="till"
                   onChange={(value) => handleDateChange('till', value)}
                   format="YYYY/MM/DD HH:mm"
@@ -307,7 +319,7 @@ export default function PlayerLogs() {
                 color="error"
                 size="large"
               >
-                Clear
+                {t("records.gameLogs.clear")}
               </Button>
             </Grid>
 
@@ -319,7 +331,7 @@ export default function PlayerLogs() {
                 size="large"
                 type="submit"
               >
-                Search
+                {t("common.search")}
               </Button>
             </Grid>
           </Grid>
@@ -328,7 +340,7 @@ export default function PlayerLogs() {
         <DetailCard elevation={0} variant="outlined" sx={{ flexGrow: 1 }}>
           <TableToolbar>
             <DebouncedSearchInput
-              placeholder={"Search logs"}
+              placeholder={t("records.gameLogs.searchLogs")}
               onChange={(value) => {
                 table.getColumn("content")?.setFilterValue(value);
               }}
@@ -344,7 +356,7 @@ export default function PlayerLogs() {
               onClick={handleDownload}
               startIcon={<DownloadIcon />}
             >
-              Download
+              {t("records.gameLogs.download")}
             </Button>
           </TableToolbar>
           <LiveLogsTable
@@ -363,4 +375,4 @@ export default function PlayerLogs() {
       </Stack>
     </Stack>
   );
-} 
+}

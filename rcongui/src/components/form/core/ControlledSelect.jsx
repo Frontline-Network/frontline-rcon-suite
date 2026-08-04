@@ -1,5 +1,6 @@
 import { Select, MenuItem, FormControl, InputLabel, FormHelperText } from '@mui/material';
 import { Controller } from 'react-hook-form';
+import { useTranslation } from "react-i18next";
 
 export function ControlledSelect({
   control,
@@ -11,6 +12,8 @@ export function ControlledSelect({
   options = [],
   ...props
 }) {
+  const { t } = useTranslation();
+
   return (
     <FormControl fullWidth disabled={disabled}>
       <InputLabel>{label}</InputLabel>
@@ -37,7 +40,7 @@ export function ControlledSelect({
               </MenuItem>
             ))}
           </Select>
-            {error && <FormHelperText>{error?.message ?? error?.text ?? "Error"}</FormHelperText>}
+            {error && <FormHelperText>{error?.message ?? error?.text ?? t("common.error")}</FormHelperText>}
           </>
         )}
       />

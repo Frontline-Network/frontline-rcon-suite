@@ -15,6 +15,7 @@ import {
 } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import { AddCircleOutline } from "@mui/icons-material";
+import { useTranslation } from "react-i18next";
 
 const SuggestionsList = styled(Paper)(({ theme }) => ({
   maxHeight: 300,
@@ -37,6 +38,7 @@ export default function PlayerSearchField({
   disableAddBtn = false,
   ...props
 }) {
+  const { t } = useTranslation();
   const [suggestions, setSuggestions] = useState([]);
   const [anchorEl, setAnchorEl] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -117,25 +119,25 @@ export default function PlayerSearchField({
         <TextField
           ref={nameInputRef}
           fullWidth
-          label={"Name"}
+          label={t("records.players.playerName")}
           value={nameInputValue}
           name="hll_player_name"
           onChange={handleInputChange}
           type={"search"}
-          placeholder={"Enter player name"}
+          placeholder={t("records.players.enterPlayerName")}
         />
         <TextField
           ref={idInputRef}
           fullWidth
-          label={"Player ID"}
+          label={t("records.players.playerId")}
           value={idInputValue}
           name="hll_player_id"
           onChange={handleInputChange}
           type={"search"}
-          placeholder={"Enter player ID"}
+          placeholder={t("records.players.enterPlayerId")}
         />
         {!disableAddBtn && (
-          <Tooltip title="Create">
+          <Tooltip title={t("records.players.create")}>
             <span>
               <IconButton
                 color="primary"

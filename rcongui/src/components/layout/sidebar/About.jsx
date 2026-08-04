@@ -22,6 +22,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import { Suspense } from 'react';
 import { ReleaseNotes } from './ReleaseNotes';
 import { HIGHLIGHT } from './utils'
+import { useTranslation } from 'react-i18next'
 
 const isNewerVersion = (a, b) => {
   const [aMajor, aMinor, aPatch] = a.split('.');
@@ -30,6 +31,7 @@ const isNewerVersion = (a, b) => {
 }
 
 export default function AboutDialog() {
+  const { t } = useTranslation();
   const [open, setOpen] = React.useState(false)
   const { releases, lastUpdate, unreadCount, markAsRead, forceUpdate } = useGithubReleases();
   const theme = useTheme();
@@ -85,7 +87,7 @@ export default function AboutDialog() {
         fullScreen={isSmallScreen}
         maxWidth={'md'}
       >
-        <DialogTitle id='about-dialog-title'>About</DialogTitle>
+        <DialogTitle id='about-dialog-title'>{t('about.title')}</DialogTitle>
         <DialogContent dividers={true}>
 
           <Stack direction={['column', 'row']} gap={2} sx={{ mb: 2 }}>
@@ -97,7 +99,7 @@ export default function AboutDialog() {
               target='_blank'
               startIcon={<FontAwesomeIcon icon={faBook} />}
             >
-              Documentation
+              {t('about.documentation')}
             </Button>
             <Button
               size='small'
@@ -107,7 +109,7 @@ export default function AboutDialog() {
               target='_blank'
               startIcon={<FontAwesomeIcon icon={faDiscord} />}
             >
-              Need Help?
+              {t('about.help')}
             </Button>
             <Button
               size='small'
@@ -117,22 +119,22 @@ export default function AboutDialog() {
               target='_blank'
               startIcon={<FontAwesomeIcon icon={faGithub} />}
             >
-              Found an issue? Submit a PR!
+              {t('about.issue')}
             </Button>
           </Stack>
 
           <DialogContentText component={'section'} id='about-dialog-description' ref={descriptionElementRef} tabIndex={-1}>
             <Typography variant='h5'>Hell Let Loose (HLL) Community RCON (CRCON)</Typography>
             <Typography>
-              An extended RCON tool for Hell Let Loose, meant to replace the official tool and go WAY beyond.
+              {t('about.description')}
             </Typography>
             <Divider sx={{ my: 2 }} />
-            <Typography variant='body1'>API Version: {isLoading ? 'Loading...' : apiVersion}</Typography>
+            <Typography variant='body1'>{t('about.apiVersion')}: {isLoading ? t('common.loading') : apiVersion}</Typography>
             <Typography variant='subtitle2'>
-                {isUpToDate ? 'You are up to date! 🥳' : 'Your app is out of date 💩. You can update now.'}
+                {isUpToDate ? t('about.upToDate') : t('about.updateAvailable')}
             </Typography>
             <Typography variant='subtitle2'>
-                Last checked: {dayjs(lastUpdate).format('LLL')} <IconButton variant='text' size='small' aria-label='Refresh latest releases' onClick={() => {
+                {t('about.lastChecked')}: {dayjs(lastUpdate).format('LLL')} <IconButton variant='text' size='small' aria-label={t('about.lastChecked')} onClick={() => {
                   forceUpdate();
                 }}>
                   <RefreshIcon />
@@ -143,7 +145,7 @@ export default function AboutDialog() {
               <>
                 <Suspense fallback={<Skeleton variant="rectangular" height={200} />}>
                   <Divider sx={{ my: 2 }} />
-                  <Typography variant='h6'>Latest Release {releases[0].name}</Typography>
+                  <Typography variant='h6'>{t('about.latestRelease')} {releases[0].name}</Typography>
                   <Typography variant='subtitle2' sx={{ mb: 2 }}>{dayjs(releases[0].published_at).format('LLL')}</Typography>
                   <ReleaseNotes release={releases[0]} />
                 </Suspense>
@@ -155,7 +157,7 @@ export default function AboutDialog() {
         </DialogContent>
 
         <DialogActions>
-          <Button onClick={handleClose}>Close</Button>
+          <Button onClick={handleClose}>{t('common.close')}</Button>
         </DialogActions>
       </Dialog>
     </React.Fragment>

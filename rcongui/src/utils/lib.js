@@ -190,6 +190,8 @@ export const logActions = {
   "ADMIN KICKED": "🚷",
   CAMERA: "👀",
   CHAT: "💬",
+  "CHAT[Team]": "💬",
+  "CHAT[Unit]": "💬",
   "CHAT[Allies]": "💬",
   "CHAT[Allies][Team]": "💬",
   "CHAT[Allies][Unit]": "💬",

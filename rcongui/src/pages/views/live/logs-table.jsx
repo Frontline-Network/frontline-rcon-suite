@@ -28,6 +28,7 @@ import { LogActionHighlightMenu } from "@/components/table/selection/LogActionHi
 import LiveLogsTable from "@/components/live-logs/LiveLogsTable";
 import TableColumnSelection from "@/components/table/TableColumnSelection";
 import { LogTeamSelectionMenu } from "@/components/table/selection/LogTeamSelectionMenu";
+import { useTranslation } from "react-i18next";
 
 const logActions = Object.entries(_logActions).reduce((acc, [name]) => {
   acc[name] = false;
@@ -69,6 +70,7 @@ function LogsTable({
   isFetching,
   isLoading,
 }) {
+  const { t } = useTranslation();
   const [tableConfigDrawerOpen, setTableConfigDrawerOpen] = useState(false);
 
   const tableConfig = useLogsTableStore();
@@ -258,7 +260,7 @@ function LogsTable({
       <Stack direction="column" spacing={0}>
         <TableToolbar>
           <DebouncedSearchInput
-            placeholder={"Search logs"}
+            placeholder={t("views.live.globalSearch")}
             onChange={(value) => {
               handleFilterChange(() => {
                 table.getColumn("message")?.setFilterValue(value);
@@ -278,8 +280,8 @@ function LogsTable({
           />
           <IconButton
             size="small"
-            aria-label="Table settings"
-            aria-description="Configure the table"
+            aria-label={t("common.settings")}
+            aria-description={t("common.settings")}
             sx={{ p: 0.5, borderRadius: 0 }}
             onClick={handleTableConfigClick}
           >
@@ -298,7 +300,7 @@ function LogsTable({
         </TableToolbar>
       </Stack>
       <TableConfigDrawer
-        name={"Logs"}
+        name={t("views.live.logs")}
         open={tableConfigDrawerOpen}
         onClose={(config) => {
           setTableConfigDrawerOpen(false);
@@ -307,7 +309,7 @@ function LogsTable({
         config={tableConfig}
       >
         <Typography sx={{ fontWeight: 500 }}>
-          {"Persistent Logs Query Params"}
+          {t("views.live.persistentLogFilters")}
         </Typography>
         <Divider flexItem />
         <div>
@@ -319,20 +321,20 @@ function LogsTable({
               letterSpacing: 1.5,
             }}
           >
-            Filter Mode
+            {t("views.live.filterMode")}
           </Typography>
           <ToggleButtonGroup
             value={searchParams.inclusive_filter ? "inclusive" : "exclusive"}
             exclusive
             onChange={handleQueryInclusiveFilterChange}
-            aria-label="filter mode change"
+            aria-label={t("views.live.filterMode")}
             fullWidth
           >
-            <ToggleButton value="inclusive" aria-label="inclusive filters">
-              Inclusive
+            <ToggleButton value="inclusive" aria-label={t("views.live.inclusiveFilters")}>
+              {t("views.live.inclusive")}
             </ToggleButton>
-            <ToggleButton value="exclusive" aria-label="exclusives filters">
-              Exclusive
+            <ToggleButton value="exclusive" aria-label={t("views.live.exclusiveFilters")}>
+              {t("views.live.exclusive")}
             </ToggleButton>
           </ToggleButtonGroup>
         </div>
@@ -345,7 +347,7 @@ function LogsTable({
               letterSpacing: 1.5,
             }}
           >
-            Filter Actions
+            {t("views.live.filterActions")}
           </Typography>
           <LogActionQuerySelectionMenu
             actionOptions={searchQueryParamsOptions}
@@ -363,7 +365,7 @@ function LogsTable({
                   secondaryAction={
                     <IconButton
                       edge="end"
-                      aria-label="delete"
+                      aria-label={t("common.delete")}
                       onClick={() => handleQueryActionParamSelect(action)}
                     >
                       <DeleteIcon />
@@ -378,7 +380,7 @@ function LogsTable({
             ))}
             {searchParams.actions.length === 0 && (
               <ListItem disableGutters={true}>
-                <ListItemText primary={"No Action Filters Selected"} />
+                <ListItemText primary={t("views.live.noActionFilters")} />
               </ListItem>
             )}
           </List>
@@ -392,13 +394,13 @@ function LogsTable({
               letterSpacing: 1.5,
             }}
           >
-            Logs Fetch Query Limit
+            {t("views.live.logQueryLimit")}
           </Typography>
           <TextField
             fullWidth
             defaultValue={searchParams.limit}
             onBlur={handleQueryLimitInputBlur}
-            placeholder="Query limit"
+            placeholder={t("views.live.logQueryLimit")}
             type="number"
             size="small"
           />

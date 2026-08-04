@@ -33,12 +33,14 @@ import CheckIcon from "@mui/icons-material/Check";
 import ErrorBrowser from "@/components/shared/ErrorBrowser";
 import debug from "@/utils/debug";
 import { useThemedImages } from "@/hooks/useThemedImages";
+import { useTranslation } from "react-i18next";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const logger = debug("DISBAND SQUAD DIALOG");
 
 // Disband Squad Dialog with react-hook-form integration
 export default function DisbandSquadDialog() {
+  const { t } = useTranslation();
   const themedImg = useThemedImages()
   const theme = useTheme()
   const UNASSIGNED = "unassigned";
@@ -255,7 +257,7 @@ export default function DisbandSquadDialog() {
 
   return (
     <React.Fragment>
-      <Tooltip title={"Disband Squad"}>
+      <Tooltip title={t("actions.disbandSquad")}>
         <span>
           <IconButton
             onClick={handleDialogClickOpen}
@@ -276,7 +278,7 @@ export default function DisbandSquadDialog() {
           },
         }}
       >
-        <DialogTitle>Disband Squad</DialogTitle>
+        <DialogTitle>{t("actions.disbandSquad")}</DialogTitle>
         <DialogContent>
           <DialogContentText>
             {`This command will redeploy(10s) all affected players and free the squad slot(s) for reassignment.`}
@@ -451,8 +453,8 @@ export default function DisbandSquadDialog() {
                                       <Box
                                         component={"img"}
                                         src="/icons/ping.webp"
-                                        alt="No Leader"
-                                        title="Unit has no leader"
+                                        alt={t("views.live.noSquadLeader")}
+                                        title={t("views.live.noSquadLeader")}
                                         width={16}
                                         height={16}
                                         sx={{ opacity: 0.7, ml: 0.5 }}
@@ -479,7 +481,7 @@ export default function DisbandSquadDialog() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleDialogClose}>Cancel</Button>
+          <Button onClick={handleDialogClose}>{t("common.cancel")}</Button>
           <Button
             type="submit"
             disabled={
@@ -488,7 +490,7 @@ export default function DisbandSquadDialog() {
               selectedSquads.length === 0
             }
           >
-            Confirm
+            {t("common.confirm")}
           </Button>
         </DialogActions>
       </Dialog>

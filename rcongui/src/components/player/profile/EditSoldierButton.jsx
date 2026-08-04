@@ -14,8 +14,10 @@ import CheckIcon from "@mui/icons-material/Check";
 import ErrorIcon from "@mui/icons-material/Error";
 import { ControlledTextInput } from "@/components/form/core/ControlledTextInput";
 import { ControlledSelect } from "@/components/form/core/ControlledSelect";
+import { useTranslation } from "react-i18next";
 
 function EditSoldierButton({ Icon, playerId, currentSoldierData }) {
+  const { t } = useTranslation();
   const [open, setOpen] = React.useState(false);
   const [submitStatus, setSubmitStatus] = React.useState(null); // null, 'success', 'error'
   const [errorMessage, setErrorMessage] = React.useState("");
@@ -77,7 +79,7 @@ function EditSoldierButton({ Icon, playerId, currentSoldierData }) {
     },
     onError: (error) => {
       setSubmitStatus('error');
-      setErrorMessage(error.message || 'Failed to update player soldier information');
+      setErrorMessage(error.message || t("playerEditor.soldier.failed"));
     },
   });
 
@@ -118,7 +120,7 @@ function EditSoldierButton({ Icon, playerId, currentSoldierData }) {
     <React.Fragment>
       <Chip
         icon={<Icon />}
-        label={"unset"}
+        label={t("playerEditor.addInformation")}
         variant="outlined"
         size="small"
         onClick={handleClickOpen}
@@ -133,16 +135,16 @@ function EditSoldierButton({ Icon, playerId, currentSoldierData }) {
           },
         }}
       >
-        <DialogTitle>Update Player Soldier Information</DialogTitle>
+        <DialogTitle>{t("playerEditor.soldier.title")}</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Fill in the missing soldier information. Fields with existing values are disabled and cannot be modified.
+            {t("playerEditor.soldier.description")}
           </DialogContentText>
           
           {submitStatus === 'success' && (
             <Alert severity="success" sx={{ mt: 2 }}>
               <CheckIcon sx={{ mr: 1 }} />
-              Successfully updated soldier information!
+              {t("playerEditor.soldier.success")}
             </Alert>
           )}
           
@@ -158,16 +160,16 @@ function EditSoldierButton({ Icon, playerId, currentSoldierData }) {
               error={errors.name}
               control={control}
               name="name"
-              label="Player Name"
+              label={t("playerEditor.soldier.name")}
               disabled={isPending || isNameDisabled}
               rules={{
                 pattern: {
                   value: /^[a-zA-Z0-9\s\-_]+$/,
-                  message: "Name can only contain letters, numbers, spaces, hyphens, and underscores"
+                  message: t("playerEditor.validation.name")
                 }
               }}
               helperText={
-                isNameDisabled ? "This field already has a value and cannot be modified" : "The player's in-game name"
+                isNameDisabled ? t("playerEditor.disabledField") : t("playerEditor.soldier.nameHelp")
               }
               fullWidth
             />
@@ -176,25 +178,25 @@ function EditSoldierButton({ Icon, playerId, currentSoldierData }) {
               error={errors.level}
               control={control}
               name="level"
-              label="Level"
+              label={t("playerEditor.soldier.level")}
               type="number"
               disabled={isPending || isLevelDisabled}
               rules={{
                 pattern: {
                   value: /^[0-9]+$/,
-                  message: "Level must be a valid number"
+                  message: t("playerEditor.validation.level")
                 },
                 min: {
                   value: 1,
-                  message: "Level must be at least 1"
+                  message: t("playerEditor.validation.levelMin")
                 },
                 max: {
                   value: 500,
-                  message: "Level cannot exceed 500"
+                  message: t("playerEditor.validation.levelMax")
                 }
               }}
               helperText={
-                isLevelDisabled ? "This field already has a value and cannot be modified" : "The player's current level (1-500)"
+                isLevelDisabled ? t("playerEditor.disabledField") : t("playerEditor.soldier.levelHelp")
               }
               fullWidth
             />
@@ -203,17 +205,17 @@ function EditSoldierButton({ Icon, playerId, currentSoldierData }) {
               error={errors.platform}
               control={control}
               name="platform"
-              label="Platform"
+              label={t("playerEditor.soldier.platform")}
               disabled={isPending || isPlatformDisabled}
               options={platformOptions}
               rules={{
                 pattern: {
                   value: /^[a-zA-Z0-9]+$/,
-                  message: "Please select a valid platform"
+                  message: t("playerEditor.validation.platform")
                 }
               }}
               helperText={
-                isPlatformDisabled ? "This field already has a value and cannot be modified" : "Select the player's gaming platform"
+                isPlatformDisabled ? t("playerEditor.disabledField") : t("playerEditor.soldier.platformHelp")
               }
             />
             
@@ -221,20 +223,20 @@ function EditSoldierButton({ Icon, playerId, currentSoldierData }) {
               error={errors.clan_tag}
               control={control}
               name="clan_tag"
-              label="Clan Tag"
+              label={t("playerEditor.soldier.clanTag")}
               disabled={isPending || isClanTagDisabled}
               rules={{
                 pattern: {
                   value: /^[a-zA-Z0-9\s\-_\[\]]*$/,
-                  message: "Clan tag can only contain letters, numbers, spaces, hyphens, underscores, and brackets"
+                  message: t("playerEditor.validation.clanTag")
                 },
                 maxLength: {
                   value: 4,
-                  message: "Clan tag cannot exceed 4 characters"
+                  message: t("playerEditor.validation.clanTagLength")
                 }
               }}
               helperText={
-                errors.clan_tag ? errors.clan_tag.message : isClanTagDisabled ? "This field already has a value and cannot be modified" : "The player's clan tag (max 4 characters)"
+                errors.clan_tag ? errors.clan_tag.message : isClanTagDisabled ? t("playerEditor.disabledField") : t("playerEditor.soldier.clanTagHelp")
               }
               fullWidth
             />
@@ -243,10 +245,10 @@ function EditSoldierButton({ Icon, playerId, currentSoldierData }) {
               error={errors.eos_id}
               control={control}
               name="eos_id"
-              label="EOS ID"
+              label={t("playerEditor.soldier.eosId")}
               disabled={isPending || isEosIdDisabled}
               helperText={
-                isEosIdDisabled ? "This field already has a value and cannot be modified" : "The player's EOS ID"
+                isEosIdDisabled ? t("playerEditor.disabledField") : t("playerEditor.soldier.eosIdHelp")
               }
               fullWidth
             />
@@ -254,14 +256,14 @@ function EditSoldierButton({ Icon, playerId, currentSoldierData }) {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClose} disabled={isPending}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button 
             type="submit" 
             disabled={isPending || (isNameDisabled && isLevelDisabled && isPlatformDisabled && isClanTagDisabled)}
             startIcon={isPending ? <CircularProgress size={16} /> : null}
           >
-            {isPending ? 'Updating...' : 'Update'}
+            {isPending ? t("playerEditor.updating") : t("common.save")}
           </Button>
         </DialogActions>
       </Dialog>

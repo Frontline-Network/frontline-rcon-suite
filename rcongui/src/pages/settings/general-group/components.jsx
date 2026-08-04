@@ -35,6 +35,7 @@ import Padlock from "@/components/shared/Padlock";
 import { toast } from "react-toastify";
 import { useForm } from "react-hook-form";
 import { getMapLayerImageSrc } from "../maps/objectives/helpers";
+import { useTranslation } from "react-i18next";
 
 export const AUTOKICK_KEY = {
   condition: "condition",
@@ -57,6 +58,7 @@ export const GENERAL_KEY = {
 
 // Reusable Components
 export const SliderInput = ({ keyName, title, value, onChange }) => {
+  const { t } = useTranslation();
   const committedValue = typeof value === "number" ? value : 0;
   const [tempValue, setTempValue] = useState(committedValue);
 
@@ -122,13 +124,14 @@ export const SliderInput = ({ keyName, title, value, onChange }) => {
         </Grid>
       </Grid>
       <Typography variant="caption" color="text.secondary">
-        {getHelpText(keyName)}
+        {getHelpText(keyName, t)}
       </Typography>
     </Box>
   );
 };
 
 export const ToggleInput = ({ keyName, title, value, onChange }) => {
+  const { t } = useTranslation();
   return (
     <Box>
       <Typography variant="h6" id={`${keyName}-slider`} gutterBottom>
@@ -137,7 +140,7 @@ export const ToggleInput = ({ keyName, title, value, onChange }) => {
       <Grid container spacing={4} sx={{ alignItems: "center" }}>
         <Grid size={{ xs: 10 }}>
           <Padlock
-            label={value ? "Enabled" : "Disabled"}
+            label={t(value ? "common.enabled" : "common.disabled")}
             checked={value}
             handleChange={onChange}
           />
@@ -148,6 +151,7 @@ export const ToggleInput = ({ keyName, title, value, onChange }) => {
 };
 
 export const ThresholdsInput = ({ keyName, title, value: pairs, onChange }) => {
+  const { t } = useTranslation();
   const addThreshold = () => {
     const startingValue =
       pairs.length > 0 ? Math.max(pairs[pairs.length - 1][0], 1) + 1 : 0;
@@ -194,7 +198,7 @@ export const ThresholdsInput = ({ keyName, title, value: pairs, onChange }) => {
           <Grid size={8}>
             <FormControl fullWidth size="small">
               <InputLabel htmlFor={`threshold-${index}-min`}>
-                Min. players
+                {t("settings.general.minimumPlayers")}
               </InputLabel>
               <Input
                 disabled={index == 0 || index < pairs.length - 1}
@@ -202,7 +206,7 @@ export const ThresholdsInput = ({ keyName, title, value: pairs, onChange }) => {
                 value={threshold[0]}
                 onChange={handleThresholdChange(index, 0)}
                 onBlur={handleBlurThreshold(index, 0)}
-                placeholder="Min. players"
+                placeholder={t("settings.general.minimumPlayers")}
                 readOnly={index === 0}
                 type="number"
                 inputProps={{
@@ -219,7 +223,7 @@ export const ThresholdsInput = ({ keyName, title, value: pairs, onChange }) => {
           <Grid size={2}>
             <FormControl fullWidth size="small">
               <InputLabel htmlFor={`threshold-${index}-votes`}>
-                Votes
+                {t("settings.general.votes")}
               </InputLabel>
               <Input
                 id={`threshold-${index}-votes`}
@@ -227,7 +231,7 @@ export const ThresholdsInput = ({ keyName, title, value: pairs, onChange }) => {
                 value={threshold[1]}
                 onChange={handleThresholdChange(index, 1)}
                 onBlur={handleBlurThreshold(index, 1)}
-                placeholder="Votes"
+                placeholder={t("settings.general.votes")}
                 type="number"
                 inputProps={{
                   min: 1,
@@ -250,7 +254,7 @@ export const ThresholdsInput = ({ keyName, title, value: pairs, onChange }) => {
       ))}
       {!pairs.length && (
         <Typography component={"p"} variant="caption" color="text.secondary">
-          No thresholds set.
+          {t("settings.general.noThresholds")}
         </Typography>
       )}
       {(!pairs.length || pairs[pairs.length - 1][0] < 50) && (
@@ -260,11 +264,11 @@ export const ThresholdsInput = ({ keyName, title, value: pairs, onChange }) => {
           variant="outlined"
           size="small"
         >
-          Add Threshold
+          {t("settings.general.addThreshold")}
         </Button>
       )}
       <Typography component={"p"} variant="caption" color="text.secondary">
-        {getHelpText(keyName)}
+        {getHelpText(keyName, t)}
       </Typography>
     </Stack>
   );
@@ -281,6 +285,7 @@ export const SliderSetting = ({
   mutationFn,
   initialData,
 }) => {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const { data } = useQuery({
@@ -302,10 +307,10 @@ export const SliderSetting = ({
       mutationFn({ payload: { [payloadKey]: value }, throwRouteError: false }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [queryKey] });
-      toast.success(`${title} updated successfully!`);
+      toast.success(t("settings.general.updated", { name: title }));
     },
     onError: (error) =>
-      toast.error(`Failed to update ${title.toLowerCase()}: ${error.message}`),
+      toast.error(t("settings.general.updateFailed", { name: title, message: error.message })),
   });
 
   const form = useForm({ defaultValues: { [settingKey]: data || 0 } });
@@ -339,7 +344,7 @@ export const SliderSetting = ({
               startIcon={<SaveIcon />}
               disabled={form.formState.isSubmitting || isPending}
             >
-              {isPending ? "Saving..." : "Save"}
+              {isPending ? t("common.processing") : t("common.save")}
             </Button>
           }
         />
@@ -369,6 +374,7 @@ export const ToggleSetting = ({
   mutationFn,
   initialData,
 }) => {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const { data } = useQuery({
@@ -390,10 +396,10 @@ export const ToggleSetting = ({
       mutationFn({ payload: { [payloadKey]: value }, throwRouteError: false }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [queryKey] });
-      toast.success(`${title} updated successfully!`);
+      toast.success(t("settings.general.updated", { name: title }));
     },
     onError: (error) =>
-      toast.error(`Failed to update ${title.toLowerCase()}: ${error.message}`),
+      toast.error(t("settings.general.updateFailed", { name: title, message: error.message })),
   });
 
   const form = useForm({ defaultValues: { [settingKey]: data || false } });
@@ -427,7 +433,7 @@ export const ToggleSetting = ({
               startIcon={<SaveIcon />}
               disabled={form.formState.isSubmitting || isPending}
             >
-              {isPending ? "Saving..." : "Save"}
+              {isPending ? t("common.processing") : t("common.save")}
             </Button>
           }
         />
@@ -457,6 +463,7 @@ export const ThresholdsSetting = ({
   mutationFn,
   initialData,
 }) => {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const { data } = useQuery({
@@ -481,10 +488,10 @@ export const ThresholdsSetting = ({
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [queryKey] });
-      toast.success(`${title} updated successfully!`);
+      toast.success(t("settings.general.updated", { name: title }));
     },
     onError: (error) =>
-      toast.error(`Failed to update ${title.toLowerCase()}: ${error.message}`),
+      toast.error(t("settings.general.updateFailed", { name: title, message: error.message })),
   });
 
   const form = useForm({ defaultValues: { [settingKey]: data || [] } });
@@ -518,7 +525,7 @@ export const ThresholdsSetting = ({
               startIcon={<SaveIcon />}
               disabled={form.formState.isSubmitting || isPending}
             >
-              {isPending ? "Saving..." : "Save"}
+              {isPending ? t("common.processing") : t("common.save")}
             </Button>
           }
         />
@@ -546,6 +553,7 @@ export const AutoVotekickSetting = ({
   mutationFn,
   initialData,
 }) => {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const { data } = useQuery({
@@ -559,10 +567,10 @@ export const AutoVotekickSetting = ({
       mutationFn({ payload: values, throwRouteError: false }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [queryKey] });
-      toast.success(`${title} updated successfully!`);
+      toast.success(t("settings.general.updated", { name: title }));
     },
     onError: (error) =>
-      toast.error(`Failed to update ${title.toLowerCase()}: ${error.message}`),
+      toast.error(t("settings.general.updateFailed", { name: title, message: error.message })),
   });
 
   const form = useForm({
@@ -612,7 +620,7 @@ export const AutoVotekickSetting = ({
               startIcon={<SaveIcon />}
               disabled={form.formState.isSubmitting || isPending}
             >
-              {isPending ? "Saving..." : "Save"}
+              {isPending ? t("common.processing") : t("common.save")}
             </Button>
           }
         />
@@ -622,14 +630,14 @@ export const AutoVotekickSetting = ({
             <Stack gap={2}>
               <ToggleInput
                 keyName={AUTOKICK_KEY.enabled}
-                title={"Auto Votekick Toggle"}
+                title={t("settings.general.autoVotekickToggle")}
                 value={form.watch(AUTOKICK_KEY.enabled)}
                 onChange={(checked) =>
                   form.setValue(AUTOKICK_KEY.enabled, checked)
                 }
               />
               <Typography variant="h6" id={`autovotekick-title`} gutterBottom>
-                {"Auto Votekick Conditions"}
+                {t("settings.general.autoVotekickConditions")}
               </Typography>
               <Stack direction={"row"} gap={1}>
                 <FormControl
@@ -637,7 +645,7 @@ export const AutoVotekickSetting = ({
                   error={form.watch(AUTOKICK_KEY.minimum_ingame_mods) === ""}
                 >
                   <InputLabel htmlFor={`in-game-moderators`}>
-                    Minimum in-game moderators
+                    {t("settings.general.minimumIngameModerators")}
                   </InputLabel>
                   <Input
                     {...form.register(AUTOKICK_KEY.minimum_ingame_mods, {
@@ -651,7 +659,7 @@ export const AutoVotekickSetting = ({
                     })}
                     id={`in-game-moderators`}
                     sx={{ minWidth: 175 }}
-                    placeholder="Minimum in-game moderators"
+                    placeholder={t("settings.general.minimumIngameModerators")}
                     type="number"
                     inputProps={{ min: 0 }}
                   />
@@ -672,7 +680,7 @@ export const AutoVotekickSetting = ({
                   error={form.watch(AUTOKICK_KEY.minimum_online_mods) === ""}
                 >
                   <InputLabel htmlFor={`online-crcon-moderators`}>
-                    Online CRCON moderators
+                    {t("settings.general.minimumOnlineModerators")}
                   </InputLabel>
                   <Input
                     {...form.register(AUTOKICK_KEY.minimum_online_mods, {
@@ -686,7 +694,7 @@ export const AutoVotekickSetting = ({
                     })}
                     id={`online-crcon-moderators`}
                     sx={{ minWidth: 175 }}
-                    placeholder="Minimum online CRCON moderators"
+                    placeholder={t("settings.general.minimumOnlineModerators")}
                     type="number"
                     inputProps={{ min: 0 }}
                   />
@@ -711,6 +719,7 @@ export const SliderTimer = ({
   removeTimer,
   initialData,
 }) => {
+  const { t } = useTranslation();
   const { mutate, isPending } = useMutation({
     mutationFn: (value) =>
       setTimer({
@@ -718,10 +727,10 @@ export const SliderTimer = ({
         throwRouteError: false,
       }),
     onSuccess: () => {
-      toast.success(`${title} updated successfully!`);
+      toast.success(t("settings.general.updated", { name: title }));
     },
     onError: (error) =>
-      toast.error(`Failed to update ${title.toLowerCase()}: ${error.message}`),
+      toast.error(t("settings.general.updateFailed", { name: title, message: error.message })),
   });
 
   const { mutate: mutateEnabled, isPending: isPendingEnabled } = useMutation({
@@ -731,10 +740,10 @@ export const SliderTimer = ({
         throwRouteError: false,
       }),
     onSuccess: () => {
-      toast.success(`Timer for ${gameMode} removed successfully!`);
+      toast.success(t("settings.general.timerRemoved", { gameMode }));
     },
     onError: (error) =>
-      toast.error(`Failed to remove timer for ${gameMode}: ${error.message}`),
+      toast.error(t("settings.general.timerRemoveFailed", { gameMode, message: error.message })),
   });
 
   const form = useForm({ defaultValues: { [settingKey]: initialData || 0 } });
@@ -761,7 +770,7 @@ export const SliderTimer = ({
               }
             >
               <Button color="error" variant="contained" onClick={mutateEnabled}>
-                Remove
+                {t("settings.general.remove")}
               </Button>
               <Button
                 type="submit"
@@ -770,7 +779,7 @@ export const SliderTimer = ({
                 size="small"
                 startIcon={<SaveIcon />}
               >
-                {isPending ? "Saving..." : "Save"}
+                {isPending ? t("common.processing") : t("common.save")}
               </Button>
             </ButtonGroup>
           }
@@ -826,17 +835,18 @@ export const DynamicWeatherSettings = ({
   icon: Icon,
   mutationFn,
 }) => {
-  const [selectedMap, setSelectedMap] = useState(options[0].id);
+  const { t } = useTranslation();
+  const [selectedMap, setSelectedMap] = useState(options[0]?.id ?? "");
   const [enabled, setEnabled] = useState(false);
 
   const { mutate, isPending } = useMutation({
     mutationFn: (values) =>
       mutationFn({ payload: values, throwRouteError: false }),
     onSuccess: () => {
-      toast.success(`${title} updated successfully!`);
+      toast.success(t("settings.general.updated", { name: title }));
     },
     onError: (error) =>
-      toast.error(`Failed to update ${title.toLowerCase()}: ${error.message}`),
+      toast.error(t("settings.general.updateFailed", { name: title, message: error.message })),
   });
 
   const form = useForm({
@@ -871,7 +881,7 @@ export const DynamicWeatherSettings = ({
               startIcon={<SaveIcon />}
               disabled={form.formState.isSubmitting || isPending}
             >
-              {isPending ? "Saving..." : "Save"}
+              {isPending ? t("common.processing") : t("common.save")}
             </Button>
           }
         />
@@ -898,7 +908,7 @@ export const DynamicWeatherSettings = ({
               }}
               isOptionEqualToValue={(option, value) => option.id === value.id}
               renderInput={(params) => (
-                <TextField {...params} label="Map Name" fullWidth />
+                <TextField {...params} label={t("maps.current")} fullWidth />
               )}
               renderOption={(props, option) => (
                 <Box
@@ -919,7 +929,7 @@ export const DynamicWeatherSettings = ({
               )}
             />
             <Padlock
-              label={enabled ? "Enabled" : "Disabled"}
+              label={t(enabled ? "common.enabled" : "common.disabled")}
               checked={enabled}
               handleChange={(checked) => {
                 setEnabled(checked);

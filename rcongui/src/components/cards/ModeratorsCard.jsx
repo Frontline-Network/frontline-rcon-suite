@@ -1,8 +1,10 @@
 import { useGlobalStore } from "@/stores/global-state";
 import { useMemo } from "react";
 import OnlineUsersCard from "@/components/shared/card/UsersCard";
+import { useTranslation } from "react-i18next";
 
 const ModeratorsCard = () => {
+  const { t } = useTranslation();
   const onlinePlayers = useGlobalStore((state) => state.onlinePlayers);
   const onlineCrconMods = useGlobalStore((state) => state.onlineCrconMods);
   const onlineIngameMods = useGlobalStore((state) => state.onlineIngameMods);
@@ -33,7 +35,7 @@ const ModeratorsCard = () => {
 
   return (
     <OnlineUsersCard
-      title="Moderators"
+      title={t("dashboard.moderators")}
       onlineUsers={[
         { group: "CRCON", label: `CRCON (${crconMods.length})`, users: crconMods, manageLink: "/admin" },
         {
@@ -47,4 +49,4 @@ const ModeratorsCard = () => {
   );
 };
 
-export default ModeratorsCard; 
+export default ModeratorsCard;

@@ -29,6 +29,7 @@ import { usePlayerSidebar } from "@/hooks/usePlayerSidebar";
 import { generatePlayerActions } from "@/features/player-action/actions";
 import { ClientError } from "../shared/ClientError";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ProfileHeader,
   ProfileWrapper,
@@ -40,20 +41,23 @@ import PlayerProfileSummary from "../player/profile/Summary";
 import PlayerProfileStatusTags from "../player/profile/StatusTags";
 import { ActionMenuButton } from "@/features/player-action/ActionMenu";
 
-const Penalties = ({ punish, kick, tempBan, parmaBan }) => (
-  <dl>
-    <dt>Punish</dt>
+const Penalties = ({ punish, kick, tempBan, parmaBan }) => {
+  const { t } = useTranslation();
+
+  return <dl>
+    <dt>{t("playerDrawer.penalties.punish")}</dt>
     <dd>{punish ?? 0}</dd>
-    <dt>Kick</dt>
+    <dt>{t("playerDrawer.penalties.kick")}</dt>
     <dd>{kick ?? 0}</dd>
-    <dt>Temporary ban</dt>
+    <dt>{t("playerDrawer.penalties.tempBan")}</dt>
     <dd>{tempBan ?? 0}</dd>
-    <dt>Permanent ban</dt>
+    <dt>{t("playerDrawer.penalties.permaBan")}</dt>
     <dd>{parmaBan ?? 0}</dd>
-  </dl>
-);
+  </dl>;
+};
 
 const ReceivedActions = ({ actions }) => {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const displayCount = expanded ? actions.length : 2;
 
@@ -84,14 +88,14 @@ const ReceivedActions = ({ actions }) => {
           aria-controls="panel-action-content"
           id="panel-action-header"
         >
-          Show all
+          {t("playerDrawer.showAll")}
         </AccordionSummary>
         <AccordionDetails>
-          {`This player received ${actions.length} actions in total.`}
+          {t("playerDrawer.actionsTotal", { count: actions.length })}
         </AccordionDetails>
         <AccordionActions>
           <Button onClick={() => setExpanded((prevState) => !prevState)}>
-            {expanded ? "Hide" : "Show"}
+            {expanded ? t("common.hide") : t("common.show")}
           </Button>
         </AccordionActions>
       </Accordion>
@@ -100,6 +104,7 @@ const ReceivedActions = ({ actions }) => {
 };
 
 const Messages = ({ messages }) => {
+  const { t } = useTranslation();
   return (
     <>
       {messages && messages.length ? (
@@ -116,7 +121,7 @@ const Messages = ({ messages }) => {
       ) : (
         <Box>
           <Typography variant="subtitle" component={"span"}>
-            No messages
+            {t("playerDrawer.noMessages")}
           </Typography>
         </Box>
       )}
@@ -167,11 +172,16 @@ const ProfileNotFound = ({ onClose }) => (
       }}
     >
       <Typography variant="h6" sx={{ textAlign: "center" }}>
-        Profile not found
+        <ProfileNotFoundLabel />
       </Typography>
     </Box>
   </DrawerBase>
 );
+
+const ProfileNotFoundLabel = () => {
+  const { t } = useTranslation();
+  return t("playerDrawer.profileNotFound");
+};
 
 const ProfileError = ({ error, onClose }) => (
   <DrawerBase onClose={onClose}>
@@ -180,6 +190,7 @@ const ProfileError = ({ error, onClose }) => (
 );
 
 const PlayerDetails = ({ player, onClose }) => {
+  const { t } = useTranslation();
   const [openedTab, setOpenedTab] = useState("profile");
   const handleTabChange = (event, newValue) => {
     setOpenedTab(newValue);
@@ -257,13 +268,13 @@ const PlayerDetails = ({ player, onClose }) => {
             onChange={handleTabChange}
             variant="scrollable"
             scrollButtons="auto"
-            aria-label="Player details"
+            aria-label={t("playerDrawer.details")}
           >
-            <Tab label="Profile" value="profile" />
-            {isOnline && <Tab label="Game" value="game" />}
-            <Tab label="Admin" value="admin" />
+            <Tab label={t("playerDrawer.tabs.profile")} value="profile" />
+            {isOnline && <Tab label={t("playerDrawer.tabs.game")} value="game" />}
+            <Tab label={t("playerDrawer.tabs.admin")} value="admin" />
             <Tab
-              label="Messages"
+              label={t("playerDrawer.tabs.messages")}
               value="messages"
               disabled={
                 profile.received_actions.filter(
@@ -272,20 +283,21 @@ const PlayerDetails = ({ player, onClose }) => {
               }
             />
             <Tab
-              label="Comments"
+              label={t("playerDrawer.tabs.comments")}
               value="comments"
               disabled={player.comments.length === 0}
             />
             <Tab
-              label="Bans"
+              label={t("playerDrawer.tabs.bans")}
               value="bans"
               disabled={player.bans.length === 0}
             />
-            <Tab label="Logs" value="logs" disabled={true} />
+            <Tab label={t("playerDrawer.tabs.logs")} value="logs" disabled={true} />
           </Tabs>
         </Box>
         <TabPanel value="profile">
           <PlayerProfileSummary
+            player={profile}
             country={player.country}
             firstSeen={profile.created ?? player.created}
             lastSeen={profile?.names[0]?.last_seen}
@@ -311,7 +323,7 @@ const PlayerDetails = ({ player, onClose }) => {
         <TabPanel value="admin">
           <Box component={"section"}>
             <Typography variant="h6" component={"h2"}>
-              Penalties
+              {t("playerDrawer.penalties.title")}
             </Typography>
             <Penalties
               punish={profile.penalty_count["PUNISH"]}
@@ -322,7 +334,7 @@ const PlayerDetails = ({ player, onClose }) => {
           </Box>
           <Box component={"section"}>
             <Typography variant="h6" component={"h2"}>
-              Received actions
+              {t("playerDrawer.receivedActions")}
             </Typography>
             <ReceivedActions actions={profile.received_actions} />
           </Box>
@@ -330,7 +342,7 @@ const PlayerDetails = ({ player, onClose }) => {
         <TabPanel value="messages">
           <Box component={"section"}>
             <Typography variant="h6" component={"h2"}>
-              Messages
+              {t("playerDrawer.tabs.messages")}
             </Typography>
             <Messages
               messages={profile.received_actions.filter(
@@ -351,10 +363,11 @@ const PlayerDetails = ({ player, onClose }) => {
 };
 
 const Comments = ({ comments }) => {
+  const { t } = useTranslation();
   return (
     <Box component={"section"}>
       <Typography variant="h6" component={"h2"}>
-        Comments
+        {t("playerDrawer.tabs.comments")}
       </Typography>
       <Stack sx={{ gap: 1 }}>
         {comments.map((comment) => (
@@ -378,10 +391,11 @@ const Comment = ({ comment }) => {
 };
 
 const Bans = ({ bans }) => {
+  const { t } = useTranslation();
   return (
     <Box component={"section"}>
       <Typography variant="h6" component={"h2"}>
-        Bans
+        {t("playerDrawer.tabs.bans")}
       </Typography>
       <Stack sx={{ gap: 1 }}>
         {bans.map((ban) => (
@@ -406,16 +420,31 @@ const Ban = ({ ban }) => {
 };
 
 const PlayerGameDetails = ({ player }) => {
+  const { t } = useTranslation();
+  const statLabels = {
+    level: t("views.table.level"),
+    unit_name: t("playerDrawer.stats.unit"),
+    loadout: t("playerDrawer.stats.loadout"),
+    team: t("views.table.team"),
+    role: t("views.table.role"),
+    kills: t("views.table.kills"),
+    deaths: t("views.table.deaths"),
+    combat: t("views.table.combat"),
+    offense: t("views.table.offense"),
+    defense: t("views.table.defense"),
+    support: t("views.table.support"),
+  };
+
   return (
     <Box component={"section"}>
       <Typography variant="h6" component={"h2"}>
-        Current Game Stats
+        {t("playerDrawer.currentGameStats")}
       </Typography>
       <Table size="small">
         <TableHead>
           <TableRow>
-            <TableCell>Stat</TableCell>
-            <TableCell>Value</TableCell>
+            <TableCell>{t("playerDrawer.stat")}</TableCell>
+            <TableCell>{t("playerDrawer.value")}</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -433,7 +462,7 @@ const PlayerGameDetails = ({ player }) => {
             "support",
           ].map((stat) => (
             <TableRow key={stat}>
-              <TableCell>{stat}</TableCell>
+              <TableCell>{statLabels[stat]}</TableCell>
               <TableCell>{player[stat] ?? "-"}</TableCell>
             </TableRow>
           ))}

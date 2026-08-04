@@ -3,6 +3,7 @@ import { PopoverMenu } from "@/components/shared/PopoverMenu";
 import GroupIcon from "@mui/icons-material/Groups";
 import { Tooltip, Button } from "@mui/material";
 import { useThemedImages } from "@/hooks/useThemedImages";
+import { useTranslation } from "react-i18next";
 
 /**
  * @typedef {Object} UnitOption
@@ -21,14 +22,15 @@ import { useThemedImages } from "@/hooks/useThemedImages";
  */
 export const UnitSelectionMenu = ({ unitOptions, onUnitSelect }) => {
   const themedImg = useThemedImages()
+  const { t } = useTranslation();
 
   return (
     <PopoverMenu
       id="unit-picker"
-      description="Pick a squad to select all players in it"
+      description={t("selection.unitDescription")}
       renderButton={(props) => (
         <Button {...props}>
-          <Tooltip title="Select by squad">
+          <Tooltip title={t("selection.unit")}>
             <GroupIcon />
           </Tooltip>
         </Button>

@@ -18,6 +18,9 @@ import { useGlobalStore } from "@/stores/global-state";
 import { ActionBar } from "@/features/player-action/ActionMenu";
 import { newRecordActions } from "@/features/player-action/actions";
 import PlayerFiltersForm from "./PlayerFiltersForm";
+import { useTranslation } from "react-i18next";
+import PageHeader from "@/components/shared/PageHeader";
+import { demoPlayerRecords, isFakeMode } from "@/mirage/demo-data";
 
 // Create a memoized version of PlayerCard
 const MemoizedPlayerCard = memo(PlayerCard);
@@ -86,7 +89,7 @@ export const loader = async ({ request }) => {
   };
 
   // In the background, this command is POST request therefore the payload and not params
-  const playersRecords = await cmd.GET_PLAYERS_RECORDS({
+  const playersRecords = isFakeMode() ? { result: { players: demoPlayerRecords, total: demoPlayerRecords.length } } : await cmd.GET_PLAYERS_RECORDS({
     payload: Object.fromEntries(
       Object.entries(fields).filter(
         ([_, value]) => value !== "" && value !== null
@@ -94,7 +97,7 @@ export const loader = async ({ request }) => {
     ),
   });
 
-  const bans = await cmd.GET_BANS();
+  const bans = isFakeMode() ? [] : await cmd.GET_BANS();
 
   return {
     players: playersRecords.result.players.map((player) => ({
@@ -111,10 +114,11 @@ export const loader = async ({ request }) => {
 };
 
 export default function PlayersRecords() {
+  const { t } = useTranslation();
   const { players: playersData, fields, total_pages, page } = useLoaderData();
   const navigation = useNavigation();
   const server = useGlobalStore((state) => state.serverState);
-  const onlinePlayers = useGlobalStore((state) => state.onlinePlayers);
+  const onlinePlayers = useGlobalStore((state) => state.onlinePlayers) ?? [];
   const [selectedPlayerIds, setSelectedPlayerIds] = useState(new Set());
   // Cache player data by player_id to support multi-page selection
   const [playerCache, setPlayerCache] = useState(new Map());
@@ -228,6 +232,11 @@ export default function PlayersRecords() {
 
   return (
     <Stack spacing={1} sx={{ mt: 2 }}>
+      <PageHeader
+        eyebrow={t("records.players.eyebrow")}
+        title={t("records.players.title")}
+        subtitle={t("records.players.subtitle")}
+      />
       <ActionBar actions={newRecordActions} recipients={selectedPlayers} />
       <Stack direction={{ xs: "column", lg: "row" }} spacing={1} sx={{ mt: 2 }}>
         {/* FILTERS */}
@@ -240,9 +249,9 @@ export default function PlayersRecords() {
           sx={{ width: "100%" }}
         >
           <Stack direction={"row"} spacing={1} alignItems={"center"}>
-            <Typography>Selected: {selectedPlayerIds.size}</Typography>
-            <Button size="small" variant="outlined" onClick={handleSelectAllPlayers}>Select All</Button>
-            <Button size="small" variant="outlined" onClick={handleUnselectAllPlayers}>Unselect All</Button>
+            <Typography>{t("records.players.selected", { count: selectedPlayerIds.size })}</Typography>
+            <Button size="small" variant="outlined" onClick={handleSelectAllPlayers}>{t("common.selectAll")}</Button>
+            <Button size="small" variant="outlined" onClick={handleUnselectAllPlayers}>{t("common.unselectAll")}</Button>
             <Divider flexItem orientation="vertical" />
             <NavPagination
               page={page}

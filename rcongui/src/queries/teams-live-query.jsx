@@ -3,10 +3,11 @@ import { extractPlayers } from "@/utils/extractPlayers";
 import { cmd } from "@/utils/fetchUtils";
 import { normalizePlayerProfile } from "@/utils/lib";
 import { useQuery } from "@tanstack/react-query";
+import { demoTeamView, isFakeMode } from "@/mirage/demo-data";
 
 export const teamsLiveQueryOptions = {
   queryKey: [{ queryIdentifier: "get_team_view" }],
-  queryFn: cmd.GET_LIVE_TEAMS,
+  queryFn: isFakeMode() ? () => Promise.resolve(demoTeamView) : cmd.GET_LIVE_TEAMS,
   select: (data) => {
     // Think of this as a middleware that transforms the player data
     // in case the API returns something different than what we expect

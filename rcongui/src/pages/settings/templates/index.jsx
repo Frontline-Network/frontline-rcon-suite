@@ -14,37 +14,39 @@ import WavingHandIcon from '@mui/icons-material/WavingHand';
 import AnnouncementIcon from '@mui/icons-material/Announcement';
 import PodcastsIcon from '@mui/icons-material/Podcasts';
 import SettingsSuggestIcon from '@mui/icons-material/SettingsSuggest';
+import { useTranslation } from "react-i18next";
 
 const categories = [
   {
-    name: "Message",
+    label: "settings.templates.message",
     href: "/settings/templates/message",
     icon: <ChatIcon />,
   },
   {
-    name: "Reason",
+    label: "settings.templates.reason",
     href: "/settings/templates/reason",
     icon: <AnnouncementIcon />,
   },
   {
-    name: "Welcome",
+    label: "settings.templates.welcome",
     href: "/settings/templates/welcome",
     icon: <WavingHandIcon />,
   },
   {
-    name: "Broadcast",
+    label: "settings.templates.broadcast",
     href: "/settings/templates/broadcast",
     icon: <PodcastsIcon />,
   },
   {
-    name: "Auto-Settings",
+    label: "settings.templates.autosettings",
     href: "/settings/templates/auto_settings",
     icon: <SettingsSuggestIcon />,
   },
 ];
 
 const MessagesRoot = () => {
-  const location = useLocation()
+  const location = useLocation();
+  const { t } = useTranslation();
 
   return (
     <Box>
@@ -53,7 +55,7 @@ const MessagesRoot = () => {
         id="messages-simple-select"
         value={location.pathname}
         displayEmpty
-        inputProps={{ "aria-label": "Select messages" }}
+        inputProps={{ "aria-label": t("settings.templates.select") }}
         fullWidth
         MenuProps={{
           PaperProps: {
@@ -79,17 +81,17 @@ const MessagesRoot = () => {
           },
         }}
       >
-        <ListSubheader sx={{ pt: 0 }}>Categories</ListSubheader>
+        <ListSubheader sx={{ pt: 0 }}>{t("settings.templates.categories")}</ListSubheader>
         {categories?.map((type) => (
           <MenuItem
-            key={type.name}
+            key={type.href}
             value={type.href}
             component={Link}
             href={type.href}
             to={type.href}
           >
             <ListItemAvatar>
-              <Avatar alt={type.name}>
+              <Avatar alt={t(type.label)}>
                 {type.icon}
               </Avatar>
             </ListItemAvatar>
@@ -99,7 +101,7 @@ const MessagesRoot = () => {
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
               }}
-              primary={type.name}
+              primary={t(type.label)}
             />
           </MenuItem>
         ))}

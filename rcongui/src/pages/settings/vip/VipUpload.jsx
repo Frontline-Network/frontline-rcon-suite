@@ -5,10 +5,12 @@ import { Alert, Button, Stack, CircularProgress, Typography } from "@mui/materia
 import { CloudUpload } from "@mui/icons-material";
 import { InputFileUpload } from "@/components/shared/InputFileUpload";
 import { vipQueryKeys } from "@/queries/vip-query";
+import { useTranslation } from "react-i18next";
 
 const POLL_INTERVAL = 2000; // 2 seconds
 
 const VipUpload = () => {
+  const { t } = useTranslation();
   const [showWarning, setShowWarning] = useState(false);
   const [uploadId, setUploadId] = useState(null);
   const [status, setStatus] = useState(null);
@@ -90,7 +92,7 @@ const VipUpload = () => {
     return (
       <Stack spacing={2} alignItems="center">
         <CircularProgress size={24} />
-        <Alert severity="info">Processing VIP records... Please wait.</Alert>
+        <Alert severity="info">{t("records.vips.uploadProcessing")}</Alert>
       </Stack>
     );
   }
@@ -98,12 +100,12 @@ const VipUpload = () => {
   if (status === "finished") {
     return (
       <Stack spacing={2}>
-        <Alert severity="success">VIP records upload finished.</Alert>
+        <Alert severity="success">{t("records.vips.uploadFinished")}</Alert>
         {result?.map((message) => (
           <Typography key={message}>{message}</Typography>
         ))}
         <Button variant="contained" onClick={reset}>
-          Confirm
+          {t("common.confirm")}
         </Button>
       </Stack>
     );
@@ -113,8 +115,7 @@ const VipUpload = () => {
     return (
       <Stack spacing={2}>
         <Alert severity="warning">
-          This action will override all VIP records for the current server. It
-          is recommended to download a backup first.
+          {t("records.vips.uploadWarning")}
         </Alert>
         <Stack direction="row" spacing={1}>
           <Button
@@ -123,10 +124,10 @@ const VipUpload = () => {
             color="error"
             onClick={reset}
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <InputFileUpload
-            text="Upload file"
+            text={t("records.vips.uploadFile")}
             color="primary"
             variant="contained"
             onChange={handleFileUpload}
@@ -146,7 +147,7 @@ const VipUpload = () => {
       onClick={handleInitialUpload}
       fullWidth
     >
-      Upload VIPs from file
+      {t("records.vips.uploadFromFile")}
     </Button>
   );
 };

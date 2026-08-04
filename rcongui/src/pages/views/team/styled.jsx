@@ -56,12 +56,13 @@ export const ScrollContainer = styled(Box)({
 });
 
 export const ContentWrapper = styled(Box)({
-  minWidth: "min-content",
+  width: "100%",
+  minWidth: 624,
 });
 
 export const gridTemplateColumns = {
-  default: "35px minmax(200px, 300px) 60px repeat(6, 60px)",
-  sm: "35px minmax(150px, 200px) 60px repeat(6, 60px)",
+  default: "36px minmax(180px, 1fr) repeat(7, 56px)",
+  sm: "36px minmax(150px, 1fr) repeat(7, 56px)",
   noScore: "35px minmax(150px, 200px) 1fr",
 };
 
@@ -186,12 +187,22 @@ export const HeaderRow = styled(Box)(({ theme }) => ({
     fontSize: "0.75rem",
     fontWeight: "bold",
     whiteSpace: "nowrap",
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
   },
   "& > :nth-of-type(1)": {
     textAlign: "center",
   },
   "& > :nth-of-type(2)": {
     textAlign: "left",
+  },
+  "& .metric-header": {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "fit-content",
+    justifySelf: "end",
   },
   [theme.breakpoints.down("sm")]: {
     gridTemplateColumns: gridTemplateColumns.sm,
