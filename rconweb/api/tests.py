@@ -240,3 +240,97 @@ class MobilePairingTests(TestCase):
         self.assertFalse(
             read_only.permissions.filter(codename__contains="mobile_devices").exists()
         )
+
+
+@patch.dict(
+    "os.environ",
+    {
+        "MOBILE_INTEGRATION_ENABLED": "true",
+        "MOBILE_PUBLIC_BASE_URL": "https://crcon.example.org",
+        "SERVER_NUMBER": "1",
+    },
+)
+class MobileContextTests(TestCase):
+    def setUp(self):
+        registered_mods = patch("api.auth.set_registered_mods")
+        registered_mods.start()
+        self.addCleanup(registered_mods.stop)
+        self.user = User.objects.create_superuser(
+            username="context-admin",
+            email="context@example.org",
+            password="secret",
+        )
+        self.client = Client()
+        self.client.force_login(self.user)
+
+    @patch("api.mobile_context._rcon_api")
+    def test_player_search_combines_history_and_live_context(self, get_rcon_api):
+        get_rcon_api.return_value.get_players_history.return_value = {
+            "players": [{"player_id": "bob", "player_name": "Bob"}]
+        }
+        get_rcon_api.return_value.get_detailed_players.return_value = {
+            "players": {
+                "bob": {
+                    "player_id": "bob",
+                    "name": "Bob",
+                    "team": "Allies",
+                    "unit_name": "Item",
+                }
+            }
+        }
+        response = self.client.get(
+            "/api/mobile/v1/players/search", {"q": "Bob", "server_number": 1}
+        )
+        self.assertEqual(response.status_code, 200)
+        player = response.json()["result"][0]
+        self.assertTrue(player["online"])
+        self.assertEqual(player["unit_name"], "Item")
+
+    @patch("api.mobile_context._rcon_api")
+    def test_squad_endpoint_returns_only_requested_squad(self, get_rcon_api):
+        get_rcon_api.return_value.get_team_view.return_value = {
+            "Allies": {
+                "squads": {
+                    "Item": {
+                        "type": "infantry",
+                        "has_leader": True,
+                        "players": [{"player_id": "leader", "name": "Leader"}],
+                    }
+                }
+            },
+            "fail_count": 0,
+        }
+        response = self.client.get("/api/mobile/v1/servers/1/squads/Allies/Item")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["result"]["squad_name"], "Item")
+        self.assertEqual(len(response.json()["result"]["players"]), 1)
+
+    @patch("api.mobile_incidents.record_mobile_audit")
+    @patch("api.mobile_incidents.mutate_incident_subject")
+    def test_subject_confirmation_uses_revision_and_idempotency(
+        self, mutate_subject, _audit
+    ):
+        incident_id = "f0c4a788-2d44-4621-9fa1-8447dd7caf65"
+        subject_id = "8a1bcbe1-315a-4411-8238-cb9ed6f0874e"
+        mutate_subject.return_value = {
+            "id": incident_id,
+            "server_number": 1,
+            "revision": 4,
+            "subjects": [],
+        }
+        response = self.client.patch(
+            f"/api/mobile/v1/incidents/{incident_id}/subjects/{subject_id}",
+            data=json.dumps({"revision": 3, "operation": "confirm"}),
+            content_type="application/json",
+            HTTP_IDEMPOTENCY_KEY="subject-confirm-1",
+        )
+        self.assertEqual(response.status_code, 200)
+        mutate_subject.assert_called_once_with(
+            incident_id,
+            actor="context-admin",
+            expected_revision=3,
+            operation="confirm",
+            payload={"revision": 3, "operation": "confirm"},
+            subject_id=subject_id,
+            idempotency_key="subject-confirm-1",
+        )

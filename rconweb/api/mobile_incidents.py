@@ -9,19 +9,21 @@ from rcon.admin_incidents import (
     IncidentNotFound,
     InvalidIncidentTransition,
     complete_incident_action,
+    confirmed_action_subject,
     create_incident,
     get_incident,
     list_incidents,
     mutate_incident,
+    mutate_incident_subject,
     reserve_incident_action,
 )
 from rcon.utils import get_server_number
 
-from . import views
 from .auth import api_response, login_required
 from .decorators import require_http_methods
 from .mobile import _error, _json_body, _require_enabled
 from .mobile_audit import record_mobile_audit
+from .mobile_context import incident_live_context
 from .multi_servers import forward_mobile_request_to_server
 
 ACTION_PERMISSIONS = {
@@ -112,6 +114,34 @@ def incident_detail(request, incident_id):
             result = get_incident(str(incident_id))
         except IncidentNotFound as exc:
             return _error(command, str(exc), 404)
+        if int(result["server_number"]) != int(
+            get_server_number()
+        ) and not request.GET.get("forwarded"):
+            try:
+                response = forward_mobile_request_to_server(
+                    request,
+                    int(result["server_number"]),
+                    request.path,
+                    method="GET",
+                    params=dict(request.GET),
+                )
+            except ValueError as exc:
+                result["live_context"] = {
+                    "available": False,
+                    "reason": str(exc),
+                    "reporter": None,
+                    "subjects": {},
+                }
+            else:
+                return HttpResponse(
+                    content=response.content,
+                    status=response.status_code,
+                    content_type=response.headers.get(
+                        "content-type", "application/json"
+                    ),
+                )
+        else:
+            result["live_context"] = incident_live_context(request, result)
         return api_response(command=command, failed=False, result=result)
 
     try:
@@ -206,13 +236,99 @@ def incident_notes(request, incident_id):
     return api_response(command=command, failed=False, result=result)
 
 
+@csrf_exempt
+@login_required()
+@require_http_methods(["POST"])
+def incident_subjects(request, incident_id):
+    command = "mobile_incident_subject"
+    if disabled := _require_enabled(command):
+        return disabled
+    if not request.user.has_perm("api.can_create_admin_incidents"):
+        return _error(command, "Missing incident update permission", 403)
+    try:
+        data = _json_body(request)
+        result = mutate_incident_subject(
+            str(incident_id),
+            actor=request.user.username,
+            expected_revision=int(data["revision"]),
+            operation="add",
+            payload=data,
+            idempotency_key=request.headers.get("Idempotency-Key", ""),
+        )
+    except IncidentNotFound as exc:
+        return _error(command, str(exc), 404)
+    except IncidentConflict as exc:
+        return _error(command, str(exc), 409)
+    except (KeyError, TypeError, ValueError) as exc:
+        return _error(command, str(exc), 400)
+    subject = result.get("primary_subject")
+    record_mobile_audit(
+        username=request.user.username,
+        command="mobile_incident_subject_added",
+        request=request,
+        server_number=result["server_number"],
+        incident_id=str(incident_id),
+        arguments={"subject_id": subject.get("id") if subject else None},
+        result={"revision": result["revision"]},
+    )
+    return api_response(command=command, failed=False, result=result)
+
+
+@csrf_exempt
+@login_required()
+@require_http_methods(["PATCH"])
+def incident_subject_detail(request, incident_id, subject_id):
+    command = "mobile_incident_subject_detail"
+    if disabled := _require_enabled(command):
+        return disabled
+    if not request.user.has_perm("api.can_create_admin_incidents"):
+        return _error(command, "Missing incident update permission", 403)
+    try:
+        data = _json_body(request)
+        operation = str(data["operation"])
+        result = mutate_incident_subject(
+            str(incident_id),
+            actor=request.user.username,
+            expected_revision=int(data["revision"]),
+            operation=operation,
+            payload=data,
+            subject_id=str(subject_id),
+            idempotency_key=request.headers.get("Idempotency-Key", ""),
+        )
+    except IncidentNotFound as exc:
+        return _error(command, str(exc), 404)
+    except IncidentConflict as exc:
+        return _error(command, str(exc), 409)
+    except (InvalidIncidentTransition, KeyError, TypeError, ValueError) as exc:
+        return _error(command, str(exc), 400)
+    record_mobile_audit(
+        username=request.user.username,
+        command=f"mobile_incident_subject_{operation}",
+        request=request,
+        server_number=result["server_number"],
+        incident_id=str(incident_id),
+        arguments={"subject_id": str(subject_id)},
+        result={"revision": result["revision"]},
+    )
+    return api_response(command=command, failed=False, result=result)
+
+
 def _execute_action(action: str, data: dict, user_name: str, incident: dict):
+    from . import views
+
     player_id = str(data.get("player_id") or incident.get("target_id") or "").strip()
+    subject = confirmed_action_subject(
+        incident,
+        player_id=player_id,
+        subject_id=str(data.get("subject_id") or "") or None,
+    )
     player_name = str(
-        data.get("player_name") or incident.get("target_name") or ""
+        data.get("player_name")
+        or subject.get("display_name")
+        or subject.get("leader_name")
+        or incident.get("target_name")
+        or ""
     ).strip()
-    if not player_id:
-        raise ValueError("The incident must be linked to a player")
     if action == "message":
         message = str(data.get("message") or "").strip()
         if not message:
@@ -279,6 +395,16 @@ def incident_actions(request, incident_id):
         return _error(command, "Missing player action permission", 403)
     if server_number != int(incident["server_number"]):
         return _error(command, "Action server does not match the incident", 400)
+    try:
+        confirmed_action_subject(
+            incident,
+            player_id=str(
+                data.get("player_id") or incident.get("target_id") or ""
+            ).strip(),
+            subject_id=str(data.get("subject_id") or "") or None,
+        )
+    except ValueError as exc:
+        return _error(command, str(exc), 400)
 
     if server_number != int(get_server_number()) and not data.get("forwarded"):
         try:
@@ -326,7 +452,7 @@ def incident_actions(request, incident_id):
             request=request,
             server_number=server_number,
             incident_id=str(incident_id),
-            arguments=data,
+            arguments={**data, "subject_id": data.get("subject_id")},
             result=result,
         )
     except Exception as exc:

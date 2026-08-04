@@ -68,6 +68,14 @@ def _incident_retention_days() -> int:
         return 90
 
 
+def _mobile_context_fuzzy_threshold() -> float:
+    try:
+        value = float(os.getenv("MOBILE_CONTEXT_FUZZY_THRESHOLD", "0.74"))
+    except (TypeError, ValueError):
+        value = 0.74
+    return max(0.0, min(value, 1.0))
+
+
 def _incident_triggers() -> list[str]:
     configured = os.getenv("MOBILE_INCIDENT_TRIGGERS", "").strip()
     if configured:
@@ -593,6 +601,8 @@ def bootstrap(request):
                 "public_base_url": os.getenv("MOBILE_PUBLIC_BASE_URL", ""),
                 "incident_triggers": _incident_triggers(),
                 "incident_retention_days": _incident_retention_days(),
+                "context_v2": os.getenv("MOBILE_CONTEXT_V2", "disabled"),
+                "context_fuzzy_threshold": _mobile_context_fuzzy_threshold(),
                 "push_relay_configured": bool(
                     os.getenv("MOBILE_PUSH_RELAY_URL", "").strip()
                 ),

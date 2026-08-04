@@ -4,15 +4,24 @@ import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'crcon_api.dart';
+import 'frontline_theme.dart';
 import 'live_updates.dart';
 import 'models.dart';
 import 'providers.dart';
 import 'push_relay.dart';
+
+final localeProvider = StateProvider<Locale>((ref) => const Locale('de'));
+
+extension FrontlineCopy on BuildContext {
+  bool get isGerman => Localizations.localeOf(this).languageCode == 'de';
+  String tr(String german, String english) => isGerman ? german : english;
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,6 +46,18 @@ final _router = GoRouter(
       builder: (_, state) => PlayerProfileScreen(
         connectionId: state.pathParameters['connectionId']!,
         playerId: state.pathParameters['playerId']!,
+        serverNumber: int.tryParse(
+          state.uri.queryParameters['server_number'] ?? '',
+        ),
+      ),
+    ),
+    GoRoute(
+      path: '/squads/:connectionId/:serverNumber/:team/:squad',
+      builder: (_, state) => SquadScreen(
+        connectionId: state.pathParameters['connectionId']!,
+        serverNumber: int.parse(state.pathParameters['serverNumber']!),
+        team: state.pathParameters['team']!,
+        squadName: state.pathParameters['squad']!,
       ),
     ),
     GoRoute(
@@ -65,6 +86,7 @@ class _CrconMobileAppState extends ConsumerState<CrconMobileApp> {
   @override
   void initState() {
     super.initState();
+    unawaited(_restoreLanguage());
     try {
       _foregroundMessages = FirebaseMessaging.onMessage.listen(_openIncident);
       _openedMessages = FirebaseMessaging.onMessageOpenedApp.listen(
@@ -82,6 +104,12 @@ class _CrconMobileAppState extends ConsumerState<CrconMobileApp> {
     } catch (_) {
       // No-op in self-hosted builds without Firebase configuration.
     }
+  }
+
+  Future<void> _restoreLanguage() async {
+    final language = await ref.read(secureStoreProvider).readLanguage();
+    if (!mounted || language == null) return;
+    ref.read(localeProvider.notifier).state = Locale(language);
   }
 
   Future<void> _rotatePushIdentity() async {
@@ -151,20 +179,40 @@ class _CrconMobileAppState extends ConsumerState<CrconMobileApp> {
     ref.listen(connectionsProvider, (_, next) {
       next.whenData(_syncLiveConnections);
     });
+    final locale = ref.watch(localeProvider);
     return MaterialApp.router(
-      title: 'CRCON Admin',
+      title: 'Frontline CRCON Admin',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xffc6a15b),
-          brightness: Brightness.dark,
-        ),
-        scaffoldBackgroundColor: const Color(0xff111315),
-        useMaterial3: true,
-      ),
+      locale: locale,
+      supportedLocales: const [Locale('de'), Locale('en')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ],
+      theme: FrontlineTheme.dark,
       routerConfig: _router,
     );
   }
+}
+
+class _LanguageButton extends ConsumerWidget {
+  const _LanguageButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => PopupMenuButton<String>(
+    tooltip: context.tr('Sprache', 'Language'),
+    icon: const Icon(Icons.language),
+    initialValue: ref.watch(localeProvider).languageCode,
+    onSelected: (language) {
+      ref.read(localeProvider.notifier).state = Locale(language);
+      unawaited(ref.read(secureStoreProvider).writeLanguage(language));
+    },
+    itemBuilder: (_) => const [
+      PopupMenuItem(value: 'de', child: Text('Deutsch')),
+      PopupMenuItem(value: 'en', child: Text('English')),
+    ],
+  );
 }
 
 class ConnectionsScreen extends ConsumerWidget {
@@ -613,11 +661,12 @@ class InboxScreen extends ConsumerWidget {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _createManualIncident(context, ref),
         icon: const Icon(Icons.add_alert),
-        label: const Text('New incident'),
+        label: Text(context.tr('Neuer Vorfall', 'New incident')),
       ),
       appBar: AppBar(
-        title: const Text('Incident inbox'),
+        title: Text(context.tr('Vorfall-Inbox', 'Incident inbox')),
         actions: [
+          const _LanguageButton(),
           IconButton(
             onPressed: () => ref.invalidate(inboxProvider),
             icon: const Icon(Icons.refresh),
@@ -649,32 +698,98 @@ class InboxScreen extends ConsumerWidget {
                   itemCount: items.length,
                   itemBuilder: (context, index) {
                     final item = items[index];
+                    final primary = item.primarySubject;
                     return Card(
-                      child: ListTile(
+                      child: InkWell(
                         onTap: () => context.push(
                           '/incidents/${item.connectionId}/${item.id}',
                         ),
-                        leading: Icon(
-                          item.status == 'new'
-                              ? Icons.notification_important
-                              : Icons.assignment_ind,
-                          color: item.status == 'new' ? Colors.orange : null,
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    item.status == 'new'
+                                        ? Icons.notification_important
+                                        : Icons.assignment_ind,
+                                    color: item.status == 'new'
+                                        ? FrontlineTheme.warning
+                                        : null,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      item.reason,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleMedium,
+                                    ),
+                                  ),
+                                  if (item.stale)
+                                    const Icon(Icons.cloud_off, size: 18)
+                                  else
+                                    Text(item.status),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  Chip(
+                                    label: Text('Server ${item.serverNumber}'),
+                                  ),
+                                  Chip(
+                                    avatar: Icon(
+                                      primary?.kind == 'squad'
+                                          ? Icons.groups_2
+                                          : primary == null
+                                          ? Icons.support_agent
+                                          : Icons.person,
+                                      size: 17,
+                                    ),
+                                    label: Text(
+                                      primary?.displayName ??
+                                          context.tr('Allgemein', 'General'),
+                                    ),
+                                  ),
+                                  if (primary?.team != null)
+                                    Chip(label: Text(primary!.team!)),
+                                  if (primary?.squadName != null)
+                                    Chip(label: Text(primary!.squadName!)),
+                                  if (item.subjects.length > 1)
+                                    Chip(
+                                      label: Text(
+                                        '+${item.subjects.length - 1}',
+                                      ),
+                                    ),
+                                  if (item.suggestedCount > 0)
+                                    Chip(
+                                      avatar: const Icon(
+                                        Icons.help_outline,
+                                        color: FrontlineTheme.warning,
+                                        size: 17,
+                                      ),
+                                      label: Text('${item.suggestedCount}'),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                '${item.reporterName ?? context.tr('manuell', 'manual')}'
+                                '${item.assignedTo == null ? '' : ' · ${item.assignedTo}'}',
+                                style: const TextStyle(
+                                  color: FrontlineTheme.muted,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        title: Text(
-                          item.reason,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: Text(
-                          'Server ${item.serverNumber} · ${item.reporterName ?? 'manual'}'
-                          '${item.assignedTo == null ? '' : ' · ${item.assignedTo}'}',
-                        ),
-                        trailing: item.stale
-                            ? const Tooltip(
-                                message: 'Cached — may be stale',
-                                child: Icon(Icons.cloud_off),
-                              )
-                            : Text(item.status),
                       ),
                     );
                   },
@@ -695,6 +810,7 @@ class PlayerSearchScreen extends ConsumerStatefulWidget {
 class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
   final _query = TextEditingController();
   String? _connectionId;
+  int? _serverNumber;
   List<Map<String, dynamic>> _results = const [];
   String? _error;
   bool _busy = false;
@@ -716,10 +832,13 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
       _error = null;
     });
     try {
-      final results = await CrconApi(
-        profile,
-        ref.read(secureStoreProvider),
-      ).searchPlayers(term);
+      final api = CrconApi(profile, ref.read(secureStoreProvider));
+      final bootstrap = await api.bootstrap();
+      _serverNumber ??= (bootstrap['server_number'] as num).toInt();
+      final results = await api.searchPlayers(
+        term,
+        serverNumber: _serverNumber,
+      );
       if (mounted) setState(() => _results = results);
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
@@ -732,7 +851,10 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
   Widget build(BuildContext context) {
     final profiles = ref.watch(connectionsProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Player search')),
+      appBar: AppBar(
+        title: Text(context.tr('Spielersuche', 'Player search')),
+        actions: const [_LanguageButton()],
+      ),
       body: profiles.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => _ErrorView(message: error.toString()),
@@ -757,7 +879,10 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
                       ),
                     )
                     .toList(),
-                onChanged: (value) => setState(() => _connectionId = value),
+                onChanged: (value) => setState(() {
+                  _connectionId = value;
+                  _serverNumber = null;
+                }),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -783,11 +908,23 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
                         player['name']?.toString() ??
                         'Unknown',
                   ),
-                  subtitle: Text(playerId),
+                  subtitle: Text(
+                    [
+                      playerId,
+                      player['online'] == true
+                          ? context.tr('online', 'online')
+                          : context.tr('historisch', 'history'),
+                      player['team']?.toString(),
+                      player['unit_name']?.toString(),
+                    ].whereType<String>().join(' · '),
+                  ),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: playerId.isEmpty
                       ? null
-                      : () => context.push('/players/$_connectionId/$playerId'),
+                      : () => context.push(
+                          '/players/$_connectionId/$playerId'
+                          '?server_number=${_serverNumber ?? ''}',
+                        ),
                 );
               }),
             ],
@@ -803,10 +940,12 @@ class PlayerProfileScreen extends ConsumerWidget {
     super.key,
     required this.connectionId,
     required this.playerId,
+    this.serverNumber,
   });
 
   final String connectionId;
   final String playerId;
+  final int? serverNumber;
 
   Future<Map<String, dynamic>> _load(WidgetRef ref) async {
     final profiles = await ref.read(connectionsProvider.future);
@@ -814,12 +953,12 @@ class PlayerProfileScreen extends ConsumerWidget {
     return CrconApi(
       profile,
       ref.read(secureStoreProvider),
-    ).playerProfile(playerId);
+    ).playerProfile(playerId, serverNumber: serverNumber);
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-    appBar: AppBar(title: const Text('Player profile')),
+    appBar: AppBar(title: Text(context.tr('Spielerprofil', 'Player profile'))),
     body: FutureBuilder<Map<String, dynamic>>(
       future: _load(ref),
       builder: (context, snapshot) {
@@ -829,73 +968,135 @@ class PlayerProfileScreen extends ConsumerWidget {
         if (snapshot.hasError) {
           return _ErrorView(message: snapshot.error.toString());
         }
-        final profile = snapshot.data!;
+        final dossier = snapshot.data!;
+        final profile = Map<String, dynamic>.from(
+          dossier['history'] as Map? ?? const {},
+        );
+        final capabilities = Map<String, dynamic>.from(
+          dossier['capabilities'] as Map? ?? const {},
+        );
         final bans = profile['bans'] as List<dynamic>? ?? const [];
         final comments = profile['comments'] as List<dynamic>? ?? const [];
         final sessions = profile['sessions'] as List<dynamic>? ?? const [];
-        final live = profile['live'] == null
+        final aliases = profile['aliases'] as List<dynamic>? ?? const [];
+        final live = dossier['live'] == null
             ? null
-            : Map<String, dynamic>.from(profile['live'] as Map);
+            : Map<String, dynamic>.from(dossier['live'] as Map);
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
             Text(
               profile['player_name']?.toString() ??
                   profile['name']?.toString() ??
-                  'Unknown player',
+                  live?['name']?.toString() ??
+                  context.tr('Unbekannter Spieler', 'Unknown player'),
               style: Theme.of(context).textTheme.headlineSmall,
             ),
-            SelectableText(profile['player_id']?.toString() ?? playerId),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(
-                live == null ? Icons.cloud_off : Icons.circle,
-                color: live == null ? null : Colors.green,
+            SelectableText(dossier['player_id']?.toString() ?? playerId),
+            const SizedBox(height: 12),
+            Card(
+              child: ListTile(
+                leading: Icon(
+                  live == null ? Icons.cloud_off : Icons.circle,
+                  color: live == null ? null : FrontlineTheme.success,
+                ),
+                title: Text(
+                  live == null
+                      ? context.tr('Offline', 'Offline')
+                      : context.tr('Jetzt online', 'Online now'),
+                ),
+                subtitle: live == null
+                    ? null
+                    : Text(
+                        [
+                              live['team']?.toString(),
+                              live['unit_name']?.toString(),
+                              live['role']?.toString(),
+                              if (live['level'] != null) 'Lvl ${live['level']}',
+                            ]
+                            .whereType<String>()
+                            .where((value) => value.isNotEmpty)
+                            .join(' · '),
+                      ),
               ),
-              title: Text(live == null ? 'Offline' : 'Online now'),
-              subtitle: live == null
-                  ? null
-                  : Text(
-                      [
-                            live['team']?.toString(),
-                            live['unit_name']?.toString(),
-                            live['role']?.toString(),
-                          ]
-                          .whereType<String>()
-                          .where((value) => value.isNotEmpty)
-                          .join(' · '),
-                    ),
             ),
-            const Divider(height: 32),
-            _ProfileCount(label: 'Sessions', count: sessions.length),
-            _ProfileCount(label: 'Bans', count: bans.length),
-            _ProfileCount(label: 'Admin comments', count: comments.length),
-            if (profile['flags'] is List)
-              _ProfileCount(
-                label: 'Flags',
-                count: (profile['flags'] as List).length,
+            if (live != null) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _MetricChip(label: 'K', value: live['kills']),
+                  _MetricChip(label: 'D', value: live['deaths']),
+                  _MetricChip(label: 'TK', value: live['teamkills']),
+                  _MetricChip(label: 'Combat', value: live['combat']),
+                  _MetricChip(label: 'Support', value: live['support']),
+                ],
               ),
-            const Divider(height: 32),
+            ],
+            const Divider(height: 28),
             Text(
-              'Recent comments',
+              context.tr('Admin-Übersicht', 'Admin overview'),
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            ...comments
-                .take(20)
-                .map(
-                  (comment) => ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.comment_outlined),
-                    title: Text(
-                      (comment as Map)['comment']?.toString() ??
-                          comment.toString(),
+            _ProfileCount(
+              label: context.tr('Sitzungen', 'Sessions'),
+              count: sessions.length,
+            ),
+            _ProfileCount(
+              label: context.tr('Aliasse', 'Aliases'),
+              count: aliases.length,
+            ),
+            if (capabilities['bans'] == true)
+              _ProfileCount(
+                label: context.tr('Sperren', 'Bans'),
+                count: bans.length,
+              ),
+            if (capabilities['comments'] == true)
+              _ProfileCount(
+                label: context.tr('Admin-Kommentare', 'Admin comments'),
+                count: comments.length,
+              ),
+            if (profile['flags'] is List)
+              _ProfileCount(
+                label: context.tr('Markierungen', 'Flags'),
+                count: (profile['flags'] as List).length,
+              ),
+            if (comments.isNotEmpty) ...[
+              const Divider(height: 32),
+              Text(
+                context.tr('Letzte Kommentare', 'Recent comments'),
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              ...comments
+                  .take(20)
+                  .map(
+                    (comment) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.comment_outlined),
+                      title: Text(
+                        (comment as Map)['comment']?.toString() ??
+                            comment.toString(),
+                      ),
                     ),
                   ),
-                ),
+            ],
           ],
         );
       },
     ),
+  );
+}
+
+class _MetricChip extends StatelessWidget {
+  const _MetricChip({required this.label, required this.value});
+  final String label;
+  final Object? value;
+
+  @override
+  Widget build(BuildContext context) => Chip(
+    label: Text('$label ${value ?? '—'}'),
+    side: BorderSide(color: Theme.of(context).colorScheme.outline),
   );
 }
 
@@ -910,6 +1111,136 @@ class _ProfileCount extends StatelessWidget {
     trailing: Text('$count', style: Theme.of(context).textTheme.titleLarge),
   );
 }
+
+class SquadScreen extends ConsumerWidget {
+  const SquadScreen({
+    super.key,
+    required this.connectionId,
+    required this.serverNumber,
+    required this.team,
+    required this.squadName,
+  });
+
+  final String connectionId;
+  final int serverNumber;
+  final String team;
+  final String squadName;
+
+  Future<Map<String, dynamic>> _load(WidgetRef ref) async {
+    final profiles = await ref.read(connectionsProvider.future);
+    final profile = profiles.firstWhere((item) => item.id == connectionId);
+    return CrconApi(
+      profile,
+      ref.read(secureStoreProvider),
+    ).squad(serverNumber, team, squadName);
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => Scaffold(
+    appBar: AppBar(title: Text('$team · $squadName')),
+    body: FutureBuilder<Map<String, dynamic>>(
+      future: _load(ref),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return _ErrorView(message: snapshot.error.toString());
+        }
+        final squad = snapshot.data!;
+        final players = squad['players'] as List<dynamic>? ?? const [];
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      squad['squad_name']?.toString() ?? squadName,
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${squad['team'] ?? team} · ${squad['type'] ?? 'infantry'} · '
+                      '${players.length} ${context.tr('Mitglieder', 'members')}',
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          squad['has_leader'] == true
+                              ? Icons.verified_user
+                              : Icons.warning_amber,
+                          color: squad['has_leader'] == true
+                              ? FrontlineTheme.success
+                              : FrontlineTheme.warning,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          squad['has_leader'] == true
+                              ? context.tr(
+                                  'Squad Leader aktiv',
+                                  'Squad leader active',
+                                )
+                              : context.tr(
+                                  'Kein Squad Leader',
+                                  'No squad leader',
+                                ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              context.tr('Mitglieder', 'Members'),
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            ...players.map((value) {
+              final player = Map<String, dynamic>.from(value as Map);
+              final playerId = player['player_id']?.toString() ?? '';
+              return Card(
+                child: ListTile(
+                  leading: Icon(
+                    _isSquadLeader(player['role']?.toString())
+                        ? Icons.shield
+                        : Icons.person_outline,
+                  ),
+                  title: Text(player['name']?.toString() ?? playerId),
+                  subtitle: Text(
+                    [
+                      player['role']?.toString(),
+                      if (player['level'] != null) 'Lvl ${player['level']}',
+                      'K ${player['kills'] ?? '—'} / D ${player['deaths'] ?? '—'}',
+                    ].whereType<String>().join(' · '),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: playerId.isEmpty
+                      ? null
+                      : () => context.push(
+                          '/players/$connectionId/$playerId'
+                          '?server_number=$serverNumber',
+                        ),
+                ),
+              );
+            }),
+          ],
+        );
+      },
+    ),
+  );
+}
+
+bool _isSquadLeader(String? role) => {
+  'officer',
+  'tankcommander',
+  'spotter',
+}.contains(role?.replaceAll(' ', '').toLowerCase());
 
 class IncidentScreen extends ConsumerStatefulWidget {
   const IncidentScreen({
@@ -978,6 +1309,31 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
       ref.invalidate(inboxProvider);
     } catch (error) {
       setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _mutateSubject(IncidentSubject subject, String operation) async {
+    final incident = _incident;
+    if (incident == null || _busy) return;
+    setState(() => _busy = true);
+    try {
+      final response = await (await _api()).mutateIncidentSubject(
+        incident.id,
+        subject.id,
+        revision: incident.revision,
+        operation: operation,
+      );
+      if (mounted) {
+        setState(
+          () =>
+              _incident = AdminIncident.fromJson(response, widget.connectionId),
+        );
+      }
+      ref.invalidate(inboxProvider);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -1103,9 +1459,21 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
     await _mutate('reassign', {'assigned_to': username});
   }
 
-  Future<void> _action(String action) async {
+  Future<void> _action(
+    String action, {
+    IncidentSubject? subject,
+    Map<String, dynamic>? selectedPlayer,
+  }) async {
     final incident = _incident;
-    if (incident == null || incident.targetId == null) return;
+    subject ??= incident?.primarySubject;
+    final playerId =
+        selectedPlayer?['player_id']?.toString() ?? subject?.actionPlayerId;
+    final playerName =
+        selectedPlayer?['name']?.toString() ??
+        (subject?.kind == 'player'
+            ? subject?.displayName
+            : subject?.leaderName);
+    if (incident == null || subject == null || playerId == null) return;
     final controller = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1140,6 +1508,9 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
     try {
       await (await _api()).runAction(incident.id, {
         'action': action,
+        'subject_id': subject.id,
+        'player_id': playerId,
+        'player_name': ?playerName,
         action == 'message'
             ? 'message'
             : action == 'comment'
@@ -1157,6 +1528,468 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
     }
   }
 
+  void _openPlayer(String playerId) => context.push(
+    '/players/${widget.connectionId}/$playerId'
+    '?server_number=${_incident!.serverNumber}',
+  );
+
+  Map<String, dynamic>? _liveSubject(IncidentSubject subject) {
+    final subjects = _incident?.liveContext['subjects'] as Map?;
+    final value = subjects?[subject.id];
+    return value is Map ? Map<String, dynamic>.from(value) : null;
+  }
+
+  String _contextLine(Map<String, dynamic> value) => [
+    value['team']?.toString(),
+    value['unit_name']?.toString() ?? value['squad_name']?.toString(),
+    value['role']?.toString(),
+  ].whereType<String>().where((item) => item.isNotEmpty).join(' · ');
+
+  Widget _workflow(AdminIncident incident) => Wrap(
+    spacing: 8,
+    runSpacing: 8,
+    children: [
+      if (incident.status == 'new')
+        FilledButton(
+          onPressed: _busy ? null : () => _mutate('claim'),
+          child: Text(context.tr('Übernehmen', 'Claim')),
+        ),
+      if (incident.status == 'claimed')
+        OutlinedButton(
+          onPressed: _busy ? null : () => _mutate('unclaim'),
+          child: Text(context.tr('Freigeben', 'Release')),
+        ),
+      if (!{'resolved', 'dismissed'}.contains(incident.status))
+        OutlinedButton(
+          onPressed: _busy ? null : _reassign,
+          child: Text(context.tr('Neu zuweisen', 'Reassign')),
+        ),
+      if (!{'resolved', 'dismissed'}.contains(incident.status)) ...[
+        FilledButton.tonal(
+          onPressed: _busy ? null : () => _mutate('resolved'),
+          child: Text(context.tr('Erledigt', 'Resolve')),
+        ),
+        OutlinedButton(
+          onPressed: _busy ? null : () => _mutate('dismissed'),
+          child: Text(context.tr('Abweisen', 'Dismiss')),
+        ),
+      ] else
+        FilledButton(
+          onPressed: _busy ? null : () => _mutate('reopen'),
+          child: Text(context.tr('Wieder öffnen', 'Reopen')),
+        ),
+    ],
+  );
+
+  Widget _messageTab(AdminIncident incident) {
+    final liveReporterValue = incident.liveContext['reporter'];
+    final liveReporter = liveReporterValue is Map
+        ? Map<String, dynamic>.from(liveReporterValue)
+        : null;
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text(
+          context.tr('Originalmeldung', 'Original report'),
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: 8),
+        SelectableText(incident.rawMessage ?? incident.reason),
+        const Divider(height: 32),
+        Text(
+          context.tr('Melder', 'Reporter'),
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.campaign_outlined),
+            title: Text(
+              incident.reporterName ?? context.tr('Unbekannt', 'Unknown'),
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _contextLine(incident.reporterContext).isEmpty
+                      ? context.tr(
+                          'Kein Meldesnapshot verfügbar',
+                          'No report snapshot available',
+                        )
+                      : '${context.tr('Damals', 'Then')}: '
+                            '${_contextLine(incident.reporterContext)}',
+                ),
+                Text(
+                  liveReporter == null
+                      ? context.tr(
+                          'Jetzt: offline oder nicht gefunden',
+                          'Now: offline or not found',
+                        )
+                      : '${context.tr('Jetzt', 'Now')}: '
+                            '${_contextLine(liveReporter)}',
+                  style: const TextStyle(color: FrontlineTheme.muted),
+                ),
+              ],
+            ),
+            trailing: incident.reporterId == null
+                ? null
+                : const Icon(Icons.chevron_right),
+            onTap: incident.reporterId == null
+                ? null
+                : () => _openPlayer(incident.reporterId!),
+          ),
+        ),
+        const Divider(height: 28),
+        _workflow(incident),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: _busy ? null : _addNote,
+          icon: const Icon(Icons.note_add_outlined),
+          label: Text(context.tr('Notiz hinzufügen', 'Add note')),
+        ),
+      ],
+    );
+  }
+
+  Widget _targetsTab(AdminIncident incident) => ListView(
+    padding: const EdgeInsets.all(16),
+    children: [
+      if (incident.subjects.isEmpty)
+        Text(
+          context.tr(
+            'Noch kein Spieler oder Squad erkannt.',
+            'No player or squad has been recognized yet.',
+          ),
+        ),
+      ...incident.subjects.map((subject) {
+        final live = _liveSubject(subject);
+        final thenLine = subject.kind == 'player'
+            ? _contextLine(subject.snapshot)
+            : [
+                subject.team,
+                subject.squadName,
+                subject.squadType,
+              ].whereType<String>().join(' · ');
+        final nowLine = live == null ? '' : _contextLine(live);
+        final percent = subject.confidence == null
+            ? null
+            : (subject.confidence! * 100).round();
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    subject.kind == 'squad' ? Icons.groups_2 : Icons.person,
+                    color: subject.state == 'confirmed'
+                        ? FrontlineTheme.success
+                        : subject.state == 'rejected'
+                        ? Theme.of(context).disabledColor
+                        : FrontlineTheme.warning,
+                  ),
+                  title: Text(subject.displayName),
+                  subtitle: Text(
+                    [
+                      subject.kind == 'squad'
+                          ? context.tr('Squad', 'Squad')
+                          : context.tr('Spieler', 'Player'),
+                      subject.state,
+                      subject.matchMethod,
+                      if (percent != null) '$percent %',
+                    ].whereType<String>().join(' · '),
+                  ),
+                  trailing: subject.isPrimary
+                      ? const Icon(Icons.star, color: FrontlineTheme.gold)
+                      : null,
+                  onTap: subject.kind == 'player' && subject.playerId != null
+                      ? () => _openPlayer(subject.playerId!)
+                      : subject.kind == 'squad' &&
+                            subject.team != null &&
+                            subject.squadName != null
+                      ? () => context.push(
+                          '/squads/${widget.connectionId}/${incident.serverNumber}/'
+                          '${Uri.encodeComponent(subject.team!)}/'
+                          '${Uri.encodeComponent(subject.squadName!)}',
+                        )
+                      : null,
+                ),
+                if (thenLine.isNotEmpty)
+                  Text('${context.tr('Damals', 'Then')}: $thenLine'),
+                Text(
+                  live == null
+                      ? context.tr(
+                          'Jetzt: offline oder nicht gefunden',
+                          'Now: offline or not found',
+                        )
+                      : '${context.tr('Jetzt', 'Now')}: $nowLine',
+                  style: TextStyle(
+                    color: live == null ? FrontlineTheme.muted : null,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    if (subject.state == 'suggested') ...[
+                      FilledButton.tonal(
+                        onPressed: _busy
+                            ? null
+                            : () => _mutateSubject(subject, 'confirm'),
+                        child: Text(context.tr('Bestätigen', 'Confirm')),
+                      ),
+                      OutlinedButton(
+                        onPressed: _busy
+                            ? null
+                            : () => _mutateSubject(subject, 'reject'),
+                        child: Text(context.tr('Verwerfen', 'Reject')),
+                      ),
+                    ],
+                    if (subject.state == 'confirmed' && !subject.isPrimary)
+                      OutlinedButton(
+                        onPressed: _busy
+                            ? null
+                            : () => _mutateSubject(subject, 'set_primary'),
+                        child: Text(
+                          context.tr('Als Hauptziel', 'Make primary'),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      }),
+      const SizedBox(height: 8),
+      OutlinedButton.icon(
+        onPressed: _busy ? null : _linkTarget,
+        icon: const Icon(Icons.person_add_alt),
+        label: Text(
+          context.tr('Spieler manuell hinzufügen', 'Add player manually'),
+        ),
+      ),
+    ],
+  );
+
+  Widget _squadTab(AdminIncident incident) {
+    final squads = incident.subjects.where(
+      (subject) => subject.kind == 'squad',
+    );
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (squads.isEmpty)
+          Text(
+            context.tr(
+              'Kein Squad in dieser Meldung.',
+              'No squad in this report.',
+            ),
+          ),
+        ...squads.map((subject) {
+          final snapshot = subject.snapshot;
+          final oldPlayers = snapshot['players'] as List<dynamic>? ?? const [];
+          final live = _liveSubject(subject);
+          final livePlayers = live?['players'] as List<dynamic>? ?? const [];
+          final liveIds = livePlayers
+              .map((player) => (player as Map)['player_id']?.toString())
+              .toSet();
+          final oldIds = oldPlayers
+              .map((player) => (player as Map)['player_id']?.toString())
+              .toSet();
+          final joinedPlayers = livePlayers.where(
+            (player) =>
+                !oldIds.contains((player as Map)['player_id']?.toString()),
+          );
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.groups_2),
+                  title: Text('${subject.team ?? '—'} · ${subject.squadName}'),
+                  subtitle: Text(
+                    '${subject.squadType ?? 'squad'} · '
+                    '${oldPlayers.length} ${context.tr('damals', 'then')} · '
+                    '${livePlayers.length} ${context.tr('jetzt', 'now')}',
+                  ),
+                ),
+              ),
+              ...oldPlayers.map((value) {
+                final player = Map<String, dynamic>.from(value as Map);
+                final playerId = player['player_id']?.toString() ?? '';
+                final onlineInSquad = liveIds.contains(playerId);
+                return ListTile(
+                  leading: Icon(
+                    _isSquadLeader(player['role']?.toString())
+                        ? Icons.shield
+                        : Icons.person_outline,
+                  ),
+                  title: Text(player['name']?.toString() ?? playerId),
+                  subtitle: Text(
+                    '${player['role'] ?? '—'} · '
+                    '${onlineInSquad ? context.tr('unverändert', 'unchanged') : context.tr('offline/gewechselt', 'offline/moved')}',
+                  ),
+                  trailing: subject.state != 'confirmed' || playerId.isEmpty
+                      ? const Icon(Icons.lock_outline)
+                      : PopupMenuButton<String>(
+                          onSelected: (action) {
+                            if (action == 'profile') {
+                              _openPlayer(playerId);
+                            } else {
+                              _action(
+                                action,
+                                subject: subject,
+                                selectedPlayer: player,
+                              );
+                            }
+                          },
+                          itemBuilder: (_) => [
+                            PopupMenuItem(
+                              value: 'profile',
+                              child: Text(
+                                context.tr('Profil öffnen', 'Open profile'),
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'message',
+                              child: Text(context.tr('Nachricht', 'Message')),
+                            ),
+                            PopupMenuItem(
+                              value: 'punish',
+                              child: Text(context.tr('Bestrafen', 'Punish')),
+                            ),
+                            PopupMenuItem(
+                              value: 'kick',
+                              child: Text(context.tr('Kicken', 'Kick')),
+                            ),
+                            PopupMenuItem(
+                              value: 'temp_ban',
+                              child: Text(
+                                context.tr('Temporär sperren', 'Temporary ban'),
+                              ),
+                            ),
+                          ],
+                        ),
+                );
+              }),
+              ...joinedPlayers.map((value) {
+                final player = Map<String, dynamic>.from(value as Map);
+                final playerId = player['player_id']?.toString() ?? '';
+                return ListTile(
+                  leading: const Icon(
+                    Icons.person_add_alt_1,
+                    color: FrontlineTheme.success,
+                  ),
+                  title: Text(player['name']?.toString() ?? playerId),
+                  subtitle: Text(
+                    '${player['role'] ?? '—'} · '
+                    '${context.tr('seit der Meldung beigetreten', 'joined since report')}',
+                  ),
+                  trailing: playerId.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: context.tr('Profil öffnen', 'Open profile'),
+                          onPressed: () => _openPlayer(playerId),
+                          icon: const Icon(Icons.chevron_right),
+                        ),
+                );
+              }),
+              const Divider(height: 28),
+            ],
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _timelineTab(AdminIncident incident) => ListView(
+    padding: const EdgeInsets.all(16),
+    children: incident.events.reversed
+        .map(
+          (event) => ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.history),
+            title: Text(event['event_type']?.toString() ?? 'event'),
+            subtitle: Text(
+              [
+                event['actor']?.toString() ?? 'system',
+                if (event['event_type'] == 'note')
+                  (event['payload'] as Map?)?['note']?.toString() ?? '',
+              ].where((value) => value.isNotEmpty).join(' · '),
+            ),
+          ),
+        )
+        .toList(),
+  );
+
+  Widget _primaryActions(AdminIncident incident) {
+    final subject = incident.primarySubject;
+    if (subject == null || subject.actionPlayerId == null) {
+      return Padding(
+        padding: const EdgeInsets.all(12),
+        child: Text(
+          context.tr(
+            'Bestätige und wähle zuerst einen Spieler für Maßnahmen.',
+            'Confirm and select a player before running an action.',
+          ),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+    return SafeArea(
+      child: Container(
+        color: FrontlineTheme.surfaceHigh,
+        padding: const EdgeInsets.all(10),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                subject.kind == 'player'
+                    ? subject.displayName
+                    : subject.leaderName ?? subject.displayName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            IconButton(
+              tooltip: context.tr('Nachricht', 'Message'),
+              onPressed: _busy
+                  ? null
+                  : () => _action('message', subject: subject),
+              icon: const Icon(Icons.message_outlined),
+            ),
+            IconButton(
+              tooltip: context.tr('Bestrafen', 'Punish'),
+              onPressed: _busy
+                  ? null
+                  : () => _action('punish', subject: subject),
+              icon: const Icon(Icons.gavel_outlined),
+            ),
+            PopupMenuButton<String>(
+              onSelected: (action) => _action(action, subject: subject),
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'comment',
+                  child: Text(context.tr('Kommentar', 'Comment')),
+                ),
+                PopupMenuItem(
+                  value: 'kick',
+                  child: Text(context.tr('Kicken', 'Kick')),
+                ),
+                PopupMenuItem(
+                  value: 'temp_ban',
+                  child: Text(context.tr('Temporär sperren', 'Temporary ban')),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen(liveIncidentUpdateProvider, (_, next) {
@@ -1168,136 +2001,116 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
     });
     final incident = _incident;
     return Scaffold(
-      appBar: AppBar(title: const Text('Incident')),
+      appBar: AppBar(
+        title: Text(context.tr('Vorfall', 'Incident')),
+        actions: [
+          IconButton(
+            onPressed: _busy ? null : _load,
+            icon: const Icon(Icons.refresh),
+          ),
+          const _LanguageButton(),
+        ],
+      ),
       body: _busy && incident == null
           ? const Center(child: CircularProgressIndicator())
           : incident == null
-          ? _ErrorView(message: _error ?? 'Incident unavailable')
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                if (_error != null) _ErrorView(message: _error!),
-                Text(
-                  incident.reason,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Server ${incident.serverNumber} · ${incident.source} · ${incident.status}',
-                ),
-                Text('Reporter: ${incident.reporterName ?? 'not set'}'),
-                Text('Target: ${incident.targetName ?? 'not linked'}'),
-                Text('Assigned: ${incident.assignedTo ?? 'nobody'}'),
-                const SizedBox(height: 20),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    if (incident.status == 'new')
-                      FilledButton(
-                        onPressed: () => _mutate('claim'),
-                        child: const Text('Claim'),
+          ? _ErrorView(
+              message:
+                  _error ??
+                  context.tr('Vorfall nicht verfügbar', 'Incident unavailable'),
+            )
+          : DefaultTabController(
+              length: 4,
+              child: Column(
+                children: [
+                  if (_busy) const LinearProgressIndicator(minHeight: 2),
+                  if (_error != null) _ErrorView(message: _error!),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              incident.reason,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: [
+                                Chip(
+                                  label: Text(
+                                    'Server ${incident.serverNumber}',
+                                  ),
+                                ),
+                                Chip(label: Text(incident.status)),
+                                if (incident.primarySubject != null)
+                                  Chip(
+                                    avatar: Icon(
+                                      incident.primarySubject!.kind == 'squad'
+                                          ? Icons.groups_2
+                                          : Icons.person,
+                                      size: 18,
+                                    ),
+                                    label: Text(
+                                      incident.primarySubject!.displayName,
+                                    ),
+                                  ),
+                                if (incident.suggestedCount > 0)
+                                  Chip(
+                                    avatar: const Icon(
+                                      Icons.help_outline,
+                                      size: 18,
+                                      color: FrontlineTheme.warning,
+                                    ),
+                                    label: Text(
+                                      '${incident.suggestedCount} '
+                                      '${context.tr('offen', 'pending')}',
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            Text(
+                              '${context.tr('Zugewiesen', 'Assigned')}: '
+                              '${incident.assignedTo ?? '—'}',
+                              style: const TextStyle(
+                                color: FrontlineTheme.muted,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    if (incident.status == 'claimed')
-                      OutlinedButton(
-                        onPressed: () => _mutate('unclaim'),
-                        child: const Text('Release'),
-                      ),
-                    if (!{'resolved', 'dismissed'}.contains(incident.status))
-                      OutlinedButton(
-                        onPressed: _busy ? null : _reassign,
-                        child: const Text('Reassign'),
-                      ),
-                    if (!{
-                      'resolved',
-                      'dismissed',
-                    }.contains(incident.status)) ...[
-                      FilledButton(
-                        onPressed: () => _mutate('resolved'),
-                        child: const Text('Resolve'),
-                      ),
-                      OutlinedButton(
-                        onPressed: () => _mutate('dismissed'),
-                        child: const Text('Dismiss'),
-                      ),
-                    ] else
-                      FilledButton(
-                        onPressed: () => _mutate('reopen'),
-                        child: const Text('Reopen'),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: _busy ? null : _addNote,
-                      icon: const Icon(Icons.note_add_outlined),
-                      label: const Text('Add note'),
                     ),
-                    if (incident.targetId == null)
-                      OutlinedButton.icon(
-                        onPressed: _busy ? null : _linkTarget,
-                        icon: const Icon(Icons.person_add_alt),
-                        label: const Text('Link player'),
-                      ),
-                  ],
-                ),
-                const Divider(height: 40),
-                Text(
-                  'Player actions',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 10),
-                if (incident.targetId == null)
-                  const Text(
-                    'Link a unique player in CRCON before using player actions.',
-                  )
-                else
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      OutlinedButton(
-                        onPressed: () => _action('message'),
-                        child: const Text('Message'),
-                      ),
-                      OutlinedButton(
-                        onPressed: () => _action('punish'),
-                        child: const Text('Punish'),
-                      ),
-                      OutlinedButton(
-                        onPressed: () => _action('comment'),
-                        child: const Text('Comment'),
-                      ),
-                      OutlinedButton(
-                        onPressed: () => _action('kick'),
-                        child: const Text('Kick'),
-                      ),
-                      FilledButton.tonal(
-                        onPressed: () => _action('temp_ban'),
-                        child: const Text('Tempban'),
-                      ),
+                  ),
+                  TabBar(
+                    isScrollable: true,
+                    tabs: [
+                      Tab(text: context.tr('Meldung', 'Report')),
+                      Tab(text: context.tr('Ziele', 'Subjects')),
+                      Tab(text: context.tr('Squad', 'Squad')),
+                      Tab(text: context.tr('Verlauf', 'Timeline')),
                     ],
                   ),
-                const Divider(height: 40),
-                Text('Timeline', style: Theme.of(context).textTheme.titleLarge),
-                ...incident.events.reversed.map(
-                  (event) => ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.history),
-                    title: Text(event['event_type']?.toString() ?? 'event'),
-                    subtitle: Text(
-                      [
-                        event['actor']?.toString() ?? 'system',
-                        if (event['event_type'] == 'note')
-                          (event['payload'] as Map?)?['note']?.toString() ?? '',
-                      ].where((value) => value.isNotEmpty).join(' · '),
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        _messageTab(incident),
+                        _targetsTab(incident),
+                        _squadTab(incident),
+                        _timelineTab(incident),
+                      ],
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
+      bottomNavigationBar: incident == null ? null : _primaryActions(incident),
     );
   }
 }

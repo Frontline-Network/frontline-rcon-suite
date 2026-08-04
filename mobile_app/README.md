@@ -1,17 +1,29 @@
-# crcon_mobile_admin
+# CRCON Mobile Admin
 
-A new Flutter project.
+Native Flutter client for per-admin CRCON pairing and incident response. The
+app uses the existing Frontline visual language, defaults to German and can be
+switched to English.
 
-## Getting Started
+The context-v2 incident detail contains four operational tabs:
 
-This project is a starting point for a Flutter application.
+- report and reporter context;
+- confirmed and suggested player/squad subjects;
+- squad snapshot/current membership comparison;
+- immutable incident timeline.
 
-A few resources to get you started if this is your first Flutter project:
+Administrative actions always require an explicitly selected confirmed player.
+Kick and temporary bans additionally require a reason and confirmation. Read
+data is encrypted locally; writes are never queued while offline.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## Development
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+flutter pub get
+flutter analyze
+flutter test
+flutter build apk --debug
+```
+
+Pair the build with a CRCON instance through **Mobile App** in the authenticated
+CRCON web UI. Production builds accept only publicly reachable HTTPS URLs with
+a valid certificate.

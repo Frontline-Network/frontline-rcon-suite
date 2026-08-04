@@ -285,7 +285,10 @@ def handle_on_chat(rcon, log):
         "on",
     }:
         try:
-            from rcon.admin_incidents import create_incident_from_chat
+            from rcon.admin_incidents import (
+                create_incident_from_chat,
+                flatten_team_view,
+            )
 
             configured_triggers = os.getenv("MOBILE_INCIDENT_TRIGGERS", "").strip()
             if configured_triggers:
@@ -300,9 +303,18 @@ def handle_on_chat(rcon, log):
                     for word in AdminPingWebhooksUserConfig.load_from_db().trigger_words
                     if word.strip()
                 ) or ("!admin",)
+            context_mode = os.getenv("MOBILE_CONTEXT_V2", "disabled").strip().lower()
+            if context_mode in {"1", "true", "on", "enabled", "shadow"}:
+                detailed = rcon.get_detailed_players()
+                current_players = list((detailed.get("players") or {}).values())
+                current_squads = flatten_team_view(rcon.get_team_view())
+            else:
+                current_players = rcon.get_players()
+                current_squads = []
             create_incident_from_chat(
                 log,
-                current_players=rcon.get_players(),
+                current_players=current_players,
+                current_squads=current_squads,
                 trigger_words=triggers,
             )
         except Exception:
