@@ -9,7 +9,7 @@ import {
   ToggleButton,
   Divider,
 } from "@mui/material";
-import vipColumns from "./vip-columns";
+import getVipColumns from "./vip-columns";
 import VipTable from "./vip-table";
 import {
   QueryClient,
@@ -38,6 +38,8 @@ import debug from "@/utils/debug";
 import { VipBulkEditDialog } from "./VipBulkEditDialog";
 import VipDownload from "./VipDownload";
 import VipUpload from "./VipUpload";
+import { useTranslation } from "react-i18next";
+import PageHeader from "@/components/shared/PageHeader";
 
 const logger = debug("VIP VIEW");
 
@@ -55,6 +57,7 @@ export const loader = async () => {
 };
 
 const VipPageContent = () => {
+  const { t, i18n } = useTranslation();
   const { data, isLoading, isFetching, refetch, dataUpdatedAt } = useQuery(
     vipQueryOptions.list()
   );
@@ -250,10 +253,10 @@ const VipPageContent = () => {
 
   const columns = useMemo(
     () => [
-      ...vipColumns,
+      ...getVipColumns(t),
       {
         id: "actions",
-        header: "Actions",
+        header: t("common.actions"),
         cell: ({ row }) => {
           const state = row.original._state;
           let removeComponent = null;
@@ -295,6 +298,8 @@ const VipPageContent = () => {
               removeComponent = (
                 <Stack direction="row" alignItems="center" spacing={1}>
                   <IconButton
+                    aria-label={t("records.vips.remove")}
+                    title={t("records.vips.remove")}
                     variant="contained"
                     size="small"
                     color={"error"}
@@ -314,6 +319,8 @@ const VipPageContent = () => {
             <Stack direction="row" alignItems="center" spacing={1}>
               {removeComponent}
               <IconButton
+                aria-label={t("records.vips.edit")}
+                title={t("records.vips.edit")}
                 variant="contained"
                 size="small"
                 color="primary"
@@ -333,7 +340,7 @@ const VipPageContent = () => {
         },
       },
     ],
-    [isFetching, forward]
+    [isFetching, forward, t]
   );
 
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
@@ -458,10 +465,16 @@ const VipPageContent = () => {
   };
 
   return (
-    <Stack direction={{ xs: "column", lg: "row" }} spacing={1} sx={{ mt: 2 }}>
+    <>
+      <PageHeader
+        eyebrow={t("records.vips.eyebrow")}
+        title={t("records.vips.title")}
+        subtitle={t("records.vips.subtitle")}
+      />
+      <Stack direction={{ xs: "column", lg: "row" }} spacing={2} sx={{ mt: 2 }}>
       <Stack spacing={1} sx={{ width: { xs: "100%", lg: "400px" } }}>
         <Stack spacing={2} sx={{ bgcolor: "background.paper", p: 2 }}>
-          <Typography variant="h6">Apply changes to</Typography>
+          <Typography variant="h6">{t("records.vips.applyChangesTo")}</Typography>
           <ToggleButtonGroup
             value={operationMode}
             exclusive
@@ -474,22 +487,22 @@ const VipPageContent = () => {
             size="small"
           >
             <ToggleButton value="single" color="primary">
-              This server
+              {t("records.vips.thisServer")}
             </ToggleButton>
             <ToggleButton value="multi" color="primary">
-              All servers
+              {t("records.vips.allServers")}
             </ToggleButton>
           </ToggleButtonGroup>
         </Stack>
 
         <Stack spacing={2} sx={{ bgcolor: "background.paper", p: 2 }}>
           <Typography>
-            Last updated:{" "}
+            {t("records.vips.lastUpdated")}{" "}
             {isFetching
-              ? "Updating..."
+              ? t("records.vips.updating")
               : dataUpdatedAt
               ? dayjs(dataUpdatedAt).format("HH:mm:ss")
-              : "Never"}
+              : t("records.vips.never")}
           </Typography>
           <Button
             variant="contained"
@@ -498,21 +511,21 @@ const VipPageContent = () => {
             onClick={refetch}
             disabled={isFetching}
           >
-            Refresh
+            {t("common.refresh")}
           </Button>
         </Stack>
         <Stack spacing={2} sx={{ bgcolor: "background.paper", p: 2 }}>
-          <Typography variant="h6">Search Player</Typography>
+          <Typography variant="h6">{t("records.vips.searchPlayer")}</Typography>
           <PlayerSearchField onSelect={handleOnPlayerSelect} disableAddBtn={true} direction={"column"} />
         </Stack>
         <Stack spacing={2} sx={{ bgcolor: "background.paper", p: 2 }}>
-          <Typography variant="h6">Add VIP</Typography>
+          <Typography variant="h6">{t("records.vips.addVip")}</Typography>
           <TextField
             value={formFields.description}
             onChange={(e) =>
               setFormFields({ ...formFields, description: e.target.value })
             }
-            label="Player Name"
+            label={t("records.vips.playerName")}
             name="description"
             fullWidth
           />
@@ -521,29 +534,39 @@ const VipPageContent = () => {
             onChange={(e) =>
               setFormFields({ ...formFields, player_id: e.target.value })
             }
-            label="Player ID"
+            label={t("records.vips.playerId")}
             name="player_id"
             fullWidth
           />
-          <LocalizationProvider dateAdapter={AdapterDayjs}>
+          <LocalizationProvider
+            dateAdapter={AdapterDayjs}
+            adapterLocale={i18n.resolvedLanguage === "en" ? "en" : "de"}
+            localeText={{ fieldOpenPickerLabel: t("common.chooseDate") }}
+          >
             <DesktopDateTimePicker
               value={formFields.expiration}
               onChange={(e) => setFormFields({ ...formFields, expiration: e })}
               format="LLL"
-              label="Expiration"
+              label={t("records.vips.expiration")}
               name="expiration"
               maxDateTime={dayjs(INDEFINITE_EXPIRATION)}
               disabled={vipIndefinitely}
               disablePast={true}
+              slotProps={{
+                openPickerButton: {
+                  "aria-label": t("common.chooseDate"),
+                  title: t("common.chooseDate"),
+                },
+              }}
             />
           </LocalizationProvider>
           <Padlock
             checked={vipIndefinitely}
             handleChange={setVipIndefinitely}
-            label="Never expires"
+            label={t("records.vips.neverExpires")}
           />
           <Button variant="contained" color="primary" onClick={handleClear}>
-            Clear
+            {t("records.vips.clear")}
           </Button>
           <Button
             variant="contained"
@@ -551,15 +574,15 @@ const VipPageContent = () => {
             disabled={isFetching}
             onClick={handleAddVip}
           >
-            Add VIP
+            {t("records.vips.addVip")}
           </Button>
         </Stack>
 
         <Stack spacing={2} sx={{ bgcolor: "background.paper", p: 2 }}>
-          <Typography variant="h6">Download VIPs</Typography>
+          <Typography variant="h6">{t("records.vips.downloadTitle")}</Typography>
           <VipDownload />
           <Divider flexItem orientation="horizontal" />
-          <Typography variant="h6">Upload VIPs</Typography>
+          <Typography variant="h6">{t("records.vips.uploadTitle")}</Typography>
           <VipUpload />
         </Stack>
       </Stack>
@@ -577,7 +600,8 @@ const VipPageContent = () => {
         onConfirm={handleBulkEdit}
         selectedCount={selectedTable?.getSelectedRowModel().rows.length || 0}
       />
-    </Stack>
+      </Stack>
+    </>
   );
 };
 

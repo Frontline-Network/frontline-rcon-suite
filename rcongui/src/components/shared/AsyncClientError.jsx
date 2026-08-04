@@ -8,8 +8,10 @@ import { useAsyncError } from "react-router-dom";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import CloseIcon from "@mui/icons-material/Close";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
-export function AsyncClientError({ title }) {
+export function AsyncClientError() {
+  const { t } = useTranslation();
   const error = useAsyncError();
   const [open, setOpen] = useState(true);
 
@@ -30,9 +32,9 @@ export function AsyncClientError({ title }) {
         </IconButton>
       }
     >
-      <AlertTitle>{title ?? "Section"} could not be displayed</AlertTitle>
+      <AlertTitle>{t("errors.sectionUnavailable")}</AlertTitle>
       <Typography>
-        {error?.name} - {error?.message ?? error.statusText}
+        {error?.message ?? error?.statusText ?? t("errors.requestFailed")}
       </Typography>
     </Alert>
   );

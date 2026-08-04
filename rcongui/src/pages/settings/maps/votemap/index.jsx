@@ -1,17 +1,19 @@
 import { Box, Tabs } from "@mui/material";
 import { Outlet, useLocation } from "react-router-dom";
 import { NavLinkTab } from "@/components/shared/NavLinkTab";
+import { useTranslation } from "react-i18next";
 
 /**
  * Map Rotation page that contains the map rotation builder component
  */
 function VotemapPage() {
+  const { t } = useTranslation();
   // Get active tab
   const location = useLocation();
   const tabs = [
-    { label: "Status", href: "/settings/maps/votemap" },
-    { label: "Map Whitelist", href: "/settings/maps/votemap/whitelist" },
-    { label: "Settings", href: "/settings/maps/votemap/settings" },
+    { label: t("maps.status"), href: "/settings/maps/votemap" },
+    { label: t("maps.whitelist"), href: "/settings/maps/votemap/whitelist" },
+    { label: t("maps.settings"), href: "/settings/maps/votemap/settings" },
   ];
   const activeTab = tabs.findIndex(({ href }) =>
     location.pathname.endsWith(href)

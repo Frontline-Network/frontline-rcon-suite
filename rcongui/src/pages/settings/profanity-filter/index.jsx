@@ -23,6 +23,8 @@ import { SearchInput } from "@/components/shared/SearchInput";
 import debounce from "lodash/debounce";
 import { InputFileUpload } from "@/components/shared/InputFileUpload";
 import exportFile from "@/utils/exportFile";
+import { isFakeMode } from "@/mirage/demo-data";
+import { useTranslation } from "react-i18next";
 
 const INTENT = {
   SINGLE: 0,
@@ -30,7 +32,7 @@ const INTENT = {
 };
 
 export const loader = async () => {
-  const profanities = await cmd.GET_PROFANITIES();
+  const profanities = isFakeMode() ? ["beleidigung-demo", "spam-demo"] : await cmd.GET_PROFANITIES();
   return { profanities };
 };
 
@@ -42,6 +44,7 @@ export const action = async ({ request }) => {
 };
 
 const ProfanityFilter = () => {
+  const { t } = useTranslation();
   const { profanities: serverProfanities } = useLoaderData();
   const [profanities, setProfanities] = useState(serverProfanities);
   const [checked, setChecked] = useState([]);
@@ -154,7 +157,7 @@ const ProfanityFilter = () => {
         gap={1}
       >
         <InputFileUpload
-          text={"Upload"}
+          text={t("settings.profanity.upload")}
           color={"secondary"}
           onChange={handleFileUpload}
           accept={".txt"}
@@ -164,19 +167,19 @@ const ProfanityFilter = () => {
           variant="contained"
           color="secondary"
         >
-          Download
+          {t("settings.profanity.download")}
         </Button>
         <Box>
           <SplitButton
             options={[
               {
-                name: "Apply",
+                name: t("settings.profanity.apply"),
                 buttonProps: {
                   onClick: submitChanges(INTENT.SINGLE),
                 },
               },
               {
-                name: "Apply all servers",
+                name: t("settings.profanity.applyAllServers"),
                 buttonProps: {
                   onClick: submitChanges(INTENT.ALL),
                 },
@@ -202,10 +205,10 @@ const ProfanityFilter = () => {
             onKeyDown={(e) => e.key === "Enter" && handleAddProfanity()}
             variant="standard"
             fullWidth
-            label={"New profanity"}
+            label={t("settings.profanity.newEntry")}
           />
           <Button onClick={handleAddProfanity} variant="contained">
-            Add
+            {t("settings.profanity.add")}
           </Button>
         </Stack>
         <Stack
@@ -217,7 +220,7 @@ const ProfanityFilter = () => {
         >
           <FormControlLabel
             sx={{ px: 0.25 }}
-            label="Select"
+            label={t("settings.profanity.select")}
             control={
               <Checkbox
                 sx={{ mr: 1, "& .MuiSvgIcon-root": { fontSize: 16 } }}
@@ -237,7 +240,7 @@ const ProfanityFilter = () => {
           <Divider orientation="vertical" flexItem />
           <SearchInput
             onChange={onSearchedChange}
-            placeholder="Search profanity"
+            placeholder={t("settings.profanity.search")}
           />
           <Divider orientation="vertical" flexItem />
           <Button
@@ -247,7 +250,7 @@ const ProfanityFilter = () => {
             disabled={!checked.length}
             sx={{ minWidth: "fit-content" }}
           >
-            Delete selected
+            {t("settings.profanity.deleteSelected")}
           </Button>
         </Stack>
         <Divider orientation="horizontal" />

@@ -13,34 +13,39 @@ import { Link } from "react-router-dom";
 import SettingsIcon from '@mui/icons-material/Settings';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
+import { useTranslation } from "react-i18next";
+import { demoServerSettings, isFakeMode } from "@/mirage/demo-data";
 
 const ServerSettingsCard = () => {
+  const { t } = useTranslation();
   const { data: settings } = useQuery({
     queryKey: ["settings", "server"],
     queryFn: async () => {
-      const result = await cmd.GET_SERVER_SETTINGS();
+      const result = isFakeMode()
+        ? demoServerSettings
+        : await cmd.GET_SERVER_SETTINGS();
       return result;
     },
   });
 
   const booleanSettings = [
-    { key: 'autobalance_enabled', label: 'Team Autobalance' },
-    { key: 'votekick_enabled', label: 'Votekick' },
+    { key: 'autobalance_enabled', label: t('serverSettings.teamAutobalance') },
+    { key: 'votekick_enabled', label: t('serverSettings.votekick') },
   ];
 
   const numericSettings = [
-    { key: 'team_switch_cooldown', label: 'Team Switch Cooldown', unit: 'min' },
-    { key: 'autobalance_threshold', label: 'Autobalance Threshold', unit: 'players' },
-    { key: 'idle_autokick_time', label: 'Idle Autokick', unit: 'min' },
-    { key: 'max_ping_autokick', label: 'Max Ping Autokick', unit: 'ms' },
-    { key: 'queue_length', label: 'Queue Length', unit: 'players' },
-    { key: 'vip_slots_num', label: 'VIP Slots', unit: 'slots' },
+    { key: 'team_switch_cooldown', label: t('serverSettings.switchCooldown'), unit: 'min' },
+    { key: 'autobalance_threshold', label: t('serverSettings.threshold'), unit: t('serverSettings.playersUnit') },
+    { key: 'idle_autokick_time', label: t('serverSettings.idleKick'), unit: 'min' },
+    { key: 'max_ping_autokick', label: t('serverSettings.maxPing'), unit: 'ms' },
+    { key: 'queue_length', label: t('serverSettings.queue'), unit: t('serverSettings.playersUnit') },
+    { key: 'vip_slots_num', label: t('serverSettings.vipSlots'), unit: t('serverSettings.slotsUnit') },
   ];
 
   return (
     <Card sx={{ height: "100%" }}>
       <CardHeader 
-        title="Server Settings" 
+        title={t("dashboard.serverSettings")}
         action={
           <IconButton 
             component={Link} 
@@ -107,7 +112,7 @@ const ServerSettingsCard = () => {
                     color: settings?.[key] === 0 ? 'text.disabled' : 'text.primary'
                   }}
                 >
-                  {settings?.[key] === 0 ? 'Disabled' : `${settings?.[key]} ${unit}`}
+                    {settings?.[key] === 0 ? t('common.disabled') : `${settings?.[key]} ${unit}`}
                 </Typography>
               </Box>
             </Grid>
@@ -118,4 +123,4 @@ const ServerSettingsCard = () => {
   );
 };
 
-export default ServerSettingsCard; 
+export default ServerSettingsCard;

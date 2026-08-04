@@ -1,8 +1,10 @@
 import { useGlobalStore } from "@/stores/global-state";
 import { useMemo } from "react";
 import OnlineUsersCard from "@/components/shared/card/UsersCard";
+import { useTranslation } from "react-i18next";
 
 const VIPWatchedCard = () => {
+  const { t } = useTranslation();
   const onlinePlayers = useGlobalStore((state) => state.onlinePlayers);
 
   const vips = useMemo(
@@ -31,13 +33,13 @@ const VIPWatchedCard = () => {
 
   return (
     <OnlineUsersCard
-      title="VIPs & Watched"
+      title={t("dashboard.vipsWatched")}
       onlineUsers={[
         { group: "VIP", label: `VIP (${vips.length})`, users: vips },
-        { group: "Watched", label: `Watched (${watchedPlayers.length})`, users: watchedPlayers },
+        { group: "Watched", label: `${t("dashboard.watched")} (${watchedPlayers.length})`, users: watchedPlayers },
       ]}
     />
   );
 };
 
-export default VIPWatchedCard; 
+export default VIPWatchedCard;

@@ -22,6 +22,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import PlatformChip from "@/components/player/profile/Platform";
 import LevelChip from "@/components/player/profile/Level";
+import { useTranslation } from "react-i18next";
 
 const ProfileDetails = () => {
   const { profile } = useOutletContext();
@@ -39,6 +40,7 @@ const ProfileDetails = () => {
 };
 
 const SoldierCard = ({ profile }) => {
+  const { t } = useTranslation();
   const { soldier } = profile;
   const { openModal: editSoldier, modal: soldierEditForm } =
     useEditSoldierModal(profile.player_id, soldier);
@@ -52,13 +54,13 @@ const SoldierCard = ({ profile }) => {
           title={
             <Stack direction={"row"} gap={1} alignItems={"center"} fontSize={"1rem"}>
               <MilitaryTechIcon sx={{ width: "1rem", height: "1rem" }} />
-              Soldier
+              {t("records.playerDetails.soldier")}
             </Stack>
           }
-          subheader={"Persistent in-game info updated upon each connection"}
+          subheader={t("records.playerDetails.soldierDescription")}
           action={
             <IconButton
-              aria-label="edit soldier"
+              aria-label={t("playerEditor.soldier.title")}
               onClick={editSoldier}
               size={"small"}
             >
@@ -70,7 +72,7 @@ const SoldierCard = ({ profile }) => {
           <List sx={{ flexGrow: 1, "& > *": {} }}>
             <ListItem sx={{ display: "flex", justifyContent: "space-between" }}>
               <Box sx={{ color: (theme) => theme.palette.text.secondary }}>
-                Name:
+                {t("records.playerDetails.name")}:
               </Box>
               <Box>
                 <CopyableText
@@ -82,19 +84,19 @@ const SoldierCard = ({ profile }) => {
             </ListItem>
             <ListItem sx={{ display: "flex", justifyContent: "space-between" }}>
               <Box sx={{ color: (theme) => theme.palette.text.secondary }}>
-                Clan Tag:
+                {t("records.playerDetails.clanTag")}:
               </Box>
               <Box>{soldier["clan_tag"]}</Box>
             </ListItem>
             <ListItem sx={{ display: "flex", justifyContent: "space-between" }}>
               <Box sx={{ color: (theme) => theme.palette.text.secondary }}>
-                Level:
+                {t("records.playerDetails.level")}:
               </Box>
               <Box><LevelChip level={soldier["level"]} /></Box>
             </ListItem>
             <ListItem sx={{ display: "flex", justifyContent: "space-between" }}>
               <Box sx={{ color: (theme) => theme.palette.text.secondary }}>
-                Platform:
+                {t("records.playerDetails.platform")}:
               </Box>
               <Box><PlatformChip platform={soldier["platform"]} playerId={profile.player_id} /></Box>
             </ListItem>
@@ -119,6 +121,7 @@ const SoldierCard = ({ profile }) => {
 };
 
 const AccountCard = ({ profile }) => {
+  const { t } = useTranslation();
   const { account } = profile;
   const { openModal: editSoldier, modal: accountEditForm } =
     useEditAccountModal(profile.player_id, account);
@@ -132,13 +135,13 @@ const AccountCard = ({ profile }) => {
           title={
             <Stack direction={"row"} gap={1} alignItems={"center"} fontSize={"1rem"}>
               <AccountCircleIcon sx={{ width: "1rem", height: "1rem" }} />
-              Account
+              {t("records.playerDetails.account")}
             </Stack>
           }
-          subheader={"CRCON DB info linked to this player(soldier)"}
+          subheader={t("records.playerDetails.accountDescription")}
           action={
             <IconButton
-              aria-label="edit account"
+              aria-label={t("playerEditor.account.title")}
               onClick={editSoldier}
               size={"small"}
             >
@@ -150,7 +153,7 @@ const AccountCard = ({ profile }) => {
           <List sx={{ flexGrow: 1 }}>
             <ListItem sx={{ display: "flex", justifyContent: "space-between" }}>
               <Box sx={{ color: (theme) => theme.palette.text.secondary }}>
-                Name:
+                {t("records.playerDetails.name")}:
               </Box>
               <Box>
                 {account["name"] ? (<CopyableText
@@ -162,7 +165,7 @@ const AccountCard = ({ profile }) => {
             </ListItem>
             <ListItem sx={{ display: "flex", justifyContent: "space-between" }}>
               <Box sx={{ color: (theme) => theme.palette.text.secondary }}>
-                Country:
+                {t("records.playerDetails.country")}:
               </Box>
               <Box>{account["country"]
                 ? <><CountryFlag country={account["country"]} /> {account["country"]}</>
@@ -171,7 +174,7 @@ const AccountCard = ({ profile }) => {
             </ListItem>
             <ListItem sx={{ display: "flex", justifyContent: "space-between" }}>
               <Box sx={{ color: (theme) => theme.palette.text.secondary }}>
-                Lang:
+                {t("records.playerDetails.language")}:
               </Box>
               <Box>{account["lang"]}</Box>
             </ListItem>
@@ -189,7 +192,7 @@ const AccountCard = ({ profile }) => {
             </ListItem>
             <ListItem sx={{ display: "flex", justifyContent: "space-between" }}>
               <Box sx={{ color: (theme) => theme.palette.text.secondary }}>
-                Membership:
+                {t("records.playerDetails.membership")}:
               </Box>
               <Box>{account["is_member"] ? <CheckCircleIcon style={{color: "green"}} /> : <CancelIcon style={{color: "red"}} />}</Box>
             </ListItem>

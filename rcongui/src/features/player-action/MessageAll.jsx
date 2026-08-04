@@ -21,10 +21,12 @@ import ErrorBrowser from "@/components/shared/ErrorBrowser";
 import debug from "@/utils/debug";
 import ThreePIcon from "@mui/icons-material/ThreeP";
 import { MessageField } from "./fields/MessageField";
+import { useTranslation } from "react-i18next";
 
 const logger = debug("MESSAGE ALL DIALOG");
 
 export default function MessageAllDialog() {
+  const { t } = useTranslation();
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down("md"));
@@ -89,7 +91,7 @@ export default function MessageAllDialog() {
 
   return (
     <React.Fragment>
-      <Tooltip title={"Message All Players"}>
+      <Tooltip title={t("actions.messageAll")}>
         <span>
           <IconButton onClick={handleDialogClickOpen}>
             <ThreePIcon />
@@ -108,23 +110,23 @@ export default function MessageAllDialog() {
           },
         }}
       >
-        <DialogTitle>Message All Players</DialogTitle>
+        <DialogTitle>{t("actions.messageAll")}</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            {`This command will message all players on the server.`}
+            {t("actions.messageAllDescription")}
           </DialogContentText>
           <Stack spacing={2} marginTop={2}>
             {isError && (
               <ErrorBrowser
                 errors={[
                   error?.message ??
-                    "Something went wrong. Check the browser developer's tool > console for more information",
+                    t("errors.unexpected"),
                 ]}
                 onClose={() => {}}
               />
             )}
             {isSuccess && (
-              <Alert severity="success">Message sent to all players.</Alert>
+              <Alert severity="success">{t("actions.messageSent")}</Alert>
             )}
             <MessageField
               control={control}
@@ -136,15 +138,15 @@ export default function MessageAllDialog() {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleDialogClose} disabled={isPending}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           {isPending ? (
             <Button disabled startIcon={<CircularProgress size={"1rem"} />}>
-              Sending...
+              {t("actions.sending")}
             </Button>
           ) : (
             <Button type="submit" disabled={isPending}>
-              Confirm
+              {t("common.confirm")}
             </Button>
           )}
         </DialogActions>

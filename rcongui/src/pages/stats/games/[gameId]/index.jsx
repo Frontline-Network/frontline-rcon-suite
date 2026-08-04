@@ -10,21 +10,25 @@ import {
   getExpandedRowModel,
   getPaginationRowModel,
 } from "@tanstack/react-table";
-import { columns } from "./game-columns";
+import { createGameColumns } from "./game-columns";
 import { useMemo, useState } from "react";
 import dayjs from "dayjs";
 import { Typography, Box, Paper } from "@mui/material";
 import Grid from "@mui/material/Grid2";
+import { useTranslation } from "react-i18next";
 
 export const StatCard = ({ playerStats, statsKey, limit = 10 }) => {
-  const title = statsKey.replace("_", " ").toUpperCase();
+  const { t } = useTranslation();
+  const title = t(`stats.gameDetails.metrics.${statsKey}`, {
+    defaultValue: statsKey.replace("_", " ").toUpperCase(),
+  });
   return (
     <Grid size={{ xs: 12, sm: 6, md: 4, xl: 2 }}>
       <Paper sx={{ p: 2 }}>
         <Typography variant="h6" sx={{ mb: 2 }}>
-          TOP {title}
+          {t("stats.gameDetails.topStat", { stat: title })}
         </Typography>
-        {playerStats
+        {[...playerStats]
           .sort((a, b) => b[statsKey] - a[statsKey])
           .slice(0, limit)
           .map((player, i) => player[statsKey] > 0 && (
@@ -53,6 +57,7 @@ export const StatCard = ({ playerStats, statsKey, limit = 10 }) => {
 };
 
 export const CompletedGameDetails = ({ mapLayer, result, start, end, id }) => {
+  const { t } = useTranslation();
   return (
     <Box
       sx={{
@@ -68,26 +73,26 @@ export const CompletedGameDetails = ({ mapLayer, result, start, end, id }) => {
         </Typography>
         {result && (
           <Typography variant="h5" sx={{ color: "text.secondary" }}>
-            Score:{" "}
+            {t("stats.gameDetails.score")}:{" "}
             <Box component="span" sx={{ color: "primary.main" }}>
-              Allies {result?.allied ?? "?"}
+              {t("views.team.allies")} {result?.allied ?? "?"}
             </Box>{" "}
             :{" "}
             <Box component="span" sx={{ color: "error.main" }}>
-              {result?.axis ?? "?"} Axis
+              {result?.axis ?? "?"} {t("views.team.axis")}
             </Box>
           </Typography>
         )}
       </Box>
       <Box sx={{ textAlign: "right" }}>
         <Typography variant="subtitle1" sx={{ mb: 1 }}>
-          {dayjs(start).format("HH:mm, MMM D, YYYY")}
+          {dayjs(start).format("L LT")}
         </Typography>
         <Typography variant="subtitle1" sx={{ mb: 1 }}>
-          Duration: {dayjs.duration(dayjs(end) - dayjs(start)).format("HH:mm")}
+          {t("stats.gameDetails.duration")}: {dayjs.duration(dayjs(end) - dayjs(start)).format("HH:mm")}
         </Typography>
         <Typography variant="subtitle2" color="text.secondary">
-          Game ID: {id}
+          {t("stats.gameDetails.gameId")}: {id}
         </Typography>
       </Box>
     </Box>
@@ -141,6 +146,8 @@ export const GameTable = ({ playerStats, columns }) => {
 };
 
 const CompletedGamePage = () => {
+  const { t } = useTranslation();
+  const columns = useMemo(() => createGameColumns(t), [t]);
   const { gameId } = useParams();
   
   const { data, isLoading, error } = useQuery({
@@ -148,11 +155,11 @@ const CompletedGamePage = () => {
   });
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return <div>{t("common.loading")}</div>;
   }
 
   if (error) {
-    return <div>Error: {error.message}</div>;
+    return <div>{t("stats.gameDetails.loadError", { message: error.message })}</div>;
   }
 
   return (

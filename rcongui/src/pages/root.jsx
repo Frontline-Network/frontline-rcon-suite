@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Container, Box, Stack, alpha } from "@mui/material";
+import { Container, Box, Stack } from "@mui/material";
 import AppNavbar from "@/components/layout/AppNavbar";
 import Header from "@/components/layout/Header";
 import SideMenu from "@/components/layout/SideMenu";
@@ -42,9 +42,7 @@ export default function Root() {
           component="main"
           sx={(theme) => ({
             flexGrow: 1,
-            backgroundColor: theme.vars
-              ? `rgba(${theme.vars.palette.background.defaultChannel} / 1)`
-              : alpha(theme.palette.background.default, 1),
+            backgroundColor: theme.palette.background.default,
             overflow: "auto",
             height: "100vh",
           })}
@@ -52,8 +50,8 @@ export default function Root() {
           <Stack
             sx={{
               alignItems: "center",
-              mx: { xs: 0, lg: 3 },
-              pb: 5,
+              mx: 0,
+              pb: 4,
               mt: { xs: 8, lg: 0 },
               minHeight: "100%",
             }}
@@ -61,12 +59,14 @@ export default function Root() {
             <Header />
             <Container 
               maxWidth={widthMode}
-              sx={{ 
+              sx={{
                 display: "flex",
                 flexDirection: "column",
                 flexGrow: 1,
                 position: "relative",
                 minHeight: "100%",
+                px: { xs: 1.5, md: 2.5 },
+                maxWidth: widthMode === false ? "none" : undefined,
               }}
             >
               <ActionDialogProvider>

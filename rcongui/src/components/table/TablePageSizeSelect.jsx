@@ -1,14 +1,16 @@
 import { Select, MenuItem } from "@mui/material";
+import { useTranslation } from "react-i18next";
 
 export const TablePageSizeSelect = ({
   pageSize,
   setPageSize,
   options = [10, 20, 50, 100],
 }) => {
+  const { t } = useTranslation();
   return (
     <Select
       value={pageSize}
-      aria-label="Page Size"
+      aria-label={t("common.pagination.pageSize")}
       onChange={(e) => setPageSize(e.target.value)}
       size="small"
       MenuProps={{

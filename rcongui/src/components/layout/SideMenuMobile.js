@@ -7,10 +7,10 @@ import { Box, List } from "@mui/material";
 import { navMenus } from "../Header/nav-data";
 import ConnectionStatus from "./sidebar/ConnectionStatus";
 import AboutDialog from "./sidebar/About";
-import ToggleColorMode from "./ColorModeIconDropdown";
-import ColorSchemeSelector from "./ColorSchemeSelector";
 import { UserActions } from "./sidebar/UserActions";
 import SystemUsage from "./sidebar/SystemUsage";
+import FrontlineBrand from "./FrontlineBrand";
+import LanguageSelector from "./LanguageSelector";
 
 const MobileDrawer = ({ open, toggleDrawer, children }) => {
   return (
@@ -36,26 +36,20 @@ const MobileDrawer = ({ open, toggleDrawer, children }) => {
 function AdminSideMenuMobile({ open, toggleDrawer }) {
   return (
     <MobileDrawer open={open} toggleDrawer={toggleDrawer}>
-      <MenuContent navigationTree={navMenus} isMobile={true} />
+      <FrontlineBrand />
+      <Box sx={{ px: 1.5, pb: 1 }}><SelectContent /></Box>
       <List dense sx={{ color: theme => theme.palette.text.secondary }}>
         <ConnectionStatus />
         <SystemUsage />
-        <AboutDialog />
       </List>
       <Divider />
+      <MenuContent navigationTree={navMenus} isMobile={true} />
+      <List dense sx={{ color: theme => theme.palette.text.secondary }}>
+        <AboutDialog />
+      </List>
       <Stack direction="row" sx={{ gap: 1, px: 1.5, py: 0.5 }}>
-        <ColorSchemeSelector />
-        <ToggleColorMode />
+        <LanguageSelector />
       </Stack>
-      <Divider />
-      <Box
-        sx={{
-          display: "flex",
-          p: 1.5,
-        }}
-      >
-        <SelectContent />
-      </Box>
       <Divider />
       <UserActions />
     </MobileDrawer>

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -13,6 +14,14 @@ import 'live_updates.dart';
 import 'models.dart';
 import 'providers.dart';
 import 'push_relay.dart';
+import 'frontline_theme.dart';
+import 'l10n/generated/app_localizations.dart';
+
+extension FrontlineLocalizations on BuildContext {
+  AppLocalizations get l10n => AppLocalizations.of(this);
+}
+
+final localeProvider = StateProvider<Locale>((ref) => const Locale('de'));
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -65,6 +74,7 @@ class _CrconMobileAppState extends ConsumerState<CrconMobileApp> {
   @override
   void initState() {
     super.initState();
+    unawaited(_restoreLanguage());
     try {
       _foregroundMessages = FirebaseMessaging.onMessage.listen(_openIncident);
       _openedMessages = FirebaseMessaging.onMessageOpenedApp.listen(
@@ -82,6 +92,12 @@ class _CrconMobileAppState extends ConsumerState<CrconMobileApp> {
     } catch (_) {
       // No-op in self-hosted builds without Firebase configuration.
     }
+  }
+
+  Future<void> _restoreLanguage() async {
+    final language = await ref.read(secureStoreProvider).readLanguage();
+    if (!mounted || language == null) return;
+    ref.read(localeProvider.notifier).state = Locale(language);
   }
 
   Future<void> _rotatePushIdentity() async {
@@ -151,20 +167,60 @@ class _CrconMobileAppState extends ConsumerState<CrconMobileApp> {
     ref.listen(connectionsProvider, (_, next) {
       next.whenData(_syncLiveConnections);
     });
+    final locale = ref.watch(localeProvider);
     return MaterialApp.router(
-      title: 'CRCON Admin',
+      onGenerateTitle: (context) => context.l10n.appTitle,
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xffc6a15b),
-          brightness: Brightness.dark,
-        ),
-        scaffoldBackgroundColor: const Color(0xff111315),
-        useMaterial3: true,
-      ),
+      locale: locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ],
+      theme: FrontlineTheme.dark,
       routerConfig: _router,
     );
   }
+}
+
+class _LanguageButton extends ConsumerWidget {
+  const _LanguageButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => PopupMenuButton<String>(
+    tooltip: context.l10n.language,
+    icon: const Icon(Icons.language),
+    initialValue: ref.watch(localeProvider).languageCode,
+    onSelected: (language) {
+      ref.read(localeProvider.notifier).state = Locale(language);
+      unawaited(ref.read(secureStoreProvider).writeLanguage(language));
+    },
+    itemBuilder: (context) => [
+      PopupMenuItem(value: 'de', child: Text(context.l10n.german)),
+      PopupMenuItem(value: 'en', child: Text(context.l10n.english)),
+    ],
+  );
+}
+
+class _FrontlineTitle extends StatelessWidget {
+  const _FrontlineTitle({required this.title});
+  final String title;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Image.asset(
+        '../assets/rcongui/frontline-logo.png',
+        height: 28,
+        fit: BoxFit.contain,
+      ),
+      const SizedBox(width: 10),
+      Flexible(child: Text(title, overflow: TextOverflow.ellipsis)),
+    ],
+  );
 }
 
 class ConnectionsScreen extends ConsumerWidget {
@@ -174,17 +230,20 @@ class ConnectionsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profiles = ref.watch(connectionsProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('CRCON connections')),
+      appBar: AppBar(
+        title: _FrontlineTitle(title: context.l10n.connections),
+        actions: const [_LanguageButton()],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/pair'),
         icon: const Icon(Icons.qr_code_scanner),
-        label: const Text('Pair CRCON'),
+        label: Text(context.l10n.pairCrcon),
       ),
       body: profiles.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => _ErrorView(message: error.toString()),
         data: (items) => items.isEmpty
-            ? const Center(child: Text('Pair your first CRCON installation.'))
+            ? Center(child: Text(context.l10n.pairFirst))
             : ListView.separated(
                 padding: const EdgeInsets.all(16),
                 itemCount: items.length,
@@ -254,18 +313,16 @@ class _ConnectionCardState extends ConsumerState<_ConnectionCard> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Revoke this device?'),
-        content: const Text(
-          'CRCON will invalidate its access and refresh tokens immediately.',
-        ),
+        title: Text(context.l10n.revokeDeviceTitle),
+        content: Text(context.l10n.revokeDeviceBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Revoke'),
+            child: Text(context.l10n.revoke),
           ),
         ],
       ),
@@ -308,7 +365,7 @@ class _ConnectionCardState extends ConsumerState<_ConnectionCard> {
         ),
         if (_notifications != null)
           SwitchListTile(
-            title: const Text('Incident notifications'),
+            title: Text(context.l10n.incidentNotifications),
             value: _notifications!,
             onChanged: _busy ? null : _setNotifications,
           ),
@@ -403,7 +460,7 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Pair CRCON')),
+    appBar: AppBar(title: Text(context.l10n.pairCrcon)),
     body: _session == null
         ? Stack(
             children: [
@@ -420,8 +477,7 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
                   padding: const EdgeInsets.all(20),
                   color: Colors.black87,
                   child: Text(
-                    _error ??
-                        'Open Mobile App in CRCON, create a QR code, then scan it here.',
+                    _error ?? context.l10n.pairInstructions,
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -436,7 +492,7 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
                 children: [
                   const Icon(Icons.phonelink_lock, size: 64),
                   const SizedBox(height: 20),
-                  const Text('Compare this code with CRCON'),
+                  Text(context.l10n.compareCode),
                   const SizedBox(height: 12),
                   Text(
                     _session!.verificationCode,
@@ -445,9 +501,7 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
                     ).textTheme.displayMedium?.copyWith(letterSpacing: 8),
                   ),
                   const SizedBox(height: 12),
-                  const Text(
-                    'Approve the phone in the CRCON browser to finish pairing.',
-                  ),
+                  Text(context.l10n.approvePhone),
                   if (_error != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 16),
@@ -503,7 +557,7 @@ Future<void> _createManualIncident(BuildContext context, WidgetRef ref) async {
       builder: (context, setDialogState) {
         final serverItems = servers[connectionId] ?? const [];
         return AlertDialog(
-          title: const Text('Create incident'),
+          title: Text(context.l10n.createIncident),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -533,14 +587,16 @@ Future<void> _createManualIncident(BuildContext context, WidgetRef ref) async {
               DropdownButtonFormField<int>(
                 key: ValueKey(connectionId),
                 initialValue: serverNumber,
-                decoration: const InputDecoration(labelText: 'Game server'),
+                decoration: InputDecoration(labelText: context.l10n.gameServer),
                 items: serverItems
                     .map(
                       (server) => DropdownMenuItem(
                         value: (server['server_number'] as num).toInt(),
                         child: Text(
                           server['name']?.toString() ??
-                              'Server ${server['server_number']}',
+                              context.l10n.serverNumber(
+                                server['server_number'],
+                              ),
                         ),
                       ),
                     )
@@ -554,14 +610,14 @@ Future<void> _createManualIncident(BuildContext context, WidgetRef ref) async {
                 controller: reason,
                 autofocus: true,
                 maxLines: 4,
-                decoration: const InputDecoration(labelText: 'Reason'),
+                decoration: InputDecoration(labelText: context.l10n.reason),
               ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: Text(context.l10n.cancel),
             ),
             FilledButton(
               onPressed: () {
@@ -572,7 +628,7 @@ Future<void> _createManualIncident(BuildContext context, WidgetRef ref) async {
                   'reason': reason.text.trim(),
                 });
               },
-              child: const Text('Create'),
+              child: Text(context.l10n.create),
             ),
           ],
         );
@@ -613,11 +669,12 @@ class InboxScreen extends ConsumerWidget {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _createManualIncident(context, ref),
         icon: const Icon(Icons.add_alert),
-        label: const Text('New incident'),
+        label: Text(context.l10n.newIncident),
       ),
       appBar: AppBar(
-        title: const Text('Incident inbox'),
+        title: _FrontlineTitle(title: context.l10n.incidentInbox),
         actions: [
+          const _LanguageButton(),
           IconButton(
             onPressed: () => ref.invalidate(inboxProvider),
             icon: const Icon(Icons.refresh),
@@ -639,9 +696,9 @@ class InboxScreen extends ConsumerWidget {
           onRefresh: () async => ref.refresh(inboxProvider.future),
           child: items.isEmpty
               ? ListView(
-                  children: const [
-                    SizedBox(height: 220),
-                    Center(child: Text('No incidents.')),
+                  children: [
+                    const SizedBox(height: 220),
+                    Center(child: Text(context.l10n.noIncidents)),
                   ],
                 )
               : ListView.builder(
@@ -666,13 +723,13 @@ class InboxScreen extends ConsumerWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                         subtitle: Text(
-                          'Server ${item.serverNumber} · ${item.reporterName ?? 'manual'}'
+                          '${context.l10n.serverNumber(item.serverNumber)} · ${item.reporterName ?? context.l10n.manual}'
                           '${item.assignedTo == null ? '' : ' · ${item.assignedTo}'}',
                         ),
                         trailing: item.stale
-                            ? const Tooltip(
-                                message: 'Cached — may be stale',
-                                child: Icon(Icons.cloud_off),
+                            ? Tooltip(
+                                message: context.l10n.cachedMayBeStale,
+                                child: const Icon(Icons.cloud_off),
                               )
                             : Text(item.status),
                       ),
@@ -732,13 +789,13 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
   Widget build(BuildContext context) {
     final profiles = ref.watch(connectionsProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Player search')),
+      appBar: AppBar(title: Text(context.l10n.playerSearch)),
       body: profiles.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => _ErrorView(message: error.toString()),
         data: (items) {
           if (items.isEmpty) {
-            return const Center(child: Text('Pair a CRCON connection first.'));
+            return Center(child: Text(context.l10n.pairConnectionFirst));
           }
           _connectionId ??= items.first.id;
           return ListView(
@@ -746,8 +803,8 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
             children: [
               DropdownButtonFormField<String>(
                 initialValue: _connectionId,
-                decoration: const InputDecoration(
-                  labelText: 'CRCON connection',
+                decoration: InputDecoration(
+                  labelText: context.l10n.crconConnection,
                 ),
                 items: items
                     .map(
@@ -763,7 +820,7 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
               TextField(
                 controller: _query,
                 decoration: InputDecoration(
-                  labelText: 'Name or player ID',
+                  labelText: context.l10n.nameOrPlayerId,
                   suffixIcon: IconButton(
                     onPressed: () => _search(items),
                     icon: const Icon(Icons.search),
@@ -781,7 +838,7 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
                   title: Text(
                     player['player_name']?.toString() ??
                         player['name']?.toString() ??
-                        'Unknown',
+                        context.l10n.unknown,
                   ),
                   subtitle: Text(playerId),
                   trailing: const Icon(Icons.chevron_right),
@@ -819,7 +876,7 @@ class PlayerProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-    appBar: AppBar(title: const Text('Player profile')),
+    appBar: AppBar(title: Text(context.l10n.playerProfile)),
     body: FutureBuilder<Map<String, dynamic>>(
       future: _load(ref),
       builder: (context, snapshot) {
@@ -842,7 +899,7 @@ class PlayerProfileScreen extends ConsumerWidget {
             Text(
               profile['player_name']?.toString() ??
                   profile['name']?.toString() ??
-                  'Unknown player',
+                  context.l10n.unknownPlayer,
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             SelectableText(profile['player_id']?.toString() ?? playerId),
@@ -852,7 +909,9 @@ class PlayerProfileScreen extends ConsumerWidget {
                 live == null ? Icons.cloud_off : Icons.circle,
                 color: live == null ? null : Colors.green,
               ),
-              title: Text(live == null ? 'Offline' : 'Online now'),
+              title: Text(
+                live == null ? context.l10n.offline : context.l10n.onlineNow,
+              ),
               subtitle: live == null
                   ? null
                   : Text(
@@ -867,17 +926,20 @@ class PlayerProfileScreen extends ConsumerWidget {
                     ),
             ),
             const Divider(height: 32),
-            _ProfileCount(label: 'Sessions', count: sessions.length),
-            _ProfileCount(label: 'Bans', count: bans.length),
-            _ProfileCount(label: 'Admin comments', count: comments.length),
+            _ProfileCount(label: context.l10n.sessions, count: sessions.length),
+            _ProfileCount(label: context.l10n.bans, count: bans.length),
+            _ProfileCount(
+              label: context.l10n.adminComments,
+              count: comments.length,
+            ),
             if (profile['flags'] is List)
               _ProfileCount(
-                label: 'Flags',
+                label: context.l10n.flags,
                 count: (profile['flags'] as List).length,
               ),
             const Divider(height: 32),
             Text(
-              'Recent comments',
+              context.l10n.recentComments,
               style: Theme.of(context).textTheme.titleLarge,
             ),
             ...comments
@@ -990,21 +1052,21 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
     final submit = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Add private admin note'),
+        title: Text(context.l10n.addPrivateNote),
         content: TextField(
           controller: controller,
           autofocus: true,
           maxLines: 4,
-          decoration: const InputDecoration(labelText: 'Note'),
+          decoration: InputDecoration(labelText: context.l10n.note),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Save'),
+            child: Text(context.l10n.save),
           ),
         ],
       ),
@@ -1036,29 +1098,29 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
     final submit = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Link target player'),
+        title: Text(context.l10n.linkTargetPlayer),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: name,
               autofocus: true,
-              decoration: const InputDecoration(labelText: 'Player name'),
+              decoration: InputDecoration(labelText: context.l10n.playerName),
             ),
             TextField(
               controller: id,
-              decoration: const InputDecoration(labelText: 'Player ID'),
+              decoration: InputDecoration(labelText: context.l10n.playerId),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Link'),
+            child: Text(context.l10n.link),
           ),
         ],
       ),
@@ -1079,20 +1141,20 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
     final submit = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Reassign incident'),
+        title: Text(context.l10n.reassignIncident),
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(labelText: 'CRCON username'),
+          decoration: InputDecoration(labelText: context.l10n.crconUsername),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Reassign'),
+            child: Text(context.l10n.reassign),
           ),
         ],
       ),
@@ -1107,30 +1169,38 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
     final incident = _incident;
     if (incident == null || incident.targetId == null) return;
     final controller = TextEditingController();
+    final actionTitle = switch (action) {
+      'message' => context.l10n.message,
+      'punish' => context.l10n.punish,
+      'comment' => context.l10n.comment,
+      'kick' => context.l10n.kick,
+      'temp_ban' => context.l10n.tempBan,
+      _ => action,
+    };
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(action == 'temp_ban' ? 'Temporary ban' : action),
+        title: Text(actionTitle),
         content: TextField(
           controller: controller,
           autofocus: true,
           decoration: InputDecoration(
             labelText: action == 'message'
-                ? 'Message'
+                ? context.l10n.message
                 : action == 'comment'
-                ? 'Admin comment'
-                : 'Required reason',
+                ? context.l10n.adminComment
+                : context.l10n.requiredReason,
           ),
           maxLines: 3,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Confirm'),
+            child: Text(context.l10n.confirm),
           ),
         ],
       ),
@@ -1168,11 +1238,11 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
     });
     final incident = _incident;
     return Scaffold(
-      appBar: AppBar(title: const Text('Incident')),
+      appBar: AppBar(title: Text(context.l10n.incident)),
       body: _busy && incident == null
           ? const Center(child: CircularProgressIndicator())
           : incident == null
-          ? _ErrorView(message: _error ?? 'Incident unavailable')
+          ? _ErrorView(message: _error ?? context.l10n.incidentUnavailable)
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -1185,9 +1255,21 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                 Text(
                   'Server ${incident.serverNumber} · ${incident.source} · ${incident.status}',
                 ),
-                Text('Reporter: ${incident.reporterName ?? 'not set'}'),
-                Text('Target: ${incident.targetName ?? 'not linked'}'),
-                Text('Assigned: ${incident.assignedTo ?? 'nobody'}'),
+                Text(
+                  context.l10n.reporter(
+                    incident.reporterName ?? context.l10n.notSet,
+                  ),
+                ),
+                Text(
+                  context.l10n.target(
+                    incident.targetName ?? context.l10n.notLinked,
+                  ),
+                ),
+                Text(
+                  context.l10n.assigned(
+                    incident.assignedTo ?? context.l10n.nobody,
+                  ),
+                ),
                 const SizedBox(height: 20),
                 Wrap(
                   spacing: 8,
@@ -1196,17 +1278,17 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                     if (incident.status == 'new')
                       FilledButton(
                         onPressed: () => _mutate('claim'),
-                        child: const Text('Claim'),
+                        child: Text(context.l10n.claim),
                       ),
                     if (incident.status == 'claimed')
                       OutlinedButton(
                         onPressed: () => _mutate('unclaim'),
-                        child: const Text('Release'),
+                        child: Text(context.l10n.release),
                       ),
                     if (!{'resolved', 'dismissed'}.contains(incident.status))
                       OutlinedButton(
                         onPressed: _busy ? null : _reassign,
-                        child: const Text('Reassign'),
+                        child: Text(context.l10n.reassign),
                       ),
                     if (!{
                       'resolved',
@@ -1214,16 +1296,16 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                     }.contains(incident.status)) ...[
                       FilledButton(
                         onPressed: () => _mutate('resolved'),
-                        child: const Text('Resolve'),
+                        child: Text(context.l10n.resolve),
                       ),
                       OutlinedButton(
                         onPressed: () => _mutate('dismissed'),
-                        child: const Text('Dismiss'),
+                        child: Text(context.l10n.dismiss),
                       ),
                     ] else
                       FilledButton(
                         onPressed: () => _mutate('reopen'),
-                        child: const Text('Reopen'),
+                        child: Text(context.l10n.reopen),
                       ),
                   ],
                 ),
@@ -1234,62 +1316,65 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                     OutlinedButton.icon(
                       onPressed: _busy ? null : _addNote,
                       icon: const Icon(Icons.note_add_outlined),
-                      label: const Text('Add note'),
+                      label: Text(context.l10n.addNote),
                     ),
                     if (incident.targetId == null)
                       OutlinedButton.icon(
                         onPressed: _busy ? null : _linkTarget,
                         icon: const Icon(Icons.person_add_alt),
-                        label: const Text('Link player'),
+                        label: Text(context.l10n.linkPlayer),
                       ),
                   ],
                 ),
                 const Divider(height: 40),
                 Text(
-                  'Player actions',
+                  context.l10n.playerActions,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 10),
                 if (incident.targetId == null)
-                  const Text(
-                    'Link a unique player in CRCON before using player actions.',
-                  )
+                  Text(context.l10n.linkPlayerFirst)
                 else
                   Wrap(
                     spacing: 8,
                     children: [
                       OutlinedButton(
                         onPressed: () => _action('message'),
-                        child: const Text('Message'),
+                        child: Text(context.l10n.message),
                       ),
                       OutlinedButton(
                         onPressed: () => _action('punish'),
-                        child: const Text('Punish'),
+                        child: Text(context.l10n.punish),
                       ),
                       OutlinedButton(
                         onPressed: () => _action('comment'),
-                        child: const Text('Comment'),
+                        child: Text(context.l10n.comment),
                       ),
                       OutlinedButton(
                         onPressed: () => _action('kick'),
-                        child: const Text('Kick'),
+                        child: Text(context.l10n.kick),
                       ),
                       FilledButton.tonal(
                         onPressed: () => _action('temp_ban'),
-                        child: const Text('Tempban'),
+                        child: Text(context.l10n.tempBan),
                       ),
                     ],
                   ),
                 const Divider(height: 40),
-                Text('Timeline', style: Theme.of(context).textTheme.titleLarge),
+                Text(
+                  context.l10n.timeline,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
                 ...incident.events.reversed.map(
                   (event) => ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.history),
-                    title: Text(event['event_type']?.toString() ?? 'event'),
+                    title: Text(
+                      event['event_type']?.toString() ?? context.l10n.event,
+                    ),
                     subtitle: Text(
                       [
-                        event['actor']?.toString() ?? 'system',
+                        event['actor']?.toString() ?? context.l10n.system,
                         if (event['event_type'] == 'note')
                           (event['payload'] as Map?)?['note']?.toString() ?? '',
                       ].where((value) => value.isNotEmpty).join(' · '),

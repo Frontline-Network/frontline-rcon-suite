@@ -1,6 +1,7 @@
 import { minWidth } from "@mui/system";
 import { getMapLayerImageSrc, getTacMapImageSrc } from "./helpers";
 import { styled } from "@mui/material";
+import { useTranslation } from "react-i18next";
 
 const MapWrapper = styled("div")({
   position: "absolute",
@@ -126,6 +127,7 @@ const isButtonDisabled = (state, index, map, objectives) => {
 };
 
 export function MapObjectivesPicker({ objectives, map, onClick, loading }) {
+  const { t } = useTranslation();
   return (
     <ObjectivesContainer>
       <MapTitle>{map.pretty_name}</MapTitle>
@@ -139,7 +141,7 @@ export function MapObjectivesPicker({ objectives, map, onClick, loading }) {
         </MapWrapper>
         <ObjectivesGrid>
           {loading ? (
-            <LoadingOverlay>LOADING...</LoadingOverlay>
+            <LoadingOverlay>{t("common.loading")}</LoadingOverlay>
           ) : (
             objectives.flat().map((state, index) => {
               return (

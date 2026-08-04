@@ -49,7 +49,7 @@ import OndemandVideoIcon from "@mui/icons-material/OndemandVideo";
 import MilitaryTechIcon from "@mui/icons-material/MilitaryTech";
 import SearchIcon from "@mui/icons-material/Search";
 
-export const navMenus = [
+const rawNavMenus = [
   {
     links: [
       {
@@ -343,3 +343,75 @@ export const navMenus = [
     ],
   },
 ];
+
+const groupTranslationKeys = {
+  Views: "navigation.groups.views",
+  Maps: "navigation.groups.maps",
+  Records: "navigation.groups.records",
+  Settings: "navigation.groups.settings",
+  Webhooks: "navigation.groups.webhooks",
+  Automods: "navigation.groups.automods",
+  Others: "navigation.groups.others",
+  Stats: "navigation.groups.stats",
+};
+
+const linkTranslationKeys = {
+  "/": "navigation.links.home",
+  "/views/live": "navigation.links.live",
+  "/views/team": "navigation.links.team",
+  "/settings/maps/change": "navigation.links.changeMap",
+  "/settings/maps/rotation": "navigation.links.rotation",
+  "/settings/maps/objectives": "navigation.links.objectives",
+  "/settings/maps/votemap": "navigation.links.votemap",
+  "/records/players": "navigation.links.players",
+  "/records/vips": "navigation.links.vips",
+  "/records/blacklists": "navigation.links.blacklist",
+  "/records/game-logs": "navigation.links.gameLogs",
+  "/records/audit-logs": "navigation.links.auditLogs",
+  "/settings/general": "navigation.links.general",
+  "/settings/services": "navigation.links.services",
+  "/settings/welcome-message": "navigation.links.welcomeMessage",
+  "/settings/broadcast-message": "navigation.links.broadcastMessage",
+  "/settings/console-admins": "navigation.links.consoleAdmins",
+  "/settings/templates/message": "navigation.links.templates",
+  "/settings/profanity-filter": "navigation.links.profanityFilter",
+  "/settings/autosettings": "navigation.links.autosettings",
+  "/settings/webhooks/audit": "navigation.links.audit",
+  "/settings/webhooks/admin-ping": "navigation.links.adminPing",
+  "/settings/webhooks/watchlist": "navigation.links.watchlist",
+  "/settings/webhooks/camera": "navigation.links.camera",
+  "/settings/webhooks/chat": "navigation.links.chat",
+  "/settings/webhooks/kills": "navigation.links.kills",
+  "/settings/webhooks/log-line": "navigation.links.logLine",
+  "/settings/automods/level": "navigation.links.level",
+  "/settings/automods/no-leader": "navigation.links.noLeader",
+  "/settings/automods/seeding": "navigation.links.seeding",
+  "/settings/automods/no-solo-tank": "navigation.links.noSoloTank",
+  "/settings/others/vac-bans": "navigation.links.vacBans",
+  "/settings/others/tk-bans": "navigation.links.tkBans",
+  "/settings/others/name-kicks": "navigation.links.nameKicks",
+  "/settings/others/seed-vip": "navigation.links.seedVip",
+  "/settings/others/game-server": "navigation.links.gameServer",
+  "/settings/others/crcon": "navigation.links.crcon",
+  "/settings/others/chat-commands": "navigation.links.chatCommands",
+  "/settings/others/rcon-chat-commands": "navigation.links.rconCommands",
+  "/settings/others/scoreboard": "navigation.links.scoreboard",
+  "/settings/others/steam": "navigation.links.steam",
+  "/settings/others/expired-vip": "navigation.links.expiredVip",
+  "/settings/others/gtx-server": "navigation.links.gtxServer",
+  "/settings/others/log-stream": "navigation.links.logStream",
+  "/settings/others/watch-kill-rate": "navigation.links.watchKillRate",
+  "stats/live-sessions": "navigation.links.liveSessions",
+  "stats/live-game": "navigation.links.liveGame",
+  "stats/games": "navigation.links.games",
+};
+
+export const navMenus = rawNavMenus.map((menu, index) => ({
+  ...menu,
+  id: menu.name?.toLowerCase() || `root-${index}`,
+  translationKey: groupTranslationKeys[menu.name],
+  links: menu.links.map((link) => ({
+    ...link,
+    translationKey: linkTranslationKeys[link.to],
+  })),
+}));

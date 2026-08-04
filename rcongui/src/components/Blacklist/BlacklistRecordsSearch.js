@@ -1,12 +1,14 @@
 import { Button, FormControl, FormControlLabel, InputLabel, MenuItem, Select, Switch, TextField } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 import {useState} from "react";
+import { useTranslation } from "react-i18next";
 
 const BlacklistRecordsSearch = ({
   blacklists,
   onSearch,
   disabled,
 }) => {
+  const { t } = useTranslation();
   const [playerIdQuery, setPlayerIdQuery] = useState("");
   const [reasonQuery, setReasonQuery] = useState("");
   const [blacklistQuery, setBlacklistQuery] = useState("");
@@ -22,25 +24,25 @@ const BlacklistRecordsSearch = ({
         alignItems="center"
         justifyContent="space-evenly"
       >
-        <Grid size={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <TextField
             fullWidth
-            label="Search by player ID"
+            label={t("records.blacklists.searchPlayerId")}
             value={playerIdQuery}
             onChange={(e) => setPlayerIdQuery(e.target.value)}
           />
         </Grid>
-        <Grid size={8}>
+        <Grid size={{ xs: 12, md: 8 }}>
           <TextField
             fullWidth
-            label="Search by name or reason"
+            label={t("records.blacklists.searchNameReason")}
             value={reasonQuery}
             onChange={(e) => setReasonQuery(e.target.value)}
           />
         </Grid>
-        <Grid size={4}>
+        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <FormControl fullWidth>
-            <InputLabel>Blacklist</InputLabel>
+            <InputLabel>{t("records.blacklists.list")}</InputLabel>
             <Select
               value={blacklistQuery}
               onChange={(e) => setBlacklistQuery(e.target.value)}
@@ -52,7 +54,7 @@ const BlacklistRecordsSearch = ({
             </Select>
           </FormControl>
         </Grid>
-        <Grid size={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <FormControlLabel
             control={
               <Switch
@@ -61,13 +63,13 @@ const BlacklistRecordsSearch = ({
                 color="primary"
               />
             }
-            label="Show Expired"
+            label={t("records.blacklists.showExpired")}
             labelPlacement="top"
           />
         </Grid>
-        <Grid size={2}>
+        <Grid size={{ xs: 12, sm: 6, md: 2 }}>
           <FormControl fullWidth>
-            <InputLabel>Page size</InputLabel>
+            <InputLabel>{t("common.pagination.pageSize")}</InputLabel>
             <Select
               value={pageSize}
               onChange={(e) => setPageSize(e.target.value)}
@@ -84,7 +86,7 @@ const BlacklistRecordsSearch = ({
             </Select>
           </FormControl>
         </Grid>
-        <Grid size={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Button
             type="submit"
             disabled={disabled}
@@ -102,7 +104,7 @@ const BlacklistRecordsSearch = ({
               });
             }}
           >
-            Search
+            {t("common.search")}
           </Button>
         </Grid>
       </Grid>

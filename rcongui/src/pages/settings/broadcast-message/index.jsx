@@ -18,8 +18,13 @@ import { BroadcastFields } from "@/components/shared/BroadcastFields";
 import Padlock from "@/components/shared/Padlock";
 import isMatch from "lodash/isMatch";
 import isEqual from "lodash/eq";
+import { isFakeMode } from "@/mirage/demo-data";
+import { useTranslation } from "react-i18next";
 
 export const loader = async () => {
+  if (isFakeMode()) {
+    return defer({ config: { enabled: true, randomize: false, messages: [{ time_sec: 120, message: "Frontline Network – fair spielen, klar kommunizieren." }] }, templates: Promise.resolve([]) });
+  }
   const config = await cmd.GET_BROADCAST_CONFIG();
   const templates = cmd.GET_MESSAGE_TEMPLATES({
     params: { category: TEMPLATE_CATEGORY.BROADCAST },
@@ -36,6 +41,7 @@ export const action = async ({ request }) => {
 const TemplateSkeleton = () => <Skeleton height={80} />;
 
 const BroadcastMessagePage = () => {
+  const { t } = useTranslation();
   const data = useLoaderData();
   const submit = useSubmit();
   const [config, setConfig] = useState(data.config);
@@ -106,14 +112,14 @@ const BroadcastMessagePage = () => {
       >
         <Stack direction={"row"} alignItems={"center"} gap={1}>
           <Padlock
-            label={config.enabled ? "Enabled" : "Disabled"}
+            label={t(config.enabled ? "common.enabled" : "common.disabled")}
             checked={config.enabled}
             handleChange={(checked) =>
               setConfig((prev) => ({ ...prev, enabled: checked }))
             }
           />
           <Padlock
-            label={config.randomize ? "Random ON" : "Random OFF"}
+            label={t(config.randomize ? "settings.broadcast.randomOn" : "settings.broadcast.randomOff")}
             checked={config.randomize}
             handleChange={(checked) =>
               setConfig((prev) => ({ ...prev, randomize: checked }))
@@ -129,10 +135,10 @@ const BroadcastMessagePage = () => {
               "/settings/templates/" + TEMPLATE_CATEGORY.BROADCAST.toLowerCase()
             }
           >
-            Create Template
+            {t("settings.broadcast.createTemplate")}
           </Button>
           <Button variant={"contained"} disabled={applyDisabled} onClick={handleApplyClick}>
-            {loading ? "Loading..." : "Apply"} 
+            {loading ? t("common.loading") : t("settings.broadcast.apply")} 
           </Button>
         </Stack>
       </Stack>
@@ -144,7 +150,7 @@ const BroadcastMessagePage = () => {
       <Suspense fallback={<TemplateSkeleton />}>
         <Await
           resolve={data.templates}
-          errorElement={<AsyncClientError title={"Welcome Templates"} />}
+          errorElement={<AsyncClientError title={t("settings.broadcast.templates")} />}
         >
           {(templates) => {
             return (
@@ -166,7 +172,7 @@ const BroadcastMessagePage = () => {
                 renderInput={(params) => (
                   <TextField
                     {...params}
-                    label="Choose a template"
+                    label={t("settings.broadcast.chooseTemplate")}
                     slotProps={{
                       htmlInput: {
                         ...params.inputProps,

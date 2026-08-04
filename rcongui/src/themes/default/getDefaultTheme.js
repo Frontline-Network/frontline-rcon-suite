@@ -8,6 +8,8 @@ import {
 
 async function getColorPrimitives(schemeName) {
   switch (schemeName) {
+    case "original":
+      return import("./primitives/default");
     case "github":
       return import("./primitives/github");
     case "highContrast":
@@ -15,7 +17,7 @@ async function getColorPrimitives(schemeName) {
     case "lime":
       return import("./primitives/lime");
     default:
-      return import("./primitives/default");
+      return import("./primitives/frontline");
   }
 }
 
@@ -40,6 +42,7 @@ export default async function getDefaultTheme(themeComponents, selectedScheme = 
       colorSchemeSelector: "data-mui-color-scheme",
       cssVarPrefix: "template",
     },
+    defaultColorScheme: "dark",
     colorSchemes, // Recently added in v6 for building light & dark mode app, see https://mui.com/material-ui/customization/palette/#color-schemes
     typography,
     shadows,

@@ -5,10 +5,25 @@ import { Link } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faDiscord } from "@fortawesome/free-brands-svg-icons";
 import siteConfig from "@/config/siteConfig";
+import { useTranslation } from "react-i18next";
 
 export default function RouteError() {
+  const { t } = useTranslation();
   const error = useRouteError();
   const location = useLocation();
+  const errorDetail =
+    error?.statusText ||
+    error?.message ||
+    error?.data?.message ||
+    error?.data?.text ||
+    (typeof error?.data === "string" ? error.data : "") ||
+    (() => {
+      try {
+        return JSON.stringify(error);
+      } catch {
+        return String(error ?? "");
+      }
+    })();
   console.error(error);
   if (
     isRouteErrorResponse(error) &&
@@ -26,7 +41,7 @@ export default function RouteError() {
         <Typography>{error.data.command ?? error.data}</Typography>
         <Typography>{error.data.name ?? error.data.error}</Typography>
         <Button variant="contained" LinkComponent={Link} to={location.pathname}>
-          Try again!
+          {t("errors.tryAgain")}
         </Button>
       </Stack>
     );
@@ -40,17 +55,22 @@ export default function RouteError() {
       justifyContent={"center"}
       sx={{ textAlign: "center" }}
     >
-      <Typography variant="h1">Oops!</Typography>
+      <Typography variant="overline" color="primary.main" sx={{ fontWeight: 800, letterSpacing: "0.14em" }}>
+        Frontline Network
+      </Typography>
+      <Typography variant="h2">{t("errors.title")}</Typography>
       <Typography variant="h2">
-        Sorry, an unexpected error has occurred.
+        {t("errors.unexpected")}
       </Typography>
       <Typography variant="h3">
-        Please contact support when this error persists.
+        {t("errors.persistent")}
       </Typography>
       <Paper elevation={4} variant="outlined" sx={{ padding: 2 }}>
-        <Typography variant="h4">Error: {error.name ?? "Unknown"}</Typography>
+        <Typography variant="h4">
+          {error.name ?? t("errors.unknown")}
+        </Typography>
         <Typography variant="body1">
-          <i>{error.statusText || error.message || error.data}</i>
+          <i>{errorDetail}</i>
         </Typography>
       </Paper>
       <Stack direction={"row"} spacing={2}>
@@ -61,10 +81,10 @@ export default function RouteError() {
           href={siteConfig.bugReportChannelUrl}
           startIcon={<FontAwesomeIcon icon={faDiscord} />}
         >
-          Report this error
+          {t("errors.report")}
         </Button>
         <Button variant="contained" LinkComponent={Link} to={location.pathname}>
-          Go back
+          {t("errors.back")}
         </Button>
       </Stack>
     </Stack>

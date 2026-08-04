@@ -19,12 +19,12 @@ import {
   FilterSection,
 } from '../styled';
 import dayjs from 'dayjs';
-import { LocalizationProvider } from '@mui/x-date-pickers';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import PlayerLogs from './logs';
 import ProfileDetails from './profile-details';
+import { useTranslation } from "react-i18next";
 
 export default function PlayerDetailView() {
+  const { t } = useTranslation();
   const { detail } = useParams();
   const { profile, submit } = useOutletContext();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -129,13 +129,13 @@ export default function PlayerDetailView() {
             <FilterSection>
               <TextField
                 sx={{ maxWidth: '200px' }}
-                label="Number of sessions"
+                label={t("records.playerDetails.sessionCount")}
                 type="number"
                 value={searchParams.get('num_sessions') || '10'}
                 onChange={handleSessionCountChange}
                 size="small"
                 InputProps={{
-                  endAdornment: <InputAdornment position="end">sessions</InputAdornment>,
+                  endAdornment: <InputAdornment position="end">{t("records.playerDetails.sessions")}</InputAdornment>,
                 }}
                 inputProps={{
                   min: 1,
@@ -143,43 +143,39 @@ export default function PlayerDetailView() {
                 }}
               />
               <Box className="date-inputs">
-                <LocalizationProvider dateAdapter={AdapterDayjs}>
-                  <DateTimePicker
-                    label="Start Date"
-                    value={filters.sessions.startDate}
-                    format='lll'
-                    onChange={(newValue) => handleFilterChange('sessions', 'startDate', newValue)}
-                    slotProps={{ textField: { size: 'small' } }}
-                  />
-                </LocalizationProvider>
-                <LocalizationProvider dateAdapter={AdapterDayjs}>
-                  <DateTimePicker
-                    label="End Date"
+                <DateTimePicker
+                  label={t("records.playerDetails.startDate")}
+                  value={filters.sessions.startDate}
+                  format='lll'
+                  onChange={(newValue) => handleFilterChange('sessions', 'startDate', newValue)}
+                  slotProps={{ textField: { size: 'small' } }}
+                />
+                <DateTimePicker
+                  label={t("records.playerDetails.endDate")}
                   value={filters.sessions.endDate}
                   format='lll'
                   onChange={(newValue) => handleFilterChange('sessions', 'endDate', newValue)}
-                    slotProps={{ textField: { size: 'small' } }}
-                  />
-                </LocalizationProvider>
+                  slotProps={{ textField: { size: 'small' } }}
+                />
               </Box>
             </FilterSection>
             <Stack direction="row" justifyContent="space-between" sx={{ p: 2 }}>
-              <Typography variant="body2">Total sessions: {filterData(profile.sessions, 'sessions').length}</Typography>
+              <Typography variant="body2">{t("records.playerDetails.totalSessions")}: {filterData(profile.sessions, 'sessions').length}</Typography>
               <Typography variant="body2">
-                Total playtime: {filterData(profile.sessions, 'sessions').reduce((acc, session) => 
+                {t("records.playerDetails.totalPlaytime")}: {filterData(profile.sessions, 'sessions').reduce((acc, session) => 
                   acc + (session.end === null ? 0 : dayjs(session.end).diff(dayjs(session.start), 'minutes')), 0)
-                } minutes
+                } {t("records.playerDetails.minutes")}
               </Typography>
             </Stack>
             <Divider />
             <ScrollableContent>
               {filterData(profile.sessions, 'sessions').map((session, index) => (
                 <ListItem sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', justifyContent: 'space-between' }} key={index}>
-                  <Typography variant="body2">Start: {formatDate(session.start)}</Typography>
+                  <Typography variant="body2">{t("records.playerDetails.start")}: {formatDate(session.start)}</Typography>
                   <Typography variant="body2">
-                    Duration: {session.end === null ? 'Unknown' : dayjs(session.end).diff(dayjs(session.start), 'minutes') + ' minutes'}
+                    {t("records.playerDetails.duration")}: {session.end === null ? t("common.unknown") : `${dayjs(session.end).diff(dayjs(session.start), "minutes")} ${t("records.playerDetails.minutes")}`}
                   </Typography>
-                  <Typography variant="body2">End: {session.end === null ? 'Unknown' : formatDate(session.end)}</Typography>
+                  <Typography variant="body2">{t("records.playerDetails.end")}: {session.end === null ? t("common.unknown") : formatDate(session.end)}</Typography>
                 </ListItem>
               ))}
             </ScrollableContent>
@@ -191,32 +187,35 @@ export default function PlayerDetailView() {
           <div>
             <FilterSection>
               <TextField
-                label="Search actions"
+                label={t("records.playerDetails.searchActions")}
                 value={filters.actions.search}
                 onChange={(e) => handleFilterChange('actions', 'search', e.target.value)}
                 size="small"
               />
               <TextField
                 select
-                label="Action Type"
+                label={t("records.playerDetails.actionType")}
                 value={filters.actions.type}
                 onChange={(e) => handleFilterChange('actions', 'type', e.target.value)}
                 size="small"
               >
-                <MenuItem value="">All</MenuItem>
-                <MenuItem value="TEMPBAN">TEMPBAN</MenuItem>
-                <MenuItem value="PUNISH">PUNISH</MenuItem>
-                <MenuItem value="KICK">KICK</MenuItem>
-                <MenuItem value="MESSAGE">MESSAGE</MenuItem>
+                <MenuItem value="">{t("common.all")}</MenuItem>
+                <MenuItem value="TEMPBAN">{t("actions.types.TEMPBAN")}</MenuItem>
+                <MenuItem value="PERMABAN">{t("actions.types.PERMABAN")}</MenuItem>
+                <MenuItem value="PUNISH">{t("actions.types.PUNISH")}</MenuItem>
+                <MenuItem value="KICK">{t("actions.types.KICK")}</MenuItem>
+                <MenuItem value="MESSAGE">{t("actions.types.MESSAGE")}</MenuItem>
               </TextField>
             </FilterSection>
             <ScrollableContent>
               {filterData(profile.received_actions, 'actions').map((action, index) => (
                 <ListItem key={index}>
-                  <Typography variant="subtitle1">{action.action_type}</Typography>
-                  <Typography>Reason: {action.reason}</Typography>
-                  <Typography>By: {action.by}</Typography>
-                  <Typography>Time: {formatDate(action.time)}</Typography>
+                  <Typography variant="subtitle1">
+                    {t(`actions.types.${action.action_type}`, { defaultValue: action.action_type })}
+                  </Typography>
+                  <Typography>{t("records.playerDetails.reason")}: {action.reason}</Typography>
+                  <Typography>{t("records.playerDetails.by")}: {action.by}</Typography>
+                  <Typography>{t("records.playerDetails.time")}: {formatDate(action.time)}</Typography>
                 </ListItem>
               ))}
             </ScrollableContent>
@@ -228,7 +227,7 @@ export default function PlayerDetailView() {
           <div>
             <FilterSection>
               <TextField
-                label="Search names"
+                label={t("records.playerDetails.searchNames")}
                 value={filters.names.search}
                 onChange={(e) => handleFilterChange('names', 'search', e.target.value)}
                 size="small"
@@ -239,7 +238,7 @@ export default function PlayerDetailView() {
               {filterData(profile.names, 'names').map((name, index) => (
                 <ListItem key={index}>
                   <Typography variant="subtitle1">{name.name}</Typography>
-                  <Typography>Last seen: {formatDate(name.last_seen)}</Typography>
+                  <Typography>{t("records.playerDetails.lastSeen")}: {formatDate(name.last_seen)}</Typography>
                 </ListItem>
               ))}
             </ScrollableContent>
@@ -252,7 +251,7 @@ export default function PlayerDetailView() {
             <Form onSubmit={handleCommentSubmit}>
               <FilterSection>
                 <TextField
-                  label="New Comment"
+                  label={t("records.playerDetails.newComment")}
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
                   size="small"
@@ -261,32 +260,32 @@ export default function PlayerDetailView() {
                   rows={2}
                 />
                 <Button type="submit" variant="contained" disabled={!newComment.trim()}>
-                  Add Comment
+                  {t("records.playerDetails.addComment")}
                 </Button>
               </FilterSection>
             </Form>
             <FilterSection>
               <TextField
-                label="Search comments"
+                label={t("records.playerDetails.searchComments")}
                 value={filters.comments.search}
                 onChange={(e) => handleFilterChange('comments', 'search', e.target.value)}
                 size="small"
               />
               <TextField
-                label="Author"
+                label={t("records.playerDetails.author")}
                 value={filters.comments.author}
                 onChange={(e) => handleFilterChange('comments', 'author', e.target.value)}
                 size="small"
               />
               <Box className="date-inputs">
                 <DateTimePicker
-                  label="Start Date"
+                  label={t("records.playerDetails.startDate")}
                   value={filters.comments.startDate}
                   onChange={(newValue) => handleFilterChange('comments', 'startDate', newValue)}
                   slotProps={{ textField: { size: 'small' } }}
                 />
                 <DateTimePicker
-                  label="End Date"
+                  label={t("records.playerDetails.endDate")}
                   value={filters.comments.endDate}
                   onChange={(newValue) => handleFilterChange('comments', 'endDate', newValue)}
                   slotProps={{ textField: { size: 'small' } }}
@@ -297,8 +296,8 @@ export default function PlayerDetailView() {
               {filterData(profile.comments, 'comments').map((comment, index) => (
                 <ListItem key={index}>
                   <Typography>{comment.content}</Typography>
-                  <Typography>By: {comment.by}</Typography>
-                  <Typography>Time: {formatDate(comment.creation_time)}</Typography>
+                  <Typography>{t("records.playerDetails.by")}: {comment.by}</Typography>
+                  <Typography>{t("records.playerDetails.time")}: {formatDate(comment.creation_time)}</Typography>
                 </ListItem>
               ))}
             </ScrollableContent>

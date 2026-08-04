@@ -36,8 +36,10 @@ import {
   mapsManagerQueryOptions,
 } from "../queries";
 import { toast } from "react-toastify";
+import { useTranslation } from "react-i18next";
 
 function MapObjectivesPage() {
+  const { t } = useTranslation();
   const initialData = useLoaderData();
   const [currentMap, setCurrentMap] = useState(
     initialData.gameState.current_map
@@ -86,7 +88,7 @@ function MapObjectivesPage() {
         }
       });
       setObjectives(finalObjectives);
-      toast.success(`Objectives have been changed.`);
+      toast.success(t("maps.objectivesChanged"));
       setConfirmDialogOpen(false);
     },
     onError: (error) => {
@@ -189,7 +191,7 @@ function MapObjectivesPage() {
     // otherwise
     toast.info(
       <div>
-        <div>The map has changed!</div>
+        <div>{t("maps.mapChanged")}</div>
         <div>{`${local.pretty_name} -> ${global.pretty_name}`}</div>
       </div>
     );
@@ -207,12 +209,10 @@ function MapObjectivesPage() {
     <>
       <Box sx={{ py: 1 }}>
         <Typography variant="h5" gutterBottom>
-          Map Objectives
+          {t("maps.objectives")}
         </Typography>
         <Typography variant="body2" gutterBottom color="textSecondary">
-          Click on the map to select objectives. The map will instantly restart
-          upon confirmation. You can only set objectives to currently running
-          map. The objectives in the omitted lines will be selected at random.
+          {t("maps.objectivesIntro")}
         </Typography>
       </Box>
       <Stack direction={{ xs: "column", md: "row" }}>
@@ -245,7 +245,7 @@ function MapObjectivesPage() {
               onClick={handleClearClick}
               startIcon={<DeleteIcon />}
             >
-              Clear
+              {t("maps.clear")}
             </Button>
             <Button
               variant="contained"
@@ -260,11 +260,11 @@ function MapObjectivesPage() {
                 )
               }
             >
-              Confirm
+              {t("common.confirm")}
             </Button>
           </Stack>
           <FormControl component="fieldset" sx={{ px: 1, mt: 1 }}>
-            <FormLabel component="legend">Select by name</FormLabel>
+            <FormLabel component="legend">{t("maps.selectByName")}</FormLabel>
             <Stack spacing={2} sx={{ py: 2 }}>
               {objectiveNames.map((names, index) => (
                 <FormControl
@@ -272,7 +272,7 @@ function MapObjectivesPage() {
                   size="small"
                   sx={{ minWidth: 180 }}
                 >
-                  <InputLabel>Objective #{index + 1}</InputLabel>
+                  <InputLabel>{t("maps.objectiveNumber", { number: index + 1 })}</InputLabel>
                   <Select
                     value={selectedObjectives[index]}
                     onChange={(e) =>
@@ -284,7 +284,7 @@ function MapObjectivesPage() {
                     label={`Objective #${index}`}
                   >
                     <MenuItem value="random" name={"objective"}>
-                      Random
+                      {t("maps.random")}
                     </MenuItem>
                     {names.map((name) => (
                       <MenuItem key={name} value={name} name={"objective"}>
@@ -297,7 +297,7 @@ function MapObjectivesPage() {
             </Stack>
           </FormControl>
           <FormControl component="fieldset" sx={{ px: 1, mt: 1 }}>
-            <FormLabel component="legend">Random fields criteria</FormLabel>
+            <FormLabel component="legend">{t("maps.randomCriteria")}</FormLabel>
             <FormGroup>
               <FormControlLabel
                 control={
@@ -307,7 +307,7 @@ function MapObjectivesPage() {
                     onChange={handleConstraintChange}
                   />
                 }
-                label="Objectives must be adjacent"
+                label={t("maps.adjacent")}
               />
               <FormControlLabel
                 control={
@@ -317,7 +317,7 @@ function MapObjectivesPage() {
                     onChange={handleConstraintChange}
                   />
                 }
-                label="Objectives must not be aligned in a straight line"
+                label={t("maps.notStraight")}
               />
             </FormGroup>
           </FormControl>
@@ -333,13 +333,12 @@ function MapObjectivesPage() {
         aria-describedby="alert-dialog-description"
       >
         <DialogTitle>
-          <div>Change objectives</div>
-          <div>Server: {serverState?.name || "this server"}</div>
+          <div>{t("maps.changeObjectives")}</div>
+          <div>{t("maps.server", { server: serverState?.name || t("common.unknown") })}</div>
         </DialogTitle>
         <DialogContent>
           <DialogContentText>
-            This will immediately restart the map with the objectives listed
-            below.
+            {t("maps.objectiveRestart")}
           </DialogContentText>
           <Box
             sx={{
@@ -356,7 +355,7 @@ function MapObjectivesPage() {
             <Stack spacing={0.5}>
               {selectedObjectives.map((objName, index) => (
                 <Typography key={`Objective #${index + 1}`}>
-                  Objective #{index + 1} - {objName}
+                  {t("maps.objectiveNumber", { number: index + 1 })} – {objName}
                 </Typography>
               ))}
             </Stack>
@@ -364,7 +363,7 @@ function MapObjectivesPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmDialogOpen(false)} color="inherit">
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             onClick={handleDialogConfirmationClick}
@@ -372,7 +371,7 @@ function MapObjectivesPage() {
             variant="contained"
             startIcon={<CheckCircleIcon />}
           >
-            Confirm
+            {t("common.confirm")}
           </Button>
         </DialogActions>
       </Dialog>

@@ -30,8 +30,10 @@ import {
 import Padlock from "@/components/shared/Padlock";
 import SaveIcon from "@mui/icons-material/Save";
 import ReplayIcon from "@mui/icons-material/Replay";
+import { useTranslation } from "react-i18next";
 
 function VotemapSettingsPage() {
+  const { t } = useTranslation();
   const loaderData = useLoaderData();
   const queryClient = useQueryClient();
 
@@ -53,7 +55,7 @@ function VotemapSettingsPage() {
         mapsManagerQueryKeys.voteMapConfig,
         mapsManagerQueryKeys.votemapStatus,
       ]);
-      toast.success(`Votemap config has been changed`);
+      toast.success(t("maps.votemapSettings.updated"));
     },
     onError: (error) => {
       toast.error(
@@ -143,7 +145,7 @@ function VotemapSettingsPage() {
     >
       {/* TOP/LEFT SIDE */}
       <Stack sx={{ width: { xs: "100%", md: "50%" } }} spacing={1}>
-        <Typography variant="h6">Messages</Typography>
+        <Typography variant="h6">{t("maps.messages")}</Typography>
         {messageFieldConfigs.map((configItem) => (
           <TextField
             key={configItem.name}
@@ -151,8 +153,8 @@ function VotemapSettingsPage() {
             variant="filled"
             multiline
             rows={configItem.rows}
-            label={configItem.label}
-            helperText={configItem.helperText}
+            label={t(`maps.votemapSettings.${configItem.labelKey}`)}
+            helperText={t(`maps.votemapSettings.${configItem.helperKey}`)}
             value={workingConfig[configItem.name] ?? ""}
             onChange={handleWorkingChanges(configItem.name)}
           />
@@ -183,7 +185,7 @@ function VotemapSettingsPage() {
             onClick={handleConfigReset}
             startIcon={<ReplayIcon />}
           >
-            Reset
+            {t("maps.votemapSettings.reset")}
           </Button>
           <Button
             variant="contained"
@@ -198,25 +200,25 @@ function VotemapSettingsPage() {
               )
             }
           >
-            Save
+            {t("common.save")}
           </Button>
         </Stack>
         {/* Form fields */}
         <Stack spacing={1}>
-          <Typography variant="h6">Configuration</Typography>
+          <Typography variant="h6">{t("maps.configuration")}</Typography>
           <FormControl>
             <InputLabel id="default_method">
-              Default map method (when no votes)
+              {t("maps.votemapSettings.defaultMapMethod")}
             </InputLabel>
             <Select
               value={workingConfig.default_method ?? ""}
               onChange={handleWorkingChanges("default_method")}
-              label={"Default map method (when no votes)"}
+              label={t("maps.votemapSettings.defaultMapMethod")}
               labelId="default_method"
             >
               {defaultMapOptions.map((option) => (
                 <MenuItem key={option.name} value={option.name}>
-                  {option.label}
+                  {t(`maps.votemapSettings.${option.labelKey}`)}
                 </MenuItem>
               ))}
             </Select>
@@ -224,10 +226,10 @@ function VotemapSettingsPage() {
 
           <Divider flexItem orientation={"horizontal"} />
 
-          {padlockConfigs.map(({ name, label }) => (
+          {padlockConfigs.map(({ name, labelKey }) => (
             <Padlock
               key={name}
-              label={label}
+              label={t(`maps.votemapSettings.${labelKey}`)}
               checked={workingConfig[name] ?? false}
               handleChange={handleWorkingChanges(name)}
             />
@@ -244,8 +246,8 @@ function VotemapSettingsPage() {
               slotProps={{
                 input: configItem.inputProps,
               }}
-              label={configItem.label}
-              helperText={configItem.helperText}
+              label={t(`maps.votemapSettings.${configItem.labelKey}`)}
+              helperText={t(`maps.votemapSettings.${configItem.helperKey}`)}
               value={workingConfig[configItem.name] ?? false}
               onChange={handleWorkingChanges(configItem.name)}
             />

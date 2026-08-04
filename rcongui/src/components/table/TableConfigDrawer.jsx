@@ -11,6 +11,7 @@ import {
 } from "@mui/material";
 import { useEffect, useState } from "react";
 import CloseIcon from "@mui/icons-material/Close";
+import { useTranslation } from "react-i18next";
 
 const ResponsiveDrawer = styled(Drawer)(({ theme }) => ({
   zIndex: theme.zIndex.modal,
@@ -43,6 +44,7 @@ const TableConfigDrawer = ({
   config,
   children,
 }) => {
+  const { t } = useTranslation();
   const [pendingConfig, setPendingConfig] = useState(null);
 
   const handleTableFontSizeChange = (e, fontSize) => {
@@ -73,7 +75,7 @@ const TableConfigDrawer = ({
         }}
       >
         <Typography sx={{ fontWeight: 500 }}>
-          {name ? `${name} Table Settings` : "Table Settings"}
+          {t("tableConfig.title", { name: name || t("tableConfig.defaultName") })}
         </Typography>
         <IconButton onClick={handleClose}>
           <CloseIcon />
@@ -92,23 +94,23 @@ const TableConfigDrawer = ({
                 letterSpacing: 1.5,
               }}
             >
-              Font Size
+              {t("tableConfig.fontSize")}
             </Typography>
             <ToggleButtonGroup
               value={pendingConfig.fontSize}
               exclusive
               onChange={handleTableFontSizeChange}
-              aria-label="table font size change"
+              aria-label={t("tableConfig.fontSize")}
               fullWidth
             >
-              <ToggleButton value="small" aria-label="small table">
-                Small
+              <ToggleButton value="small" aria-label={t("tableConfig.small")}>
+                {t("tableConfig.small")}
               </ToggleButton>
-              <ToggleButton value="normal" aria-label="normal table">
-                Normal
+              <ToggleButton value="normal" aria-label={t("tableConfig.normal")}>
+                {t("tableConfig.normal")}
               </ToggleButton>
-              <ToggleButton value="large" aria-label="large table">
-                Large
+              <ToggleButton value="large" aria-label={t("tableConfig.large")}>
+                {t("tableConfig.large")}
               </ToggleButton>
             </ToggleButtonGroup>
           </div>
@@ -121,23 +123,23 @@ const TableConfigDrawer = ({
                 letterSpacing: 1.5,
               }}
             >
-              Table Density
+              {t("tableConfig.density")}
             </Typography>
             <ToggleButtonGroup
               value={pendingConfig.density}
               exclusive
               onChange={handleTableDensityChange}
-              aria-label="table density change"
+              aria-label={t("tableConfig.density")}
               fullWidth
             >
-              <ToggleButton value="dense" aria-label="dense table">
-                Dense
+              <ToggleButton value="dense" aria-label={t("tableConfig.dense")}>
+                {t("tableConfig.dense")}
               </ToggleButton>
-              <ToggleButton value="normal" aria-label="normal table">
-                Normal
+              <ToggleButton value="normal" aria-label={t("tableConfig.normal")}>
+                {t("tableConfig.normal")}
               </ToggleButton>
-              <ToggleButton value="comfortable" aria-label="comfortable table">
-                Comfortable
+              <ToggleButton value="comfortable" aria-label={t("tableConfig.comfortable")}>
+                {t("tableConfig.comfortable")}
               </ToggleButton>
             </ToggleButtonGroup>
           </div>

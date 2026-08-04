@@ -15,8 +15,15 @@ import AppTheme from "@/themes/AppTheme";
 import { CssBaseline } from '@mui/material';
 import { useAppStore } from './stores/app-state';
 import TitleManager from './features/title-manager/TitleManager';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { deDE, enUS } from '@mui/x-date-pickers/locales';
+import { useTranslation } from 'react-i18next';
 
 const App = () => {
+  const { i18n } = useTranslation();
+  const isEnglish = i18n.resolvedLanguage === 'en';
+  const pickerLocale = isEnglish ? enUS : deDE;
   // Dayjs plugins
   dayjs.extend(relativeTimePlugin);
   dayjs.extend(durationPlugin);
@@ -37,11 +44,17 @@ const App = () => {
   return (
     <StrictMode>
       <QueryClientProvider client={queryClient}>
-        <AppTheme selectedScheme={colorScheme}>
-          <CssBaseline enableColorScheme />
-          <RouterProvider router={adminRouter} />
-          <ReactQueryDevtools initialIsOpen={false} />
-        </AppTheme>
+        <LocalizationProvider
+          dateAdapter={AdapterDayjs}
+          adapterLocale={isEnglish ? 'en' : 'de'}
+          localeText={pickerLocale.components.MuiLocalizationProvider.defaultProps.localeText}
+        >
+          <AppTheme selectedScheme={colorScheme}>
+            <CssBaseline enableColorScheme />
+            <RouterProvider router={adminRouter} />
+            <ReactQueryDevtools initialIsOpen={false} />
+          </AppTheme>
+        </LocalizationProvider>
         <TitleManager />
       </QueryClientProvider>
     </StrictMode>

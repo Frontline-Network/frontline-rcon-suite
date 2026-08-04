@@ -82,6 +82,11 @@ class SecureConnectionStore {
   Future<void> writeCacheKey(String value) =>
       _storage.write(key: 'crcon.cache.key.v1', value: value);
 
+  Future<String?> readLanguage() => _storage.read(key: 'crcon.language.v1');
+
+  Future<void> writeLanguage(String languageCode) =>
+      _storage.write(key: 'crcon.language.v1', value: languageCode);
+
   String _tokenKey(String connectionId, String kind) =>
       'crcon.$connectionId.$kind.v1';
 }

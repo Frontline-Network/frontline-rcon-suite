@@ -4,6 +4,7 @@ import { ForwardField } from "../fields/ForwardField";
 import { Alert, Box, Button, Stack, TextField } from "@mui/material";
 import dayjs from "dayjs";
 import { ControlledTextInput } from "@/components/form/core/ControlledTextInput";
+import { useTranslation } from "react-i18next";
 
 const presetTimes = [
   [2, "hours"],
@@ -13,17 +14,18 @@ const presetTimes = [
 ];
 
 export const AddVipFormFields = ({ control, errors, setValue, getValues }) => {
+  const { t } = useTranslation();
   const expiration = getValues()?.expiration;
   return (
     <Stack gap={3}>
       <TextField
-        label="Description (Preview)"
+        label={t("fields.vipPreview")}
         value={
           (getValues()?.prefix ?? "") +
           "<Player>" +
           (getValues()?.suffix ?? "")
         }
-        helperText="The VIP will be displayed as <PREFIX><PLAYER_NAME><SUFFIX>"
+        helperText={t("fields.vipPreviewHelp")}
         fullWidth
         disabled
       />
@@ -36,9 +38,9 @@ export const AddVipFormFields = ({ control, errors, setValue, getValues }) => {
           onChange={(e) => setValue("prefix", e.target.value, { shouldValidate: true })}
           value={getValues()?.prefix ?? ""}
           name="prefix"
-          label="Prefix"
+          label={t("fields.prefix")}
           placeholder="[TAG]"
-          helperText="Prefix to be added to the front of the player's name"
+          helperText={t("fields.prefixHelp")}
           sx={{ flex: 1 }}
         />
         <ControlledTextInput
@@ -49,9 +51,9 @@ export const AddVipFormFields = ({ control, errors, setValue, getValues }) => {
           onChange={(e) => setValue("suffix", e.target.value, { shouldValidate: true })}
           value={getValues()?.suffix ?? ""}
           name="suffix"
-          label="Suffix"
+          label={t("fields.suffix")}
           placeholder="[TAG]"
-          helperText="Suffix to be added to the end of the player's name"
+          helperText={t("fields.suffixHelp")}
           sx={{ flex: 1 }}
         />
       </Stack>
@@ -60,7 +62,7 @@ export const AddVipFormFields = ({ control, errors, setValue, getValues }) => {
       ) : (
         <>
           <Alert severity="info">
-            Selected players will be VIP indefinitely.
+            {t("fields.vipIndefinite")}
           </Alert>
           <input type="hidden" name="expiration" value={null} />
         </>
@@ -73,7 +75,7 @@ export const AddVipFormFields = ({ control, errors, setValue, getValues }) => {
           style={{ display: "block", width: "100%", marginBottom: 4 }}
           onClick={() => setValue("expiration", dayjs().add(15, "minutes"))}
         >
-          Help to skip the queue!
+          {t("fields.vipQueueHelp")}
         </Button>
         {presetTimes.map(([amount, unit], index) => (
           <TimePickerButtons
@@ -103,7 +105,7 @@ export const AddVipFormFields = ({ control, errors, setValue, getValues }) => {
             })
           }
         >
-          Never expires
+          {t("fields.neverExpires")}
         </Button>
       </Box>
       <ForwardField control={control} errors={errors} />

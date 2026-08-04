@@ -1,12 +1,14 @@
 import dayjs from 'dayjs';
 import { ControlledDesktopDateTimePicker } from '@/components/form/core/ControlledDesktopDateTimePicker';
+import { useTranslation } from "react-i18next";
 
 export const ExpirationField = ({ control, errors, defaultValue, name }) => {
+  const { t } = useTranslation();
   const error = errors['expiration'];
   const hasError = !!error;
 
   if (hasError && error.type === 'moreThanNow') {
-    error.message = 'Must be older then current time.';
+    error.message = t("fields.expirationFuture");
   }
 
   return (
@@ -15,7 +17,7 @@ export const ExpirationField = ({ control, errors, defaultValue, name }) => {
       control={control}
       errors={errors}
       name={name ?? "expiration"}
-      rules={{ required: 'Expiration date is required.', moreThanNow: 'Date must be more then now.', valueAsDate: true, validate: {
+      rules={{ required: t("fields.expirationRequired"), moreThanNow: t("fields.expirationFuture"), valueAsDate: true, validate: {
         moreThanNow: (value) => dayjs().isBefore(value),
       } }}
       error={error}
@@ -25,7 +27,7 @@ export const ExpirationField = ({ control, errors, defaultValue, name }) => {
         textField: {
           helperText: hasError
             ? error.message
-            : 'The date this action will expire.',
+            : t("fields.expirationHelp"),
         },
       }}
     />

@@ -21,6 +21,7 @@ import PersonIcon from "@mui/icons-material/Person";
 import { useMemo, useState } from "react";
 import { useEditAccountModal } from "@/hooks/useEditAccountModal";
 import { useEditSoldierModal } from "@/hooks/useEditSoldierModal";
+import { useTranslation } from "react-i18next";
 
 /**
  * Displays a menu of actions that the user can perform on a player.
@@ -33,6 +34,7 @@ export function ActionMenu({
   setAnchorEl,
   withProfile = false,
 }) {
+  const { t } = useTranslation();
   const { permissions: user } = useAuth();
   const { openDialog } = useActionDialog();
   const { openWithId } = usePlayerSidebar();
@@ -72,19 +74,19 @@ export function ActionMenu({
             <ListItemIcon>
               <PersonIcon />
             </ListItemIcon>
-            View Profile
+            {t("actions.viewProfile")}
           </MenuItem>
           <MenuItem onClick={openSoldierModal} dense>
             <ListItemIcon>
               <MilitaryTechIcon />
             </ListItemIcon>
-            Edit Soldier
+            {t("actions.editSoldier")}
           </MenuItem>
           <MenuItem onClick={openAccountModal} dense>
             <ListItemIcon>
               <AssignmentIndIcon />
             </ListItemIcon>
-            Edit Account
+            {t("actions.editAccount")}
           </MenuItem>
         </>
       )}
@@ -102,12 +104,12 @@ export function ActionMenu({
             variant="inherit"
             sx={{ textDecoration: action.deprecated ? "line-through" : "" }}
           >
-            {action.name[0].toUpperCase() + action.name.slice(1)}
+            {action.translationKey ? t(`${action.translationKey}.name`) : action.name}
           </Typography>
         </MenuItem>
       ))}
       {filteredActionList.length === 0 && (
-        <MenuItem onClick={handleClose}>No actions available</MenuItem>
+        <MenuItem onClick={handleClose}>{t("actions.none")}</MenuItem>
       )}
       {accountModal}
       {soldierModal}
@@ -144,6 +146,7 @@ export function ActionMenuButton({
   size = "regular",
   ...props
 }) {
+  const { t } = useTranslation();
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
 
@@ -152,7 +155,7 @@ export function ActionMenuButton({
   };
 
   const buttonProps = {
-    "aria-label": "more",
+    "aria-label": t("actions.menu"),
     id: "default-action-menu-button",
     "aria-controls": open ? "default-action-menu-button" : undefined,
     "aria-expanded": open ? "true" : undefined,
@@ -219,6 +222,7 @@ export function ActionIconButton({
   sx,
   ...props
 }) {
+  const { t } = useTranslation();
   const { permissions: user } = useAuth();
   const { openDialog } = useActionDialog();
 
@@ -227,7 +231,7 @@ export function ActionIconButton({
   };
 
   return (
-    <Tooltip title={label || action.name} key={action.name}>
+    <Tooltip title={label || (action.translationKey ? t(`${action.translationKey}.name`) : action.name)} key={action.name}>
       <span>
         <IconButton
           key={action.name}

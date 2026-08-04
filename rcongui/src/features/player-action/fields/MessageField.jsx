@@ -2,8 +2,10 @@ import { ControlledTextInput } from "@/components/form/core/ControlledTextInput"
 import { useTemplates } from "@/hooks/useTemplates";
 import { MenuItem, Select } from "@mui/material";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 export const MessageField = ({ control, errors, setValue, ...props }) => {
+  const { t } = useTranslation();
   const templates = useTemplates("message");
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const error = errors["message"];
@@ -25,11 +27,11 @@ export const MessageField = ({ control, errors, setValue, ...props }) => {
       <ControlledTextInput
         error={hasError}
         name={"message"}
-        label={"Message"}
+        label={t("fields.message")}
         control={control}
-        rules={{ required: "Message is required" }}
+        rules={{ required: t("fields.messageRequired") }}
         helperText={
-          hasError ? error.message : "The message displayed to the player."
+          hasError ? error.message : t("fields.messageHelp")
         }
         multiline
         minRows={5}
@@ -39,12 +41,12 @@ export const MessageField = ({ control, errors, setValue, ...props }) => {
         id="saved-messages-select"
         value={selectedTemplate}
         onChange={handleOnSelectChange}
-        inputProps={{ "aria-label": "Saved Messages" }}
+        inputProps={{ "aria-label": t("fields.savedMessages") }}
         fullWidth
         displayEmpty
       >
         <MenuItem value="">
-          <em>Saved Messages</em>
+          <em>{t("fields.savedMessages")}</em>
         </MenuItem>
         {templates.map((template, i) => {
           return (

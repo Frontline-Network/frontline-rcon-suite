@@ -3,6 +3,7 @@ import { CountryFlag } from "@/components/shared/CountryFlag";
 import { PopoverMenu } from "@/components/shared/PopoverMenu";
 import FlagIcon from "@mui/icons-material/Flag";
 import { Tooltip, Button } from "@mui/material";
+import { useTranslation } from "react-i18next";
 
 /**
  * @typedef {Object} CountryOption
@@ -16,13 +17,14 @@ import { Tooltip, Button } from "@mui/material";
  * @param {Function} props.onCountrySelect
  * @returns {JSX.Element}
  */
-export const CountrySelectionMenu = ({ countryOptions, onCountrySelect }) => (
-  <PopoverMenu
+export const CountrySelectionMenu = ({ countryOptions, onCountrySelect }) => {
+  const { t } = useTranslation();
+  return <PopoverMenu
     id="country-picker"
-    description="Pick a country to select all players from it"
+    description={t("selection.countryDescription")}
     renderButton={(props) => (
       <Button {...props}>
-        <Tooltip title="Select by country">
+        <Tooltip title={t("selection.country")}> 
           <FlagIcon />
         </Tooltip>
       </Button>
@@ -59,5 +61,5 @@ export const CountrySelectionMenu = ({ countryOptions, onCountrySelect }) => (
         </ListItem>
       ))}
     </List>
-  </PopoverMenu>
-);
+  </PopoverMenu>;
+};

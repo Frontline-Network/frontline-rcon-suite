@@ -9,8 +9,10 @@ import {
 } from "@mui/material";
 import ArrowLeftIcon from "@mui/icons-material/ArrowLeft";
 import ArrowRightIcon from "@mui/icons-material/ArrowRight";
+import { useTranslation } from "react-i18next";
 
 const ErrorBrowser = ({ errors, onClose }) => {
+  const { t } = useTranslation();
   const [open, setOpen] = React.useState(true);
   const [active, setActive] = React.useState(0);
 
@@ -29,7 +31,7 @@ const ErrorBrowser = ({ errors, onClose }) => {
       <AlertTitle>
         <Stack direction={"row"} gap={1} alignItems={"center"}>
           <IconButton
-            aria-label="previous"
+            aria-label={t("common.previous")}
             size="small"
             onClick={() => setActive((prev) => Math.max(0, prev - 1))}
             disabled={active === 0}
@@ -37,10 +39,10 @@ const ErrorBrowser = ({ errors, onClose }) => {
             <ArrowLeftIcon fontSize="inherit" />
           </IconButton>
           <Typography variant="subtitle2">
-            Error {`(${active + 1}/${errors.length})`}
+            {t("errors.title")} {`(${active + 1}/${errors.length})`}
           </Typography>
           <IconButton
-            aria-label="next"
+            aria-label={t("common.next")}
             size="small"
             onClick={() =>
               setActive((prev) => Math.min(errors.length - 1, prev + 1))

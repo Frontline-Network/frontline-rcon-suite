@@ -26,8 +26,12 @@ import StickyContainer from "@/components/shared/StickyContainer";
 import DisbandSquadDialog from "@/features/player-action/DisbandSquad";
 import { DebouncedSearchInput } from "@/components/shared/DebouncedSearchInput";
 import MessageAllDialog from "@/features/player-action/MessageAll";
+import { useTranslation } from "react-i18next";
+import PageHeader from "@/components/shared/PageHeader";
+import { demoGameState, isFakeMode } from "@/mirage/demo-data";
 
 const TeamViewPage = () => {
+  const { t } = useTranslation();
   const { data: teams, isFetching } = useQuery({
     ...teamsLiveQueryOptions,
     staleTime: 5 * 1000,
@@ -36,7 +40,7 @@ const TeamViewPage = () => {
 
   const { data: gameState } = useQuery({
     queryKey: ["game", "state"],
-    queryFn: cmd.GET_GAME_STATE,
+    queryFn: isFakeMode() ? () => Promise.resolve(demoGameState) : cmd.GET_GAME_STATE,
     staleTime: 5 * 1000,
     refetchInterval: 10 * 1000,
   });
@@ -259,6 +263,11 @@ const TeamViewPage = () => {
         width: "100%",
       }}
     >
+      <PageHeader
+        eyebrow={t("views.team.eyebrow")}
+        title={t("views.team.title")}
+        subtitle={t("views.team.subtitle")}
+      />
       {gameData ? (
         <GameOverview
           map={gameData.current_map}
@@ -292,7 +301,7 @@ const TeamViewPage = () => {
           }}
         >
           <DebouncedSearchInput
-            placeholder={"Search player"}
+            placeholder={t("views.team.searchPlayer")}
             initialValue={searchTerm}
             onChange={setSearchTerm}
           />
@@ -306,16 +315,16 @@ const TeamViewPage = () => {
             disabled={!selectedPlayers.size}
             orientation="horizontal"
           />
-          <Tooltip title="Select All">
+          <Tooltip title={t("common.selectAll")}>
             <span>
-              <IconButton aria-label="Select All" onClick={handleSelectAll}>
+              <IconButton aria-label={t("common.selectAll")} onClick={handleSelectAll}>
                 <PlaylistAddCheckIcon />
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title="Unselect All">
+          <Tooltip title={t("common.unselectAll")}>
             <span>
-              <IconButton aria-label="Unselect All" onClick={handleUnselectAll}>
+              <IconButton aria-label={t("common.unselectAll")} onClick={handleUnselectAll}>
                 <PlaylistRemoveIcon />
               </IconButton>
             </span>
@@ -325,18 +334,18 @@ const TeamViewPage = () => {
           <DisbandSquadDialog />
           <Box sx={{ flexGrow: 1 }} />
           {anySquadCollapsed ? (
-            <Tooltip title="Expand All">
+            <Tooltip title={t("views.team.expandAll")}>
               <span>
-                <IconButton aria-label="Expand All" onClick={handleExpandAll}>
+                <IconButton aria-label={t("views.team.expandAll")} onClick={handleExpandAll}>
                   <UnfoldMoreDoubleIcon />
                 </IconButton>
               </span>
             </Tooltip>
           ) : (
-            <Tooltip title="Collapse All">
+            <Tooltip title={t("views.team.collapseAll")}>
               <span>
                 <IconButton
-                  aria-label="Collapse All"
+                  aria-label={t("views.team.collapseAll")}
                   onClick={handleCollapseAll}
                 >
                   <UnfoldLessDoubleIcon />

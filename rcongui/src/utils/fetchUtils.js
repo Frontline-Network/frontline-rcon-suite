@@ -1,7 +1,11 @@
 import { json } from "react-router-dom";
 import { toast } from "react-toastify";
 
-const CRCON_API = `${process.env.REACT_APP_API_URL}`;
+// Vite does not define the legacy CRA environment variable in fake mode.
+// Keep legacy loader calls rooted at the local Mirage API instead of creating
+// URLs such as "undefinedget_player_profile".
+const configuredApi = process.env.REACT_APP_API_URL;
+const CRCON_API = configuredApi && configuredApi !== "undefined" ? configuredApi : "/";
 
 async function requestFactory({
   method = "GET",

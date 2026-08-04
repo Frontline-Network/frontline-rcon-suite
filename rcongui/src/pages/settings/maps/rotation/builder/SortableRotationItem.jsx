@@ -3,8 +3,10 @@ import CloseIcon from "@mui/icons-material/Close";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { MapDetailsCard } from "../../MapDetailsCard";
+import { useTranslation } from "react-i18next";
 
 function SortableRotationItem({ item, onRemove, isNext }) {
+  const { t } = useTranslation();
   const {
     attributes,
     listeners,
@@ -65,8 +67,8 @@ function SortableRotationItem({ item, onRemove, isNext }) {
         <MapDetailsCard mapLayer={mapLayer} />
       </Box>
       <Stack direction={"row"} gap={0.25} alignItems={"center"}>
-        {isNext && <Chip color="secondary" label="Next" />}
-        <Tooltip title="Remove from rotation">
+        {isNext && <Chip color="secondary" label={t("maps.next")} />}
+        <Tooltip title={t("maps.removeFromRotation")}>
           <IconButton size="small" onClick={() => onRemove(mapLayer)} color="error">
             <CloseIcon fontSize="small" />
           </IconButton>

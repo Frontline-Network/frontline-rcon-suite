@@ -8,6 +8,7 @@ import { styled } from "@mui/material/styles";
 import DevicesRoundedIcon from "@mui/icons-material/DevicesRounded";
 import { useGlobalStore } from "@/stores/global-state";
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from "react-i18next";
 
 const Avatar = styled(MuiAvatar)(({ theme }) => ({
   width: 28,
@@ -23,6 +24,7 @@ const ListItemAvatar = styled(MuiListItemAvatar)({
 });
 
 export default function SelectContent() {
+  const { t } = useTranslation();
   const thisServer = useGlobalStore((state) => state.serverState);
   const otherServers = useGlobalStore((state) => state.servers);
   const navigate = useNavigate();
@@ -63,7 +65,7 @@ export default function SelectContent() {
       value={thisServer?.server_number ?? ""}
       onChange={handleChange(servers)}
       displayEmpty
-      inputProps={{ "aria-label": "Select server" }}
+      inputProps={{ "aria-label": t("sidebar.selectServer") }}
       fullWidth
       MenuProps={{
         PaperProps: {
@@ -87,7 +89,7 @@ export default function SelectContent() {
         },
       }}
     >
-      <ListSubheader sx={{ pt: 0 }}>Servers</ListSubheader>
+      <ListSubheader sx={{ pt: 0 }}>{t("sidebar.servers")}</ListSubheader>
       {servers ? (
         servers.map((server) => (
           <MenuItem key={server.server_number} value={server.server_number}>
@@ -104,7 +106,7 @@ export default function SelectContent() {
               }}
               primary={server.name ?? "<server_name>"}
               secondary={
-                `Server - ${server.server_number}` ?? "<server_number>"
+                t("sidebar.serverNumber", { number: server.server_number })
               }
             />
           </MenuItem>
@@ -122,7 +124,7 @@ export default function SelectContent() {
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
             }}
-            primary={"Loading..."}
+            primary={t("common.loading")}
             secondary={"..."}
           />
         </MenuItem>

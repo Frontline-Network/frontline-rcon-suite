@@ -16,6 +16,7 @@ import {
 } from "@mui/material";
 import { usePlayerSidebar } from "@/hooks/usePlayerSidebar";
 import GroupIcon from "@mui/icons-material/Group";
+import { useTranslation } from "react-i18next";
 
 // Styled components
 const StyledCard = styled(Card)({
@@ -65,17 +66,16 @@ const EmptyStateContainer = styled(Box)(({ theme }) => ({
   color: theme.palette.text.secondary,
 }));
 
-const EmptyState = () => (
-  <EmptyStateContainer>
-  <GroupIcon sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
-  <Typography variant="body1" gutterBottom>
-    No users online
-  </Typography>
-  <Typography variant="body2" align="center">
-    Users will appear here when they come online
-  </Typography>
-</EmptyStateContainer>
-);
+const EmptyState = () => {
+  const { t } = useTranslation();
+  return (
+    <EmptyStateContainer>
+      <GroupIcon sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
+      <Typography variant="body1" gutterBottom>{t("dashboard.noUsersOnline")}</Typography>
+      <Typography variant="body2" align="center">{t("dashboard.usersAppearOnline")}</Typography>
+    </EmptyStateContainer>
+  );
+};
 
 /**
  * @typedef {Object} User

@@ -13,6 +13,7 @@ import Person4Icon from "@mui/icons-material/Person4";
 import { Tooltip, Button } from "@mui/material";
 import { SearchInput } from "@/components/shared/SearchInput";
 import { useSelectionMenu } from "@/hooks/useSelectionMenu";
+import { useTranslation } from "react-i18next";
 
 /**
  * @param {Object} props
@@ -21,6 +22,7 @@ import { useSelectionMenu } from "@/hooks/useSelectionMenu";
  * @returns {JSX.Element}
  */
 export const LogPlayerSelectionMenu = ({ actionOptions, onActionSelect }) => {
+  const { t } = useTranslation();
   const {
     search,
     setSearch,
@@ -34,12 +36,12 @@ export const LogPlayerSelectionMenu = ({ actionOptions, onActionSelect }) => {
   return (
     <PopoverMenu
       id="log-player-picker"
-      description="Pick a player to filter the logs"
+      description={t("selection.logPlayerDescription")}
       onOpen={onOpen}
       onClose={onClose}
       renderButton={(props) => (
         <Button {...props}>
-          <Tooltip title="Filter by player">
+          <Tooltip title={t("selection.logPlayer")}>
             <Badge
               color="secondary"
               variant="dot"

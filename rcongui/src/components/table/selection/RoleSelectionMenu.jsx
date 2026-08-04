@@ -3,6 +3,7 @@ import { PopoverMenu } from "@/components/shared/PopoverMenu";
 import WorkIcon from '@mui/icons-material/Work';
 import { Tooltip, Button } from "@mui/material";
 import { RoleIcon } from "@/components/shared/RoleIcon";
+import { useTranslation } from "react-i18next";
     
 /**
  * @typedef {Object} RoleOption
@@ -16,13 +17,14 @@ import { RoleIcon } from "@/components/shared/RoleIcon";
  * @param {Function} props.onRoleSelect
  * @returns {JSX.Element}
  */
-export const RoleSelectionMenu = ({ roleOptions, onRoleSelect }) => (
-  <PopoverMenu
+export const RoleSelectionMenu = ({ roleOptions, onRoleSelect }) => {
+  const { t } = useTranslation();
+  return <PopoverMenu
     id="role-picker"
-    description="Pick a role to select all players with it"
+    description={t("selection.roleDescription")}
     renderButton={(props) => (
       <Button {...props}>
-        <Tooltip title="Select by role">
+        <Tooltip title={t("selection.role")}>
           <WorkIcon />
         </Tooltip>
       </Button>
@@ -59,5 +61,5 @@ export const RoleSelectionMenu = ({ roleOptions, onRoleSelect }) => (
         </ListItem>
       ))}
     </List>
-  </PopoverMenu>
-);
+  </PopoverMenu>;
+};

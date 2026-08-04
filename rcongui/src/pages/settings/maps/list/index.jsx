@@ -22,6 +22,8 @@ import { mapsManagerMutationOptions, mapsManagerQueryKeys } from "../queries";
 import { toast } from "react-toastify";
 import { MapFilter } from "../MapFilter";
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import { useTranslation } from "react-i18next";
+import PageHeader from "@/components/shared/PageHeader";
 
 const MapListContainer = styled(Box)(({ theme }) => ({
   width: "100%",
@@ -44,6 +46,7 @@ const ActionsContainer = styled(Box)(({ theme }) => ({
 }));
 
 const MapListPage = () => {
+  const { t } = useTranslation();
   const { maps } = useRouteLoaderData("maps");
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [mapToConfirm, setMapToConfirm] = useState(null);
@@ -59,7 +62,7 @@ const MapListPage = () => {
       queryClient.invalidateQueries({
         queryKey: mapsManagerQueryKeys.gameState,
       });
-      toast.success(`Map has been changed to ${mapName}`, {
+      toast.success(t("maps.changed", { map: mapName }), {
         toastId: `map-change-success`,
       });
       setConfirmDialogOpen(false);
@@ -95,6 +98,11 @@ const MapListPage = () => {
 
   return (
     <>
+      <PageHeader
+        eyebrow={t("maps.eyebrow")}
+        title={t("maps.title")}
+        subtitle={t("maps.subtitle")}
+      />
       <Stack direction={{ xs: "column-reverse", md: "row" }} spacing={1}>
         <MapListContainer>
           <MapFilter maps={maps} onFilterChange={handleFilterChange} />
@@ -112,15 +120,15 @@ const MapListPage = () => {
         <ActionsContainer>
           {gameState && (
             <>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>Current map</Typography>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>{t("maps.current")}</Typography>
               <MapChangeListItem
                 mapLayer={gameState.current_map}
                 key={gameState.current_map.id}
                 onClick={handleChangeMapClick}
                 icon={<RestartAltIcon />}
-                title={"Restart the current map"}
+                title={t("maps.restart")}
               />
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>Next map</Typography>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>{t("maps.next")}</Typography>
               <MapChangeListItem
                 mapLayer={gameState.next_map}
                 key={gameState.next_map.id}
@@ -140,13 +148,12 @@ const MapListPage = () => {
         aria-describedby="alert-dialog-description"
       >
         <DialogTitle>
-          <div>Set current map: {mapToConfirm?.pretty_name}</div>
-          <div>Server: {serverState?.name || "this server"}</div>
+          <div>{t("maps.setCurrent", { map: mapToConfirm?.pretty_name ?? mapToConfirm?.map?.pretty_name ?? "" })}</div>
+          <div>{t("maps.server", { server: serverState?.name || t("common.unknown") })}</div>
         </DialogTitle>
         <DialogContent>
           <DialogContentText>
-            This will set a 60 seconds timer and override the current active
-            map.
+            {t("maps.timerNotice")}
           </DialogContentText>
           {mapToConfirm && (
             <Box
@@ -167,7 +174,7 @@ const MapListPage = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmDialogOpen(false)} color="inherit">
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             onClick={handleConfirmMapChange}
@@ -175,7 +182,7 @@ const MapListPage = () => {
             variant="contained"
             startIcon={<CheckCircleIcon />}
           >
-            Confirm
+            {t("common.confirm")}
           </Button>
         </DialogActions>
       </Dialog>

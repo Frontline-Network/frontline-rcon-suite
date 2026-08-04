@@ -3,6 +3,7 @@ import {
   ButtonGroup,
 } from "@mui/material";
 import dayjs from "dayjs";
+import { useTranslation } from "react-i18next";
 
 export const TimePickerButtons = ({
   amount,
@@ -11,6 +12,7 @@ export const TimePickerButtons = ({
   setExpirationTimestamp,
   enablePast = false,
 }) => {
+  const { t } = useTranslation();
 
   const adjustTimestamp = (amount, unit) => {
     const after = dayjs(expirationTimestamp).add(amount, unit);
@@ -34,7 +36,7 @@ export const TimePickerButtons = ({
         -
       </Button>
       <Button style={{ display: "block", width: "100%" }} onClick={() => setTimestamp(amount, unit)}>
-        {amount} {unit}
+        {amount} {t(`common.timeUnits.${unit}`, { count: amount })}
       </Button>
       <Button style={{ display: "block", width: "100%", maxWidth: "2rem" }} onClick={() => adjustTimestamp(amount, unit)}>
         +

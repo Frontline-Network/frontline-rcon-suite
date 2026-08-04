@@ -6,18 +6,33 @@ import ListItemText from "@mui/material/ListItemText";
 import Stack from "@mui/material/Stack";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
-import { Link } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { Collapse, TextField, InputAdornment, IconButton, Box } from "@mui/material";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "@/stores/app-state";
 import SearchIcon from "@mui/icons-material/Search";
 import CloseIcon from "@mui/icons-material/Close";
+import { useTranslation } from "react-i18next";
 
 const NavigationLink = ({ to, icon, text, onClick }) => {
 
   return (
     <ListItem key={to} onClick={onClick} disablePadding sx={{ display: "block" }}>
-      <ListItemButton component={Link} to={to}>
+      <ListItemButton
+        component={NavLink}
+        to={to}
+        end={to === "/"}
+        sx={{
+          borderLeft: "2px solid transparent",
+          borderRadius: 0,
+          minHeight: 38,
+          "&.active": {
+            color: "primary.light",
+            borderLeftColor: "primary.main",
+            bgcolor: "action.selected",
+          },
+        }}
+      >
         {icon && <ListItemIcon>{icon}</ListItemIcon>}
         <ListItemText primary={text} />
       </ListItemButton>
@@ -49,6 +64,7 @@ const Group = ({ groupName, icon, level = 1, open, forceOpen = false, onToggle, 
 };
 
 export default function MenuContent({ navigationTree, isMobile }) {
+  const { t } = useTranslation();
   const toggleDrawer = useAppStore((state) => state.toggleDrawer);
   const groupOpenState = useAppStore((state) => state.groupOpenState);
   const toggleMenuGroupOpen = useAppStore((state) => state.toggleMenuGroupOpen);
@@ -85,11 +101,11 @@ export default function MenuContent({ navigationTree, isMobile }) {
     return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
   }, [isApplePlatform]);
 
-  const toggleGroup = (groupName) => {
-    toggleMenuGroupOpen(groupName);
+  const toggleGroup = (groupId) => {
+    toggleMenuGroupOpen(groupId);
   };
 
-  const isGroupOpen = (groupName) => !!groupOpenState[groupName];
+  const isGroupOpen = (groupId) => !!groupOpenState[groupId];
 
   const handleLinkClick = () => {
     if (isMobile) {
@@ -98,6 +114,8 @@ export default function MenuContent({ navigationTree, isMobile }) {
   };
 
   // Filter navigation tree based on search term
+  const getLabel = (item) => item.translationKey ? t(item.translationKey) : item.name;
+
   const filterNavigationTree = (tree, searchTerm) => {
     if (!searchTerm.trim()) {
       return tree;
@@ -109,11 +127,11 @@ export default function MenuContent({ navigationTree, isMobile }) {
       .map((group) => {
         // Check if group has a name (it's a group)
         if ("name" in group) {
-          const groupNameMatches = group.name.toLowerCase().includes(lowerSearchTerm);
+          const groupNameMatches = getLabel(group).toLowerCase().includes(lowerSearchTerm);
           
           // Filter links that match
           const matchingLinks = group.links.filter((link) =>
-            link.name.toLowerCase().includes(lowerSearchTerm)
+            getLabel(link).toLowerCase().includes(lowerSearchTerm)
           );
 
           // If group name matches, show all links; if only links match, show group with filtered links
@@ -127,7 +145,7 @@ export default function MenuContent({ navigationTree, isMobile }) {
         } else {
           // It's a link without a group
           const matchingLinks = group.links.filter((link) =>
-            link.name.toLowerCase().includes(lowerSearchTerm)
+            getLabel(link).toLowerCase().includes(lowerSearchTerm)
           );
 
           if (matchingLinks.length > 0) {
@@ -156,7 +174,7 @@ export default function MenuContent({ navigationTree, isMobile }) {
         <TextField
           size="small"
           fullWidth
-          placeholder="Search..."
+          placeholder={t("navigation.search")}
           name="crcon-search"
           inputRef={searchInputRef}
           value={searchTerm}
@@ -207,7 +225,7 @@ export default function MenuContent({ navigationTree, isMobile }) {
           }}
         />
         {isMobile && (
-          <IconButton size="small" onClick={toggleDrawer}>
+          <IconButton size="small" onClick={toggleDrawer} aria-label={t("common.close")}>
             <CloseIcon sx={{ fontSize: 24 }} />
           </IconButton>
         )}
@@ -220,7 +238,7 @@ export default function MenuContent({ navigationTree, isMobile }) {
               <NavigationLink
                 key={link.to}
                 to={link.to}
-                text={link.name}
+                text={getLabel(link)}
                 icon={link.icon}
                 onClick={handleLinkClick}
               />
@@ -231,18 +249,18 @@ export default function MenuContent({ navigationTree, isMobile }) {
           .filter((group) => "name" in group)
           .map((group) => (
             <Group
-              key={group.name}
-              groupName={group.name}
+              key={group.id}
+              groupName={getLabel(group)}
               icon={group.icon}
-              open={isGroupOpen(group.name)}
+              open={isGroupOpen(group.id)}
               forceOpen={!!searchTerm.trim()}
-              onToggle={() => toggleGroup(group.name)}
+              onToggle={() => toggleGroup(group.id)}
             >
               {group.links.map((link) => (
                 <NavigationLink
                   key={link.to}
                   to={link.to}
-                  text={link.name}
+                  text={getLabel(link)}
                   icon={link.icon}
                   onClick={handleLinkClick}
                 />

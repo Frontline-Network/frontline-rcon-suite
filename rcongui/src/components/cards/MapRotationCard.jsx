@@ -4,8 +4,10 @@ import { Divider, Stack } from "@mui/material";
 import ScrollableCard from "@/components/shared/card/ScrollableCard";
 import { MapDetailsCardCompact } from "@/pages/settings/maps/MapDetailsCard";
 import { mapsManagerQueryKeys } from "@/pages/settings/maps/queries";
+import { useTranslation } from "react-i18next";
 
 const MapRotationCard = () => {
+  const { t } = useTranslation();
   const { data: mapRotation } = useQuery({
     queryKey: mapsManagerQueryKeys.mapRotation,
     queryFn: cmd.GET_MAP_ROTATION,
@@ -13,7 +15,7 @@ const MapRotationCard = () => {
   });
 
   return (
-    <ScrollableCard sx={{ height: "100%" }} title="Map Rotation">
+    <ScrollableCard sx={{ height: "100%" }} title={t("dashboard.mapRotation")}>
       <Stack divider={<Divider sx={{ my: 0.2 }} />}>
         {mapRotation.maps.map((map) => (
           <MapDetailsCardCompact key={map.id} mapLayer={map} />

@@ -1,6 +1,8 @@
 import { ControlledTextInput } from "@/components/form/core/ControlledTextInput";
+import { useTranslation } from "react-i18next";
 
 export const CommentField = ({ control, errors, ...props }) => {
+  const { t } = useTranslation();
   const error = errors['comment'];
   const hasError = !!error;
 
@@ -8,10 +10,10 @@ export const CommentField = ({ control, errors, ...props }) => {
     <ControlledTextInput
       error={hasError}
       name={'comment'}
-      label={'Comment'}
+      label={t("fields.comment")}
       control={control}
-      rules={{ minLength: { value: 5, message: 'Must be at least 5 characters long.' }, ...props.rules }}
-      helperText={hasError ? error.message : 'The comment saved to the player profile.'}
+      rules={{ minLength: { value: 5, message: t("fields.commentMin") }, ...props.rules }}
+      helperText={hasError ? error.message : t("fields.commentHelp")}
       multiline
       minRows={5}
       fullWidth

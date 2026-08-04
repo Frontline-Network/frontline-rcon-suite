@@ -3,8 +3,6 @@ import dayjs from "dayjs";
 import { Action, SortableHeader, TextButton } from "@/components/table/styles";
 import { generatePlayerActions } from "@/features/player-action/actions";
 
-const TIME_FORMAT = "HH:mm:ss, MMM DD";
-
 const removePlayerIds = (message) => {
   // Combine both regex patterns into one
   return message.replace(
@@ -25,19 +23,22 @@ const playerNameFilter = (row, columnId, filterValue = []) => {
 };
 
 // Column definitions for the log table
-export const logsColumns = [
+export const getLogsColumns = (t) => [
   {
-    header: SortableHeader("Time"),
+    header: SortableHeader(t("views.table.time")),
     accessorKey: "event_time",
     cell: ({ row }) => {
-      return dayjs.utc(row.original.event_time).tz(Intl.DateTimeFormat().resolvedOptions().timeZone).format(TIME_FORMAT);
+      return dayjs
+        .utc(row.original.event_time)
+        .tz(Intl.DateTimeFormat().resolvedOptions().timeZone)
+        .format(t("common.logDateTimeFormat"));
     },
     meta: {
       variant: "time"
     },
   },
   {
-    header: "This Player",
+    header: t("views.table.thisPlayer"),
     accessorKey: "player1_name",
     cell: ({ row }) => {
       return row.original.player1_name && row.original.player1_id ? (
@@ -60,7 +61,7 @@ export const logsColumns = [
     },
   },
   {
-    header: "Action",
+    header: t("views.table.action"),
     accessorKey: "type",
     id: "type",
     cell: ({ row }) => {
@@ -72,7 +73,7 @@ export const logsColumns = [
     },
   },
   {
-    header: "That Player",
+    header: t("views.table.otherPlayer"),
     accessorKey: "player2_name",
     filterFn: playerNameFilter,
     cell: ({ row }) => {
@@ -94,7 +95,7 @@ export const logsColumns = [
     },
   },
   {
-    header: "Message",
+    header: t("views.table.message"),
     accessorKey: "content",
     meta: {
       size: "full",

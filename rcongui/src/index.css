@@ -1,10 +1,26 @@
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
-    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
-    sans-serif;
+  background: #050706;
+  color: #ede5d7;
+  font-family: Bahnschrift, "Segoe UI", system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  scrollbar-color: #7c5a2a #080b08;
+  scrollbar-width: thin;
+}
+
+*::selection {
+  color: #050706;
+  background: #f1cf83;
 }
 
 code {

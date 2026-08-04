@@ -22,6 +22,7 @@ import { TableToolbar } from "@/components/table/TableToolbar";
 import { DebouncedSearchInput } from "@/components/shared/DebouncedSearchInput";
 import { TablePagination } from "@/components/table/TablePagination";
 import ConfirmButton from "@/components/shared/ConfirmButton";
+import { useTranslation } from "react-i18next";
 
 const VipTable = memo(
   ({
@@ -32,6 +33,7 @@ const VipTable = memo(
     handleBulkRemove,
     editSelected,
   }) => {
+    const { t } = useTranslation();
     const [pagination, setPagination] = useState({
       pageIndex: 0,
       pageSize: 50,
@@ -85,12 +87,12 @@ const VipTable = memo(
             size="small"
             onClick={() => editSelected(table)}
           >
-            Edit Selected
+            {t("records.vips.editSelected")}
           </Button>
           <ConfirmButton
-            buttonText="Remove Selected"
-            title="Remove Selected VIPs?"
-            description={`Are you sure you want to remove ${selectedRows} selected VIP(s)?`}
+            buttonText={t("records.vips.removeSelected")}
+            title={t("records.vips.removeSelectedTitle")}
+            description={t("records.vips.removeSelectedDescription", { count: selectedRows })}
             onConfirm={() => handleBulkRemove(table)}
             disabled={selectedRows === 0 || isFetching}
             buttonProps={{
@@ -108,7 +110,7 @@ const VipTable = memo(
             sx={{ width: "100%", p: 1 }}
           >
             <DebouncedSearchInput
-              placeholder={"Search player"}
+              placeholder={t("records.vips.search")}
               onChange={(value) => {
                 setGlobalFilter(value);
               }}
@@ -134,7 +136,7 @@ const VipTable = memo(
             sx={{ width: "100%", p: 1 }}
           >
             <Typography variant="body2">
-              {selectedRows} / {rowsCount} selected
+              {t("records.vips.selection", { selected: selectedRows, total: rowsCount })}
             </Typography>
             <Box sx={{ flexGrow: 1 }} />
             <TablePagination table={table} />
@@ -147,21 +149,22 @@ const VipTable = memo(
 );
 
 export const StatusFilter = ({ value, onChange }) => {
+  const { t } = useTranslation();
   return (
     <FormControl sx={{ minWidth: 120 }} size="small">
-      <InputLabel id="status-filter-label">Status</InputLabel>
+      <InputLabel id="status-filter-label">{t("records.vips.status")}</InputLabel>
       <Select
         labelId="status-filter-label"
         id="status-filter"
         value={value || ""}
-        label="Status"
+        label={t("records.vips.status")}
         onChange={(event) => onChange(event.target.value)}
       >
         <MenuItem value="">
-          <em>All</em>
+          <em>{t("records.vips.all")}</em>
         </MenuItem>
-        <MenuItem value="active">Active</MenuItem>
-        <MenuItem value="expired">Expired</MenuItem>
+        <MenuItem value="active">{t("records.vips.active")}</MenuItem>
+        <MenuItem value="expired">{t("records.vips.expired")}</MenuItem>
       </Select>
     </FormControl>
   );

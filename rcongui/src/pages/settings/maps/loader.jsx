@@ -1,6 +1,7 @@
 import { cmd } from "@/utils/fetchUtils"
+import { demoMapLayers, isFakeMode } from "@/mirage/demo-data"
 
 export const loader = async () => {
-    const maps = await cmd.GET_MAPS()
+    const maps = isFakeMode() ? demoMapLayers : await cmd.GET_MAPS()
     return { maps }    
 }

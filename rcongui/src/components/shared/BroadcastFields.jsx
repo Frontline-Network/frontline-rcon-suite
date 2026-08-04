@@ -9,6 +9,7 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
+import { useTranslation } from "react-i18next";
 
 const StyledTextField = styled(TextField)((theme) => ({
   "& .MuiOutlinedInput-root, & .MuiOutlinedInput-notchedOutline": {
@@ -17,6 +18,7 @@ const StyledTextField = styled(TextField)((theme) => ({
 }));
 
 export function BroadcastFields({ messages, disabled, onChange, ...props }) {
+  const { t } = useTranslation();
 
   const handleAddRow = () => {
     onChange([...messages, { time_sec: "", message: "" }]);
@@ -51,7 +53,7 @@ export function BroadcastFields({ messages, disabled, onChange, ...props }) {
             value={time_sec}
             name={"broadcast-time"}
             onChange={handleRowChange(index, "time_sec")}
-            placeholder="Time"
+            placeholder={t("common.time")}
             sx={{ width: "100px" }}
             slotProps={{
               input: {
@@ -68,7 +70,7 @@ export function BroadcastFields({ messages, disabled, onChange, ...props }) {
             value={message}
             name={"broadcast-message"}
             onChange={handleRowChange(index, "message")}
-            placeholder="Message"
+            placeholder={t("common.message")}
             disabled={disabled}
           />
           {!disabled && (
@@ -81,7 +83,7 @@ export function BroadcastFields({ messages, disabled, onChange, ...props }) {
       {!disabled && (
         <Box sx={{ p: 1, borderWidth: 1, borderStyle: "solid", borderColor: (theme) => theme.palette.divider }}>
           <Button onClick={handleAddRow} startIcon={<AddIcon />}>
-            Add Message
+            {t("common.addMessage")}
           </Button>
         </Box>
       )}

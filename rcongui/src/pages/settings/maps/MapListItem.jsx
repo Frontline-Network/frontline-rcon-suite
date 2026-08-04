@@ -11,6 +11,7 @@ import { MapDetailsCard } from "./MapDetailsCard";
 import { useState } from "react";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import CloseIcon from "@mui/icons-material/Close";
+import { useTranslation } from "react-i18next";
 
 function MapListItemBase({ mapLayer, renderActions, sx, ...props }) {
   return (
@@ -42,11 +43,12 @@ export function MapListItem({ mapLayer }) {
 }
 
 export function MapChangeListItem({ mapLayer, onClick, icon, title }) {
+  const { t } = useTranslation();
   return (
     <MapListItemBase
       mapLayer={mapLayer}
       renderActions={(mapLayer) => (
-        <Tooltip title={title ?? "Set as current map"}>
+        <Tooltip title={title ?? t("maps.setAsCurrent")}>
           <span>
             <IconButton
               sx={{
@@ -70,6 +72,7 @@ export function MapChangeListItem({ mapLayer, onClick, icon, title }) {
 }
 
 export function MapBuilderListItem({ mapLayer, onClick }) {
+  const { t } = useTranslation();
   return (
     <MapListItemBase
       mapLayer={mapLayer}
@@ -80,7 +83,7 @@ export function MapBuilderListItem({ mapLayer, onClick }) {
           startIcon={<AddIcon />}
           onClick={() => onClick(mapLayer)}
         >
-          Add
+          {t("maps.add")}
         </Button>
       )}
     />
@@ -88,7 +91,10 @@ export function MapBuilderListItem({ mapLayer, onClick }) {
 }
 
 export function MapVotemapListItem({ mapLayer, voters }) {
+  const { t } = useTranslation();
   const [anchorEl, setAnchorEl] = useState(null);
+  const voterList = Array.isArray(voters) ? voters : [];
+  const voterCount = Array.isArray(voters) ? voters.length : Number(voters) || 0;
 
   const handleClick = (event) => {
     setAnchorEl(event.currentTarget);
@@ -111,10 +117,12 @@ export function MapVotemapListItem({ mapLayer, voters }) {
           direction={"row"}
           spacing={2}
         >
-          <Box sx={{}}>{`Votes: ${voters.length}`}</Box>
-          <Button aria-describedby={id} onClick={handleClick}>
-            Show
-          </Button>
+          <Box sx={{}}>{t("maps.votes", { count: voterCount })}</Box>
+          {voterList.length > 0 && (
+            <Button aria-describedby={id} onClick={handleClick}>
+              {t("maps.show")}
+            </Button>
+          )}
           <Popover
             id={id}
             open={open}
@@ -130,7 +138,7 @@ export function MapVotemapListItem({ mapLayer, voters }) {
             }}
           >
             <Box>
-              {voters.map((voter, i) => (
+              {voterList.map((voter, i) => (
                 <Box sx={{ py: 1, px: 2 }} key={voter + i}>
                   {voter}
                 </Box>
@@ -144,6 +152,7 @@ export function MapVotemapListItem({ mapLayer, voters }) {
 }
 
 export function MapVotemapWhitelistItem({ mapLayer, onClick }) {
+  const { t } = useTranslation();
   return (
     <MapListItemBase
       mapLayer={mapLayer}
@@ -159,7 +168,7 @@ export function MapVotemapWhitelistItem({ mapLayer, onClick }) {
         boxShadow: 1,
       }}
       renderActions={(mapLayer) => (
-        <Tooltip title="Remove from whitelist">
+        <Tooltip title={t("maps.removeFromWhitelist")}>
           <IconButton
             size="small"
             color="error"

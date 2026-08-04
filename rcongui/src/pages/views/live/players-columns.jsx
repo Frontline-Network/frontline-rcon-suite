@@ -60,7 +60,7 @@ const Center = styled(Box)(() => ({
 const iconFontSize = "1em";
 const emojiFontSize = "0.85em";
 
-export const columns = [
+export const getColumns = (t) => [
   {
     id: "select",
     header: ({ table }) => (
@@ -95,7 +95,7 @@ export const columns = [
   {
     accessorKey: "team",
     id: "team",
-    header: SortableHeader("T", "Team"),
+    header: SortableHeader("T", t("views.table.team")),
     cell: ({ row }) => {
       const themedImg = useThemedImages()
       return (
@@ -120,7 +120,7 @@ export const columns = [
   },
   {
     id: "unit",
-    header: SortableHeader("U", "Unit"),
+    header: SortableHeader("U", t("views.table.unit")),
     accessorKey: "unit_name",
     // Group by unit name and team
     // getGroupingValue: (row) => `${row.original.unit_name ?? "-"}-${row.original.team}`,
@@ -141,7 +141,7 @@ export const columns = [
   },
   {
     id: "role",
-    header: SortableHeader("R", "Role"),
+    header: SortableHeader("R", t("views.table.role")),
     accessorKey: "role",
     cell: ({ row }) => {
       const themedImg = useThemedImages();
@@ -165,7 +165,7 @@ export const columns = [
   },
   {
     id: "level",
-    header: SortableHeader("LVL", "Level"),
+    header: SortableHeader("LVL", t("views.table.level")),
     accessorKey: "level",
     aggregationFn: "mean",
     cell: ({ row }) => {
@@ -181,7 +181,7 @@ export const columns = [
   },
   {
     id: "kills",
-    header: SortableHeader("KILLS", "Kills"),
+    header: SortableHeader("K", t("views.table.kills")),
     accessorKey: "kills",
     cell: ({ row }) => {
       return <>{row.original.kills}</>;
@@ -189,12 +189,14 @@ export const columns = [
   },
   {
     id: "kpm",
-    header: SortableHeader("KPM", "Kills/Min"),
+    header: SortableHeader("KPM", t("views.table.killsPerMinute")),
     accessorFn: (row) => {
-      const kills = row.kills;
-      const playtime = row.map_playtime_seconds;
-      if (kills === 0 || playtime === 0) return 0;
-      return Number((kills / playtime * 60));
+      const kills = Number(row.kills) || 0;
+      const playtime = Number(
+        row.map_playtime_seconds ?? row.profile?.current_playtime_seconds ?? 0,
+      );
+      if (!Number.isFinite(playtime) || playtime <= 0 || kills <= 0) return 0;
+      return (kills / playtime) * 60;
     },
     cell: (props) => {
       return <>{props.getValue()?.toFixed(2)}</>;
@@ -202,7 +204,7 @@ export const columns = [
   },
   {
     id: "combat",
-    header: SortableHeader("CE", "Combat Effectiveness"),
+    header: SortableHeader("CE", t("views.table.combat")),
     accessorKey: "combat",
     cell: ({ row }) => {
       return <>{row.original.combat}</>;
@@ -210,7 +212,7 @@ export const columns = [
   },
   {
     id: "offense",
-    header: SortableHeader("OE", "Offensive Effectiveness"),
+    header: SortableHeader("OE", t("views.table.offense")),
     accessorKey: "offense",
     cell: ({ row }) => {
       return <>{row.original.offense}</>;
@@ -218,7 +220,7 @@ export const columns = [
   },
   {
     id: "defense",
-    header: SortableHeader("DE", "Defensive Effectiveness"),
+    header: SortableHeader("DE", t("views.table.defense")),
     accessorKey: "defense",
     cell: ({ row }) => {
       return <>{row.original.defense}</>;
@@ -226,7 +228,7 @@ export const columns = [
   },
   {
     id: "support",
-    header: SortableHeader("SE", "Support Effectiveness"),
+    header: SortableHeader("SE", t("views.table.support")),
     accessorKey: "support",
     cell: ({ row }) => {
       return <>{row.original.support}</>;
@@ -234,7 +236,7 @@ export const columns = [
   },
   {
     id: "actions",
-    header: <span title="Actions">🛠️</span>,
+    header: SortableHeader("ACT", t("common.actions")),
     accessorKey: "actions",
     cell: ({ row }) => {
       return (
@@ -260,7 +262,7 @@ export const columns = [
   },
   {
     id: "platform",
-    header: SortableHeader("🖥️", "Platform"),
+    header: SortableHeader("OS", t("views.table.platform")),
     accessorFn: (row) => (isSteamPlayer(row) ? "Steam" : "Xbox"),
     cell: ({ row }) => {
       const isSteam = isSteamPlayer(row.original)
@@ -281,7 +283,7 @@ export const columns = [
   },
   {
     id: "clan-tag",
-    header: SortableHeader("Clan","Clan Tag"),
+    header: SortableHeader("Clan", t("views.table.clanTag")),
     accessorKey: "clan_tag",
     cell: ({ row }) => {
       return <>{row.original.clan_tag}</>;
@@ -289,7 +291,7 @@ export const columns = [
   },
   {
     id: "name",
-    header: SortableHeader("Name", "Name"),
+    header: SortableHeader("Name", t("views.table.name")),
     accessorKey: "name",
     cell: ({ row }) => {
       const { openWithId } = usePlayerSidebar();
@@ -322,7 +324,7 @@ export const columns = [
   },
   {
     id: "warnings",
-    header: SortableHeader("⚠️", "Has recently received action"),
+    header: SortableHeader("!", t("views.table.recentAction")),
     accessorKey: "profile.received_actions",
     cell: ({ row }) => {
       return hasRecentWarnings(row.original.profile.received_actions) ? (
@@ -341,7 +343,7 @@ export const columns = [
   },
   {
     id: "watchlist",
-    header: SortableHeader("👁️", "On watchlist"),
+    header: SortableHeader("W", t("views.table.watchlist")),
     accessorKey: "profile.watchlist",
     cell: ({ row }) => {
       return row.original.profile?.watchlist &&
@@ -352,7 +354,7 @@ export const columns = [
   },
   {
     id: "country",
-    header: SortableHeader("🌎", "Country"),
+    header: SortableHeader("CC", t("views.table.country")),
     accessorKey: "country",
     cell: ({ row }) => {
       return row.original.country && row.original.country !== "private" ? (
@@ -378,7 +380,7 @@ export const columns = [
   },
   {
     id: "flags",
-    header: "FLAGS",
+    header: t("views.table.flags").toUpperCase(),
     accessorKey: "profile.flags",
     cell: ({ row }) => {
       const flags = row.original.profile.flags;
@@ -403,7 +405,7 @@ export const columns = [
   },
   {
     id: "visits",
-    header: SortableHeader("VISITS","Number of player visits"),
+    header: SortableHeader("VISITS", t("views.table.visits")),
     accessorKey: "profile.sessions_count",
     cell: ({ row }) => {
       return <>{row.original.profile.sessions_count}</>;
@@ -411,7 +413,7 @@ export const columns = [
   },
   {
     id: "time",
-    header: SortableHeader("TIME","Current Playtime"),
+    header: SortableHeader(t("views.table.timeShort"), t("views.table.currentPlaytime")),
     accessorKey: "profile.current_playtime_seconds",
     aggregationFn: "mean",
     cell: ({ row }) => {

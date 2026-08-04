@@ -6,34 +6,34 @@ import { cmd } from "@/utils/fetchUtils";
 import SelfImprovementIcon from "@mui/icons-material/SelfImprovement";
 import TimerIcon from "@mui/icons-material/Timer";
 import CloudIcon from "@mui/icons-material/Cloud";
+import { useTranslation } from "react-i18next";
 
 function GameTimersSettings() {
+  const { t } = useTranslation();
   const loaderData = useLoaderData();
 
   return (
     <Stack gap={2}>
-      <Divider>Dynamic Weather</Divider>
+      <Divider>{t("settings.game.dynamicWeather")}</Divider>
       <Grid container spacing={1}>
         <DynamicWeatherSettings
           options={loaderData.maps}
           settingKey={`map_name`}
-          title={`Dynamic Weather Toggle`}
-          subheader="Enable or Disable Dynamic Weather for a specific map."
+          title={t("settings.game.dynamicWeatherToggle")}
+          subheader={t("settings.game.dynamicWeatherDescription")}
           icon={CloudIcon}
           mutationFn={cmd.SET_DYNAMIC_WEATHER_ENABLED}
         />
       </Grid>
-      <Divider>Match Timers</Divider>
+      <Divider>{t("settings.game.matchTimers")}</Divider>
       <Grid container spacing={1}>
         {Object.keys(loaderData.timers.match).map((gameMode) => (
           <SliderTimer
             key={`match_${gameMode}_timer`}
             settingKey={`match_${gameMode}_timer`}
             gameMode={gameMode}
-            title={`${
-              gameMode[0].toUpperCase() + gameMode.slice(1)
-            } Match Timer`}
-            subheader={gameMode === "offensive" ? "The length of each control point phase." : "The total length of the match."}
+            title={t("settings.game.matchTimer", { mode: t(`views.team.gameModes.${gameMode}`, { defaultValue: gameMode }) })}
+            subheader={gameMode === "offensive" ? t("settings.game.offensiveTimerDescription") : t("settings.game.matchTimerDescription")}
             icon={TimerIcon}
             setTimer={cmd.SET_MATCH_TIMER}
             removeTimer={cmd.REMOVE_MATCH_TIMER}
@@ -41,17 +41,15 @@ function GameTimersSettings() {
           />
         ))}
       </Grid>
-      <Divider>Warm Up Timers</Divider>
+      <Divider>{t("settings.game.warmupTimers")}</Divider>
       <Grid container spacing={1}>
         {Object.keys(loaderData.timers.warmup).map((gameMode) => (
           <SliderTimer
             key={`warmup_${gameMode}_timer`}
             settingKey={`warmup_${gameMode}_timer`}
             gameMode={gameMode}
-            title={`${
-              gameMode[0].toUpperCase() + gameMode.slice(1)
-            } Warm Up Timer`}
-            subheader="The length of the match warm up."
+            title={t("settings.game.warmupTimer", { mode: t(`views.team.gameModes.${gameMode}`, { defaultValue: gameMode }) })}
+            subheader={t("settings.game.warmupTimerDescription")}
             icon={SelfImprovementIcon}
             setTimer={cmd.SET_WARMUP_TIMER}
             removeTimer={cmd.REMOVE_WARMUP_TIMER}
@@ -60,13 +58,13 @@ function GameTimersSettings() {
         ))}
       </Grid>
       <Typography variant="body2" color="text.secondary" component="div">
-        <em>{`Example: Match Timer = 93 minutes, Warm Up Timer = 3 minutes => Total Match Time = 93 minutes.`}</em>
+        <em>{t("settings.game.timerExample")}</em>
       </Typography>
       <Typography variant="body2" color="text.secondary" component="div">
-        <em>Note: The changes will be applied on a map change.</em>
+        <em>{t("settings.game.changeNote")}</em>
       </Typography>
       <Typography variant="body2" color="text.secondary" component="div">
-        <em>Note: Removing the timer will set the timer to its default value and the label from the HLL server browser will be removed as well.</em>
+        <em>{t("settings.game.removeTimerNote")}</em>
       </Typography>
     </Stack>
   );

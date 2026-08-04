@@ -26,8 +26,10 @@ import { useMutation } from "@tanstack/react-query";
 import { QRCodeSVG } from "qrcode.react";
 import { cmd, mobileRequest } from "@/utils/fetchUtils";
 import { toast } from "react-toastify";
+import { useTranslation } from "react-i18next";
 
 function CrconAppSettings() {
+  const { t } = useTranslation();
   const [password, setPassword] = useState("");
   const [pairing, setPairing] = useState(null);
   const [devices, setDevices] = useState([]);
@@ -99,7 +101,7 @@ function CrconAppSettings() {
     try {
       await mobileRequest(`devices/${deviceId}`, { method: "DELETE" });
       await loadDevices();
-      toast.success("Mobile device revoked");
+      toast.success(t("settings.mobile.deviceRevoked"));
     } catch (error) {
       toast.error(error.message);
     }
@@ -109,10 +111,10 @@ function CrconAppSettings() {
   const flushCacheMutation = useMutation({
     mutationFn: () => cmd.CLEAR_APPLICATION_CACHE({ throwRouteError: false }),
     onSuccess: () => {
-      toast.success("Cache flushed successfully!");
+      toast.success(t("settings.mobile.cacheFlushed"));
     },
     onError: (error) => {
-      toast.error(`Failed to flush cache: ${error.message}`);
+      toast.error(`${t("settings.mobile.cacheFlushFailed")}: ${error.message}`);
     },
   });
 
@@ -120,10 +122,10 @@ function CrconAppSettings() {
   const reconnectMutation = useMutation({
     mutationFn: () => cmd.RECONNECT_GAME_SERVER({ throwRouteError: false }),
     onSuccess: () => {
-      toast.success("Reconnected to gameserver successfully!");
+      toast.success(t("settings.mobile.reconnected"));
     },
     onError: (error) => {
-      toast.error(`Failed to reconnect to gameserver: ${error.message}`);
+      toast.error(`${t("settings.mobile.reconnectFailed")}: ${error.message}`);
     },
   });
 
@@ -141,21 +143,20 @@ function CrconAppSettings() {
         <Card elevation={2}>
           <CardHeader
             avatar={<QrCodeIcon color="primary" />}
-            title="Mobile Admin App"
-            subheader="Pair your own CRCON account with a trusted phone"
+            title={t("settings.mobile.title")}
+            subheader={t("settings.mobile.subtitle")}
           />
           <Divider flexItem />
           <CardContent>
             <Stack spacing={2}>
               {mobileError && <Alert severity="info">{mobileError}</Alert>}
               <Alert severity="warning">
-                Only approve the phone if its six-digit code matches this page.
-                The QR code expires after two minutes and can be used only once.
+                {t("settings.mobile.pairingWarning")}
               </Alert>
               {!pairing || ["consumed", "denied"].includes(pairing.state) ? (
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                   <TextField
-                    label="Confirm your CRCON password"
+                    label={t("settings.mobile.confirmPassword")}
                     type="password"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
@@ -168,7 +169,7 @@ function CrconAppSettings() {
                     disabled={!password || createPairingMutation.isPending}
                     onClick={() => createPairingMutation.mutate()}
                   >
-                    Create QR code
+                    {t("settings.mobile.createQr")}
                   </Button>
                 </Stack>
               ) : (
@@ -188,13 +189,13 @@ function CrconAppSettings() {
                   )}
                   <Stack spacing={1} sx={{ minWidth: 280 }}>
                     <Chip
-                      label={`Status: ${pairing.state}`}
+                      label={`${t("settings.mobile.statusLabel")}: ${t(`settings.mobile.status.${pairing.state}`, { defaultValue: pairing.state })}`}
                       color="primary"
                       variant="outlined"
                     />
                     {pairing.state === "pending" && (
                       <Typography color="text.secondary">
-                        Scan this code in the CRCON Admin app.
+                        {t("settings.mobile.scanCode")}
                       </Typography>
                     )}
                     {pairing.state === "scanned" && (
@@ -210,20 +211,20 @@ function CrconAppSettings() {
                             variant="contained"
                             onClick={() => approvePairingMutation.mutate(true)}
                           >
-                            Codes match — approve
+                            {t("settings.mobile.approve")}
                           </Button>
                           <Button
                             color="error"
                             onClick={() => approvePairingMutation.mutate(false)}
                           >
-                            Deny
+                            {t("settings.mobile.deny")}
                           </Button>
                         </Stack>
                       </>
                     )}
                     {pairing.state === "approved" && (
                       <Typography>
-                        Approved. Finish the connection on the phone.
+                        {t("settings.mobile.approved")}
                       </Typography>
                     )}
                   </Stack>
@@ -236,19 +237,19 @@ function CrconAppSettings() {
               ) && (
                 <>
                   <Typography variant="h6">
-                    Installation configuration
+                    {t("settings.mobile.installationConfiguration")}
                   </Typography>
                   <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
                     <Chip
-                      label={`URL: ${bootstrap.mobile_configuration.public_base_url}`}
+                      label={`${t("settings.mobile.url")}: ${bootstrap.mobile_configuration.public_base_url}`}
                     />
                     <Chip
-                      label={`Triggers: ${bootstrap.mobile_configuration.incident_triggers.join(
+                      label={`${t("settings.mobile.triggers")}: ${bootstrap.mobile_configuration.incident_triggers.join(
                         ", "
                       )}`}
                     />
                     <Chip
-                      label={`Retention: ${bootstrap.mobile_configuration.incident_retention_days} days`}
+                      label={`${t("settings.mobile.retention")}: ${bootstrap.mobile_configuration.incident_retention_days} ${t("settings.mobile.days")}`}
                     />
                     <Chip
                       color={
@@ -258,14 +259,13 @@ function CrconAppSettings() {
                       }
                       label={
                         bootstrap.mobile_configuration.push_relay_configured
-                          ? "Push configured"
-                          : "Push disabled"
+                          ? t("settings.mobile.pushConfigured")
+                          : t("settings.mobile.pushDisabled")
                       }
                     />
                   </Stack>
                   <Typography variant="body2" color="text.secondary">
-                    These security-sensitive deployment values are changed
-                    through the CRCON environment file.
+                    {t("settings.mobile.configurationHint")}
                   </Typography>
                   <Divider />
                 </>
@@ -274,12 +274,12 @@ function CrconAppSettings() {
                 {bootstrap?.user?.permissions?.includes(
                   "api.can_manage_all_mobile_devices"
                 )
-                  ? "All mobile devices"
-                  : "My devices"}
+                  ? t("settings.mobile.allDevices")
+                  : t("settings.mobile.myDevices")}
               </Typography>
               {devices.length === 0 ? (
                 <Typography color="text.secondary">
-                  No mobile devices paired.
+                  {t("settings.mobile.noDevices")}
                 </Typography>
               ) : (
                 <List disablePadding>
@@ -293,7 +293,7 @@ function CrconAppSettings() {
                             color="error"
                             onClick={() => revokeDevice(device.id)}
                           >
-                            Revoke
+                            {t("settings.mobile.revoke")}
                           </Button>
                         )
                       }
@@ -306,11 +306,11 @@ function CrconAppSettings() {
                         primary={`${device.name} · ${device.username}`}
                         secondary={`${device.platform} · ${
                           device.last_seen_at
-                            ? `last seen ${new Date(
+                            ? `${t("settings.mobile.lastSeen")} ${new Date(
                                 device.last_seen_at
                               ).toLocaleString()}`
-                            : "never used"
-                        }${device.revoked_at ? " · revoked" : ""}`}
+                            : t("settings.mobile.neverUsed")
+                        }${device.revoked_at ? ` · ${t("settings.mobile.revoked")}` : ""}`}
                       />
                     </ListItem>
                   ))}
@@ -326,20 +326,17 @@ function CrconAppSettings() {
         <Card elevation={2}>
           <CardHeader
             avatar={<CacheIcon color="primary" />}
-            title="Cache Management"
-            subheader="Clear application cache"
+            title={t("settings.mobile.cacheTitle")}
+            subheader={t("settings.mobile.cacheSubtitle")}
           />
           <Divider flexItem sx={{ mt: 1, mb: 2 }} />
           <CardContent>
             <Stack spacing={2}>
               <Typography variant="body2" color="text.secondary">
-                Clicking this will flush the internal cache used by different
-                CRCON components. Avoid using it unnecessarily, as it forces a
-                lot of data to be recalculated and reloaded.
+                {t("settings.mobile.cacheDescription")}
               </Typography>
               <Alert severity="warning">
-                Do not use this until instructed to do so by the CRCON
-                maintainers or you know what you are doing.
+                {t("settings.mobile.cacheWarning")}
               </Alert>
               <Button
                 variant="contained"
@@ -348,7 +345,7 @@ function CrconAppSettings() {
                 disabled={flushCacheMutation.isPending}
                 startIcon={<CacheIcon />}
               >
-                {flushCacheMutation.isPending ? "Flushing..." : "Flush Cache"}
+                {flushCacheMutation.isPending ? t("settings.mobile.flushing") : t("settings.mobile.flushCache")}
               </Button>
             </Stack>
           </CardContent>
@@ -360,15 +357,14 @@ function CrconAppSettings() {
         <Card elevation={2}>
           <CardHeader
             avatar={<LinkIcon color="primary" />}
-            title="Gameserver Connection"
-            subheader="Reconnect to gameserver"
+            title={t("settings.mobile.connectionTitle")}
+            subheader={t("settings.mobile.connectionSubtitle")}
           />
           <Divider flexItem sx={{ mt: 1, mb: 2 }} />
           <CardContent>
             <Stack spacing={2}>
               <Typography variant="body2" color="text.secondary">
-                Force a reconnection to the gameserver. Use this if the
-                connection appears to be unstable.
+                {t("settings.mobile.connectionDescription")}
               </Typography>
               <Button
                 variant="contained"
@@ -377,7 +373,7 @@ function CrconAppSettings() {
                 disabled={reconnectMutation.isPending}
                 startIcon={<LinkIcon />}
               >
-                {reconnectMutation.isPending ? "Reconnecting..." : "Reconnect"}
+                {reconnectMutation.isPending ? t("settings.mobile.reconnecting") : t("settings.mobile.reconnect")}
               </Button>
             </Stack>
           </CardContent>

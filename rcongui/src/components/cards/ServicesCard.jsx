@@ -19,12 +19,15 @@ import StopIcon from '@mui/icons-material/Stop';
 import ErrorIcon from '@mui/icons-material/Error';
 import BlockIcon from '@mui/icons-material/Block';
 import InfoIcon from '@mui/icons-material/Info';
+import { useTranslation } from "react-i18next";
+import { demoServices, isFakeMode } from "@/mirage/demo-data";
 
 const ServicesCard = () => {
+  const { t } = useTranslation();
   const { data: services = [] } = useQuery({
     queryKey: ["settings", "services"],
     queryFn: async () => {
-      const result = await cmd.GET_SERVICES();
+      const result = isFakeMode() ? demoServices : await cmd.GET_SERVICES();
       return result;
     },
   });
@@ -118,7 +121,7 @@ const ServicesCard = () => {
         }}
       >
         <StatusIcon status={status} />
-        {status} ({services.length})
+        {({ RUNNING: t("dashboard.running"), STOPPED: t("dashboard.stopped"), FATAL: t("dashboard.fatal"), EXITED: t("dashboard.exited") })[status]} ({services.length})
       </Typography>
       <Stack spacing={1}>
         {services.map(service => (
@@ -131,7 +134,7 @@ const ServicesCard = () => {
   return (
     <Card sx={{ height: '100%' }}>
       <CardHeader 
-        title="Services" 
+        title={t("dashboard.services")}
         action={
           <IconButton 
             component={Link} 
@@ -156,4 +159,4 @@ const ServicesCard = () => {
   );
 };
 
-export default ServicesCard; 
+export default ServicesCard;

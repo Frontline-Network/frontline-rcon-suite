@@ -17,12 +17,15 @@ import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import localizedFormat from "dayjs/plugin/localizedFormat";
 import { Form, useLoaderData } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import PageHeader from "@/components/shared/PageHeader";
+import { demoServices, isFakeMode } from "@/mirage/demo-data";
 
 dayjs.extend(relativeTime);
 dayjs.extend(localizedFormat);
 
 export const loader = async () => {
-  const services = await cmd.GET_SERVICES();
+  const services = isFakeMode() ? demoServices : await cmd.GET_SERVICES();
   return services.map((service) => ({
     ...service,
     uptime: dayjs(service.start * 1000).from(service.now * 1000),
@@ -50,20 +53,25 @@ const isRunning = (service) => service.statename === "RUNNING";
 
 const Services = () => {
   const services = useLoaderData();
+  const { t } = useTranslation();
 
   return (
     <Stack sx={{ maxWidth: (theme) => theme.breakpoints.values.md }}>
+      <PageHeader
+        eyebrow={t("settings.services.eyebrow")}
+        title={t("settings.services.title")}
+        subtitle={t("settings.services.subtitle")}
+      />
       <Alert
         sx={{ mb: 2 }}
         severity="info"
         action={
           <Button href="/api/logs" component={"a"}>
-            Search logs
+            {t("settings.services.searchLogs")}
           </Button>
         }
       >
-        Each service generates logs. If you need to report an issue, please
-        include the relevant log report.
+        {t("settings.services.hint")}
       </Alert>
       {services.map((service) => {
         return (
@@ -87,7 +95,7 @@ const Services = () => {
               <Stack component={"section"} gap={4}>
                 {service.spawnerr && (
                   <Alert severity="error">
-                    <AlertTitle>Error</AlertTitle>
+                    <AlertTitle>{t("settings.services.error")}</AlertTitle>
                     {service.spawnerr}
                   </Alert>
                 )}
@@ -98,23 +106,23 @@ const Services = () => {
                   gap={1}
                 >
                   <Typography variant="caption">
-                    {`${isRunning(service) ? "Started" : "Stopped"} ${
+                    {`${isRunning(service) ? t("settings.services.started") : t("settings.services.stopped")} ${
                       service.uptime
                     }`}
                   </Typography>
                   <Divider orientation="vertical" flexItem />
                   <Typography variant="caption">
-                    Stopped @ {service.stop}
+                    {t("settings.services.stoppedAt")} {service.stop}
                   </Typography>
                   <Divider orientation="vertical" flexItem />
                   <Typography variant="caption">
-                    Started @ {service.start}
+                    {t("settings.services.startedAt")} {service.start}
                   </Typography>
                 </Stack>
               </Stack>
               <Divider sx={{ my: 0.5 }} orientation="horizontal" flexItem />
               <Typography>
-                {service.info || "Service description missing."}
+                {service.info || t("settings.services.missingDescription")}
               </Typography>
             </AccordionDetails>
 
@@ -133,7 +141,7 @@ const Services = () => {
                   name={"action"}
                   value={isRunning(service) ? "stop" : "start"}
                 >
-                  {isRunning(service) ? "Stop service" : "Start service"}
+                  {isRunning(service) ? t("settings.services.stop") : t("settings.services.start")}
                 </Button>
               </Form>
             </AccordionActions>

@@ -18,8 +18,6 @@ import {
   SummaryCard,
   DetailCard,
 } from "./styled";
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import PlayerProfileSummary from "@/components/player/profile/Summary";
 import PlayerProfileHeader from "@/components/player/profile/Header";
 import { generatePlayerActions } from "@/features/player-action/actions";
@@ -27,31 +25,36 @@ import PlayerProfileStatusTags from "@/components/player/profile/StatusTags";
 import ReceivedActions from "./[detail]/received-actions";
 import { useGlobalStore } from "@/stores/global-state";
 import ProfileActions from "@/components/player/profile/Actions";
+import { useTranslation } from "react-i18next";
 
 const DETAIL_LINKS = [
-  { path: "", label: "Profile" },
-  { path: "actions", label: "Received Actions" },
-  { path: "sessions", label: "Sessions" },
-  { path: "names", label: "Names" },
-  { path: "comments", label: "Comments" },
-  { path: "logs", label: "Logs" },
+  { path: "", label: "records.playerDetails.profile" },
+  { path: "actions", label: "records.playerDetails.actions" },
+  { path: "sessions", label: "records.playerDetails.sessions" },
+  { path: "names", label: "records.playerDetails.names" },
+  { path: "comments", label: "records.playerDetails.comments" },
+  { path: "logs", label: "records.playerDetails.logs" },
 ];
 
 export default function PlayerProfilePage() {
+  const { t } = useTranslation();
   const { profile } = useLoaderData();
   const submit = useSubmit();
   const location = useLocation();
   const navigate = useNavigate();
 
-  const onlinePlayers = useGlobalStore((state) => state.onlinePlayers);
+  const onlinePlayers = useGlobalStore((state) => state.onlinePlayers) ?? [];
   const server = useGlobalStore((state) => state.serverState);
+  const profileVips = profile?.vips ?? [];
+  const profileNames = profile?.names ?? [];
+  const profileSoldier = profile?.soldier ?? {};
   const thisOnlinePlayer = useMemo(
     () =>
       onlinePlayers.find((player) => player.player_id === profile.player_id),
     [onlinePlayers, profile.player_id]
   );
 
-  const playerVip = profile.vips.find(
+  const playerVip = profileVips.find(
     (vip) => vip.server_number === server?.server_number
   );
   const isVip = thisOnlinePlayer?.is_vip || playerVip;
@@ -62,7 +65,7 @@ export default function PlayerProfilePage() {
     multiAction: false,
     onlineAction: !!thisOnlinePlayer,
   });
-  const name = profile?.account?.name ?? profile.names[0]?.name ?? profile?.soldier?.name ?? "???";
+  const name = profile?.account?.name ?? profileNames[0]?.name ?? profileSoldier.name ?? "???";
   const avatar = profile?.steaminfo?.profile?.avatar;
   const country = profile?.country ?? profile?.account?.country ?? profile?.steaminfo?.country
   const level = thisOnlinePlayer?.level ?? profile?.soldier?.level ?? 0
@@ -109,44 +112,43 @@ export default function PlayerProfilePage() {
             />
             <Divider />
             <PlayerProfileSummary
+              player={profile}
               country={profile.country}
               firstSeen={profile.created}
-              lastSeen={profile?.names[0]?.last_seen}
+              lastSeen={profileNames[0]?.last_seen}
               sessionCount={profile.sessions_count}
               flags={profile.flags}
               totalPlaytime={profile.total_playtime_seconds}
-              vip={profile.vips.find(
+              vip={profileVips.find(
                 (vip) => vip.server_number === profile.server_number
               )}
-              otherVips={profile.vips.filter(
+              otherVips={profileVips.filter(
                 (vip) =>
                   vip.server_number !==
                   (thisOnlinePlayer?.vip?.server_number ?? -1)
               )}
-              names={profile.names}
+              names={profileNames}
               watchlist={profile.watchlist}
-              eosId={profile.soldier.eos_id}
+              eosId={profileSoldier.eos_id}
             />
           </CardContent>
         </SummaryCard>
 
-        <LocalizationProvider dateAdapter={AdapterDayjs}>
-          <DetailCard elevation={0} variant="outlined">
-            <CardContent>
-              <Tabs
-                value={getActiveTab()}
-                onChange={handleTabChange}
-                variant="standard"
-                sx={{ mb: 3 }}
-              >
-                {DETAIL_LINKS.map((link) => (
-                  <Tab key={link.path} label={link.label} />
-                ))}
-              </Tabs>
-              <Outlet context={{ profile, submit }} />
-            </CardContent>
-          </DetailCard>
-        </LocalizationProvider>
+        <DetailCard elevation={0} variant="outlined">
+          <CardContent>
+            <Tabs
+              value={getActiveTab()}
+              onChange={handleTabChange}
+              variant="standard"
+              sx={{ mb: 3 }}
+            >
+              {DETAIL_LINKS.map((link) => (
+                <Tab key={link.path} label={t(link.label)} />
+              ))}
+            </Tabs>
+            <Outlet context={{ profile, submit }} />
+          </CardContent>
+        </DetailCard>
       </MainContent>
     </ProfileContainer>
   );
