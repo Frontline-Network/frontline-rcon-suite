@@ -129,6 +129,58 @@ def test_parser_recognizes_reporter_team_squad_and_captures_members():
     assert len(subject["snapshot"]["players"]) == 2
 
 
+@pytest.mark.parametrize("squad_name", ["Able", "Baker", "Charlie", "George", "Item"])
+def test_parser_recognizes_every_squad_from_live_team_view(squad_name):
+    current_squads = incidents.flatten_team_view(
+        {
+            "allies": {
+                "squads": {
+                    squad_name.casefold(): {
+                        "type": "infantry",
+                        "has_leader": True,
+                        "players": [
+                            {
+                                "name": "Leader",
+                                "player_id": "leader",
+                                "team": "allies",
+                                "unit_name": squad_name.casefold(),
+                                "role": "officer",
+                            }
+                        ],
+                    }
+                }
+            },
+            "axis": {"squads": {}},
+            "fail_count": 0,
+        }
+    )
+    parsed = incidents.parse_chat_report(
+        f"!admin {squad_name} spricht nicht",
+        reporter_context={"team": "Team.ALLIES"},
+        current_squads=current_squads,
+    )
+    subject = parsed["subjects"][0]
+    assert subject["kind"] == "squad"
+    assert subject["state"] == "confirmed"
+    assert subject["squad_name"] == squad_name.casefold()
+
+
+def test_parser_resolves_unique_player_name_anywhere_in_report():
+    parsed = incidents.parse_chat_report(
+        "!admin bitte prüft Biene wegen Teamkill",
+        current_players=[
+            {
+                "name": "Biene",
+                "player_id": "biene-id",
+                "team": "allies",
+                "unit_name": "able",
+            }
+        ],
+    )
+    assert parsed["target_id"] == "biene-id"
+    assert parsed["subjects"][0]["state"] == "confirmed"
+
+
 def test_fuzzy_player_is_never_confirmed_automatically():
     parsed = incidents.parse_chat_report(
         "!admin Eazy Company Bob team killing",

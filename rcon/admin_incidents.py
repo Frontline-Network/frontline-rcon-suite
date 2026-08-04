@@ -57,6 +57,19 @@ def _normalize_message(value: str) -> str:
     return " ".join(re.sub(r"[^\w]+", " ", value).split())
 
 
+def _normalize_team(value: Any) -> str:
+    """Normalize CRCON team values without assuming their representation."""
+
+    normalized = _normalize_message(str(value or ""))
+    tail = normalized.split()[-1] if normalized else ""
+    aliases = {
+        "allied": "allies",
+        "allies": "allies",
+        "axis": "axis",
+    }
+    return aliases.get(tail, tail)
+
+
 def _strip_clan_tag(value: str) -> str:
     return re.sub(r"^\s*(?:\[[^\]]+\]|<[^>]+>|\([^\)]+\))\s*", "", value).strip()
 
@@ -222,6 +235,7 @@ def _resolve_subjects(
             )
 
     reporter_team = str(reporter_context.get("team") or "")
+    normalized_reporter_team = _normalize_team(reporter_team)
     squad_names: dict[tuple[str, str], list[dict]] = {}
     for squad in current_squads:
         name = str(squad.get("name") or squad.get("squad_name") or "").strip()
@@ -229,7 +243,10 @@ def _resolve_subjects(
         if name:
             squad_names.setdefault((team, _normalize_message(name)), []).append(squad)
     for (team, normalized_name), matching_squads in squad_names.items():
-        if len(normalized_name) < 3 or (reporter_team and team != reporter_team):
+        if len(normalized_name) < 3 or (
+            normalized_reporter_team
+            and _normalize_team(team) != normalized_reporter_team
+        ):
             continue
         exact = re.search(
             rf"(?<!\w){re.escape(normalized_name)}(?!\w)", normalized_message
@@ -244,7 +261,7 @@ def _resolve_subjects(
         else:
             confidence, matched_text, method = 1.0, exact.group(0), "squad_exact"
         unique = len(matching_squads) == 1 and (
-            bool(reporter_team)
+            bool(normalized_reporter_team)
             or sum(
                 1
                 for candidate_team, candidate_name in squad_names

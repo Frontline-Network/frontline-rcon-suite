@@ -205,8 +205,15 @@ class _LanguageButton extends ConsumerWidget {
     icon: const Icon(Icons.language),
     initialValue: ref.watch(localeProvider).languageCode,
     onSelected: (language) {
-      ref.read(localeProvider.notifier).state = Locale(language);
-      unawaited(ref.read(secureStoreProvider).writeLanguage(language));
+      // Let the popup route finish its teardown before replacing Localizations.
+      // Rebuilding the inherited locale while the popup still had dependents
+      // caused `_dependents.isEmpty` assertions on Android debug builds.
+      unawaited(
+        Future<void>.delayed(kThemeAnimationDuration, () {
+          ref.read(localeProvider.notifier).state = Locale(language);
+          return ref.read(secureStoreProvider).writeLanguage(language);
+        }),
+      );
     },
     itemBuilder: (_) => const [
       PopupMenuItem(value: 'de', child: Text('Deutsch')),
@@ -513,6 +520,144 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
   );
 }
 
+class ManualIncidentDialog extends StatefulWidget {
+  const ManualIncidentDialog({
+    super.key,
+    required this.profiles,
+    required this.servers,
+  });
+
+  final List<ConnectionProfile> profiles;
+  final Map<String, List<Map<String, dynamic>>> servers;
+
+  @override
+  State<ManualIncidentDialog> createState() => _ManualIncidentDialogState();
+}
+
+class _ManualIncidentDialogState extends State<ManualIncidentDialog> {
+  final _reason = TextEditingController();
+  late String _connectionId;
+  late int _serverNumber;
+
+  @override
+  void initState() {
+    super.initState();
+    _connectionId = widget.profiles.first.id;
+    _serverNumber = _firstServerNumber(_connectionId);
+  }
+
+  int _firstServerNumber(String connectionId) =>
+      (widget.servers[connectionId]?.firstOrNull?['server_number'] as num?)
+          ?.toInt() ??
+      1;
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final serverItems = widget.servers[_connectionId] ?? const [];
+    return AlertDialog(
+      scrollable: true,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      title: Text(context.tr('Vorfall erstellen', 'Create incident')),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DropdownButtonFormField<String>(
+              initialValue: _connectionId,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'CRCON'),
+              items: widget.profiles
+                  .map(
+                    (profile) => DropdownMenuItem(
+                      value: profile.id,
+                      child: Text(
+                        profile.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() {
+                  _connectionId = value;
+                  _serverNumber = _firstServerNumber(value);
+                });
+              },
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<int>(
+              key: ValueKey(_connectionId),
+              initialValue: _serverNumber,
+              isExpanded: true,
+              decoration: InputDecoration(
+                labelText: context.tr('Gameserver', 'Game server'),
+              ),
+              items: serverItems
+                  .map(
+                    (server) => DropdownMenuItem(
+                      value: (server['server_number'] as num).toInt(),
+                      child: Text(
+                        server['name']?.toString() ??
+                            'Server ${server['server_number']}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) _serverNumber = value;
+              },
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _reason,
+              autofocus: true,
+              minLines: 2,
+              maxLines: 3,
+              textInputAction: TextInputAction.done,
+              decoration: InputDecoration(
+                labelText: context.tr('Grund', 'Reason'),
+              ),
+              onChanged: (_) => setState(() {}),
+              onSubmitted: (_) => _submit(),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(context.tr('Abbrechen', 'Cancel')),
+        ),
+        FilledButton(
+          onPressed: _reason.text.trim().isEmpty ? null : _submit,
+          child: Text(context.tr('Erstellen', 'Create')),
+        ),
+      ],
+    );
+  }
+
+  void _submit() {
+    final reason = _reason.text.trim();
+    if (reason.isEmpty) return;
+    Navigator.pop(context, {
+      'connection_id': _connectionId,
+      'server_number': _serverNumber,
+      'reason': reason,
+    });
+  }
+}
+
 Future<void> _createManualIncident(BuildContext context, WidgetRef ref) async {
   final profiles = await ref.read(connectionsProvider.future);
   if (!context.mounted) return;
@@ -540,94 +685,10 @@ Future<void> _createManualIncident(BuildContext context, WidgetRef ref) async {
     return;
   }
   if (!context.mounted) return;
-  var connectionId = profiles.first.id;
-  var serverNumber =
-      (servers[connectionId]?.firstOrNull?['server_number'] as num?)?.toInt() ??
-      1;
-  final reason = TextEditingController();
   final submission = await showDialog<Map<String, dynamic>>(
     context: context,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setDialogState) {
-        final serverItems = servers[connectionId] ?? const [];
-        return AlertDialog(
-          title: const Text('Create incident'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<String>(
-                initialValue: connectionId,
-                decoration: const InputDecoration(labelText: 'CRCON'),
-                items: profiles
-                    .map(
-                      (profile) => DropdownMenuItem(
-                        value: profile.id,
-                        child: Text(profile.name),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) {
-                  if (value == null) return;
-                  setDialogState(() {
-                    connectionId = value;
-                    serverNumber =
-                        (servers[value]?.firstOrNull?['server_number'] as num?)
-                            ?.toInt() ??
-                        1;
-                  });
-                },
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<int>(
-                key: ValueKey(connectionId),
-                initialValue: serverNumber,
-                decoration: const InputDecoration(labelText: 'Game server'),
-                items: serverItems
-                    .map(
-                      (server) => DropdownMenuItem(
-                        value: (server['server_number'] as num).toInt(),
-                        child: Text(
-                          server['name']?.toString() ??
-                              'Server ${server['server_number']}',
-                        ),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) {
-                  if (value != null) serverNumber = value;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: reason,
-                autofocus: true,
-                maxLines: 4,
-                decoration: const InputDecoration(labelText: 'Reason'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (reason.text.trim().isEmpty) return;
-                Navigator.pop(context, {
-                  'connection_id': connectionId,
-                  'server_number': serverNumber,
-                  'reason': reason.text.trim(),
-                });
-              },
-              child: const Text('Create'),
-            ),
-          ],
-        );
-      },
-    ),
+    builder: (_) => ManualIncidentDialog(profiles: profiles, servers: servers),
   );
-  reason.dispose();
   if (submission == null || !context.mounted) return;
   try {
     final profile = profiles.firstWhere(
@@ -860,7 +921,14 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
         error: (error, _) => _ErrorView(message: error.toString()),
         data: (items) {
           if (items.isEmpty) {
-            return const Center(child: Text('Pair a CRCON connection first.'));
+            return Center(
+              child: Text(
+                context.tr(
+                  'Verbinde zuerst eine CRCON-Installation.',
+                  'Pair a CRCON connection first.',
+                ),
+              ),
+            );
           }
           _connectionId ??= items.first.id;
           return ListView(
@@ -868,8 +936,8 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
             children: [
               DropdownButtonFormField<String>(
                 initialValue: _connectionId,
-                decoration: const InputDecoration(
-                  labelText: 'CRCON connection',
+                decoration: InputDecoration(
+                  labelText: context.tr('CRCON-Verbindung', 'CRCON connection'),
                 ),
                 items: items
                     .map(
@@ -888,7 +956,10 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
               TextField(
                 controller: _query,
                 decoration: InputDecoration(
-                  labelText: 'Name or player ID',
+                  labelText: context.tr(
+                    'Name oder Spieler-ID',
+                    'Name or player ID',
+                  ),
                   suffixIcon: IconButton(
                     onPressed: () => _search(items),
                     icon: const Icon(Icons.search),
@@ -906,7 +977,7 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
                   title: Text(
                     player['player_name']?.toString() ??
                         player['name']?.toString() ??
-                        'Unknown',
+                        context.tr('Unbekannt', 'Unknown'),
                   ),
                   subtitle: Text(
                     [
@@ -1927,14 +1998,20 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
   Widget _primaryActions(AdminIncident incident) {
     final subject = incident.primarySubject;
     if (subject == null || subject.actionPlayerId == null) {
-      return Padding(
-        padding: const EdgeInsets.all(12),
-        child: Text(
-          context.tr(
-            'Bestätige und wähle zuerst einen Spieler für Maßnahmen.',
-            'Confirm and select a player before running an action.',
+      return SafeArea(
+        top: false,
+        child: Container(
+          width: double.infinity,
+          color: FrontlineTheme.surfaceHigh,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Text(
+            context.tr(
+              'Bestätige und wähle zuerst einen Spieler für Maßnahmen.',
+              'Confirm and select a player before running an action.',
+            ),
+            style: const TextStyle(color: FrontlineTheme.muted),
+            textAlign: TextAlign.center,
           ),
-          textAlign: TextAlign.center,
         ),
       );
     }
