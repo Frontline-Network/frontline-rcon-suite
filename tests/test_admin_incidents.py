@@ -165,6 +165,57 @@ def test_parser_recognizes_every_squad_from_live_team_view(squad_name):
     assert subject["squad_name"] == squad_name.casefold()
 
 
+def test_chat_ingestion_persists_dynamic_squad_context(incident_database, monkeypatch):
+    monkeypatch.setenv("MOBILE_CONTEXT_V2", "enabled")
+    monkeypatch.setattr(incidents, "get_server_number", lambda: 2)
+    result, created = incidents.create_incident_from_chat(
+        {
+            "sub_content": "!admin Able spricht nicht",
+            "player_id_1": "reporter",
+            "player_name_1": "Reporter",
+        },
+        current_players=[
+            {
+                "player_id": "reporter",
+                "name": "Reporter",
+                "team": "Allies",
+                "unit_name": "Baker",
+                "role": "Officer",
+            },
+            {
+                "player_id": "leader",
+                "name": "Leader",
+                "team": "Allies",
+                "unit_name": "Able",
+                "role": "Officer",
+            },
+        ],
+        current_squads=[
+            {
+                "name": "Able",
+                "team": "Allies",
+                "type": "infantry",
+                "has_leader": True,
+                "leader": {
+                    "player_id": "leader",
+                    "name": "Leader",
+                    "role": "Officer",
+                },
+                "players": [
+                    {"player_id": "leader", "name": "Leader", "role": "Officer"},
+                ],
+            }
+        ],
+    )
+
+    assert created is True
+    assert result["server_number"] == 2
+    assert result["target_id"] == "leader"
+    assert result["subjects"][0]["kind"] == "squad"
+    assert result["subjects"][0]["squad_name"] == "Able"
+    assert result["reporter_context"]["unit_name"] == "Baker"
+
+
 def test_parser_resolves_unique_player_name_anywhere_in_report():
     parsed = incidents.parse_chat_report(
         "!admin bitte prüft Biene wegen Teamkill",
