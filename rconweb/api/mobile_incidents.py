@@ -39,6 +39,8 @@ ACTION_PERMISSIONS = {
     "temp_ban": "api.can_temp_ban_players",
     "perma_ban": "api.can_perma_ban_players",
     "comment": "api.can_add_player_comments",
+    "disband_squad": "api.can_disband_squad",
+    "remove_from_squad": "api.can_remove_player_from_squad",
 }
 
 
@@ -375,10 +377,33 @@ def _execute_action(action: str, data: dict, user_name: str, incident: dict):
     from . import views
 
     player_id = str(data.get("player_id") or incident.get("target_id") or "").strip()
+    subject_id = str(data.get("subject_id") or "") or None
+    if action == "disband_squad":
+        subject = next(
+            (
+                item
+                for item in incident.get("subjects") or []
+                if item.get("id") == subject_id
+                and item.get("kind") == "squad"
+                and item.get("state") == "confirmed"
+            ),
+            None,
+        )
+        if not subject:
+            raise ValueError("Select a confirmed squad before disbanding it")
+        reason = str(data.get("reason") or "").strip()
+        if not reason or data.get("confirmed") is not True:
+            raise ValueError("Disbanding a squad requires a reason and confirmation")
+        team = str(subject.get("team") or "").strip()
+        squad_name = str(subject.get("squad_name") or subject.get("display_name") or "").strip()
+        if not team or not squad_name:
+            raise ValueError("The confirmed squad has no team or squad name")
+        return views.rcon_api.disband_squad_by_name(team, squad_name, reason)
+
     subject = confirmed_action_subject(
         incident,
         player_id=player_id,
-        subject_id=str(data.get("subject_id") or "") or None,
+        subject_id=subject_id,
     )
     player_name = str(
         data.get("player_name")
@@ -435,6 +460,13 @@ def _execute_action(action: str, data: dict, user_name: str, incident: dict):
         return views.rcon_api.post_player_comment(
             player_id=player_id, comment=comment, by=user_name
         )
+    if action == "remove_from_squad":
+        if subject.get("kind") != "squad":
+            raise ValueError("Select a player from a confirmed squad")
+        reason = str(data.get("reason") or "").strip()
+        if not reason or data.get("confirmed") is not True:
+            raise ValueError("Removing a player from a squad requires a reason and confirmation")
+        return views.rcon_api.remove_player_from_squad(player_id, reason)
     raise ValueError("Unsupported mobile action")
 
 
@@ -459,16 +491,12 @@ def incident_actions(request, incident_id):
         return _error(command, "Missing player action permission", 403)
     if server_number != int(incident["server_number"]):
         return _error(command, "Action server does not match the incident", 400)
-    try:
-        confirmed_action_subject(
-            incident,
-            player_id=str(
-                data.get("player_id") or incident.get("target_id") or ""
-            ).strip(),
-            subject_id=str(data.get("subject_id") or "") or None,
-        )
-    except ValueError as exc:
-        return _error(command, str(exc), 400)
+    if incident["status"] == "new" and not request.user.has_perm(
+        "api.can_claim_admin_incidents"
+    ):
+        return _error(command, "Missing incident claim permission", 403)
+    if incident["assigned_to"] and incident["assigned_to"] != request.user.username:
+        return _error(command, "Incident is already claimed by another admin", 409)
 
     if server_number != int(get_server_number()) and not data.get("forwarded"):
         try:
@@ -491,10 +519,14 @@ def incident_actions(request, incident_id):
             action=action,
             arguments=data,
             idempotency_key=idempotency_key,
+            confirm_subject_id=str(data.get("confirm_subject_id") or "") or None,
+            validate_action_subject=True,
         )
     except IncidentNotFound as exc:
         return _error(command, str(exc), 404)
-    except ValueError as exc:
+    except IncidentConflict as exc:
+        return _error(command, str(exc), 409)
+    except (InvalidIncidentTransition, ValueError) as exc:
         return _error(command, str(exc), 400)
     if not created:
         if reservation["event_type"] == "action_started":
@@ -506,7 +538,12 @@ def incident_actions(request, incident_id):
         )
 
     try:
-        result = _execute_action(action, data, request.user.username, incident)
+        result = _execute_action(
+            action,
+            data,
+            request.user.username,
+            get_incident(str(incident_id)),
+        )
         updated_incident = complete_incident_action(
             idempotency_key, result=result, error=None
         )

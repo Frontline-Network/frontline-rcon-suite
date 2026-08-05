@@ -73,7 +73,7 @@ class CrconApi {
         'secret': payload.secret,
         'device_name': deviceName,
         'platform': platform,
-        'app_version': '0.1.6',
+        'app_version': '0.1.7',
         'push_handle': pushHandle,
         'push_capability': pushCapability,
       },
@@ -308,6 +308,20 @@ class CrconApi {
     if (result is! Map) {
       throw const CrconApiException(
         'CRCON hat keine gültigen Squad-Daten geliefert.',
+      );
+    }
+    return Map<String, dynamic>.from(result);
+  }
+
+  Future<Map<String, dynamic>> autobalancerStatus(int serverNumber) async {
+    final result = await _authorized(
+      'GET',
+      'autobalancer',
+      queryParameters: {'server_number': serverNumber},
+    );
+    if (result is! Map) {
+      throw const CrconApiException(
+        'CRCON hat keinen gültigen Autobalancer-Status geliefert.',
       );
     }
     return Map<String, dynamic>.from(result);

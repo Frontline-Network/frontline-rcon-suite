@@ -145,6 +145,21 @@ class MobilePairingTests(TestCase):
         replay = self._post("/api/mobile/v1/tokens/refresh", payload, client=Client())
         self.assertEqual(replay.status_code, 401)
 
+    def test_bootstrap_lists_only_active_admins_eligible_for_incident_handover(self):
+        User.objects.create_user(
+            username="mobile-observer",
+            email="observer@example.org",
+            password="secret",
+        )
+
+        response = self.client.get("/api/mobile/v1/bootstrap")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["result"]["user"]["assignable_admins"],
+            ["mobile-admin"],
+        )
+
     def test_pairing_expires_and_never_stores_raw_secret(self):
         pairing, query = self._pairing()
         record = MobilePairing.objects.get(pk=pairing["id"])
@@ -287,6 +302,56 @@ class MobileContextTests(TestCase):
         player = response.json()["result"][0]
         self.assertTrue(player["online"])
         self.assertEqual(player["unit_name"], "Item")
+
+    @patch("api.mobile_context.AutobalancerStore")
+    def test_autobalancer_mobile_status_is_read_only_and_minimal(self, store):
+        store.return_value.load_status.return_value = {
+            "mode": "automatic",
+            "phase": "armed",
+            "team_counts": {"allies": 46, "axis": 42},
+            "team_difference": 4,
+            "required_switches": 1,
+            "proposal": {"player_id": "must-not-leak"},
+            "plan": {"steps": ["must-not-leak"]},
+            "block_reasons": [],
+            "warnings": ["low confidence"],
+        }
+
+        response = self.client.get(
+            "/api/mobile/v1/autobalancer", {"server_number": 1}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()["result"]
+        self.assertEqual(result["team_counts"], {"allies": 46, "axis": 42})
+        self.assertEqual(result["required_switches"], 1)
+        self.assertNotIn("proposal", result)
+        self.assertNotIn("plan", result)
+
+    @patch("api.mobile_context._rcon_api")
+    def test_player_detail_keeps_steam_and_eos_identifiers_separate(
+        self, get_rcon_api
+    ):
+        get_rcon_api.return_value.get_player_profile.return_value = {
+            "player_id": "76561198036685843",
+            "soldier": {"eos_id": "eos-7db4c0a9"},
+        }
+        get_rcon_api.return_value.get_detailed_player_info.return_value = None
+
+        response = self.client.get(
+            "/api/mobile/v1/players/76561198036685843",
+            {"server_number": 1},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["result"]["identifiers"],
+            {
+                "steam_id": "76561198036685843",
+                "eos_id": "eos-7db4c0a9",
+                "platform_player_id": None,
+            },
+        )
 
     @patch("api.mobile_context._rcon_api")
     def test_squad_endpoint_returns_only_requested_squad(self, get_rcon_api):

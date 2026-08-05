@@ -61,7 +61,7 @@ MOBILE_API_DOCUMENTATION = [
         "endpoint": "mobile/v1/bootstrap",
         "allowed_http_methods": ["GET"],
         "permissions_required": [],
-        "description": "Load installation, device, server, user, and permission metadata.",
+        "description": "Load installation, device, server, user, permission metadata, and permitted incident assignees.",
     },
     {
         "endpoint": "mobile/v1/incidents",
@@ -85,7 +85,7 @@ MOBILE_API_DOCUMENTATION = [
         "endpoint": "mobile/v1/incidents/{id}/actions",
         "allowed_http_methods": ["POST"],
         "permissions_required": [],
-        "description": "Run a permission-checked, idempotent mobile player action.",
+        "description": "Run a permission-checked, idempotent mobile player, squad removal, or squad disband action.",
     },
     {
         "endpoint": "mobile/v1/incidents/{id}/subjects",
@@ -104,6 +104,12 @@ MOBILE_API_DOCUMENTATION = [
         "allowed_http_methods": ["GET"],
         "permissions_required": [],
         "description": "Search permission-filtered historical and online players.",
+    },
+    {
+        "endpoint": "mobile/v1/autobalancer",
+        "allowed_http_methods": ["GET"],
+        "permissions_required": ["api.can_view_autobalancer"],
+        "description": "Load a minimal, read-only Fair Autobalancer live status for one server.",
     },
     {
         "endpoint": "mobile/v1/players/{player_id}",
@@ -186,6 +192,11 @@ urlpatterns = [
         name="mobile-incident-subject-detail",
     ),
     path("players/search", mobile_context.players_search, name="mobile-player-search"),
+    path(
+        "autobalancer",
+        mobile_context.autobalancer_status,
+        name="mobile-autobalancer-status",
+    ),
     path(
         "players/<str:player_id>",
         mobile_context.player_detail,

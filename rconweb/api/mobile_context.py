@@ -4,6 +4,7 @@ from django.http import HttpResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
+from rcon.autobalancer.store import AutobalancerStore
 from rcon.utils import get_server_number
 
 from .auth import api_response, login_required
@@ -209,6 +210,73 @@ def player_detail(request, player_id):
             live = _rcon_api().get_detailed_player_info(str(player_id))
         except Exception:
             live = None
+    # ``player_id`` is a legacy CRCON name and can contain a SteamID64, an
+    # EOS identifier, or another platform identifier.  Do not present it to a
+    # mobile admin as a SteamID unless it actually has the SteamID64 shape.
+    # The EOS value is maintained separately on the soldier profile.
+    soldier = (history or {}).get("soldier") or {}
+    canonical_player_id = str((history or {}).get("player_id") or player_id)
+    steam_id = (
+        canonical_player_id
+        if canonical_player_id.isdigit() and len(canonical_player_id) == 17
+        else None
+    )
+    eos_id = str(soldier.get("eos_id") or "").strip() or None
+    identifiers = {
+        "steam_id": steam_id,
+        "eos_id": eos_id,
+        # Retain an unknown platform identifier without falsely calling it a
+        # SteamID or EOS-ID.  This is useful for Xbox/PlayStation records.
+        "platform_player_id": (
+            canonical_player_id
+            if canonical_player_id not in {steam_id, eos_id}
+            else None
+        ),
+    }
+
+
+@csrf_exempt
+@login_required()
+@require_http_methods(["GET"])
+def autobalancer_status(request):
+    """Return the minimal, read-only live balance view for a mobile admin."""
+
+    command = "mobile_autobalancer_status"
+    if disabled := _require_enabled(command):
+        return disabled
+    if not request.user.has_perm("api.can_view_autobalancer"):
+        return _error(command, "Missing autobalancer view permission", 403)
+    try:
+        server_number = _server_number(request)
+    except ValueError as exc:
+        return _error(command, str(exc), 400)
+    if forwarded := _forward_get(request, server_number):
+        return forwarded
+
+    # Keep this surface intentionally read-only and do not disclose an
+    # actionable candidate or plan. Existing CRCON controls remain the sole
+    # place that can approve, cancel, or configure the Fair Autobalancer.
+    status = AutobalancerStore().load_status()
+    return api_response(
+        command=command,
+        failed=False,
+        result={
+            "server_number": int(get_server_number()),
+            "mode": status.get("mode", "disabled"),
+            "phase": status.get("phase", "idle"),
+            "team_counts": status.get("team_counts") or {},
+            "team_difference": status.get("team_difference"),
+            "required_switches": status.get("required_switches", 0),
+            "team_ratings": status.get("team_ratings") or {},
+            "data_confidence": status.get("data_confidence"),
+            "rating_model_version": status.get("rating_model_version"),
+            "strategy": status.get("strategy"),
+            "block_reasons": status.get("block_reasons") or [],
+            "warnings": status.get("warnings") or [],
+            "native_autobalance": status.get("native_autobalance") or {},
+            "updated_at": status.get("updated_at"),
+        },
+    )
     return api_response(
         command=command,
         failed=False,
@@ -216,6 +284,7 @@ def player_detail(request, player_id):
             "player_id": str(player_id),
             "server_number": server_number,
             "capabilities": capabilities,
+            "identifiers": identifiers,
             "history": history,
             "live": live,
         },

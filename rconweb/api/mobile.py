@@ -6,6 +6,7 @@ import uuid
 from datetime import timedelta
 from urllib.parse import urlencode, urlparse
 
+from django.contrib.auth.models import User
 from django.db import transaction
 from django.http import HttpRequest
 from django.utils import timezone
@@ -580,6 +581,16 @@ def bootstrap(request):
         return disabled
     permissions = sorted(request.user.get_all_permissions())
     mobile_device = getattr(request, "mobile_device", None)
+    # Assignment is deliberately limited to users who can themselves claim a
+    # mobile incident.  This keeps the directory useful for handovers without
+    # exposing the complete CRCON user list to every mobile device.
+    assignable_admins: list[str] = []
+    if request.user.has_perm("api.can_reassign_admin_incidents"):
+        assignable_admins = [
+            user.username
+            for user in User.objects.filter(is_active=True).order_by("username")
+            if user.has_perm("api.can_claim_admin_incidents")
+        ]
     try:
         config = RconServerSettingsUserConfig.load_from_db()
         display_name = config.short_name or "CRCON"
@@ -611,6 +622,7 @@ def bootstrap(request):
                 "username": request.user.username,
                 "is_superuser": request.user.is_superuser,
                 "permissions": permissions,
+                "assignable_admins": assignable_admins,
             },
             "device": _device_dict(mobile_device) if mobile_device else None,
         },

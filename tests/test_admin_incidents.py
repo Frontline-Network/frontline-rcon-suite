@@ -347,6 +347,34 @@ def test_claim_uses_revision_and_prevents_takeover(incident_database):
         )
 
 
+def test_reassignment_records_the_selected_admin_and_handover_note(incident_database):
+    incident, _ = incidents.create_incident(
+        server_number=2,
+        source="manual",
+        reason="handover",
+        actor="alice",
+    )
+
+    reassigned = incidents.mutate_incident(
+        incident["id"],
+        actor="alice",
+        expected_revision=incident["revision"],
+        operation="reassign",
+        payload={
+            "assigned_to": "bob",
+            "handover_note": "Bitte die letzten Teamkills prüfen.",
+        },
+    )
+
+    assert reassigned["status"] == "claimed"
+    assert reassigned["assigned_to"] == "bob"
+    assert reassigned["events"][-1]["event_type"] == "reassign"
+    assert reassigned["events"][-1]["payload"] == {
+        "assigned_to": "bob",
+        "handover_note": "Bitte die letzten Teamkills prüfen.",
+    }
+
+
 def test_action_idempotency_key_is_reserved_once(incident_database):
     incident, _ = incidents.create_incident(
         server_number=1,
@@ -389,6 +417,84 @@ def test_action_idempotency_key_is_reserved_once(incident_database):
     assert next_cursor > cursor
     assert retry_created is False
     assert outcome["event_type"] == "action"
+
+
+def test_action_reservation_claims_incident_and_confirms_selected_suggestion(
+    incident_database,
+):
+    incident, _ = incidents.create_incident(
+        server_number=1,
+        source="chat",
+        reason="possible cheating",
+        actor="system:chat",
+        subjects=[
+            {
+                "kind": "player",
+                "state": "suggested",
+                "display_name": "Bob",
+                "player_id": "bob",
+                "confidence": 0.76,
+                "match_method": "fuzzy",
+            }
+        ],
+    )
+    subject_id = incident["subjects"][0]["id"]
+
+    _, created = incidents.reserve_incident_action(
+        incident["id"],
+        actor="alice",
+        action="punish",
+        arguments={"player_id": "bob", "subject_id": subject_id, "reason": "Check"},
+        idempotency_key="claim-with-action-1",
+        confirm_subject_id=subject_id,
+    )
+
+    updated = incidents.get_incident(incident["id"])
+    assert created is True
+    assert updated["status"] == "claimed"
+    assert updated["assigned_to"] == "alice"
+    assert updated["primary_subject"]["id"] == subject_id
+    assert updated["primary_subject"]["state"] == "confirmed"
+    assert {event["event_type"] for event in updated["events"]} >= {
+        "claim",
+        "subject_confirmed",
+        "action_started",
+    }
+
+
+def test_disband_squad_action_reserves_confirmed_squad(incident_database):
+    incident, _ = incidents.create_incident(
+        server_number=1,
+        source="chat",
+        reason="squad issue",
+        actor="system:chat",
+        subjects=[
+            {
+                "kind": "squad",
+                "state": "confirmed",
+                "display_name": "Able",
+                "team": "allies",
+                "squad_name": "Able",
+                "squad_type": "infantry",
+            }
+        ],
+    )
+    subject_id = incident["subjects"][0]["id"]
+
+    _, created = incidents.reserve_incident_action(
+        incident["id"],
+        actor="alice",
+        action="disband_squad",
+        arguments={"subject_id": subject_id, "reason": "No squad leader"},
+        idempotency_key="disband-squad-1",
+        validate_action_subject=True,
+    )
+
+    updated = incidents.get_incident(incident["id"])
+    assert created is True
+    assert updated["status"] == "claimed"
+    assert updated["assigned_to"] == "alice"
+    assert updated["events"][-1]["event_type"] == "action_started"
 
 
 def test_manual_creation_idempotency_returns_original_incident(incident_database):
