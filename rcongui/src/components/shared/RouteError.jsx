@@ -6,6 +6,16 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faDiscord } from "@fortawesome/free-brands-svg-icons";
 import siteConfig from "@/config/siteConfig";
 import { useTranslation } from "react-i18next";
+import { useEffect } from "react";
+
+const chunkLoadErrorPattern =
+  /failed to fetch dynamically imported module|importing a module script failed|chunkloaderror/i;
+const chunkReloadKeyPrefix = "crcon.chunk-load-retry:";
+
+const getChunkReloadKey = (errorDetail) => {
+  const assetUrl = errorDetail.match(/\/assets\/[^\s)]+\.js/i)?.[0];
+  return `${chunkReloadKeyPrefix}${assetUrl ?? errorDetail}`;
+};
 
 export default function RouteError() {
   const { t } = useTranslation();
@@ -24,6 +34,23 @@ export default function RouteError() {
         return String(error ?? "");
       }
     })();
+  const normalizedErrorDetail = String(errorDetail ?? "");
+  const isChunkLoadError = chunkLoadErrorPattern.test(normalizedErrorDetail);
+
+  useEffect(() => {
+    if (!isChunkLoadError) return;
+
+    const reloadKey = getChunkReloadKey(normalizedErrorDetail);
+    try {
+      if (window.sessionStorage.getItem(reloadKey)) return;
+      window.sessionStorage.setItem(reloadKey, "1");
+      window.location.reload();
+    } catch {
+      // If session storage is not available, keep the error visible instead of
+      // risking a reload loop.
+    }
+  }, [isChunkLoadError, normalizedErrorDetail]);
+
   console.error(error);
   if (
     isRouteErrorResponse(error) &&
