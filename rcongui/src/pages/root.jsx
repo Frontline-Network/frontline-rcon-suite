@@ -66,6 +66,7 @@ export default function Root() {
                 position: "relative",
                 minHeight: "100%",
                 px: { xs: 1.5, md: 2.5 },
+                pt: { xs: 1, md: 1.25 },
                 maxWidth: widthMode === false ? "none" : undefined,
               }}
             >
