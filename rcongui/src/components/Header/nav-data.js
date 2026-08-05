@@ -396,6 +396,7 @@ const linkTranslationKeys = {
   "/settings/others/vac-bans": "navigation.links.vacBans",
   "/settings/others/tk-bans": "navigation.links.tkBans",
   "/settings/others/name-kicks": "navigation.links.nameKicks",
+  "/settings/others/autobalancer": "navigation.links.autobalancer",
   "/settings/others/seed-vip": "navigation.links.seedVip",
   "/settings/others/game-server": "navigation.links.gameServer",
   "/settings/others/crcon": "navigation.links.crcon",

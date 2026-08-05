@@ -6,7 +6,7 @@ import {
   useRevalidator,
   useSubmit,
 } from "react-router-dom";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { execute, get, handleHttpError } from "@/utils/fetchUtils";
 import {
   Box,
@@ -37,6 +37,67 @@ import AutobalancerHelp from "@/pages/settings/[configs]/autobalancer-help";
 import AutobalancerShadowOverview from "@/pages/settings/[configs]/autobalancer-shadow-overview";
 
 const Editor = lazy(() => import("@monaco-editor/react"));
+
+const OTHER_CONFIG_COMMANDS = new Set([
+  "autobalancer_config",
+  "seed_vip_config",
+  "rcon_connection_settings_config",
+  "rcon_server_settings_config",
+  "chat_commands_config",
+  "rcon_chat_commands_config",
+  "scoreboard_config",
+  "steam_config",
+  "vac_game_bans_config",
+  "tk_ban_on_connect_config",
+  "name_kick_config",
+  "expired_vip_config",
+  "server_name_change_config",
+  "log_stream_config",
+  "watch_killrate_config",
+]);
+
+const localizeOtherSchema = (schema, t) => {
+  const localizeNode = (node, propertyName) => {
+    if (Array.isArray(node)) {
+      return node.map((item) => localizeNode(item));
+    }
+
+    if (!node || typeof node !== "object") return node;
+
+    const localized = { ...node };
+    if (propertyName) {
+      const key = `settings.others.fields.${propertyName}`;
+      if (i18n.exists(`${key}.title`)) localized.title = t(`${key}.title`);
+      if (i18n.exists(`${key}.description`)) {
+        localized.description = t(`${key}.description`);
+      }
+    }
+
+    if (node.properties) {
+      localized.properties = Object.fromEntries(
+        Object.entries(node.properties).map(([name, value]) => [
+          name,
+          localizeNode(value, name),
+        ])
+      );
+    }
+    if (node.$defs) {
+      localized.$defs = Object.fromEntries(
+        Object.entries(node.$defs).map(([name, value]) => [
+          name,
+          localizeNode(value),
+        ])
+      );
+    }
+    ["items", "anyOf", "oneOf", "allOf"].forEach((key) => {
+      if (node[key]) localized[key] = localizeNode(node[key]);
+    });
+
+    return localized;
+  };
+
+  return localizeNode(schema);
+};
 
 export const loader = async ({ params }) => {
   const { category, type } = params;
@@ -179,6 +240,13 @@ const ConfigPage = () => {
   const submit = useSubmit();
   const theme = useTheme();
   const isAutobalancer = command === "autobalancer_config";
+  const localizedSchema = useMemo(
+    () =>
+      OTHER_CONFIG_COMMANDS.has(command)
+        ? localizeOtherSchema(schema, t)
+        : schema,
+    [command, schema, t]
+  );
 
   useEffect(() => {
     setEditorContent(JSON.stringify(data, null, 2));
@@ -307,8 +375,8 @@ const ConfigPage = () => {
                         fontSize: "14px",
                       },
                     }}
-                    schema={schema}
-                    uischema={Generate.uiSchema(schema)}
+                    schema={localizedSchema}
+                    uischema={Generate.uiSchema(localizedSchema)}
                     renderers={[...customRenderers, ...materialRenderers]}
                     cells={materialCells}
                   />

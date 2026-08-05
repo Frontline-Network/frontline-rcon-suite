@@ -4,11 +4,12 @@ import { useTranslation } from "react-i18next";
 const objectRenderer = (props) => {
   const { t } = useTranslation();
   const name = props.uischema.scope.replace('#/properties/', '');
+  const label = props.label || props.schema?.title || name;
 
   return (
     <>
-      <InputLabel>{name}</InputLabel>
-      {t("settings.config.objectUnsupported", { name })}
+      <InputLabel>{label}</InputLabel>
+      {t("settings.config.objectUnsupported", { name: label })}
     </>
   );
 }
