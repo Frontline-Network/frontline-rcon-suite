@@ -14,6 +14,7 @@ from rcon.automods.no_solotank import NoSoloTankAutomod
 from rcon.automods.seeding_rules import SeedingRulesAutomod
 from rcon.cache_utils import get_redis_client
 from rcon.commands import HLLCommandFailedError
+from rcon.connection import HLLServerError
 from rcon.discord import send_to_discord_audit
 from rcon.hooks import inject_player_ids
 from rcon.logs.loop import on_kill, on_connected
@@ -112,9 +113,12 @@ def _do_punitions(
                     msg=f"---> KICKING <---: {aplayer}",
                     author=aplayer.details.author,
                 )
-        except HLLCommandFailedError:
+        except (HLLCommandFailedError, HLLServerError):
             logger.warning(
-                "Couldn't `%s` player `%s`. Will retry.", repr(method), repr(aplayer)
+                "Couldn't `%s` player `%s` because the HLL RCON command failed. Will retry.",
+                repr(method),
+                repr(aplayer),
+                exc_info=True,
             )
             if method == ActionMethod.PUNISH:
                 for m in mods:
