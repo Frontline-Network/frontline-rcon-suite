@@ -122,6 +122,11 @@ export const StyledTh = styled("th", {
     textAlign: variant === "icon" ? "center" : "left",
     paddingLeft: variant === "icon" ? 0 : undefined,
     paddingRight: variant === "icon" ? 0 : undefined,
+    // MUI buttons center their content by default. Table cells are left aligned,
+    // so sortable text headers otherwise appear offset from their column values.
+    "& .MuiButton-root": {
+      justifyContent: variant === "icon" ? "center" : "flex-start",
+    },
   };
 });
 
