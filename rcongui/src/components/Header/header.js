@@ -7,6 +7,7 @@ import ServerStatus from "./server-status";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
 import { navMenus } from "./nav-data";
+import { useTranslation } from "react-i18next";
 import { LoginBox } from "./login";
 import { styled } from "@mui/material/styles";
 import {Fragment, useState} from "react";
@@ -43,6 +44,7 @@ const initialMenuState = navMenus.reduce((state, menu) => {
 
 // TODO: Make this reactive, it's causing the view on mobile to be bigger then it should
 const Header = () => {
+  const { t } = useTranslation();
   const [openedMenu, setOpenedMenu] = useState(initialMenuState);
   const [anchorEl, setAnchorEl] = useState(null);
 
@@ -72,7 +74,7 @@ const Header = () => {
               {navMenus.map((menu) => (
                 <Fragment key={menu.name}>
                   <Button onClick={handleOpenMenu(menu.name)}>
-                    {menu.name}
+                    {menu.translationKey ? t(menu.translationKey) : menu.name}
                   </Button>
                   <Menu
                     id={`${menu.name}-menu`}
@@ -88,7 +90,7 @@ const Header = () => {
                   >
                     {menu.links.map((link) => (
                       <MenuItem component={RouterLink} to={link.to} key={link.to} onClick={handleCloseMenu(menu.name)}>
-                        {link.name}
+                        {link.translationKey ? t(link.translationKey) : link.name}
                       </MenuItem>
                     ))}
                   </Menu>
