@@ -122,11 +122,6 @@ export const StyledTh = styled("th", {
     textAlign: variant === "icon" ? "center" : "left",
     paddingLeft: variant === "icon" ? 0 : undefined,
     paddingRight: variant === "icon" ? 0 : undefined,
-    // MUI buttons center their content by default. Table cells are left aligned,
-    // so sortable text headers otherwise appear offset from their column values.
-    "& .MuiButton-root": {
-      justifyContent: variant === "icon" ? "center" : "flex-start",
-    },
   };
 });
 
@@ -182,8 +177,14 @@ export const HeaderButton = styled((props) => (
 export const SortableHeader =
   (text, title) =>
   ({ column }) => {
+    const isIconColumn = column.columnDef?.meta?.variant === "icon";
+
     return (
-      <HeaderButton onClick={column.getToggleSortingHandler()} title={title || ""}>
+      <HeaderButton
+        onClick={column.getToggleSortingHandler()}
+        title={title || ""}
+        sx={{ justifyContent: isIconColumn ? "center" : "flex-start" }}
+      >
         {text}
         {column.getIsSorted() &&
           (column.getIsSorted() === "asc" ? (
