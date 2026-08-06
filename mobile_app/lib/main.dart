@@ -1950,8 +1950,10 @@ class PairingScreen extends ConsumerStatefulWidget {
   ConsumerState<PairingScreen> createState() => _PairingScreenState();
 }
 
-class _PairingScreenState extends ConsumerState<PairingScreen> {
+class _PairingScreenState extends ConsumerState<PairingScreen>
+    with WidgetsBindingObserver {
   bool _busy = false;
+  bool _exchanging = false;
   String? _error;
   PairingSession? _session;
   DesktopAuthorizationSession? _desktopSession;
@@ -1959,10 +1961,33 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
   Timer? _poller;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _poller?.cancel();
     _desktopUrl.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _session != null) {
+      AppLogger.instance.info(
+        'pairing',
+        'App resumed while waiting for pairing approval; retrying exchange',
+      );
+      unawaited(_exchange());
+    }
+  }
+
+  void _startPairingPoller() {
+    _poller?.cancel();
+    _poller = Timer.periodic(const Duration(seconds: 1), (_) => _exchange());
   }
 
   Future<void> _scan(String raw) async {
@@ -1999,8 +2024,16 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
         pushHandle: relayIdentity?.handle ?? '',
         pushCapability: relayIdentity?.capability ?? '',
       );
-      setState(() => _session = session);
-      _poller = Timer.periodic(const Duration(seconds: 1), (_) => _exchange());
+      setState(() {
+        _session = session;
+        _error = null;
+      });
+      AppLogger.instance.info(
+        'pairing',
+        'QR scan accepted; waiting for approval',
+      );
+      _startPairingPoller();
+      unawaited(_exchange());
     } catch (error) {
       setState(() => _error = error.toString());
     } finally {
@@ -2010,13 +2043,15 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
 
   Future<void> _exchange() async {
     final session = _session;
-    if (session == null || _busy) return;
+    if (session == null || _busy || _exchanging) return;
+    _exchanging = true;
     try {
       final profile = await CrconApi.exchangePairing(
         session,
         ref.read(secureStoreProvider),
       );
       if (profile == null || !mounted) return;
+      AppLogger.instance.info('pairing', 'Pairing approved; connection stored');
       _poller?.cancel();
       ref.invalidate(connectionsProvider);
       ref.invalidate(inboxProvider);
@@ -2026,7 +2061,24 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
         _poller?.cancel();
         setState(() => _error = error.message);
       }
+    } catch (error, stackTrace) {
+      AppLogger.instance.error(
+        'pairing',
+        error,
+        message: 'Pairing exchange failed',
+        stackTrace: stackTrace,
+      );
+      _poller?.cancel();
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      _exchanging = false;
     }
+  }
+
+  Future<void> _retryExchange() async {
+    if (_session == null) return;
+    if (_poller == null || !_poller!.isActive) _startPairingPoller();
+    await _exchange();
   }
 
   Future<void> _startDesktopAuthorization() async {
@@ -2291,8 +2343,33 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
                       const SizedBox(height: 12),
                       Text(
                         context.tr(
-                          'Bestätige das Telefon im CRCON-Browser, um die Kopplung abzuschließen.',
-                          'Approve the phone in the CRCON browser to finish pairing.',
+                          'Bestätige das Gerät im CRCON-Browser. Kehre anschließend hierher zurück – die Verbindung wird automatisch abgeschlossen.',
+                          'Approve the device in the CRCON browser, then return here. The connection will finish automatically.',
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+                      FilledButton.icon(
+                        onPressed: _exchanging ? null : _retryExchange,
+                        icon: _exchanging
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.check_circle_outline),
+                        label: Text(
+                          _exchanging
+                              ? context.tr(
+                                  'Verbindung wird geprüft …',
+                                  'Checking connection …',
+                                )
+                              : context.tr(
+                                  'Verbindung abschließen',
+                                  'Finish connection',
+                                ),
                         ),
                       ),
                       if (_error != null)
