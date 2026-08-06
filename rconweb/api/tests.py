@@ -168,7 +168,7 @@ class MobilePairingTests(TestCase):
         )
         self.assertEqual(created.status_code, 200)
         result = created.json()["result"]
-        self.assertIn("/settings/crcon?desktop_code=", result["verification_uri"])
+        self.assertIn("/apps?desktop_code=", result["verification_uri"])
         self.assertTrue(result["user_code"].startswith("FLN-"))
 
         record = MobilePairing.objects.get(pk=result["id"])

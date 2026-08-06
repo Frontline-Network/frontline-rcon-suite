@@ -289,7 +289,7 @@ def create_desktop_authorization(request):
         app_version=str(data.get("app_version", ""))[:32],
         expires_at=timezone.now() + PAIRING_LIFETIME,
     )
-    approval_url = f"{base_url}/settings/crcon?" + urlencode(
+    approval_url = f"{base_url}/apps?" + urlencode(
         {"desktop_code": user_code}
     )
     return api_response(
