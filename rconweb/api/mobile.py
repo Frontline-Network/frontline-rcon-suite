@@ -149,6 +149,25 @@ def _pairing_dict(pairing: MobilePairing) -> dict:
     }
 
 
+def _desktop_user_code() -> str:
+    """Return a readable, non-ambiguous one-time code for the browser flow."""
+    alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+    return "FLN-" + "-".join(
+        "".join(secrets.choice(alphabet) for _ in range(4)) for _ in range(2)
+    )
+
+
+def _require_recent_authentication(request: HttpRequest, data: dict):
+    recent_auth_at = float(request.session.get("mobile_recent_auth_at", 0))
+    if time.time() - recent_auth_at <= RECENT_AUTH_SECONDS:
+        return None
+    password = data.get("password", "")
+    if not password or not request.user.check_password(password):
+        return _error("mobile_recent_auth", "Password confirmation is required", 401)
+    request.session["mobile_recent_auth_at"] = time.time()
+    return None
+
+
 @csrf_exempt
 @require_http_methods(["GET"])
 def discovery(request):
@@ -191,12 +210,8 @@ def create_pairing(request):
     except ValueError as exc:
         return _error(command, str(exc), 400)
 
-    recent_auth_at = float(request.session.get("mobile_recent_auth_at", 0))
-    if time.time() - recent_auth_at > RECENT_AUTH_SECONDS:
-        password = data.get("password", "")
-        if not password or not request.user.check_password(password):
-            return _error(command, "Password confirmation is required", 401)
-        request.session["mobile_recent_auth_at"] = time.time()
+    if authentication_error := _require_recent_authentication(request, data):
+        return authentication_error
 
     MobilePairing.objects.filter(
         user=request.user,
@@ -226,6 +241,186 @@ def create_pairing(request):
         result={"state": pairing.state, "expires_at": pairing.expires_at},
     )
     return api_response(command=command, failed=False, result=result)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def create_desktop_authorization(request):
+    """Start the Windows device-code flow without requiring a local browser login."""
+    command = "mobile_create_desktop_authorization"
+    if disabled := _require_enabled(command):
+        return disabled
+    try:
+        data = _json_body(request)
+        base_url = _public_base_url(request)
+        device_name = str(data["device_name"]).strip()[:128]
+    except (KeyError, ValueError) as exc:
+        return _error(command, f"Missing or invalid field: {exc}", 400)
+    if not device_name:
+        return _error(command, "A device name is required", 400)
+
+    raw_device_code = random_token("crcon_desktop_device")
+    user_code = _desktop_user_code()
+    pairing = MobilePairing.objects.create(
+        kind=MobilePairing.Kind.DESKTOP,
+        secret_digest=token_digest(raw_device_code, "desktop_device"),
+        user_code_digest=token_digest(user_code, "desktop_user"),
+        device_name=device_name,
+        platform="windows",
+        app_version=str(data.get("app_version", ""))[:32],
+        expires_at=timezone.now() + PAIRING_LIFETIME,
+    )
+    approval_url = f"{base_url}/settings/crcon?" + urlencode(
+        {"desktop_code": user_code}
+    )
+    return api_response(
+        command=command,
+        failed=False,
+        result={
+            "id": str(pairing.id),
+            "device_code": raw_device_code,
+            "user_code": user_code,
+            "verification_uri": approval_url,
+            "expires_at": pairing.expires_at,
+            "interval": 2,
+        },
+    )
+
+
+@csrf_exempt
+@login_required()
+@permission_required("api.can_manage_own_mobile_devices", raise_exception=True)
+@require_http_methods(["POST"])
+def approve_desktop_authorization(request):
+    command = "mobile_approve_desktop_authorization"
+    if disabled := _require_enabled(command):
+        return disabled
+    try:
+        data = _json_body(request)
+        user_code = str(data["user_code"]).strip().upper()
+    except (KeyError, ValueError) as exc:
+        return _error(command, f"Missing or invalid field: {exc}", 400)
+    if authentication_error := _require_recent_authentication(request, data):
+        return authentication_error
+
+    with transaction.atomic():
+        try:
+            pairing = MobilePairing.objects.select_for_update().get(
+                kind=MobilePairing.Kind.DESKTOP,
+                user_code_digest=token_digest(user_code, "desktop_user"),
+            )
+        except MobilePairing.DoesNotExist:
+            return _error(command, "Desktop code was not found", 404)
+        if pairing.expires_at <= timezone.now():
+            pairing.state = MobilePairing.State.DENIED
+            pairing.save(update_fields=("state",))
+            return _error(command, "Desktop code expired", 410)
+        if pairing.state != MobilePairing.State.PENDING:
+            return _error(command, "Desktop code is no longer available", 409)
+        approve = data.get("approve", True)
+        if not isinstance(approve, bool):
+            return _error(command, "approve must be a boolean", 400)
+        pairing.user = request.user
+        pairing.state = (
+            MobilePairing.State.APPROVED if approve else MobilePairing.State.DENIED
+        )
+        pairing.approved_at = timezone.now() if approve else None
+        pairing.save(update_fields=("user", "state", "approved_at"))
+
+    record_mobile_audit(
+        username=request.user.username,
+        command=(
+            "mobile_desktop_authorization_approved"
+            if approve
+            else "mobile_desktop_authorization_denied"
+        ),
+        request=request,
+        arguments={
+            "pairing_id": str(pairing.id),
+            "device_name": pairing.device_name,
+            "platform": pairing.platform,
+        },
+        result={"state": pairing.state},
+    )
+    return api_response(
+        command=command,
+        failed=False,
+        result={"state": pairing.state, "device_name": pairing.device_name},
+    )
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def exchange_desktop_authorization(request, pairing_id):
+    command = "mobile_exchange_desktop_authorization"
+    if disabled := _require_enabled(command):
+        return disabled
+    try:
+        data = _json_body(request)
+        raw_device_code = str(data["device_code"])
+    except (KeyError, ValueError) as exc:
+        return _error(command, f"Missing or invalid field: {exc}", 400)
+
+    with transaction.atomic():
+        try:
+            pairing = (
+                MobilePairing.objects.select_for_update()
+                .select_related("user")
+                .get(
+                    pk=pairing_id,
+                    kind=MobilePairing.Kind.DESKTOP,
+                    secret_digest=token_digest(raw_device_code, "desktop_device"),
+                )
+            )
+        except (MobilePairing.DoesNotExist, ValueError):
+            return _error(command, "Invalid desktop device code", 401)
+        if pairing.expires_at <= timezone.now():
+            pairing.state = MobilePairing.State.DENIED
+            pairing.save(update_fields=("state",))
+            return _error(command, "Desktop code expired", 410)
+        if pairing.state == MobilePairing.State.PENDING:
+            return _error(
+                command, "Desktop authorization is awaiting browser approval", 202
+            )
+        if pairing.state == MobilePairing.State.DENIED:
+            return _error(command, "Desktop authorization was denied", 403)
+        if pairing.state != MobilePairing.State.APPROVED or pairing.user is None:
+            return _error(command, "Desktop authorization is no longer available", 409)
+
+        device = MobileDevice.objects.create(
+            user=pairing.user,
+            name=pairing.device_name,
+            platform=pairing.platform,
+            app_version=pairing.app_version,
+        )
+        tokens = issue_device_tokens(device, initialize_absolute_expiry=True)
+        pairing.state = MobilePairing.State.CONSUMED
+        pairing.consumed_at = timezone.now()
+        pairing.secret_digest = token_digest(
+            random_token("consumed_desktop"), "desktop_device"
+        )
+        pairing.save(update_fields=("state", "consumed_at", "secret_digest"))
+
+    record_mobile_audit(
+        username=device.user.username,
+        command="mobile_desktop_device_paired",
+        device_id=str(device.id),
+        arguments={
+            "pairing_id": str(pairing.id),
+            "device_name": device.name,
+            "platform": device.platform,
+        },
+        result={"state": pairing.state},
+    )
+    return api_response(
+        command=command,
+        failed=False,
+        result={
+            **tokens,
+            "installation_id": _installation_id(),
+            "username": device.user.username,
+        },
+    )
 
 
 @csrf_exempt

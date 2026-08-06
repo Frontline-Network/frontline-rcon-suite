@@ -33,6 +33,24 @@ class PairingSession {
   final String verificationCode;
 }
 
+class DesktopAuthorizationSession {
+  const DesktopAuthorizationSession({
+    required this.baseUrl,
+    required this.pairingId,
+    required this.deviceCode,
+    required this.userCode,
+    required this.verificationUri,
+    required this.interval,
+  });
+
+  final String baseUrl;
+  final String pairingId;
+  final String deviceCode;
+  final String userCode;
+  final Uri verificationUri;
+  final Duration interval;
+}
+
 class CrconApi {
   CrconApi(this.profile, this.store)
     : _dio = _diagnosticDio(
@@ -73,7 +91,7 @@ class CrconApi {
         'secret': payload.secret,
         'device_name': deviceName,
         'platform': platform,
-        'app_version': '0.1.7',
+        'app_version': '0.1.8',
         'push_handle': pushHandle,
         'push_capability': pushCapability,
       },
@@ -87,6 +105,64 @@ class CrconApi {
       exchangeToken: result['exchange_token'].toString(),
       verificationCode: result['verification_code'].toString(),
     );
+  }
+
+  static Future<DesktopAuthorizationSession> startDesktopAuthorization(
+    String baseUrl, {
+    required String deviceName,
+  }) async {
+    final normalizedBaseUrl = baseUrl.trim().replaceFirst(RegExp(r'/+$'), '');
+    validateProductionUrl(normalizedBaseUrl);
+    final response = await _diagnosticDio().post<Map<String, dynamic>>(
+      '$normalizedBaseUrl/api/mobile/v1/desktop-authorizations',
+      data: {
+        'device_name': deviceName,
+        'platform': 'windows',
+        'app_version': '0.1.8',
+      },
+      options: Options(
+        validateStatus: (status) => status != null && status < 500,
+      ),
+    );
+    final result = decodeCrconResponse(response) as Map;
+    final interval = (result['interval'] as num?)?.toInt() ?? 2;
+    return DesktopAuthorizationSession(
+      baseUrl: normalizedBaseUrl,
+      pairingId: result['id'].toString(),
+      deviceCode: result['device_code'].toString(),
+      userCode: result['user_code'].toString(),
+      verificationUri: Uri.parse(result['verification_uri'].toString()),
+      interval: Duration(seconds: interval.clamp(1, 10)),
+    );
+  }
+
+  static Future<ConnectionProfile?> exchangeDesktopAuthorization(
+    DesktopAuthorizationSession session,
+    SecureConnectionStore store,
+  ) async {
+    final response = await _diagnosticDio().post<Map<String, dynamic>>(
+      '${session.baseUrl}/api/mobile/v1/desktop-authorizations/'
+      '${session.pairingId}/exchange',
+      data: {'device_code': session.deviceCode},
+      options: Options(
+        validateStatus: (status) => status != null && status < 500,
+      ),
+    );
+    if (response.statusCode == HttpStatus.accepted) return null;
+    final result = decodeCrconResponse(response) as Map;
+    final profile = ConnectionProfile(
+      id: result['installation_id'].toString(),
+      baseUrl: session.baseUrl,
+      name: Uri.parse(session.baseUrl).host,
+      username: result['username'].toString(),
+      deviceId: result['device_id'].toString(),
+    );
+    await store.saveConnection(
+      profile,
+      accessToken: result['access_token'].toString(),
+      refreshToken: result['refresh_token'].toString(),
+    );
+    return profile;
   }
 
   static Future<ConnectionProfile?> exchangePairing(

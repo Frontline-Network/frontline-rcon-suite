@@ -145,6 +145,64 @@ class MobilePairingTests(TestCase):
         replay = self._post("/api/mobile/v1/tokens/refresh", payload, client=Client())
         self.assertEqual(replay.status_code, 401)
 
+    def test_desktop_authorization_requires_browser_approval_and_is_single_use(self):
+        desktop = Client()
+        created = self._post(
+            "/api/mobile/v1/desktop-authorizations",
+            {"device_name": "Frontline Control Room", "app_version": "0.1.8"},
+            client=desktop,
+        )
+        self.assertEqual(created.status_code, 200)
+        result = created.json()["result"]
+        self.assertIn("/settings/crcon?desktop_code=", result["verification_uri"])
+        self.assertTrue(result["user_code"].startswith("FLN-"))
+
+        record = MobilePairing.objects.get(pk=result["id"])
+        self.assertIsNone(record.user)
+        self.assertNotEqual(record.secret_digest, result["device_code"])
+        self.assertNotEqual(record.user_code_digest, result["user_code"])
+
+        exchange_path = f"/api/mobile/v1/desktop-authorizations/{result['id']}/exchange"
+        pending = self._post(
+            exchange_path, {"device_code": result["device_code"]}, client=desktop
+        )
+        self.assertEqual(pending.status_code, 202)
+
+        approved = self._post(
+            "/api/mobile/v1/desktop-authorizations/approve",
+            {
+                "user_code": result["user_code"],
+                "password": "correct horse battery staple",
+                "approve": True,
+            },
+        )
+        self.assertEqual(approved.status_code, 200)
+
+        exchanged = self._post(
+            exchange_path, {"device_code": result["device_code"]}, client=desktop
+        )
+        self.assertEqual(exchanged.status_code, 200)
+        self.assertEqual(exchanged.json()["result"]["username"], self.user.username)
+        self.assertEqual(MobileDevice.objects.get().platform, "windows")
+
+        replay = self._post(
+            exchange_path, {"device_code": result["device_code"]}, client=desktop
+        )
+        self.assertEqual(replay.status_code, 401)
+
+    def test_desktop_authorization_rejects_invalid_device_code(self):
+        created = self._post(
+            "/api/mobile/v1/desktop-authorizations",
+            {"device_name": "Frontline Control Room"},
+            client=Client(),
+        ).json()["result"]
+        response = self._post(
+            f"/api/mobile/v1/desktop-authorizations/{created['id']}/exchange",
+            {"device_code": "wrong"},
+            client=Client(),
+        )
+        self.assertEqual(response.status_code, 401)
+
     def test_bootstrap_lists_only_active_admins_eligible_for_incident_handover(self):
         User.objects.create_user(
             username="mobile-observer",
@@ -317,9 +375,7 @@ class MobileContextTests(TestCase):
             "warnings": ["low confidence"],
         }
 
-        response = self.client.get(
-            "/api/mobile/v1/autobalancer", {"server_number": 1}
-        )
+        response = self.client.get("/api/mobile/v1/autobalancer", {"server_number": 1})
 
         self.assertEqual(response.status_code, 200)
         result = response.json()["result"]
@@ -329,9 +385,7 @@ class MobileContextTests(TestCase):
         self.assertNotIn("plan", result)
 
     @patch("api.mobile_context._rcon_api")
-    def test_player_detail_keeps_steam_and_eos_identifiers_separate(
-        self, get_rcon_api
-    ):
+    def test_player_detail_keeps_steam_and_eos_identifiers_separate(self, get_rcon_api):
         get_rcon_api.return_value.get_player_profile.return_value = {
             "player_id": "76561198036685843",
             "soldier": {"eos_id": "eos-7db4c0a9"},

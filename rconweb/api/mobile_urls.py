@@ -106,6 +106,24 @@ MOBILE_API_DOCUMENTATION = [
         "description": "Search permission-filtered historical and online players.",
     },
     {
+        "endpoint": "mobile/v1/desktop-authorizations",
+        "allowed_http_methods": ["POST"],
+        "permissions_required": [],
+        "description": "Start a Windows desktop device-code authorization without a QR scanner.",
+    },
+    {
+        "endpoint": "mobile/v1/desktop-authorizations/approve",
+        "allowed_http_methods": ["POST"],
+        "permissions_required": ["api.can_manage_own_mobile_devices"],
+        "description": "Approve or deny a short Windows device code in CRCON.",
+    },
+    {
+        "endpoint": "mobile/v1/desktop-authorizations/{id}/exchange",
+        "allowed_http_methods": ["POST"],
+        "permissions_required": [],
+        "description": "Poll and exchange an approved Windows device authorization.",
+    },
+    {
         "endpoint": "mobile/v1/autobalancer",
         "allowed_http_methods": ["GET"],
         "permissions_required": ["api.can_view_autobalancer"],
@@ -196,6 +214,21 @@ urlpatterns = [
         "autobalancer",
         mobile_context.autobalancer_status,
         name="mobile-autobalancer-status",
+    ),
+    path(
+        "desktop-authorizations",
+        mobile.create_desktop_authorization,
+        name="mobile-create-desktop-authorization",
+    ),
+    path(
+        "desktop-authorizations/approve",
+        mobile.approve_desktop_authorization,
+        name="mobile-approve-desktop-authorization",
+    ),
+    path(
+        "desktop-authorizations/<uuid:pairing_id>/exchange",
+        mobile.exchange_desktop_authorization,
+        name="mobile-exchange-desktop-authorization",
     ),
     path(
         "players/<str:player_id>",

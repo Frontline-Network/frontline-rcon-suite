@@ -18,6 +18,7 @@ import {
 } from "@mui/material";
 import {
   Cached as CacheIcon,
+  DesktopWindows as DesktopIcon,
   Link as LinkIcon,
   PhoneAndroid as PhoneIcon,
   QrCode2 as QrCodeIcon,
@@ -31,6 +32,8 @@ import { useTranslation } from "react-i18next";
 function CrconAppSettings() {
   const { t } = useTranslation();
   const [password, setPassword] = useState("");
+  const [desktopPassword, setDesktopPassword] = useState("");
+  const [desktopCode, setDesktopCode] = useState("");
   const [pairing, setPairing] = useState(null);
   const [devices, setDevices] = useState([]);
   const [bootstrap, setBootstrap] = useState(null);
@@ -54,6 +57,13 @@ function CrconAppSettings() {
   useEffect(() => {
     loadDevices();
   }, [loadDevices]);
+
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get("desktop_code");
+    if (code) {
+      setDesktopCode(code.toUpperCase());
+    }
+  }, []);
 
   useEffect(() => {
     if (
@@ -94,6 +104,25 @@ function CrconAppSettings() {
         payload: { approve, verification_code: pairing.verification_code },
       }),
     onSuccess: (result) => setPairing((current) => ({ ...current, ...result })),
+    onError: (error) => setMobileError(error.message),
+  });
+
+  const approveDesktopMutation = useMutation({
+    mutationFn: () =>
+      mobileRequest("desktop-authorizations/approve", {
+        method: "POST",
+        payload: {
+          user_code: desktopCode.trim().toUpperCase(),
+          password: desktopPassword,
+          approve: true,
+        },
+      }),
+    onSuccess: async () => {
+      setDesktopPassword("");
+      setMobileError("");
+      toast.success(t("settings.desktopMobile.approved"));
+      await loadDevices();
+    },
     onError: (error) => setMobileError(error.message),
   });
 
@@ -230,6 +259,51 @@ function CrconAppSettings() {
                   </Stack>
                 </Stack>
               )}
+
+              <Divider />
+              <Stack spacing={2}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <DesktopIcon color="primary" />
+                  <Typography variant="h6">
+                    {t("settings.desktopMobile.title")}
+                  </Typography>
+                </Stack>
+                <Typography variant="body2" color="text.secondary">
+                  {t("settings.desktopMobile.hint")}
+                </Typography>
+                <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                  <TextField
+                    label={t("settings.desktopMobile.code")}
+                    value={desktopCode}
+                    onChange={(event) =>
+                      setDesktopCode(event.target.value.toUpperCase())
+                    }
+                    placeholder="FLN-7KQ9-PM2X"
+                    inputProps={{ autoCapitalize: "characters", spellCheck: false }}
+                    fullWidth
+                  />
+                  <TextField
+                    label={t("settings.mobile.confirmPassword")}
+                    type="password"
+                    value={desktopPassword}
+                    onChange={(event) => setDesktopPassword(event.target.value)}
+                    autoComplete="current-password"
+                    fullWidth
+                  />
+                  <Button
+                    variant="contained"
+                    startIcon={<DesktopIcon />}
+                    disabled={
+                      !desktopCode.trim() ||
+                      !desktopPassword ||
+                      approveDesktopMutation.isPending
+                    }
+                    onClick={() => approveDesktopMutation.mutate()}
+                  >
+                    {t("settings.desktopMobile.approve")}
+                  </Button>
+                </Stack>
+              </Stack>
 
               <Divider />
               {bootstrap?.user?.permissions?.includes(

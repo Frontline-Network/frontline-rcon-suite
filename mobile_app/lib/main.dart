@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'app_logger.dart';
 import 'crcon_api.dart';
@@ -1311,11 +1312,14 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
   bool _busy = false;
   String? _error;
   PairingSession? _session;
+  DesktopAuthorizationSession? _desktopSession;
+  final _desktopUrl = TextEditingController();
   Timer? _poller;
 
   @override
   void dispose() {
     _poller?.cancel();
+    _desktopUrl.dispose();
     super.dispose();
   }
 
@@ -1385,13 +1389,199 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
     }
   }
 
+  Future<void> _startDesktopAuthorization() async {
+    if (_busy || _desktopSession != null) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final session = await CrconApi.startDesktopAuthorization(
+        _desktopUrl.text,
+        deviceName: Platform.localHostname.isEmpty
+            ? 'CRCON Windows app'
+            : Platform.localHostname,
+      );
+      if (!mounted) return;
+      setState(() => _desktopSession = session);
+      _poller = Timer.periodic(session.interval, (_) => _exchangeDesktop());
+      await _openDesktopBrowser();
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _openDesktopBrowser() async {
+    final session = _desktopSession;
+    if (session == null) return;
+    final opened = await launchUrl(
+      session.verificationUri,
+      mode: LaunchMode.externalApplication,
+    );
+    if (!opened && mounted) {
+      setState(
+        () => _error = context.tr(
+          'Browser konnte nicht geöffnet werden. Öffne die CRCON-Adresse manuell und gib den Gerätecode ein.',
+          'The browser could not be opened. Open the CRCON address manually and enter the device code.',
+        ),
+      );
+    }
+  }
+
+  Future<void> _exchangeDesktop() async {
+    final session = _desktopSession;
+    if (session == null || _busy) return;
+    try {
+      final profile = await CrconApi.exchangeDesktopAuthorization(
+        session,
+        ref.read(secureStoreProvider),
+      );
+      if (profile == null || !mounted) return;
+      _poller?.cancel();
+      ref.invalidate(connectionsProvider);
+      ref.invalidate(inboxProvider);
+      context.go('/inbox');
+    } on CrconApiException catch (error) {
+      if (error.statusCode != 202 && mounted) {
+        _poller?.cancel();
+        setState(() => _error = error.message);
+      }
+    }
+  }
+
+  Widget _desktopPairing(BuildContext context) {
+    final session = _desktopSession;
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Icon(
+                    Icons.desktop_windows_outlined,
+                    size: 48,
+                    color: FrontlineTheme.gold,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    context.tr('Windows-App verbinden', 'Connect Windows app'),
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    session == null
+                        ? context.tr(
+                            'Gib die öffentliche HTTPS-Adresse deines CRCON ein. Anschließend öffnet sich der Browser zur sicheren Freigabe.',
+                            'Enter the public HTTPS address of your CRCON. The browser will then open for secure approval.',
+                          )
+                        : context.tr(
+                            'Bestätige diesen Code im CRCON-Browser mit deinem eigenen Konto. Die Windows-App verbindet sich danach automatisch.',
+                            'Confirm this code in the CRCON browser with your own account. The Windows app will then connect automatically.',
+                          ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  if (session == null) ...[
+                    TextField(
+                      controller: _desktopUrl,
+                      keyboardType: TextInputType.url,
+                      autofillHints: const [AutofillHints.url],
+                      decoration: InputDecoration(
+                        labelText: context.tr('CRCON-Adresse', 'CRCON address'),
+                        hintText: 'https://crcon.example.org',
+                        prefixIcon: const Icon(Icons.language_outlined),
+                      ),
+                      onSubmitted: (_) => _startDesktopAuthorization(),
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: _busy ? null : _startDesktopAuthorization,
+                      icon: const Icon(Icons.open_in_browser),
+                      label: Text(
+                        context.tr(
+                          'Browser öffnen und verbinden',
+                          'Open browser and connect',
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    Semantics(
+                      label: context.tr('Gerätecode', 'Device code'),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 20),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: FrontlineTheme.gold),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          session.userCode,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.headlineMedium
+                              ?.copyWith(
+                                letterSpacing: 3,
+                                color: FrontlineTheme.gold,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: () => Clipboard.setData(
+                        ClipboardData(text: session.userCode),
+                      ),
+                      icon: const Icon(Icons.copy_outlined),
+                      label: Text(context.tr('Code kopieren', 'Copy code')),
+                    ),
+                    const SizedBox(height: 8),
+                    FilledButton.tonalIcon(
+                      onPressed: _openDesktopBrowser,
+                      icon: const Icon(Icons.open_in_browser),
+                      label: Text(
+                        context.tr(
+                          'Browser erneut öffnen',
+                          'Open browser again',
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (_error != null) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      _error!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: Text(context.tr('CRCON koppeln', 'Pair CRCON')),
       actions: const [_LanguageButton()],
     ),
-    body: _session == null
+    body: Platform.isWindows
+        ? _desktopPairing(context)
+        : _session == null
         ? Stack(
             children: [
               MobileScanner(
