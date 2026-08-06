@@ -532,6 +532,7 @@ class MobileContextTests(TestCase):
         self.assertEqual(response.status_code, 200)
         events = response.json()["result"]["events"]
         self.assertEqual([event["type"] for event in events], ["chat", "teamkill"])
+        self.assertEqual(events[0]["message"], "hello")
         call = get_rcon_api.return_value.get_historical_logs.call_args.kwargs
         self.assertEqual(call["player_id"], "p1")
         self.assertEqual(call["server_filter"], "1")

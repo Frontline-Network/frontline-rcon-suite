@@ -4727,6 +4727,7 @@ class _ContextEventRow extends StatelessWidget {
         context.tr('Unbekannter Spieler', 'Unknown player');
     final other = event['other_name']?.toString();
     final weapon = event['weapon']?.toString();
+    final message = event['message']?.toString().trim() ?? '';
     final details = <String?>[
       if (weapon != null && weapon.isNotEmpty) weapon,
       _contextEventTime(event['occurred_at']),
@@ -4771,6 +4772,18 @@ class _ContextEventRow extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
+              if (kind == 'chat' && message.isNotEmpty) ...[
+                const SizedBox(height: 5),
+                Text(
+                  message,
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: FrontlineTheme.chalk,
+                    height: 1.35,
+                  ),
+                ),
+              ],
               if (details.isNotEmpty) ...[
                 const SizedBox(height: 3),
                 Text(
