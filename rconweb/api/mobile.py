@@ -612,9 +612,13 @@ def exchange_pairing(request, pairing_id):
 
     with transaction.atomic():
         try:
+            # ``user`` remains nullable until the browser approves the QR
+            # pairing. PostgreSQL cannot lock the nullable side introduced by
+            # ``select_related`` here (``FOR UPDATE`` on an outer join), so
+            # lock only the pairing row and load the approved user lazily.
+            # This also keeps a concurrent exchange single-use.
             pairing = (
                 MobilePairing.objects.select_for_update()
-                .select_related("user")
                 .get(
                     pk=pairing_id,
                     exchange_token_digest=token_digest(raw_exchange_token, "exchange"),
@@ -628,7 +632,7 @@ def exchange_pairing(request, pairing_id):
             return _error(command, "Pairing is awaiting web approval", 202)
         if pairing.state == MobilePairing.State.DENIED:
             return _error(command, "Pairing was denied", 403)
-        if pairing.state != MobilePairing.State.APPROVED:
+        if pairing.state != MobilePairing.State.APPROVED or pairing.user is None:
             return _error(command, "Pairing is no longer available", 409)
 
         device = MobileDevice.objects.create(
