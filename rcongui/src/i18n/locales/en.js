@@ -445,9 +445,9 @@ const en = {
   apps: {
     eyebrow: "Overview",
     title: "Set up apps",
-    subtitle: "The Frontline App brings incidents, player checks and secure admin actions to your phone, the web and Windows.",
-    frontline: { title: "Frontline App", description: "The mobile command centre for fast, secure admin work.", security: "Account-based permissions", qr: "Secure QR pairing", devices: "Android, web & Windows", detail: "The app only uses your existing CRCON permissions. Every device is paired separately and can be revoked here at any time.", setup: "Pair a device", open: "Open Frontline web app", openWindows: "Open Frontline for Windows", windowsHint: "Frontline for Windows is available for this platform. It pairs through a short device code." },
-    how: { title: "In three steps", one: "Open the Frontline App on your phone, in a browser or on Windows.", two: "Choose “Pair a device” here, confirm your password and scan the QR code.", three: "Verify the six-digit comparison code and approve the connection." },
+    subtitle: "The Frontline App brings incidents, player checks and secure admin actions to your phone and the web.",
+    frontline: { title: "Frontline App", description: "The mobile command centre for fast, secure admin work.", security: "Account-based permissions", qr: "Secure QR pairing", devices: "Android & web", detail: "The app only uses your existing CRCON permissions. Every device is paired separately and can be revoked here at any time.", setup: "Pair a device", open: "Open Frontline web app", openWindows: "Open Frontline for Windows", windowsHint: "Frontline for Windows is available for this platform. It pairs through a short device code." },
+    how: { title: "In three steps", one: "Open Frontline on your phone or in a browser at webapp.fln.gg.", two: "Choose “Pair a device” here, confirm your password and scan the QR code.", three: "Verify the six-digit comparison code and approve the connection." },
   },
   serverSettings: {
     teamAutobalance: "Team autobalance",

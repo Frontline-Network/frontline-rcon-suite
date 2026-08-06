@@ -1,5 +1,5 @@
 import {
-  LaptopWindows as LaptopWindowsIcon,
+  Language as LanguageIcon,
   PhoneAndroid as PhoneAndroidIcon,
   QrCode2 as QrCodeIcon,
   Security as SecurityIcon,
@@ -10,11 +10,7 @@ import CrconAppSettings from "@/pages/settings/general-group/crcon-app";
 
 const FrontlineAppsPage = () => {
   const { t } = useTranslation();
-  const isWindows =
-    typeof navigator !== "undefined" && /windows/i.test(navigator.userAgent);
-  const companionUrl = isWindows
-    ? "https://github.com/Frontline-Network/hll_rcon_tool-mobile-admin/releases"
-    : "https://webapp.fln.gg";
+  const companionUrl = "https://webapp.fln.gg";
 
   return (
     <Box sx={{ py: { xs: 2, md: 2.5 } }}>
@@ -53,22 +49,16 @@ const FrontlineAppsPage = () => {
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1} useFlexGap flexWrap="wrap">
                   <Chip icon={<SecurityIcon />} label={t("apps.frontline.security")} />
                   <Chip icon={<QrCodeIcon />} label={t("apps.frontline.qr")} />
-                  <Chip icon={<LaptopWindowsIcon />} label={t("apps.frontline.devices")} />
+                  <Chip icon={<LanguageIcon />} label={t("apps.frontline.devices")} />
                 </Stack>
 
                 <Typography variant="body2" color="text.secondary">
                   {t("apps.frontline.detail")}
                 </Typography>
 
-                {isWindows && (
-                  <Typography variant="body2" color="text.secondary">
-                    {t("apps.frontline.windowsHint")}
-                  </Typography>
-                )}
-
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
                   <Button component="a" href={companionUrl} target="_blank" rel="noreferrer" variant="outlined">
-                    {isWindows ? t("apps.frontline.openWindows") : t("apps.frontline.open")}
+                    {t("apps.frontline.open")}
                   </Button>
                 </Stack>
               </Stack>
