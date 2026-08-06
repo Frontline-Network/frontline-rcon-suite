@@ -2840,7 +2840,11 @@ class _FirstConnectionWizard extends StatelessWidget {
                     const _LanguageButton(),
                   ],
                 ),
-                const SizedBox(height: 58),
+                if (appIsWeb) ...[
+                  const SizedBox(height: 28),
+                  const _WebAppInstallCard(),
+                ],
+                SizedBox(height: appIsWeb ? 38 : 58),
                 const Icon(
                   Icons.phonelink_lock_outlined,
                   size: 56,
@@ -2863,10 +2867,6 @@ class _FirstConnectionWizard extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: FrontlineTheme.muted),
                 ),
-                if (appIsWeb) ...[
-                  const SizedBox(height: 24),
-                  const _WebAppInstallCard(),
-                ],
                 const SizedBox(height: 30),
                 _WizardStep(
                   number: '1',
