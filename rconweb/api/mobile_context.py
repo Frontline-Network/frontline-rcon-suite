@@ -233,6 +233,18 @@ def player_detail(request, player_id):
             else None
         ),
     }
+    return api_response(
+        command=command,
+        failed=False,
+        result={
+            "player_id": str(player_id),
+            "server_number": server_number,
+            "capabilities": capabilities,
+            "identifiers": identifiers,
+            "history": history,
+            "live": live,
+        },
+    )
 
 
 @csrf_exempt
@@ -275,18 +287,6 @@ def autobalancer_status(request):
             "warnings": status.get("warnings") or [],
             "native_autobalance": status.get("native_autobalance") or {},
             "updated_at": status.get("updated_at"),
-        },
-    )
-    return api_response(
-        command=command,
-        failed=False,
-        result={
-            "player_id": str(player_id),
-            "server_number": server_number,
-            "capabilities": capabilities,
-            "identifiers": identifiers,
-            "history": history,
-            "live": live,
         },
     )
 
