@@ -2844,6 +2844,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, _) => _ErrorView(message: error.toString()),
           data: (items) {
+            if (appIsWindows) {
+              return _WindowsLeitstelle(items: items);
+            }
             final filtered = _filtered(items);
             final servers =
                 items.map((incident) => incident.serverNumber).toSet().toList()
@@ -2966,6 +2969,942 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
           ),
         ),
       );
+}
+
+/// Windows is intentionally a different workspace from the mobile inbox: the
+/// case list remains visible while a moderator examines the selected report.
+class _WindowsLeitstelle extends StatefulWidget {
+  const _WindowsLeitstelle({required this.items});
+
+  final List<AdminIncident> items;
+
+  @override
+  State<_WindowsLeitstelle> createState() => _WindowsLeitstelleState();
+}
+
+class _WindowsLeitstelleState extends State<_WindowsLeitstelle> {
+  String? _selectedId;
+  int? _server;
+  int _tab = 0;
+
+  List<AdminIncident> get _items => widget.items
+      .where((item) => _server == null || item.serverNumber == _server)
+      .toList();
+
+  AdminIncident? get _selected {
+    final items = _items;
+    if (items.isEmpty) return null;
+    return items.firstWhere(
+      (item) => item.id == _selectedId,
+      orElse: () => items.first,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = _selected;
+    final servers =
+        widget.items.map((item) => item.serverNumber).toSet().toList()..sort();
+    return Scaffold(
+      body: SafeArea(
+        child: Row(
+          children: [
+            _WindowsNavigation(),
+            const VerticalDivider(width: 1),
+            SizedBox(
+              width: 330,
+              child: _WindowsCaseQueue(
+                items: _items,
+                selectedId: selected?.id,
+                server: _server,
+                servers: servers,
+                onServerChanged: (value) => setState(() {
+                  _server = value;
+                  _selectedId = null;
+                }),
+                onSelected: (item) => setState(() => _selectedId = item.id),
+              ),
+            ),
+            const VerticalDivider(width: 1),
+            Expanded(
+              child: selected == null
+                  ? Center(
+                      child: Text(
+                        context.tr('Keine Vorfälle.', 'No incidents.'),
+                        style: const TextStyle(color: FrontlineTheme.muted),
+                      ),
+                    )
+                  : _WindowsIncidentWorkspace(
+                      item: selected,
+                      tab: _tab,
+                      onTabChanged: (value) => setState(() => _tab = value),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WindowsNavigation extends StatelessWidget {
+  const _WindowsNavigation();
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = <(IconData, String, String)>[
+      (
+        Icons.inbox_outlined,
+        context.tr('Leitstelle', 'Command center'),
+        '/inbox',
+      ),
+      (Icons.person_outline, context.tr('Spieler', 'Players'), '/players'),
+      (
+        Icons.visibility_outlined,
+        context.tr('Watchlist', 'Watchlist'),
+        '/connections',
+      ),
+      (Icons.dns_outlined, context.tr('Server', 'Servers'), '/connections'),
+      (Icons.settings_outlined, context.tr('Mehr', 'More'), '/connections'),
+    ];
+    return SizedBox(
+      width: 88,
+      child: ColoredBox(
+        color: const Color(0xff0c100d),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 24, bottom: 28),
+              child: Image.asset('assets/fln_logo.png', width: 42, height: 42),
+            ),
+            for (final entry in entries)
+              Tooltip(
+                message: entry.$2,
+                child: InkWell(
+                  onTap: () => context.go(entry.$3),
+                  child: SizedBox(
+                    height: 58,
+                    child: Icon(
+                      entry.$1,
+                      color: entry.$3 == '/inbox'
+                          ? FrontlineTheme.gold
+                          : FrontlineTheme.chalk,
+                    ),
+                  ),
+                ),
+              ),
+            const Spacer(),
+            const Padding(
+              padding: EdgeInsets.only(bottom: 20),
+              child: Icon(Icons.bolt_outlined, color: FrontlineTheme.gold),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WindowsCaseQueue extends StatelessWidget {
+  const _WindowsCaseQueue({
+    required this.items,
+    required this.selectedId,
+    required this.server,
+    required this.servers,
+    required this.onServerChanged,
+    required this.onSelected,
+  });
+
+  final List<AdminIncident> items;
+  final String? selectedId;
+  final int? server;
+  final List<int> servers;
+  final ValueChanged<int?> onServerChanged;
+  final ValueChanged<AdminIncident> onSelected;
+
+  @override
+  Widget build(BuildContext context) => ColoredBox(
+    color: const Color(0xff10130f),
+    child: Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(22, 23, 12, 15),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  context.tr('Vorfallliste', 'Case list'),
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              PopupMenuButton<int?>(
+                tooltip: context.tr('Server filtern', 'Filter servers'),
+                onSelected: onServerChanged,
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: null,
+                    child: Text(context.tr('Alle Server', 'All servers')),
+                  ),
+                  ...servers.map(
+                    (value) => PopupMenuItem(
+                      value: value,
+                      child: Text('${context.tr('Server', 'Server')} $value'),
+                    ),
+                  ),
+                ],
+                icon: const Icon(Icons.tune, color: FrontlineTheme.chalk),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: items.isEmpty
+              ? Center(
+                  child: Text(context.tr('Keine Meldungen.', 'No reports.')),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  itemCount: items.length,
+                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    final subject = item.primarySubject;
+                    final isSquad = subject?.kind == 'squad';
+                    final target = subject == null
+                        ? context.tr('Allgemeine Meldung', 'General report')
+                        : isSquad
+                        ? context.squadName(
+                            subject.squadName ?? subject.displayName,
+                          )
+                        : subject.displayName;
+                    final type = subject == null
+                        ? context.tr('Allgemeine Meldung', 'General report')
+                        : isSquad
+                        ? context.tr('Squadmeldung', 'Squad report')
+                        : context.tr('Spielermeldung', 'Player report');
+                    final selected = item.id == selectedId;
+                    return InkWell(
+                      onTap: () => onSelected(item),
+                      child: Container(
+                        color: selected
+                            ? const Color(0xff2a291b)
+                            : Colors.transparent,
+                        padding: const EdgeInsets.fromLTRB(18, 16, 16, 15),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 3,
+                              height: 62,
+                              color: selected
+                                  ? FrontlineTheme.gold
+                                  : Colors.transparent,
+                            ),
+                            const SizedBox(width: 11),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    target,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    type,
+                                    style: const TextStyle(
+                                      color: FrontlineTheme.muted,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    '${context.tr('Server', 'Server')} ${item.serverNumber} · ${_relativeIncidentTime(context, item.createdAt)}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: FrontlineTheme.chalk,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Text(
+                              context.incidentStatus(item.status),
+                              style: TextStyle(
+                                color: item.status == 'new'
+                                    ? FrontlineTheme.chalk
+                                    : FrontlineTheme.gold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _WindowsIncidentWorkspace extends StatelessWidget {
+  const _WindowsIncidentWorkspace({
+    required this.item,
+    required this.tab,
+    required this.onTabChanged,
+  });
+
+  final AdminIncident item;
+  final int tab;
+  final ValueChanged<int> onTabChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final subject = item.primarySubject;
+    final isSquad = subject?.kind == 'squad';
+    final target = subject == null
+        ? context.tr('Allgemeine Meldung', 'General report')
+        : isSquad
+        ? context.squadName(subject.squadName ?? subject.displayName)
+        : subject.displayName;
+    final report = (item.rawMessage ?? item.reason).trim();
+    final reporterTeam = item.reporterContext['team']?.toString();
+    final reporterSquad =
+        item.reporterContext['squad']?.toString() ??
+        item.reporterContext['squad_name']?.toString();
+    final snapshot = subject?.snapshot ?? const <String, dynamic>{};
+    final members = _listValue(snapshot['players'])
+        .whereType<Map>()
+        .map((value) => Map<String, dynamic>.from(value))
+        .toList();
+    final leader =
+        subject?.leaderName ??
+        _desktopMemberName(
+          members.where((value) => value['is_leader'] == true),
+        ) ??
+        context.tr('Unbekannt', 'Unknown');
+    return ColoredBox(
+      color: const Color(0xff10130f),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(34, 22, 34, 20),
+            child: Row(
+              children: [
+                Icon(
+                  isSquad ? Icons.groups_2_outlined : Icons.person_outline,
+                  color: FrontlineTheme.gold,
+                  size: 31,
+                ),
+                const SizedBox(width: 13),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${isSquad ? context.tr('Squad', 'Squad') : context.tr('Spieler', 'Player')} $target',
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        [
+                          '${context.tr('Server', 'Server')} ${item.serverNumber}',
+                          if (subject?.team != null)
+                            '${context.tr('Seite', 'Side')}: ${context.teamName(subject?.team)}',
+                          if (subject?.squadType != null)
+                            context.squadTypeName(subject?.squadType),
+                          if (isSquad)
+                            '${context.tr('Squadleader', 'Squad leader')}: $leader',
+                        ].join('  ·  '),
+                        style: const TextStyle(
+                          color: FrontlineTheme.chalk,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  context.incidentStatus(item.status),
+                  style: const TextStyle(
+                    color: FrontlineTheme.gold,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(34, 25, 34, 18),
+              children: [
+                Text(
+                  context
+                      .tr('Originalmeldung', 'Original report')
+                      .toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: FrontlineTheme.muted,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: .6,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  report.isEmpty ? item.reason : report,
+                  style: const TextStyle(
+                    fontSize: 27,
+                    height: 1.22,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Divider(height: 1),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _WindowsInfoBlock(
+                        title: context.tr(
+                          'Melder (nicht Ziel)',
+                          'Reporter (not target)',
+                        ),
+                        icon: Icons.person_outline,
+                        lines: [
+                          item.reporterName ??
+                              context.tr('Unbekannt', 'Unknown'),
+                          if (item.reporterId != null)
+                            'SteamID: ${item.reporterId}',
+                          if (reporterTeam != null)
+                            '${context.tr('Seite', 'Side')}: ${context.teamName(reporterTeam)}',
+                          if (reporterSquad != null)
+                            '${context.tr('Squad', 'Squad')}: ${context.squadName(reporterSquad)}',
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 18),
+                    Expanded(
+                      child: _WindowsInfoBlock(
+                        title: context.tr('Gemeldetes Ziel', 'Reported target'),
+                        icon: isSquad
+                            ? Icons.groups_2_outlined
+                            : Icons.gps_fixed,
+                        lines: [
+                          target,
+                          '${context.tr('Server', 'Server')} ${item.serverNumber}',
+                          if (subject?.team != null)
+                            '${context.tr('Seite', 'Side')}: ${context.teamName(subject?.team)}',
+                          if (isSquad)
+                            '${context.tr('Squadleader', 'Squad leader')}: $leader',
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 22),
+                _WindowsWorkspaceTabs(value: tab, onChanged: onTabChanged),
+                const SizedBox(height: 16),
+                if (tab == 0)
+                  _WindowsReportPanel(item: item, report: report)
+                else if (tab == 1)
+                  _WindowsTargetsPanel(
+                    item: item,
+                    target: target,
+                    isSquad: isSquad,
+                    leader: leader,
+                  )
+                else if (tab == 2)
+                  _WindowsOverviewPanel(
+                    item: item,
+                    subject: subject,
+                    members: members,
+                    leader: leader,
+                  )
+                else if (tab == 3)
+                  _WindowsEventsPanel(events: item.events)
+                else
+                  _WindowsHistoryPanel(item: item),
+              ],
+            ),
+          ),
+          _WindowsActions(item: item, leader: leader),
+        ],
+      ),
+    );
+  }
+}
+
+class _WindowsInfoBlock extends StatelessWidget {
+  const _WindowsInfoBlock({
+    required this.title,
+    required this.icon,
+    required this.lines,
+  });
+  final String title;
+  final IconData icon;
+  final List<String> lines;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: const Color(0xff171b15),
+      border: Border.all(color: const Color(0xff4b4d3d)),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: FrontlineTheme.gold),
+        const SizedBox(width: 11),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title.toUpperCase(),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: FrontlineTheme.gold,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: .5,
+                ),
+              ),
+              const SizedBox(height: 9),
+              for (final line in lines)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    line,
+                    style: const TextStyle(color: FrontlineTheme.chalk),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _WindowsWorkspaceTabs extends StatelessWidget {
+  const _WindowsWorkspaceTabs({required this.value, required this.onChanged});
+  final int value;
+  final ValueChanged<int> onChanged;
+  @override
+  Widget build(BuildContext context) {
+    final labels = [
+      context.tr('Meldung', 'Report'),
+      context.tr('Ziele', 'Targets'),
+      context.tr('Squad', 'Squad'),
+      context.tr('Ereignisse', 'Events'),
+      context.tr('Verlauf', 'History'),
+    ];
+    return Row(
+      children: List.generate(
+        labels.length,
+        (index) => Padding(
+          padding: const EdgeInsets.only(right: 4),
+          child: TextButton(
+            onPressed: () => onChanged(index),
+            style: TextButton.styleFrom(
+              foregroundColor: value == index
+                  ? FrontlineTheme.gold
+                  : FrontlineTheme.chalk,
+              backgroundColor: value == index
+                  ? const Color(0xff302f20)
+                  : Colors.transparent,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.zero,
+              ),
+            ),
+            child: Text(labels[index]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WindowsReportPanel extends StatelessWidget {
+  const _WindowsReportPanel({required this.item, required this.report});
+  final AdminIncident item;
+  final String report;
+
+  @override
+  Widget build(BuildContext context) => _WindowsPanel(
+    title: context.tr('Meldung einordnen', 'Report context'),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          context.tr(
+            'Die Meldung bezieht sich auf das oben markierte Ziel. Der Melder wird nur als Quelle angezeigt und ist keine automatische Maßnahmenauswahl.',
+            'This report concerns the highlighted target above. The reporter is shown as a source only and is not selected for actions automatically.',
+          ),
+          style: const TextStyle(color: FrontlineTheme.chalk, height: 1.45),
+        ),
+        const SizedBox(height: 15),
+        Text(
+          '${context.tr('Zeitpunkt', 'Time')}: ${item.createdAt.toLocal()}',
+          style: const TextStyle(color: FrontlineTheme.muted),
+        ),
+        if (report.isNotEmpty) ...[
+          const SizedBox(height: 15),
+          Text(report, style: const TextStyle(fontSize: 17, height: 1.35)),
+        ],
+      ],
+    ),
+  );
+}
+
+class _WindowsTargetsPanel extends StatelessWidget {
+  const _WindowsTargetsPanel({
+    required this.item,
+    required this.target,
+    required this.isSquad,
+    required this.leader,
+  });
+  final AdminIncident item;
+  final String target;
+  final bool isSquad;
+  final String leader;
+
+  @override
+  Widget build(BuildContext context) => _WindowsPanel(
+    title: context.tr('Bestätigte Ziele', 'Confirmed targets'),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(
+            isSquad ? Icons.groups_2_outlined : Icons.person_outline,
+            color: FrontlineTheme.gold,
+          ),
+          title: Text(target),
+          subtitle: Text(
+            [
+              '${context.tr('Server', 'Server')} ${item.serverNumber}',
+              if (isSquad)
+                '${context.tr('Squadleader', 'Squad leader')}: $leader',
+            ].join('  ·  '),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          isSquad
+              ? context.tr(
+                  'Maßnahmen bleiben immer auf einen einzelnen Spieler begrenzt. Beim Squad ist der Leader vorausgewählt; ein Mitglied kann anschließend bewusst gewählt werden.',
+                  'Actions always remain limited to one player. For a squad, the leader is preselected; a member can then be chosen deliberately.',
+                )
+              : context.tr(
+                  'Dieses bestätigte Spielerziel wird für Maßnahmen verwendet.',
+                  'This confirmed player target is used for actions.',
+                ),
+          style: const TextStyle(color: FrontlineTheme.chalk, height: 1.45),
+        ),
+      ],
+    ),
+  );
+}
+
+class _WindowsOverviewPanel extends StatelessWidget {
+  const _WindowsOverviewPanel({
+    required this.item,
+    required this.subject,
+    required this.members,
+    required this.leader,
+  });
+  final AdminIncident item;
+  final IncidentSubject? subject;
+  final List<Map<String, dynamic>> members;
+  final String leader;
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Expanded(
+        child: _WindowsPanel(
+          title: context.tr('Squad-Snapshot', 'Squad snapshot'),
+          child: members.isEmpty
+              ? Text(
+                  context.tr(
+                    'Kein Squad-Snapshot verfügbar.',
+                    'No squad snapshot available.',
+                  ),
+                  style: const TextStyle(color: FrontlineTheme.muted),
+                )
+              : Column(
+                  children: members.take(8).map((member) {
+                    final name =
+                        _desktopMemberName([member]) ??
+                        context.tr('Unbekannt', 'Unknown');
+                    final role = member['role']?.toString();
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 5),
+                      child: Row(
+                        children: [
+                          Icon(
+                            name == leader
+                                ? Icons.workspace_premium_outlined
+                                : Icons.person_outline,
+                            size: 18,
+                            color: name == leader
+                                ? FrontlineTheme.gold
+                                : FrontlineTheme.chalk,
+                          ),
+                          const SizedBox(width: 9),
+                          Expanded(child: Text(name)),
+                          if (role != null)
+                            Text(
+                              context.roleName(role),
+                              style: const TextStyle(
+                                color: FrontlineTheme.muted,
+                                fontSize: 13,
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+        ),
+      ),
+      const SizedBox(width: 18),
+      Expanded(
+        child: _WindowsPanel(
+          title: context.tr('Aktuelle Zuordnung', 'Current assignment'),
+          child: Column(
+            children: [
+              _WindowsFact(
+                label: context.tr('Serverzuordnung', 'Server assignment'),
+                value: '${context.tr('Server', 'Server')} ${item.serverNumber}',
+              ),
+              _WindowsFact(
+                label: context.tr('Seite', 'Side'),
+                value: context.teamName(subject?.team),
+              ),
+              _WindowsFact(
+                label: context.tr('Squad', 'Squad'),
+                value: subject?.kind == 'squad'
+                    ? context.squadName(
+                        subject?.squadName ?? subject?.displayName,
+                      )
+                    : context.squadName(subject?.squadName),
+              ),
+              _WindowsFact(
+                label: context.tr('Squadleader', 'Squad leader'),
+                value: leader,
+              ),
+              _WindowsFact(
+                label: context.tr('Mitglieder', 'Members'),
+                value: members.isEmpty ? '—' : '${members.length}',
+              ),
+            ],
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+class _WindowsPanel extends StatelessWidget {
+  const _WindowsPanel({required this.title, required this.child});
+  final String title;
+  final Widget child;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(17),
+    decoration: BoxDecoration(
+      color: const Color(0xff151914),
+      border: Border.all(color: const Color(0xff4b4d3d)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title.toUpperCase(),
+          style: const TextStyle(
+            color: FrontlineTheme.muted,
+            fontWeight: FontWeight.w700,
+            letterSpacing: .5,
+          ),
+        ),
+        const SizedBox(height: 13),
+        child,
+      ],
+    ),
+  );
+}
+
+class _WindowsFact extends StatelessWidget {
+  const _WindowsFact({required this.label, required this.value});
+  final String label;
+  final String value;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(color: FrontlineTheme.muted),
+          ),
+        ),
+        Flexible(child: Text(value, textAlign: TextAlign.right)),
+      ],
+    ),
+  );
+}
+
+class _WindowsEventsPanel extends StatelessWidget {
+  const _WindowsEventsPanel({required this.events});
+  final List<Map<String, dynamic>> events;
+  @override
+  Widget build(BuildContext context) => _WindowsPanel(
+    title: context.tr('Ereignisse zum Vorfall', 'Incident events'),
+    child: events.isEmpty
+        ? Text(
+            context.tr('Keine Ereignisse verfügbar.', 'No events available.'),
+            style: const TextStyle(color: FrontlineTheme.muted),
+          )
+        : Column(
+            children: events.take(12).map((event) {
+              final kind = event['kind']?.toString() ?? 'event';
+              final message =
+                  event['message']?.toString().trim().isNotEmpty == true
+                  ? event['message'].toString()
+                  : event['title']?.toString() ?? kind;
+              return Container(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: const BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Color(0xff3f4235))),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      kind == 'teamkill'
+                          ? Icons.warning_amber_outlined
+                          : Icons.chat_bubble_outline,
+                      size: 18,
+                      color: kind == 'teamkill'
+                          ? FrontlineTheme.gold
+                          : FrontlineTheme.chalk,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(message)),
+                    if (event['time'] != null)
+                      Text(
+                        event['time'].toString(),
+                        style: const TextStyle(
+                          color: FrontlineTheme.muted,
+                          fontSize: 12,
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+  );
+}
+
+class _WindowsHistoryPanel extends StatelessWidget {
+  const _WindowsHistoryPanel({required this.item});
+  final AdminIncident item;
+  @override
+  Widget build(BuildContext context) => _WindowsPanel(
+    title: context.tr('Fallverlauf', 'Case history'),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '${context.tr('Eingegangen', 'Received')}: ${item.createdAt.toLocal()}',
+        ),
+        const SizedBox(height: 10),
+        Text(
+          '${context.tr('Aktueller Status', 'Current status')}: ${context.incidentStatus(item.status)}',
+        ),
+        if (item.assignedTo != null) ...[
+          const SizedBox(height: 10),
+          Text(
+            '${context.tr('Zugewiesen an', 'Assigned to')}: ${item.assignedTo}',
+          ),
+        ],
+      ],
+    ),
+  );
+}
+
+class _WindowsActions extends StatelessWidget {
+  const _WindowsActions({required this.item, required this.leader});
+  final AdminIncident item;
+  final String leader;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(34, 13, 34, 16),
+    decoration: const BoxDecoration(
+      color: Color(0xff121611),
+      border: Border(top: BorderSide(color: Color(0xff4b4d3d))),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          flex: 2,
+          child: FilledButton.icon(
+            onPressed: () =>
+                context.push('/incidents/${item.connectionId}/${item.id}'),
+            icon: const Icon(Icons.chat_bubble_outline),
+            label: Text(context.tr('Nachricht an $leader', 'Message $leader')),
+          ),
+        ),
+        const SizedBox(width: 10),
+        for (final action in <(IconData, String)>[
+          (Icons.shield_outlined, context.tr('Warnung', 'Warning')),
+          (Icons.person_remove_alt_1_outlined, context.tr('Kick', 'Kick')),
+          (Icons.timer_outlined, context.tr('Tempban', 'Tempban')),
+        ]) ...[
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () =>
+                  context.push('/incidents/${item.connectionId}/${item.id}'),
+              icon: Icon(action.$1, size: 18),
+              label: Text(action.$2),
+            ),
+          ),
+          const SizedBox(width: 10),
+        ],
+        IconButton(
+          onPressed: () =>
+              context.push('/incidents/${item.connectionId}/${item.id}'),
+          icon: const Icon(Icons.more_horiz),
+        ),
+      ],
+    ),
+  );
+}
+
+String? _desktopMemberName(Iterable<Map<String, dynamic>> members) {
+  for (final member in members) {
+    final name =
+        member['name']?.toString() ?? member['player_name']?.toString();
+    if (name != null && name.isNotEmpty) return name;
+  }
+  return null;
 }
 
 class _FirstConnectionWizard extends StatelessWidget {
