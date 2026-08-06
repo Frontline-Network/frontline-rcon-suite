@@ -363,14 +363,16 @@ def exchange_desktop_authorization(request, pairing_id):
 
     with transaction.atomic():
         try:
-            pairing = (
-                MobilePairing.objects.select_for_update()
-                .select_related("user")
-                .get(
-                    pk=pairing_id,
-                    kind=MobilePairing.Kind.DESKTOP,
-                    secret_digest=token_digest(raw_device_code, "desktop_device"),
-                )
+            # ``user`` is intentionally nullable while a desktop code awaits
+            # browser approval. Locking a query with a select_related outer
+            # join makes PostgreSQL reject it (FOR UPDATE cannot lock the
+            # nullable join side). The pairing row is the only record that
+            # needs serialization here; the user is loaded lazily once the
+            # approval exists.
+            pairing = MobilePairing.objects.select_for_update().get(
+                pk=pairing_id,
+                kind=MobilePairing.Kind.DESKTOP,
+                secret_digest=token_digest(raw_device_code, "desktop_device"),
             )
         except (MobilePairing.DoesNotExist, ValueError):
             return _error(command, "Invalid desktop device code", 401)
