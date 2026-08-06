@@ -1854,6 +1854,73 @@ class _ConnectionCardState extends ConsumerState<_ConnectionCard> {
     }
   }
 
+  Future<void> _activatePush() async {
+    if (_busy || !_firebaseAvailable) return;
+    setState(() => _busy = true);
+    try {
+      // Web browsers reliably show their permission dialog only from a user
+      // gesture. Keeping this explicit action also gives an admin a safe way
+      // to re-register after a browser or FCM token rotation.
+      final permission = await FirebaseMessaging.instance.requestPermission();
+      final authorized =
+          permission.authorizationStatus == AuthorizationStatus.authorized ||
+          permission.authorizationStatus == AuthorizationStatus.provisional;
+      if (!authorized) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                context.tr(
+                  'Benachrichtigungen wurden nicht freigegeben. Erlaube sie in den Browser- oder App-Einstellungen und versuche es erneut.',
+                  'Notifications were not authorized. Allow them in your browser or app settings, then try again.',
+                ),
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      final identity = await PushRelay.register();
+      if (identity == null) {
+        throw StateError('Push registration returned no device identity');
+      }
+      await _api.updatePushIdentity(identity.handle, identity.capability);
+      await _api.updateNotifications(true);
+      AppLogger.instance.info(
+        'push',
+        'Push notifications activated for ${widget.profile.baseUrl}',
+      );
+      if (mounted) {
+        setState(() => _notifications = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              context.tr(
+                'Push-Benachrichtigungen sind für diese Verbindung aktiv.',
+                'Push notifications are active for this connection.',
+              ),
+            ),
+          ),
+        );
+      }
+    } catch (error, stackTrace) {
+      AppLogger.instance.error(
+        'push',
+        error,
+        message: 'Could not activate push notifications',
+        stackTrace: stackTrace,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _remove() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1937,6 +2004,23 @@ class _ConnectionCardState extends ConsumerState<_ConnectionCard> {
                   onPressed: _busy ? null : _remove,
                 ),
               ],
+            ),
+          ),
+        if (_firebaseAvailable)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _busy ? null : _activatePush,
+                icon: const Icon(Icons.notifications_active_outlined),
+                label: Text(
+                  context.tr(
+                    'Push auf diesem Gerät aktivieren',
+                    'Enable push on this device',
+                  ),
+                ),
+              ),
             ),
           ),
       ],
