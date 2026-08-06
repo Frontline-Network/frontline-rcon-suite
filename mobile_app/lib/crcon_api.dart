@@ -373,6 +373,70 @@ class CrconApi {
     return Map<String, dynamic>.from(result);
   }
 
+  Future<Map<String, dynamic>> playerContext(
+    String incidentId,
+    String playerId, {
+    int limit = 5,
+  }) async {
+    final result = await _authorized(
+      'GET',
+      'incidents/$incidentId/player-context',
+      queryParameters: {'player_id': playerId, 'limit': limit},
+    );
+    if (result is! Map) {
+      throw const CrconApiException(
+        'CRCON hat keinen gültigen Fallauszug geliefert.',
+      );
+    }
+    return Map<String, dynamic>.from(result);
+  }
+
+  Future<List<Map<String, dynamic>>> watchlist({int? serverNumber}) async {
+    final result = await _authorized(
+      'GET',
+      'watchlist',
+      queryParameters: {'server_number': ?serverNumber},
+    );
+    final map = result is Map ? Map<String, dynamic>.from(result) : const {};
+    return (map['players'] as List? ?? const [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  Future<void> watchPlayer(
+    String playerId, {
+    required String reason,
+    int? serverNumber,
+    String? playerName,
+    String? incidentId,
+  }) async {
+    await _authorized(
+      'PUT',
+      'players/${Uri.encodeComponent(playerId)}/watch',
+      data: {
+        'reason': reason,
+        'server_number': ?serverNumber,
+        'player_name': ?playerName,
+        'incident_id': ?incidentId,
+      },
+      headers: {'Idempotency-Key': const Uuid().v4()},
+    );
+  }
+
+  Future<void> unwatchPlayer(
+    String playerId, {
+    int? serverNumber,
+    String? incidentId,
+  }) async {
+    await _authorized(
+      'DELETE',
+      'players/${Uri.encodeComponent(playerId)}/watch',
+      data: {'server_number': ?serverNumber, 'incident_id': ?incidentId},
+      headers: {'Idempotency-Key': const Uuid().v4()},
+    );
+  }
+
   Future<Map<String, dynamic>> roster(int serverNumber) async {
     final result = await _authorized('GET', 'servers/$serverNumber/roster');
     if (result is! Map) {
@@ -410,6 +474,19 @@ class CrconApi {
     if (result is! Map) {
       throw const CrconApiException(
         'CRCON hat keinen gültigen Autobalancer-Status geliefert.',
+      );
+    }
+    return Map<String, dynamic>.from(result);
+  }
+
+  Future<Map<String, dynamic>> liveStatus(int serverNumber) async {
+    final result = await _authorized(
+      'GET',
+      'servers/$serverNumber/live-status',
+    );
+    if (result is! Map) {
+      throw const CrconApiException(
+        'CRCON hat keinen gültigen Serverstatus geliefert.',
       );
     }
     return Map<String, dynamic>.from(result);

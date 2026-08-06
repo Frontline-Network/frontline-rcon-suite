@@ -1,5 +1,7 @@
 """Permission-aware player and squad context for the native mobile client."""
 
+from datetime import datetime, timedelta, timezone as datetime_timezone
+
 from django.http import HttpResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -11,7 +13,14 @@ from rcon.utils import get_server_number
 
 from .auth import api_response, login_required
 from .decorators import require_http_methods
-from .mobile import _error, _require_enabled
+from .mobile import (
+    _error,
+    _json_body,
+    _require_enabled,
+    _require_feature,
+    mobile_feature_enabled,
+)
+from .mobile_audit import record_mobile_audit
 from .multi_servers import forward_mobile_request_to_server
 
 
@@ -47,6 +56,95 @@ def _forward_get(request, server_number: int):
 
 def _server_number(request) -> int:
     return int(request.GET.get("server_number", get_server_number()))
+
+
+def _forward_mutation(request, server_number: int, data: dict):
+    if server_number == int(get_server_number()) or data.get("forwarded"):
+        return None
+    try:
+        response = forward_mobile_request_to_server(
+            request,
+            server_number,
+            request.path,
+            data=data,
+            method=request.method,
+            params={key: value for key, value in request.GET.items() if key != "forwarded"},
+        )
+    except ValueError as exc:
+        return _error("mobile_context", str(exc), 503)
+    return HttpResponse(
+        content=response.content,
+        status=response.status_code,
+        content_type=response.headers.get("content-type", "application/json"),
+    )
+
+
+def _display_player_name(player: dict) -> str:
+    soldier = player.get("soldier") or {}
+    names = player.get("names") or []
+    return str(
+        player.get("name")
+        or player.get("player_name")
+        or soldier.get("name")
+        or (names[0].get("name") if names and isinstance(names[0], dict) else "")
+        or player.get("player_id")
+        or "Unknown"
+    )
+
+
+def _watch_summary(player: dict) -> dict:
+    watch = player.get("watchlist") or {}
+    return {
+        "player_id": str(player.get("player_id") or watch.get("player_id") or ""),
+        "name": _display_player_name(player),
+        "reason": str(watch.get("reason") or ""),
+        "by": watch.get("by"),
+        "modified": watch.get("modified"),
+        "count": int(watch.get("count") or 0),
+        "last_seen_timestamp_ms": player.get("last_seen_timestamp_ms"),
+        "online": bool(player.get("online", False)),
+    }
+
+
+def _incident_time(value) -> datetime:
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=datetime_timezone.utc)
+    return parsed
+
+
+def _event_type(action: str | None) -> str | None:
+    normalized = str(action or "").upper()
+    if normalized == "TEAM KILL":
+        return "teamkill"
+    if normalized == "KILL":
+        return "kill"
+    if normalized.startswith("CHAT"):
+        return "chat"
+    if normalized == "CONNECTED":
+        return "join"
+    if normalized == "DISCONNECTED":
+        return "leave"
+    return None
+
+
+def _context_event(log: dict) -> dict | None:
+    kind = _event_type(log.get("type") or log.get("action"))
+    if kind is None:
+        return None
+    occurred_at = log.get("event_time") or log.get("timestamp")
+    return {
+        "id": str(log.get("id") or ""),
+        "type": kind,
+        "occurred_at": occurred_at,
+        "actor_name": log.get("player1_name") or log.get("player_name_1"),
+        "other_name": log.get("player2_name") or log.get("player_name_2"),
+        "message": log.get("content") or log.get("message") or "",
+        "weapon": log.get("weapon"),
+    }
 
 
 def _team_view_for_user(request):
@@ -183,6 +281,7 @@ def player_detail(request, player_id):
     if forwarded := _forward_get(request, server_number):
         return forwarded
 
+    player_operations_enabled = mobile_feature_enabled("MOBILE_PLAYER_OPERATIONS")
     capabilities = {
         "history": request.user.has_perm("api.can_view_player_profile"),
         "live": request.user.has_perm("api.can_view_detailed_player_info"),
@@ -193,6 +292,14 @@ def player_detail(request, player_id):
         "kick": request.user.has_perm("api.can_kick_players"),
         "temp_ban": request.user.has_perm("api.can_temp_ban_players"),
         "comment": request.user.has_perm("api.can_add_player_comments"),
+        "watch_view": player_operations_enabled
+        and request.user.has_perm("api.can_view_player_history"),
+        "watch_add": player_operations_enabled
+        and request.user.has_perm("api.can_add_player_watch"),
+        "watch_remove": player_operations_enabled
+        and request.user.has_perm("api.can_remove_player_watch"),
+        "incident_context": player_operations_enabled
+        and request.user.has_perm("api.can_view_historical_logs"),
     }
     if not capabilities["history"] and not capabilities["live"]:
         return _error(command, "Missing player detail permission", 403)
@@ -291,6 +398,265 @@ def autobalancer_status(request):
             "updated_at": status.get("updated_at"),
         },
     )
+
+
+@csrf_exempt
+@login_required()
+@require_http_methods(["GET"])
+def watchlist(request):
+    """List the existing CRCON watchlist without introducing a second list."""
+
+    command = "mobile_watchlist"
+    if disabled := _require_feature(command, "MOBILE_PLAYER_OPERATIONS"):
+        return disabled
+    if not request.user.has_perm("api.can_view_player_history"):
+        return _error(command, "Missing watchlist view permission", 403)
+    try:
+        server_number = _server_number(request)
+        limit = min(max(int(request.GET.get("limit", 100)), 1), 100)
+    except ValueError as exc:
+        return _error(command, str(exc), 400)
+    if forwarded := _forward_get(request, server_number):
+        return forwarded
+
+    api = _rcon_api()
+    history = api.get_players_history(
+        page=1, page_size=limit, is_watched=True
+    )
+    players = [_watch_summary(item) for item in history.get("players") or []]
+    if request.user.has_perm("api.can_view_detailed_players"):
+        try:
+            live_ids = {
+                str(player_id)
+                for player_id in (api.get_detailed_players().get("players") or {})
+            }
+            for player in players:
+                player["online"] = player["player_id"] in live_ids
+        except Exception:
+            # The database-backed watchlist remains useful during a temporary
+            # RCON outage; do not turn a live-status embellishment into a
+            # failed list request.
+            pass
+    return api_response(
+        command=command,
+        failed=False,
+        result={
+            "server_number": server_number,
+            "players": players,
+            "total": history.get("total", len(players)),
+        },
+    )
+
+
+@csrf_exempt
+@login_required()
+@require_http_methods(["PUT", "DELETE"])
+def player_watch(request, player_id):
+    """Add or remove a watch using CRCON's native watchlist permission model."""
+
+    command = "mobile_player_watch"
+    if disabled := _require_feature(command, "MOBILE_PLAYER_OPERATIONS"):
+        return disabled
+    try:
+        data = _json_body(request)
+        server_number = int(data.get("server_number", request.GET.get("server_number", get_server_number())))
+    except (TypeError, ValueError) as exc:
+        return _error(command, str(exc), 400)
+    if forwarded := _forward_mutation(request, server_number, data):
+        return forwarded
+
+    player_id = str(player_id)
+    incident_id = str(data.get("incident_id") or "") or None
+    if request.method == "PUT":
+        if not request.user.has_perm("api.can_add_player_watch"):
+            return _error(command, "Missing watchlist add permission", 403)
+        reason = str(data.get("reason") or "").strip()
+        if not reason:
+            return _error(command, "A watch reason is required", 400)
+        player_name = str(data.get("player_name") or "").strip() or None
+        _rcon_api().watch_player(
+            player_id=player_id,
+            reason=reason,
+            by=request.user.username,
+            player_name=player_name,
+        )
+        record_mobile_audit(
+            username=request.user.username,
+            command="mobile_watch_player",
+            request=request,
+            server_number=server_number,
+            incident_id=incident_id,
+            arguments={"player_id": player_id, "reason": reason},
+            result={"watched": True},
+        )
+        return api_response(
+            command=command,
+            failed=False,
+            result={"player_id": player_id, "watched": True},
+        )
+
+    if not request.user.has_perm("api.can_remove_player_watch"):
+        return _error(command, "Missing watchlist remove permission", 403)
+    _rcon_api().unwatch_player(player_id=player_id)
+    record_mobile_audit(
+        username=request.user.username,
+        command="mobile_unwatch_player",
+        request=request,
+        server_number=server_number,
+        incident_id=incident_id,
+        arguments={"player_id": player_id},
+        result={"watched": False},
+    )
+    return api_response(
+        command=command,
+        failed=False,
+        result={"player_id": player_id, "watched": False},
+    )
+
+
+@csrf_exempt
+@login_required()
+@require_http_methods(["GET"])
+def incident_player_context(request, incident_id):
+    """Return a bounded ten-minute event excerpt for an incident player.
+
+    This deliberately exposes only the five event classes useful for first
+    response. It is not a general purpose raw-log browser.
+    """
+
+    command = "mobile_incident_player_context"
+    if disabled := _require_feature(command, "MOBILE_PLAYER_OPERATIONS"):
+        return disabled
+    if not request.user.has_perm("api.can_view_admin_incidents"):
+        return _error(command, "Missing incident view permission", 403)
+    if not request.user.has_perm("api.can_view_historical_logs"):
+        return _error(command, "Missing historical log permission", 403)
+    player_id = str(request.GET.get("player_id") or "").strip()
+    if not player_id:
+        return _error(command, "player_id is required", 400)
+    try:
+        from rcon.admin_incidents import IncidentNotFound, get_incident
+
+        incident = get_incident(str(incident_id))
+    except (IncidentNotFound, ValueError):
+        return _error(command, "Incident not found", 404)
+    server_number = int(incident.get("server_number", get_server_number()))
+    if forwarded := _forward_get(request, server_number):
+        return forwarded
+
+    confirmed_players = {
+        str(subject.get("player_id"))
+        for subject in incident.get("subjects") or []
+        if subject.get("kind") == "player"
+        and subject.get("state") == "confirmed"
+        and subject.get("player_id")
+    }
+    reporter_id = str(incident.get("reporter_id") or "")
+    if player_id not in confirmed_players and player_id != reporter_id:
+        return _error(command, "Player is not available in this incident", 403)
+    try:
+        report_time = _incident_time(incident.get("created_at"))
+    except (TypeError, ValueError):
+        return _error(command, "Incident timestamp is invalid", 500)
+    start = report_time - timedelta(minutes=5)
+    end = report_time + timedelta(minutes=5)
+    logs = _rcon_api().get_historical_logs(
+        player_id=player_id,
+        from_=start,
+        till=end,
+        limit=80,
+        time_sort="asc",
+        exact_player_match=True,
+        server_filter=str(server_number),
+    )
+    events: list[dict] = []
+    seen: set[tuple] = set()
+    for log in logs or []:
+        event = _context_event(log)
+        if event is None:
+            continue
+        marker = (
+            event["type"],
+            str(event.get("occurred_at")),
+            event.get("actor_name"),
+            event.get("other_name"),
+            event.get("message"),
+        )
+        if marker in seen:
+            continue
+        seen.add(marker)
+        events.append(event)
+    limit = min(max(int(request.GET.get("limit", 5)), 1), 50)
+    return api_response(
+        command=command,
+        failed=False,
+        result={
+            "incident_id": str(incident_id),
+            "player_id": player_id,
+            "server_number": server_number,
+            "window_start": start,
+            "window_end": end,
+            "events": events[:limit],
+            "total": len(events),
+        },
+    )
+
+
+@csrf_exempt
+@login_required()
+@require_http_methods(["GET"])
+def live_status(request, server_number):
+    """Read-only server situation with each field guarded by its CRCON right."""
+
+    command = "mobile_live_status"
+    if disabled := _require_feature(command, "MOBILE_LIVE_STATUS"):
+        return disabled
+    try:
+        server_number = int(server_number)
+    except (TypeError, ValueError) as exc:
+        return _error(command, str(exc), 400)
+    if forwarded := _forward_get(request, server_number):
+        return forwarded
+    permissions = {
+        "status": request.user.has_perm("api.can_view_get_status"),
+        "gamestate": request.user.has_perm("api.can_view_gamestate"),
+        "next_map": request.user.has_perm("api.can_view_next_map"),
+        "queue": request.user.has_perm("api.can_view_queue_length"),
+        "ingame_admins": request.user.has_perm("api.can_view_ingame_admins"),
+        "crcon_admins": request.user.has_perm("api.can_view_online_admins"),
+    }
+    if not any(permissions.values()):
+        return _error(command, "Missing live status permission", 403)
+    api = _rcon_api()
+    result = {"server_number": server_number, "captured_at": timezone.now()}
+    if permissions["status"]:
+        result["status"] = api.get_status()
+    if permissions["gamestate"]:
+        game = api.get_gamestate()
+        result["match"] = {
+            "current_map": game.get("current_map"),
+            "time_remaining": game.get("raw_time_remaining"),
+            "time_remaining_seconds": int(game.get("time_remaining").total_seconds())
+            if game.get("time_remaining")
+            else None,
+            "team_counts": {
+                "allies": game.get("num_allied_players"),
+                "axis": game.get("num_axis_players"),
+            },
+            "team_scores": {
+                "allies": game.get("allied_score"),
+                "axis": game.get("axis_score"),
+            },
+        }
+    if permissions["next_map"]:
+        result["next_map"] = api.get_next_map()
+    if permissions["queue"]:
+        result["queue_length"] = api.get_queue_length()
+    if permissions["ingame_admins"]:
+        result["ingame_admin_count"] = len(api.get_ingame_mods() or [])
+    if permissions["crcon_admins"]:
+        result["crcon_admin_count"] = len(api.get_online_mods() or [])
+    return api_response(command=command, failed=False, result=result)
 
 
 @csrf_exempt

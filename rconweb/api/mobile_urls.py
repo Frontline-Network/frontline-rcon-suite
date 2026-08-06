@@ -88,6 +88,15 @@ MOBILE_API_DOCUMENTATION = [
         "description": "Run a permission-checked, idempotent mobile player, squad removal, or squad disband action.",
     },
     {
+        "endpoint": "mobile/v1/incidents/{id}/player-context",
+        "allowed_http_methods": ["GET"],
+        "permissions_required": [
+            "api.can_view_admin_incidents",
+            "api.can_view_historical_logs",
+        ],
+        "description": "Load the bounded chat, kill, teamkill, join and leave excerpt around an incident.",
+    },
+    {
         "endpoint": "mobile/v1/incidents/{id}/subjects",
         "allowed_http_methods": ["POST"],
         "permissions_required": ["api.can_create_admin_incidents"],
@@ -140,6 +149,26 @@ MOBILE_API_DOCUMENTATION = [
         "allowed_http_methods": ["GET"],
         "permissions_required": [],
         "description": "Load a permission-filtered player dossier and live context.",
+    },
+    {
+        "endpoint": "mobile/v1/players/{player_id}/watch",
+        "allowed_http_methods": ["PUT", "DELETE"],
+        "permissions_required": [
+            "api.can_add_player_watch or api.can_remove_player_watch",
+        ],
+        "description": "Add or remove a player from CRCON's existing watchlist.",
+    },
+    {
+        "endpoint": "mobile/v1/watchlist",
+        "allowed_http_methods": ["GET"],
+        "permissions_required": ["api.can_view_player_history"],
+        "description": "List the existing CRCON watchlist for one game server.",
+    },
+    {
+        "endpoint": "mobile/v1/servers/{server_number}/live-status",
+        "allowed_http_methods": ["GET"],
+        "permissions_required": ["existing live-status read permissions"],
+        "description": "Load a permission-filtered, read-only server situation.",
     },
     {
         "endpoint": "mobile/v1/servers/{server_number}/roster",
@@ -222,6 +251,11 @@ urlpatterns = [
         name="mobile-autobalancer-status",
     ),
     path(
+        "incidents/<uuid:incident_id>/player-context",
+        mobile_context.incident_player_context,
+        name="mobile-incident-player-context",
+    ),
+    path(
         "templates",
         mobile_context.action_templates,
         name="mobile-action-templates",
@@ -247,9 +281,20 @@ urlpatterns = [
         name="mobile-player-detail",
     ),
     path(
+        "players/<str:player_id>/watch",
+        mobile_context.player_watch,
+        name="mobile-player-watch",
+    ),
+    path("watchlist", mobile_context.watchlist, name="mobile-watchlist"),
+    path(
         "servers/<int:server_number>/roster",
         mobile_context.roster,
         name="mobile-server-roster",
+    ),
+    path(
+        "servers/<int:server_number>/live-status",
+        mobile_context.live_status,
+        name="mobile-live-status",
     ),
     path(
         "servers/<int:server_number>/squads/<str:team>/<str:squad>",

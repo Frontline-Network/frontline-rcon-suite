@@ -62,6 +62,25 @@ def mobile_integration_enabled() -> bool:
     }
 
 
+def mobile_feature_enabled(name: str) -> bool:
+    """Read an explicitly opt-in mobile capability flag.
+
+    Mobile endpoints are deployed together with CRCON, but higher-risk or
+    larger surfaces stay dark until an operator enables their dedicated flag.
+    Keeping this helper here makes the decision consistent for every backend.
+    """
+
+    return os.getenv(name, "false").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _require_feature(command: str, name: str):
+    if disabled := _require_enabled(command):
+        return disabled
+    if not mobile_feature_enabled(name):
+        return _error(command, "This mobile feature is disabled", 404)
+    return None
+
+
 def _incident_retention_days() -> int:
     try:
         return max(1, int(os.getenv("MOBILE_INCIDENT_RETENTION_DAYS", "90")))
@@ -811,6 +830,10 @@ def bootstrap(request):
                 "incident_retention_days": _incident_retention_days(),
                 "context_v2": os.getenv("MOBILE_CONTEXT_V2", "disabled"),
                 "context_fuzzy_threshold": _mobile_context_fuzzy_threshold(),
+                "player_operations": mobile_feature_enabled(
+                    "MOBILE_PLAYER_OPERATIONS"
+                ),
+                "live_status": mobile_feature_enabled("MOBILE_LIVE_STATUS"),
                 "push_relay_configured": bool(
                     os.getenv("MOBILE_PUSH_RELAY_URL", "").strip()
                 ),

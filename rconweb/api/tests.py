@@ -416,6 +416,138 @@ class MobileContextTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
 
+    @patch.dict("os.environ", {"MOBILE_PLAYER_OPERATIONS": "true"})
+    @patch("api.mobile_context._rcon_api")
+    def test_watchlist_reuses_native_watch_entries(self, get_rcon_api):
+        get_rcon_api.return_value.get_players_history.return_value = {
+            "total": 1,
+            "players": [
+                {
+                    "player_id": "p1",
+                    "names": [{"name": "Watched Player"}],
+                    "watchlist": {
+                        "reason": "Suspicious behaviour",
+                        "by": "admin",
+                        "count": 2,
+                    },
+                }
+            ],
+        }
+
+        response = self.client.get("/api/mobile/v1/watchlist", {"server_number": 1})
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()["result"]
+        self.assertEqual(result["players"][0]["name"], "Watched Player")
+        self.assertEqual(result["players"][0]["count"], 2)
+        get_rcon_api.return_value.get_players_history.assert_called_once_with(
+            page=1, page_size=100, is_watched=True
+        )
+
+    @patch.dict("os.environ", {"MOBILE_PLAYER_OPERATIONS": "true"})
+    @patch("api.mobile_context.record_mobile_audit")
+    @patch("api.mobile_context._rcon_api")
+    def test_watch_requires_reason_and_records_native_operation(
+        self, get_rcon_api, audit
+    ):
+        missing = self.client.put(
+            "/api/mobile/v1/players/p1/watch",
+            data=json.dumps({"server_number": 1}),
+            content_type="application/json",
+        )
+        self.assertEqual(missing.status_code, 400)
+        response = self.client.put(
+            "/api/mobile/v1/players/p1/watch",
+            data=json.dumps(
+                {
+                    "server_number": 1,
+                    "reason": "Check teamkills",
+                    "player_name": "Player One",
+                    "incident_id": "11111111-1111-1111-1111-111111111111",
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        get_rcon_api.return_value.watch_player.assert_called_once_with(
+            player_id="p1",
+            reason="Check teamkills",
+            by="context-admin",
+            player_name="Player One",
+        )
+        audit.assert_called_once()
+
+    @patch.dict("os.environ", {"MOBILE_PLAYER_OPERATIONS": "true"})
+    @patch("rcon.admin_incidents.get_incident")
+    @patch("api.mobile_context._rcon_api")
+    def test_incident_context_is_bounded_and_filters_raw_log_types(
+        self, get_rcon_api, get_incident
+    ):
+        get_incident.return_value = {
+            "server_number": 1,
+            "created_at": "2026-08-06T12:00:00+00:00",
+            "reporter_id": "reporter",
+            "subjects": [
+                {"kind": "player", "state": "confirmed", "player_id": "p1"}
+            ],
+        }
+        get_rcon_api.return_value.get_historical_logs.return_value = [
+            {
+                "id": 1,
+                "type": "CHAT[Allies]",
+                "event_time": "2026-08-06T11:58:00+00:00",
+                "player1_name": "Player One",
+                "content": "hello",
+            },
+            {
+                "id": 2,
+                "type": "TEAM KILL",
+                "event_time": "2026-08-06T12:01:00+00:00",
+                "player1_name": "Player One",
+                "player2_name": "Friendly",
+                "content": "team kill",
+            },
+            {"id": 3, "type": "ADMIN", "content": "must not appear"},
+        ]
+
+        response = self.client.get(
+            "/api/mobile/v1/incidents/11111111-1111-1111-1111-111111111111/player-context",
+            {"player_id": "p1", "limit": 5},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        events = response.json()["result"]["events"]
+        self.assertEqual([event["type"] for event in events], ["chat", "teamkill"])
+        call = get_rcon_api.return_value.get_historical_logs.call_args.kwargs
+        self.assertEqual(call["player_id"], "p1")
+        self.assertEqual(call["server_filter"], "1")
+
+    @patch.dict("os.environ", {"MOBILE_LIVE_STATUS": "true"})
+    @patch("api.mobile_context._rcon_api")
+    def test_live_status_only_returns_read_only_fields(self, get_rcon_api):
+        api = get_rcon_api.return_value
+        api.get_status.return_value = {"name": "Server 1", "current_players": 42, "max_players": 100}
+        api.get_gamestate.return_value = {
+            "current_map": {"pretty_name": "Foy"},
+            "time_remaining": timedelta(minutes=42),
+            "num_allied_players": 21,
+            "num_axis_players": 21,
+            "allied_score": 2,
+            "axis_score": 3,
+        }
+        api.get_next_map.return_value = {"pretty_name": "Carentan"}
+        api.get_queue_length.return_value = 4
+        api.get_ingame_mods.return_value = ["a"]
+        api.get_online_mods.return_value = ["a", "b"]
+
+        response = self.client.get("/api/mobile/v1/servers/1/live-status")
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()["result"]
+        self.assertEqual(result["match"]["team_counts"], {"allies": 21, "axis": 21})
+        self.assertEqual(result["ingame_admin_count"], 1)
+        self.assertNotIn("set_map", result)
+
     @patch("api.mobile_context._rcon_api")
     def test_player_detail_keeps_steam_and_eos_identifiers_separate(self, get_rcon_api):
         get_rcon_api.return_value.get_player_profile.return_value = {

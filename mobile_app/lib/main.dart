@@ -149,6 +149,8 @@ final _router = GoRouter(
       path: '/autobalancer',
       builder: (_, _) => const AutobalancerScreen(),
     ),
+    GoRoute(path: '/watchlist', builder: (_, _) => const WatchlistScreen()),
+    GoRoute(path: '/live-status', builder: (_, _) => const LiveStatusScreen()),
     GoRoute(path: '/diagnostics', builder: (_, _) => const DiagnosticsScreen()),
     GoRoute(
       path: '/players/:connectionId/:playerId',
@@ -579,6 +581,10 @@ class ConnectionsScreen extends ConsumerWidget {
                 onTap: () => context.push('/autobalancer'),
               ),
             ),
+            if (items.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _MoreOperations(profile: items.first),
+            ],
             const SizedBox(height: 12),
             if (items.isEmpty)
               Card(
@@ -613,6 +619,475 @@ class ConnectionsScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+class _MoreOperations extends ConsumerWidget {
+  const _MoreOperations({required this.profile});
+
+  final ConnectionProfile profile;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => FutureBuilder(
+    future: CrconApi(profile, ref.read(secureStoreProvider)).bootstrap(),
+    builder: (context, snapshot) {
+      if (!snapshot.hasData) return const SizedBox.shrink();
+      final configuration = _mapValue(snapshot.data!['mobile_configuration']);
+      final playerOperations = configuration['player_operations'] == true;
+      final liveStatus = configuration['live_status'] == true;
+      if (!playerOperations && !liveStatus) return const SizedBox.shrink();
+      return Column(
+        children: [
+          if (playerOperations)
+            Card(
+              child: ListTile(
+                leading: const Icon(
+                  Icons.visibility_outlined,
+                  color: FrontlineTheme.gold,
+                ),
+                title: Text(context.tr('Beobachtungsliste', 'Watchlist')),
+                subtitle: Text(
+                  context.tr(
+                    'Beobachtete Spieler und letzter Kontakt',
+                    'Watched players and last contact',
+                  ),
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/watchlist'),
+              ),
+            ),
+          if (playerOperations && liveStatus) const SizedBox(height: 12),
+          if (liveStatus)
+            Card(
+              child: ListTile(
+                leading: const Icon(
+                  Icons.radar_outlined,
+                  color: FrontlineTheme.gold,
+                ),
+                title: Text(context.tr('Server-Lage', 'Server situation')),
+                subtitle: Text(
+                  context.tr(
+                    'Karte, Teams, Warteschlange und Admins',
+                    'Map, teams, queue and admins',
+                  ),
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/live-status'),
+              ),
+            ),
+        ],
+      );
+    },
+  );
+}
+
+class WatchlistScreen extends ConsumerStatefulWidget {
+  const WatchlistScreen({super.key});
+
+  @override
+  ConsumerState<WatchlistScreen> createState() => _WatchlistScreenState();
+}
+
+class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
+  ConnectionProfile? _profile;
+  List<Map<String, dynamic>> _servers = const [];
+  List<Map<String, dynamic>> _players = const [];
+  int? _serverNumber;
+  Object? _error;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_initialize());
+  }
+
+  Future<void> _initialize() async {
+    try {
+      final profiles = await ref.read(connectionsProvider.future);
+      if (profiles.isEmpty) return;
+      final profile = profiles.first;
+      final bootstrap = await CrconApi(
+        profile,
+        ref.read(secureStoreProvider),
+      ).bootstrap();
+      final servers = _listValue(
+        bootstrap['servers'],
+      ).map(_mapValue).where((value) => value['server_number'] is num).toList();
+      if (mounted) {
+        setState(() {
+          _profile = profile;
+          _servers = servers;
+          _serverNumber = servers.isNotEmpty
+              ? (servers.first['server_number'] as num).toInt()
+              : (bootstrap['server_number'] as num?)?.toInt();
+        });
+      }
+      await _load();
+    } catch (error) {
+      if (mounted) setState(() => _error = error);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _load() async {
+    final profile = _profile;
+    if (profile == null) return;
+    setState(() => _loading = true);
+    try {
+      final players = await CrconApi(
+        profile,
+        ref.read(secureStoreProvider),
+      ).watchlist(serverNumber: _serverNumber);
+      if (mounted) setState(() => _players = players);
+    } catch (error) {
+      if (mounted) setState(() => _error = error);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: Text(context.tr('Beobachtungsliste', 'Watchlist')),
+      actions: [
+        IconButton(
+          onPressed: _loading ? null : _load,
+          icon: const Icon(Icons.refresh),
+        ),
+      ],
+    ),
+    bottomNavigationBar: const _FrontlineBottomBar(currentIndex: 2),
+    body: _error != null
+        ? _ErrorView(message: _error.toString())
+        : _loading && _profile == null
+        ? const Center(child: CircularProgressIndicator())
+        : ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              if (_servers.length > 1)
+                DropdownButtonFormField<int>(
+                  initialValue: _serverNumber,
+                  decoration: InputDecoration(
+                    labelText: context.tr('Server', 'Server'),
+                  ),
+                  items: _servers.map((server) {
+                    final number = (server['server_number'] as num).toInt();
+                    return DropdownMenuItem(
+                      value: number,
+                      child: Text(
+                        server['name']?.toString() ?? 'Server $number',
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    if (value == null) {
+                      return;
+                    }
+                    setState(() => _serverNumber = value);
+                    unawaited(_load());
+                  },
+                ),
+              if (_servers.length > 1) const SizedBox(height: 14),
+              if (_loading) const LinearProgressIndicator(),
+              if (_players.isEmpty && !_loading)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Text(
+                      context.tr(
+                        'Keine Spieler werden aktuell beobachtet.',
+                        'No players are currently watched.',
+                      ),
+                    ),
+                  ),
+                ),
+              ..._players.map((player) {
+                final id = player['player_id']?.toString() ?? '';
+                final modified = player['modified']?.toString();
+                return Card(
+                  child: ListTile(
+                    leading: Icon(
+                      player['online'] == true
+                          ? Icons.visibility
+                          : Icons.visibility_outlined,
+                      color: player['online'] == true
+                          ? FrontlineTheme.success
+                          : FrontlineTheme.gold,
+                    ),
+                    title: Text(player['name']?.toString() ?? id),
+                    subtitle: Text(
+                      [
+                            player['reason']?.toString(),
+                            if (player['by'] case final by?)
+                              '${context.tr('von', 'by')} $by',
+                            modified ?? '',
+                            '${player['count'] ?? 0} ${context.tr('Sichtungen', 'sightings')}',
+                          ]
+                          .whereType<String>()
+                          .where((value) => value.isNotEmpty)
+                          .join(' · '),
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: id.isEmpty || _profile == null
+                        ? null
+                        : () => context.push(
+                            '/players/${_profile!.id}/$id?server_number=${_serverNumber ?? ''}',
+                          ),
+                  ),
+                );
+              }),
+            ],
+          ),
+  );
+}
+
+class LiveStatusScreen extends ConsumerStatefulWidget {
+  const LiveStatusScreen({super.key});
+
+  @override
+  ConsumerState<LiveStatusScreen> createState() => _LiveStatusScreenState();
+}
+
+class _LiveStatusScreenState extends ConsumerState<LiveStatusScreen> {
+  ConnectionProfile? _profile;
+  List<Map<String, dynamic>> _servers = const [];
+  int? _serverNumber;
+  Map<String, dynamic>? _status;
+  Object? _error;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_initialize());
+  }
+
+  Future<void> _initialize() async {
+    try {
+      final profiles = await ref.read(connectionsProvider.future);
+      if (profiles.isEmpty) return;
+      final profile = profiles.first;
+      final bootstrap = await CrconApi(
+        profile,
+        ref.read(secureStoreProvider),
+      ).bootstrap();
+      final servers = _listValue(bootstrap['servers']).map(_mapValue).toList();
+      if (mounted) {
+        setState(() {
+          _profile = profile;
+          _servers = servers;
+          _serverNumber = servers.isNotEmpty
+              ? (servers.first['server_number'] as num?)?.toInt()
+              : (bootstrap['server_number'] as num?)?.toInt();
+        });
+      }
+      await _load();
+    } catch (error) {
+      if (mounted) setState(() => _error = error);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _load() async {
+    if (_profile == null || _serverNumber == null) return;
+    setState(() => _loading = true);
+    try {
+      final value = await CrconApi(
+        _profile!,
+        ref.read(secureStoreProvider),
+      ).liveStatus(_serverNumber!);
+      if (mounted) setState(() => _status = value);
+    } catch (error) {
+      if (mounted) setState(() => _error = error);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final status = _mapValue(_status?['status']);
+    final match = _mapValue(_status?['match']);
+    final counts = _mapValue(match['team_counts']);
+    final scores = _mapValue(match['team_scores']);
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(context.tr('Server-Lage', 'Server situation')),
+        actions: [
+          IconButton(
+            onPressed: _loading ? null : _load,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
+      ),
+      bottomNavigationBar: const _FrontlineBottomBar(currentIndex: 2),
+      body: _error != null
+          ? _ErrorView(message: _error.toString())
+          : _loading && _status == null
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                if (_servers.length > 1)
+                  DropdownButtonFormField<int>(
+                    initialValue: _serverNumber,
+                    decoration: InputDecoration(
+                      labelText: context.tr('Server', 'Server'),
+                    ),
+                    items: _servers.map((server) {
+                      final number = (server['server_number'] as num).toInt();
+                      return DropdownMenuItem(
+                        value: number,
+                        child: Text(
+                          server['name']?.toString() ?? 'Server $number',
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      if (value == null) {
+                        return;
+                      }
+                      setState(() => _serverNumber = value);
+                      unawaited(_load());
+                    },
+                  ),
+                if (_servers.length > 1) const SizedBox(height: 14),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          status['name']?.toString() ??
+                              'Server ${_serverNumber ?? '—'}',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 12),
+                        _LiveStatusRow(
+                          label: context.tr('Aktuelle Karte', 'Current map'),
+                          value: _liveMapName(
+                            match['current_map'] ?? status['map'],
+                          ),
+                        ),
+                        if (_status?['next_map'] != null)
+                          _LiveStatusRow(
+                            label: context.tr('Nächste Karte', 'Next map'),
+                            value: _liveMapName(_status?['next_map']),
+                          ),
+                        if (match['time_remaining'] != null)
+                          _LiveStatusRow(
+                            label: context.tr('Restzeit', 'Time remaining'),
+                            value: match['time_remaining'].toString(),
+                          ),
+                        if (status.isNotEmpty)
+                          _LiveStatusRow(
+                            label: context.tr('Spieler', 'Players'),
+                            value:
+                                '${status['current_players'] ?? '—'} / ${status['max_players'] ?? '—'}',
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          context.tr('Teams & Betrieb', 'Teams & operations'),
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 10),
+                        if (counts.isNotEmpty)
+                          _LiveStatusRow(
+                            label: context.tr(
+                              'Alliierte / Achse',
+                              'Allies / Axis',
+                            ),
+                            value:
+                                '${counts['allies'] ?? '—'} / ${counts['axis'] ?? '—'}',
+                          ),
+                        if (scores.isNotEmpty)
+                          _LiveStatusRow(
+                            label: context.tr('Punkte', 'Scores'),
+                            value:
+                                '${scores['allies'] ?? '—'} / ${scores['axis'] ?? '—'}',
+                          ),
+                        if (_status?['queue_length'] != null)
+                          _LiveStatusRow(
+                            label: context.tr('Warteschlange', 'Queue'),
+                            value: _status!['queue_length'].toString(),
+                          ),
+                        if (_status?['ingame_admin_count'] != null)
+                          _LiveStatusRow(
+                            label: context.tr(
+                              'Ingame-Admins',
+                              'In-game admins',
+                            ),
+                            value: _status!['ingame_admin_count'].toString(),
+                          ),
+                        if (_status?['crcon_admin_count'] != null)
+                          _LiveStatusRow(
+                            label: context.tr('CRCON-Admins', 'CRCON admins'),
+                            value: _status!['crcon_admin_count'].toString(),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () => context.push('/autobalancer'),
+                  icon: const Icon(Icons.balance_outlined),
+                  label: Text(
+                    context.tr(
+                      'Fair Autobalancer öffnen',
+                      'Open Fair Autobalancer',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+String _liveMapName(dynamic value) {
+  if (value is Map) {
+    return value['pretty_name']?.toString() ??
+        value['name']?.toString() ??
+        value['id']?.toString() ??
+        '—';
+  }
+  return value?.toString() ?? '—';
+}
+
+class _LiveStatusRow extends StatelessWidget {
+  const _LiveStatusRow({required this.label, required this.value});
+  final String label;
+  final String value;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 5),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(color: FrontlineTheme.muted),
+          ),
+        ),
+        Text(value),
+      ],
+    ),
+  );
 }
 
 class AutobalancerScreen extends ConsumerStatefulWidget {
@@ -3231,6 +3706,8 @@ class PlayerProfileScreen extends ConsumerWidget {
           dossier: snapshot.data!,
           playerId: playerId,
           incidentContext: incidentContext,
+          connectionId: connectionId,
+          serverNumber: serverNumber,
         );
       },
     ),
@@ -3248,11 +3725,15 @@ class PlayerProfileDossier extends StatelessWidget {
     required this.dossier,
     required this.playerId,
     required this.incidentContext,
+    this.connectionId = '',
+    this.serverNumber,
   });
 
   final Map<String, dynamic> dossier;
   final String playerId;
   final PlayerIncidentContext? incidentContext;
+  final String connectionId;
+  final int? serverNumber;
 
   @override
   Widget build(BuildContext context) {
@@ -3275,6 +3756,7 @@ class PlayerProfileDossier extends StatelessWidget {
     final flags = _listValue(history['flags']);
     final comments = _listValue(history['comments']);
     final sessions = _listValue(history['sessions']);
+    final capabilities = _mapValue(dossier['capabilities']);
 
     return LayoutBuilder(
       builder: (context, constraints) => Align(
@@ -3293,6 +3775,29 @@ class PlayerProfileDossier extends StatelessWidget {
               if (incidentContext != null) ...[
                 const SizedBox(height: 14),
                 _PlayerIncidentReport(context: incidentContext!),
+              ],
+              if (capabilities['watch_view'] == true ||
+                  capabilities['watch_add'] == true ||
+                  capabilities['watch_remove'] == true) ...[
+                const SizedBox(height: 14),
+                _PlayerWatchCard(
+                  connectionId: connectionId,
+                  playerId: playerId,
+                  playerName: name,
+                  serverNumber: serverNumber,
+                  incidentId: incidentContext?.incidentId,
+                  watch: _nullableMapValue(history['watchlist']),
+                  capabilities: capabilities,
+                ),
+              ],
+              if (incidentContext != null &&
+                  capabilities['incident_context'] == true) ...[
+                const SizedBox(height: 14),
+                _PlayerContextExcerpt(
+                  connectionId: connectionId,
+                  incidentId: incidentContext!.incidentId,
+                  playerId: playerId,
+                ),
               ],
               const SizedBox(height: 14),
               _PlayerProfileStats(
@@ -3330,6 +3835,350 @@ class PlayerProfileDossier extends StatelessWidget {
       ),
     );
   }
+}
+
+class _PlayerWatchCard extends ConsumerStatefulWidget {
+  const _PlayerWatchCard({
+    required this.connectionId,
+    required this.playerId,
+    required this.playerName,
+    required this.serverNumber,
+    required this.incidentId,
+    required this.watch,
+    required this.capabilities,
+  });
+
+  final String connectionId;
+  final String playerId;
+  final String playerName;
+  final int? serverNumber;
+  final String? incidentId;
+  final Map<String, dynamic>? watch;
+  final Map<String, dynamic> capabilities;
+
+  @override
+  ConsumerState<_PlayerWatchCard> createState() => _PlayerWatchCardState();
+}
+
+class _PlayerWatchCardState extends ConsumerState<_PlayerWatchCard> {
+  bool _busy = false;
+  late Map<String, dynamic>? _watch = widget.watch;
+
+  Future<CrconApi> _api() async {
+    final profiles = await ref.read(connectionsProvider.future);
+    final profile = profiles.firstWhere(
+      (item) => item.id == widget.connectionId,
+    );
+    return CrconApi(profile, ref.read(secureStoreProvider));
+  }
+
+  Future<void> _watchPlayer() async {
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (_) => _TextInputDialog(
+        title: context.tr('Spieler beobachten', 'Watch player'),
+        label: context.tr('Pflichtgrund', 'Required reason'),
+        confirmLabel: context.tr('Beobachten', 'Watch'),
+        maxLines: 3,
+      ),
+    );
+    if (reason == null || reason.trim().isEmpty) return;
+    setState(() => _busy = true);
+    try {
+      await (await _api()).watchPlayer(
+        widget.playerId,
+        reason: reason.trim(),
+        playerName: widget.playerName,
+        serverNumber: widget.serverNumber,
+        incidentId: widget.incidentId,
+      );
+      if (mounted) {
+        setState(() {
+          _watch = {
+            'reason': reason.trim(),
+            'by': null,
+            'modified': DateTime.now().toIso8601String(),
+            'count': 0,
+            'is_watched': true,
+          };
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _unwatchPlayer() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(context.tr('Beobachtung beenden?', 'End watch?')),
+        content: Text(
+          context.tr(
+            'Der Spieler wird aus der CRCON-Watchlist entfernt.',
+            'The player will be removed from CRCON\'s watchlist.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(context.tr('Abbrechen', 'Cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(context.tr('Beenden', 'End watch')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _busy = true);
+    try {
+      await (await _api()).unwatchPlayer(
+        widget.playerId,
+        serverNumber: widget.serverNumber,
+        incidentId: widget.incidentId,
+      );
+      if (mounted) setState(() => _watch = null);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final watched = _watch?['is_watched'] == true;
+    final canAdd = widget.capabilities['watch_add'] == true;
+    final canRemove = widget.capabilities['watch_remove'] == true;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  watched ? Icons.visibility : Icons.visibility_off_outlined,
+                  color: watched
+                      ? FrontlineTheme.success
+                      : FrontlineTheme.muted,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    context.tr('Beobachtung', 'Watch'),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                Text(
+                  watched
+                      ? context.tr('aktiv', 'active')
+                      : context.tr('inaktiv', 'inactive'),
+                  style: TextStyle(
+                    color: watched
+                        ? FrontlineTheme.success
+                        : FrontlineTheme.muted,
+                  ),
+                ),
+              ],
+            ),
+            if (watched) ...[
+              const SizedBox(height: 10),
+              Text(_watch?['reason']?.toString() ?? '—'),
+              const SizedBox(height: 4),
+              Text(
+                [
+                  if (_watch?['by'] != null)
+                    '${context.tr('gesetzt von', 'set by')} ${_watch?['by']}',
+                  if (_watch?['modified'] != null)
+                    _watch?['modified'].toString(),
+                  '${_watch?['count'] ?? 0} ${context.tr('Sichtungen', 'sightings')}',
+                ].join(' · '),
+                style: const TextStyle(color: FrontlineTheme.muted),
+              ),
+            ],
+            const SizedBox(height: 12),
+            if (!watched && canAdd)
+              OutlinedButton.icon(
+                onPressed: _busy ? null : _watchPlayer,
+                icon: const Icon(Icons.visibility_outlined),
+                label: Text(context.tr('Beobachten', 'Watch')),
+              ),
+            if (watched && canRemove)
+              OutlinedButton.icon(
+                onPressed: _busy ? null : _unwatchPlayer,
+                icon: const Icon(Icons.visibility_off_outlined),
+                label: Text(context.tr('Beobachtung beenden', 'End watch')),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PlayerContextExcerpt extends ConsumerWidget {
+  const _PlayerContextExcerpt({
+    required this.connectionId,
+    required this.incidentId,
+    required this.playerId,
+  });
+  final String connectionId;
+  final String incidentId;
+  final String playerId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) =>
+      FutureBuilder<Map<String, dynamic>>(
+        future: () async {
+          final profiles = await ref.read(connectionsProvider.future);
+          final profile = profiles.firstWhere(
+            (item) => item.id == connectionId,
+          );
+          return CrconApi(
+            profile,
+            ref.read(secureStoreProvider),
+          ).playerContext(incidentId, playerId);
+        }(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError || !snapshot.hasData) {
+            return const SizedBox.shrink();
+          }
+          final events = _listValue(
+            snapshot.data!['events'],
+          ).map(_mapValue).toList();
+          if (events.isEmpty) return const SizedBox.shrink();
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    context.tr('Ereignisse zum Vorfall', 'Incident events'),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  ...events.map(
+                    (event) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(_eventIcon(event['type']?.toString())),
+                      title: Text(_eventLabel(context, event)),
+                      subtitle: Text(
+                        event['message']?.toString() ??
+                            event['occurred_at']?.toString() ??
+                            '',
+                      ),
+                    ),
+                  ),
+                  if ((snapshot.data!['total'] as num? ?? events.length) >
+                      events.length)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () => _openAll(context, ref),
+                        child: Text(context.tr('Alle anzeigen', 'Show all')),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+
+  void _openAll(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => FutureBuilder<Map<String, dynamic>>(
+        future: () async {
+          final profiles = await ref.read(connectionsProvider.future);
+          final profile = profiles.firstWhere(
+            (item) => item.id == connectionId,
+          );
+          return CrconApi(
+            profile,
+            ref.read(secureStoreProvider),
+          ).playerContext(incidentId, playerId, limit: 50);
+        }(),
+        builder: (context, snapshot) => SafeArea(
+          child: SizedBox(
+            height: MediaQuery.sizeOf(context).height * .72,
+            child: snapshot.hasData
+                ? ListView(
+                    children: [
+                      for (final value in _listValue(
+                        snapshot.data!['events'],
+                      ).map(_mapValue))
+                        ListTile(
+                          leading: Icon(_eventIcon(value['type']?.toString())),
+                          title: Text(_eventLabel(context, value)),
+                          subtitle: Text(
+                            value['message']?.toString() ??
+                                value['occurred_at']?.toString() ??
+                                '',
+                          ),
+                        ),
+                    ],
+                  )
+                : const Center(child: CircularProgressIndicator()),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+IconData _eventIcon(String? value) => switch (value) {
+  'chat' => Icons.chat_bubble_outline,
+  'kill' => Icons.gps_fixed,
+  'teamkill' => Icons.warning_amber_outlined,
+  'join' => Icons.login,
+  'leave' => Icons.logout,
+  _ => Icons.history,
+};
+
+String _eventLabel(BuildContext context, Map<String, dynamic> event) {
+  final actor =
+      event['actor_name']?.toString() ?? context.tr('Spieler', 'Player');
+  final other = event['other_name']?.toString();
+  return switch (event['type']?.toString()) {
+    'chat' => context.tr(
+      '$actor schrieb im Chat',
+      '$actor sent a chat message',
+    ),
+    'kill' =>
+      other == null
+          ? context.tr('$actor tötete einen Spieler', '$actor killed a player')
+          : context.tr('$actor tötete $other', '$actor killed $other'),
+    'teamkill' =>
+      other == null
+          ? context.tr(
+              '$actor teamkillte einen Spieler',
+              '$actor teamkilled a player',
+            )
+          : context.tr('$actor teamkillte $other', '$actor teamkilled $other'),
+    'join' => context.tr('$actor ist beigetreten', '$actor joined'),
+    'leave' => context.tr(
+      '$actor hat den Server verlassen',
+      '$actor left the server',
+    ),
+    _ => context.tr('Ereignis', 'Event'),
+  };
 }
 
 class _PlayerIdentityHeader extends StatelessWidget {
@@ -5379,21 +6228,29 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
 
   void _openPlayer(String playerId) {
     final incident = _incident;
-    final primary = incident?.primarySubject;
-    final isPrimaryTarget =
-        primary?.actionPlayerId == playerId ||
-        (primary?.actionPlayerId == null && incident?.targetId == playerId);
+    final selectedSubject = incident?.subjects
+        .where(
+          (subject) =>
+              subject.kind == 'player' &&
+              subject.state == 'confirmed' &&
+              subject.playerId == playerId,
+        )
+        .firstOrNull;
+    final isReporter = incident?.reporterId == playerId;
     final incidentContext =
-        incident != null && isPrimaryTarget && primary != null
+        incident != null && (selectedSubject != null || isReporter)
         ? PlayerIncidentContext(
             incidentId: incident.id,
-            subjectId: primary.id,
-            subjectState: primary.state,
+            subjectId: selectedSubject?.id ?? '',
+            subjectState: selectedSubject?.state ?? 'reporter',
             serverNumber: incident.serverNumber,
-            report: _incidentExcerpt(incident, primary),
+            report: _incidentExcerpt(
+              incident,
+              selectedSubject ?? incident.primarySubject,
+            ),
             reporterName: incident.reporterName,
             reportedAt: incident.createdAt,
-            canRunActions: primary.actionPlayerId == playerId,
+            canRunActions: selectedSubject?.actionPlayerId == playerId,
           )
         : null;
     context.push(
@@ -5513,6 +6370,16 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                 : () => _openPlayer(incident.reporterId!),
           ),
         ),
+        if ((incident.primarySubject?.actionPlayerId ?? incident.reporterId) !=
+            null) ...[
+          const SizedBox(height: 14),
+          _PlayerContextExcerpt(
+            connectionId: widget.connectionId,
+            incidentId: incident.id,
+            playerId:
+                incident.primarySubject?.actionPlayerId ?? incident.reporterId!,
+          ),
+        ],
         const Divider(height: 28),
         _workflow(incident),
         const SizedBox(height: 12),
