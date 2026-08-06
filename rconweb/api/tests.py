@@ -145,6 +145,20 @@ class MobilePairingTests(TestCase):
         replay = self._post("/api/mobile/v1/tokens/refresh", payload, client=Client())
         self.assertEqual(replay.status_code, 401)
 
+    def test_web_app_can_scan_qr_pairing(self):
+        pairing, query = self._pairing()
+        scanned = self._post(
+            f"/api/mobile/v1/pairings/{pairing['id']}/scan",
+            {
+                "secret": query["secret"][0],
+                "device_name": "Frontline Web",
+                "platform": "web",
+            },
+        )
+
+        self.assertEqual(scanned.status_code, 200)
+        self.assertEqual(MobilePairing.objects.get(pk=pairing["id"]).platform, "web")
+
     def test_desktop_authorization_requires_browser_approval_and_is_single_use(self):
         desktop = Client()
         created = self._post(

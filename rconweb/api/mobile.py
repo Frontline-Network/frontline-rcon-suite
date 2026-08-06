@@ -478,7 +478,7 @@ def scan_pairing(request, pairing_id):
         platform = str(data["platform"]).strip().lower()[:32]
     except (KeyError, ValueError) as exc:
         return _error(command, f"Missing or invalid field: {exc}", 400)
-    if not device_name or platform not in {"android", "ios"}:
+    if not device_name or platform not in {"android", "ios", "web"}:
         return _error(command, "A device name and supported platform are required", 400)
 
     with transaction.atomic():
