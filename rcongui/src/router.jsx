@@ -272,7 +272,7 @@ const router = createBrowserRouter([
                     {
                         path: 'crcon',
                         handle: { crumb: () => <span>CRCON APP</span> },
-                        element: <CrconAppSettingsPage />,
+                        element: <CrconAppSettingsPage showFrontline={false} />,
                         errorElement: <RouteError />,
                     },
                 ]

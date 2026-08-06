@@ -29,7 +29,7 @@ import { cmd, mobileRequest } from "@/utils/fetchUtils";
 import { toast } from "react-toastify";
 import { useTranslation } from "react-i18next";
 
-function CrconAppSettings() {
+function CrconAppSettings({ showFrontline = true, showUtilities = true }) {
   const { t } = useTranslation();
   const [password, setPassword] = useState("");
   const [desktopPassword, setDesktopPassword] = useState("");
@@ -55,8 +55,10 @@ function CrconAppSettings() {
   }, []);
 
   useEffect(() => {
-    loadDevices();
-  }, [loadDevices]);
+    if (showFrontline) {
+      loadDevices();
+    }
+  }, [loadDevices, showFrontline]);
 
   useEffect(() => {
     const code = new URLSearchParams(window.location.search).get("desktop_code");
@@ -67,6 +69,7 @@ function CrconAppSettings() {
 
   useEffect(() => {
     if (
+      !showFrontline ||
       !pairing?.id ||
       !["pending", "scanned", "approved"].includes(pairing.state)
     ) {
@@ -84,7 +87,7 @@ function CrconAppSettings() {
       }
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [pairing?.id, pairing?.state, loadDevices]);
+  }, [pairing?.id, pairing?.state, loadDevices, showFrontline]);
 
   const createPairingMutation = useMutation({
     mutationFn: () =>
@@ -168,7 +171,7 @@ function CrconAppSettings() {
 
   return (
     <Grid container spacing={3}>
-      <Grid size={12}>
+      {showFrontline && <Grid size={12}>
         <Card elevation={2}>
           <CardHeader
             avatar={<QrCodeIcon color="primary" />}
@@ -393,10 +396,10 @@ function CrconAppSettings() {
             </Stack>
           </CardContent>
         </Card>
-      </Grid>
+      </Grid>}
 
       {/* Flush Cache Card */}
-      <Grid size={{ xs: 12, md: 6 }}>
+      {showUtilities && <Grid size={{ xs: 12, md: 6 }}>
         <Card elevation={2}>
           <CardHeader
             avatar={<CacheIcon color="primary" />}
@@ -424,10 +427,10 @@ function CrconAppSettings() {
             </Stack>
           </CardContent>
         </Card>
-      </Grid>
+      </Grid>}
 
       {/* Reconnect Gameserver Card */}
-      <Grid size={{ xs: 12, md: 6 }}>
+      {showUtilities && <Grid size={{ xs: 12, md: 6 }}>
         <Card elevation={2}>
           <CardHeader
             avatar={<LinkIcon color="primary" />}
@@ -452,7 +455,7 @@ function CrconAppSettings() {
             </Stack>
           </CardContent>
         </Card>
-      </Grid>
+      </Grid>}
     </Grid>
   );
 }

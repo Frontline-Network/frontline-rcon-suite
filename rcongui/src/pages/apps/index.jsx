@@ -1,13 +1,12 @@
 import {
-  ArrowForward as ArrowForwardIcon,
   LaptopWindows as LaptopWindowsIcon,
   PhoneAndroid as PhoneAndroidIcon,
   QrCode2 as QrCodeIcon,
   Security as SecurityIcon,
 } from "@mui/icons-material";
 import { Box, Button, Card, CardContent, Chip, Grid2 as Grid, Stack, Typography } from "@mui/material";
-import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import CrconAppSettings from "@/pages/settings/general-group/crcon-app";
 
 const FrontlineAppsPage = () => {
   const { t } = useTranslation();
@@ -57,9 +56,6 @@ const FrontlineAppsPage = () => {
                 </Typography>
 
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
-                  <Button component={Link} to="/settings/crcon" variant="contained" endIcon={<ArrowForwardIcon />}>
-                    {t("apps.frontline.setup")}
-                  </Button>
                   <Button component="a" href="https://webapp.fln.gg" target="_blank" rel="noreferrer" variant="outlined">
                     {t("apps.frontline.open")}
                   </Button>
@@ -86,6 +82,9 @@ const FrontlineAppsPage = () => {
           </Card>
         </Grid>
       </Grid>
+      <Box id="frontline-pairing" sx={{ mt: 3 }}>
+        <CrconAppSettings showUtilities={false} />
+      </Box>
     </Box>
   );
 };
