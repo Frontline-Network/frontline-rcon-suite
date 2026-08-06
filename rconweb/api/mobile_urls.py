@@ -130,6 +130,12 @@ MOBILE_API_DOCUMENTATION = [
         "description": "Load a minimal, read-only Fair Autobalancer live status for one server.",
     },
     {
+        "endpoint": "mobile/v1/templates",
+        "allowed_http_methods": ["GET"],
+        "permissions_required": ["api.can_view_message_templates"],
+        "description": "Load shared CRCON message and reason templates for mobile incident actions.",
+    },
+    {
         "endpoint": "mobile/v1/players/{player_id}",
         "allowed_http_methods": ["GET"],
         "permissions_required": [],
@@ -214,6 +220,11 @@ urlpatterns = [
         "autobalancer",
         mobile_context.autobalancer_status,
         name="mobile-autobalancer-status",
+    ),
+    path(
+        "templates",
+        mobile_context.action_templates,
+        name="mobile-action-templates",
     ),
     path(
         "desktop-authorizations",

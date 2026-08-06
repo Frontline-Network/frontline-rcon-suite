@@ -5,6 +5,8 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
 from rcon.autobalancer.store import AutobalancerStore
+from rcon.message_templates import get_message_templates
+from rcon.types import MessageTemplateCategory
 from rcon.utils import get_server_number
 
 from .auth import api_response, login_required
@@ -287,6 +289,32 @@ def autobalancer_status(request):
             "warnings": status.get("warnings") or [],
             "native_autobalance": status.get("native_autobalance") or {},
             "updated_at": status.get("updated_at"),
+        },
+    )
+
+
+@csrf_exempt
+@login_required()
+@require_http_methods(["GET"])
+def action_templates(request):
+    """Expose CRCON's shared player-message and reason templates to mobile.
+
+    Template authoring remains in the existing CRCON settings UI.  Returning
+    only action-safe categories avoids disclosing unrelated broadcast or
+    welcome-message templates through the mobile device API.
+    """
+
+    command = "mobile_action_templates"
+    if disabled := _require_enabled(command):
+        return disabled
+    if not request.user.has_perm("api.can_view_message_templates"):
+        return _error(command, "Missing message template permission", 403)
+    return api_response(
+        command=command,
+        failed=False,
+        result={
+            "message": get_message_templates(MessageTemplateCategory.MESSAGE),
+            "reason": get_message_templates(MessageTemplateCategory.REASON),
         },
     )
 

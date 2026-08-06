@@ -3991,6 +3991,12 @@ class _PlayerProfileActionBar extends ConsumerWidget {
     final incident = incidentContext;
     if (incident == null) return;
     final message = action == 'message';
+    final profiles = await ref.read(connectionsProvider.future);
+    if (!context.mounted) return;
+    final profile = profiles.firstWhere((item) => item.id == connectionId);
+    final api = CrconApi(profile, ref.read(secureStoreProvider));
+    final templates = await _loadActionTemplates(api, action, context);
+    if (!context.mounted) return;
     final value = await showDialog<String>(
       context: context,
       builder: (_) => _TextInputDialog(
@@ -4008,31 +4014,12 @@ class _PlayerProfileActionBar extends ConsumerWidget {
             : context.tr('Pflichtgrund', 'Required reason'),
         confirmLabel: context.tr('Ausführen', 'Run action'),
         maxLines: 3,
-        suggestions: action == 'message'
-            ? [
-                context.tr(
-                  'Wir prüfen deine Meldung.',
-                  'We are reviewing your report.',
-                ),
-                context.tr(
-                  'Bitte bleib kurz auf dem Server.',
-                  'Please stay on the server for a moment.',
-                ),
-              ]
-            : [
-                context.tr('Teamkill', 'Team kill'),
-                context.tr('Regelverstoß', 'Rule violation'),
-              ],
+        templates: templates,
       ),
     );
     if (value == null || value.trim().isEmpty || !context.mounted) return;
     try {
-      final profiles = await ref.read(connectionsProvider.future);
-      final profile = profiles.firstWhere((item) => item.id == connectionId);
-      await CrconApi(
-        profile,
-        ref.read(secureStoreProvider),
-      ).runAction(incident.incidentId, {
+      await api.runAction(incident.incidentId, {
         'action': action,
         'subject_id': incident.subjectId,
         'player_id': playerId,
@@ -4455,14 +4442,14 @@ class _TextInputDialog extends StatefulWidget {
     required this.label,
     required this.confirmLabel,
     this.maxLines = 1,
-    this.suggestions = const [],
+    this.templates = const [],
   });
 
   final String title;
   final String label;
   final String confirmLabel;
   final int maxLines;
-  final List<String> suggestions;
+  final List<_ActionTemplate> templates;
 
   @override
   State<_TextInputDialog> createState() => _TextInputDialogState();
@@ -4493,7 +4480,7 @@ class _TextInputDialogState extends State<_TextInputDialog> {
           maxLines: widget.maxLines,
           decoration: InputDecoration(labelText: widget.label),
         ),
-        if (widget.suggestions.isNotEmpty) ...[
+        if (widget.templates.isNotEmpty) ...[
           const SizedBox(height: 14),
           Text(
             context.tr('Schnellvorlage', 'Quick template'),
@@ -4503,14 +4490,15 @@ class _TextInputDialogState extends State<_TextInputDialog> {
           Wrap(
             spacing: 7,
             runSpacing: 7,
-            children: widget.suggestions
+            children: widget.templates
                 .map(
-                  (suggestion) => ActionChip(
-                    label: Text(suggestion),
+                  (template) => ActionChip(
+                    tooltip: template.content,
+                    label: Text(template.title),
                     onPressed: () => setState(() {
-                      _controller.text = suggestion;
+                      _controller.text = template.content;
                       _controller.selection = TextSelection.collapsed(
-                        offset: suggestion.length,
+                        offset: template.content.length,
                       );
                     }),
                   ),
@@ -4531,6 +4519,95 @@ class _TextInputDialogState extends State<_TextInputDialog> {
       ),
     ],
   );
+}
+
+class _ActionTemplate {
+  const _ActionTemplate({required this.title, required this.content});
+
+  factory _ActionTemplate.fromJson(Map<String, dynamic> value) {
+    final content = value['content']?.toString().trim() ?? '';
+    final title = value['title']?.toString().trim();
+    return _ActionTemplate(
+      title: title == null || title.isEmpty ? content : title,
+      content: content,
+    );
+  }
+
+  final String title;
+  final String content;
+}
+
+Future<List<_ActionTemplate>> _loadActionTemplates(
+  CrconApi api,
+  String action,
+  BuildContext context,
+) async {
+  final category = action == 'message'
+      ? 'message'
+      : {
+          'punish',
+          'kick',
+          'temp_ban',
+          'perma_ban',
+          'disband_squad',
+          'remove_from_squad',
+        }.contains(action)
+      ? 'reason'
+      : null;
+  if (category == null) return const [];
+  try {
+    final remote = await api.actionTemplates();
+    final templates = (remote[category] ?? const [])
+        .map(_ActionTemplate.fromJson)
+        .where((template) => template.content.isNotEmpty)
+        .toList();
+    if (templates.isNotEmpty) return templates;
+  } catch (_) {
+    // Existing actions remain available to older CRCON instances and to roles
+    // that deliberately do not have the shared-template permission.
+  }
+  if (!context.mounted) return const [];
+  return _localActionTemplates(action, context);
+}
+
+List<_ActionTemplate> _localActionTemplates(
+  String action,
+  BuildContext context,
+) {
+  final values = switch (action) {
+    'message' => [
+      context.tr('Wir prüfen deine Meldung.', 'We are reviewing your report.'),
+      context.tr(
+        'Bitte bleib kurz auf dem Server.',
+        'Please stay on the server for a moment.',
+      ),
+      context.tr(
+        'Danke für die Meldung. Ein Admin kümmert sich darum.',
+        'Thanks for the report. An admin is handling it.',
+      ),
+    ],
+    'punish' => [
+      context.tr('Teamkill', 'Team kill'),
+      context.tr('Regelverstoß', 'Rule violation'),
+      context.tr('Beleidigung', 'Abusive language'),
+    ],
+    'kick' || 'temp_ban' || 'perma_ban' => [
+      context.tr('Wiederholtes Teamkilling', 'Repeated team killing'),
+      context.tr('Wiederholter Regelverstoß', 'Repeated rule violation'),
+      context.tr(
+        'Beleidigung / toxisches Verhalten',
+        'Abusive / toxic behavior',
+      ),
+    ],
+    'disband_squad' || 'remove_from_squad' => [
+      context.tr('Kein Squadleader vorhanden', 'No squad leader present'),
+      context.tr('Verstoß gegen Squad-Regeln', 'Squad rule violation'),
+    ],
+    _ => const <String>[],
+  };
+  return values
+      .map((value) => _ActionTemplate(title: value, content: value))
+      .toList();
 }
 
 class _HandoverSubmission {
@@ -5224,6 +5301,10 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
       );
       if (!mounted || target == null) return;
     }
+    final api = await _api();
+    if (!mounted) return;
+    final templates = await _loadActionTemplates(api, action, context);
+    if (!mounted) return;
     final reason = await showDialog<String>(
       context: context,
       builder: (_) => _TextInputDialog(
@@ -5258,7 +5339,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
             ? context.tr('Übernehmen & ausführen', 'Claim & run')
             : context.tr('Ausführen', 'Run action'),
         maxLines: 3,
-        suggestions: _actionSuggestions(action),
+        templates: templates,
       ),
     );
     if (reason == null || reason.trim().isEmpty) return;
@@ -5295,38 +5376,6 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
       if (mounted) setState(() => _busy = false);
     }
   }
-
-  List<String> _actionSuggestions(String action) => switch (action) {
-    'message' => [
-      context.tr('Wir prüfen deine Meldung.', 'We are reviewing your report.'),
-      context.tr(
-        'Bitte bleib kurz auf dem Server.',
-        'Please stay on the server for a moment.',
-      ),
-      context.tr(
-        'Danke für die Meldung. Ein Admin kümmert sich darum.',
-        'Thanks for the report. An admin is handling it.',
-      ),
-    ],
-    'punish' => [
-      context.tr('Teamkill', 'Team kill'),
-      context.tr('Regelverstoß', 'Rule violation'),
-      context.tr('Beleidigung', 'Abusive language'),
-    ],
-    'kick' || 'temp_ban' || 'perma_ban' => [
-      context.tr('Wiederholtes Teamkilling', 'Repeated team killing'),
-      context.tr('Wiederholter Regelverstoß', 'Repeated rule violation'),
-      context.tr(
-        'Beleidigung / toxisches Verhalten',
-        'Abusive / toxic behavior',
-      ),
-    ],
-    'disband_squad' || 'remove_from_squad' => [
-      context.tr('Kein Squadleader vorhanden', 'No squad leader present'),
-      context.tr('Verstoß gegen Squad-Regeln', 'Squad rule violation'),
-    ],
-    _ => const [],
-  };
 
   void _openPlayer(String playerId) {
     final incident = _incident;

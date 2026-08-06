@@ -384,6 +384,38 @@ class MobileContextTests(TestCase):
         self.assertNotIn("proposal", result)
         self.assertNotIn("plan", result)
 
+    @patch("api.mobile_context.get_message_templates")
+    def test_action_templates_expose_only_message_and_reason_templates(
+        self, get_templates
+    ):
+        get_templates.side_effect = lambda category: [
+            {
+                "id": 1,
+                "title": f"{category.value} template",
+                "content": "Prepared text",
+                "category": category.value,
+            }
+        ]
+
+        response = self.client.get("/api/mobile/v1/templates")
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()["result"]
+        self.assertEqual(result["message"][0]["content"], "Prepared text")
+        self.assertEqual(result["reason"][0]["content"], "Prepared text")
+        self.assertEqual(
+            [call.args[0].value for call in get_templates.call_args_list],
+            ["MESSAGE", "REASON"],
+        )
+
+    def test_action_templates_require_existing_template_permission(self):
+        limited = User.objects.create_user("limited-template-viewer", password="secret")
+        self.client.force_login(limited)
+
+        response = self.client.get("/api/mobile/v1/templates")
+
+        self.assertEqual(response.status_code, 403)
+
     @patch("api.mobile_context._rcon_api")
     def test_player_detail_keeps_steam_and_eos_identifiers_separate(self, get_rcon_api):
         get_rcon_api.return_value.get_player_profile.return_value = {

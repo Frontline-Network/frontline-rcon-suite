@@ -209,6 +209,18 @@ class CrconApi {
   Future<Map<String, dynamic>> bootstrap() async =>
       Map<String, dynamic>.from(await _authorized('GET', 'bootstrap') as Map);
 
+  Future<Map<String, List<Map<String, dynamic>>>> actionTemplates() async {
+    final result = Map<String, dynamic>.from(
+      await _authorized('GET', 'templates') as Map,
+    );
+    List<Map<String, dynamic>> entries(String category) =>
+        (result[category] as List? ?? const [])
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+    return {'message': entries('message'), 'reason': entries('reason')};
+  }
+
   Future<Map<String, dynamic>> createIncident({
     required int serverNumber,
     required String reason,
