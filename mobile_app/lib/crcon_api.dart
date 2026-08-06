@@ -91,7 +91,7 @@ class CrconApi {
         'secret': payload.secret,
         'device_name': deviceName,
         'platform': platform,
-        'app_version': '0.1.8',
+        'app_version': '0.1.9',
         'push_handle': pushHandle,
         'push_capability': pushCapability,
       },
@@ -118,7 +118,7 @@ class CrconApi {
       data: {
         'device_name': deviceName,
         'platform': 'windows',
-        'app_version': '0.1.8',
+        'app_version': '0.1.9',
       },
       options: Options(
         validateStatus: (status) => status != null && status < 500,
