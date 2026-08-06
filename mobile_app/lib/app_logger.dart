@@ -143,7 +143,7 @@ class AppLogger {
   String exportText() {
     final buffer = StringBuffer()
       ..writeln('Frontline CRCON Admin diagnostics')
-      ..writeln('App: 0.1.18+19')
+      ..writeln('App: 0.1.19+20')
       ..writeln('Platform: $appLogPlatform')
       ..writeln('Exported: ${DateTime.now().toUtc().toIso8601String()}')
       ..writeln('Sensitive credentials are automatically redacted.')

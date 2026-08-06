@@ -13,4 +13,33 @@ firebase.initializeApp({
   appId: '1:1050619413922:web:2ff7a5272de985aa8c9efb',
 });
 
-firebase.messaging();
+const messaging = firebase.messaging();
+
+// CRCON sends an intentionally opaque data payload. Turn it into a generic
+// system notification only while the PWA is in the background; neither player
+// names nor report text ever leave CRCON as part of this notification.
+messaging.onBackgroundMessage((payload) => {
+  const eventType = payload && payload.data && payload.data.event_type;
+  const body = eventType === 'created'
+    ? 'Eine neue Meldung wartet auf Bearbeitung.'
+    : 'Ein Vorfall wurde aktualisiert.';
+  const data = (payload && payload.data) || {};
+  self.registration.showNotification('Frontline', {
+    body,
+    icon: '/icons/Icon-192.png',
+    badge: '/icons/Icon-192.png',
+    tag: `frontline-${data.incident_id || 'incident'}`,
+    data,
+  });
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clients) => {
+        if (clients.length > 0) return clients[0].focus();
+        return self.clients.openWindow('/');
+      }),
+  );
+});
