@@ -2382,8 +2382,8 @@ class _PairingScreenState extends ConsumerState<PairingScreen>
                         Text(
                           _error ??
                               context.tr(
-                                'Öffne in CRCON die Mobile App, erstelle einen QR-Code und scanne ihn hier.',
-                                'Open Mobile App in CRCON, create a QR code, then scan it here.',
+                                'Öffne in CRCON „Apps einrichten“, erstelle einen QR-Code und scanne ihn hier.',
+                                'Open “Set up apps” in CRCON, create a QR code, then scan it here.',
                               ),
                           textAlign: TextAlign.center,
                         ),
@@ -3042,8 +3042,8 @@ class _FirstConnectionWizard extends StatelessWidget {
                   number: '2',
                   title: context.tr('QR-Code erstellen', 'Create a QR code'),
                   description: context.tr(
-                    'Öffne dort „Mobile App“ und wähle „Gerät koppeln“.',
-                    'Open “Mobile App” there and choose “Pair device”.',
+                    'Öffne dort „Apps einrichten“ und wähle „Gerät koppeln“.',
+                    'Open “Set up apps” there and choose “Pair device”.',
                   ),
                 ),
                 const SizedBox(height: 12),

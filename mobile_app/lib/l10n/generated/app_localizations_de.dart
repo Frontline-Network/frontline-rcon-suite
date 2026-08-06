@@ -38,7 +38,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get pairInstructions =>
-      'Öffne Mobile App in CRCON, erstelle einen QR-Code und scanne ihn hier.';
+      'Öffne in CRCON „Apps einrichten“, erstelle einen QR-Code und scanne ihn hier.';
 
   @override
   String get compareCode => 'Vergleiche diesen Code mit CRCON';

@@ -9,7 +9,7 @@
   "revokeDeviceBody": "CRCON macht Zugriffs- und Aktualisierungstoken sofort ungültig.",
   "cancel": "Abbrechen",
   "revoke": "Widerrufen",
-  "pairInstructions": "Öffne Mobile App in CRCON, erstelle einen QR-Code und scanne ihn hier.",
+  "pairInstructions": "Öffne in CRCON „Apps einrichten“, erstelle einen QR-Code und scanne ihn hier.",
   "compareCode": "Vergleiche diesen Code mit CRCON",
   "approvePhone": "Bestätige das Smartphone im CRCON-Browser, um die Kopplung abzuschließen.",
   "createIncident": "Vorfall erstellen",

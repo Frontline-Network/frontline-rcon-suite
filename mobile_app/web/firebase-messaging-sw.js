@@ -27,7 +27,10 @@ messaging.onBackgroundMessage((payload) => {
   self.registration.showNotification('Frontline', {
     body,
     icon: '/icons/Icon-192.png',
-    badge: '/icons/Icon-192.png',
+    // Android turns notification badges into a monochrome status-bar glyph.
+    // This asset has a transparent canvas, so only the Frontline mark is
+    // rendered instead of a solid white square.
+    badge: '/icons/frontline-notification-badge.svg',
     tag: `frontline-${data.incident_id || 'incident'}`,
     data,
   });

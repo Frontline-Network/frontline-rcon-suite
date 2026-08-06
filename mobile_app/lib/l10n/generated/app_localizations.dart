@@ -155,7 +155,7 @@ abstract class AppLocalizations {
   /// No description provided for @pairInstructions.
   ///
   /// In en, this message translates to:
-  /// **'Open Mobile App in CRCON, create a QR code, then scan it here.'**
+  /// **'Open “Set up apps” in CRCON, create a QR code, then scan it here.'**
   String get pairInstructions;
 
   /// No description provided for @compareCode.
