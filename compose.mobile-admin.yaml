@@ -33,6 +33,13 @@ services:
     <<: *frontline-backend
     environment: *mobile-environment
 
+  mobile_push_worker:
+    # The worker delivers opaque incident notifications. It must run the
+    # same Frontline build as the API so payload and relay capability handling
+    # stay in lockstep with the mobile endpoints.
+    <<: *frontline-backend
+    environment: *mobile-environment
+
   backend_1:
     <<: *frontline-backend
     environment: *mobile-environment
