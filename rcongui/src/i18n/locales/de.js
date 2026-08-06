@@ -505,7 +505,7 @@ const de = {
     eyebrow: "Übersicht",
     title: "Apps einrichten",
     subtitle: "Die Frontline App bringt Meldungen, Spielerprüfungen und sichere Admin-Aktionen auf dein Smartphone, ins Web und auf Windows.",
-    frontline: { title: "Frontline App", description: "Die mobile Leitstelle für schnelle, sichere Admin-Arbeit.", security: "Kontogebundene Rechte", qr: "Sichere QR-Kopplung", devices: "Android, Web & Windows", detail: "Die App übernimmt ausschließlich deine bestehenden CRCON-Rechte. Jedes Gerät wird einzeln gekoppelt und kann hier jederzeit entzogen werden.", setup: "Gerät koppeln", open: "Frontline Web-App öffnen" },
+    frontline: { title: "Frontline App", description: "Die mobile Leitstelle für schnelle, sichere Admin-Arbeit.", security: "Kontogebundene Rechte", qr: "Sichere QR-Kopplung", devices: "Android, Web & Windows", detail: "Die App übernimmt ausschließlich deine bestehenden CRCON-Rechte. Jedes Gerät wird einzeln gekoppelt und kann hier jederzeit entzogen werden.", setup: "Gerät koppeln", open: "Frontline Web-App öffnen", openWindows: "Frontline für Windows öffnen", windowsHint: "Für diese Plattform steht die Frontline-Windows-App bereit. Dort erfolgt die Kopplung über einen kurzen Gerätecode." },
     how: { title: "In drei Schritten", one: "Frontline App auf Smartphone, im Browser oder unter Windows öffnen.", two: "Hier „Gerät koppeln“ wählen und nach Passwortbestätigung den QR-Code scannen.", three: "Den sechsstelligen Vergleichscode prüfen und die Verbindung bestätigen." },
   },
   serverSettings: {

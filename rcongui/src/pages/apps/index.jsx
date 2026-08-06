@@ -10,6 +10,11 @@ import CrconAppSettings from "@/pages/settings/general-group/crcon-app";
 
 const FrontlineAppsPage = () => {
   const { t } = useTranslation();
+  const isWindows =
+    typeof navigator !== "undefined" && /windows/i.test(navigator.userAgent);
+  const companionUrl = isWindows
+    ? "https://github.com/Frontline-Network/hll_rcon_tool-mobile-admin/releases"
+    : "https://webapp.fln.gg";
 
   return (
     <Box sx={{ py: { xs: 2, md: 2.5 } }}>
@@ -55,9 +60,15 @@ const FrontlineAppsPage = () => {
                   {t("apps.frontline.detail")}
                 </Typography>
 
+                {isWindows && (
+                  <Typography variant="body2" color="text.secondary">
+                    {t("apps.frontline.windowsHint")}
+                  </Typography>
+                )}
+
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
-                  <Button component="a" href="https://webapp.fln.gg" target="_blank" rel="noreferrer" variant="outlined">
-                    {t("apps.frontline.open")}
+                  <Button component="a" href={companionUrl} target="_blank" rel="noreferrer" variant="outlined">
+                    {isWindows ? t("apps.frontline.openWindows") : t("apps.frontline.open")}
                   </Button>
                 </Stack>
               </Stack>
