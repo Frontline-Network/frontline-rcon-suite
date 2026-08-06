@@ -710,6 +710,12 @@ class _AutobalancerScreenState extends ConsumerState<AutobalancerScreen> {
         : int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
+  String _serverLabel(BuildContext context, Map<String, dynamic> server) {
+    final number = (server['server_number'] as num).toInt();
+    return server['name']?.toString() ??
+        context.tr('Server $number', 'Server $number');
+  }
+
   String _phase(BuildContext context, String phase) => switch (phase) {
     'idle' => context.tr('Ausgeglichen', 'Balanced'),
     'armed' => context.tr('Beobachtet', 'Monitoring'),
@@ -728,6 +734,7 @@ class _AutobalancerScreenState extends ConsumerState<AutobalancerScreen> {
     final allies = _teamCount(counts, 'allies');
     final axis = _teamCount(counts, 'axis');
     final total = allies + axis;
+    final hasLiveTeamCounts = counts.isNotEmpty;
     final phase = status?['phase']?.toString() ?? 'idle';
     final required = (status?['required_switches'] as num?)?.toInt() ?? 0;
     final warnings = _listValue(status?['warnings'])
@@ -778,6 +785,7 @@ class _AutobalancerScreenState extends ConsumerState<AutobalancerScreen> {
                   DropdownButtonFormField<int>(
                     key: ValueKey(_serverNumber),
                     initialValue: _serverNumber,
+                    isExpanded: true,
                     decoration: InputDecoration(
                       labelText: context.tr('Spielserver', 'Game server'),
                       prefixIcon: const Icon(Icons.dns_outlined),
@@ -787,11 +795,21 @@ class _AutobalancerScreenState extends ConsumerState<AutobalancerScreen> {
                           (server) => DropdownMenuItem(
                             value: (server['server_number'] as num).toInt(),
                             child: Text(
-                              server['name']?.toString() ??
-                                  context.tr(
-                                    'Server ${(server['server_number'] as num).toInt()}',
-                                    'Server ${(server['server_number'] as num).toInt()}',
-                                  ),
+                              _serverLabel(context, server),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    selectedItemBuilder: (context) => _servers
+                        .map(
+                          (server) => Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              _serverLabel(context, server),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         )
@@ -818,7 +836,10 @@ class _AutobalancerScreenState extends ConsumerState<AutobalancerScreen> {
                     allies: allies,
                     axis: axis,
                     total: total,
-                    difference: status['team_difference'],
+                    hasLiveTeamCounts: hasLiveTeamCounts,
+                    difference: hasLiveTeamCounts
+                        ? status['team_difference']
+                        : null,
                   ),
                   const SizedBox(height: 12),
                   _AutobalancerDataCard(status: status),
@@ -925,12 +946,14 @@ class _AutobalancerTeamsCard extends StatelessWidget {
     required this.allies,
     required this.axis,
     required this.total,
+    required this.hasLiveTeamCounts,
     required this.difference,
   });
 
   final int allies;
   final int axis;
   final int total;
+  final bool hasLiveTeamCounts;
   final Object? difference;
 
   @override
@@ -951,51 +974,73 @@ class _AutobalancerTeamsCard extends StatelessWidget {
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _AutobalancerTeamCount(
-                  label: context.tr('Alliierte', 'Allies'),
-                  count: allies,
-                  color: const Color(0xff5d8ebf),
-                  alignEnd: false,
+          if (!hasLiveTeamCounts)
+            Row(
+              children: [
+                const Icon(
+                  Icons.sensors_off_outlined,
+                  color: FrontlineTheme.muted,
+                  size: 22,
                 ),
-              ),
-              const SizedBox(width: 18),
-              Expanded(
-                child: _AutobalancerTeamCount(
-                  label: context.tr('Achsenmächte', 'Axis'),
-                  count: axis,
-                  color: const Color(0xffb55c52),
-                  alignEnd: true,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    context.tr(
+                      'Noch keine Live-Teamzählung verfügbar.',
+                      'Live team counts are not available yet.',
+                    ),
+                    style: const TextStyle(color: FrontlineTheme.muted),
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: SizedBox(
-              height: 12,
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: (share * 100).round().clamp(1, 99),
-                    child: const ColoredBox(color: Color(0xff5d8ebf)),
+              ],
+            )
+          else ...[
+            Row(
+              children: [
+                Expanded(
+                  child: _AutobalancerTeamCount(
+                    label: context.tr('Alliierte', 'Allies'),
+                    count: allies,
+                    color: const Color(0xff5d8ebf),
+                    alignEnd: false,
                   ),
-                  Expanded(
-                    flex: ((1 - share) * 100).round().clamp(1, 99),
-                    child: const ColoredBox(color: Color(0xffb55c52)),
+                ),
+                const SizedBox(width: 18),
+                Expanded(
+                  child: _AutobalancerTeamCount(
+                    label: context.tr('Achsenmächte', 'Axis'),
+                    count: axis,
+                    color: const Color(0xffb55c52),
+                    alignEnd: true,
                   ),
-                ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: SizedBox(
+                height: 12,
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: (share * 100).round().clamp(1, 99),
+                      child: const ColoredBox(color: Color(0xff5d8ebf)),
+                    ),
+                    Expanded(
+                      flex: ((1 - share) * 100).round().clamp(1, 99),
+                      child: const ColoredBox(color: Color(0xffb55c52)),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            '${context.tr('Differenz', 'Difference')}: ${difference ?? '—'} ${context.tr('Spieler', 'players')}',
-            style: const TextStyle(color: FrontlineTheme.muted),
-          ),
+            const SizedBox(height: 10),
+            Text(
+              '${context.tr('Differenz', 'Difference')}: ${difference ?? '—'} ${context.tr('Spieler', 'players')}',
+              style: const TextStyle(color: FrontlineTheme.muted),
+            ),
+          ],
         ],
       ),
     );
