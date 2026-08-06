@@ -404,6 +404,7 @@ def _execute_action(action: str, data: dict, user_name: str, incident: dict):
         incident,
         player_id=player_id,
         subject_id=subject_id,
+        allow_reporter=data.get("reporter_action") is True,
     )
     player_name = str(
         data.get("player_name")

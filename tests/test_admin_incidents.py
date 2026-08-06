@@ -603,6 +603,54 @@ def test_action_target_must_belong_to_confirmed_subject(incident_database):
         incidents.confirmed_action_subject(incident, player_id="outsider")
 
 
+def test_general_incident_allows_explicit_reporter_action_without_subject(
+    incident_database,
+):
+    incident, _ = incidents.create_incident(
+        server_number=1,
+        source="chat",
+        reporter_id="reporter-id",
+        reporter_name="Reporter",
+        reason="General request for an admin",
+        actor="system:chat",
+    )
+
+    with pytest.raises(ValueError):
+        incidents.confirmed_action_subject(incident, player_id="reporter-id")
+
+    reporter = incidents.confirmed_action_subject(
+        incident,
+        player_id="reporter-id",
+        allow_reporter=True,
+    )
+    assert reporter == {
+        "id": None,
+        "kind": "reporter",
+        "state": "contact",
+        "player_id": "reporter-id",
+        "display_name": "Reporter",
+    }
+
+    _, created = incidents.reserve_incident_action(
+        incident["id"],
+        actor="alice",
+        action="message",
+        arguments={
+            "player_id": "reporter-id",
+            "player_name": "Reporter",
+            "reporter_action": True,
+            "message": "We are looking into this.",
+        },
+        idempotency_key="reporter-message-1",
+        validate_action_subject=True,
+    )
+    updated = incidents.get_incident(incident["id"])
+    assert created is True
+    assert updated["status"] == "claimed"
+    assert updated["target_id"] is None
+    assert updated["primary_subject"] is None
+
+
 def test_end_to_end_chat_report_to_resolved_incident(incident_database, monkeypatch):
     monkeypatch.setenv("MOBILE_CONTEXT_V2", "enabled")
     players = [

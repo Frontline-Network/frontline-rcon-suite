@@ -4629,16 +4629,23 @@ class _HandoverDialogState extends State<_HandoverDialog> {
 
 class _ActionTargetSelection {
   const _ActionTargetSelection({
-    required this.subject,
+    this.subject,
     required this.playerId,
     this.playerName,
-  });
+  }) : isReporter = false;
 
-  final IncidentSubject subject;
+  const _ActionTargetSelection.reporter({
+    required this.playerId,
+    this.playerName,
+  }) : subject = null,
+       isReporter = true;
+
+  final IncidentSubject? subject;
   final String playerId;
   final String? playerName;
+  final bool isReporter;
 
-  bool get confirmSuggested => subject.state == 'suggested';
+  bool get confirmSuggested => !isReporter && subject?.state == 'suggested';
 }
 
 class _ActionTargetPicker extends StatelessWidget {
@@ -5107,6 +5114,19 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
       );
     }
 
+    // A report without a confirmed player or squad normally needs a quick
+    // follow-up with its reporter.  Select that known player directly rather
+    // than sending an admin through the manual ID search.  The server keeps
+    // this separate from incident subjects, so the reporter never becomes an
+    // accused/primary target by implication.
+    final reporterId = incident.reporterId;
+    if (reporterId != null && reporterId.isNotEmpty) {
+      return _ActionTargetSelection.reporter(
+        playerId: reporterId,
+        playerName: incident.reporterName,
+      );
+    }
+
     final linkPlayer = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -5246,11 +5266,14 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
     try {
       await (await _api()).runAction(incident.id, {
         'action': action,
-        'subject_id': isSquadDisband ? selectedSubject!.id : target!.subject.id,
+        if (isSquadDisband) 'subject_id': selectedSubject!.id,
+        if (!isSquadDisband && target!.subject != null)
+          'subject_id': target.subject!.id,
         if (!isSquadDisband) 'player_id': target!.playerId,
         if (!isSquadDisband) 'player_name': ?target!.playerName,
+        if (!isSquadDisband && target!.isReporter) 'reporter_action': true,
         if (!isSquadDisband && target!.confirmSuggested)
-          'confirm_subject_id': target.subject.id,
+          'confirm_subject_id': target.subject!.id,
         action == 'message'
             ? 'message'
             : action == 'comment'

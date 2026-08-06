@@ -1020,7 +1020,11 @@ def mutate_incident_subject(
 
 
 def confirmed_action_subject(
-    incident: dict, *, player_id: str | None, subject_id: str | None = None
+    incident: dict,
+    *,
+    player_id: str | None,
+    subject_id: str | None = None,
+    allow_reporter: bool = False,
 ) -> dict:
     player_id = str(player_id or "").strip()
     subjects = incident.get("subjects") or []
@@ -1046,6 +1050,27 @@ def confirmed_action_subject(
             "state": "confirmed",
             "player_id": player_id,
             "display_name": incident.get("target_name"),
+        }
+    # General reports do not have an accused player.  Their reporter is still
+    # a valid, explicit contact/action target, but must never silently become
+    # an incident subject or the primary target.
+    reporter_id = str(incident.get("reporter_id") or "").strip()
+    has_confirmed_subject = any(
+        subject.get("state") == "confirmed" for subject in subjects
+    )
+    if (
+        allow_reporter
+        and not subject_id
+        and reporter_id
+        and player_id == reporter_id
+        and not has_confirmed_subject
+    ):
+        return {
+            "id": None,
+            "kind": "reporter",
+            "state": "contact",
+            "player_id": reporter_id,
+            "display_name": incident.get("reporter_name"),
         }
     raise ValueError("Actions require a player from a confirmed incident subject")
 
@@ -1092,6 +1117,9 @@ def reserve_incident_action(
 
         player_id = str(arguments.get("player_id") or "").strip()
         subject_id = str(arguments.get("subject_id") or "").strip() or None
+        reporter_action = arguments.get("reporter_action") is True
+        if reporter_action and subject_id:
+            raise ValueError("Reporter actions cannot include an incident subject")
         if action == "disband_squad":
             subject = next(
                 (item for item in incident.subjects if item.id == subject_id),
@@ -1140,6 +1168,7 @@ def reserve_incident_action(
                 incident.to_dict(include_events=False),
                 player_id=player_id,
                 subject_id=subject_id,
+                allow_reporter=reporter_action,
             )
 
         if incident.status == "new":
