@@ -249,6 +249,7 @@ final _router = GoRouter(
     ),
     GoRoute(path: '/watchlist', builder: (_, _) => const WatchlistScreen()),
     GoRoute(path: '/live-status', builder: (_, _) => const LiveStatusScreen()),
+    GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
     GoRoute(path: '/diagnostics', builder: (_, _) => const DiagnosticsScreen()),
     GoRoute(
       path: '/players/:connectionId/:playerId',
@@ -653,17 +654,20 @@ class ConnectionsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profiles = ref.watch(connectionsProvider);
+    if (appIsWindows) return _WindowsConnectionsPage(profiles: profiles);
     return Scaffold(
-      appBar: AppBar(
-        title: Text(context.tr('Mehr', 'More')),
-        actions: [
-          IconButton(
-            tooltip: context.tr('Diagnoseprotokoll', 'Diagnostics log'),
-            onPressed: () => context.push('/diagnostics'),
-            icon: const Icon(Icons.bug_report_outlined),
-          ),
-        ],
-      ),
+      appBar: appIsWindows
+          ? null
+          : AppBar(
+              title: Text(context.tr('Mehr', 'More')),
+              actions: [
+                IconButton(
+                  tooltip: context.tr('Diagnoseprotokoll', 'Diagnostics log'),
+                  onPressed: () => context.push('/diagnostics'),
+                  icon: const Icon(Icons.bug_report_outlined),
+                ),
+              ],
+            ),
       bottomNavigationBar: const _FrontlineBottomBar(currentIndex: 2),
       body: profiles.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -747,6 +751,213 @@ class ConnectionsScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _WindowsConnectionsPage extends StatelessWidget {
+  const _WindowsConnectionsPage({required this.profiles});
+
+  final AsyncValue<List<ConnectionProfile>> profiles;
+
+  @override
+  Widget build(BuildContext context) => _WindowsDesktopScaffold(
+    title: context.tr('Verbindungen', 'Connections'),
+    actions: [
+      OutlinedButton.icon(
+        onPressed: () => context.push('/pair'),
+        icon: const Icon(Icons.open_in_browser_outlined),
+        label: Text(context.tr('CRCON verbinden', 'Connect CRCON')),
+      ),
+    ],
+    child: profiles.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => _ErrorView(message: error.toString()),
+      data: (items) => ListView(
+        padding: const EdgeInsets.fromLTRB(34, 30, 34, 40),
+        children: [
+          _WindowsSectionLead(
+            title: context.tr(
+              'Leitstellen-Verbindungen',
+              'Command connections',
+            ),
+            description: context.tr(
+              'Jede Verbindung bleibt einem persönlichen CRCON-Konto zugeordnet. Windows verwendet dafür die Browser-Anmeldung – keinen QR-Code.',
+              'Every connection remains tied to a personal CRCON account. Windows uses browser sign-in – not a QR code.',
+            ),
+          ),
+          const SizedBox(height: 24),
+          if (items.isEmpty)
+            _WindowsPanel(
+              title: context.tr('Noch nicht verbunden', 'Not connected'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    context.tr(
+                      'Starte die Browser-Anmeldung, gib die HTTPS-Adresse deines CRCON ein und bestätige den Gerätecode in deinem Browser.',
+                      'Start browser sign-in, enter your CRCON HTTPS address, and confirm the device code in your browser.',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: () => context.push('/pair'),
+                    icon: const Icon(Icons.open_in_browser_outlined),
+                    label: Text(
+                      context.tr(
+                        'Browser-Anmeldung starten',
+                        'Start browser sign-in',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            ...items.map(
+              (profile) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _WindowsPanel(
+                  title: profile.name,
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.dns_outlined,
+                        color: FrontlineTheme.gold,
+                      ),
+                      const SizedBox(width: 13),
+                      Expanded(
+                        child: Text(
+                          profile.baseUrl,
+                          style: const TextStyle(color: FrontlineTheme.chalk),
+                        ),
+                      ),
+                      const Icon(
+                        Icons.circle,
+                        color: FrontlineTheme.success,
+                        size: 11,
+                      ),
+                      const SizedBox(width: 7),
+                      Text(context.tr('Verbunden', 'Connected')),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _WindowsSectionLead extends StatelessWidget {
+  const _WindowsSectionLead({required this.title, required this.description});
+  final String title;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        title,
+        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+      ),
+      const SizedBox(height: 7),
+      ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 680),
+        child: Text(
+          description,
+          style: const TextStyle(color: FrontlineTheme.muted, height: 1.4),
+        ),
+      ),
+    ],
+  );
+}
+
+class SettingsScreen extends ConsumerWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final locale = ref.watch(localeProvider).languageCode;
+    final content = ListView(
+      padding: const EdgeInsets.fromLTRB(34, 30, 34, 40),
+      children: [
+        _WindowsSectionLead(
+          title: context.tr('Frontline-Einstellungen', 'Frontline settings'),
+          description: context.tr(
+            'Diese Einstellungen gelten nur für Frontline. Rollen, Rechte und Serverkonfiguration bleiben in CRCON.',
+            'These settings apply only to Frontline. Roles, permissions, and server configuration remain in CRCON.',
+          ),
+        ),
+        const SizedBox(height: 24),
+        _WindowsPanel(
+          title: context.tr('Darstellung', 'Appearance'),
+          child: DropdownButtonFormField<String>(
+            initialValue: locale,
+            decoration: InputDecoration(
+              labelText: context.tr('Sprache', 'Language'),
+            ),
+            items: const [
+              DropdownMenuItem(value: 'de', child: Text('Deutsch')),
+              DropdownMenuItem(value: 'en', child: Text('English')),
+            ],
+            onChanged: (value) {
+              if (value == null) return;
+              ref.read(localeProvider.notifier).state = Locale(value);
+              unawaited(ref.read(secureStoreProvider).writeLanguage(value));
+            },
+          ),
+        ),
+        const SizedBox(height: 14),
+        _WindowsPanel(
+          title: context.tr(
+            'Windows-Benachrichtigungen',
+            'Windows notifications',
+          ),
+          child: Text(
+            context.tr(
+              'Während Frontline geöffnet ist, hält die Live-Verbindung die Leitstelle aktuell. Native Hintergrund-Benachrichtigungen werden als eigener Windows-Kanal ergänzt.',
+              'While Frontline is open, the live connection keeps the command center current. Native background notifications will be added as a dedicated Windows channel.',
+            ),
+            style: const TextStyle(color: FrontlineTheme.muted, height: 1.45),
+          ),
+        ),
+        const SizedBox(height: 14),
+        _WindowsPanel(
+          title: context.tr('Diagnose', 'Diagnostics'),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  context.tr(
+                    'Diagnoseprotokolle enthalten keine Zugangsdaten oder Pairing-Geheimnisse.',
+                    'Diagnostic logs do not include credentials or pairing secrets.',
+                  ),
+                  style: const TextStyle(color: FrontlineTheme.muted),
+                ),
+              ),
+              const SizedBox(width: 18),
+              OutlinedButton.icon(
+                onPressed: () => context.push('/diagnostics'),
+                icon: const Icon(Icons.bug_report_outlined),
+                label: Text(context.tr('Protokoll öffnen', 'Open log')),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+    if (appIsWindows) {
+      return _WindowsDesktopScaffold(
+        title: context.tr('Einstellungen', 'Settings'),
+        child: content,
+      );
+    }
+    return Scaffold(
+      appBar: AppBar(title: Text(context.tr('Einstellungen', 'Settings'))),
+      body: content,
     );
   }
 }
@@ -878,18 +1089,8 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: Text(context.tr('Beobachtungsliste', 'Watchlist')),
-      actions: [
-        IconButton(
-          onPressed: _loading ? null : _load,
-          icon: const Icon(Icons.refresh),
-        ),
-      ],
-    ),
-    bottomNavigationBar: const _FrontlineBottomBar(currentIndex: 2),
-    body: _error != null
+  Widget build(BuildContext context) {
+    final body = _error != null
         ? _ErrorView(message: _error.toString())
         : _loading && _profile == null
         ? const Center(child: CircularProgressIndicator())
@@ -969,8 +1170,33 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
                 );
               }),
             ],
-          ),
-  );
+          );
+    final refresh = IconButton(
+      onPressed: _loading ? null : _load,
+      icon: const Icon(Icons.refresh),
+      tooltip: context.tr('Aktualisieren', 'Refresh'),
+    );
+    if (appIsWindows) {
+      return _WindowsDesktopScaffold(
+        title: context.tr('Watchlist', 'Watchlist'),
+        actions: [refresh],
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 12, 28, 24),
+          child: body,
+        ),
+      );
+    }
+    return Scaffold(
+      appBar: appIsWindows
+          ? null
+          : AppBar(
+              title: Text(context.tr('Beobachtungsliste', 'Watchlist')),
+              actions: [refresh],
+            ),
+      bottomNavigationBar: const _FrontlineBottomBar(currentIndex: 2),
+      body: body,
+    );
+  }
 }
 
 class LiveStatusScreen extends ConsumerStatefulWidget {
@@ -1043,148 +1269,156 @@ class _LiveStatusScreenState extends ConsumerState<LiveStatusScreen> {
     final match = _mapValue(_status?['match']);
     final counts = _mapValue(match['team_counts']);
     final scores = _mapValue(match['team_scores']);
+    final body = _error != null
+        ? _ErrorView(message: _error.toString())
+        : _loading && _status == null
+        ? const Center(child: CircularProgressIndicator())
+        : ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              if (_servers.length > 1)
+                DropdownButtonFormField<int>(
+                  initialValue: _serverNumber,
+                  decoration: InputDecoration(
+                    labelText: context.tr('Server', 'Server'),
+                  ),
+                  items: _servers.map((server) {
+                    final number = (server['server_number'] as num).toInt();
+                    return DropdownMenuItem(
+                      value: number,
+                      child: Text(
+                        server['name']?.toString() ?? 'Server $number',
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    if (value == null) {
+                      return;
+                    }
+                    setState(() => _serverNumber = value);
+                    unawaited(_load());
+                  },
+                ),
+              if (_servers.length > 1) const SizedBox(height: 14),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        status['name']?.toString() ??
+                            'Server ${_serverNumber ?? '—'}',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 12),
+                      _LiveStatusRow(
+                        label: context.tr('Aktuelle Karte', 'Current map'),
+                        value: _liveMapName(
+                          match['current_map'] ?? status['map'],
+                        ),
+                      ),
+                      if (_status?['next_map'] != null)
+                        _LiveStatusRow(
+                          label: context.tr('Nächste Karte', 'Next map'),
+                          value: _liveMapName(_status?['next_map']),
+                        ),
+                      if (match['time_remaining'] != null)
+                        _LiveStatusRow(
+                          label: context.tr('Restzeit', 'Time remaining'),
+                          value: match['time_remaining'].toString(),
+                        ),
+                      if (status.isNotEmpty)
+                        _LiveStatusRow(
+                          label: context.tr('Spieler', 'Players'),
+                          value:
+                              '${status['current_players'] ?? '—'} / ${status['max_players'] ?? '—'}',
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        context.tr('Teams & Betrieb', 'Teams & operations'),
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 10),
+                      if (counts.isNotEmpty)
+                        _LiveStatusRow(
+                          label: context.tr(
+                            'Alliierte / Achse',
+                            'Allies / Axis',
+                          ),
+                          value:
+                              '${counts['allies'] ?? '—'} / ${counts['axis'] ?? '—'}',
+                        ),
+                      if (scores.isNotEmpty)
+                        _LiveStatusRow(
+                          label: context.tr('Punkte', 'Scores'),
+                          value:
+                              '${scores['allies'] ?? '—'} / ${scores['axis'] ?? '—'}',
+                        ),
+                      if (_status?['queue_length'] != null)
+                        _LiveStatusRow(
+                          label: context.tr('Warteschlange', 'Queue'),
+                          value: _status!['queue_length'].toString(),
+                        ),
+                      if (_status?['ingame_admin_count'] != null)
+                        _LiveStatusRow(
+                          label: context.tr('Ingame-Admins', 'In-game admins'),
+                          value: _status!['ingame_admin_count'].toString(),
+                        ),
+                      if (_status?['crcon_admin_count'] != null)
+                        _LiveStatusRow(
+                          label: context.tr('CRCON-Admins', 'CRCON admins'),
+                          value: _status!['crcon_admin_count'].toString(),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () => context.push('/autobalancer'),
+                icon: const Icon(Icons.balance_outlined),
+                label: Text(
+                  context.tr(
+                    'Fair Autobalancer öffnen',
+                    'Open Fair Autobalancer',
+                  ),
+                ),
+              ),
+            ],
+          );
+    final refresh = IconButton(
+      onPressed: _loading ? null : _load,
+      icon: const Icon(Icons.refresh),
+      tooltip: context.tr('Aktualisieren', 'Refresh'),
+    );
+    if (appIsWindows) {
+      return _WindowsDesktopScaffold(
+        title: context.tr('Live-Lage', 'Live situation'),
+        actions: [refresh],
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 12, 28, 24),
+          child: body,
+        ),
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         title: Text(context.tr('Server-Lage', 'Server situation')),
-        actions: [
-          IconButton(
-            onPressed: _loading ? null : _load,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
+        actions: [refresh],
       ),
       bottomNavigationBar: const _FrontlineBottomBar(currentIndex: 2),
-      body: _error != null
-          ? _ErrorView(message: _error.toString())
-          : _loading && _status == null
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                if (_servers.length > 1)
-                  DropdownButtonFormField<int>(
-                    initialValue: _serverNumber,
-                    decoration: InputDecoration(
-                      labelText: context.tr('Server', 'Server'),
-                    ),
-                    items: _servers.map((server) {
-                      final number = (server['server_number'] as num).toInt();
-                      return DropdownMenuItem(
-                        value: number,
-                        child: Text(
-                          server['name']?.toString() ?? 'Server $number',
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      if (value == null) {
-                        return;
-                      }
-                      setState(() => _serverNumber = value);
-                      unawaited(_load());
-                    },
-                  ),
-                if (_servers.length > 1) const SizedBox(height: 14),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          status['name']?.toString() ??
-                              'Server ${_serverNumber ?? '—'}',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 12),
-                        _LiveStatusRow(
-                          label: context.tr('Aktuelle Karte', 'Current map'),
-                          value: _liveMapName(
-                            match['current_map'] ?? status['map'],
-                          ),
-                        ),
-                        if (_status?['next_map'] != null)
-                          _LiveStatusRow(
-                            label: context.tr('Nächste Karte', 'Next map'),
-                            value: _liveMapName(_status?['next_map']),
-                          ),
-                        if (match['time_remaining'] != null)
-                          _LiveStatusRow(
-                            label: context.tr('Restzeit', 'Time remaining'),
-                            value: match['time_remaining'].toString(),
-                          ),
-                        if (status.isNotEmpty)
-                          _LiveStatusRow(
-                            label: context.tr('Spieler', 'Players'),
-                            value:
-                                '${status['current_players'] ?? '—'} / ${status['max_players'] ?? '—'}',
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          context.tr('Teams & Betrieb', 'Teams & operations'),
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 10),
-                        if (counts.isNotEmpty)
-                          _LiveStatusRow(
-                            label: context.tr(
-                              'Alliierte / Achse',
-                              'Allies / Axis',
-                            ),
-                            value:
-                                '${counts['allies'] ?? '—'} / ${counts['axis'] ?? '—'}',
-                          ),
-                        if (scores.isNotEmpty)
-                          _LiveStatusRow(
-                            label: context.tr('Punkte', 'Scores'),
-                            value:
-                                '${scores['allies'] ?? '—'} / ${scores['axis'] ?? '—'}',
-                          ),
-                        if (_status?['queue_length'] != null)
-                          _LiveStatusRow(
-                            label: context.tr('Warteschlange', 'Queue'),
-                            value: _status!['queue_length'].toString(),
-                          ),
-                        if (_status?['ingame_admin_count'] != null)
-                          _LiveStatusRow(
-                            label: context.tr(
-                              'Ingame-Admins',
-                              'In-game admins',
-                            ),
-                            value: _status!['ingame_admin_count'].toString(),
-                          ),
-                        if (_status?['crcon_admin_count'] != null)
-                          _LiveStatusRow(
-                            label: context.tr('CRCON-Admins', 'CRCON admins'),
-                            value: _status!['crcon_admin_count'].toString(),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: () => context.push('/autobalancer'),
-                  icon: const Icon(Icons.balance_outlined),
-                  label: Text(
-                    context.tr(
-                      'Fair Autobalancer öffnen',
-                      'Open Fair Autobalancer',
-                    ),
-                  ),
-                ),
-              ],
-            ),
+      body: body,
     );
   }
 }
@@ -1350,6 +1584,119 @@ class _AutobalancerScreenState extends ConsumerState<AutobalancerScreen> {
         .map((value) => value?.toString() ?? '')
         .where((value) => value.isNotEmpty)
         .toList();
+    final body = _loading && status == null
+        ? const Center(child: CircularProgressIndicator())
+        : _profile == null
+        ? Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                context.tr(
+                  'Kopple zuerst eine CRCON-Installation.',
+                  'Pair a CRCON installation first.',
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          )
+        : ListView(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+            children: [
+              if (_servers.isNotEmpty)
+                DropdownButtonFormField<int>(
+                  key: ValueKey(_serverNumber),
+                  initialValue: _serverNumber,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: context.tr('Spielserver', 'Game server'),
+                    prefixIcon: const Icon(Icons.dns_outlined),
+                  ),
+                  items: _servers
+                      .map(
+                        (server) => DropdownMenuItem(
+                          value: (server['server_number'] as num).toInt(),
+                          child: Text(
+                            _serverLabel(context, server),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  selectedItemBuilder: (context) => _servers
+                      .map(
+                        (server) => Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            _serverLabel(context, server),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: _loading
+                      ? null
+                      : (value) {
+                          if (value == null) return;
+                          setState(() => _serverNumber = value);
+                          unawaited(_load());
+                        },
+                ),
+              const SizedBox(height: 14),
+              if (_error != null) _ErrorView(message: _error.toString()),
+              if (status != null) ...[
+                _AutobalancerHero(
+                  phase: _phase(context, phase),
+                  mode: status['mode']?.toString() ?? 'disabled',
+                  requiredSwitches: required,
+                  updatedAt: status['updated_at']?.toString(),
+                ),
+                const SizedBox(height: 12),
+                _AutobalancerTeamsCard(
+                  allies: allies,
+                  axis: axis,
+                  total: total,
+                  hasLiveTeamCounts: hasLiveTeamCounts,
+                  difference: hasLiveTeamCounts
+                      ? status['team_difference']
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                _AutobalancerDataCard(status: status),
+                if (blocks.isNotEmpty || warnings.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _AutobalancerMessages(blocks: blocks, warnings: warnings),
+                ],
+              ],
+              const SizedBox(height: 14),
+              Text(
+                context.tr(
+                  'Diese mobile Ansicht ist nur lesend. Entscheidungen, Konfiguration und Eingriffe bleiben in CRCON.',
+                  'This mobile view is read-only. Decisions, configuration, and interventions remain in CRCON.',
+                ),
+                style: const TextStyle(
+                  color: FrontlineTheme.muted,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          );
+    final refresh = IconButton(
+      tooltip: context.tr('Aktualisieren', 'Refresh'),
+      onPressed: _loading ? null : _load,
+      icon: const Icon(Icons.refresh),
+    );
+    if (appIsWindows) {
+      return _WindowsDesktopScaffold(
+        title: context.tr('Fair Autobalancer', 'Fair Autobalancer'),
+        actions: [refresh],
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 12, 28, 24),
+          child: body,
+        ),
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -1359,113 +1706,10 @@ class _AutobalancerScreenState extends ConsumerState<AutobalancerScreen> {
             Text(context.tr('Fair Autobalancer', 'Fair Autobalancer')),
           ],
         ),
-        actions: [
-          IconButton(
-            tooltip: context.tr('Aktualisieren', 'Refresh'),
-            onPressed: _loading ? null : _load,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
+        actions: [refresh],
       ),
       bottomNavigationBar: const _FrontlineBottomBar(currentIndex: 2),
-      body: _loading && status == null
-          ? const Center(child: CircularProgressIndicator())
-          : _profile == null
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  context.tr(
-                    'Kopple zuerst eine CRCON-Installation.',
-                    'Pair a CRCON installation first.',
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            )
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
-              children: [
-                if (_servers.isNotEmpty)
-                  DropdownButtonFormField<int>(
-                    key: ValueKey(_serverNumber),
-                    initialValue: _serverNumber,
-                    isExpanded: true,
-                    decoration: InputDecoration(
-                      labelText: context.tr('Spielserver', 'Game server'),
-                      prefixIcon: const Icon(Icons.dns_outlined),
-                    ),
-                    items: _servers
-                        .map(
-                          (server) => DropdownMenuItem(
-                            value: (server['server_number'] as num).toInt(),
-                            child: Text(
-                              _serverLabel(context, server),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    selectedItemBuilder: (context) => _servers
-                        .map(
-                          (server) => Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              _serverLabel(context, server),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: _loading
-                        ? null
-                        : (value) {
-                            if (value == null) return;
-                            setState(() => _serverNumber = value);
-                            unawaited(_load());
-                          },
-                  ),
-                const SizedBox(height: 14),
-                if (_error != null) _ErrorView(message: _error.toString()),
-                if (status != null) ...[
-                  _AutobalancerHero(
-                    phase: _phase(context, phase),
-                    mode: status['mode']?.toString() ?? 'disabled',
-                    requiredSwitches: required,
-                    updatedAt: status['updated_at']?.toString(),
-                  ),
-                  const SizedBox(height: 12),
-                  _AutobalancerTeamsCard(
-                    allies: allies,
-                    axis: axis,
-                    total: total,
-                    hasLiveTeamCounts: hasLiveTeamCounts,
-                    difference: hasLiveTeamCounts
-                        ? status['team_difference']
-                        : null,
-                  ),
-                  const SizedBox(height: 12),
-                  _AutobalancerDataCard(status: status),
-                  if (blocks.isNotEmpty || warnings.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    _AutobalancerMessages(blocks: blocks, warnings: warnings),
-                  ],
-                ],
-                const SizedBox(height: 14),
-                Text(
-                  context.tr(
-                    'Diese mobile Ansicht ist nur lesend. Entscheidungen, Konfiguration und Eingriffe bleiben in CRCON.',
-                    'This mobile view is read-only. Decisions, configuration, and interventions remain in CRCON.',
-                  ),
-                  style: const TextStyle(
-                    color: FrontlineTheme.muted,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
+      body: body,
     );
   }
 }
@@ -3074,47 +3318,203 @@ class _WindowsNavigation extends StatelessWidget {
       (
         Icons.visibility_outlined,
         context.tr('Watchlist', 'Watchlist'),
+        '/watchlist',
+      ),
+      (
+        Icons.radar_outlined,
+        context.tr('Live-Lage', 'Live situation'),
+        '/live-status',
+      ),
+      (
+        Icons.balance_outlined,
+        context.tr('Autobalancer', 'Autobalancer'),
+        '/autobalancer',
+      ),
+      (
+        Icons.link_outlined,
+        context.tr('Verbindungen', 'Connections'),
         '/connections',
       ),
-      (Icons.dns_outlined, context.tr('Server', 'Servers'), '/connections'),
-      (Icons.settings_outlined, context.tr('Mehr', 'More'), '/connections'),
+      (
+        Icons.settings_outlined,
+        context.tr('Einstellungen', 'Settings'),
+        '/settings',
+      ),
     ];
+    final activePath = GoRouterState.of(context).uri.path;
     return SizedBox(
-      width: 88,
+      width: 184,
       child: ColoredBox(
         color: const Color(0xff0c100d),
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.only(top: 24, bottom: 28),
-              child: Image.asset('assets/fln_logo.png', width: 42, height: 42),
-            ),
-            for (final entry in entries)
-              Tooltip(
-                message: entry.$2,
-                child: InkWell(
-                  onTap: () => context.go(entry.$3),
-                  child: SizedBox(
-                    height: 58,
-                    child: Icon(
-                      entry.$1,
-                      color: entry.$3 == '/inbox'
-                          ? FrontlineTheme.gold
-                          : FrontlineTheme.chalk,
+              padding: const EdgeInsets.fromLTRB(20, 24, 14, 26),
+              child: Row(
+                children: [
+                  Image.asset('assets/fln_logo.png', width: 34, height: 34),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'FRONTLINE',
+                      style: TextStyle(
+                        color: FrontlineTheme.chalk,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.1,
+                      ),
                     ),
                   ),
-                ),
+                ],
+              ),
+            ),
+            for (final entry in entries)
+              Builder(
+                builder: (context) {
+                  final active = activePath == entry.$3;
+                  return InkWell(
+                    onTap: () => context.go(entry.$3),
+                    child: Container(
+                      height: 54,
+                      color: active ? const Color(0xff292718) : null,
+                      padding: const EdgeInsets.only(left: 18, right: 14),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 3,
+                            height: 32,
+                            color: active
+                                ? FrontlineTheme.gold
+                                : Colors.transparent,
+                          ),
+                          const SizedBox(width: 12),
+                          Icon(
+                            entry.$1,
+                            color: active
+                                ? FrontlineTheme.gold
+                                : FrontlineTheme.chalk,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 11),
+                          Expanded(
+                            child: Text(
+                              entry.$2,
+                              style: TextStyle(
+                                color: active
+                                    ? FrontlineTheme.chalk
+                                    : FrontlineTheme.muted,
+                                fontWeight: active
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
             const Spacer(),
-            const Padding(
-              padding: EdgeInsets.only(bottom: 20),
-              child: Icon(Icons.bolt_outlined, color: FrontlineTheme.gold),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 16, 20),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.circle,
+                    color: FrontlineTheme.success,
+                    size: 10,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    context.tr('Verbunden', 'Connected'),
+                    style: const TextStyle(
+                      color: FrontlineTheme.muted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+class _WindowsDesktopScaffold extends StatelessWidget {
+  const _WindowsDesktopScaffold({
+    required this.title,
+    required this.child,
+    this.actions = const [],
+  });
+
+  final String title;
+  final Widget child;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: SafeArea(
+      child: Row(
+        children: [
+          const _WindowsNavigation(),
+          const VerticalDivider(width: 1),
+          Expanded(
+            child: ColoredBox(
+              color: const Color(0xff10130f),
+              child: Column(
+                children: [
+                  Container(
+                    height: 74,
+                    padding: const EdgeInsets.symmetric(horizontal: 30),
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(color: Color(0xff3d3f32)),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const Spacer(),
+                        ...actions,
+                        const SizedBox(width: 8),
+                        const _LanguageButton(),
+                      ],
+                    ),
+                  ),
+                  Expanded(child: child),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _WindowsBodyLayout extends StatelessWidget {
+  const _WindowsBodyLayout({
+    required this.title,
+    required this.child,
+    this.actions = const [],
+  });
+
+  final String title;
+  final Widget child;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) => appIsWindows
+      ? _WindowsDesktopScaffold(title: title, actions: actions, child: child)
+      : child;
 }
 
 class _WindowsCaseQueue extends StatelessWidget {
@@ -4865,19 +5265,42 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
   Widget build(BuildContext context) {
     final profiles = ref.watch(connectionsProvider);
     return Scaffold(
-      appBar: AppBar(
-        titleSpacing: 20,
-        toolbarHeight: 54,
-        title: Row(
-          children: [
-            Image.asset('assets/fln_logo.png', width: 20, height: 20),
-            const SizedBox(width: 8),
-            Text(
-              context.tr('Spieler', 'Players'),
-              style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w500),
+      appBar: appIsWindows
+          ? null
+          : AppBar(
+              titleSpacing: 20,
+              toolbarHeight: 54,
+              title: Row(
+                children: [
+                  Image.asset('assets/fln_logo.png', width: 20, height: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    context.tr('Spieler', 'Players'),
+                    style: const TextStyle(
+                      fontSize: 25,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                IconButton(
+                  tooltip: context.tr('Aktualisieren', 'Refresh'),
+                  onPressed: _busy
+                      ? null
+                      : () => _loadDirectory(
+                          ref.read(connectionsProvider).valueOrNull ?? const [],
+                        ),
+                  icon: const Icon(Icons.refresh),
+                ),
+                const _LanguageButton(),
+              ],
             ),
-          ],
-        ),
+      bottomNavigationBar: appIsWindows
+          ? null
+          : const _FrontlineBottomBar(currentIndex: 1),
+      body: _WindowsBodyLayout(
+        title: context.tr('Spieler', 'Players'),
         actions: [
           IconButton(
             tooltip: context.tr('Aktualisieren', 'Refresh'),
@@ -4888,165 +5311,169 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
                   ),
             icon: const Icon(Icons.refresh),
           ),
-          const _LanguageButton(),
         ],
-      ),
-      bottomNavigationBar: const _FrontlineBottomBar(currentIndex: 1),
-      body: profiles.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => _ErrorView(message: error.toString()),
-        data: (items) {
-          if (items.isEmpty) {
-            return Center(
-              child: Text(
-                context.tr(
-                  'Verbinde zuerst eine CRCON-Installation.',
-                  'Pair a CRCON connection first.',
-                ),
-              ),
-            );
-          }
-          _connectionId ??= items.first.id;
-          if (!_loaded && !_busy) {
-            WidgetsBinding.instance.addPostFrameCallback(
-              (_) => _loadDirectory(items),
-            );
-          }
-          final players = _visiblePlayers();
-          final activeServerLabel = _serverNumber == null
-              ? context.tr('Alle Server', 'All servers')
-              : '${context.tr('Server', 'Server')} $_serverNumber';
-          return LayoutBuilder(
-            builder: (context, constraints) => Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 720),
-                child: ListView(
-                  padding: EdgeInsets.fromLTRB(
-                    constraints.maxWidth < 420 ? 16 : 20,
-                    8,
-                    constraints.maxWidth < 420 ? 16 : 20,
-                    18,
+        child: profiles.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, _) => _ErrorView(message: error.toString()),
+          data: (items) {
+            if (items.isEmpty) {
+              return Center(
+                child: Text(
+                  context.tr(
+                    'Verbinde zuerst eine CRCON-Installation.',
+                    'Pair a CRCON connection first.',
                   ),
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: _busy ? null : () => _chooseServer(items),
-                      icon: const Icon(Icons.dns_outlined),
-                      label: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(activeServerLabel),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(62),
-                        foregroundColor: FrontlineTheme.chalk,
-                        side: const BorderSide(color: Color(0xff5d5d4c)),
-                      ),
+                ),
+              );
+            }
+            _connectionId ??= items.first.id;
+            if (!_loaded && !_busy) {
+              WidgetsBinding.instance.addPostFrameCallback(
+                (_) => _loadDirectory(items),
+              );
+            }
+            final players = _visiblePlayers();
+            final activeServerLabel = _serverNumber == null
+                ? context.tr('Alle Server', 'All servers')
+                : '${context.tr('Server', 'Server')} $_serverNumber';
+            return LayoutBuilder(
+              builder: (context, constraints) => Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: appIsWindows ? 1120 : 720,
+                  ),
+                  child: ListView(
+                    padding: EdgeInsets.fromLTRB(
+                      constraints.maxWidth < 420 ? 16 : 20,
+                      8,
+                      constraints.maxWidth < 420 ? 16 : 20,
+                      18,
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _query,
-                      onChanged: (_) => setState(() {
-                        if (_query.text.trim().isEmpty) _results = const [];
-                      }),
-                      decoration: InputDecoration(
-                        hintText: context.tr(
-                          'Spielername oder Steam-ID suchen',
-                          'Search player name or Steam ID',
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: _busy ? null : () => _chooseServer(items),
+                        icon: const Icon(Icons.dns_outlined),
+                        label: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(activeServerLabel),
                         ),
-                        prefixIcon: const Icon(Icons.search),
-                        suffixIcon: IconButton(
-                          onPressed: () => _search(items),
-                          icon: const Icon(Icons.arrow_forward),
-                          tooltip: context.tr('Suchen', 'Search'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(62),
+                          foregroundColor: FrontlineTheme.chalk,
+                          side: const BorderSide(color: Color(0xff5d5d4c)),
                         ),
                       ),
-                      textInputAction: TextInputAction.search,
-                      onSubmitted: (_) => _search(items),
-                    ),
-                    if (_busy) ...[
-                      const SizedBox(height: 10),
-                      const LinearProgressIndicator(),
-                    ],
-                    if (_error != null) ...[
                       const SizedBox(height: 12),
-                      _ErrorView(message: _error!),
-                    ],
-                    const SizedBox(height: 20),
-                    Wrap(
-                      alignment: WrapAlignment.spaceBetween,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: [
-                        Text(
-                          _results.isNotEmpty
-                              ? context.tr('Suchergebnisse', 'Search results')
-                              : context.tr(
-                                  'Spieler im Einsatz',
-                                  'Players in action',
-                                ),
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            TextButton(
-                              onPressed: () => setState(() => _showAll = false),
-                              style: TextButton.styleFrom(
-                                foregroundColor: !_showAll
-                                    ? FrontlineTheme.gold
-                                    : FrontlineTheme.muted,
-                              ),
-                              child: Text(context.tr('Online', 'Online')),
-                            ),
-                            TextButton(
-                              onPressed: () => setState(() => _showAll = true),
-                              style: TextButton.styleFrom(
-                                foregroundColor: _showAll
-                                    ? FrontlineTheme.gold
-                                    : FrontlineTheme.muted,
-                              ),
-                              child: Text(context.tr('Alle', 'All')),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    if (_loaded && players.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 28),
-                        child: Center(
-                          child: Text(
-                            context.tr(
-                              'Keine Spieler gefunden.',
-                              'No players found.',
-                            ),
-                            style: const TextStyle(color: FrontlineTheme.muted),
+                      TextField(
+                        controller: _query,
+                        onChanged: (_) => setState(() {
+                          if (_query.text.trim().isEmpty) _results = const [];
+                        }),
+                        decoration: InputDecoration(
+                          hintText: context.tr(
+                            'Spielername oder Steam-ID suchen',
+                            'Search player name or Steam ID',
+                          ),
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: IconButton(
+                            onPressed: () => _search(items),
+                            icon: const Icon(Icons.arrow_forward),
+                            tooltip: context.tr('Suchen', 'Search'),
                           ),
                         ),
+                        textInputAction: TextInputAction.search,
+                        onSubmitted: (_) => _search(items),
                       ),
-                    ...players.map(
-                      (player) => PlayerDirectoryRow(
-                        player: player,
-                        onTap: () {
-                          final playerId =
-                              player['player_id']?.toString() ?? '';
-                          if (playerId.isEmpty) return;
-                          final server =
-                              (player['server_number'] as num?)?.toInt() ??
-                              _serverNumber;
-                          context.push(
-                            '/players/$_connectionId/$playerId?server_number=${server ?? ''}',
-                          );
-                        },
+                      if (_busy) ...[
+                        const SizedBox(height: 10),
+                        const LinearProgressIndicator(),
+                      ],
+                      if (_error != null) ...[
+                        const SizedBox(height: 12),
+                        _ErrorView(message: _error!),
+                      ],
+                      const SizedBox(height: 20),
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          Text(
+                            _results.isNotEmpty
+                                ? context.tr('Suchergebnisse', 'Search results')
+                                : context.tr(
+                                    'Spieler im Einsatz',
+                                    'Players in action',
+                                  ),
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              TextButton(
+                                onPressed: () =>
+                                    setState(() => _showAll = false),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: !_showAll
+                                      ? FrontlineTheme.gold
+                                      : FrontlineTheme.muted,
+                                ),
+                                child: Text(context.tr('Online', 'Online')),
+                              ),
+                              TextButton(
+                                onPressed: () =>
+                                    setState(() => _showAll = true),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: _showAll
+                                      ? FrontlineTheme.gold
+                                      : FrontlineTheme.muted,
+                                ),
+                                child: Text(context.tr('Alle', 'All')),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      if (_loaded && players.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 28),
+                          child: Center(
+                            child: Text(
+                              context.tr(
+                                'Keine Spieler gefunden.',
+                                'No players found.',
+                              ),
+                              style: const TextStyle(
+                                color: FrontlineTheme.muted,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ...players.map(
+                        (player) => PlayerDirectoryRow(
+                          player: player,
+                          onTap: () {
+                            final playerId =
+                                player['player_id']?.toString() ?? '';
+                            if (playerId.isEmpty) return;
+                            final server =
+                                (player['server_number'] as num?)?.toInt() ??
+                                _serverNumber;
+                            context.push(
+                              '/players/$_connectionId/$playerId?server_number=${server ?? ''}',
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
@@ -5194,39 +5621,46 @@ class PlayerProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-    appBar: AppBar(
-      title: Row(
-        children: [
-          Image.asset('assets/fln_logo.png', width: 23, height: 23),
-          const SizedBox(width: 9),
-          Text(context.tr('Spielerprofil', 'Player profile')),
-        ],
+    appBar: appIsWindows
+        ? null
+        : AppBar(
+            title: Row(
+              children: [
+                Image.asset('assets/fln_logo.png', width: 23, height: 23),
+                const SizedBox(width: 9),
+                Text(context.tr('Spielerprofil', 'Player profile')),
+              ],
+            ),
+            actions: const [_LanguageButton()],
+          ),
+    body: _WindowsBodyLayout(
+      title: context.tr('Spielerprofil', 'Player profile'),
+      child: FutureBuilder<Map<String, dynamic>>(
+        future: _load(ref),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return _ErrorView(message: snapshot.error.toString());
+          }
+          return PlayerProfileDossier(
+            dossier: snapshot.data!,
+            playerId: playerId,
+            incidentContext: incidentContext,
+            connectionId: connectionId,
+            serverNumber: serverNumber,
+          );
+        },
       ),
-      actions: const [_LanguageButton()],
     ),
-    body: FutureBuilder<Map<String, dynamic>>(
-      future: _load(ref),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return _ErrorView(message: snapshot.error.toString());
-        }
-        return PlayerProfileDossier(
-          dossier: snapshot.data!,
-          playerId: playerId,
-          incidentContext: incidentContext,
-          connectionId: connectionId,
-          serverNumber: serverNumber,
-        );
-      },
-    ),
-    bottomNavigationBar: _PlayerProfileActionBar(
-      incidentContext: incidentContext,
-      connectionId: connectionId,
-      playerId: playerId,
-    ),
+    bottomNavigationBar: appIsWindows
+        ? null
+        : _PlayerProfileActionBar(
+            incidentContext: incidentContext,
+            connectionId: connectionId,
+            playerId: playerId,
+          ),
   );
 }
 
@@ -5273,7 +5707,7 @@ class PlayerProfileDossier extends StatelessWidget {
       builder: (context, constraints) => Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720),
+          constraints: BoxConstraints(maxWidth: appIsWindows ? 1120 : 720),
           child: ListView(
             padding: EdgeInsets.fromLTRB(
               constraints.maxWidth < 420 ? 14 : 20,
@@ -6756,196 +7190,212 @@ class SquadScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-    appBar: AppBar(
-      title: Text(context.tr('Squad', 'Squad')),
-      actions: const [_LanguageButton()],
-    ),
-    bottomNavigationBar: const _FrontlineBottomBar(currentIndex: 1),
-    body: FutureBuilder<Map<String, dynamic>>(
-      future: _load(ref),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return _ErrorView(message: snapshot.error.toString());
-        }
-        final squad = snapshot.data!;
-        final players = _listValue(squad['players']);
-        return ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: FrontlineTheme.surface,
-                border: Border.all(
-                  color: Theme.of(context).colorScheme.outline,
+    appBar: appIsWindows
+        ? null
+        : AppBar(
+            title: Text(context.tr('Squad', 'Squad')),
+            actions: const [_LanguageButton()],
+          ),
+    bottomNavigationBar: appIsWindows
+        ? null
+        : const _FrontlineBottomBar(currentIndex: 1),
+    body: _WindowsBodyLayout(
+      title: context.tr('Squad', 'Squad'),
+      child: FutureBuilder<Map<String, dynamic>>(
+        future: _load(ref),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return _ErrorView(message: snapshot.error.toString());
+          }
+          final squad = snapshot.data!;
+          final players = _listValue(squad['players']);
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: FrontlineTheme.surface,
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
                 ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    context.squadName(
-                      squad['squad_name']?.toString() ?? squadName,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.squadName(
+                        squad['squad_name']?.toString() ?? squadName,
+                      ),
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _ContextChip(
-                        icon: Icons.flag_outlined,
-                        label: context.teamName(
-                          squad['team']?.toString() ?? team,
-                        ),
-                      ),
-                      _ContextChip(
-                        icon: Icons.groups_2_outlined,
-                        label: context.squadTypeName(squad['type']?.toString()),
-                      ),
-                      _ContextChip(
-                        icon: Icons.person_outline,
-                        label:
-                            '${players.length} ${context.tr('Mitglieder', 'members')}',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Icon(
-                        squad['has_leader'] == true
-                            ? Icons.verified_user
-                            : Icons.warning_amber,
-                        color: squad['has_leader'] == true
-                            ? FrontlineTheme.success
-                            : FrontlineTheme.warning,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        squad['has_leader'] == true
-                            ? context.tr(
-                                'Squadleader aktiv',
-                                'Squad leader active',
-                              )
-                            : context.tr('Kein Squadleader', 'No squad leader'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              decoration: BoxDecoration(
-                color: FrontlineTheme.surface,
-                border: Border.all(
-                  color: Theme.of(context).colorScheme.outline,
-                ),
-              ),
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 13,
-                    ),
-                    child: Row(
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
-                        Text(
-                          context.tr('Mitglieder', 'Members'),
-                          style: Theme.of(context).textTheme.titleMedium,
+                        _ContextChip(
+                          icon: Icons.flag_outlined,
+                          label: context.teamName(
+                            squad['team']?.toString() ?? team,
+                          ),
                         ),
-                        const Spacer(),
-                        Text(
-                          context.tr('Live', 'Live'),
-                          style: const TextStyle(color: FrontlineTheme.success),
+                        _ContextChip(
+                          icon: Icons.groups_2_outlined,
+                          label: context.squadTypeName(
+                            squad['type']?.toString(),
+                          ),
+                        ),
+                        _ContextChip(
+                          icon: Icons.person_outline,
+                          label:
+                              '${players.length} ${context.tr('Mitglieder', 'members')}',
                         ),
                       ],
                     ),
-                  ),
-                  const Divider(height: 1),
-                  ...players.map((value) {
-                    final player = _mapValue(value);
-                    final playerId = player['player_id']?.toString() ?? '';
-                    final isLeader = _isSquadLeader(player['role']?.toString());
-                    return InkWell(
-                      onTap: playerId.isEmpty
-                          ? null
-                          : () => context.push(
-                              '/players/$connectionId/$playerId?server_number=$serverNumber',
-                            ),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Icon(
+                          squad['has_leader'] == true
+                              ? Icons.verified_user
+                              : Icons.warning_amber,
+                          color: squad['has_leader'] == true
+                              ? FrontlineTheme.success
+                              : FrontlineTheme.warning,
                         ),
-                        decoration: const BoxDecoration(
-                          border: Border(
-                            bottom: BorderSide(color: Color(0xff3d3f32)),
+                        const SizedBox(width: 8),
+                        Text(
+                          squad['has_leader'] == true
+                              ? context.tr(
+                                  'Squadleader aktiv',
+                                  'Squad leader active',
+                                )
+                              : context.tr(
+                                  'Kein Squadleader',
+                                  'No squad leader',
+                                ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                decoration: BoxDecoration(
+                  color: FrontlineTheme.surface,
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 13,
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            context.tr('Mitglieder', 'Members'),
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const Spacer(),
+                          Text(
+                            context.tr('Live', 'Live'),
+                            style: const TextStyle(
+                              color: FrontlineTheme.success,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    ...players.map((value) {
+                      final player = _mapValue(value);
+                      final playerId = player['player_id']?.toString() ?? '';
+                      final isLeader = _isSquadLeader(
+                        player['role']?.toString(),
+                      );
+                      return InkWell(
+                        onTap: playerId.isEmpty
+                            ? null
+                            : () => context.push(
+                                '/players/$connectionId/$playerId?server_number=$serverNumber',
+                              ),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          decoration: const BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(color: Color(0xff3d3f32)),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                isLeader
+                                    ? Icons.shield_outlined
+                                    : Icons.person_outline,
+                                color: isLeader
+                                    ? FrontlineTheme.gold
+                                    : FrontlineTheme.chalk,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      player['name']?.toString() ?? playerId,
+                                      style: const TextStyle(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      [
+                                        context.roleName(
+                                          player['role']?.toString(),
+                                        ),
+                                        if (player['level'] != null)
+                                          'Lvl ${player['level']}',
+                                        'K ${player['kills'] ?? '—'} / D ${player['deaths'] ?? '—'}',
+                                      ].whereType<String>().join(' · '),
+                                      style: const TextStyle(
+                                        color: FrontlineTheme.muted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(
+                                Icons.chevron_right,
+                                color: FrontlineTheme.muted,
+                              ),
+                            ],
                           ),
                         ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              isLeader
-                                  ? Icons.shield_outlined
-                                  : Icons.person_outline,
-                              color: isLeader
-                                  ? FrontlineTheme.gold
-                                  : FrontlineTheme.chalk,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    player['name']?.toString() ?? playerId,
-                                    style: const TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    [
-                                      context.roleName(
-                                        player['role']?.toString(),
-                                      ),
-                                      if (player['level'] != null)
-                                        'Lvl ${player['level']}',
-                                      'K ${player['kills'] ?? '—'} / D ${player['deaths'] ?? '—'}',
-                                    ].whereType<String>().join(' · '),
-                                    style: const TextStyle(
-                                      color: FrontlineTheme.muted,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const Icon(
-                              Icons.chevron_right,
-                              color: FrontlineTheme.muted,
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }),
-                ],
+                      );
+                    }),
+                  ],
+                ),
               ),
-            ),
-          ],
-        );
-      },
+            ],
+          );
+        },
+      ),
     ),
   );
 }
