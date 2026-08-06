@@ -730,8 +730,16 @@ class ConnectionsScreen extends ConsumerWidget {
             const SizedBox(height: 6),
             OutlinedButton.icon(
               onPressed: () => context.push('/pair'),
-              icon: const Icon(Icons.qr_code_scanner),
-              label: Text(context.tr('CRCON koppeln', 'Pair CRCON')),
+              icon: Icon(
+                appIsWindows
+                    ? Icons.open_in_browser_outlined
+                    : Icons.qr_code_scanner,
+              ),
+              label: Text(
+                appIsWindows
+                    ? context.tr('CRCON verbinden', 'Connect CRCON')
+                    : context.tr('CRCON koppeln', 'Pair CRCON'),
+              ),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size.fromHeight(52),
               ),
@@ -2350,7 +2358,11 @@ class _PairingScreenState extends ConsumerState<PairingScreen>
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text(context.tr('CRCON koppeln', 'Pair CRCON')),
+      title: Text(
+        appIsWindows
+            ? context.tr('Windows-App verbinden', 'Connect Windows app')
+            : context.tr('CRCON koppeln', 'Pair CRCON'),
+      ),
       actions: const [_LanguageButton()],
     ),
     body: appIsWindows
@@ -3945,14 +3957,21 @@ class _FirstConnectionWizard extends StatelessWidget {
                   const _WebAppInstallCard(),
                 ],
                 SizedBox(height: appIsWeb ? 38 : 58),
-                const Icon(
-                  Icons.phonelink_lock_outlined,
+                Icon(
+                  appIsWindows
+                      ? Icons.desktop_windows_outlined
+                      : Icons.phonelink_lock_outlined,
                   size: 56,
                   color: FrontlineTheme.gold,
                 ),
                 const SizedBox(height: 22),
                 Text(
-                  context.tr('Frontline einrichten', 'Set up Frontline'),
+                  appIsWindows
+                      ? context.tr(
+                          'Windows-App einrichten',
+                          'Set up Windows app',
+                        )
+                      : context.tr('Frontline einrichten', 'Set up Frontline'),
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w700,
@@ -3960,49 +3979,90 @@ class _FirstConnectionWizard extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  context.tr(
-                    'Kopple dein persönliches CRCON-Konto sicher in weniger als einer Minute.',
-                    'Securely connect your own CRCON account in less than a minute.',
-                  ),
+                  appIsWindows
+                      ? context.tr(
+                          'Melde die Windows-App direkt über deinen Browser und dein eigenes CRCON-Konto an.',
+                          'Sign the Windows app in directly through your browser and your own CRCON account.',
+                        )
+                      : context.tr(
+                          'Kopple dein persönliches CRCON-Konto sicher in weniger als einer Minute.',
+                          'Securely connect your own CRCON account in less than a minute.',
+                        ),
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: FrontlineTheme.muted),
                 ),
                 const SizedBox(height: 30),
                 _WizardStep(
                   number: '1',
-                  title: context.tr('CRCON öffnen', 'Open CRCON'),
-                  description: context.tr(
-                    'Melde dich im CRCON mit deinem eigenen Admin-Konto an.',
-                    'Sign in to CRCON with your own administrator account.',
-                  ),
+                  title: appIsWindows
+                      ? context.tr(
+                          'CRCON-Adresse eingeben',
+                          'Enter CRCON address',
+                        )
+                      : context.tr('CRCON öffnen', 'Open CRCON'),
+                  description: appIsWindows
+                      ? context.tr(
+                          'Gib die öffentliche HTTPS-Adresse deiner CRCON-Installation ein.',
+                          'Enter the public HTTPS address of your CRCON installation.',
+                        )
+                      : context.tr(
+                          'Melde dich im CRCON mit deinem eigenen Admin-Konto an.',
+                          'Sign in to CRCON with your own administrator account.',
+                        ),
                 ),
                 const SizedBox(height: 12),
                 _WizardStep(
                   number: '2',
-                  title: context.tr('QR-Code erstellen', 'Create a QR code'),
-                  description: context.tr(
-                    'Öffne dort „Apps einrichten“ und wähle „Gerät koppeln“.',
-                    'Open “Set up apps” there and choose “Pair device”.',
-                  ),
+                  title: appIsWindows
+                      ? context.tr('Browser-Anmeldung', 'Browser sign-in')
+                      : context.tr('QR-Code erstellen', 'Create a QR code'),
+                  description: appIsWindows
+                      ? context.tr(
+                          'Frontline öffnet den Browser. Melde dich dort mit deinem eigenen Admin-Konto an.',
+                          'Frontline opens your browser. Sign in there with your own administrator account.',
+                        )
+                      : context.tr(
+                          'Öffne dort „Apps einrichten“ und wähle „Gerät koppeln“.',
+                          'Open “Set up apps” there and choose “Pair device”.',
+                        ),
                 ),
                 const SizedBox(height: 12),
                 _WizardStep(
                   number: '3',
-                  title: context.tr(
-                    'Scannen und bestätigen',
-                    'Scan and approve',
-                  ),
-                  description: context.tr(
-                    'Scanne den Code hier und bestätige anschließend den Vergleichscode im CRCON.',
-                    'Scan the code here, then confirm the comparison code in CRCON.',
-                  ),
+                  title: appIsWindows
+                      ? context.tr('Freigabe abschließen', 'Finish approval')
+                      : context.tr(
+                          'Scannen und bestätigen',
+                          'Scan and approve',
+                        ),
+                  description: appIsWindows
+                      ? context.tr(
+                          'Bestätige den Gerätecode im Browser. Die Windows-App verbindet sich automatisch.',
+                          'Approve the device code in your browser. The Windows app connects automatically.',
+                        )
+                      : context.tr(
+                          'Scanne den Code hier und bestätige anschließend den Vergleichscode im CRCON.',
+                          'Scan the code here, then confirm the comparison code in CRCON.',
+                        ),
                 ),
                 const SizedBox(height: 30),
                 FilledButton.icon(
                   onPressed: () => context.push('/pair'),
-                  icon: const Icon(Icons.qr_code_scanner),
+                  icon: Icon(
+                    appIsWindows
+                        ? Icons.open_in_browser_outlined
+                        : Icons.qr_code_scanner,
+                  ),
                   label: Text(
-                    context.tr('QR-Code jetzt scannen', 'Scan QR code now'),
+                    appIsWindows
+                        ? context.tr(
+                            'Browser-Anmeldung starten',
+                            'Start browser sign-in',
+                          )
+                        : context.tr(
+                            'QR-Code jetzt scannen',
+                            'Scan QR code now',
+                          ),
                   ),
                   style: FilledButton.styleFrom(
                     minimumSize: const Size.fromHeight(54),
@@ -4011,8 +4071,12 @@ class _FirstConnectionWizard extends StatelessWidget {
                 const SizedBox(height: 14),
                 Text(
                   context.tr(
-                    'CRCON bestimmt weiterhin deine Rollen und Rechte. Frontline speichert keine gemeinsamen Zugangsdaten.',
-                    'CRCON continues to determine your roles and permissions. Frontline does not store shared credentials.',
+                    appIsWindows
+                        ? 'Für Windows wird kein QR-Code verwendet. CRCON bestimmt weiterhin deine Rollen und Rechte.'
+                        : 'CRCON bestimmt weiterhin deine Rollen und Rechte. Frontline speichert keine gemeinsamen Zugangsdaten.',
+                    appIsWindows
+                        ? 'Windows does not use a QR code. CRCON continues to determine your roles and permissions.'
+                        : 'CRCON continues to determine your roles and permissions. Frontline does not store shared credentials.',
                   ),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
