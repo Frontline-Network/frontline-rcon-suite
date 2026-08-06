@@ -1,7 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
-
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
@@ -148,7 +146,8 @@ class CrconApi {
         validateStatus: (status) => status != null && status < 500,
       ),
     );
-    if (response.statusCode == HttpStatus.accepted) return null;
+    // 202 means that the owner has not approved this authorization yet.
+    if (response.statusCode == 202) return null;
     final result = decodeCrconResponse(response) as Map;
     final profile = ConnectionProfile(
       id: result['installation_id'].toString(),
@@ -177,7 +176,8 @@ class CrconApi {
         validateStatus: (status) => status != null && status < 500,
       ),
     );
-    if (response.statusCode == HttpStatus.accepted) return null;
+    // 202 means that the owner has not approved this pairing yet.
+    if (response.statusCode == 202) return null;
     final result = decodeCrconResponse(response);
     final profile = ConnectionProfile(
       id: result['installation_id'].toString(),
@@ -552,7 +552,7 @@ class CrconApi {
         refreshToken: result['refresh_token'].toString(),
       );
     } on CrconApiException catch (error) {
-      if (error.statusCode == HttpStatus.unauthorized) {
+      if (error.statusCode == 401) {
         throw CrconAuthException(
           'Die CRCON-Kopplung ist abgelaufen. Bitte dieses Gerät neu koppeln.',
           statusCode: error.statusCode,
@@ -576,7 +576,7 @@ dynamic decodeCrconResponse(Response<dynamic> response) {
             '${response.requestOptions.uri.path} (HTTP ${status ?? 'unknown'})',
       );
       throw CrconApiException(
-        status == HttpStatus.notFound
+        status == 404
             ? 'CRCON Mobile API ist noch nicht auf dem benötigten Stand.'
             : 'CRCON hat eine ungültige Antwort geliefert${status == null ? '' : ' (HTTP $status)'}.',
         statusCode: status,

@@ -66,7 +66,7 @@ def _session():
 
 class RegistrationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    platform: str = Field(pattern="^(android|ios)$")
+    platform: str = Field(pattern="^(android|ios|web)$")
     push_token: str = Field(min_length=20, max_length=4096)
 
 

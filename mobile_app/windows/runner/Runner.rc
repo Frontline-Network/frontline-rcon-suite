@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "app.crcon" "\0"
-            VALUE "FileDescription", "crcon_mobile_admin" "\0"
+            VALUE "FileDescription", "Frontline" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "crcon_mobile_admin" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 app.crcon. All rights reserved." "\0"
             VALUE "OriginalFilename", "crcon_mobile_admin.exe" "\0"
-            VALUE "ProductName", "crcon_mobile_admin" "\0"
+            VALUE "ProductName", "Frontline" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

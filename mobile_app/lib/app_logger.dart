@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
+
+import 'app_logger_persistence.dart'
+    if (dart.library.html) 'app_logger_persistence_web.dart';
 
 enum AppLogLevel { info, warning, error }
 
@@ -59,18 +60,14 @@ class AppLogger {
   final ValueNotifier<int> revision = ValueNotifier<int>(0);
   final List<AppLogEntry> _entries = [];
   Future<void> _writeQueue = Future<void>.value();
-  File? _file;
+  AppLogPersistence? _persistence;
 
   List<AppLogEntry> get entries => List.unmodifiable(_entries.reversed);
 
   Future<void> initialize() async {
     try {
-      final directory = await getApplicationSupportDirectory();
-      _file = File(
-        '${directory.path}${Platform.pathSeparator}diagnostics-v1.jsonl',
-      );
-      if (!await _file!.exists()) return;
-      final lines = await _file!.readAsLines();
+      _persistence = await openAppLogPersistence();
+      final lines = await _persistence!.readLines();
       for (final line in lines.skip(
         lines.length > _maximumEntries ? lines.length - _maximumEntries : 0,
       )) {
@@ -146,8 +143,8 @@ class AppLogger {
   String exportText() {
     final buffer = StringBuffer()
       ..writeln('Frontline CRCON Admin diagnostics')
-      ..writeln('App: 0.1.9+10')
-      ..writeln('Platform: ${Platform.operatingSystem}')
+      ..writeln('App: 0.1.14+15')
+      ..writeln('Platform: $appLogPlatform')
       ..writeln('Exported: ${DateTime.now().toUtc().toIso8601String()}')
       ..writeln('Sensitive credentials are automatically redacted.')
       ..writeln();
@@ -158,15 +155,12 @@ class AppLogger {
   }
 
   Future<void> _persist() async {
-    final file = _file;
-    if (file == null) return;
+    final persistence = _persistence;
+    if (persistence == null) return;
     final contents = _entries
         .map((entry) => jsonEncode(entry.toJson()))
         .join('\n');
-    await file.writeAsString(
-      contents.isEmpty ? '' : '$contents\n',
-      flush: true,
-    );
+    await persistence.writeText(contents.isEmpty ? '' : '$contents\n');
   }
 
   @visibleForTesting

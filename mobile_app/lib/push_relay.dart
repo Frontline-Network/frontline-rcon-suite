@@ -1,9 +1,8 @@
-import 'dart:io';
-
 import 'package:dio/dio.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'app_logger.dart';
+import 'platform_info.dart' if (dart.library.html) 'platform_info_web.dart';
 
 class PushRelayIdentity {
   const PushRelayIdentity({required this.handle, required this.capability});
@@ -13,10 +12,13 @@ class PushRelayIdentity {
 
 class PushRelay {
   static const baseUrl = String.fromEnvironment('PUSH_RELAY_URL');
+  static const webVapidKey = String.fromEnvironment('FIREBASE_WEB_VAPID_KEY');
 
   static Future<PushRelayIdentity?> register() async {
     if (baseUrl.isEmpty) return null;
-    final token = await FirebaseMessaging.instance.getToken();
+    final token = await FirebaseMessaging.instance.getToken(
+      vapidKey: webVapidKey.isEmpty ? null : webVapidKey,
+    );
     if (token == null) return null;
     final endpoint = '${baseUrl.replaceFirst(RegExp(r'/$'), '')}/v1/devices';
     try {
@@ -26,10 +28,7 @@ class PushRelay {
       );
       final response = await Dio().post<Map<String, dynamic>>(
         endpoint,
-        data: {
-          'platform': Platform.isIOS ? 'ios' : 'android',
-          'push_token': token,
-        },
+        data: {'platform': appDevicePlatform, 'push_token': token},
       );
       AppLogger.instance.info(
         'push',

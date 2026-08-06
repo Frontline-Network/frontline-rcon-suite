@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:ui';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -15,11 +14,13 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'app_logger.dart';
 import 'crcon_api.dart';
+import 'firebase_options.dart';
 import 'frontline_theme.dart';
-import 'live_updates.dart';
+import 'live_updates.dart' if (dart.library.html) 'live_updates_web.dart';
 import 'models.dart';
 import 'providers.dart';
 import 'push_relay.dart';
+import 'platform_info.dart' if (dart.library.html) 'platform_info_web.dart';
 
 final localeProvider = StateProvider<Locale>((ref) => const Locale('de'));
 bool _firebaseAvailable = false;
@@ -97,6 +98,10 @@ List<Object?> _listValue(Object? value) => value is List ? value : const [];
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  runApp(const ProviderScope(child: _FrontlineBootstrap()));
+}
+
+Future<void> _initializeApplication() async {
   await AppLogger.instance.initialize();
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
@@ -119,8 +124,7 @@ Future<void> main() async {
   AppLogger.instance.info('app', 'Application started');
   if (PushRelay.baseUrl.isNotEmpty) {
     try {
-      await Firebase.initializeApp();
-      await FirebaseMessaging.instance.requestPermission();
+      await Firebase.initializeApp(options: firebaseOptionsForCurrentPlatform);
       _firebaseAvailable = true;
     } catch (error) {
       AppLogger.instance.warning(
@@ -135,7 +139,101 @@ Future<void> main() async {
       'Push is disabled for this build; no relay URL is configured',
     );
   }
-  runApp(const ProviderScope(child: CrconMobileApp()));
+}
+
+class _FrontlineBootstrap extends StatefulWidget {
+  const _FrontlineBootstrap();
+
+  @override
+  State<_FrontlineBootstrap> createState() => _FrontlineBootstrapState();
+}
+
+class _FrontlineBootstrapState extends State<_FrontlineBootstrap> {
+  bool _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_start());
+  }
+
+  Future<void> _start() async {
+    final startedAt = DateTime.now();
+    try {
+      await _initializeApplication();
+    } catch (error, stackTrace) {
+      AppLogger.instance.error(
+        'app',
+        error,
+        message: 'Application startup failed',
+        stackTrace: stackTrace,
+      );
+    }
+    const minimumSplash = Duration(milliseconds: 900);
+    final elapsed = DateTime.now().difference(startedAt);
+    if (elapsed < minimumSplash) {
+      await Future<void>.delayed(minimumSplash - elapsed);
+    }
+    if (mounted) setState(() => _ready = true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_ready) return const CrconMobileApp();
+    return MaterialApp(
+      title: 'Frontline',
+      debugShowCheckedModeBanner: false,
+      theme: FrontlineTheme.dark,
+      home: const _FrontlineLoadingScreen(),
+    );
+  }
+}
+
+class _FrontlineLoadingScreen extends StatelessWidget {
+  const _FrontlineLoadingScreen();
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 42),
+        child: SizedBox(
+          width: double.infinity,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Spacer(flex: 4),
+              Image.asset(
+                'assets/frontline_app_icon.png',
+                width: 108,
+                height: 108,
+                filterQuality: FilterQuality.high,
+              ),
+              const SizedBox(height: 22),
+              Text(
+                'Frontline',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  color: FrontlineTheme.chalk,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: .2,
+                ),
+              ),
+              const SizedBox(height: 28),
+              const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: FrontlineTheme.gold,
+                ),
+              ),
+              const Spacer(flex: 4),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 final _router = GoRouter(
@@ -196,6 +294,7 @@ class _CrconMobileAppState extends ConsumerState<CrconMobileApp> {
   StreamSubscription<RemoteMessage>? _openedMessages;
   StreamSubscription<String>? _tokenChanges;
   final Map<String, CrconLiveUpdates> _liveConnections = {};
+  bool _pushPermissionRequested = false;
 
   @override
   void initState() {
@@ -215,7 +314,6 @@ class _CrconMobileAppState extends ConsumerState<CrconMobileApp> {
       _tokenChanges = FirebaseMessaging.instance.onTokenRefresh.listen(
         (_) => _rotatePushIdentity(),
       );
-      unawaited(_rotatePushIdentity());
     } catch (error) {
       AppLogger.instance.warning(
         'push',
@@ -262,6 +360,29 @@ class _CrconMobileAppState extends ConsumerState<CrconMobileApp> {
     }
   }
 
+  Future<void> _enablePushAfterPairing() async {
+    if (!_firebaseAvailable || _pushPermissionRequested) return;
+    _pushPermissionRequested = true;
+    try {
+      final permission = await FirebaseMessaging.instance.requestPermission();
+      if (permission.authorizationStatus == AuthorizationStatus.authorized ||
+          permission.authorizationStatus == AuthorizationStatus.provisional) {
+        await _rotatePushIdentity();
+      } else {
+        AppLogger.instance.info(
+          'push',
+          'Notifications were not authorized for this device',
+        );
+      }
+    } catch (error, stackTrace) {
+      AppLogger.instance.warning(
+        'push',
+        'Could not request notification permission',
+        error: '$error\n$stackTrace',
+      );
+    }
+  }
+
   void _openIncident(RemoteMessage message) {
     final connectionId = message.data['connection_key'];
     final incidentId = message.data['incident_id'];
@@ -291,6 +412,7 @@ class _CrconMobileAppState extends ConsumerState<CrconMobileApp> {
         }),
       );
     }
+    if (profiles.isNotEmpty) unawaited(_enablePushAfterPairing());
   }
 
   @override
@@ -311,7 +433,7 @@ class _CrconMobileAppState extends ConsumerState<CrconMobileApp> {
     });
     final locale = ref.watch(localeProvider);
     return MaterialApp.router(
-      title: 'Frontline CRCON Admin',
+      title: 'Frontline',
       debugShowCheckedModeBanner: false,
       locale: locale,
       supportedLocales: const [Locale('de'), Locale('en')],
@@ -1872,10 +1994,8 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
       }
       final session = await CrconApi.scanPairing(
         payload,
-        deviceName: Platform.localHostname.isEmpty
-            ? 'CRCON phone'
-            : Platform.localHostname,
-        platform: Platform.isIOS ? 'ios' : 'android',
+        deviceName: appDeviceName('CRCON phone'),
+        platform: appDevicePlatform,
         pushHandle: relayIdentity?.handle ?? '',
         pushCapability: relayIdentity?.capability ?? '',
       );
@@ -1918,9 +2038,7 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
     try {
       final session = await CrconApi.startDesktopAuthorization(
         _desktopUrl.text,
-        deviceName: Platform.localHostname.isEmpty
-            ? 'CRCON Windows app'
-            : Platform.localHostname,
+        deviceName: appDeviceName('CRCON Windows app'),
       );
       if (!mounted) return;
       setState(() => _desktopSession = session);
@@ -2099,7 +2217,7 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
       title: Text(context.tr('CRCON koppeln', 'Pair CRCON')),
       actions: const [_LanguageButton()],
     ),
-    body: Platform.isWindows
+    body: appIsWindows
         ? _desktopPairing(context)
         : _session == null
         ? Stack(
@@ -2480,6 +2598,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final profiles = ref.watch(connectionsProvider);
+    if (profiles.valueOrNull?.isEmpty == true) {
+      return const _FirstConnectionWizard();
+    }
     final inbox = ref.watch(inboxProvider);
 
     return Scaffold(
@@ -2683,6 +2805,231 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
           ),
         ),
       );
+}
+
+class _FirstConnectionWizard extends StatelessWidget {
+  const _FirstConnectionWizard();
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: RadialGradient(
+          center: Alignment(-.35, -.55),
+          radius: 1.35,
+          colors: [Color(0xff1a1f16), FrontlineTheme.background],
+        ),
+      ),
+      child: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(24, 36, 24, 28),
+              children: [
+                Row(
+                  children: [
+                    Image.asset('assets/fln_logo.png', width: 32, height: 32),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Frontline',
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const Spacer(),
+                    const _LanguageButton(),
+                  ],
+                ),
+                const SizedBox(height: 58),
+                const Icon(
+                  Icons.phonelink_lock_outlined,
+                  size: 56,
+                  color: FrontlineTheme.gold,
+                ),
+                const SizedBox(height: 22),
+                Text(
+                  context.tr('Frontline einrichten', 'Set up Frontline'),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  context.tr(
+                    'Kopple dein persönliches CRCON-Konto sicher in weniger als einer Minute.',
+                    'Securely connect your own CRCON account in less than a minute.',
+                  ),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: FrontlineTheme.muted),
+                ),
+                if (appIsWeb) ...[
+                  const SizedBox(height: 24),
+                  const _WebAppInstallCard(),
+                ],
+                const SizedBox(height: 30),
+                _WizardStep(
+                  number: '1',
+                  title: context.tr('CRCON öffnen', 'Open CRCON'),
+                  description: context.tr(
+                    'Melde dich im CRCON mit deinem eigenen Admin-Konto an.',
+                    'Sign in to CRCON with your own administrator account.',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _WizardStep(
+                  number: '2',
+                  title: context.tr('QR-Code erstellen', 'Create a QR code'),
+                  description: context.tr(
+                    'Öffne dort „Mobile App“ und wähle „Gerät koppeln“.',
+                    'Open “Mobile App” there and choose “Pair device”.',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _WizardStep(
+                  number: '3',
+                  title: context.tr(
+                    'Scannen und bestätigen',
+                    'Scan and approve',
+                  ),
+                  description: context.tr(
+                    'Scanne den Code hier und bestätige anschließend den Vergleichscode im CRCON.',
+                    'Scan the code here, then confirm the comparison code in CRCON.',
+                  ),
+                ),
+                const SizedBox(height: 30),
+                FilledButton.icon(
+                  onPressed: () => context.push('/pair'),
+                  icon: const Icon(Icons.qr_code_scanner),
+                  label: Text(
+                    context.tr('QR-Code jetzt scannen', 'Scan QR code now'),
+                  ),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(54),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  context.tr(
+                    'CRCON bestimmt weiterhin deine Rollen und Rechte. Frontline speichert keine gemeinsamen Zugangsdaten.',
+                    'CRCON continues to determine your roles and permissions. Frontline does not store shared credentials.',
+                  ),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: FrontlineTheme.muted,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _WebAppInstallCard extends StatelessWidget {
+  const _WebAppInstallCard();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: const Color(0xff1c2119),
+      border: Border.all(color: FrontlineTheme.gold.withValues(alpha: .7)),
+      borderRadius: BorderRadius.circular(5),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(
+              Icons.install_mobile_outlined,
+              color: FrontlineTheme.gold,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                context.tr(
+                  'Als App installieren (empfohlen)',
+                  'Install as an app (recommended)',
+                ),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Text(
+          context.tr(
+            'iPhone: Öffne diese Seite in Safari, tippe auf „Teilen“ und wähle „Zum Home-Bildschirm“. Android: In Chrome das Menü öffnen und „Installieren & verknüpfen“, „App installieren“ oder „Zum Startbildschirm hinzufügen“ wählen.',
+            'iPhone: Open this page in Safari, tap Share, then choose Add to Home Screen. Android: Open Chrome’s menu and choose Install and link, Install app, or Add to Home screen.',
+          ),
+          style: const TextStyle(color: FrontlineTheme.muted, height: 1.35),
+        ),
+      ],
+    ),
+  );
+}
+
+class _WizardStep extends StatelessWidget {
+  const _WizardStep({
+    required this.number,
+    required this.title,
+    required this.description,
+  });
+
+  final String number;
+  final String title;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: FrontlineTheme.surface,
+      border: Border.all(color: Theme.of(context).colorScheme.outline),
+      borderRadius: BorderRadius.circular(5),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 30,
+          height: 30,
+          alignment: Alignment.center,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: FrontlineTheme.gold,
+          ),
+          child: Text(
+            number,
+            style: const TextStyle(
+              color: FrontlineTheme.background,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 4),
+              Text(
+                description,
+                style: const TextStyle(color: FrontlineTheme.muted),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _OnlineBadge extends StatelessWidget {
@@ -4041,64 +4388,76 @@ class _PlayerContextExcerpt extends ConsumerWidget {
   final String playerId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) =>
-      FutureBuilder<Map<String, dynamic>>(
-        future: () async {
-          final profiles = await ref.read(connectionsProvider.future);
-          final profile = profiles.firstWhere(
-            (item) => item.id == connectionId,
-          );
-          return CrconApi(
-            profile,
-            ref.read(secureStoreProvider),
-          ).playerContext(incidentId, playerId);
-        }(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError || !snapshot.hasData) {
-            return const SizedBox.shrink();
-          }
-          final events = _listValue(
-            snapshot.data!['events'],
-          ).map(_mapValue).toList();
-          if (events.isEmpty) return const SizedBox.shrink();
-          return Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    context.tr('Ereignisse zum Vorfall', 'Incident events'),
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  ...events.map(
-                    (event) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(_eventIcon(event['type']?.toString())),
-                      title: Text(_eventLabel(context, event)),
-                      subtitle: Text(
-                        event['message']?.toString() ??
-                            event['occurred_at']?.toString() ??
-                            '',
-                      ),
-                    ),
-                  ),
-                  if ((snapshot.data!['total'] as num? ?? events.length) >
-                      events.length)
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () => _openAll(context, ref),
-                        child: Text(context.tr('Alle anzeigen', 'Show all')),
-                      ),
-                    ),
-                ],
+  Widget build(
+    BuildContext context,
+    WidgetRef ref,
+  ) => FutureBuilder<Map<String, dynamic>>(
+    future: () async {
+      final profiles = await ref.read(connectionsProvider.future);
+      final profile = profiles.firstWhere((item) => item.id == connectionId);
+      return CrconApi(
+        profile,
+        ref.read(secureStoreProvider),
+      ).playerContext(incidentId, playerId);
+    }(),
+    builder: (context, snapshot) {
+      if (snapshot.hasError || !snapshot.hasData) {
+        return const SizedBox.shrink();
+      }
+      final events = _listValue(
+        snapshot.data!['events'],
+      ).map(_mapValue).toList();
+      if (events.isEmpty) return const SizedBox.shrink();
+      final total = (snapshot.data!['total'] as num? ?? events.length).toInt();
+      final teamkills = events
+          .where((event) => event['type']?.toString() == 'teamkill')
+          .length;
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                context.tr('Ereignisse zum Vorfall', 'Incident events'),
+                style: Theme.of(context).textTheme.titleMedium,
               ),
-            ),
-          );
-        },
+              const SizedBox(height: 4),
+              Text(
+                context.tr(
+                  '10 Minuten vor / nach der Meldung',
+                  '10 minutes before / after the report',
+                ),
+                style: const TextStyle(color: FrontlineTheme.muted),
+              ),
+              if (teamkills > 0) ...[
+                const SizedBox(height: 14),
+                _ContextSummary(
+                  teamkills: teamkills,
+                  showAll: total > events.length,
+                  onShowAll: () => _openAll(context, ref),
+                ),
+              ],
+              const SizedBox(height: 12),
+              for (var index = 0; index < events.length; index++) ...[
+                _ContextEventRow(event: events[index]),
+                if (index != events.length - 1) const Divider(height: 24),
+              ],
+              if (total > events.length && teamkills == 0)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: () => _openAll(context, ref),
+                    icon: const Icon(Icons.format_list_bulleted),
+                    label: Text(context.tr('Alle anzeigen', 'Show all')),
+                  ),
+                ),
+            ],
+          ),
+        ),
       );
+    },
+  );
 
   void _openAll(BuildContext context, WidgetRef ref) {
     showModalBottomSheet<void>(
@@ -4121,17 +4480,22 @@ class _PlayerContextExcerpt extends ConsumerWidget {
             child: snapshot.hasData
                 ? ListView(
                     children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                        child: Text(
+                          context.tr('Alle Ereignisse', 'All events'),
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                      ),
                       for (final value in _listValue(
                         snapshot.data!['events'],
                       ).map(_mapValue))
-                        ListTile(
-                          leading: Icon(_eventIcon(value['type']?.toString())),
-                          title: Text(_eventLabel(context, value)),
-                          subtitle: Text(
-                            value['message']?.toString() ??
-                                value['occurred_at']?.toString() ??
-                                '',
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 10,
                           ),
+                          child: _ContextEventRow(event: value),
                         ),
                     ],
                   )
@@ -4139,6 +4503,124 @@ class _PlayerContextExcerpt extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ContextSummary extends StatelessWidget {
+  const _ContextSummary({
+    required this.teamkills,
+    required this.showAll,
+    required this.onShowAll,
+  });
+
+  final int teamkills;
+  final bool showAll;
+  final VoidCallback onShowAll;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    decoration: BoxDecoration(
+      border: Border.all(color: FrontlineTheme.warning.withValues(alpha: .62)),
+      color: FrontlineTheme.surfaceHigh,
+    ),
+    child: Row(
+      children: [
+        const Icon(Icons.warning_amber_rounded, color: FrontlineTheme.warning),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            context.tr(
+              '$teamkills ${teamkills == 1 ? 'Teamkill' : 'Teamkills'} im Zeitfenster',
+              '$teamkills team ${teamkills == 1 ? 'kill' : 'kills'} in time window',
+            ),
+            style: const TextStyle(
+              color: FrontlineTheme.warning,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        if (showAll)
+          TextButton(
+            onPressed: onShowAll,
+            child: Text(context.tr('Alle', 'All')),
+          ),
+      ],
+    ),
+  );
+}
+
+class _ContextEventRow extends StatelessWidget {
+  const _ContextEventRow({required this.event});
+
+  final Map<String, dynamic> event;
+
+  @override
+  Widget build(BuildContext context) {
+    final kind = event['type']?.toString();
+    final isTeamkill = kind == 'teamkill';
+    final actor =
+        event['actor_name']?.toString() ??
+        context.tr('Unbekannter Spieler', 'Unknown player');
+    final other = event['other_name']?.toString();
+    final weapon = event['weapon']?.toString();
+    final details = <String?>[
+      if (weapon != null && weapon.isNotEmpty) weapon,
+      _contextEventTime(event['occurred_at']),
+    ].whereType<String>().where((value) => value.isNotEmpty).toList();
+    final title = _contextEventTitle(context, kind, actor, other);
+    final eyebrow = _contextEventEyebrow(context, kind);
+    final accent = isTeamkill ? const Color(0xffe06f65) : FrontlineTheme.chalk;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 42,
+          child: Icon(
+            _eventIcon(kind),
+            color: isTeamkill ? const Color(0xffe06f65) : FrontlineTheme.muted,
+            size: 28,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (eyebrow != null) ...[
+                Text(
+                  eyebrow,
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 3),
+              ],
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (details.isNotEmpty) ...[
+                const SizedBox(height: 3),
+                Text(
+                  details.join(' · '),
+                  style: const TextStyle(color: FrontlineTheme.muted),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -4152,33 +4634,45 @@ IconData _eventIcon(String? value) => switch (value) {
   _ => Icons.history,
 };
 
-String _eventLabel(BuildContext context, Map<String, dynamic> event) {
-  final actor =
-      event['actor_name']?.toString() ?? context.tr('Spieler', 'Player');
-  final other = event['other_name']?.toString();
-  return switch (event['type']?.toString()) {
-    'chat' => context.tr(
-      '$actor schrieb im Chat',
-      '$actor sent a chat message',
-    ),
-    'kill' =>
-      other == null
-          ? context.tr('$actor tötete einen Spieler', '$actor killed a player')
-          : context.tr('$actor tötete $other', '$actor killed $other'),
-    'teamkill' =>
-      other == null
-          ? context.tr(
-              '$actor teamkillte einen Spieler',
-              '$actor teamkilled a player',
-            )
-          : context.tr('$actor teamkillte $other', '$actor teamkilled $other'),
-    'join' => context.tr('$actor ist beigetreten', '$actor joined'),
-    'leave' => context.tr(
-      '$actor hat den Server verlassen',
-      '$actor left the server',
-    ),
-    _ => context.tr('Ereignis', 'Event'),
-  };
+String _contextEventTitle(
+  BuildContext context,
+  String? kind,
+  String actor,
+  String? other,
+) => switch (kind) {
+  'chat' => context.tr('$actor schrieb im Chat', '$actor sent a chat message'),
+  'kill' =>
+    other == null
+        ? context.tr('$actor tötete einen Spieler', '$actor killed a player')
+        : '$actor → $other',
+  'teamkill' =>
+    other == null
+        ? context.tr(
+            '$actor teamkillte einen Spieler',
+            '$actor teamkilled a player',
+          )
+        : '$actor → $other',
+  'join' => context.tr('$actor ist beigetreten', '$actor joined'),
+  'leave' => context.tr(
+    '$actor hat den Server verlassen',
+    '$actor left the server',
+  ),
+  _ => context.tr('Ereignis', 'Event'),
+};
+
+String? _contextEventEyebrow(BuildContext context, String? kind) =>
+    switch (kind) {
+      'teamkill' => context.tr('TEAMKILL', 'TEAM KILL'),
+      'kill' => context.tr('KILL', 'KILL'),
+      'chat' => context.tr('CHAT', 'CHAT'),
+      _ => null,
+    };
+
+String? _contextEventTime(dynamic value) {
+  if (value == null) return null;
+  final timestamp = DateTime.tryParse(value.toString())?.toLocal();
+  if (timestamp == null) return null;
+  return '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
 }
 
 class _PlayerIdentityHeader extends StatelessWidget {

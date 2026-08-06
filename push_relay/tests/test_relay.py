@@ -36,6 +36,16 @@ def test_registration_and_opaque_notification(monkeypatch, tmp_path):
     assert response.status_code == 202
 
 
+def test_registration_accepts_a_web_pwa_token(monkeypatch, tmp_path):
+    client = _client(monkeypatch, tmp_path)
+    response = client.post(
+        "/v1/devices",
+        json={"platform": "web", "push_token": "w" * 64},
+    )
+    assert response.status_code == 200
+    assert response.json()["handle"]
+
+
 def test_rejects_sensitive_payload_fields(monkeypatch, tmp_path):
     client = _client(monkeypatch, tmp_path)
     registration = client.post(
