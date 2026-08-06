@@ -83,7 +83,7 @@ const FrontlineAppsPage = () => {
         </Grid>
       </Grid>
       <Box id="frontline-pairing" sx={{ mt: 3 }}>
-        <CrconAppSettings showUtilities={false} />
+        <CrconAppSettings showUtilities={false} frontlinePresentation />
       </Box>
     </Box>
   );

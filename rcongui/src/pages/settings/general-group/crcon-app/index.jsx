@@ -29,7 +29,11 @@ import { cmd, mobileRequest } from "@/utils/fetchUtils";
 import { toast } from "react-toastify";
 import { useTranslation } from "react-i18next";
 
-function CrconAppSettings({ showFrontline = true, showUtilities = true }) {
+function CrconAppSettings({
+  showFrontline = true,
+  showUtilities = true,
+  frontlinePresentation = false,
+}) {
   const { t } = useTranslation();
   const [password, setPassword] = useState("");
   const [desktopPassword, setDesktopPassword] = useState("");
@@ -169,24 +173,42 @@ function CrconAppSettings({ showFrontline = true, showUtilities = true }) {
     reconnectMutation.mutate();
   };
 
+  const frontlineCardSx = frontlinePresentation
+    ? (theme) => ({
+        border: "1px solid",
+        borderColor: "primary.main",
+        background: `linear-gradient(125deg, ${theme.palette.background.paper} 0%, ${theme.palette.action.hover} 100%)`,
+      })
+    : undefined;
+  const frontlineSectionSx = frontlinePresentation
+    ? {
+        p: { xs: 1.5, md: 2 },
+        border: "1px solid",
+        borderColor: "divider",
+        borderRadius: 2,
+        bgcolor: "background.paper",
+      }
+    : undefined;
+
   return (
     <Grid container spacing={3}>
       {showFrontline && <Grid size={12}>
-        <Card elevation={2}>
+        <Card elevation={frontlinePresentation ? 0 : 2} sx={frontlineCardSx}>
           <CardHeader
             avatar={<QrCodeIcon color="primary" />}
             title={t("settings.mobile.title")}
             subheader={t("settings.mobile.subtitle")}
+            sx={frontlinePresentation ? { pb: 2 } : undefined}
           />
           <Divider flexItem />
-          <CardContent>
+          <CardContent sx={frontlinePresentation ? { p: { xs: 2, md: 3 } } : undefined}>
             <Stack spacing={2}>
               {mobileError && <Alert severity="info">{mobileError}</Alert>}
-              <Alert severity="warning">
+              <Alert severity={frontlinePresentation ? "info" : "warning"} variant={frontlinePresentation ? "outlined" : "standard"}>
                 {t("settings.mobile.pairingWarning")}
               </Alert>
               {!pairing || ["consumed", "denied"].includes(pairing.state) ? (
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={frontlineSectionSx}>
                   <TextField
                     label={t("settings.mobile.confirmPassword")}
                     type="password"
@@ -209,6 +231,7 @@ function CrconAppSettings({ showFrontline = true, showUtilities = true }) {
                   direction={{ xs: "column", md: "row" }}
                   spacing={3}
                   alignItems="center"
+                  sx={frontlineSectionSx}
                 >
                   {pairing.qr_payload && pairing.state === "pending" && (
                     <Box sx={{ bgcolor: "white", p: 2, borderRadius: 1 }}>
@@ -264,7 +287,7 @@ function CrconAppSettings({ showFrontline = true, showUtilities = true }) {
               )}
 
               <Divider />
-              <Stack spacing={2}>
+              <Stack spacing={2} sx={frontlineSectionSx}>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <DesktopIcon color="primary" />
                   <Typography variant="h6">
@@ -309,6 +332,7 @@ function CrconAppSettings({ showFrontline = true, showUtilities = true }) {
               </Stack>
 
               <Divider />
+              <Stack spacing={2} sx={frontlineSectionSx}>
               {bootstrap?.user?.permissions?.includes(
                 "api.can_manage_all_mobile_devices"
               ) && (
@@ -344,7 +368,6 @@ function CrconAppSettings({ showFrontline = true, showUtilities = true }) {
                   <Typography variant="body2" color="text.secondary">
                     {t("settings.mobile.configurationHint")}
                   </Typography>
-                  <Divider />
                 </>
               )}
               <Typography variant="h6">
@@ -393,6 +416,7 @@ function CrconAppSettings({ showFrontline = true, showUtilities = true }) {
                   ))}
                 </List>
               )}
+              </Stack>
             </Stack>
           </CardContent>
         </Card>
