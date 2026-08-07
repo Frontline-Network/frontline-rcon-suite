@@ -702,13 +702,11 @@ def devices(request):
     command = "mobile_devices"
     if disabled := _require_enabled(command):
         return disabled
-    queryset = MobileDevice.objects.select_related("user")
-    if request.GET.get("all") == "true" and request.user.has_perm(
-        "api.can_manage_all_mobile_devices"
-    ):
-        pass
-    else:
-        queryset = queryset.filter(user=request.user)
+    # A paired device belongs to its CRCON account.  Do not expose another
+    # administrator's device metadata from the regular mobile endpoint, even
+    # if a legacy client sends ``?all=true``.  Installation-wide device
+    # operations need a separate, deliberately privileged management surface.
+    queryset = MobileDevice.objects.select_related("user").filter(user=request.user)
     return api_response(
         command=command,
         failed=False,
@@ -717,10 +715,9 @@ def devices(request):
 
 
 def _device_for_user(request, device_id):
-    queryset = MobileDevice.objects.select_related("user")
-    if request.user.has_perm("api.can_manage_all_mobile_devices"):
-        return queryset.get(pk=device_id)
-    return queryset.get(pk=device_id, user=request.user)
+    return MobileDevice.objects.select_related("user").get(
+        pk=device_id, user=request.user
+    )
 
 
 @csrf_exempt

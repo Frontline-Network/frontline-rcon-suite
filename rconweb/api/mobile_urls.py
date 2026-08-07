@@ -49,7 +49,7 @@ MOBILE_API_DOCUMENTATION = [
         "endpoint": "mobile/v1/devices",
         "allowed_http_methods": ["GET"],
         "permissions_required": ["api.can_manage_own_mobile_devices"],
-        "description": "List own devices or all devices with owner permission.",
+        "description": "List devices paired with the authenticated CRCON account.",
     },
     {
         "endpoint": "mobile/v1/devices/{id}",

@@ -45,9 +45,8 @@ function CrconAppSettings({
 
   const loadDevices = useCallback(async () => {
     try {
-      // Owners receive all installations; other roles transparently receive only their own.
       const [nextDevices, nextBootstrap] = await Promise.all([
-        mobileRequest("devices?all=true"),
+        mobileRequest("devices"),
         mobileRequest("bootstrap"),
       ]);
       setDevices(nextDevices);
@@ -370,13 +369,7 @@ function CrconAppSettings({
                   </Typography>
                 </>
               )}
-              <Typography variant="h6">
-                {bootstrap?.user?.permissions?.includes(
-                  "api.can_manage_all_mobile_devices"
-                )
-                  ? t("settings.mobile.allDevices")
-                  : t("settings.mobile.myDevices")}
-              </Typography>
+              <Typography variant="h6">{t("settings.mobile.myDevices")}</Typography>
               {devices.length === 0 ? (
                 <Typography color="text.secondary">
                   {t("settings.mobile.noDevices")}

@@ -302,6 +302,30 @@ class MobilePairingTests(TestCase):
         self.assertEqual(revoked.status_code, 200)
         self.assertEqual(bearer.get("/api/mobile/v1/devices").status_code, 401)
 
+    def test_devices_endpoint_never_exposes_or_mutates_another_users_device(self):
+        tokens = self._paired_tokens()
+        other_user = User.objects.create_user(
+            username="another-admin", password="another correct password"
+        )
+        other_device = MobileDevice.objects.create(
+            user=other_user,
+            name="Another admin's phone",
+            platform="android",
+        )
+
+        # The authenticated user is a superuser in this test.  Even that must
+        # not widen the account-bound mobile device endpoint.
+        bearer = Client(HTTP_AUTHORIZATION=f"Bearer {tokens['access_token']}")
+        listed = bearer.get("/api/mobile/v1/devices?all=true")
+        self.assertEqual(listed.status_code, 200)
+        device_ids = {item["id"] for item in listed.json()["result"]}
+        self.assertEqual(device_ids, {tokens["device_id"]})
+
+        forbidden = bearer.delete(f"/api/mobile/v1/devices/{other_device.id}")
+        self.assertEqual(forbidden.status_code, 404)
+        other_device.refresh_from_db()
+        self.assertIsNone(other_device.revoked_at)
+
     def test_permission_loss_takes_effect_on_next_request(self):
         tokens = self._paired_tokens()
         bearer = Client(HTTP_AUTHORIZATION=f"Bearer {tokens['access_token']}")
