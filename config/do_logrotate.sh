@@ -4,4 +4,4 @@ then
 # 0644 permissions are already safe for logrotate; changing ownership here
 # makes the non-root deployment user unable to inspect or update the checkout.
 /usr/sbin/logrotate /config/logrotate.conf
-fi 
+fi
