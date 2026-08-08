@@ -38,6 +38,22 @@ if [[ ! -f compose.yaml || ! -f compose.mobile-admin.yaml || ! -f .env ]]; then
   exit 1
 fi
 
+# The generated compose.yaml is installation-specific: a one-server host must
+# not start backend_2/frontend_2/supervisor_2 merely because the shared
+# Frontline override also knows how to customize those services. Deploy only
+# the services that exist in the generated base file, plus the mobile worker
+# contributed by the Frontline override.
+mapfile -t deployment_services < <(
+  docker compose -f compose.yaml config --services
+)
+if [[ " ${deployment_services[*]} " != *" mobile_push_worker "* ]]; then
+  deployment_services+=(mobile_push_worker)
+fi
+if ((${#deployment_services[@]} == 0)); then
+  echo "No deployment services found in compose.yaml." >&2
+  exit 1
+fi
+
 current_branch="$(git symbolic-ref --quiet --short HEAD || true)"
 if [[ "$current_branch" != "$expected_branch" ]]; then
   echo "Refusing deployment from branch '$current_branch'; expected '$expected_branch'." >&2
@@ -81,6 +97,7 @@ CRCON_IMAGE_TAG="$target_short" docker compose \
   config --quiet
 
 echo "Preflight passed: $current_short -> $target_short"
+echo "Deployment services: ${deployment_services[*]}"
 if [[ "$mode" == "--check-only" ]]; then
   exit 0
 fi
@@ -141,7 +158,7 @@ compose_target() {
 
 compose_target config --quiet
 echo "Building immutable images for $target_short..."
-compose_target build --pull
+compose_target build --pull "${deployment_services[@]}"
 
 env_tmp="$(mktemp "$repo_root/.env.XXXXXX")"
 if grep -q '^CRCON_IMAGE_TAG=' .env; then
@@ -163,7 +180,8 @@ EOF
 chmod 600 "$state_dir/$timestamp.env"
 
 echo "Starting CRCON at $target_short..."
-compose_target up -d --remove-orphans --wait --wait-timeout 300
+compose_target up -d --remove-orphans --wait --wait-timeout 300 \
+  "${deployment_services[@]}"
 
 maintenance_container="$(compose_target ps -q maintenance)"
 docker exec "$maintenance_container" sh -lc 'cd /code && alembic current'
