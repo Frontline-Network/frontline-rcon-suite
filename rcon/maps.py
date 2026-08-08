@@ -112,6 +112,7 @@ class Environment(str, Enum):
 
 class FactionName(Enum):
     CW = "cw"
+    DAK = "dak"
     GB = "gb"
     GER = "ger"
     RUS = "rus"
@@ -419,7 +420,7 @@ MAPS = {
             pretty_name="El Alamein",
             shortname="Alamein",
             allies=Faction(name=FactionName.GB.value, team=Team.ALLIES),
-            axis=Faction(name=FactionName.GER.value, team=Team.AXIS),
+            axis=Faction(name=FactionName.DAK.value, team=Team.AXIS),
             orientation=Orientation.HORIZONTAL,
         ),
         Map(
@@ -449,7 +450,7 @@ MAPS = {
             pretty_name="Tobruk",
             shortname="Tobruk",
             allies=Faction(name=FactionName.GB.value, team=Team.ALLIES),
-            axis=Faction(name=FactionName.GER.value, team=Team.AXIS),
+            axis=Faction(name=FactionName.DAK.value, team=Team.AXIS),
             orientation=Orientation.HORIZONTAL,
         ),
         Map(

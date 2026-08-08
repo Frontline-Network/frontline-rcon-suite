@@ -12,6 +12,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cmd } from "@/utils/fetchUtils";
 import TeamBalanceBar from "@/components/shared/TeamBalanceBar";
+import { useAuth } from "@/hooks/useAuth";
 
 const PHASE_LABELS = {
   idle: "Bereit",
@@ -51,9 +52,16 @@ const MODE_EXPLANATIONS = {
 
 const AutobalancerCard = () => {
   const queryClient = useQueryClient();
+  const { permissions } = useAuth();
+  const canViewAutobalancer =
+    permissions?.is_superuser ||
+    permissions?.permissions?.some(
+      ({ permission }) => permission === "can_view_autobalancer"
+    );
   const { data: status, isError } = useQuery({
     queryKey: [{ queryIdentifier: "get_autobalancer_status" }],
     queryFn: cmd.GET_AUTOBALANCER_STATUS,
+    enabled: Boolean(canViewAutobalancer),
     refetchInterval: 5_000,
     retry: false,
   });
@@ -79,7 +87,7 @@ const AutobalancerCard = () => {
     onSuccess: refresh,
   });
 
-  if (isError || !status) return null;
+  if (!canViewAutobalancer || isError || !status) return null;
   const proposal = status.proposal;
   const counts = status.team_counts || {};
   return (

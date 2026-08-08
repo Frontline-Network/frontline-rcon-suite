@@ -235,6 +235,7 @@ def expose_api_endpoint(
         aliases = getattr(func, "_parameter_aliases", {})
         arguments = {}
         failure = False
+        rcon_unavailable = False
         others = None
         error: str | None = None
         errors_as_json: bool = False
@@ -309,6 +310,11 @@ def expose_api_endpoint(
         except HLLCommandFailedError as e:
             failure = True
             error = e.args[0] if e.args else None
+        except (TimeoutError, OSError):
+            logger.exception("RCON command %s timed out or could not reach the game server", command_name)
+            failure = True
+            rcon_unavailable = True
+            error = "The game server did not respond in time. Please try again shortly."
 
         response = RconJsonResponse(
             dict(
@@ -320,7 +326,7 @@ def expose_api_endpoint(
                 forward_results=others,
                 version=TAG_VERSION,
             ),
-            status=400 if error is not None else 200,
+            status=504 if rcon_unavailable else (400 if error is not None else 200),
         )
 
         # Handle all the special cases of forwarding commands here so we don't

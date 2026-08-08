@@ -1,5 +1,6 @@
 import { blue, green, grey, purple, red, yellow } from "@mui/material/colors";
 import dayjs from "dayjs";
+import { getFactionIconSrc as getFactionIcon } from "@/utils/factionIcons";
 
 export const TEMPLATE_CATEGORY = {
   WELCOME: "WELCOME",
@@ -283,4 +284,4 @@ export function useTierColors() {
   return getTierColors(theme.palette.mode);
 }
 
-export const getColoredFactionIconSrc = (team) => `/icons/teams/${team}_colored.webp`
+export const getColoredFactionIconSrc = (faction) => getFactionIcon(faction, "colored");

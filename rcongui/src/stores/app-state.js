@@ -26,6 +26,13 @@ export const useAppStore = create(
     }),
     {
       name: withPrefix("app"),
+      version: 1,
+      migrate: (persistedState, version) => {
+        if (version < 1) {
+          return { ...persistedState, colorScheme: "default" };
+        }
+        return persistedState;
+      },
     }
   )
 );
