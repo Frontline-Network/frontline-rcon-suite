@@ -219,7 +219,9 @@ const en = {
     },
     table: {
       team: "Team", unit: "Unit", role: "Role", level: "Level", kills: "Kills", deaths: "Deaths",
-      killsPerMinute: "Kills per minute", combat: "Combat effectiveness",
+      killsPerMinute: "Kills per minute", teamKills: "Team kills",
+      vehicleKills: "Vehicle kills", vehiclesDestroyed: "Vehicles destroyed",
+      combat: "Combat effectiveness",
       offense: "Offensive effectiveness", defense: "Defensive effectiveness",
       support: "Support effectiveness", platform: "Platform", clanTag: "Clan tag",
       name: "Name", recentAction: "Recently received action", watchlist: "On watchlist",
