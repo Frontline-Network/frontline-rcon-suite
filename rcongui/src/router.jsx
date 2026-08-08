@@ -117,6 +117,16 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { GlobalState } from "./stores/global-state";
 import RouteError from "@/components/shared/RouteError";
 
+const autobalancerViewLoader = (args) =>
+    configLoader({
+        ...args,
+        params: {
+            ...args.params,
+            category: "others",
+            type: "autobalancer",
+        },
+    });
+
 const router = createBrowserRouter([
     {
         path: '/',
@@ -145,7 +155,7 @@ const router = createBrowserRouter([
             {
                 path: 'views',
                 errorElement: <RouteError />,
-                handle: { crumb: () => <span>Views</span> },
+                handle: { crumb: () => <span>Ansichten</span> },
                 children: [
                     {
                         path: 'live',
@@ -159,7 +169,15 @@ const router = createBrowserRouter([
                         handle: { crumb: () => <Link to={'/views/team'}>Team</Link> },
                         element: <TeamView />,
                         errorElement: <RouteError />,
-                    }
+                    },
+                    {
+                        path: 'autobalancer',
+                        handle: { crumb: () => <Link to={'/views/autobalancer'}>Autobalancer</Link> },
+                        element: <ConfigDetail />,
+                        loader: autobalancerViewLoader,
+                        action: configAction,
+                        errorElement: <RouteError />,
+                    },
                 ]
             },
             {

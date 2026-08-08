@@ -80,9 +80,23 @@ export const loader = async ({ params }) => {
   }
 
   if (isFakeMode()) {
+    if (details.command === "autobalancer_config") {
+      const { autobalancerConfig, autobalancerSchema } = await import(
+        "@/mirage/data/autobalancer"
+      );
+      return {
+        note: note.default,
+        data: autobalancerConfig,
+        schema: autobalancerSchema,
+        ...details,
+      };
+    }
     return {
       note: note.default,
-      data: { enabled: true, discord_webhook_url: "https://discord.example/frontline" },
+      data: {
+        enabled: true,
+        discord_webhook_url: "https://discord.example/frontline",
+      },
       schema: {
         type: "object",
         properties: {
@@ -128,7 +142,8 @@ export const action = async ({ request }) => {
   let error = null;
   let response;
 
-  if (!(name && config)) return { ok: false, error: i18n.t("errors.missingParameters") };
+  if (!(name && config))
+    return { ok: false, error: i18n.t("errors.missingParameters") };
 
   config = JSON.parse(config);
 
@@ -225,11 +240,26 @@ const ConfigPage = () => {
     setMode(mode);
   }
 
+  const handleOpenAutobalancerSettings = () => {
+    setSettingsOpen(true);
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById("autobalancer-settings")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
+
   return (
     <Stack direction={"column"} spacing={4}>
-      {isAutobalancer && <AutobalancerShadowOverview config={jsonData} />}
+      {isAutobalancer && (
+        <AutobalancerShadowOverview
+          config={jsonData}
+          onOpenSettings={handleOpenAutobalancerSettings}
+        />
+      )}
       {isAutobalancer && (
         <Button
+          id="autobalancer-settings"
           fullWidth
           size="large"
           variant="outlined"
@@ -265,13 +295,17 @@ const ConfigPage = () => {
                   variant={mode === "visual" ? "contained" : "outlined"}
                   onClick={() => updateMode("visual")}
                 >
-                  {isAutobalancer ? "Einfache Ansicht" : t("settings.config.visual")}
+                  {isAutobalancer
+                    ? "Einfache Ansicht"
+                    : t("settings.config.visual")}
                 </Button>
                 <Button
                   variant={mode === "code" ? "contained" : "outlined"}
                   onClick={() => updateMode("code")}
                 >
-                  {isAutobalancer ? "Erweitert (JSON)" : t("settings.config.code")}
+                  {isAutobalancer
+                    ? "Erweitert (JSON)"
+                    : t("settings.config.code")}
                 </Button>
               </ButtonGroup>
             </Stack>

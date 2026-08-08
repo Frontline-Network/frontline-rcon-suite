@@ -67,7 +67,7 @@ const rawNavMenus = [
     ],
   },
   {
-    name: "Views",
+    name: "Ansichten",
     icon: <ViewCarouselIcon />,
     links: [
       {
@@ -79,6 +79,11 @@ const rawNavMenus = [
         name: "Team",
         to: "/views/team",
         icon: <GroupsIcon />,
+      },
+      {
+        name: "Autobalancer",
+        to: "/views/autobalancer",
+        icon: <BalanceIcon />,
       },
     ],
   },
@@ -271,11 +276,6 @@ const rawNavMenus = [
     name: "Others",
     icon: <MiscellaneousServicesIcon />,
     links: [
-      {
-        name: "Fair Autobalancer",
-        to: "/settings/others/autobalancer",
-        icon: <BalanceIcon />,
-      },
       {
         name: "Seeder VIP Reward",
         to: "/settings/others/seed-vip",

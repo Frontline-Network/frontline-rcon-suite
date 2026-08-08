@@ -13,6 +13,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cmd } from "@/utils/fetchUtils";
 import TeamBalanceBar from "@/components/shared/TeamBalanceBar";
 import { useAuth } from "@/hooks/useAuth";
+import { Link } from "react-router-dom";
 
 const PHASE_LABELS = {
   idle: "Bereit",
@@ -27,13 +28,20 @@ const PHASE_LABELS = {
 
 const PHASE_EXPLANATIONS = {
   idle: "Aktuell liegt kein zu bearbeitender Balance-Vorfall vor.",
-  observing: "Die Teamdifferenz ist zu groß. Der Dienst prüft, ob sie lange genug in derselben Richtung bestehen bleibt.",
-  volunteer: "Geeignete Spieler im größeren Team können sich jetzt mit !balance freiwillig melden.",
-  proposed: "Ein Kandidat wurde berechnet. Im manuellen Modus wartet der Vorschlag auf eine Admin-Freigabe.",
-  armed: "Der Kandidat ist vorgemerkt. Ein Wechsel ist nur nach seinem nächsten frischen Todesereignis möglich.",
-  verifying: "Der RCON-Befehl wurde gesendet. Log und neuer Snapshot müssen den Wechsel jetzt bestätigen.",
-  cooldown: "Der vorherige Vorfall ist beendet. Vor einem neuen Versuch muss die Differenz erneut stabil bestehen.",
-  blocked: "Mindestens eine Sicherheitsbedingung ist nicht erfüllt. Deshalb plant der Dienst momentan keinen Wechsel.",
+  observing:
+    "Die Teamdifferenz ist zu groß. Der Dienst prüft, ob sie lange genug in derselben Richtung bestehen bleibt.",
+  volunteer:
+    "Geeignete Spieler im größeren Team können sich jetzt mit !balance freiwillig melden.",
+  proposed:
+    "Ein Kandidat wurde berechnet. Im manuellen Modus wartet der Vorschlag auf eine Admin-Freigabe.",
+  armed:
+    "Der Kandidat ist vorgemerkt. Ein Wechsel ist nur nach seinem nächsten frischen Todesereignis möglich.",
+  verifying:
+    "Der RCON-Befehl wurde gesendet. Log und neuer Snapshot müssen den Wechsel jetzt bestätigen.",
+  cooldown:
+    "Der vorherige Vorfall ist beendet. Vor einem neuen Versuch muss die Differenz erneut stabil bestehen.",
+  blocked:
+    "Mindestens eine Sicherheitsbedingung ist nicht erfüllt. Deshalb plant der Dienst momentan keinen Wechsel.",
 };
 
 const MODE_LABELS = {
@@ -45,8 +53,10 @@ const MODE_LABELS = {
 
 const MODE_EXPLANATIONS = {
   disabled: "Der Autobalancer ist ausgeschaltet.",
-  shadow: "Testbetrieb: Es werden nur Vorschläge protokolliert. Niemand erhält Nachrichten oder wird verschoben.",
-  manual: "Ein Vorschlag muss von einem Admin freigegeben werden. Der Wechsel erfolgt anschließend nach dem Tod.",
+  shadow:
+    "Testbetrieb: Es werden nur Vorschläge protokolliert. Niemand erhält Nachrichten oder wird verschoben.",
+  manual:
+    "Ein Vorschlag muss von einem Admin freigegeben werden. Der Wechsel erfolgt anschließend nach dem Tod.",
   auto: "Nach der Freiwilligenphase wird automatisch ausgewählt. Der Wechsel erfolgt nach dem Tod.",
 };
 
@@ -98,7 +108,7 @@ const AutobalancerCard = () => {
           spacing={1}
           alignItems={{ md: "center" }}
         >
-          <Typography variant="h6">Fair Autobalancer</Typography>
+          <Typography variant="h6">Autobalancer</Typography>
           <Chip
             size="small"
             label={MODE_LABELS[status.mode] || status.mode}
@@ -151,28 +161,33 @@ const AutobalancerCard = () => {
           </Alert>
         ))}
       </CardContent>
-      {status.incident_id && (
-        <CardActions>
-          {status.mode === "manual" && status.phase === "proposed" && (
+      <CardActions>
+        <Button component={Link} to="/views/autobalancer" size="small">
+          Dashboard öffnen
+        </Button>
+        {status.incident_id && (
+          <>
+            {status.mode === "manual" && status.phase === "proposed" && (
+              <Button
+                size="small"
+                variant="contained"
+                disabled={approve.isPending}
+                onClick={() => approve.mutate()}
+              >
+                Vorschlag freigeben
+              </Button>
+            )}
             <Button
               size="small"
-              variant="contained"
-              disabled={approve.isPending}
-              onClick={() => approve.mutate()}
+              color="warning"
+              disabled={cancel.isPending}
+              onClick={() => cancel.mutate()}
             >
-              Vorschlag freigeben
+              Incident abbrechen
             </Button>
-          )}
-          <Button
-            size="small"
-            color="warning"
-            disabled={cancel.isPending}
-            onClick={() => cancel.mutate()}
-          >
-            Incident abbrechen
-          </Button>
-        </CardActions>
-      )}
+          </>
+        )}
+      </CardActions>
     </Card>
   );
 };
