@@ -19,6 +19,9 @@ def test_explicit_cors_origins_are_normalized_and_deduplicated():
             "HLL_MAINTENANCE_CONTAINER": "true",
         }
     )
+    environment["PYTHONPATH"] = os.pathsep.join(
+        filter(None, (str(ROOT), environment.get("PYTHONPATH")))
+    )
     command = (
         "import json; "
         "from rconweb import settings; "
@@ -43,4 +46,3 @@ def test_explicit_cors_origins_are_normalized_and_deduplicated():
 
     assert origins.count("https://webapp.fln.gg") == 1
     assert "https://ops.fln.gg" in origins
-
