@@ -1,14 +1,14 @@
 """Mobile admin incident inbox
 
 Revision ID: b7a1c2d3e4f5
-Revises: b42e9a1c7d3f
+Revises: 89a3502370a0
 """
 
 import sqlalchemy as sa
 from alembic import op
 
 revision = "b7a1c2d3e4f5"
-down_revision = "b42e9a1c7d3f"
+down_revision = "89a3502370a0"
 branch_labels = None
 depends_on = None
 

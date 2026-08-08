@@ -6,7 +6,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("api", "0025_mobile_admin_auth"),
+        ("api", "0025_merge_autobalancer_mobile_admin"),
     ]
 
     operations = [

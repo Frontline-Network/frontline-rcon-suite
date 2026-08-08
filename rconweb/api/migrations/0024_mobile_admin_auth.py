@@ -65,7 +65,7 @@ def remove_mobile_permissions(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("api", "0024_add_autobalancer_permissions"),
+        ("api", "0023_alter_rconuser_options"),
     ]
 
     operations = [
