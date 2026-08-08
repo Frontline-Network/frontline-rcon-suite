@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 from urllib.parse import parse_qs, urlparse
 
 from django.contrib.auth.models import Group, User
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
 from .models import MobileAccessToken, MobileDevice, MobilePairing
@@ -158,6 +158,24 @@ class MobilePairingTests(TestCase):
 
         self.assertEqual(scanned.status_code, 200)
         self.assertEqual(MobilePairing.objects.get(pk=pairing["id"]).platform, "web")
+
+    @override_settings(CORS_ALLOWED_ORIGINS=["https://webapp.fln.gg"])
+    def test_web_app_cors_preflight_allows_json_pairing_request(self):
+        response = Client().options(
+            "/api/mobile/v1/pairings/00000000-0000-0000-0000-000000000000/scan",
+            HTTP_ORIGIN="https://webapp.fln.gg",
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD="POST",
+            HTTP_ACCESS_CONTROL_REQUEST_HEADERS="content-type",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response["Access-Control-Allow-Origin"], "https://webapp.fln.gg"
+        )
+        self.assertIn("POST", response["Access-Control-Allow-Methods"])
+        self.assertIn(
+            "content-type", response["Access-Control-Allow-Headers"].lower()
+        )
 
     def test_desktop_authorization_requires_browser_approval_and_is_single_use(self):
         desktop = Client()

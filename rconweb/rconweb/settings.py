@@ -146,9 +146,18 @@ ALLOWED_HOSTS = [
     "localhost",
     "localhost:3000",
 ] + os.getenv("DOMAINS", "").split(",")
-CORS_ALLOWED_ORIGINS = ["http://{}".format(h) for h in ALLOWED_HOSTS if h] + [
-    "https://{}".format(h) for h in ALLOWED_HOSTS if h
+configured_cors_origins = [
+    origin.strip().rstrip("/")
+    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
 ]
+CORS_ALLOWED_ORIGINS = list(
+    dict.fromkeys(
+        ["http://{}".format(h) for h in ALLOWED_HOSTS if h]
+        + ["https://{}".format(h) for h in ALLOWED_HOSTS if h]
+        + configured_cors_origins
+    )
+)
 CORS_ALLOW_CREDENTIALS = True
 
 # TODO: You might not want that. Think XSS
