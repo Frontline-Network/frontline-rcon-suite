@@ -40,15 +40,12 @@ fi
 
 # The generated compose.yaml is installation-specific: a one-server host must
 # not start backend_2/frontend_2/supervisor_2 merely because the shared
-# Frontline override also knows how to customize those services. Deploy only
-# the services that exist in the generated base file, plus the mobile worker
-# contributed by the Frontline override.
+# Frontline override also knows how to customize those services. Start with
+# only the services that exist in the generated base file. The optional mobile
+# push worker is added below only when its relay is configured.
 mapfile -t deployment_services < <(
   docker compose -f compose.yaml config --services
 )
-if [[ " ${deployment_services[*]} " != *" mobile_push_worker "* ]]; then
-  deployment_services+=(mobile_push_worker)
-fi
 if ((${#deployment_services[@]} == 0)); then
   echo "No deployment services found in compose.yaml." >&2
   exit 1
@@ -95,6 +92,34 @@ CRCON_IMAGE_TAG="$target_short" docker compose \
   -f compose.yaml \
   -f "$target_override" \
   config --quiet
+
+resolved_environment="$(
+  docker compose \
+    --profile mobile \
+    -f compose.yaml \
+    -f "$target_override" \
+    config --environment
+)"
+mobile_integration_enabled="$(
+  awk -F= '$1 == "MOBILE_INTEGRATION_ENABLED" { print substr($0, index($0, "=") + 1) }' \
+    <<<"$resolved_environment" | tail -n 1
+)"
+mobile_push_relay_url="$(
+  awk -F= '$1 == "MOBILE_PUSH_RELAY_URL" { print substr($0, index($0, "=") + 1) }' \
+    <<<"$resolved_environment" | tail -n 1
+)"
+mobile_push_worker_enabled=false
+case "${mobile_integration_enabled,,}" in
+  1|true|yes|on)
+    if [[ -n "$mobile_push_relay_url" ]]; then
+      mobile_push_worker_enabled=true
+      deployment_services+=(mobile_push_worker)
+    fi
+    ;;
+esac
+if [[ "$mobile_push_worker_enabled" == false ]]; then
+  echo "Mobile push worker disabled: integration or relay URL is not configured."
+fi
 
 echo "Preflight passed: $current_short -> $target_short"
 echo "Deployment services: ${deployment_services[*]}"
@@ -157,6 +182,11 @@ compose_target() {
 }
 
 compose_target config --quiet
+if [[ "$mobile_push_worker_enabled" == false ]]; then
+  # A worker from an older deployment is a configured service, not an orphan,
+  # so --remove-orphans will not remove it for us.
+  compose_target rm --stop --force mobile_push_worker >/dev/null 2>&1 || true
+fi
 echo "Building immutable images for $target_short..."
 compose_target build --pull "${deployment_services[@]}"
 
