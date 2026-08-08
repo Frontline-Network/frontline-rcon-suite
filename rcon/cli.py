@@ -460,7 +460,10 @@ def _merge_duplicate_player_ids(existing_ids: set[str] | None = None):
             stmt = select(PlayerID).filter(PlayerID.player_id.in_(existing_ids))
         else:
             stmt = select(PlayerID)
-        rows = session.execute(stmt).scalars()
+        # Keep the oldest record deterministically.  Besides making the merge
+        # repeatable, this avoids choosing a different canonical ID after a
+        # restart when a database happens to return rows in a different order.
+        rows = session.execute(stmt.order_by(PlayerID.id)).scalars()
 
         for player in rows:
             id_, steamid = player.id, player.player_id
@@ -474,6 +477,44 @@ def _merge_duplicate_player_ids(existing_ids: set[str] | None = None):
         for steamid, ids in duplicate_players.items():
             logger.info(f"Merging {steamid}")
             keep = ids.pop(0)
+
+            # Mobile-admin data has a one-to-one relationship to a player ID.
+            # Reassigning it is safe when it exists only on a duplicate record.
+            # If both records already have mobile data, do not guess which
+            # account/soldier information should win: leave this group intact
+            # and log it for a deliberate, recoverable repair instead.
+            mobile_conflict = session.execute(
+                text(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM player_account canonical
+                        WHERE canonical.playersteamid_id = :keep
+                    ) AND EXISTS (
+                        SELECT 1
+                        FROM player_account duplicate
+                        WHERE duplicate.playersteamid_id = ANY(:ids)
+                    )
+                    OR EXISTS (
+                        SELECT 1
+                        FROM player_soldier canonical
+                        WHERE canonical.playersteamid_id = :keep
+                    ) AND EXISTS (
+                        SELECT 1
+                        FROM player_soldier duplicate
+                        WHERE duplicate.playersteamid_id = ANY(:ids)
+                    )
+                    """
+                ),
+                {"keep": keep, "ids": ids},
+            ).scalar_one()
+            if mobile_conflict:
+                logger.warning(
+                    "Skipping duplicate player ID merge for %s: both records "
+                    "contain mobile-admin account or soldier data",
+                    steamid,
+                )
+                continue
 
             session.execute(
                 text(
@@ -496,6 +537,12 @@ def _merge_duplicate_player_ids(existing_ids: set[str] | None = None):
             session.execute(
                 text(
                     "UPDATE player_at_count SET playersteamid_id = :keep WHERE playersteamid_id = ANY(:ids)"
+                ),
+                {"keep": keep, "ids": ids},
+            )
+            session.execute(
+                text(
+                    "UPDATE player_account SET playersteamid_id = :keep WHERE playersteamid_id = ANY(:ids)"
                 ),
                 {"keep": keep, "ids": ids},
             )
@@ -526,6 +573,12 @@ def _merge_duplicate_player_ids(existing_ids: set[str] | None = None):
             session.execute(
                 text(
                     "UPDATE player_sessions SET playersteamid_id = :keep WHERE playersteamid_id = ANY(:ids)"
+                ),
+                {"keep": keep, "ids": ids},
+            )
+            session.execute(
+                text(
+                    "UPDATE player_soldier SET playersteamid_id = :keep WHERE playersteamid_id = ANY(:ids)"
                 ),
                 {"keep": keep, "ids": ids},
             )

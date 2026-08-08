@@ -9,6 +9,7 @@ from rcon.maps import (
     MAPS,
     UNKNOWN_MAP_NAME,
     Environment,
+    FactionName,
     GameMode,
     Layer,
     Team,
@@ -152,6 +153,11 @@ def test_parse_layer(layer_name, expected):
 )
 def test_is_server_loading_map(map_name, expected):
     assert is_server_loading_map(map_name=map_name) == expected
+
+
+@pytest.mark.parametrize("map_name", ["elalamein", "tobruk"])
+def test_north_africa_maps_use_dak_axis_faction(map_name):
+    assert MAPS[map_name].axis.name == FactionName.DAK.value
 
 
 def test_all_map_images_exist():

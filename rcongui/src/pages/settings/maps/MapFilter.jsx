@@ -42,7 +42,7 @@ const MenuProps = {
 export const MapFilter = ({ maps, onFilterChange }) => {
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedModes, setSelectedModes] = useState(["warfare"]);
+  const [selectedModes, setSelectedModes] = useState([]);
   const [selectedWeathers, setSelectedWeathers] = useState([]);
 
   // Compute unique modes and weathers for dropdowns
@@ -122,7 +122,7 @@ export const MapFilter = ({ maps, onFilterChange }) => {
             fontSize={10}
             sx={{ textTransform: "uppercase", width: 70 }}
           >
-            {t("maps.gameMode")}
+            {`${t("maps.gameMode")} (${t("maps.filter")})`}
           </Typography>
           <Stack direction={"row"} flexWrap={"wrap"}>
             {allModes.map((mode) => (
