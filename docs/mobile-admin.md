@@ -11,11 +11,16 @@ Set at least:
 ```env
 MOBILE_INTEGRATION_ENABLED=true
 MOBILE_PUBLIC_BASE_URL=https://crcon.example.org
+CORS_ALLOWED_ORIGINS=https://webapp.example.org
 MOBILE_INCIDENT_TRIGGERS=!admin
 MOBILE_INCIDENT_RETENTION_DAYS=90
 MOBILE_CONTEXT_V2=shadow
 MOBILE_CONTEXT_FUZZY_THRESHOLD=0.74
 ```
+
+`CORS_ALLOWED_ORIGINS` accepts comma-separated, complete origins. Add only the
+trusted browser frontends that need to call this CRCON installation; do not use
+a wildcard for authenticated mobile API requests.
 
 Run both Django and Alembic migrations during the normal maintenance startup.
 For Frontline production hosts, follow the guarded GitHub deployment workflow in
