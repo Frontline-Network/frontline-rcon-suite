@@ -1,11 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
-
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
+import 'app_logger.dart';
 import 'models.dart';
 import 'secure_store.dart';
 
@@ -15,6 +14,10 @@ class CrconApiException implements Exception {
   final int? statusCode;
   @override
   String toString() => message;
+}
+
+class CrconAuthException extends CrconApiException {
+  const CrconAuthException(super.message, {super.statusCode});
 }
 
 class PairingSession {
@@ -28,9 +31,27 @@ class PairingSession {
   final String verificationCode;
 }
 
+class DesktopAuthorizationSession {
+  const DesktopAuthorizationSession({
+    required this.baseUrl,
+    required this.pairingId,
+    required this.deviceCode,
+    required this.userCode,
+    required this.verificationUri,
+    required this.interval,
+  });
+
+  final String baseUrl;
+  final String pairingId;
+  final String deviceCode;
+  final String userCode;
+  final Uri verificationUri;
+  final Duration interval;
+}
+
 class CrconApi {
   CrconApi(this.profile, this.store)
-    : _dio = Dio(
+    : _dio = _diagnosticDio(
         BaseOptions(
           baseUrl: '${profile.baseUrl}/api/mobile/v1/',
           connectTimeout: const Duration(seconds: 8),
@@ -42,6 +63,7 @@ class CrconApi {
   final ConnectionProfile profile;
   final SecureConnectionStore store;
   final Dio _dio;
+  static final Map<String, Future<void>> _refreshes = {};
 
   static void validateProductionUrl(String baseUrl) {
     final uri = Uri.parse(baseUrl);
@@ -61,13 +83,13 @@ class CrconApi {
     String pushCapability = '',
   }) async {
     validateProductionUrl(payload.baseUrl);
-    final response = await Dio().post<Map<String, dynamic>>(
+    final response = await _diagnosticDio().post<Map<String, dynamic>>(
       '${payload.baseUrl}/api/mobile/v1/pairings/${payload.pairingId}/scan',
       data: {
         'secret': payload.secret,
         'device_name': deviceName,
         'platform': platform,
-        'app_version': '0.1.1',
+        'app_version': '0.1.9',
         'push_handle': pushHandle,
         'push_capability': pushCapability,
       },
@@ -83,11 +105,70 @@ class CrconApi {
     );
   }
 
+  static Future<DesktopAuthorizationSession> startDesktopAuthorization(
+    String baseUrl, {
+    required String deviceName,
+  }) async {
+    final normalizedBaseUrl = baseUrl.trim().replaceFirst(RegExp(r'/+$'), '');
+    validateProductionUrl(normalizedBaseUrl);
+    final response = await _diagnosticDio().post<Map<String, dynamic>>(
+      '$normalizedBaseUrl/api/mobile/v1/desktop-authorizations',
+      data: {
+        'device_name': deviceName,
+        'platform': 'windows',
+        'app_version': '0.1.9',
+      },
+      options: Options(
+        validateStatus: (status) => status != null && status < 500,
+      ),
+    );
+    final result = decodeCrconResponse(response) as Map;
+    final interval = (result['interval'] as num?)?.toInt() ?? 2;
+    return DesktopAuthorizationSession(
+      baseUrl: normalizedBaseUrl,
+      pairingId: result['id'].toString(),
+      deviceCode: result['device_code'].toString(),
+      userCode: result['user_code'].toString(),
+      verificationUri: Uri.parse(result['verification_uri'].toString()),
+      interval: Duration(seconds: interval.clamp(1, 10)),
+    );
+  }
+
+  static Future<ConnectionProfile?> exchangeDesktopAuthorization(
+    DesktopAuthorizationSession session,
+    SecureConnectionStore store,
+  ) async {
+    final response = await _diagnosticDio().post<Map<String, dynamic>>(
+      '${session.baseUrl}/api/mobile/v1/desktop-authorizations/'
+      '${session.pairingId}/exchange',
+      data: {'device_code': session.deviceCode},
+      options: Options(
+        validateStatus: (status) => status != null && status < 500,
+      ),
+    );
+    // 202 means that the owner has not approved this authorization yet.
+    if (response.statusCode == 202) return null;
+    final result = decodeCrconResponse(response) as Map;
+    final profile = ConnectionProfile(
+      id: result['installation_id'].toString(),
+      baseUrl: session.baseUrl,
+      name: Uri.parse(session.baseUrl).host,
+      username: result['username'].toString(),
+      deviceId: result['device_id'].toString(),
+    );
+    await store.saveConnection(
+      profile,
+      accessToken: result['access_token'].toString(),
+      refreshToken: result['refresh_token'].toString(),
+    );
+    return profile;
+  }
+
   static Future<ConnectionProfile?> exchangePairing(
     PairingSession session,
     SecureConnectionStore store,
   ) async {
-    final response = await Dio().post<Map<String, dynamic>>(
+    final response = await _diagnosticDio().post<Map<String, dynamic>>(
       '${session.payload.baseUrl}/api/mobile/v1/pairings/'
       '${session.payload.pairingId}/exchange',
       data: {'exchange_token': session.exchangeToken},
@@ -95,7 +176,8 @@ class CrconApi {
         validateStatus: (status) => status != null && status < 500,
       ),
     );
-    if (response.statusCode == HttpStatus.accepted) return null;
+    // 202 means that the owner has not approved this pairing yet.
+    if (response.statusCode == 202) return null;
     final result = decodeCrconResponse(response);
     final profile = ConnectionProfile(
       id: result['installation_id'].toString(),
@@ -126,6 +208,18 @@ class CrconApi {
 
   Future<Map<String, dynamic>> bootstrap() async =>
       Map<String, dynamic>.from(await _authorized('GET', 'bootstrap') as Map);
+
+  Future<Map<String, List<Map<String, dynamic>>>> actionTemplates() async {
+    final result = Map<String, dynamic>.from(
+      await _authorized('GET', 'templates') as Map,
+    );
+    List<Map<String, dynamic>> entries(String category) =>
+        (result[category] as List? ?? const [])
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+    return {'message': entries('message'), 'reason': entries('reason')};
+  }
 
   Future<Map<String, dynamic>> createIncident({
     required int serverNumber,
@@ -251,40 +345,152 @@ class CrconApi {
       'players/search',
       queryParameters: {'q': query, 'server_number': ?serverNumber},
     );
-    return (result as List<dynamic>? ?? const [])
-        .map((item) => Map<String, dynamic>.from(item as Map))
+    final values = result is List
+        ? result
+        : result is Map
+        ? result.values.toList()
+        : const <dynamic>[];
+    return values
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
         .toList();
   }
 
   Future<Map<String, dynamic>> playerProfile(
     String playerId, {
     int? serverNumber,
-  }) async => Map<String, dynamic>.from(
-    await _authorized(
-          'GET',
-          'players/$playerId',
-          queryParameters: {'server_number': ?serverNumber},
-        )
-        as Map,
-  );
-
-  Future<Map<String, dynamic>> roster(int serverNumber) async =>
-      Map<String, dynamic>.from(
-        await _authorized('GET', 'servers/$serverNumber/roster') as Map,
+  }) async {
+    final result = await _authorized(
+      'GET',
+      'players/$playerId',
+      queryParameters: {'server_number': ?serverNumber},
+    );
+    if (result is! Map) {
+      throw const CrconApiException(
+        'CRCON hat kein gültiges Spielerprofil geliefert.',
       );
+    }
+    return Map<String, dynamic>.from(result);
+  }
+
+  Future<Map<String, dynamic>> playerContext(
+    String incidentId,
+    String playerId, {
+    int limit = 5,
+  }) async {
+    final result = await _authorized(
+      'GET',
+      'incidents/$incidentId/player-context',
+      queryParameters: {'player_id': playerId, 'limit': limit},
+    );
+    if (result is! Map) {
+      throw const CrconApiException(
+        'CRCON hat keinen gültigen Fallauszug geliefert.',
+      );
+    }
+    return Map<String, dynamic>.from(result);
+  }
+
+  Future<List<Map<String, dynamic>>> watchlist({int? serverNumber}) async {
+    final result = await _authorized(
+      'GET',
+      'watchlist',
+      queryParameters: {'server_number': ?serverNumber},
+    );
+    final map = result is Map ? Map<String, dynamic>.from(result) : const {};
+    return (map['players'] as List? ?? const [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  Future<void> watchPlayer(
+    String playerId, {
+    required String reason,
+    int? serverNumber,
+    String? playerName,
+    String? incidentId,
+  }) async {
+    await _authorized(
+      'PUT',
+      'players/${Uri.encodeComponent(playerId)}/watch',
+      data: {
+        'reason': reason,
+        'server_number': ?serverNumber,
+        'player_name': ?playerName,
+        'incident_id': ?incidentId,
+      },
+      headers: {'Idempotency-Key': const Uuid().v4()},
+    );
+  }
+
+  Future<void> unwatchPlayer(
+    String playerId, {
+    int? serverNumber,
+    String? incidentId,
+  }) async {
+    await _authorized(
+      'DELETE',
+      'players/${Uri.encodeComponent(playerId)}/watch',
+      data: {'server_number': ?serverNumber, 'incident_id': ?incidentId},
+      headers: {'Idempotency-Key': const Uuid().v4()},
+    );
+  }
+
+  Future<Map<String, dynamic>> roster(int serverNumber) async {
+    final result = await _authorized('GET', 'servers/$serverNumber/roster');
+    if (result is! Map) {
+      throw const CrconApiException(
+        'CRCON hat keinen gültigen Spielerkader geliefert.',
+      );
+    }
+    return Map<String, dynamic>.from(result);
+  }
 
   Future<Map<String, dynamic>> squad(
     int serverNumber,
     String team,
     String squadName,
-  ) async => Map<String, dynamic>.from(
-    await _authorized(
-          'GET',
-          'servers/$serverNumber/squads/'
-              '${Uri.encodeComponent(team)}/${Uri.encodeComponent(squadName)}',
-        )
-        as Map,
-  );
+  ) async {
+    final result = await _authorized(
+      'GET',
+      'servers/$serverNumber/squads/'
+          '${Uri.encodeComponent(team)}/${Uri.encodeComponent(squadName)}',
+    );
+    if (result is! Map) {
+      throw const CrconApiException(
+        'CRCON hat keine gültigen Squad-Daten geliefert.',
+      );
+    }
+    return Map<String, dynamic>.from(result);
+  }
+
+  Future<Map<String, dynamic>> autobalancerStatus(int serverNumber) async {
+    final result = await _authorized(
+      'GET',
+      'autobalancer',
+      queryParameters: {'server_number': serverNumber},
+    );
+    if (result is! Map) {
+      throw const CrconApiException(
+        'CRCON hat keinen gültigen Autobalancer-Status geliefert.',
+      );
+    }
+    return Map<String, dynamic>.from(result);
+  }
+
+  Future<Map<String, dynamic>> liveStatus(int serverNumber) async {
+    final result = await _authorized(
+      'GET',
+      'servers/$serverNumber/live-status',
+    );
+    if (result is! Map) {
+      throw const CrconApiException(
+        'CRCON hat keinen gültigen Serverstatus geliefert.',
+      );
+    }
+    return Map<String, dynamic>.from(result);
+  }
 
   Future<dynamic> _authorized(
     String method,
@@ -319,17 +525,41 @@ class CrconApi {
   }
 
   Future<void> _refresh() async {
+    final inFlight = _refreshes[profile.id];
+    if (inFlight != null) return inFlight;
+    final refresh = _refreshTokens();
+    _refreshes[profile.id] = refresh;
+    try {
+      await refresh;
+    } finally {
+      if (identical(_refreshes[profile.id], refresh)) {
+        _refreshes.remove(profile.id);
+      }
+    }
+  }
+
+  Future<void> _refreshTokens() async {
     final refreshToken = await store.refreshToken(profile.id);
-    final response = await _dio.post<Map<String, dynamic>>(
-      'tokens/refresh',
-      data: {'device_id': profile.deviceId, 'refresh_token': refreshToken},
-    );
-    final result = decodeCrconResponse(response);
-    await store.replaceTokens(
-      profile.id,
-      accessToken: result['access_token'].toString(),
-      refreshToken: result['refresh_token'].toString(),
-    );
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        'tokens/refresh',
+        data: {'device_id': profile.deviceId, 'refresh_token': refreshToken},
+      );
+      final result = decodeCrconResponse(response);
+      await store.replaceTokens(
+        profile.id,
+        accessToken: result['access_token'].toString(),
+        refreshToken: result['refresh_token'].toString(),
+      );
+    } on CrconApiException catch (error) {
+      if (error.statusCode == 401) {
+        throw CrconAuthException(
+          'Die CRCON-Kopplung ist abgelaufen. Bitte dieses Gerät neu koppeln.',
+          statusCode: error.statusCode,
+        );
+      }
+      rethrow;
+    }
   }
 }
 
@@ -340,8 +570,13 @@ dynamic decodeCrconResponse(Response<dynamic> response) {
       payload = jsonDecode(payload);
     } on FormatException {
       final status = response.statusCode;
+      AppLogger.instance.warning(
+        'api',
+        'CRCON returned non-JSON data for ${response.requestOptions.method} '
+            '${response.requestOptions.uri.path} (HTTP ${status ?? 'unknown'})',
+      );
       throw CrconApiException(
-        status == HttpStatus.notFound
+        status == 404
             ? 'CRCON Mobile API ist noch nicht auf dem benötigten Stand.'
             : 'CRCON hat eine ungültige Antwort geliefert${status == null ? '' : ' (HTTP $status)'}.',
         statusCode: status,
@@ -349,6 +584,11 @@ dynamic decodeCrconResponse(Response<dynamic> response) {
     }
   }
   if (payload is! Map) {
+    AppLogger.instance.warning(
+      'api',
+      'CRCON returned ${payload.runtimeType} instead of an envelope for '
+          '${response.requestOptions.method} ${response.requestOptions.uri.path}',
+    );
     throw CrconApiException(
       'CRCON hat ein unerwartetes Antwortformat geliefert.',
       statusCode: response.statusCode,
@@ -364,4 +604,68 @@ dynamic decodeCrconResponse(Response<dynamic> response) {
     );
   }
   return envelope['result'];
+}
+
+Dio _diagnosticDio([BaseOptions? options]) {
+  final dio = Dio(options);
+  dio.interceptors.add(_DiagnosticInterceptor());
+  return dio;
+}
+
+class _DiagnosticInterceptor extends Interceptor {
+  static const _startedAtKey = 'diagnostics_started_at';
+
+  String _requestLabel(RequestOptions options) =>
+      '${options.method.toUpperCase()} ${options.uri.host}${options.uri.path}';
+
+  int? _elapsedMilliseconds(RequestOptions options) {
+    final startedAt = options.extra[_startedAtKey];
+    return startedAt is int
+        ? DateTime.now().millisecondsSinceEpoch - startedAt
+        : null;
+  }
+
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    options.extra[_startedAtKey] = DateTime.now().millisecondsSinceEpoch;
+    AppLogger.instance.info('api', '${_requestLabel(options)} started');
+    handler.next(options);
+  }
+
+  @override
+  void onResponse(
+    Response<dynamic> response,
+    ResponseInterceptorHandler handler,
+  ) {
+    final elapsed = _elapsedMilliseconds(response.requestOptions);
+    AppLogger.instance.info(
+      'api',
+      '${_requestLabel(response.requestOptions)} -> '
+          'HTTP ${response.statusCode ?? 'unknown'}'
+          '${elapsed == null ? '' : ' in ${elapsed}ms'}',
+    );
+    handler.next(response);
+  }
+
+  @override
+  void onError(DioException error, ErrorInterceptorHandler handler) {
+    final elapsed = _elapsedMilliseconds(error.requestOptions);
+    final message =
+        '${_requestLabel(error.requestOptions)} failed'
+        '${error.response?.statusCode == null ? '' : ' with HTTP ${error.response!.statusCode}'}'
+        '${elapsed == null ? '' : ' after ${elapsed}ms'}';
+    if (error.type == DioExceptionType.connectionError ||
+        error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.receiveTimeout) {
+      AppLogger.instance.warning('api', '$message (network unavailable)');
+    } else {
+      AppLogger.instance.error(
+        'api',
+        error.type,
+        message: message,
+        stackTrace: error.stackTrace,
+      );
+    }
+    handler.next(error);
+  }
 }

@@ -49,7 +49,7 @@ MOBILE_API_DOCUMENTATION = [
         "endpoint": "mobile/v1/devices",
         "allowed_http_methods": ["GET"],
         "permissions_required": ["api.can_manage_own_mobile_devices"],
-        "description": "List own devices or all devices with owner permission.",
+        "description": "List devices paired with the authenticated CRCON account.",
     },
     {
         "endpoint": "mobile/v1/devices/{id}",
@@ -61,7 +61,7 @@ MOBILE_API_DOCUMENTATION = [
         "endpoint": "mobile/v1/bootstrap",
         "allowed_http_methods": ["GET"],
         "permissions_required": [],
-        "description": "Load installation, device, server, user, and permission metadata.",
+        "description": "Load installation, device, server, user, permission metadata, and permitted incident assignees.",
     },
     {
         "endpoint": "mobile/v1/incidents",
@@ -85,7 +85,16 @@ MOBILE_API_DOCUMENTATION = [
         "endpoint": "mobile/v1/incidents/{id}/actions",
         "allowed_http_methods": ["POST"],
         "permissions_required": [],
-        "description": "Run a permission-checked, idempotent mobile player action.",
+        "description": "Run a permission-checked, idempotent mobile player, squad removal, or squad disband action.",
+    },
+    {
+        "endpoint": "mobile/v1/incidents/{id}/player-context",
+        "allowed_http_methods": ["GET"],
+        "permissions_required": [
+            "api.can_view_admin_incidents",
+            "api.can_view_historical_logs",
+        ],
+        "description": "Load the bounded chat, kill, teamkill, join and leave excerpt around an incident.",
     },
     {
         "endpoint": "mobile/v1/incidents/{id}/subjects",
@@ -106,10 +115,60 @@ MOBILE_API_DOCUMENTATION = [
         "description": "Search permission-filtered historical and online players.",
     },
     {
+        "endpoint": "mobile/v1/desktop-authorizations",
+        "allowed_http_methods": ["POST"],
+        "permissions_required": [],
+        "description": "Start a Windows desktop device-code authorization without a QR scanner.",
+    },
+    {
+        "endpoint": "mobile/v1/desktop-authorizations/approve",
+        "allowed_http_methods": ["POST"],
+        "permissions_required": ["api.can_manage_own_mobile_devices"],
+        "description": "Approve or deny a short Windows device code in CRCON.",
+    },
+    {
+        "endpoint": "mobile/v1/desktop-authorizations/{id}/exchange",
+        "allowed_http_methods": ["POST"],
+        "permissions_required": [],
+        "description": "Poll and exchange an approved Windows device authorization.",
+    },
+    {
+        "endpoint": "mobile/v1/autobalancer",
+        "allowed_http_methods": ["GET"],
+        "permissions_required": ["api.can_view_autobalancer"],
+        "description": "Load a minimal, read-only Fair Autobalancer live status for one server.",
+    },
+    {
+        "endpoint": "mobile/v1/templates",
+        "allowed_http_methods": ["GET"],
+        "permissions_required": ["api.can_view_message_templates"],
+        "description": "Load shared CRCON message and reason templates for mobile incident actions.",
+    },
+    {
         "endpoint": "mobile/v1/players/{player_id}",
         "allowed_http_methods": ["GET"],
         "permissions_required": [],
         "description": "Load a permission-filtered player dossier and live context.",
+    },
+    {
+        "endpoint": "mobile/v1/players/{player_id}/watch",
+        "allowed_http_methods": ["PUT", "DELETE"],
+        "permissions_required": [
+            "api.can_add_player_watch or api.can_remove_player_watch",
+        ],
+        "description": "Add or remove a player from CRCON's existing watchlist.",
+    },
+    {
+        "endpoint": "mobile/v1/watchlist",
+        "allowed_http_methods": ["GET"],
+        "permissions_required": ["api.can_view_player_history"],
+        "description": "List the existing CRCON watchlist for one game server.",
+    },
+    {
+        "endpoint": "mobile/v1/servers/{server_number}/live-status",
+        "allowed_http_methods": ["GET"],
+        "permissions_required": ["existing live-status read permissions"],
+        "description": "Load a permission-filtered, read-only server situation.",
     },
     {
         "endpoint": "mobile/v1/servers/{server_number}/roster",
@@ -187,14 +246,55 @@ urlpatterns = [
     ),
     path("players/search", mobile_context.players_search, name="mobile-player-search"),
     path(
+        "autobalancer",
+        mobile_context.autobalancer_status,
+        name="mobile-autobalancer-status",
+    ),
+    path(
+        "incidents/<uuid:incident_id>/player-context",
+        mobile_context.incident_player_context,
+        name="mobile-incident-player-context",
+    ),
+    path(
+        "templates",
+        mobile_context.action_templates,
+        name="mobile-action-templates",
+    ),
+    path(
+        "desktop-authorizations",
+        mobile.create_desktop_authorization,
+        name="mobile-create-desktop-authorization",
+    ),
+    path(
+        "desktop-authorizations/approve",
+        mobile.approve_desktop_authorization,
+        name="mobile-approve-desktop-authorization",
+    ),
+    path(
+        "desktop-authorizations/<uuid:pairing_id>/exchange",
+        mobile.exchange_desktop_authorization,
+        name="mobile-exchange-desktop-authorization",
+    ),
+    path(
         "players/<str:player_id>",
         mobile_context.player_detail,
         name="mobile-player-detail",
     ),
     path(
+        "players/<str:player_id>/watch",
+        mobile_context.player_watch,
+        name="mobile-player-watch",
+    ),
+    path("watchlist", mobile_context.watchlist, name="mobile-watchlist"),
+    path(
         "servers/<int:server_number>/roster",
         mobile_context.roster,
         name="mobile-server-roster",
+    ),
+    path(
+        "servers/<int:server_number>/live-status",
+        mobile_context.live_status,
+        name="mobile-live-status",
     ),
     path(
         "servers/<int:server_number>/squads/<str:team>/<str:squad>",

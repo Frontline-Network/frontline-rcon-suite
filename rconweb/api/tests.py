@@ -145,6 +145,94 @@ class MobilePairingTests(TestCase):
         replay = self._post("/api/mobile/v1/tokens/refresh", payload, client=Client())
         self.assertEqual(replay.status_code, 401)
 
+    def test_web_app_can_scan_qr_pairing(self):
+        pairing, query = self._pairing()
+        scanned = self._post(
+            f"/api/mobile/v1/pairings/{pairing['id']}/scan",
+            {
+                "secret": query["secret"][0],
+                "device_name": "Frontline Web",
+                "platform": "web",
+            },
+        )
+
+        self.assertEqual(scanned.status_code, 200)
+        self.assertEqual(MobilePairing.objects.get(pk=pairing["id"]).platform, "web")
+
+    def test_desktop_authorization_requires_browser_approval_and_is_single_use(self):
+        desktop = Client()
+        created = self._post(
+            "/api/mobile/v1/desktop-authorizations",
+            {"device_name": "Frontline Control Room", "app_version": "0.1.8"},
+            client=desktop,
+        )
+        self.assertEqual(created.status_code, 200)
+        result = created.json()["result"]
+        self.assertIn("/apps?desktop_code=", result["verification_uri"])
+        self.assertTrue(result["user_code"].startswith("FLN-"))
+
+        record = MobilePairing.objects.get(pk=result["id"])
+        self.assertIsNone(record.user)
+        self.assertNotEqual(record.secret_digest, result["device_code"])
+        self.assertNotEqual(record.user_code_digest, result["user_code"])
+
+        exchange_path = f"/api/mobile/v1/desktop-authorizations/{result['id']}/exchange"
+        pending = self._post(
+            exchange_path, {"device_code": result["device_code"]}, client=desktop
+        )
+        self.assertEqual(pending.status_code, 202)
+
+        approved = self._post(
+            "/api/mobile/v1/desktop-authorizations/approve",
+            {
+                "user_code": result["user_code"],
+                "password": "correct horse battery staple",
+                "approve": True,
+            },
+        )
+        self.assertEqual(approved.status_code, 200)
+
+        exchanged = self._post(
+            exchange_path, {"device_code": result["device_code"]}, client=desktop
+        )
+        self.assertEqual(exchanged.status_code, 200)
+        self.assertEqual(exchanged.json()["result"]["username"], self.user.username)
+        self.assertEqual(MobileDevice.objects.get().platform, "windows")
+
+        replay = self._post(
+            exchange_path, {"device_code": result["device_code"]}, client=desktop
+        )
+        self.assertEqual(replay.status_code, 401)
+
+    def test_desktop_authorization_rejects_invalid_device_code(self):
+        created = self._post(
+            "/api/mobile/v1/desktop-authorizations",
+            {"device_name": "Frontline Control Room"},
+            client=Client(),
+        ).json()["result"]
+        response = self._post(
+            f"/api/mobile/v1/desktop-authorizations/{created['id']}/exchange",
+            {"device_code": "wrong"},
+            client=Client(),
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_bootstrap_lists_only_active_admins_eligible_for_incident_handover(self):
+        User.objects.create_user(
+            username="mobile-observer",
+            email="observer@example.org",
+            password="secret",
+        )
+
+        response = self.client.get("/api/mobile/v1/bootstrap")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["result"]["user"]["assignable_admins"],
+            ["mobile-admin"],
+        )
+        self.assertEqual(response.json()["result"]["incident_cursor"], 0)
+
     def test_pairing_expires_and_never_stores_raw_secret(self):
         pairing, query = self._pairing()
         record = MobilePairing.objects.get(pk=pairing["id"])
@@ -214,6 +302,30 @@ class MobilePairingTests(TestCase):
         revoked = self.client.delete(f"/api/mobile/v1/devices/{tokens['device_id']}")
         self.assertEqual(revoked.status_code, 200)
         self.assertEqual(bearer.get("/api/mobile/v1/devices").status_code, 401)
+
+    def test_devices_endpoint_never_exposes_or_mutates_another_users_device(self):
+        tokens = self._paired_tokens()
+        other_user = User.objects.create_user(
+            username="another-admin", password="another correct password"
+        )
+        other_device = MobileDevice.objects.create(
+            user=other_user,
+            name="Another admin's phone",
+            platform="android",
+        )
+
+        # The authenticated user is a superuser in this test.  Even that must
+        # not widen the account-bound mobile device endpoint.
+        bearer = Client(HTTP_AUTHORIZATION=f"Bearer {tokens['access_token']}")
+        listed = bearer.get("/api/mobile/v1/devices?all=true")
+        self.assertEqual(listed.status_code, 200)
+        device_ids = {item["id"] for item in listed.json()["result"]}
+        self.assertEqual(device_ids, {tokens["device_id"]})
+
+        forbidden = bearer.delete(f"/api/mobile/v1/devices/{other_device.id}")
+        self.assertEqual(forbidden.status_code, 404)
+        other_device.refresh_from_db()
+        self.assertIsNone(other_device.revoked_at)
 
     def test_permission_loss_takes_effect_on_next_request(self):
         tokens = self._paired_tokens()
@@ -287,6 +399,217 @@ class MobileContextTests(TestCase):
         player = response.json()["result"][0]
         self.assertTrue(player["online"])
         self.assertEqual(player["unit_name"], "Item")
+
+    @patch("api.mobile_context.AutobalancerStore")
+    def test_autobalancer_mobile_status_is_read_only_and_minimal(self, store):
+        store.return_value.load_status.return_value = {
+            "mode": "automatic",
+            "phase": "armed",
+            "team_counts": {"allies": 46, "axis": 42},
+            "team_difference": 4,
+            "required_switches": 1,
+            "proposal": {"player_id": "must-not-leak"},
+            "plan": {"steps": ["must-not-leak"]},
+            "block_reasons": [],
+            "warnings": ["low confidence"],
+        }
+
+        response = self.client.get("/api/mobile/v1/autobalancer", {"server_number": 1})
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()["result"]
+        self.assertEqual(result["team_counts"], {"allies": 46, "axis": 42})
+        self.assertEqual(result["required_switches"], 1)
+        self.assertNotIn("proposal", result)
+        self.assertNotIn("plan", result)
+
+    @patch("api.mobile_context.get_message_templates")
+    def test_action_templates_expose_only_message_and_reason_templates(
+        self, get_templates
+    ):
+        get_templates.side_effect = lambda category: [
+            {
+                "id": 1,
+                "title": f"{category.value} template",
+                "content": "Prepared text",
+                "category": category.value,
+            }
+        ]
+
+        response = self.client.get("/api/mobile/v1/templates")
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()["result"]
+        self.assertEqual(result["message"][0]["content"], "Prepared text")
+        self.assertEqual(result["reason"][0]["content"], "Prepared text")
+        self.assertEqual(
+            [call.args[0].value for call in get_templates.call_args_list],
+            ["MESSAGE", "REASON"],
+        )
+
+    def test_action_templates_require_existing_template_permission(self):
+        limited = User.objects.create_user("limited-template-viewer", password="secret")
+        self.client.force_login(limited)
+
+        response = self.client.get("/api/mobile/v1/templates")
+
+        self.assertEqual(response.status_code, 403)
+
+    @patch.dict("os.environ", {"MOBILE_PLAYER_OPERATIONS": "true"})
+    @patch("api.mobile_context._rcon_api")
+    def test_watchlist_reuses_native_watch_entries(self, get_rcon_api):
+        get_rcon_api.return_value.get_players_history.return_value = {
+            "total": 1,
+            "players": [
+                {
+                    "player_id": "p1",
+                    "names": [{"name": "Watched Player"}],
+                    "watchlist": {
+                        "reason": "Suspicious behaviour",
+                        "by": "admin",
+                        "count": 2,
+                    },
+                }
+            ],
+        }
+
+        response = self.client.get("/api/mobile/v1/watchlist", {"server_number": 1})
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()["result"]
+        self.assertEqual(result["players"][0]["name"], "Watched Player")
+        self.assertEqual(result["players"][0]["count"], 2)
+        get_rcon_api.return_value.get_players_history.assert_called_once_with(
+            page=1, page_size=100, is_watched=True
+        )
+
+    @patch.dict("os.environ", {"MOBILE_PLAYER_OPERATIONS": "true"})
+    @patch("api.mobile_context.record_mobile_audit")
+    @patch("api.mobile_context._rcon_api")
+    def test_watch_requires_reason_and_records_native_operation(
+        self, get_rcon_api, audit
+    ):
+        missing = self.client.put(
+            "/api/mobile/v1/players/p1/watch",
+            data=json.dumps({"server_number": 1}),
+            content_type="application/json",
+        )
+        self.assertEqual(missing.status_code, 400)
+        response = self.client.put(
+            "/api/mobile/v1/players/p1/watch",
+            data=json.dumps(
+                {
+                    "server_number": 1,
+                    "reason": "Check teamkills",
+                    "player_name": "Player One",
+                    "incident_id": "11111111-1111-1111-1111-111111111111",
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        get_rcon_api.return_value.watch_player.assert_called_once_with(
+            player_id="p1",
+            reason="Check teamkills",
+            by="context-admin",
+            player_name="Player One",
+        )
+        audit.assert_called_once()
+
+    @patch.dict("os.environ", {"MOBILE_PLAYER_OPERATIONS": "true"})
+    @patch("rcon.admin_incidents.get_incident")
+    @patch("api.mobile_context._rcon_api")
+    def test_incident_context_is_bounded_and_filters_raw_log_types(
+        self, get_rcon_api, get_incident
+    ):
+        get_incident.return_value = {
+            "server_number": 1,
+            "created_at": "2026-08-06T12:00:00+00:00",
+            "reporter_id": "reporter",
+            "subjects": [
+                {"kind": "player", "state": "confirmed", "player_id": "p1"}
+            ],
+        }
+        get_rcon_api.return_value.get_historical_logs.return_value = [
+            {
+                "id": 1,
+                "type": "CHAT[Allies]",
+                "event_time": "2026-08-06T11:58:00+00:00",
+                "player1_name": "Player One",
+                "content": "hello",
+            },
+            {
+                "id": 2,
+                "type": "TEAM KILL",
+                "event_time": "2026-08-06T12:01:00+00:00",
+                "player1_name": "Player One",
+                "player2_name": "Friendly",
+                "content": "team kill",
+            },
+            {"id": 3, "type": "ADMIN", "content": "must not appear"},
+        ]
+
+        response = self.client.get(
+            "/api/mobile/v1/incidents/11111111-1111-1111-1111-111111111111/player-context",
+            {"player_id": "p1", "limit": 5},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        events = response.json()["result"]["events"]
+        self.assertEqual([event["type"] for event in events], ["chat", "teamkill"])
+        self.assertEqual(events[0]["message"], "hello")
+        call = get_rcon_api.return_value.get_historical_logs.call_args.kwargs
+        self.assertEqual(call["player_id"], "p1")
+        self.assertEqual(call["server_filter"], "1")
+
+    @patch.dict("os.environ", {"MOBILE_LIVE_STATUS": "true"})
+    @patch("api.mobile_context._rcon_api")
+    def test_live_status_only_returns_read_only_fields(self, get_rcon_api):
+        api = get_rcon_api.return_value
+        api.get_status.return_value = {"name": "Server 1", "current_players": 42, "max_players": 100}
+        api.get_gamestate.return_value = {
+            "current_map": {"pretty_name": "Foy"},
+            "time_remaining": timedelta(minutes=42),
+            "num_allied_players": 21,
+            "num_axis_players": 21,
+            "allied_score": 2,
+            "axis_score": 3,
+        }
+        api.get_next_map.return_value = {"pretty_name": "Carentan"}
+        api.get_queue_length.return_value = 4
+        api.get_ingame_mods.return_value = ["a"]
+        api.get_online_mods.return_value = ["a", "b"]
+
+        response = self.client.get("/api/mobile/v1/servers/1/live-status")
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()["result"]
+        self.assertEqual(result["match"]["team_counts"], {"allies": 21, "axis": 21})
+        self.assertEqual(result["ingame_admin_count"], 1)
+        self.assertNotIn("set_map", result)
+
+    @patch("api.mobile_context._rcon_api")
+    def test_player_detail_keeps_steam_and_eos_identifiers_separate(self, get_rcon_api):
+        get_rcon_api.return_value.get_player_profile.return_value = {
+            "player_id": "76561198036685843",
+            "soldier": {"eos_id": "eos-7db4c0a9"},
+        }
+        get_rcon_api.return_value.get_detailed_player_info.return_value = None
+
+        response = self.client.get(
+            "/api/mobile/v1/players/76561198036685843",
+            {"server_number": 1},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["result"]["identifiers"],
+            {
+                "steam_id": "76561198036685843",
+                "eos_id": "eos-7db4c0a9",
+                "platform_player_id": None,
+            },
+        )
 
     @patch("api.mobile_context._rcon_api")
     def test_squad_endpoint_returns_only_requested_squad(self, get_rcon_api):

@@ -12,6 +12,7 @@ import ModeratorsCard from "@/components/cards/ModeratorsCard";
 import GamesCard from "@/components/cards/GamesCard";
 import MapStatsCard from "@/components/cards/MapStatsCard";
 import AutomodsCard from "@/components/cards/AutomodsCard";
+import FrontlineAppCard from "@/components/cards/FrontlineAppCard";
 import BattleOverview from "@/components/dashboard/BattleOverview";
 import { Box, Stack, Typography } from "@mui/material";
 import { useTranslation } from "react-i18next";
@@ -129,6 +130,9 @@ const Dashboard = () => {
       <BattleOverview />
 
       <Grid container sx={{ overflow: "hidden", mt: 2 }} spacing={2}>
+      <Grid size={LARGE_CARD_SIZE}>
+        <FrontlineAppCard />
+      </Grid>
       <Grid size={SMALL_CARD_SIZE}>
         <ServerSettingsCard />
       </Grid>

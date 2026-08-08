@@ -6,7 +6,7 @@ import {
   useRevalidator,
   useSubmit,
 } from "react-router-dom";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { execute, get, handleHttpError } from "@/utils/fetchUtils";
 import {
   Box,
@@ -30,74 +30,13 @@ import { Generate } from "@jsonforms/core";
 import ButtonGroup from "@mui/material/ButtonGroup";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { customRenderers } from "@/pages/settings/[configs]/renderer/renderer";
-import AutobalancerHelp from "@/pages/settings/[configs]/autobalancer-help";
-import AutobalancerShadowOverview from "@/pages/settings/[configs]/autobalancer-shadow-overview";
 import { isFakeMode } from "@/mirage/demo-data";
 import { useTranslation } from "react-i18next";
 import i18n from "@/i18n";
+import AutobalancerHelp from "@/pages/settings/[configs]/autobalancer-help";
+import AutobalancerShadowOverview from "@/pages/settings/[configs]/autobalancer-shadow-overview";
 
 const Editor = lazy(() => import("@monaco-editor/react"));
-
-const OTHER_CONFIG_COMMANDS = new Set([
-  "autobalancer_config",
-  "seed_vip_config",
-  "rcon_connection_settings_config",
-  "rcon_server_settings_config",
-  "chat_commands_config",
-  "rcon_chat_commands_config",
-  "scoreboard_config",
-  "steam_config",
-  "vac_game_bans_config",
-  "tk_ban_on_connect_config",
-  "name_kick_config",
-  "expired_vip_config",
-  "server_name_change_config",
-  "log_stream_config",
-  "watch_killrate_config",
-]);
-
-const localizeOtherSchema = (schema, t) => {
-  const localizeNode = (node, propertyName) => {
-    if (Array.isArray(node)) {
-      return node.map((item) => localizeNode(item));
-    }
-
-    if (!node || typeof node !== "object") return node;
-
-    const localized = { ...node };
-    if (propertyName) {
-      const key = `settings.others.fields.${propertyName}`;
-      if (i18n.exists(`${key}.title`)) localized.title = t(`${key}.title`);
-      if (i18n.exists(`${key}.description`)) {
-        localized.description = t(`${key}.description`);
-      }
-    }
-
-    if (node.properties) {
-      localized.properties = Object.fromEntries(
-        Object.entries(node.properties).map(([name, value]) => [
-          name,
-          localizeNode(value, name),
-        ])
-      );
-    }
-    if (node.$defs) {
-      localized.$defs = Object.fromEntries(
-        Object.entries(node.$defs).map(([name, value]) => [
-          name,
-          localizeNode(value),
-        ])
-      );
-    }
-    ["items", "anyOf", "oneOf", "allOf"].forEach((key) => {
-      if (node[key]) localized[key] = localizeNode(node[key]);
-    });
-
-    return localized;
-  };
-
-  return localizeNode(schema);
-};
 
 export const loader = async ({ params }) => {
   const { category, type } = params;
@@ -240,13 +179,6 @@ const ConfigPage = () => {
   const submit = useSubmit();
   const theme = useTheme();
   const isAutobalancer = command === "autobalancer_config";
-  const localizedSchema = useMemo(
-    () =>
-      OTHER_CONFIG_COMMANDS.has(command)
-        ? localizeOtherSchema(schema, t)
-        : schema,
-    [command, schema, t]
-  );
 
   useEffect(() => {
     setEditorContent(JSON.stringify(data, null, 2));
@@ -375,8 +307,8 @@ const ConfigPage = () => {
                         fontSize: "14px",
                       },
                     }}
-                    schema={localizedSchema}
-                    uischema={Generate.uiSchema(localizedSchema)}
+                    schema={schema}
+                    uischema={Generate.uiSchema(schema)}
                     renderers={[...customRenderers, ...materialRenderers]}
                     cells={materialCells}
                   />
@@ -400,7 +332,9 @@ const ConfigPage = () => {
                   {isAutobalancer ? "Neu laden" : t("common.refresh")}
                 </Button>
                 <Button variant={"contained"} type="submit">
-                  {isAutobalancer ? "Einstellungen speichern" : t("settings.config.submit")}
+                  {isAutobalancer
+                    ? "Einstellungen speichern"
+                    : t("settings.config.submit")}
                 </Button>
               </Stack>
             </Stack>
@@ -408,7 +342,9 @@ const ConfigPage = () => {
           {mode === "code" ? (
             <>
               <Typography variant="h4">
-                {isAutobalancer ? "Erklärung" : t("settings.config.documentation")}
+                {isAutobalancer
+                  ? "Erklärung"
+                  : t("settings.config.documentation")}
               </Typography>
               <CopyBlock
                 wrapLongLines
@@ -418,7 +354,9 @@ const ConfigPage = () => {
                 theme={theme.palette.mode === "dark" ? a11yDark : a11yLight}
               />
               <Typography variant="h4">
-                {isAutobalancer ? "Technisches Schema" : t("settings.config.modelSchema")}
+                {isAutobalancer
+                  ? "Technisches Schema"
+                  : t("settings.config.modelSchema")}
               </Typography>
               <CopyBlock
                 wrapLongLines

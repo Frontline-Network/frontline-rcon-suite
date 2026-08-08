@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import secrets
 import time
@@ -6,6 +7,7 @@ import uuid
 from datetime import timedelta
 from urllib.parse import urlencode, urlparse
 
+from django.contrib.auth.models import User
 from django.db import transaction
 from django.http import HttpRequest
 from django.utils import timezone
@@ -35,6 +37,8 @@ PAIRING_LIFETIME = timedelta(seconds=120)
 RECENT_AUTH_SECONDS = 5 * 60
 MOBILE_PROTOCOL_VERSION = 1
 
+logger = logging.getLogger(__name__)
+
 
 def _json_body(request: HttpRequest) -> dict:
     if not request.body:
@@ -59,6 +63,25 @@ def mobile_integration_enabled() -> bool:
         "yes",
         "on",
     }
+
+
+def mobile_feature_enabled(name: str) -> bool:
+    """Read an explicitly opt-in mobile capability flag.
+
+    Mobile endpoints are deployed together with CRCON, but higher-risk or
+    larger surfaces stay dark until an operator enables their dedicated flag.
+    Keeping this helper here makes the decision consistent for every backend.
+    """
+
+    return os.getenv(name, "false").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _require_feature(command: str, name: str):
+    if disabled := _require_enabled(command):
+        return disabled
+    if not mobile_feature_enabled(name):
+        return _error(command, "This mobile feature is disabled", 404)
+    return None
 
 
 def _incident_retention_days() -> int:
@@ -148,6 +171,25 @@ def _pairing_dict(pairing: MobilePairing) -> dict:
     }
 
 
+def _desktop_user_code() -> str:
+    """Return a readable, non-ambiguous one-time code for the browser flow."""
+    alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+    return "FLN-" + "-".join(
+        "".join(secrets.choice(alphabet) for _ in range(4)) for _ in range(2)
+    )
+
+
+def _require_recent_authentication(request: HttpRequest, data: dict):
+    recent_auth_at = float(request.session.get("mobile_recent_auth_at", 0))
+    if time.time() - recent_auth_at <= RECENT_AUTH_SECONDS:
+        return None
+    password = data.get("password", "")
+    if not password or not request.user.check_password(password):
+        return _error("mobile_recent_auth", "Password confirmation is required", 401)
+    request.session["mobile_recent_auth_at"] = time.time()
+    return None
+
+
 @csrf_exempt
 @require_http_methods(["GET"])
 def discovery(request):
@@ -190,12 +232,8 @@ def create_pairing(request):
     except ValueError as exc:
         return _error(command, str(exc), 400)
 
-    recent_auth_at = float(request.session.get("mobile_recent_auth_at", 0))
-    if time.time() - recent_auth_at > RECENT_AUTH_SECONDS:
-        password = data.get("password", "")
-        if not password or not request.user.check_password(password):
-            return _error(command, "Password confirmation is required", 401)
-        request.session["mobile_recent_auth_at"] = time.time()
+    if authentication_error := _require_recent_authentication(request, data):
+        return authentication_error
 
     MobilePairing.objects.filter(
         user=request.user,
@@ -225,6 +263,186 @@ def create_pairing(request):
         result={"state": pairing.state, "expires_at": pairing.expires_at},
     )
     return api_response(command=command, failed=False, result=result)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def create_desktop_authorization(request):
+    """Start the Windows device-code flow without requiring a local browser login."""
+    command = "mobile_create_desktop_authorization"
+    if disabled := _require_enabled(command):
+        return disabled
+    try:
+        data = _json_body(request)
+        base_url = _public_base_url(request)
+        device_name = str(data["device_name"]).strip()[:128]
+    except (KeyError, ValueError) as exc:
+        return _error(command, f"Missing or invalid field: {exc}", 400)
+    if not device_name:
+        return _error(command, "A device name is required", 400)
+
+    raw_device_code = random_token("crcon_desktop_device")
+    user_code = _desktop_user_code()
+    pairing = MobilePairing.objects.create(
+        kind=MobilePairing.Kind.DESKTOP,
+        secret_digest=token_digest(raw_device_code, "desktop_device"),
+        user_code_digest=token_digest(user_code, "desktop_user"),
+        device_name=device_name,
+        platform="windows",
+        app_version=str(data.get("app_version", ""))[:32],
+        expires_at=timezone.now() + PAIRING_LIFETIME,
+    )
+    approval_url = f"{base_url}/apps?" + urlencode({"desktop_code": user_code})
+    return api_response(
+        command=command,
+        failed=False,
+        result={
+            "id": str(pairing.id),
+            "device_code": raw_device_code,
+            "user_code": user_code,
+            "verification_uri": approval_url,
+            "expires_at": pairing.expires_at,
+            "interval": 2,
+        },
+    )
+
+
+@csrf_exempt
+@login_required()
+@permission_required("api.can_manage_own_mobile_devices", raise_exception=True)
+@require_http_methods(["POST"])
+def approve_desktop_authorization(request):
+    command = "mobile_approve_desktop_authorization"
+    if disabled := _require_enabled(command):
+        return disabled
+    try:
+        data = _json_body(request)
+        user_code = str(data["user_code"]).strip().upper()
+    except (KeyError, ValueError) as exc:
+        return _error(command, f"Missing or invalid field: {exc}", 400)
+    if authentication_error := _require_recent_authentication(request, data):
+        return authentication_error
+
+    with transaction.atomic():
+        try:
+            pairing = MobilePairing.objects.select_for_update().get(
+                kind=MobilePairing.Kind.DESKTOP,
+                user_code_digest=token_digest(user_code, "desktop_user"),
+            )
+        except MobilePairing.DoesNotExist:
+            return _error(command, "Desktop code was not found", 404)
+        if pairing.expires_at <= timezone.now():
+            pairing.state = MobilePairing.State.DENIED
+            pairing.save(update_fields=("state",))
+            return _error(command, "Desktop code expired", 410)
+        if pairing.state != MobilePairing.State.PENDING:
+            return _error(command, "Desktop code is no longer available", 409)
+        approve = data.get("approve", True)
+        if not isinstance(approve, bool):
+            return _error(command, "approve must be a boolean", 400)
+        pairing.user = request.user
+        pairing.state = (
+            MobilePairing.State.APPROVED if approve else MobilePairing.State.DENIED
+        )
+        pairing.approved_at = timezone.now() if approve else None
+        pairing.save(update_fields=("user", "state", "approved_at"))
+
+    record_mobile_audit(
+        username=request.user.username,
+        command=(
+            "mobile_desktop_authorization_approved"
+            if approve
+            else "mobile_desktop_authorization_denied"
+        ),
+        request=request,
+        arguments={
+            "pairing_id": str(pairing.id),
+            "device_name": pairing.device_name,
+            "platform": pairing.platform,
+        },
+        result={"state": pairing.state},
+    )
+    return api_response(
+        command=command,
+        failed=False,
+        result={"state": pairing.state, "device_name": pairing.device_name},
+    )
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def exchange_desktop_authorization(request, pairing_id):
+    command = "mobile_exchange_desktop_authorization"
+    if disabled := _require_enabled(command):
+        return disabled
+    try:
+        data = _json_body(request)
+        raw_device_code = str(data["device_code"])
+    except (KeyError, ValueError) as exc:
+        return _error(command, f"Missing or invalid field: {exc}", 400)
+
+    with transaction.atomic():
+        try:
+            # ``user`` is intentionally nullable while a desktop code awaits
+            # browser approval. Locking a query with a select_related outer
+            # join makes PostgreSQL reject it (FOR UPDATE cannot lock the
+            # nullable join side). The pairing row is the only record that
+            # needs serialization here; the user is loaded lazily once the
+            # approval exists.
+            pairing = MobilePairing.objects.select_for_update().get(
+                pk=pairing_id,
+                kind=MobilePairing.Kind.DESKTOP,
+                secret_digest=token_digest(raw_device_code, "desktop_device"),
+            )
+        except (MobilePairing.DoesNotExist, ValueError):
+            return _error(command, "Invalid desktop device code", 401)
+        if pairing.expires_at <= timezone.now():
+            pairing.state = MobilePairing.State.DENIED
+            pairing.save(update_fields=("state",))
+            return _error(command, "Desktop code expired", 410)
+        if pairing.state == MobilePairing.State.PENDING:
+            return _error(
+                command, "Desktop authorization is awaiting browser approval", 202
+            )
+        if pairing.state == MobilePairing.State.DENIED:
+            return _error(command, "Desktop authorization was denied", 403)
+        if pairing.state != MobilePairing.State.APPROVED or pairing.user is None:
+            return _error(command, "Desktop authorization is no longer available", 409)
+
+        device = MobileDevice.objects.create(
+            user=pairing.user,
+            name=pairing.device_name,
+            platform=pairing.platform,
+            app_version=pairing.app_version,
+        )
+        tokens = issue_device_tokens(device, initialize_absolute_expiry=True)
+        pairing.state = MobilePairing.State.CONSUMED
+        pairing.consumed_at = timezone.now()
+        pairing.secret_digest = token_digest(
+            random_token("consumed_desktop"), "desktop_device"
+        )
+        pairing.save(update_fields=("state", "consumed_at", "secret_digest"))
+
+    record_mobile_audit(
+        username=device.user.username,
+        command="mobile_desktop_device_paired",
+        device_id=str(device.id),
+        arguments={
+            "pairing_id": str(pairing.id),
+            "device_name": device.name,
+            "platform": device.platform,
+        },
+        result={"state": pairing.state},
+    )
+    return api_response(
+        command=command,
+        failed=False,
+        result={
+            **tokens,
+            "installation_id": _installation_id(),
+            "username": device.user.username,
+        },
+    )
 
 
 @csrf_exempt
@@ -261,7 +479,7 @@ def scan_pairing(request, pairing_id):
         platform = str(data["platform"]).strip().lower()[:32]
     except (KeyError, ValueError) as exc:
         return _error(command, f"Missing or invalid field: {exc}", 400)
-    if not device_name or platform not in {"android", "ios"}:
+    if not device_name or platform not in {"android", "ios", "web"}:
         return _error(command, "A device name and supported platform are required", 400)
 
     with transaction.atomic():
@@ -395,13 +613,14 @@ def exchange_pairing(request, pairing_id):
 
     with transaction.atomic():
         try:
-            pairing = (
-                MobilePairing.objects.select_for_update()
-                .select_related("user")
-                .get(
-                    pk=pairing_id,
-                    exchange_token_digest=token_digest(raw_exchange_token, "exchange"),
-                )
+            # ``user`` remains nullable until the browser approves the QR
+            # pairing. PostgreSQL cannot lock the nullable side introduced by
+            # ``select_related`` here (``FOR UPDATE`` on an outer join), so
+            # lock only the pairing row and load the approved user lazily.
+            # This also keeps a concurrent exchange single-use.
+            pairing = MobilePairing.objects.select_for_update().get(
+                pk=pairing_id,
+                exchange_token_digest=token_digest(raw_exchange_token, "exchange"),
             )
         except (MobilePairing.DoesNotExist, ValueError):
             return _error(command, "Invalid exchange token", 401)
@@ -411,7 +630,7 @@ def exchange_pairing(request, pairing_id):
             return _error(command, "Pairing is awaiting web approval", 202)
         if pairing.state == MobilePairing.State.DENIED:
             return _error(command, "Pairing was denied", 403)
-        if pairing.state != MobilePairing.State.APPROVED:
+        if pairing.state != MobilePairing.State.APPROVED or pairing.user is None:
             return _error(command, "Pairing is no longer available", 409)
 
         device = MobileDevice.objects.create(
@@ -481,13 +700,11 @@ def devices(request):
     command = "mobile_devices"
     if disabled := _require_enabled(command):
         return disabled
-    queryset = MobileDevice.objects.select_related("user")
-    if request.GET.get("all") == "true" and request.user.has_perm(
-        "api.can_manage_all_mobile_devices"
-    ):
-        pass
-    else:
-        queryset = queryset.filter(user=request.user)
+    # A paired device belongs to its CRCON account.  Do not expose another
+    # administrator's device metadata from the regular mobile endpoint, even
+    # if a legacy client sends ``?all=true``.  Installation-wide device
+    # operations need a separate, deliberately privileged management surface.
+    queryset = MobileDevice.objects.select_related("user").filter(user=request.user)
     return api_response(
         command=command,
         failed=False,
@@ -496,10 +713,9 @@ def devices(request):
 
 
 def _device_for_user(request, device_id):
-    queryset = MobileDevice.objects.select_related("user")
-    if request.user.has_perm("api.can_manage_all_mobile_devices"):
-        return queryset.get(pk=device_id)
-    return queryset.get(pk=device_id, user=request.user)
+    return MobileDevice.objects.select_related("user").get(
+        pk=device_id, user=request.user
+    )
 
 
 @csrf_exempt
@@ -580,11 +796,29 @@ def bootstrap(request):
         return disabled
     permissions = sorted(request.user.get_all_permissions())
     mobile_device = getattr(request, "mobile_device", None)
+    # Assignment is deliberately limited to users who can themselves claim a
+    # mobile incident.  This keeps the directory useful for handovers without
+    # exposing the complete CRCON user list to every mobile device.
+    assignable_admins: list[str] = []
+    if request.user.has_perm("api.can_reassign_admin_incidents"):
+        assignable_admins = [
+            user.username
+            for user in User.objects.filter(is_active=True).order_by("username")
+            if user.has_perm("api.can_claim_admin_incidents")
+        ]
     try:
         config = RconServerSettingsUserConfig.load_from_db()
         display_name = config.short_name or "CRCON"
     except Exception:
         display_name = "CRCON"
+    try:
+        incident_cursor = latest_incident_event_cursor()
+    except Exception:
+        logger.warning(
+            "Could not load the latest mobile incident cursor",
+            exc_info=True,
+        )
+        incident_cursor = 0
     return api_response(
         command=command,
         failed=False,
@@ -595,7 +829,7 @@ def bootstrap(request):
             "servers": mobile_server_list(request, display_name),
             "crcon_version": TAG_VERSION,
             "protocol_version": MOBILE_PROTOCOL_VERSION,
-            "incident_cursor": latest_incident_event_cursor(),
+            "incident_cursor": incident_cursor,
             "mobile_configuration": {
                 "enabled": mobile_integration_enabled(),
                 "public_base_url": os.getenv("MOBILE_PUBLIC_BASE_URL", ""),
@@ -603,6 +837,8 @@ def bootstrap(request):
                 "incident_retention_days": _incident_retention_days(),
                 "context_v2": os.getenv("MOBILE_CONTEXT_V2", "disabled"),
                 "context_fuzzy_threshold": _mobile_context_fuzzy_threshold(),
+                "player_operations": mobile_feature_enabled("MOBILE_PLAYER_OPERATIONS"),
+                "live_status": mobile_feature_enabled("MOBILE_LIVE_STATUS"),
                 "push_relay_configured": bool(
                     os.getenv("MOBILE_PUSH_RELAY_URL", "").strip()
                 ),
@@ -611,6 +847,7 @@ def bootstrap(request):
                 "username": request.user.username,
                 "is_superuser": request.user.is_superuser,
                 "permissions": permissions,
+                "assignable_admins": assignable_admins,
             },
             "device": _device_dict(mobile_device) if mobile_device else None,
         },

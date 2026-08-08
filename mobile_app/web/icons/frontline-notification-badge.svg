@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" aria-label="Frontline">
+  <!-- Transparent notification badge: Android applies the system white tint. -->
+  <path fill="#fff" d="M156 215h527l188 48-105 68H484l-28 79h262L592 533H424L376 681 209 810l156-478H273z"/>
+  <path fill="#fff" d="M275 355h67l-18 62z"/>
+</svg>

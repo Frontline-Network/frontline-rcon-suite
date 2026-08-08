@@ -18,6 +18,7 @@ import {
 } from "@mui/material";
 import {
   Cached as CacheIcon,
+  DesktopWindows as DesktopIcon,
   Link as LinkIcon,
   PhoneAndroid as PhoneIcon,
   QrCode2 as QrCodeIcon,
@@ -28,9 +29,15 @@ import { cmd, mobileRequest } from "@/utils/fetchUtils";
 import { toast } from "react-toastify";
 import { useTranslation } from "react-i18next";
 
-function CrconAppSettings() {
+function CrconAppSettings({
+  showFrontline = true,
+  showUtilities = true,
+  frontlinePresentation = false,
+}) {
   const { t } = useTranslation();
   const [password, setPassword] = useState("");
+  const [desktopPassword, setDesktopPassword] = useState("");
+  const [desktopCode, setDesktopCode] = useState("");
   const [pairing, setPairing] = useState(null);
   const [devices, setDevices] = useState([]);
   const [bootstrap, setBootstrap] = useState(null);
@@ -38,9 +45,8 @@ function CrconAppSettings() {
 
   const loadDevices = useCallback(async () => {
     try {
-      // Owners receive all installations; other roles transparently receive only their own.
       const [nextDevices, nextBootstrap] = await Promise.all([
-        mobileRequest("devices?all=true"),
+        mobileRequest("devices"),
         mobileRequest("bootstrap"),
       ]);
       setDevices(nextDevices);
@@ -52,11 +58,21 @@ function CrconAppSettings() {
   }, []);
 
   useEffect(() => {
-    loadDevices();
-  }, [loadDevices]);
+    if (showFrontline) {
+      loadDevices();
+    }
+  }, [loadDevices, showFrontline]);
+
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get("desktop_code");
+    if (code) {
+      setDesktopCode(code.toUpperCase());
+    }
+  }, []);
 
   useEffect(() => {
     if (
+      !showFrontline ||
       !pairing?.id ||
       !["pending", "scanned", "approved"].includes(pairing.state)
     ) {
@@ -74,7 +90,7 @@ function CrconAppSettings() {
       }
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [pairing?.id, pairing?.state, loadDevices]);
+  }, [pairing?.id, pairing?.state, loadDevices, showFrontline]);
 
   const createPairingMutation = useMutation({
     mutationFn: () =>
@@ -94,6 +110,25 @@ function CrconAppSettings() {
         payload: { approve, verification_code: pairing.verification_code },
       }),
     onSuccess: (result) => setPairing((current) => ({ ...current, ...result })),
+    onError: (error) => setMobileError(error.message),
+  });
+
+  const approveDesktopMutation = useMutation({
+    mutationFn: () =>
+      mobileRequest("desktop-authorizations/approve", {
+        method: "POST",
+        payload: {
+          user_code: desktopCode.trim().toUpperCase(),
+          password: desktopPassword,
+          approve: true,
+        },
+      }),
+    onSuccess: async () => {
+      setDesktopPassword("");
+      setMobileError("");
+      toast.success(t("settings.desktopMobile.approved"));
+      await loadDevices();
+    },
     onError: (error) => setMobileError(error.message),
   });
 
@@ -137,24 +172,42 @@ function CrconAppSettings() {
     reconnectMutation.mutate();
   };
 
+  const frontlineCardSx = frontlinePresentation
+    ? (theme) => ({
+        border: "1px solid",
+        borderColor: "primary.main",
+        background: `linear-gradient(125deg, ${theme.palette.background.paper} 0%, ${theme.palette.action.hover} 100%)`,
+      })
+    : undefined;
+  const frontlineSectionSx = frontlinePresentation
+    ? {
+        p: { xs: 1.5, md: 2 },
+        border: "1px solid",
+        borderColor: "divider",
+        borderRadius: 2,
+        bgcolor: "background.paper",
+      }
+    : undefined;
+
   return (
     <Grid container spacing={3}>
-      <Grid size={12}>
-        <Card elevation={2}>
+      {showFrontline && <Grid size={12}>
+        <Card elevation={frontlinePresentation ? 0 : 2} sx={frontlineCardSx}>
           <CardHeader
             avatar={<QrCodeIcon color="primary" />}
             title={t("settings.mobile.title")}
             subheader={t("settings.mobile.subtitle")}
+            sx={frontlinePresentation ? { pb: 2 } : undefined}
           />
           <Divider flexItem />
-          <CardContent>
+          <CardContent sx={frontlinePresentation ? { p: { xs: 2, md: 3 } } : undefined}>
             <Stack spacing={2}>
               {mobileError && <Alert severity="info">{mobileError}</Alert>}
-              <Alert severity="warning">
+              <Alert severity={frontlinePresentation ? "info" : "warning"} variant={frontlinePresentation ? "outlined" : "standard"}>
                 {t("settings.mobile.pairingWarning")}
               </Alert>
               {!pairing || ["consumed", "denied"].includes(pairing.state) ? (
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={frontlineSectionSx}>
                   <TextField
                     label={t("settings.mobile.confirmPassword")}
                     type="password"
@@ -177,6 +230,7 @@ function CrconAppSettings() {
                   direction={{ xs: "column", md: "row" }}
                   spacing={3}
                   alignItems="center"
+                  sx={frontlineSectionSx}
                 >
                   {pairing.qr_payload && pairing.state === "pending" && (
                     <Box sx={{ bgcolor: "white", p: 2, borderRadius: 1 }}>
@@ -232,6 +286,52 @@ function CrconAppSettings() {
               )}
 
               <Divider />
+              <Stack spacing={2} sx={frontlineSectionSx}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <DesktopIcon color="primary" />
+                  <Typography variant="h6">
+                    {t("settings.desktopMobile.title")}
+                  </Typography>
+                </Stack>
+                <Typography variant="body2" color="text.secondary">
+                  {t("settings.desktopMobile.hint")}
+                </Typography>
+                <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                  <TextField
+                    label={t("settings.desktopMobile.code")}
+                    value={desktopCode}
+                    onChange={(event) =>
+                      setDesktopCode(event.target.value.toUpperCase())
+                    }
+                    placeholder="FLN-7KQ9-PM2X"
+                    inputProps={{ autoCapitalize: "characters", spellCheck: false }}
+                    fullWidth
+                  />
+                  <TextField
+                    label={t("settings.mobile.confirmPassword")}
+                    type="password"
+                    value={desktopPassword}
+                    onChange={(event) => setDesktopPassword(event.target.value)}
+                    autoComplete="current-password"
+                    fullWidth
+                  />
+                  <Button
+                    variant="contained"
+                    startIcon={<DesktopIcon />}
+                    disabled={
+                      !desktopCode.trim() ||
+                      !desktopPassword ||
+                      approveDesktopMutation.isPending
+                    }
+                    onClick={() => approveDesktopMutation.mutate()}
+                  >
+                    {t("settings.desktopMobile.approve")}
+                  </Button>
+                </Stack>
+              </Stack>
+
+              <Divider />
+              <Stack spacing={2} sx={frontlineSectionSx}>
               {bootstrap?.user?.permissions?.includes(
                 "api.can_manage_all_mobile_devices"
               ) && (
@@ -267,16 +367,9 @@ function CrconAppSettings() {
                   <Typography variant="body2" color="text.secondary">
                     {t("settings.mobile.configurationHint")}
                   </Typography>
-                  <Divider />
                 </>
               )}
-              <Typography variant="h6">
-                {bootstrap?.user?.permissions?.includes(
-                  "api.can_manage_all_mobile_devices"
-                )
-                  ? t("settings.mobile.allDevices")
-                  : t("settings.mobile.myDevices")}
-              </Typography>
+              <Typography variant="h6">{t("settings.mobile.myDevices")}</Typography>
               {devices.length === 0 ? (
                 <Typography color="text.secondary">
                   {t("settings.mobile.noDevices")}
@@ -316,13 +409,14 @@ function CrconAppSettings() {
                   ))}
                 </List>
               )}
+              </Stack>
             </Stack>
           </CardContent>
         </Card>
-      </Grid>
+      </Grid>}
 
       {/* Flush Cache Card */}
-      <Grid size={{ xs: 12, md: 6 }}>
+      {showUtilities && <Grid size={{ xs: 12, md: 6 }}>
         <Card elevation={2}>
           <CardHeader
             avatar={<CacheIcon color="primary" />}
@@ -350,10 +444,10 @@ function CrconAppSettings() {
             </Stack>
           </CardContent>
         </Card>
-      </Grid>
+      </Grid>}
 
       {/* Reconnect Gameserver Card */}
-      <Grid size={{ xs: 12, md: 6 }}>
+      {showUtilities && <Grid size={{ xs: 12, md: 6 }}>
         <Card elevation={2}>
           <CardHeader
             avatar={<LinkIcon color="primary" />}
@@ -378,7 +472,7 @@ function CrconAppSettings() {
             </Stack>
           </CardContent>
         </Card>
-      </Grid>
+      </Grid>}
     </Grid>
   );
 }

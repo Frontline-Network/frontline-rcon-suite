@@ -75,7 +75,6 @@ export const others = [
     path: "/settings/others/autobalancer",
     command: "autobalancer_config",
     name: "Fair Autobalancer",
-    nameKey: "navigation.links.autobalancer",
   },
   {
     path: "/settings/others/seed-vip",

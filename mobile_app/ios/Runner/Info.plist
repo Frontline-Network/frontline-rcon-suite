@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>CRCON Admin</string>
+	<string>Frontline</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Scan the one-time QR code displayed by your CRCON installation.</string>
 	<key>CFBundleURLTypes</key>
@@ -26,7 +26,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>crcon_mobile_admin</string>
+	<string>Frontline</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

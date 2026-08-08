@@ -4,12 +4,24 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'models.dart';
 
-class SecureConnectionStore {
+abstract interface class PushRelayIdentityStore {
+  Future<Map<String, String>?> readPushRelayIdentity();
+
+  Future<void> writePushRelayIdentity({
+    required String baseUrl,
+    required String pushToken,
+    required String handle,
+    required String capability,
+  });
+}
+
+class SecureConnectionStore implements PushRelayIdentityStore {
   SecureConnectionStore([FlutterSecureStorage? storage])
     : _storage = storage ?? const FlutterSecureStorage();
 
   final FlutterSecureStorage _storage;
   static const _connectionIndex = 'crcon.connections.v1';
+  static const _pushRelayIdentity = 'crcon.push-relay.identity.v1';
 
   Future<List<ConnectionProfile>> readConnections() async {
     final raw = await _storage.read(key: _connectionIndex);
@@ -86,6 +98,45 @@ class SecureConnectionStore {
 
   Future<void> writeLanguage(String languageCode) =>
       _storage.write(key: 'crcon.language.v1', value: languageCode);
+
+  @override
+  Future<Map<String, String>?> readPushRelayIdentity() async {
+    final raw = await _storage.read(key: _pushRelayIdentity);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final value = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+      final identity = value.map(
+        (key, value) => MapEntry(key, value?.toString() ?? ''),
+      );
+      if ((identity['base_url'] ?? '').isEmpty ||
+          (identity['push_token'] ?? '').isEmpty ||
+          (identity['handle'] ?? '').isEmpty ||
+          (identity['capability'] ?? '').isEmpty) {
+        return null;
+      }
+      return identity;
+    } on FormatException {
+      return null;
+    } on TypeError {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> writePushRelayIdentity({
+    required String baseUrl,
+    required String pushToken,
+    required String handle,
+    required String capability,
+  }) => _storage.write(
+    key: _pushRelayIdentity,
+    value: jsonEncode({
+      'base_url': baseUrl,
+      'push_token': pushToken,
+      'handle': handle,
+      'capability': capability,
+    }),
+  );
 
   String _tokenKey(String connectionId, String kind) =>
       'crcon.$connectionId.$kind.v1';

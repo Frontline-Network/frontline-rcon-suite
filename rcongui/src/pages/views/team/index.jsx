@@ -26,10 +26,10 @@ import StickyContainer from "@/components/shared/StickyContainer";
 import DisbandSquadDialog from "@/features/player-action/DisbandSquad";
 import { DebouncedSearchInput } from "@/components/shared/DebouncedSearchInput";
 import MessageAllDialog from "@/features/player-action/MessageAll";
-import AutobalancerCard from "./autobalancer-card";
 import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/shared/PageHeader";
 import { demoGameState, isFakeMode } from "@/mirage/demo-data";
+import AutobalancerCard from "./autobalancer-card";
 
 const TeamViewPage = () => {
   const { t } = useTranslation();

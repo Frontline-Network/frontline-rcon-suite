@@ -11,7 +11,14 @@ then
   # TODO: we can eventually remove this in a few releases once old installs have updated their game servers and CRCON
   # SERVER_NUMBER is mandatory and not otherwise set in the maintenance container; only want it to run once
   # LOGGING_PATH and LOGGING_FILENAME need to be passed to get it to log to the directory that is bind mounted
-  SERVER_NUMBER=1 LOGGING_PATH=/logs/ LOGGING_FILENAME=startup.log python -m rcon.cli merge_duplicate_player_ids
+  # A historical player record can still be referenced by an account.  Do not
+  # block every subsequent deployment (including schema migrations) on that
+  # legacy cleanup; the command remains safe to retry after the reference has
+  # been resolved.
+  if ! SERVER_NUMBER=1 LOGGING_PATH=/logs/ LOGGING_FILENAME=startup.log python -m rcon.cli merge_duplicate_player_ids
+  then
+    echo "WARNING: legacy duplicate-player-id cleanup was deferred; see startup.log" >&2
+  fi
   SERVER_NUMBER=1 LOGGING_PATH=/logs/ LOGGING_FILENAME=startup.log python -m rcon.cli convert_win_player_ids
   cd rconweb
   ./manage.py makemigrations --no-input

@@ -68,7 +68,10 @@ void main() {
     final context = tester.element(find.byType(Scaffold));
 
     expect(scaffold.backgroundColor, isNull);
-    expect(Theme.of(context).scaffoldBackgroundColor, FrontlineTheme.background);
+    expect(
+      Theme.of(context).scaffoldBackgroundColor,
+      FrontlineTheme.background,
+    );
     expect(Theme.of(context).colorScheme.primary, FrontlineTheme.gold);
   });
 }
