@@ -3,7 +3,7 @@
 #   docker compose -f compose.yaml -f compose.mobile-admin.yaml up -d
 
 x-frontline-backend: &frontline-backend
-  image: frontline/hll_rcon_tool:mobile-admin-autobalancer-v11.11.1
+  image: frontline/hll_rcon_tool:${CRCON_IMAGE_TAG:-mobile-admin-autobalancer-v11.11.1}
   build:
     context: .
     dockerfile: Dockerfile
@@ -19,7 +19,7 @@ x-mobile-environment: &mobile-environment
   MOBILE_PUSH_RELAY_URL: ${MOBILE_PUSH_RELAY_URL:-}
 
 x-frontline-frontend: &frontline-frontend
-  image: frontline/hll_rcon_tool_frontend:mobile-admin-autobalancer-v11.11.1
+  image: frontline/hll_rcon_tool_frontend:${CRCON_IMAGE_TAG:-mobile-admin-autobalancer-v11.11.1}
   build:
     context: .
     dockerfile: Dockerfile-frontend
@@ -38,6 +38,7 @@ services:
     # same Frontline build as the API so payload and relay capability handling
     # stay in lockstep with the mobile endpoints.
     <<: *frontline-backend
+    command: mobile_push_worker
     environment: *mobile-environment
 
   backend_1:

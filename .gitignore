@@ -165,6 +165,10 @@ push_relay/firebase-service-account.json
 .codex-worktrees/
 CRCON-Mobile-Admin-*-test.apk
 
+# Production deploy state is host-specific and may contain database backups.
+.deploy-backups/
+.deploy-state/
+
 # The upstream Python rule ignores every directory named `lib`; keep Flutter sources.
 !mobile_app/lib/
 !mobile_app/lib/**

@@ -18,6 +18,9 @@ MOBILE_CONTEXT_FUZZY_THRESHOLD=0.74
 ```
 
 Run both Django and Alembic migrations during the normal maintenance startup.
+For Frontline production hosts, follow the guarded GitHub deployment workflow in
+[`production-deploy.md`](production-deploy.md); it preserves the migration graph
+already used by production and creates a database backup before every rollout.
 The **Settings → CRCON App → Mobile Admin App** card then creates a two-minute,
 one-time QR code. The administrator must compare the six-digit code shown on
 both devices and approve the phone in the authenticated CRCON browser.
