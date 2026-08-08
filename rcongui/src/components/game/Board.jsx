@@ -35,10 +35,22 @@ const SmallText = styled(Typography)(({ theme }) => ({
  */
 export const Board = ({ data, ...props }) => {
   const themedImg = useThemedImages()
+  const boardData = data ?? {};
+  // A server can briefly return an incomplete public game state while a map
+  // is loading or when the game connection is reconnecting. Keep the board
+  // useful in that state instead of crashing the whole route while reading
+  // faction names from an undefined map object.
+  const currentMap = data?.current_map ?? {};
+  const map = currentMap.map ?? {};
+  const alliesName = map.allies?.name;
+  const axisName = map.axis?.name;
+  const mapName = currentMap.pretty_name ?? map.pretty_name ?? "Unknown Map";
+  const gameMode = currentMap.game_mode?.toUpperCase() ?? "—";
+
   return (
     <StyledStack>
       <SmallText textAlign={"center"} fontWeight={"bold"}>
-        {data.raw_time_remaining}
+        {boardData.raw_time_remaining ?? "—"}
       </SmallText>
       <Divider variant="middle" />
       <Grid
@@ -56,23 +68,25 @@ export const Board = ({ data, ...props }) => {
             alignItems: "start",
           }}
         >
-          <Box
-            width={24}
-            height={24}
-            component={"img"}
-            alt="Allies"
-            src={themedImg.getFactionIconSrc(data.current_map.map.allies.name)}
-          />
+          {alliesName ? (
+            <Box
+              width={24}
+              height={24}
+              component={"img"}
+              alt="Allies"
+              src={themedImg.getFactionIconSrc(alliesName)}
+            />
+          ) : null}
         </Grid>
         <Grid container sx={{ textAlign: "center" }} size={4}>
           <Grid size={5}>
-            <Typography component={"span"} fontWeight={"bold"}>{data.allied_score}</Typography>
+            <Typography component={"span"} fontWeight={"bold"}>{boardData.allied_score ?? 0}</Typography>
           </Grid>
           <Grid size={2}>
             <Typography component={"span"}>:</Typography>
           </Grid>
           <Grid size={5}>
-            <Typography component={"span"} fontWeight={"bold"}>{data.axis_score}</Typography>
+            <Typography component={"span"} fontWeight={"bold"}>{boardData.axis_score ?? 0}</Typography>
           </Grid>
         </Grid>
         <Grid
@@ -83,38 +97,40 @@ export const Board = ({ data, ...props }) => {
             alignItems: "start",
           }}
         >
-          <Box
-            width={24}
-            height={24}
-            component={"img"}
-            alt="Axis"
-            src={themedImg.getFactionIconSrc(data.current_map.map.axis.name)}
-          />
+          {axisName ? (
+            <Box
+              width={24}
+              height={24}
+              component={"img"}
+              alt="Axis"
+              src={themedImg.getFactionIconSrc(axisName)}
+            />
+          ) : null}
         </Grid>
       </Grid>
       <Divider variant="middle" />
       <Grid container>
         <Grid size={3}>
           <SmallText textAlign={"left"} sx={{ pl: 0.75 }}>
-            {`[${data.num_allied_players ?? 0}]`}
+            {`[${boardData.num_allied_players ?? 0}]`}
           </SmallText>
         </Grid>
         <Grid size={6}>
           <SmallText textAlign={"center"}>
-            {data.current_map.map.pretty_name}
+            {mapName}
           </SmallText>
         </Grid>
         <Grid size={3}>
           <SmallText textAlign={"right"} sx={{ pr: 0.75 }}>
-            {`[${data.num_axis_players ?? 0}]`}
+            {`[${boardData.num_axis_players ?? 0}]`}
           </SmallText>
         </Grid>
       </Grid>
-        <Grid size={12}>
-          <SmallText textAlign={"center"}>
-            {data.current_map.game_mode.toUpperCase()}
-          </SmallText>
-        </Grid>
+      <Grid size={12}>
+        <SmallText textAlign={"center"}>
+          {gameMode}
+        </SmallText>
+      </Grid>
     </StyledStack>
   );
 };

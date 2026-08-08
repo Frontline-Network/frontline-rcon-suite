@@ -87,6 +87,10 @@ class MobileDevice(models.Model):
 
 
 class MobilePairing(models.Model):
+    class Kind(models.TextChoices):
+        QR = "qr", "QR"
+        DESKTOP = "desktop", "Desktop device code"
+
     class State(models.TextChoices):
         PENDING = "pending", "Pending"
         SCANNED = "scanned", "Scanned"
@@ -96,9 +100,19 @@ class MobilePairing(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="mobile_pairings"
+        User,
+        on_delete=models.CASCADE,
+        related_name="mobile_pairings",
+        null=True,
+        blank=True,
     )
+    kind = models.CharField(max_length=16, choices=Kind.choices, default=Kind.QR)
     secret_digest = models.CharField(max_length=64, unique=True)
+    # Desktop device codes are deliberately short enough to compare in a
+    # browser, but are never retained as plaintext in CRCON's database.
+    user_code_digest = models.CharField(
+        max_length=64, unique=True, null=True, blank=True
+    )
     exchange_token_digest = models.CharField(
         max_length=64, unique=True, null=True, blank=True
     )

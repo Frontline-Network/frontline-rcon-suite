@@ -9,7 +9,7 @@
   "revokeDeviceBody": "CRCON will invalidate its access and refresh tokens immediately.",
   "cancel": "Cancel",
   "revoke": "Revoke",
-  "pairInstructions": "Open Mobile App in CRCON, create a QR code, then scan it here.",
+  "pairInstructions": "Open “Set up apps” in CRCON, create a QR code, then scan it here.",
   "compareCode": "Compare this code with CRCON",
   "approvePhone": "Approve the phone in the CRCON browser to finish pairing.",
   "createIncident": "Create incident",

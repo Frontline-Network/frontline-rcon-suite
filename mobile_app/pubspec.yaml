@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 0.1.1+2
+version: 0.1.24+25
 
 environment:
   sdk: ^3.12.1
@@ -49,6 +49,8 @@ dependencies:
   path: ^1.9.1
   uuid: ^4.6.0
   intl: ^0.20.2
+  share_plus: ^13.3.0
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
@@ -60,6 +62,13 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+
+# The Windows compiler cannot read the global Pub-cache symlink in the desktop
+# build environment.  Keep the audited upstream 4.2.2 source in-tree so a
+# released Windows build is reproducible and uses the native OS keystore.
+dependency_overrides:
+  flutter_secure_storage_windows:
+    path: third_party/flutter_secure_storage_windows
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -74,6 +83,8 @@ flutter:
   uses-material-design: true
   assets:
     - ../assets/rcongui/frontline-logo.png
+    - assets/fln_logo.png
+    - assets/frontline_app_icon.png
 
 # sqlite3 3.x ships native assets. Selecting SQLCipher keeps the Drift cache
 # encrypted at rest on both supported mobile platforms.

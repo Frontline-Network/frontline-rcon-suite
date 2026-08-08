@@ -852,6 +852,11 @@ def mutate_incident(
                 raise ValueError("assigned_to is required")
             incident.status = "claimed"
             incident.assigned_to = assigned_to[:150]
+            handover_note = str(payload.get("handover_note") or "").strip()
+            payload = {
+                "assigned_to": incident.assigned_to,
+                "handover_note": handover_note[:2000] if handover_note else None,
+            }
         elif operation == "link_target":
             target_id = str(payload.get("target_id") or "").strip()
             target_name = str(payload.get("target_name") or "").strip()
@@ -1015,7 +1020,11 @@ def mutate_incident_subject(
 
 
 def confirmed_action_subject(
-    incident: dict, *, player_id: str | None, subject_id: str | None = None
+    incident: dict,
+    *,
+    player_id: str | None,
+    subject_id: str | None = None,
+    allow_reporter: bool = False,
 ) -> dict:
     player_id = str(player_id or "").strip()
     subjects = incident.get("subjects") or []
@@ -1042,6 +1051,27 @@ def confirmed_action_subject(
             "player_id": player_id,
             "display_name": incident.get("target_name"),
         }
+    # General reports do not have an accused player.  Their reporter is still
+    # a valid, explicit contact/action target, but must never silently become
+    # an incident subject or the primary target.
+    reporter_id = str(incident.get("reporter_id") or "").strip()
+    has_confirmed_subject = any(
+        subject.get("state") == "confirmed" for subject in subjects
+    )
+    if (
+        allow_reporter
+        and not subject_id
+        and reporter_id
+        and player_id == reporter_id
+        and not has_confirmed_subject
+    ):
+        return {
+            "id": None,
+            "kind": "reporter",
+            "state": "contact",
+            "player_id": reporter_id,
+            "display_name": incident.get("reporter_name"),
+        }
     raise ValueError("Actions require a player from a confirmed incident subject")
 
 
@@ -1052,6 +1082,8 @@ def reserve_incident_action(
     action: str,
     arguments: dict,
     idempotency_key: str,
+    confirm_subject_id: str | None = None,
+    validate_action_subject: bool = False,
 ) -> tuple[dict, bool]:
     if not idempotency_key or len(idempotency_key) > 64:
         raise ValueError("A valid Idempotency-Key header is required")
@@ -1076,6 +1108,75 @@ def reserve_incident_action(
         ).scalar_one_or_none()
         if not incident:
             raise IncidentNotFound("Incident not found")
+        if incident.status not in {"new", "claimed"}:
+            raise InvalidIncidentTransition(
+                "Only open incidents can receive player actions"
+            )
+        if incident.assigned_to and incident.assigned_to != actor:
+            raise IncidentConflict("Incident is already claimed by another admin")
+
+        player_id = str(arguments.get("player_id") or "").strip()
+        subject_id = str(arguments.get("subject_id") or "").strip() or None
+        reporter_action = arguments.get("reporter_action") is True
+        if reporter_action and subject_id:
+            raise ValueError("Reporter actions cannot include an incident subject")
+        if action == "disband_squad":
+            subject = next(
+                (item for item in incident.subjects if item.id == subject_id),
+                None,
+            )
+            if not subject:
+                raise IncidentNotFound("Incident subject not found")
+            if subject.kind != "squad" or subject.state != "confirmed":
+                raise InvalidIncidentTransition(
+                    "Only a confirmed squad can be disbanded"
+                )
+        elif confirm_subject_id:
+            subject = next(
+                (item for item in incident.subjects if item.id == confirm_subject_id),
+                None,
+            )
+            if not subject:
+                raise IncidentNotFound("Incident subject not found")
+            if subject.kind != "player" or subject.state != "suggested":
+                raise InvalidIncidentTransition(
+                    "Only a suggested player can be confirmed during an action"
+                )
+            if subject.player_id != player_id or subject_id != subject.id:
+                raise ValueError("Action target does not match the selected suggestion")
+            subject.state = "confirmed"
+            subject.confirmed_by = actor
+            subject.is_primary = True
+            _sync_primary_target(incident)
+            incident.events.append(
+                _event(
+                    actor,
+                    "subject_confirmed",
+                    {
+                        "subject_id": subject.id,
+                        "kind": subject.kind,
+                        "state": subject.state,
+                        "is_primary": subject.is_primary,
+                        "match_method": subject.match_method,
+                        "confidence": subject.confidence,
+                        "via": "action",
+                    },
+                )
+            )
+        elif validate_action_subject:
+            confirmed_action_subject(
+                incident.to_dict(include_events=False),
+                player_id=player_id,
+                subject_id=subject_id,
+                allow_reporter=reporter_action,
+            )
+
+        if incident.status == "new":
+            incident.status = "claimed"
+            incident.assigned_to = actor
+            incident.events.append(
+                _event(actor, "claim", {"via": "action", "action": action})
+            )
         safe_arguments = {
             key: value
             for key, value in arguments.items()

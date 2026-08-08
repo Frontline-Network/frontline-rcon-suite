@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'app_logger.dart';
 import 'crcon_api.dart';
 import 'models.dart';
 import 'secure_store.dart';
@@ -48,6 +49,10 @@ class CrconLiveUpdates {
           uri.toString(),
           headers: {'Authorization': 'Bearer $accessToken'},
         );
+        AppLogger.instance.info(
+          'websocket',
+          'Connected to ${uri.host}${uri.path}',
+        );
         _socket!.add(jsonEncode({'cursor': cursor}));
         retrySeconds = 1;
         await for (final raw in _socket!) {
@@ -61,8 +66,33 @@ class CrconLiveUpdates {
             onIncident(Map<String, dynamic>.from(item as Map));
           }
         }
-      } catch (_) {
+      } catch (error, stackTrace) {
         if (_stopped) return;
+        if (error is CrconAuthException) {
+          AppLogger.instance.warning(
+            'websocket',
+            'Live updates for ${Uri.parse(profile.baseUrl).host} stopped; '
+                'device pairing is no longer valid',
+          );
+          return;
+        }
+        final message =
+            'Live updates for ${Uri.parse(profile.baseUrl).host} failed; '
+            'retrying in ${retrySeconds}s';
+        if (error is SocketException ||
+            error.toString().contains('Failed host lookup')) {
+          AppLogger.instance.warning(
+            'websocket',
+            '$message (network unavailable)',
+          );
+        } else {
+          AppLogger.instance.error(
+            'websocket',
+            error,
+            message: message,
+            stackTrace: stackTrace,
+          );
+        }
       } finally {
         _socket = null;
       }

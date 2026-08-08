@@ -11,6 +11,7 @@ import {
 } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cmd } from "@/utils/fetchUtils";
+import TeamBalanceBar from "@/components/shared/TeamBalanceBar";
 
 const PHASE_LABELS = {
   idle: "Bereit",
@@ -100,10 +101,15 @@ const AutobalancerCard = () => {
             label={PHASE_LABELS[status.phase] || status.phase}
           />
           <Typography variant="body2" color="text.secondary">
-            Allies {counts.allies ?? "–"} : {counts.axis ?? "–"} Axis ·{" "}
             {status.required_switches ?? 0} Wechsel nötig
           </Typography>
         </Stack>
+        <TeamBalanceBar
+          compact
+          allies={counts.allies}
+          axis={counts.axis}
+          targetDifference={status.target_difference}
+        />
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
           {MODE_EXPLANATIONS[status.mode]}
         </Typography>

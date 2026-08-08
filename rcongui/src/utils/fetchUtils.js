@@ -39,10 +39,9 @@ async function requestFactory({
 
   // Add a body for all mutating JSON requests.
   if (method !== "GET" && method !== "HEAD") {
-    requestOptions.body =
-      headers["Content-Type"] === "application/json"
-        ? JSON.stringify(payload)
-        : payload;
+    requestOptions.body = headers["Content-Type"] === "application/json"
+      ? JSON.stringify(payload)
+      : payload;
   }
 
   // Create a Request object

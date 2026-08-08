@@ -14,6 +14,8 @@ x-mobile-environment: &mobile-environment
   MOBILE_INSTALLATION_ID: ${MOBILE_INSTALLATION_ID:-}
   MOBILE_INCIDENT_TRIGGERS: ${MOBILE_INCIDENT_TRIGGERS:-}
   MOBILE_INCIDENT_RETENTION_DAYS: ${MOBILE_INCIDENT_RETENTION_DAYS:-90}
+  MOBILE_CONTEXT_V2: ${MOBILE_CONTEXT_V2:-disabled}
+  MOBILE_CONTEXT_FUZZY_THRESHOLD: ${MOBILE_CONTEXT_FUZZY_THRESHOLD:-0.74}
   MOBILE_PUSH_RELAY_URL: ${MOBILE_PUSH_RELAY_URL:-}
 
 x-frontline-frontend: &frontline-frontend
@@ -28,6 +30,13 @@ services:
     environment: *mobile-environment
 
   webhook_service:
+    <<: *frontline-backend
+    environment: *mobile-environment
+
+  mobile_push_worker:
+    # The worker delivers opaque incident notifications. It must run the
+    # same Frontline build as the API so payload and relay capability handling
+    # stay in lockstep with the mobile endpoints.
     <<: *frontline-backend
     environment: *mobile-environment
 

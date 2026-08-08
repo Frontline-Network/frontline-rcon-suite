@@ -1,21 +1,29 @@
 import hashlib
 import hmac
 import os
-import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
+from threading import Lock
+from time import monotonic
 
 import firebase_admin
-from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
 from firebase_admin import credentials, messaging
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import DateTime, Integer, String, Text, create_engine, select
+from sqlalchemy import DateTime, Integer, String, Text, create_engine, func, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 DATABASE_URL = os.getenv("RELAY_DATABASE_URL", "sqlite:///./push-relay.sqlite")
 RELAY_SECRET = os.getenv("RELAY_SECRET", "")
 RATE_LIMIT_PER_MINUTE = int(os.getenv("RELAY_RATE_LIMIT_PER_MINUTE", "30"))
+REGISTRATION_RATE_LIMIT_PER_MINUTE = int(
+    os.getenv("RELAY_REGISTRATION_RATE_LIMIT_PER_MINUTE", "120")
+)
+MAX_REGISTERED_DEVICES = int(os.getenv("RELAY_MAX_REGISTERED_DEVICES", "10000"))
 DRY_RUN = os.getenv("RELAY_DRY_RUN", "false").lower() in {"1", "true", "yes"}
+
+_registration_windows: dict[str, tuple[float, int]] = {}
+_registration_windows_lock = Lock()
 
 if len(RELAY_SECRET) < 32:
     raise RuntimeError("RELAY_SECRET must contain at least 32 characters")
@@ -66,7 +74,7 @@ def _session():
 
 class RegistrationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    platform: str = Field(pattern="^(android|ios)$")
+    platform: str = Field(pattern="^(android|ios|web)$")
     push_token: str = Field(min_length=20, max_length=4096)
 
 
@@ -86,6 +94,33 @@ class NotificationRequest(BaseModel):
 app = FastAPI(title="CRCON Push Relay", version="1.0")
 
 
+def _check_registration_rate_limit(client_host: str):
+    now = monotonic()
+    with _registration_windows_lock:
+        if len(_registration_windows) >= 4096:
+            expired = [
+                key
+                for key, (started_at, _) in _registration_windows.items()
+                if started_at <= now - 60
+            ]
+            for key in expired:
+                del _registration_windows[key]
+        if (
+            client_host not in _registration_windows
+            and len(_registration_windows) >= 4096
+        ):
+            client_host = "__overflow__"
+
+        started_at, count = _registration_windows.get(client_host, (now, 0))
+        if started_at <= now - 60:
+            started_at, count = now, 0
+        if count >= REGISTRATION_RATE_LIMIT_PER_MINUTE:
+            raise HTTPException(
+                status_code=429, detail="Device registration rate limit exceeded"
+            )
+        _registration_windows[client_host] = (started_at, count + 1)
+
+
 def _init_firebase():
     if firebase_admin._apps:
         return
@@ -102,14 +137,28 @@ def healthz():
 
 
 @app.post("/v1/devices", response_model=RegistrationResponse)
-def register_device(payload: RegistrationRequest, session: Session = Depends(_session)):
+def register_device(
+    payload: RegistrationRequest,
+    request: Request,
+    session: Session = Depends(_session),
+):
+    _check_registration_rate_limit(
+        request.client.host if request.client is not None else "unknown"
+    )
     now = datetime.now(tz=timezone.utc)
-    raw_capability = f"notify_{secrets.token_urlsafe(32)}"
     token_digest = _digest(payload.push_token, "push-token")
+    raw_capability = f"notify_{_digest(payload.push_token, 'notify-capability')}"
     device = session.execute(
         select(RelayDevice).where(RelayDevice.token_digest == token_digest)
     ).scalar_one_or_none()
     if device is None:
+        registered_devices = session.scalar(
+            select(func.count()).select_from(RelayDevice)
+        )
+        if registered_devices >= MAX_REGISTERED_DEVICES:
+            raise HTTPException(
+                status_code=503, detail="Device registration capacity reached"
+            )
         device = RelayDevice(
             handle=str(uuid.uuid4()),
             platform=payload.platform,

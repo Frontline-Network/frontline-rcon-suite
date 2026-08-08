@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'crcon_api.dart';
-import 'incident_cache.dart';
+import 'incident_cache.dart' if (dart.library.html) 'incident_cache_web.dart';
 import 'models.dart';
 import 'secure_store.dart';
 

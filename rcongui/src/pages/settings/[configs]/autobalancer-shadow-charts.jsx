@@ -11,6 +11,7 @@ import {
 import { BarChart } from "@mui/x-charts/BarChart";
 import { ChartsReferenceLine } from "@mui/x-charts/ChartsReferenceLine";
 import { LineChart } from "@mui/x-charts/LineChart";
+import TeamBalanceBar from "@/components/shared/TeamBalanceBar";
 
 const PHASE_LABELS = {
   idle: "Kein Eingriff nötig",
@@ -78,8 +79,6 @@ const LiveBalance = ({ status, targetDifference, minimumPlayers }) => {
     reasons.some((reason) => UNRELIABLE_REASONS.includes(reason));
   const difference = hasCounts ? Math.abs(allies - axis) : null;
   const balanced = !unreliable && difference <= targetDifference;
-  const total = hasCounts ? allies + axis : 0;
-  const alliesShare = total ? (allies / total) * 100 : 50;
   const inactive = reasons.includes("Mindestspielerzahl ist nicht erreicht");
 
   const state = unreliable
@@ -140,17 +139,11 @@ const LiveBalance = ({ status, targetDifference, minimumPlayers }) => {
               </Typography>
             )}
           </Stack>
-          <Typography
-            variant="h2"
-            sx={{ mt: 1, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}
-          >
-            Allies {allies ?? "–"} : {axis ?? "–"} Axis
-          </Typography>
-          <Typography variant="body1" sx={{ mt: 0.5 }}>
-            {unreliable
-              ? "Der Snapshot ist unvollständig. Aus diesen Zahlen wird keine Balanceentscheidung abgeleitet."
-              : `Differenz: ${difference} Spieler · erlaubt: höchstens ${targetDifference}`}
-          </Typography>
+          {unreliable && (
+            <Typography variant="body1" sx={{ mt: 1 }}>
+              Der Snapshot ist unvollständig. Aus diesen Zahlen wird keine Balanceentscheidung abgeleitet.
+            </Typography>
+          )}
         </Box>
         <Stack alignItems={{ md: "flex-end" }} spacing={0.5}>
           <Typography variant="h5" sx={{ fontWeight: 700 }}>
@@ -169,33 +162,11 @@ const LiveBalance = ({ status, targetDifference, minimumPlayers }) => {
         </Stack>
       </Stack>
 
-      {hasCounts && total > 0 && (
-        <Box sx={{ mt: 2 }}>
-          <Stack direction="row" justifyContent="space-between">
-            <Typography variant="caption">
-              Allies {Math.round(alliesShare)} %
-            </Typography>
-            <Typography variant="caption">
-              Axis {Math.round(100 - alliesShare)} %
-            </Typography>
-          </Stack>
-          <Box
-            aria-label={`Teamverteilung: ${allies} Allies und ${axis} Axis`}
-            sx={{
-              height: 18,
-              display: "flex",
-              overflow: "hidden",
-              borderRadius: 9,
-              border: 1,
-              borderColor: "divider",
-              mt: 0.5,
-            }}
-          >
-            <Box sx={{ width: `${alliesShare}%`, bgcolor: "primary.main" }} />
-            <Box sx={{ flexGrow: 1, bgcolor: "warning.main" }} />
-          </Box>
-        </Box>
-      )}
+      <TeamBalanceBar
+        allies={allies}
+        axis={axis}
+        targetDifference={targetDifference}
+      />
 
       {status?.team_ratings && (
         <Stack direction="row" gap={1} flexWrap="wrap" sx={{ mt: 1.5 }}>

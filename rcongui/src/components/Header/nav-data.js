@@ -49,6 +49,7 @@ import OndemandVideoIcon from "@mui/icons-material/OndemandVideo";
 import MilitaryTechIcon from "@mui/icons-material/MilitaryTech";
 import SearchIcon from "@mui/icons-material/Search";
 import BalanceIcon from "@mui/icons-material/Balance";
+import PhoneAndroidIcon from "@mui/icons-material/PhoneAndroid";
 
 const rawNavMenus = [
   {
@@ -57,6 +58,11 @@ const rawNavMenus = [
         name: "Home",
         to: "/",
         icon: <HomeIcon />,
+      },
+      {
+        name: "Apps setup",
+        to: "/apps",
+        icon: <PhoneAndroidIcon />,
       },
     ],
   },
@@ -363,6 +369,7 @@ const groupTranslationKeys = {
 
 const linkTranslationKeys = {
   "/": "navigation.links.home",
+  "/apps": "navigation.links.appsSetup",
   "/views/live": "navigation.links.live",
   "/views/team": "navigation.links.team",
   "/settings/maps/change": "navigation.links.changeMap",
@@ -396,7 +403,6 @@ const linkTranslationKeys = {
   "/settings/others/vac-bans": "navigation.links.vacBans",
   "/settings/others/tk-bans": "navigation.links.tkBans",
   "/settings/others/name-kicks": "navigation.links.nameKicks",
-  "/settings/others/autobalancer": "navigation.links.autobalancer",
   "/settings/others/seed-vip": "navigation.links.seedVip",
   "/settings/others/game-server": "navigation.links.gameServer",
   "/settings/others/crcon": "navigation.links.crcon",
