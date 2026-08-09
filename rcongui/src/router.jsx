@@ -1,4 +1,5 @@
 import { createBrowserRouter, Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import Root from "./pages/root"
 import { loader as rootLoader } from "./pages/root"
@@ -117,6 +118,21 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { GlobalState } from "./stores/global-state";
 import RouteError from "@/components/shared/RouteError";
 
+const ViewsCrumb = () => {
+    const { t } = useTranslation();
+    return <span>{t("navigation.groups.views")}</span>;
+};
+
+const autobalancerViewLoader = (args) =>
+    configLoader({
+        ...args,
+        params: {
+            ...args.params,
+            category: "others",
+            type: "autobalancer",
+        },
+    });
+
 const router = createBrowserRouter([
     {
         path: '/',
@@ -145,7 +161,7 @@ const router = createBrowserRouter([
             {
                 path: 'views',
                 errorElement: <RouteError />,
-                handle: { crumb: () => <span>Views</span> },
+                handle: { crumb: () => <ViewsCrumb /> },
                 children: [
                     {
                         path: 'live',
@@ -159,7 +175,15 @@ const router = createBrowserRouter([
                         handle: { crumb: () => <Link to={'/views/team'}>Team</Link> },
                         element: <TeamView />,
                         errorElement: <RouteError />,
-                    }
+                    },
+                    {
+                        path: 'autobalancer',
+                        handle: { crumb: () => <Link to={'/views/autobalancer'}>Autobalancer</Link> },
+                        element: <ConfigDetail />,
+                        loader: autobalancerViewLoader,
+                        action: configAction,
+                        errorElement: <RouteError />,
+                    },
                 ]
             },
             {

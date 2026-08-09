@@ -2,6 +2,15 @@ import { createServer } from "miragejs";
 import { handleTeamView } from "./routes/team-view";
 import { createGameState } from "./state/game";
 import { handleRecentLogs } from "./routes/recent-logs";
+import {
+  autobalancerConfig,
+  autobalancerHistoryDashboard,
+  autobalancerRoundArchive,
+  autobalancerSchema,
+  autobalancerShadowOverview,
+  autobalancerStatus,
+  reviewAutobalancerShadowDecision,
+} from "./data/autobalancer";
 
 export function makeServer({ environment = "development" } = {}) {
   let gameState = createGameState();
@@ -334,6 +343,35 @@ export function makeServer({ environment = "development" } = {}) {
       this.get("/get_seed_vip_config", () => ok(autoMod(true)));
       this.get("/get_chat_commands_config", () => ok(autoMod(true, true)));
       this.get("/get_rcon_chat_commands_config", () => ok(autoMod(true)));
+
+      this.get("/get_autobalancer_config", () => ok(autobalancerConfig));
+      this.get("/describe_autobalancer_config", () => ok(autobalancerSchema));
+      this.get("/get_autobalancer_status", () =>
+        ok({ ...autobalancerStatus, updated_at: new Date().toISOString() })
+      );
+      this.get("/get_autobalancer_shadow_overview", () =>
+        ok(autobalancerShadowOverview)
+      );
+      this.get("/get_autobalancer_history_dashboard", () =>
+        ok(autobalancerHistoryDashboard)
+      );
+      this.get("/get_autobalancer_round_archive", () =>
+        ok(autobalancerRoundArchive)
+      );
+      this.post("/review_autobalancer_shadow_decision", (schema, request) => {
+        const payload = request.requestBody
+          ? JSON.parse(request.requestBody)
+          : {};
+        const decision = reviewAutobalancerShadowDecision(payload);
+        if (!decision) {
+          return {
+            failed: true,
+            error: "Shadow-Vorschlag wurde nicht gefunden",
+            result: null,
+          };
+        }
+        return ok(decision);
+      });
       
       this.get("/get_team_view", () => {
         return handleTeamView(gameState);
