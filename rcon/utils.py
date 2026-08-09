@@ -281,12 +281,15 @@ class FixedLenList(Generic[T]):
         if isinstance(index, slice):
             if index.step is not None:
                 raise ValueError("Step is not supported")
-            start = index.start or 0
-            end = index.stop if index.stop is not None else -1
-            return [
-                self.deserializer(o)
-                for o in self.red.lrange(self.key, start, end)
-            ]
+            start, stop, _ = index.indices(len(self))
+            if start >= stop:
+                return []
+
+            # Redis LRANGE uses an inclusive end while Python slices use an
+            # exclusive stop. Keeping that distinction here also guarantees
+            # that a request for N elements never transfers N + 1 elements.
+            end = stop - 1
+            return [self.deserializer(o) for o in self.red.lrange(self.key, start, end)]
 
         val = self.red.lindex(self.key, index)
         if val is None:
@@ -315,6 +318,7 @@ class FixedLenList(Generic[T]):
 
     def clear(self) -> None:
         self.red.delete(self.key)
+
 
 def logs_deserializer(data: bytes | str) -> StructuredLogLineWithMetaData:
     """

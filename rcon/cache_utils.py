@@ -181,8 +181,11 @@ class RedisCached:
         else:
             key = self.key(*args, **kwargs)
         logger.debug("Invalidating cache for %s", key)
-        if key:
-            self.red.delete(key)
+        try:
+            if key:
+                self.red.delete(key)
+        except redis.exceptions.RedisError:
+            logger.exception("Unable to clear cache key %s", key)
 
     def clear_all(self):
         try:

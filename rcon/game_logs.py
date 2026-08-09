@@ -76,14 +76,19 @@ def get_recent_logs(
     # inclusive_filter=True retains this default behavior
     # inclusive_filter=False will do the opposite, show all lines except what is passed in
     # `actions_filter`
-    log_list = LogLoop.get_log_history_list()
-    all_logs = log_list
-
     if not isinstance(start, int):
         start = 0
 
     if not isinstance(end, int):
         end = 1000
+
+    start = max(0, start)
+    end = max(start, end)
+
+    log_list = LogLoop.get_log_history_list()
+    # FixedLenList.__iter__ loads the complete Redis list. Always slice here so
+    # callers asking for a small page only transfer that page from Redis.
+    all_logs = log_list[start : min(end, len(log_list))]
 
     if not isinstance(min_timestamp, float) and min_timestamp:
         min_timestamp = float(min_timestamp)
@@ -92,8 +97,6 @@ def get_recent_logs(
     exact_action = strtobool(exact_action)
     inclusive_filter = strtobool(inclusive_filter)
 
-    if start != 0:
-        all_logs = log_list[start : min(end, len(log_list))]
     logs: list[StructuredLogLineWithMetaData] = []
     all_players = set()
     actions = set(LOG_ACTIONS)

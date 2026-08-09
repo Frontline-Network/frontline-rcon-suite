@@ -1,7 +1,7 @@
 from collections import defaultdict
 from logging import getLogger
 
-from rcon.cache_utils import invalidates, ttl_cache
+from rcon.cache_utils import ttl_cache
 from rcon.logs.loop import on_kill, on_match_start, on_tk
 from rcon.rcon import Rcon
 from rcon.types import MostRecentEvents, StructuredLogLineWithMetaData
@@ -23,8 +23,11 @@ def get_recent_actions() -> defaultdict[str, MostRecentEvents]:
 
 def set_recent_actions(recent_actions: defaultdict[str, MostRecentEvents]):
     global RECENT_ACTIONS
-    with invalidates(get_recent_actions):
-        RECENT_ACTIONS = recent_actions
+    RECENT_ACTIONS = recent_actions
+    # This cache has one exact key because get_recent_actions takes no
+    # arguments. Invalidating that key directly avoids two Redis SCANs for
+    # every kill and team kill event.
+    get_recent_actions.clear_for()
 
 
 @on_match_start
