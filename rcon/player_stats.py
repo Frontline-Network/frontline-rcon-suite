@@ -94,7 +94,7 @@ class BaseStats:
 
     def _process_death_time(self, log_time, stats, save_spawn=True):
         if not isinstance(stats["last_spawn"], datetime.datetime):
-            logger.warning("Unknown last spawn")
+            logger.debug("Unknown last spawn")
             stats["last_spawn"] = log_time
             return
 
@@ -395,14 +395,14 @@ class TimeWindowStats(BaseStats):
         try:
             return self.times[player["name"]]["total"]
         except KeyError:
-            logger.warning("Unable to get session time for %s", player.get("name"))
+            logger.debug("Unable to get session time for %s", player.get("name"))
             return 0
 
     def _get_player_first_appearance(self, player):
         try:
             return self.times[player["name"]]["start"][0]
         except KeyError:
-            logger.warning(
+            logger.debug(
                 "Unable to get first appearance time for %s", player.get("name")
             )
             return 0
@@ -524,7 +524,7 @@ class TimeWindowStats(BaseStats):
             )
             if len(rows) == 0:
                 return {"Allied": 2, "Axis": 2}
-            (allied, axis) = self.match_end_result_regex.match(
+            allied, axis = self.match_end_result_regex.match(
                 rows[0].compatible_dict().get("message")
             ).groups()
             return {"Allied": int(allied), "Axis": int(axis)}

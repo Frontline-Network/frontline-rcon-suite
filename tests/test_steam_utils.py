@@ -1,6 +1,11 @@
 import pytest
 
-from rcon.steam_utils import filter_steam_id, filter_steam_ids, is_steam_id_64
+from rcon.steam_utils import (
+    filter_steam_id,
+    filter_steam_ids,
+    is_steam_id_64,
+    redact_steam_error,
+)
 
 
 @pytest.mark.parametrize(
@@ -50,3 +55,18 @@ def test_steam_id_filter(player_id, expected):
 )
 def test_steam_ids_filter(player_ids, expected: list[str]):
     assert should_filter_multiple_ids(player_ids) == expected
+
+
+@pytest.mark.parametrize("parameter", ["key", "api_key", "apikey", "KEY"])
+def test_redact_steam_error_hides_sensitive_query_parameters(parameter):
+    secret = "do-not-log-this"
+    message = (
+        "429 for https://api.steampowered.com/example?"
+        f"{parameter}={secret}&steamids=76561198080212634"
+    )
+
+    redacted = redact_steam_error(RuntimeError(message))
+
+    assert secret not in redacted
+    assert f"{parameter}=<redacted>" in redacted
+    assert "steamids=76561198080212634" in redacted

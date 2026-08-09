@@ -1,6 +1,7 @@
 import datetime
 import logging
 import math
+import re
 import time
 from dataclasses import dataclass
 from functools import wraps
@@ -25,6 +26,14 @@ last_steam_api_key_warning = datetime.datetime.now()
 STEAM_API_MAX_STEAM_IDS = 100
 
 STEAM_API: WebAPI | None = None
+SENSITIVE_QUERY_PARAMETER = re.compile(
+    r"([?&](?:key|api_key|apikey)=)[^&\s]+", re.IGNORECASE
+)
+
+
+def redact_steam_error(error: BaseException | str) -> str:
+    """Return an exception message without credentials embedded in query strings."""
+    return SENSITIVE_QUERY_PARAMETER.sub(r"\1<redacted>", str(error))
 
 
 def get_steam_api() -> WebAPI:
@@ -152,15 +161,18 @@ def fetch_steam_player_summary_mult_players(
                 ]
                 raw_profiles.extend(chunk_profiles)
             except steam.exceptions.SteamError as e:
-                logger.error(e)
+                logger.error("Steam API error: %s", redact_steam_error(e))
             except AttributeError:
                 logger.error("Steam API key is invalid, can't fetch steam profile")
                 break
             except IndexError:
                 logger.error("Steam: no player(s) found")
             except Exception as e:
-                logger.exception(e)
-                logger.error("Unexpected error while fetching steam profile")
+                logger.error(
+                    "Unexpected error while fetching Steam profiles (%s): %s",
+                    type(e).__name__,
+                    redact_steam_error(e),
+                )
 
     return {raw["steamid"]: raw for raw in raw_profiles}
 
@@ -195,7 +207,7 @@ def fetch_steam_bans_mult_players(
                 raw_bans.extend(chunk_bans)  # type: ignore
 
         except steam.exceptions.SteamError as e:
-            logger.error(e)
+            logger.error("Steam API error: %s", redact_steam_error(e))
         except AttributeError:
             logger.error("Steam API key is invalid, can't fetch steam profile")
         except IndexError:
@@ -412,8 +424,12 @@ def enrich_db_users(chunk_size=100, update_from_days_old=30):
                     num_bans,
                 )
             except Exception as e:
-                logger.exception(e)
-                logger.error("Error while fetching page %s: %s", idx + 1, e)
+                logger.error(
+                    "Error while fetching Steam page %s (%s): %s",
+                    idx + 1,
+                    type(e).__name__,
+                    redact_steam_error(e),
+                )
 
             # Shouldn't really need this with how many API calls we should be able to make
             # but just to be on the safe side
