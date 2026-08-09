@@ -19,6 +19,7 @@ from django.db.models.signals import post_delete, post_save
 from django.http import HttpResponse, QueryDict, parse_cookie
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+from django_ratelimit.decorators import ratelimit
 
 from rcon.audit import heartbeat, set_registered_mods
 from rcon.cache_utils import invalidates, ttl_cache
@@ -29,6 +30,7 @@ from rconweb.settings import SECRET_KEY, TAG_VERSION
 from .decorators import require_content_type, require_http_methods
 from .mobile_tokens import authenticate_mobile_access_token
 from .models import DjangoAPIKey, SteamPlayer
+from .ratelimits import login_account_rate_limit_key, request_rate_limit_key
 
 logger = logging.getLogger("rconweb")
 
@@ -233,6 +235,18 @@ def api_csv_response(content, name, header):
 @csrf_exempt
 @require_http_methods(["POST"])
 @require_content_type()
+@ratelimit(
+    group="login-account",
+    key=login_account_rate_limit_key,
+    rate="10/15m",
+    block=True,
+)
+@ratelimit(
+    group="login-client",
+    key=request_rate_limit_key,
+    rate="30/15m",
+    block=True,
+)
 def do_login(request):
     try:
         data = json.loads(request.body)
@@ -270,6 +284,7 @@ def get_moderators_accounts() -> list[tuple[str, str]]:
 
 @csrf_exempt
 @require_http_methods(["GET"])
+@ratelimit(key=request_rate_limit_key, rate="180/m", block=True)
 def is_logged_in(request):
     is_auth = request.user.is_authenticated
     if is_auth:
@@ -292,6 +307,7 @@ def is_logged_in(request):
 
 @csrf_exempt
 @require_http_methods(["GET", "POST"])
+@ratelimit(key=request_rate_limit_key, rate="30/m", block=True)
 def do_logout(request):
     logout(request)
     return api_response(result=True, command="logout", failed=False)

@@ -16,6 +16,7 @@ from django.http import (
     HttpResponseNotAllowed,
 )
 from django.views.decorators.csrf import csrf_exempt
+from django_ratelimit.decorators import ratelimit
 
 from discord.utils import escape_markdown
 from rcon.api_commands import get_rcon_api
@@ -37,6 +38,7 @@ from .audit_log import auto_record_audit, record_audit
 from .auth import AUTHORIZATION, RconJsonResponse, api_response, login_required
 from .decorators import permission_required, require_content_type, require_http_methods
 from .multi_servers import forward_command
+from .ratelimits import request_rate_limit_key
 from .utils import _get_data
 
 logger = logging.getLogger("rconweb")
@@ -79,6 +81,7 @@ def set_temp_msg(request, func, name):
 
 @csrf_exempt
 @require_http_methods(["GET"])
+@ratelimit(key=request_rate_limit_key, rate="30/m", block=True)
 def get_version(request):
     res = run(["git", "describe", "--tags"], stdout=PIPE, stderr=PIPE)
     return api_response(res.stdout.decode(), failed=False, command="get_version")
@@ -86,6 +89,7 @@ def get_version(request):
 
 @csrf_exempt
 @require_http_methods(["GET"])
+@ratelimit(key=request_rate_limit_key, rate="60/m", block=True)
 def get_public_info(request):
     try:
         current_map_start = MapsHistory(max_len=1)[0]["start"]

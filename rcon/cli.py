@@ -480,32 +480,24 @@ def _merge_duplicate_player_ids(existing_ids: set[str] | None = None):
 
             # Mobile-admin data has a one-to-one relationship to a player ID.
             # Reassigning it is safe when it exists only on a duplicate record.
-            # If both records already have mobile data, do not guess which
-            # account/soldier information should win: leave this group intact
-            # and log it for a deliberate, recoverable repair instead.
+            # If more than one record in the duplicate group has mobile data,
+            # do not guess which account/soldier information should win: leave
+            # this group intact for a deliberate, recoverable repair instead.
             mobile_conflict = session.execute(
-                text(
-                    """
-                    SELECT EXISTS (
-                        SELECT 1
-                        FROM player_account canonical
-                        WHERE canonical.playersteamid_id = :keep
-                    ) AND EXISTS (
-                        SELECT 1
-                        FROM player_account duplicate
-                        WHERE duplicate.playersteamid_id = ANY(:ids)
-                    )
-                    OR EXISTS (
-                        SELECT 1
-                        FROM player_soldier canonical
-                        WHERE canonical.playersteamid_id = :keep
-                    ) AND EXISTS (
-                        SELECT 1
-                        FROM player_soldier duplicate
-                        WHERE duplicate.playersteamid_id = ANY(:ids)
-                    )
-                    """
-                ),
+                text("""
+                    SELECT (
+                        SELECT COUNT(*)
+                        FROM player_account
+                        WHERE playersteamid_id = :keep
+                           OR playersteamid_id = ANY(:ids)
+                    ) > 1
+                    OR (
+                        SELECT COUNT(*)
+                        FROM player_soldier
+                        WHERE playersteamid_id = :keep
+                           OR playersteamid_id = ANY(:ids)
+                    ) > 1
+                    """),
                 {"keep": keep, "ids": ids},
             ).scalar_one()
             if mobile_conflict:
