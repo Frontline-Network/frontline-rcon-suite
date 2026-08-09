@@ -1,4 +1,26 @@
-import { QueryClient } from '@tanstack/react-query';
+import { focusManager, QueryClient } from '@tanstack/react-query';
+
+if (typeof document !== "undefined") {
+  focusManager.setEventListener((setFocused) => {
+    const syncFocusWithVisibility = () => {
+      setFocused(document.visibilityState === "visible");
+    };
+
+    document.addEventListener(
+      "visibilitychange",
+      syncFocusWithVisibility,
+      false,
+    );
+    syncFocusWithVisibility();
+
+    return () => {
+      document.removeEventListener(
+        "visibilitychange",
+        syncFocusWithVisibility,
+      );
+    };
+  });
+}
 
 // Create a new QueryClient instance with default options
 export const queryClient = new QueryClient({
