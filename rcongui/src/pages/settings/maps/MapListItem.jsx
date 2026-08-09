@@ -5,6 +5,8 @@ import {
   Tooltip,
   Popover,
   Stack,
+  Typography,
+  Divider,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { MapDetailsCard } from "./MapDetailsCard";
@@ -12,6 +14,8 @@ import { useState } from "react";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import CloseIcon from "@mui/icons-material/Close";
 import { useTranslation } from "react-i18next";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import { PlayerDrawerLink } from "@/components/shared/PlayerDrawerLink";
 
 function MapListItemBase({ mapLayer, renderActions, sx, ...props }) {
   return (
@@ -31,9 +35,7 @@ function MapListItemBase({ mapLayer, renderActions, sx, ...props }) {
       {...props}
     >
       <MapDetailsCard mapLayer={mapLayer} />
-      {renderActions && (
-        <Box sx={{ display: "flex", gap: 1 }}>{renderActions(mapLayer)}</Box>
-      )}
+      {renderActions && <>{renderActions(mapLayer)}</>}
     </Box>
   );
 }
@@ -90,11 +92,11 @@ export function MapBuilderListItem({ mapLayer, onClick }) {
   );
 }
 
-export function MapVotemapListItem({ mapLayer, voters }) {
+export function MapVotemapListItem({ mapLayer, voters, votesCount, onClick }) {
   const { t } = useTranslation();
   const [anchorEl, setAnchorEl] = useState(null);
   const voterList = Array.isArray(voters) ? voters : [];
-  const voterCount = Array.isArray(voters) ? voters.length : Number(voters) || 0;
+  const voterCount = Number(votesCount) || 0;
 
   const handleClick = (event) => {
     setAnchorEl(event.currentTarget);
@@ -110,19 +112,41 @@ export function MapVotemapListItem({ mapLayer, voters }) {
   return (
     <MapListItemBase
       mapLayer={mapLayer}
-      renderActions={() => (
+      renderActions={(mapLayer) => (
         <Stack
-          sx={{ px: 1 }}
-          alignItems={"center"}
           direction={"row"}
-          spacing={2}
+          justifyContent={"center"}
+          alignItems={"center"}
         >
-          <Box sx={{}}>{t("maps.votes", { count: voterCount })}</Box>
-          {voterList.length > 0 && (
-            <Button aria-describedby={id} onClick={handleClick}>
-              {t("maps.show")}
-            </Button>
-          )}
+          <Stack>
+            <Typography fontSize={"0.75rem"} color="text.secondary">
+              {t("settings.general.votes")}
+            </Typography>
+            <Typography textAlign={"center"} fontWeight={500}>
+              {voterCount}
+            </Typography>
+          </Stack>
+
+          <Divider flexItem orientation="vertical" sx={{ px: 0.5, mx: 0.5 }} />
+
+          <Tooltip title={t("maps.show")}>
+            <IconButton
+              aria-describedby={id}
+              size="small"
+              onClick={handleClick}
+            >
+              <VisibilityIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title={t("settings.general.remove")}>
+            <IconButton
+              size="small"
+              color="error"
+              onClick={() => onClick(mapLayer)}
+            >
+              <CloseIcon />
+            </IconButton>
+          </Tooltip>
           <Popover
             id={id}
             open={open}
@@ -139,12 +163,33 @@ export function MapVotemapListItem({ mapLayer, voters }) {
           >
             <Box>
               {voterList.map((voter, i) => (
-                <Box sx={{ py: 1, px: 2 }} key={voter + i}>
-                  {voter}
+                <Box sx={{ py: 1, px: 2 }} key={voter.player_id ?? i}>
+                  <PlayerDrawerLink playerId={voter.player_id}>
+                    {voter.player_name}: {voter.count}
+                  </PlayerDrawerLink>
                 </Box>
               ))}
             </Box>
           </Popover>
+        </Stack>
+      )}
+    />
+  );
+}
+
+export function MapVotemapResultListItem({ mapLayer, votesCount }) {
+  const { t } = useTranslation();
+  return (
+    <MapListItemBase
+      mapLayer={mapLayer}
+      renderActions={() => (
+        <Stack>
+          <Typography fontSize={"0.75rem"} color="text.secondary">
+            {t("settings.general.votes")}
+          </Typography>
+          <Typography textAlign={"center"} fontWeight={500}>
+            {votesCount}
+          </Typography>
         </Stack>
       )}
     />

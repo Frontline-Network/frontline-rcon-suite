@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 
 export function VotemapChangeNotification({ closeToast, data }) {
   const { t } = useTranslation();
-  const acceptChanges = true;
   return (
     <div>
       <div>{t("maps.votemapConfigChanged")}</div>
@@ -15,14 +14,17 @@ export function VotemapChangeNotification({ closeToast, data }) {
       <Button
         size="small"
         color="primary"
-        onClick={() => closeToast(acceptChanges)}
+        onClick={() => {
+          if (data.onAccept) data.onAccept();
+          closeToast("accept");
+        }}
       >
         {t("common.confirm")}
       </Button>
       <Button
         size="small"
         color="secondary"
-        onClick={() => closeToast(!acceptChanges)}
+        onClick={() => closeToast("ignore")}
       >
         {t("maps.ignoreChanges")}
       </Button>
