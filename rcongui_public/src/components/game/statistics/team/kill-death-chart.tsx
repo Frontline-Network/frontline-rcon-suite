@@ -6,7 +6,7 @@ import {useTranslation} from 'react-i18next'
 import colors from 'tailwindcss/colors'
 
 export function KillDeathChart({stats, handlePlayerClick}: {
-  stats: Player[] 
+  stats: Player[]
   handlePlayerClick: (id: string) => void
 }) {
 

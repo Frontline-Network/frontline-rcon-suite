@@ -6,7 +6,7 @@ import {RankCompareChart} from "@/components/game/statistics/team/rank-compare-c
 import {KillCategoryChart} from "@/components/game/statistics/team/kill-category-chart";
 
 export function TeamStats({stats, handlePlayerClick}: {
-  stats: Player[] 
+  stats: Player[]
   handlePlayerClick: (id: string) => void
 }) {
 

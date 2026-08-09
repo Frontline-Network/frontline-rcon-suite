@@ -844,7 +844,7 @@ def strtobool(val) -> bool:
         return False
     else:
         raise ValueError("invalid truth value %r" % (val,))
-    
+
 
 def guess_map_from_log(log: StructuredLogLineWithMetaData) -> Layer:
     guessed_map: Layer

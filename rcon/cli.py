@@ -265,7 +265,7 @@ def process_games(start_day_offset, end_day_offset=0, force=False):
         for map_ in all_maps:
             print("Reprocessing map: ", map_.to_dict())
             try:
-                # TODO we could attempt to find the temporary cached stats in redis for the match 
+                # TODO we could attempt to find the temporary cached stats in redis for the match
                 record_stats_from_map(sess, map_, None, force=force)
                 sess.commit()
                 print("Done")

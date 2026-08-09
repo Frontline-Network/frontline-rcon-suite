@@ -259,7 +259,7 @@ class LogLoop:
                 self.now = int(datetime.datetime.now(tz=datetime.UTC).timestamp())
                 prev_map_time_elapsed = self.update_maps_history(prev_map_time_elapsed)
             except (HLLServerError, ConnectionError) as e:
-                # The server becomes unresponsive when the map is changing 
+                # The server becomes unresponsive when the map is changing
                 # which in turn restarts this service
                 # Let's log it and prevent restarting the service
                 logger.warning("Connection error: %s", str(e))
@@ -288,7 +288,7 @@ class LogLoop:
         if not current_map:
             logger.info("[MATCH UNKNOWN] No map seems to be running: %s", current_map)
             return prev_map_time_elapsed
-        
+
         map_start = current_map["start"]
         if map_start is None:
             logger.info("[MATCH START MISSING] Probably a very old map record: %s", current_map)
@@ -306,7 +306,7 @@ class LogLoop:
         if gs["current_map"]["id"] != current_map["name"] and gs["time_remaining"].seconds == 0:
             logger.info("[MATCH IDLE] - Map has changed but has not started yet(based on map id diff), skipping saving stats - current_map: %s - cached_map:%s", gs["current_map"]["id"], current_map["name"])
             return 0
-        
+
         # time remaining is 0 during match overtime so that value alone is not sufficient enough
         if gs["time_remaining"].seconds == 0 and prev_map_time_elapsed == 0:
             logger.info("[MATCH IDLE] - Map has changed but has not started yet(based on time remaining diff), skipping saving stats - time_remaining: %d - currently_recorded_time_elapsed: %d - previously_recorded_time_elapsed: %d", gs["time_remaining"].seconds, curr_map_time_elapsed, prev_map_time_elapsed)
@@ -333,7 +333,7 @@ class LogLoop:
         )
         self.GET_LOGS_SINCE_MIN = 5
         current_map = MapsHistory().get_current_map()
-        name_to_id = self._get_name_to_id(current_map) if current_map else {} 
+        name_to_id = self._get_name_to_id(current_map) if current_map else {}
         for log in reversed(logs["logs"]):
             line = self.record_line(log, name_to_id)
             if line:
@@ -379,7 +379,7 @@ class LogLoop:
 
         # Compare cached player stats with live player stats
         # if player not online, append UNASSIGNED role
-        # that will be eventually used to calc accurate times each role was played 
+        # that will be eventually used to calc accurate times each role was played
         offline_unit = UnitHistoryEntry(ts=sec_from_start, t=UNASSIGNED, s=UNASSIGNED, r=UNASSIGNED)
         for player_id, player_stats in map_cached_stats.items():
             # When player joins both role and squad are set to 0 vals but only team is not assigned
@@ -423,7 +423,7 @@ class LogLoop:
                 )
                 continue
 
-            # BUG: HLL SERVER 
+            # BUG: HLL SERVER
             # Some player's stats are leaking into the next match before the player
             # properly connects to the server / before the player's map loads
             if skip_caching_player_stats:
@@ -431,7 +431,7 @@ class LogLoop:
                 # continue so some other players can be cached for the first time as well
                 # or marked as 'offline'
                 continue
-            
+
             # first coordinates change
             # Is this still needed? Perhaps for some future use
             # NOTE: if timestamp provided we could track 'idle' players
@@ -468,7 +468,7 @@ class LogLoop:
                 if current[v] < cached[v]:
                     cached["p_" + v] = cached["p_" + v] + cached[v]
                 cached[v] = current[v]
-            
+
             if current["kills"] < cached["kills_and_assists"]:
                 cached["p_kills_and_assists"] = cached["p_kills_and_assists"] + cached["kills_and_assists"]
             cached["kills_and_assists"] = current["kills"]
@@ -476,7 +476,7 @@ class LogLoop:
             if current["deaths"] < cached["deaths_and_redeploys"]:
                 cached["p_deaths_and_redeploys"] = cached["p_deaths_and_redeploys"] + cached["deaths_and_redeploys"]
             cached["deaths_and_redeploys"] = current["deaths"]
-            
+
             current_role = all_roles.get(current["role"] or "", UNASSIGNED)
             current_team = all_teams.get(current["team"] or "", UNASSIGNED)
             current_squad = current["unit_id"] or UNASSIGNED
@@ -521,7 +521,7 @@ class LogLoop:
             return log_time >= map_start
         map_end = datetime.datetime.fromtimestamp(map["end"], tz=datetime.UTC)
         return map_start <= log_time <= map_end
-        
+
     def _get_name_to_id(self, map: MapInfo) -> dict[str, str]:
         # if one player with name 'foo' disconnects and another player with
         # the same name connects the online player takes preference
@@ -571,7 +571,7 @@ class LogLoop:
 
                     if not player_id and not player_name:
                         continue
-                    
+
                     if not player_id and player_name:
                         # Let's try to backtrack the player_id from cached player stats(redis)
                         player_id = name_to_id.get(player_name)
@@ -587,7 +587,7 @@ class LogLoop:
                         if prev_key != player_id:
                             logger.warning("This log potentialy belonging to 1 or more players\nName: %s, ID: %s, Log: %s", player_name, prev_key, log["raw"])
                     log[f"player_id_{slot}"] = player_id
-                    
+
         self.log_history.add(log)
         return log
 

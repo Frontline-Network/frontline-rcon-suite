@@ -60,4 +60,3 @@ export const VisitsSelectionMenu = ({ onVisitsChange }) => {
     </PopoverMenu>
   );
 };
-

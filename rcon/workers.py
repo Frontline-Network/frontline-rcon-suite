@@ -164,7 +164,7 @@ def save_missing_match_logs(map_: MapInfo):
         with enter_session() as sess:
             if not _are_match_logs_available(sess, int(get_server_number()), match_start, match_end):
                 raise Exception("match logs are not yet available, skipping backtracking logs")
-        
+
         # Adding 1 more minute to the query just to be sure no logs are missed by a few seconds
         minutes_from_now = 1 + ((datetime.datetime.now(tz=datetime.UTC) - match_start).seconds // 60)
 
@@ -175,16 +175,16 @@ def save_missing_match_logs(map_: MapInfo):
 
         logger.info("Match start: %s | Match end: %s", match_start, match_end)
         logger.info("HLLSERVER logs count: %d", len(rcon_match_logs))
-        
+
         if len(rcon_match_logs) == 0:
             logger.info("This match is probably too old and the HLLSERVER does not retain those logs any longer")
             logger.info("[WORKER] - Done backtracking logs")
             return
-        
+
         logger.info("First log: %s, Last log: %s", rcon_match_logs[-1]["raw"], rcon_match_logs[0]["raw"])
 
         id_to_log = {unique_id(log["message"]): log for log in rcon_match_logs}
-        
+
         logger.info("CACHE logs count: %d", len(match_redis_logs))
         for log in match_redis_logs:
             if not id_to_log.get(unique_id(log["message"])):
@@ -216,7 +216,7 @@ def save_missing_match_logs(map_: MapInfo):
         logger.error("[WORKER] - Error while backtracking logs\n:%s", str(e))
         raise
 
-        
+
 
 def record_stats_worker(map_info: MapInfo, depends_on: Job | None = None):
     queue = get_queue()
@@ -225,7 +225,7 @@ def record_stats_worker(map_info: MapInfo, depends_on: Job | None = None):
     # One possible expected exception occurs when the game logs are not yet dumped into the db. This retries should
     # therefore be higher than the default dump interval of logs in LogRecorder
     if depends_on:
-        dependency = Dependency(jobs=depends_on, allow_failure=True)   
+        dependency = Dependency(jobs=depends_on, allow_failure=True)
         queue.enqueue(record_stats, map_info, retry=Retry(max=15, interval=30), depends_on=dependency)
     else:
         queue.enqueue(record_stats, map_info, retry=Retry(max=15, interval=30))
@@ -324,7 +324,7 @@ def _are_match_logs_available(session: Session, server_number: int, start: datet
     if len(match_ended_search) > 0:
         logger.debug("match logs available based on found 'MATCH ENDED' log")
         return True
-    
+
     match_started_search = get_historical_logs_records(
         session,
         from_=start,
@@ -416,7 +416,7 @@ def record_stats_from_map(
                 if key not in ("player_id_id", "map_id"):
                     setattr(existing, key, value)
             continue
-        
+
         logger.debug("Saving stats for player %s on map %s", player_id, map_.id)
         player_stat_record = PlayerStats(**combined_player_stats)
         sess.add(player_stat_record)

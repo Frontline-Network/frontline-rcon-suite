@@ -7,7 +7,7 @@ export function mergeKillsDeaths(player: Player) {
   const merged: Faceoff[] = []
   // hacky way to recognize if key is player's name or players'id
   // if any of the keys has any other value than [a-z0-9] it is set of names
-  // as it used to be recorded like that 
+  // as it used to be recorded like that
   const isSetOfNames = allPlayerKeys.keys().some(key => !key.match(/^[a-zA-Z0-9]+$/))
   allPlayerKeys.forEach((key) => {
     const faceoff: Faceoff =

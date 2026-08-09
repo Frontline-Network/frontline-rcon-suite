@@ -128,7 +128,7 @@ def get_map_scoreboard(request):
                 encounters = {
                     stats["player_id"]: [] for stats in game["player_stats"]
                 }
-                
+
                 for log in logs:
                     timestamp = int(
                         (log["event_time"].replace(tzinfo=UTC) - game["start"].replace(tzinfo=UTC)).total_seconds()

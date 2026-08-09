@@ -438,7 +438,7 @@ class KillInfo(TypedDict):
     weapon: str
 
 PlayerEncounters = list[KillInfo]
-    
+
 class PlayerStatsType(TypedDict, total=False):
     id: int
     player_id: str
