@@ -58,7 +58,13 @@ then
   python -m rcon.user_config.seed_db
   # TODO: Temporarily handle converting users old scorebot URLs to the new format; remove in a few releases
   SERVER_NUMBER=${SERVER_NUMBER} LOGGING_PATH=/logs/ LOGGING_FILENAME=api_${SERVER_NUMBER}.log python -m rcon.cli port_legacy_scorebot_urls
-  SERVER_NUMBER=${SERVER_NUMBER} LOGGING_PATH=/logs/ LOGGING_FILENAME=api_${SERVER_NUMBER}.log python -m rcon.cli remove_orphaned_map_ids
+  # Map cleanup depends on the game server being reachable.  An offline RCON
+  # endpoint must not prevent the independent web API (including login) from
+  # starting; the cleanup is safe to retry on the next container start.
+  if ! SERVER_NUMBER=${SERVER_NUMBER} LOGGING_PATH=/logs/ LOGGING_FILENAME=api_${SERVER_NUMBER}.log python -m rcon.cli remove_orphaned_map_ids
+  then
+    echo "WARNING: orphaned-map-id cleanup was deferred because the HLL RCON endpoint is unavailable" >&2
+  fi
   SERVER_NUMBER=${SERVER_NUMBER} LOGGING_PATH=/logs/ LOGGING_FILENAME=api_${SERVER_NUMBER}.log python -m rcon.cli clear_maps_cache
   ./manage.py register_api
   cd rconweb
@@ -88,4 +94,3 @@ fi
   export LOGGING_FILENAME=supervisor_$SERVER_NUMBER.log
   supervisord -c /config/supervisord_$SERVER_NUMBER.conf || supervisord -c /config/supervisord.conf
 fi
-
