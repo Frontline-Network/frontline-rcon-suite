@@ -1,8 +1,15 @@
 import os
 
-# Allows importing the models in the maintenance container to run database migrations
-if not os.getenv("HLL_MAINTENANCE_CONTAINER") and not os.getenv(
-    "HLL_WH_SERVICE_CONTAINER"
+# Only the general-purpose CLI needs every config model registered at package
+# import time. Long-running supervisor services import the specific config
+# classes they use and should not retain all unrelated models.
+if not any(
+    os.getenv(name)
+    for name in (
+        "HLL_MAINTENANCE_CONTAINER",
+        "HLL_WH_SERVICE_CONTAINER",
+        "HLL_SUPERVISOR_PROCESS",
+    )
 ):
 
     # Import all the sub modules that represent a user setting
