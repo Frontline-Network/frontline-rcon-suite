@@ -9,6 +9,7 @@ import {
   autobalancerSchema,
   autobalancerShadowOverview,
   autobalancerStatus,
+  reviewAutobalancerShadowDecision,
 } from "./data/autobalancer";
 
 export function makeServer({ environment = "development" } = {}) {
@@ -357,9 +358,20 @@ export function makeServer({ environment = "development" } = {}) {
       this.get("/get_autobalancer_round_archive", () =>
         ok(autobalancerRoundArchive)
       );
-      this.post("/review_autobalancer_shadow_decision", () =>
-        ok({ saved: true })
-      );
+      this.post("/review_autobalancer_shadow_decision", (schema, request) => {
+        const payload = request.requestBody
+          ? JSON.parse(request.requestBody)
+          : {};
+        const decision = reviewAutobalancerShadowDecision(payload);
+        if (!decision) {
+          return {
+            failed: true,
+            error: "Shadow-Vorschlag wurde nicht gefunden",
+            result: null,
+          };
+        }
+        return ok(decision);
+      });
       
       this.get("/get_team_view", () => {
         return handleTeamView(gameState);

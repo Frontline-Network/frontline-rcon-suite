@@ -67,6 +67,16 @@ const ROLE_FAMILY_LABELS = {
   specialist: "Armor / Recon / Artillery",
 };
 
+const REVIEW_CATEGORY_LABELS = {
+  squad_should_stay: "Squad sollte zusammenbleiben",
+  critical_role: "Rolle ist spielerisch zu wichtig",
+  recent_join_or_move: "Verbindungs- oder Squadzeit wirkt falsch",
+  better_candidate: "Ein anderer Kandidat wäre fairer",
+  skill_balance: "Stärkeausgleich ist nicht überzeugend",
+  wrong_team_counts: "Teamzählung oder Wechselzahl ist falsch",
+  other: "Anderer Grund",
+};
+
 const formatPercent = (value) =>
   Number.isFinite(value) ? `${Math.round(value * 100)} %` : "Noch keine Daten";
 
@@ -482,6 +492,31 @@ const ProposalDetail = ({
         />
       </Stack>
 
+      {decision.review_verdict && (
+        <Alert
+          severity={
+            decision.review_verdict === "accepted" ? "success" : "warning"
+          }
+          sx={{ mb: 2 }}
+        >
+          <strong>
+            {decision.review_verdict === "accepted"
+              ? "Als akzeptabel bewertet."
+              : "Als nicht akzeptabel bewertet."}
+          </strong>{" "}
+          {decision.reviewed_by && `Von ${decision.reviewed_by}`}
+          {decision.reviewed_at && ` am ${formatDate(decision.reviewed_at)}`}.
+          {decision.review_category && (
+            <>
+              {" "}
+              Grund: {REVIEW_CATEGORY_LABELS[decision.review_category] ||
+                decision.review_category}.
+            </>
+          )}
+          {decision.review_comment && <> Kommentar: {decision.review_comment}</>}
+        </Alert>
+      )}
+
       <Box
         sx={{
           display: "grid",
@@ -865,20 +900,20 @@ const ProposalDetail = ({
   );
 };
 
-const ProposalQueue = ({ decisions, onOpen }) => {
-  const pending = decisions.filter((decision) => !decision.review_verdict);
-  if (!pending.length) {
-    return (
-      <Alert severity="success">
-        Alle vorhandenen Shadow-Vorschläge wurden bewertet. Neue Einträge
-        erscheinen automatisch, sobald ein Balancevorfall erkannt wird.
-      </Alert>
-    );
+const ProposalQueue = ({
+  decisions,
+  onOpen,
+  emptyMessage = "Noch keine Shadow-Vorschläge vorhanden.",
+  emptySeverity = "info",
+}) => {
+  if (!decisions.length) {
+    return <Alert severity={emptySeverity}>{emptyMessage}</Alert>;
   }
   return (
     <Stack spacing={1}>
-      {pending.map((decision) => {
+      {decisions.map((decision) => {
         const assessment = getDecisionAssessment(decision);
+        const isReviewed = Boolean(decision.review_verdict);
         return (
           <Card key={decision.decision_id} variant="outlined">
             <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
@@ -921,17 +956,29 @@ const ProposalQueue = ({ decisions, onOpen }) => {
                 </Box>
                 <Chip
                   size="small"
-                  color={assessment.color}
-                  label={assessment.label}
+                  color={
+                    decision.review_verdict === "accepted"
+                      ? "success"
+                      : decision.review_verdict === "rejected"
+                      ? "warning"
+                      : assessment.color
+                  }
+                  label={
+                    decision.review_verdict === "accepted"
+                      ? "Akzeptabel"
+                      : decision.review_verdict === "rejected"
+                      ? "Nicht akzeptabel"
+                      : assessment.label
+                  }
                 />
                 <Button
                   variant="outlined"
                   onClick={() => onOpen(decision)}
                   aria-label={`Vorschlag für ${
                     decision.player_name || "unbekannten Kandidaten"
-                  } prüfen`}
+                  } ${isReviewed ? "ansehen" : "prüfen"}`}
                 >
-                  Prüfen
+                  {isReviewed ? "Ansehen" : "Prüfen"}
                 </Button>
               </Box>
             </CardContent>
@@ -961,6 +1008,7 @@ const AutobalancerModeratorDashboard = ({
   const decisions = data.decisions || [];
   const status = liveStatus || data.live_status || {};
   const pending = decisions.filter((decision) => !decision.review_verdict);
+  const reviewed = decisions.filter((decision) => decision.review_verdict);
   const selectedDecision = useMemo(
     () =>
       decisions.find((decision) => decision.decision_id === selectedDecisionId),
@@ -1200,6 +1248,12 @@ const AutobalancerModeratorDashboard = ({
           <ProposalQueue
             decisions={pending.slice(0, 3)}
             onOpen={openDecision}
+            emptyMessage={
+              decisions.length
+                ? "Alle vorhandenen Shadow-Vorschläge wurden bewertet. Neue Einträge erscheinen automatisch."
+                : "Noch kein Shadow-Vorschlag vorhanden. Ein Eintrag erscheint, sobald ein Balancevorfall erkannt wird."
+            }
+            emptySeverity={decisions.length ? "success" : "info"}
           />
 
           <Box sx={{ mt: 3, mb: 1.5 }}>
@@ -1290,7 +1344,33 @@ const AutobalancerModeratorDashboard = ({
               } bewertet`}
             />
           </Stack>
-          <ProposalQueue decisions={decisions} onOpen={openDecision} />
+          <ProposalQueue
+            decisions={pending}
+            onOpen={openDecision}
+            emptyMessage={
+              decisions.length
+                ? "Keine offenen Vorschläge. Alle vorhandenen Bewertungen sind abgeschlossen."
+                : "Noch kein Shadow-Vorschlag vorhanden."
+            }
+            emptySeverity={decisions.length ? "success" : "info"}
+          />
+
+          {reviewed.length > 0 && (
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
+                Bereits bewertet
+              </Typography>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mb: 1.5 }}
+              >
+                Diese Entscheidungen bleiben für Kontrolle und Korrekturen
+                einsehbar.
+              </Typography>
+              <ProposalQueue decisions={reviewed} onOpen={openDecision} />
+            </Box>
+          )}
         </Box>
       )}
 

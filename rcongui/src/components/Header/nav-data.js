@@ -67,7 +67,7 @@ const rawNavMenus = [
     ],
   },
   {
-    name: "Ansichten",
+    name: "Views",
     icon: <ViewCarouselIcon />,
     links: [
       {

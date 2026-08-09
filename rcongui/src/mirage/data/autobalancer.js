@@ -180,6 +180,68 @@ export const autobalancerShadowOverview = {
   ],
 };
 
+export const reviewAutobalancerShadowDecision = (payload) => {
+  const decision = autobalancerShadowOverview.decisions.find(
+    (item) => item.decision_id === payload.decision_id
+  );
+  if (!decision) return null;
+
+  const summary = autobalancerShadowOverview.summary;
+  const goals = autobalancerShadowOverview.pilot_goals;
+  const previousVerdict = decision.review_verdict;
+  const previousCategory = decision.review_category;
+
+  if (!previousVerdict) {
+    summary.reviewed += 1;
+    summary.pending_review = Math.max(0, summary.pending_review - 1);
+  } else if (previousVerdict === "accepted") {
+    summary.accepted = Math.max(0, summary.accepted - 1);
+  } else if (previousVerdict === "rejected") {
+    summary.rejected = Math.max(0, summary.rejected - 1);
+    if (previousCategory && summary.rejection_categories?.[previousCategory]) {
+      summary.rejection_categories[previousCategory] -= 1;
+    }
+  }
+
+  decision.review_verdict = payload.verdict;
+  decision.review_category =
+    payload.verdict === "rejected" ? payload.category : null;
+  decision.review_comment = payload.comment || null;
+  decision.reviewed_by = "Frontline Admin";
+  decision.reviewed_at = new Date().toISOString();
+  decision.review_preferred_strategy = payload.preferred_strategy || null;
+  decision.review_preferred_player_id = payload.preferred_player_id || null;
+
+  if (payload.verdict === "accepted") {
+    summary.accepted += 1;
+  } else {
+    summary.rejected += 1;
+    const category = payload.category || "other";
+    summary.rejection_categories ||= {};
+    summary.rejection_categories[category] =
+      (summary.rejection_categories[category] || 0) + 1;
+  }
+
+  summary.acceptance_rate = summary.reviewed
+    ? summary.accepted / summary.reviewed
+    : null;
+  goals.reviewed_proposals_met =
+    summary.reviewed >= goals.reviewed_proposals_target;
+  goals.acceptance_rate_met =
+    summary.acceptance_rate >= goals.acceptance_rate_target;
+  goals.rating_confidence_met =
+    summary.median_rating_confidence >= goals.rating_confidence_target;
+  goals.ready_for_manual = Boolean(
+    goals.reviewed_rounds_met &&
+      goals.reviewed_proposals_met &&
+      goals.acceptance_rate_met &&
+      goals.rating_confidence_met &&
+      goals.gap_guardrail_met
+  );
+
+  return decision;
+};
+
 export const autobalancerHistoryDashboard = {
   generated_at: new Date().toISOString(),
   source_counts: {
