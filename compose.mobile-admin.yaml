@@ -9,6 +9,7 @@ x-frontline-backend: &frontline-backend
     dockerfile: Dockerfile
 
 x-mobile-environment: &mobile-environment
+  RATELIMIT_PROXY_DEPTH: ${RATELIMIT_PROXY_DEPTH:-1}
   MOBILE_INTEGRATION_ENABLED: ${MOBILE_INTEGRATION_ENABLED:-false}
   MOBILE_PUBLIC_BASE_URL: ${MOBILE_PUBLIC_BASE_URL:-}
   CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
