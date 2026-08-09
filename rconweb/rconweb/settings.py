@@ -109,6 +109,26 @@ with configure_scope() as scope:
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# django-ratelimit needs one shared, atomic cache across all API workers.
+# Local development and isolated test runs keep working without a Redis service.
+if redis_url := os.getenv("HLL_REDIS_URL"):
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": redis_url,
+            "KEY_PREFIX": f"crcon-ratelimit:{os.getenv('SERVER_NUMBER', '0')}",
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "crcon-ratelimit-local",
+        }
+    }
+
+RATELIMIT_USE_CACHE = "default"
+
 # Needed for WS broadcasting functionality
 # See https://channels.readthedocs.io/en/stable/topics/channel_layers.html
 CHANNEL_LAYERS = {

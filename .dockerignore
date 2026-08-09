@@ -2,6 +2,12 @@ db_data/
 logs/
 servicediscovery/
 redis_data/
+.deploy-backups/
+.deploy-state/
+.env
+certs/
+static/
+supervisor_data/
 docker-templates/
 *.yml
 *.log
