@@ -1,4 +1,8 @@
-import { focusManager, QueryClient } from '@tanstack/react-query';
+import {
+  focusManager,
+  onlineManager,
+  QueryClient,
+} from '@tanstack/react-query';
 
 if (typeof document !== "undefined") {
   focusManager.setEventListener((setFocused) => {
@@ -17,6 +21,32 @@ if (typeof document !== "undefined") {
       document.removeEventListener(
         "visibilitychange",
         syncFocusWithVisibility,
+      );
+    };
+  });
+
+  onlineManager.setEventListener((setOnline) => {
+    const syncOnlineWithVisibility = () => {
+      setOnline(
+        document.visibilityState === "visible" && navigator.onLine !== false,
+      );
+    };
+
+    window.addEventListener("online", syncOnlineWithVisibility, false);
+    window.addEventListener("offline", syncOnlineWithVisibility, false);
+    document.addEventListener(
+      "visibilitychange",
+      syncOnlineWithVisibility,
+      false,
+    );
+    syncOnlineWithVisibility();
+
+    return () => {
+      window.removeEventListener("online", syncOnlineWithVisibility);
+      window.removeEventListener("offline", syncOnlineWithVisibility);
+      document.removeEventListener(
+        "visibilitychange",
+        syncOnlineWithVisibility,
       );
     };
   });
