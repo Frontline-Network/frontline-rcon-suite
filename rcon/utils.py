@@ -309,6 +309,43 @@ class FixedLenList(Generic[T]):
         for o in self.red.lrange(self.key, 0, -1):
             yield self.deserializer(o)
 
+    def iter_range(
+        self,
+        start: int = 0,
+        stop: int | None = None,
+        page_size: int = 500,
+    ) -> Iterator[T]:
+        """Iterate over a bounded range without loading the full Redis list.
+
+        ``stop`` follows normal Python slice semantics and is exclusive. A
+        missing stop reads until Redis returns a short page. Callers that can
+        stop early therefore transfer only the pages they actually inspect.
+        """
+        if page_size <= 0:
+            raise ValueError("page_size must be greater than zero")
+        if start < 0:
+            raise ValueError("start must not be negative")
+        if stop is not None and stop < start:
+            return
+
+        offset = start
+        while stop is None or offset < stop:
+            page_stop = offset + page_size
+            if stop is not None:
+                page_stop = min(page_stop, stop)
+            requested_count = page_stop - offset
+
+            raw_page = self.red.lrange(self.key, offset, page_stop - 1)
+            if not raw_page:
+                break
+
+            for raw_item in raw_page:
+                yield self.deserializer(raw_item)
+
+            offset += len(raw_page)
+            if len(raw_page) < requested_count:
+                break
+
     def __len__(self) -> int:
         return self.red.llen(self.key)
 
@@ -338,6 +375,65 @@ def logs_deserializer(data: bytes | str) -> StructuredLogLineWithMetaData:
 class LogsHistory(FixedLenList[StructuredLogLineWithMetaData]):
     def __init__(self, key: str = "logs_history", max_len: int = 100_000):
         super().__init__(key, max_len, deserializer=logs_deserializer)
+
+
+class LogsHistorySnapshot:
+    """Cache decoded log-history pages for reuse within one computation cycle."""
+
+    def __init__(self, history: LogsHistory | None = None, page_size: int = 500):
+        if page_size <= 0:
+            raise ValueError("page_size must be greater than zero")
+        self.history = history if history is not None else LogsHistory()
+        self.page_size = page_size
+        self._pages: dict[int, list[StructuredLogLineWithMetaData]] = {}
+
+    def _get_page(self, page_start: int) -> list[StructuredLogLineWithMetaData]:
+        page = self._pages.get(page_start)
+        if page is None:
+            page = list(
+                self.history.iter_range(
+                    start=page_start,
+                    stop=page_start + self.page_size,
+                    page_size=self.page_size,
+                )
+            )
+            self._pages[page_start] = page
+        return page
+
+    def iter_range(
+        self,
+        start: int = 0,
+        stop: int | None = None,
+        page_size: int | None = None,
+    ) -> Iterator[StructuredLogLineWithMetaData]:
+        """Iterate cached, page-aligned data from the underlying log list."""
+        if start < 0:
+            raise ValueError("start must not be negative")
+        if stop is not None and stop < start:
+            return
+
+        page_start = start - (start % self.page_size)
+        offset_in_page = start - page_start
+        current_index = start
+
+        while stop is None or current_index < stop:
+            page = self._get_page(page_start)
+            if not page or offset_in_page >= len(page):
+                break
+
+            page_stop = len(page)
+            if stop is not None:
+                page_stop = min(page_stop, offset_in_page + stop - current_index)
+
+            for item in page[offset_in_page:page_stop]:
+                yield item
+                current_index += 1
+
+            if len(page) < self.page_size:
+                break
+
+            page_start += self.page_size
+            offset_in_page = 0
 
 
 class MapsHistory(FixedLenList[MapInfo]):

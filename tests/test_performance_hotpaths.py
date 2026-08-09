@@ -1,22 +1,115 @@
+import datetime
 from collections import defaultdict
+from types import SimpleNamespace
 from unittest import mock
 
+import orjson
+
 from rcon import game_logs, recent_actions
+from rcon.logs.recorder import LOG_HISTORY_PAGE_SIZE, LogRecorder
 from rcon.logs.stream import LogStream
+from rcon.utils import LogsHistory, LogsHistorySnapshot
 
 
 def test_recent_logs_reads_only_requested_page(monkeypatch):
     log_history = mock.MagicMock()
-    log_history.__len__.return_value = 100_000
-    log_history.__getitem__.return_value = []
+    log_history.iter_range.return_value = iter([])
     log_history.__iter__.side_effect = AssertionError("full Redis list was read")
     monkeypatch.setattr(game_logs.LogLoop, "get_log_history_list", lambda: log_history)
 
     result = game_logs.get_recent_logs(start=0, end=250)
 
     assert result["logs"] == []
-    log_history.__getitem__.assert_called_once_with(slice(0, 250))
+    log_history.iter_range.assert_called_once_with(start=0, stop=250)
     log_history.__iter__.assert_not_called()
+
+
+def test_fixed_len_list_iter_range_stops_after_short_page():
+    history = LogsHistory.__new__(LogsHistory)
+    history.red = mock.Mock()
+    history.key = "logs_history"
+    history.deserializer = lambda value: int(value)
+    history.red.lrange.side_effect = [[b"5", b"4"], [b"3"]]
+
+    assert list(history.iter_range(start=0, stop=10, page_size=2)) == [5, 4, 3]
+    assert history.red.lrange.call_args_list == [
+        mock.call("logs_history", 0, 1),
+        mock.call("logs_history", 2, 3),
+    ]
+
+
+def test_recent_logs_timestamp_filter_does_not_fetch_older_pages():
+    new_log = {
+        "timestamp_ms": 2_000,
+        "action": "CHAT",
+        "player_name_1": "new",
+        "player_name_2": None,
+    }
+    old_log = {
+        "timestamp_ms": 999,
+        "action": "CHAT",
+        "player_name_1": "old",
+        "player_name_2": None,
+    }
+    history = LogsHistory.__new__(LogsHistory)
+    history.red = mock.Mock()
+    history.key = "logs_history"
+    history.deserializer = orjson.loads
+    history.red.lrange.return_value = [
+        orjson.dumps(new_log),
+        orjson.dumps(old_log),
+        *[orjson.dumps(old_log) for _ in range(498)],
+    ]
+
+    result = game_logs.get_recent_logs(
+        min_timestamp=1.0,
+        log_history=history,
+    )
+
+    assert result["logs"] == [new_log]
+    history.red.lrange.assert_called_once_with("logs_history", 0, 499)
+
+
+def test_log_history_snapshot_reuses_pages():
+    source = mock.Mock()
+    source.iter_range.side_effect = [iter(["new", "middle"]), iter(["old"])]
+    snapshot = LogsHistorySnapshot(history=source, page_size=2)
+
+    assert list(snapshot.iter_range(stop=3)) == ["new", "middle", "old"]
+    assert list(snapshot.iter_range(stop=3)) == ["new", "middle", "old"]
+    assert source.iter_range.call_args_list == [
+        mock.call(start=0, stop=2, page_size=2),
+        mock.call(start=2, stop=4, page_size=2),
+    ]
+
+
+def test_log_recorder_pages_until_last_persisted_log():
+    last_timestamp = datetime.datetime.fromtimestamp(1, datetime.UTC)
+    new_log = {
+        "timestamp_ms": 2_000,
+        "line_without_time": "CHAT: new",
+    }
+    last_log = {
+        "timestamp_ms": 1_000,
+        "line_without_time": "CHAT: saved",
+    }
+    older_log = {
+        "timestamp_ms": 500,
+        "line_without_time": "CHAT: old",
+    }
+    history = mock.Mock()
+    history.iter_range.return_value = iter([new_log, last_log, older_log])
+    session = mock.Mock()
+    session.query.return_value.filter.return_value.order_by.return_value.limit.return_value.one_or_none.return_value = SimpleNamespace(
+        event_time=last_timestamp,
+        raw="[0 ms (1)] CHAT: saved",
+    )
+    recorder = LogRecorder.__new__(LogRecorder)
+    recorder.server_id = "1"
+    recorder.log_history_fn = lambda: history
+
+    assert recorder._get_new_logs(session) == [new_log]
+    history.iter_range.assert_called_once_with(page_size=LOG_HISTORY_PAGE_SIZE)
 
 
 def test_recent_actions_invalidates_exact_cache_key(monkeypatch):

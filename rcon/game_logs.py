@@ -71,6 +71,7 @@ def get_recent_logs(
     exact_player_match: bool = False,
     exact_action: bool = False,
     inclusive_filter: bool = True,
+    log_history=None,
 ) -> ParsedLogsType:
     # The default behavior is to only show log lines with actions in `actions_filter`
     # inclusive_filter=True retains this default behavior
@@ -85,10 +86,15 @@ def get_recent_logs(
     start = max(0, start)
     end = max(start, end)
 
-    log_list = LogLoop.get_log_history_list()
-    # FixedLenList.__iter__ loads the complete Redis list. Always slice here so
-    # callers asking for a small page only transfer that page from Redis.
-    all_logs = log_list[start : min(end, len(log_list))]
+    log_list = log_history if log_history is not None else LogLoop.get_log_history_list()
+    # Read large/time-based ranges page by page so the timestamp check below
+    # can stop before older Redis pages are transferred and deserialized.
+    iter_range = getattr(log_list, "iter_range", None)
+    if callable(iter_range):
+        all_logs = iter_range(start=start, stop=end)
+    else:
+        # Preserve support for injected plain lists used by callers/tests.
+        all_logs = iter(log_list[start:end])
 
     if not isinstance(min_timestamp, float) and min_timestamp:
         min_timestamp = float(min_timestamp)
