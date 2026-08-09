@@ -1,7 +1,8 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pytest
 
+from rcon.logs.loop import LogLoop
 from rcon.rcon import Rcon
 
 
@@ -219,11 +220,31 @@ def test_multiline_parsing(raw_logs, expected):
 @pytest.mark.parametrize(
     "raw_timestamp, expected",
     [
-        ("1606999065", datetime(2020, 12, 3, 12, 37, 45)),
+        ("1606999065", datetime(2020, 12, 3, 12, 37, 45, tzinfo=UTC)),
     ],
 )
 def test_timestamp_parsing(raw_timestamp, expected):
     assert Rcon._extract_time(raw_timestamp) == expected
+
+
+@pytest.mark.parametrize(
+    "event_time, expected",
+    [
+        (datetime(2026, 8, 9, 10, 0), True),
+        (datetime(2026, 8, 9, 10, 0, tzinfo=UTC), True),
+        ("2026-08-09T10:00:00+00:00", True),
+        ("not-a-date", False),
+        (None, False),
+    ],
+)
+def test_log_map_membership_accepts_supported_event_time_formats(event_time, expected):
+    map_start = int(datetime(2026, 8, 9, 9, 0, tzinfo=UTC).timestamp())
+    map_end = int(datetime(2026, 8, 9, 11, 0, tzinfo=UTC).timestamp())
+
+    log = {"event_time": event_time}
+    map_info = {"start": map_start, "end": map_end}
+
+    assert LogLoop._is_log_from_map(None, log, map_info) is expected
 
 
 @pytest.mark.parametrize(
