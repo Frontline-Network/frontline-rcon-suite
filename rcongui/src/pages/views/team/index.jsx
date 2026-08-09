@@ -30,6 +30,7 @@ import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/shared/PageHeader";
 import { demoGameState, isFakeMode } from "@/mirage/demo-data";
 import AutobalancerCard from "./autobalancer-card";
+import { gameQueryOptions } from "@/queries/game-query";
 
 const TeamViewPage = () => {
   const { t } = useTranslation();
@@ -40,9 +41,8 @@ const TeamViewPage = () => {
   });
 
   const { data: gameState } = useQuery({
-    queryKey: ["game", "state"],
+    ...gameQueryOptions.state(),
     queryFn: isFakeMode() ? () => Promise.resolve(demoGameState) : cmd.GET_GAME_STATE,
-    staleTime: 5 * 1000,
     refetchInterval: 10 * 1000,
   });
 

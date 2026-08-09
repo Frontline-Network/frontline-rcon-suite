@@ -5,6 +5,7 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: STALE_TIME,
+      refetchIntervalInBackground: false,
     },
   },
 })

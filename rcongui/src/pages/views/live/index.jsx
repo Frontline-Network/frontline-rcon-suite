@@ -30,6 +30,7 @@ import MessageAllDialog from "@/features/player-action/MessageAll";
 import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/shared/PageHeader";
 import { demoGameState, isFakeMode } from "@/mirage/demo-data";
+import { gameQueryOptions } from "@/queries/game-query";
 
 const interval = 15 * 1000; // 15 seconds
 const UNASSIGNED = "unassigned"
@@ -110,9 +111,8 @@ const Live = () => {
 
   // ---------------- GAME HEADER DATA -----------------
   const { data: gameState } = useQuery({
-    queryKey: ["game", "state"],
+    ...gameQueryOptions.state(),
     queryFn: isFakeMode() ? () => Promise.resolve(demoGameState) : cmd.GET_GAME_STATE,
-    staleTime: 5 * 1000,
     refetchInterval: 10 * 1000,
   });
 

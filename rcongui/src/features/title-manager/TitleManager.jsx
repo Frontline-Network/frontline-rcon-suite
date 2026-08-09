@@ -24,9 +24,7 @@ const TitleManager = () => {
     data: gameState,
     isLoading: isGameLoading,
   } = useQuery({
-    queryKey: [{ queryIdentifier: "get_gamestate" }],
-    queryFn: cmd.GET_GAME_STATE,
-    refetchIntervalInBackground: true,
+    ...gameQueryOptions.state(),
     refetchInterval: 30_000,
   });
 
@@ -45,7 +43,6 @@ const TitleManager = () => {
       }
       return result
     },
-    refetchIntervalInBackground: true,
     refetchInterval: 30_000,
     retry: 1,
   });
