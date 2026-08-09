@@ -21,6 +21,11 @@ class MockRedis:
         pass
 
 
+class MockRedisDeleteUnavailable(MockRedis):
+    def delete(self, _key):
+        raise redis.exceptions.RedisError
+
+
 def _needs_qual_name():
     pass
 
@@ -72,3 +77,15 @@ def test_mem_cache_used(monkeypatch):
     # so we can't isinstance check it
     c = ttl_cache(ttl=1)
     assert not isinstance(c, RedisCached)
+
+
+def test_clear_for_tolerates_unavailable_redis():
+    cached_func = mock.Mock(spec=_needs_qual_name)
+    cached = RedisCached(
+        pool=None,
+        red=MockRedisDeleteUnavailable(),
+        ttl_seconds=1,
+        function=cached_func,
+    )
+
+    cached.clear_for()

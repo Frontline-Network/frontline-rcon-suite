@@ -13,14 +13,15 @@ from rcon.utils import Stream, StreamOlderElement, StreamID, StreamNoElements
 
 logger = logging.getLogger(__name__)
 
+
 class LogStream:
     # Each CRCON uses its own redis database, no need for keys to be unique across servers
     def __init__(
-            self,
-            rcon: Rcon | None = None,
-            red: redis.StrictRedis | None = None,
-            key="log_stream",
-            maxlen: int | None = None,
+        self,
+        rcon: Rcon | None = None,
+        red: redis.StrictRedis | None = None,
+        key="log_stream",
+        maxlen: int | None = None,
     ) -> None:
         config = LogStreamUserConfig.load_from_db()
         self.rcon = rcon or get_rcon()
@@ -59,11 +60,48 @@ class LogStream:
 
         return ordered_logs
 
+    @staticmethod
+    def _stream_id_parts(stream_id: str) -> tuple[int, int]:
+        timestamp, sequence = stream_id.split("-", maxsplit=1)
+        return int(timestamp), int(sequence)
+
+    def _append_new_logs(
+        self,
+        logs: list[StructuredLogLineWithMetaData],
+        last_seen_id: StreamID,
+    ) -> tuple[StreamID, int]:
+        """Append only entries newer than the current Redis stream tail."""
+        last_seen_parts = (
+            self._stream_id_parts(last_seen_id) if last_seen_id is not None else None
+        )
+        new_logs = 0
+
+        for _timestamp, log_bucket in self.bucket_by_timestamp(logs):
+            for idx, log in enumerate(log_bucket):
+                timestamp_ms = log["timestamp_ms"] // 1000
+                stream_id = f"{timestamp_ms}-{idx}"
+                if (
+                    last_seen_parts is not None
+                    and self._stream_id_parts(stream_id) <= last_seen_parts
+                ):
+                    continue
+
+                try:
+                    last_seen_id = self.log_stream.add(custom_id=stream_id, obj=log)
+                    last_seen_parts = self._stream_id_parts(last_seen_id)
+                    new_logs += 1
+                except StreamOlderElement:
+                    # Another writer may have advanced the stream between the
+                    # tail read and XADD. Preserve the previous safe behavior.
+                    continue
+
+        return last_seen_id, new_logs
+
     def run(
-            self,
-            loop_frequency_secs: int | None = None,
-            initial_since_min: int | None = None,
-            active_since_min: int | None = None,
+        self,
+        loop_frequency_secs: int | None = None,
+        initial_since_min: int | None = None,
+        active_since_min: int | None = None,
     ):
         """Poll the game server and add new logs to the stream"""
 
@@ -73,22 +111,13 @@ class LogStream:
         logs = self.rcon.get_structured_logs(since_min_ago=since_min)["logs"]
         since_min = active_since_min or config.refresh_since_mins
 
-        last_seen_id = None
+        tail = self.log_stream.tail()
+        last_seen_id = tail[0] if tail else None
         while True:
             config = LogStreamUserConfig.load_from_db()
             if not config.enabled:
                 break
-            ordered_logs = self.bucket_by_timestamp(logs)
-            new_logs = 0
-            for timestamp, log_bucket in ordered_logs:
-                for idx, log in enumerate(log_bucket):
-                    timestamp_ms = log["timestamp_ms"] // 1000
-                    stream_id = f"{timestamp_ms}-{idx}"
-                    try:
-                        last_seen_id = self.log_stream.add(custom_id=stream_id, obj=log)
-                        new_logs += 1
-                    except StreamOlderElement:
-                        continue
+            last_seen_id, new_logs = self._append_new_logs(logs, last_seen_id)
 
             if new_logs:
                 logger.info(f"Added {new_logs} new logs {last_seen_id=}")
@@ -96,7 +125,7 @@ class LogStream:
             logs = self.rcon.get_structured_logs(since_min_ago=since_min)["logs"]
 
     def logs_since(
-            self, last_seen: StreamID | None = None, block_ms=500
+        self, last_seen: StreamID | None = None, block_ms=500
     ) -> list[tuple[StreamID, StructuredLogLineWithMetaData]]:
         """Return a list of logs more recent than the last_seen ID"""
         try:

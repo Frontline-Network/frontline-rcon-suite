@@ -1,4 +1,6 @@
-from rcon.utils import exception_in_chain
+from unittest import mock
+
+from rcon.utils import FixedLenList, exception_in_chain
 
 
 class FakeException(Exception):
@@ -51,3 +53,26 @@ def test_deeply_chained_implicit():
     e.__context__.__cause__.__context__ = DeepChainedException()
 
     assert exception_in_chain(e, DeepChainedException)
+
+
+def test_fixed_len_list_slice_uses_bounded_redis_range():
+    values = FixedLenList.__new__(FixedLenList)
+    values.key = "values"
+    values.red = mock.Mock()
+    values.red.llen.return_value = 100_000
+    values.red.lrange.return_value = [b"one", b"two", b"three"]
+    values.deserializer = bytes.decode
+
+    assert values[0:3] == ["one", "two", "three"]
+    values.red.lrange.assert_called_once_with("values", 0, 2)
+
+
+def test_fixed_len_list_empty_slice_does_not_read_redis_range():
+    values = FixedLenList.__new__(FixedLenList)
+    values.key = "values"
+    values.red = mock.Mock()
+    values.red.llen.return_value = 10
+    values.deserializer = bytes.decode
+
+    assert values[5:5] == []
+    values.red.lrange.assert_not_called()
