@@ -26,6 +26,25 @@ from rcon.user_config.seed_vip import SeedVIPUserConfig
 logger = getLogger(__name__)
 
 
+def get_server_snapshot(rcon_api):
+    """Read the RCON data needed by one loop without stopping the service."""
+    try:
+        online_players = get_online_players(rcon=rcon_api)
+        gamestate = get_gamestate(rcon=rcon_api)
+    except Exception as e:
+        logger.warning(
+            "Unable to query HLL RCON for Seed VIP (%s); retrying on the next poll",
+            type(e).__name__,
+        )
+        return None
+
+    if online_players is None or gamestate is None:
+        logger.warning("HLL RCON returned an incomplete Seed VIP snapshot; retrying")
+        return None
+
+    return online_players, gamestate
+
+
 def run():
     config = SeedVIPUserConfig.load_from_db()
     current_lang = config.language
@@ -44,8 +63,7 @@ def run():
     last_bucket_announced = False
     seeded_timestamp: datetime | None = None
 
-    gamestate = get_gamestate(rcon=rcon_api)
-    is_seeding = not is_seeded(config=config, gamestate=gamestate)
+    is_seeding: bool | None = None
 
     try:
         while True:
@@ -73,24 +91,18 @@ def run():
                     f"Unable to activate language={config.language}, defaulting to English"
                 )
 
-            online_players = get_online_players(rcon=rcon_api)
-            if online_players is None:
-                logger.debug(
-                    f"Did not receive a usable result from `get_online_players`, sleeping {config.poll_time_seeding} seconds"
-                )
+            snapshot = get_server_snapshot(rcon_api)
+            if snapshot is None:
                 sleep(config.poll_time_seeding)
                 continue
 
-            gamestate = get_gamestate(rcon=rcon_api)
+            online_players, gamestate = snapshot
+            if is_seeding is None:
+                is_seeding = not is_seeded(config=config, gamestate=gamestate)
 
-            if gamestate is None:
-                logger.debug(
-                    f"Did not receive a usable result from `get_gamestate`, sleeping {config.poll_time_seeding} seconds"
-                )
-                sleep(config.poll_time_seeding)
-                continue
-
-            total_players = gamestate["num_allied_players"] + gamestate["num_axis_players"]
+            total_players = (
+                gamestate["num_allied_players"] + gamestate["num_axis_players"]
+            )
 
             player_name_lookup |= {
                 p.player_id: p.name for p in online_players.players.values()

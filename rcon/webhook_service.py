@@ -142,7 +142,13 @@ def handle_webhook_not_found(
     webhook_type: "WebhookType",
     webhook_id: str,
 ) -> None:
-    """Record a Discord 404 without assuming this was an edit request."""
+    """Record a Discord 404 and discard work that cannot succeed.
+
+    A 404 for an edit identifies a missing Discord message, so only queued edits
+    for that message are removed. A 404 without a message ID identifies a
+    deleted webhook; every remaining item in that webhook's queue would fail in
+    the same way and must be discarded at once.
+    """
     message_id = payload.get("message_id")
     if message_id:
         set_message_edit_404_failure(red=red, message_id=message_id)
@@ -151,6 +157,8 @@ def handle_webhook_not_found(
             queue_id=queue_id,
             message_id=message_id,
         )
+    else:
+        red.delete(queue_id)
 
     set_webhook_error(
         red=red,
@@ -650,9 +658,19 @@ async def dequeue_message(
         # are inherently transient; so we will set the error status for the webhook ID
         # and drop the message
         if res.status_code == 404:
-            logger.error(
-                f"Received HTTP 404 from the webhook with webhook ID: {message.payload.get('webhook_id')} message ID: {message.payload.get('message_id')} purging the queue for this message ID"
-            )
+            message_id = message.payload.get("message_id")
+            if message_id:
+                logger.error(
+                    "Received HTTP 404 from webhook ID %s for message ID %s; "
+                    "purging queued edits for that message",
+                    message.payload.get("webhook_id"),
+                    message_id,
+                )
+            else:
+                logger.error(
+                    "Received HTTP 404 from webhook ID %s; purging its queue",
+                    message.payload.get("webhook_id"),
+                )
             handle_webhook_not_found(
                 red=red,
                 queue_id=queue_id,

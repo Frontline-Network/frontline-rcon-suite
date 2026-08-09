@@ -6,7 +6,7 @@ from rcon.webhook_service import (
 )
 
 
-def test_webhook_404_without_message_id_only_marks_webhook_error():
+def test_webhook_404_without_message_id_marks_error_and_purges_webhook_queue():
     red = Mock()
 
     handle_webhook_not_found(
@@ -19,6 +19,7 @@ def test_webhook_404_without_message_id_only_marks_webhook_error():
 
     red.set.assert_not_called()
     red.lrange.assert_not_called()
+    red.delete.assert_called_once_with("whs:1:discord:audit:123")
     red.hset.assert_called_once()
 
 
@@ -36,4 +37,5 @@ def test_webhook_404_with_message_id_marks_edit_and_clears_related_queue_items()
 
     red.set.assert_called_once()
     red.lrange.assert_called_once_with("whs:1:discord:scoreboard:123", 0, -1)
+    red.delete.assert_not_called()
     red.hset.assert_called_once()
