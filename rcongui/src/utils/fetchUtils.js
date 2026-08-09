@@ -5,7 +5,8 @@ import { toast } from "react-toastify";
 // Keep legacy loader calls rooted at the local Mirage API instead of creating
 // URLs such as "undefinedget_player_profile".
 const configuredApi = process.env.REACT_APP_API_URL;
-const CRCON_API = configuredApi && configuredApi !== "undefined" ? configuredApi : "/";
+const CRCON_API =
+  configuredApi && configuredApi !== "undefined" ? configuredApi : "/";
 
 async function requestFactory({
   method = "GET",
@@ -39,9 +40,10 @@ async function requestFactory({
 
   // Add a body for all mutating JSON requests.
   if (method !== "GET" && method !== "HEAD") {
-    requestOptions.body = headers["Content-Type"] === "application/json"
-      ? JSON.stringify(payload)
-      : payload;
+    requestOptions.body =
+      headers["Content-Type"] === "application/json"
+        ? JSON.stringify(payload)
+        : payload;
   }
 
   // Create a Request object
@@ -109,6 +111,8 @@ async function parseJsonResponse(response) {
 export const cmd = {
   ADD_CONSOLE_ADMIN: (params) =>
     requestFactory({ method: "POST", cmd: "add_admin", ...params }),
+  ADD_MAP_TO_VOTEMAP: (params) =>
+    requestFactory({ method: "POST", cmd: "add_map_to_votemap", ...params }),
   ADD_MESSAGE_TEMPLATE: (params) =>
     requestFactory({ method: "POST", cmd: "add_message_template", ...params }),
   ADD_VIP: (params) =>
@@ -354,6 +358,8 @@ export const cmd = {
     requestFactory({ method: "GET", cmd: "get_votemap_config", ...params }),
   GET_VOTEMAP_STATUS: (params) =>
     requestFactory({ method: "GET", cmd: "get_votemap_status", ...params }),
+  GET_VOTEMAP_RESULTS: (params) =>
+    requestFactory({ method: "GET", cmd: "get_votemap_results", ...params }),
   GET_WELCOME_MESSAGE: (params) =>
     requestFactory({ method: "GET", cmd: "get_welcome_message", ...params }),
   IS_AUTHENTICATED: (params) =>
@@ -372,6 +378,12 @@ export const cmd = {
     }),
   REMOVE_WARMUP_TIMER: (params) =>
     requestFactory({ method: "POST", cmd: "remove_warmup_timer", ...params }),
+  REMOVE_MAP_FROM_VOTEMAP: (params) =>
+    requestFactory({
+      method: "POST",
+      cmd: "remove_map_from_votemap",
+      ...params,
+    }),
   RESET_VOTEMAP_STATE: (params) =>
     requestFactory({ method: "POST", cmd: "reset_votemap_state", ...params }),
   RESET_VOTEMAP_WHITELIST: (params) =>
@@ -386,6 +398,8 @@ export const cmd = {
       cmd: "reset_votekick_thresholds",
       ...params,
     }),
+  SEND_VOTEMAP_REMINDER: (params) =>
+    requestFactory({ method: "POST", cmd: "send_votemap_reminder", ...params }),
   APPROVE_AUTOBALANCER: (params) =>
     requestFactory({
       method: "POST",
@@ -496,6 +510,8 @@ export const cmd = {
     }),
   SET_VOTEMAP_CONFIG: (params) =>
     requestFactory({ method: "POST", cmd: "set_votemap_config", ...params }),
+  SET_VOTEMAP_WINNER: (params) =>
+    requestFactory({ method: "POST", cmd: "set_votemap_winner", ...params }),
   SET_VOTEMAP_WHITELIST: (params) =>
     requestFactory({ method: "POST", cmd: "set_votemap_whitelist", ...params }),
   SET_WARMUP_TIMER: (params) =>

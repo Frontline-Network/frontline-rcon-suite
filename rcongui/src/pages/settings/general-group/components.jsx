@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import {
-  Autocomplete,
   Box,
   Button,
   ButtonGroup,
@@ -16,7 +15,6 @@ import {
   Select,
   Slider,
   Stack,
-  TextField,
   Typography,
 } from "@mui/material";
 import SaveIcon from "@mui/icons-material/Save";
@@ -34,8 +32,8 @@ import {
 import Padlock from "@/components/shared/Padlock";
 import { toast } from "react-toastify";
 import { useForm } from "react-hook-form";
-import { getMapLayerImageSrc } from "../maps/objectives/helpers";
 import { useTranslation } from "react-i18next";
+import MapAutocomplete from "@/components/shared/MapAutocomplete";
 
 export const AUTOKICK_KEY = {
   condition: "condition",
@@ -310,7 +308,12 @@ export const SliderSetting = ({
       toast.success(t("settings.general.updated", { name: title }));
     },
     onError: (error) =>
-      toast.error(t("settings.general.updateFailed", { name: title, message: error.message })),
+      toast.error(
+        t("settings.general.updateFailed", {
+          name: title,
+          message: error.message,
+        })
+      ),
   });
 
   const form = useForm({ defaultValues: { [settingKey]: data || 0 } });
@@ -399,7 +402,12 @@ export const ToggleSetting = ({
       toast.success(t("settings.general.updated", { name: title }));
     },
     onError: (error) =>
-      toast.error(t("settings.general.updateFailed", { name: title, message: error.message })),
+      toast.error(
+        t("settings.general.updateFailed", {
+          name: title,
+          message: error.message,
+        })
+      ),
   });
 
   const form = useForm({ defaultValues: { [settingKey]: data || false } });
@@ -491,7 +499,12 @@ export const ThresholdsSetting = ({
       toast.success(t("settings.general.updated", { name: title }));
     },
     onError: (error) =>
-      toast.error(t("settings.general.updateFailed", { name: title, message: error.message })),
+      toast.error(
+        t("settings.general.updateFailed", {
+          name: title,
+          message: error.message,
+        })
+      ),
   });
 
   const form = useForm({ defaultValues: { [settingKey]: data || [] } });
@@ -570,7 +583,12 @@ export const AutoVotekickSetting = ({
       toast.success(t("settings.general.updated", { name: title }));
     },
     onError: (error) =>
-      toast.error(t("settings.general.updateFailed", { name: title, message: error.message })),
+      toast.error(
+        t("settings.general.updateFailed", {
+          name: title,
+          message: error.message,
+        })
+      ),
   });
 
   const form = useForm({
@@ -730,7 +748,12 @@ export const SliderTimer = ({
       toast.success(t("settings.general.updated", { name: title }));
     },
     onError: (error) =>
-      toast.error(t("settings.general.updateFailed", { name: title, message: error.message })),
+      toast.error(
+        t("settings.general.updateFailed", {
+          name: title,
+          message: error.message,
+        })
+      ),
   });
 
   const { mutate: mutateEnabled, isPending: isPendingEnabled } = useMutation({
@@ -743,7 +766,12 @@ export const SliderTimer = ({
       toast.success(t("settings.general.timerRemoved", { gameMode }));
     },
     onError: (error) =>
-      toast.error(t("settings.general.timerRemoveFailed", { gameMode, message: error.message })),
+      toast.error(
+        t("settings.general.timerRemoveFailed", {
+          gameMode,
+          message: error.message,
+        })
+      ),
   });
 
   const form = useForm({ defaultValues: { [settingKey]: initialData || 0 } });
@@ -800,33 +828,6 @@ export const SliderTimer = ({
   );
 };
 
-/*
-Option example 
-{
-    "id": "foy_warfare",
-    "map": {
-        "id": "foy",
-        "name": "FOY",
-        "tag": "FOY",
-        "pretty_name": "Foy",
-        "shortname": "Foy",
-        "allies": {
-            "name": "us",
-            "team": "allies"
-        },
-        "axis": {
-            "name": "ger",
-            "team": "axis"
-        },
-        "orientation": "vertical"
-    },
-    "game_mode": "warfare",
-    "attackers": null,
-    "environment": "day",
-    "pretty_name": "Foy Warfare",
-    "image_name": "foy-day.webp"
-}
-*/
 export const DynamicWeatherSettings = ({
   options,
   settingKey,
@@ -846,7 +847,12 @@ export const DynamicWeatherSettings = ({
       toast.success(t("settings.general.updated", { name: title }));
     },
     onError: (error) =>
-      toast.error(t("settings.general.updateFailed", { name: title, message: error.message })),
+      toast.error(
+        t("settings.general.updateFailed", {
+          name: title,
+          message: error.message,
+        })
+      ),
   });
 
   const form = useForm({
@@ -894,39 +900,14 @@ export const DynamicWeatherSettings = ({
             id={`${settingKey}-form`}
             onSubmit={onSubmit}
           >
-            <Autocomplete
-              fullWidth
+            <MapAutocomplete
               options={options}
-              getOptionLabel={(option) =>
-                option?.pretty_name ?? option?.name ?? ""
-              }
-              value={options.find((map) => map.id === selectedMap) || null}
-              onChange={(event, newValue) => {
-                const newMapId = newValue?.id || "";
+              selected={selectedMap}
+              onSelect={(newMapId) => {
                 setSelectedMap(newMapId);
                 form.setValue(settingKey, newMapId);
               }}
-              isOptionEqualToValue={(option, value) => option.id === value.id}
-              renderInput={(params) => (
-                <TextField {...params} label={t("maps.current")} fullWidth />
-              )}
-              renderOption={(props, option) => (
-                <Box
-                  component="li"
-                  sx={{ "& > img": { mr: 2, flexShrink: 0 } }}
-                  {...props}
-                >
-                  <img
-                    loading="lazy"
-                    width="40"
-                    height="24"
-                    src={getMapLayerImageSrc(option)}
-                    alt={option?.pretty_name || option?.name}
-                    style={{ objectFit: "cover", borderRadius: "2px" }}
-                  />
-                  {option?.pretty_name || option?.name}
-                </Box>
-              )}
+              label={t("maps.current")}
             />
             <Padlock
               label={t(enabled ? "common.enabled" : "common.disabled")}

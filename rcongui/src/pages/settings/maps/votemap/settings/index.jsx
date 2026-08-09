@@ -10,16 +10,19 @@ import _ from "lodash";
 import { toast } from "react-toastify";
 import { VotemapChangeNotification } from "./VotemapChangeNotification";
 import {
+  Box,
   Button,
   CircularProgress,
   Divider,
   FormControl,
+  IconButton,
   InputLabel,
   MenuItem,
   Select,
   Stack,
   TextField,
   Typography,
+  useTheme,
 } from "@mui/material";
 import {
   defaultMapOptions,
@@ -31,11 +34,17 @@ import Padlock from "@/components/shared/Padlock";
 import SaveIcon from "@mui/icons-material/Save";
 import ReplayIcon from "@mui/icons-material/Replay";
 import { useTranslation } from "react-i18next";
+import { lazy, Suspense } from "react";
+const EmojiPicker = lazy(() => import("@emoji-mart/react"));
+import emojiData from "@emoji-mart/data/sets/15/twitter.json";
+import Emoji from "@/components/shared/Emoji";
+import AddCircleIcon from "@mui/icons-material/AddCircle";
 
 function VotemapSettingsPage() {
   const { t } = useTranslation();
   const loaderData = useLoaderData();
   const queryClient = useQueryClient();
+  const theme = useTheme();
 
   const { data: config } = useQuery({
     ...mapsManagerQueryOptions.voteMapConfig(),
@@ -51,10 +60,12 @@ function VotemapSettingsPage() {
       // Update this reference so the user does not get change
       // notification about his own changes
       prevConfig.current = workingConfig;
-      queryClient.invalidateQueries([
-        mapsManagerQueryKeys.voteMapConfig,
-        mapsManagerQueryKeys.votemapStatus,
-      ]);
+      queryClient.invalidateQueries({
+        queryKey: mapsManagerQueryKeys.voteMapConfig,
+      });
+      queryClient.invalidateQueries({
+        queryKey: mapsManagerQueryKeys.votemapStatus,
+      });
       toast.success(t("maps.votemapSettings.updated"));
     },
     onError: (error) => {
@@ -69,10 +80,23 @@ function VotemapSettingsPage() {
 
   const prevConfig = useRef(config);
   const [workingConfig, setWorkingConfig] = useState(config);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [emojiPickerIndex, setEmojiPickerIndex] = useState(null);
+  const [emojiPickerMode, setEmojiPickerMode] = useState(null);
+
+  const getLabel = (configItem) =>
+    t(
+      configItem.translationKey ?? `maps.votemapSettings.${configItem.labelKey}`
+    );
+  const getHelperText = (configItem) =>
+    t(
+      configItem.helperTranslationKey ??
+        `maps.votemapSettings.${configItem.helperKey}`
+    );
 
   // Compare incoming config changes
   const handleIncomingConfigChange = () => {
-    // check how the configs differ
+    // check how the configs differ (deep comparison)
     const diff = _.transform(
       prevConfig.current,
       (result, value, key) => {
@@ -91,27 +115,30 @@ function VotemapSettingsPage() {
 
     // update reference
     // this will also prevent infinite toasting for the same changes
-    prevConfig.current = config;
+    prevConfig.current = _.cloneDeep(config);
 
     // if only 'enabled' changed do nothing
     if (enabledOnly) return;
 
     // announce there have been some changes made
-    toast.info(VotemapChangeNotification, {
-      onClose: (changesAccepted) => {
-        if (changesAccepted) {
-          // only override what has actually changed on the server
-          // to keep any other local changes
+    toast(VotemapChangeNotification, {
+      onClose(reason) {
+        // No-op: all logic is handled in the onAccept callback below
+      },
+      data: {
+        changes: diff,
+        onAccept: () => {
           setWorkingConfig((prev) => {
             const combined = { ...prev };
             diff.forEach((key) => {
-              combined[key] = config[key];
+              combined[key] = _.cloneDeep(config[key]);
             });
             return combined;
           });
-        }
+        },
       },
-      data: { changes: diff },
+      autoClose: false,
+      closeOnClick: false,
     });
   };
 
@@ -135,6 +162,167 @@ function VotemapSettingsPage() {
     }));
   };
 
+  const handleRemoveVoteFlag = (index) => {
+    setWorkingConfig((prev) => ({
+      ...prev,
+      vote_flags: prev.vote_flags.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleRemovePlayerChoiceFlag = (index) => {
+    setWorkingConfig((prev) => ({
+      ...prev,
+      player_choice_flags: prev.player_choice_flags.filter(
+        (_, i) => i !== index
+      ),
+    }));
+  };
+
+  const handleRemoveVoteBanFlag = (index) => {
+    setWorkingConfig((prev) => ({
+      ...prev,
+      vote_ban_flags: prev.vote_ban_flags.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleRemoveAllowOnlyFlag = (index) => {
+    setWorkingConfig((prev) => ({
+      ...prev,
+      allow_flag_only: (prev.allow_flag_only || []).filter(
+        (_, i) => i !== index
+      ),
+    }));
+  };
+
+  const handleRemoveFlag = (index) => {
+    switch (emojiPickerMode) {
+      case "update_vote_flag":
+        handleRemoveVoteFlag(index);
+        break;
+      case "update_player_choice_flag":
+        handleRemovePlayerChoiceFlag(index);
+        break;
+      case "update_vote_ban_flag":
+        handleRemoveVoteBanFlag(index);
+        break;
+      case "update_allow_flag_only":
+        handleRemoveAllowOnlyFlag(index);
+        break;
+      default:
+        break;
+    }
+  };
+
+  const handlePlayerChoiceFlagChange = (index, value) => {
+    setWorkingConfig((prev) => {
+      const updated = [...(prev.player_choice_flags || [])];
+      updated[index] = value;
+      return { ...prev, player_choice_flags: updated };
+    });
+  };
+
+  const handleAddPlayerChoiceFlag = (index, value) => {
+    setWorkingConfig((prev) => {
+      const updated = (prev.player_choice_flags || []).concat(value);
+      return { ...prev, player_choice_flags: updated };
+    });
+  };
+
+  const handleVoteBanFlagChange = (index, value) => {
+    setWorkingConfig((prev) => {
+      const updated = [...(prev.vote_ban_flags || [])];
+      updated[index] = value;
+      return { ...prev, vote_ban_flags: updated };
+    });
+  };
+
+  const handleAllowOnlyFlagChange = (index, value) => {
+    setWorkingConfig((prev) => {
+      const updated = [...(prev.allow_flag_only || [])];
+      updated[index] = value;
+      return { ...prev, allow_flag_only: updated };
+    });
+  };
+
+  const handleAddVoteBanFlag = (index, value) => {
+    setWorkingConfig((prev) => {
+      const updated = (prev.vote_ban_flags || []).concat(value);
+      return { ...prev, vote_ban_flags: updated };
+    });
+  };
+
+  const handleAddVoteFlag = (index, value) => {
+    setWorkingConfig((prev) => {
+      const another = { flag: value, vote_count: 1 };
+      const updated = (prev.vote_flags || []).concat(another);
+      return { ...prev, vote_flags: updated };
+    });
+  };
+
+  const handleAddAllowOnlyFlag = (index, value) => {
+    setWorkingConfig((prev) => {
+      const updated = (prev.allow_flag_only || []).concat(value);
+      return { ...prev, allow_flag_only: updated };
+    });
+  };
+
+  const handleVoteFlagChange = (index, key, value) => {
+    setWorkingConfig((prev) => {
+      const updated = [...(prev.vote_flags || [])];
+      if (key === "vote_count") {
+        value = Math.max(0, Math.min(100, Number(value)));
+      }
+      updated[index] = { ...updated[index], [key]: value };
+      return { ...prev, vote_flags: updated };
+    });
+  };
+
+  const handleOpenEmojiPicker = (index, mode) => {
+    setEmojiPickerIndex(index);
+    setEmojiPickerOpen(true);
+    setEmojiPickerMode(mode);
+  };
+
+  const handleCloseEmojiPicker = () => {
+    setEmojiPickerIndex(null);
+    setEmojiPickerOpen(false);
+    setEmojiPickerMode(null);
+  };
+
+  const handleEmojiSelected = (emoji) => {
+    if (emojiPickerIndex !== null && emojiPickerMode !== null) {
+      switch (emojiPickerMode) {
+        case "update_vote_flag":
+          handleVoteFlagChange(emojiPickerIndex, "flag", emoji.native);
+          break;
+        case "update_player_choice_flag":
+          handlePlayerChoiceFlagChange(emojiPickerIndex, emoji.native);
+          break;
+        case "update_vote_ban_flag":
+          handleVoteBanFlagChange(emojiPickerIndex, emoji.native);
+          break;
+        case "update_allow_flag_only":
+          handleAllowOnlyFlagChange(emojiPickerIndex, emoji.native);
+          break;
+        case "add_player_choice_flag":
+          handleAddPlayerChoiceFlag(emojiPickerIndex, emoji.native);
+          break;
+        case "add_vote_ban_flag":
+          handleAddVoteBanFlag(emojiPickerIndex, emoji.native);
+          break;
+        case "add_vote_flag":
+          handleAddVoteFlag(emojiPickerIndex, emoji.native);
+          break;
+        case "add_allow_flag_only":
+          handleAddAllowOnlyFlag(emojiPickerIndex, emoji.native);
+          break;
+        default:
+          break;
+      }
+    }
+    handleCloseEmojiPicker();
+  };
+
   useEffect(handleIncomingConfigChange, [config, workingConfig]);
 
   return (
@@ -153,8 +341,8 @@ function VotemapSettingsPage() {
             variant="filled"
             multiline
             rows={configItem.rows}
-            label={t(`maps.votemapSettings.${configItem.labelKey}`)}
-            helperText={t(`maps.votemapSettings.${configItem.helperKey}`)}
+            label={getLabel(configItem)}
+            helperText={getHelperText(configItem)}
             value={workingConfig[configItem.name] ?? ""}
             onChange={handleWorkingChanges(configItem.name)}
           />
@@ -226,12 +414,12 @@ function VotemapSettingsPage() {
 
           <Divider flexItem orientation={"horizontal"} />
 
-          {padlockConfigs.map(({ name, labelKey }) => (
+          {padlockConfigs.map((configItem) => (
             <Padlock
-              key={name}
-              label={t(`maps.votemapSettings.${labelKey}`)}
-              checked={workingConfig[name] ?? false}
-              handleChange={handleWorkingChanges(name)}
+              key={configItem.name}
+              label={getLabel(configItem)}
+              checked={workingConfig[configItem.name] ?? false}
+              handleChange={handleWorkingChanges(configItem.name)}
             />
           ))}
 
@@ -246,12 +434,221 @@ function VotemapSettingsPage() {
               slotProps={{
                 input: configItem.inputProps,
               }}
-              label={t(`maps.votemapSettings.${configItem.labelKey}`)}
-              helperText={t(`maps.votemapSettings.${configItem.helperKey}`)}
+              label={getLabel(configItem)}
+              helperText={getHelperText(configItem)}
               value={workingConfig[configItem.name] ?? false}
               onChange={handleWorkingChanges(configItem.name)}
             />
           ))}
+
+          <Divider flexItem orientation={"horizontal"} />
+
+          {/* Vote Flags Section */}
+          <Typography variant="subtitle1">
+            {t("maps.votemapAdvanced.voteCountFlags")}
+          </Typography>
+          <Typography variant="caption">
+            {t("maps.votemapAdvanced.voteCountFlagsHelp")}
+          </Typography>
+          <Stack
+            direction="row"
+            gap={1}
+            flexWrap={"wrap"}
+            alignItems={"center"}
+          >
+            {(workingConfig.vote_flags || []).map((item, idx) => (
+              <Stack key={idx} direction="row" gap={0.25} alignItems="center">
+                <Button
+                  variant="outlined"
+                  onClick={() => handleOpenEmojiPicker(idx, "update_vote_flag")}
+                  sx={{ minWidth: 48, fontSize: 24 }}
+                >
+                  <Emoji emoji={item.flag || "❓"} />
+                </Button>
+                <TextField
+                  type="number"
+                  label={t("maps.votemapAdvanced.voteCount")}
+                  slotProps={{ input: { min: 1, max: 100 } }}
+                  value={item.vote_count}
+                  onChange={(e) =>
+                    handleVoteFlagChange(idx, "vote_count", e.target.value)
+                  }
+                  sx={{ width: 80 }}
+                />
+              </Stack>
+            ))}
+            <IconButton
+              variant="outlined"
+              onClick={() =>
+                handleOpenEmojiPicker(
+                  (workingConfig.vote_flags || []).length,
+                  "add_vote_flag"
+                )
+              }
+            >
+              <AddCircleIcon />
+            </IconButton>
+          </Stack>
+
+          <Divider flexItem orientation={"horizontal"} />
+
+          {/* Vote Whitelist Flags Section */}
+          <Typography variant="subtitle1">
+            {t("maps.votemapAdvanced.voteWhitelistFlags")}
+          </Typography>
+          <Typography variant="caption">
+            {t("maps.votemapAdvanced.voteWhitelistFlagsHelp")}
+          </Typography>
+          <Stack direction="row" flexWrap={"wrap"} gap={1} alignItems="center">
+            {(workingConfig.allow_flag_only || []).map((item, idx) => (
+              <Button
+                key={idx}
+                variant="outlined"
+                onClick={() =>
+                  handleOpenEmojiPicker(idx, "update_allow_flag_only")
+                }
+                sx={{ minWidth: 48, fontSize: 24 }}
+              >
+                <Emoji emoji={item ?? "❓"} />
+              </Button>
+            ))}
+            <IconButton
+              variant="outlined"
+              onClick={() =>
+                handleOpenEmojiPicker(
+                  (workingConfig.allow_flag_only || []).length,
+                  "add_allow_flag_only"
+                )
+              }
+            >
+              <AddCircleIcon />
+            </IconButton>
+          </Stack>
+
+          {/* Vote Ban Flags Section */}
+          <Typography variant="subtitle1">
+            {t("maps.votemapAdvanced.voteBanFlags")}
+          </Typography>
+          <Typography variant="caption">
+            {t("maps.votemapAdvanced.voteBanFlagsHelp")}
+          </Typography>
+          <Stack direction="row" flexWrap={"wrap"} gap={1} alignItems="center">
+            {(workingConfig.vote_ban_flags || []).map((item, idx) => (
+              <Button
+                key={idx}
+                variant="outlined"
+                onClick={() =>
+                  handleOpenEmojiPicker(idx, "update_vote_ban_flag")
+                }
+                sx={{ minWidth: 48, fontSize: 24 }}
+              >
+                <Emoji emoji={item ?? "❓"} />
+              </Button>
+            ))}
+            <IconButton
+              variant="outlined"
+              onClick={() =>
+                handleOpenEmojiPicker(
+                  (workingConfig.vote_ban_flags || []).length,
+                  "add_vote_ban_flag"
+                )
+              }
+            >
+              <AddCircleIcon />
+            </IconButton>
+          </Stack>
+
+          <Divider flexItem orientation={"horizontal"} />
+
+          {/* Player Choice Flags Section */}
+          <Typography variant="subtitle1">
+            {t("maps.votemapAdvanced.playerChoiceWhitelistFlags")}
+          </Typography>
+          <Typography variant="caption">
+            {t("maps.votemapAdvanced.playerChoiceWhitelistFlagsHelp")}
+          </Typography>
+          <Stack direction="row" flexWrap={"wrap"} gap={1} alignItems="center">
+            {(workingConfig.player_choice_flags || []).map((item, idx) => (
+              <Button
+                key={idx}
+                variant="outlined"
+                onClick={() =>
+                  handleOpenEmojiPicker(idx, "update_player_choice_flag")
+                }
+                sx={{ minWidth: 48, fontSize: 24 }}
+              >
+                <Emoji emoji={item ?? "❓"} />
+              </Button>
+            ))}
+            <IconButton
+              variant="outlined"
+              onClick={() =>
+                handleOpenEmojiPicker(
+                  (workingConfig.player_choice_flags || []).length,
+                  "add_player_choice_flag"
+                )
+              }
+            >
+              <AddCircleIcon />
+            </IconButton>
+          </Stack>
+          {/* Emoji Picker Dialog */}
+          {emojiPickerOpen && (
+            <div
+              style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                width: "100vw",
+                height: "100vh",
+                background: "rgba(0,0,0,0.2)",
+                zIndex: 1300,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+              onClick={handleCloseEmojiPicker}
+            >
+              <div onClick={(e) => e.stopPropagation()}>
+                <Suspense
+                  fallback={
+                    <div>{t("maps.votemapAdvanced.loadingEmojiPicker")}</div>
+                  }
+                >
+                  <EmojiPicker
+                    set="twitter"
+                    theme={theme.palette.mode}
+                    data={emojiData}
+                    onEmojiSelect={handleEmojiSelected}
+                  />
+                  {!emojiPickerMode.startsWith("add_") && (
+                    <Stack
+                      sx={{
+                        bgcolor: (theme) => theme.palette.background.paper,
+                        borderBottomLeftRadius: (theme) =>
+                          theme.shape.borderRadius,
+                        borderBottomRightRadius: theme.shape.borderRadius,
+                      }}
+                      direction={"row"}
+                    >
+                      <Button
+                        onClick={() => {
+                          handleRemoveFlag(emojiPickerIndex);
+                          handleCloseEmojiPicker();
+                        }}
+                        sx={{ borderTopLeftRadius: 0, borderTopRightRadius: 0 }}
+                        variant="contained"
+                        color="error"
+                        fullWidth
+                      >
+                        {t("settings.general.remove")}
+                      </Button>
+                    </Stack>
+                  )}
+                </Suspense>
+              </div>
+            </div>
+          )}
         </Stack>
       </Stack>
     </Stack>
