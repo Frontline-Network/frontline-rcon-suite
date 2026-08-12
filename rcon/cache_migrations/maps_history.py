@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 
-MAPS_HISTORY_SCHEMA_VERSION = 1
+MAPS_HISTORY_SCHEMA_VERSION = 2
 MAPS_HISTORY_SCHEMA_KEY_SUFFIX = "schema_version"
 MAPS_HISTORY_MIGRATION_LOCK_SUFFIX = "migration_lock"
 MAPS_HISTORY_BACKUP_SUFFIX = "backup_previous"
@@ -116,8 +116,52 @@ def _migrate_to_v1(value: Mapping[str, Any]) -> dict[str, Any]:
     return item
 
 
+def _migrate_unit_history_entry_v2(value: Any) -> dict[str, Any]:
+    """Expand the legacy t/s/r unit keys without losing active match data."""
+    if not isinstance(value, Mapping):
+        value = {}
+
+    unit = dict(value)
+    unit["ts"] = unit.get("ts", 0)
+    unit["team"] = unit.get("team", unit.get("t", -111))
+    unit["squad"] = unit.get("squad", unit.get("s", -111))
+    unit["role"] = unit.get("role", unit.get("r", -111))
+    unit.pop("t", None)
+    unit.pop("s", None)
+    unit.pop("r", None)
+    return unit
+
+
+def _migrate_to_v2(value: Mapping[str, Any]) -> dict[str, Any]:
+    item = dict(value)
+    player_stats = item.get("player_stats")
+    if not isinstance(player_stats, Mapping):
+        player_stats = {}
+
+    migrated_player_stats: dict[str, Any] = {}
+    for player_id, value in player_stats.items():
+        if not isinstance(value, Mapping):
+            raise ValueError(
+                f"Invalid maps_history player_stats entry for {player_id!r}"
+            )
+
+        stat = dict(value)
+        stat["p_unit"] = _migrate_unit_history_entry_v2(stat.get("p_unit"))
+        units = stat.get("units")
+        stat["units"] = [
+            _migrate_unit_history_entry_v2(unit)
+            for unit in units
+        ] if isinstance(units, list) else []
+        migrated_player_stats[str(player_id)] = stat
+
+    item["player_stats"] = migrated_player_stats
+    item["_schema_version"] = 2
+    return item
+
+
 MAP_INFO_MIGRATIONS = {
     1: _migrate_to_v1,
+    2: _migrate_to_v2,
 }
 
 
