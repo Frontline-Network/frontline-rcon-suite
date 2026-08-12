@@ -17,6 +17,8 @@ from rcon.utils import get_server_number
 
 logger = logging.getLogger(__name__)
 
+LOG_HISTORY_PAGE_SIZE = 500
+
 class LogRecorder:
     def __init__(self, dump_frequency_seconds=10, log_history_fn: Callable[[], Iterable[StructuredLogLineWithMetaData]] = LogLoop.get_log_history_list):
         self.dump_frequency_seconds = dump_frequency_seconds
@@ -35,8 +37,14 @@ class LogRecorder:
             .one_or_none()
         )
         logger.info("Getting new logs from %s", last_log.event_time if last_log else 0)
+        log_history = self.log_history_fn()
+        iter_range = getattr(log_history, "iter_range", None)
+        if callable(iter_range):
+            logs = iter_range(page_size=LOG_HISTORY_PAGE_SIZE)
+        else:
+            logs = iter(log_history)
         log: StructuredLogLineWithMetaData
-        for log in self.log_history_fn():
+        for log in logs:
             if not isinstance(log, dict):
                 logger.warning("Log is invalid, not a dict: %s", log)
                 continue

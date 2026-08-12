@@ -2,15 +2,17 @@ import os
 
 import rcon.settings
 
-# Allows importing the models in the maintenance container to run database migrations
-if not os.getenv("HLL_MAINTENANCE_CONTAINER") and not os.getenv(
-    "HLL_WH_SERVICE_CONTAINER"
+# Maintenance, webhook and dedicated supervisor processes do not all need the
+# log event handlers. Importing them eagerly adds tens of MiB to every Python
+# process. The log loop registers them explicitly before it starts.
+if not any(
+    os.getenv(name)
+    for name in (
+        "HLL_MAINTENANCE_CONTAINER",
+        "HLL_WH_SERVICE_CONTAINER",
+        "HLL_SUPERVISOR_PROCESS",
+    )
 ):
-    # Just make sure hooks are imported so the code registering the hooks will run
-    from rcon import hooks
-    from rcon.autobalancer import hooks as autobalancer_hooks
-    from rcon.auto_kick import auto_kick
-    from rcon.automods.tk_autoban import auto_ban_if_tks_right_after_connection
-    from rcon.discord_chat import handle_on_chat, handle_on_kill, handle_on_tk
-    from rcon.recent_actions import update_kills, update_tks
-    from rcon.watchlist import watchdog
+    from rcon.log_hooks import register_log_hooks
+
+    register_log_hooks()

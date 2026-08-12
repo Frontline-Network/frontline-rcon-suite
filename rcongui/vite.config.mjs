@@ -1,13 +1,26 @@
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig, loadEnv, transformWithOxc } from "vite";
 import react from "@vitejs/plugin-react";
 import fs from "fs/promises";
 import path from "path";
-import { fileURLToPath } from "url";
-
-const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
 
 const DEFAULT_CRCON_SERVER_URL = "http://localhost:8010";
 const DEFAULT_CRCON_API_ENDPOINT = "/api/";
+
+const jsxInJsPlugin = {
+  name: "jsx-in-js",
+  enforce: "pre",
+  async load(id) {
+    if (/\/src\/.*\.js$/.test(id)) {
+      const code = await fs.readFile(id, "utf8");
+      const result = await transformWithOxc(code, id, {
+        lang: "jsx",
+        jsx: { runtime: "automatic" },
+      });
+
+      return { code: result.code, map: result.map, moduleType: "js" };
+    }
+  },
+};
 
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -59,10 +72,10 @@ export default defineConfig(({ command, mode }) => {
     resolve: {
       extensions: [".js", ".jsx"],
       alias: {
-        "@": path.resolve(currentDirectory, "./src"),
+        "@": path.resolve(import.meta.dirname, "./src"),
       },
     },
-    plugins: [react()],
+    plugins: [jsxInJsPlugin, react()],
     server: {
       port: 3000,
       proxy: {
@@ -81,25 +94,9 @@ export default defineConfig(({ command, mode }) => {
         },
       },
     },
-    esbuild: {
-      loader: "jsx",
-      include: /src\/.*\.jsx?$/,
-      exclude: [],
-    },
     optimizeDeps: {
-      esbuildOptions: {
-        loader: { ".js": "jsx" },
-        plugins: [
-          {
-            name: "load-js-files-as-jsx",
-            setup(build) {
-              build.onLoad({ filter: /src\/.*\.js$/ }, async (args) => ({
-                loader: "jsx",
-                contents: await fs.readFile(args.path, "utf8"),
-              }));
-            },
-          },
-        ],
+      rolldownOptions: {
+        moduleTypes: { ".js": "jsx" },
       },
     },
   };

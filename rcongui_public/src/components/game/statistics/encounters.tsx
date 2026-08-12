@@ -37,9 +37,9 @@ function unitAt(units: PlayerUnit[], timestamp: number) {
 
 function RoleIcon({ unit }: { unit?: PlayerUnit }) {
   const { t } = useTranslation('game')
-  const icon = roleIcon(unit?.r)
-  const lightModeIcon = roleIcon(unit?.r, 'black')
-  const roleKey = unit?.r === undefined ? undefined : HLL_ROLES[unit.r]
+  const icon = roleIcon(unit?.role)
+  const lightModeIcon = roleIcon(unit?.role, 'black')
+  const roleKey = unit?.role === undefined ? undefined : HLL_ROLES[unit.role]
   const role = roleKey ? t(`timelineDetails.roles.${roleKey}`) : t('timelineDetails.unknownRole')
 
   return icon && lightModeIcon ? (
@@ -77,9 +77,9 @@ function EncounterItem({
     >
       <time
         className="col-start-1 row-start-1 text-[11px] tabular-nums text-muted-foreground"
-        dateTime={`PT${encounter.timestamp}S`}
+        dateTime={`PT${encounter.ts}S`}
       >
-        {formatTime(encounter.timestamp)}
+        {formatTime(encounter.ts)}
       </time>
       <span className="col-start-2 row-start-1 flex min-w-0 flex-wrap items-center gap-x-1.5">
         <RoleIcon unit={actorUnit} />
@@ -103,8 +103,9 @@ function EncounterItem({
           <Trans
             t={t}
             i18nKey="timelineDetails.withWeapon"
-            values={{ weapon: encounter.weapon }}
-            components={{ weapon: <span className="font-medium text-foreground" /> }}
+            components={{
+              weapon: <span className="font-medium text-foreground">{encounter.weapon}</span>,
+            }}
           />
         </span>
       )}
@@ -158,7 +159,7 @@ function playerStateEvents(units: PlayerUnit[]): PlayerStateEvent[] {
   const orderedUnits = [...units].sort((a, b) => a.ts - b.ts)
 
   orderedUnits.forEach((unit) => {
-    const offline = unit.t === -111 && unit.s === -111 && unit.r === -111
+    const offline = unit.team === -111 && unit.squad === -111 && unit.role === -111
 
     if (offline) {
       if (hasJoined && !isDisconnected) events.push({ kind: 'disconnected', timestamp: unit.ts })
@@ -168,20 +169,20 @@ function playerStateEvents(units: PlayerUnit[]): PlayerStateEvent[] {
 
     // The default rifleman with no squad is a lobby placeholder. Other roles may
     // retain -111 after a deployed player is removed from their squad.
-    if (unit.s === -111 && unit.r === 0) return
+    if (unit.squad === -111 && unit.role === 0) return
 
-    if (!isTeamId(unit.t)) return
+    if (!isTeamId(unit.team)) return
 
     if (!hasJoined) {
-      events.push({ kind: 'joined', timestamp: unit.ts, team: unit.t })
+      events.push({ kind: 'joined', timestamp: unit.ts, team: unit.team })
       hasJoined = true
     } else if (isDisconnected && lastTeam) {
-      events.push({ kind: 'reconnected', timestamp: unit.ts, team: unit.t, previousTeam: lastTeam })
-    } else if (lastTeam && unit.t !== lastTeam) {
-      events.push({ kind: 'switched', timestamp: unit.ts, team: unit.t, previousTeam: lastTeam })
+      events.push({ kind: 'reconnected', timestamp: unit.ts, team: unit.team, previousTeam: lastTeam })
+    } else if (lastTeam && unit.team !== lastTeam) {
+      events.push({ kind: 'switched', timestamp: unit.ts, team: unit.team, previousTeam: lastTeam })
     }
 
-    lastTeam = unit.t
+    lastTeam = unit.team
     isDisconnected = false
   })
 
@@ -248,12 +249,12 @@ export function Encounters({
     encounters.forEach((encounter, encounterIndex) => {
       if (encounter.action !== 'KILL') return
       const targetUnits = players.find(({ id }) => id === encounter.player_id)?.units ?? []
-      const targetRole = unitAt(targetUnits, encounter.timestamp)?.r
+      const targetRole = unitAt(targetUnits, encounter.ts)?.role
       if (targetRole !== 11 && targetRole !== 12) return
 
-      const indices = tankCrewKillsByTimestamp.get(encounter.timestamp) ?? []
+      const indices = tankCrewKillsByTimestamp.get(encounter.ts) ?? []
       indices.push(encounterIndex)
-      tankCrewKillsByTimestamp.set(encounter.timestamp, indices)
+      tankCrewKillsByTimestamp.set(encounter.ts, indices)
     })
 
     Array.from(tankCrewKillsByTimestamp.entries())
@@ -317,7 +318,7 @@ export function Encounters({
       encounter,
       encounterIndex,
       vehicleGroup: vehicleGroups.get(encounterIndex),
-      timestamp: encounter.timestamp,
+      timestamp: encounter.ts,
     })),
     ...capFlipEntries,
     ...stateEvents.map((event, playerStateIndex) => ({
@@ -359,7 +360,7 @@ export function Encounters({
         }
 
         if (entry.type === 'cap-flip') {
-          const playerTeam = unitAt(units, entry.timestamp)?.t
+          const playerTeam = unitAt(units, entry.timestamp)?.team
           const capturedTeamId = entry.capturedBy === 'allies' ? 1 : entry.capturedBy === 'axis' ? 2 : undefined
           const captureDescription = capturedTeamId
             ? playerTeam === capturedTeamId
@@ -396,16 +397,14 @@ export function Encounters({
         }
 
         const { encounter, encounterIndex } = entry
-        const actorUnit = unitAt(units, encounter.timestamp)
+        const actorUnit = unitAt(units, encounter.ts)
         const targetUnits = players.find(({ id }) => id === encounter.player_id)?.units ?? []
         const title = streakStarts.get(encounterIndex)
         const endedCount = streakEnds.get(encounterIndex)
         const vehicleGroup = entry.vehicleGroup
 
         return (
-          <Fragment
-            key={`encounter-${encounter.timestamp}-${encounter.action}-${encounter.player_id}-${encounterIndex}`}
-          >
+          <Fragment key={`encounter-${encounter.ts}-${encounter.action}-${encounter.player_id}-${encounterIndex}`}>
             {title && (
               <li className="px-2 py-1">
                 <Marker variant="separator" className="text-xs text-amber-700 dark:text-amber-400">
@@ -439,7 +438,7 @@ export function Encounters({
             <EncounterItem
               encounter={encounter}
               actorUnit={actorUnit}
-              targetUnit={unitAt(targetUnits, encounter.timestamp)}
+              targetUnit={unitAt(targetUnits, encounter.ts)}
               vehicleGroup={vehicleGroup}
               focusPlayerBy={focusPlayerBy}
             />

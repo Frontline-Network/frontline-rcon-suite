@@ -72,10 +72,10 @@ export interface ServerFinalStats {
 
 
 export interface PlayerUnit {
-  t: number
-  s: number
-  r: number
   ts: number
+  team: number
+  squad: number
+  role: number
 }
 
 export interface Result {
@@ -140,7 +140,7 @@ export interface KillInfo {
     action: "KILL" | "DEATH"
     player_id: string
     player_name: string
-    timestamp: number
+    ts: number
     weapon: string
 }
 

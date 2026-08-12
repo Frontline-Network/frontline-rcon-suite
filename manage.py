@@ -39,9 +39,12 @@ if __name__ == "__main__":
     logger = logging.getLogger("rcon")
     try:
         # pre_flight_checks(env)
-        from rcon.cli import cli, init
+        if env.get("HLL_SUPERVISOR_PROCESS"):
+            from rcon.supervisor_cli import cli
+        else:
+            from rcon.cli import cli, init
 
-        init()
+            init()
         cli()
     except SystemExit as e:
         logger.info("Program requested exit %s", repr(e))

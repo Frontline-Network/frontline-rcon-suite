@@ -80,6 +80,11 @@ SAMPLE_MAPS = [
 ]
 
 
+class FakeMapsHistory(list):
+    def get_current_map(self):
+        return self[0] if self else None
+
+
 @pytest.fixture
 def redis_client():
     """Fixture for a fake Redis client."""
@@ -214,14 +219,14 @@ def mock_maps_history():
             "end": minus_hour(8),
         },
     ]
-    return history
+    return FakeMapsHistory(history)
 
 
 @pytest.fixture
 def votemap(redis_client, mock_rcon, default_config_loader, mock_maps_history):
     """Fixture for a VoteMap instance with injected dependencies."""
     with (
-        patch("rcon.vote_map.get_redis_client", return_value=redis_client),
+        patch("rcon.vote_map.state.get_redis_client", return_value=redis_client),
         patch(
             "rcon.user_config.vote_map.VoteMapUserConfig.load_from_db",
             return_value=default_config_loader,
@@ -239,7 +244,7 @@ def votemap_disabled(
     redis_client, mock_rcon, disabled_config_loader, mock_maps_history
 ):
     """Fixture for VoteMap with disabled voting."""
-    with patch("rcon.vote_map.get_redis_client", return_value=redis_client):
+    with patch("rcon.vote_map.state.get_redis_client", return_value=redis_client):
         return VoteMap(
             rcon=mock_rcon,
             config_loader=disabled_config_loader,
@@ -251,7 +256,7 @@ def votemap_flags(
     redis_client, mock_rcon, config_loader_with_vote_flags, mock_maps_history
 ):
     """Fixture for VoteMap with disabled voting."""
-    with patch("rcon.vote_map.get_redis_client", return_value=redis_client):
+    with patch("rcon.vote_map.state.get_redis_client", return_value=redis_client):
         return VoteMap(
             rcon=mock_rcon,
             config_loader=config_loader_with_vote_flags,
@@ -347,7 +352,7 @@ def test_get_default_next_map_as_least_played_from_selection(votemap):
 def test_get_default_next_map_as_least_played_from_all(
     mock_rcon, redis_client, mock_maps_history
 ):
-    with patch("rcon.vote_map.get_redis_client", return_value=redis_client):
+    with patch("rcon.vote_map.state.get_redis_client", return_value=redis_client):
         votemap = VoteMap(
             rcon=mock_rcon,
             maps_history=mock_maps_history,
@@ -380,6 +385,19 @@ def test_register_vote(votemap):
     assert vote["player_name"] == player["names"][0]["name"]
     assert vote["vote_count"] == 1
     assert vote["map_id"] == selected_map.id
+
+
+def test_remove_winning_map_from_selection_reapplies_results(votemap, mock_rcon):
+    player = mock_player_profile("123456", "player_1")
+    votemap.set_selection([HUR_WARFARE_DAY, UTAH_WARFARE_DAY])
+    votemap.register_vote(player, int(datetime.now().timestamp()), 1)
+
+    assert votemap.get_next_map() == HUR_WARFARE_DAY
+
+    votemap.remove_map_from_selection(HUR_WARFARE_DAY)
+
+    assert votemap.get_next_map() == UTAH_WARFARE_DAY
+    assert mock_rcon.get_map_rotation()["maps"] == [UTAH_WARFARE_DAY]
 
 
 def test_register_vote_invalid_entry(votemap):
@@ -489,15 +507,49 @@ def test_ensure_selection_when_no_maps_to_select_from(votemap):
     assert HUR_WARFARE_DAY not in new_selection
 
 
+def test_disallow_consecutive_offensives_uses_current_map_from_history(
+    redis_client, mock_rcon
+):
+    """The RCON current-map cache can still hold the previous layer at match start."""
+    history = FakeMapsHistory(
+        [{"name": CAR_OFF_ALLIES.id, "start": 1, "end": None}]
+    )
+    mock_rcon.current_map = HUR_WARFARE_DAY
+    config_loader = lambda: VoteMapUserConfig(
+        enabled=True,
+        number_last_played_to_exclude=0,
+        consider_offensive_same_map=False,
+        consider_skirmishes_as_same_map=False,
+        allow_consecutive_offensives=False,
+        allow_consecutive_offensives_opposite_sides=True,
+        num_warfare_options=10,
+        num_offensive_options=10,
+        num_skirmish_control_options=10,
+    )
+
+    with patch("rcon.vote_map.state.get_redis_client", return_value=redis_client):
+        votemap = VoteMap(
+            rcon=mock_rcon,
+            config_loader=config_loader,
+            maps_history=history,
+        )
+    votemap.set_map_whitelist(SAMPLE_MAPS)
+
+    selection = votemap.get_new_selection()
+
+    assert selection
+    assert all(map_.game_mode != GameMode.OFFENSIVE for map_ in selection)
+
+
 def test_exclude_last_maps_considers_same_mode_different_environment(
     redis_client, mock_rcon
 ):
     """Excluding last 2 maps also excludes same maps with the same game
     mode with different environment."""
-    history = [
+    history = FakeMapsHistory([
         {"name": HUR_WARFARE_DAY.id, "start": 1, "end": None},
         {"name": CAR_WARFARE_DAY.id, "start": 0, "end": 1},
-    ]
+    ])
     mock_rcon.current_map = HUR_WARFARE_DAY
     allowed_maps = list(set(SAMPLE_MAPS) | {UTAH_WARFARE_DAY})
 
@@ -513,7 +565,7 @@ def test_exclude_last_maps_considers_same_mode_different_environment(
             num_offensive_options=10,
             num_skirmish_control_options=10,
         )
-        with patch("rcon.vote_map.get_redis_client", return_value=redis_client):
+        with patch("rcon.vote_map.state.get_redis_client", return_value=redis_client):
             votemap = VoteMap(
                 rcon=mock_rcon,
                 config_loader=config_loader,
@@ -543,9 +595,9 @@ def test_dont_allow_same_map_per_mode_with_different_environment(
 ):
     """When new votemap selection is created and allow_multiple_maps_with_same_environment
     is disabled there should never be multiple maps of the same gamemode in the selection"""
-    history = [
+    history = FakeMapsHistory([
         {"name": CAR_SKIRMISH_DAY.id, "start": 1, "end": None},
-    ]
+    ])
     mock_rcon.current_map = HUR_WARFARE_DAY
     allowed_maps = list(set(SAMPLE_MAPS) | {UTAH_WARFARE_DAY})
 
@@ -555,6 +607,7 @@ def test_dont_allow_same_map_per_mode_with_different_environment(
             number_last_played_to_exclude=1,
             consider_environment_as_same_map=False,
             allow_consecutive_offensives_opposite_sides=True,
+            allow_consecutive_skirmishes=True,
             allow_multiple_maps_with_same_environment=allow_multiple_maps_with_same_environment,
             consider_offensive_same_map=False,
             consider_skirmishes_as_same_map=False,
@@ -562,7 +615,7 @@ def test_dont_allow_same_map_per_mode_with_different_environment(
             num_offensive_options=10,
             num_skirmish_control_options=10,
         )
-        with patch("rcon.vote_map.get_redis_client", return_value=redis_client):
+        with patch("rcon.vote_map.state.get_redis_client", return_value=redis_client):
             votemap = VoteMap(
                 rcon=mock_rcon,
                 config_loader=config_loader,

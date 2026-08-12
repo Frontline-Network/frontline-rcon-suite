@@ -57,7 +57,12 @@ def test_version_zero_map_is_normalized_to_current_schema():
     assert player["combat"] == 10
     assert player["names"] == [player_id]
     assert player["status"] == "offline"
-    assert player["p_unit"] == {"ts": 0, "t": -111, "s": -111, "r": -111}
+    assert player["p_unit"] == {
+        "ts": 0,
+        "team": -111,
+        "squad": -111,
+        "role": -111,
+    }
     assert player["units"] == []
 
 
@@ -66,6 +71,35 @@ def test_map_normalization_is_idempotent():
 
     assert migrate_map_info(migrated) == migrated
     assert migrate_map_info(orjson.loads(orjson.dumps(migrated))) == migrated
+
+
+def test_version_one_unit_history_keys_are_migrated_without_data_loss():
+    legacy_v1 = {
+        "_schema_version": 1,
+        "player_stats": {
+            "player": {
+                "p_unit": {"ts": 42, "t": 1, "s": 7, "r": 11},
+                "units": [
+                    {"ts": 10, "t": 0, "s": 2, "r": 3},
+                    {"ts": 20, "team": 1, "squad": 4, "role": 5},
+                ],
+            }
+        },
+    }
+
+    item = migrate_map_info(legacy_v1)
+
+    assert item["_schema_version"] == MAPS_HISTORY_SCHEMA_VERSION
+    assert item["player_stats"]["player"]["p_unit"] == {
+        "ts": 42,
+        "team": 1,
+        "squad": 7,
+        "role": 11,
+    }
+    assert item["player_stats"]["player"]["units"] == [
+        {"ts": 10, "team": 0, "squad": 2, "role": 3},
+        {"ts": 20, "team": 1, "squad": 4, "role": 5},
+    ]
 
 
 def test_newer_map_schema_is_rejected():
@@ -81,7 +115,9 @@ def test_redis_migration_is_atomic_and_does_not_replace_backup_on_restart():
     history = SimpleNamespace(red=client, key="maps_history", max_len=500)
 
     assert migrate_maps_history(history) == 1
-    assert orjson.loads(client.lindex("maps_history", 0))["_schema_version"] == 1
+    assert orjson.loads(client.lindex("maps_history", 0))[
+        "_schema_version"
+    ] == MAPS_HISTORY_SCHEMA_VERSION
     backup = client.lrange("maps_history:backup_previous", 0, -1)
     assert backup == [raw_item]
 

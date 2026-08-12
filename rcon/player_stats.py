@@ -28,7 +28,7 @@ from rcon.types import (
     StructuredLogLineWithMetaData,
 )
 from rcon.user_config.rcon_server_settings import RconServerSettingsUserConfig
-from rcon.utils import MapsHistory, get_default_player_stats
+from rcon.utils import LogsHistorySnapshot, MapsHistory, get_default_player_stats
 
 logger = logging.getLogger(__name__)
 
@@ -347,7 +347,7 @@ class LiveStats(BaseStats):
 
         return logs_indexed, id_to_name
 
-    def get_current_players_stats(self):
+    def get_current_players_stats(self, log_history: LogsHistorySnapshot | None = None):
         players: list[GetPlayersType]  = self.rcon.get_players()
         if not players:
             logger.debug("No players")
@@ -379,7 +379,10 @@ class LiveStats(BaseStats):
                 now - datetime.timedelta(seconds=oldest_session_seconds)
             ).timestamp()
             logger.debug("Min timestamp: %s", min_timestamp)
-            logs = get_recent_logs(min_timestamp=min_timestamp)
+            logs = get_recent_logs(
+                min_timestamp=min_timestamp,
+                log_history=log_history,
+            )
 
             logger.info("%s log lines to process", len(logs["logs"]))
 
@@ -411,9 +414,9 @@ class LiveStats(BaseStats):
             )
             return stats
 
-    def set_live_stats(self):
+    def set_live_stats(self, log_history: LogsHistorySnapshot | None = None):
         snapshot_ts = datetime.datetime.now().timestamp()
-        stats = self.get_current_players_stats()
+        stats = self.get_current_players_stats(log_history=log_history)
         self.red.set(
             "LIVE_STATS",
             pickle.dumps(
@@ -645,9 +648,13 @@ class TimeWindowStats(BaseStats):
         self,
         from_timestamp: float,
         cached_players: dict[str, PlayerStat] | None = None,
+        log_history: LogsHistorySnapshot | None = None,
     ):
         cached_players = cached_players or {}
-        logs = get_recent_logs(min_timestamp=from_timestamp)
+        logs = get_recent_logs(
+            min_timestamp=from_timestamp,
+            log_history=log_history,
+        )
         return self._get_players_stats_from_logs(
             reversed(logs.get("logs", [])),
             datetime.datetime.fromtimestamp(from_timestamp, datetime.UTC),
@@ -676,20 +683,23 @@ def live_stats_loop():
         last_loop_game_seconds = (
             datetime.datetime.now() - last_loop_game
         ).total_seconds()
+        session_due = last_loop_session_seconds >= live_session_sleep_seconds
+        game_due = last_loop_game_seconds >= live_game_sleep_seconds
+        log_history = LogsHistorySnapshot() if session_due or game_due else None
 
-        if last_loop_session_seconds >= live_session_sleep_seconds:
+        if session_due:
             last_loop_session = datetime.datetime.now()
             try:
-                live.set_live_stats()
+                live.set_live_stats(log_history=log_history)
                 logger.debug("Refreshed set_live_stats")
             except Exception:
                 logger.exception("Error while producing stats")
 
-        if last_loop_game_seconds >= live_game_sleep_seconds:
+        if game_due:
             last_loop_game = datetime.datetime.now()
             try:
                 snapshot_ts = datetime.datetime.now().timestamp()
-                stats = current_game_stats()
+                stats = current_game_stats(log_history=log_history)
                 logger.debug("Refreshed current_game_stats")
                 red.set(
                     "LIVE_GAME_STATS",
@@ -707,7 +717,7 @@ def live_stats_loop():
         time.sleep(0.1)
 
 
-def current_game_stats():
+def current_game_stats(log_history: LogsHistorySnapshot | None = None):
     current_map = MapsHistory().get_current_map()
     if not current_map:
         logger.error("Unable to get current game stats [no map information available]")
@@ -716,7 +726,11 @@ def current_game_stats():
         logger.error("Unable to get current game stats [missing map start information]")
         return {}
 
-    stats = TimeWindowStats().get_players_stats_from_time(current_map["start"], current_map["player_stats"])
+    stats = TimeWindowStats().get_players_stats_from_time(
+        current_map["start"],
+        current_map["player_stats"],
+        log_history=log_history,
+    )
     _apply_current_map_player_stats(
         stats=stats, current_map=current_map
     )
@@ -750,7 +764,7 @@ def _apply_current_map_player_stats(
         unit = map_stat.get("p_unit", None)
         if unit:
             try:
-                team = Team.by_id(unit["t"])
+                team = Team.by_id(unit["team"])
                 team_name = team.name.lower()
                 if team == Team.ALLIES:
                     faction_name = map_layer.map.allies.name.lower()

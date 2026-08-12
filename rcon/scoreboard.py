@@ -34,6 +34,8 @@ from rcon.webhook_service import (
     get_message_edit_404_failure,
 )
 
+SCOREBOARD_CONFIG_RETRY_SECONDS = 30
+
 if TYPE_CHECKING:
     from rcon.api_commands import RconAPI
 
@@ -459,30 +461,42 @@ def run():
     # Avoid circular imports
     from rcon.api_commands import get_rcon_api
 
-    config = ScoreboardUserConfig.load_from_db()
     rcon_api = get_rcon_api()
 
     try:
-        if config.public_scoreboard_url is None:
-            logger.fatal(
-                "Your Public Scoreboard URL is not configured, set it and restart the Scoreboard service."
-            )
-            sys.exit(-1)
-
-        if not config.hooks:
-            logger.fatal(
-                "You do not have any Discord webhooks configured, set some and restart the Scoreboard service."
-            )
-            sys.exit(-1)
-
         # Track the last updated time for each message key by webhook URL
         last_updated: defaultdict[str, defaultdict[str, datetime | None]] = defaultdict(
             lambda: defaultdict(lambda: None)
         )
+        previous_configuration_warning: str | None = None
 
         while True:
             timestamp = datetime.now()
             config = ScoreboardUserConfig.load_from_db()
+
+            configuration_warning = None
+            if config.public_scoreboard_url is None:
+                configuration_warning = (
+                    "Public Scoreboard URL is not configured. Scoreboard is waiting "
+                    "for configuration."
+                )
+            elif not config.hooks:
+                configuration_warning = (
+                    "No Discord webhooks are configured. Scoreboard is waiting for "
+                    "configuration."
+                )
+
+            if configuration_warning:
+                if configuration_warning != previous_configuration_warning:
+                    logger.warning(configuration_warning)
+                previous_configuration_warning = configuration_warning
+                time.sleep(SCOREBOARD_CONFIG_RETRY_SECONDS)
+                continue
+
+            if previous_configuration_warning:
+                logger.info("Scoreboard configuration is available; resuming updates")
+                previous_configuration_warning = None
+
             server_config = RconServerSettingsUserConfig.load_from_db()
 
             for webhook in config.hooks:
