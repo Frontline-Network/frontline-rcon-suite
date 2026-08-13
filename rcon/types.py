@@ -393,6 +393,7 @@ class LinkedPlayerAccountType(TypedDict):
     name: str
     game: Literal["hll", "hll_vietnam"]
     active_blacklists: list["BlacklistRecordWithBlacklistType"]
+    existing_blacklists: list["BlacklistRecordWithBlacklistType"]
     is_banned: NotRequired[bool]
     bans: NotRequired[list[GameServerBanType]]
 

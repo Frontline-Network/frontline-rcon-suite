@@ -65,13 +65,26 @@ def _player_identity_name(player: PlayerID) -> str:
     return player.player_id
 
 
-def _active_player_blacklists(player: PlayerID) -> list[dict]:
-    this_server = int(get_server_number())
+def _existing_player_blacklists(player: PlayerID) -> list[dict]:
+    """Return blacklist records that still exist as active restrictions.
+
+    The record may belong to another FLN server.  This is useful as an
+    administrative risk signal, but does not make the restriction applicable
+    to the current game server and must never trigger an automatic action.
+    """
     return [
         record
         for record in (blacklist.to_dict() for blacklist in player.blacklists)
         if record["is_active"]
-        and (
+    ]
+
+
+def _active_player_blacklists(player: PlayerID) -> list[dict]:
+    this_server = int(get_server_number())
+    return [
+        record
+        for record in _existing_player_blacklists(player)
+        if (
             record["blacklist"]["servers"] is None
             or this_server in record["blacklist"]["servers"]
         )
@@ -138,6 +151,7 @@ def get_player_identity_links(sess: Session, players: list[PlayerID]) -> dict[st
                     "steam_id": linked.steam_id,
                     "name": _player_identity_name(linked),
                     "active_blacklists": _active_player_blacklists(linked),
+                    "existing_blacklists": _existing_player_blacklists(linked),
                     "game": (
                         "hll"
                         if len(linked.player_id) == 17 and linked.player_id.isdigit()
