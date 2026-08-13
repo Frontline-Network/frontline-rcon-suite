@@ -1,7 +1,7 @@
 import pytest
 
 from rcon.types import GetDetailedPlayer, GameEnum
-from rcon.utils import parse_raw_player_info
+from rcon.utils import get_squad_leader_roles, parse_raw_player_info
 
 
 def mock_get_detailed_player(
@@ -215,3 +215,21 @@ def test_parse_hllv_player_uses_crcon_logical_team_names(raw_team, faction, team
 
     assert parsed["faction"] == faction
     assert parsed["team"] == team
+
+
+def test_hllv_squad_leader_roles_include_vietnam_unit_leaders():
+    leader_roles = get_squad_leader_roles(GameEnum.HLL_VIETNAM)
+
+    assert {
+        "squadleader",
+        "tankcommander",
+        "spotter",
+        "mortarobserver",
+        "helicopterlogisticsofficer",
+    } <= leader_roles
+
+
+def test_hll_squad_leader_roles_keep_ww2_officers():
+    leader_roles = get_squad_leader_roles(GameEnum.HLL_WW2)
+
+    assert {"officer", "tankcommander", "spotter", "artilleryobserver"} <= leader_roles

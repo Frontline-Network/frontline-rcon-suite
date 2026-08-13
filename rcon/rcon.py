@@ -57,6 +57,7 @@ from rcon.utils import (
     MapsHistory,
     default_player_info_dict,
     get_server_number,
+    get_squad_leader_roles,
     parse_raw_player_info,
 )
 
@@ -473,10 +474,11 @@ class Rcon(ServerCtl):
         return "infantry"
 
     def _has_leader(self, squad) -> bool:
-        for players in squad.get("players", []):
-            if players.get("role") in ["tankcommander", "officer", "spotter", "artilleryobserver"]:
-                return True
-        return False
+        leader_roles = get_squad_leader_roles(self.config.game)
+        return any(
+            player.get("role") in leader_roles
+            for player in squad.get("players", [])
+        )
 
     @ttl_cache(ttl=60 * 60 * 24, cache_falsy=False)
     def get_player_info(self, player_id: str, can_fail=False):
