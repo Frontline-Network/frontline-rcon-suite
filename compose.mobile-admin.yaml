@@ -9,6 +9,7 @@ x-frontline-backend: &frontline-backend
     dockerfile: Dockerfile
 
 x-mobile-environment: &mobile-environment
+  HLL_GAME: ${HLL_GAME:-hll}
   RATELIMIT_PROXY_DEPTH: ${RATELIMIT_PROXY_DEPTH:-1}
   MOBILE_INTEGRATION_ENABLED: ${MOBILE_INTEGRATION_ENABLED:-false}
   MOBILE_PUBLIC_BASE_URL: ${MOBILE_PUBLIC_BASE_URL:-}
@@ -19,6 +20,14 @@ x-mobile-environment: &mobile-environment
   MOBILE_CONTEXT_V2: ${MOBILE_CONTEXT_V2:-disabled}
   MOBILE_CONTEXT_FUZZY_THRESHOLD: ${MOBILE_CONTEXT_FUZZY_THRESHOLD:-0.74}
   MOBILE_PUSH_RELAY_URL: ${MOBILE_PUSH_RELAY_URL:-}
+
+x-mobile-environment-server-2: &mobile-environment-server-2
+  <<: *mobile-environment
+  HLL_GAME: ${HLL_GAME_2:-hll}
+
+x-mobile-environment-server-3: &mobile-environment-server-3
+  <<: *mobile-environment
+  HLL_GAME: ${HLL_GAME_3:-hll}
 
 x-frontline-frontend: &frontline-frontend
   image: frontline/hll_rcon_tool_frontend:${CRCON_IMAGE_TAG:-mobile-admin-autobalancer-v11.11.1}
@@ -53,14 +62,25 @@ services:
 
   backend_2:
     <<: *frontline-backend
-    environment: *mobile-environment
+    environment: *mobile-environment-server-2
 
   supervisor_2:
     <<: *frontline-backend
-    environment: *mobile-environment
+    environment: *mobile-environment-server-2
+
+  backend_3:
+    <<: *frontline-backend
+    environment: *mobile-environment-server-3
+
+  supervisor_3:
+    <<: *frontline-backend
+    environment: *mobile-environment-server-3
 
   frontend_1:
     <<: *frontline-frontend
 
   frontend_2:
+    <<: *frontline-frontend
+
+  frontend_3:
     <<: *frontline-frontend

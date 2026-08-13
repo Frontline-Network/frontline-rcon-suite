@@ -11,7 +11,7 @@ def test_alembic_has_one_production_compatible_head():
     config = Config(str(ROOT / "alembic.ini"))
     config.set_main_option("script_location", str(ROOT / "alembic"))
 
-    assert ScriptDirectory.from_config(config).get_heads() == ["29edf99df5fd"]
+    assert ScriptDirectory.from_config(config).get_heads() == ["70d823b91325"]
 
 
 def test_django_mobile_and_autobalancer_branches_merge_before_frontline_permissions():
