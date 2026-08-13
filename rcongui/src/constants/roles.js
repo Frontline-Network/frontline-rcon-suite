@@ -38,6 +38,19 @@ export const ROLES_TO_LABELS = {
   [ROLES.GUNNER]: "Gunner",
 };
 
+const ROLE_ICON_FALLBACKS = {
+  squadleader: ROLES.SQUAD_LEAD,
+  specialist: ROLES.ASSAULT,
+  grenadier: ROLES.ANTI_TANK,
+  mortarsupport: ROLES.SUPPORT,
+  mortarobserver: ROLES.ARTILLERY_OBSERVER,
+  mortargunner: ROLES.GUNNER,
+  helicopterpilot: ROLES.CREWMAN,
+  helicopterlogisticsofficer: ROLES.SQUAD_LEAD,
+};
+
+export const getRoleIconKey = (role) => ROLE_ICON_FALLBACKS[role] || role;
+
 
 export const getAllRoles = () => [
   { value: ROLES.COMMANDER, label: ROLES_TO_LABELS[ROLES.COMMANDER] },
