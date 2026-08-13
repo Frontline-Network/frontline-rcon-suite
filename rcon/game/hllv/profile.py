@@ -22,4 +22,8 @@ HLLV_PROFILE = GameProfile(
             GameMode.DOMINATION,
         }
     ),
+    game_mode_aliases={
+        "nva offensive": GameMode.OFFENSIVE,
+        "us offensive": GameMode.OFFENSIVE,
+    },
 )

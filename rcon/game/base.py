@@ -21,6 +21,7 @@ class GameProfile:
     weapons: Mapping[str, WeaponType] = field(default_factory=dict)
     weapon_sides: Mapping[str, Team] = field(default_factory=dict)
     supported_game_modes: frozenset[GameMode] = field(default_factory=frozenset)
+    game_mode_aliases: Mapping[str, GameMode] = field(default_factory=dict)
 
     def parse_layer(self, layer_name: str | Layer) -> Layer:
         return self.layer_parser(layer_name)
@@ -32,7 +33,13 @@ class GameProfile:
             return self.layers["unknown"]
 
     def parse_game_mode(self, game_mode: str | GameMode) -> GameMode:
-        mode = game_mode if isinstance(game_mode, GameMode) else GameMode(game_mode.lower())
+        if isinstance(game_mode, GameMode):
+            mode = game_mode
+        else:
+            normalized = game_mode.strip().lower()
+            mode = self.game_mode_aliases.get(normalized, normalized)
+            if not isinstance(mode, GameMode):
+                mode = GameMode(mode)
         if mode not in self.supported_game_modes:
             raise ValueError(
                 f"Game mode {mode.value!r} is not supported by the '{self.game.value}' game profile"
