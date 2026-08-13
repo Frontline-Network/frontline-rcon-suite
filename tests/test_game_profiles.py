@@ -129,6 +129,26 @@ def test_server_ctl_parses_game_state_with_selected_profile(
     assert game_state["game_mode"] is GameMode(game_mode.lower())
 
 
+def test_hllv_gamestate_uses_layer_mode_during_map_transition():
+    ctl = HLLVServerCtl(ServerInfo(game=GameEnum.HLL_VIETNAM), Mock())
+    ctl.exchange = Mock(
+        side_effect=[
+            _response(_session("wdeve_offensivenva_day", "")),
+            _response(
+                {
+                    "mAPS": [{"iD": "wdeve_offensivenva_day"}],
+                    "currentIndex": 0,
+                }
+            ),
+        ]
+    )
+
+    game_state = ctl.get_gamestate()
+
+    assert game_state["current_map"]["id"] == "wdeve_offensivenva_day"
+    assert game_state["game_mode"] is GameMode.OFFENSIVE
+
+
 def test_game_specific_controller_surface():
     hll = HLLServerCtl(ServerInfo(game=GameEnum.HLL_WW2), Mock())
     hllv = HLLVServerCtl(ServerInfo(game=GameEnum.HLL_VIETNAM), Mock())
