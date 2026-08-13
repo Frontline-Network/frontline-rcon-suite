@@ -1,5 +1,6 @@
 const en = {
   brand: { product: "CRCON Administration" },
+  playerIdentity: { linkedAccounts: "Automatically linked to", restrictedTitle: "Security warning: linked account is banned", restrictedDescription: "The linked {{game}} “{{name}}” has an active ban. No automatic action was taken.", games: { hll: "HLL account", hll_vietnam: "HLL:V account" } },
   common: {
     actions: "Actions",
     all: "All",

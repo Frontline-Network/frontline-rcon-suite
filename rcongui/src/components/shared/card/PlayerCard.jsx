@@ -14,6 +14,7 @@ import ActionList from "@/components/player/profile/ActionList";
 import ProfileActions from "@/components/player/profile/Actions";
 import { useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
+import LinkedAccounts from "@/components/player/profile/LinkedAccounts";
 
 export default function PlayerCard({
   player: playerProfile,
@@ -84,6 +85,7 @@ export default function PlayerCard({
           platform={platform}
           clanTag={clanTag}
         />
+        <LinkedAccounts identity={playerProfile.identity} compact />
         <ActionList playerProfile={playerProfile} />
         <FlagList player={playerProfile} />
         <Stack

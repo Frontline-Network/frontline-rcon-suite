@@ -1,5 +1,6 @@
 const de = {
   brand: { product: "CRCON Administration" },
+  playerIdentity: { linkedAccounts: "Automatisch verknüpft mit", restrictedTitle: "Sicherheitswarnung: verknüpftes Konto gesperrt", restrictedDescription: "Das verknüpfte {{game}} „{{name}}“ besitzt eine aktive Sperre. Es wurde keine automatische Maßnahme ausgeführt.", games: { hll: "HLL-Konto", hll_vietnam: "HLL:V-Konto" } },
   common: {
     actions: "Aktionen",
     all: "Alle",

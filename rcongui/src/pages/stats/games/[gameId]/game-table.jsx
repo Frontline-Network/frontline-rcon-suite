@@ -14,7 +14,7 @@ import {downloadGame} from "@/features/download-game";
 import { useGameDetailsTableStore } from "@/stores/table-config";
 import { useTranslation } from "react-i18next";
 
-const renderSubComponent = ({ row }, t) => {
+const renderSubComponent = ({ row }, t, playerNames) => {
   // Create a custom component that renders the player's stats
   const statCategories = {
     combat: [
@@ -60,12 +60,12 @@ const renderSubComponent = ({ row }, t) => {
   );
 
   const players = Object.entries(row.original.most_killed || {}).map(
-      ([player, kills]) => (
+      ([playerId, kills]) => (
           <Box
-              key={player}
+              key={playerId}
               sx={{ display: "flex", justifyContent: "space-between", py: 0.5 }}
           >
-              <Typography variant="body2">{player}:</Typography>
+              <Typography variant="body2">{playerNames.get(playerId) || playerId}:</Typography>
               <Typography variant="body2" sx={{ ml: 2 }}>
                   {kills}
               </Typography>
@@ -102,12 +102,12 @@ const renderSubComponent = ({ row }, t) => {
   ));
 
   const deathsByPlayer = Object.entries(row.original.death_by || {}).map(
-    ([player, deaths]) => (
+    ([playerId, deaths]) => (
       <Box
-        key={player}
+        key={playerId}
         sx={{ display: "flex", justifyContent: "space-between", py: 0.5 }}
       >
-        <Typography variant="body2">{player}:</Typography>
+        <Typography variant="body2">{playerNames.get(playerId) || playerId}:</Typography>
         <Typography variant="body2" sx={{ ml: 2 }}>
           {deaths}
         </Typography>
@@ -167,6 +167,9 @@ const PlayersTable = ({ table, selectedPlayers }) => {
   const [tableConfigDrawerOpen, setTableConfigDrawerOpen] = useState(false);
   const tableConfig = useGameDetailsTableStore();
   const setConfig = useGameDetailsTableStore(state => state.setConfig);
+  const playerNames = new Map(
+    table.options.data.map((player) => [player.player_id, player.player])
+  );
 
   const handleTableConfigClick = () => {
     setTableConfigDrawerOpen(prev => !prev);
@@ -227,7 +230,7 @@ const PlayersTable = ({ table, selectedPlayers }) => {
       <Table
         table={table}
         config={tableConfig}
-        renderSubComponent={(props) => renderSubComponent(props, t)}
+        renderSubComponent={(props) => renderSubComponent(props, t, playerNames)}
       />
       <TableConfigDrawer
         name={t("stats.gameDetails.title")}

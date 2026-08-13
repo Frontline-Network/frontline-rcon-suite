@@ -447,6 +447,13 @@ class RconAPI(Rcon):
             bans = self.get_ban(player_id=player_id)
             comments = player_history.get_player_comments(player_id=player_id)
 
+            for linked_account in raw_profile.get("identity", {}).get(
+                "linked_accounts", []
+            ):
+                linked_bans = self.get_ban(player_id=linked_account["player_id"])
+                linked_account["bans"] = linked_bans
+                linked_account["is_banned"] = bool(linked_bans)
+
             profile = raw_profile.copy()
             profile.update(
                 {

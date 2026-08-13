@@ -26,6 +26,7 @@ from rcon.models import (
     WatchList,
     enter_session,
 )
+from rcon.steam_utils import is_steam_id_64
 from rcon.types import (
     PlayerActionState,
     PlayerActionType,
@@ -54,6 +55,108 @@ def get_player(sess: Session, player_id: str) -> PlayerID | None:
     return sess.query(PlayerID).filter(PlayerID.player_id == player_id).one_or_none()
 
 
+def _player_identity_name(player: PlayerID) -> str:
+    if player.account and player.account.name:
+        return player.account.name
+    if player.names:
+        return player.names[0].name
+    if player.soldier and player.soldier.name:
+        return player.soldier.name
+    return player.player_id
+
+
+def _active_player_blacklists(player: PlayerID) -> list[dict]:
+    this_server = int(get_server_number())
+    return [
+        record
+        for record in (blacklist.to_dict() for blacklist in player.blacklists)
+        if record["is_active"]
+        and (
+            record["blacklist"]["servers"] is None
+            or this_server in record["blacklist"]["servers"]
+        )
+    ]
+
+
+def get_player_identity_links(sess: Session, players: list[PlayerID]) -> dict[str, dict]:
+    """Resolve HLL and HLL:V records belonging to the same Steam account.
+
+    HLL:V keeps its game-specific player ID because logs and admin commands need
+    it. The persisted ``steam_id`` is used as a non-destructive identity link to
+    the classic HLL record. Names are deliberately never used for matching.
+    """
+    if not players:
+        return {}
+
+    canonical_ids = {
+        player.steam_id
+        if player.steam_id and is_steam_id_64(player.steam_id)
+        else player.player_id
+        for player in players
+    }
+    related = (
+        sess.query(PlayerID)
+        .filter(
+            or_(
+                PlayerID.player_id.in_(canonical_ids),
+                PlayerID.steam_id.in_(canonical_ids),
+            )
+        )
+        .options(
+            selectinload(PlayerID.names),
+            selectinload(PlayerID.account),
+            selectinload(PlayerID.soldier),
+            selectinload(PlayerID.blacklists).selectinload(BlacklistRecord.blacklist),
+        )
+        .all()
+    )
+
+    groups: dict[str, list[PlayerID]] = {}
+    for related_player in related:
+        identity_key = (
+            related_player.steam_id
+            if related_player.steam_id and is_steam_id_64(related_player.steam_id)
+            else related_player.player_id
+        )
+        groups.setdefault(identity_key, []).append(related_player)
+
+    result = {}
+    for player in players:
+        identity_key = (
+            player.steam_id
+            if player.steam_id and is_steam_id_64(player.steam_id)
+            else player.player_id
+        )
+        identity_group = groups.get(identity_key, [])
+        has_classic_hll_account = is_steam_id_64(identity_key) and any(
+            linked.player_id == identity_key for linked in identity_group
+        )
+        linked_accounts = (
+            [
+                {
+                    "player_id": linked.player_id,
+                    "steam_id": linked.steam_id,
+                    "name": _player_identity_name(linked),
+                    "active_blacklists": _active_player_blacklists(linked),
+                    "game": (
+                        "hll"
+                        if len(linked.player_id) == 17 and linked.player_id.isdigit()
+                        else "hll_vietnam"
+                    ),
+                }
+                for linked in identity_group
+                if linked.player_id != player.player_id
+            ]
+            if has_classic_hll_account
+            else []
+        )
+        result[player.player_id] = {
+            "linked_accounts": linked_accounts,
+        }
+
+    return result
+
+
 def get_player_profile(player_id: str, nb_sessions: int):
     nb_sessions = int(nb_sessions)
 
@@ -63,7 +166,9 @@ def get_player_profile(player_id: str, nb_sessions: int):
         )
         if player is None:
             return
-        return player.to_dict(limit_sessions=nb_sessions)
+        profile = player.to_dict(limit_sessions=nb_sessions)
+        profile["identity"] = get_player_identity_links(sess, [player])[player_id]
+        return profile
 
 
 def get_player_profile_by_player_ids(sess, player_ids):
@@ -257,8 +362,14 @@ def get_players_by_appearance(
                 selectinload(PlayerID.flags),
                 selectinload(PlayerID.watchlist),
                 selectinload(PlayerID.steaminfo),
+                selectinload(PlayerID.account),
+                selectinload(PlayerID.soldier),
             )
             .all()
+        )
+
+        identity_links = get_player_identity_links(
+            sess, [player[0] for player in players]
         )
 
         def sort_name_match(v, v2):
@@ -282,6 +393,7 @@ def get_players_by_appearance(
             "players": [
                 {
                     **p[0].to_dict(limit_sessions=0),
+                    "identity": identity_links[p[0].player_id],
                     "names_by_match": sorted(
                         (n.name for n in p[0].names), key=cmp_to_key(sort_name_match)
                     ),
