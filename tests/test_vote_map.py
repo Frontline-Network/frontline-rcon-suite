@@ -3,10 +3,13 @@ import pytest
 from fakeredis import FakeStrictRedis
 from unittest.mock import MagicMock, patch
 from rcon import maps
+from rcon.game.hll.profile import HLL_PROFILE
+from rcon.game.hllv.profile import HLLV_PROFILE
 from rcon.user_config.vote_map import DefaultMethods
 from rcon.vote_map import InvalidVoteError, PlayerChoiceNotAllowed, PlayerVoteNotAllowed, VoteMap, VoteMapException, VoteMapUserConfig
 from rcon.maps import LAYERS, MAPS, Environment, Layer, GameMode, Team
 from rcon.types import PlayerProfileType
+from rcon.vote_map.state import VotemapState
 
 ALL_MAPS = list(LAYERS.values())
 
@@ -95,6 +98,7 @@ def redis_client():
 def mock_rcon():
     """Fixture for mocking Rcon interactions."""
     rcon = MagicMock()
+    rcon.game_profile = HLL_PROFILE
     rcon.get_maps.return_value = ALL_MAPS
     rcon.get_player_ids.return_value = [
         ("Player1", "71234567890"),
@@ -125,6 +129,17 @@ def mock_rcon():
 
     rcon.add_map_to_rotation.side_effect = add_map_to_rotation
     return rcon
+
+
+def test_votemap_state_uses_configured_hllv_layer_parser(redis_client):
+    with patch("rcon.vote_map.state.get_redis_client", return_value=redis_client):
+        state = VotemapState(layer_parser=HLLV_PROFILE.parse_layer)
+        redis_client.sadd(state.MAP_WHITELIST, "wdeva_warfare_day")
+
+        [layer] = state.get_whitelist()
+
+    assert layer.id == "wdeva_warfare_day"
+    assert layer.map.id == "WDEV_A"
 
 
 @pytest.fixture
