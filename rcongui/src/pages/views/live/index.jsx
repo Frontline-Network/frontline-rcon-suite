@@ -30,6 +30,7 @@ import MessageAllDialog from "@/features/player-action/MessageAll";
 import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/shared/PageHeader";
 import { demoGameState, isFakeMode } from "@/mirage/demo-data";
+import { getActiveBanStatus } from "./active-ban";
 
 const interval = 15 * 1000; // 15 seconds
 const UNASSIGNED = "unassigned"
@@ -73,10 +74,16 @@ const Live = () => {
 
   const playersData = useMemo(() => {
     if (!teamData) return [];
-    return extractPlayers(teamData).map((player) => ({
-      ...player,
-      profile: normalizePlayerProfile(player.profile),
-    }));
+    return extractPlayers(teamData).map((player) => {
+      const normalizedPlayer = {
+        ...player,
+        profile: normalizePlayerProfile(player.profile),
+      };
+      return {
+        ...normalizedPlayer,
+        activeBanStatus: getActiveBanStatus(normalizedPlayer),
+      };
+    });
   }, [teamData]);
 
   // ---------------- LOGS DATA -----------------

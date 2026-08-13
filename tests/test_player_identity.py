@@ -54,6 +54,7 @@ def test_links_hllv_and_hll_by_authoritative_steam_id_not_name():
             "name": "Completely different historical name",
             "game": "hll",
             "active_blacklists": [],
+            "existing_blacklists": [],
         }
     ]
     assert links[hll.player_id]["linked_accounts"][0]["player_id"] == hllv.player_id
@@ -77,7 +78,7 @@ def test_does_not_publish_link_until_classic_hll_account_exists():
     assert links[hllv.player_id]["linked_accounts"] == []
 
 
-def test_reports_only_active_blacklists_applicable_to_this_server():
+def test_reports_applicable_and_existing_blacklists_separately():
     steam_id = "76561198036685843"
     hll = player(
         steam_id,
@@ -97,6 +98,12 @@ def test_reports_only_active_blacklists_applicable_to_this_server():
             "active_blacklists"
         ]
     ] == ["Active network ban"]
+    assert [
+        record["reason"]
+        for record in links[hllv.player_id]["linked_accounts"][0][
+            "existing_blacklists"
+        ]
+    ] == ["Active network ban", "Other server"]
 
 
 def test_profile_api_marks_current_game_server_ban_on_linked_account():
