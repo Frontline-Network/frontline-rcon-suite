@@ -672,19 +672,24 @@ class RconAPI(Rcon):
 
     def remove_map_from_votemap(self, map_name: str):
         v = VoteMap()
-        v.remove_map_from_selection(maps.parse_layer(map_name))
+        v.remove_map_from_selection(self.game_profile.parse_layer(map_name))
 
     def add_map_to_votemap(self, map_name: str):
         v = VoteMap()
-        v.add_map_to_selection(maps.parse_layer(map_name))
+        v.add_map_to_selection(self.game_profile.parse_layer(map_name))
 
     def set_votemap_winner(self, map_name: str):
         v = VoteMap()
-        v.guarantee_next_map(maps.parse_layer(map_name))
+        v.guarantee_next_map(self.game_profile.parse_layer(map_name))
 
     def add_votemap_vote(self, player_id: str, player_name: str, map_name: str, vote_count: int | None = None):
         v = VoteMap()
-        v.add_vote(maps.parse_layer(map_name), player_id, player_name, vote_count)
+        v.add_vote(
+            self.game_profile.parse_layer(map_name),
+            player_id,
+            player_name,
+            vote_count,
+        )
 
     def send_votemap_reminder(self):
         v = VoteMap()
@@ -703,19 +708,23 @@ class RconAPI(Rcon):
 
     def add_map_to_votemap_whitelist(self, map_name: str):
         v = VoteMap()
-        v.add_map_to_whitelist(maps.parse_layer(map_name))
+        v.add_map_to_whitelist(self.game_profile.parse_layer(map_name))
 
     def add_maps_to_votemap_whitelist(self, map_names: Iterable[str]):
         v = VoteMap()
-        v.add_maps_to_whitelist([maps.parse_layer(map) for map in map_names])
+        v.add_maps_to_whitelist(
+            [self.game_profile.parse_layer(map_name) for map_name in map_names]
+        )
 
     def remove_map_from_votemap_whitelist(self, map_name: str):
         v = VoteMap()
-        v.remove_map_from_whitelist(maps.parse_layer(map_name))
+        v.remove_map_from_whitelist(self.game_profile.parse_layer(map_name))
 
     def remove_maps_from_votemap_whitelist(self, map_names: Iterable[str]):
         v = VoteMap()
-        v.remove_maps_from_whitelist(map_names)
+        v.remove_maps_from_whitelist(
+            [self.game_profile.parse_layer(map_name) for map_name in map_names]
+        )
 
     def reset_map_votemap_whitelist(self):
         v = VoteMap()
@@ -723,7 +732,9 @@ class RconAPI(Rcon):
 
     def set_votemap_whitelist(self, map_names: Iterable[str]):
         v = VoteMap()
-        v.set_map_whitelist([maps.parse_layer(map) for map in map_names])
+        v.set_map_whitelist(
+            [self.game_profile.parse_layer(map_name) for map_name in map_names]
+        )
 
     def get_votemap_config(self) -> VoteMapUserConfig:
         v = VoteMap()

@@ -239,3 +239,15 @@ def test_welcome_message_uses_game_specific_command(ctl_type, game, command):
     ctl.set_welcome_message("Welcome")
 
     ctl.exchange.assert_called_once_with(command, 2, {"Message": "Welcome"})
+
+
+def test_hllv_votemap_whitelist_uses_selected_game_profile(monkeypatch):
+    votemap = Mock()
+    monkeypatch.setattr("rcon.api_commands.VoteMap", Mock(return_value=votemap))
+    ctl = HLLVRconAPI(ServerInfo(game=GameEnum.HLL_VIETNAM))
+
+    ctl.set_votemap_whitelist(["wdeva_warfare_day"])
+
+    votemap.set_map_whitelist.assert_called_once_with(
+        [HLLV_PROFILE.parse_layer("wdeva_warfare_day")]
+    )
