@@ -3,6 +3,7 @@ import logging
 import os
 import secrets
 from datetime import UTC, datetime, timedelta, timezone
+from functools import cache
 from itertools import islice
 from typing import Any, Callable, Generic, Iterable, Iterator, Optional, TypeVar, overload
 
@@ -61,6 +62,16 @@ ALL_ROLES = (
 )
 
 ALL_ROLES_KEY_INDEX_MAP = {v: i for i, v in enumerate(ALL_ROLES)}
+
+
+@cache
+def get_squad_leader_roles(game: GameEnum) -> frozenset[str]:
+    """Return the squad-leader role names for the selected game profile."""
+
+    role_cls = game_switch(game, hllrcon.HLLRole, hllrcon.HLLVRole)
+    return frozenset(
+        role.name.lower() for role in role_cls.all() if role.is_squad_leader
+    )
 
 
 T = TypeVar("T")
