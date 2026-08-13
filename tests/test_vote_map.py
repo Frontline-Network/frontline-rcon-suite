@@ -10,6 +10,7 @@ from rcon.vote_map import InvalidVoteError, PlayerChoiceNotAllowed, PlayerVoteNo
 from rcon.maps import LAYERS, MAPS, Environment, Layer, GameMode, Team
 from rcon.types import PlayerProfileType
 from rcon.vote_map.state import VotemapState
+from rcon.vote_map.selection import MapSelectionBuilder, MapSelectionCriteria
 
 ALL_MAPS = list(LAYERS.values())
 
@@ -69,6 +70,16 @@ INVALID_MAP = Layer(
     map=MAPS["utahbeach"],
     game_mode=GameMode.WARFARE,
 )
+CAR_CONQUEST = Layer(
+    id="carentan_conquest",
+    map=MAPS["carentan"],
+    game_mode=GameMode.CONQUEST,
+)
+CAR_DOMINATION = Layer(
+    id="carentan_domination",
+    map=MAPS["carentan"],
+    game_mode=GameMode.DOMINATION,
+)
 
 # Sample map data for mocking
 SAMPLE_MAPS = [
@@ -81,6 +92,55 @@ SAMPLE_MAPS = [
     CAR_SKIRMISH_RAIN,
     HUR_WARFARE_DAY,
 ]
+
+
+def test_votemap_selects_conquest_and_domination_options():
+    criteria = MapSelectionCriteria(
+        maps_history=[],
+        current_map=HUR_WARFARE_DAY,
+        allowed_maps={CAR_CONQUEST, CAR_DOMINATION},
+        number_last_played_to_exclude=0,
+        num_warfare_options=0,
+        num_offensive_options=0,
+        num_conquest_options=1,
+        num_domination_options=1,
+        num_skirmish_control_options=0,
+        consider_offensive_same_map=False,
+        consider_skirmishes_as_same_map=False,
+        consider_environment_as_same_map=False,
+        allow_multiple_maps_with_same_environment=False,
+        allow_consecutive_offensives=True,
+        allow_consecutive_offensives_opposite_sides=True,
+        allow_consecutive_skirmishes=True,
+    )
+
+    selection = MapSelectionBuilder().build(criteria)
+
+    assert set(selection) == {CAR_CONQUEST, CAR_DOMINATION}
+
+
+def test_votemap_sorting_preserves_conquest_and_domination():
+    selection = maps.sort_maps_by_gamemode(
+        [CAR_DOMINATION, CAR_CONQUEST, CAR_OFF_ALLIES, CAR_WARFARE_DAY]
+    )
+
+    assert selection == [
+        CAR_WARFARE_DAY,
+        CAR_OFF_ALLIES,
+        CAR_CONQUEST,
+        CAR_DOMINATION,
+    ]
+
+
+def test_existing_votemap_config_defaults_new_modes_to_disabled():
+    config = VoteMapUserConfig.model_validate(
+        VoteMapUserConfig().model_dump(
+            exclude={"num_conquest_options", "num_domination_options"}
+        )
+    )
+
+    assert config.num_conquest_options == 0
+    assert config.num_domination_options == 0
 
 
 class FakeMapsHistory(list):

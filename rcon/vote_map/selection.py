@@ -22,6 +22,8 @@ class MapSelectionCriteria:
     number_last_played_to_exclude: int
     num_warfare_options: int
     num_offensive_options: int
+    num_conquest_options: int
+    num_domination_options: int
     num_skirmish_control_options: int
     consider_offensive_same_map: bool
     consider_skirmishes_as_same_map: bool
@@ -208,7 +210,7 @@ class MapSelectionBuilder:
     def _sample_selection(
         self, candidates: set[Layer], criteria: MapSelectionCriteria
     ) -> list[Layer]:
-        """Randomly sample warfare, offensive, and skirmish options from the filtered candidates."""
+        """Randomly sample the configured number of options for each supported mode."""
         categorized_maps = categorize_maps(candidates)
         return (
             self._get_random_map_selection(
@@ -219,6 +221,16 @@ class MapSelectionBuilder:
             + self._get_random_map_selection(
                 categorized_maps[GameMode.WARFARE],
                 criteria.num_warfare_options,
+                criteria.allow_multiple_maps_with_same_environment,
+            )
+            + self._get_random_map_selection(
+                categorized_maps[GameMode.CONQUEST],
+                criteria.num_conquest_options,
+                criteria.allow_multiple_maps_with_same_environment,
+            )
+            + self._get_random_map_selection(
+                categorized_maps[GameMode.DOMINATION],
+                criteria.num_domination_options,
                 criteria.allow_multiple_maps_with_same_environment,
             )
             + self._get_random_map_selection(
