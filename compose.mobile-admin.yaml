@@ -29,6 +29,10 @@ x-mobile-environment-server-3: &mobile-environment-server-3
   <<: *mobile-environment
   HLL_GAME: ${HLL_GAME_3:-hll}
 
+x-mobile-environment-server-4: &mobile-environment-server-4
+  <<: *mobile-environment
+  HLL_GAME: ${HLL_GAME_4:-hll}
+
 x-frontline-frontend: &frontline-frontend
   image: frontline/hll_rcon_tool_frontend:${CRCON_IMAGE_TAG:-mobile-admin-autobalancer-v11.11.1}
   build:
@@ -76,6 +80,14 @@ services:
     <<: *frontline-backend
     environment: *mobile-environment-server-3
 
+  backend_4:
+    <<: *frontline-backend
+    environment: *mobile-environment-server-4
+
+  supervisor_4:
+    <<: *frontline-backend
+    environment: *mobile-environment-server-4
+
   frontend_1:
     <<: *frontline-frontend
 
@@ -83,4 +95,7 @@ services:
     <<: *frontline-frontend
 
   frontend_3:
+    <<: *frontline-frontend
+
+  frontend_4:
     <<: *frontline-frontend
