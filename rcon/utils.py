@@ -637,7 +637,18 @@ def parse_raw_player_info(raw: PlayerInfoType, game: GameEnum) -> GetDetailedPla
         role = None
 
     data["faction"] = faction.short_name.lower() if faction else None
-    data["team"] = faction.team.name.lower() if faction else None
+    # Keep the logical team names stable across games. CRCON's team view,
+    # automods, and frontend use ``allies``/``axis`` as API keys, while HLLV's
+    # game-facing names are ``South``/``North``. The faction remains game
+    # specific (for example ``us``/``nva``), but the team contract must not
+    # change with the selected game profile.
+    data["team"] = (
+        "allies"
+        if faction and faction.is_allied
+        else "axis"
+        if faction and faction.is_axis
+        else None
+    )
     data["role"] = role.name.lower() if role else None
     data["loadout"] = raw["loadout"].lower()
     data["level"] = int(raw["level"])

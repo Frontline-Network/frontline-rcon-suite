@@ -174,3 +174,44 @@ def mock_get_detailed_player(
 )
 def test_parse_raw_player_info(raw, expected):
     assert parse_raw_player_info(raw=raw, game=GameEnum.HLL_WW2) == expected
+
+
+@pytest.mark.parametrize(
+    "raw_team, faction, team",
+    [
+        (1, "us", "allies"),
+        (6, "nva", "axis"),
+    ],
+)
+def test_parse_hllv_player_uses_crcon_logical_team_names(raw_team, faction, team):
+    raw = {
+        "iD": "hllv-player-id",
+        "steamId": "76561199502921234",
+        "team": raw_team,
+        "role": 0,
+        "level": 16,
+        "loadout": "Standard Issue",
+        "name": "MasterShake",
+        "platoon": "ABLE",
+        "scoreData": {
+            "cOMBAT": 72,
+            "offense": 100,
+            "defense": 220,
+            "support": 65,
+        },
+        "stats": {
+            "teamKills": 1,
+            "vehicleKills": 2,
+            "vehiclesDestroyed": 3,
+            "infantryKills": 11,
+            "deaths": 9,
+        },
+        "platform": "steam",
+        "clanTag": "GH",
+        "worldPosition": {},
+    }
+
+    parsed = parse_raw_player_info(raw=raw, game=GameEnum.HLL_VIETNAM)
+
+    assert parsed["faction"] == faction
+    assert parsed["team"] == team
