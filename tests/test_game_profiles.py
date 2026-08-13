@@ -169,6 +169,22 @@ def test_concrete_rcon_classes_share_commands_but_identify_their_game():
     assert HLLVRcon.game_test_command(None) is GameEnum.HLL_VIETNAM
 
 
+def test_detailed_player_parser_receives_controller_game(monkeypatch):
+    parser = Mock(return_value={"player_id": "player-1"})
+    monkeypatch.setattr("rcon.rcon.parse_raw_player_info", parser)
+    ctl = HLLVRcon(ServerInfo(game=GameEnum.HLL_VIETNAM), Mock())
+    player_info = {"iD": "player-1"}
+
+    result = ctl._get_detailed_player_info(
+        player_info,
+        {"is_vip": True, "profile": None},
+    )
+
+    parser.assert_called_once_with(player_info, GameEnum.HLL_VIETNAM)
+    assert result["is_vip"] is True
+    assert result["profile"] is None
+
+
 @pytest.mark.parametrize(
     ("game", "expected_type"),
     [
