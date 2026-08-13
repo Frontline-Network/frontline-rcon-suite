@@ -172,7 +172,7 @@ def test_concrete_rcon_classes_share_commands_but_identify_their_game():
 def test_detailed_player_parser_receives_controller_game(monkeypatch):
     parser = Mock(return_value={"player_id": "player-1"})
     monkeypatch.setattr("rcon.rcon.parse_raw_player_info", parser)
-    ctl = HLLVRcon(ServerInfo(game=GameEnum.HLL_VIETNAM), Mock())
+    ctl = HLLVRcon(ServerInfo(game=GameEnum.HLL_VIETNAM))
     player_info = {"iD": "player-1"}
 
     result = ctl._get_detailed_player_info(
