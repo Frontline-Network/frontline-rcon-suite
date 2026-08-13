@@ -64,6 +64,14 @@ export const messageAction = {
   component: MessageFormFields,
   icon: MessageIcon,
   execute: executeAction("message_player"),
+  execution: {
+    // HLL Vietnam rejects part of a large recipient list when every request
+    // reaches the RCON server at once. Keep only a small number in flight and
+    // retry explicit overload/server failures after a short delay.
+    concurrency: 3,
+    maxAttempts: 2,
+    retryDelayMs: 300,
+  },
   permission: ["can_message_players"],
 };
 
