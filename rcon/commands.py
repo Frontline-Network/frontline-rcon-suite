@@ -612,8 +612,15 @@ class ServerCtl:
         seconds_remaining = int(time_remaining.total_seconds())
         raw_time_remaining = f"{seconds_remaining // 3600}:{(seconds_remaining // 60) % 60:02}:{seconds_remaining % 60:02}"
 
-        game_mode = self.game_profile.parse_game_mode(s["gameMode"])
         current_map = self.game_profile.parse_layer_or_unknown(s["mapId"])
+        raw_game_mode = s.get("gameMode")
+        # During a map transition the game server can briefly return an empty
+        # gameMode while the map id already identifies the incoming layer.
+        # Keep the endpoint available by deriving the mode from that layer.
+        if isinstance(raw_game_mode, str) and raw_game_mode.strip():
+            game_mode = self.game_profile.parse_game_mode(raw_game_mode)
+        else:
+            game_mode = current_map.game_mode
 
         try:
             next_map = self.game_profile.parse_layer_or_unknown(

@@ -128,10 +128,31 @@ function checkValidServiceWorker(swUrl, config) {
     });
 }
 
-export function unregister() {
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.ready.then((registration) => {
-      registration.unregister();
-    });
+export async function unregister() {
+  if (!("serviceWorker" in navigator)) {
+    return;
+  }
+
+  try {
+    const wasControlled = Boolean(navigator.serviceWorker.controller);
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((registration) => registration.unregister()));
+
+    if ("caches" in window) {
+      const cacheNames = await window.caches.keys();
+      await Promise.all(cacheNames.map((cacheName) => window.caches.delete(cacheName)));
+    }
+
+    // Unregistering does not release an already controlled tab until it reloads.
+    // Reload once so deployments cannot remain pinned to an obsolete JS bundle.
+    const reloadMarker = "crcon-service-worker-cleanup";
+    if (wasControlled && !sessionStorage.getItem(reloadMarker)) {
+      sessionStorage.setItem(reloadMarker, "1");
+      window.location.reload();
+    } else {
+      sessionStorage.removeItem(reloadMarker);
+    }
+  } catch (error) {
+    console.warn("Unable to remove the legacy CRCON service worker", error);
   }
 }

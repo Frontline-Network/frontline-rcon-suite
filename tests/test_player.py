@@ -217,6 +217,42 @@ def test_parse_hllv_player_uses_crcon_logical_team_names(raw_team, faction, team
     assert parsed["team"] == team
 
 
+def test_parse_hllv_player_accepts_temporary_unassigned_team():
+    raw = {
+        "iD": "hllv-transition-player",
+        "steamId": "76561199502921234",
+        "team": 0,
+        "role": 0,
+        "level": 16,
+        "loadout": "Standard Issue",
+        "name": "Transition Player",
+        "platoon": "",
+        "scoreData": {
+            "cOMBAT": 0,
+            "offense": 0,
+            "defense": 0,
+            "support": 0,
+        },
+        "stats": {
+            "teamKills": 0,
+            "vehicleKills": 0,
+            "vehiclesDestroyed": 0,
+            "infantryKills": 0,
+            "deaths": 0,
+        },
+        "platform": "steam",
+        "clanTag": "",
+        "worldPosition": {},
+    }
+
+    parsed = parse_raw_player_info(raw=raw, game=GameEnum.HLL_VIETNAM)
+
+    assert parsed["faction"] is None
+    assert parsed["team"] is None
+    assert parsed["unit_id"] == 0
+    assert parsed["unit_name"] == "unassigned"
+
+
 def test_hllv_squad_leader_roles_include_vietnam_unit_leaders():
     leader_roles = get_squad_leader_roles(GameEnum.HLL_VIETNAM)
 

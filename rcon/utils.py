@@ -636,11 +636,18 @@ def parse_raw_player_info(raw: PlayerInfoType, game: GameEnum) -> GetDetailedPla
     faction_cls = game_switch(game, hllrcon.HLLFaction, hllrcon.HLLVFaction)
     role_cls = game_switch(game, hllrcon.HLLRole, hllrcon.HLLVRole)
 
-    try:
-        faction = faction_cls.by_id(raw["team"])
-    except ValueError:
-        logger.exception("Unknown team %s", raw["team"])
+    raw_team = raw["team"]
+    # HLL Vietnam reports team 0 for players while a new map is loading.
+    # Unlike HLL WW2, 0 is not a faction id in HLLV; it is a temporary
+    # unassigned state and must not flood the logs with stack traces.
+    if game is GameEnum.HLL_VIETNAM and raw_team == 0:
         faction = None
+    else:
+        try:
+            faction = faction_cls.by_id(raw_team)
+        except ValueError:
+            logger.exception("Unknown team %s", raw_team)
+            faction = None
     try:
         role = role_cls.by_id(raw["role"])
     except ValueError:
