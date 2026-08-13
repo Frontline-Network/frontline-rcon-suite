@@ -26,6 +26,7 @@ import ReceivedActions from "./[detail]/received-actions";
 import { useGlobalStore } from "@/stores/global-state";
 import ProfileActions from "@/components/player/profile/Actions";
 import { useTranslation } from "react-i18next";
+import LinkedAccounts from "@/components/player/profile/LinkedAccounts";
 
 const DETAIL_LINKS = [
   { path: "", label: "records.playerDetails.profile" },
@@ -103,6 +104,7 @@ export default function PlayerProfilePage() {
               clanTag={clanTag}
               platform={platform}
             />
+            <LinkedAccounts identity={profile.identity} />
             <Divider />
             <PlayerProfileStatusTags
               isVip={isVip}
