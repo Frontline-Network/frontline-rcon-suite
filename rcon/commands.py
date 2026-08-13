@@ -728,6 +728,9 @@ class HLLServerCtl(ServerCtl):
 class HLLVServerCtl(ServerCtl):
     """Hell Let Loose: Vietnam controller extension point."""
 
+    def set_welcome_message(self, message):
+        self.exchange("SetNoticeMessage", 2, {"Message": message})
+
 
 
 if __name__ == "__main__":

@@ -223,3 +223,19 @@ def test_timer_commands_validate_mode_against_profile():
 
     with pytest.raises(ValueError, match="not supported by the 'hllv' game profile"):
         ctl.set_match_timer(GameMode.SKIRMISH, 30)
+
+
+@pytest.mark.parametrize(
+    ("ctl_type", "game", "command"),
+    [
+        (HLLServerCtl, GameEnum.HLL_WW2, "SetWelcomeMessage"),
+        (HLLVServerCtl, GameEnum.HLL_VIETNAM, "SetNoticeMessage"),
+    ],
+)
+def test_welcome_message_uses_game_specific_command(ctl_type, game, command):
+    ctl = ctl_type(ServerInfo(game=game), Mock())
+    ctl.exchange = Mock()
+
+    ctl.set_welcome_message("Welcome")
+
+    ctl.exchange.assert_called_once_with(command, 2, {"Message": "Welcome"})
