@@ -53,10 +53,25 @@ async function requestFactory({
     return await handleFetchResponse(req, res, cmd);
   } catch (error) {
     if (throwRouteError) {
-      throw json(error, {
-        status: error.status,
-        statusText: error.message || error.text,
-      });
+      const message =
+        error?.message || error?.text || "The request could not be completed.";
+      const status =
+        Number.isInteger(error?.status) &&
+        error.status >= 400 &&
+        error.status <= 599
+          ? error.status
+          : 500;
+
+      // Response.statusText only accepts HTTP reason-phrase characters. CRCON
+      // errors may contain translated text, player names or map names (for
+      // example "Huế") and therefore must remain in the JSON body instead.
+      throw json(
+        { message },
+        {
+          status,
+          statusText: "Request failed",
+        }
+      );
     }
     throw error;
   }

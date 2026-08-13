@@ -4,6 +4,7 @@ import { BadgeList } from "./BadgeList";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import PlayerSearchField from "@/components/form/custom/PlayerSearchField";
+import { executeQueued } from "./executionQueue.mjs";
 
 const ACTION_STATUS = {
   default: "default",
@@ -43,7 +44,8 @@ export const ActionForm = ({ state: actionState, actionHandlers }) => {
     },
   });
   const { recipients, action, params } = actionState;
-  const { submitRef, closeDialog, setLoading, setError, setSuccess } = actionHandlers;
+  const { submitRef, closeDialog, setLoading, setError, setSuccess } =
+    actionHandlers;
   const [recipientStates, setRecipientStates] = useState(
     initRecipients(recipients)
   );
@@ -81,8 +83,6 @@ export const ActionForm = ({ state: actionState, actionHandlers }) => {
           ...params,
         });
       }
-      // now map payloads to requests
-      const requests = payloads.map((payload) => action.execute(payload));
       // Update UI to signalize pending state
       setRecipientStates((prevState) =>
         prevState.map((state) => ({
@@ -90,8 +90,13 @@ export const ActionForm = ({ state: actionState, actionHandlers }) => {
           status: ACTION_STATUS.pending,
         }))
       );
-      // call requests in parallel
-      const responses = await Promise.allSettled(requests);
+      // Large message selections must not hit the game server all at once.
+      // Actions without queue settings keep their existing parallel behavior.
+      const responses = action.execution
+        ? await executeQueued(payloads, action.execute, action.execution)
+        : await Promise.allSettled(
+            payloads.map((payload) => action.execute(payload))
+          );
       // create a map of players' ids and their statuses
       const idsToStatus = recipientStates.reduce(
         (obj, { recipient, status }) => {
