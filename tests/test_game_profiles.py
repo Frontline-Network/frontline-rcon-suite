@@ -92,6 +92,11 @@ def test_profiles_only_accept_their_supported_game_modes():
         HLLV_PROFILE.parse_game_mode("Skirmish")
 
 
+@pytest.mark.parametrize("raw_mode", ["NVA Offensive", "US Offensive"])
+def test_hllv_profile_accepts_faction_specific_offensive_modes(raw_mode):
+    assert HLLV_PROFILE.parse_game_mode(raw_mode) is GameMode.OFFENSIVE
+
+
 @pytest.mark.parametrize(
     ("game", "game_mode", "expected_map_id"),
     [
