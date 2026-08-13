@@ -722,4 +722,11 @@ const de = {
   language: { label: "Sprache", de: "Deutsch", en: "English" },
 };
 
+Object.assign(de.maps.votemapSettings, {
+  conquestOptions: "Conquest-Karten",
+  conquestOptionsHelp: "Anzahl der angebotenen Conquest-Karten.",
+  dominationOptions: "Domination-Karten",
+  dominationOptionsHelp: "Anzahl der angebotenen Domination-Karten.",
+});
+
 export default de;

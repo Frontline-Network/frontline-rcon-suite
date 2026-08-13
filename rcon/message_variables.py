@@ -235,24 +235,32 @@ def format_map_vote(format_type="line"):
             selection=categorized[maps.GameMode.WARFARE],
             maps_to_numbers=maps_to_numbers,
         )
+        conquest = join_vote_options(
+            selection=categorized[maps.GameMode.CONQUEST],
+            maps_to_numbers=maps_to_numbers,
+        )
+        domination = join_vote_options(
+            selection=categorized[maps.GameMode.DOMINATION],
+            maps_to_numbers=maps_to_numbers,
+        )
         control_skirmish = join_vote_options(
             selection=categorized[maps.GameMode.SKIRMISH],
             maps_to_numbers=maps_to_numbers,
         )
         if format_type == "by_mod_line":
-            return "OFFENSIVE: {} WARFARE: {} SKIRMISH: {}".format(
-                off, warfare, control_skirmish
+            return "OFFENSIVE: {} WARFARE: {} CONQUEST: {} DOMINATION: {} SKIRMISH: {}".format(
+                off, warfare, conquest, domination, control_skirmish
             )
         if format_type == "by_mod_vertical":
-            return "OFFENSIVE:\n{}\nWARFARE:\n{}\nSKIRMISH:\n{}".format(
-                off, warfare, control_skirmish
+            return "OFFENSIVE:\n{}\nWARFARE:\n{}\nCONQUEST:\n{}\nDOMINATION:\n{}\nSKIRMISH:\n{}".format(
+                off, warfare, conquest, domination, control_skirmish
             )
         if format_type == "by_mod_split":
-            return "OFFENSIVE: {}\nWARFARE: {}\nSKIRMISH: {}".format(
-                off, warfare, control_skirmish
+            return "OFFENSIVE: {}\nWARFARE: {}\nCONQUEST: {}\nDOMINATION: {}\nSKIRMISH: {}".format(
+                off, warfare, conquest, domination, control_skirmish
             )
         if format_type == "by_mod_vertical_all":
-            return "OFFENSIVE:\n{}\nWARFARE:\n{}\nSKIRMISH:\n{}".format(
+            return "OFFENSIVE:\n{}\nWARFARE:\n{}\nCONQUEST:\n{}\nDOMINATION:\n{}\nSKIRMISH:\n{}".format(
                 join_vote_options(
                     selection=categorized[maps.GameMode.OFFENSIVE],
                     maps_to_numbers=maps_to_numbers,
@@ -260,6 +268,16 @@ def format_map_vote(format_type="line"):
                 ),
                 join_vote_options(
                     selection=categorized[maps.GameMode.WARFARE],
+                    maps_to_numbers=maps_to_numbers,
+                    join_char="\n",
+                ),
+                join_vote_options(
+                    selection=categorized[maps.GameMode.CONQUEST],
+                    maps_to_numbers=maps_to_numbers,
+                    join_char="\n",
+                ),
+                join_vote_options(
+                    selection=categorized[maps.GameMode.DOMINATION],
                     maps_to_numbers=maps_to_numbers,
                     join_char="\n",
                 ),

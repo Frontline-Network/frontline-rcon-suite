@@ -92,6 +92,16 @@ export const textFieldConfigs = [
     helperKey: "offensiveOptionsHelp",
   },
   {
+    name: "num_conquest_options",
+    labelKey: "conquestOptions",
+    helperKey: "conquestOptionsHelp",
+  },
+  {
+    name: "num_domination_options",
+    labelKey: "dominationOptions",
+    helperKey: "dominationOptionsHelp",
+  },
+  {
     name: "num_skirmish_control_options",
     labelKey: "skirmishOptions",
     helperKey: "skirmishOptionsHelp",
