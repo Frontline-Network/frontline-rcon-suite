@@ -32,6 +32,7 @@ import makePlayerProfileUrl from "../../utils/makePlayerProfileUrl";
 import moment from "moment";
 import Grid from "@mui/material/Grid2";
 import { useTheme } from "@mui/material/styles";
+import { getRoleIconKey } from "@/constants/roles";
 
 
 const zeroPad = (num, places) => String(num).padStart(places, "0");
@@ -164,10 +165,11 @@ const getScoreIconSrc = (type, mode) => {
 };
 
 const getRoleIconSrc = (role, mode) => {
+  const iconRole = getRoleIconKey(role);
   if (mode === "light") {
-    return `icons/roles/${role}_black.png`;
+    return `icons/roles/${iconRole}_black.png`;
   }
-  return `icons/roles/${role}.png`;
+  return `icons/roles/${iconRole}.png`;
 };
 
 const ScoreChips = ({ player }) => {
