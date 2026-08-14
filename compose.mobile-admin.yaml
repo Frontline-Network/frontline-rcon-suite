@@ -20,6 +20,8 @@ x-mobile-environment: &mobile-environment
   MOBILE_CONTEXT_V2: ${MOBILE_CONTEXT_V2:-disabled}
   MOBILE_CONTEXT_FUZZY_THRESHOLD: ${MOBILE_CONTEXT_FUZZY_THRESHOLD:-0.74}
   MOBILE_PUSH_RELAY_URL: ${MOBILE_PUSH_RELAY_URL:-}
+  FRONTLINE_VIP_REDEEM_URL: ${FRONTLINE_VIP_REDEEM_URL:-}
+  FRONTLINE_VIP_REDEEM_SECRET: ${FRONTLINE_VIP_REDEEM_SECRET:-}
 
 x-mobile-environment-server-2: &mobile-environment-server-2
   <<: *mobile-environment
