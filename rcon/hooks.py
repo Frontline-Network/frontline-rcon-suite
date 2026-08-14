@@ -19,6 +19,7 @@ from rcon.blacklist import (
 from rcon.cache_utils import invalidates, get_redis_client
 from rcon.commands import HLLCommandFailedError
 from rcon.discord import get_prepared_discord_hooks, send_to_discord_audit
+from rcon.frontline_vip_verification import handle_chat_verification
 from rcon.logs.loop import (
     on_camera,
     on_chat,
@@ -87,6 +88,11 @@ ARG_RE = re.compile(r"\$(\d+)")
 @on_chat
 def count_map_vote(_, struct_log: StructuredLogLineWithMetaData):
     VoteMap().handle_vote_command(struct_log)
+
+
+@on_chat
+def frontline_vip_verification(rcon: Rcon, struct_log: StructuredLogLineWithMetaData):
+    handle_chat_verification(rcon, struct_log)
 
 
 @on_chat
