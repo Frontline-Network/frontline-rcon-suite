@@ -1,4 +1,5 @@
 import MuiAvatar from "@mui/material/Avatar";
+import Chip from "@mui/material/Chip";
 import MuiListItemAvatar from "@mui/material/ListItemAvatar";
 import MenuItem from "@mui/material/MenuItem";
 import ListItemText from "@mui/material/ListItemText";
@@ -7,8 +8,26 @@ import Select, { selectClasses } from "@mui/material/Select";
 import { styled } from "@mui/material/styles";
 import DevicesRoundedIcon from "@mui/icons-material/DevicesRounded";
 import { useGlobalStore } from "@/stores/global-state";
-import { useNavigate } from 'react-router-dom';
 import { useTranslation } from "react-i18next";
+
+export function getServerHref(selectedServer, currentHref = window.location.href) {
+  const currentUrl = new URL(currentHref);
+  let targetUrl;
+
+  if (selectedServer.link) {
+    targetUrl = new URL(selectedServer.link);
+  } else {
+    const regex = /:(\d+)/gm;
+    targetUrl = new URL(
+      currentUrl.href.replace(regex, `:${selectedServer.port}`)
+    );
+  }
+
+  targetUrl.pathname = currentUrl.pathname;
+  targetUrl.search = currentUrl.search;
+  targetUrl.hash = currentUrl.hash;
+  return targetUrl.href;
+}
 
 const Avatar = styled(MuiAvatar)(({ theme }) => ({
   width: 28,
@@ -23,11 +42,21 @@ const ListItemAvatar = styled(MuiListItemAvatar)({
   marginRight: 12,
 });
 
+const GAME_LABELS = {
+  hll: "HLL",
+  hllv: "HLL: Vietnam",
+};
+
+export const getGameLabel = (game) => GAME_LABELS[game] ?? null;
+
 export default function SelectContent() {
   const { t } = useTranslation();
   const thisServer = useGlobalStore((state) => state.serverState);
   const otherServers = useGlobalStore((state) => state.servers);
-  const navigate = useNavigate();
+
+  const switchToServer = (selectedServer) => {
+    window.location.assign(getServerHref(selectedServer));
+  };
 
   const handleChange = (servers) => (event) => {
     const serverNumber = Number(event.target.value);
@@ -38,22 +67,7 @@ export default function SelectContent() {
       return;
     }
 
-    let newUrl;
-    if (selectedServer.link) {
-      newUrl = new URL(selectedServer.link);
-      newUrl.pathname = window.location.pathname;
-      newUrl.search = window.location.search;
-      newUrl.hash = window.location.hash;
-    } else {
-      const regex = /:(\d+)/gm;
-      newUrl = new URL(window.location.href.replace(regex, `:${selectedServer.port}`));
-    }
-
-    if (newUrl.origin === window.location.origin) {
-      navigate(newUrl.pathname + newUrl.search + newUrl.hash, { replace: true });
-    } else {
-      window.location.replace(newUrl.href);
-    }
+    switchToServer(selectedServer);
   };
 
   const servers = thisServer ? [thisServer, ...otherServers] : null;
@@ -91,26 +105,54 @@ export default function SelectContent() {
     >
       <ListSubheader sx={{ pt: 0 }}>{t("sidebar.servers")}</ListSubheader>
       {servers ? (
-        servers.map((server) => (
-          <MenuItem key={server.server_number} value={server.server_number}>
-            <ListItemAvatar>
-              <Avatar alt={server.name ?? "<server_name>"}>
-                <DevicesRoundedIcon sx={{ fontSize: "1rem" }} />
-              </Avatar>
-            </ListItemAvatar>
-            <ListItemText
-              sx={{
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-              primary={server.name ?? "<server_name>"}
-              secondary={
-                t("sidebar.serverNumber", { number: server.server_number })
-              }
-            />
-          </MenuItem>
-        ))
+        servers.map((server) => {
+          const gameLabel = getGameLabel(server.game);
+
+          return (
+            <MenuItem
+              key={server.server_number}
+              value={server.server_number}
+              component="a"
+              href={getServerHref(server)}
+              onClick={() => switchToServer(server)}
+              sx={{ minWidth: 0 }}
+            >
+              <ListItemAvatar>
+                <Avatar alt={server.name ?? "<server_name>"}>
+                  <DevicesRoundedIcon sx={{ fontSize: "1rem" }} />
+                </Avatar>
+              </ListItemAvatar>
+              <ListItemText
+                sx={{
+                  minWidth: 0,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+                primary={server.name ?? "<server_name>"}
+                secondary={
+                  t("sidebar.serverNumber", { number: server.server_number })
+                }
+              />
+              {gameLabel ? (
+                <Chip
+                  label={gameLabel}
+                  size="small"
+                  color={server.game === "hllv" ? "warning" : "default"}
+                  variant={server.game === "hllv" ? "filled" : "outlined"}
+                  sx={{
+                    flexShrink: 0,
+                    height: 22,
+                    ml: 1,
+                    fontSize: "0.65rem",
+                    fontWeight: 700,
+                    letterSpacing: "0.02em",
+                  }}
+                />
+              ) : null}
+            </MenuItem>
+          );
+        })
       ) : (
         <MenuItem value={""}>
           <ListItemAvatar>
