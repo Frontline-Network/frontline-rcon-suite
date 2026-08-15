@@ -67,6 +67,13 @@ services:
     environment: *mobile-environment
 
   discord_report_worker:
+    # The generated base Compose file already contains the installation's
+    # database, Redis, volume and network settings on backend_1. Reuse them
+    # here so the standalone worker does not fall back to localhost or miss
+    # SERVER_NUMBER during Django startup.
+    extends:
+      file: compose.yaml
+      service: backend_1
     <<: *frontline-backend
     command: discord_report_worker
     environment: *mobile-environment
