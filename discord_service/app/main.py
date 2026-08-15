@@ -63,13 +63,14 @@ def _check_rate_limit(key: str):
                 _rate_windows.pop(item_key, None)
 
 
-class PairingRequest(BaseModel):
+class PairingDiscoveryRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     crcon_callback_url: HttpUrl
     pairing_id: str = Field(min_length=1, max_length=36)
     pairing_secret: str = Field(min_length=32, max_length=255)
-    guild_id: str = Field(pattern=r"^[0-9]+$", max_length=32)
-    guild_name: str = Field(default="", max_length=128)
+
+
+class PairingRequest(PairingDiscoveryRequest):
     channel_id: str = Field(pattern=r"^[0-9]+$", max_length=32)
     channel_name: str = Field(default="", max_length=128)
 
@@ -217,6 +218,35 @@ def _validate_crcon_callback(callback: str) -> None:
         raise HTTPException(
             status_code=400, detail="CRCON callback must resolve to public addresses"
         )
+
+
+def _verify_pending_pairing(payload: PairingDiscoveryRequest, callback: str) -> None:
+    verify_url = callback.removesuffix("/complete") + "/verify"
+    try:
+        response = httpx.post(
+            verify_url,
+            json={
+                "pairing_id": payload.pairing_id,
+                "pairing_secret": payload.pairing_secret,
+            },
+            timeout=10,
+        )
+        response.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=400, detail="CRCON pairing is invalid or expired"
+        ) from exc
+
+
+def _single_guild_options() -> dict:
+    try:
+        return DiscordClient().single_guild_options()
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=502, detail="Discord server options are unavailable"
+        ) from exc
 
 
 def _purge_expired_relays(session: Session) -> None:
@@ -381,15 +411,36 @@ def oauth_install():
     return RedirectResponse(get_settings().discord_install_url, status_code=302)
 
 
+@app.post("/v1/pairing-options")
+def pairing_options(payload: PairingDiscoveryRequest):
+    callback = str(payload.crcon_callback_url)
+    _check_rate_limit(f"pairing-options:{urlsplit(callback).hostname}")
+    _validate_crcon_callback(callback)
+    _verify_pending_pairing(payload, callback)
+    return _single_guild_options()
+
+
 @app.post("/v1/pairings", status_code=status.HTTP_201_CREATED)
 def pair_installation(
     payload: PairingRequest, session: Session = Depends(session_dependency)
 ):
-    _check_rate_limit(f"pairing:{payload.guild_id}")
     callback = str(payload.crcon_callback_url)
+    _check_rate_limit(f"pairing:{urlsplit(callback).hostname}")
     _validate_crcon_callback(callback)
+    options = _single_guild_options()
+    guild_id = str(options["guild"]["id"])
+    guild_name = str(options["guild"].get("name") or guild_id)[:128]
+    channel = next(
+        (item for item in options["channels"] if str(item["id"]) == payload.channel_id),
+        None,
+    )
+    if channel is None:
+        raise HTTPException(
+            status_code=400,
+            detail="The selected channel is not available on the installed Discord server",
+        )
     try:
-        DiscordClient().validate_channel(payload.channel_id, payload.guild_id)
+        DiscordClient().validate_channel(payload.channel_id, guild_id)
     except (httpx.HTTPError, ValueError) as exc:
         raise HTTPException(
             status_code=400, detail="Discord channel cannot be used by this app"
@@ -402,10 +453,10 @@ def pair_installation(
                 "pairing_id": payload.pairing_id,
                 "pairing_secret": payload.pairing_secret,
                 "crcon_action_capability": action_capability,
-                "guild_id": payload.guild_id,
-                "guild_name": payload.guild_name,
+                "guild_id": guild_id,
+                "guild_name": guild_name,
                 "channel_id": payload.channel_id,
-                "channel_name": payload.channel_name,
+                "channel_name": str(channel.get("name") or payload.channel_name)[:128],
             },
             timeout=10,
         )
@@ -419,13 +470,13 @@ def pair_installation(
     integration = session.get(Integration, installation_id) or Integration(
         installation_id=installation_id,
         crcon_base_url=crcon_base_url,
-        guild_id=payload.guild_id,
+        guild_id=guild_id,
         channel_id=payload.channel_id,
         event_capability_digest="",
         action_capability_ciphertext="",
     )
     integration.crcon_base_url = crcon_base_url
-    integration.guild_id = payload.guild_id
+    integration.guild_id = guild_id
     integration.channel_id = payload.channel_id
     integration.event_capability_digest = digest(event_capability, "events")
     integration.action_capability_ciphertext = encrypt(action_capability)

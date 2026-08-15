@@ -84,6 +84,33 @@ def _integration() -> DiscordReportIntegration:
     return integration
 
 
+def _new_pairing(request) -> tuple[DiscordPairing, str, dict]:
+    DiscordPairing.objects.filter(state=DiscordPairing.State.PENDING).delete()
+    secret = new_capability("pair")
+    pairing = DiscordPairing.objects.create(
+        secret_digest=capability_digest(secret),
+        expires_at=timezone.now() + timedelta(minutes=10),
+    )
+    payload = {
+        "crcon_callback_url": request.build_absolute_uri(
+            "/api/discord/v1/pairings/complete"
+        ),
+        "pairing_id": str(pairing.id),
+        "pairing_secret": secret,
+    }
+    return pairing, secret, payload
+
+
+def _service_error(response, fallback: str) -> str:
+    """Expose the central service's safe API detail, not a generic HTTP error."""
+
+    try:
+        detail = response.json().get("detail")
+    except (AttributeError, TypeError, ValueError):
+        detail = None
+    return str(detail)[:500] if detail else fallback
+
+
 def _serialized(integration: DiscordReportIntegration) -> dict:
     return {
         "installation_id": str(integration.installation_id),
@@ -318,21 +345,33 @@ def integration_options(request):
     if denied := _require_manager(request, command):
         return denied
     integration = _integration()
-    if not integration.enabled or not integration.outbound_capability_ciphertext:
-        return _error(command, "Discord integration is not connected", 409)
     try:
-        response = requests.get(
-            (
-                f"{integration.service_url.rstrip('/')}/v1/options/"
-                f"{integration.installation_id}"
-            ),
-            headers={
-                "Authorization": (
-                    f"Bearer {decrypt_capability(integration.outbound_capability_ciphertext)}"
-                )
-            },
-            timeout=10,
-        )
+        if integration.outbound_capability_ciphertext:
+            response = requests.get(
+                (
+                    f"{integration.service_url.rstrip('/')}/v1/options/"
+                    f"{integration.installation_id}"
+                ),
+                headers={
+                    "Authorization": (
+                        f"Bearer {decrypt_capability(integration.outbound_capability_ciphertext)}"
+                    )
+                },
+                timeout=10,
+            )
+        else:
+            _, _, pairing_payload = _new_pairing(request)
+            response = requests.post(
+                f"{integration.service_url.rstrip('/')}/v1/pairing-options",
+                json=pairing_payload,
+                timeout=15,
+            )
+        if not response.ok:
+            return _error(
+                command,
+                _service_error(response, "Discord server options are unavailable"),
+                response.status_code if 400 <= response.status_code < 500 else 503,
+            )
         response.raise_for_status()
         result = response.json()
     except (requests.RequestException, ValueError) as exc:
@@ -353,12 +392,7 @@ def create_discord_pairing(request):
         and integration.service_url.startswith("http://")
     ):
         return _error(command, "DISCORD_SERVICE_URL must use HTTPS", 400)
-    DiscordPairing.objects.filter(state=DiscordPairing.State.PENDING).delete()
-    secret = new_capability("pair")
-    pairing = DiscordPairing.objects.create(
-        secret_digest=capability_digest(secret),
-        expires_at=timezone.now() + timedelta(minutes=10),
-    )
+    pairing, secret, _ = _new_pairing(request)
     return api_response(
         command=command,
         failed=False,
@@ -386,38 +420,30 @@ def connect_integration(request):
     integration = _integration()
     try:
         data = _json_body(request)
-        guild_id = str(data["guild_id"])
         channel_id = str(data["channel_id"])
-        if not re.fullmatch(r"[0-9]+", guild_id) or not re.fullmatch(
-            r"[0-9]+", channel_id
-        ):
-            raise ValueError("Guild and channel IDs must be numeric")
+        if not re.fullmatch(r"[0-9]+", channel_id):
+            raise ValueError("Channel ID must be numeric")
         if not integration.service_url.startswith("https://") and not (
             os.getenv("DEBUG", "false").lower() == "true"
             and integration.service_url.startswith("http://")
         ):
             raise ValueError("DISCORD_SERVICE_URL must use HTTPS")
-        DiscordPairing.objects.filter(state=DiscordPairing.State.PENDING).delete()
-        secret = new_capability("pair")
-        pairing = DiscordPairing.objects.create(
-            secret_digest=capability_digest(secret),
-            expires_at=timezone.now() + timedelta(minutes=10),
-        )
+        _, _, pairing_payload = _new_pairing(request)
         response = requests.post(
             f"{integration.service_url.rstrip('/')}/v1/pairings",
             json={
-                "crcon_callback_url": request.build_absolute_uri(
-                    "/api/discord/v1/pairings/complete"
-                ),
-                "pairing_id": str(pairing.id),
-                "pairing_secret": secret,
-                "guild_id": guild_id,
-                "guild_name": str(data.get("guild_name") or "")[:128],
+                **pairing_payload,
                 "channel_id": channel_id,
                 "channel_name": str(data.get("channel_name") or "")[:128],
             },
             timeout=15,
         )
+        if not response.ok:
+            return _error(
+                command,
+                _service_error(response, "Discord pairing failed"),
+                response.status_code if 400 <= response.status_code < 500 else 503,
+            )
         response.raise_for_status()
         integration.refresh_from_db()
         roles = [str(value) for value in data.get("moderator_role_ids", [])]
@@ -428,6 +454,28 @@ def connect_integration(request):
     except (KeyError, TypeError, ValueError, requests.RequestException) as exc:
         return _error(command, f"Discord pairing failed: {exc}", 400)
     return api_response(command=command, failed=False, result=_serialized(integration))
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def verify_pairing(request):
+    """Let the central service authenticate discovery without consuming pairing."""
+
+    command = "discord_report_pairing_verify"
+    try:
+        data = _json_body(request)
+        pairing = DiscordPairing.objects.get(pk=data["pairing_id"])
+        if (
+            pairing.state != DiscordPairing.State.PENDING
+            or pairing.expires_at <= timezone.now()
+            or not capability_matches(
+                str(data["pairing_secret"]), pairing.secret_digest
+            )
+        ):
+            return _error(command, "Pairing is invalid or expired", 404)
+    except (DiscordPairing.DoesNotExist, KeyError, TypeError, ValueError):
+        return _error(command, "Pairing is invalid or expired", 404)
+    return api_response(command=command, failed=False, result={"valid": True})
 
 
 @csrf_exempt

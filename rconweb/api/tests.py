@@ -780,6 +780,15 @@ class MobileContextTests(TestCase):
 
 
 class DiscordActionTemplateTests(TestCase):
+    def _discord_manager(self):
+        user = User.objects.create_superuser(
+            username="discord-manager",
+            email="manager@example.org",
+            password="secret",
+        )
+        self.client.force_login(user)
+        return user
+
     def test_action_subject_confirmation_is_derived_from_crcon_state(self):
         from api.discord_integration import _normalize_action_subject
 
@@ -863,10 +872,7 @@ class DiscordActionTemplateTests(TestCase):
     def test_discord_options_are_proxied_for_authenticated_manager(
         self, integration, get, _decrypt
     ):
-        user = User.objects.create_superuser(
-            username="discord-manager", email="manager@example.org", password="secret"
-        )
-        self.client.force_login(user)
+        self._discord_manager()
         integration.return_value = SimpleNamespace(
             enabled=True,
             outbound_capability_ciphertext=b"ciphertext",
@@ -887,3 +893,88 @@ class DiscordActionTemplateTests(TestCase):
             headers={"Authorization": "Bearer events-test"},
             timeout=10,
         )
+
+    @patch("api.discord_integration.requests.post")
+    @patch("api.discord_integration._integration")
+    def test_disconnected_options_use_authenticated_pairing_discovery(
+        self, integration, post
+    ):
+        self._discord_manager()
+        integration.return_value = SimpleNamespace(
+            enabled=False,
+            outbound_capability_ciphertext=b"",
+            service_url="https://discord.example",
+        )
+        post.return_value.ok = True
+        post.return_value.status_code = 200
+        post.return_value.raise_for_status.return_value = None
+        post.return_value.json.return_value = {
+            "guild": {"id": "123", "name": "Frontline"},
+            "channels": [{"id": "456", "name": "admin-ping"}],
+            "roles": [{"id": "789", "name": "HLL-Moderator"}],
+        }
+
+        response = self.client.get(
+            "/api/discord/v1/options", HTTP_HOST="rcon.example.org"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["result"]["guild"]["name"], "Frontline")
+        request_payload = post.call_args.kwargs["json"]
+        self.assertNotIn("guild_id", request_payload)
+        self.assertEqual(
+            request_payload["crcon_callback_url"],
+            "http://rcon.example.org/api/discord/v1/pairings/complete",
+        )
+
+    @patch("api.discord_integration.requests.post")
+    @patch("api.discord_integration._integration")
+    def test_connect_does_not_accept_guild_and_surfaces_service_detail(
+        self, integration, post
+    ):
+        self._discord_manager()
+        integration.return_value = SimpleNamespace(
+            service_url="https://discord.example"
+        )
+        post.return_value.ok = False
+        post.return_value.status_code = 400
+        post.return_value.json.return_value = {
+            "detail": "The selected channel is not available on the installed Discord server"
+        }
+
+        response = self.client.post(
+            "/api/discord/v1/connect",
+            data=json.dumps({"guild_id": "999", "channel_id": "456"}),
+            content_type="application/json",
+            HTTP_HOST="rcon.example.org",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("selected channel", str(response.json()))
+        self.assertNotIn("guild_id", post.call_args.kwargs["json"])
+
+    def test_pairing_verification_is_one_time_secret_protected(self):
+        from api.discord_capabilities import capability_digest
+        from api.models import DiscordPairing
+
+        secret = "pair-secret-that-is-at-least-32-characters"
+        pairing = DiscordPairing.objects.create(
+            secret_digest=capability_digest(secret),
+            expires_at=timezone.now() + timedelta(minutes=10),
+        )
+        valid = self.client.post(
+            "/api/discord/v1/pairings/verify",
+            data=json.dumps(
+                {"pairing_id": str(pairing.id), "pairing_secret": secret}
+            ),
+            content_type="application/json",
+        )
+        invalid = self.client.post(
+            "/api/discord/v1/pairings/verify",
+            data=json.dumps(
+                {"pairing_id": str(pairing.id), "pairing_secret": "wrong"}
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(valid.status_code, 200)
+        self.assertEqual(invalid.status_code, 404)

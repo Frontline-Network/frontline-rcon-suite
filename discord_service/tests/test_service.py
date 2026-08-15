@@ -181,6 +181,51 @@ def test_pairing_rejects_private_callback_targets():
     assert getattr(exc_info.value, "status_code", None) == 400
 
 
+def test_pairing_derives_guild_from_discord_and_does_not_accept_client_guild():
+    options = {
+        "guild": {"id": "123", "name": "Frontline"},
+        "channels": [{"id": "456", "name": "admin-reports", "position": 1}],
+        "roles": [],
+    }
+    callback_response = httpx.Response(
+        200,
+        request=httpx.Request(
+            "POST", "https://crcon.example/api/discord/v1/pairings/complete"
+        ),
+        json={
+            "result": {
+                "installation_id": "11111111-1111-1111-1111-111111111111",
+                "event_capability": "events-test",
+            }
+        },
+    )
+    payload = {
+        "crcon_callback_url": "https://crcon.example/api/discord/v1/pairings/complete",
+        "pairing_id": "22222222-2222-2222-2222-222222222222",
+        "pairing_secret": "pair-secret-that-is-at-least-32-characters",
+        "channel_id": "456",
+    }
+    with (
+        patch("discord_service.app.main._validate_crcon_callback"),
+        patch("discord_service.app.main._single_guild_options", return_value=options),
+        patch("discord_service.app.main.DiscordClient.validate_channel"),
+        patch("discord_service.app.main.httpx.post", return_value=callback_response),
+    ):
+        response = TestClient(app).post("/v1/pairings", json=payload)
+    assert response.status_code == 201
+    with SessionLocal() as session:
+        integration = session.get(
+            Integration, "11111111-1111-1111-1111-111111111111"
+        )
+        assert integration.guild_id == "123"
+        assert integration.channel_id == "456"
+
+    rejected = TestClient(app).post(
+        "/v1/pairings", json={**payload, "guild_id": "999"}
+    )
+    assert rejected.status_code == 422
+
+
 def test_directional_capability_derivation_is_retry_stable():
     first = derive_capability("pairing-id", "actions")
     assert first == derive_capability("pairing-id", "actions")

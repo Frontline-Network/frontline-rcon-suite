@@ -25,6 +25,11 @@ urlpatterns = [
         name="discord-pairing-complete",
     ),
     path(
+        "pairings/verify",
+        discord_integration.verify_pairing,
+        name="discord-pairing-verify",
+    ),
+    path(
         "actions/prepare",
         discord_integration.prepare_action,
         name="discord-action-prepare",

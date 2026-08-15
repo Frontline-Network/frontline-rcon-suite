@@ -470,6 +470,36 @@ class DiscordClient:
         if str(response.json().get("guild_id") or "") != guild_id:
             raise ValueError("Discord channel does not belong to the selected guild")
 
+    def single_guild_options(self) -> dict:
+        """Return the bot's only guild and its selectable channels and roles.
+
+        Guild selection is deliberately not delegated to CRCON clients.  A
+        single-guild installation has one authoritative Discord binding; if the
+        bot is installed elsewhere too, pairing must stop instead of guessing.
+        """
+
+        if self.settings.dry_run or not self.settings.discord_bot_token:
+            return self.guild_options("123")
+        response = self.client.get(
+            "https://discord.com/api/v10/users/@me/guilds",
+            headers={"Authorization": f"Bot {self.settings.discord_bot_token}"},
+        )
+        response.raise_for_status()
+        guilds = response.json()
+        if not isinstance(guilds, list):
+            raise ValueError("Discord returned an invalid guild list")
+        if not guilds:
+            raise ValueError("The Discord app is not installed on a server")
+        if len(guilds) != 1:
+            raise ValueError(
+                "The Discord app is installed on more than one server; "
+                "automatic guild selection is ambiguous"
+            )
+        guild_id = str(guilds[0].get("id") or "")
+        if not guild_id:
+            raise ValueError("Discord returned a guild without an ID")
+        return self.guild_options(guild_id)
+
     def guild_options(self, guild_id: str) -> dict:
         if self.settings.dry_run or not self.settings.discord_bot_token:
             return {
