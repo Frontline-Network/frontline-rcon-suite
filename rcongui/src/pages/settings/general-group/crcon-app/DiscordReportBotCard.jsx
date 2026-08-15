@@ -45,6 +45,7 @@ export default function DiscordReportBotCard() {
   const [exceptions, setExceptions] = useState("");
   const [regexes, setRegexes] = useState("");
   const [usage, setUsage] = useState(null);
+  const [editingConnection, setEditingConnection] = useState(false);
 
   const apply = useCallback((next) => {
     setConfig(next);
@@ -80,10 +81,19 @@ export default function DiscordReportBotCard() {
           },
         })
       );
+      setEditingConnection(false);
       toast.success(t("settings.discordReports.connected"));
     } catch (requestError) {
       setError(requestError.message);
     }
+  };
+
+  const cancelConnectionEdit = () => {
+    setGuildId(config.guild_id || "");
+    setChannelId(config.channel_id || "");
+    setRoles((config.moderator_role_ids || []).join(", "));
+    setEditingConnection(false);
+    setError("");
   };
 
   const save = async () => {
@@ -163,26 +173,29 @@ export default function DiscordReportBotCard() {
                   {t("settings.discordReports.install")}
                 </Button>
                 <TextField
-                  label="Guild ID"
+                  label={t("settings.discordReports.guildId")}
                   value={guildId}
                   onChange={(event) => setGuildId(event.target.value)}
+                  helperText={t("settings.discordReports.guildIdHelp")}
                   fullWidth
                 />
                 <TextField
-                  label="Channel ID"
+                  label={t("settings.discordReports.channelId")}
                   value={channelId}
                   onChange={(event) => setChannelId(event.target.value)}
+                  helperText={t("settings.discordReports.channelIdHelp")}
                   fullWidth
                 />
                 <TextField
                   label={t("settings.discordReports.roles")}
                   value={roles}
                   onChange={(event) => setRoles(event.target.value)}
+                  helperText={t("settings.discordReports.rolesHelp")}
                   fullWidth
                 />
                 <Button
                   variant="contained"
-                  disabled={!guildId || !channelId || !roles}
+                  disabled={!guildId || !channelId}
                   onClick={connect}
                 >
                   {t("settings.discordReports.connect")}
@@ -202,10 +215,95 @@ export default function DiscordReportBotCard() {
                   })}
                 </Alert>
               )}
+              {!editingConnection ? (
+                <Stack spacing={2}>
+                  <Alert severity="success">
+                    {t("settings.discordReports.connectedTo", {
+                      guild: config.guild_name || config.guild_id,
+                      channel: config.channel_name
+                        ? `#${config.channel_name}`
+                        : config.channel_id,
+                    })}
+                  </Alert>
+                  <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                    <TextField
+                      label={t("settings.discordReports.discordServer")}
+                      value={config.guild_name || config.guild_id || ""}
+                      helperText={config.guild_id || ""}
+                      InputProps={{ readOnly: true }}
+                      fullWidth
+                    />
+                    <TextField
+                      label={t("settings.discordReports.reportChannel")}
+                      value={
+                        config.channel_name
+                          ? `#${config.channel_name}`
+                          : config.channel_id || ""
+                      }
+                      helperText={config.channel_id || ""}
+                      InputProps={{ readOnly: true }}
+                      fullWidth
+                    />
+                    <Button
+                      variant="outlined"
+                      onClick={() => setEditingConnection(true)}
+                    >
+                      {t("settings.discordReports.changeConnection")}
+                    </Button>
+                  </Stack>
+                </Stack>
+              ) : (
+                <Stack spacing={2}>
+                  <Alert severity="warning">
+                    {t("settings.discordReports.changeConnectionHint")}
+                  </Alert>
+                  <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                    <Button
+                      variant="outlined"
+                      onClick={() =>
+                        window.open(
+                          `${config.service_url.replace(/\/$/, "")}/oauth/install`,
+                          "_blank",
+                          "noopener,noreferrer"
+                        )
+                      }
+                    >
+                      {t("settings.discordReports.install")}
+                    </Button>
+                    <TextField
+                      label={t("settings.discordReports.guildId")}
+                      value={guildId}
+                      onChange={(event) => setGuildId(event.target.value)}
+                      helperText={t("settings.discordReports.guildIdHelp")}
+                      fullWidth
+                    />
+                    <TextField
+                      label={t("settings.discordReports.channelId")}
+                      value={channelId}
+                      onChange={(event) => setChannelId(event.target.value)}
+                      helperText={t("settings.discordReports.channelIdHelp")}
+                      fullWidth
+                    />
+                  </Stack>
+                  <Stack direction="row" spacing={1}>
+                    <Button
+                      variant="contained"
+                      disabled={!guildId || !channelId}
+                      onClick={connect}
+                    >
+                      {t("settings.discordReports.saveConnection")}
+                    </Button>
+                    <Button onClick={cancelConnectionEdit}>
+                      {t("settings.discordReports.cancel")}
+                    </Button>
+                  </Stack>
+                </Stack>
+              )}
               <TextField
                 label={t("settings.discordReports.roles")}
                 value={roles}
                 onChange={(event) => setRoles(event.target.value)}
+                helperText={t("settings.discordReports.rolesHelp")}
               />
               <TextField
                 select
