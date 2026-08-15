@@ -536,8 +536,30 @@ class ApiKey:
             return key.decode()
         return key
 
-    def delete_key(self):
-        self.red.delete(self.key)
+    def delete_key(self, expected_key: str | None = None) -> bool:
+        """Delete this instance's registration without racing a replacement.
+
+        During a rolling container replacement the new backend can register
+        before the old backend reaches its shutdown handler.  An unconditional
+        delete from the old container would then remove the new registration
+        and make the other CRCON profiles disappear until another restart.
+        """
+
+        if expected_key is None:
+            return bool(self.red.delete(self.key))
+
+        deleted = self.red.eval(
+            """
+            if redis.call('get', KEYS[1]) == ARGV[1] then
+                return redis.call('del', KEYS[1])
+            end
+            return 0
+            """,
+            1,
+            self.key,
+            expected_key,
+        )
+        return bool(deleted)
 
     def get_all_keys(self) -> dict[str, str]:
         return {

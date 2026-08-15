@@ -1,5 +1,6 @@
 const de = {
   brand: { product: "CRCON Administration" },
+  playerIdentity: { linkedAccounts: "Automatisch verknüpft mit", restrictedTitle: "Sicherheitswarnung: verknüpftes Konto gesperrt", restrictedDescription: "Das verknüpfte {{game}} „{{name}}“ besitzt eine aktive Sperre. Es wurde keine automatische Maßnahme ausgeführt.", games: { hll: "HLL-Konto", hll_vietnam: "HLL:V-Konto" } },
   common: {
     actions: "Aktionen",
     all: "Alle",
@@ -247,6 +248,12 @@ const de = {
       clanTag: "Clan-Tag",
       name: "Name",
       recentAction: "Kürzlich eine Maßnahme erhalten",
+      activeBan: "Noch bestehender Bann",
+      activeBanDirect: "Aktiver Bann auf diesem Spielkonto",
+      activeBlacklistDirect: "Aktiver Eintrag in {{list}}",
+      activeBanLinked: "Aktiver Bann auf dem verknüpften {{game}}-Konto {{name}}",
+      activeBlacklistLinked: "Aktiver Eintrag in {{list}} auf dem verknüpften {{game}}-Konto {{name}}",
+      activeBanNoAutomaticAction: "Nur Hinweis – keine automatische Maßnahme.",
       watchlist: "Auf der Beobachtungsliste",
       country: "Land",
       flags: "Markierungen",
@@ -659,6 +666,13 @@ const de = {
     serverNumber: "Server {{number}}",
     changePassword: "Passwort ändern",
     logout: "Abmelden",
+  },
+  matchStatus: {
+    ariaLabel: "Aktueller Spielstatus",
+    players: "Spieler",
+    map: "Karte",
+    remaining: "Restzeit",
+    unknownMap: "Unbekannte Karte",
   },
   dashboard: {
     title: "Übersicht",

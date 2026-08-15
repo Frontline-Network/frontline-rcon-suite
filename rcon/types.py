@@ -384,6 +384,22 @@ class BasicPlayerProfileType(TypedDict):
     created: datetime.datetime
     names: list[PlayerNameType]
     steaminfo: Optional[SteamInfoType]
+    identity: NotRequired["PlayerIdentityType"]
+
+
+class LinkedPlayerAccountType(TypedDict):
+    player_id: str
+    steam_id: str | None
+    name: str
+    game: Literal["hll", "hll_vietnam"]
+    active_blacklists: list["BlacklistRecordWithBlacklistType"]
+    existing_blacklists: list["BlacklistRecordWithBlacklistType"]
+    is_banned: NotRequired[bool]
+    bans: NotRequired[list[GameServerBanType]]
+
+
+class PlayerIdentityType(TypedDict):
+    linked_accounts: list[LinkedPlayerAccountType]
 
 
 class BlacklistSyncMethod(str, enum.Enum):

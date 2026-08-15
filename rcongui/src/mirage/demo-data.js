@@ -161,6 +161,7 @@ export const demoServerConnection = {
   name: "[GER] Frontline Network | #2",
   short_name: "Frontline #2",
   server_number: 2,
+  game: "hll",
   current_players: 86,
   max_players: 100,
   port: 4174,

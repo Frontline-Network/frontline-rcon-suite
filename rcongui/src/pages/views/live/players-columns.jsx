@@ -6,7 +6,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { Star, Warning } from "@mui/icons-material";
+import { ErrorOutline, Star, Warning } from "@mui/icons-material";
 import { yellow } from "@mui/material/colors";
 import dayjs from "dayjs";
 import { ActionMenuButton } from "@/features/player-action/ActionMenu";
@@ -68,6 +68,30 @@ const Center = styled(Box)(() => ({
 
 const iconFontSize = "1em";
 const emojiFontSize = "0.85em";
+
+const getBanDetailText = (t, detail) => {
+  if (detail.scope === "direct" && detail.type === "gameServer") {
+    return t("views.table.activeBanDirect");
+  }
+  if (detail.scope === "direct") {
+    return t("views.table.activeBlacklistDirect", {
+      list: detail.record?.blacklist?.name ?? "–",
+    });
+  }
+
+  const game = t(`playerIdentity.games.${detail.account?.game}`);
+  if (detail.type === "gameServer") {
+    return t("views.table.activeBanLinked", {
+      game,
+      name: detail.account?.name,
+    });
+  }
+  return t("views.table.activeBlacklistLinked", {
+    game,
+    name: detail.account?.name,
+    list: detail.record?.blacklist?.name ?? "–",
+  });
+};
 
 export const getColumns = (t) => [
   {
@@ -372,6 +396,43 @@ export const getColumns = (t) => [
     accessorKey: "player_id",
     cell: ({ row }) => {
       return <CopyableText text={row.original.player_id} />;
+    },
+  },
+  {
+    id: "active_ban",
+    header: SortableHeader("B", t("views.table.activeBan")),
+    accessorFn: (row) => (row.activeBanStatus?.isActive ? 1 : 0),
+    cell: ({ row }) => {
+      const status = row.original.activeBanStatus;
+      if (!status?.isActive) return null;
+      return (
+        <Tooltip
+          arrow
+          title={
+            <Stack spacing={0.25}>
+              <Typography variant="caption" fontWeight="bold">
+                {t("views.table.activeBan")}
+              </Typography>
+              {status.details.map((detail, index) => (
+                <Typography key={index} variant="caption">
+                  {getBanDetailText(t, detail)}
+                </Typography>
+              ))}
+              <Typography variant="caption">
+                {t("views.table.activeBanNoAutomaticAction")}
+              </Typography>
+            </Stack>
+          }
+        >
+          <ErrorOutline
+            aria-label={t("views.table.activeBan")}
+            sx={{ color: "error.main", fontSize: "1.15em" }}
+          />
+        </Tooltip>
+      );
+    },
+    meta: {
+      variant: "icon",
     },
   },
   {

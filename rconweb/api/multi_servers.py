@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from copy import deepcopy
 from typing import Any
 
@@ -22,6 +23,7 @@ def mobile_server_list(request, local_name: str) -> list[dict]:
         {
             "server_number": int(get_server_number()),
             "name": local_name,
+            "game": os.getenv("HLL_GAME", "hll"),
             "available": True,
         }
     ]
@@ -61,6 +63,7 @@ def mobile_server_list(request, local_name: str) -> list[dict]:
                 {
                     "server_number": server_number,
                     "name": str(info.get("name") or f"Server {server_number}"),
+                    "game": info.get("game"),
                     "available": True,
                 }
             )

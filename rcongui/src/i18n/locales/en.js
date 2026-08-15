@@ -1,5 +1,6 @@
 const en = {
   brand: { product: "CRCON Administration" },
+  playerIdentity: { linkedAccounts: "Automatically linked to", restrictedTitle: "Security warning: linked account is banned", restrictedDescription: "The linked {{game}} “{{name}}” has an active ban. No automatic action was taken.", games: { hll: "HLL account", hll_vietnam: "HLL:V account" } },
   common: {
     actions: "Actions",
     all: "All",
@@ -224,7 +225,14 @@ const en = {
       combat: "Combat effectiveness",
       offense: "Offensive effectiveness", defense: "Defensive effectiveness",
       support: "Support effectiveness", platform: "Platform", clanTag: "Clan tag",
-      name: "Name", recentAction: "Recently received action", watchlist: "On watchlist",
+      name: "Name", recentAction: "Recently received action",
+      activeBan: "Existing active ban",
+      activeBanDirect: "Active ban on this game account",
+      activeBlacklistDirect: "Active entry in {{list}}",
+      activeBanLinked: "Active ban on linked {{game}} account {{name}}",
+      activeBlacklistLinked: "Active entry in {{list}} on linked {{game}} account {{name}}",
+      activeBanNoAutomaticAction: "Information only – no automatic action.",
+      watchlist: "On watchlist",
       country: "Country", flags: "Flags", visits: "Visits", currentPlaytime: "Current playtime", timeShort: "TIME",
       columns: "Columns", expandDetails: "Show extra details", collapseDetails: "Hide extra details",
       time: "Time", thisPlayer: "This player", action: "Action", otherPlayer: "Other player",
@@ -599,6 +607,13 @@ const en = {
     serverNumber: "Server {{number}}",
     changePassword: "Change password",
     logout: "Log out",
+  },
+  matchStatus: {
+    ariaLabel: "Current match status",
+    players: "Players",
+    map: "Map",
+    remaining: "Remaining",
+    unknownMap: "Unknown map",
   },
   dashboard: {
     title: "Overview",

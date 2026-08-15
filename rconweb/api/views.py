@@ -384,6 +384,7 @@ def get_connection_info(request):
             "port": os.getenv("RCONWEB_PORT"),
             "link": str(config.server_url) if config.server_url else config.server_url,
             "server_number": int(get_server_number()),
+            "game": rcon_api.config.game.value,
         },
         failed=False,
         command="get_connection_info",

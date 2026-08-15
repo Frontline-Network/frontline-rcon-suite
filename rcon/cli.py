@@ -1,8 +1,10 @@
 import inspect
 import json
 import logging
+import os
 import sys
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, Set, Type
 
 import click
@@ -40,6 +42,8 @@ from rcon.utils import ApiKey
 from rcon.vote_map import VoteMap
 
 logger = logging.getLogger(__name__)
+
+API_REGISTRATION_FILE = Path("/tmp/crcon_api_registration")
 
 
 @click.group()
@@ -187,12 +191,21 @@ def maprot(maps):
 
 @cli.command(name="register_api")
 def register():
-    ApiKey().generate_key()
+    registration = ApiKey().generate_key()
+    API_REGISTRATION_FILE.write_text(registration, encoding="utf-8")
+    os.chmod(API_REGISTRATION_FILE, 0o600)
 
 
 @cli.command(name="unregister_api")
 def unregister():
-    ApiKey().delete_key()
+    try:
+        registration = API_REGISTRATION_FILE.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        # Older containers do not own registrations created by replacements.
+        return
+
+    ApiKey().delete_key(expected_key=registration)
+    API_REGISTRATION_FILE.unlink(missing_ok=True)
 
 
 @cli.command(name="import_vips")

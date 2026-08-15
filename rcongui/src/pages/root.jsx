@@ -52,7 +52,7 @@ export default function Root() {
               alignItems: "center",
               mx: 0,
               pb: 4,
-              mt: { xs: 8, lg: 0 },
+              mt: { xs: 13, lg: 0 },
               minHeight: "100%",
             }}
           >
