@@ -942,9 +942,11 @@ class Rcon(ServerCtl):
         be retrieved if it was set by CRCON and the cache has not expired
         """
         red = get_redis_client()
-        msg: bytes = red.get("BROADCAST_MESSAGE")  # type: ignore
-        if isinstance(msg, (str, bytes)):
+        msg: str | bytes | None = red.get("BROADCAST_MESSAGE")  # type: ignore
+        if isinstance(msg, bytes):
             return msg.decode()
+        if isinstance(msg, str):
+            return msg
         return msg
 
     def set_broadcast(self, message: str) -> str:

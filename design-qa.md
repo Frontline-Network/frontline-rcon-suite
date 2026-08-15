@@ -97,3 +97,36 @@ Die Implementierung wurde auf demselben mobilen Seitenverhältnis geprüft. Die 
 ## Ergebnis
 
 passed
+
+# Spielerakten — Option 1 mit Karten-/Listenumschaltung
+
+## Vergleichsbasis
+
+- Designziel: `C:\Users\chris\.codex\generated_images\019fcc8c-5bf7-7ca1-b168-4771dfd9dd7d\exec-466bd42b-e644-4ff7-b43d-27a8e0e69fc7.png`
+- Implementierung: `C:\Users\chris\Documents\Codex\2026-06-12\files-mentioned-by-the-user-frontline\outputs\players-option1-implementation.png`
+- Kombinierter Direktvergleich: `C:\Users\chris\Documents\Codex\2026-06-12\files-mentioned-by-the-user-frontline\outputs\players-option1-comparison.png`
+- Geprüfte Route: `/records/players`
+- Viewports: 1440 × 1024 und 390 × 844 CSS px
+
+## Geprüfte Flächen und Interaktionen
+
+- Die Filter stehen auf dem Desktop in einer kompakten horizontalen Leiste; selten genutzte Kriterien sind unter „Weitere Filter“ erreichbar.
+- Ergebniszahl, Auswahlstatus, Seitennavigation und Ansichtsumschalter bilden eine gemeinsame Werkzeugleiste.
+- Die Kartenansicht zeigt drei gleich breite Akten pro Reihe und behält alle vorhandenen Profil- und Moderationsaktionen.
+- Die neue Listenansicht zeigt dieselben Spieler kompakt mit Plattform/Level, Verknüpfungsstatus, letzter Sichtung, Spielzeit, Maßnahmen und Aktionsmenü.
+- Karten-/Listenwahl funktioniert ohne Neuladen und bleibt nach einem Neuladen gespeichert.
+- Spielerauswahl aktualisiert den Auswahlzähler und bleibt mit den bestehenden Massenaktionen kompatibel.
+- „Weitere Filter“ öffnet alle vier Schalter sowie Markierungs- und Datumsfilter.
+- Auf kleinen Viewports wird bewusst die Kartenansicht verwendet und der Desktop-Umschalter ausgeblendet.
+- Mobile Kontrolle bei 390 × 844: `scrollWidth` entspricht `innerWidth` (390 px), kein horizontaler Overflow.
+- Browserkonsole: keine Fehler während Ansichtswechsel, Auswahl, Filter-Collapse und Reload.
+- Produktions-Webbuild mit `REACT_APP_API_URL=/api/`: erfolgreich.
+
+## Behobene QA-Findings
+
+1. [P1, Responsiveness] Die Desktop-Flex-Basis der drei Hauptfilter wurde in der mobilen Spaltenansicht als Höhe interpretiert und erzeugte große Leerflächen. Fix: breakpoint-spezifische Flexwerte und volle mobile Breite in `PlayerFiltersForm.jsx`. Nachprüfung bei 390 × 844 ohne Leerfläche oder Overflow bestanden.
+2. [P2, Layout] Die bestehende Mindestbreite der Spielerkarte verhinderte ein belastbares Drei-Spaltenraster. Fix: Karte auf `minWidth: 0` und volle Rasterhöhe gesetzt.
+
+Keine verbleibenden P0-, P1- oder P2-Abweichungen innerhalb der Spielerakten-Neuanordnung.
+
+final result: passed
