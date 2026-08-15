@@ -65,6 +65,13 @@ class Command(BaseCommand):
             return 0
         capability = decrypt_capability(integration.outbound_capability_ciphertext)
         now = datetime.now(tz=timezone.utc)
+        delivery_started_at = integration.delivery_started_at
+        if delivery_started_at is None:
+            # Safe upgrade path for installations paired before the cut-over
+            # field existed: do not replay their complete incident history.
+            integration.delivery_started_at = now
+            integration.save(update_fields=["delivery_started_at", "updated_at"])
+            return 0
         delivered_count = 0
         with enter_session() as session:
             rows = session.execute(
@@ -74,6 +81,7 @@ class Command(BaseCommand):
                     AdminIncidentDiscordDelivery.event_id == AdminIncidentEvent.id,
                 )
                 .where(
+                    AdminIncidentEvent.created_at >= delivery_started_at,
                     AdminIncidentEvent.event_type != "action_started",
                     or_(
                         AdminIncidentDiscordDelivery.id.is_(None),

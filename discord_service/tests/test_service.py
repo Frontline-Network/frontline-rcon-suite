@@ -225,3 +225,16 @@ def test_ai_pipeline_uses_moderation_store_false_and_strict_schema():
     assert fake.responses.kwargs["model"] == "gpt-5.6-luna"
     assert fake.responses.kwargs["store"] is False
     assert fake.responses.kwargs["text_format"].model_config["extra"] == "forbid"
+
+
+def test_player_names_do_not_use_general_moderation_as_hard_gate():
+    fake = _OpenAI()
+    result = ManagedAnalyzer(settings=get_settings(), client=fake).analyze(
+        text="Gewaltlord",
+        source=ModerationSource.PLAYER_NAME,
+        policy=ModerationPolicy(),
+    )
+    assert result.analysis is not None
+    assert result.analysis.source == ModerationSource.PLAYER_NAME
+    assert result.analysis.hard_hit is False
+    assert not hasattr(fake.moderations, "kwargs")

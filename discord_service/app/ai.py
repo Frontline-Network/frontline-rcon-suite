@@ -44,11 +44,18 @@ class ManagedAnalyzer:
         if self.client is None:
             return AnalysisResult(None, unavailable_reason="openai_not_configured")
         try:
-            moderation = self.client.moderations.create(
-                model=self.settings.moderation_model, input=text
-            )
-            moderation_result = moderation.results[0]
-            hard_hit = bool(moderation_result.flagged)
+            # Short player handles regularly contain harmless fragments such as
+            # "hitman" or "Gewalt". The general-purpose moderation endpoint has
+            # no player-name context and would turn those broad category matches
+            # into hard hits that bypass the configured risk threshold. Names
+            # therefore go through the structured contextual analysis only.
+            moderation_result = None
+            if source != ModerationSource.PLAYER_NAME:
+                moderation = self.client.moderations.create(
+                    model=self.settings.moderation_model, input=text
+                )
+                moderation_result = moderation.results[0]
+            hard_hit = bool(moderation_result and moderation_result.flagged)
             moderation_categories = []
             categories = getattr(moderation_result, "categories", None)
             if categories is not None:

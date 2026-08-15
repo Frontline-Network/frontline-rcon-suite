@@ -203,6 +203,7 @@ def integration_detail(request):
         integration.channel_id = ""
         integration.channel_name = ""
         integration.moderator_role_ids = []
+        integration.delivery_started_at = None
         integration.inbound_capability_digest = ""
         integration.outbound_capability_ciphertext = b""
         integration.save()
@@ -364,6 +365,9 @@ def complete_pairing(request):
         integration.outbound_capability_ciphertext = encrypt_capability(
             event_capability
         )
+        # Existing incidents predate this connection and must not flood a newly
+        # selected Discord channel. Only events created after pairing are sent.
+        integration.delivery_started_at = timezone.now()
         integration.enabled = True
         integration.save()
     except (DiscordPairing.DoesNotExist, KeyError, TypeError, ValueError) as exc:

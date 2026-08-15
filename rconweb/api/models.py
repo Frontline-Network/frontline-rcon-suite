@@ -169,6 +169,7 @@ class DiscordReportIntegration(models.Model):
     ai_config = models.JSONField(default=dict)
     policy = models.JSONField(default=dict)
     reporter_templates = models.JSONField(default=dict)
+    delivery_started_at = models.DateTimeField(null=True, blank=True)
     inbound_capability_digest = models.CharField(max_length=64, blank=True, default="")
     # This is Fernet ciphertext, never a plaintext capability.
     outbound_capability_ciphertext = models.BinaryField(blank=True, default=bytes)
