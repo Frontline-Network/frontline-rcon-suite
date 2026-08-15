@@ -313,6 +313,56 @@ def test_disallowed_roles_does_not_enforce_below_min_players(team_view):
     assert [] == punitions.kick
 
 
+def test_unknown_live_roles_do_not_abort_automod_cycle(team_view):
+    able = team_view["allies"]["squads"]["able"]
+    able["players"][0]["role"] = "specialist"
+    able["players"][1]["role"] = "grenadier"
+    player_count = get_team_count(team_view, "allies") + get_team_count(
+        team_view, "axis"
+    )
+    mod = mod_with_config(
+        AutoModSeedingUserConfig(
+            enabled=True,
+            disallowed_roles=DisallowedRoles(
+                roles={Roles.tank_commander: "Tanks"},
+                min_players=0,
+                max_players=player_count + 1,
+            ),
+        )
+    )
+
+    punitions = mod.punitions_to_apply(
+        team_view, "able", "allies", able, game_state
+    )
+
+    assert punitions == PunitionsToApply()
+
+
+def test_vietnam_squadleader_uses_officer_role_rules(team_view):
+    able = team_view["allies"]["squads"]["able"]
+    able["players"] = [able["players"][0]]
+    able["players"][0]["role"] = "squadleader"
+    player_count = get_team_count(team_view, "allies") + get_team_count(
+        team_view, "axis"
+    )
+    mod = mod_with_config(
+        AutoModSeedingUserConfig(
+            enabled=True,
+            disallowed_roles=DisallowedRoles(
+                roles={Roles.squad_lead: "Squad leaders"},
+                min_players=0,
+                max_players=player_count + 1,
+            ),
+        )
+    )
+
+    punitions = mod.punitions_to_apply(
+        team_view, "able", "allies", able, game_state
+    )
+
+    assert ["WilliePeter"] == [player.name for player in punitions.warning]
+
+
 def test_does_nothing_when_enough_players(team_view):
     config = AutoModSeedingUserConfig(
         enabled=True,

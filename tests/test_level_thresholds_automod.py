@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 from rcon.automods.level_thresholds import LevelThresholdsAutomod
 from rcon.automods.models import NoLevelViolation, WatchStatus
-from rcon.user_config.auto_mod_level import AutoModLevelUserConfig, Role, Roles
+from rcon.user_config.auto_mod_level import AutoModLevelUserConfig, Roles
 from tests.test_player import mock_get_detailed_player
 
 state = {}
@@ -188,3 +188,33 @@ def test_announces_on_connect_detailed_player_info_is_none():
         "message\nmin level is 10\nmax level is 100\nSpotter needs level 10\n"
         == punitions.warning[0].details.message
     )
+
+
+def test_unknown_live_role_does_not_abort_level_automod_cycle():
+    player = mock_get_detailed_player(
+        name="VietnamPlayer",
+        player_id="EOS_ID",
+        level=10,
+        role="specialist",
+    )
+    squad = {"players": [player]}
+    team_view = {
+        "allies": {"commander": None, "squads": {"able": squad}},
+        "axis": {"commander": None, "squads": {}},
+    }
+    mod = mod_with_config(
+        AutoModLevelUserConfig(
+            enabled=True,
+            level_thresholds={
+                Roles.spotter: dict(label="Spotter", min_players=0, min_level=50)
+            },
+        )
+    )
+
+    punitions = mod.punitions_to_apply(
+        team_view, "able", "allies", squad, game_state={}
+    )
+
+    assert not punitions.warning
+    assert not punitions.punish
+    assert not punitions.kick

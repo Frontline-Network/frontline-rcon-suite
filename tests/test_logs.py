@@ -560,6 +560,19 @@ def test_team_kills(
                 "sub_content": None,
             },
         ),
+        (
+            "DISCONNECTED  ()",
+            {
+                "action": "DISCONNECTED",
+                "player_name_1": None,
+                "player_id_1": None,
+                "player_name_2": None,
+                "player_id_2": None,
+                "weapon": None,
+                "message": "()",
+                "sub_content": None,
+            },
+        ),
     ],
 )
 def test_connect_disconnect(raw_log_line, expected):

@@ -1,6 +1,7 @@
 from unittest import mock
 
-from rcon.utils import FixedLenList, exception_in_chain
+from rcon.game.hllv.maps import HLLV_LAYERS
+from rcon.utils import FixedLenList, exception_in_chain, guess_map_from_log
 
 
 class FakeException(Exception):
@@ -13,6 +14,15 @@ class ChainedException(Exception):
 
 class DeepChainedException(Exception):
     pass
+
+
+def test_guess_map_from_log_uses_game_specific_layers():
+    layer = guess_map_from_log(
+        {"raw": "MATCH START Cam Ranh Port Warfare"},
+        HLLV_LAYERS,
+    )
+
+    assert layer.id == "wdeve_warfare_day"
 
 
 def test_direct_exception():

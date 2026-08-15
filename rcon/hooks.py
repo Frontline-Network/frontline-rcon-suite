@@ -31,7 +31,6 @@ from rcon.logs.loop import (
 from rcon.maps import (
     UNKNOWN_MAP_NAME,
     get_theoretical_match_time,
-    parse_layer,
 )
 from rcon.message_variables import format_message_string, populate_message_variables
 from rcon.models import PlayerID, PlayerSoldier, enter_session, GameLayout
@@ -282,14 +281,16 @@ def reset_watch_killrate_cooldown(rcon: Rcon, struct_log: StructuredLogLineWithM
 
 @on_match_start
 def handle_new_match_start(rcon: Rcon, struct_log):
-    log_map = guess_map_from_log(struct_log)
+    log_map = guess_map_from_log(struct_log, rcon.game_profile.layers)
     try:
         logger.info("New match started recording map %s", struct_log)
         with invalidates(Rcon.get_map, Rcon.get_next_map, Rcon.get_gamestate):
             try:
                 # Don't use the current_map property and clear the cache to pull the new map name
                 gamestate = rcon.get_gamestate()
-                current_map = parse_layer(gamestate["current_map"]["id"])
+                current_map = rcon.game_profile.parse_layer(
+                    gamestate["current_map"]["id"]
+                )
                 if current_map.game_mode != gamestate["game_mode"]:
                     # During a map transition the session fields are not updated
                     # atomically. Do not combine a new layer with the old mode's
@@ -306,7 +307,7 @@ def handle_new_match_start(rcon: Rcon, struct_log):
                         gamestate["game_mode"], gamestate["match_time"]
                     )
             except HLLCommandFailedError:
-                current_map = parse_layer(UNKNOWN_MAP_NAME)
+                current_map = rcon.game_profile.parse_layer(UNKNOWN_MAP_NAME)
                 match_time = 0
                 logger.error(
                     "Unable to get current map, falling back to recording map as %s",
@@ -392,16 +393,18 @@ def record_map_end(rcon: Rcon, struct_log: StructuredLogLineWithMetaData):
     with invalidates(Rcon.get_map, Rcon.get_next_map, Rcon.get_gamestate):
         try:
             gamestate = rcon.get_gamestate()
-            current_map = parse_layer(gamestate["current_map"]["id"])
+            current_map = rcon.game_profile.parse_layer(
+                gamestate["current_map"]["id"]
+            )
         except HLLCommandFailedError:
-            current_map = parse_layer(UNKNOWN_MAP_NAME)
+            current_map = rcon.game_profile.parse_layer(UNKNOWN_MAP_NAME)
             logger.error(
                 "Unable to get current map, falling back to recording map as %s",
                 UNKNOWN_MAP_NAME,
             )
 
     # Log map names are inconsistently formatted but should match the map name that each Layer has
-    log_map = guess_map_from_log(struct_log)
+    log_map = guess_map_from_log(struct_log, rcon.game_profile.layers)
     logger.debug("LOG MAP: %s\nCURRENT MAP: %s", log_map, current_map)
     logger.debug("LOG TIME: %s\nNOW: %s", struct_log["event_time"].replace(tzinfo=UTC), datetime.now(tz=UTC))
     # The log event loop can receive and process old log lines sometimes
@@ -582,6 +585,9 @@ def handle_on_connect(
 @on_disconnected
 @inject_player_ids
 def handle_on_disconnect(rcon, struct_log, _, player_id: str):
+    if not player_id:
+        logger.debug("Ignoring anonymous disconnect event: %s", struct_log["raw"])
+        return
     save_end_player_session(player_id, struct_log["timestamp_ms"] / 1000)
 
 

@@ -7,6 +7,7 @@ from functools import cmp_to_key
 
 from dateutil import parser
 from sqlalchemy import func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, contains_eager, selectinload
 from sqlalchemy.sql.functions import ReturnTypeFromArgs
 
@@ -432,10 +433,22 @@ def _save_player_id(sess, player_id: str) -> PlayerID:
     if not player:
         logger.info("Adding first time seen %s", player_id)
         player = PlayerID(player_id=player_id)
-        sess.add(player)
-        sess.add(PlayerAccount(player=player))
-        sess.add(PlayerSoldier(player=player))
-        sess.commit()
+        try:
+            # CONNECTED and stats workers can observe a new player at the same
+            # time. Isolate the insert in a savepoint so a uniqueness race does
+            # not invalidate the caller's complete database transaction.
+            with sess.begin_nested():
+                sess.add(player)
+                sess.add(PlayerAccount(player=player))
+                sess.add(PlayerSoldier(player=player))
+                sess.flush()
+        except IntegrityError:
+            player = get_player(sess, player_id)
+            if player is None:
+                raise
+            logger.debug("Player %s was inserted concurrently", player_id)
+        else:
+            sess.commit()
 
     return player
 

@@ -3,6 +3,7 @@ import pytest
 from fakeredis import FakeStrictRedis
 from unittest.mock import MagicMock, patch
 from rcon import maps
+from rcon.connection import HLLCommandError
 from rcon.game.hll.profile import HLL_PROFILE
 from rcon.game.hllv.profile import HLLV_PROFILE
 from rcon.user_config.vote_map import DefaultMethods
@@ -737,3 +738,15 @@ def test_reminder_sent_while_enabled(votemap):
     t2 = votemap.get_last_reminder_time()
     assert result.ok is True
     assert t1 != t2
+
+
+def test_reminder_continues_after_one_player_message_fails(votemap, mock_rcon):
+    mock_rcon.message_player.side_effect = [
+        HLLCommandError(500, "player already disconnected"),
+        None,
+    ]
+
+    result = votemap.send_reminder(force=True)
+
+    assert result.ok is True
+    assert mock_rcon.message_player.call_count == 2
