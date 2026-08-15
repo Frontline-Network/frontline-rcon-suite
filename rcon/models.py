@@ -1715,6 +1715,28 @@ class ModerationCandidateOutbox(Base):
     )
 
 
+class PlayerNameModerationState(Base):
+    """Last name state checked for a stable player identity.
+
+    This table stores only the normalized handle and evaluation versions. It is
+    intentionally independent from 30-day moderation-content retention so an
+    unchanged name never causes periodic AI calls.
+    """
+
+    __tablename__ = "player_name_moderation_state"
+
+    player_id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    normalized_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    model_version: Mapped[str] = mapped_column(String(100), nullable=False)
+    policy_profile_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    policy_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    candidate_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    checked_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        default=lambda: datetime.now(tz=timezone.utc),
+    )
+
+
 class Blacklist(Base):
     __tablename__: str = "blacklist"
     id: Mapped[int] = mapped_column(primary_key=True)

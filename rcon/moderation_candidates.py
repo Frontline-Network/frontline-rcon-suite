@@ -14,6 +14,7 @@ from rcon.models import (
     AdminIncidentEvent,
     ModerationAnalysisRecord,
     ModerationCandidateOutbox,
+    PlayerNameModerationState,
     enter_session,
 )
 from rcon.moderation import (
@@ -77,6 +78,24 @@ def runtime_moderation_config() -> tuple[dict, ModerationPolicy] | None:
     )
 
 
+def player_name_state_is_current(
+    state: PlayerNameModerationState | None,
+    *,
+    normalized_name: str,
+    model_version: str,
+    policy: ModerationPolicy,
+) -> bool:
+    """Return whether this exact identity state has already been queued."""
+
+    return bool(
+        state
+        and state.normalized_name == normalized_name
+        and state.model_version == model_version
+        and state.policy_profile_id == policy.profile_id
+        and state.policy_version == policy.version
+    )
+
+
 def enqueue_candidate(
     *,
     source: ModerationSource,
@@ -91,11 +110,19 @@ def enqueue_candidate(
     enabled_key = "chat_enabled" if source == ModerationSource.CHAT else "names_enabled"
     if not ai_config.get(enabled_key) or source not in policy.enabled_sources:
         return None
+    if source == ModerationSource.PLAYER_NAME and not player_id:
+        # A stable identity is required to detect a real name change. Scanning
+        # anonymous log fragments repeatedly would waste tokens.
+        return None
     prefilter = prefilter_candidate(candidate_text, policy)
     if source == ModerationSource.CHAT and not prefilter.suspicious:
         return None
     normalized = normalize_candidate(candidate_text)
-    model_version = os.getenv("AI_MODERATION_MODEL", "gpt-5.6-luna")
+    model_version = (
+        os.getenv("AI_PLAYER_NAME_MODEL", "gpt-5-nano")
+        if source == ModerationSource.PLAYER_NAME
+        else os.getenv("AI_MODERATION_MODEL", "gpt-5.6-luna")
+    )
     fingerprint = hashlib.sha256(
         (
             f"{source.value}:{player_id or ''}:{normalized}:"
@@ -103,20 +130,26 @@ def enqueue_candidate(
         ).encode("utf-8")
     ).hexdigest()
     now = datetime.now(tz=timezone.utc)
-    dedupe_since = now - (
-        timedelta(hours=24)
-        if source == ModerationSource.PLAYER_NAME
-        else timedelta(minutes=5)
-    )
     with enter_session() as session:
-        existing = session.execute(
-            select(ModerationCandidateOutbox).where(
-                ModerationCandidateOutbox.candidate_fingerprint == fingerprint,
-                ModerationCandidateOutbox.created_at >= dedupe_since,
-            )
-        ).scalar_one_or_none()
-        if existing:
-            return existing.id, False
+        if source == ModerationSource.PLAYER_NAME:
+            state = session.get(PlayerNameModerationState, player_id)
+            if player_name_state_is_current(
+                state,
+                normalized_name=normalized,
+                model_version=model_version,
+                policy=policy,
+            ):
+                return state.candidate_fingerprint, False
+        else:
+            dedupe_since = now - timedelta(minutes=5)
+            existing = session.execute(
+                select(ModerationCandidateOutbox).where(
+                    ModerationCandidateOutbox.candidate_fingerprint == fingerprint,
+                    ModerationCandidateOutbox.created_at >= dedupe_since,
+                )
+            ).scalar_one_or_none()
+            if existing:
+                return existing.id, False
         item = ModerationCandidateOutbox(
             source=source.value,
             server_number=int(get_server_number()),
@@ -131,6 +164,16 @@ def enqueue_candidate(
             created_at=now,
         )
         session.add(item)
+        if source == ModerationSource.PLAYER_NAME:
+            if state is None:
+                state = PlayerNameModerationState(player_id=player_id)
+                session.add(state)
+            state.normalized_name = normalized[:255]
+            state.model_version = model_version
+            state.policy_profile_id = policy.profile_id
+            state.policy_version = policy.version
+            state.candidate_fingerprint = fingerprint
+            state.checked_at = now
         session.flush()
         return item.id, True
 
@@ -210,11 +253,7 @@ def persist_candidate_analysis(
                 prompt_version=analysis.prompt_version,
                 policy_profile_id=analysis.policy_profile_id,
                 policy_version=analysis.policy_version,
-                dedupe_until=(
-                    now + timedelta(hours=24)
-                    if analysis.source == ModerationSource.PLAYER_NAME
-                    else None
-                ),
+                dedupe_until=None,
                 created_at=now,
             )
         )

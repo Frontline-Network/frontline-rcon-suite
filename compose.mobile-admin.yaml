@@ -30,6 +30,8 @@ x-mobile-environment: &mobile-environment
   DISCORD_REPORTS_ENABLED: ${DISCORD_REPORTS_ENABLED:-false}
   DISCORD_SERVICE_URL: ${DISCORD_SERVICE_URL:-}
   AI_MODERATION_ENABLED: ${AI_MODERATION_ENABLED:-false}
+  AI_MODERATION_MODEL: ${AI_MODERATION_MODEL:-gpt-5.6-luna}
+  AI_PLAYER_NAME_MODEL: ${AI_PLAYER_NAME_MODEL:-gpt-5-nano}
 
 x-mobile-environment-server-2: &mobile-environment-server-2
   <<: *mobile-environment

@@ -21,6 +21,14 @@ action reasons, messages, or previews.
 `DISCORD_SERVICE_MONTHLY_TOKEN_QUOTA=0` means no fixed service-side quota. A
 positive value is enforced per CRCON installation and is displayed in CRCON.
 
+Player names use the separate `DISCORD_SERVICE_PLAYER_NAME_MODEL` (default:
+`gpt-5-nano`) with a compact schema and low reasoning; they do not call the
+generic moderation endpoint first. Chat candidates use `DISCORD_SERVICE_AI_MODEL`
+only after the moderation/policy gate. Normal player reports are delivered
+without AI analysis. CRCON stores the last normalized
+name per player identity, model, and policy version locally, so an unchanged
+name is not sent for another AI check.
+
 ## Required security settings
 
 - `DISCORD_SERVICE_SECRET`: random value with at least 32 characters; changing it

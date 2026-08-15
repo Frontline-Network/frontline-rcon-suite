@@ -147,6 +147,32 @@ def _validate_binding(
         raise PermissionError("Discord action is disabled in CRCON")
 
 
+def _normalize_action_subject(incident: dict, arguments: dict) -> dict:
+    """Derive confirmation state from CRCON data, never from Discord input."""
+
+    normalized = dict(arguments)
+    subject_id = str(normalized.get("subject_id") or "").strip()
+    subject = next(
+        (
+            item
+            for item in incident.get("subjects") or []
+            if str(item.get("id") or "") == subject_id
+        ),
+        None,
+    )
+    if (
+        subject
+        and subject.get("kind") == "player"
+        and subject.get("state") == "suggested"
+    ):
+        normalized["confirm_subject_id"] = subject_id
+    else:
+        normalized.pop("confirm_subject_id", None)
+    if not normalized.get("player_id") and incident.get("target_id"):
+        normalized["player_id"] = str(incident["target_id"])
+    return normalized
+
+
 @csrf_exempt
 @require_http_methods(["POST"])
 def discord_action_templates(request):
@@ -553,13 +579,14 @@ def prepare_action(request):
             f"{action} on {incident.get('target_name') or 'selected subject'}: "
             f"{reason or interaction.payload.get('message') or ''}"
         )[:2000]
+        arguments = _normalize_action_subject(incident, dict(interaction.payload))
         prepared = DiscordPreparedAction.objects.create(
             incident_id=interaction.incident_id,
             incident_revision=incident["revision"],
             interaction_id=interaction.interaction_id,
             action=action,
             actor=interaction.actor.model_dump(mode="json"),
-            arguments=dict(interaction.payload),
+            arguments=arguments,
             confirmation_digest=capability_digest(token),
             confirmation_ciphertext=encrypt_capability(token),
             preview=preview,
@@ -712,7 +739,7 @@ def execute_action(request, preparation_id):
             raise PermissionError("Invalid action confirmation")
         incident = get_incident(str(prepared.incident_id))
         actor_name = f"discord:{actor.discord_id}:{actor.display_name}"[:150]
-        arguments = dict(prepared.arguments)
+        arguments = _normalize_action_subject(incident, dict(prepared.arguments))
         arguments["discord_actor"] = actor.model_dump(mode="json")
         arguments["confirmed"] = True
         reservation, created = reserve_incident_action(

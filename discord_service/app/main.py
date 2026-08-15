@@ -147,10 +147,7 @@ def _policy_from_event(envelope: IncidentEventEnvelope) -> ModerationPolicy:
 
 
 def _has_local_hard_rule(policy: ModerationPolicy, rule_ids: list[str]) -> bool:
-    return bool(
-        policy.hard_rule_ids.intersection(rule_ids)
-        or any(rule_id.startswith("frontline_hard:") for rule_id in rule_ids)
-    )
+    return bool(policy.hard_rule_ids.intersection(rule_ids))
 
 
 def _usage_summary(session: Session, installation_id: str) -> dict[str, int | None]:
@@ -513,8 +510,8 @@ def receive_event(
             installation_id=envelope.installation_id,
             kind="moderation_analysis",
             model=(
-                get_settings().ai_model
-                if result.used_responses_model
+                result.analysis.model_version
+                if result.analysis
                 else get_settings().moderation_model
             ),
             input_tokens=result.input_tokens,
@@ -656,6 +653,7 @@ def receive_analysis_job(
         policy=job.policy,
         player_ids=[job.player_id] if job.player_id else [],
         force_structured_analysis=local_hard_hit,
+        matched_rule_ids=job.matched_rule_ids,
     )
     if result.analysis is None:
         raise HTTPException(status_code=503, detail="AI analysis unavailable")
@@ -703,11 +701,7 @@ def receive_analysis_job(
         TechnicalUsageMetric(
             installation_id=job.installation_id,
             kind=job.source.value,
-            model=(
-                get_settings().ai_model
-                if result.used_responses_model
-                else get_settings().moderation_model
-            ),
+            model=result.analysis.model_version,
             input_tokens=result.input_tokens,
             output_tokens=result.output_tokens,
             success=True,
@@ -1043,7 +1037,6 @@ async def discord_interaction(
                 **(
                     {
                         "subject_id": mapping.primary_subject_id,
-                        "confirm_subject_id": mapping.primary_subject_id,
                     }
                     if mapping and mapping.primary_subject_id
                     else {}

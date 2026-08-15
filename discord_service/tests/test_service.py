@@ -13,7 +13,7 @@ os.environ.setdefault("DISCORD_SERVICE_DRY_RUN", "true")
 
 from fastapi.testclient import TestClient
 
-from discord_service.app.ai import ManagedAnalyzer
+from discord_service.app.ai import ManagedAnalyzer, PlayerNameDecision
 from discord_service.app.config import Settings, get_settings
 from discord_service.app.contracts import (
     IncidentEventEnvelope,
@@ -285,34 +285,63 @@ def test_player_name_alert_is_compact_and_omits_empty_report_sections():
 
 
 class _Moderations:
+    def __init__(self, *, flagged=False):
+        self.flagged = flagged
+
     def create(self, **kwargs):
         self.kwargs = kwargs
-        result = type("Moderation", (), {"flagged": False})()
+        categories = type("Categories", (), {"violence": self.flagged})()
+        result = type(
+            "Moderation",
+            (),
+            {"flagged": self.flagged, "categories": categories},
+        )()
         return type("Response", (), {"results": [result]})()
 
 
 class _Responses:
+    def __init__(self, *, clear_name=False):
+        self.clear_name = clear_name
+
     def parse(self, **kwargs):
         self.kwargs = kwargs
-        parsed = kwargs["text_format"](
-            source="report",
-            severity="low",
-            risk_score=0.2,
-            rationale="No policy violation found",
-            suggested_action="none",
-            model_version="placeholder",
-            prompt_version="placeholder",
-            policy_profile_id="placeholder",
-            policy_version="placeholder",
-        )
+        if kwargs["text_format"] is PlayerNameDecision:
+            parsed = PlayerNameDecision(
+                category="targeted_hate" if self.clear_name else "none",
+                target="protected_group" if self.clear_name else "none",
+                clear_violation=self.clear_name,
+                protected_target_excerpt=("target" if self.clear_name else None),
+                hostile_excerpt=("hostile" if self.clear_name else None),
+                offending_excerpt=None,
+                severity="high" if self.clear_name else "none",
+                risk_score=0.2 if self.clear_name else 0.1,
+                rationale=(
+                    "Protected group combined with hostile meaning"
+                    if self.clear_name
+                    else "No actionable name violation"
+                ),
+                suggested_action="manual_review" if self.clear_name else "none",
+            )
+        else:
+            parsed = kwargs["text_format"](
+                source="report",
+                severity="low",
+                risk_score=0.2,
+                rationale="No policy violation found",
+                suggested_action="none",
+                model_version="placeholder",
+                prompt_version="placeholder",
+                policy_profile_id="placeholder",
+                policy_version="placeholder",
+            )
         usage = type("Usage", (), {"input_tokens": 10, "output_tokens": 5})()
         return type("Response", (), {"output_parsed": parsed, "usage": usage})()
 
 
 class _OpenAI:
-    def __init__(self):
-        self.moderations = _Moderations()
-        self.responses = _Responses()
+    def __init__(self, *, moderation_flagged=False, clear_name=False):
+        self.moderations = _Moderations(flagged=moderation_flagged)
+        self.responses = _Responses(clear_name=clear_name)
 
 
 def test_ai_pipeline_uses_moderation_store_false_and_strict_schema():
@@ -329,7 +358,7 @@ def test_ai_pipeline_uses_moderation_store_false_and_strict_schema():
     assert fake.responses.kwargs["text_format"].model_config["extra"] == "forbid"
 
 
-def test_player_names_stop_after_clean_omni_gate():
+def test_player_names_use_nano_with_small_schema():
     fake = _OpenAI()
     result = ManagedAnalyzer(settings=get_settings(), client=fake).analyze(
         text="Gewaltlord",
@@ -339,12 +368,30 @@ def test_player_names_stop_after_clean_omni_gate():
     assert result.analysis is not None
     assert result.analysis.source == ModerationSource.PLAYER_NAME
     assert result.analysis.hard_hit is False
-    assert result.analysis.risk_score == 0
-    assert result.input_tokens == 0
-    assert result.output_tokens == 0
-    assert result.used_responses_model is False
-    assert fake.moderations.kwargs["model"] == "omni-moderation-latest"
-    assert not hasattr(fake.responses, "kwargs")
+    assert result.analysis.risk_score == 0.1
+    assert result.input_tokens == 10
+    assert result.output_tokens == 5
+    assert result.used_responses_model is True
+    assert not hasattr(fake.moderations, "kwargs")
+    assert fake.responses.kwargs["model"] == "gpt-5-nano"
+    assert fake.responses.kwargs["store"] is False
+    assert fake.responses.kwargs["reasoning"] == {"effort": "low"}
+    assert fake.responses.kwargs["text"] == {"verbosity": "low"}
+    assert fake.responses.kwargs["max_output_tokens"] == 1200
+    assert fake.responses.kwargs["text_format"] is PlayerNameDecision
+    assert PlayerNameDecision.model_config["extra"] == "forbid"
+
+
+def test_clear_semantic_player_name_violation_reaches_incident_threshold():
+    fake = _OpenAI(clear_name=True)
+    result = ManagedAnalyzer(settings=get_settings(), client=fake).analyze(
+        text="protected target plus hostile agent",
+        source=ModerationSource.PLAYER_NAME,
+        policy=ModerationPolicy(),
+    )
+    assert result.analysis is not None
+    assert result.analysis.risk_score == 0.9
+    assert result.analysis.categories == ["targeted_hate"]
 
 
 def test_hard_local_rule_can_request_structured_analysis_after_omni():

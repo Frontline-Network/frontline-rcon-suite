@@ -195,21 +195,6 @@ _LEET_TRANSLATION = str.maketrans(
     {"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "8": "b"}
 )
 
-# Small, version-controlled hard rules cover German compounds that the generic
-# moderation endpoint can miss. They intentionally describe combinations of a
-# protected group and an explicitly hostile term instead of matching group
-# names on their own.
-_FRONTLINE_HARD_PATTERNS = (
-    (
-        "frontline_hard:hate_targeted_turkish_de:v1",
-        re.compile(
-            r"\bt[uo]rk(?:e|en|in|innen)?\s*"
-            r"(?:fetzer|hasser|jager|jaeger|killer|vernichter|schlachter)\b",
-            re.IGNORECASE,
-        ),
-    ),
-)
-
 
 def normalize_candidate(value: str) -> str:
     value = unicodedata.normalize("NFKD", value.casefold()).translate(_LEET_TRANSLATION)
@@ -258,14 +243,7 @@ def prefilter_candidate(text: str, policy: ModerationPolicy) -> LocalPrefilterRe
         if re.search(expression, normalized, re.IGNORECASE):
             matched.append(f"custom_regex:{index}")
 
-    for rule_id, expression in _FRONTLINE_HARD_PATTERNS:
-        if expression.search(normalized):
-            matched.append(rule_id)
-
-    hard_hit = bool(
-        policy.hard_rule_ids.intersection(matched)
-        or any(rule_id.startswith("frontline_hard:") for rule_id in matched)
-    )
+    hard_hit = bool(policy.hard_rule_ids.intersection(matched))
     return LocalPrefilterResult(
         suspicious=bool(matched),
         hard_hit=hard_hit,

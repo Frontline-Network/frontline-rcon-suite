@@ -780,6 +780,44 @@ class MobileContextTests(TestCase):
 
 
 class DiscordActionTemplateTests(TestCase):
+    def test_action_subject_confirmation_is_derived_from_crcon_state(self):
+        from api.discord_integration import _normalize_action_subject
+
+        confirmed_squad = {
+            "target_id": "leader-id",
+            "subjects": [
+                {
+                    "id": "squad-subject",
+                    "kind": "squad",
+                    "state": "confirmed",
+                }
+            ],
+        }
+        normalized = _normalize_action_subject(
+            confirmed_squad,
+            {
+                "subject_id": "squad-subject",
+                "confirm_subject_id": "squad-subject",
+            },
+        )
+        self.assertNotIn("confirm_subject_id", normalized)
+        self.assertEqual(normalized["player_id"], "leader-id")
+
+        suggested_player = {
+            "target_id": "player-id",
+            "subjects": [
+                {
+                    "id": "player-subject",
+                    "kind": "player",
+                    "state": "suggested",
+                }
+            ],
+        }
+        normalized = _normalize_action_subject(
+            suggested_player, {"subject_id": "player-subject"}
+        )
+        self.assertEqual(normalized["confirm_subject_id"], "player-subject")
+
     @patch("api.discord_integration._validate_binding")
     @patch("api.discord_integration._authorized_integration")
     @patch("api.discord_integration.get_message_templates")

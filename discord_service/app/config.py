@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     allowed_crcon_hosts: str = ""
     openai_api_key: str = ""
     ai_model: str = "gpt-5.6-luna"
+    player_name_model: str = "gpt-5-nano"
     moderation_model: str = "omni-moderation-latest"
     prompt_version: str = "moderation-v1"
     rate_limit_per_minute: int = Field(default=120, ge=1, le=10000)
