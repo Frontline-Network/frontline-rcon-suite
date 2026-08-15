@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: discord
+      POSTGRES_USER: discord
+      POSTGRES_PASSWORD: ${DISCORD_POSTGRES_PASSWORD:?set DISCORD_POSTGRES_PASSWORD}
+    volumes:
+      - discord_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U discord -d discord"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  service:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DISCORD_SERVICE_DATABASE_URL: postgresql+psycopg://discord:${DISCORD_POSTGRES_PASSWORD}@postgres/discord
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${DISCORD_SERVICE_HOST_PORT:-18081}:8080"
+
+volumes:
+  discord_postgres:
