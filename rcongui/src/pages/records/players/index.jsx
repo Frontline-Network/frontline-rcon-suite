@@ -5,13 +5,17 @@ import {
   Grid2 as Grid,
   Typography,
   Divider,
+  ToggleButton,
+  ToggleButtonGroup,
+  Tooltip,
+  useMediaQuery,
 } from "@mui/material";
-import {
-  useLoaderData,
-  useNavigation,
-} from "react-router-dom";
+import ViewListIcon from "@mui/icons-material/ViewList";
+import ViewModuleIcon from "@mui/icons-material/ViewModule";
+import { useLoaderData, useNavigation } from "react-router-dom";
 import { useMemo, useState, memo, useCallback, useEffect } from "react";
 import PlayerCard from "@/components/shared/card/PlayerCard";
+import PlayerRecordsList from "./PlayerRecordsList";
 import NavPagination from "@/pages/stats/games/nav-pagination";
 import { Box } from "@mui/material";
 import { useGlobalStore } from "@/stores/global-state";
@@ -21,6 +25,7 @@ import PlayerFiltersForm from "./PlayerFiltersForm";
 import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/shared/PageHeader";
 import { demoPlayerRecords, isFakeMode } from "@/mirage/demo-data";
+import { useStorageState } from "@/hooks/useStorageState";
 
 // Create a memoized version of PlayerCard
 const MemoizedPlayerCard = memo(PlayerCard);
@@ -33,7 +38,8 @@ const PlayersGrid = memo(
         {players.map((player) => (
           <Grid
             key={player.player_id}
-            size={{ xs: 12, sm: 6, md: "auto" }}
+            size={{ xs: 12, md: 6, lg: 4 }}
+            sx={{ "& > .MuiCard-root": { height: "100%", minWidth: 0 } }}
           >
             <MemoizedPlayerCard
               player={player}
@@ -89,13 +95,17 @@ export const loader = async ({ request }) => {
   };
 
   // In the background, this command is POST request therefore the payload and not params
-  const playersRecords = isFakeMode() ? { result: { players: demoPlayerRecords, total: demoPlayerRecords.length } } : await cmd.GET_PLAYERS_RECORDS({
-    payload: Object.fromEntries(
-      Object.entries(fields).filter(
-        ([_, value]) => value !== "" && value !== null
-      )
-    ),
-  });
+  const playersRecords = isFakeMode()
+    ? {
+        result: { players: demoPlayerRecords, total: demoPlayerRecords.length },
+      }
+    : await cmd.GET_PLAYERS_RECORDS({
+        payload: Object.fromEntries(
+          Object.entries(fields).filter(
+            ([_, value]) => value !== "" && value !== null
+          )
+        ),
+      });
 
   const bans = isFakeMode() ? [] : await cmd.GET_BANS();
 
@@ -108,6 +118,7 @@ export const loader = async ({ request }) => {
       page_size > 0
         ? Math.ceil(Number(playersRecords.result.total) / page_size)
         : 1,
+    total: Number(playersRecords.result.total),
     page: Number(page),
     fields,
   };
@@ -115,13 +126,27 @@ export const loader = async ({ request }) => {
 
 export default function PlayersRecords() {
   const { t } = useTranslation();
-  const { players: playersData, fields, total_pages, page } = useLoaderData();
+  const {
+    players: playersData,
+    fields,
+    total_pages,
+    total,
+    page,
+  } = useLoaderData();
   const navigation = useNavigation();
+  const isCompactViewport = useMediaQuery((theme) =>
+    theme.breakpoints.down("md")
+  );
   const server = useGlobalStore((state) => state.serverState);
   const onlinePlayers = useGlobalStore((state) => state.onlinePlayers) ?? [];
   const [selectedPlayerIds, setSelectedPlayerIds] = useState(new Set());
   // Cache player data by player_id to support multi-page selection
   const [playerCache, setPlayerCache] = useState(new Map());
+  const [storedViewMode, setStoredViewMode] = useStorageState(
+    "playerRecords.viewMode",
+    "cards"
+  );
+  const viewMode = isCompactViewport ? "cards" : storedViewMode;
 
   const players = useMemo(() => {
     if (!server) return playersData;
@@ -176,13 +201,15 @@ export default function PlayersRecords() {
     setSelectedPlayerIds((prev) => {
       // Check if all current page players are already selected
       const currentPageIds = new Set(players.map((p) => p.player_id));
-      const allCurrentPageSelected = players.every((p) => prev.has(p.player_id));
-      
+      const allCurrentPageSelected = players.every((p) =>
+        prev.has(p.player_id)
+      );
+
       if (allCurrentPageSelected && players.length > 0) {
         // All current page players are selected, return unchanged
         return prev;
       }
-      
+
       // Add all current page players to existing selection
       const newSet = new Set(prev);
       for (const player of players) {
@@ -193,8 +220,12 @@ export default function PlayersRecords() {
   }, [players]);
 
   const handleUnselectAllPlayers = () => {
-    setSelectedPlayerIds(new Set())
-  }
+    setSelectedPlayerIds(new Set());
+  };
+
+  const handleViewModeChange = (event, nextViewMode) => {
+    if (nextViewMode) setStoredViewMode(nextViewMode);
+  };
 
   // Convert Set to array of player objects for ActionBar
   // Uses cache to include players from all pages, not just current page
@@ -204,13 +235,13 @@ export default function PlayersRecords() {
       const cachedPlayer = playerCache.get(playerId);
       if (cachedPlayer) {
         // Ensure the player has a name field for ActionForm
-        const playerName = 
+        const playerName =
           cachedPlayer.name ??
           cachedPlayer.account?.name ??
           cachedPlayer.names?.[0]?.name ??
           cachedPlayer.soldier?.name ??
           playerId;
-        
+
         result.push({
           ...cachedPlayer,
           name: playerName,
@@ -238,33 +269,123 @@ export default function PlayersRecords() {
         subtitle={t("records.players.subtitle")}
       />
       <ActionBar actions={newRecordActions} recipients={selectedPlayers} />
-      <Stack direction={{ xs: "column", lg: "row" }} spacing={1} sx={{ mt: 2 }}>
-        {/* FILTERS */}
-        <PlayerFiltersForm fields={fields} />
-        {/* MAIN CONTENT */}
+      <PlayerFiltersForm fields={fields} />
+      <Stack
+        component="section"
+        id="players-section"
+        spacing={1}
+        sx={{ width: "100%" }}
+      >
         <Stack
-          component="section"
-          id="players-section"
+          direction={{ xs: "column", md: "row" }}
           spacing={1}
-          sx={{ width: "100%" }}
+          alignItems={{ xs: "stretch", md: "center" }}
+          justifyContent="space-between"
+          sx={{
+            border: (theme) => `1px solid ${theme.palette.divider}`,
+            borderRadius: 1,
+            bgcolor: "background.paper",
+            px: 1.25,
+            py: 1,
+          }}
         >
-          <Stack direction={"row"} spacing={1} alignItems={"center"}>
-            <Typography>{t("records.players.selected", { count: selectedPlayerIds.size })}</Typography>
-            <Button size="small" variant="outlined" onClick={handleSelectAllPlayers}>{t("common.selectAll")}</Button>
-            <Button size="small" variant="outlined" onClick={handleUnselectAllPlayers}>{t("common.unselectAll")}</Button>
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            flexWrap="wrap"
+            useFlexGap
+          >
+            <Typography fontWeight={600}>
+              {t("records.players.results", { count: total })}
+            </Typography>
             <Divider flexItem orientation="vertical" />
+            <Typography color="text.secondary">
+              {t("records.players.selected", { count: selectedPlayerIds.size })}
+            </Typography>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={handleSelectAllPlayers}
+            >
+              {t("common.selectAll")}
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={handleUnselectAllPlayers}
+              disabled={selectedPlayerIds.size === 0}
+            >
+              {t("common.unselectAll")}
+            </Button>
+          </Stack>
+
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            justifyContent="space-between"
+          >
             <NavPagination
               page={page}
               maxPages={total_pages}
               disabled={navigation.state === "loading"}
             />
+            {!isCompactViewport && (
+              <ToggleButtonGroup
+                exclusive
+                size="small"
+                value={viewMode}
+                onChange={handleViewModeChange}
+                aria-label={t("records.players.viewMode")}
+              >
+                <Tooltip title={t("records.players.cardView")}>
+                  <ToggleButton
+                    value="cards"
+                    aria-label={t("records.players.cardView")}
+                    sx={{ minWidth: 40, minHeight: 40 }}
+                  >
+                    <ViewModuleIcon />
+                  </ToggleButton>
+                </Tooltip>
+                <Tooltip title={t("records.players.listView")}>
+                  <ToggleButton
+                    value="list"
+                    aria-label={t("records.players.listView")}
+                    sx={{ minWidth: 40, minHeight: 40 }}
+                  >
+                    <ViewListIcon />
+                  </ToggleButton>
+                </Tooltip>
+              </ToggleButtonGroup>
+            )}
           </Stack>
-          <PlayersGrid
-            players={players}
-            selectedIds={selectedPlayerIds}
-            handlePlayerSelect={handlePlayerSelect}
-          />
-          <Box sx={{ flexGrow: 1 }} />
+        </Stack>
+
+        <Box
+          aria-busy={navigation.state === "loading"}
+          sx={{
+            opacity: navigation.state === "loading" ? 0.55 : 1,
+            transition: (theme) => theme.transitions.create("opacity"),
+          }}
+        >
+          {viewMode === "list" ? (
+            <PlayerRecordsList
+              players={players}
+              selectedIds={selectedPlayerIds}
+              onSelect={handlePlayerSelect}
+            />
+          ) : (
+            <PlayersGrid
+              players={players}
+              selectedIds={selectedPlayerIds}
+              handlePlayerSelect={handlePlayerSelect}
+            />
+          )}
+        </Box>
+
+        <Box sx={{ flexGrow: 1 }} />
+        <Stack direction="row" justifyContent="flex-end">
           <NavPagination
             page={page}
             maxPages={total_pages}
