@@ -705,8 +705,11 @@ class VoteMap:
                     player_id=player_id,
                     message=reminder_message,
                 )
-            except HLLCommandFailedError:
-                logger.warning("Unable to message %s", name)
+            except (HLLCommandFailedError, HLLCommandError) as exc:
+                # A player may have disconnected between collecting the player
+                # list and sending the reminder. Continue with every remaining
+                # recipient instead of aborting the complete reminder run.
+                logger.warning("Unable to message %s: %s", name, exc)
 
         self.set_last_reminder_time()
         return ActionResult(

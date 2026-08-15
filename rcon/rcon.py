@@ -1413,8 +1413,14 @@ class Rcon(ServerCtl):
                 raise ValueError(f"Unable to parse line: {raw_line}")
         elif raw_line.startswith("DISCONNECTED") or raw_line.startswith("CONNECTED"):
             action, name_and_player_id = raw_line.split(" ", 1)
+            name_and_player_id = name_and_player_id.strip()
             if match := re.match(Rcon.connect_disconnect_pattern, name_and_player_id):
                 player, player_id_1 = match.groups()
+                content = name_and_player_id
+            elif name_and_player_id == "()":
+                # HLL: Vietnam can emit an anonymous disconnect event. Keep it
+                # as a structured log so the duplicate guard consumes it, but
+                # leave identity fields empty for hooks to handle safely.
                 content = name_and_player_id
             else:
                 raise ValueError(f"Unable to parse line: {raw_line}")

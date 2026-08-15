@@ -2,6 +2,7 @@ import inspect
 import logging
 import os
 import secrets
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta, timezone
 from functools import cache
 from itertools import islice
@@ -1011,17 +1012,25 @@ def strtobool(val) -> bool:
         raise ValueError("invalid truth value %r" % (val,))
 
 
-def guess_map_from_log(log: StructuredLogLineWithMetaData) -> Layer:
+def guess_map_from_log(
+    log: StructuredLogLineWithMetaData,
+    layers: Mapping[str, Layer] = LAYERS,
+) -> Layer:
     guessed_map: Layer
     try:
         name, env, game_mode = parse_map_string(log["raw"])
-        maps = [l for l in LAYERS.values() if l.map.name.lower() == name.lower() and l.game_mode == game_mode]
+        maps = [
+            layer
+            for layer in layers.values()
+            if layer.map.name.lower() == name.lower()
+            and layer.game_mode == game_mode
+        ]
         # ignoring attackers for offensives
         env_to_maps = {l.environment: l for l in maps}
         if not env:
             # in most cases when env not provided the env is day
             env = Environment.DAY
         guessed_map = env_to_maps.get(env, maps[0])
-    except:
-        guessed_map = LAYERS[UNKNOWN_MAP_NAME]
+    except (IndexError, KeyError, TypeError, ValueError):
+        guessed_map = layers[UNKNOWN_MAP_NAME]
     return guessed_map

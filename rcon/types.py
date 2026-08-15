@@ -241,6 +241,36 @@ class Roles(str, enum.Enum):
     gunner = "gunner"
 
 
+ROLE_ALIASES: dict[str, Roles] = {
+    # HLL: Vietnam reports the infantry leader with this role value while
+    # legacy HLL uses ``officer`` for the same responsibility.
+    "squadleader": Roles.squad_lead,
+}
+
+
+def normalize_role(role: str | Roles | None) -> Roles | None:
+    """Return the compatible CRCON role for a live game role, if known.
+
+    Game servers can introduce role values before CRCON's configurable role
+    catalog is updated. Runtime automods must ignore those unknown values
+    instead of aborting the complete moderation cycle with ``ValueError``.
+    Configuration parsing remains strict because it still uses ``Roles``.
+    """
+    if isinstance(role, Roles):
+        return role
+    if not role:
+        return None
+
+    normalized = role.strip().lower()
+    if normalized in ROLE_ALIASES:
+        return ROLE_ALIASES[normalized]
+
+    try:
+        return Roles(normalized)
+    except ValueError:
+        return None
+
+
 class InvalidRoleError(ValueError):
     def __init__(self, role: str) -> None:
         super().__init__()

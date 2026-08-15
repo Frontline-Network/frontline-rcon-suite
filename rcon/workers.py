@@ -299,6 +299,10 @@ def _build_player_stat_dict(
 ) -> dict[str, Any]:
     """Combine game log stats with temp stats values."""
     adjusted = _compute_temporary_stats(temp_stats)
+    # The live endpoint may temporarily report no level. PlayerStats.level is
+    # intentionally non-nullable, and 0 is CRCON's existing "unknown" value.
+    if adjusted.get("level") is None:
+        adjusted["level"] = 0
     return {
         "player_id_id": player_id_id,
         "map_id": map_id,

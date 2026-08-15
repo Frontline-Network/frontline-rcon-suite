@@ -22,7 +22,7 @@ from rcon.automods.models import (
     WatchStatus,
 )
 from rcon.automods.num_or_inf import num_or_inf
-from rcon.types import GameStateType, GetDetailedPlayer
+from rcon.types import GameStateType, GetDetailedPlayer, normalize_role
 from rcon.user_config.auto_mod_level import AutoModLevelUserConfig, Roles
 
 LEVEL_THRESHOLDS_RESET_SECS = 120
@@ -370,7 +370,9 @@ class LevelThresholdsAutomod:
 
                 # By role level thresholds check
                 if self.config.level_thresholds:
-                    role_config = self.config.level_thresholds.get(Roles(aplayer.role))
+                    role_config = self.config.level_thresholds.get(
+                        normalize_role(aplayer.role)
+                    )
 
                     if (
                         role_config
