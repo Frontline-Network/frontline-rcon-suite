@@ -914,9 +914,7 @@ class DiscordActionTemplateTests(TestCase):
             "roles": [{"id": "789", "name": "HLL-Moderator"}],
         }
 
-        response = self.client.get(
-            "/api/discord/v1/options", HTTP_HOST="rcon.example.org"
-        )
+        response = self.client.get("/api/discord/v1/options")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["result"]["guild"]["name"], "Frontline")
@@ -924,7 +922,7 @@ class DiscordActionTemplateTests(TestCase):
         self.assertNotIn("guild_id", request_payload)
         self.assertEqual(
             request_payload["crcon_callback_url"],
-            "http://rcon.example.org/api/discord/v1/pairings/complete",
+            "http://testserver/api/discord/v1/pairings/complete",
         )
 
     @patch("api.discord_integration.requests.post")
@@ -946,7 +944,6 @@ class DiscordActionTemplateTests(TestCase):
             "/api/discord/v1/connect",
             data=json.dumps({"guild_id": "999", "channel_id": "456"}),
             content_type="application/json",
-            HTTP_HOST="rcon.example.org",
         )
 
         self.assertEqual(response.status_code, 400)
