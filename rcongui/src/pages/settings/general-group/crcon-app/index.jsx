@@ -192,9 +192,9 @@ function CrconAppSettings({
 
   return (
     <Grid container spacing={3}>
-      {showFrontline && <Grid size={12}>
+      <Grid size={12}>
         <DiscordReportBotCard />
-      </Grid>}
+      </Grid>
       {showFrontline && <Grid size={12}>
         <Card elevation={frontlinePresentation ? 0 : 2} sx={frontlineCardSx}>
           <CardHeader
