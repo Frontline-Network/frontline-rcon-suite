@@ -223,6 +223,19 @@ def _purge_expired_relays(session: Session) -> None:
     )
 
 
+def _crcon_interaction_error(exc: httpx.HTTPError) -> str:
+    """Return an honest user-facing error without exposing CRCON internals."""
+
+    if isinstance(exc, httpx.HTTPStatusError):
+        return {
+            400: "CRCON hat die Interaktion als ungültig abgelehnt.",
+            403: "Du hast keine aktuell erlaubte Discord-Moderatorrolle.",
+            404: "Incident oder Discord-Integration wurde nicht gefunden.",
+            409: "Der Incident wurde bereits geändert. Bitte nutze die aktualisierte Nachricht.",
+        }.get(exc.response.status_code, "CRCON hat die Interaktion abgelehnt.")
+    return "CRCON ist derzeit nicht erreichbar."
+
+
 @app.get("/healthz")
 def healthz():
     return {"ok": True, "ai_configured": bool(get_settings().openai_api_key)}
@@ -683,11 +696,11 @@ async def discord_interaction(
                 timeout=10,
             )
             response.raise_for_status()
-        except httpx.HTTPError:
+        except httpx.HTTPError as exc:
             return {
                 "type": 4,
                 "data": {
-                    "content": "Aktion konnte in CRCON nicht ausgeführt werden.",
+                    "content": _crcon_interaction_error(exc),
                     "flags": 64,
                 },
             }
@@ -911,10 +924,10 @@ async def discord_interaction(
         )
         response.raise_for_status()
         result = response.json().get("result", response.json())
-    except httpx.HTTPError:
+    except httpx.HTTPError as exc:
         return {
             "type": 4,
-            "data": {"content": "CRCON ist derzeit nicht erreichbar.", "flags": 64},
+            "data": {"content": _crcon_interaction_error(exc), "flags": 64},
         }
     if operation == "recommend":
         preview = str(result.get("preview") or recommended_action)[:2000]

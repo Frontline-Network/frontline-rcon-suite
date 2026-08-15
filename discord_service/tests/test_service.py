@@ -2,6 +2,7 @@ import os
 from datetime import datetime, timezone
 from unittest.mock import patch
 
+import httpx
 import pytest
 
 os.environ.setdefault("DISCORD_SERVICE_DATABASE_URL", "sqlite:///:memory:")
@@ -22,7 +23,11 @@ from discord_service.app.contracts import (
 )
 from discord_service.app.db import Base, SessionLocal, engine
 from discord_service.app.discord_client import render_message
-from discord_service.app.main import _validate_crcon_callback, app
+from discord_service.app.main import (
+    _crcon_interaction_error,
+    _validate_crcon_callback,
+    app,
+)
 from discord_service.app.models import (
     EventReceipt,
     IncidentMessage,
@@ -238,3 +243,11 @@ def test_player_names_do_not_use_general_moderation_as_hard_gate():
     assert result.analysis.source == ModerationSource.PLAYER_NAME
     assert result.analysis.hard_hit is False
     assert not hasattr(fake.moderations, "kwargs")
+
+
+def test_crcon_permission_error_is_not_reported_as_outage():
+    request = httpx.Request("POST", "https://rcon.example/api")
+    response = httpx.Response(403, request=request)
+    error = httpx.HTTPStatusError("forbidden", request=request, response=response)
+    assert "Moderatorrolle" in _crcon_interaction_error(error)
+    assert "nicht erreichbar" not in _crcon_interaction_error(error)
