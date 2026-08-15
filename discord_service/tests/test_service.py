@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, timezone
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
@@ -22,7 +22,7 @@ from discord_service.app.contracts import (
     ModerationSource,
 )
 from discord_service.app.db import Base, SessionLocal, engine
-from discord_service.app.discord_client import render_message
+from discord_service.app.discord_client import DiscordClient, render_message
 from discord_service.app.main import (
     _action_modal,
     _crcon_interaction_error,
@@ -224,6 +224,27 @@ def test_pairing_derives_guild_from_discord_and_does_not_accept_client_guild():
         "/v1/pairings", json={**payload, "guild_id": "999"}
     )
     assert rejected.status_code == 422
+
+
+def test_existing_server_side_binding_resolves_multiple_bot_guilds():
+    settings = Settings(
+        secret="test-secret-that-is-at-least-32-characters",
+        dry_run=False,
+        discord_bot_token="test-token",
+    )
+    api = MagicMock()
+    api.get.return_value = httpx.Response(
+        200,
+        request=httpx.Request("GET", "https://discord.com/api/v10/users/@me/guilds"),
+        json=[{"id": "123"}, {"id": "999"}],
+    )
+    client = DiscordClient(settings=settings, client=api)
+    expected = {"guild": {"id": "123", "name": "Frontline"}}
+    with patch.object(client, "guild_options", return_value=expected) as options:
+        assert client.single_guild_options("123") == expected
+        with pytest.raises(ValueError, match="ambiguous"):
+            client.single_guild_options()
+    options.assert_called_once_with("123")
 
 
 def test_directional_capability_derivation_is_retry_stable():

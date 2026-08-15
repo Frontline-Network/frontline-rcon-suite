@@ -238,9 +238,17 @@ def _verify_pending_pairing(payload: PairingDiscoveryRequest, callback: str) -> 
         ) from exc
 
 
-def _single_guild_options() -> dict:
+def _single_guild_options(session: Session) -> dict:
+    paired_guilds = {
+        str(value)
+        for value in session.execute(
+            select(Integration.guild_id).where(Integration.enabled.is_(True)).distinct()
+        ).scalars()
+        if value
+    }
+    preferred_guild_id = next(iter(paired_guilds)) if len(paired_guilds) == 1 else None
     try:
-        return DiscordClient().single_guild_options()
+        return DiscordClient().single_guild_options(preferred_guild_id)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except httpx.HTTPError as exc:
@@ -412,12 +420,15 @@ def oauth_install():
 
 
 @app.post("/v1/pairing-options")
-def pairing_options(payload: PairingDiscoveryRequest):
+def pairing_options(
+    payload: PairingDiscoveryRequest,
+    session: Session = Depends(session_dependency),
+):
     callback = str(payload.crcon_callback_url)
     _check_rate_limit(f"pairing-options:{urlsplit(callback).hostname}")
     _validate_crcon_callback(callback)
     _verify_pending_pairing(payload, callback)
-    return _single_guild_options()
+    return _single_guild_options(session)
 
 
 @app.post("/v1/pairings", status_code=status.HTTP_201_CREATED)
@@ -427,7 +438,7 @@ def pair_installation(
     callback = str(payload.crcon_callback_url)
     _check_rate_limit(f"pairing:{urlsplit(callback).hostname}")
     _validate_crcon_callback(callback)
-    options = _single_guild_options()
+    options = _single_guild_options(session)
     guild_id = str(options["guild"]["id"])
     guild_name = str(options["guild"].get("name") or guild_id)[:128]
     channel = next(
