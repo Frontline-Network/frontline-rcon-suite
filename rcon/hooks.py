@@ -69,7 +69,12 @@ from rcon.user_config.rcon_server_settings import RconServerSettingsUserConfig
 from rcon.user_config.real_vip import RealVipUserConfig
 from rcon.user_config.vac_game_bans import VacGameBansUserConfig
 from rcon.user_config.webhooks import CameraWebhooksUserConfig
-from rcon.utils import DefaultStringFormat, MapsHistory, guess_map_from_log
+from rcon.utils import (
+    DefaultStringFormat,
+    MapsHistory,
+    get_server_number,
+    guess_map_from_log,
+)
 from rcon.vote_map import VoteMap
 from rcon.workers import (
     get_queue,
@@ -82,6 +87,9 @@ from rcon.workers import (
 
 logger = logging.getLogger(__name__)
 ARG_RE = re.compile(r"\$(\d+)")
+STEAM_ENRICHMENT_MAX_EVENT_AGE: Final = timedelta(minutes=5)
+STEAM_ENRICHMENT_DEDUPE_SECONDS: Final = 15 * 60
+STEAM_ENRICHMENT_DEDUPE_PREFIX: Final = "steam_connect_enrichment"
 
 
 @on_chat
@@ -604,13 +612,51 @@ def update_player_steaminfo_on_connect(
         )
         return
 
-    logger.info("Queueing Steam enrichment for player %s %s", struct_log["player_name_1"], player_id)
-    get_queue().enqueue(
-        update_player_steaminfo_on_connect_worker,
+    event_time = struct_log.get("event_time")
+    if not isinstance(event_time, datetime):
+        timestamp_ms = struct_log.get("timestamp_ms")
+        if isinstance(timestamp_ms, (int, float)):
+            event_time = datetime.fromtimestamp(timestamp_ms / 1000, tz=UTC)
+    elif event_time.tzinfo is None:
+        event_time = event_time.replace(tzinfo=UTC)
+    else:
+        event_time = event_time.astimezone(UTC)
+
+    if isinstance(event_time, datetime):
+        event_age = datetime.now(tz=UTC) - event_time
+        if event_age > STEAM_ENRICHMENT_MAX_EVENT_AGE:
+            logger.info(
+                "Skipping Steam enrichment for historical connection (%ds old)",
+                int(event_age.total_seconds()),
+            )
+            return
+
+    dedupe_key = f"{STEAM_ENRICHMENT_DEDUPE_PREFIX}:{get_server_number()}:{player_id}"
+    red = get_redis_client()
+    if not red.set(
+        dedupe_key,
+        "1",
+        nx=True,
+        ex=STEAM_ENRICHMENT_DEDUPE_SECONDS,
+    ):
+        logger.debug("Steam enrichment already queued recently for %s", player_id)
+        return
+
+    logger.info(
+        "Queueing Steam enrichment for player %s %s",
         struct_log["player_name_1"],
         player_id,
-        job_timeout=60,
     )
+    try:
+        get_queue().enqueue(
+            update_player_steaminfo_on_connect_worker,
+            struct_log["player_name_1"],
+            player_id,
+            job_timeout=60,
+        )
+    except Exception:
+        red.delete(dedupe_key)
+        raise
 
 
 @on_connected()
