@@ -453,6 +453,8 @@ export const cmd = {
       cmd: "set_auto_broadcasts_config",
       ...params,
     }),
+  SET_BROADCAST_MESSAGE: (params) =>
+    requestFactory({ method: "POST", cmd: "set_broadcast", ...params }),
   SET_CAMERA_NOTIFICATION_CONFIG: (params) =>
     requestFactory({
       method: "POST",
