@@ -1,5 +1,4 @@
 import hashlib
-import os
 import re
 import unicodedata
 from datetime import datetime, timedelta, timezone
@@ -14,6 +13,10 @@ from rcon.models import (
     AdminIncidentSubject,
     enter_session,
 )
+from rcon.incident_settings import (
+    incident_context_fuzzy_threshold,
+    incident_context_mode,
+)
 from rcon.utils import get_server_number
 
 INCIDENT_STATUSES = {"new", "claimed", "resolved", "dismissed"}
@@ -26,13 +29,9 @@ DEFAULT_FUZZY_THRESHOLD = 0.74
 
 
 def _mobile_context_fuzzy_threshold() -> float:
-    try:
-        value = float(
-            os.getenv("MOBILE_CONTEXT_FUZZY_THRESHOLD", str(DEFAULT_FUZZY_THRESHOLD))
-        )
-    except (TypeError, ValueError):
-        value = DEFAULT_FUZZY_THRESHOLD
-    return max(0.0, min(value, 1.0))
+    """Compatibility alias retained for callers and older tests."""
+
+    return incident_context_fuzzy_threshold(DEFAULT_FUZZY_THRESHOLD)
 
 
 class IncidentNotFound(ValueError):
@@ -563,7 +562,7 @@ def create_incident(
     dedupe_seconds: int = 60,
     idempotency_key: str | None = None,
 ) -> tuple[dict, bool]:
-    if source not in {"chat", "manual"}:
+    if source not in {"chat", "manual", "ai_chat", "ai_player_name"}:
         raise ValueError("Unsupported incident source")
     reason = reason.strip()
     if not reason:
@@ -666,11 +665,7 @@ def create_incident_from_chat(
     )
     reporter_context = player_snapshot(reporter)
     reporter_context["online"] = reporter is not None
-    context_mode = os.getenv("MOBILE_CONTEXT_V2", "disabled").strip().lower()
-    if context_mode in {"1", "true", "on", "enabled"}:
-        context_mode = "enabled"
-    elif context_mode != "shadow":
-        context_mode = "disabled"
+    context_mode = incident_context_mode()
     parsed = parse_chat_report(
         str(log.get("sub_content") or ""),
         trigger_words=trigger_words,

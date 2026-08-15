@@ -22,6 +22,14 @@ x-mobile-environment: &mobile-environment
   MOBILE_PUSH_RELAY_URL: ${MOBILE_PUSH_RELAY_URL:-}
   FRONTLINE_VIP_REDEEM_URL: ${FRONTLINE_VIP_REDEEM_URL:-}
   FRONTLINE_VIP_REDEEM_SECRET: ${FRONTLINE_VIP_REDEEM_SECRET:-}
+  INCIDENT_CAPTURE_ENABLED: ${INCIDENT_CAPTURE_ENABLED:-}
+  INCIDENT_TRIGGERS: ${INCIDENT_TRIGGERS:-}
+  INCIDENT_CONTEXT_MODE: ${INCIDENT_CONTEXT_MODE:-}
+  INCIDENT_CONTEXT_FUZZY_THRESHOLD: ${INCIDENT_CONTEXT_FUZZY_THRESHOLD:-}
+  INCIDENT_RETENTION_DAYS: ${INCIDENT_RETENTION_DAYS:-}
+  DISCORD_REPORTS_ENABLED: ${DISCORD_REPORTS_ENABLED:-false}
+  DISCORD_SERVICE_URL: ${DISCORD_SERVICE_URL:-}
+  AI_MODERATION_ENABLED: ${AI_MODERATION_ENABLED:-false}
 
 x-mobile-environment-server-2: &mobile-environment-server-2
   <<: *mobile-environment
@@ -56,6 +64,11 @@ services:
     # stay in lockstep with the mobile endpoints.
     <<: *frontline-backend
     command: mobile_push_worker
+    environment: *mobile-environment
+
+  discord_report_worker:
+    <<: *frontline-backend
+    command: discord_report_worker
     environment: *mobile-environment
 
   backend_1:

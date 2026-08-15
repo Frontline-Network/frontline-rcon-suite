@@ -407,6 +407,23 @@ const de = {
     },
   },
   settings: {
+    discordReports: {
+      title: "Discord Report Bot",
+      subtitle: "Gemeinsamer Report-Kanal mit rollenbasierter Moderation und verwalteter KI-Analyse.",
+      statusConnected: "Verbunden", statusDisconnected: "Nicht verbunden",
+      installHint: "Installiere zuerst die Frontline Discord-App und verbinde anschließend Guild, Kanal und Moderatorrollen. Ein eigener Bot-Token ist nicht nötig.",
+      install: "Discord-App installieren", roles: "Moderatorrollen (IDs)", connect: "Verbinden",
+      connected: "Discord Report Bot verbunden.", enabled: "Integration aktiv", language: "Sprache",
+      reports_enabled: "KI für Reports", chat_enabled: "KI für Chat", names_enabled: "KI für Namen",
+      shadow_mode: "Shadow-Modus", quality_opt_in: "Anonymisierte Qualitätsbeispiele (Opt-in)",
+      usage: "KI-Verbrauch in diesem Monat: {{used}} / {{quota}} Tokens", unlimited: "kein festes Limit",
+      customTerms: "Eigene Begriffe", exceptions: "Ausnahmen", regexes: "Reguläre Ausdrücke",
+      template_received: "Spielerantwort: Eingang", template_claimed: "Spielerantwort: Übernahme",
+      template_resolved: "Spielerantwort: Abschluss", template_dismissed: "Spielerantwort: Ablehnung",
+      aiSafety: "KI-Ergebnisse sind ausschließlich Vorschläge. Jede Spielaktion benötigt einen aktuell berechtigten Moderator; destruktive Aktionen zusätzlich Grund, Vorschau und zweite Bestätigung.",
+      save: "Speichern", saved: "Discord- und KI-Konfiguration gespeichert.", test: "Testmeldung",
+      testSent: "Testmeldung gesendet.", disconnect: "Verbindung trennen",
+    },
     others: {
       fields: {
         enabled: { title: "Aktiviert", description: "Legt fest, ob diese Funktion auf dem Server aktiv ist." },

@@ -21,15 +21,15 @@ from django.urls import include, path
 
 from api.browse_logsdir import list_logs
 
-if (
-    not os.getenv("HLL_MAINTENANCE_CONTAINER")
-    and not os.getenv("HLL_WH_SERVICE_CONTAINER")
+if not os.getenv("HLL_MAINTENANCE_CONTAINER") and not os.getenv(
+    "HLL_WH_SERVICE_CONTAINER"
 ):
     urlpatterns = [
         path("admin/", admin.site.urls),
         path("accounts/", include("django.contrib.auth.urls")),
         path("api/", include("api.urls")),
         path("api/mobile/v1/", include("api.mobile_urls")),
+        path("api/discord/v1/", include("api.discord_urls")),
         path("api/logs/", list_logs),
         path("api/logs/<path:path>", list_logs),
     ]

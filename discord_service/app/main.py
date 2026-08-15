@@ -1,0 +1,982 @@
+from __future__ import annotations
+
+import ipaddress
+import re
+import socket
+import uuid
+from datetime import datetime, timedelta, timezone
+from threading import Lock
+from time import monotonic, time
+from urllib.parse import urlsplit
+
+import httpx
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi.responses import RedirectResponse
+from nacl.exceptions import BadSignatureError
+from nacl.signing import VerifyKey
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from sqlalchemy import delete, func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from .ai import ManagedAnalyzer
+from .config import get_settings
+from .contracts import (
+    IncidentEventEnvelope,
+    ModerationAnalysisJobEnvelope,
+    ModerationPolicy,
+    ModerationSource,
+)
+from .db import Base, engine, session_dependency
+from .discord_client import DiscordClient, render_message
+from .models import (
+    EventReceipt,
+    IncidentMessage,
+    Integration,
+    PreparedActionRelay,
+    TechnicalUsageMetric,
+)
+from .security import decrypt, derive_capability, digest, encrypt, matches
+
+Base.metadata.create_all(engine)
+app = FastAPI(title="Frontline CRCON Discord Service", version="1.0.0")
+_rate_windows: dict[str, tuple[float, int]] = {}
+_rate_lock = Lock()
+
+
+def _check_rate_limit(key: str):
+    now = monotonic()
+    with _rate_lock:
+        started, count = _rate_windows.get(key, (now, 0))
+        if started <= now - 60:
+            started, count = now, 0
+        if count >= get_settings().rate_limit_per_minute:
+            raise HTTPException(status_code=429, detail="Rate limit exceeded")
+        _rate_windows[key] = (started, count + 1)
+        if len(_rate_windows) > 10000:
+            expired = [
+                item_key
+                for item_key, (item_started, _) in _rate_windows.items()
+                if item_started <= now - 60
+            ]
+            for item_key in expired:
+                _rate_windows.pop(item_key, None)
+
+
+class PairingRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    crcon_callback_url: HttpUrl
+    pairing_id: str = Field(min_length=1, max_length=36)
+    pairing_secret: str = Field(min_length=32, max_length=255)
+    guild_id: str = Field(pattern=r"^[0-9]+$", max_length=32)
+    guild_name: str = Field(default="", max_length=128)
+    channel_id: str = Field(pattern=r"^[0-9]+$", max_length=32)
+    channel_name: str = Field(default="", max_length=128)
+
+
+def _bearer(authorization: str | None) -> str:
+    return (
+        authorization[7:]
+        if authorization and authorization.startswith("Bearer ")
+        else ""
+    )
+
+
+def _integration_for_event(
+    session: Session, envelope: IncidentEventEnvelope, authorization: str | None
+) -> Integration:
+    integration = session.get(Integration, envelope.installation_id)
+    if (
+        integration is None
+        or not integration.enabled
+        or not matches(
+            _bearer(authorization), integration.event_capability_digest, "events"
+        )
+    ):
+        raise HTTPException(status_code=404, detail="Unknown installation capability")
+    return integration
+
+
+def _send_feedback(
+    integration: Integration,
+    *,
+    interaction_id: str,
+    guild_id: str,
+    channel_id: str,
+    incident_id: str,
+    analysis_id: str | None,
+    actor: dict,
+    decision: str,
+    actual_action: str,
+) -> None:
+    if not analysis_id:
+        return
+    try:
+        response = httpx.post(
+            f"{integration.crcon_base_url}/api/discord/v1/moderation-feedback",
+            headers={
+                "Authorization": (
+                    f"Bearer {decrypt(integration.action_capability_ciphertext)}"
+                )
+            },
+            json={
+                "feedback_id": str(
+                    uuid.uuid5(uuid.NAMESPACE_URL, f"discord-feedback:{interaction_id}")
+                ),
+                "guild_id": guild_id,
+                "channel_id": channel_id,
+                "feedback": {
+                    "incident_id": incident_id,
+                    "analysis_id": analysis_id,
+                    "actor": actor,
+                    "decision": decision,
+                    "actual_action": actual_action,
+                },
+            },
+            timeout=10,
+        )
+        response.raise_for_status()
+    except httpx.HTTPError:
+        # Feedback must never roll back an already audited moderation decision.
+        return
+
+
+def _policy_from_event(envelope: IncidentEventEnvelope) -> ModerationPolicy:
+    raw = envelope.incident.get("moderation_policy") or {}
+    return ModerationPolicy.model_validate(raw)
+
+
+def _usage_summary(session: Session, installation_id: str) -> dict[str, int | None]:
+    now = datetime.now(tz=timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    used = int(
+        session.execute(
+            select(
+                func.coalesce(
+                    func.sum(
+                        TechnicalUsageMetric.input_tokens
+                        + TechnicalUsageMetric.output_tokens
+                    ),
+                    0,
+                )
+            ).where(
+                TechnicalUsageMetric.installation_id == installation_id,
+                TechnicalUsageMetric.created_at >= month_start,
+            )
+        ).scalar_one()
+    )
+    quota = get_settings().monthly_token_quota
+    return {
+        "used_tokens": used,
+        "quota_tokens": quota or None,
+        "remaining_tokens": max(0, quota - used) if quota else None,
+    }
+
+
+def _quota_available(session: Session, installation_id: str) -> bool:
+    usage = _usage_summary(session, installation_id)
+    return usage["quota_tokens"] is None or bool(usage["remaining_tokens"])
+
+
+def _validate_crcon_callback(callback: str) -> None:
+    settings = get_settings()
+    parsed = urlsplit(callback)
+    if settings.dry_run:
+        return
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+        or parsed.path != "/api/discord/v1/pairings/complete"
+        or parsed.port not in {None, 443}
+    ):
+        raise HTTPException(status_code=400, detail="Invalid CRCON callback URL")
+    hostname = parsed.hostname.lower()
+    allowed_hosts = settings.crcon_host_allowlist()
+    if allowed_hosts and hostname not in allowed_hosts:
+        raise HTTPException(status_code=400, detail="CRCON host is not allowed")
+    try:
+        addresses = {
+            item[4][0].split("%", 1)[0]
+            for item in socket.getaddrinfo(hostname, 443, type=socket.SOCK_STREAM)
+        }
+    except socket.gaierror as exc:
+        raise HTTPException(
+            status_code=400, detail="CRCON host cannot be resolved"
+        ) from exc
+    if not addresses or any(
+        not ipaddress.ip_address(address).is_global for address in addresses
+    ):
+        raise HTTPException(
+            status_code=400, detail="CRCON callback must resolve to public addresses"
+        )
+
+
+def _purge_expired_relays(session: Session) -> None:
+    session.execute(
+        delete(PreparedActionRelay).where(
+            PreparedActionRelay.expires_at <= datetime.now(tz=timezone.utc)
+        )
+    )
+
+
+@app.get("/healthz")
+def healthz():
+    return {"ok": True, "ai_configured": bool(get_settings().openai_api_key)}
+
+
+@app.get("/oauth/install")
+def oauth_install():
+    if not get_settings().discord_install_url:
+        raise HTTPException(
+            status_code=503, detail="Discord install URL is not configured"
+        )
+    return RedirectResponse(get_settings().discord_install_url, status_code=302)
+
+
+@app.post("/v1/pairings", status_code=status.HTTP_201_CREATED)
+def pair_installation(
+    payload: PairingRequest, session: Session = Depends(session_dependency)
+):
+    _check_rate_limit(f"pairing:{payload.guild_id}")
+    callback = str(payload.crcon_callback_url)
+    _validate_crcon_callback(callback)
+    try:
+        DiscordClient().validate_channel(payload.channel_id, payload.guild_id)
+    except (httpx.HTTPError, ValueError) as exc:
+        raise HTTPException(
+            status_code=400, detail="Discord channel cannot be used by this app"
+        ) from exc
+    action_capability = derive_capability(payload.pairing_id, "actions")
+    try:
+        response = httpx.post(
+            callback,
+            json={
+                "pairing_id": payload.pairing_id,
+                "pairing_secret": payload.pairing_secret,
+                "crcon_action_capability": action_capability,
+                "guild_id": payload.guild_id,
+                "guild_name": payload.guild_name,
+                "channel_id": payload.channel_id,
+                "channel_name": payload.channel_name,
+            },
+            timeout=10,
+        )
+        response.raise_for_status()
+        result = response.json().get("result", response.json())
+        installation_id = str(result["installation_id"])
+        event_capability = str(result["event_capability"])
+    except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(status_code=502, detail="CRCON pairing failed") from exc
+    crcon_base_url = callback.rsplit("/api/discord/v1/", 1)[0]
+    integration = session.get(Integration, installation_id) or Integration(
+        installation_id=installation_id,
+        crcon_base_url=crcon_base_url,
+        guild_id=payload.guild_id,
+        channel_id=payload.channel_id,
+        event_capability_digest="",
+        action_capability_ciphertext="",
+    )
+    integration.crcon_base_url = crcon_base_url
+    integration.guild_id = payload.guild_id
+    integration.channel_id = payload.channel_id
+    integration.event_capability_digest = digest(event_capability, "events")
+    integration.action_capability_ciphertext = encrypt(action_capability)
+    integration.enabled = True
+    session.add(integration)
+    session.commit()
+    return {"installation_id": installation_id, "connected": True}
+
+
+@app.post("/v1/events", status_code=status.HTTP_202_ACCEPTED)
+def receive_event(
+    envelope: IncidentEventEnvelope,
+    authorization: str | None = Header(default=None),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    session: Session = Depends(session_dependency),
+):
+    if not idempotency_key or len(idempotency_key) > 160:
+        raise HTTPException(
+            status_code=400, detail="A valid Idempotency-Key is required"
+        )
+    integration = _integration_for_event(session, envelope, authorization)
+    _purge_expired_relays(session)
+    _check_rate_limit(f"events:{integration.installation_id}")
+    existing = session.get(EventReceipt, idempotency_key)
+    if existing:
+        return {"accepted": True, "cached": True}
+    mapping = session.execute(
+        select(IncidentMessage).where(
+            IncidentMessage.installation_id == envelope.installation_id,
+            IncidentMessage.incident_id == envelope.incident_id,
+        )
+    ).scalar_one_or_none()
+    if mapping and envelope.incident_revision < mapping.last_revision:
+        session.add(
+            EventReceipt(
+                idempotency_key=idempotency_key,
+                installation_id=envelope.installation_id,
+                event_id=envelope.event_id,
+                event_type=envelope.event_type,
+            )
+        )
+        try:
+            session.commit()
+        except IntegrityError:
+            session.rollback()
+        return {"accepted": True, "cached": True, "stale": True}
+    analysis = envelope.analysis
+    unavailable = False
+    usage = None
+    ai_config = envelope.incident.get("ai_config") or {}
+    raw_source = str(envelope.incident.get("source") or "")
+    ai_toggle = {
+        "chat": "reports_enabled",
+        "manual": "reports_enabled",
+        "ai_chat": "chat_enabled",
+        "ai_player_name": "names_enabled",
+    }.get(raw_source, "reports_enabled")
+    source_ai_enabled = bool(ai_config.get(ai_toggle, ai_toggle == "reports_enabled"))
+    quota_available = _quota_available(session, envelope.installation_id)
+    if analysis is None and envelope.event_type == "created" and source_ai_enabled:
+        unavailable = not quota_available
+    if (
+        analysis is None
+        and envelope.event_type == "created"
+        and source_ai_enabled
+        and quota_available
+    ):
+        source = (
+            ModerationSource.REPORT
+            if raw_source in {"chat", "manual"}
+            else ModerationSource(raw_source)
+        )
+        result = ManagedAnalyzer().analyze(
+            text=str(envelope.incident.get("reason") or ""),
+            source=source,
+            policy=_policy_from_event(envelope),
+            player_ids=[
+                value for value in [envelope.incident.get("target_id")] if value
+            ],
+        )
+        analysis = result.analysis
+        unavailable = analysis is None
+        usage = TechnicalUsageMetric(
+            installation_id=envelope.installation_id,
+            kind="moderation_analysis",
+            model=get_settings().ai_model,
+            input_tokens=result.input_tokens,
+            output_tokens=result.output_tokens,
+            success=analysis is not None,
+        )
+        if analysis is not None:
+            try:
+                callback = httpx.post(
+                    f"{integration.crcon_base_url}/api/discord/v1/moderation-results",
+                    headers={
+                        "Authorization": (
+                            f"Bearer {decrypt(integration.action_capability_ciphertext)}"
+                        )
+                    },
+                    json={
+                        "installation_id": integration.installation_id,
+                        "analysis_id": str(uuid.uuid4()),
+                        "incident_id": envelope.incident_id,
+                        "analysis": analysis.model_dump(mode="json"),
+                        "policy": _policy_from_event(envelope).model_dump(mode="json"),
+                    },
+                    timeout=10,
+                )
+                callback.raise_for_status()
+            except httpx.HTTPError:
+                # The normal Discord report remains available; CRCON's outbox
+                # will retry future events and AI is visibly best-effort.
+                pass
+    message_payload = render_message(envelope, analysis, ai_unavailable=unavailable)
+    try:
+        message_id = DiscordClient().upsert(
+            integration.channel_id,
+            message_payload,
+            mapping.message_id if mapping else None,
+        )
+    except httpx.HTTPStatusError as exc:
+        status_code = exc.response.status_code
+        if status_code == 429:
+            raise HTTPException(status_code=429, detail="Discord rate limited") from exc
+        raise HTTPException(
+            status_code=503, detail="Discord delivery unavailable"
+        ) from exc
+    now = datetime.now(tz=timezone.utc)
+    if mapping is None:
+        mapping = IncidentMessage(
+            installation_id=envelope.installation_id,
+            incident_id=envelope.incident_id,
+            message_id=message_id,
+            channel_id=integration.channel_id,
+            last_revision=envelope.incident_revision,
+            analysis_id=str(envelope.incident.get("analysis_id") or "") or None,
+            suggested_action=(analysis.suggested_action.value if analysis else None),
+            suggested_duration_hours=(
+                analysis.suggested_duration_hours if analysis else None
+            ),
+            primary_subject_id=str(
+                (envelope.incident.get("primary_subject") or {}).get("id") or ""
+            )
+            or None,
+            updated_at=now,
+        )
+        session.add(mapping)
+    else:
+        mapping.message_id = message_id
+        mapping.last_revision = max(mapping.last_revision, envelope.incident_revision)
+        if envelope.incident.get("analysis_id"):
+            mapping.analysis_id = str(envelope.incident["analysis_id"])
+        if analysis:
+            mapping.suggested_action = analysis.suggested_action.value
+            mapping.suggested_duration_hours = analysis.suggested_duration_hours
+        primary_subject_id = str(
+            (envelope.incident.get("primary_subject") or {}).get("id") or ""
+        )
+        if primary_subject_id:
+            mapping.primary_subject_id = primary_subject_id
+        mapping.updated_at = now
+    session.add(
+        EventReceipt(
+            idempotency_key=idempotency_key,
+            installation_id=envelope.installation_id,
+            event_id=envelope.event_id,
+            event_type=envelope.event_type,
+        )
+    )
+    if usage:
+        session.add(usage)
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        return {"accepted": True, "cached": True}
+    return {"accepted": True, "cached": False, "ai_available": not unavailable}
+
+
+@app.get("/v1/usage/{installation_id}")
+def integration_usage(
+    installation_id: str,
+    authorization: str | None = Header(default=None),
+    session: Session = Depends(session_dependency),
+):
+    integration = session.get(Integration, installation_id)
+    if integration is None or not matches(
+        _bearer(authorization), integration.event_capability_digest, "events"
+    ):
+        raise HTTPException(status_code=404, detail="Unknown installation capability")
+    return _usage_summary(session, installation_id)
+
+
+@app.post("/v1/analysis-jobs", status_code=status.HTTP_202_ACCEPTED)
+def receive_analysis_job(
+    job: ModerationAnalysisJobEnvelope,
+    authorization: str | None = Header(default=None),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    session: Session = Depends(session_dependency),
+):
+    if not idempotency_key or len(idempotency_key) > 160:
+        raise HTTPException(
+            status_code=400, detail="A valid Idempotency-Key is required"
+        )
+    integration = session.get(Integration, job.installation_id)
+    if (
+        integration is None
+        or not integration.enabled
+        or not matches(
+            _bearer(authorization), integration.event_capability_digest, "events"
+        )
+    ):
+        raise HTTPException(status_code=404, detail="Unknown installation capability")
+    _check_rate_limit(f"analysis:{integration.installation_id}")
+    if session.get(EventReceipt, idempotency_key):
+        return {"accepted": True, "cached": True}
+    if not _quota_available(session, job.installation_id):
+        raise HTTPException(status_code=429, detail="Monthly AI quota exhausted")
+    result = ManagedAnalyzer().analyze(
+        text=job.candidate_text,
+        source=job.source,
+        policy=job.policy,
+        player_ids=[job.player_id] if job.player_id else [],
+    )
+    if result.analysis is None:
+        raise HTTPException(status_code=503, detail="AI analysis unavailable")
+    supplied_rules = list(
+        dict.fromkeys([*result.analysis.rule_ids, *job.matched_rule_ids])
+    )[:20]
+    analysis = result.analysis.model_copy(
+        update={
+            "rule_ids": supplied_rules,
+            "hard_hit": result.analysis.hard_hit
+            or bool(job.policy.hard_rule_ids.intersection(job.matched_rule_ids)),
+        }
+    )
+    analysis_id = str(uuid.uuid4())
+    try:
+        callback = httpx.post(
+            f"{integration.crcon_base_url}/api/discord/v1/moderation-results",
+            headers={
+                "Authorization": (
+                    f"Bearer {decrypt(integration.action_capability_ciphertext)}"
+                )
+            },
+            json={
+                "installation_id": integration.installation_id,
+                "analysis_id": analysis_id,
+                "job_id": job.job_id,
+                "analysis": analysis.model_dump(mode="json"),
+                "policy": job.policy.model_dump(mode="json"),
+            },
+            timeout=10,
+        )
+        callback.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=503, detail="CRCON analysis callback unavailable"
+        ) from exc
+    session.add(
+        EventReceipt(
+            idempotency_key=idempotency_key,
+            installation_id=job.installation_id,
+            event_id=0,
+            event_type="analysis_job",
+        )
+    )
+    session.add(
+        TechnicalUsageMetric(
+            installation_id=job.installation_id,
+            kind=job.source.value,
+            model=get_settings().ai_model,
+            input_tokens=result.input_tokens,
+            output_tokens=result.output_tokens,
+            success=True,
+        )
+    )
+    session.commit()
+    return {"accepted": True, "cached": False}
+
+
+@app.post("/v1/test-messages", status_code=status.HTTP_202_ACCEPTED)
+def test_message(
+    payload: dict,
+    authorization: str | None = Header(default=None),
+    session: Session = Depends(session_dependency),
+):
+    installation_id = str(payload.get("installation_id") or "")
+    integration = session.get(Integration, installation_id)
+    if integration is None or not matches(
+        _bearer(authorization), integration.event_capability_digest, "events"
+    ):
+        raise HTTPException(status_code=404, detail="Unknown installation capability")
+    _check_rate_limit(f"test:{integration.installation_id}")
+    DiscordClient().upsert(
+        integration.channel_id,
+        {
+            "embeds": [
+                {
+                    "title": "CRCON-Verbindung erfolgreich",
+                    "description": "Der Frontline Discord Report Bot ist verbunden.",
+                    "color": 5763719,
+                }
+            ],
+            "allowed_mentions": {"parse": []},
+        },
+    )
+    return {"accepted": True}
+
+
+def _verify_discord_signature(request_body: bytes, signature: str, timestamp: str):
+    public_key = get_settings().discord_public_key
+    if not public_key:
+        raise HTTPException(status_code=503, detail="Discord public key not configured")
+    try:
+        if abs(time() - int(timestamp)) > 300:
+            raise ValueError("stale timestamp")
+        VerifyKey(bytes.fromhex(public_key)).verify(
+            timestamp.encode("utf-8") + request_body, bytes.fromhex(signature)
+        )
+    except (BadSignatureError, ValueError) as exc:
+        raise HTTPException(
+            status_code=401, detail="Invalid Discord signature"
+        ) from exc
+
+
+@app.post("/v1/discord/interactions")
+async def discord_interaction(
+    request: Request,
+    x_signature_ed25519: str = Header(default=""),
+    x_signature_timestamp: str = Header(default=""),
+    session: Session = Depends(session_dependency),
+):
+    body = await request.body()
+    _verify_discord_signature(body, x_signature_ed25519, x_signature_timestamp)
+    _purge_expired_relays(session)
+    payload = await request.json()
+    if payload.get("type") == 1:
+        return {"type": 1}
+    rate_member = payload.get("member") or {}
+    rate_user = rate_member.get("user") or {}
+    _check_rate_limit(
+        f"interaction:{payload.get('guild_id')}:{rate_user.get('id')}"
+    )
+    custom_id = str((payload.get("data") or {}).get("custom_id") or "")
+    if payload.get("type") == 3 and custom_id.startswith("confirm:"):
+        handle = custom_id.split(":", 1)[1]
+        relay = session.get(PreparedActionRelay, handle)
+        member = payload.get("member") or {}
+        user = member.get("user") or {}
+        actor_id = str(user.get("id") or "")
+        now = datetime.now(tz=timezone.utc)
+        expires_at = relay.expires_at if relay else None
+        if expires_at is not None and expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if (
+            relay is None
+            or relay.used_at is not None
+            or expires_at is None
+            or expires_at <= now
+            or relay.actor_id != actor_id
+        ):
+            return {
+                "type": 4,
+                "data": {
+                    "content": "Bestätigung ist ungültig oder abgelaufen.",
+                    "flags": 64,
+                },
+            }
+        integration = session.get(Integration, relay.installation_id)
+        if integration is None or not integration.enabled:
+            return {
+                "type": 4,
+                "data": {"content": "Integration ist nicht mehr aktiv.", "flags": 64},
+            }
+        actor = {
+            "discord_id": actor_id,
+            "display_name": str(
+                member.get("nick")
+                or user.get("global_name")
+                or user.get("username")
+                or "Discord moderator"
+            ),
+            "role_ids": [str(value) for value in member.get("roles") or []],
+        }
+        try:
+            response = httpx.post(
+                f"{integration.crcon_base_url}/api/discord/v1/actions/{relay.preparation_id}/execute",
+                headers={
+                    "Authorization": f"Bearer {decrypt(integration.action_capability_ciphertext)}"
+                },
+                json={
+                    "interaction_id": str(payload.get("id")),
+                    "guild_id": relay.guild_id,
+                    "channel_id": relay.channel_id,
+                    "actor": actor,
+                    "confirmation_token": decrypt(relay.confirmation_ciphertext),
+                },
+                timeout=10,
+            )
+            response.raise_for_status()
+        except httpx.HTTPError:
+            return {
+                "type": 4,
+                "data": {
+                    "content": "Aktion konnte in CRCON nicht ausgeführt werden.",
+                    "flags": 64,
+                },
+            }
+        relay.used_at = now
+        session.commit()
+        _send_feedback(
+            integration,
+            interaction_id=str(payload.get("id")),
+            guild_id=relay.guild_id,
+            channel_id=relay.channel_id,
+            incident_id=relay.incident_id,
+            analysis_id=relay.analysis_id,
+            actor=actor,
+            decision=(
+                "accepted"
+                if relay.actual_action == relay.suggested_action
+                else "overridden"
+            ),
+            actual_action=relay.actual_action,
+        )
+        return {
+            "type": 4,
+            "data": {
+                "content": "Aktion wurde in CRCON ausgeführt und protokolliert.",
+                "flags": 64,
+            },
+        }
+
+    choice_match = re.fullmatch(r"choose:([0-9a-f-]{36}):(\d+)", custom_id)
+    modal_match = re.fullmatch(
+        r"action-modal:([0-9a-f-]{36}):(\d+):([a-z_]+)", custom_id
+    )
+    modal_values: dict[str, str | int] = {}
+    if payload.get("type") == 3 and choice_match:
+        operation = "recommend"
+        incident_id, revision = choice_match.groups()
+        selected = (payload.get("data") or {}).get("values") or []
+        recommended_action = str(selected[0]) if selected else ""
+        match = bool(re.fullmatch(r"[a-z_]+", recommended_action))
+    elif payload.get("type") == 5 and modal_match:
+        operation = "recommend"
+        incident_id, revision, recommended_action = modal_match.groups()
+        rows = (payload.get("data") or {}).get("components") or []
+        modal_values = {
+            str(component.get("custom_id")): str(component.get("value") or "").strip()
+            for row in rows
+            for component in row.get("components", [])
+        }
+        required_text_key = "message" if recommended_action == "message" else "reason"
+        if not modal_values.get(required_text_key):
+            return {
+                "type": 4,
+                "data": {
+                    "content": "Ein Text oder Grund ist erforderlich.",
+                    "flags": 64,
+                },
+            }
+        if recommended_action == "temp_ban":
+            try:
+                modal_values["duration_hours"] = int(modal_values["duration_hours"])
+            except (KeyError, ValueError):
+                return {
+                    "type": 4,
+                    "data": {"content": "Die Dauer muss eine Zahl sein.", "flags": 64},
+                }
+        if recommended_action == "blacklist":
+            try:
+                modal_values["blacklist_id"] = int(modal_values["blacklist_id"])
+            except (KeyError, ValueError):
+                return {
+                    "type": 4,
+                    "data": {
+                        "content": "Die Blacklist-ID muss eine Zahl sein.",
+                        "flags": 64,
+                    },
+                }
+        match = True
+    else:
+        match = re.fullmatch(
+            r"(claim|resolve|dismiss|recommend):([0-9a-f-]{36}):(\d+)(?::([a-z_]+))?",
+            custom_id,
+        )
+    if not match:
+        return {"type": 4, "data": {"content": "Unbekannte Interaktion", "flags": 64}}
+    if not choice_match and (modal_match is None or payload.get("type") != 5):
+        operation, incident_id, revision, recommended_action = match.groups()
+    if operation == "recommend" and payload.get("type") != 5:
+        text_key = "message" if recommended_action == "message" else "reason"
+        inputs = [
+            {
+                "type": 1,
+                "components": [
+                    {
+                        "type": 4,
+                        "custom_id": text_key,
+                        "label": "Nachricht" if text_key == "message" else "Grund",
+                        "style": 2,
+                        "required": True,
+                        "min_length": 1 if text_key == "message" else 3,
+                        "max_length": 1000,
+                    }
+                ],
+            }
+        ]
+        if recommended_action == "temp_ban":
+            inputs.append(
+                {
+                    "type": 1,
+                    "components": [
+                        {
+                            "type": 4,
+                            "custom_id": "duration_hours",
+                            "label": "Dauer in Stunden (1-720)",
+                            "style": 1,
+                            "required": True,
+                            "value": "2",
+                            "max_length": 3,
+                        }
+                    ],
+                }
+            )
+        if recommended_action == "blacklist":
+            inputs.append(
+                {
+                    "type": 1,
+                    "components": [
+                        {
+                            "type": 4,
+                            "custom_id": "blacklist_id",
+                            "label": "Blacklist-ID",
+                            "style": 1,
+                            "required": True,
+                            "max_length": 10,
+                        }
+                    ],
+                }
+            )
+        return {
+            "type": 9,
+            "data": {
+                "custom_id": f"action-modal:{incident_id}:{revision}:{recommended_action}",
+                "title": "Aktion prüfen und vorbereiten",
+                "components": inputs,
+            },
+        }
+    guild_id = str(payload.get("guild_id") or "")
+    channel_id = str(payload.get("channel_id") or "")
+    integration = session.execute(
+        select(Integration).where(
+            Integration.guild_id == guild_id,
+            Integration.channel_id == channel_id,
+            Integration.enabled.is_(True),
+        )
+    ).scalar_one_or_none()
+    if integration is None:
+        return {
+            "type": 4,
+            "data": {"content": "Integration nicht gefunden", "flags": 64},
+        }
+    mapping = session.execute(
+        select(IncidentMessage).where(
+            IncidentMessage.installation_id == integration.installation_id,
+            IncidentMessage.incident_id == incident_id,
+        )
+    ).scalar_one_or_none()
+    member = payload.get("member") or {}
+    user = member.get("user") or {}
+    actor = {
+        "discord_id": str(user.get("id") or ""),
+        "display_name": str(
+            member.get("nick")
+            or user.get("global_name")
+            or user.get("username")
+            or "Discord moderator"
+        ),
+        "role_ids": [str(value) for value in member.get("roles") or []],
+    }
+    endpoint = "actions/prepare" if operation == "recommend" else "incidents/transition"
+    outgoing_operation = "prepare_action" if operation == "recommend" else operation
+    data = {
+        "interaction_id": str(payload.get("id")),
+        "installation_id": integration.installation_id,
+        "guild_id": guild_id,
+        "channel_id": channel_id,
+        "incident_id": incident_id,
+        "incident_revision": int(revision),
+        "actor": actor,
+        "operation": outgoing_operation,
+        "payload": (
+            {
+                "action": recommended_action,
+                **modal_values,
+                "discord_actor": actor,
+                "ai_suggested_action": (mapping.suggested_action if mapping else None),
+                "ai_decision": (
+                    "accepted"
+                    if mapping and mapping.suggested_action == recommended_action
+                    else "overridden"
+                ),
+                **(
+                    {
+                        "subject_id": mapping.primary_subject_id,
+                        "confirm_subject_id": mapping.primary_subject_id,
+                    }
+                    if mapping and mapping.primary_subject_id
+                    else {}
+                ),
+            }
+            if recommended_action
+            else {}
+        ),
+    }
+    try:
+        response = httpx.post(
+            f"{integration.crcon_base_url}/api/discord/v1/{endpoint}",
+            headers={
+                "Authorization": f"Bearer {decrypt(integration.action_capability_ciphertext)}"
+            },
+            json=data,
+            timeout=10,
+        )
+        response.raise_for_status()
+        result = response.json().get("result", response.json())
+    except httpx.HTTPError:
+        return {
+            "type": 4,
+            "data": {"content": "CRCON ist derzeit nicht erreichbar.", "flags": 64},
+        }
+    if operation == "recommend":
+        preview = str(result.get("preview") or recommended_action)[:2000]
+        relay = PreparedActionRelay(
+            handle=str(uuid.uuid4()),
+            installation_id=integration.installation_id,
+            incident_id=incident_id,
+            preparation_id=str(result["preparation_id"]),
+            confirmation_ciphertext=encrypt(str(result["confirmation_token"])),
+            actor_id=actor["discord_id"],
+            guild_id=guild_id,
+            channel_id=channel_id,
+            analysis_id=mapping.analysis_id if mapping else None,
+            suggested_action=mapping.suggested_action if mapping else None,
+            actual_action=str(recommended_action),
+            expires_at=datetime.now(tz=timezone.utc) + timedelta(minutes=5),
+        )
+        session.add(relay)
+        session.commit()
+        content = f"Vorbereitet: {preview}"
+        return {
+            "type": 4,
+            "data": {
+                "content": content[:1800],
+                "flags": 64,
+                "components": [
+                    {
+                        "type": 1,
+                        "components": [
+                            {
+                                "type": 2,
+                                "style": (
+                                    4
+                                    if result.get("requires_second_confirmation")
+                                    else 1
+                                ),
+                                "label": "Verbindlich bestätigen",
+                                "custom_id": f"confirm:{relay.handle}",
+                            }
+                        ],
+                    }
+                ],
+            },
+        }
+    else:
+        content = f"Incident aktualisiert: {operation}."
+        if operation == "dismiss":
+            mapping = session.execute(
+                select(IncidentMessage).where(
+                    IncidentMessage.installation_id == integration.installation_id,
+                    IncidentMessage.incident_id == incident_id,
+                )
+            ).scalar_one_or_none()
+            _send_feedback(
+                integration,
+                interaction_id=str(payload.get("id")),
+                guild_id=guild_id,
+                channel_id=channel_id,
+                incident_id=incident_id,
+                analysis_id=mapping.analysis_id if mapping else None,
+                actor=actor,
+                decision="rejected",
+                actual_action="none",
+            )
+    return {"type": 4, "data": {"content": content[:1900], "flags": 64}}

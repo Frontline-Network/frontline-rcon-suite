@@ -21,6 +21,7 @@ def register_log_hooks() -> None:
         handle_on_kill,
         handle_on_tk,
     )
+    from rcon.moderation_hooks import analyze_player_name_candidate  # noqa: F401
     from rcon.recent_actions import update_kills, update_tks  # noqa: F401
     from rcon.watchlist import watchdog  # noqa: F401
 

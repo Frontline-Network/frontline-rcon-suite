@@ -737,7 +737,9 @@ class LogLine(Base):
     player_1: Mapped[PlayerID] = relationship(foreign_keys=[player1_player_id])
     player_2: Mapped[PlayerID] = relationship(foreign_keys=[player2_player_id])
     server: Mapped[str] = mapped_column()
-    game: Mapped[int] = mapped_column(default=GameIntEnum.HLL_WW2.value, server_default=str(GameIntEnum.HLL_WW2.value))
+    game: Mapped[int] = mapped_column(
+        default=GameIntEnum.HLL_WW2.value, server_default=str(GameIntEnum.HLL_WW2.value)
+    )
 
     def get_weapon(self) -> str | None:
         if self.weapon:
@@ -809,9 +811,13 @@ class Maps(Base):
     game_layout: Mapped["GameLayout"] = mapped_column(
         JSON, nullable=False, default=GameLayout
     )
-    cap_flips: Mapped[list[MapScore]] = mapped_column(JSON, nullable=False, default=list)
+    cap_flips: Mapped[list[MapScore]] = mapped_column(
+        JSON, nullable=False, default=list
+    )
     match_time: Mapped[int] = mapped_column(default=0)
-    game: Mapped[int] = mapped_column(default=GameIntEnum.HLL_WW2.value, server_default=str(GameIntEnum.HLL_WW2.value))
+    game: Mapped[int] = mapped_column(
+        default=GameIntEnum.HLL_WW2.value, server_default=str(GameIntEnum.HLL_WW2.value)
+    )
 
     player_stats: Mapped[list["PlayerStats"]] = relationship(back_populates="map")
 
@@ -1360,7 +1366,8 @@ class AdminIncident(Base):
     __tablename__ = "admin_incident"
     __table_args__ = (
         CheckConstraint(
-            "source IN ('chat', 'manual')", name="ck_admin_incident_source"
+            "source IN ('chat', 'manual', 'ai_chat', 'ai_player_name')",
+            name="ck_admin_incident_source",
         ),
         CheckConstraint(
             "status IN ('new', 'claimed', 'resolved', 'dismissed')",
@@ -1581,6 +1588,130 @@ class AdminIncidentPushDelivery(Base):
     error: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), default=lambda: datetime.now(tz=timezone.utc)
+    )
+
+
+class AdminIncidentDiscordDelivery(Base):
+    """Durable outbox state for one event sent to the Frontline Discord service."""
+
+    __tablename__ = "admin_incident_discord_delivery"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    event_id: Mapped[int] = mapped_column(
+        ForeignKey("admin_incident_event.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    attempts: Mapped[int] = mapped_column(nullable=False, default=0)
+    next_attempt_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(tz=timezone.utc),
+        index=True,
+    )
+    delivered_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), index=True
+    )
+    last_error: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), default=lambda: datetime.now(tz=timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        default=lambda: datetime.now(tz=timezone.utc),
+        onupdate=lambda: datetime.now(tz=timezone.utc),
+    )
+
+
+class ModerationAnalysisRecord(Base):
+    """Local analysis/audit record; shadow content never leaves this database."""
+
+    __tablename__ = "moderation_analysis"
+    __table_args__ = (
+        CheckConstraint(
+            "source IN ('report', 'ai_chat', 'ai_player_name')",
+            name="ck_moderation_analysis_source",
+        ),
+        CheckConstraint(
+            "visibility IN ('incident', 'shadow', 'ignore')",
+            name="ck_moderation_analysis_visibility",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    incident_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("admin_incident.id", ondelete="CASCADE"), index=True
+    )
+    source: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    player_id: Mapped[str | None] = mapped_column(String(100), index=True)
+    candidate_fingerprint: Mapped[str] = mapped_column(
+        String(64), nullable=False, index=True
+    )
+    # Candidate content is retained locally only and is purged after 30 days
+    # for shadow/ignored results.  It is never included in service metrics.
+    candidate_text: Mapped[str | None] = mapped_column(Text)
+    analysis: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    visibility: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    model_version: Mapped[str] = mapped_column(String(100), nullable=False)
+    prompt_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    policy_profile_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    policy_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    dedupe_until: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        default=lambda: datetime.now(tz=timezone.utc),
+        index=True,
+    )
+
+
+class ModerationCandidateOutbox(Base):
+    """Local-only candidate content and its reliable analysis job state."""
+
+    __tablename__ = "moderation_candidate_outbox"
+    __table_args__ = (
+        CheckConstraint(
+            "source IN ('ai_chat', 'ai_player_name')",
+            name="ck_moderation_candidate_source",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    source: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    server_number: Mapped[int] = mapped_column(nullable=False, index=True)
+    player_id: Mapped[str | None] = mapped_column(String(100), index=True)
+    player_name: Mapped[str | None] = mapped_column(String(255))
+    candidate_text: Mapped[str] = mapped_column(Text, nullable=False)
+    candidate_fingerprint: Mapped[str] = mapped_column(
+        String(64), nullable=False, index=True
+    )
+    matched_rule_ids: Mapped[list[str]] = mapped_column(
+        JSON, nullable=False, default=list
+    )
+    policy: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    shadow_only: Mapped[bool] = mapped_column(nullable=False, default=True)
+    attempts: Mapped[int] = mapped_column(nullable=False, default=0)
+    next_attempt_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(tz=timezone.utc),
+        index=True,
+    )
+    delivered_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
+    analysis_received_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), index=True
+    )
+    last_error: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        default=lambda: datetime.now(tz=timezone.utc),
+        index=True,
     )
 
 

@@ -28,6 +28,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { cmd, mobileRequest } from "@/utils/fetchUtils";
 import { toast } from "react-toastify";
 import { useTranslation } from "react-i18next";
+import DiscordReportBotCard from "./DiscordReportBotCard";
 
 function CrconAppSettings({
   showFrontline = true,
@@ -191,6 +192,9 @@ function CrconAppSettings({
 
   return (
     <Grid container spacing={3}>
+      {showFrontline && <Grid size={12}>
+        <DiscordReportBotCard />
+      </Grid>}
       {showFrontline && <Grid size={12}>
         <Card elevation={frontlinePresentation ? 0 : 2} sx={frontlineCardSx}>
           <CardHeader

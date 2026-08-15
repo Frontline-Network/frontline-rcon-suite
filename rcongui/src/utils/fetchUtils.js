@@ -574,6 +574,32 @@ export async function mobileRequest(path, { method = "GET", payload } = {}) {
   return envelope.result;
 }
 
+export async function discordRequest(path, { method = "GET", payload } = {}) {
+  const apiBase = new URL(CRCON_API, document.location.origin);
+  const url = new URL(`discord/v1/${path}`, apiBase);
+  const response = await fetch(url, {
+    method,
+    mode: "cors",
+    cache: "no-store",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    redirect: "follow",
+    referrerPolicy: "origin",
+    ...(method !== "GET" && method !== "HEAD"
+      ? { body: JSON.stringify(payload ?? {}) }
+      : {}),
+  });
+  const envelope = await parseJsonResponse(response);
+  if (!response.ok || envelope.failed) {
+    throw new APIError(
+      envelope.error || "Discord integration request failed",
+      path,
+      response.status
+    );
+  }
+  return envelope.result;
+}
+
 export function execute(command, data) {
   return postData(CRCON_API + command, data);
 }

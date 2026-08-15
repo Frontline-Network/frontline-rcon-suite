@@ -1,0 +1,370 @@
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  Alert,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  Chip,
+  Divider,
+  FormControlLabel,
+  MenuItem,
+  Stack,
+  Switch,
+  TextField,
+} from "@mui/material";
+import { SmartToy as BotIcon } from "@mui/icons-material";
+import { discordRequest } from "@/utils/fetchUtils";
+import { toast } from "react-toastify";
+import { useTranslation } from "react-i18next";
+
+const ACTIONS = [
+  "message",
+  "punish",
+  "kick",
+  "temp_ban",
+  "perma_ban",
+  "blacklist",
+  "remove_from_squad",
+  "disband_squad",
+];
+const splitValues = (value) =>
+  value
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+export default function DiscordReportBotCard() {
+  const { t } = useTranslation();
+  const [config, setConfig] = useState(null);
+  const [error, setError] = useState("");
+  const [guildId, setGuildId] = useState("");
+  const [channelId, setChannelId] = useState("");
+  const [roles, setRoles] = useState("");
+  const [terms, setTerms] = useState("");
+  const [exceptions, setExceptions] = useState("");
+  const [regexes, setRegexes] = useState("");
+  const [usage, setUsage] = useState(null);
+
+  const apply = useCallback((next) => {
+    setConfig(next);
+    setGuildId(next.guild_id || "");
+    setChannelId(next.channel_id || "");
+    setRoles((next.moderator_role_ids || []).join(", "));
+    setTerms((next.policy?.custom_terms || []).join("\n"));
+    setExceptions((next.policy?.exceptions || []).join("\n"));
+    setRegexes((next.policy?.custom_regexes || []).join("\n"));
+    setError("");
+  }, []);
+
+  useEffect(() => {
+    discordRequest("integration")
+      .then((next) => {
+        apply(next);
+        if (next.connected) {
+          discordRequest("usage").then(setUsage).catch(() => setUsage(null));
+        }
+      })
+      .catch((requestError) => setError(requestError.message));
+  }, [apply]);
+
+  const connect = async () => {
+    try {
+      apply(
+        await discordRequest("connect", {
+          method: "POST",
+          payload: {
+            guild_id: guildId,
+            channel_id: channelId,
+            moderator_role_ids: splitValues(roles),
+          },
+        })
+      );
+      toast.success(t("settings.discordReports.connected"));
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  };
+
+  const save = async () => {
+    try {
+      const policy = {
+        profile_id: "frontline-default",
+        version: "1",
+        language: config.language,
+        enabled_sources: ["report", "ai_chat", "ai_player_name"],
+        alert_threshold: 0.9,
+        shadow_threshold: 0.7,
+        hard_rule_ids: config.policy?.hard_rule_ids || [],
+        custom_terms: splitValues(terms),
+        exceptions: splitValues(exceptions),
+        custom_regexes: splitValues(regexes),
+      };
+      apply(
+        await discordRequest("integration", {
+          method: "PUT",
+          payload: {
+            enabled: config.enabled,
+            moderator_role_ids: splitValues(roles),
+            allowed_actions: config.allowed_actions || [],
+            language: config.language,
+            ai_config: config.ai_config || {},
+            policy,
+            reporter_templates: config.reporter_templates || {},
+          },
+        })
+      );
+      toast.success(t("settings.discordReports.saved"));
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  };
+
+  if (!config && !error) return null;
+  return (
+    <Card elevation={2}>
+      <CardHeader
+        avatar={<BotIcon color="primary" />}
+        title={t("settings.discordReports.title")}
+        subheader={t("settings.discordReports.subtitle")}
+        action={
+          config && (
+            <Chip
+              color={config.connected ? "success" : "default"}
+              label={
+                config.connected
+                  ? t("settings.discordReports.statusConnected")
+                  : t("settings.discordReports.statusDisconnected")
+              }
+            />
+          )
+        }
+      />
+      <Divider />
+      <CardContent>
+        <Stack spacing={2}>
+          {error && <Alert severity="warning">{error}</Alert>}
+          {config && !config.connected && (
+            <>
+              <Alert severity="info">
+                {t("settings.discordReports.installHint")}
+              </Alert>
+              <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                <Button
+                  variant="outlined"
+                  onClick={() =>
+                    window.open(
+                      `${config.service_url.replace(/\/$/, "")}/oauth/install`,
+                      "_blank",
+                      "noopener,noreferrer"
+                    )
+                  }
+                >
+                  {t("settings.discordReports.install")}
+                </Button>
+                <TextField
+                  label="Guild ID"
+                  value={guildId}
+                  onChange={(event) => setGuildId(event.target.value)}
+                  fullWidth
+                />
+                <TextField
+                  label="Channel ID"
+                  value={channelId}
+                  onChange={(event) => setChannelId(event.target.value)}
+                  fullWidth
+                />
+                <TextField
+                  label={t("settings.discordReports.roles")}
+                  value={roles}
+                  onChange={(event) => setRoles(event.target.value)}
+                  fullWidth
+                />
+                <Button
+                  variant="contained"
+                  disabled={!guildId || !channelId || !roles}
+                  onClick={connect}
+                >
+                  {t("settings.discordReports.connect")}
+                </Button>
+              </Stack>
+            </>
+          )}
+          {config?.connected && (
+            <>
+              {usage && (
+                <Alert severity="info">
+                  {t("settings.discordReports.usage", {
+                    used: usage.used_tokens.toLocaleString(),
+                    quota: usage.quota_tokens
+                      ? usage.quota_tokens.toLocaleString()
+                      : t("settings.discordReports.unlimited"),
+                  })}
+                </Alert>
+              )}
+              <TextField
+                label={t("settings.discordReports.roles")}
+                value={roles}
+                onChange={(event) => setRoles(event.target.value)}
+              />
+              <TextField
+                select
+                label={t("settings.discordReports.language")}
+                value={config.language || "de"}
+                onChange={(event) =>
+                  setConfig({ ...config, language: event.target.value })
+                }
+              >
+                <MenuItem value="de">Deutsch</MenuItem>
+                <MenuItem value="en">English</MenuItem>
+              </TextField>
+              <Stack direction="row" spacing={2} useFlexGap flexWrap="wrap">
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={config.enabled}
+                      onChange={(event) =>
+                        setConfig({ ...config, enabled: event.target.checked })
+                      }
+                    />
+                  }
+                  label={t("settings.discordReports.enabled")}
+                />
+                {[
+                  "reports_enabled",
+                  "chat_enabled",
+                  "names_enabled",
+                  "shadow_mode",
+                  "quality_opt_in",
+                ].map((key) => (
+                  <FormControlLabel
+                    key={key}
+                    control={
+                      <Switch
+                        checked={Boolean(config.ai_config?.[key])}
+                        onChange={(event) =>
+                          setConfig({
+                            ...config,
+                            ai_config: {
+                              ...(config.ai_config || {}),
+                              [key]: event.target.checked,
+                            },
+                          })
+                        }
+                      />
+                    }
+                    label={t(`settings.discordReports.${key}`)}
+                  />
+                ))}
+              </Stack>
+              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                {ACTIONS.map((action) => {
+                  const active = (config.allowed_actions || []).includes(
+                    action
+                  );
+                  return (
+                    <Chip
+                      key={action}
+                      clickable
+                      color={active ? "primary" : "default"}
+                      label={action}
+                      onClick={() =>
+                        setConfig({
+                          ...config,
+                          allowed_actions: active
+                            ? config.allowed_actions.filter(
+                                (item) => item !== action
+                              )
+                            : [...(config.allowed_actions || []), action],
+                        })
+                      }
+                    />
+                  );
+                })}
+              </Stack>
+              <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                <TextField
+                  multiline
+                  minRows={3}
+                  label={t("settings.discordReports.customTerms")}
+                  value={terms}
+                  onChange={(event) => setTerms(event.target.value)}
+                  fullWidth
+                />
+                <TextField
+                  multiline
+                  minRows={3}
+                  label={t("settings.discordReports.exceptions")}
+                  value={exceptions}
+                  onChange={(event) => setExceptions(event.target.value)}
+                  fullWidth
+                />
+                <TextField
+                  multiline
+                  minRows={3}
+                  label={t("settings.discordReports.regexes")}
+                  value={regexes}
+                  onChange={(event) => setRegexes(event.target.value)}
+                  fullWidth
+                />
+              </Stack>
+              <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                {["received", "claimed", "resolved", "dismissed"].map(
+                  (templateKey) => (
+                    <TextField
+                      key={templateKey}
+                      label={t(
+                        `settings.discordReports.template_${templateKey}`
+                      )}
+                      value={config.reporter_templates?.[templateKey] || ""}
+                      onChange={(event) =>
+                        setConfig({
+                          ...config,
+                          reporter_templates: {
+                            ...(config.reporter_templates || {}),
+                            [templateKey]: event.target.value,
+                          },
+                        })
+                      }
+                      fullWidth
+                    />
+                  )
+                )}
+              </Stack>
+              <Alert severity="info">
+                {t("settings.discordReports.aiSafety")}
+              </Alert>
+              <Stack direction="row" spacing={1}>
+                <Button variant="contained" onClick={save}>
+                  {t("settings.discordReports.save")}
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={() =>
+                    discordRequest("test-message", { method: "POST" })
+                      .then(() =>
+                        toast.success(t("settings.discordReports.testSent"))
+                      )
+                      .catch((requestError) => setError(requestError.message))
+                  }
+                >
+                  {t("settings.discordReports.test")}
+                </Button>
+                <Button
+                  color="error"
+                  onClick={() =>
+                    discordRequest("integration", { method: "DELETE" })
+                      .then(apply)
+                      .catch((requestError) => setError(requestError.message))
+                  }
+                >
+                  {t("settings.discordReports.disconnect")}
+                </Button>
+              </Stack>
+            </>
+          )}
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}

@@ -348,6 +348,23 @@ const en = {
     },
   },
   settings: {
+    discordReports: {
+      title: "Discord Report Bot",
+      subtitle: "One report channel with role-based moderation and managed AI analysis.",
+      statusConnected: "Connected", statusDisconnected: "Disconnected",
+      installHint: "Install the Frontline Discord app first, then connect the guild, channel, and moderator roles. No customer bot token is required.",
+      install: "Install Discord app", roles: "Moderator roles (IDs)", connect: "Connect",
+      connected: "Discord Report Bot connected.", enabled: "Integration enabled", language: "Language",
+      reports_enabled: "AI for reports", chat_enabled: "AI for chat", names_enabled: "AI for names",
+      shadow_mode: "Shadow mode", quality_opt_in: "Anonymized quality examples (opt-in)",
+      usage: "AI usage this month: {{used}} / {{quota}} tokens", unlimited: "no fixed limit",
+      customTerms: "Custom terms", exceptions: "Exceptions", regexes: "Regular expressions",
+      template_received: "Player reply: received", template_claimed: "Player reply: claimed",
+      template_resolved: "Player reply: resolved", template_dismissed: "Player reply: dismissed",
+      aiSafety: "AI results are suggestions only. Every game action requires a currently authorized moderator; destructive actions also require a reason, preview, and second confirmation.",
+      save: "Save", saved: "Discord and AI configuration saved.", test: "Test message",
+      testSent: "Test message sent.", disconnect: "Disconnect",
+    },
     others: {
       fields: {
         enabled: { title: "Enabled", description: "Controls whether this feature is active on the server." },

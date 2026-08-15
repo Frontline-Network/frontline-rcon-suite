@@ -45,6 +45,12 @@ then
   exec python manage.py mobile_push_worker
 fi
 
+if [ "$1" == 'discord_report_worker' ]
+then
+  cd rconweb
+  exec python manage.py discord_report_worker
+fi
+
 # Check if we're in a backend container
 if [ "$1" == 'web' ]
 then

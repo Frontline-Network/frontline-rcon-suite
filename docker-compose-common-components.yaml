@@ -148,3 +148,32 @@ services:
       - ./logs:/logs/
     networks:
       - common
+  discord_report_worker:
+    profiles: ["discord"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${BACKEND_DOCKER_REPOSITORY}:${TAGGED_VERSION}
+    command: discord_report_worker
+    restart: unless-stopped
+    environment:
+      SERVER_NUMBER: 1
+      LOGGING_PATH: /logs/
+      HLL_DB_USER: ${HLL_DB_USER}
+      HLL_DB_PASSWORD: ${HLL_DB_PASSWORD}
+      HLL_DB_NAME: ${HLL_DB_NAME}
+      HLL_DB_HOST: ${HLL_DB_HOST}
+      HLL_DB_HOST_PORT: ${HLL_DB_HOST_PORT}
+      HLL_DB_URL: postgresql://${HLL_DB_USER}:${HLL_DB_PASSWORD}@${HLL_DB_HOST}:${HLL_DB_HOST_PORT}/${HLL_DB_NAME}
+      HLL_REDIS_URL: redis://${HLL_REDIS_HOST}:${HLL_REDIS_HOST_PORT}/0
+      RCONWEB_API_SECRET: ${RCONWEB_API_SECRET}
+      DISCORD_REPORTS_ENABLED: ${DISCORD_REPORTS_ENABLED}
+      DISCORD_SERVICE_URL: ${DISCORD_SERVICE_URL}
+      AI_MODERATION_ENABLED: ${AI_MODERATION_ENABLED}
+    depends_on:
+      maintenance:
+        condition: service_healthy
+    volumes:
+      - ./logs:/logs/
+    networks:
+      - common
