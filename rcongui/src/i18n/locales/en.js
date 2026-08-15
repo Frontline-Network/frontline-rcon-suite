@@ -573,6 +573,13 @@ const en = {
     changePassword: "Change password",
     logout: "Log out",
   },
+  matchStatus: {
+    ariaLabel: "Current match status",
+    players: "Players",
+    map: "Map",
+    remaining: "Remaining",
+    unknownMap: "Unknown map",
+  },
   dashboard: {
     title: "Overview",
     subtitle: "Central overview of your Hell Let Loose server",

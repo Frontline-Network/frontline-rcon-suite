@@ -632,6 +632,13 @@ const de = {
     changePassword: "Passwort ändern",
     logout: "Abmelden",
   },
+  matchStatus: {
+    ariaLabel: "Aktueller Spielstatus",
+    players: "Spieler",
+    map: "Karte",
+    remaining: "Restzeit",
+    unknownMap: "Unbekannte Karte",
+  },
   dashboard: {
     title: "Übersicht",
     subtitle: "Zentrale Übersicht deines Hell-Let-Loose-Servers",

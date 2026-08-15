@@ -9,18 +9,17 @@ import MenuButton from "./MenuButton";
 import NavbarBreadcrumbs from "./NavbarBreadcrumbs";
 import { useMediaQuery, useTheme } from "@mui/system";
 import ServerStatus from "../Header/server-status";
-import { Box } from "@mui/material";
 import { useAppStore } from "@/stores/app-state";
 import FrontlineBrand from "./FrontlineBrand";
 
 const Toolbar = styled(MuiToolbar)({
   width: "100%",
-  padding: "12px",
+  padding: "8px 12px",
   display: "flex",
   flexDirection: "column",
   alignItems: "start",
   justifyContent: "center",
-  gap: "12px",
+  gap: "8px",
   flexShrink: 0,
   [`& ${tabsClasses.flexContainer}`]: {
     gap: "8px",
@@ -55,9 +54,6 @@ const AppNavbarBase = ({ toggleDrawer, open, isSmallScreen }) => {
             <MenuRoundedIcon />
           </MenuButton>
           <FrontlineBrand compact />
-          <Box sx={{ overflow: "hidden", display: { xs: "none", sm: "block" } }}>
-            {isSmallScreen && <ServerStatus compact={isSmallScreen || !open} />}
-          </Box>
           <Stack
             direction="row"
             spacing={1}
@@ -66,6 +62,7 @@ const AppNavbarBase = ({ toggleDrawer, open, isSmallScreen }) => {
             <NavbarBreadcrumbs />
           </Stack>
         </Stack>
+        {isSmallScreen && <ServerStatus compact={isSmallScreen || !open} />}
       </Toolbar>
     </AppBar>
   );

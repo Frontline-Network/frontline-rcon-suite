@@ -6,6 +6,7 @@ import MenuButton from "./MenuButton";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import MenuOpenIcon from "@mui/icons-material/MenuOpen";
 import { useAppStore } from "@/stores/app-state";
+import ServerStatus from "../Header/server-status";
 
 export default function Header() {
   const openDrawer = useAppStore((state) => state.openDrawer);
@@ -27,7 +28,7 @@ export default function Header() {
       }}
       spacing={2}
     >
-      <Stack direction="row" sx={{ gap: 1 }}>
+      <Stack direction="row" sx={{ gap: 1, flex: 1, minWidth: 0 }}>
         <MenuButton
           aria-label="toggle-menu"
           onClick={toggleDrawer}
@@ -37,7 +38,8 @@ export default function Header() {
         </MenuButton>
         <NavbarBreadcrumbs />
       </Stack>
-      <Stack direction="row" sx={{ gap: 1 }}>
+      <ServerStatus />
+      <Stack direction="row" sx={{ gap: 1, flexShrink: 0 }}>
         <Box sx={{ display: "flex", gap: 2, width: "fit-content" }}>
           <ToggleWidthMode />
           <LanguageSelector />
