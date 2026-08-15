@@ -822,6 +822,7 @@ class DiscordActionTemplateTests(TestCase):
                     "id": "player-subject",
                     "kind": "player",
                     "state": "suggested",
+                    "player_id": "player-id",
                 }
             ],
         }
