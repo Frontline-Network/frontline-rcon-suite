@@ -21,6 +21,11 @@ export default function PlayerCard({
   selected,
 }) {
   const { t, i18n } = useTranslation();
+  const name =
+    playerProfile?.account?.name ??
+    playerProfile.names?.[0]?.name ??
+    playerProfile?.soldier?.name ??
+    "???";
   const actionList = useMemo(
     () =>
       generatePlayerActions({
@@ -41,22 +46,21 @@ export default function PlayerCard({
           size="small"
           checked={selected}
           onChange={handleSelect}
+          inputProps={{
+            "aria-label": t("records.players.selectPlayer", { name }),
+          }}
           sx={{ width: 24, height: 24 }}
         />
         <ProfileActions player={playerProfile} actions={actionList} />
       </Stack>
     ),
-    [selected, handleSelect, playerProfile, actionList]
+    [selected, handleSelect, playerProfile, actionList, name, t]
   );
-
-  const name =
-    playerProfile?.account?.name ??
-    playerProfile.names?.[0]?.name ??
-    playerProfile?.soldier?.name ??
-    "???";
   const avatar = playerProfile?.steaminfo?.profile?.avatar ?? name;
   const penalties = playerProfile?.penalty_count;
-  const firstSeen = dayjs(playerProfile.first_seen_timestamp_ms).locale(i18n.language).format("L");
+  const firstSeen = dayjs(playerProfile.first_seen_timestamp_ms)
+    .locale(i18n.language)
+    .format("L");
   const lastSeen = dayjs(playerProfile.last_seen_timestamp_ms).fromNow();
   const country =
     playerProfile?.country ??
@@ -71,8 +75,14 @@ export default function PlayerCard({
   const clanTag = playerProfile?.clan_tag ?? playerProfile?.soldier?.clan_tag;
 
   return (
-    <Card sx={{ minWidth: { md: 380 }, borderColor: (theme) => selected ? theme.palette.primary.main : "" }}>
-      <CardContent>
+    <Card
+      sx={{
+        minWidth: 0,
+        height: "100%",
+        borderColor: (theme) => (selected ? theme.palette.primary.main : ""),
+      }}
+    >
+      <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
         <PlayerProfileHeader
           player={playerProfile}
           isOnline={playerProfile.is_online}

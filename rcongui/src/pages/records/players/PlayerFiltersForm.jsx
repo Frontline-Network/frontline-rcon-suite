@@ -1,23 +1,31 @@
 import {
+  Autocomplete,
+  Badge,
+  Box,
   Button,
-  TextField,
-  FormControlLabel,
-  Switch,
-  Stack,
   Chip,
-  Popover,
+  Collapse,
+  FormControlLabel,
   IconButton,
+  InputAdornment,
+  Popover,
   Skeleton,
+  Stack,
+  Switch,
+  TextField,
   Typography,
 } from "@mui/material";
+import AddReactionIcon from "@mui/icons-material/AddReaction";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import RestartAltIcon from "@mui/icons-material/RestartAlt";
+import SearchIcon from "@mui/icons-material/Search";
+import TuneIcon from "@mui/icons-material/Tune";
 import { Form, useNavigation, useSubmit } from "react-router-dom";
-import { Autocomplete } from "@mui/material";
 import { CountryFlag } from "@/components/shared/CountryFlag";
-import { useMemo, useState, Suspense, lazy } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import countries from "country-list";
 import emojiData from "@emoji-mart/data/sets/15/twitter.json";
 import Emoji from "@/components/shared/Emoji";
-import AddReactionIcon from "@mui/icons-material/AddReaction";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
@@ -25,14 +33,22 @@ import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
 
 const EmojiPicker = lazy(() => import("@emoji-mart/react"));
-
-// Get all countries for autocomplete
 const countryCodes = countries.getCodes();
 
 export default function PlayerFiltersForm({ fields }) {
   const { t, i18n } = useTranslation();
   const submit = useSubmit();
   const navigation = useNavigation();
+  const hasAdvancedFilters = Boolean(
+    fields.flags?.length ||
+      fields.last_seen_from ||
+      fields.last_seen_till ||
+      fields.blacklisted ||
+      fields.exact_name_match ||
+      fields.ignore_accent ||
+      fields.is_watched
+  );
+  const [advancedOpen, setAdvancedOpen] = useState(hasAdvancedFilters);
   const [formFields, setFormFields] = useState({
     player_name: fields.player_name || "",
     player_id: fields.player_id || "",
@@ -56,13 +72,19 @@ export default function PlayerFiltersForm({ fields }) {
     }));
   }, [i18n.resolvedLanguage]);
 
-  const handleEmojiButtonClick = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleClose = () => {
-    setAnchorEl(null);
-  };
+  const advancedFilterCount = useMemo(
+    () =>
+      [
+        selectedEmoji.length > 0,
+        Boolean(formFields.last_seen_from),
+        Boolean(formFields.last_seen_till),
+        formFields.blacklisted,
+        formFields.exact_name_match,
+        formFields.ignore_accent,
+        formFields.is_watched,
+      ].filter(Boolean).length,
+    [formFields, selectedEmoji.length]
+  );
 
   const handleReset = () => {
     setFormFields({
@@ -77,255 +99,318 @@ export default function PlayerFiltersForm({ fields }) {
     });
     setSelectedCountry("");
     setSelectedEmoji([]);
+    setAdvancedOpen(false);
     submit(null, { method: "GET" });
   };
 
-  const handleInputChange = (e) => {
-    const { name, value, checked } = e.target;
-    setFormFields((prev) => ({
-      ...prev,
-      [name]: e.target.type === "checkbox" ? checked : value,
+  const handleInputChange = (event) => {
+    const { name, value, checked } = event.target;
+    setFormFields((previous) => ({
+      ...previous,
+      [name]: event.target.type === "checkbox" ? checked : value,
     }));
   };
 
   return (
     <Form method="GET">
-      <Stack spacing={2} sx={{ width: { xs: "100%", lg: "300px" } }}>
-        <TextField
-          value={formFields.player_name}
-          onChange={handleInputChange}
-          label={t("records.players.playerName")}
-          name="player_name"
-          fullWidth
-        />
-
-        <TextField
-          value={formFields.player_id}
-          onChange={handleInputChange}
-          label={t("records.players.playerId")}
-          name="player_id"
-          fullWidth
-        />
-
-        <Autocomplete
-          openText={t("common.openOptions")}
-          closeText={t("common.closeOptions")}
-          clearText={t("common.clearSelection")}
-          noOptionsText={t("common.noResults")}
-          options={countryOptions}
-          getOptionLabel={(option) => option.name}
-          value={
-            countryOptions.find((c) => c.code === selectedCountry) || null
-          }
-          onChange={(event, newValue) => {
-            setSelectedCountry(newValue?.code || "");
-          }}
-          renderOption={({ key, ...props }, option) => (
-            <li key={key} {...props}>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <CountryFlag country={option.code} />
-                <span>{option.name}</span>
-              </Stack>
-            </li>
-          )}
-          renderInput={({ key, ...params }) => (
-            <>
-              <TextField key={key} {...params} label={t("records.players.country")} fullWidth />
-              {/* A hacky way to submit the country code but display the country name */}
-              <input
-                type="hidden"
-                name="country"
-                value={selectedCountry ?? ""}
-              />
-            </>
-          )}
-        />
-
+      <Stack
+        spacing={1}
+        sx={{
+          width: "100%",
+          border: (theme) => `1px solid ${theme.palette.divider}`,
+          borderRadius: 1,
+          bgcolor: "background.paper",
+          p: { xs: 1, md: 1.25 },
+        }}
+      >
         <Stack
-          sx={{
-            width: "100%",
-            border: (theme) => `1px solid ${theme.palette.divider}`,
-            borderRadius: "4px",
-            p: 1,
-          }}
-          direction="row"
+          direction={{ xs: "column", md: "row" }}
           spacing={1}
-          alignItems="center"
-          justifyContent="space-between"
+          alignItems={{ xs: "stretch", md: "center" }}
         >
-          <Stack
-            direction="row"
-            spacing={1}
-            alignItems="center"
-            flexWrap="wrap"
-          >
-            {selectedEmoji.map((emoji) => (
-              <Chip
-                key={emoji.id}
-                size={"medium"}
-                label={<Emoji emoji={emoji} size={18} />}
-                onDelete={() =>
-                  setSelectedEmoji(
-                    selectedEmoji.filter((e) => e.id !== emoji.id)
-                  )
-                }
-              />
-            ))}
-            {selectedEmoji.length === 0 && (
-              <Typography
-                sx={{ pl: 1 }}
-                variant="body"
-                color="text.secondary"
-              >
-                {t("records.players.filterFlags")}
-              </Typography>
+          <TextField
+            value={formFields.player_name}
+            onChange={handleInputChange}
+            label={t("records.players.playerName")}
+            name="player_name"
+            size="small"
+            sx={{
+              width: "100%",
+              flex: { xs: "0 0 auto", md: "1 1 280px" },
+            }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+          />
+
+          <TextField
+            value={formFields.player_id}
+            onChange={handleInputChange}
+            label={t("records.players.playerId")}
+            name="player_id"
+            size="small"
+            sx={{
+              width: "100%",
+              flex: { xs: "0 0 auto", md: "1 1 260px" },
+            }}
+          />
+
+          <Autocomplete
+            openText={t("common.openOptions")}
+            closeText={t("common.closeOptions")}
+            clearText={t("common.clearSelection")}
+            noOptionsText={t("common.noResults")}
+            options={countryOptions}
+            getOptionLabel={(option) => option.name}
+            value={
+              countryOptions.find(
+                (country) => country.code === selectedCountry
+              ) || null
+            }
+            onChange={(event, newValue) =>
+              setSelectedCountry(newValue?.code || "")
+            }
+            sx={{
+              width: "100%",
+              flex: { xs: "0 0 auto", md: "0 1 220px" },
+              minWidth: { md: 180 },
+            }}
+            renderOption={({ key, ...props }, option) => (
+              <li key={key} {...props}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <CountryFlag country={option.code} />
+                  <span>{option.name}</span>
+                </Stack>
+              </li>
             )}
-          </Stack>
-          <IconButton
-            onClick={handleEmojiButtonClick}
-            aria-label={t("records.players.addFlagFilter")}
+            renderInput={(params) => (
+              <>
+                <TextField
+                  {...params}
+                  label={t("records.players.country")}
+                  size="small"
+                />
+                <input
+                  type="hidden"
+                  name="country"
+                  value={selectedCountry ?? ""}
+                />
+              </>
+            )}
+          />
+
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+            startIcon={<SearchIcon />}
+            disabled={navigation.state === "loading"}
+            sx={{ minHeight: 40, minWidth: 118 }}
           >
-            <AddReactionIcon />
-          </IconButton>
+            {t("common.search")}
+          </Button>
+
+          <Button
+            variant="outlined"
+            color="secondary"
+            startIcon={<RestartAltIcon />}
+            onClick={handleReset}
+            disabled={navigation.state === "loading"}
+            sx={{ minHeight: 40 }}
+          >
+            {t("records.players.reset")}
+          </Button>
+
+          <Button
+            variant="outlined"
+            color="inherit"
+            startIcon={
+              <Badge badgeContent={advancedFilterCount} color="primary">
+                <TuneIcon />
+              </Badge>
+            }
+            endIcon={
+              <ExpandMoreIcon
+                sx={{
+                  transform: advancedOpen ? "rotate(180deg)" : "none",
+                  transition: (theme) => theme.transitions.create("transform"),
+                }}
+              />
+            }
+            aria-expanded={advancedOpen}
+            aria-controls="player-advanced-filters"
+            onClick={() => setAdvancedOpen((value) => !value)}
+            sx={{ minHeight: 40, whiteSpace: "nowrap" }}
+          >
+            {t("records.players.moreFilters")}
+          </Button>
         </Stack>
-        <Popover
-          open={open}
-          anchorEl={anchorEl}
-          onClose={handleClose}
-          anchorOrigin={{
-            vertical: "bottom",
-            horizontal: "left",
-          }}
-        >
-          <Suspense
-            fallback={
-              <Skeleton variant="rectangular" height={400} width={300} />
-            }
+
+        <Collapse in={advancedOpen} unmountOnExit>
+          <Box
+            id="player-advanced-filters"
+            sx={{
+              borderTop: (theme) => `1px solid ${theme.palette.divider}`,
+              pt: 1.25,
+            }}
           >
-            <EmojiPicker
-              set="twitter"
-              data={emojiData}
-              onEmojiSelect={(emoji) => {
-                // Don't allow duplicates
-                if (selectedEmoji.some((e) => e.id === emoji.id)) return;
-                setSelectedEmoji([...selectedEmoji, emoji]);
-              }}
-            />
-          </Suspense>
-        </Popover>
-        <input
-          type="hidden"
-          name="flags"
-          value={selectedEmoji.map((e) => e.native).join(",")}
-        />
+            <Stack spacing={1.25}>
+              <Stack
+                direction={{ xs: "column", md: "row" }}
+                spacing={1}
+                alignItems={{ xs: "stretch", md: "center" }}
+              >
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  alignItems="center"
+                  justifyContent="space-between"
+                  sx={{
+                    flex: { xs: "0 0 auto", md: "1 1 260px" },
+                    minHeight: 40,
+                    border: (theme) => `1px solid ${theme.palette.divider}`,
+                    borderRadius: 1,
+                    px: 1,
+                  }}
+                >
+                  <Stack
+                    direction="row"
+                    spacing={0.75}
+                    alignItems="center"
+                    flexWrap="wrap"
+                    useFlexGap
+                  >
+                    {selectedEmoji.map((emoji) => (
+                      <Chip
+                        key={emoji.id}
+                        size="small"
+                        label={<Emoji emoji={emoji} size={18} />}
+                        onDelete={() =>
+                          setSelectedEmoji(
+                            selectedEmoji.filter((item) => item.id !== emoji.id)
+                          )
+                        }
+                      />
+                    ))}
+                    {selectedEmoji.length === 0 && (
+                      <Typography variant="body2" color="text.secondary">
+                        {t("records.players.filterFlags")}
+                      </Typography>
+                    )}
+                  </Stack>
+                  <IconButton
+                    size="small"
+                    onClick={(event) => setAnchorEl(event.currentTarget)}
+                    aria-label={t("records.players.addFlagFilter")}
+                  >
+                    <AddReactionIcon />
+                  </IconButton>
+                </Stack>
 
-        <LocalizationProvider dateAdapter={AdapterDayjs}>
-          <DateTimePicker
-            localeText={{ openDatePickerDialogue: () => t("common.chooseDate") }}
-            value={formFields.last_seen_from}
-            onChange={(newValue) =>
-              setFormFields((prev) => ({
-                ...prev,
-                last_seen_from: newValue,
-              }))
-            }
-            label={t("records.players.lastSeenFrom")}
-            name="last_seen_from"
-            format="DD.MM.YYYY HH:mm"
-            ampm={false}
-            slotProps={{
-              textField: { fullWidth: true },
-            }}
-          />
-        </LocalizationProvider>
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <DateTimePicker
+                    localeText={{
+                      openDatePickerDialogue: () => t("common.chooseDate"),
+                    }}
+                    value={formFields.last_seen_from}
+                    onChange={(newValue) =>
+                      setFormFields((previous) => ({
+                        ...previous,
+                        last_seen_from: newValue,
+                      }))
+                    }
+                    label={t("records.players.lastSeenFrom")}
+                    name="last_seen_from"
+                    format="DD.MM.YYYY HH:mm"
+                    ampm={false}
+                    slotProps={{
+                      textField: { size: "small", sx: { minWidth: 210 } },
+                    }}
+                  />
+                </LocalizationProvider>
 
-        <LocalizationProvider dateAdapter={AdapterDayjs}>
-          <DateTimePicker
-            localeText={{ openDatePickerDialogue: () => t("common.chooseDate") }}
-            value={formFields.last_seen_till}
-            onChange={(newValue) =>
-              setFormFields((prev) => ({
-                ...prev,
-                last_seen_till: newValue,
-              }))
-            }
-            label={t("records.players.lastSeenUntil")}
-            name="last_seen_till"
-            format="DD.MM.YYYY HH:mm"
-            ampm={false}
-            slotProps={{
-              textField: { fullWidth: true },
-            }}
-          />
-        </LocalizationProvider>
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <DateTimePicker
+                    localeText={{
+                      openDatePickerDialogue: () => t("common.chooseDate"),
+                    }}
+                    value={formFields.last_seen_till}
+                    onChange={(newValue) =>
+                      setFormFields((previous) => ({
+                        ...previous,
+                        last_seen_till: newValue,
+                      }))
+                    }
+                    label={t("records.players.lastSeenUntil")}
+                    name="last_seen_till"
+                    format="DD.MM.YYYY HH:mm"
+                    ampm={false}
+                    slotProps={{
+                      textField: { size: "small", sx: { minWidth: 210 } },
+                    }}
+                  />
+                </LocalizationProvider>
+              </Stack>
 
-        <FormControlLabel
-          control={
-            <Switch
-              name="blacklisted"
-              checked={formFields.blacklisted}
-              onChange={handleInputChange}
-            />
-          }
-          label={t("records.players.blacklistedOnly")}
-        />
-
-        <FormControlLabel
-          control={
-            <Switch
-              name="exact_name_match"
-              checked={formFields.exact_name_match}
-              onChange={handleInputChange}
-            />
-          }
-          label={t("records.players.exactName")}
-        />
-
-        <FormControlLabel
-          control={
-            <Switch
-              name="ignore_accent"
-              checked={formFields.ignore_accent}
-              onChange={handleInputChange}
-            />
-          }
-          label={t("records.players.ignoreAccent")}
-        />
-
-        <FormControlLabel
-          control={
-            <Switch
-              name="is_watched"
-              checked={formFields.is_watched}
-              onChange={handleInputChange}
-            />
-          }
-          label={t("records.players.watchedOnly")}
-        />
+              <Stack
+                direction="row"
+                spacing={{ xs: 1, md: 2 }}
+                flexWrap="wrap"
+                useFlexGap
+              >
+                {[
+                  ["blacklisted", "blacklistedOnly"],
+                  ["exact_name_match", "exactName"],
+                  ["ignore_accent", "ignoreAccent"],
+                  ["is_watched", "watchedOnly"],
+                ].map(([name, label]) => (
+                  <FormControlLabel
+                    key={name}
+                    control={
+                      <Switch
+                        size="small"
+                        name={name}
+                        checked={formFields[name]}
+                        onChange={handleInputChange}
+                      />
+                    }
+                    label={t(`records.players.${label}`)}
+                  />
+                ))}
+              </Stack>
+            </Stack>
+          </Box>
+        </Collapse>
       </Stack>
 
-      <Stack direction="column" spacing={1} sx={{ mt: 2 }}>
-        <Button
-          variant="contained"
-          color="secondary"
-          sx={{ mt: 2 }}
-          onClick={handleReset}
-          disabled={navigation.state === "loading"}
+      <Popover
+        open={open}
+        anchorEl={anchorEl}
+        onClose={() => setAnchorEl(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+      >
+        <Suspense
+          fallback={<Skeleton variant="rectangular" height={400} width={300} />}
         >
-          {t("records.players.reset")}
-        </Button>
-
-        <Button
-          type="submit"
-          variant="contained"
-          color="primary"
-          sx={{ mt: 2 }}
-          disabled={navigation.state === "loading"}
-        >
-          {t("common.search")}
-        </Button>
-      </Stack>
+          <EmojiPicker
+            set="twitter"
+            data={emojiData}
+            onEmojiSelect={(emoji) => {
+              if (selectedEmoji.some((item) => item.id === emoji.id)) return;
+              setSelectedEmoji([...selectedEmoji, emoji]);
+            }}
+          />
+        </Suspense>
+      </Popover>
+      <input
+        type="hidden"
+        name="flags"
+        value={selectedEmoji.map((emoji) => emoji.native).join(",")}
+      />
     </Form>
   );
 }
-
