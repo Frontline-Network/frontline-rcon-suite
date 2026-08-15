@@ -78,6 +78,22 @@ def test_prompt_injection_is_data_not_an_action_contract():
     assert SuggestedAction.PERMA_BAN.value == "perma_ban"
 
 
+@pytest.mark.parametrize("name", ["TörkenFetzer", "TURKEN-FETZER"])
+def test_german_targeted_hate_compounds_are_local_hard_hits(name):
+    result = prefilter_candidate(name, ModerationPolicy())
+    assert result.suspicious
+    assert result.hard_hit
+    assert result.matched_rule_ids == [
+        "frontline_hard:hate_targeted_turkish_de:v1"
+    ]
+
+
+def test_group_name_without_hostile_compound_is_not_a_hard_hit():
+    result = prefilter_candidate("Türken", ModerationPolicy())
+    assert not result.suspicious
+    assert not result.hard_hit
+
+
 def test_candidate_jobs_default_to_shadow_only():
     job = ModerationAnalysisJobEnvelope(
         installation_id="install",

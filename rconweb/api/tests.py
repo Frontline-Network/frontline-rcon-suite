@@ -818,3 +818,34 @@ class DiscordActionTemplateTests(TestCase):
         self.assertEqual(result["selected"]["content"], "Gespeicherter Grund")
         self.assertNotIn("content", result["templates"][0])
         validate_binding.assert_called_once()
+
+    @patch("api.discord_integration.decrypt_capability", return_value="events-test")
+    @patch("api.discord_integration.requests.get")
+    @patch("api.discord_integration._integration")
+    def test_discord_options_are_proxied_for_authenticated_manager(
+        self, integration, get, _decrypt
+    ):
+        user = User.objects.create_superuser(
+            username="discord-manager", email="manager@example.org", password="secret"
+        )
+        self.client.force_login(user)
+        integration.return_value = SimpleNamespace(
+            enabled=True,
+            outbound_capability_ciphertext=b"ciphertext",
+            service_url="https://discord.example",
+            installation_id="11111111-1111-1111-1111-111111111111",
+        )
+        get.return_value.raise_for_status.return_value = None
+        get.return_value.json.return_value = {
+            "guild": {"id": "123", "name": "Frontline"},
+            "channels": [{"id": "456", "name": "admin-ping"}],
+            "roles": [{"id": "789", "name": "HLL-Moderator"}],
+        }
+        response = self.client.get("/api/discord/v1/options")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["result"]["roles"][0]["name"], "HLL-Moderator")
+        get.assert_called_once_with(
+            "https://discord.example/v1/options/11111111-1111-1111-1111-111111111111",
+            headers={"Authorization": "Bearer events-test"},
+            timeout=10,
+        )

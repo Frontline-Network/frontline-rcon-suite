@@ -50,8 +50,8 @@ def render_message(
     labels = {
         "de": {
             "incident": "Admin-Meldung",
-            "name_alert": "KI-Namensprüfung",
-            "chat_alert": "KI-Chatprüfung",
+            "name_alert": "Spielername prüfen",
+            "chat_alert": "Chatnachricht prüfen",
             "server": "Server",
             "source": "Quelle",
             "reporter": "Reporter",
@@ -60,6 +60,7 @@ def render_message(
             "combat": "⚔️ Kampf",
             "performance": "⚡ Leistung",
             "unit": "👥 Einheit",
+            "teamkills": "⚠️ Teamkills",
             "status": "📌 Bearbeitung",
             "ai_assessment": "🤖 KI-Einschätzung",
             "rationale": "🧾 KI-Begründung",
@@ -73,8 +74,8 @@ def render_message(
         },
         "en": {
             "incident": "Admin report",
-            "name_alert": "AI name review",
-            "chat_alert": "AI chat review",
+            "name_alert": "Review player name",
+            "chat_alert": "Review chat message",
             "server": "Server",
             "source": "Source",
             "reporter": "Reporter",
@@ -83,6 +84,7 @@ def render_message(
             "combat": "⚔️ Combat",
             "performance": "⚡ Performance",
             "unit": "👥 Unit",
+            "teamkills": "⚠️ Teamkills",
             "status": "📌 Processing",
             "ai_assessment": "🤖 AI assessment",
             "rationale": "🧾 AI rationale",
@@ -143,6 +145,13 @@ def render_message(
         "high": "hoch" if language == "de" else "high",
         "critical": "kritisch" if language == "de" else "critical",
     }
+    category_labels = {
+        "violence": "Gewalt" if language == "de" else "Violence",
+        "harassment": "Belästigung" if language == "de" else "Harassment",
+        "hate": "Hassrede" if language == "de" else "Hate",
+        "sexual": "Sexuell" if language == "de" else "Sexual",
+        "self-harm": "Selbstverletzung" if language == "de" else "Self-harm",
+    }
     source = str(incident.get("source") or "manual")
     title_kind = labels[
         (
@@ -152,78 +161,112 @@ def render_message(
         )
     ]
     team_emoji, color = _team_style(team, analysis.risk_score if analysis else None)
+    if source == "ai_player_name":
+        team_emoji = "🔎"
     identity = f"👤 **{_truncate(target_name, 200)}**"
     if player_id:
         identity += f"\n🆔 `{_truncate(player_id, 100)}`"
     identity += (
         f"\n🎮 **{envelope.server_name} · #{envelope.server_number} · {game_label}**"
-        f"\n📡 {source_labels.get(source, source)}"
     )
+    if source != "ai_player_name":
+        identity += f"\n📡 {source_labels.get(source, source)}"
+    if source in {"chat", "manual"}:
+        unit_context = " · ".join(
+            str(value)
+            for value in [
+                team,
+                primary.get("squad_name")
+                or snapshot.get("unit_name")
+                or snapshot.get("squad_name"),
+                primary.get("role") or snapshot.get("role"),
+            ]
+            if _present(value)
+        )
+        if unit_context:
+            identity += f"\n👥 {unit_context}"
     reporter_name = incident.get("reporter_name")
     if reporter_name:
         identity += f"\n👮 {labels['reporter']}: **{_truncate(reporter_name, 180)}**"
-    fields = [
-        {
-            "name": labels["reason"],
-            "value": _truncate(incident.get("reason"), 1024),
-            "inline": False,
-        },
-        {
-            "name": labels["combat"],
-            "value": _field_block(
-                _metric("Kills", kills),
-                _metric("Deaths", deaths),
-                _metric("K/D", kd),
-                _metric("Teamkills", snapshot.get("teamkills")),
+    fields = []
+    if source != "ai_player_name":
+        fields.append(
+            {
+                "name": labels["reason"],
+                "value": _truncate(incident.get("reason"), 1024),
+                "inline": False,
+            }
+        )
+        stat_groups = [
+            (
+                labels["combat"],
+                [
+                    _metric("Kills", kills),
+                    _metric("Deaths", deaths),
+                    _metric("K/D", kd),
+                ],
             ),
-            "inline": True,
-        },
-        {
-            "name": labels["performance"],
-            "value": _field_block(
-                _metric("Level", snapshot.get("level")),
-                _metric("Combat", snapshot.get("combat")),
-                _metric("Spielzeit" if language == "de" else "Playtime", playtime),
+            (
+                labels["performance"],
+                [
+                    _metric("Level", snapshot.get("level")),
+                    _metric("Combat", snapshot.get("combat")),
+                    _metric("Spielzeit" if language == "de" else "Playtime", playtime),
+                ],
             ),
-            "inline": True,
-        },
-        {
-            "name": labels["unit"],
-            "value": _field_block(
-                _metric("Team", team),
-                _metric(
-                    "Squad",
-                    primary.get("squad_name")
-                    or snapshot.get("unit_name")
-                    or snapshot.get("squad_name"),
-                ),
-                _metric(
-                    "Rolle" if language == "de" else "Role",
-                    primary.get("role") or snapshot.get("role"),
-                ),
+            (
+                labels["teamkills"],
+                [
+                    _metric(
+                        "Anzahl" if language == "de" else "Count",
+                        snapshot.get("teamkills"),
+                    ),
+                ],
             ),
-            "inline": True,
-        },
-        {
-            "name": labels["status"],
-            "value": _truncate(
-                " · ".join(
-                    value
-                    for value in [
-                        status_labels.get(
-                            str(incident.get("status", "new")),
-                            str(incident.get("status", "new")),
-                        ),
-                        incident.get("assigned_to"),
-                    ]
-                    if value
-                ),
-                1024,
+        ]
+        fields.extend(
+            {
+                "name": name,
+                "value": _field_block(*values),
+                "inline": True,
+            }
+            for name, values in stat_groups
+            if any(values)
+        )
+    if analysis and source == "ai_player_name":
+        categories = ", ".join(
+            category_labels.get(value, value.replace("_", " ").title())
+            for value in analysis.categories
+        )
+        assessment_lines = [
+            (
+                f"**{analysis.risk_score:.0%} · "
+                f"{severity_labels.get(analysis.severity.value, analysis.severity.value)}**"
             ),
-            "inline": False,
-        },
-    ]
-    if analysis:
+            f"**Kategorie:** {categories}" if categories else None,
+            analysis.rationale,
+        ]
+        recommendation_lines = [
+            f"**{action_labels.get(analysis.suggested_action.value, analysis.suggested_action.value)}**",
+            analysis.suggested_player_response,
+        ]
+        fields.extend(
+            [
+                {
+                    "name": "🧠 Einschätzung" if language == "de" else "🧠 Assessment",
+                    "value": _truncate(_field_block(*assessment_lines), 1024),
+                    "inline": False,
+                },
+                {
+                    "name": (
+                        "💡 Empfehlung" if language == "de" else "💡 Recommendation"
+                    ),
+                    "value": _truncate(_field_block(*recommendation_lines), 1024),
+                    "inline": False,
+                },
+            ]
+        )
+    elif analysis and source == "ai_chat":
         fields.extend(
             [
                 {
@@ -272,10 +315,30 @@ def render_message(
                     "inline": False,
                 }
             )
-    elif ai_unavailable:
+    elif ai_unavailable and source in {"ai_chat", "ai_player_name"}:
         fields.append(
             {"name": "KI / AI", "value": labels["unavailable"], "inline": False}
         )
+    fields.append(
+        {
+            "name": labels["status"],
+            "value": _truncate(
+                " · ".join(
+                    value
+                    for value in [
+                        status_labels.get(
+                            str(incident.get("status", "new")),
+                            str(incident.get("status", "new")),
+                        ),
+                        incident.get("assigned_to"),
+                    ]
+                    if value
+                ),
+                1024,
+            ),
+            "inline": False,
+        }
+    )
     revision = envelope.incident_revision
     incident_id = envelope.incident_id
     allowed_actions = [
@@ -296,11 +359,13 @@ def render_message(
     components = []
     moderation_ready = incident.get("discord_moderation_ready", True)
     status = str(incident.get("status") or "new")
-    if not moderation_ready:
+    if status in {"resolved", "dismissed"}:
+        pass
+    elif not moderation_ready:
         fields.append(
             {"name": "Discord", "value": labels["not_configured"], "inline": False}
         )
-    elif status not in {"resolved", "dismissed"}:
+    else:
         action_icons = {
             "message": "💬",
             "punish": "⚠️",
@@ -311,7 +376,11 @@ def render_message(
             "remove_from_squad": "↪️",
             "disband_squad": "💥",
         }
-        recommended = analysis.suggested_action.value if analysis else None
+        recommended = (
+            analysis.suggested_action.value
+            if analysis and source in {"ai_chat", "ai_player_name"}
+            else None
+        )
         action_buttons = [
             {
                 "type": 2,
@@ -400,6 +469,60 @@ class DiscordClient:
         response.raise_for_status()
         if str(response.json().get("guild_id") or "") != guild_id:
             raise ValueError("Discord channel does not belong to the selected guild")
+
+    def guild_options(self, guild_id: str) -> dict:
+        if self.settings.dry_run or not self.settings.discord_bot_token:
+            return {
+                "guild": {"id": guild_id, "name": guild_id},
+                "channels": [],
+                "roles": [],
+            }
+        headers = {"Authorization": f"Bot {self.settings.discord_bot_token}"}
+        guild_response = self.client.get(
+            f"https://discord.com/api/v10/guilds/{guild_id}", headers=headers
+        )
+        channels_response = self.client.get(
+            f"https://discord.com/api/v10/guilds/{guild_id}/channels", headers=headers
+        )
+        roles_response = self.client.get(
+            f"https://discord.com/api/v10/guilds/{guild_id}/roles", headers=headers
+        )
+        guild_response.raise_for_status()
+        channels_response.raise_for_status()
+        roles_response.raise_for_status()
+        guild = guild_response.json()
+        channels = sorted(
+            (
+                {
+                    "id": str(item["id"]),
+                    "name": str(item.get("name") or item["id"]),
+                    "position": int(item.get("position") or 0),
+                }
+                for item in channels_response.json()
+                if item.get("type") in {0, 5}
+            ),
+            key=lambda item: (item["position"], item["name"].casefold()),
+        )
+        roles = sorted(
+            (
+                {
+                    "id": str(item["id"]),
+                    "name": str(item.get("name") or item["id"]),
+                    "position": int(item.get("position") or 0),
+                }
+                for item in roles_response.json()
+                if not item.get("managed") and item.get("name") != "@everyone"
+            ),
+            key=lambda item: (-item["position"], item["name"].casefold()),
+        )
+        return {
+            "guild": {
+                "id": str(guild["id"]),
+                "name": str(guild.get("name") or guild["id"]),
+            },
+            "channels": channels,
+            "roles": roles,
+        }
 
     def upsert(
         self, channel_id: str, payload: dict, message_id: str | None = None

@@ -147,6 +147,27 @@ def test_usage_is_content_free_and_capability_protected():
     }
 
 
+def test_discord_options_are_capability_protected_and_scoped_to_paired_guild():
+    capability = _seed()
+    expected = {
+        "guild": {"id": "123", "name": "Frontline"},
+        "channels": [{"id": "456", "name": "admin-ping", "position": 1}],
+        "roles": [{"id": "789", "name": "HLL-Moderator", "position": 10}],
+    }
+    path = "/v1/options/11111111-1111-1111-1111-111111111111"
+    with patch(
+        "discord_service.app.main.DiscordClient.guild_options",
+        return_value=expected,
+    ) as guild_options:
+        assert TestClient(app).get(path).status_code == 404
+        response = TestClient(app).get(
+            path, headers={"Authorization": f"Bearer {capability}"}
+        )
+    assert response.status_code == 200
+    assert response.json() == expected
+    guild_options.assert_called_once_with("123")
+
+
 def test_pairing_rejects_private_callback_targets():
     settings = Settings(
         secret="test-secret-that-is-at-least-32-characters",
@@ -200,6 +221,8 @@ def test_embed_distinguishes_game_server_and_exposes_manual_actions():
         field["name"] == "⚔️ Combat" and "**K/D:** 3.00" in field["value"]
         for field in fields
     )
+    assert not any("AI" in field["name"] for field in fields)
+    assert "Representative test" not in str(payload["embeds"][0])
     action_row = payload["components"][0]["components"]
     assert [button["custom_id"].rsplit(":", 1)[-1] for button in action_row] == [
         "message",
@@ -218,6 +241,47 @@ def test_embed_hides_actions_until_a_moderator_role_is_configured():
         "Keine Moderatorrolle" in field["value"]
         for field in payload["embeds"][0]["fields"]
     )
+
+
+def test_player_name_alert_is_compact_and_omits_empty_report_sections():
+    event = _event()
+    event["incident"].update(
+        {
+            "source": "ai_player_name",
+            "reason": "Verdächtiger Spielername: Gewaltlord",
+            "status": "dismissed",
+            "target_name": "Gewaltlord",
+            "target_id": "player-id",
+            "discord_language": "de",
+            "discord_moderation_ready": False,
+        }
+    )
+    analysis = ModerationAnalysis(
+        source="ai_player_name",
+        severity="medium",
+        risk_score=0.72,
+        categories=["violence"],
+        rationale="Der Name enthält einen Gewaltbezug.",
+        relevant_excerpts=["Gewaltlord"],
+        suggested_action="manual_review",
+        suggested_player_response="Bitte wähle einen unbedenklichen Namen.",
+        model_version="gpt-5.6-luna",
+        prompt_version="moderation-v1",
+        policy_profile_id="frontline-default",
+        policy_version="1",
+    )
+    payload = render_message(IncidentEventEnvelope.model_validate(event), analysis)
+    embed = payload["embeds"][0]
+    field_names = [field["name"] for field in embed["fields"]]
+    rendered = str(embed)
+    assert embed["title"] == "🔎 Spielername prüfen: Gewaltlord"
+    assert "📡" not in embed["description"]
+    assert field_names == ["🧠 Einschätzung", "💡 Empfehlung", "📌 Bearbeitung"]
+    assert "Gewalt" in rendered
+    assert "Regeln" not in rendered
+    assert "Relevante Textstellen" not in rendered
+    assert "Keine Moderatorrolle" not in rendered
+    assert payload["components"] == []
 
 
 class _Moderations:
@@ -265,7 +329,7 @@ def test_ai_pipeline_uses_moderation_store_false_and_strict_schema():
     assert fake.responses.kwargs["text_format"].model_config["extra"] == "forbid"
 
 
-def test_player_names_do_not_use_general_moderation_as_hard_gate():
+def test_player_names_stop_after_clean_omni_gate():
     fake = _OpenAI()
     result = ManagedAnalyzer(settings=get_settings(), client=fake).analyze(
         text="Gewaltlord",
@@ -275,7 +339,25 @@ def test_player_names_do_not_use_general_moderation_as_hard_gate():
     assert result.analysis is not None
     assert result.analysis.source == ModerationSource.PLAYER_NAME
     assert result.analysis.hard_hit is False
-    assert not hasattr(fake.moderations, "kwargs")
+    assert result.analysis.risk_score == 0
+    assert result.input_tokens == 0
+    assert result.output_tokens == 0
+    assert result.used_responses_model is False
+    assert fake.moderations.kwargs["model"] == "omni-moderation-latest"
+    assert not hasattr(fake.responses, "kwargs")
+
+
+def test_hard_local_rule_can_request_structured_analysis_after_omni():
+    fake = _OpenAI()
+    result = ManagedAnalyzer(settings=get_settings(), client=fake).analyze(
+        text="customer-specific expression",
+        source=ModerationSource.CHAT,
+        policy=ModerationPolicy(),
+        force_structured_analysis=True,
+    )
+    assert result.analysis is not None
+    assert result.used_responses_model is True
+    assert fake.responses.kwargs["model"] == "gpt-5.6-luna"
 
 
 def test_crcon_permission_error_is_not_reported_as_outage():

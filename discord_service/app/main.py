@@ -146,6 +146,13 @@ def _policy_from_event(envelope: IncidentEventEnvelope) -> ModerationPolicy:
     return ModerationPolicy.model_validate(raw)
 
 
+def _has_local_hard_rule(policy: ModerationPolicy, rule_ids: list[str]) -> bool:
+    return bool(
+        policy.hard_rule_ids.intersection(rule_ids)
+        or any(rule_id.startswith("frontline_hard:") for rule_id in rule_ids)
+    )
+
+
 def _usage_summary(session: Session, installation_id: str) -> dict[str, int | None]:
     now = datetime.now(tz=timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -344,6 +351,30 @@ def healthz():
     return {"ok": True, "ai_configured": bool(get_settings().openai_api_key)}
 
 
+@app.get("/v1/options/{installation_id}")
+def discord_options(
+    installation_id: str,
+    authorization: str | None = Header(default=None),
+    session: Session = Depends(session_dependency),
+):
+    integration = session.get(Integration, installation_id)
+    if (
+        integration is None
+        or not integration.enabled
+        or not matches(
+            _bearer(authorization), integration.event_capability_digest, "events"
+        )
+    ):
+        raise HTTPException(status_code=404, detail="Unknown installation capability")
+    _check_rate_limit(f"options:{installation_id}")
+    try:
+        return DiscordClient().guild_options(integration.guild_id)
+    except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=502, detail="Discord server options are unavailable"
+        ) from exc
+
+
 @app.get("/oauth/install")
 def oauth_install():
     if not get_settings().discord_install_url:
@@ -450,12 +481,10 @@ def receive_event(
     ai_config = envelope.incident.get("ai_config") or {}
     raw_source = str(envelope.incident.get("source") or "")
     ai_toggle = {
-        "chat": "reports_enabled",
-        "manual": "reports_enabled",
         "ai_chat": "chat_enabled",
         "ai_player_name": "names_enabled",
-    }.get(raw_source, "reports_enabled")
-    source_ai_enabled = bool(ai_config.get(ai_toggle, ai_toggle == "reports_enabled"))
+    }.get(raw_source)
+    source_ai_enabled = bool(ai_toggle and ai_config.get(ai_toggle, False))
     quota_available = _quota_available(session, envelope.installation_id)
     if analysis is None and envelope.event_type == "created" and source_ai_enabled:
         unavailable = not quota_available
@@ -483,7 +512,11 @@ def receive_event(
         usage = TechnicalUsageMetric(
             installation_id=envelope.installation_id,
             kind="moderation_analysis",
-            model=get_settings().ai_model,
+            model=(
+                get_settings().ai_model
+                if result.used_responses_model
+                else get_settings().moderation_model
+            ),
             input_tokens=result.input_tokens,
             output_tokens=result.output_tokens,
             success=analysis is not None,
@@ -616,11 +649,13 @@ def receive_analysis_job(
         return {"accepted": True, "cached": True}
     if not _quota_available(session, job.installation_id):
         raise HTTPException(status_code=429, detail="Monthly AI quota exhausted")
+    local_hard_hit = _has_local_hard_rule(job.policy, job.matched_rule_ids)
     result = ManagedAnalyzer().analyze(
         text=job.candidate_text,
         source=job.source,
         policy=job.policy,
         player_ids=[job.player_id] if job.player_id else [],
+        force_structured_analysis=local_hard_hit,
     )
     if result.analysis is None:
         raise HTTPException(status_code=503, detail="AI analysis unavailable")
@@ -630,8 +665,7 @@ def receive_analysis_job(
     analysis = result.analysis.model_copy(
         update={
             "rule_ids": supplied_rules,
-            "hard_hit": result.analysis.hard_hit
-            or bool(job.policy.hard_rule_ids.intersection(job.matched_rule_ids)),
+            "hard_hit": result.analysis.hard_hit or local_hard_hit,
         }
     )
     analysis_id = str(uuid.uuid4())
@@ -669,7 +703,11 @@ def receive_analysis_job(
         TechnicalUsageMetric(
             installation_id=job.installation_id,
             kind=job.source.value,
-            model=get_settings().ai_model,
+            model=(
+                get_settings().ai_model
+                if result.used_responses_model
+                else get_settings().moderation_model
+            ),
             input_tokens=result.input_tokens,
             output_tokens=result.output_tokens,
             success=True,

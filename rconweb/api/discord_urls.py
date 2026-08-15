@@ -9,6 +9,11 @@ urlpatterns = [
         name="discord-integration",
     ),
     path(
+        "options",
+        discord_integration.integration_options,
+        name="discord-options",
+    ),
+    path(
         "pairings",
         discord_integration.create_discord_pairing,
         name="discord-pairing",

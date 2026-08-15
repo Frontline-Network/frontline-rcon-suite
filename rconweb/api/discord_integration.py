@@ -65,7 +65,7 @@ DEFAULT_REPORTER_TEMPLATES = {
     "dismissed": "Dein Admin-Report wurde abgelehnt.",
 }
 DEFAULT_AI_CONFIG = {
-    "reports_enabled": True,
+    "reports_enabled": False,
     "chat_enabled": False,
     "names_enabled": False,
     "shadow_mode": True,
@@ -220,6 +220,9 @@ def _config_payload(data: dict) -> dict:
         mode="json"
     )
     ai_config = {**DEFAULT_AI_CONFIG, **dict(data.get("ai_config") or {})}
+    # Normal player/admin reports deliberately use CRCON's deterministic
+    # moderator workflow and never require managed AI analysis.
+    ai_config["reports_enabled"] = False
     allowed_ai_keys = {
         "reports_enabled",
         "chat_enabled",
@@ -279,6 +282,36 @@ def integration_detail(request):
     except (TypeError, ValueError) as exc:
         return _error(command, str(exc), 400)
     return api_response(command=command, failed=False, result=_serialized(integration))
+
+
+@csrf_exempt
+@login_required()
+@require_http_methods(["GET"])
+def integration_options(request):
+    command = "discord_report_options"
+    if denied := _require_manager(request, command):
+        return denied
+    integration = _integration()
+    if not integration.enabled or not integration.outbound_capability_ciphertext:
+        return _error(command, "Discord integration is not connected", 409)
+    try:
+        response = requests.get(
+            (
+                f"{integration.service_url.rstrip('/')}/v1/options/"
+                f"{integration.installation_id}"
+            ),
+            headers={
+                "Authorization": (
+                    f"Bearer {decrypt_capability(integration.outbound_capability_ciphertext)}"
+                )
+            },
+            timeout=10,
+        )
+        response.raise_for_status()
+        result = response.json()
+    except (requests.RequestException, ValueError) as exc:
+        return _error(command, f"Discord options unavailable: {exc}", 503)
+    return api_response(command=command, failed=False, result=result)
 
 
 @csrf_exempt

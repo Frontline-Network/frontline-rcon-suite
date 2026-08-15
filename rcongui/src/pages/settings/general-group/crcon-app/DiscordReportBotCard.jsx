@@ -40,7 +40,12 @@ export default function DiscordReportBotCard() {
   const [error, setError] = useState("");
   const [guildId, setGuildId] = useState("");
   const [channelId, setChannelId] = useState("");
-  const [roles, setRoles] = useState("");
+  const [roles, setRoles] = useState([]);
+  const [discordOptions, setDiscordOptions] = useState({
+    guild: null,
+    channels: [],
+    roles: [],
+  });
   const [terms, setTerms] = useState("");
   const [exceptions, setExceptions] = useState("");
   const [regexes, setRegexes] = useState("");
@@ -51,11 +56,21 @@ export default function DiscordReportBotCard() {
     setConfig(next);
     setGuildId(next.guild_id || "");
     setChannelId(next.channel_id || "");
-    setRoles((next.moderator_role_ids || []).join(", "));
+    setRoles(next.moderator_role_ids || []);
     setTerms((next.policy?.custom_terms || []).join("\n"));
     setExceptions((next.policy?.exceptions || []).join("\n"));
     setRegexes((next.policy?.custom_regexes || []).join("\n"));
     setError("");
+  }, []);
+
+  const loadDiscordOptions = useCallback(async () => {
+    const options = await discordRequest("options");
+    setDiscordOptions({
+      guild: options.guild || null,
+      channels: options.channels || [],
+      roles: options.roles || [],
+    });
+    return options;
   }, []);
 
   useEffect(() => {
@@ -64,10 +79,13 @@ export default function DiscordReportBotCard() {
         apply(next);
         if (next.connected) {
           discordRequest("usage").then(setUsage).catch(() => setUsage(null));
+          loadDiscordOptions().catch((requestError) =>
+            setError(requestError.message)
+          );
         }
       })
       .catch((requestError) => setError(requestError.message));
-  }, [apply]);
+  }, [apply, loadDiscordOptions]);
 
   const connect = async () => {
     try {
@@ -76,11 +94,16 @@ export default function DiscordReportBotCard() {
           method: "POST",
           payload: {
             guild_id: guildId,
+            guild_name: discordOptions.guild?.name || config.guild_name || "",
             channel_id: channelId,
-            moderator_role_ids: splitValues(roles),
+            channel_name:
+              discordOptions.channels.find((item) => item.id === channelId)
+                ?.name || "",
+            moderator_role_ids: roles,
           },
         })
       );
+      await loadDiscordOptions();
       setEditingConnection(false);
       toast.success(t("settings.discordReports.connected"));
     } catch (requestError) {
@@ -91,7 +114,7 @@ export default function DiscordReportBotCard() {
   const cancelConnectionEdit = () => {
     setGuildId(config.guild_id || "");
     setChannelId(config.channel_id || "");
-    setRoles((config.moderator_role_ids || []).join(", "));
+    setRoles(config.moderator_role_ids || []);
     setEditingConnection(false);
     setError("");
   };
@@ -115,7 +138,7 @@ export default function DiscordReportBotCard() {
           method: "PUT",
           payload: {
             enabled: config.enabled,
-            moderator_role_ids: splitValues(roles),
+            moderator_role_ids: roles,
             allowed_actions: config.allowed_actions || [],
             language: config.language,
             ai_config: config.ai_config || {},
@@ -186,13 +209,6 @@ export default function DiscordReportBotCard() {
                   helperText={t("settings.discordReports.channelIdHelp")}
                   fullWidth
                 />
-                <TextField
-                  label={t("settings.discordReports.roles")}
-                  value={roles}
-                  onChange={(event) => setRoles(event.target.value)}
-                  helperText={t("settings.discordReports.rolesHelp")}
-                  fullWidth
-                />
                 <Button
                   variant="contained"
                   disabled={!guildId || !channelId}
@@ -229,7 +245,6 @@ export default function DiscordReportBotCard() {
                     <TextField
                       label={t("settings.discordReports.discordServer")}
                       value={config.guild_name || config.guild_id || ""}
-                      helperText={config.guild_id || ""}
                       InputProps={{ readOnly: true }}
                       fullWidth
                     />
@@ -240,7 +255,6 @@ export default function DiscordReportBotCard() {
                           ? `#${config.channel_name}`
                           : config.channel_id || ""
                       }
-                      helperText={config.channel_id || ""}
                       InputProps={{ readOnly: true }}
                       fullWidth
                     />
@@ -278,12 +292,18 @@ export default function DiscordReportBotCard() {
                       fullWidth
                     />
                     <TextField
-                      label={t("settings.discordReports.channelId")}
+                      select
+                      label={t("settings.discordReports.reportChannel")}
                       value={channelId}
                       onChange={(event) => setChannelId(event.target.value)}
-                      helperText={t("settings.discordReports.channelIdHelp")}
                       fullWidth
-                    />
+                    >
+                      {discordOptions.channels.map((channel) => (
+                        <MenuItem key={channel.id} value={channel.id}>
+                          #{channel.name}
+                        </MenuItem>
+                      ))}
+                    </TextField>
                   </Stack>
                   <Stack direction="row" spacing={1}>
                     <Button
@@ -300,11 +320,32 @@ export default function DiscordReportBotCard() {
                 </Stack>
               )}
               <TextField
+                select
                 label={t("settings.discordReports.roles")}
                 value={roles}
-                onChange={(event) => setRoles(event.target.value)}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setRoles(typeof value === "string" ? value.split(",") : value);
+                }}
                 helperText={t("settings.discordReports.rolesHelp")}
-              />
+                SelectProps={{
+                  multiple: true,
+                  renderValue: (selected) =>
+                    selected
+                      .map(
+                        (id) =>
+                          discordOptions.roles.find((role) => role.id === id)
+                            ?.name || id
+                      )
+                      .join(", "),
+                }}
+              >
+                {discordOptions.roles.map((role) => (
+                  <MenuItem key={role.id} value={role.id}>
+                    {role.name}
+                  </MenuItem>
+                ))}
+              </TextField>
               <TextField
                 select
                 label={t("settings.discordReports.language")}
@@ -329,7 +370,6 @@ export default function DiscordReportBotCard() {
                   label={t("settings.discordReports.enabled")}
                 />
                 {[
-                  "reports_enabled",
                   "chat_enabled",
                   "names_enabled",
                   "shadow_mode",
