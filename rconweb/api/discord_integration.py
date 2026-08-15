@@ -31,6 +31,8 @@ from rcon.moderation import (
 )
 from rcon.moderation_candidates import persist_candidate_analysis
 from rcon.moderation_store import persist_analysis
+from rcon.message_templates import get_message_templates
+from rcon.types import MessageTemplateCategory
 
 from .auth import api_response, login_required
 from .decorators import require_http_methods
@@ -143,6 +145,65 @@ def _validate_binding(
         raise PermissionError("No currently allowed Discord moderator role")
     if action and action not in set(integration.allowed_actions or []):
         raise PermissionError("Discord action is disabled in CRCON")
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def discord_action_templates(request):
+    """Return CRCON's shared action templates without persisting them centrally."""
+
+    command = "discord_action_templates"
+    integration, denied = _authorized_integration(request, command)
+    if denied:
+        return denied
+    try:
+        data = _json_body(request)
+        actor = DiscordActor.model_validate(data["actor"])
+        action = str(data["action"])
+        _validate_binding(
+            integration,
+            guild_id=str(data["guild_id"]),
+            channel_id=str(data["channel_id"]),
+            actor=actor,
+            action=action,
+        )
+        category = (
+            MessageTemplateCategory.MESSAGE
+            if action == SuggestedAction.MESSAGE.value
+            else MessageTemplateCategory.REASON
+        )
+        templates = get_message_templates(category)
+        selected_id = data.get("template_id")
+        selected = None
+        if selected_id is not None:
+            selected_id = int(selected_id)
+            match = next(
+                (item for item in templates if int(item["id"]) == selected_id), None
+            )
+            if match is None:
+                raise ValueError("Template does not exist in this action category")
+            selected = {
+                "id": int(match["id"]),
+                "title": str(match["title"])[:100],
+                "content": str(match["content"])[:1000],
+            }
+        result = {
+            "category": category.value,
+            "templates": [
+                {"id": int(item["id"]), "title": str(item["title"])[:100]}
+                for item in templates[:24]
+            ],
+            "selected": selected,
+        }
+    except PermissionError as exc:
+        return _error(command, str(exc), 403)
+    except Exception as exc:
+        if isinstance(
+            exc, (KeyError, TypeError, ValueError)
+        ) or exc.__class__.__module__.startswith("pydantic"):
+            return _error(command, str(exc), 400)
+        raise
+    return api_response(command=command, failed=False, result=result)
 
 
 def _config_payload(data: dict) -> dict:

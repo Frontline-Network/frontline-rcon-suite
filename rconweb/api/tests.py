@@ -173,9 +173,7 @@ class MobilePairingTests(TestCase):
             response["Access-Control-Allow-Origin"], "https://webapp.fln.gg"
         )
         self.assertIn("POST", response["Access-Control-Allow-Methods"])
-        self.assertIn(
-            "content-type", response["Access-Control-Allow-Headers"].lower()
-        )
+        self.assertIn("content-type", response["Access-Control-Allow-Headers"].lower())
 
     def test_desktop_authorization_requires_browser_approval_and_is_single_use(self):
         desktop = Client()
@@ -544,9 +542,7 @@ class MobileContextTests(TestCase):
             "server_number": 1,
             "created_at": "2026-08-06T12:00:00+00:00",
             "reporter_id": "reporter",
-            "subjects": [
-                {"kind": "player", "state": "confirmed", "player_id": "p1"}
-            ],
+            "subjects": [{"kind": "player", "state": "confirmed", "player_id": "p1"}],
         }
         get_rcon_api.return_value.get_historical_logs.return_value = [
             {
@@ -584,7 +580,11 @@ class MobileContextTests(TestCase):
     @patch("api.mobile_context._rcon_api")
     def test_live_status_only_returns_read_only_fields(self, get_rcon_api):
         api = get_rcon_api.return_value
-        api.get_status.return_value = {"name": "Server 1", "current_players": 42, "max_players": 100}
+        api.get_status.return_value = {
+            "name": "Server 1",
+            "current_players": 42,
+            "max_players": 100,
+        }
         api.get_gamestate.return_value = {
             "current_map": {"pretty_name": "Foy"},
             "time_remaining": timedelta(minutes=42),
@@ -777,3 +777,44 @@ class MobileContextTests(TestCase):
             by="context-admin",
             player_name="Biene",
         )
+
+
+class DiscordActionTemplateTests(TestCase):
+    @patch("api.discord_integration._validate_binding")
+    @patch("api.discord_integration._authorized_integration")
+    @patch("api.discord_integration.get_message_templates")
+    def test_templates_come_from_shared_crcon_categories(
+        self, get_templates, authorized, validate_binding
+    ):
+        authorized.return_value = (SimpleNamespace(), None)
+        get_templates.return_value = [
+            {
+                "id": 7,
+                "title": "Beleidigung",
+                "content": "Gespeicherter Grund",
+            }
+        ]
+        response = self.client.post(
+            "/api/discord/v1/action-templates",
+            data=json.dumps(
+                {
+                    "guild_id": "123",
+                    "channel_id": "456",
+                    "actor": {
+                        "discord_id": "789",
+                        "display_name": "Moderator",
+                        "role_ids": ["42"],
+                    },
+                    "action": "kick",
+                    "template_id": 7,
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        result = response.json()["result"]
+        self.assertEqual(result["category"], "REASON")
+        self.assertEqual(result["templates"], [{"id": 7, "title": "Beleidigung"}])
+        self.assertEqual(result["selected"]["content"], "Gespeicherter Grund")
+        self.assertNotIn("content", result["templates"][0])
+        validate_binding.assert_called_once()

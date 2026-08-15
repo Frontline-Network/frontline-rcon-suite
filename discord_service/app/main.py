@@ -236,6 +236,109 @@ def _crcon_interaction_error(exc: httpx.HTTPError) -> str:
     return "CRCON ist derzeit nicht erreichbar."
 
 
+def _action_modal(
+    incident_id: str,
+    revision: str,
+    action: str,
+    *,
+    initial_text: str = "",
+) -> dict:
+    text_key = "message" if action == "message" else "reason"
+    inputs = [
+        {
+            "type": 1,
+            "components": [
+                {
+                    "type": 4,
+                    "custom_id": text_key,
+                    "label": "Nachricht" if text_key == "message" else "Grund",
+                    "style": 2,
+                    "required": True,
+                    "min_length": 1 if text_key == "message" else 3,
+                    "max_length": 1000,
+                    **({"value": initial_text[:1000]} if initial_text else {}),
+                }
+            ],
+        }
+    ]
+    if action == "temp_ban":
+        inputs.append(
+            {
+                "type": 1,
+                "components": [
+                    {
+                        "type": 4,
+                        "custom_id": "duration_hours",
+                        "label": "Dauer in Stunden (1-720)",
+                        "style": 1,
+                        "required": True,
+                        "value": "2",
+                        "max_length": 3,
+                    }
+                ],
+            }
+        )
+    if action == "blacklist":
+        inputs.append(
+            {
+                "type": 1,
+                "components": [
+                    {
+                        "type": 4,
+                        "custom_id": "blacklist_id",
+                        "label": "Blacklist-ID",
+                        "style": 1,
+                        "required": True,
+                        "max_length": 10,
+                    }
+                ],
+            }
+        )
+    return {
+        "type": 9,
+        "data": {
+            "custom_id": f"action-modal:{incident_id}:{revision}:{action}",
+            "title": "Aktion prüfen und vorbereiten",
+            "components": inputs,
+        },
+    }
+
+
+def _template_picker(
+    incident_id: str, revision: str, action: str, templates: list[dict]
+) -> dict:
+    options = [
+        {
+            "label": str(item.get("title") or f"Vorlage {item.get('id')}")[:100],
+            "value": str(item["id"]),
+        }
+        for item in templates[:24]
+    ]
+    options.append({"label": "Freitext", "value": "custom", "emoji": {"name": "✍️"}})
+    return {
+        "type": 4,
+        "data": {
+            "content": "Wähle eine CRCON-Vorlage oder öffne ein leeres Freitextfeld.",
+            "flags": 64,
+            "components": [
+                {
+                    "type": 1,
+                    "components": [
+                        {
+                            "type": 3,
+                            "custom_id": f"template:{incident_id}:{revision}:{action}",
+                            "placeholder": "CRCON-Vorlage auswählen",
+                            "min_values": 1,
+                            "max_values": 1,
+                            "options": options,
+                        }
+                    ],
+                }
+            ],
+        },
+    }
+
+
 @app.get("/healthz")
 def healthz():
     return {"ok": True, "ai_configured": bool(get_settings().openai_api_key)}
@@ -636,9 +739,7 @@ async def discord_interaction(
         return {"type": 1}
     rate_member = payload.get("member") or {}
     rate_user = rate_member.get("user") or {}
-    _check_rate_limit(
-        f"interaction:{payload.get('guild_id')}:{rate_user.get('id')}"
-    )
+    _check_rate_limit(f"interaction:{payload.get('guild_id')}:{rate_user.get('id')}")
     custom_id = str((payload.get("data") or {}).get("custom_id") or "")
     if payload.get("type") == 3 and custom_id.startswith("confirm:"):
         handle = custom_id.split(":", 1)[1]
@@ -730,16 +831,28 @@ async def discord_interaction(
         }
 
     choice_match = re.fullmatch(r"choose:([0-9a-f-]{36}):(\d+)", custom_id)
+    template_match = re.fullmatch(
+        r"template:([0-9a-f-]{36}):(\d+):([a-z_]+)", custom_id
+    )
     modal_match = re.fullmatch(
         r"action-modal:([0-9a-f-]{36}):(\d+):([a-z_]+)", custom_id
     )
     modal_values: dict[str, str | int] = {}
+    selected_template_id: str | None = None
     if payload.get("type") == 3 and choice_match:
         operation = "recommend"
         incident_id, revision = choice_match.groups()
         selected = (payload.get("data") or {}).get("values") or []
         recommended_action = str(selected[0]) if selected else ""
         match = bool(re.fullmatch(r"[a-z_]+", recommended_action))
+    elif payload.get("type") == 3 and template_match:
+        operation = "recommend"
+        incident_id, revision, recommended_action = template_match.groups()
+        selected = (payload.get("data") or {}).get("values") or []
+        selected_template_id = str(selected[0]) if selected else ""
+        match = selected_template_id == "custom" or bool(
+            re.fullmatch(r"[0-9]+", selected_template_id)
+        )
     elif payload.get("type") == 5 and modal_match:
         operation = "recommend"
         incident_id, revision, recommended_action = modal_match.groups()
@@ -783,69 +896,10 @@ async def discord_interaction(
             r"(claim|resolve|dismiss|recommend):([0-9a-f-]{36}):(\d+)(?::([a-z_]+))?",
             custom_id,
         )
+        if match:
+            operation, incident_id, revision, recommended_action = match.groups()
     if not match:
         return {"type": 4, "data": {"content": "Unbekannte Interaktion", "flags": 64}}
-    if not choice_match and (modal_match is None or payload.get("type") != 5):
-        operation, incident_id, revision, recommended_action = match.groups()
-    if operation == "recommend" and payload.get("type") != 5:
-        text_key = "message" if recommended_action == "message" else "reason"
-        inputs = [
-            {
-                "type": 1,
-                "components": [
-                    {
-                        "type": 4,
-                        "custom_id": text_key,
-                        "label": "Nachricht" if text_key == "message" else "Grund",
-                        "style": 2,
-                        "required": True,
-                        "min_length": 1 if text_key == "message" else 3,
-                        "max_length": 1000,
-                    }
-                ],
-            }
-        ]
-        if recommended_action == "temp_ban":
-            inputs.append(
-                {
-                    "type": 1,
-                    "components": [
-                        {
-                            "type": 4,
-                            "custom_id": "duration_hours",
-                            "label": "Dauer in Stunden (1-720)",
-                            "style": 1,
-                            "required": True,
-                            "value": "2",
-                            "max_length": 3,
-                        }
-                    ],
-                }
-            )
-        if recommended_action == "blacklist":
-            inputs.append(
-                {
-                    "type": 1,
-                    "components": [
-                        {
-                            "type": 4,
-                            "custom_id": "blacklist_id",
-                            "label": "Blacklist-ID",
-                            "style": 1,
-                            "required": True,
-                            "max_length": 10,
-                        }
-                    ],
-                }
-            )
-        return {
-            "type": 9,
-            "data": {
-                "custom_id": f"action-modal:{incident_id}:{revision}:{recommended_action}",
-                "title": "Aktion prüfen und vorbereiten",
-                "components": inputs,
-            },
-        }
     guild_id = str(payload.get("guild_id") or "")
     channel_id = str(payload.get("channel_id") or "")
     integration = session.execute(
@@ -878,6 +932,54 @@ async def discord_interaction(
         ),
         "role_ids": [str(value) for value in member.get("roles") or []],
     }
+    if operation == "recommend" and payload.get("type") != 5:
+        if selected_template_id == "custom":
+            return _action_modal(incident_id, revision, recommended_action)
+        template_request = {
+            "guild_id": guild_id,
+            "channel_id": channel_id,
+            "actor": actor,
+            "action": recommended_action,
+            **(
+                {"template_id": int(selected_template_id)}
+                if selected_template_id
+                else {}
+            ),
+        }
+        try:
+            template_response = httpx.post(
+                f"{integration.crcon_base_url}/api/discord/v1/action-templates",
+                headers={
+                    "Authorization": (
+                        f"Bearer {decrypt(integration.action_capability_ciphertext)}"
+                    )
+                },
+                json=template_request,
+                timeout=10,
+            )
+            template_response.raise_for_status()
+            template_result = template_response.json().get(
+                "result", template_response.json()
+            )
+        except httpx.HTTPError as exc:
+            return {
+                "type": 4,
+                "data": {"content": _crcon_interaction_error(exc), "flags": 64},
+            }
+        if selected_template_id:
+            selected_template = template_result.get("selected") or {}
+            return _action_modal(
+                incident_id,
+                revision,
+                recommended_action,
+                initial_text=str(selected_template.get("content") or ""),
+            )
+        templates = template_result.get("templates") or []
+        if templates:
+            return _template_picker(
+                incident_id, revision, recommended_action, templates
+            )
+        return _action_modal(incident_id, revision, recommended_action)
     endpoint = "actions/prepare" if operation == "recommend" else "incidents/transition"
     outgoing_operation = "prepare_action" if operation == "recommend" else operation
     data = {

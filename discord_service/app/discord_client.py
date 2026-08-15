@@ -13,6 +13,31 @@ def _truncate(value: object, length: int) -> str:
     return text if len(text) <= length else f"{text[: length - 1]}…"
 
 
+def _present(value: object) -> bool:
+    return value is not None and value != ""
+
+
+def _metric(label: str, value: object) -> str | None:
+    if not _present(value):
+        return None
+    return f"**{label}:** {value}"
+
+
+def _field_block(*values: str | None) -> str:
+    return "\n".join(value for value in values if value) or "-"
+
+
+def _team_style(team: object, risk_score: float | None) -> tuple[str, int]:
+    normalized = str(team or "").casefold()
+    if "all" in normalized:
+        return "🔵", 0x3B88C3
+    if "axis" in normalized:
+        return "🔴", 0xD63031
+    if risk_score is not None and risk_score >= 0.9:
+        return "🚨", 0xD63031
+    return "⚪", 0xD85F0E
+
+
 def render_message(
     envelope: IncidentEventEnvelope,
     analysis: ModerationAnalysis | None,
@@ -24,99 +49,175 @@ def render_message(
     language = incident.get("discord_language", "de")
     labels = {
         "de": {
-            "incident": "Admin-Incident",
+            "incident": "Admin-Meldung",
+            "name_alert": "KI-Namensprüfung",
+            "chat_alert": "KI-Chatprüfung",
             "server": "Server",
             "source": "Quelle",
             "reporter": "Reporter",
             "affected": "Betroffen",
-            "context": "Spiel-/Squad-Kontext",
-            "status": "Status / Bearbeiter",
-            "risk": "KI-Risiko",
-            "categories": "Kategorie / Regeln",
-            "recommendation": "Empfehlung",
-            "rationale": "Begründung",
+            "reason": "📣 Grund der Meldung",
+            "combat": "⚔️ Kampf",
+            "performance": "⚡ Leistung",
+            "unit": "👥 Einheit",
+            "status": "📌 Bearbeitung",
+            "ai_assessment": "🤖 KI-Einschätzung",
+            "rationale": "🧾 KI-Begründung",
             "excerpts": "Relevante Textstellen",
-            "player_response": "Spielerantwort (Entwurf, nicht gesendet)",
+            "player_response": "💬 Antwortvorschlag (nicht gesendet)",
             "unavailable": "Nicht verfügbar",
-            "claim": "Übernehmen",
-            "resolve": "Abschließen",
-            "dismiss": "Ablehnen",
-            "accept": "Empfehlung übernehmen",
+            "claim": "🙋 Übernehmen",
+            "resolve": "✅ Abschließen",
+            "dismiss": "🚫 Ablehnen",
+            "not_configured": "⚙️ Keine Moderatorrolle eingerichtet. Aktionen sind gesperrt.",
         },
         "en": {
-            "incident": "Admin incident",
+            "incident": "Admin report",
+            "name_alert": "AI name review",
+            "chat_alert": "AI chat review",
             "server": "Server",
             "source": "Source",
             "reporter": "Reporter",
             "affected": "Affected",
-            "context": "Game / squad context",
-            "status": "Status / assignee",
-            "risk": "AI risk",
-            "categories": "Category / rules",
-            "recommendation": "Recommendation",
-            "rationale": "Rationale",
+            "reason": "📣 Report reason",
+            "combat": "⚔️ Combat",
+            "performance": "⚡ Performance",
+            "unit": "👥 Unit",
+            "status": "📌 Processing",
+            "ai_assessment": "🤖 AI assessment",
+            "rationale": "🧾 AI rationale",
             "excerpts": "Relevant excerpts",
-            "player_response": "Player response (draft, not sent)",
+            "player_response": "💬 Suggested reply (not sent)",
             "unavailable": "Unavailable",
-            "claim": "Claim",
-            "resolve": "Resolve",
-            "dismiss": "Dismiss",
-            "accept": "Accept recommendation",
+            "claim": "🙋 Claim",
+            "resolve": "✅ Complete",
+            "dismiss": "🚫 Reject",
+            "not_configured": "⚙️ No moderator role configured. Actions are locked.",
         },
     }.get(language, {})
     snapshot = primary.get("snapshot") or {}
-    context_values = {
-        "team": primary.get("team") or snapshot.get("team"),
-        "squad": primary.get("squad_name") or snapshot.get("squad_name"),
-        "role": primary.get("role") or snapshot.get("role"),
-        "level": snapshot.get("level"),
-        "kills": snapshot.get("kills"),
-        "deaths": snapshot.get("deaths"),
-        "score": snapshot.get("score") or snapshot.get("combat"),
-    }
-    context = (
-        " · ".join(
-            f"{key}: {value}"
-            for key, value in context_values.items()
-            if value is not None
-        )
-        or "-"
+    team = primary.get("team") or snapshot.get("team")
+    target_name = primary.get("display_name") or incident.get("target_name") or "-"
+    player_id = (
+        primary.get("player_id")
+        or snapshot.get("player_id")
+        or incident.get("target_id")
     )
+    kills = snapshot.get("kills")
+    deaths = snapshot.get("deaths")
+    kd = None
+    if isinstance(kills, (int, float)) and isinstance(deaths, (int, float)):
+        kd = f"{kills / max(deaths, 1):.2f}"
+    playtime = snapshot.get("map_playtime_seconds")
+    if isinstance(playtime, (int, float)):
+        playtime = f"{playtime / 60:.0f} min"
+    game_label = "HLL Vietnam" if envelope.game == "hll_vietnam" else "Hell Let Loose"
+    source_labels = {
+        "chat": "!admin",
+        "manual": "Manuell" if language == "de" else "Manual",
+        "ai_chat": "KI-Chat" if language == "de" else "AI chat",
+        "ai_player_name": "KI-Spielername" if language == "de" else "AI player name",
+    }
+    status_labels = {
+        "new": "Neu" if language == "de" else "New",
+        "claimed": "Übernommen" if language == "de" else "Claimed",
+        "resolved": "Abgeschlossen" if language == "de" else "Completed",
+        "dismissed": "Abgelehnt" if language == "de" else "Rejected",
+    }
+    action_labels = {
+        "none": "Keine Aktion" if language == "de" else "No action",
+        "manual_review": "Manuell prüfen" if language == "de" else "Manual review",
+        "message": "Nachricht" if language == "de" else "Message",
+        "punish": "Punish",
+        "kick": "Kick",
+        "temp_ban": "Tempban",
+        "perma_ban": "Permaban",
+        "blacklist": "Blacklist",
+        "remove_from_squad": "Squad-Kick",
+        "disband_squad": "Squad auflösen" if language == "de" else "Disband squad",
+    }
+    severity_labels = {
+        "none": "kein Risiko" if language == "de" else "no risk",
+        "low": "niedrig" if language == "de" else "low",
+        "medium": "mittel" if language == "de" else "medium",
+        "high": "hoch" if language == "de" else "high",
+        "critical": "kritisch" if language == "de" else "critical",
+    }
+    source = str(incident.get("source") or "manual")
+    title_kind = labels[
+        (
+            "name_alert"
+            if source == "ai_player_name"
+            else "chat_alert" if source == "ai_chat" else "incident"
+        )
+    ]
+    team_emoji, color = _team_style(team, analysis.risk_score if analysis else None)
+    identity = f"👤 **{_truncate(target_name, 200)}**"
+    if player_id:
+        identity += f"\n🆔 `{_truncate(player_id, 100)}`"
+    identity += (
+        f"\n🎮 **{envelope.server_name} · #{envelope.server_number} · {game_label}**"
+        f"\n📡 {source_labels.get(source, source)}"
+    )
+    reporter_name = incident.get("reporter_name")
+    if reporter_name:
+        identity += f"\n👮 {labels['reporter']}: **{_truncate(reporter_name, 180)}**"
     fields = [
         {
-            "name": labels["server"],
-            "value": _truncate(
-                f"{envelope.server_name} · #{envelope.server_number} · {envelope.game}",
-                1024,
-            ),
+            "name": labels["reason"],
+            "value": _truncate(incident.get("reason"), 1024),
             "inline": False,
         },
         {
-            "name": labels["source"],
-            "value": _truncate(incident.get("source"), 1024),
-            "inline": True,
-        },
-        {
-            "name": labels["reporter"],
-            "value": _truncate(incident.get("reporter_name"), 1024),
-            "inline": True,
-        },
-        {
-            "name": labels["affected"],
-            "value": _truncate(
-                primary.get("display_name") or incident.get("target_name"), 1024
+            "name": labels["combat"],
+            "value": _field_block(
+                _metric("Kills", kills),
+                _metric("Deaths", deaths),
+                _metric("K/D", kd),
+                _metric("Teamkills", snapshot.get("teamkills")),
             ),
             "inline": True,
         },
         {
-            "name": labels["context"],
-            "value": _truncate(context, 1024),
-            "inline": False,
+            "name": labels["performance"],
+            "value": _field_block(
+                _metric("Level", snapshot.get("level")),
+                _metric("Combat", snapshot.get("combat")),
+                _metric("Spielzeit" if language == "de" else "Playtime", playtime),
+            ),
+            "inline": True,
+        },
+        {
+            "name": labels["unit"],
+            "value": _field_block(
+                _metric("Team", team),
+                _metric(
+                    "Squad",
+                    primary.get("squad_name")
+                    or snapshot.get("unit_name")
+                    or snapshot.get("squad_name"),
+                ),
+                _metric(
+                    "Rolle" if language == "de" else "Role",
+                    primary.get("role") or snapshot.get("role"),
+                ),
+            ),
+            "inline": True,
         },
         {
             "name": labels["status"],
             "value": _truncate(
-                f"{incident.get('status', 'new')} · {incident.get('assigned_to') or '-'}",
+                " · ".join(
+                    value
+                    for value in [
+                        status_labels.get(
+                            str(incident.get("status", "new")),
+                            str(incident.get("status", "new")),
+                        ),
+                        incident.get("assigned_to"),
+                    ]
+                    if value
+                ),
                 1024,
             ),
             "inline": False,
@@ -126,41 +227,24 @@ def render_message(
         fields.extend(
             [
                 {
-                    "name": labels["risk"],
-                    "value": f"{analysis.severity.value} · {analysis.risk_score:.0%}",
-                    "inline": True,
-                },
-                {
-                    "name": labels["categories"],
+                    "name": labels["ai_assessment"],
                     "value": _truncate(
-                        " · ".join(
+                        "\n".join(
                             [
-                                ", ".join(analysis.categories) or "-",
-                                ", ".join(analysis.rule_ids) or "-",
-                            ]
-                        ),
-                        1024,
-                    ),
-                    "inline": True,
-                },
-                {
-                    "name": labels["recommendation"],
-                    "value": _truncate(
-                        " · ".join(
-                            value
-                            for value in [
-                                analysis.suggested_action.value,
-                                (
-                                    f"{analysis.suggested_duration_hours}h"
+                                f"**Risiko:** {severity_labels.get(analysis.severity.value, analysis.severity.value)} · {analysis.risk_score:.0%}",
+                                f"**Kategorie:** {', '.join(analysis.categories) or '-'}",
+                                f"**Regeln:** {', '.join(analysis.rule_ids) or '-'}",
+                                f"**Empfehlung:** {action_labels.get(analysis.suggested_action.value, analysis.suggested_action.value)}"
+                                + (
+                                    f" · {analysis.suggested_duration_hours} h"
                                     if analysis.suggested_duration_hours
-                                    else None
+                                    else ""
                                 ),
                             ]
-                            if value
                         ),
                         1024,
                     ),
-                    "inline": True,
+                    "inline": False,
                 },
                 {
                     "name": labels["rationale"],
@@ -209,101 +293,85 @@ def render_message(
             "disband_squad",
         }
     ]
-    components = [
-        {
-            "type": 1,
-            "components": [
-                {
-                    "type": 2,
-                    "style": 1,
-                    "label": labels["claim"],
-                    "custom_id": f"claim:{incident_id}:{revision}",
-                },
-                {
-                    "type": 2,
-                    "style": 3,
-                    "label": labels["resolve"],
-                    "custom_id": f"resolve:{incident_id}:{revision}",
-                },
-                {
-                    "type": 2,
-                    "style": 2,
-                    "label": labels["dismiss"],
-                    "custom_id": f"dismiss:{incident_id}:{revision}",
-                },
-            ],
+    components = []
+    moderation_ready = incident.get("discord_moderation_ready", True)
+    status = str(incident.get("status") or "new")
+    if not moderation_ready:
+        fields.append(
+            {"name": "Discord", "value": labels["not_configured"], "inline": False}
+        )
+    elif status not in {"resolved", "dismissed"}:
+        action_icons = {
+            "message": "💬",
+            "punish": "⚠️",
+            "kick": "👢",
+            "temp_ban": "⏱️",
+            "perma_ban": "🔨",
+            "blacklist": "⛔",
+            "remove_from_squad": "↪️",
+            "disband_squad": "💥",
         }
-    ]
-    if (
-        analysis
-        and analysis.suggested_action.value not in {"none", "manual_review"}
-        and analysis.suggested_action.value in allowed_actions
-    ):
+        recommended = analysis.suggested_action.value if analysis else None
+        action_buttons = [
+            {
+                "type": 2,
+                "style": (
+                    4
+                    if action in {"perma_ban", "blacklist", "disband_squad"}
+                    else 1 if action == recommended else 2
+                ),
+                "label": _truncate(
+                    f"{'✨' if action == recommended else action_icons[action]} {action_labels[action]}",
+                    80,
+                ),
+                "custom_id": f"recommend:{incident_id}:{revision}:{action}",
+            }
+            for action in allowed_actions
+        ]
+        for offset in range(0, len(action_buttons), 5):
+            components.append(
+                {"type": 1, "components": action_buttons[offset : offset + 5]}
+            )
         components.append(
             {
                 "type": 1,
                 "components": [
                     {
                         "type": 2,
-                        "style": (
-                            4
-                            if analysis.suggested_action.value
-                            in {"perma_ban", "blacklist", "disband_squad"}
-                            else 1
-                        ),
-                        "label": labels["accept"],
-                        "custom_id": f"recommend:{incident_id}:{revision}:{analysis.suggested_action.value}",
-                    }
-                ],
-            }
-        )
-    if allowed_actions:
-        components.append(
-            {
-                "type": 1,
-                "components": [
+                        "style": 1,
+                        "label": labels["claim"],
+                        "custom_id": f"claim:{incident_id}:{revision}",
+                    },
                     {
-                        "type": 3,
-                        "custom_id": f"choose:{incident_id}:{revision}",
-                        "placeholder": (
-                            "Manuelle Aktion wählen"
-                            if language == "de"
-                            else "Choose a manual action"
-                        ),
-                        "min_values": 1,
-                        "max_values": 1,
-                        "options": [
-                            {"label": action.replace("_", " ")[:100], "value": action}
-                            for action in allowed_actions
-                        ],
-                    }
+                        "type": 2,
+                        "style": 3,
+                        "label": labels["resolve"],
+                        "custom_id": f"resolve:{incident_id}:{revision}",
+                    },
+                    {
+                        "type": 2,
+                        "style": 2,
+                        "label": labels["dismiss"],
+                        "custom_id": f"dismiss:{incident_id}:{revision}",
+                    },
                 ],
             }
         )
     return {
         "embeds": [
             {
-                "title": _truncate(
-                    f"{labels['incident']} · {envelope.server_name}", 256
-                ),
-                "description": _truncate(incident.get("reason"), 4096),
-                "color": (
-                    15158332 if analysis and analysis.risk_score >= 0.9 else 3447003
-                ),
+                "title": _truncate(f"{team_emoji} {title_kind}: {target_name}", 256),
+                "description": _truncate(identity, 4096),
+                "color": color,
                 "fields": fields[:25],
                 "footer": {
                     "text": _truncate(
                         " · ".join(
                             value
                             for value in [
-                                f"Incident {incident_id}",
+                                f"CRCON #{envelope.server_number}",
+                                f"Incident {incident_id[:8]}",
                                 f"Revision {revision}",
-                                (
-                                    f"{analysis.model_version} / {analysis.prompt_version} / "
-                                    f"{analysis.policy_profile_id}:{analysis.policy_version}"
-                                    if analysis
-                                    else None
-                                ),
                             ]
                             if value
                         ),

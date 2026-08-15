@@ -21,6 +21,11 @@ urlpatterns = [
         name="discord-action-prepare",
     ),
     path(
+        "action-templates",
+        discord_integration.discord_action_templates,
+        name="discord-action-templates",
+    ),
+    path(
         "incidents/transition",
         discord_integration.transition_incident,
         name="discord-incident-transition",

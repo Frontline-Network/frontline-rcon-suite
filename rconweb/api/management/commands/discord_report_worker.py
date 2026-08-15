@@ -126,6 +126,9 @@ class Command(BaseCommand):
                 incident_payload["ai_config"] = ai_config
                 incident_payload["discord_language"] = integration.language
                 incident_payload["allowed_actions"] = integration.allowed_actions or []
+                incident_payload["discord_moderation_ready"] = bool(
+                    integration.moderator_role_ids
+                )
                 if analysis_record:
                     incident_payload["analysis_id"] = analysis_record.id
                 envelope = IncidentEventEnvelope(

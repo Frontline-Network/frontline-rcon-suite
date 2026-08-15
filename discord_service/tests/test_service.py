@@ -24,7 +24,9 @@ from discord_service.app.contracts import (
 from discord_service.app.db import Base, SessionLocal, engine
 from discord_service.app.discord_client import render_message
 from discord_service.app.main import (
+    _action_modal,
     _crcon_interaction_error,
+    _template_picker,
     _validate_crcon_callback,
     app,
 )
@@ -169,6 +171,15 @@ def test_embed_distinguishes_game_server_and_exposes_manual_actions():
     event = _event()
     event["incident"]["discord_language"] = "en"
     event["incident"]["allowed_actions"] = ["message", "kick"]
+    event["incident"]["discord_moderation_ready"] = True
+    event["incident"]["primary_subject"] = {
+        "display_name": "Target",
+        "player_id": "steam-id",
+        "team": "Allies",
+        "squad_name": "Able",
+        "role": "Rifleman",
+        "snapshot": {"kills": 12, "deaths": 4, "level": 99},
+    }
     envelope = IncidentEventEnvelope.model_validate(event)
     analysis = ModerationAnalysis(
         source="report",
@@ -183,8 +194,30 @@ def test_embed_distinguishes_game_server_and_exposes_manual_actions():
     )
     payload = render_message(envelope, analysis)
     fields = payload["embeds"][0]["fields"]
-    assert any("Ente 2 · #2 · hll_vietnam" in field["value"] for field in fields)
-    assert payload["components"][-1]["components"][0]["type"] == 3
+    assert "Ente 2 · #2 · HLL Vietnam" in payload["embeds"][0]["description"]
+    assert payload["embeds"][0]["title"] == "🔵 Admin report: Target"
+    assert any(
+        field["name"] == "⚔️ Combat" and "**K/D:** 3.00" in field["value"]
+        for field in fields
+    )
+    action_row = payload["components"][0]["components"]
+    assert [button["custom_id"].rsplit(":", 1)[-1] for button in action_row] == [
+        "message",
+        "kick",
+    ]
+    assert payload["components"][-1]["components"][0]["custom_id"].startswith("claim:")
+
+
+def test_embed_hides_actions_until_a_moderator_role_is_configured():
+    event = _event()
+    event["incident"]["allowed_actions"] = ["kick"]
+    event["incident"]["discord_moderation_ready"] = False
+    payload = render_message(IncidentEventEnvelope.model_validate(event), None)
+    assert payload["components"] == []
+    assert any(
+        "Keine Moderatorrolle" in field["value"]
+        for field in payload["embeds"][0]["fields"]
+    )
 
 
 class _Moderations:
@@ -251,3 +284,30 @@ def test_crcon_permission_error_is_not_reported_as_outage():
     error = httpx.HTTPStatusError("forbidden", request=request, response=response)
     assert "Moderatorrolle" in _crcon_interaction_error(error)
     assert "nicht erreichbar" not in _crcon_interaction_error(error)
+
+
+def test_crcon_templates_are_selected_before_editable_action_modal():
+    picker = _template_picker(
+        "22222222-2222-2222-2222-222222222222",
+        "3",
+        "kick",
+        [{"id": 7, "title": "Beleidigung", "content": "must not be sent"}],
+    )
+    select_menu = picker["data"]["components"][0]["components"][0]
+    assert picker["data"]["flags"] == 64
+    assert select_menu["options"] == [
+        {"label": "Beleidigung", "value": "7"},
+        {"label": "Freitext", "value": "custom", "emoji": {"name": "✍️"}},
+    ]
+    assert "must not be sent" not in str(picker)
+
+    modal = _action_modal(
+        "22222222-2222-2222-2222-222222222222",
+        "3",
+        "kick",
+        initial_text="Gespeicherter CRCON-Grund",
+    )
+    text_input = modal["data"]["components"][0]["components"][0]
+    assert modal["type"] == 9
+    assert text_input["custom_id"] == "reason"
+    assert text_input["value"] == "Gespeicherter CRCON-Grund"
