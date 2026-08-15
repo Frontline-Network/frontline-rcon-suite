@@ -284,7 +284,7 @@ def integration_detail(request):
 @csrf_exempt
 @login_required()
 @require_http_methods(["POST"])
-def create_pairing(request):
+def create_discord_pairing(request):
     command = "discord_report_pairing"
     if denied := _require_manager(request, command):
         return denied
