@@ -836,6 +836,51 @@ class DiscordActionTemplateTests(TestCase):
         with self.assertRaisesRegex(ValueError, "confirmed player"):
             _validate_prepared_action_target("message", {"subjects": []}, {})
 
+    @patch("api.discord_integration.mutate_incident")
+    @patch("api.discord_integration._validate_binding")
+    @patch("api.discord_integration._authorized_integration")
+    def test_transition_persists_datetime_result_as_idempotency_receipt(
+        self, authorized, validate_binding, mutate_incident
+    ):
+        from api.models import DiscordInteractionReceipt
+
+        authorized.return_value = (SimpleNamespace(reporter_templates={}), None)
+        mutate_incident.return_value = {
+            "id": "22222222-2222-2222-2222-222222222222",
+            "status": "resolved",
+            "revision": 2,
+            "updated_at": timezone.now(),
+            "reporter_id": None,
+        }
+        response = self.client.post(
+            "/api/discord/v1/incidents/transition",
+            data=json.dumps(
+                {
+                    "interaction_id": "1538274085513994999",
+                    "installation_id": "11111111-1111-1111-1111-111111111111",
+                    "guild_id": "123",
+                    "channel_id": "456",
+                    "incident_id": "22222222-2222-2222-2222-222222222222",
+                    "incident_revision": 1,
+                    "actor": {
+                        "discord_id": "789",
+                        "display_name": "Moderator",
+                        "role_ids": ["42"],
+                    },
+                    "operation": "resolve",
+                    "payload": {},
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        receipt = DiscordInteractionReceipt.objects.get(
+            interaction_id="1538274085513994999"
+        )
+        self.assertIsInstance(receipt.result["updated_at"], str)
+        self.assertEqual(receipt.result["status"], "resolved")
+        validate_binding.assert_called_once()
+
     @patch("api.discord_integration._validate_binding")
     @patch("api.discord_integration._authorized_integration")
     @patch("api.discord_integration.get_message_templates")

@@ -495,6 +495,19 @@ def test_crcon_permission_error_is_not_reported_as_outage():
     assert "nicht erreichbar" not in _crcon_interaction_error(error)
 
 
+def test_crcon_known_validation_error_explains_missing_player():
+    request = httpx.Request("POST", "https://rcon.example/api")
+    response = httpx.Response(
+        400,
+        request=request,
+        json={"error": "Select a confirmed player before running an action"},
+    )
+    error = httpx.HTTPStatusError("invalid", request=request, response=response)
+    message = _crcon_interaction_error(error)
+    assert "keinen bestätigten betroffenen Spieler" in message
+    assert "ungültig" not in message
+
+
 def test_crcon_templates_are_selected_before_editable_action_modal():
     picker = _template_picker(
         "22222222-2222-2222-2222-222222222222",

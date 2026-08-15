@@ -269,6 +269,27 @@ def _crcon_interaction_error(exc: httpx.HTTPError) -> str:
     """Return an honest user-facing error without exposing CRCON internals."""
 
     if isinstance(exc, httpx.HTTPStatusError):
+        try:
+            detail = str((exc.response.json() or {}).get("error") or "")
+        except (TypeError, ValueError):
+            detail = ""
+        known_details = {
+            "Select a confirmed player before running an action": (
+                "Dieser Report hat keinen bestätigten betroffenen Spieler."
+            ),
+            "Actions require a player from a confirmed incident subject": (
+                "Für diese Aktion muss zuerst ein betroffener Spieler bestätigt werden."
+            ),
+            "Select an affected player before running this action": (
+                "Dieser Report hat keinen betroffenen Spieler."
+            ),
+            "Incident is already closed": "Dieser Incident ist bereits abgeschlossen.",
+            "Only open incidents can be claimed": (
+                "Dieser Incident ist bereits abgeschlossen."
+            ),
+        }
+        if detail in known_details:
+            return known_details[detail]
         return {
             400: "CRCON hat die Interaktion als ungültig abgelehnt.",
             403: "Du hast keine aktuell erlaubte Discord-Moderatorrolle.",

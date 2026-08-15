@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import secrets
 from datetime import timedelta
 
 import requests
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
 from django.http import HttpResponse
 from django.utils import timezone
@@ -72,6 +74,12 @@ DEFAULT_AI_CONFIG = {
     "shadow_mode": True,
     "quality_opt_in": False,
 }
+
+
+def _json_safe(value):
+    """Normalize audited results before storing them in Django JSONFields."""
+
+    return json.loads(json.dumps(value, cls=DjangoJSONEncoder))
 
 
 def _integration() -> DiscordReportIntegration:
@@ -762,6 +770,7 @@ def transition_incident(request):
             payload=interaction.payload,
             idempotency_key=f"discord:{interaction.interaction_id}"[:64],
         )
+        result = _json_safe(result)
         DiscordInteractionReceipt.objects.create(
             interaction_id=interaction.interaction_id,
             operation=interaction.operation,
@@ -871,6 +880,7 @@ def execute_action(request, preparation_id):
                 )
                 raise
             result = {"action_result": action_result, "incident": updated}
+        result = _json_safe(result)
         prepared.executed_at = timezone.now()
         prepared.execution_result = result
         prepared.save(update_fields=["executed_at", "execution_result"])
