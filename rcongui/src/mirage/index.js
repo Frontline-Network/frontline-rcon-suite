@@ -393,7 +393,7 @@ export function makeServer({ environment = "development" } = {}) {
       });
 
       const playerActionCommands = [
-        "message_player", "message_all_players", "bulk_message_players",
+        "message_player", "message_all_players", "bulk_message_players", "set_broadcast",
         "watch_player", "unwatch_player", "add_vip", "remove_vip",
         "switch_player_now", "switch_player_on_death", "punish", "kick",
         "temp_ban", "perma_ban", "unban", "add_blacklist_record",

@@ -123,6 +123,11 @@ const ViewsCrumb = () => {
     return <span>{t("navigation.groups.views")}</span>;
 };
 
+const CampaignsCrumb = () => {
+    const { t } = useTranslation();
+    return <span>{t("navigation.links.broadcastMessage")}</span>;
+};
+
 const autobalancerViewLoader = (args) =>
     configLoader({
         ...args,
@@ -335,7 +340,7 @@ const router = createBrowserRouter([
             },
             {
                 path: 'settings/broadcast-message',
-                handle: { crumb: () => <span>Broadcast Message</span> },
+                handle: { crumb: () => <CampaignsCrumb /> },
                 element: <BroadcastMessageSettings />,
                 loader: broadcastMessageLoader,
                 action: broadcastMessageAction,
