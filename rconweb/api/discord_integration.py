@@ -17,6 +17,7 @@ from rcon.admin_incidents import (
     IncidentConflict,
     IncidentNotFound,
     complete_incident_action,
+    confirmed_action_subject,
     get_incident,
     mutate_incident,
     reserve_incident_action,
@@ -197,7 +198,61 @@ def _normalize_action_subject(incident: dict, arguments: dict) -> dict:
         normalized.pop("confirm_subject_id", None)
     if not normalized.get("player_id") and incident.get("target_id"):
         normalized["player_id"] = str(incident["target_id"])
+    if (
+        not normalized.get("player_id")
+        and subject
+        and subject.get("kind") == "player"
+        and subject.get("player_id")
+    ):
+        normalized["player_id"] = str(subject["player_id"])
     return normalized
+
+
+def _validate_prepared_action_target(action: str, incident: dict, arguments: dict):
+    """Reject targetless game actions before claiming the incident."""
+
+    if action == "disband_squad":
+        subject_id = str(arguments.get("subject_id") or "").strip()
+        subject = next(
+            (
+                item
+                for item in incident.get("subjects") or []
+                if str(item.get("id") or "") == subject_id
+            ),
+            None,
+        )
+        if (
+            not subject
+            or subject.get("kind") != "squad"
+            or subject.get("state") != "confirmed"
+        ):
+            raise ValueError("Select a confirmed squad before running this action")
+        return
+    confirm_subject_id = str(arguments.get("confirm_subject_id") or "").strip()
+    if confirm_subject_id:
+        subject = next(
+            (
+                item
+                for item in incident.get("subjects") or []
+                if str(item.get("id") or "") == confirm_subject_id
+            ),
+            None,
+        )
+        if (
+            not subject
+            or subject.get("kind") != "player"
+            or subject.get("state") != "suggested"
+            or str(subject.get("player_id") or "")
+            != str(arguments.get("player_id") or "")
+        ):
+            raise ValueError("Select an affected player before running this action")
+        return
+    confirmed_action_subject(
+        incident,
+        player_id=str(arguments.get("player_id") or ""),
+        subject_id=str(arguments.get("subject_id") or "").strip() or None,
+        allow_reporter=arguments.get("reporter_action") is True,
+    )
 
 
 @csrf_exempt
@@ -604,6 +659,8 @@ def prepare_action(request):
         incident = get_incident(interaction.incident_id)
         if incident["revision"] != interaction.incident_revision:
             raise IncidentConflict("Incident revision changed")
+        arguments = _normalize_action_subject(incident, dict(interaction.payload))
+        _validate_prepared_action_target(action, incident, arguments)
         actor_name = (
             f"discord:{interaction.actor.discord_id}:{interaction.actor.display_name}"[
                 :150
@@ -627,7 +684,6 @@ def prepare_action(request):
             f"{action} on {incident.get('target_name') or 'selected subject'}: "
             f"{reason or interaction.payload.get('message') or ''}"
         )[:2000]
-        arguments = _normalize_action_subject(incident, dict(interaction.payload))
         prepared = DiscordPreparedAction.objects.create(
             incident_id=interaction.incident_id,
             incident_revision=incident["revision"],

@@ -297,6 +297,20 @@ def test_embed_distinguishes_game_server_and_exposes_manual_actions():
     assert payload["components"][-1]["components"][0]["custom_id"].startswith("claim:")
 
 
+def test_targetless_report_does_not_offer_player_actions():
+    event = _event()
+    event["incident"]["allowed_actions"] = ["message", "kick", "perma_ban"]
+    event["incident"]["discord_moderation_ready"] = True
+    payload = render_message(IncidentEventEnvelope.model_validate(event), None)
+    custom_ids = [
+        component["custom_id"]
+        for row in payload["components"]
+        for component in row["components"]
+    ]
+    assert not any(custom_id.startswith("recommend:") for custom_id in custom_ids)
+    assert any(custom_id.startswith("claim:") for custom_id in custom_ids)
+
+
 def test_embed_hides_actions_until_a_moderator_role_is_configured():
     event = _event()
     event["incident"]["allowed_actions"] = ["kick"]
@@ -506,3 +520,97 @@ def test_crcon_templates_are_selected_before_editable_action_modal():
     assert modal["type"] == 9
     assert text_input["custom_id"] == "reason"
     assert text_input["value"] == "Gespeicherter CRCON-Grund"
+
+
+def _modal_interaction(action: str) -> dict:
+    text_key = "message" if action == "message" else "reason"
+    return {
+        "id": "1538274085513994251",
+        "type": 5,
+        "guild_id": "123",
+        "channel_id": "456",
+        "member": {
+            "user": {"id": "789", "username": "Moderator"},
+            "roles": ["42"],
+        },
+        "data": {
+            "custom_id": (
+                "action-modal:22222222-2222-2222-2222-222222222222:1:"
+                f"{action}"
+            ),
+            "components": [
+                {
+                    "components": [
+                        {"custom_id": text_key, "value": "Test moderation action"}
+                    ]
+                }
+            ],
+        },
+    }
+
+
+def test_non_destructive_action_executes_immediately_without_confirmation_button():
+    _seed()
+    prepare = httpx.Response(
+        200,
+        request=httpx.Request("POST", "https://crcon.example/prepare"),
+        json={
+            "result": {
+                "preparation_id": "33333333-3333-3333-3333-333333333333",
+                "confirmation_token": "confirmation-test",
+                "preview": "message on Target: Test moderation action",
+                "requires_second_confirmation": False,
+            }
+        },
+    )
+    execute = httpx.Response(
+        200,
+        request=httpx.Request("POST", "https://crcon.example/execute"),
+        json={"result": {"ok": True}},
+    )
+    with (
+        patch("discord_service.app.main._verify_discord_signature"),
+        patch("discord_service.app.main.httpx.post", side_effect=[prepare, execute]) as post,
+    ):
+        response = TestClient(app).post(
+            "/v1/discord/interactions", json=_modal_interaction("message")
+        )
+    assert response.status_code == 200
+    assert "ausgeführt" in response.json()["data"]["content"]
+    assert "components" not in response.json()["data"]
+    assert post.call_count == 2
+    assert post.call_args_list[1].kwargs["json"]["interaction_id"] == (
+        "1538274085513994251"
+    )
+    with SessionLocal() as session:
+        assert session.query(PreparedActionRelay).count() == 0
+
+
+def test_destructive_action_keeps_explicit_final_confirmation():
+    _seed()
+    prepare = httpx.Response(
+        200,
+        request=httpx.Request("POST", "https://crcon.example/prepare"),
+        json={
+            "result": {
+                "preparation_id": "33333333-3333-3333-3333-333333333333",
+                "confirmation_token": "confirmation-test",
+                "preview": "perma_ban on Target: Test moderation action",
+                "requires_second_confirmation": True,
+            }
+        },
+    )
+    with (
+        patch("discord_service.app.main._verify_discord_signature"),
+        patch("discord_service.app.main.httpx.post", return_value=prepare) as post,
+    ):
+        response = TestClient(app).post(
+            "/v1/discord/interactions", json=_modal_interaction("perma_ban")
+        )
+    button = response.json()["data"]["components"][0]["components"][0]
+    assert response.status_code == 200
+    assert button["label"] == "Endgültig ausführen"
+    assert button["style"] == 4
+    assert post.call_count == 1
+    with SessionLocal() as session:
+        assert session.query(PreparedActionRelay).count() == 1

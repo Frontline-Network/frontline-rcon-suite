@@ -359,6 +359,7 @@ def render_message(
     components = []
     moderation_ready = incident.get("discord_moderation_ready", True)
     status = str(incident.get("status") or "new")
+    has_action_target = bool(player_id)
     if status in {"resolved", "dismissed"}:
         pass
     elif not moderation_ready:
@@ -396,6 +397,7 @@ def render_message(
                 "custom_id": f"recommend:{incident_id}:{revision}:{action}",
             }
             for action in allowed_actions
+            if has_action_target
         ]
         for offset in range(0, len(action_buttons), 5):
             components.append(

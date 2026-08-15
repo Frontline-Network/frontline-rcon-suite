@@ -278,6 +278,35 @@ def _crcon_interaction_error(exc: httpx.HTTPError) -> str:
     return "CRCON ist derzeit nicht erreichbar."
 
 
+def _execute_prepared_action(
+    integration: Integration,
+    *,
+    preparation_id: str,
+    confirmation_token: str,
+    interaction_id: str,
+    guild_id: str,
+    channel_id: str,
+    actor: dict,
+) -> None:
+    response = httpx.post(
+        f"{integration.crcon_base_url}/api/discord/v1/actions/{preparation_id}/execute",
+        headers={
+            "Authorization": (
+                f"Bearer {decrypt(integration.action_capability_ciphertext)}"
+            )
+        },
+        json={
+            "interaction_id": interaction_id,
+            "guild_id": guild_id,
+            "channel_id": channel_id,
+            "actor": actor,
+            "confirmation_token": confirmation_token,
+        },
+        timeout=10,
+    )
+    response.raise_for_status()
+
+
 def _action_modal(
     incident_id: str,
     revision: str,
@@ -340,7 +369,11 @@ def _action_modal(
         "type": 9,
         "data": {
             "custom_id": f"action-modal:{incident_id}:{revision}:{action}",
-            "title": "Aktion prüfen und vorbereiten",
+            "title": (
+                "Aktion prüfen und vorbereiten"
+                if action in {"perma_ban", "blacklist", "disband_squad"}
+                else "Aktion ausführen"
+            ),
             "components": inputs,
         },
     }
@@ -876,21 +909,15 @@ async def discord_interaction(
             "role_ids": [str(value) for value in member.get("roles") or []],
         }
         try:
-            response = httpx.post(
-                f"{integration.crcon_base_url}/api/discord/v1/actions/{relay.preparation_id}/execute",
-                headers={
-                    "Authorization": f"Bearer {decrypt(integration.action_capability_ciphertext)}"
-                },
-                json={
-                    "interaction_id": str(payload.get("id")),
-                    "guild_id": relay.guild_id,
-                    "channel_id": relay.channel_id,
-                    "actor": actor,
-                    "confirmation_token": decrypt(relay.confirmation_ciphertext),
-                },
-                timeout=10,
+            _execute_prepared_action(
+                integration,
+                preparation_id=relay.preparation_id,
+                confirmation_token=decrypt(relay.confirmation_ciphertext),
+                interaction_id=str(payload.get("id")),
+                guild_id=relay.guild_id,
+                channel_id=relay.channel_id,
+                actor=actor,
             )
-            response.raise_for_status()
         except httpx.HTTPError as exc:
             return {
                 "type": 4,
@@ -1126,6 +1153,47 @@ async def discord_interaction(
         }
     if operation == "recommend":
         preview = str(result.get("preview") or recommended_action)[:2000]
+        if not result.get("requires_second_confirmation"):
+            try:
+                _execute_prepared_action(
+                    integration,
+                    preparation_id=str(result["preparation_id"]),
+                    confirmation_token=str(result["confirmation_token"]),
+                    interaction_id=str(payload.get("id")),
+                    guild_id=guild_id,
+                    channel_id=channel_id,
+                    actor=actor,
+                )
+            except httpx.HTTPError as exc:
+                return {
+                    "type": 4,
+                    "data": {
+                        "content": _crcon_interaction_error(exc),
+                        "flags": 64,
+                    },
+                }
+            _send_feedback(
+                integration,
+                interaction_id=str(payload.get("id")),
+                guild_id=guild_id,
+                channel_id=channel_id,
+                incident_id=incident_id,
+                analysis_id=mapping.analysis_id if mapping else None,
+                actor=actor,
+                decision=(
+                    "accepted"
+                    if mapping and mapping.suggested_action == recommended_action
+                    else "overridden"
+                ),
+                actual_action=str(recommended_action),
+            )
+            return {
+                "type": 4,
+                "data": {
+                    "content": "Aktion wurde in CRCON ausgeführt und protokolliert.",
+                    "flags": 64,
+                },
+            }
         relay = PreparedActionRelay(
             handle=str(uuid.uuid4()),
             installation_id=integration.installation_id,
@@ -1142,7 +1210,7 @@ async def discord_interaction(
         )
         session.add(relay)
         session.commit()
-        content = f"Vorbereitet: {preview}"
+        content = f"Vorschau: {preview}"
         return {
             "type": 4,
             "data": {
@@ -1154,12 +1222,8 @@ async def discord_interaction(
                         "components": [
                             {
                                 "type": 2,
-                                "style": (
-                                    4
-                                    if result.get("requires_second_confirmation")
-                                    else 1
-                                ),
-                                "label": "Verbindlich bestätigen",
+                                "style": 4,
+                                "label": "Endgültig ausführen",
                                 "custom_id": f"confirm:{relay.handle}",
                             }
                         ],

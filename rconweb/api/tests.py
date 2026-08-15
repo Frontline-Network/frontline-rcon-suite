@@ -790,7 +790,10 @@ class DiscordActionTemplateTests(TestCase):
         return user
 
     def test_action_subject_confirmation_is_derived_from_crcon_state(self):
-        from api.discord_integration import _normalize_action_subject
+        from api.discord_integration import (
+            _normalize_action_subject,
+            _validate_prepared_action_target,
+        )
 
         confirmed_squad = {
             "target_id": "leader-id",
@@ -826,6 +829,11 @@ class DiscordActionTemplateTests(TestCase):
             suggested_player, {"subject_id": "player-subject"}
         )
         self.assertEqual(normalized["confirm_subject_id"], "player-subject")
+        self.assertEqual(normalized["player_id"], "player-id")
+        _validate_prepared_action_target("kick", suggested_player, normalized)
+
+        with self.assertRaisesRegex(ValueError, "confirmed player"):
+            _validate_prepared_action_target("message", {"subjects": []}, {})
 
     @patch("api.discord_integration._validate_binding")
     @patch("api.discord_integration._authorized_integration")
