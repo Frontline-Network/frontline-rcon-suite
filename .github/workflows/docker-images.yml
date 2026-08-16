@@ -11,8 +11,8 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  BACKEND_IMAGE: frontline-network/hll_rcon_tool-mobile-admin
-  FRONTEND_IMAGE: frontline-network/hll_rcon_tool-mobile-admin-frontend
+  BACKEND_IMAGE: frontline-network/frontline-rcon-suite
+  FRONTEND_IMAGE: frontline-network/frontline-rcon-suite-frontend
 
 jobs:
   backend:
