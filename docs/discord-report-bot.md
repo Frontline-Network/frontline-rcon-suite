@@ -19,6 +19,7 @@ CRCON-Datenbank und werden nach 30 Tagen gelöscht. Normale Incidents verwenden
 ```dotenv
 DISCORD_REPORTS_ENABLED=true
 DISCORD_SERVICE_URL=https://discord-service.example.org
+DISCORD_CALLBACK_BASE_URL=https://callback.example.org
 AI_MODERATION_ENABLED=true
 
 # Generische Werte; leere Werte verwenden weiterhin die MOBILE_*-Einstellungen.
@@ -37,6 +38,21 @@ die erlaubten Aktionen wählen.
 Eine Installation unterstützt genau eine Guild und einen gemeinsamen Kanal.
 Mehrere Gameserver derselben CRCON-Installation werden durch Servername,
 Servernummer und Spiel (`hll` oder `hll_vietnam`) im Embed unterschieden.
+
+Für mehrere Kundendiscords verwendet der zentrale Dienst einen kurzlebigen,
+installationseindeutigen OAuth-State. Der bei Discord ausgewählte Server wird
+serverseitig an die CRCON-Installations-ID gebunden; die Guild-ID ist im Browser
+nicht frei editierbar. Dafür müssen in der zentralen Service-Umgebung
+`DISCORD_SERVICE_DISCORD_APPLICATION_ID`,
+`DISCORD_SERVICE_DISCORD_CLIENT_SECRET` und
+`DISCORD_SERVICE_DISCORD_OAUTH_REDIRECT_URI` gesetzt sein. Die Redirect URI muss
+im Discord Developer Portal exakt registriert sein.
+
+Verkaufte Installationen verwenden `DISCORD_CALLBACK_BASE_URL`. Der
+Callback-Broker speichert ausschließlich die Installations-ID, die öffentliche
+HTTPS-Zieladresse und technische Lifecycle-Daten. Das WordPress-Admin-Secret und
+die getrennte Discord-zu-Broker-Fähigkeit werden nie an CRCON-Container oder
+Browser übertragen.
 
 ## KI und Shadow-Rollout
 

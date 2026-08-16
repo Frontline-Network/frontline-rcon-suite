@@ -160,6 +160,23 @@ export default function DiscordReportBotCard() {
     }
   };
 
+  const installDiscordApp = async () => {
+    const popup = window.open("about:blank", "_blank");
+    try {
+      const pairing = await discordRequest("pairings", { method: "POST" });
+      if (popup) {
+        popup.opener = null;
+        popup.location = pairing.install_url;
+      } else {
+        window.location.assign(pairing.install_url);
+      }
+      setError("");
+    } catch (requestError) {
+      if (popup) popup.close();
+      setError(requestError.message);
+    }
+  };
+
   const cancelConnectionEdit = () => {
     setChannelId(config.channel_id || "");
     setRoles(config.moderator_role_ids || []);
@@ -263,16 +280,7 @@ export default function DiscordReportBotCard() {
                 <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
                   <Button
                     variant="outlined"
-                    onClick={() =>
-                      window.open(
-                        `${config.service_url.replace(
-                          /\/$/,
-                          ""
-                        )}/oauth/install`,
-                        "_blank",
-                        "noopener,noreferrer"
-                      )
-                    }
+                    onClick={installDiscordApp}
                   >
                     {t("settings.discordReports.install")}
                   </Button>
@@ -392,16 +400,7 @@ export default function DiscordReportBotCard() {
                   <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
                     <Button
                       variant="outlined"
-                      onClick={() =>
-                        window.open(
-                          `${config.service_url.replace(
-                            /\/$/,
-                            ""
-                          )}/oauth/install`,
-                          "_blank",
-                          "noopener,noreferrer"
-                        )
-                      }
+                      onClick={installDiscordApp}
                     >
                       {t("settings.discordReports.install")}
                     </Button>

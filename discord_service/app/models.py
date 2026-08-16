@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
@@ -20,6 +20,27 @@ class Integration(Base):
     action_capability_ciphertext: Mapped[str] = mapped_column(Text, nullable=False)
     enabled: Mapped[bool] = mapped_column(default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc)
+    )
+
+
+class OAuthInstallIntent(Base):
+    __tablename__ = "discord_oauth_install_intent"
+
+    state_digest: Mapped[str] = mapped_column(String(64), primary_key=True)
+    installation_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class InstallationGuildBinding(Base):
+    __tablename__ = "discord_installation_guild_binding"
+
+    installation_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    guild_id: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    guild_name: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    authorized: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc)
     )
 

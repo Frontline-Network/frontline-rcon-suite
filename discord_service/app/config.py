@@ -13,8 +13,14 @@ class Settings(BaseSettings):
     secret: str = Field(default="development-only-change-me-32chars", min_length=32)
     discord_bot_token: str = ""
     discord_public_key: str = ""
+    discord_application_id: str = ""
+    discord_client_secret: str = ""
+    discord_oauth_redirect_uri: str = ""
+    discord_permissions: int = 84992
     discord_install_url: str = ""
     allowed_crcon_hosts: str = ""
+    callback_broker_url: str = ""
+    callback_broker_token: str = ""
     openai_api_key: str = ""
     ai_model: str = "gpt-5.6-luna"
     player_name_model: str = "gpt-5.4-nano"

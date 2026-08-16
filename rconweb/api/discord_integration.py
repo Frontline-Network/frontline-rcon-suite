@@ -116,7 +116,7 @@ def _integration() -> DiscordReportIntegration:
     return integration
 
 
-def _pairing_callback_url(request) -> str:
+def _pairing_callback_url(request, installation_id=None) -> str:
     """Return the externally reachable HTTPS callback behind reverse proxies.
 
     ``request.build_absolute_uri`` reflects the internal HTTP hop when CRCON is
@@ -124,6 +124,30 @@ def _pairing_callback_url(request) -> str:
     public base URL is already the installation's validated, operator-managed
     HTTPS address, so it is also the authoritative Discord callback origin.
     """
+
+    callback_base_url = os.getenv("DISCORD_CALLBACK_BASE_URL", "").strip().rstrip("/")
+    if callback_base_url and installation_id:
+        try:
+            parsed = urlsplit(callback_base_url)
+            port = parsed.port
+        except ValueError:
+            parsed = None
+            port = None
+        if (
+            parsed is not None
+            and parsed.scheme == "https"
+            and parsed.hostname
+            and not parsed.username
+            and not parsed.password
+            and not parsed.query
+            and not parsed.fragment
+            and port in {None, 443}
+            and parsed.path in {"", "/"}
+        ):
+            return (
+                f"{callback_base_url}/v1/installations/{installation_id}"
+                f"{DISCORD_PAIRING_CALLBACK_PATH}"
+            )
 
     public_base_url = os.getenv("MOBILE_PUBLIC_BASE_URL", "").strip().rstrip("/")
     if public_base_url:
@@ -155,10 +179,14 @@ def _new_pairing(request) -> tuple[DiscordPairing, str, dict]:
         secret_digest=capability_digest(secret),
         expires_at=timezone.now() + timedelta(minutes=10),
     )
+    integration = _integration()
     payload = {
-        "crcon_callback_url": _pairing_callback_url(request),
+        "crcon_callback_url": _pairing_callback_url(
+            request, getattr(integration, "installation_id", None)
+        ),
         "pairing_id": str(pairing.id),
         "pairing_secret": secret,
+        "installation_id": str(integration.installation_id),
     }
     return pairing, secret, payload
 
@@ -708,7 +736,24 @@ def create_discord_pairing(request):
         and integration.service_url.startswith("http://")
     ):
         return _error(command, "DISCORD_SERVICE_URL must use HTTPS", 400)
-    pairing, secret, _ = _new_pairing(request)
+    pairing, secret, pairing_payload = _new_pairing(request)
+    try:
+        response = requests.post(
+            f"{integration.service_url.rstrip('/')}/v1/install-intents",
+            json=pairing_payload,
+            timeout=15,
+        )
+        if not response.ok:
+            return _error(
+                command,
+                _service_error(response, "Discord installation could not be started"),
+                response.status_code if 400 <= response.status_code < 500 else 503,
+            )
+        install_url = str(response.json()["install_url"])
+        if not install_url.startswith("https://discord.com/"):
+            raise ValueError("Discord service returned an invalid install URL")
+    except (KeyError, TypeError, ValueError, requests.RequestException) as exc:
+        return _error(command, f"Discord installation could not be started: {exc}", 503)
     return api_response(
         command=command,
         failed=False,
@@ -716,8 +761,11 @@ def create_discord_pairing(request):
             "pairing_id": str(pairing.id),
             "pairing_secret": secret,
             "expires_at": pairing.expires_at,
+            "install_url": install_url,
             "service_url": integration.service_url,
-            "crcon_callback_url": _pairing_callback_url(request),
+            "crcon_callback_url": _pairing_callback_url(
+                request, integration.installation_id
+            ),
         },
     )
 
