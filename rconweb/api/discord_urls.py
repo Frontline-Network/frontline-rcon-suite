@@ -45,6 +45,11 @@ urlpatterns = [
         name="discord-incident-transition",
     ),
     path(
+        "incidents/select-subject",
+        discord_integration.select_incident_subject,
+        name="discord-incident-select-subject",
+    ),
+    path(
         "incidents/logs",
         discord_integration.incident_logs,
         name="discord-incident-logs",

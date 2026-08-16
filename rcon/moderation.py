@@ -173,7 +173,13 @@ class DiscordInteractionRequest(BaseModel):
     incident_revision: int = Field(ge=1)
     actor: DiscordActor
     operation: Literal[
-        "claim", "unclaim", "resolve", "dismiss", "prepare_action", "feedback"
+        "claim",
+        "unclaim",
+        "resolve",
+        "dismiss",
+        "select_subject",
+        "prepare_action",
+        "feedback",
     ]
     payload: dict = Field(default_factory=dict)
 

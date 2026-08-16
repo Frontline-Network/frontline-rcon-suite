@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import ipaddress
 import re
 import socket
@@ -484,6 +485,79 @@ def _claim_from_first_button(
     return response.json().get("result", response.json())
 
 
+def _confirmed_squad_subject_ids(incident: dict) -> set[str]:
+    return {
+        str(subject.get("id"))
+        for subject in incident.get("subjects") or []
+        if subject.get("id")
+        and subject.get("kind") == "squad"
+        and subject.get("state") == "confirmed"
+    }
+
+
+def _message_selection_update(
+    message: dict, *, subject_id: str, display_name: str
+) -> dict:
+    """Return a safe Discord message update with a globally visible selection."""
+
+    embeds = copy.deepcopy(message.get("embeds") or [])[:10]
+    components = copy.deepcopy(message.get("components") or [])[:5]
+    for embed in embeds:
+        # Discord includes response-only metadata in interaction payloads.
+        # It must not be echoed back in an Update Message response.
+        embed.pop("type", None)
+    for row in components:
+        row.pop("id", None)
+        for component in row.get("components") or []:
+            component.pop("id", None)
+    valid_option = False
+    for row in components:
+        for component in row.get("components") or []:
+            if component.get("type") != 3 or not str(
+                component.get("custom_id") or ""
+            ).startswith("subject:"):
+                continue
+            for option in component.get("options") or []:
+                selected = str(option.get("value") or "") == subject_id
+                option["default"] = selected
+                valid_option = valid_option or selected
+    if not valid_option:
+        raise ValueError("The selected subject is not available in this message")
+    if embeds:
+        fields = embeds[0].setdefault("fields", [])
+        selection_field = next(
+            (
+                field
+                for field in fields
+                if str(field.get("name") or "").startswith("🎯")
+            ),
+            None,
+        )
+        language_is_german = bool(
+            selection_field and "Zielauswahl" in str(selection_field.get("name") or "")
+        )
+        value = (
+            f"Ausgewählt: **{display_name}**"
+            if language_is_german
+            else f"Selected: **{display_name}**"
+        )
+        if selection_field:
+            selection_field["value"] = value
+        elif len(fields) < 25:
+            fields.append(
+                {
+                    "name": "🎯 Zielauswahl",
+                    "value": f"Ausgewählt: **{display_name}**",
+                    "inline": False,
+                }
+            )
+    return {
+        "embeds": embeds,
+        "components": components,
+        "allowed_mentions": {"parse": []},
+    }
+
+
 @app.get("/healthz")
 def healthz():
     return {"ok": True, "ai_configured": bool(get_settings().openai_api_key)}
@@ -706,7 +780,22 @@ def receive_event(
                 # The normal Discord report remains available; CRCON's outbox
                 # will retry future events and AI is visibly best-effort.
                 pass
-    message_payload = render_message(envelope, analysis, ai_unavailable=unavailable)
+    squad_subject_ids = _confirmed_squad_subject_ids(envelope.incident)
+    is_multi_squad_report = (
+        str(envelope.incident.get("source") or "") in {"chat", "manual"}
+        and len(squad_subject_ids) > 1
+    )
+    selected_subject_id = (
+        mapping.primary_subject_id
+        if mapping and mapping.primary_subject_id in squad_subject_ids
+        else None
+    )
+    message_payload = render_message(
+        envelope,
+        analysis,
+        ai_unavailable=unavailable,
+        selected_subject_id=selected_subject_id,
+    )
     try:
         message_id = DiscordClient().upsert(
             integration.channel_id,
@@ -733,10 +822,14 @@ def receive_event(
             suggested_duration_hours=(
                 analysis.suggested_duration_hours if analysis else None
             ),
-            primary_subject_id=str(
-                (envelope.incident.get("primary_subject") or {}).get("id") or ""
-            )
-            or None,
+            primary_subject_id=(
+                None
+                if is_multi_squad_report
+                else str(
+                    (envelope.incident.get("primary_subject") or {}).get("id") or ""
+                )
+                or None
+            ),
             updated_at=now,
         )
         session.add(mapping)
@@ -748,11 +841,14 @@ def receive_event(
         if analysis:
             mapping.suggested_action = analysis.suggested_action.value
             mapping.suggested_duration_hours = analysis.suggested_duration_hours
-        primary_subject_id = str(
-            (envelope.incident.get("primary_subject") or {}).get("id") or ""
-        )
-        if primary_subject_id:
-            mapping.primary_subject_id = primary_subject_id
+        if is_multi_squad_report:
+            if mapping.primary_subject_id not in squad_subject_ids:
+                mapping.primary_subject_id = None
+        else:
+            primary_subject_id = str(
+                (envelope.incident.get("primary_subject") or {}).get("id") or ""
+            )
+            mapping.primary_subject_id = primary_subject_id or None
         mapping.updated_at = now
     session.add(
         EventReceipt(
@@ -1022,6 +1118,7 @@ async def discord_interaction(
         }
 
     choice_match = re.fullmatch(r"choose:([0-9a-f-]{36}):(\d+)", custom_id)
+    subject_match = re.fullmatch(r"subject:([0-9a-f-]{36}):(\d+)", custom_id)
     template_match = re.fullmatch(
         r"template:([0-9a-f-]{36}):(\d+):([a-z_]+)", custom_id
     )
@@ -1030,7 +1127,14 @@ async def discord_interaction(
     )
     modal_values: dict[str, str | int] = {}
     selected_template_id: str | None = None
-    if payload.get("type") == 3 and choice_match:
+    selected_subject_id: str | None = None
+    if payload.get("type") == 3 and subject_match:
+        operation = "select_subject"
+        incident_id, revision = subject_match.groups()
+        selected = (payload.get("data") or {}).get("values") or []
+        selected_subject_id = str(selected[0]) if selected else ""
+        match = bool(re.fullmatch(r"[0-9a-f-]{36}", selected_subject_id))
+    elif payload.get("type") == 3 and choice_match:
         operation = "action"
         incident_id, revision = choice_match.groups()
         selected = (payload.get("data") or {}).get("values") or []
@@ -1128,6 +1232,99 @@ async def discord_interaction(
         ),
         "role_ids": [str(value) for value in member.get("roles") or []],
     }
+    message = payload.get("message") or {}
+    has_subject_selector = any(
+        str(component.get("custom_id") or "").startswith(f"subject:{incident_id}:")
+        for row in message.get("components") or []
+        for component in row.get("components") or []
+    )
+    if operation == "select_subject":
+        if mapping is None or not selected_subject_id:
+            return {
+                "type": 4,
+                "data": {"content": "Report-Zuordnung nicht gefunden.", "flags": 64},
+            }
+        selected_option = next(
+            (
+                option
+                for row in message.get("components") or []
+                for component in row.get("components") or []
+                if str(component.get("custom_id") or "") == custom_id
+                for option in component.get("options") or []
+                if str(option.get("value") or "") == selected_subject_id
+            ),
+            None,
+        )
+        if not selected_option:
+            return {
+                "type": 4,
+                "data": {
+                    "content": "Dieses Ziel ist nicht mehr auswählbar.",
+                    "flags": 64,
+                },
+            }
+        try:
+            selection_response = httpx.post(
+                f"{integration.crcon_base_url}/api/discord/v1/incidents/select-subject",
+                headers={
+                    "Authorization": (
+                        f"Bearer {decrypt(integration.action_capability_ciphertext)}"
+                    )
+                },
+                json={
+                    "interaction_id": str(payload.get("id")),
+                    "installation_id": integration.installation_id,
+                    "guild_id": guild_id,
+                    "channel_id": channel_id,
+                    "incident_id": incident_id,
+                    "incident_revision": int(revision),
+                    "actor": actor,
+                    "operation": "select_subject",
+                    "payload": {"subject_id": selected_subject_id},
+                },
+                timeout=10,
+            )
+            selection_response.raise_for_status()
+            selection_result = selection_response.json().get(
+                "result", selection_response.json()
+            )
+            display_name = str(
+                selection_result.get("display_name")
+                or selected_option.get("label")
+                or "-"
+            )
+            updated_message = _message_selection_update(
+                message,
+                subject_id=selected_subject_id,
+                display_name=display_name,
+            )
+        except httpx.HTTPError as exc:
+            return {
+                "type": 4,
+                "data": {"content": _crcon_interaction_error(exc), "flags": 64},
+            }
+        except (KeyError, TypeError, ValueError):
+            return {
+                "type": 4,
+                "data": {"content": "Die Zielauswahl ist ungültig.", "flags": 64},
+            }
+        mapping.primary_subject_id = selected_subject_id
+        mapping.updated_at = datetime.now(tz=timezone.utc)
+        session.commit()
+        return {"type": 7, "data": updated_message}
+    if (
+        operation in {"action", "logs"}
+        and recommended_action != "message_reporter"
+        and has_subject_selector
+        and (mapping is None or not mapping.primary_subject_id)
+    ):
+        return {
+            "type": 4,
+            "data": {
+                "content": "Bitte wähle zuerst das Squad aus, für das die Aktion gelten soll.",
+                "flags": 64,
+            },
+        }
     if operation == "action" and custom_id.startswith("action:"):
         try:
             claimed = _claim_from_first_button(
@@ -1224,6 +1421,11 @@ async def discord_interaction(
                     "channel_id": channel_id,
                     "incident_id": incident_id,
                     "actor": actor,
+                    **(
+                        {"subject_id": mapping.primary_subject_id}
+                        if mapping and mapping.primary_subject_id
+                        else {}
+                    ),
                 },
                 timeout=10,
             )

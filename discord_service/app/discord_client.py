@@ -77,6 +77,36 @@ def _action_actor(event: dict, arguments: dict) -> str:
     return _assigned_display_name(event.get("actor")) or "-"
 
 
+def _subject_by_id(incident: dict, subject_id: object) -> dict:
+    normalized = str(subject_id or "").strip()
+    if not normalized:
+        return {}
+    return next(
+        (
+            subject
+            for subject in incident.get("subjects") or []
+            if str(subject.get("id") or "") == normalized
+        ),
+        {},
+    )
+
+
+def _action_target(incident: dict, arguments: dict) -> object:
+    if arguments.get("reporter_action") is True:
+        return incident.get("reporter_name")
+    subject = _subject_by_id(incident, arguments.get("subject_id"))
+    if subject:
+        if subject.get("kind") == "squad":
+            return (
+                subject.get("leader_name")
+                or (subject.get("snapshot") or {}).get("leader", {}).get("name")
+                or subject.get("squad_name")
+                or subject.get("display_name")
+            )
+        return subject.get("display_name") or subject.get("player_name")
+    return arguments.get("player_name") or incident.get("target_name")
+
+
 def _action_timestamp(event: dict) -> str:
     value = event.get("created_at")
     if not value:
@@ -92,25 +122,76 @@ def _action_timestamp(event: dict) -> str:
         return ""
 
 
-def _action_log_entry(event: dict, incident: dict, language: str) -> str | None:
+def _incident_log_entry(event: dict, incident: dict, language: str) -> str | None:
     event_type = str(event.get("event_type") or "")
-    if event_type not in {"action", "action_failed"}:
-        return None
     payload = event.get("payload") or {}
     arguments = payload.get("arguments") or {}
     if not isinstance(arguments, dict):
         arguments = {}
-    action = str(payload.get("action") or arguments.get("action") or "").strip()
     actor = _truncate(_action_actor(event, arguments), 100)
+    timestamp = _action_timestamp(event)
+    if event_type in {
+        "claim",
+        "unclaim",
+        "resolved",
+        "dismissed",
+        "reopen",
+        "reassign",
+    }:
+        if language == "de":
+            if event_type == "claim":
+                description = (
+                    f"{actor} übernahm die manuelle Bearbeitung."
+                    if payload.get("mode") == "manual"
+                    else f"{actor} übernahm den Report."
+                )
+            elif event_type == "unclaim":
+                description = f"{actor} gab den Report wieder frei."
+            elif event_type == "resolved":
+                description = f"{actor} schloss den Report ab."
+            elif event_type == "dismissed":
+                description = (
+                    f"{actor} schloss den Report als Fehlmeldung."
+                    if payload.get("reason") == "wrong_player"
+                    else f"{actor} lehnte den Report als unberechtigt ab."
+                )
+            elif event_type == "reopen":
+                description = f"{actor} öffnete den Report erneut."
+            else:
+                assignee = _truncate(
+                    _assigned_display_name(payload.get("assigned_to")) or "-", 100
+                )
+                description = f"{actor} übergab den Report an {assignee}."
+        else:
+            if event_type == "claim":
+                description = (
+                    f"{actor} started manual processing."
+                    if payload.get("mode") == "manual"
+                    else f"{actor} claimed the report."
+                )
+            elif event_type == "unclaim":
+                description = f"{actor} released the report."
+            elif event_type == "resolved":
+                description = f"{actor} closed the report."
+            elif event_type == "dismissed":
+                description = (
+                    f"{actor} closed the report as a wrong-player report."
+                    if payload.get("reason") == "wrong_player"
+                    else f"{actor} rejected the report as unjustified."
+                )
+            elif event_type == "reopen":
+                description = f"{actor} reopened the report."
+            else:
+                assignee = _truncate(
+                    _assigned_display_name(payload.get("assigned_to")) or "-", 100
+                )
+                description = f"{actor} handed the report to {assignee}."
+        return _truncate(f"{timestamp}{description}", 700)
+    if event_type not in {"action", "action_failed"}:
+        return None
+    action = str(payload.get("action") or arguments.get("action") or "").strip()
     reporter_action = arguments.get("reporter_action") is True
-    target = _truncate(
-        (
-            incident.get("reporter_name")
-            if reporter_action
-            else arguments.get("player_name") or incident.get("target_name")
-        ),
-        100,
-    )
+    target = _truncate(_action_target(incident, arguments), 100)
     reason = _truncate(arguments.get("reason"), 300)
     message = _truncate(arguments.get("message"), 300)
     duration = arguments.get("duration_hours") or arguments.get("duration")
@@ -166,14 +247,14 @@ def _action_log_entry(event: dict, incident: dict, language: str) -> str | None:
         )
         if failed:
             description = f"❌ Failed: {description}"
-    return _truncate(f"{_action_timestamp(event)}{description}", 700)
+    return _truncate(f"{timestamp}{description}", 700)
 
 
 def _action_log_field(incident: dict, language: str) -> dict | None:
     entries = [
         entry
         for event in incident.get("events") or []
-        if (entry := _action_log_entry(event, incident, language))
+        if (entry := _incident_log_entry(event, incident, language))
     ]
     if not entries:
         return None
@@ -208,14 +289,129 @@ def _display_unit(value: object) -> str:
     return text.title() if text.islower() or text.isupper() else text
 
 
+def _confirmed_squad_subjects(incident: dict) -> list[dict]:
+    return [
+        subject
+        for subject in incident.get("subjects") or []
+        if subject.get("kind") == "squad" and subject.get("state") == "confirmed"
+    ]
+
+
+def _additional_squad_embed(
+    subject: dict,
+    *,
+    envelope: IncidentEventEnvelope,
+    incident: dict,
+    language: str,
+    selected: bool,
+    position: int,
+    total: int,
+) -> dict:
+    snapshot = subject.get("snapshot") or {}
+    leader = _squad_leader(snapshot)
+    team = subject.get("team") or snapshot.get("team")
+    team_emoji, color = _team_style(team, None)
+    squad_name = _display_unit(subject.get("squad_name") or subject.get("display_name"))
+    leader_name = subject.get("leader_name") or leader.get("name") or "-"
+    player_id = subject.get("leader_player_id") or leader.get("player_id")
+    identity = f"👤 **{_truncate(leader_name, 200)}**"
+    if _present(leader.get("level")):
+        identity += f" (Lvl {leader['level']})"
+    if player_id:
+        identity += f"\n🆔 `{_truncate(player_id, 100)}`"
+
+    kills = leader.get("kills")
+    deaths = leader.get("deaths")
+    playtime_seconds = leader.get("map_playtime_seconds")
+    playtime_hours = (
+        float(playtime_seconds) / 3600
+        if isinstance(playtime_seconds, (int, float))
+        else None
+    )
+    fields = [
+        {
+            "name": "📣 Grund der Meldung" if language == "de" else "📣 Report reason",
+            "value": _truncate(incident.get("reason"), 1024),
+            "inline": False,
+        },
+        {
+            "name": "⚔️ Kills",
+            "value": f"**{kills if _present(kills) else '-'}**",
+            "inline": True,
+        },
+        {
+            "name": "💀 Deaths",
+            "value": f"**{deaths if _present(deaths) else '-'}**",
+            "inline": True,
+        },
+        {
+            "name": "⏱️ Gesamtspielzeit" if language == "de" else "⏱️ Total playtime",
+            "value": f"{playtime_hours:.1f} h" if playtime_hours is not None else "-",
+            "inline": True,
+        },
+    ]
+    members = snapshot.get("players") or []
+    if members:
+        member_lines = []
+        for member in members:
+            entry = (
+                f"{member.get('name') or '-'} (Lvl {member.get('level') or 0})"
+                f" • {member.get('kills') or 0}/{member.get('deaths') or 0}"
+                f" • {member.get('role') or '-'}"
+            )
+            if str(member.get("player_id") or "") == str(player_id or ""):
+                entry = f"**{entry}**"
+            member_lines.append(entry)
+        fields.append(
+            {
+                "name": f"👥 Squad Members ({len(member_lines)})",
+                "value": _truncate("\n".join(member_lines), 1024),
+                "inline": False,
+            }
+        )
+    game_label = "HLL Vietnam" if envelope.game == "hll_vietnam" else "Hell Let Loose"
+    marker = "🎯 " if selected else ""
+    return {
+        "title": _truncate(
+            f"{marker}{team_emoji} {squad_name} | {_display_unit(team)}", 256
+        ),
+        "description": _truncate(identity, 4096),
+        "color": color,
+        "fields": fields[:25],
+        "footer": {
+            "text": _truncate(
+                f"Squad {position}/{total} | {envelope.server_name} · "
+                f"#{envelope.server_number} · {game_label}",
+                2048,
+            )
+        },
+    }
+
+
 def render_message(
     envelope: IncidentEventEnvelope,
     analysis: ModerationAnalysis | None,
     *,
     ai_unavailable: bool = False,
+    selected_subject_id: str | None = None,
 ) -> dict:
     incident = envelope.incident
     primary = incident.get("primary_subject") or {}
+    squad_subjects = _confirmed_squad_subjects(incident)
+    multi_squad_report = (
+        str(incident.get("source") or "") in {"chat", "manual"}
+        and len(squad_subjects) > 1
+    )
+    selected_squad = next(
+        (
+            subject
+            for subject in squad_subjects
+            if str(subject.get("id") or "") == str(selected_subject_id or "")
+        ),
+        None,
+    )
+    if selected_squad:
+        primary = selected_squad
     language = incident.get("discord_language", "de")
     labels = {
         "de": {
@@ -422,6 +618,33 @@ def render_message(
     action_log = _action_log_field(incident, language)
     if action_log:
         fields.append(action_log)
+    if multi_squad_report:
+        selected_label = (
+            _display_unit(
+                selected_squad.get("squad_name") or selected_squad.get("display_name")
+            )
+            if selected_squad
+            else None
+        )
+        fields.append(
+            {
+                "name": "🎯 Zielauswahl" if language == "de" else "🎯 Target selection",
+                "value": (
+                    f"Ausgewählt: **{selected_label}**"
+                    if selected_label and language == "de"
+                    else (
+                        f"Selected: **{selected_label}**"
+                        if selected_label
+                        else (
+                            "Bitte vor einer Aktion unten ein Squad auswählen."
+                            if language == "de"
+                            else "Select a squad below before running an action."
+                        )
+                    )
+                ),
+                "inline": False,
+            }
+        )
     revision = envelope.incident_revision
     incident_id = envelope.incident_id
     allowed_actions = [
@@ -441,7 +664,10 @@ def render_message(
     ]
     components = []
     moderation_ready = incident.get("discord_moderation_ready", True)
-    has_action_target = bool(player_id)
+    has_player_target = bool(player_id)
+    has_squad_target = bool(
+        team and primary.get("squad_name")
+    )
     if status in {"resolved", "dismissed"}:
         pass
     elif not moderation_ready:
@@ -449,6 +675,46 @@ def render_message(
             {"name": "Discord", "value": labels["not_configured"], "inline": False}
         )
     else:
+        if multi_squad_report:
+            components.append(
+                {
+                    "type": 1,
+                    "components": [
+                        {
+                            "type": 3,
+                            "custom_id": f"subject:{incident_id}:{revision}",
+                            "placeholder": (
+                                "Squad für die Aktion auswählen"
+                                if language == "de"
+                                else "Select squad for the action"
+                            ),
+                            "min_values": 1,
+                            "max_values": 1,
+                            "options": [
+                                {
+                                    "label": _truncate(
+                                        _display_unit(
+                                            subject.get("squad_name")
+                                            or subject.get("display_name")
+                                        ),
+                                        100,
+                                    ),
+                                    "value": str(subject.get("id")),
+                                    "description": _truncate(
+                                        f"{_display_unit(subject.get('team'))} · "
+                                        f"{subject.get('leader_name') or 'Kein Squadlead'}",
+                                        100,
+                                    ),
+                                    "default": str(subject.get("id") or "")
+                                    == str(selected_subject_id or ""),
+                                }
+                                for subject in squad_subjects[:25]
+                                if subject.get("id")
+                            ],
+                        }
+                    ],
+                }
+            )
         if _manual_processing(incident):
             components.append(
                 {
@@ -465,7 +731,19 @@ def render_message(
             )
         else:
             old_actions = [
-                ("message", 2, f"📧 {_truncate(target_name, 65)}"),
+                (
+                    "message",
+                    2,
+                    (
+                        "📧 Nachricht"
+                        if multi_squad_report and language == "de"
+                        else (
+                            "📧 Message"
+                            if multi_squad_report
+                            else f"📧 {_truncate(target_name, 65)}"
+                        )
+                    ),
+                ),
                 ("punish", 1, "💀 Bestrafen" if language == "de" else "💀 Punish"),
                 ("kick", 3, "🤜 Kicken" if language == "de" else "🤜 Kick"),
                 ("temp_ban", 3, "⏰ TB"),
@@ -479,7 +757,7 @@ def render_message(
                     "custom_id": f"action:{incident_id}:{revision}:{action}",
                 }
                 for action, style, label in old_actions
-                if has_action_target and action in allowed_actions
+                if has_player_target and action in allowed_actions
             ]
             if row:
                 components.append({"type": 1, "components": row})
@@ -493,7 +771,7 @@ def render_message(
                         "custom_id": f"action:{incident_id}:{revision}:message_reporter",
                     }
                 )
-            if has_action_target and "blacklist" in allowed_actions:
+            if has_player_target and "blacklist" in allowed_actions:
                 context_row.append(
                     {
                         "type": 2,
@@ -510,7 +788,9 @@ def render_message(
                     "💣 Squad auflösen" if language == "de" else "💣 Disband squad",
                 ),
             ]:
-                if has_action_target and action in allowed_actions:
+                if (
+                    has_squad_target if action == "disband_squad" else has_player_target
+                ) and action in allowed_actions:
                     context_row.append(
                         {
                             "type": 2,
@@ -519,7 +799,7 @@ def render_message(
                             "custom_id": f"action:{incident_id}:{revision}:{action}",
                         }
                     )
-            if has_action_target:
+            if has_player_target:
                 context_row.append(
                     {
                         "type": 2,
@@ -577,16 +857,35 @@ def render_message(
             f"{envelope.server_name} · #{envelope.server_number} · {game_label}",
         ]
     )
+    primary_embed = {
+        "title": _truncate(f"{team_emoji} {title}", 256),
+        "description": _truncate(identity, 4096),
+        "color": color,
+        "fields": fields[:25],
+        "footer": {"text": _truncate(" | ".join(footer_parts), 2048)},
+    }
+    embeds = [primary_embed]
+    if multi_squad_report:
+        ordered_subjects = [
+            subject
+            for subject in squad_subjects
+            if str(subject.get("id") or "") != str(primary.get("id") or "")
+        ]
+        for position, subject in enumerate(ordered_subjects[:9], start=2):
+            embeds.append(
+                _additional_squad_embed(
+                    subject,
+                    envelope=envelope,
+                    incident=incident,
+                    language=language,
+                    selected=str(subject.get("id") or "")
+                    == str(selected_subject_id or ""),
+                    position=position,
+                    total=len(squad_subjects),
+                )
+            )
     return {
-        "embeds": [
-            {
-                "title": _truncate(f"{team_emoji} {title}", 256),
-                "description": _truncate(identity, 4096),
-                "color": color,
-                "fields": fields[:25],
-                "footer": {"text": _truncate(" | ".join(footer_parts), 2048)},
-            }
-        ],
+        "embeds": embeds,
         "components": components,
         "allowed_mentions": {"parse": []},
     }

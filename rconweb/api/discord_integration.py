@@ -24,6 +24,7 @@ from rcon.admin_incidents import (
     mutate_incident,
     reserve_incident_action,
 )
+from rcon.message_templates import get_message_templates
 from rcon.moderation import (
     DiscordActor,
     DiscordInteractionRequest,
@@ -34,7 +35,6 @@ from rcon.moderation import (
 )
 from rcon.moderation_candidates import persist_candidate_analysis
 from rcon.moderation_store import persist_analysis
-from rcon.message_templates import get_message_templates
 from rcon.types import MessageTemplateCategory
 
 from .auth import api_response, login_required
@@ -213,6 +213,14 @@ def _normalize_action_subject(incident: dict, arguments: dict) -> dict:
         ),
         None,
     )
+    if subject_id and not subject:
+        raise ValueError("The selected incident subject does not exist")
+    if subject:
+        # Discord only selects an opaque subject ID. Always derive the actual
+        # player target from current CRCON data so a stale or forged player ID
+        # can never redirect the action to another player.
+        normalized.pop("player_id", None)
+        normalized.pop("player_name", None)
     if (
         subject
         and subject.get("kind") == "player"
@@ -221,8 +229,6 @@ def _normalize_action_subject(incident: dict, arguments: dict) -> dict:
         normalized["confirm_subject_id"] = subject_id
     else:
         normalized.pop("confirm_subject_id", None)
-    if not normalized.get("player_id") and incident.get("target_id"):
-        normalized["player_id"] = str(incident["target_id"])
     if (
         not normalized.get("player_id")
         and subject
@@ -230,6 +236,9 @@ def _normalize_action_subject(incident: dict, arguments: dict) -> dict:
         and subject.get("player_id")
     ):
         normalized["player_id"] = str(subject["player_id"])
+        normalized["player_name"] = str(
+            subject.get("display_name") or subject.get("player_name") or ""
+        )
     if not normalized.get("player_id") and subject and subject.get("kind") == "squad":
         snapshot = subject.get("snapshot") or {}
         leader = snapshot.get("leader") or {}
@@ -240,16 +249,46 @@ def _normalize_action_subject(incident: dict, arguments: dict) -> dict:
                 "",
                 str(candidate.get("role") or "").casefold(),
             )
-            if candidate and (
-                candidate is leader
-                or role in SQUAD_LEADER_ROLES
-            ):
+            if candidate and (candidate is leader or role in SQUAD_LEADER_ROLES):
                 player_id = str(candidate.get("player_id") or "").strip()
                 if player_id:
                     normalized["player_id"] = player_id
                     normalized.setdefault("player_name", candidate.get("name"))
                     break
+    if not subject and not normalized.get("player_id") and incident.get("target_id"):
+        normalized["player_id"] = str(incident["target_id"])
+        normalized.setdefault("player_name", incident.get("target_name"))
     return normalized
+
+
+def _selected_subject_name(incident: dict, arguments: dict) -> str:
+    subject_id = str(arguments.get("subject_id") or "").strip()
+    subject = next(
+        (
+            item
+            for item in incident.get("subjects") or []
+            if str(item.get("id") or "") == subject_id
+        ),
+        {},
+    )
+    return str(
+        arguments.get("player_name")
+        or subject.get("leader_name")
+        or subject.get("display_name")
+        or subject.get("squad_name")
+        or incident.get("target_name")
+        or "selected subject"
+    )
+
+
+def _should_auto_resolve_after_action(incident: dict) -> bool:
+    confirmed = [
+        subject
+        for subject in incident.get("subjects") or []
+        if subject.get("state") == "confirmed"
+        and subject.get("kind") in {"player", "squad"}
+    ]
+    return len(confirmed) <= 1
 
 
 def _validate_prepared_action_target(action: str, incident: dict, arguments: dict):
@@ -383,7 +422,15 @@ def incident_logs(request):
         actor_name = f"discord:{actor.discord_id}:{actor.display_name}"[:150]
         if incident.get("assigned_to") != actor_name:
             raise IncidentConflict("Incident is already claimed by another admin")
-        subject = incident.get("primary_subject") or {}
+        requested_subject_id = str(data.get("subject_id") or "").strip()
+        subject = next(
+            (
+                item
+                for item in incident.get("subjects") or []
+                if str(item.get("id") or "") == requested_subject_id
+            ),
+            incident.get("primary_subject") or {},
+        )
         normalized = _normalize_action_subject(
             incident, {"subject_id": str(subject.get("id") or "")}
         )
@@ -807,7 +854,7 @@ def prepare_action(request):
         preview_target = (
             incident.get("reporter_name")
             if arguments.get("reporter_action") is True
-            else incident.get("target_name")
+            else _selected_subject_name(incident, arguments)
         ) or "selected subject"
         preview = (
             f"{action} on {preview_target}: "
@@ -852,6 +899,76 @@ def prepare_action(request):
             "expires_at": prepared.expires_at,
         },
     )
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def select_incident_subject(request):
+    """Validate a Discord target selection without changing incident state."""
+
+    command = "discord_incident_select_subject"
+    integration, denied = _authorized_integration(request, command)
+    if denied:
+        return denied
+    try:
+        interaction = DiscordInteractionRequest.model_validate(_json_body(request))
+        if interaction.operation != "select_subject":
+            raise ValueError("Expected select_subject operation")
+        _validate_binding(
+            integration,
+            guild_id=interaction.guild_id,
+            channel_id=interaction.channel_id,
+            actor=interaction.actor,
+        )
+        cached = DiscordInteractionReceipt.objects.filter(
+            interaction_id=interaction.interaction_id
+        ).first()
+        if cached:
+            return api_response(command=command, failed=False, result=cached.result)
+        incident = get_incident(interaction.incident_id)
+        if int(incident["revision"]) != interaction.incident_revision:
+            raise IncidentConflict("Incident revision changed")
+        subject_id = str(interaction.payload.get("subject_id") or "").strip()
+        subject = next(
+            (
+                item
+                for item in incident.get("subjects") or []
+                if str(item.get("id") or "") == subject_id
+                and item.get("state") == "confirmed"
+                and item.get("kind") in {"player", "squad"}
+            ),
+            None,
+        )
+        if not subject:
+            raise ValueError("Select a confirmed incident subject")
+        result = _json_safe(
+            {
+                "incident_id": interaction.incident_id,
+                "incident_revision": incident["revision"],
+                "subject_id": subject_id,
+                "display_name": (
+                    subject.get("squad_name") or subject.get("display_name") or "-"
+                ),
+            }
+        )
+        DiscordInteractionReceipt.objects.create(
+            interaction_id=interaction.interaction_id,
+            operation="select_subject",
+            result=result,
+        )
+    except PermissionError as exc:
+        return _error(command, str(exc), 403)
+    except IncidentNotFound as exc:
+        return _error(command, str(exc), 404)
+    except IncidentConflict as exc:
+        return _error(command, str(exc), 409)
+    except Exception as exc:
+        if isinstance(
+            exc, (KeyError, TypeError, ValueError)
+        ) or exc.__class__.__module__.startswith("pydantic"):
+            return _error(command, str(exc), 400)
+        raise
+    return api_response(command=command, failed=False, result=result)
 
 
 @csrf_exempt
@@ -996,7 +1113,10 @@ def execute_action(request, preparation_id):
                 updated = complete_incident_action(
                     f"discord:{interaction_id}"[:64], result=action_result, error=None
                 )
-                if prepared.action != SuggestedAction.MESSAGE.value:
+                if (
+                    prepared.action != SuggestedAction.MESSAGE.value
+                    and _should_auto_resolve_after_action(incident)
+                ):
                     try:
                         updated = mutate_incident(
                             str(prepared.incident_id),

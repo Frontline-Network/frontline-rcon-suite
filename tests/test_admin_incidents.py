@@ -129,6 +129,38 @@ def test_parser_recognizes_reporter_team_squad_and_captures_members():
     assert len(subject["snapshot"]["players"]) == 2
 
 
+def test_parser_resolves_three_named_squads_in_one_report():
+    squads = [
+        {
+            "name": name,
+            "team": "Allies",
+            "type": "infantry",
+            "has_leader": True,
+            "leader": {
+                "name": f"{name} Lead",
+                "player_id": f"{name.casefold()}-leader",
+                "role": "Officer",
+            },
+            "players": [],
+        }
+        for name in ["Able", "Charlie", "Baker"]
+    ]
+
+    parsed = incidents.parse_chat_report(
+        "!admin squads able, charlie und baker reden nicht",
+        reporter_context={"team": "Allies"},
+        current_squads=squads,
+    )
+
+    assert [subject["squad_name"] for subject in parsed["subjects"]] == [
+        "Able",
+        "Charlie",
+        "Baker",
+    ]
+    assert all(subject["state"] == "confirmed" for subject in parsed["subjects"])
+    assert sum(bool(subject["is_primary"]) for subject in parsed["subjects"]) == 1
+
+
 def test_team_view_recognizes_vietnam_squadleader_and_normalizes_teamkills():
     squads = incidents.flatten_team_view(
         {

@@ -11,8 +11,6 @@ os.environ.setdefault(
 )
 os.environ.setdefault("DISCORD_SERVICE_DRY_RUN", "true")
 
-from fastapi.testclient import TestClient
-
 from discord_service.app.ai import ManagedAnalyzer, PlayerNameDecision
 from discord_service.app.config import Settings, get_settings
 from discord_service.app.contracts import (
@@ -37,6 +35,7 @@ from discord_service.app.models import (
     PreparedActionRelay,
 )
 from discord_service.app.security import derive_capability, digest, encrypt
+from fastapi.testclient import TestClient
 
 
 def setup_function():
@@ -315,6 +314,8 @@ def test_embed_exposes_blacklist_action_in_context_row():
                 "kind": "player",
                 "display_name": "Target",
                 "player_id": "target-id",
+                "team": "Allies",
+                "squad_name": "Able",
                 "snapshot": {},
             },
         }
@@ -349,6 +350,8 @@ def test_embed_exposes_every_configured_report_action_with_valid_row_sizes():
                 "kind": "player",
                 "display_name": "Target",
                 "player_id": "target-id",
+                "team": "Allies",
+                "squad_name": "Able",
                 "snapshot": {},
             },
         }
@@ -534,6 +537,49 @@ def test_failed_action_is_honestly_recorded_without_internal_error_details():
     assert "secret backend details" not in logbook["value"]
 
 
+@pytest.mark.parametrize(
+    ("event_type", "payload", "expected"),
+    [
+        ("claim", {}, "[FLN] Simu übernahm den Report"),
+        ("claim", {"mode": "manual"}, "übernahm die manuelle Bearbeitung"),
+        ("resolved", {}, "[FLN] Simu schloss den Report ab"),
+        (
+            "dismissed",
+            {"reason": "unjustified"},
+            "[FLN] Simu lehnte den Report als unberechtigt ab",
+        ),
+        (
+            "dismissed",
+            {"reason": "wrong_player"},
+            "[FLN] Simu schloss den Report als Fehlmeldung",
+        ),
+    ],
+)
+def test_incident_transitions_are_visible_in_the_embed_logbook(
+    event_type, payload, expected
+):
+    event = _event()
+    event["incident"].update(
+        {
+            "source": "ai_player_name",
+            "target_name": "ANTIGITANOS",
+            "events": [
+                {
+                    "actor": "discord:789:[FLN] Simu",
+                    "event_type": event_type,
+                    "payload": payload,
+                }
+            ],
+        }
+    )
+
+    rendered = render_message(IncidentEventEnvelope.model_validate(event), None)
+    logbook = next(
+        field for field in rendered["embeds"][0]["fields"] if field["name"] == "Logbuch"
+    )
+    assert expected in logbook["value"]
+
+
 def test_squad_report_uses_old_unit_report_layout():
     event = _event()
     event["incident"].update(
@@ -583,6 +629,92 @@ def test_squad_report_uses_old_unit_report_layout():
         "⏱️ Gesamtspielzeit",
     ]
     assert "HLL Unit Report" in embed["footer"]["text"]
+
+
+def _multi_squad_event() -> dict:
+    event = _event()
+    subjects = []
+    for index, name in enumerate(["Able", "Charlie", "Baker"], start=3):
+        subject_id = f"{index}{index}{index}{index}{index}{index}{index}{index}-3333-3333-3333-333333333333"
+        leader_id = f"{name.casefold()}-leader"
+        subjects.append(
+            {
+                "id": subject_id,
+                "kind": "squad",
+                "state": "confirmed",
+                "is_primary": name == "Able",
+                "display_name": name,
+                "squad_name": name,
+                "team": "Allies",
+                "leader_name": f"{name} Lead",
+                "leader_player_id": leader_id,
+                "snapshot": {
+                    "leader": {
+                        "player_id": leader_id,
+                        "name": f"{name} Lead",
+                        "level": 100 + index,
+                        "role": "officer",
+                    },
+                    "players": [],
+                },
+            }
+        )
+    event["incident"].update(
+        {
+            "source": "chat",
+            "reason": "squads able, charlie und baker reden nicht",
+            "subjects": subjects,
+            "primary_subject": subjects[0],
+            "target_id": "able-leader",
+            "target_name": "Able Lead",
+            "allowed_actions": ["message", "kick", "disband_squad"],
+            "discord_moderation_ready": True,
+        }
+    )
+    return event
+
+
+def test_multi_squad_report_renders_one_embed_per_squad_and_target_selector():
+    event = _multi_squad_event()
+    rendered = render_message(IncidentEventEnvelope.model_validate(event), None)
+
+    assert len(rendered["embeds"]) == 3
+    assert ["Able" in embed["title"] for embed in rendered["embeds"]] == [
+        True,
+        False,
+        False,
+    ]
+    selector = rendered["components"][0]["components"][0]
+    assert selector["custom_id"].startswith("subject:")
+    assert [option["label"] for option in selector["options"]] == [
+        "Able",
+        "Charlie",
+        "Baker",
+    ]
+    assert not any(option["default"] for option in selector["options"])
+    selection_field = next(
+        field
+        for field in rendered["embeds"][0]["fields"]
+        if field["name"] == "🎯 Zielauswahl"
+    )
+    assert "Bitte vor einer Aktion" in selection_field["value"]
+
+
+def test_multi_squad_render_marks_the_validated_selection():
+    event = _multi_squad_event()
+    selected_id = event["incident"]["subjects"][1]["id"]
+    rendered = render_message(
+        IncidentEventEnvelope.model_validate(event),
+        None,
+        selected_subject_id=selected_id,
+    )
+
+    selector = rendered["components"][0]["components"][0]
+    assert (
+        next(option for option in selector["options"] if option["default"])["label"]
+        == "Charlie"
+    )
+    assert "Charlie" in rendered["embeds"][0]["title"]
 
 
 def test_squadleader_fallback_restores_existing_unit_report_target_and_actions():
@@ -981,6 +1113,155 @@ def test_first_action_button_claims_before_opening_crcon_templates():
     assert post.call_args_list[0].kwargs["json"]["operation"] == "claim"
     assert post.call_args_list[0].kwargs["json"]["payload"]["button"] == "kick"
     assert post.call_args_list[1].kwargs["json"]["action"] == "kick"
+
+
+def _multi_squad_interaction_payload() -> tuple[dict, str]:
+    event = _multi_squad_event()
+    rendered = render_message(IncidentEventEnvelope.model_validate(event), None)
+    selected_id = event["incident"]["subjects"][1]["id"]
+    return (
+        {
+            "id": "1538274085513994260",
+            "type": 3,
+            "guild_id": "123",
+            "channel_id": "456",
+            "member": {
+                "user": {"id": "789", "username": "Moderator"},
+                "roles": ["42"],
+            },
+            "message": rendered,
+            "data": {
+                "custom_id": rendered["components"][0]["components"][0]["custom_id"],
+                "values": [selected_id],
+            },
+        },
+        selected_id,
+    )
+
+
+def test_multi_squad_selection_is_validated_and_persisted_before_actions():
+    _seed()
+    interaction, selected_id = _multi_squad_interaction_payload()
+    with SessionLocal() as session:
+        session.add(
+            IncidentMessage(
+                installation_id="11111111-1111-1111-1111-111111111111",
+                incident_id="22222222-2222-2222-2222-222222222222",
+                message_id="999",
+                channel_id="456",
+                last_revision=1,
+                primary_subject_id=None,
+            )
+        )
+        session.commit()
+    validated = httpx.Response(
+        200,
+        request=httpx.Request("POST", "https://crcon.example/select-subject"),
+        json={
+            "result": {
+                "subject_id": selected_id,
+                "display_name": "Charlie",
+                "incident_revision": 1,
+            }
+        },
+    )
+
+    with (
+        patch("discord_service.app.main._verify_discord_signature"),
+        patch("discord_service.app.main.httpx.post", return_value=validated) as post,
+    ):
+        response = TestClient(app).post("/v1/discord/interactions", json=interaction)
+
+    assert response.status_code == 200
+    assert response.json()["type"] == 7
+    selector = response.json()["data"]["components"][0]["components"][0]
+    assert (
+        next(option for option in selector["options"] if option["default"])["label"]
+        == "Charlie"
+    )
+    assert (
+        "Charlie"
+        in next(
+            field
+            for field in response.json()["data"]["embeds"][0]["fields"]
+            if field["name"] == "🎯 Zielauswahl"
+        )["value"]
+    )
+    assert post.call_args.kwargs["json"]["operation"] == "select_subject"
+    assert post.call_args.kwargs["json"]["payload"] == {"subject_id": selected_id}
+    with SessionLocal() as session:
+        assert session.query(IncidentMessage).one().primary_subject_id == selected_id
+
+
+def test_multi_squad_action_is_blocked_until_a_subject_is_selected():
+    _seed()
+    interaction, _ = _multi_squad_interaction_payload()
+    interaction["id"] = "1538274085513994261"
+    interaction["data"] = {
+        "custom_id": "action:22222222-2222-2222-2222-222222222222:1:kick"
+    }
+    with SessionLocal() as session:
+        session.add(
+            IncidentMessage(
+                installation_id="11111111-1111-1111-1111-111111111111",
+                incident_id="22222222-2222-2222-2222-222222222222",
+                message_id="999",
+                channel_id="456",
+                last_revision=1,
+                primary_subject_id=None,
+            )
+        )
+        session.commit()
+
+    with (
+        patch("discord_service.app.main._verify_discord_signature"),
+        patch("discord_service.app.main.httpx.post") as post,
+    ):
+        response = TestClient(app).post("/v1/discord/interactions", json=interaction)
+
+    assert response.status_code == 200
+    assert "wähle zuerst das Squad" in response.json()["data"]["content"]
+    post.assert_not_called()
+
+
+def test_selected_squad_subject_is_forwarded_to_action_preparation():
+    _seed()
+    selection_interaction, selected_id = _multi_squad_interaction_payload()
+    interaction = _modal_interaction("kick")
+    interaction["message"] = selection_interaction["message"]
+    with SessionLocal() as session:
+        session.add(
+            IncidentMessage(
+                installation_id="11111111-1111-1111-1111-111111111111",
+                incident_id="22222222-2222-2222-2222-222222222222",
+                message_id="999",
+                channel_id="456",
+                last_revision=1,
+                primary_subject_id=selected_id,
+            )
+        )
+        session.commit()
+    prepared = httpx.Response(
+        200,
+        request=httpx.Request("POST", "https://crcon.example/prepare"),
+        json={
+            "result": {
+                "preparation_id": "33333333-3333-3333-3333-333333333333",
+                "confirmation_token": "confirmation-test",
+                "preview": "kick on Charlie Lead: Test moderation action",
+                "requires_second_confirmation": True,
+            }
+        },
+    )
+
+    with (
+        patch("discord_service.app.main._verify_discord_signature"),
+        patch("discord_service.app.main.httpx.post", return_value=prepared) as post,
+    ):
+        response = TestClient(app).post("/v1/discord/interactions", json=interaction)
+
+    assert response.status_code == 200
+    assert post.call_args.kwargs["json"]["payload"]["subject_id"] == selected_id
 
 
 def test_non_destructive_action_executes_immediately_without_confirmation_button():

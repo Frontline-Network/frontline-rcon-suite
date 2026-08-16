@@ -1018,6 +1018,13 @@ class DiscordActionTemplateTests(TestCase):
                     "id": "squad-subject",
                     "kind": "squad",
                     "state": "confirmed",
+                    "snapshot": {
+                        "leader": {
+                            "player_id": "leader-id",
+                            "name": "Able Lead",
+                            "role": "officer",
+                        }
+                    },
                 }
             ],
         }
@@ -1078,6 +1085,117 @@ class DiscordActionTemplateTests(TestCase):
 
         with self.assertRaisesRegex(ValueError, "confirmed player"):
             _validate_prepared_action_target("message", {"subjects": []}, {})
+
+    def test_selected_squad_takes_priority_over_incident_primary_target(self):
+        from api.discord_integration import _normalize_action_subject
+
+        incident = {
+            "target_id": "able-leader",
+            "target_name": "Able Lead",
+            "subjects": [
+                {
+                    "id": "able-subject",
+                    "kind": "squad",
+                    "state": "confirmed",
+                    "snapshot": {
+                        "leader": {
+                            "player_id": "able-leader",
+                            "name": "Able Lead",
+                            "role": "officer",
+                        }
+                    },
+                },
+                {
+                    "id": "charlie-subject",
+                    "kind": "squad",
+                    "state": "confirmed",
+                    "snapshot": {
+                        "leader": {
+                            "player_id": "charlie-leader",
+                            "name": "Charlie Lead",
+                            "role": "officer",
+                        }
+                    },
+                },
+            ],
+        }
+
+        normalized = _normalize_action_subject(
+            incident,
+            {
+                "subject_id": "charlie-subject",
+                "player_id": "forged-player",
+            },
+        )
+
+        self.assertEqual(normalized["player_id"], "charlie-leader")
+        self.assertEqual(normalized["player_name"], "Charlie Lead")
+
+    def test_multiple_confirmed_subjects_keep_incident_open_after_one_action(self):
+        from api.discord_integration import _should_auto_resolve_after_action
+
+        self.assertFalse(
+            _should_auto_resolve_after_action(
+                {
+                    "subjects": [
+                        {"kind": "squad", "state": "confirmed"},
+                        {"kind": "squad", "state": "confirmed"},
+                    ]
+                }
+            )
+        )
+        self.assertTrue(
+            _should_auto_resolve_after_action(
+                {"subjects": [{"kind": "player", "state": "confirmed"}]}
+            )
+        )
+
+    @patch("api.discord_integration.get_incident")
+    @patch("api.discord_integration._validate_binding")
+    @patch("api.discord_integration._authorized_integration")
+    def test_subject_selection_is_role_and_revision_validated_without_mutation(
+        self, authorized, validate_binding, get_incident
+    ):
+        authorized.return_value = (SimpleNamespace(), None)
+        get_incident.return_value = {
+            "id": "22222222-2222-2222-2222-222222222222",
+            "revision": 4,
+            "subjects": [
+                {
+                    "id": "33333333-3333-3333-3333-333333333333",
+                    "kind": "squad",
+                    "state": "confirmed",
+                    "display_name": "Charlie",
+                    "squad_name": "Charlie",
+                }
+            ],
+        }
+        response = self.client.post(
+            "/api/discord/v1/incidents/select-subject",
+            data=json.dumps(
+                {
+                    "interaction_id": "1538274085513994998",
+                    "installation_id": "11111111-1111-1111-1111-111111111111",
+                    "guild_id": "123",
+                    "channel_id": "456",
+                    "incident_id": "22222222-2222-2222-2222-222222222222",
+                    "incident_revision": 4,
+                    "actor": {
+                        "discord_id": "789",
+                        "display_name": "Moderator",
+                        "role_ids": ["42"],
+                    },
+                    "operation": "select_subject",
+                    "payload": {"subject_id": "33333333-3333-3333-3333-333333333333"},
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["result"]["display_name"], "Charlie")
+        validate_binding.assert_called_once()
+        get_incident.assert_called_once_with("22222222-2222-2222-2222-222222222222")
 
     @patch("api.discord_integration.mutate_incident")
     @patch("api.discord_integration._validate_binding")
