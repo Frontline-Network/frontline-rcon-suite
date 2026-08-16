@@ -27,7 +27,10 @@ from rcon.moderation import (
     ModerationAnalysisJobEnvelope,
     PlayerNameAnalysisBatchEnvelope,
 )
-from rcon.moderation_candidates import next_player_name_batch_at
+from rcon.moderation_candidates import (
+    next_player_name_batch_at,
+    player_name_batch_window_is_open,
+)
 
 
 def _server_label(server_number: int) -> tuple[str, str]:
@@ -207,13 +210,19 @@ class Command(BaseCommand):
                 session.flush()
             if not deliver_moderation or not ai_moderation_enabled():
                 return delivered_count
+            candidate_query = select(ModerationCandidateOutbox).where(
+                ModerationCandidateOutbox.delivered_at.is_(None),
+                ModerationCandidateOutbox.next_attempt_at <= now,
+            )
+            if not player_name_batch_window_is_open(now):
+                # Old installations may contain name retries with arbitrary
+                # timestamps. Never let those bypass the half-hour cadence.
+                candidate_query = candidate_query.where(
+                    ModerationCandidateOutbox.source != "ai_player_name"
+                )
             candidates = list(
                 session.execute(
-                    select(ModerationCandidateOutbox)
-                    .where(
-                        ModerationCandidateOutbox.delivered_at.is_(None),
-                        ModerationCandidateOutbox.next_attempt_at <= now,
-                    )
+                    candidate_query
                     .order_by(ModerationCandidateOutbox.created_at.asc())
                     .limit(50)
                 )

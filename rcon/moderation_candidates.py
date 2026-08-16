@@ -107,6 +107,12 @@ def next_player_name_batch_at(now: datetime) -> datetime:
     return now.replace(minute=boundary_minute, second=0, microsecond=0)
 
 
+def player_name_batch_window_is_open(now: datetime) -> bool:
+    """Allow draining name batches only during UTC minute :00 or :30."""
+
+    return now.minute in {0, 30}
+
+
 def enqueue_candidate(
     *,
     source: ModerationSource,

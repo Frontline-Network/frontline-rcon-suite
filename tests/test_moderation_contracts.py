@@ -23,6 +23,7 @@ from rcon.moderation import (
 )
 from rcon.moderation_candidates import (
     next_player_name_batch_at,
+    player_name_batch_window_is_open,
     player_name_state_is_current,
 )
 
@@ -108,6 +109,12 @@ def test_player_name_jobs_wait_for_next_half_hour_boundary():
     assert next_player_name_batch_at(
         datetime(2026, 8, 16, 12, 30, tzinfo=timezone.utc)
     ) == datetime(2026, 8, 16, 13, 0, tzinfo=timezone.utc)
+    assert player_name_batch_window_is_open(
+        datetime(2026, 8, 16, 12, 30, 59, tzinfo=timezone.utc)
+    )
+    assert not player_name_batch_window_is_open(
+        datetime(2026, 8, 16, 12, 31, tzinfo=timezone.utc)
+    )
 
 
 def test_player_name_batch_rejects_chat_and_mixed_provider_jobs():
