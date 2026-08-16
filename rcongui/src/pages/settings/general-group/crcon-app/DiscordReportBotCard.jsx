@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
+  Box,
   Button,
   Card,
   CardContent,
@@ -12,8 +13,15 @@ import {
   Stack,
   Switch,
   TextField,
+  Typography,
 } from "@mui/material";
-import { SmartToy as BotIcon } from "@mui/icons-material";
+import {
+  AutoAwesome as AiIcon,
+  Forum as ReplyIcon,
+  Link as ConnectionIcon,
+  Security as PermissionsIcon,
+  SmartToy as DiscordBotIcon,
+} from "@mui/icons-material";
 import { discordRequest } from "@/utils/fetchUtils";
 import { toast } from "react-toastify";
 import { useTranslation } from "react-i18next";
@@ -33,6 +41,33 @@ const splitValues = (value) =>
     .split(/[\n,]/)
     .map((item) => item.trim())
     .filter(Boolean);
+
+const SectionTitle = ({ icon, title, help }) => (
+  <Stack direction="row" spacing={1.5} alignItems="flex-start">
+    <Box
+      sx={{
+        display: "grid",
+        placeItems: "center",
+        width: 38,
+        height: 38,
+        flex: "0 0 auto",
+        borderRadius: 1.5,
+        bgcolor: "action.selected",
+        color: "primary.main",
+      }}
+    >
+      {icon}
+    </Box>
+    <Box>
+      <Typography variant="h6" sx={{ fontWeight: 750, lineHeight: 1.25 }}>
+        {title}
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.35 }}>
+        {help}
+      </Typography>
+    </Box>
+  </Stack>
+);
 
 export default function DiscordReportBotCard() {
   const { t } = useTranslation();
@@ -151,9 +186,31 @@ export default function DiscordReportBotCard() {
 
   if (!config && !error) return null;
   return (
-    <Card elevation={2}>
+    <Card
+      elevation={0}
+      sx={{
+        overflow: "hidden",
+        border: "1px solid",
+        borderColor: "divider",
+        borderRadius: 3,
+      }}
+    >
       <CardHeader
-        avatar={<BotIcon color="primary" />}
+        avatar={
+          <Box
+            sx={{
+              display: "grid",
+              placeItems: "center",
+              width: 48,
+              height: 48,
+              borderRadius: 2,
+              bgcolor: "#5865F2",
+              color: "white",
+            }}
+          >
+            <DiscordBotIcon />
+          </Box>
+        }
         title={t("settings.discordReports.title")}
         subheader={t("settings.discordReports.subtitle")}
         action={
@@ -170,11 +227,16 @@ export default function DiscordReportBotCard() {
         }
       />
       <Divider />
-      <CardContent>
-        <Stack spacing={2}>
+      <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+        <Stack spacing={3}>
           {error && <Alert severity="warning">{error}</Alert>}
           {config && !config.connected && (
             <>
+              <SectionTitle
+                icon={<ConnectionIcon />}
+                title={t("settings.discordReports.sectionConnection")}
+                help={t("settings.discordReports.sectionConnectionHelp")}
+              />
               <Alert severity="info">
                 {t("settings.discordReports.installHint")}
               </Alert>
@@ -267,6 +329,11 @@ export default function DiscordReportBotCard() {
                   })}
                 </Alert>
               )}
+              <SectionTitle
+                icon={<ConnectionIcon />}
+                title={t("settings.discordReports.sectionConnection")}
+                help={t("settings.discordReports.sectionConnectionHelp")}
+              />
               {!editingConnection ? (
                 <Stack spacing={2}>
                   <Alert severity="success">
@@ -360,6 +427,12 @@ export default function DiscordReportBotCard() {
                   </Stack>
                 </Stack>
               )}
+              <Divider />
+              <SectionTitle
+                icon={<PermissionsIcon />}
+                title={t("settings.discordReports.sectionPermissions")}
+                help={t("settings.discordReports.sectionPermissionsHelp")}
+              />
               <TextField
                 select
                 label={t("settings.discordReports.roles")}
@@ -410,6 +483,43 @@ export default function DiscordReportBotCard() {
                   }
                   label={t("settings.discordReports.enabled")}
                 />
+              </Stack>
+              <Typography variant="subtitle2" color="text.secondary">
+                {t("settings.discordReports.allowedActions")}
+              </Typography>
+              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                {ACTIONS.map((action) => {
+                  const active = (config.allowed_actions || []).includes(
+                    action
+                  );
+                  return (
+                    <Chip
+                      key={action}
+                      clickable
+                      variant={active ? "filled" : "outlined"}
+                      color={active ? "primary" : "default"}
+                      label={t(`settings.discordReports.action_${action}`)}
+                      onClick={() =>
+                        setConfig({
+                          ...config,
+                          allowed_actions: active
+                            ? config.allowed_actions.filter(
+                                (item) => item !== action
+                              )
+                            : [...(config.allowed_actions || []), action],
+                        })
+                      }
+                    />
+                  );
+                })}
+              </Stack>
+              <Divider />
+              <SectionTitle
+                icon={<AiIcon />}
+                title={t("settings.discordReports.sectionAi")}
+                help={t("settings.discordReports.sectionAiHelp")}
+              />
+              <Stack direction="row" spacing={2} useFlexGap flexWrap="wrap">
                 {[
                   "chat_enabled",
                   "names_enabled",
@@ -435,31 +545,6 @@ export default function DiscordReportBotCard() {
                     label={t(`settings.discordReports.${key}`)}
                   />
                 ))}
-              </Stack>
-              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                {ACTIONS.map((action) => {
-                  const active = (config.allowed_actions || []).includes(
-                    action
-                  );
-                  return (
-                    <Chip
-                      key={action}
-                      clickable
-                      color={active ? "primary" : "default"}
-                      label={action}
-                      onClick={() =>
-                        setConfig({
-                          ...config,
-                          allowed_actions: active
-                            ? config.allowed_actions.filter(
-                                (item) => item !== action
-                              )
-                            : [...(config.allowed_actions || []), action],
-                        })
-                      }
-                    />
-                  );
-                })}
               </Stack>
               <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
                 <TextField
@@ -487,6 +572,15 @@ export default function DiscordReportBotCard() {
                   fullWidth
                 />
               </Stack>
+              <Alert severity="info">
+                {t("settings.discordReports.aiSafety")}
+              </Alert>
+              <Divider />
+              <SectionTitle
+                icon={<ReplyIcon />}
+                title={t("settings.discordReports.sectionTemplates")}
+                help={t("settings.discordReports.sectionTemplatesHelp")}
+              />
               <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
                 {["received", "claimed", "resolved", "dismissed"].map(
                   (templateKey) => (
@@ -510,10 +604,8 @@ export default function DiscordReportBotCard() {
                   )
                 )}
               </Stack>
-              <Alert severity="info">
-                {t("settings.discordReports.aiSafety")}
-              </Alert>
-              <Stack direction="row" spacing={1}>
+              <Divider />
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                 <Button variant="contained" onClick={save}>
                   {t("settings.discordReports.save")}
                 </Button>

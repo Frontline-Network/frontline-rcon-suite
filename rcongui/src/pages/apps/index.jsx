@@ -1,11 +1,15 @@
 import {
+  AutoAwesome as AiIcon,
+  Forum as ForumIcon,
   Language as LanguageIcon,
   PhoneAndroid as PhoneAndroidIcon,
   QrCode2 as QrCodeIcon,
   Security as SecurityIcon,
+  SmartToy as DiscordBotIcon,
 } from "@mui/icons-material";
 import { Box, Button, Card, CardContent, Chip, Grid2 as Grid, Stack, Typography } from "@mui/material";
 import { useTranslation } from "react-i18next";
+import { Link as RouterLink } from "react-router-dom";
 import CrconAppSettings from "@/pages/settings/general-group/crcon-app";
 
 const FrontlineAppsPage = () => {
@@ -25,7 +29,7 @@ const FrontlineAppsPage = () => {
       </Typography>
 
       <Grid container spacing={2} sx={{ mt: 2.5 }}>
-        <Grid size={{ xs: 12, lg: 8 }}>
+        <Grid size={{ xs: 12, lg: 6 }}>
           <Card
             sx={(theme) => ({
               height: "100%",
@@ -57,6 +61,9 @@ const FrontlineAppsPage = () => {
                 </Typography>
 
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
+                  <Button component="a" href="#frontline-pairing" variant="contained">
+                    {t("apps.frontline.setup")}
+                  </Button>
                   <Button component="a" href={companionUrl} target="_blank" rel="noreferrer" variant="outlined">
                     {t("apps.frontline.open")}
                   </Button>
@@ -65,19 +72,44 @@ const FrontlineAppsPage = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, lg: 4 }}>
-          <Card sx={{ height: "100%" }}>
+        <Grid size={{ xs: 12, lg: 6 }}>
+          <Card
+            sx={{
+              height: "100%",
+              border: "1px solid rgba(88, 101, 242, 0.65)",
+              background: "linear-gradient(135deg, rgba(88, 101, 242, 0.2) 0%, rgba(88, 101, 242, 0.04) 70%)",
+            }}
+          >
             <CardContent sx={{ p: { xs: 2.5, md: 3 } }}>
-              <Stack spacing={1.25}>
-                <Typography variant="h6">{t("apps.how.title")}</Typography>
-                {["one", "two", "three"].map((step, index) => (
-                  <Stack key={step} direction="row" spacing={1.25} alignItems="flex-start">
-                    <Box sx={{ display: "grid", placeItems: "center", flex: "0 0 auto", width: 24, height: 24, borderRadius: "50%", bgcolor: "primary.main", color: "primary.contrastText", fontSize: 13, fontWeight: 700 }}>
-                      {index + 1}
-                    </Box>
-                    <Typography variant="body2" color="text.secondary">{t(`apps.how.${step}`)}</Typography>
-                  </Stack>
-                ))}
+              <Stack spacing={2.5}>
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Box sx={{ display: "grid", placeItems: "center", width: 52, height: 52, borderRadius: 2, bgcolor: "#5865F2", color: "white" }}>
+                    <DiscordBotIcon fontSize="large" />
+                  </Box>
+                  <Box>
+                    <Typography variant="h4" sx={{ fontWeight: 700 }}>{t("apps.discord.title")}</Typography>
+                    <Typography color="text.secondary">{t("apps.discord.description")}</Typography>
+                  </Box>
+                </Stack>
+
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1} useFlexGap flexWrap="wrap">
+                  <Chip icon={<ForumIcon />} label={t("apps.discord.reports")} />
+                  <Chip icon={<SecurityIcon />} label={t("apps.discord.permissions")} />
+                  <Chip icon={<AiIcon />} label={t("apps.discord.ai")} />
+                </Stack>
+
+                <Typography variant="body2" color="text.secondary">
+                  {t("apps.discord.detail")}
+                </Typography>
+
+                <Button
+                  component={RouterLink}
+                  to="/apps/discord-report-bot"
+                  variant="contained"
+                  sx={{ alignSelf: "flex-start", bgcolor: "#5865F2", "&:hover": { bgcolor: "#4752C4" } }}
+                >
+                  {t("apps.discord.setup")}
+                </Button>
               </Stack>
             </CardContent>
           </Card>

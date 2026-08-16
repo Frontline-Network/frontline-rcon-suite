@@ -372,6 +372,17 @@ const en = {
       aiSafety: "AI results are suggestions only. Every game action requires a currently authorized moderator; destructive actions also require a reason, preview, and second confirmation.",
       save: "Save", saved: "Discord and AI configuration saved.", test: "Test message",
       testSent: "Test message sent.", disconnect: "Disconnect",
+      sectionConnection: "Discord connection",
+      sectionConnectionHelp: "The server and report channel are securely detected through the installed Discord app.",
+      sectionPermissions: "Moderation & permissions",
+      sectionPermissionsHelp: "Choose which Discord roles can use the bot and which actions are available.",
+      sectionAi: "AI checks",
+      sectionAiHelp: "Automated checks apply to chat and player names; regular player reports do not require AI.",
+      sectionTemplates: "Player replies",
+      sectionTemplatesHelp: "These CRCON templates are used in game for the corresponding processing stages.",
+      allowedActions: "Allowed Discord actions",
+      action_message: "Message", action_punish: "Punish", action_kick: "Kick", action_temp_ban: "Temporary ban",
+      action_perma_ban: "Permanent ban", action_blacklist: "Blacklist", action_remove_from_squad: "Squad kick", action_disband_squad: "Disband squad",
     },
     others: {
       fields: {
@@ -556,6 +567,7 @@ const en = {
     search: "Search navigation...",
     navigateTo: "Navigate to",
     groups: {
+      appsSetup: "Set up apps",
       views: "Views",
       maps: "Maps",
       records: "Records",
@@ -567,7 +579,8 @@ const en = {
     },
     links: {
       home: "Overview",
-      appsSetup: "Set up apps",
+      frontlineApp: "Frontline App",
+      discordReportBot: "Discord Report Bot",
       live: "Live view",
       team: "Teams",
       changeMap: "Change map",
@@ -691,8 +704,9 @@ const en = {
   apps: {
     eyebrow: "Overview",
     title: "Set up apps",
-    subtitle: "The Frontline App brings incidents, player checks and secure admin actions to your phone and the web.",
+    subtitle: "Connect CRCON to Frontline apps for mobile administration and Discord reports.",
     frontline: { title: "Frontline App", description: "The mobile command centre for fast, secure admin work.", security: "Account-based permissions", qr: "Secure QR pairing", devices: "Android & web", detail: "The app only uses your existing CRCON permissions. Every device is paired separately and can be revoked here at any time.", setup: "Pair a device", open: "Open Frontline web app", openWindows: "Open Frontline for Windows", windowsHint: "Frontline for Windows is available for this platform. It pairs through a short device code." },
+    discord: { eyebrow: "Set up apps", title: "Discord Report Bot", description: "Receive and safely process reports directly in Discord.", detail: "Select the Discord server, report channel and moderator roles directly in CRCON. Game actions remain bound to current CRCON permissions.", setup: "Set up Discord Report Bot", reports: "Live player reports", permissions: "Role-based actions", ai: "Optional AI checks", pageSubtitle: "Install and manage the central Frontline bot, assign moderator roles and configure reports, actions and AI checks in one place." },
     how: { title: "In three steps", one: "Open Frontline on your phone or in a browser at webapp.fln.gg.", two: "Choose “Pair a device” here, confirm your password and scan the QR code.", three: "Verify the six-digit comparison code and approve the connection." },
   },
   serverSettings: {

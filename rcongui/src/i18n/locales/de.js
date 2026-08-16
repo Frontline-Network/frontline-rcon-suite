@@ -431,6 +431,17 @@ const de = {
       aiSafety: "KI-Ergebnisse sind ausschließlich Vorschläge. Jede Spielaktion benötigt einen aktuell berechtigten Moderator; destruktive Aktionen zusätzlich Grund, Vorschau und zweite Bestätigung.",
       save: "Speichern", saved: "Discord- und KI-Konfiguration gespeichert.", test: "Testmeldung",
       testSent: "Testmeldung gesendet.", disconnect: "Verbindung trennen",
+      sectionConnection: "Discord-Verbindung",
+      sectionConnectionHelp: "Server und Report-Kanal werden über die installierte Discord-App sicher erkannt.",
+      sectionPermissions: "Moderation & Berechtigungen",
+      sectionPermissionsHelp: "Lege fest, welche Discord-Rollen den Bot bedienen und welche Aktionen angeboten werden.",
+      sectionAi: "KI-Prüfungen",
+      sectionAiHelp: "Automatische Prüfungen betreffen Chat und Spielernamen; normale Spielerreports benötigen keine KI.",
+      sectionTemplates: "Antworten an Spieler",
+      sectionTemplatesHelp: "Diese CRCON-Vorlagen werden bei den jeweiligen Bearbeitungsschritten im Spiel verwendet.",
+      allowedActions: "Erlaubte Discord-Aktionen",
+      action_message: "Nachricht", action_punish: "Bestrafen", action_kick: "Kicken", action_temp_ban: "Temporär bannen",
+      action_perma_ban: "Permanent bannen", action_blacklist: "Blacklist", action_remove_from_squad: "Squad-Kick", action_disband_squad: "Squad auflösen",
     },
     others: {
       fields: {
@@ -615,6 +626,7 @@ const de = {
     search: "Navigation durchsuchen …",
     navigateTo: "Navigieren zu",
     groups: {
+      appsSetup: "Apps einrichten",
       views: "Ansichten",
       maps: "Karten",
       records: "Protokolle",
@@ -626,7 +638,8 @@ const de = {
     },
     links: {
       home: "Übersicht",
-      appsSetup: "Apps einrichten",
+      frontlineApp: "Frontline App",
+      discordReportBot: "Discord Report Bot",
       live: "Live-Ansicht",
       team: "Teams",
       changeMap: "Karte wechseln",
@@ -750,8 +763,9 @@ const de = {
   apps: {
     eyebrow: "Übersicht",
     title: "Apps einrichten",
-    subtitle: "Die Frontline App bringt Meldungen, Spielerprüfungen und sichere Admin-Aktionen auf dein Smartphone und ins Web.",
+    subtitle: "Verbinde CRCON mit den Frontline-Apps für mobile Administration und Discord-Reports.",
     frontline: { title: "Frontline App", description: "Die mobile Leitstelle für schnelle, sichere Admin-Arbeit.", security: "Kontogebundene Rechte", qr: "Sichere QR-Kopplung", devices: "Android & Web", detail: "Die App übernimmt ausschließlich deine bestehenden CRCON-Rechte. Jedes Gerät wird einzeln gekoppelt und kann hier jederzeit entzogen werden.", setup: "Gerät koppeln", open: "Frontline Web-App öffnen", openWindows: "Frontline für Windows öffnen", windowsHint: "Für diese Plattform steht die Frontline-Windows-App bereit. Dort erfolgt die Kopplung über einen kurzen Gerätecode." },
+    discord: { eyebrow: "Apps einrichten", title: "Discord Report Bot", description: "Reports direkt in Discord empfangen und sicher bearbeiten.", detail: "Wähle Discord-Server, Report-Kanal und Moderatorrollen direkt in CRCON. Spielaktionen bleiben an die aktuellen CRCON-Berechtigungen gebunden.", setup: "Discord Report Bot einrichten", reports: "Live-Spielerreports", permissions: "Rollenbasierte Aktionen", ai: "Optionale KI-Prüfungen", pageSubtitle: "Installiere und verwalte den zentralen Frontline-Bot, lege Moderatorrollen fest und konfiguriere Reports, Aktionen und KI-Prüfungen an einem Ort." },
     how: { title: "In drei Schritten", one: "Frontline auf dem Smartphone oder im Browser unter webapp.fln.gg öffnen.", two: "Hier „Gerät koppeln“ wählen und nach Passwortbestätigung den QR-Code scannen.", three: "Den sechsstelligen Vergleichscode prüfen und die Verbindung bestätigen." },
   },
   serverSettings: {
