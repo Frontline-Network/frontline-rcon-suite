@@ -296,6 +296,13 @@ def _crcon_interaction_error(exc: httpx.HTTPError) -> str:
         }
         if detail in known_details:
             return known_details[detail]
+        if exc.response.status_code == 502 and (
+            "HLLCommandError" in detail or "HLLCommandFailedError" in detail
+        ):
+            return (
+                "Der Gameserver konnte die Aktion vorübergehend nicht ausführen. "
+                "Der Report bleibt offen; bitte versuche es erneut."
+            )
         return {
             400: "CRCON hat die Interaktion als ungültig abgelehnt.",
             403: "Du hast keine aktuell erlaubte Discord-Moderatorrolle.",

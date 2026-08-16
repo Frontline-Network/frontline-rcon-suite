@@ -488,6 +488,25 @@ def test_rejected_game_action_has_an_honest_discord_error():
     assert "bleibt offen" in message
 
 
+def test_temporary_gameserver_error_is_not_reported_as_invalid_interaction():
+    request = httpx.Request("POST", "https://crcon.example/action")
+    response = httpx.Response(
+        502,
+        request=request,
+        json={
+            "error": (
+                "HLLCommandError('Unable to perform request. "
+                "The server encountered an error.')"
+            )
+        },
+    )
+    error = httpx.HTTPStatusError("failed", request=request, response=response)
+    message = _crcon_interaction_error(error)
+    assert "vorübergehend nicht ausführen" in message
+    assert "bleibt offen" in message
+    assert "Interaktion" not in message
+
+
 def test_embed_hides_actions_until_a_moderator_role_is_configured():
     event = _event()
     event["incident"]["allowed_actions"] = ["kick"]
