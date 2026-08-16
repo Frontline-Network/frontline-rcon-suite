@@ -210,13 +210,30 @@ class Command(BaseCommand):
                 session.flush()
             if not deliver_moderation or not ai_moderation_enabled():
                 return delivered_count
+            ai_config = {
+                **{
+                    "provider": "managed",
+                    "ai_model": "gpt-5.6-luna",
+                    "player_name_model": "gpt-5.4-nano",
+                    "chat_enabled": False,
+                    "names_enabled": False,
+                },
+                **dict(integration.ai_config or {}),
+            }
             candidate_query = select(ModerationCandidateOutbox).where(
                 ModerationCandidateOutbox.delivered_at.is_(None),
                 ModerationCandidateOutbox.next_attempt_at <= now,
             )
-            if not player_name_batch_window_is_open(now):
+            if not bool(ai_config["chat_enabled"]):
+                candidate_query = candidate_query.where(
+                    ModerationCandidateOutbox.source != "ai_chat"
+                )
+            if not bool(ai_config["names_enabled"]) or not (
+                player_name_batch_window_is_open(now)
+            ):
                 # Old installations may contain name retries with arbitrary
-                # timestamps. Never let those bypass the half-hour cadence.
+                # timestamps or may have been disabled after enqueueing. Never
+                # let those bypass the current source settings and cadence.
                 candidate_query = candidate_query.where(
                     ModerationCandidateOutbox.source != "ai_player_name"
                 )
@@ -228,14 +245,6 @@ class Command(BaseCommand):
                 )
                 .scalars()
             )
-            ai_config = {
-                **{
-                    "provider": "managed",
-                    "ai_model": "gpt-5.6-luna",
-                    "player_name_model": "gpt-5.4-nano",
-                },
-                **dict(integration.ai_config or {}),
-            }
             provider = str(ai_config["provider"])
             api_key = None
             if provider == "api_key" and integration.ai_api_key_ciphertext:
