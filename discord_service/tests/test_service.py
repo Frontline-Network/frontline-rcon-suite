@@ -348,6 +348,75 @@ def test_claimed_report_uses_old_green_footer_and_manual_finish_button():
     assert buttons[0]["custom_id"].startswith("finish:")
 
 
+def test_successful_action_is_recorded_in_the_embed_logbook():
+    event = _event()
+    event["incident"].update(
+        {
+            "discord_language": "de",
+            "target_name": "Biene",
+            "events": [
+                {
+                    "actor": "discord:789:fallback",
+                    "event_type": "action",
+                    "created_at": "2026-08-16T10:15:00+00:00",
+                    "payload": {
+                        "action": "message",
+                        "arguments": {
+                            "message": "Hallo",
+                            "discord_actor": {
+                                "discord_id": "789",
+                                "display_name": "[FLN] Pingu",
+                            },
+                        },
+                        "result": True,
+                        "error": None,
+                    },
+                }
+            ],
+        }
+    )
+
+    payload = render_message(IncidentEventEnvelope.model_validate(event), None)
+    logbook = next(
+        field for field in payload["embeds"][0]["fields"] if field["name"] == "Logbuch"
+    )
+    assert "<t:1786875300:f>" in logbook["value"]
+    assert (
+        "[FLN] Pingu schrieb dem Spieler Biene eine Nachricht" in logbook["value"]
+    )
+    assert "Inhalt: Hallo" in logbook["value"]
+
+
+def test_failed_action_is_honestly_recorded_without_internal_error_details():
+    event = _event()
+    event["incident"].update(
+        {
+            "discord_language": "de",
+            "target_name": "Biene",
+            "events": [
+                {
+                    "actor": "discord:789:[FLN] Biene",
+                    "event_type": "action_failed",
+                    "payload": {
+                        "action": "kick",
+                        "arguments": {"reason": "Ping limit"},
+                        "result": None,
+                        "error": "HLLCommandError(secret backend details)",
+                    },
+                }
+            ],
+        }
+    )
+
+    payload = render_message(IncidentEventEnvelope.model_validate(event), None)
+    logbook = next(
+        field for field in payload["embeds"][0]["fields"] if field["name"] == "Logbuch"
+    )
+    assert "❌ Fehlgeschlagen" in logbook["value"]
+    assert "[FLN] Biene kickte Biene. Grund: Ping limit" in logbook["value"]
+    assert "secret backend details" not in logbook["value"]
+
+
 def test_squad_report_uses_old_unit_report_layout():
     event = _event()
     event["incident"].update(

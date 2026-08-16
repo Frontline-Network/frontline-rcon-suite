@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from datetime import datetime
 
 import httpx
 
@@ -65,6 +66,124 @@ def _manual_processing(incident: dict) -> bool:
         and (event.get("payload") or {}).get("mode") == "manual"
         for event in incident.get("events") or []
     )
+
+
+def _action_actor(event: dict, arguments: dict) -> str:
+    discord_actor = arguments.get("discord_actor") or {}
+    if isinstance(discord_actor, dict):
+        display_name = str(discord_actor.get("display_name") or "").strip()
+        if display_name:
+            return display_name
+    return _assigned_display_name(event.get("actor")) or "-"
+
+
+def _action_timestamp(event: dict) -> str:
+    value = event.get("created_at")
+    if not value:
+        return ""
+    try:
+        parsed = value if isinstance(value, datetime) else datetime.fromisoformat(
+            str(value).replace("Z", "+00:00")
+        )
+        return f"<t:{int(parsed.timestamp())}:f>: "
+    except (TypeError, ValueError, OverflowError):
+        return ""
+
+
+def _action_log_entry(event: dict, incident: dict, language: str) -> str | None:
+    event_type = str(event.get("event_type") or "")
+    if event_type not in {"action", "action_failed"}:
+        return None
+    payload = event.get("payload") or {}
+    arguments = payload.get("arguments") or {}
+    if not isinstance(arguments, dict):
+        arguments = {}
+    action = str(payload.get("action") or arguments.get("action") or "").strip()
+    actor = _truncate(_action_actor(event, arguments), 100)
+    reporter_action = arguments.get("reporter_action") is True
+    target = _truncate(
+        (
+            incident.get("reporter_name")
+            if reporter_action
+            else arguments.get("player_name") or incident.get("target_name")
+        ),
+        100,
+    )
+    reason = _truncate(arguments.get("reason"), 300)
+    message = _truncate(arguments.get("message"), 300)
+    duration = arguments.get("duration_hours") or arguments.get("duration")
+    failed = (
+        event_type == "action_failed"
+        or bool(payload.get("error"))
+        or payload.get("result") is False
+    )
+
+    if language == "de":
+        descriptions = {
+            "message": (
+                f"{actor} schrieb dem {'Melder' if reporter_action else 'Spieler'} "
+                f"{target} eine Nachricht. Inhalt: {message}"
+            ),
+            "punish": f"{actor} bestrafte {target}. Grund: {reason}",
+            "kick": f"{actor} kickte {target}. Grund: {reason}",
+            "temp_ban": (
+                f"{actor} bannte {target} für {duration or '-'} Stunden. Grund: {reason}"
+            ),
+            "perma_ban": f"{actor} bannte {target} permanent. Grund: {reason}",
+            "blacklist": f"{actor} setzte {target} auf die Blacklist. Grund: {reason}",
+            "remove_from_squad": (
+                f"{actor} entfernte {target} aus dem Squad. Grund: {reason}"
+            ),
+            "disband_squad": f"{actor} löste den Squad auf. Grund: {reason}",
+        }
+        description = descriptions.get(
+            action, f"{actor} führte {action or 'eine Aktion'} für {target} aus."
+        )
+        if failed:
+            description = f"❌ Fehlgeschlagen: {description}"
+    else:
+        descriptions = {
+            "message": (
+                f"{actor} sent a message to the {'reporter' if reporter_action else 'player'} "
+                f"{target}. Content: {message}"
+            ),
+            "punish": f"{actor} punished {target}. Reason: {reason}",
+            "kick": f"{actor} kicked {target}. Reason: {reason}",
+            "temp_ban": (
+                f"{actor} banned {target} for {duration or '-'} hours. Reason: {reason}"
+            ),
+            "perma_ban": f"{actor} permanently banned {target}. Reason: {reason}",
+            "blacklist": f"{actor} added {target} to the blacklist. Reason: {reason}",
+            "remove_from_squad": (
+                f"{actor} removed {target} from the squad. Reason: {reason}"
+            ),
+            "disband_squad": f"{actor} disbanded the squad. Reason: {reason}",
+        }
+        description = descriptions.get(
+            action, f"{actor} performed {action or 'an action'} for {target}."
+        )
+        if failed:
+            description = f"❌ Failed: {description}"
+    return _truncate(f"{_action_timestamp(event)}{description}", 700)
+
+
+def _action_log_field(incident: dict, language: str) -> dict | None:
+    entries = [
+        entry
+        for event in incident.get("events") or []
+        if (entry := _action_log_entry(event, incident, language))
+    ]
+    if not entries:
+        return None
+    # Discord limits one embed field to 1024 characters. Keep the newest
+    # actions, but retain their chronological order inside the logbook.
+    while len("\n".join(entries)) > 1024 and len(entries) > 1:
+        entries.pop(0)
+    return {
+        "name": "Logbuch" if language == "de" else "Logbook",
+        "value": _truncate("\n".join(entries), 1024),
+        "inline": False,
+    }
 
 
 def _squad_leader(snapshot: dict) -> dict:
@@ -290,6 +409,9 @@ def render_message(
         fields.append(
             {"name": "KI / AI", "value": labels["unavailable"], "inline": False}
         )
+    action_log = _action_log_field(incident, language)
+    if action_log:
+        fields.append(action_log)
     revision = envelope.incident_revision
     incident_id = envelope.incident_id
     allowed_actions = [
