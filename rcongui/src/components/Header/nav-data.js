@@ -59,10 +59,21 @@ const rawNavMenus = [
         to: "/",
         icon: <HomeIcon />,
       },
+    ],
+  },
+  {
+    name: "Apps setup",
+    icon: <PhoneAndroidIcon />,
+    links: [
       {
-        name: "Apps setup",
+        name: "Frontline App",
         to: "/apps",
         icon: <PhoneAndroidIcon />,
+      },
+      {
+        name: "Discord Report Bot",
+        to: "/apps/discord-report-bot",
+        icon: <SmartToyIcon />,
       },
     ],
   },
@@ -357,6 +368,7 @@ const rawNavMenus = [
 ];
 
 const groupTranslationKeys = {
+  "Apps setup": "navigation.groups.appsSetup",
   Views: "navigation.groups.views",
   Maps: "navigation.groups.maps",
   Records: "navigation.groups.records",
@@ -369,7 +381,8 @@ const groupTranslationKeys = {
 
 const linkTranslationKeys = {
   "/": "navigation.links.home",
-  "/apps": "navigation.links.appsSetup",
+  "/apps": "navigation.links.frontlineApp",
+  "/apps/discord-report-bot": "navigation.links.discordReportBot",
   "/views/live": "navigation.links.live",
   "/views/team": "navigation.links.team",
   "/settings/maps/change": "navigation.links.changeMap",

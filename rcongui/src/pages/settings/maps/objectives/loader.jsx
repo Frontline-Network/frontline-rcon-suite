@@ -1,5 +1,6 @@
 import { cmd } from "@/utils/fetchUtils"
 import { demoMapLayers, isFakeMode } from "@/mirage/demo-data"
+import { unifiedGamemodeName } from "./helpers"
 
 export const loader = async () => {
     if (isFakeMode()) {
@@ -14,7 +15,10 @@ export const loader = async () => {
         gameState: { current_map: demoMapLayers[0], next_map: demoMapLayers[1] },
       }
     }
-    const objectives = await cmd.GET_MAP_OBJECTIVES()
     const gameState = await cmd.GET_GAME_STATE()
+    if (unifiedGamemodeName(gameState.current_map.game_mode) === "skirmish") {
+      throw new Error("skirmish")
+    }
+    const objectives = await cmd.GET_MAP_OBJECTIVES()
     return { objectives, gameState }
 }

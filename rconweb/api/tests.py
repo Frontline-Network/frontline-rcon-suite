@@ -173,9 +173,7 @@ class MobilePairingTests(TestCase):
             response["Access-Control-Allow-Origin"], "https://webapp.fln.gg"
         )
         self.assertIn("POST", response["Access-Control-Allow-Methods"])
-        self.assertIn(
-            "content-type", response["Access-Control-Allow-Headers"].lower()
-        )
+        self.assertIn("content-type", response["Access-Control-Allow-Headers"].lower())
 
     def test_desktop_authorization_requires_browser_approval_and_is_single_use(self):
         desktop = Client()
@@ -544,9 +542,7 @@ class MobileContextTests(TestCase):
             "server_number": 1,
             "created_at": "2026-08-06T12:00:00+00:00",
             "reporter_id": "reporter",
-            "subjects": [
-                {"kind": "player", "state": "confirmed", "player_id": "p1"}
-            ],
+            "subjects": [{"kind": "player", "state": "confirmed", "player_id": "p1"}],
         }
         get_rcon_api.return_value.get_historical_logs.return_value = [
             {
@@ -584,7 +580,11 @@ class MobileContextTests(TestCase):
     @patch("api.mobile_context._rcon_api")
     def test_live_status_only_returns_read_only_fields(self, get_rcon_api):
         api = get_rcon_api.return_value
-        api.get_status.return_value = {"name": "Server 1", "current_players": 42, "max_players": 100}
+        api.get_status.return_value = {
+            "name": "Server 1",
+            "current_players": 42,
+            "max_players": 100,
+        }
         api.get_gamestate.return_value = {
             "current_map": {"pretty_name": "Foy"},
             "time_remaining": timedelta(minutes=42),
@@ -777,3 +777,699 @@ class MobileContextTests(TestCase):
             by="context-admin",
             player_name="Biene",
         )
+
+    @patch("api.mobile_incidents.confirmed_action_subject")
+    def test_rejected_rcon_action_is_not_treated_as_success(self, confirmed_subject):
+        from api.mobile_incidents import _execute_action
+
+        confirmed_subject.return_value = {
+            "display_name": "Biene",
+            "player_id": "biene-id",
+        }
+        kick = MagicMock(return_value=False)
+        fake_views = SimpleNamespace(rcon_api=SimpleNamespace(kick=kick))
+
+        with patch.dict(sys.modules, {"api.views": fake_views}):
+            with self.assertRaisesRegex(ValueError, "game server rejected"):
+                _execute_action(
+                    "kick",
+                    {
+                        "player_id": "biene-id",
+                        "reason": "Ping limit exceeded",
+                        "confirmed": True,
+                    },
+                    "context-admin",
+                    {"target_id": "biene-id", "target_name": "Biene"},
+                )
+
+    @patch("api.mobile_incidents.confirmed_action_subject")
+    def test_rejected_blacklist_is_not_treated_as_success(self, confirmed_subject):
+        from api.mobile_incidents import _execute_action
+
+        confirmed_subject.return_value = {
+            "display_name": "Biene",
+            "player_id": "biene-id",
+        }
+        add_blacklist_record = MagicMock(return_value=False)
+        fake_views = SimpleNamespace(
+            rcon_api=SimpleNamespace(add_blacklist_record=add_blacklist_record)
+        )
+
+        with patch.dict(sys.modules, {"api.views": fake_views}):
+            with self.assertRaisesRegex(ValueError, "game server rejected"):
+                _execute_action(
+                    "blacklist",
+                    {
+                        "player_id": "biene-id",
+                        "blacklist_id": 4,
+                        "reason": "Reason",
+                        "confirmed": True,
+                    },
+                    "context-admin",
+                    {"target_id": "biene-id", "target_name": "Biene"},
+                )
+
+    def test_rejected_squad_disband_is_not_treated_as_success(self):
+        from api.mobile_incidents import _execute_action
+
+        disband = MagicMock(return_value=False)
+        fake_views = SimpleNamespace(
+            rcon_api=SimpleNamespace(disband_squad_by_name=disband)
+        )
+        incident = {
+            "subjects": [
+                {
+                    "id": "squad-subject",
+                    "kind": "squad",
+                    "state": "confirmed",
+                    "team": "allies",
+                    "squad_name": "able",
+                }
+            ]
+        }
+
+        with patch.dict(sys.modules, {"api.views": fake_views}):
+            with self.assertRaisesRegex(ValueError, "game server rejected"):
+                _execute_action(
+                    "disband_squad",
+                    {
+                        "subject_id": "squad-subject",
+                        "reason": "Reason",
+                        "confirmed": True,
+                    },
+                    "context-admin",
+                    incident,
+                )
+
+    @patch("api.mobile_incidents.confirmed_action_subject")
+    def test_all_discord_game_actions_reach_the_expected_crcon_method(
+        self, confirmed_subject
+    ):
+        from api.mobile_incidents import _execute_action
+
+        confirmed_subject.return_value = {
+            "id": "player-subject",
+            "kind": "player",
+            "state": "confirmed",
+            "display_name": "Biene",
+            "player_id": "player-id",
+            "team": "allies",
+            "squad_name": "able",
+        }
+        api = SimpleNamespace(
+            message_player=MagicMock(return_value=True),
+            punish=MagicMock(return_value=True),
+            kick=MagicMock(return_value=True),
+            temp_ban=MagicMock(return_value=True),
+            perma_ban=MagicMock(return_value=True),
+            add_blacklist_record=MagicMock(return_value={"id": 9}),
+            remove_player_from_squad=MagicMock(return_value=True),
+            disband_squad_by_name=MagicMock(return_value={"squad_name": "able"}),
+        )
+        incident = {
+            "target_id": "player-id",
+            "target_name": "Biene",
+            "subjects": [
+                {
+                    "id": "player-subject",
+                    "kind": "player",
+                    "state": "confirmed",
+                    "player_id": "player-id",
+                    "display_name": "Biene",
+                    "team": "allies",
+                    "squad_name": "able",
+                }
+            ],
+        }
+
+        with patch.dict(sys.modules, {"api.views": SimpleNamespace(rcon_api=api)}):
+            self.assertTrue(
+                _execute_action(
+                    "message",
+                    {"player_id": "player-id", "message": "Hello"},
+                    "Moderator",
+                    incident,
+                )
+            )
+            self.assertTrue(
+                _execute_action(
+                    "punish",
+                    {"player_id": "player-id", "reason": "Reason"},
+                    "Moderator",
+                    incident,
+                )
+            )
+            for action in ("kick", "perma_ban"):
+                self.assertTrue(
+                    _execute_action(
+                        action,
+                        {
+                            "player_id": "player-id",
+                            "reason": "Reason",
+                            "confirmed": True,
+                        },
+                        "Moderator",
+                        incident,
+                    )
+                )
+            self.assertTrue(
+                _execute_action(
+                    "temp_ban",
+                    {
+                        "player_id": "player-id",
+                        "reason": "Reason",
+                        "duration_hours": 6,
+                        "confirmed": True,
+                    },
+                    "Moderator",
+                    incident,
+                )
+            )
+            self.assertEqual(
+                _execute_action(
+                    "blacklist",
+                    {
+                        "player_id": "player-id",
+                        "reason": "Reason",
+                        "blacklist_id": 4,
+                        "confirmed": True,
+                    },
+                    "Moderator",
+                    incident,
+                ),
+                {"id": 9},
+            )
+            self.assertTrue(
+                _execute_action(
+                    "remove_from_squad",
+                    {
+                        "player_id": "player-id",
+                        "reason": "Reason",
+                        "confirmed": True,
+                    },
+                    "Moderator",
+                    incident,
+                )
+            )
+            self.assertEqual(
+                _execute_action(
+                    "disband_squad",
+                    {
+                        "subject_id": "player-subject",
+                        "reason": "Reason",
+                        "confirmed": True,
+                    },
+                    "Moderator",
+                    incident,
+                ),
+                {"squad_name": "able"},
+            )
+
+        api.message_player.assert_called_once()
+        api.punish.assert_called_once()
+        api.kick.assert_called_once()
+        api.temp_ban.assert_called_once()
+        api.perma_ban.assert_called_once()
+        api.add_blacklist_record.assert_called_once()
+        api.remove_player_from_squad.assert_called_once_with("player-id", "Reason")
+        api.disband_squad_by_name.assert_called_once_with("allies", "able", "Reason")
+
+
+class DiscordActionTemplateTests(TestCase):
+    def _discord_manager(self):
+        user = User.objects.create_superuser(
+            username="discord-manager",
+            email="manager@example.org",
+            password="secret",
+        )
+        self.client.force_login(user)
+        return user
+
+    def test_ai_provider_config_encrypts_api_key_and_never_serializes_it(self):
+        from api.discord_capabilities import decrypt_capability
+        from api.models import DiscordReportIntegration
+
+        self._discord_manager()
+        response = self.client.put(
+            "/api/discord/v1/integration",
+            data=json.dumps(
+                {
+                    "enabled": True,
+                    "moderator_role_ids": [],
+                    "allowed_actions": [],
+                    "language": "de",
+                    "ai_config": {
+                        "provider": "api_key",
+                        "ai_model": "gpt-5.6-luna",
+                        "player_name_model": "gpt-5.4-nano",
+                    },
+                    "api_key": "sk-test-key-that-is-long-enough",
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        result = response.json()["result"]
+        self.assertTrue(result["has_api_key"])
+        self.assertNotIn("api_key", result)
+        integration = DiscordReportIntegration.objects.get(pk=1)
+        self.assertNotIn(b"sk-test", bytes(integration.ai_api_key_ciphertext))
+        self.assertEqual(
+            decrypt_capability(integration.ai_api_key_ciphertext),
+            "sk-test-key-that-is-long-enough",
+        )
+
+    def test_ai_provider_rejects_invalid_model_identifier(self):
+        from api.discord_integration import _config_payload
+
+        with self.assertRaisesRegex(ValueError, "Invalid AI model"):
+            _config_payload(
+                {
+                    "ai_config": {
+                        "provider": "api_key",
+                        "ai_model": "../../secret",
+                    }
+                }
+            )
+
+    def test_legacy_managed_provider_is_disabled_until_customer_configures_ai(self):
+        from api.discord_integration import _config_payload, _normalized_ai_config
+
+        normalized = _normalized_ai_config(
+            {
+                "provider": "managed",
+                "chat_enabled": True,
+                "names_enabled": True,
+            }
+        )
+        self.assertEqual(normalized["provider"], "api_key")
+        self.assertFalse(normalized["chat_enabled"])
+        self.assertFalse(normalized["names_enabled"])
+        with self.assertRaisesRegex(ValueError, "Unknown AI provider"):
+            _config_payload({"ai_config": {"provider": "managed"}})
+
+    def test_action_subject_confirmation_is_derived_from_crcon_state(self):
+        from api.discord_integration import (
+            _normalize_action_subject,
+            _validate_prepared_action_target,
+        )
+
+        confirmed_squad = {
+            "target_id": "leader-id",
+            "subjects": [
+                {
+                    "id": "squad-subject",
+                    "kind": "squad",
+                    "state": "confirmed",
+                    "snapshot": {
+                        "leader": {
+                            "player_id": "leader-id",
+                            "name": "Able Lead",
+                            "role": "officer",
+                        }
+                    },
+                }
+            ],
+        }
+        normalized = _normalize_action_subject(
+            confirmed_squad,
+            {
+                "subject_id": "squad-subject",
+                "confirm_subject_id": "squad-subject",
+            },
+        )
+        self.assertNotIn("confirm_subject_id", normalized)
+        self.assertEqual(normalized["player_id"], "leader-id")
+
+        vietnam_squad = {
+            "target_id": None,
+            "subjects": [
+                {
+                    "id": "vietnam-squad",
+                    "kind": "squad",
+                    "state": "confirmed",
+                    "snapshot": {
+                        "leader": {},
+                        "players": [
+                            {
+                                "player_id": "eos-leader",
+                                "name": "Biene",
+                                "role": "squadleader",
+                            }
+                        ],
+                    },
+                }
+            ],
+        }
+        normalized = _normalize_action_subject(
+            vietnam_squad, {"subject_id": "vietnam-squad"}
+        )
+        self.assertEqual(normalized["player_id"], "eos-leader")
+        self.assertEqual(normalized["player_name"], "Biene")
+        _validate_prepared_action_target("kick", vietnam_squad, normalized)
+
+        suggested_player = {
+            "target_id": "player-id",
+            "subjects": [
+                {
+                    "id": "player-subject",
+                    "kind": "player",
+                    "state": "suggested",
+                    "player_id": "player-id",
+                }
+            ],
+        }
+        normalized = _normalize_action_subject(
+            suggested_player, {"subject_id": "player-subject"}
+        )
+        self.assertEqual(normalized["confirm_subject_id"], "player-subject")
+        self.assertEqual(normalized["player_id"], "player-id")
+        _validate_prepared_action_target("kick", suggested_player, normalized)
+
+        with self.assertRaisesRegex(ValueError, "confirmed player"):
+            _validate_prepared_action_target("message", {"subjects": []}, {})
+
+    def test_selected_squad_takes_priority_over_incident_primary_target(self):
+        from api.discord_integration import _normalize_action_subject
+
+        incident = {
+            "target_id": "able-leader",
+            "target_name": "Able Lead",
+            "subjects": [
+                {
+                    "id": "able-subject",
+                    "kind": "squad",
+                    "state": "confirmed",
+                    "snapshot": {
+                        "leader": {
+                            "player_id": "able-leader",
+                            "name": "Able Lead",
+                            "role": "officer",
+                        }
+                    },
+                },
+                {
+                    "id": "charlie-subject",
+                    "kind": "squad",
+                    "state": "confirmed",
+                    "snapshot": {
+                        "leader": {
+                            "player_id": "charlie-leader",
+                            "name": "Charlie Lead",
+                            "role": "officer",
+                        }
+                    },
+                },
+            ],
+        }
+
+        normalized = _normalize_action_subject(
+            incident,
+            {
+                "subject_id": "charlie-subject",
+                "player_id": "forged-player",
+            },
+        )
+
+        self.assertEqual(normalized["player_id"], "charlie-leader")
+        self.assertEqual(normalized["player_name"], "Charlie Lead")
+
+    def test_multiple_confirmed_subjects_keep_incident_open_after_one_action(self):
+        from api.discord_integration import _should_auto_resolve_after_action
+
+        self.assertFalse(
+            _should_auto_resolve_after_action(
+                {
+                    "subjects": [
+                        {"kind": "squad", "state": "confirmed"},
+                        {"kind": "squad", "state": "confirmed"},
+                    ]
+                }
+            )
+        )
+        self.assertTrue(
+            _should_auto_resolve_after_action(
+                {"subjects": [{"kind": "player", "state": "confirmed"}]}
+            )
+        )
+
+    @patch("api.discord_integration.get_incident")
+    @patch("api.discord_integration._validate_binding")
+    @patch("api.discord_integration._authorized_integration")
+    def test_subject_selection_is_role_and_revision_validated_without_mutation(
+        self, authorized, validate_binding, get_incident
+    ):
+        authorized.return_value = (SimpleNamespace(), None)
+        get_incident.return_value = {
+            "id": "22222222-2222-2222-2222-222222222222",
+            "revision": 4,
+            "subjects": [
+                {
+                    "id": "33333333-3333-3333-3333-333333333333",
+                    "kind": "squad",
+                    "state": "confirmed",
+                    "display_name": "Charlie",
+                    "squad_name": "Charlie",
+                }
+            ],
+        }
+        response = self.client.post(
+            "/api/discord/v1/incidents/select-subject",
+            data=json.dumps(
+                {
+                    "interaction_id": "1538274085513994998",
+                    "installation_id": "11111111-1111-1111-1111-111111111111",
+                    "guild_id": "123",
+                    "channel_id": "456",
+                    "incident_id": "22222222-2222-2222-2222-222222222222",
+                    "incident_revision": 4,
+                    "actor": {
+                        "discord_id": "789",
+                        "display_name": "Moderator",
+                        "role_ids": ["42"],
+                    },
+                    "operation": "select_subject",
+                    "payload": {"subject_id": "33333333-3333-3333-3333-333333333333"},
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["result"]["display_name"], "Charlie")
+        validate_binding.assert_called_once()
+        get_incident.assert_called_once_with("22222222-2222-2222-2222-222222222222")
+
+    @patch("api.discord_integration.mutate_incident")
+    @patch("api.discord_integration._validate_binding")
+    @patch("api.discord_integration._authorized_integration")
+    def test_transition_persists_datetime_result_as_idempotency_receipt(
+        self, authorized, validate_binding, mutate_incident
+    ):
+        from api.models import DiscordInteractionReceipt
+
+        authorized.return_value = (SimpleNamespace(reporter_templates={}), None)
+        mutate_incident.return_value = {
+            "id": "22222222-2222-2222-2222-222222222222",
+            "status": "resolved",
+            "revision": 2,
+            "updated_at": timezone.now(),
+            "reporter_id": None,
+        }
+        response = self.client.post(
+            "/api/discord/v1/incidents/transition",
+            data=json.dumps(
+                {
+                    "interaction_id": "1538274085513994999",
+                    "installation_id": "11111111-1111-1111-1111-111111111111",
+                    "guild_id": "123",
+                    "channel_id": "456",
+                    "incident_id": "22222222-2222-2222-2222-222222222222",
+                    "incident_revision": 1,
+                    "actor": {
+                        "discord_id": "789",
+                        "display_name": "Moderator",
+                        "role_ids": ["42"],
+                    },
+                    "operation": "resolve",
+                    "payload": {},
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        receipt = DiscordInteractionReceipt.objects.get(
+            interaction_id="1538274085513994999"
+        )
+        self.assertIsInstance(receipt.result["updated_at"], str)
+        self.assertEqual(receipt.result["status"], "resolved")
+        validate_binding.assert_called_once()
+
+    @patch("api.discord_integration._validate_binding")
+    @patch("api.discord_integration._authorized_integration")
+    @patch("api.discord_integration.get_message_templates")
+    def test_templates_come_from_shared_crcon_categories(
+        self, get_templates, authorized, validate_binding
+    ):
+        authorized.return_value = (SimpleNamespace(), None)
+        get_templates.return_value = [
+            {
+                "id": 7,
+                "title": "Beleidigung",
+                "content": "Gespeicherter Grund",
+            }
+        ]
+        response = self.client.post(
+            "/api/discord/v1/action-templates",
+            data=json.dumps(
+                {
+                    "guild_id": "123",
+                    "channel_id": "456",
+                    "actor": {
+                        "discord_id": "789",
+                        "display_name": "Moderator",
+                        "role_ids": ["42"],
+                    },
+                    "action": "kick",
+                    "template_id": 7,
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        result = response.json()["result"]
+        self.assertEqual(result["category"], "REASON")
+        self.assertEqual(result["templates"], [{"id": 7, "title": "Beleidigung"}])
+        self.assertEqual(result["selected"]["content"], "Gespeicherter Grund")
+        self.assertNotIn("content", result["templates"][0])
+        validate_binding.assert_called_once()
+
+    @patch("api.discord_integration.decrypt_capability", return_value="events-test")
+    @patch("api.discord_integration.requests.get")
+    @patch("api.discord_integration._integration")
+    def test_discord_options_are_proxied_for_authenticated_manager(
+        self, integration, get, _decrypt
+    ):
+        self._discord_manager()
+        integration.return_value = SimpleNamespace(
+            enabled=True,
+            outbound_capability_ciphertext=b"ciphertext",
+            service_url="https://discord.example",
+            installation_id="11111111-1111-1111-1111-111111111111",
+        )
+        get.return_value.raise_for_status.return_value = None
+        get.return_value.json.return_value = {
+            "guild": {"id": "123", "name": "Frontline"},
+            "channels": [{"id": "456", "name": "admin-ping"}],
+            "roles": [{"id": "789", "name": "HLL-Moderator"}],
+        }
+        response = self.client.get("/api/discord/v1/options")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["result"]["roles"][0]["name"], "HLL-Moderator")
+        get.assert_called_once_with(
+            "https://discord.example/v1/options/11111111-1111-1111-1111-111111111111",
+            headers={"Authorization": "Bearer events-test"},
+            timeout=10,
+        )
+
+    @patch("api.discord_integration.requests.post")
+    @patch("api.discord_integration._integration")
+    def test_disconnected_options_use_authenticated_pairing_discovery(
+        self, integration, post
+    ):
+        self._discord_manager()
+        integration.return_value = SimpleNamespace(
+            enabled=False,
+            outbound_capability_ciphertext=b"",
+            service_url="https://discord.example",
+        )
+        post.return_value.ok = True
+        post.return_value.status_code = 200
+        post.return_value.raise_for_status.return_value = None
+        post.return_value.json.return_value = {
+            "guild": {"id": "123", "name": "Frontline"},
+            "channels": [{"id": "456", "name": "admin-ping"}],
+            "roles": [{"id": "789", "name": "HLL-Moderator"}],
+        }
+
+        response = self.client.get("/api/discord/v1/options")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["result"]["guild"]["name"], "Frontline")
+        request_payload = post.call_args.kwargs["json"]
+        self.assertNotIn("guild_id", request_payload)
+        self.assertEqual(
+            request_payload["crcon_callback_url"],
+            "http://testserver/api/discord/v1/pairings/complete",
+        )
+
+    @patch("api.discord_integration.requests.post")
+    @patch("api.discord_integration._integration")
+    def test_connect_does_not_accept_guild_and_surfaces_service_detail(
+        self, integration, post
+    ):
+        self._discord_manager()
+        integration.return_value = SimpleNamespace(
+            service_url="https://discord.example"
+        )
+        post.return_value.ok = False
+        post.return_value.status_code = 400
+        post.return_value.json.return_value = {
+            "detail": "The selected channel is not available on the installed Discord server"
+        }
+
+        response = self.client.post(
+            "/api/discord/v1/connect",
+            data=json.dumps({"guild_id": "999", "channel_id": "456"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("selected channel", str(response.json()))
+        self.assertNotIn("guild_id", post.call_args.kwargs["json"])
+
+    def test_pairing_verification_is_one_time_secret_protected(self):
+        from api.discord_capabilities import capability_digest
+        from api.models import DiscordPairing
+
+        secret = "pair-secret-that-is-at-least-32-characters"
+        pairing = DiscordPairing.objects.create(
+            secret_digest=capability_digest(secret),
+            expires_at=timezone.now() + timedelta(minutes=10),
+        )
+        valid = self.client.post(
+            "/api/discord/v1/pairings/verify",
+            data=json.dumps({"pairing_id": str(pairing.id), "pairing_secret": secret}),
+            content_type="application/json",
+        )
+        invalid = self.client.post(
+            "/api/discord/v1/pairings/verify",
+            data=json.dumps({"pairing_id": str(pairing.id), "pairing_secret": "wrong"}),
+            content_type="application/json",
+        )
+        self.assertEqual(valid.status_code, 200)
+        self.assertEqual(invalid.status_code, 404)
+
+
+class DiscordOutboxWorkerModeTests(TestCase):
+    def test_event_worker_never_processes_moderation_jobs(self):
+        from api.management.commands.discord_report_worker import Command
+
+        command = Command()
+        with patch.object(
+            command, "_deliver_batch", side_effect=KeyboardInterrupt
+        ) as deliver:
+            with self.assertRaises(KeyboardInterrupt):
+                command.handle(events_only=True, moderation_only=False)
+        deliver.assert_called_once_with(deliver_events=True, deliver_moderation=False)
+
+    def test_moderation_worker_never_processes_incident_events(self):
+        from api.management.commands.discord_report_worker import Command
+
+        command = Command()
+        with patch.object(
+            command, "_deliver_batch", side_effect=KeyboardInterrupt
+        ) as deliver:
+            with self.assertRaises(KeyboardInterrupt):
+                command.handle(events_only=False, moderation_only=True)
+        deliver.assert_called_once_with(deliver_events=False, deliver_moderation=True)

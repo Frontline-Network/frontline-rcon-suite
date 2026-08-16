@@ -48,6 +48,7 @@ import ServerNameSettingsPage from "./pages/settings/general-group/server-name";
 import { loader as serverNameSettingsLoader } from "./pages/settings/general-group/server-name/loader"
 import CrconAppSettingsPage from "./pages/settings/general-group/crcon-app";
 import FrontlineAppsPage from "./pages/apps";
+import DiscordReportBotPage from "./pages/apps/discord-report-bot";
 import GameSettingsPage from "./pages/settings/general-group/game";
 import { loader as gameSettingsLoader } from "./pages/settings/general-group/game/loader"
 
@@ -159,8 +160,14 @@ const router = createBrowserRouter([
             },
             {
                 path: 'apps',
-                handle: { crumb: () => <span>Apps</span> },
+                handle: { crumb: () => <span>Frontline App</span> },
                 element: <FrontlineAppsPage />,
+                errorElement: <RouteError />,
+            },
+            {
+                path: 'apps/discord-report-bot',
+                handle: { crumb: () => <span>Discord Report Bot</span> },
+                element: <DiscordReportBotPage />,
                 errorElement: <RouteError />,
             },
             {

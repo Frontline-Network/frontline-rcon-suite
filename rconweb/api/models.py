@@ -152,6 +152,105 @@ class MobileAccessToken(models.Model):
         default_permissions = ()
 
 
+class DiscordReportIntegration(models.Model):
+    """Single Discord installation bound to one guild and one report channel."""
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    installation_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    enabled = models.BooleanField(default=False)
+    service_url = models.URLField(max_length=500, blank=True, default="")
+    guild_id = models.CharField(max_length=32, blank=True, default="")
+    guild_name = models.CharField(max_length=128, blank=True, default="")
+    channel_id = models.CharField(max_length=32, blank=True, default="")
+    channel_name = models.CharField(max_length=128, blank=True, default="")
+    moderator_role_ids = models.JSONField(default=list)
+    allowed_actions = models.JSONField(default=list)
+    language = models.CharField(max_length=2, default="de")
+    ai_config = models.JSONField(default=dict)
+    # Optional customer API key encrypted with the installation's Django secret.
+    ai_api_key_ciphertext = models.BinaryField(blank=True, default=bytes)
+    policy = models.JSONField(default=dict)
+    reporter_templates = models.JSONField(default=dict)
+    delivery_started_at = models.DateTimeField(null=True, blank=True)
+    inbound_capability_digest = models.CharField(max_length=64, blank=True, default="")
+    # This is Fernet ciphertext, never a plaintext capability.
+    outbound_capability_ciphertext = models.BinaryField(blank=True, default=bytes)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        default_permissions = ()
+        permissions = (
+            (
+                "can_manage_discord_report_bot",
+                "Can configure the Discord report bot and AI moderation",
+            ),
+        )
+
+
+class DiscordPairing(models.Model):
+    class State(models.TextChoices):
+        PENDING = "pending", "Pending"
+        CONSUMED = "consumed", "Consumed"
+        EXPIRED = "expired", "Expired"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    secret_digest = models.CharField(max_length=64, unique=True)
+    state = models.CharField(
+        max_length=16, choices=State.choices, default=State.PENDING
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    consumed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        default_permissions = ()
+
+
+class DiscordPreparedAction(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    incident_id = models.UUIDField(db_index=True)
+    incident_revision = models.PositiveIntegerField()
+    interaction_id = models.CharField(max_length=32, unique=True)
+    action = models.CharField(max_length=32)
+    actor = models.JSONField(default=dict)
+    arguments = models.JSONField(default=dict)
+    confirmation_digest = models.CharField(max_length=64, unique=True)
+    confirmation_ciphertext = models.BinaryField(blank=True, default=bytes)
+    preview = models.TextField()
+    expires_at = models.DateTimeField(db_index=True)
+    executed_at = models.DateTimeField(null=True, blank=True)
+    execution_result = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        default_permissions = ()
+
+
+class DiscordInteractionReceipt(models.Model):
+    interaction_id = models.CharField(max_length=32, primary_key=True)
+    operation = models.CharField(max_length=32)
+    result = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        default_permissions = ()
+
+
+class DiscordModerationFeedback(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    incident_id = models.UUIDField(db_index=True)
+    analysis_id = models.UUIDField(db_index=True)
+    actor = models.JSONField(default=dict)
+    decision = models.CharField(max_length=16)
+    actual_action = models.CharField(max_length=32)
+    reason = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        default_permissions = ()
+
+
 class RconUser(User):
     """api_rconuser table"""
 
@@ -249,7 +348,10 @@ class RconUser(User):
             ("can_reset_votekick_threshold", "Can reset votekick thresholds"),
             ("can_reset_votemap_state", "Can reset votemap selection & votes"),
             ("can_run_raw_commands", "Can send raw commands to the HLL game server"),
-            ("can_send_votemap_reminder", "Can send votemap reminder message to all players"),
+            (
+                "can_send_votemap_reminder",
+                "Can send votemap reminder message to all players",
+            ),
             ("can_set_map_whitelist", "Can set the votemap whitelist"),
             ("can_switch_players_immediately", "Can immediately switch players"),
             ("can_switch_players_on_death", "Can switch players on death"),
@@ -603,7 +705,10 @@ class RconUser(User):
                 "can_execute_autobalancer",
                 "Can approve or cancel autobalancer incidents",
             ),
-            ("can_remove_map_from_votemap", "Can remove map from current votemap selection"),
+            (
+                "can_remove_map_from_votemap",
+                "Can remove map from current votemap selection",
+            ),
             ("can_add_map_to_votemap", "Can add map to current votemap selection"),
             ("can_set_votemap_winner", "Can guarantee next map with votemap enabled"),
             ("can_add_votemap_vote", "Can manually add vote"),

@@ -1,9 +1,11 @@
+from contextlib import nullcontext
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 import pytest
 
 from rcon.commands import HLLServerCtl, HLLVServerCtl
+from rcon.connection import HLLBrokenConnectionError, HLLCommandError
 from rcon.api_commands import (
     HLLRconAPI,
     HLLVRconAPI,
@@ -194,6 +196,164 @@ def test_concrete_rcon_classes_share_commands_but_identify_their_game():
     assert HLLVRcon.game_test_command(None) is GameEnum.HLL_VIETNAM
 
 
+@pytest.mark.parametrize(
+    ("controller_type", "game", "player_id"),
+    [
+        (HLLServerCtl, GameEnum.HLL_WW2, "76561198036685843"),
+        (
+            HLLVServerCtl,
+            GameEnum.HLL_VIETNAM,
+            "00026a3466a244829409f77af0a752d9",
+        ),
+    ],
+)
+def test_report_bot_moderation_commands_share_the_game_advertised_contract(
+    controller_type, game, player_id
+):
+    controller = controller_type(ServerInfo(game=game), Mock())
+    controller.exchange_success = Mock(return_value=True)
+
+    assert controller.message_player(player_id, "Message") is True
+    assert controller.punish(player_id, "Reason") is True
+    assert controller.kick(player_id, "Reason") is True
+    assert controller.temp_ban(player_id, 2, "Reason", "Moderator") is True
+    assert controller.perma_ban(player_id, "Reason", "Moderator") is True
+    assert controller.remove_player_from_squad(player_id, "Reason") is True
+
+    controller.exchange_success.assert_has_calls(
+        [
+            call("MessagePlayer", 2, {"Message": "Message", "PlayerId": player_id}),
+            call("PunishPlayer", 2, {"PlayerId": player_id, "Reason": "Reason"}),
+            call("KickPlayer", 2, {"PlayerId": player_id, "Reason": "Reason"}),
+            call(
+                "TemporaryBanPlayer",
+                2,
+                {
+                    "PlayerId": player_id,
+                    "Duration": 2,
+                    "Reason": "Reason",
+                    "AdminName": "Moderator",
+                },
+            ),
+            call(
+                "PermanentBanPlayer",
+                2,
+                {
+                    "PlayerId": player_id,
+                    "Reason": "Reason",
+                    "AdminName": "Moderator",
+                },
+            ),
+            call(
+                "RemovePlayerFromPlatoon",
+                2,
+                {"PlayerId": player_id, "Reason": "Reason"},
+            ),
+        ]
+    )
+
+
+def test_rcon_internal_error_retries_message_player_once(monkeypatch):
+    controller = HLLServerCtl(ServerInfo(game=GameEnum.HLL_WW2), Mock())
+    handle = Mock()
+    handle.request = SimpleNamespace(
+        name="MessagePlayer",
+        version=2,
+        content={"PlayerId": "player-id", "Message": "Hello"},
+    )
+    handle.receive.side_effect = HLLCommandError(
+        500, "Unable to perform request. The server encountered an error."
+    )
+    retry_response = Mock()
+    retry_response.is_successful.return_value = True
+    retry_connection = Mock()
+    retry_connection.exchange.return_value = retry_response
+    controller.with_connection = Mock(return_value=nullcontext(retry_connection))
+    sleep = Mock()
+    monkeypatch.setattr("rcon.commands.time.sleep", sleep)
+
+    assert controller.receive_success(handle) is True
+    sleep.assert_called_once_with(1)
+    retry_connection.exchange.assert_called_once_with(
+        "MessagePlayer",
+        2,
+        {"PlayerId": "player-id", "Message": "Hello"},
+    )
+
+
+def test_rcon_internal_error_after_retry_is_not_downgraded_to_false(monkeypatch):
+    controller = HLLServerCtl(ServerInfo(game=GameEnum.HLL_WW2), Mock())
+    handle = Mock()
+    handle.request = SimpleNamespace(name="KickPlayer", version=2, content={})
+    handle.receive.side_effect = HLLCommandError(500, "first failure")
+    retry_response = Mock()
+    retry_response.is_successful.side_effect = HLLCommandError(500, "second failure")
+    retry_connection = Mock()
+    retry_connection.exchange.return_value = retry_response
+    controller.with_connection = Mock(return_value=nullcontext(retry_connection))
+    monkeypatch.setattr("rcon.commands.time.sleep", Mock())
+
+    with pytest.raises(HLLCommandError, match="second failure"):
+        controller.receive_success(handle)
+
+
+def test_rcon_client_error_is_not_retried(monkeypatch):
+    controller = HLLServerCtl(ServerInfo(game=GameEnum.HLL_WW2), Mock())
+    handle = Mock()
+    handle.request = SimpleNamespace(name="MessagePlayer", version=2, content={})
+    handle.receive.side_effect = HLLCommandError(400, "invalid player")
+    controller.with_connection = Mock()
+    sleep = Mock()
+    monkeypatch.setattr("rcon.commands.time.sleep", sleep)
+
+    with pytest.raises(HLLCommandError, match="invalid player"):
+        controller.receive_success(handle)
+    sleep.assert_not_called()
+    controller.with_connection.assert_not_called()
+
+
+def test_broken_connection_retries_send_with_a_fresh_connection(monkeypatch):
+    controller = HLLServerCtl(ServerInfo(game=GameEnum.HLL_WW2), Mock())
+    broken_connection = Mock()
+    broken_connection.send.side_effect = HLLBrokenConnectionError("connection lost")
+    retry_handle = Mock()
+    retry_connection = Mock()
+    retry_connection.send.return_value = retry_handle
+    controller.with_connection = Mock(
+        side_effect=[
+            nullcontext(broken_connection),
+            nullcontext(retry_connection),
+        ]
+    )
+    sleep = Mock()
+    monkeypatch.setattr("rcon.commands.time.sleep", sleep)
+
+    assert (
+        controller.send("MessagePlayer", 2, {"PlayerId": "player-id"}) is retry_handle
+    )
+    sleep.assert_called_once_with(1)
+    retry_connection.send.assert_called_once_with(
+        "MessagePlayer", 2, {"PlayerId": "player-id"}
+    )
+
+
+def test_explicit_connection_send_is_never_retried(monkeypatch):
+    controller = HLLServerCtl(ServerInfo(game=GameEnum.HLL_WW2), Mock())
+    explicit_connection = Mock()
+    explicit_connection.send.side_effect = OSError("socket closed")
+    sleep = Mock()
+    monkeypatch.setattr("rcon.commands.time.sleep", sleep)
+
+    with pytest.raises(OSError, match="socket closed"):
+        controller.send(
+            "MessagePlayer",
+            2,
+            {"PlayerId": "player-id"},
+            conn=explicit_connection,
+        )
+    sleep.assert_not_called()
+
+
 def test_detailed_player_parser_receives_controller_game(monkeypatch):
     parser = Mock(return_value={"player_id": "player-1"})
     monkeypatch.setattr("rcon.rcon.parse_raw_player_info", parser)
@@ -248,6 +408,54 @@ def test_timer_commands_validate_mode_against_profile():
 
     with pytest.raises(ValueError, match="not supported by the 'hllv' game profile"):
         ctl.set_match_timer(GameMode.SKIRMISH, 30)
+
+
+def test_hllv_objective_rows_ignore_map_id_reference_parameter():
+    ctl = HLLVServerCtl(ServerInfo(game=GameEnum.HLL_VIETNAM), Mock())
+    ctl.exchange = Mock(
+        return_value=_response(
+            {
+                "dialogueParameters": [
+                    {"iD": "MapId", "valueMember": "wdevb_warfare_day"},
+                    *[
+                        {"iD": f"Sector_{index}", "valueMember": "0,1,2"}
+                        for index in range(1, 6)
+                    ],
+                ]
+            }
+        )
+    )
+
+    assert ctl.get_objective_rows() == [["0", "1", "2"]] * 5
+    ctl.exchange.assert_called_once_with(
+        "GetClientReferenceData", 2, "SetSectorLayout"
+    )
+
+
+def test_hllv_set_sector_layout_includes_current_map_id_and_integer_indices():
+    ctl = HLLVServerCtl(ServerInfo(game=GameEnum.HLL_VIETNAM), Mock())
+    ctl.get_map = Mock(return_value="wdeve_warfare_day")
+    ctl.exchange = Mock(return_value=_response({}))
+
+    assert ctl.set_game_layout(["0", "1", "2", "1", "0"]) == [
+        "0",
+        "1",
+        "2",
+        "1",
+        "0",
+    ]
+    ctl.exchange.assert_called_once_with(
+        "SetSectorLayout",
+        2,
+        {
+            "MapId": "wdeve_warfare_day",
+            "Sector_1": 0,
+            "Sector_2": 1,
+            "Sector_3": 2,
+            "Sector_4": 1,
+            "Sector_5": 0,
+        },
+    )
 
 
 @pytest.mark.parametrize(

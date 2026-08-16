@@ -22,6 +22,16 @@ x-mobile-environment: &mobile-environment
   MOBILE_PUSH_RELAY_URL: ${MOBILE_PUSH_RELAY_URL:-}
   FRONTLINE_VIP_REDEEM_URL: ${FRONTLINE_VIP_REDEEM_URL:-}
   FRONTLINE_VIP_REDEEM_SECRET: ${FRONTLINE_VIP_REDEEM_SECRET:-}
+  INCIDENT_CAPTURE_ENABLED: ${INCIDENT_CAPTURE_ENABLED:-}
+  INCIDENT_TRIGGERS: ${INCIDENT_TRIGGERS:-}
+  INCIDENT_CONTEXT_MODE: ${INCIDENT_CONTEXT_MODE:-}
+  INCIDENT_CONTEXT_FUZZY_THRESHOLD: ${INCIDENT_CONTEXT_FUZZY_THRESHOLD:-}
+  INCIDENT_RETENTION_DAYS: ${INCIDENT_RETENTION_DAYS:-}
+  DISCORD_REPORTS_ENABLED: ${DISCORD_REPORTS_ENABLED:-false}
+  DISCORD_SERVICE_URL: ${DISCORD_SERVICE_URL:-}
+  AI_MODERATION_ENABLED: ${AI_MODERATION_ENABLED:-false}
+  AI_MODERATION_MODEL: ${AI_MODERATION_MODEL:-gpt-5.6-luna}
+  AI_PLAYER_NAME_MODEL: ${AI_PLAYER_NAME_MODEL:-gpt-5.4-nano}
 
 x-mobile-environment-server-2: &mobile-environment-server-2
   <<: *mobile-environment
@@ -57,6 +67,58 @@ services:
     <<: *frontline-backend
     command: mobile_push_worker
     environment: *mobile-environment
+
+  discord_report_worker:
+    # The generated base Compose file already contains the installation's
+    # database, Redis, volume and network settings on backend_1. Reuse them
+    # here so the standalone worker does not fall back to localhost or miss
+    # SERVER_NUMBER during Django startup.
+    extends:
+      file: compose.yaml
+      service: backend_1
+    <<: *frontline-backend
+    command: discord_event_worker
+    # Extending backend_1 also inherits its private-network alias "backend".
+    # Clear that alias or the frontend may send HTTP requests to this worker
+    # instead of the actual Django backend after a worker recreation.
+    networks:
+      server1:
+        aliases: !reset []
+    environment:
+      <<: *mobile-environment
+      # This worker delivers incidents from every CRCON database partition,
+      # not only backend_1. Pass every game profile explicitly so Discord does
+      # not label HLL Vietnam incidents as HLL/WW2.
+      HLL_GAME: ${HLL_GAME:-hll}
+      HLL_GAME_2: ${HLL_GAME_2:-hll}
+      HLL_GAME_3: ${HLL_GAME_3:-hll}
+      HLL_GAME_4: ${HLL_GAME_4:-hll}
+      HLL_SERVER_NAME: ${HLL_SERVER_NAME:-CRCON Server 1}
+      HLL_SERVER_NAME_2: ${HLL_SERVER_NAME_2:-CRCON Server 2}
+      HLL_SERVER_NAME_3: ${HLL_SERVER_NAME_3:-CRCON Server 3}
+      HLL_SERVER_NAME_4: ${HLL_SERVER_NAME_4:-CRCON Server 4}
+
+  discord_moderation_worker:
+    # AI requests can take several seconds. Keep them in a separate process so
+    # they can never delay time-sensitive admin reports and interaction edits.
+    extends:
+      file: compose.yaml
+      service: backend_1
+    <<: *frontline-backend
+    command: discord_moderation_worker
+    networks:
+      server1:
+        aliases: !reset []
+    environment:
+      <<: *mobile-environment
+      HLL_GAME: ${HLL_GAME:-hll}
+      HLL_GAME_2: ${HLL_GAME_2:-hll}
+      HLL_GAME_3: ${HLL_GAME_3:-hll}
+      HLL_GAME_4: ${HLL_GAME_4:-hll}
+      HLL_SERVER_NAME: ${HLL_SERVER_NAME:-CRCON Server 1}
+      HLL_SERVER_NAME_2: ${HLL_SERVER_NAME_2:-CRCON Server 2}
+      HLL_SERVER_NAME_3: ${HLL_SERVER_NAME_3:-CRCON Server 3}
+      HLL_SERVER_NAME_4: ${HLL_SERVER_NAME_4:-CRCON Server 4}
 
   backend_1:
     <<: *frontline-backend

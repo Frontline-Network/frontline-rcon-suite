@@ -1,5 +1,4 @@
 import logging
-import os
 import re
 from datetime import datetime
 from functools import lru_cache
@@ -278,49 +277,65 @@ def get_handler():
 @on_chat
 def handle_on_chat(rcon, log):
     get_handler().send_chat_message(log)
-    if os.getenv("MOBILE_INTEGRATION_ENABLED", "false").lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }:
+    captured_report = False
+    from rcon.incident_settings import (
+        incident_capture_enabled,
+        incident_context_mode,
+        incident_triggers,
+    )
+
+    if incident_capture_enabled():
         try:
             from rcon.admin_incidents import (
                 create_incident_from_chat,
                 flatten_team_view,
             )
 
-            configured_triggers = os.getenv("MOBILE_INCIDENT_TRIGGERS", "").strip()
-            if configured_triggers:
-                triggers = tuple(
-                    word.strip().lower()
-                    for word in configured_triggers.split(",")
-                    if word.strip()
-                )
-            else:
+            triggers = incident_triggers()
+            if not triggers:
                 triggers = tuple(
                     word.strip().lower()
                     for word in AdminPingWebhooksUserConfig.load_from_db().trigger_words
                     if word.strip()
                 ) or ("!admin",)
-            context_mode = os.getenv("MOBILE_CONTEXT_V2", "disabled").strip().lower()
-            if context_mode in {"1", "true", "on", "enabled", "shadow"}:
+            context_mode = incident_context_mode()
+            if context_mode in {"enabled", "shadow"}:
                 detailed = rcon.get_detailed_players()
                 current_players = list((detailed.get("players") or {}).values())
                 current_squads = flatten_team_view(rcon.get_team_view())
             else:
                 current_players = rcon.get_players()
                 current_squads = []
-            create_incident_from_chat(
+            incident, created = create_incident_from_chat(
                 log,
                 current_players=current_players,
                 current_squads=current_squads,
                 trigger_words=triggers,
             )
+            captured_report = incident is not None
+            if created and incident.get("reporter_id"):
+                from rcon.incident_notifications import received_reporter_template
+
+                if template := received_reporter_template():
+                    rcon.message_player(incident["reporter_id"], message=template)
         except Exception:
             # Incident persistence must never interrupt the game log loop or
             # existing Discord notifications.
-            logger.exception("Unable to create mobile admin incident")
+            logger.exception("Unable to create admin incident")
+    try:
+        if captured_report:
+            return
+        from rcon.moderation import ModerationSource
+        from rcon.moderation_candidates import enqueue_candidate
+
+        enqueue_candidate(
+            source=ModerationSource.CHAT,
+            candidate_text=str(log.get("sub_content") or ""),
+            player_id=str(log.get("player_id_1") or "") or None,
+            player_name=str(log.get("player_name_1") or "") or None,
+        )
+    except Exception:
+        logger.exception("Unable to queue chat moderation candidate")
 
 
 @on_kill

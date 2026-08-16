@@ -6,11 +6,28 @@ from contextlib import contextmanager, nullcontext
 from functools import wraps
 from typing import Generator, Literal, Sequence, Any, List
 
-from rcon.connection import HLLCommandError, HLLConnection, Handle, Response
+from rcon.connection import (
+    HLLBrokenConnectionError,
+    HLLCommandError,
+    HLLCommandFailedError as ConnectionCommandFailedError,
+    HLLConnection,
+    Handle,
+    Response,
+)
 from rcon.game import get_game_profile
 from rcon.maps import GameMode
 from rcon.perf_statistics import PerformanceStatistics
-from rcon.types import MapRotationResponse, MapSequenceResponse, PlayerInfoType, PublicConfig, ServerInfo, SlotsType, VipId, GameStateType, AdminType
+from rcon.types import (
+    MapRotationResponse,
+    MapSequenceResponse,
+    PlayerInfoType,
+    PublicConfig,
+    ServerInfo,
+    SlotsType,
+    VipId,
+    GameStateType,
+    AdminType,
+)
 from rcon.utils import exception_in_chain
 
 logger = logging.getLogger(__name__)
@@ -46,10 +63,8 @@ def _escape_params(func):
 
 class HLLCommandFailedError(Exception):
     """Raised when a command fails"""
-    pass
 
-class HLLBrokenConnectionError(Exception):
-    """Raised when the connection has broken and needs to be re-established"""
+    pass
 
 
 class ServerCtl:
@@ -100,7 +115,7 @@ class ServerCtl:
             # connection itself. Instead of reconnecting the existing connection here (conditionally), we simply discard
             # the connection, assuming it is broken. The pool will establish a new connection when needed.
             if isinstance(e.__context__, RuntimeError | OSError) or exception_in_chain(
-                    e, OSError
+                e, OSError
             ):
                 logger.warning(
                     "Connection (%s) errored in thread %s: %s, removing",
@@ -147,21 +162,20 @@ class ServerCtl:
 
     def _connect(self, conn: HLLConnection) -> None:
         try:
-            conn.connect(
-                self.config.host, int(self.config.port), self.config.password
-            )
+            conn.connect(self.config.host, int(self.config.port), self.config.password)
         except (TypeError, ValueError) as e:
             logger.exception("Invalid connection information", e)
             raise
 
     def send(
-            self,
-            command: str,
-            version: int,
-            content: dict[str, Any] | str = "",
-            log_info=False,
-            conn: HLLConnection | None = None,
+        self,
+        command: str,
+        version: int,
+        content: dict[str, Any] | str = "",
+        log_info=False,
+        conn: HLLConnection | None = None,
     ) -> Handle:
+        provided_conn = conn
         if conn is None:
             logger.debug("acquiring new connection")
             connection = self.with_connection()
@@ -177,24 +191,31 @@ class ServerCtl:
         self.perf_stats.increment("send")
         self.perf_stats.increment("send_size", len(content))
         try:
-            with connection as conn:
-                return conn.send(command, version, content)
+            with connection as active_conn:
+                return active_conn.send(command, version, content)
         except (
-                RuntimeError,
-                UnicodeDecodeError,
+            HLLBrokenConnectionError,
+            RuntimeError,
+            UnicodeDecodeError,
+            OSError,
         ):
-            if self.auto_retry is False or conn is not None:
+            if self.auto_retry is False or provided_conn is not None:
                 raise
 
-            logger.exception("Auto retrying send %s %s %s after 1 second", command, version, content)
+            logger.exception(
+                "Auto retrying send %s %s %s after 1 second",
+                command,
+                version,
+                content,
+            )
             time.sleep(1)
 
-            with connection as conn:
-                return conn.send(command, version, content)
+            with self.with_connection() as retry_conn:
+                return retry_conn.send(command, version, content)
 
     def receive(
-            self,
-            handle: Handle,
+        self,
+        handle: Handle,
     ) -> Response:
         try:
             response = handle.receive()
@@ -202,11 +223,22 @@ class ServerCtl:
             response.raise_for_status()
             return response
 
-        except (HLLCommandFailedError, UnicodeDecodeError, OSError) as e:
+        except (
+            HLLCommandFailedError,
+            ConnectionCommandFailedError,
+            HLLBrokenConnectionError,
+            HLLCommandError,
+            UnicodeDecodeError,
+            OSError,
+        ) as e:
             if not self.auto_retry:
                 raise
 
-            if isinstance(e, HLLCommandError) and e.status_code >= 400 and e.status_code < 500:
+            if (
+                isinstance(e, HLLCommandError)
+                and e.status_code >= 400
+                and e.status_code < 500
+            ):
                 # Client error, do not retry
                 raise
 
@@ -224,19 +256,28 @@ class ServerCtl:
                 return response
 
     def receive_optional(
-            self,
-            handle: Handle,
-            ignore_internal_errors: bool = False,
+        self,
+        handle: Handle,
+        ignore_internal_errors: bool = False,
     ) -> Response | None:
         try:
             response = handle.receive()
             self.perf_stats.increment("receive_size", len(response.content))
             return response if response.is_successful() else None
 
-        except (HLLCommandFailedError, UnicodeDecodeError, OSError) as e:
+        except (
+            HLLCommandFailedError,
+            ConnectionCommandFailedError,
+            HLLBrokenConnectionError,
+            HLLCommandError,
+            UnicodeDecodeError,
+            OSError,
+        ) as e:
             if isinstance(e, HLLCommandError):
                 if ignore_internal_errors:
                     return None
+                if 400 <= e.status_code < 500:
+                    raise
 
             if not self.auto_retry:
                 raise
@@ -254,52 +295,55 @@ class ServerCtl:
 
                 try:
                     return response if response.is_successful() else None
-                except HLLCommandError as e:
-                    return response if ignore_internal_errors else None
+                except HLLCommandError:
+                    if ignore_internal_errors:
+                        return None
+                    raise
 
     def receive_success(
-            self,
-            handle: Handle,
-            ignore_internal_errors: bool = False,
+        self,
+        handle: Handle,
+        ignore_internal_errors: bool = False,
     ) -> bool:
         return self.receive_optional(handle, ignore_internal_errors) is not None
 
     def exchange(
-            self,
-            command: str,
-            version: int,
-            content: dict[str, Any] | str = "",
-            log_info=False,
-            conn: HLLConnection | None = None,
+        self,
+        command: str,
+        version: int,
+        content: dict[str, Any] | str = "",
+        log_info=False,
+        conn: HLLConnection | None = None,
     ) -> Response:
         handle = self.send(command, version, content, log_info=log_info, conn=conn)
         return self.receive(handle)
 
     def exchange_optional(
-            self,
-            command: str,
-            version: int,
-            content: dict[str, Any] | str = "",
-            log_info=False,
-            conn: HLLConnection | None = None,
+        self,
+        command: str,
+        version: int,
+        content: dict[str, Any] | str = "",
+        log_info=False,
+        conn: HLLConnection | None = None,
     ) -> Response | None:
         handle = self.send(command, version, content, log_info=log_info, conn=conn)
         return self.receive_optional(handle)
 
     def exchange_success(
-            self,
-            command: str,
-            version: int,
-            content: dict[str, Any] | str = "",
-            log_info=False,
-            conn: HLLConnection | None = None,
+        self,
+        command: str,
+        version: int,
+        content: dict[str, Any] | str = "",
+        log_info=False,
+        conn: HLLConnection | None = None,
     ) -> bool:
         handle = self.send(command, version, content, log_info=log_info, conn=conn)
         return self.receive_success(handle)
 
-
     def get_profanities(self) -> list[str]:
-        return self.exchange("GetServerInformation", 2, {"Name": "bannedwords", "Value": ""}).content_dict["bannedWords"]
+        return self.exchange(
+            "GetServerInformation", 2, {"Name": "bannedwords", "Value": ""}
+        ).content_dict["bannedWords"]
 
     def ban_profanities(self, profanities: str) -> bool:
         self.exchange("AddBannedWords", 2, {"BannedWords": profanities})
@@ -310,7 +354,9 @@ class ServerCtl:
         return True
 
     def get_name(self) -> str:
-        return self.exchange("GetServerInformation", 2, {"Name": "session", "Value": ""}).content_dict["serverName"]
+        return self.exchange(
+            "GetServerInformation", 2, {"Name": "session", "Value": ""}
+        ).content_dict["serverName"]
 
     def get_map(self) -> str:
         return self.get_gamestate()["current_map"]["id"]
@@ -323,22 +369,34 @@ class ServerCtl:
         return parameters[0]["valueMember"].split(",")
 
     def get_player_ids(self) -> dict[str, str]:
-        return {x["name"]: x["iD"] for x in self.exchange("GetServerInformation", 2, {"Name": "players", "Value": ""}).content_dict["players"]}
+        return {
+            x["name"]: x["iD"]
+            for x in self.exchange(
+                "GetServerInformation", 2, {"Name": "players", "Value": ""}
+            ).content_dict["players"]
+        }
 
     # TODO: HLLV: Update response type and everything that depends on it
     def get_all_player_info(self) -> list[PlayerInfoType]:
-        return self.exchange("GetServerInformation", 2, {"Name": "players", "Value": ""}).content_dict["players"]
+        return self.exchange(
+            "GetServerInformation", 2, {"Name": "players", "Value": ""}
+        ).content_dict["players"]
 
     # TODO: HLLV: Update response type and everything that depends on it
     def get_player_info(self, player_id: str) -> PlayerInfoType | None:
-        return self.exchange("GetServerInformation", 2, {"Name": "player", "Value": player_id}).content_dict
+        return self.exchange(
+            "GetServerInformation", 2, {"Name": "player", "Value": player_id}
+        ).content_dict
 
     def get_admin_ids(self) -> list[AdminType]:
-        return [{
-            "player_id": x["userId"],
-            "name": x["comment"],
-            "role": x["group"],
-        } for x in self.exchange("GetAdminUsers", 2).content_dict["adminUsers"]]
+        return [
+            {
+                "player_id": x["userId"],
+                "name": x["comment"],
+                "role": x["group"],
+            }
+            for x in self.exchange("GetAdminUsers", 2).content_dict["adminUsers"]
+        ]
 
     def get_temp_bans(self) -> list[dict]:
         return self.exchange("GetTemporaryBans", 2).content_dict["banList"]
@@ -350,20 +408,26 @@ class ServerCtl:
         return self.exchange("GetTeamSwitchCooldown", 2).content_dict["teamSwitchTimer"]
 
     def get_autobalance_threshold(self) -> int:
-        return self.exchange("GetAutoBalanceThreshold", 2).content_dict["autoBalanceThreshold"]
+        return self.exchange("GetAutoBalanceThreshold", 2).content_dict[
+            "autoBalanceThreshold"
+        ]
 
     def get_votekick_enabled(self) -> bool:
         return self.exchange("GetVoteKickEnabled", 2).content_dict["enable"]
 
     def get_votekick_thresholds(self) -> list[list[int]]:
-        thresholds = self.exchange("GetVoteKickThreshold", 2).content_dict["voteThresholdList"]
+        thresholds = self.exchange("GetVoteKickThreshold", 2).content_dict[
+            "voteThresholdList"
+        ]
         return [[int(x["playerCount"]), int(x["voteThreshold"])] for x in thresholds]
 
     def get_map_rotation(self) -> MapRotationResponse:
-        data = self.exchange("GetServerInformation", 2, {"Name": "maprotation", "Value": ""}).content_dict
+        data = self.exchange(
+            "GetServerInformation", 2, {"Name": "maprotation", "Value": ""}
+        ).content_dict
         return {
             "maps": [x["iD"] for x in data["mAPS"]],
-            "current_index": data["currentIndex"]
+            "current_index": data["currentIndex"],
         }
 
     def get_map_sequence(self) -> MapSequenceResponse:
@@ -376,8 +440,10 @@ class ServerCtl:
         }
 
     def get_slots(self) -> SlotsType:
-        resp = self.exchange("GetServerInformation", 2, {"Name": "session", "Value": ""}).content_dict
-        
+        resp = self.exchange(
+            "GetServerInformation", 2, {"Name": "session", "Value": ""}
+        ).content_dict
+
         return SlotsType(
             current_players=resp["playerCount"],
             max_players=resp["maxPlayerCount"],
@@ -386,7 +452,9 @@ class ServerCtl:
     def get_vip_ids(self) -> list[VipId]:
         return [
             VipId(player_id=vip["iD"], name=vip["comment"])
-            for vip in self.exchange("GetServerInformation", 2, {"Name": "vipplayers", "Value": ""}).content_dict["vipPlayers"]
+            for vip in self.exchange(
+                "GetServerInformation", 2, {"Name": "vipplayers", "Value": ""}
+            ).content_dict["vipPlayers"]
         ]
 
     def get_admin_groups(self) -> list[str]:
@@ -396,32 +464,42 @@ class ServerCtl:
         return self.exchange("GetAutoBalanceEnabled", 2).content_dict["enable"]
 
     def get_logs(
-            self,
-            since_min_ago: int,
-            filter_: str = "",
-            conn: HLLConnection | None = None,
+        self,
+        since_min_ago: int,
+        filter_: str = "",
+        conn: HLLConnection | None = None,
     ) -> list[str]:
         return [
             entry["message"]
-            for entry in self.exchange("GetAdminLog", 2, {
-                "LogBackTrackTime": since_min_ago * 60,
-                "Filters": filter_
-            }, conn=conn).content_dict["entries"]
+            for entry in self.exchange(
+                "GetAdminLog",
+                2,
+                {"LogBackTrackTime": since_min_ago * 60, "Filters": filter_},
+                conn=conn,
+            ).content_dict["entries"]
         ]
 
     def get_idle_autokick_time(self) -> int:
-        return self.exchange("GetKickIdleDuration", 2).content_dict["idleTimeoutMinutes"]
+        return self.exchange("GetKickIdleDuration", 2).content_dict[
+            "idleTimeoutMinutes"
+        ]
 
     def get_max_ping_autokick(self) -> int:
-        return self.exchange("GetHighPingThreshold", 2).content_dict["highPingThresholdMs"]
+        return self.exchange("GetHighPingThreshold", 2).content_dict[
+            "highPingThresholdMs"
+        ]
 
     def get_queue_length(self) -> int:
         # TODO: Verify if this value is updated instantly or after the current session ends or any async time
-        return self.exchange("GetServerInformation", 2, {"Name": "session", "Value": ""}).content_dict["maxQueueCount"]
+        return self.exchange(
+            "GetServerInformation", 2, {"Name": "session", "Value": ""}
+        ).content_dict["maxQueueCount"]
 
     def get_vip_slots_num(self) -> int:
         # TODO: Verify if this value is updated instantly or after the current session ends or any async time
-        return self.exchange("GetServerInformation", 2, {"Name": "session", "Value": ""}).content_dict["maxVipQueueCount"]
+        return self.exchange(
+            "GetServerInformation", 2, {"Name": "session", "Value": ""}
+        ).content_dict["maxVipQueueCount"]
 
     def set_autobalance_enabled(self, value: bool) -> bool:
         self.exchange("SetAutoBalanceEnabled", 2, {"Enable": value})
@@ -480,22 +558,32 @@ class ServerCtl:
 
     def switch_player_on_death(self, player_id: str) -> bool:
         # TODO: player_name changed to player_id: Possibly the frontend needs to be changed as well
-        return self.exchange_success("ForceTeamSwitch", 2, {"PlayerId": player_id, "ForceMode": 0})
+        return self.exchange_success(
+            "ForceTeamSwitch", 2, {"PlayerId": player_id, "ForceMode": 0}
+        )
 
     def switch_player_now(self, player_id: str) -> bool:
         # TODO: player_name changed to player_id: Possibly the frontend needs to be changed as well
-        return self.exchange_success("ForceTeamSwitch", 2, {"PlayerId": player_id, "ForceMode": 1})
+        return self.exchange_success(
+            "ForceTeamSwitch", 2, {"PlayerId": player_id, "ForceMode": 1}
+        )
 
-    def remove_player_from_squad(self, player_id: str, reason: str) -> None:
-        self.exchange_success("RemovePlayerFromPlatoon", 2, {"PlayerId": player_id, "Reason": reason})
+    def remove_player_from_squad(self, player_id: str, reason: str) -> bool:
+        return self.exchange_success(
+            "RemovePlayerFromPlatoon", 2, {"PlayerId": player_id, "Reason": reason}
+        )
 
     def disband_squad(self, team_index: int, squad_index: int, reason: str) -> None:
-        self.exchange_success("DisbandPlatoon", 2, { "TeamIndex": team_index, "SquadIndex": squad_index, "Reason": reason })
+        self.exchange_success(
+            "DisbandPlatoon",
+            2,
+            {"TeamIndex": team_index, "SquadIndex": squad_index, "Reason": reason},
+        )
 
     def add_map_to_rotation(
-            self,
-            map_name: str,
-            after_map_name: str | None = None,
+        self,
+        map_name: str,
+        after_map_name: str | None = None,
     ):
         rotation = self.get_map_rotation()["maps"]
 
@@ -505,7 +593,7 @@ class ServerCtl:
                 map_index = rotation.index(after_map_name or "")
             except ValueError:
                 pass
-        
+
         self.add_map_to_rotation_at_index(map_name, map_index)
 
     def add_map_to_rotation_at_index(self, map_name: str, map_index: int):
@@ -517,9 +605,9 @@ class ServerCtl:
             map_index = rotation.index(map_name)
         except ValueError:
             raise HLLCommandFailedError(f"Map {map_name} not in rotation")
-        
+
         self.remove_map_from_rotation_at_index(map_index)
-    
+
     def remove_map_from_rotation_at_index(self, map_index: int):
         self.exchange("RemoveMapFromRotation", 2, {"Index": map_index})
 
@@ -538,30 +626,47 @@ class ServerCtl:
 
     @_escape_params
     def punish(self, player_id: str, reason: str) -> bool:
-        return self.exchange_success("PunishPlayer", 2, {"PlayerId": player_id, "Reason": reason})
+        return self.exchange_success(
+            "PunishPlayer", 2, {"PlayerId": player_id, "Reason": reason}
+        )
 
     @_escape_params
     def kick(self, player_id: str, reason: str) -> bool:
-        return self.exchange_success("KickPlayer", 2, {"PlayerId": player_id, "Reason": reason})
+        return self.exchange_success(
+            "KickPlayer", 2, {"PlayerId": player_id, "Reason": reason}
+        )
 
     @_escape_params
     def temp_ban(
-            self,
-            player_id: str,
-            duration_hours: int = 2,
-            reason: str = "",
-            admin_name: str = "",
+        self,
+        player_id: str,
+        duration_hours: int = 2,
+        reason: str = "",
+        admin_name: str = "",
     ) -> bool:
-        return self.exchange_success("TemporaryBanPlayer", 2, {"PlayerId": player_id, "Duration": duration_hours, "Reason": reason, "AdminName": admin_name})
+        return self.exchange_success(
+            "TemporaryBanPlayer",
+            2,
+            {
+                "PlayerId": player_id,
+                "Duration": duration_hours,
+                "Reason": reason,
+                "AdminName": admin_name,
+            },
+        )
 
     @_escape_params
     def perma_ban(
-            self,
-            player_id: str,
-            reason: str = "",
-            admin_name: str = "",
+        self,
+        player_id: str,
+        reason: str = "",
+        admin_name: str = "",
     ) -> bool:
-        return self.exchange_success("PermanentBanPlayer", 2, {"PlayerId": player_id, "Reason": reason, "AdminName": admin_name})
+        return self.exchange_success(
+            "PermanentBanPlayer",
+            2,
+            {"PlayerId": player_id, "Reason": reason, "AdminName": admin_name},
+        )
 
     def remove_temp_ban(self, player_id: str) -> bool:
         return self.exchange_success("RemoveTemporaryBan", 2, {"PlayerId": player_id})
@@ -571,43 +676,52 @@ class ServerCtl:
 
     @_escape_params
     def add_admin(self, player_id, role, description) -> bool:
-        return self.exchange_success("AddAdmin", 2, {"PlayerId": player_id, "AdminGroup": role, "Comment": description})
+        return self.exchange_success(
+            "AddAdmin",
+            2,
+            {"PlayerId": player_id, "AdminGroup": role, "Comment": description},
+        )
 
     def remove_admin(self, player_id) -> bool:
         return self.exchange_success("RemoveAdmin", 2, {"PlayerId": player_id})
 
     @_escape_params
     def add_vip(self, player_id: str, description: str) -> bool:
-        return self.exchange_success("AddVip", 2, {"PlayerId": player_id, "Comment": description})
+        return self.exchange_success(
+            "AddVip", 2, {"PlayerId": player_id, "Comment": description}
+        )
 
     def remove_vip(self, player_id) -> bool:
         return self.exchange_success("RemoveVip", 2, {"PlayerId": player_id})
 
     @_escape_params
     def message_player(self, player_id: str, message: str) -> bool:
-        return self.exchange_success("MessagePlayer", 2, {"Message": message, "PlayerId": player_id})
+        return self.exchange_success(
+            "MessagePlayer", 2, {"Message": message, "PlayerId": player_id}
+        )
 
     @_escape_params
     def message_all_players(self, message: str) -> bool:
         return self.exchange_success("MessageAllPlayers", 2, {"Message": message})
-    
+
     @_escape_params
     def bulk_message_players(self, player_ids: list[str], messages: list[str]) -> bool:
         if len(player_ids) != len(messages):
-            raise HLLCommandFailedError("Must have an equal amount of players and messages")
+            raise HLLCommandFailedError(
+                "Must have an equal amount of players and messages"
+            )
 
         handles = [
             self.send("MessagePlayer", 2, {"Message": message, "PlayerId": player_id})
             for player_id, message in zip(player_ids, messages)
         ]
-        responses = [
-            self.receive_success(handle)
-            for handle in handles
-        ]
+        responses = [self.receive_success(handle) for handle in handles]
         return any(responses)
 
     def get_gamestate(self) -> GameStateType:
-        s = self.exchange("GetServerInformation", 2, {"Name": "session", "Value": ""}).content_dict
+        s = self.exchange(
+            "GetServerInformation", 2, {"Name": "session", "Value": ""}
+        ).content_dict
         time_remaining = timedelta(seconds=int(s["remainingMatchTime"]))
         seconds_remaining = int(time_remaining.total_seconds())
         raw_time_remaining = f"{seconds_remaining // 3600}:{(seconds_remaining // 60) % 60:02}:{seconds_remaining % 60:02}"
@@ -623,9 +737,7 @@ class ServerCtl:
             game_mode = current_map.game_mode
 
         try:
-            next_map = self.game_profile.parse_layer_or_unknown(
-                self._get_next_map_id()
-            )
+            next_map = self.game_profile.parse_layer_or_unknown(self._get_next_map_id())
         except Exception:
             next_map = self.game_profile.parse_layer_or_unknown("unknown")
 
@@ -655,38 +767,41 @@ class ServerCtl:
         )
 
     def get_game_mode(self) -> str:
-        return self.exchange("GetServerInformation", 2, {"Name": "session", "Value": ""}).content_dict["gameMode"]
-
+        return self.exchange(
+            "GetServerInformation", 2, {"Name": "session", "Value": ""}
+        ).content_dict["gameMode"]
 
     def set_match_timer(self, game_mode: str | GameMode, length: int):
         mode = self.game_profile.parse_game_mode(game_mode)
-        self.exchange("SetMatchTimer", 2, {"GameMode": mode.value, "MatchLength": length})
-
+        self.exchange(
+            "SetMatchTimer", 2, {"GameMode": mode.value, "MatchLength": length}
+        )
 
     def remove_match_timer(self, game_mode: str | GameMode):
         mode = self.game_profile.parse_game_mode(game_mode)
         self.exchange("RemoveMatchTimer", 2, {"GameMode": mode.value})
 
-
     def set_warmup_timer(self, game_mode: str | GameMode, length: int):
         mode = self.game_profile.parse_game_mode(game_mode)
-        self.exchange("SetWarmupTimer", 2, {"GameMode": mode.value, "WarmupLength": length})
-
+        self.exchange(
+            "SetWarmupTimer", 2, {"GameMode": mode.value, "WarmupLength": length}
+        )
 
     def remove_warmup_timer(self, game_mode: str | GameMode):
         mode = self.game_profile.parse_game_mode(game_mode)
         self.exchange("RemoveWarmupTimer", 2, {"GameMode": mode.value})
 
-
     def get_server_config(self) -> PublicConfig:
-        cfg = self.exchange("GetServerInformation", 2, {"Name": "serverconfig", "Value": ""}).content_dict
+        cfg = self.exchange(
+            "GetServerInformation", 2, {"Name": "serverconfig", "Value": ""}
+        ).content_dict
         return {
             "build_number": cfg["buildNumber"],
             "build_revision": cfg["buildRevision"],
             "password_protected": cfg["passwordProtected"],
             "server_name": cfg["serverName"],
             "supported_platforms": cfg["supportedPlatforms"],
-            "game": self.config.game
+            "game": self.config.game,
         }
 
     def _get_next_map_id(self) -> str:
@@ -725,7 +840,9 @@ class ServerCtl:
     # TODO: HLLV: Add commands to get and remove sector layouts
 
     def set_dynamic_weather_enabled(self, map_name: str, enabled: bool):
-        self.exchange("SetDynamicWeatherEnabled", 2, {"MapId": map_name, "Enable": enabled})
+        self.exchange(
+            "SetDynamicWeatherEnabled", 2, {"MapId": map_name, "Enable": enabled}
+        )
 
 
 class HLLServerCtl(ServerCtl):
@@ -735,16 +852,54 @@ class HLLServerCtl(ServerCtl):
 class HLLVServerCtl(ServerCtl):
     """Hell Let Loose: Vietnam controller extension point."""
 
+    def get_objective_rows(self) -> List[List[str]]:
+        details = self.exchange("GetClientReferenceData", 2, "SetSectorLayout")
+        parameters = details.content_dict.get("dialogueParameters") or []
+        parameters_by_id = {
+            str(parameter.get("iD")): parameter
+            for parameter in parameters
+            if isinstance(parameter, dict)
+        }
+        sectors = [
+            parameters_by_id.get(f"Sector_{index}") for index in range(1, 6)
+        ]
+        if any(
+            not sector or not isinstance(sector.get("valueMember"), str)
+            for sector in sectors
+        ):
+            raise HLLCommandFailedError("Received unexpected response from server.")
+        return [sector["valueMember"].split(",") for sector in sectors]
+
+    def set_game_layout(self, objectives: Sequence[str]):
+        if len(objectives) != 5:
+            raise ValueError("5 objectives must be provided")
+        try:
+            sector_indices = [int(objective) for objective in objectives]
+        except (TypeError, ValueError) as exc:
+            raise ValueError("HLL Vietnam objectives must use sector indices") from exc
+        if any(index not in range(3) for index in sector_indices):
+            raise ValueError("HLL Vietnam objective indices must be between 0 and 2")
+
+        self.exchange(
+            "SetSectorLayout",
+            2,
+            {
+                "MapId": self.get_map(),
+                **{
+                    f"Sector_{index}": value
+                    for index, value in enumerate(sector_indices, 1)
+                },
+            },
+        )
+        return list(objectives)
+
     def set_welcome_message(self, message):
         self.exchange("SetNoticeMessage", 2, {"Message": message})
-
 
 
 if __name__ == "__main__":
     import rcon.settings
 
     server_info = rcon.settings.get_server_info()
-    controller_type = (
-        HLLServerCtl if server_info.game.value == "hll" else HLLVServerCtl
-    )
-    ctl = controller_type(server_info, PerformanceStatistics('rcon'))
+    controller_type = HLLServerCtl if server_info.game.value == "hll" else HLLVServerCtl
+    ctl = controller_type(server_info, PerformanceStatistics("rcon"))

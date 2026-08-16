@@ -1,5 +1,4 @@
 import hashlib
-import os
 import re
 import unicodedata
 from datetime import datetime, timedelta, timezone
@@ -14,7 +13,12 @@ from rcon.models import (
     AdminIncidentSubject,
     enter_session,
 )
-from rcon.utils import get_server_number
+from rcon.incident_settings import (
+    incident_context_fuzzy_threshold,
+    incident_context_mode,
+)
+from rcon.types import GameEnum
+from rcon.utils import get_server_number, get_squad_leader_roles
 
 INCIDENT_STATUSES = {"new", "claimed", "resolved", "dismissed"}
 FINAL_STATUSES = {"resolved", "dismissed"}
@@ -23,16 +27,15 @@ SUBJECT_KINDS = {"player", "squad"}
 SUBJECT_STATES = {"suggested", "confirmed", "rejected"}
 PARSER_VERSION = "2.0.0"
 DEFAULT_FUZZY_THRESHOLD = 0.74
+SQUAD_LEADER_ROLES = get_squad_leader_roles(
+    GameEnum.HLL_WW2
+) | get_squad_leader_roles(GameEnum.HLL_VIETNAM)
 
 
 def _mobile_context_fuzzy_threshold() -> float:
-    try:
-        value = float(
-            os.getenv("MOBILE_CONTEXT_FUZZY_THRESHOLD", str(DEFAULT_FUZZY_THRESHOLD))
-        )
-    except (TypeError, ValueError):
-        value = DEFAULT_FUZZY_THRESHOLD
-    return max(0.0, min(value, 1.0))
+    """Compatibility alias retained for callers and older tests."""
+
+    return incident_context_fuzzy_threshold(DEFAULT_FUZZY_THRESHOLD)
 
 
 class IncidentNotFound(ValueError):
@@ -94,8 +97,9 @@ def player_snapshot(player: dict | None) -> dict:
         "loadout",
         "level",
         "kills",
+        "kills_streak",
         "deaths",
-        "teamkills",
+        "teamkills_streak",
         "combat",
         "offense",
         "defense",
@@ -103,11 +107,29 @@ def player_snapshot(player: dict | None) -> dict:
         "map_playtime_seconds",
         "is_vip",
     )
-    return {
+    snapshot = {
         field: _simple_value(player.get(field))
         for field in fields
         if player.get(field) is not None
     }
+    # The live RCON player payload calls this field ``team_kills`` while the
+    # historical/statistics API calls it ``teamkills``.  Incidents expose one
+    # stable name so all consumers display the live value, including zero.
+    teamkills = player.get("teamkills")
+    if teamkills is None:
+        teamkills = player.get("team_kills")
+    if teamkills is not None:
+        snapshot["teamkills"] = _simple_value(teamkills)
+    return snapshot
+
+
+def _is_squad_leader(player: dict) -> bool:
+    role = re.sub(r"[^a-z0-9]", "", str(player.get("role") or "").casefold())
+    return role in SQUAD_LEADER_ROLES
+
+
+def _squad_leader(players: list[dict]) -> dict | None:
+    return next((player for player in players if _is_squad_leader(player)), None)
 
 
 def flatten_team_view(team_view: dict | None) -> list[dict]:
@@ -119,15 +141,7 @@ def flatten_team_view(team_view: dict | None) -> list[dict]:
             if not isinstance(squad, dict):
                 continue
             players = [player_snapshot(player) for player in squad.get("players", [])]
-            leader = next(
-                (
-                    player
-                    for player in players
-                    if str(player.get("role") or "").casefold()
-                    in {"officer", "tankcommander", "spotter"}
-                ),
-                None,
-            )
+            leader = _squad_leader(players)
             squads.append(
                 {
                     "name": str(squad_name or "Unassigned"),
@@ -563,7 +577,7 @@ def create_incident(
     dedupe_seconds: int = 60,
     idempotency_key: str | None = None,
 ) -> tuple[dict, bool]:
-    if source not in {"chat", "manual"}:
+    if source not in {"chat", "manual", "ai_chat", "ai_player_name"}:
         raise ValueError("Unsupported incident source")
     reason = reason.strip()
     if not reason:
@@ -666,11 +680,7 @@ def create_incident_from_chat(
     )
     reporter_context = player_snapshot(reporter)
     reporter_context["online"] = reporter is not None
-    context_mode = os.getenv("MOBILE_CONTEXT_V2", "disabled").strip().lower()
-    if context_mode in {"1", "true", "on", "enabled"}:
-        context_mode = "enabled"
-    elif context_mode != "shadow":
-        context_mode = "disabled"
+    context_mode = incident_context_mode()
     parsed = parse_chat_report(
         str(log.get("sub_content") or ""),
         trigger_words=trigger_words,
@@ -815,9 +825,18 @@ def mutate_incident(
         if not incident:
             raise IncidentNotFound("Incident not found")
         if incident.revision != expected_revision:
-            raise IncidentConflict(
-                f"Incident revision changed from {expected_revision} to {incident.revision}"
-            )
+            if operation == "claim" and incident.status == "claimed":
+                if incident.assigned_to == actor:
+                    if payload.get("mode") != "manual":
+                        return incident.to_dict(include_events=True)
+                else:
+                    raise IncidentConflict(
+                        "Incident is already claimed by another admin"
+                    )
+            else:
+                raise IncidentConflict(
+                    f"Incident revision changed from {expected_revision} to {incident.revision}"
+                )
 
         if operation == "claim":
             if incident.status not in {"new", "claimed"}:
@@ -838,6 +857,10 @@ def mutate_incident(
         elif operation in FINAL_STATUSES:
             if incident.status not in {"new", "claimed"}:
                 raise InvalidIncidentTransition("Incident is already closed")
+            if incident.assigned_to and incident.assigned_to != actor:
+                raise IncidentConflict("Incident is already claimed by another admin")
+            if not incident.assigned_to:
+                incident.assigned_to = actor
             incident.status = operation
             incident.resolved_at = now
         elif operation == "reopen":
@@ -1055,16 +1078,7 @@ def confirmed_action_subject(
     # a valid, explicit contact/action target, but must never silently become
     # an incident subject or the primary target.
     reporter_id = str(incident.get("reporter_id") or "").strip()
-    has_confirmed_subject = any(
-        subject.get("state") == "confirmed" for subject in subjects
-    )
-    if (
-        allow_reporter
-        and not subject_id
-        and reporter_id
-        and player_id == reporter_id
-        and not has_confirmed_subject
-    ):
+    if allow_reporter and not subject_id and reporter_id and player_id == reporter_id:
         return {
             "id": None,
             "kind": "reporter",
@@ -1127,9 +1141,14 @@ def reserve_incident_action(
             )
             if not subject:
                 raise IncidentNotFound("Incident subject not found")
-            if subject.kind != "squad" or subject.state != "confirmed":
+            if (
+                subject.state != "confirmed"
+                or subject.kind not in {"player", "squad"}
+                or not subject.team
+                or not subject.squad_name
+            ):
                 raise InvalidIncidentTransition(
-                    "Only a confirmed squad can be disbanded"
+                    "Only confirmed squad context can be disbanded"
                 )
         elif confirm_subject_id:
             subject = next(

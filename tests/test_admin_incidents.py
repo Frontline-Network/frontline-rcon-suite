@@ -129,6 +129,66 @@ def test_parser_recognizes_reporter_team_squad_and_captures_members():
     assert len(subject["snapshot"]["players"]) == 2
 
 
+def test_parser_resolves_three_named_squads_in_one_report():
+    squads = [
+        {
+            "name": name,
+            "team": "Allies",
+            "type": "infantry",
+            "has_leader": True,
+            "leader": {
+                "name": f"{name} Lead",
+                "player_id": f"{name.casefold()}-leader",
+                "role": "Officer",
+            },
+            "players": [],
+        }
+        for name in ["Able", "Charlie", "Baker"]
+    ]
+
+    parsed = incidents.parse_chat_report(
+        "!admin squads able, charlie und baker reden nicht",
+        reporter_context={"team": "Allies"},
+        current_squads=squads,
+    )
+
+    assert [subject["squad_name"] for subject in parsed["subjects"]] == [
+        "Able",
+        "Charlie",
+        "Baker",
+    ]
+    assert all(subject["state"] == "confirmed" for subject in parsed["subjects"])
+    assert sum(bool(subject["is_primary"]) for subject in parsed["subjects"]) == 1
+
+
+def test_team_view_recognizes_vietnam_squadleader_and_normalizes_teamkills():
+    squads = incidents.flatten_team_view(
+        {
+            "allies": {
+                "squads": {
+                    "able": {
+                        "type": "infantry",
+                        "has_leader": True,
+                        "players": [
+                            {
+                                "name": "Biene",
+                                "player_id": "eos-id",
+                                "role": "squadleader",
+                                "team_kills": 0,
+                            }
+                        ],
+                    }
+                }
+            },
+            "fail_count": 0,
+        }
+    )
+
+    assert squads[0]["leader"]["player_id"] == "eos-id"
+    assert squads[0]["leader"]["teamkills"] == 0
+    assert squads[0]["players"][0]["teamkills"] == 0
+
+
 @pytest.mark.parametrize(
     "squad_name",
     [
@@ -373,6 +433,88 @@ def test_reassignment_records_the_selected_admin_and_handover_note(incident_data
         "assigned_to": "bob",
         "handover_note": "Bitte die letzten Teamkills prüfen.",
     }
+
+
+def test_first_closer_becomes_owner_and_other_admin_cannot_close(incident_database):
+    incident, _ = incidents.create_incident(
+        server_number=2,
+        source="manual",
+        reason="first button wins",
+        actor="system",
+    )
+    closed = incidents.mutate_incident(
+        incident["id"],
+        actor="discord:1:Alice",
+        expected_revision=incident["revision"],
+        operation="dismissed",
+        idempotency_key="dismiss-by-alice",
+    )
+    assert closed["status"] == "dismissed"
+    assert closed["assigned_to"] == "discord:1:Alice"
+
+    second, _ = incidents.create_incident(
+        server_number=2,
+        source="manual",
+        reason="already owned",
+        actor="system",
+    )
+    claimed = incidents.mutate_incident(
+        second["id"],
+        actor="discord:1:Alice",
+        expected_revision=second["revision"],
+        operation="claim",
+        idempotency_key="claim-by-alice",
+    )
+    with pytest.raises(incidents.IncidentConflict, match="another admin"):
+        incidents.mutate_incident(
+            second["id"],
+            actor="discord:2:Bob",
+            expected_revision=claimed["revision"],
+            operation="resolved",
+            idempotency_key="resolve-by-bob",
+        )
+
+
+def test_stale_first_button_returns_current_claim_only_to_owner(incident_database):
+    incident, _ = incidents.create_incident(
+        server_number=1,
+        source="manual",
+        reason="stale Discord message",
+        actor="system",
+    )
+    claimed = incidents.mutate_incident(
+        incident["id"],
+        actor="discord:1:Alice",
+        expected_revision=incident["revision"],
+        operation="claim",
+        idempotency_key="first-click-alice",
+    )
+    retry = incidents.mutate_incident(
+        incident["id"],
+        actor="discord:1:Alice",
+        expected_revision=incident["revision"],
+        operation="claim",
+        idempotency_key="stale-click-alice",
+    )
+    assert retry["revision"] == claimed["revision"]
+    manual = incidents.mutate_incident(
+        incident["id"],
+        actor="discord:1:Alice",
+        expected_revision=incident["revision"],
+        operation="claim",
+        payload={"mode": "manual"},
+        idempotency_key="stale-manual-alice",
+    )
+    assert manual["revision"] == claimed["revision"] + 1
+    assert manual["events"][-1]["payload"] == {"mode": "manual"}
+    with pytest.raises(incidents.IncidentConflict, match="another admin"):
+        incidents.mutate_incident(
+            incident["id"],
+            actor="discord:2:Bob",
+            expected_revision=incident["revision"],
+            operation="claim",
+            idempotency_key="stale-click-bob",
+        )
 
 
 def test_action_idempotency_key_is_reserved_once(incident_database):
@@ -651,6 +793,35 @@ def test_general_incident_allows_explicit_reporter_action_without_subject(
     assert updated["primary_subject"] is None
 
 
+def test_explicit_reporter_message_remains_available_with_accused_player(
+    incident_database,
+):
+    incident, _ = incidents.create_incident(
+        server_number=1,
+        source="chat",
+        reporter_id="reporter-id",
+        reporter_name="Reporter",
+        reason="Target is teamkilling",
+        actor="system:chat",
+        subjects=[
+            {
+                "kind": "player",
+                "state": "confirmed",
+                "is_primary": True,
+                "display_name": "Target",
+                "player_id": "target-id",
+            }
+        ],
+    )
+    reporter = incidents.confirmed_action_subject(
+        incident,
+        player_id="reporter-id",
+        allow_reporter=True,
+    )
+    assert reporter["kind"] == "reporter"
+    assert reporter["player_id"] == "reporter-id"
+
+
 def test_end_to_end_chat_report_to_resolved_incident(incident_database, monkeypatch):
     monkeypatch.setenv("MOBILE_CONTEXT_V2", "enabled")
     players = [
@@ -693,7 +864,9 @@ def test_end_to_end_chat_report_to_resolved_incident(incident_database, monkeypa
     assert created is True
     assert incident["source"] == "chat"
     assert incident["reporter_context"]["unit_name"] == "Charlie"
-    assert {(subject["kind"], subject["state"]) for subject in incident["subjects"]} == {
+    assert {
+        (subject["kind"], subject["state"]) for subject in incident["subjects"]
+    } == {
         ("squad", "confirmed"),
         ("player", "confirmed"),
     }
@@ -706,9 +879,7 @@ def test_end_to_end_chat_report_to_resolved_incident(incident_database, monkeypa
         idempotency_key="e2e-claim",
     )
     player_subject = next(
-        subject
-        for subject in claimed["subjects"]
-        if subject["kind"] == "player"
+        subject for subject in claimed["subjects"] if subject["kind"] == "player"
     )
     target = incidents.confirmed_action_subject(
         claimed,
