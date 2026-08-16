@@ -304,6 +304,125 @@ def test_embed_distinguishes_game_server_and_exposes_manual_actions():
     ]
 
 
+def test_embed_exposes_blacklist_action_in_context_row():
+    event = _event()
+    event["incident"].update(
+        {
+            "allowed_actions": ["message", "blacklist"],
+            "discord_moderation_ready": True,
+            "reporter_id": "reporter-id",
+            "primary_subject": {
+                "kind": "player",
+                "display_name": "Target",
+                "player_id": "target-id",
+                "snapshot": {},
+            },
+        }
+    )
+
+    payload = render_message(IncidentEventEnvelope.model_validate(event), None)
+    buttons = [button for row in payload["components"] for button in row["components"]]
+    blacklist = next(
+        button for button in buttons if button["custom_id"].endswith(":blacklist")
+    )
+    assert blacklist["label"] == "⛔ Blacklist"
+    assert blacklist["style"] == 4
+
+
+def test_embed_exposes_every_configured_report_action_with_valid_row_sizes():
+    event = _event()
+    event["incident"].update(
+        {
+            "allowed_actions": [
+                "message",
+                "punish",
+                "kick",
+                "temp_ban",
+                "perma_ban",
+                "blacklist",
+                "remove_from_squad",
+                "disband_squad",
+            ],
+            "discord_moderation_ready": True,
+            "reporter_id": "reporter-id",
+            "primary_subject": {
+                "kind": "player",
+                "display_name": "Target",
+                "player_id": "target-id",
+                "snapshot": {},
+            },
+        }
+    )
+
+    payload = render_message(IncidentEventEnvelope.model_validate(event), None)
+    custom_ids = {
+        button["custom_id"].rsplit(":", 1)[-1]
+        for row in payload["components"]
+        for button in row["components"]
+        if button["custom_id"].startswith("action:")
+    }
+    assert custom_ids == {
+        "message",
+        "message_reporter",
+        "punish",
+        "kick",
+        "temp_ban",
+        "perma_ban",
+        "blacklist",
+        "remove_from_squad",
+        "disband_squad",
+    }
+    assert all(len(row["components"]) <= 5 for row in payload["components"])
+
+
+@pytest.mark.parametrize(
+    ("action", "arguments", "expected"),
+    [
+        ("message", {"message": "Hallo"}, "schrieb dem Spieler Biene"),
+        ("punish", {"reason": "Grund"}, "bestrafte Biene"),
+        ("kick", {"reason": "Grund"}, "kickte Biene"),
+        (
+            "temp_ban",
+            {"reason": "Grund", "duration_hours": 6},
+            "bannte Biene für 6 Stunden",
+        ),
+        ("perma_ban", {"reason": "Grund"}, "bannte Biene permanent"),
+        ("blacklist", {"reason": "Grund"}, "setzte Biene auf die Blacklist"),
+        (
+            "remove_from_squad",
+            {"reason": "Grund"},
+            "entfernte Biene aus dem Squad",
+        ),
+        ("disband_squad", {"reason": "Grund"}, "löste den Squad auf"),
+    ],
+)
+def test_every_game_action_has_a_readable_logbook_entry(action, arguments, expected):
+    event = _event()
+    event["incident"].update(
+        {
+            "discord_language": "de",
+            "target_name": "Biene",
+            "events": [
+                {
+                    "actor": "discord:789:[FLN] Pingu",
+                    "event_type": "action",
+                    "payload": {
+                        "action": action,
+                        "arguments": arguments,
+                        "result": True,
+                    },
+                }
+            ],
+        }
+    )
+
+    payload = render_message(IncidentEventEnvelope.model_validate(event), None)
+    logbook = next(
+        field for field in payload["embeds"][0]["fields"] if field["name"] == "Logbuch"
+    )
+    assert expected in logbook["value"]
+
+
 def test_targetless_report_does_not_offer_player_actions():
     event = _event()
     event["incident"]["allowed_actions"] = ["message", "kick", "perma_ban"]
@@ -381,9 +500,7 @@ def test_successful_action_is_recorded_in_the_embed_logbook():
         field for field in payload["embeds"][0]["fields"] if field["name"] == "Logbuch"
     )
     assert "<t:1786875300:f>" in logbook["value"]
-    assert (
-        "[FLN] Pingu schrieb dem Spieler Biene eine Nachricht" in logbook["value"]
-    )
+    assert "[FLN] Pingu schrieb dem Spieler Biene eine Nachricht" in logbook["value"]
     assert "Inhalt: Hallo" in logbook["value"]
 
 

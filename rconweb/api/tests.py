@@ -803,6 +803,65 @@ class MobileContextTests(TestCase):
                 )
 
     @patch("api.mobile_incidents.confirmed_action_subject")
+    def test_rejected_blacklist_is_not_treated_as_success(self, confirmed_subject):
+        from api.mobile_incidents import _execute_action
+
+        confirmed_subject.return_value = {
+            "display_name": "Biene",
+            "player_id": "biene-id",
+        }
+        add_blacklist_record = MagicMock(return_value=False)
+        fake_views = SimpleNamespace(
+            rcon_api=SimpleNamespace(add_blacklist_record=add_blacklist_record)
+        )
+
+        with patch.dict(sys.modules, {"api.views": fake_views}):
+            with self.assertRaisesRegex(ValueError, "game server rejected"):
+                _execute_action(
+                    "blacklist",
+                    {
+                        "player_id": "biene-id",
+                        "blacklist_id": 4,
+                        "reason": "Reason",
+                        "confirmed": True,
+                    },
+                    "context-admin",
+                    {"target_id": "biene-id", "target_name": "Biene"},
+                )
+
+    def test_rejected_squad_disband_is_not_treated_as_success(self):
+        from api.mobile_incidents import _execute_action
+
+        disband = MagicMock(return_value=False)
+        fake_views = SimpleNamespace(
+            rcon_api=SimpleNamespace(disband_squad_by_name=disband)
+        )
+        incident = {
+            "subjects": [
+                {
+                    "id": "squad-subject",
+                    "kind": "squad",
+                    "state": "confirmed",
+                    "team": "allies",
+                    "squad_name": "able",
+                }
+            ]
+        }
+
+        with patch.dict(sys.modules, {"api.views": fake_views}):
+            with self.assertRaisesRegex(ValueError, "game server rejected"):
+                _execute_action(
+                    "disband_squad",
+                    {
+                        "subject_id": "squad-subject",
+                        "reason": "Reason",
+                        "confirmed": True,
+                    },
+                    "context-admin",
+                    incident,
+                )
+
+    @patch("api.mobile_incidents.confirmed_action_subject")
     def test_all_discord_game_actions_reach_the_expected_crcon_method(
         self, confirmed_subject
     ):
@@ -1019,6 +1078,7 @@ class DiscordActionTemplateTests(TestCase):
 
         with self.assertRaisesRegex(ValueError, "confirmed player"):
             _validate_prepared_action_target("message", {"subjects": []}, {})
+
     @patch("api.discord_integration.mutate_incident")
     @patch("api.discord_integration._validate_binding")
     @patch("api.discord_integration._authorized_integration")
@@ -1220,9 +1280,7 @@ class DiscordOutboxWorkerModeTests(TestCase):
         ) as deliver:
             with self.assertRaises(KeyboardInterrupt):
                 command.handle(events_only=True, moderation_only=False)
-        deliver.assert_called_once_with(
-            deliver_events=True, deliver_moderation=False
-        )
+        deliver.assert_called_once_with(deliver_events=True, deliver_moderation=False)
 
     def test_moderation_worker_never_processes_incident_events(self):
         from api.management.commands.discord_report_worker import Command
@@ -1233,6 +1291,4 @@ class DiscordOutboxWorkerModeTests(TestCase):
         ) as deliver:
             with self.assertRaises(KeyboardInterrupt):
                 command.handle(events_only=False, moderation_only=True)
-        deliver.assert_called_once_with(
-            deliver_events=False, deliver_moderation=True
-        )
+        deliver.assert_called_once_with(deliver_events=False, deliver_moderation=True)

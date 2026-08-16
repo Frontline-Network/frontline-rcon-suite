@@ -1,9 +1,11 @@
+from contextlib import nullcontext
 from types import SimpleNamespace
 from unittest.mock import Mock, call
 
 import pytest
 
 from rcon.commands import HLLServerCtl, HLLVServerCtl
+from rcon.connection import HLLBrokenConnectionError, HLLCommandError
 from rcon.api_commands import (
     HLLRconAPI,
     HLLVRconAPI,
@@ -249,6 +251,107 @@ def test_report_bot_moderation_commands_share_the_game_advertised_contract(
             ),
         ]
     )
+
+
+def test_rcon_internal_error_retries_message_player_once(monkeypatch):
+    controller = HLLServerCtl(ServerInfo(game=GameEnum.HLL_WW2), Mock())
+    handle = Mock()
+    handle.request = SimpleNamespace(
+        name="MessagePlayer",
+        version=2,
+        content={"PlayerId": "player-id", "Message": "Hello"},
+    )
+    handle.receive.side_effect = HLLCommandError(
+        500, "Unable to perform request. The server encountered an error."
+    )
+    retry_response = Mock()
+    retry_response.is_successful.return_value = True
+    retry_connection = Mock()
+    retry_connection.exchange.return_value = retry_response
+    controller.with_connection = Mock(return_value=nullcontext(retry_connection))
+    sleep = Mock()
+    monkeypatch.setattr("rcon.commands.time.sleep", sleep)
+
+    assert controller.receive_success(handle) is True
+    sleep.assert_called_once_with(1)
+    retry_connection.exchange.assert_called_once_with(
+        "MessagePlayer",
+        2,
+        {"PlayerId": "player-id", "Message": "Hello"},
+    )
+
+
+def test_rcon_internal_error_after_retry_is_not_downgraded_to_false(monkeypatch):
+    controller = HLLServerCtl(ServerInfo(game=GameEnum.HLL_WW2), Mock())
+    handle = Mock()
+    handle.request = SimpleNamespace(name="KickPlayer", version=2, content={})
+    handle.receive.side_effect = HLLCommandError(500, "first failure")
+    retry_response = Mock()
+    retry_response.is_successful.side_effect = HLLCommandError(500, "second failure")
+    retry_connection = Mock()
+    retry_connection.exchange.return_value = retry_response
+    controller.with_connection = Mock(return_value=nullcontext(retry_connection))
+    monkeypatch.setattr("rcon.commands.time.sleep", Mock())
+
+    with pytest.raises(HLLCommandError, match="second failure"):
+        controller.receive_success(handle)
+
+
+def test_rcon_client_error_is_not_retried(monkeypatch):
+    controller = HLLServerCtl(ServerInfo(game=GameEnum.HLL_WW2), Mock())
+    handle = Mock()
+    handle.request = SimpleNamespace(name="MessagePlayer", version=2, content={})
+    handle.receive.side_effect = HLLCommandError(400, "invalid player")
+    controller.with_connection = Mock()
+    sleep = Mock()
+    monkeypatch.setattr("rcon.commands.time.sleep", sleep)
+
+    with pytest.raises(HLLCommandError, match="invalid player"):
+        controller.receive_success(handle)
+    sleep.assert_not_called()
+    controller.with_connection.assert_not_called()
+
+
+def test_broken_connection_retries_send_with_a_fresh_connection(monkeypatch):
+    controller = HLLServerCtl(ServerInfo(game=GameEnum.HLL_WW2), Mock())
+    broken_connection = Mock()
+    broken_connection.send.side_effect = HLLBrokenConnectionError("connection lost")
+    retry_handle = Mock()
+    retry_connection = Mock()
+    retry_connection.send.return_value = retry_handle
+    controller.with_connection = Mock(
+        side_effect=[
+            nullcontext(broken_connection),
+            nullcontext(retry_connection),
+        ]
+    )
+    sleep = Mock()
+    monkeypatch.setattr("rcon.commands.time.sleep", sleep)
+
+    assert (
+        controller.send("MessagePlayer", 2, {"PlayerId": "player-id"}) is retry_handle
+    )
+    sleep.assert_called_once_with(1)
+    retry_connection.send.assert_called_once_with(
+        "MessagePlayer", 2, {"PlayerId": "player-id"}
+    )
+
+
+def test_explicit_connection_send_is_never_retried(monkeypatch):
+    controller = HLLServerCtl(ServerInfo(game=GameEnum.HLL_WW2), Mock())
+    explicit_connection = Mock()
+    explicit_connection.send.side_effect = OSError("socket closed")
+    sleep = Mock()
+    monkeypatch.setattr("rcon.commands.time.sleep", sleep)
+
+    with pytest.raises(OSError, match="socket closed"):
+        controller.send(
+            "MessagePlayer",
+            2,
+            {"PlayerId": "player-id"},
+            conn=explicit_connection,
+        )
+    sleep.assert_not_called()
 
 
 def test_detailed_player_parser_receives_controller_game(monkeypatch):

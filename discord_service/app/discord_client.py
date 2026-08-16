@@ -82,8 +82,10 @@ def _action_timestamp(event: dict) -> str:
     if not value:
         return ""
     try:
-        parsed = value if isinstance(value, datetime) else datetime.fromisoformat(
-            str(value).replace("Z", "+00:00")
+        parsed = (
+            value
+            if isinstance(value, datetime)
+            else datetime.fromisoformat(str(value).replace("Z", "+00:00"))
         )
         return f"<t:{int(parsed.timestamp())}:f>: "
     except (TypeError, ValueError, OverflowError):
@@ -250,10 +252,14 @@ def render_message(
     stat_snapshot = _squad_leader(snapshot) if is_squad_report else snapshot
     team = primary.get("team") or snapshot.get("team")
     target_name = (
-        primary.get("leader_name") or stat_snapshot.get("name")
-        if is_squad_report
-        else primary.get("display_name")
-    ) or incident.get("target_name") or "-"
+        (
+            primary.get("leader_name") or stat_snapshot.get("name")
+            if is_squad_report
+            else primary.get("display_name")
+        )
+        or incident.get("target_name")
+        or "-"
+    )
     player_id = (
         primary.get("player_id")
         or primary.get("leader_player_id")
@@ -316,7 +322,11 @@ def render_message(
                         "inline": True,
                     },
                     {
-                        "name": "⏱️ Gesamtspielzeit" if language == "de" else "⏱️ Total playtime",
+                        "name": (
+                            "⏱️ Gesamtspielzeit"
+                            if language == "de"
+                            else "⏱️ Total playtime"
+                        ),
                         "value": (
                             f"{playtime_hours:.1f} h"
                             if playtime_hours is not None
@@ -348,39 +358,39 @@ def render_message(
         else:
             fields.extend(
                 [
-                {
-                    "name": "⚔️ Combat",
-                    "value": _field_block(
-                        _metric("Kills", kills),
-                        _metric("Deaths", deaths),
-                        _metric("K/D", kd),
-                    ),
-                    "inline": True,
-                },
-                {
-                    "name": "⚡ Performance",
-                    "value": _field_block(
-                        _metric("KPM", f"{kpm:.2f}" if kpm is not None else None),
-                        _metric("Streak", stat_snapshot.get("kills_streak")),
-                        _metric(
-                            "Time",
-                            (
-                                f"{playtime_hours:.1f} h"
-                                if playtime_hours is not None
-                                else None
+                    {
+                        "name": "⚔️ Combat",
+                        "value": _field_block(
+                            _metric("Kills", kills),
+                            _metric("Deaths", deaths),
+                            _metric("K/D", kd),
+                        ),
+                        "inline": True,
+                    },
+                    {
+                        "name": "⚡ Performance",
+                        "value": _field_block(
+                            _metric("KPM", f"{kpm:.2f}" if kpm is not None else None),
+                            _metric("Streak", stat_snapshot.get("kills_streak")),
+                            _metric(
+                                "Time",
+                                (
+                                    f"{playtime_hours:.1f} h"
+                                    if playtime_hours is not None
+                                    else None
+                                ),
                             ),
                         ),
-                    ),
-                    "inline": True,
-                },
-                {
-                    "name": "⚠️ Teamkills",
-                    "value": _field_block(
-                        _metric("Count", stat_snapshot.get("teamkills")),
-                        _metric("Streak", stat_snapshot.get("teamkills_streak")),
-                    ),
-                    "inline": True,
-                },
+                        "inline": True,
+                    },
+                    {
+                        "name": "⚠️ Teamkills",
+                        "value": _field_block(
+                            _metric("Count", stat_snapshot.get("teamkills")),
+                            _metric("Streak", stat_snapshot.get("teamkills_streak")),
+                        ),
+                        "inline": True,
+                    },
                 ]
             )
     elif analysis and source in {"ai_player_name", "ai_chat"}:
@@ -481,6 +491,15 @@ def render_message(
                         "style": 2,
                         "label": labels["reporter"],
                         "custom_id": f"action:{incident_id}:{revision}:message_reporter",
+                    }
+                )
+            if has_action_target and "blacklist" in allowed_actions:
+                context_row.append(
+                    {
+                        "type": 2,
+                        "style": 4,
+                        "label": "⛔ Blacklist",
+                        "custom_id": f"action:{incident_id}:{revision}:blacklist",
                     }
                 )
             for action, style, label in [

@@ -409,7 +409,9 @@ def _execute_action(action: str, data: dict, user_name: str, incident: dict):
         squad_name = str(subject.get("squad_name") or "").strip()
         if not team or not squad_name:
             raise ValueError("The confirmed squad has no team or squad name")
-        return views.rcon_api.disband_squad_by_name(team, squad_name, reason)
+        return require_success(
+            views.rcon_api.disband_squad_by_name(team, squad_name, reason)
+        )
 
     subject = confirmed_action_subject(
         incident,
@@ -491,11 +493,13 @@ def _execute_action(action: str, data: dict, user_name: str, incident: dict):
             raise ValueError(
                 "Blacklist requires a reason, blacklist_id and explicit confirmation"
             )
-        return views.rcon_api.add_blacklist_record(
-            player_id=player_id,
-            blacklist_id=blacklist_id,
-            reason=reason,
-            admin_name=user_name,
+        return require_success(
+            views.rcon_api.add_blacklist_record(
+                player_id=player_id,
+                blacklist_id=blacklist_id,
+                reason=reason,
+                admin_name=user_name,
+            )
         )
     if action == "comment":
         comment = str(data.get("comment") or "").strip()
