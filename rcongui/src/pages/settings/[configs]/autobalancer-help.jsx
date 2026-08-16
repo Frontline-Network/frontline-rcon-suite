@@ -81,7 +81,7 @@ const FIELD_GROUPS = [
         unit: "Spieler insgesamt",
         recommended: "40",
         description:
-          "Allies und Axis werden zusammengezählt. Unterhalb dieses Werts startet kein Vorfall, damit der Balancer das Seeding nicht stört.",
+          "Beide Teams werden zusammengezählt. Unterhalb dieses Werts startet kein Vorfall, damit der Balancer das Seeding nicht stört.",
         lower: "Der Balancer kann schon während des Serveraufbaus eingreifen.",
         higher:
           "Mehr Schutz fürs Seeding, aber spätere Aktivierung bei mittelvollen Servern.",

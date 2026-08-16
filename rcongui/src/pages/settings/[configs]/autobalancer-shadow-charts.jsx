@@ -66,6 +66,10 @@ const LiveBalance = ({ status, targetDifference, minimumPlayers }) => {
   const counts = status?.team_counts || {};
   const allies = counts.allies;
   const axis = counts.axis;
+  const teamLabels = status?.team_labels || {
+    allies: "Allies",
+    axis: "Axis",
+  };
   const hasCounts = Number.isFinite(allies) && Number.isFinite(axis);
   const reasons = status?.block_reasons || [];
   const updatedAt = status?.updated_at ? new Date(status.updated_at) : null;
@@ -165,6 +169,8 @@ const LiveBalance = ({ status, targetDifference, minimumPlayers }) => {
       <TeamBalanceBar
         allies={allies}
         axis={axis}
+        alliesLabel={teamLabels.allies}
+        axisLabel={teamLabels.axis}
         targetDifference={targetDifference}
       />
 
@@ -173,9 +179,9 @@ const LiveBalance = ({ status, targetDifference, minimumPlayers }) => {
           <Chip
             size="small"
             variant="outlined"
-            label={`Teamrating Allies ${
+            label={`Teamrating ${teamLabels.allies} ${
               status.team_ratings.allies ?? "–"
-            } · Axis ${status.team_ratings.axis ?? "–"}`}
+            } · ${teamLabels.axis} ${status.team_ratings.axis ?? "–"}`}
           />
           <Chip
             size="small"
@@ -225,7 +231,7 @@ const LiveBalance = ({ status, targetDifference, minimumPlayers }) => {
   );
 };
 
-const DifferenceTimeline = ({ timeline, targetDifference }) => {
+const DifferenceTimeline = ({ timeline, targetDifference, teamLabels }) => {
   const points = (timeline || [])
     .map((sample) => ({
       time: new Date(sample.updated_at),
@@ -282,9 +288,9 @@ const DifferenceTimeline = ({ timeline, targetDifference }) => {
           curve: "linear",
           valueFormatter: (value) =>
             value > 0
-              ? `Allies +${value}`
+              ? `${teamLabels.allies} +${value}`
               : value < 0
-              ? `Axis +${Math.abs(value)}`
+              ? `${teamLabels.axis} +${Math.abs(value)}`
               : "Gleichstand",
         },
       ]}
@@ -418,6 +424,10 @@ const DistributionCharts = ({ summary }) => {
 
 const AutobalancerShadowCharts = ({ status, timeline, summary, config }) => {
   const targetDifference = config?.target_difference ?? 2;
+  const teamLabels = status?.team_labels || {
+    allies: "Allies",
+    axis: "Axis",
+  };
   return (
     <>
       <LiveBalance
@@ -428,11 +438,12 @@ const AutobalancerShadowCharts = ({ status, timeline, summary, config }) => {
       <Box sx={{ mt: 2 }}>
         <ChartShell
           title="Teamdifferenz im Zeitverlauf"
-          subtitle="Letzte sechs Stunden, Messung alle 30 Sekunden. Positive Werte: Allies größer; negative Werte: Axis größer. Orange Linien markieren die erlaubte Differenz."
+          subtitle={`Letzte sechs Stunden, Messung alle 30 Sekunden. Positive Werte: ${teamLabels.allies} größer; negative Werte: ${teamLabels.axis} größer. Orange Linien markieren die erlaubte Differenz.`}
         >
           <DifferenceTimeline
             timeline={timeline}
             targetDifference={targetDifference}
+            teamLabels={teamLabels}
           />
         </ChartShell>
       </Box>

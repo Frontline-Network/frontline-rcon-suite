@@ -100,6 +100,7 @@ const AutobalancerCard = () => {
   if (!canViewAutobalancer || isError || !status) return null;
   const proposal = status.proposal;
   const counts = status.team_counts || {};
+  const teamLabels = status.team_labels || { allies: "Allies", axis: "Axis" };
   return (
     <Card variant="outlined" sx={{ m: 1.5 }}>
       <CardContent sx={{ pb: 1 }}>
@@ -126,6 +127,8 @@ const AutobalancerCard = () => {
           compact
           allies={counts.allies}
           axis={counts.axis}
+          alliesLabel={teamLabels.allies}
+          axisLabel={teamLabels.axis}
           targetDifference={status.target_difference}
         />
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
@@ -138,7 +141,7 @@ const AutobalancerCard = () => {
           <Box sx={{ mt: 1 }}>
             <Typography variant="body2">
               Vorschlag: <strong>{proposal.player_name}</strong> nach{" "}
-              {status.plan?.target_team || "Gegenteam"}
+              {teamLabels[status.plan?.target_team] || "Gegenteam"}
             </Typography>
             <Typography variant="caption" color="text.secondary">
               Auswahlgrund: {proposal.reason} · Schutzstufe {proposal.base_tier}

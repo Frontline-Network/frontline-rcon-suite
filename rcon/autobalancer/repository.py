@@ -7,7 +7,13 @@ from typing import Any
 
 from sqlalchemy import func, select
 
+from rcon.game.hllv.profile import HLLV_PROFILE
 from rcon.models import AutobalanceDecision, Maps, enter_session
+from rcon.types import GameEnum, Roles
+from rcon.utils import get_role_unit_type, get_squad_leader_roles
+
+
+HLL_ROLE_NAMES = frozenset(role.value for role in Roles)
 
 
 def _shadow_decision_summary(decision: dict[str, Any]) -> dict[str, Any]:
@@ -42,6 +48,22 @@ def _shadow_decision_summary(decision: dict[str, Any]) -> dict[str, Any]:
             warnings.append("Commander wurde als Kandidat vorgeschlagen")
         if player.get("team") != decision.get("source_team"):
             warnings.append("Kandidat war nicht im gespeicherten Quellteam")
+        game_value = snapshot.get("game")
+        if not game_value and role in HLLV_PROFILE.roles - HLL_ROLE_NAMES:
+            game_value = GameEnum.HLL_VIETNAM.value
+        try:
+            game = GameEnum(game_value) if game_value else None
+        except ValueError:
+            game = None
+        if game is not None:
+            expected_unit_type = get_role_unit_type(game, role)
+            if expected_unit_type != "infantry" and unit_type != expected_unit_type:
+                warnings.append(
+                    f"Rolle {role} wurde fälschlich als {unit_type or 'unbekannt'} "
+                    f"statt {expected_unit_type} klassifiziert"
+                )
+            if role in get_squad_leader_roles(game) and not player.get("is_leader"):
+                warnings.append(f"Führungsrolle {role} wurde nicht als Leader erkannt")
     if isinstance(allies, int) and isinstance(axis, int) and allies != axis:
         expected_source = "allies" if allies > axis else "axis"
         if decision.get("source_team") != expected_source:
@@ -96,6 +118,10 @@ def _shadow_decision_summary(decision: dict[str, Any]) -> dict[str, Any]:
             "warnings": strategy_plan.get("warnings") or [],
         }
     player_rating = player.get("rating") or {}
+    team_labels = snapshot.get("team_labels") or {
+        "allies": "Allies",
+        "axis": "Axis",
+    }
     return {
         "decision_id": decision.get("decision_id"),
         "incident_id": decision.get("incident_id"),
@@ -109,6 +135,7 @@ def _shadow_decision_summary(decision: dict[str, Any]) -> dict[str, Any]:
         "size_overshoot": size_overshoot,
         "source_team": decision.get("source_team"),
         "target_team": decision.get("target_team"),
+        "team_labels": team_labels,
         "player_id": decision.get("player_id"),
         "player_name": decision.get("player_name"),
         "volunteer": bool(decision.get("volunteer")),

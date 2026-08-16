@@ -56,6 +56,7 @@ from rcon.utils import (
     INDEFINITE_VIP_DATE,
     MapsHistory,
     default_player_info_dict,
+    get_role_unit_type,
     get_server_number,
     get_squad_leader_roles,
     parse_raw_player_info,
@@ -460,16 +461,19 @@ class Rcon(ServerCtl):
 
     def _guess_squad_type(
             self, squad
-    ) -> Literal["armor", "recon", "commander", "infantry", "artillery"]:
+    ) -> Literal[
+        "armor",
+        "recon",
+        "commander",
+        "infantry",
+        "artillery",
+        "mortar",
+        "helicopter",
+    ]:
         for player in squad.get("players", []):
-            if player.get("role") in ["tankcommander", "crewman"]:
-                return "armor"
-            if player.get("role") in ["spotter", "sniper"]:
-                return "recon"
-            if player.get("role") in ["armycommander"]:
-                return "commander"
-            if player.get("role") in ["artilleryobserver", "operator", "gunner"]:
-                return "artillery"
+            unit_type = get_role_unit_type(self.config.game, player.get("role"))
+            if unit_type != "infantry":
+                return unit_type
 
         return "infantry"
 

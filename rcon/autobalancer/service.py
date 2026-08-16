@@ -374,7 +374,9 @@ class AutobalancerService:
             connection_grace_seconds=config.connection_grace_seconds,
         )
         message = config.messages.volunteer_request.format(
-            target_team=snapshot.smaller_team.capitalize(),
+            target_team=snapshot.team_labels.get(
+                snapshot.smaller_team, snapshot.smaller_team.capitalize()
+            ),
             seconds=config.volunteer_phase_seconds,
         )
         for player in recipients:
@@ -530,6 +532,7 @@ class AutobalancerService:
                     name: candidate_plan.public_dict() if candidate_plan else None
                     for name, candidate_plan in strategy_plans.items()
                 },
+                "team_labels": dict(snapshot.team_labels),
                 "proposal_expires_at": now.timestamp()
                 + config.manual_proposal_timeout_seconds,
             }
@@ -549,7 +552,9 @@ class AutobalancerService:
         self.rcon.message_player(
             candidate["player_id"],
             message=config.messages.candidate_selected.format(
-                target_team=str(state["target_team"]).capitalize(),
+                target_team=(state.get("team_labels") or {}).get(
+                    state["target_team"], str(state["target_team"]).capitalize()
+                ),
                 cooldown_maps=config.cooldown_maps,
             ),
         )
@@ -675,7 +680,9 @@ class AutobalancerService:
         self.rcon.message_player(
             candidate["player_id"],
             message=config.messages.switch_completed.format(
-                target_team=str(state["target_team"]).capitalize(),
+                target_team=snapshot.team_labels.get(
+                    state["target_team"], str(state["target_team"]).capitalize()
+                ),
                 cooldown_maps=config.cooldown_maps,
             ),
         )
@@ -832,6 +839,7 @@ class AutobalancerService:
             "decision_id": state.get("decision_id"),
             "round_id": snapshot.round_id,
             "team_counts": snapshot.team_counts,
+            "team_labels": dict(snapshot.team_labels),
             "team_difference": snapshot.difference,
             "required_switches": max(
                 0,

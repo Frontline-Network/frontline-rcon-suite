@@ -84,6 +84,9 @@ def test_required_switches(allies, axis, target, expected):
         (player("armor", role="crewman", unit_type="armor"), 5),
         (player("recon", role="sniper", unit_type="recon"), 5),
         (player("arty", role="gunner", unit_type="artillery"), 5),
+        (player("mortar", role="mortargunner", unit_type="mortar"), 5),
+        (player("helicopter", role="helicopterpilot", unit_type="helicopter"), 5),
+        (player("hllv-leader", role="squadleader", leader=True), 4),
     ],
 )
 def test_protection_tiers(candidate, expected):
