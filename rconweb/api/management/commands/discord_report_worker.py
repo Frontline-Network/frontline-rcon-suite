@@ -214,6 +214,21 @@ class Command(BaseCommand):
                 .limit(50)
             ).scalars()
             for candidate in candidates:
+                ai_config = {**{
+                    "provider": "managed",
+                    "ai_model": "gpt-5.6-luna",
+                    "player_name_model": "gpt-5.4-nano",
+                }, **dict(integration.ai_config or {})}
+                provider = str(ai_config["provider"])
+                api_key = None
+                if provider == "api_key":
+                    if not integration.ai_api_key_ciphertext:
+                        candidate.attempts += 1
+                        candidate.last_error = "api_key_not_configured"
+                        candidate.next_attempt_at = now + timedelta(minutes=5)
+                        session.flush()
+                        continue
+                    api_key = decrypt_capability(integration.ai_api_key_ciphertext)
                 job = ModerationAnalysisJobEnvelope(
                     installation_id=str(integration.installation_id),
                     job_id=candidate.id,
@@ -225,6 +240,10 @@ class Command(BaseCommand):
                     matched_rule_ids=candidate.matched_rule_ids,
                     policy=candidate.policy,
                     shadow_only=candidate.shadow_only,
+                    ai_provider=provider,
+                    ai_model=str(ai_config["ai_model"]),
+                    player_name_model=str(ai_config["player_name_model"]),
+                    api_key=api_key,
                     created_at=candidate.created_at,
                 )
                 try:

@@ -167,6 +167,8 @@ class DiscordReportIntegration(models.Model):
     allowed_actions = models.JSONField(default=list)
     language = models.CharField(max_length=2, default="de")
     ai_config = models.JSONField(default=dict)
+    # Optional customer API key encrypted with the installation's Django secret.
+    ai_api_key_ciphertext = models.BinaryField(blank=True, default=bytes)
     policy = models.JSONField(default=dict)
     reporter_templates = models.JSONField(default=dict)
     delivery_started_at = models.DateTimeField(null=True, blank=True)

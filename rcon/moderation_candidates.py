@@ -119,9 +119,15 @@ def enqueue_candidate(
         return None
     normalized = normalize_candidate(candidate_text)
     model_version = (
-        os.getenv("AI_PLAYER_NAME_MODEL", "gpt-5-nano")
+        str(
+            ai_config.get("player_name_model")
+            or os.getenv("AI_PLAYER_NAME_MODEL", "gpt-5.4-nano")
+        )
         if source == ModerationSource.PLAYER_NAME
-        else os.getenv("AI_MODERATION_MODEL", "gpt-5.6-luna")
+        else str(
+            ai_config.get("ai_model")
+            or os.getenv("AI_MODERATION_MODEL", "gpt-5.6-luna")
+        )
     )
     fingerprint = hashlib.sha256(
         (

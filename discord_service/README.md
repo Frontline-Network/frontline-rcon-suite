@@ -22,7 +22,7 @@ action reasons, messages, or previews.
 positive value is enforced per CRCON installation and is displayed in CRCON.
 
 Player names use the separate `DISCORD_SERVICE_PLAYER_NAME_MODEL` (default:
-`gpt-5-nano`) with a compact schema and low reasoning; they do not call the
+`gpt-5.4-nano`) with a compact schema and low reasoning; they do not call the
 generic moderation endpoint first. Chat candidates use `DISCORD_SERVICE_AI_MODEL`
 only after the moderation/policy gate. Normal player reports are delivered
 without AI analysis. CRCON stores the last normalized
@@ -45,6 +45,28 @@ Do not place capabilities in URLs or logs. Pairing is valid for ten minutes and
 creates separate random capabilities for CRCON-to-service events and
 service-to-CRCON actions. The receiver stores only a keyed digest; the sender
 stores the raw value encrypted.
+
+## AI providers
+
+CRCON offers three provider modes per installation:
+
+- **Frontline quota** uses `DISCORD_SERVICE_OPENAI_API_KEY` and the configured
+  service quota.
+- **Own API key** keeps the key encrypted in CRCON and sends it only with the
+  individual analysis request over the existing authenticated HTTPS channel.
+  The central service does not persist it.
+- **ChatGPT/Codex** starts the official Codex device-code flow. OAuth state is
+  encrypted per installation on the `discord_codex` volume and is only
+  materialized in a temporary `CODEX_HOME` while the Codex process needs it.
+  Before untrusted text reaches a model turn, the plaintext credentials are
+  detached again. The model list is read dynamically from that signed-in
+  account. CRCON never receives or displays the OAuth tokens.
+
+The Codex mode is deliberately isolated and read-only: every moderation turn is
+ephemeral, uses a strict JSON schema, has no writable workspace or built-in
+execution/search tools, and runs with approval policy `never`. If authentication,
+plan quota, the selected model, or the runtime is unavailable, moderation is
+marked unavailable while ordinary Discord reports continue to work.
 
 ## Verification
 

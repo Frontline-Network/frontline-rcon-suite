@@ -1005,6 +1005,53 @@ class DiscordActionTemplateTests(TestCase):
         self.client.force_login(user)
         return user
 
+    def test_ai_provider_config_encrypts_api_key_and_never_serializes_it(self):
+        from api.discord_capabilities import decrypt_capability
+        from api.models import DiscordReportIntegration
+
+        self._discord_manager()
+        response = self.client.put(
+            "/api/discord/v1/integration",
+            data=json.dumps(
+                {
+                    "enabled": True,
+                    "moderator_role_ids": [],
+                    "allowed_actions": [],
+                    "language": "de",
+                    "ai_config": {
+                        "provider": "api_key",
+                        "ai_model": "gpt-5.6-luna",
+                        "player_name_model": "gpt-5.4-nano",
+                    },
+                    "api_key": "sk-test-key-that-is-long-enough",
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        result = response.json()["result"]
+        self.assertTrue(result["has_api_key"])
+        self.assertNotIn("api_key", result)
+        integration = DiscordReportIntegration.objects.get(pk=1)
+        self.assertNotIn(b"sk-test", bytes(integration.ai_api_key_ciphertext))
+        self.assertEqual(
+            decrypt_capability(integration.ai_api_key_ciphertext),
+            "sk-test-key-that-is-long-enough",
+        )
+
+    def test_ai_provider_rejects_invalid_model_identifier(self):
+        from api.discord_integration import _config_payload
+
+        with self.assertRaisesRegex(ValueError, "Invalid AI model"):
+            _config_payload(
+                {
+                    "ai_config": {
+                        "provider": "managed",
+                        "ai_model": "../../secret",
+                    }
+                }
+            )
+
     def test_action_subject_confirmation_is_derived_from_crcon_state(self):
         from api.discord_integration import (
             _normalize_action_subject,

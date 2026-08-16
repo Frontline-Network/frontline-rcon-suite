@@ -10,6 +10,7 @@ from openai import OpenAI
 from pydantic import BaseModel, ConfigDict, Field
 
 from .config import Settings, get_settings
+from .codex_runtime import CodexRuntimeError, run_structured
 from .contracts import (
     ModerationAnalysis,
     ModerationPolicy,
@@ -86,6 +87,57 @@ def _normalized_evidence(value: str | None) -> str:
 def _has_exact_evidence(text: str, excerpt: str | None) -> bool:
     candidate = _normalized_evidence(excerpt)
     return bool(candidate and candidate in _normalized_evidence(text))
+
+
+def _player_name_analysis(
+    *,
+    decision: PlayerNameDecision,
+    text: str,
+    source: ModerationSource,
+    policy: ModerationPolicy,
+    player_ids: list[str],
+    model: str,
+    prompt_version: str,
+) -> ModerationAnalysis:
+    targeted_hate_evidenced = (
+        decision.category == "targeted_hate"
+        and decision.target == "protected_group"
+        and _has_exact_evidence(text, decision.protected_target_excerpt)
+        and _has_exact_evidence(text, decision.hostile_excerpt)
+    )
+    direct_violation_evidenced = decision.category in {
+        "slur",
+        "dehumanization",
+        "sexual_abuse",
+        "credible_threat",
+    } and _has_exact_evidence(text, decision.offending_excerpt)
+    clear_violation = decision.clear_violation and (
+        targeted_hate_evidenced or direct_violation_evidenced
+    )
+    risk_score = (
+        max(decision.risk_score, 0.9)
+        if clear_violation
+        else min(decision.risk_score, 0.89)
+    )
+    return ModerationAnalysis(
+        source=source,
+        affected_player_ids=player_ids,
+        categories=[] if decision.category == "none" else [decision.category],
+        rule_ids=[],
+        severity=decision.severity,
+        risk_score=risk_score,
+        rationale=decision.rationale,
+        relevant_excerpts=[text[:255]],
+        suggested_action=SuggestedAction(decision.suggested_action),
+        suggested_duration_hours=None,
+        duration_rationale=None,
+        suggested_player_response=decision.suggested_player_response,
+        model_version=model,
+        prompt_version=prompt_version,
+        policy_profile_id=policy.profile_id,
+        policy_version=policy.version,
+        hard_hit=False,
+    )
 
 
 class ManagedAnalyzer:
@@ -188,49 +240,14 @@ class ManagedAnalyzer:
                     return AnalysisResult(
                         None, unavailable_reason="empty_structured_output"
                     )
-                targeted_hate_evidenced = (
-                    decision.category == "targeted_hate"
-                    and decision.target == "protected_group"
-                    and _has_exact_evidence(text, decision.protected_target_excerpt)
-                    and _has_exact_evidence(text, decision.hostile_excerpt)
-                )
-                direct_violation_evidenced = decision.category in {
-                    "slur",
-                    "dehumanization",
-                    "sexual_abuse",
-                    "credible_threat",
-                } and _has_exact_evidence(text, decision.offending_excerpt)
-                clear_violation = decision.clear_violation and (
-                    targeted_hate_evidenced or direct_violation_evidenced
-                )
-                risk_score = (
-                    max(decision.risk_score, 0.9)
-                    if clear_violation
-                    else min(decision.risk_score, 0.89)
-                )
-                parsed = ModerationAnalysis(
+                parsed = _player_name_analysis(
+                    decision=decision,
+                    text=text,
                     source=source,
-                    affected_player_ids=player_ids or [],
-                    categories=(
-                        [] if decision.category == "none" else [decision.category]
-                    ),
-                    rule_ids=[],
-                    severity=decision.severity,
-                    risk_score=risk_score,
-                    rationale=decision.rationale,
-                    relevant_excerpts=[text[:255]],
-                    suggested_action=SuggestedAction(decision.suggested_action),
-                    suggested_duration_hours=None,
-                    duration_rationale=None,
-                    suggested_player_response=decision.suggested_player_response,
-                    model_version=self.settings.player_name_model,
-                    prompt_version=f"{self.settings.prompt_version}-player-name-nano",
-                    policy_profile_id=policy.profile_id,
-                    policy_version=policy.version,
-                    # Omni's broad violence category is context, not a hard
-                    # player-name verdict. Only customer policy hard rules are
-                    # promoted at CRCON's trust boundary.
-                    hard_hit=False,
+                    policy=policy,
+                    player_ids=player_ids or [],
+                    model=self.settings.player_name_model,
+                    prompt_version=f"{self.settings.prompt_version}-player-name",
                 )
                 usage = getattr(response, "usage", None)
                 return AnalysisResult(
@@ -284,6 +301,137 @@ class ManagedAnalyzer:
                 used_responses_model=True,
             )
         except Exception as exc:
+            return AnalysisResult(
+                None, unavailable_reason=f"{type(exc).__name__}:analysis_failed"
+            )
+
+
+class CodexAnalyzer:
+    """Subscription-backed analyzer using an isolated Codex app-server home."""
+
+    def __init__(self, installation_id: str, settings: Settings | None = None):
+        self.installation_id = installation_id
+        self.settings = settings or get_settings()
+        self.moderation_client = (
+            OpenAI(api_key=self.settings.openai_api_key)
+            if self.settings.openai_api_key
+            else None
+        )
+
+    def analyze(
+        self,
+        *,
+        text: str,
+        source: ModerationSource,
+        policy: ModerationPolicy,
+        model: str,
+        player_ids: list[str] | None = None,
+        force_structured_analysis: bool = False,
+        matched_rule_ids: list[str] | None = None,
+    ) -> AnalysisResult:
+        try:
+            moderation_flagged = False
+            moderation_categories: list[str] = []
+            if source != ModerationSource.PLAYER_NAME and self.moderation_client:
+                moderation = self.moderation_client.moderations.create(
+                    model=self.settings.moderation_model, input=text
+                )
+                result = moderation.results[0]
+                moderation_flagged = bool(result and result.flagged)
+                categories = getattr(result, "categories", None)
+                if categories is not None:
+                    raw = (
+                        categories.model_dump()
+                        if hasattr(categories, "model_dump")
+                        else vars(categories)
+                    )
+                    moderation_categories = [
+                        name for name, matched in raw.items() if matched
+                    ]
+            if (
+                source == ModerationSource.CHAT
+                and self.moderation_client
+                and not moderation_flagged
+                and not force_structured_analysis
+            ):
+                return AnalysisResult(
+                    ModerationAnalysis(
+                        source=source,
+                        affected_player_ids=player_ids or [],
+                        categories=[],
+                        rule_ids=[],
+                        severity=ModerationSeverity.NONE,
+                        risk_score=0,
+                        rationale="Omni moderation gate found no actionable safety signal.",
+                        relevant_excerpts=[],
+                        suggested_action=SuggestedAction.NONE,
+                        model_version=self.settings.moderation_model,
+                        prompt_version=f"{self.settings.prompt_version}-omni-gate",
+                        policy_profile_id=policy.profile_id,
+                        policy_version=policy.version,
+                        hard_hit=False,
+                    )
+                )
+            if source == ModerationSource.PLAYER_NAME:
+                prompt = (
+                    f"{PLAYER_NAME_PROMPT}\n\n"
+                    f"LANGUAGE: {policy.language}\nPLAYER_NAME: {text[:255]}\n"
+                    "LOCAL_RULE_IDS: "
+                    f"{','.join((matched_rule_ids or [])[:20]) or 'none'}\n"
+                    "Return the requested JSON object. Do not use tools or inspect files."
+                )
+                raw = run_structured(
+                    self.installation_id,
+                    model=model,
+                    prompt=prompt,
+                    output_schema=PlayerNameDecision.model_json_schema(),
+                )
+                decision = PlayerNameDecision.model_validate(raw)
+                return AnalysisResult(
+                    _player_name_analysis(
+                        decision=decision,
+                        text=text,
+                        source=source,
+                        policy=policy,
+                        player_ids=player_ids or [],
+                        model=model,
+                        prompt_version=f"{self.settings.prompt_version}-codex-player-name",
+                    ),
+                    used_responses_model=True,
+                )
+            prompt = (
+                f"{SYSTEM_PROMPT}\n\nSOURCE: {source.value}\n"
+                f"POLICY_JSON: {policy.model_dump_json()}\n"
+                f"UNTRUSTED_TEXT_BEGIN\n{text[:4000]}\nUNTRUSTED_TEXT_END\n"
+                f"MODERATION_GATE_FLAGGED: {moderation_flagged}\n"
+                "MODERATION_GATE_CATEGORIES: "
+                f"{','.join(moderation_categories) or 'none'}\n"
+                "Return the requested JSON object. Do not use tools or inspect files."
+            )
+            parsed = ModerationAnalysis.model_validate(
+                run_structured(
+                    self.installation_id,
+                    model=model,
+                    prompt=prompt,
+                    output_schema=ModerationAnalysis.model_json_schema(),
+                )
+            )
+            return AnalysisResult(
+                parsed.model_copy(
+                    update={
+                        "source": source,
+                        "affected_player_ids": player_ids
+                        or parsed.affected_player_ids,
+                        "hard_hit": moderation_flagged,
+                        "model_version": model,
+                        "prompt_version": f"{self.settings.prompt_version}-codex",
+                        "policy_profile_id": policy.profile_id,
+                        "policy_version": policy.version,
+                    }
+                ),
+                used_responses_model=True,
+            )
+        except (CodexRuntimeError, ValueError) as exc:
             return AnalysisResult(
                 None, unavailable_reason=f"{type(exc).__name__}:analysis_failed"
             )

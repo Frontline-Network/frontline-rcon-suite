@@ -1,4 +1,5 @@
 import os
+import shutil
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
@@ -11,8 +12,9 @@ os.environ.setdefault(
 )
 os.environ.setdefault("DISCORD_SERVICE_DRY_RUN", "true")
 
-from discord_service.app.ai import ManagedAnalyzer, PlayerNameDecision
+from discord_service.app.ai import CodexAnalyzer, ManagedAnalyzer, PlayerNameDecision
 from discord_service.app.config import Settings, get_settings
+from discord_service.app.codex_runtime import _persist_credentials, _runtime_home
 from discord_service.app.contracts import (
     IncidentEventEnvelope,
     ModerationAnalysis,
@@ -969,7 +971,7 @@ def test_player_names_use_nano_with_small_schema():
     assert result.output_tokens == 5
     assert result.used_responses_model is True
     assert not hasattr(fake.moderations, "kwargs")
-    assert fake.responses.kwargs["model"] == "gpt-5-nano"
+    assert fake.responses.kwargs["model"] == "gpt-5.4-nano"
     assert fake.responses.kwargs["store"] is False
     assert fake.responses.kwargs["reasoning"] == {"effort": "low"}
     assert fake.responses.kwargs["text"] == {"verbosity": "low"}
@@ -988,6 +990,77 @@ def test_clear_semantic_player_name_violation_reaches_incident_threshold():
     assert result.analysis is not None
     assert result.analysis.risk_score == 0.9
     assert result.analysis.categories == ["targeted_hate"]
+
+
+def test_codex_player_name_analysis_uses_selected_subscription_model():
+    decision = PlayerNameDecision(
+        category="none",
+        target="none",
+        clear_violation=False,
+        severity="none",
+        risk_score=0.1,
+        rationale="No actionable violation",
+        suggested_action="none",
+    )
+    with patch(
+        "discord_service.app.ai.run_structured",
+        return_value=decision.model_dump(mode="json"),
+    ) as run:
+        result = CodexAnalyzer(
+            "11111111-1111-1111-1111-111111111111",
+            settings=Settings(
+                secret="test-secret-that-is-at-least-32-characters",
+                openai_api_key="",
+            ),
+        ).analyze(
+            text="Gewaltlord",
+            source=ModerationSource.PLAYER_NAME,
+            policy=ModerationPolicy(),
+            model="gpt-5.6-luna",
+        )
+    assert result.analysis is not None
+    assert result.analysis.model_version == "gpt-5.6-luna"
+    assert result.analysis.prompt_version.endswith("codex-player-name")
+    assert run.call_args.kwargs["model"] == "gpt-5.6-luna"
+
+
+def test_codex_status_endpoint_is_capability_protected():
+    capability = _seed()
+    path = "/v1/ai/11111111-1111-1111-1111-111111111111/status"
+    assert TestClient(app).get(path).status_code == 404
+    expected = {
+        "available": True,
+        "connected": True,
+        "state": "connected",
+        "models": [{"id": "gpt-test", "name": "GPT Test"}],
+    }
+    with patch(
+        "discord_service.app.main.codex_account_status", return_value=expected
+    ):
+        response = TestClient(app).get(
+            path, headers={"Authorization": f"Bearer {capability}"}
+        )
+    assert response.status_code == 200
+    assert response.json() == expected
+
+
+def test_codex_credentials_are_encrypted_at_rest(tmp_path):
+    store = tmp_path / "installation"
+    store.mkdir()
+    runtime = tmp_path / "runtime-home"
+    runtime.mkdir()
+    secret = '{"tokens":{"access_token":"private-test-token"}}'
+    (runtime / "auth.json").write_text(secret, encoding="utf-8")
+
+    _persist_credentials(store, runtime)
+
+    encrypted = (store / "auth.json.enc").read_text(encoding="ascii")
+    assert "private-test-token" not in encrypted
+    restored = _runtime_home(store)
+    try:
+        assert (restored / "auth.json").read_text(encoding="utf-8") == secret
+    finally:
+        shutil.rmtree(restored)
 
 
 def test_hard_local_rule_can_request_structured_analysis_after_omni():

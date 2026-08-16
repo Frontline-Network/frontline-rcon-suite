@@ -17,6 +17,8 @@ import {
 } from "@mui/material";
 import {
   AutoAwesome as AiIcon,
+  Key as ApiKeyIcon,
+  Login as LoginIcon,
   Forum as ReplyIcon,
   Link as ConnectionIcon,
   Security as PermissionsIcon,
@@ -84,6 +86,8 @@ export default function DiscordReportBotCard() {
   const [exceptions, setExceptions] = useState("");
   const [regexes, setRegexes] = useState("");
   const [usage, setUsage] = useState(null);
+  const [aiStatus, setAiStatus] = useState(null);
+  const [apiKey, setApiKey] = useState("");
   const [editingConnection, setEditingConnection] = useState(false);
 
   const apply = useCallback((next) => {
@@ -107,19 +111,36 @@ export default function DiscordReportBotCard() {
     return options;
   }, []);
 
+  const loadAiStatus = useCallback(async () => {
+    const status = await discordRequest("ai/status");
+    setAiStatus((previous) => ({ ...(previous || {}), ...status }));
+    return status;
+  }, []);
+
   useEffect(() => {
     discordRequest("integration")
       .then((next) => {
         apply(next);
         if (next.connected) {
-          discordRequest("usage").then(setUsage).catch(() => setUsage(null));
+          discordRequest("usage")
+            .then(setUsage)
+            .catch(() => setUsage(null));
+          loadAiStatus().catch(() => setAiStatus(null));
         }
         loadDiscordOptions().catch((requestError) =>
           setError(requestError.message)
         );
       })
       .catch((requestError) => setError(requestError.message));
-  }, [apply, loadDiscordOptions]);
+  }, [apply, loadAiStatus, loadDiscordOptions]);
+
+  useEffect(() => {
+    if (aiStatus?.state !== "pending") return undefined;
+    const timer = window.setInterval(() => {
+      loadAiStatus().catch(() => null);
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [aiStatus?.state, loadAiStatus]);
 
   const connect = async () => {
     try {
@@ -173,11 +194,13 @@ export default function DiscordReportBotCard() {
             allowed_actions: config.allowed_actions || [],
             language: config.language,
             ai_config: config.ai_config || {},
+            ...(apiKey ? { api_key: apiKey } : {}),
             policy,
             reporter_templates: config.reporter_templates || {},
           },
         })
       );
+      setApiKey("");
       toast.success(t("settings.discordReports.saved"));
     } catch (requestError) {
       setError(requestError.message);
@@ -246,7 +269,10 @@ export default function DiscordReportBotCard() {
                     variant="outlined"
                     onClick={() =>
                       window.open(
-                        `${config.service_url.replace(/\/$/, "")}/oauth/install`,
+                        `${config.service_url.replace(
+                          /\/$/,
+                          ""
+                        )}/oauth/install`,
                         "_blank",
                         "noopener,noreferrer"
                       )
@@ -319,14 +345,20 @@ export default function DiscordReportBotCard() {
           )}
           {config?.connected && (
             <>
-              {usage && (
+              {usage &&
+                (config.ai_config?.provider || "managed") === "managed" && (
+                  <Alert severity="info">
+                    {t("settings.discordReports.usage", {
+                      used: usage.used_tokens.toLocaleString(),
+                      quota: usage.quota_tokens
+                        ? usage.quota_tokens.toLocaleString()
+                        : t("settings.discordReports.unlimited"),
+                    })}
+                  </Alert>
+                )}
+              {(config.ai_config?.provider || "managed") !== "managed" && (
                 <Alert severity="info">
-                  {t("settings.discordReports.usage", {
-                    used: usage.used_tokens.toLocaleString(),
-                    quota: usage.quota_tokens
-                      ? usage.quota_tokens.toLocaleString()
-                      : t("settings.discordReports.unlimited"),
-                  })}
+                  {t("settings.discordReports.externalBilling")}
                 </Alert>
               )}
               <SectionTitle
@@ -379,7 +411,10 @@ export default function DiscordReportBotCard() {
                       variant="outlined"
                       onClick={() =>
                         window.open(
-                          `${config.service_url.replace(/\/$/, "")}/oauth/install`,
+                          `${config.service_url.replace(
+                            /\/$/,
+                            ""
+                          )}/oauth/install`,
                           "_blank",
                           "noopener,noreferrer"
                         )
@@ -395,7 +430,9 @@ export default function DiscordReportBotCard() {
                         config.guild_id ||
                         ""
                       }
-                      helperText={t("settings.discordReports.guildDetectedHelp")}
+                      helperText={t(
+                        "settings.discordReports.guildDetectedHelp"
+                      )}
                       InputProps={{ readOnly: true }}
                       fullWidth
                     />
@@ -439,7 +476,9 @@ export default function DiscordReportBotCard() {
                 value={roles}
                 onChange={(event) => {
                   const value = event.target.value;
-                  setRoles(typeof value === "string" ? value.split(",") : value);
+                  setRoles(
+                    typeof value === "string" ? value.split(",") : value
+                  );
                 }}
                 helperText={t("settings.discordReports.rolesHelp")}
                 SelectProps={{
@@ -519,6 +558,187 @@ export default function DiscordReportBotCard() {
                 title={t("settings.discordReports.sectionAi")}
                 help={t("settings.discordReports.sectionAiHelp")}
               />
+              <TextField
+                select
+                label={t("settings.discordReports.aiProvider")}
+                value={config.ai_config?.provider || "managed"}
+                onChange={(event) =>
+                  setConfig({
+                    ...config,
+                    ai_config: {
+                      ...(config.ai_config || {}),
+                      provider: event.target.value,
+                    },
+                  })
+                }
+                helperText={t(
+                  `settings.discordReports.provider_${
+                    config.ai_config?.provider || "managed"
+                  }_help`
+                )}
+                fullWidth
+              >
+                <MenuItem value="managed">
+                  {t("settings.discordReports.provider_managed")}
+                </MenuItem>
+                <MenuItem value="api_key">
+                  {t("settings.discordReports.provider_api_key")}
+                </MenuItem>
+                <MenuItem value="codex">
+                  {t("settings.discordReports.provider_codex")}
+                </MenuItem>
+              </TextField>
+              {(config.ai_config?.provider || "managed") === "api_key" && (
+                <Stack spacing={1.25}>
+                  <TextField
+                    type="password"
+                    label={t("settings.discordReports.apiKey")}
+                    value={apiKey}
+                    onChange={(event) => setApiKey(event.target.value)}
+                    placeholder={
+                      config.has_api_key ? "sk-••••••••••••" : "sk-…"
+                    }
+                    helperText={
+                      config.has_api_key
+                        ? t("settings.discordReports.apiKeyStored")
+                        : t("settings.discordReports.apiKeyHelp")
+                    }
+                    InputProps={{
+                      startAdornment: <ApiKeyIcon sx={{ mr: 1 }} />,
+                    }}
+                    fullWidth
+                  />
+                </Stack>
+              )}
+              {(config.ai_config?.provider || "managed") === "codex" && (
+                <Stack spacing={1.25}>
+                  {aiStatus?.connected ? (
+                    <Alert
+                      severity="success"
+                      action={
+                        <Button
+                          color="inherit"
+                          size="small"
+                          onClick={() =>
+                            discordRequest("ai/logout", { method: "POST" })
+                              .then(loadAiStatus)
+                              .catch((requestError) =>
+                                setError(requestError.message)
+                              )
+                          }
+                        >
+                          {t("settings.discordReports.codexLogout")}
+                        </Button>
+                      }
+                    >
+                      {t("settings.discordReports.codexConnected", {
+                        email: aiStatus.email || "ChatGPT",
+                        plan: aiStatus.plan_type || "Codex",
+                      })}
+                    </Alert>
+                  ) : aiStatus?.state === "pending" ? (
+                    <Alert severity="info">
+                      {t("settings.discordReports.codexPending", {
+                        code: aiStatus.user_code || "",
+                      })}
+                    </Alert>
+                  ) : (
+                    <Alert
+                      severity={
+                        aiStatus?.available === false ? "warning" : "info"
+                      }
+                      action={
+                        <Button
+                          color="inherit"
+                          size="small"
+                          startIcon={<LoginIcon />}
+                          disabled={aiStatus?.available === false}
+                          onClick={() =>
+                            discordRequest("ai/login", { method: "POST" })
+                              .then((next) => {
+                                setAiStatus(next);
+                                window.open(
+                                  next.verification_url,
+                                  "_blank",
+                                  "noopener,noreferrer"
+                                );
+                              })
+                              .catch((requestError) =>
+                                setError(requestError.message)
+                              )
+                          }
+                        >
+                          {t("settings.discordReports.codexLogin")}
+                        </Button>
+                      }
+                    >
+                      {aiStatus?.available === false
+                        ? t("settings.discordReports.codexUnavailable")
+                        : t("settings.discordReports.codexDisconnected")}
+                    </Alert>
+                  )}
+                  {aiStatus?.state === "pending" &&
+                    aiStatus.verification_url && (
+                      <Button
+                        variant="outlined"
+                        onClick={() =>
+                          window.open(
+                            aiStatus.verification_url,
+                            "_blank",
+                            "noopener,noreferrer"
+                          )
+                        }
+                      >
+                        {t("settings.discordReports.codexOpenLogin", {
+                          code: aiStatus.user_code,
+                        })}
+                      </Button>
+                    )}
+                </Stack>
+              )}
+              <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                {["ai_model", "player_name_model"].map((key) => {
+                  const provider = config.ai_config?.provider || "managed";
+                  const options =
+                    provider === "codex"
+                      ? aiStatus?.models || []
+                      : config.api_model_options || [];
+                  const selected =
+                    config.ai_config?.[key] ||
+                    (key === "ai_model" ? "gpt-5.6-luna" : "gpt-5.4-nano");
+                  const visibleOptions = options.some(
+                    (option) => option.id === selected
+                  )
+                    ? options
+                    : [{ id: selected, name: selected }, ...options];
+                  return (
+                    <TextField
+                      key={key}
+                      select
+                      label={t(`settings.discordReports.${key}`)}
+                      value={selected}
+                      onChange={(event) =>
+                        setConfig({
+                          ...config,
+                          ai_config: {
+                            ...(config.ai_config || {}),
+                            [key]: event.target.value,
+                          },
+                        })
+                      }
+                      disabled={provider === "codex" && !aiStatus?.connected}
+                      helperText={t(`settings.discordReports.${key}Help`)}
+                      fullWidth
+                    >
+                      {visibleOptions.map((option) => (
+                        <MenuItem key={option.id} value={option.id}>
+                          {option.name || option.id}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  );
+                })}
+              </Stack>
               <Stack direction="row" spacing={2} useFlexGap flexWrap="wrap">
                 {[
                   "chat_enabled",

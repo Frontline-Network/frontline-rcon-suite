@@ -20,7 +20,13 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .ai import ManagedAnalyzer
+from .ai import CodexAnalyzer, ManagedAnalyzer
+from .codex_runtime import (
+    CodexRuntimeError,
+    account_status as codex_account_status,
+    logout as codex_logout,
+    start_device_login,
+)
 from .config import get_settings
 from .contracts import (
     IncidentEventEnvelope,
@@ -88,6 +94,21 @@ def _integration_for_event(
     session: Session, envelope: IncidentEventEnvelope, authorization: str | None
 ) -> Integration:
     integration = session.get(Integration, envelope.installation_id)
+    if (
+        integration is None
+        or not integration.enabled
+        or not matches(
+            _bearer(authorization), integration.event_capability_digest, "events"
+        )
+    ):
+        raise HTTPException(status_code=404, detail="Unknown installation capability")
+    return integration
+
+
+def _integration_for_capability(
+    session: Session, installation_id: str, authorization: str | None
+) -> Integration:
+    integration = session.get(Integration, installation_id)
     if (
         integration is None
         or not integration.enabled
@@ -882,6 +903,46 @@ def integration_usage(
     return _usage_summary(session, installation_id)
 
 
+@app.get("/v1/ai/{installation_id}/status")
+def ai_provider_status(
+    installation_id: str,
+    authorization: str | None = Header(default=None),
+    session: Session = Depends(session_dependency),
+):
+    _integration_for_capability(session, installation_id, authorization)
+    _check_rate_limit(f"ai-status:{installation_id}")
+    return codex_account_status(installation_id)
+
+
+@app.post("/v1/ai/{installation_id}/login")
+def ai_provider_login(
+    installation_id: str,
+    authorization: str | None = Header(default=None),
+    session: Session = Depends(session_dependency),
+):
+    _integration_for_capability(session, installation_id, authorization)
+    _check_rate_limit(f"ai-login:{installation_id}")
+    try:
+        return start_device_login(installation_id)
+    except CodexRuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.post("/v1/ai/{installation_id}/logout")
+def ai_provider_logout(
+    installation_id: str,
+    authorization: str | None = Header(default=None),
+    session: Session = Depends(session_dependency),
+):
+    _integration_for_capability(session, installation_id, authorization)
+    _check_rate_limit(f"ai-logout:{installation_id}")
+    try:
+        codex_logout(installation_id)
+    except CodexRuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {"connected": False, "state": "disconnected"}
+
+
 @app.post("/v1/analysis-jobs", status_code=status.HTTP_202_ACCEPTED)
 def receive_analysis_job(
     job: ModerationAnalysisJobEnvelope,
@@ -905,17 +966,47 @@ def receive_analysis_job(
     _check_rate_limit(f"analysis:{integration.installation_id}")
     if session.get(EventReceipt, idempotency_key):
         return {"accepted": True, "cached": True}
-    if not _quota_available(session, job.installation_id):
+    if job.ai_provider == "managed" and not _quota_available(
+        session, job.installation_id
+    ):
         raise HTTPException(status_code=429, detail="Monthly AI quota exhausted")
     local_hard_hit = _has_local_hard_rule(job.policy, job.matched_rule_ids)
-    result = ManagedAnalyzer().analyze(
-        text=job.candidate_text,
-        source=job.source,
-        policy=job.policy,
-        player_ids=[job.player_id] if job.player_id else [],
-        force_structured_analysis=local_hard_hit,
-        matched_rule_ids=job.matched_rule_ids,
-    )
+    if job.ai_provider == "codex":
+        selected_model = (
+            job.player_name_model
+            if job.source == ModerationSource.PLAYER_NAME
+            else job.ai_model
+        )
+        result = CodexAnalyzer(job.installation_id).analyze(
+            text=job.candidate_text,
+            source=job.source,
+            policy=job.policy,
+            model=selected_model,
+            player_ids=[job.player_id] if job.player_id else [],
+            force_structured_analysis=local_hard_hit,
+            matched_rule_ids=job.matched_rule_ids,
+        )
+    else:
+        api_key = (
+            job.api_key if job.ai_provider == "api_key" else get_settings().openai_api_key
+        )
+        if not api_key:
+            raise HTTPException(status_code=409, detail="OpenAI API key is not configured")
+        analyzer_settings = get_settings().model_copy(
+            update={
+                "openai_api_key": api_key,
+                "ai_model": job.ai_model,
+                "player_name_model": job.player_name_model,
+            }
+        )
+        result = ManagedAnalyzer(settings=analyzer_settings).analyze(
+            text=job.candidate_text,
+            source=job.source,
+            policy=job.policy,
+            player_ids=[job.player_id] if job.player_id else [],
+            force_structured_analysis=local_hard_hit,
+            matched_rule_ids=job.matched_rule_ids,
+        )
     if result.analysis is None:
         raise HTTPException(status_code=503, detail="AI analysis unavailable")
     supplied_rules = list(

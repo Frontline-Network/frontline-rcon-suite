@@ -44,10 +44,14 @@ Reports, Chat und Namen sind getrennt schaltbar. Chat verlässt CRCON erst nach
 dem lokalen Begriffs-/Regex-/Ausnahmefilter. Namen werden pro Spieler,
 normalisiertem Namen, Modell und Regelprofil für 24 Stunden dedupliziert.
 
-Der zentrale Ablauf verwendet zuerst `omni-moderation-latest` und anschließend
-die Responses API mit `gpt-5.6-luna`, `store: false`, festem Systemprompt, ohne
-Tools und mit strengem Ausgabeschema. Spieltext wird ausschließlich als nicht
-vertrauenswürdige Evidenz behandelt. Siehe die offiziellen Hinweise zu
+Als KI-Anbieter sind Frontline-Kontingent, ein eigener verschlüsselt in CRCON
+gespeicherter API-Key und ein ChatGPT/Codex-Login auswählbar. API-Aufrufe
+verwenden zuerst `omni-moderation-latest` und anschließend die Responses API mit
+dem gewählten Modell, `store: false`, festem Systemprompt, ohne Tools und mit
+strengem Ausgabeschema. Der Codex-Modus verwendet den offiziellen
+Device-Code-Login, liest die im Abonnement verfügbaren Modelle dynamisch und
+führt jede Analyse als isolierten, flüchtigen Read-only-Turn aus. Spieltext wird
+ausschließlich als nicht vertrauenswürdige Evidenz behandelt. Siehe die offiziellen Hinweise zu
 [GPT-5.6 Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna),
 [omni-moderation-latest](https://developers.openai.com/api/docs/models/omni-moderation-latest)
 und [API-Datenkontrollen](https://developers.openai.com/api/docs/guides/your-data).

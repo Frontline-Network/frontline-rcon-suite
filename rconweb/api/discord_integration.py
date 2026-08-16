@@ -73,7 +73,18 @@ DEFAULT_AI_CONFIG = {
     "names_enabled": False,
     "shadow_mode": True,
     "quality_opt_in": False,
+    "provider": "managed",
+    "ai_model": "gpt-5.6-luna",
+    "player_name_model": "gpt-5.4-nano",
 }
+AI_PROVIDERS = {"managed", "api_key", "codex"}
+API_MODEL_OPTIONS = (
+    {"id": "gpt-5.4-nano", "name": "GPT-5.4 Nano"},
+    {"id": "gpt-5.6-luna", "name": "GPT-5.6 Luna"},
+    {"id": "gpt-5.6-terra", "name": "GPT-5.6 Terra"},
+    {"id": "gpt-5.6-sol", "name": "GPT-5.6 Sol"},
+)
+_MODEL_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,100}$")
 SQUAD_LEADER_ROLES = {
     "officer",
     "squadleader",
@@ -148,6 +159,8 @@ def _serialized(integration: DiscordReportIntegration) -> dict:
         "allowed_actions": integration.allowed_actions,
         "language": integration.language,
         "ai_config": {**DEFAULT_AI_CONFIG, **(integration.ai_config or {})},
+        "has_api_key": bool(integration.ai_api_key_ciphertext),
+        "api_model_options": list(API_MODEL_OPTIONS),
         "policy": integration.policy,
         "reporter_templates": {
             **DEFAULT_REPORTER_TEMPLATES,
@@ -508,9 +521,18 @@ def _config_payload(data: dict) -> dict:
         "names_enabled",
         "shadow_mode",
         "quality_opt_in",
+        "provider",
+        "ai_model",
+        "player_name_model",
     }
     if set(ai_config) - allowed_ai_keys:
         raise ValueError("Unknown AI configuration field")
+    if ai_config["provider"] not in AI_PROVIDERS:
+        raise ValueError("Unknown AI provider")
+    for key in ("ai_model", "player_name_model"):
+        ai_config[key] = str(ai_config.get(key) or DEFAULT_AI_CONFIG[key])
+        if not _MODEL_ID_RE.fullmatch(ai_config[key]):
+            raise ValueError("Invalid AI model ID")
     templates = {
         str(key): str(value)[:500]
         for key, value in dict(data.get("reporter_templates") or {}).items()
@@ -549,14 +571,31 @@ def integration_detail(request):
         integration.delivery_started_at = None
         integration.inbound_capability_digest = ""
         integration.outbound_capability_ciphertext = b""
+        integration.ai_api_key_ciphertext = b""
         integration.save()
         DiscordPairing.objects.filter(state=DiscordPairing.State.PENDING).delete()
         return api_response(
             command=command, failed=False, result=_serialized(integration)
         )
     try:
-        for field, value in _config_payload(_json_body(request)).items():
+        data = _json_body(request)
+        for field, value in _config_payload(data).items():
             setattr(integration, field, value)
+        supplied_key = data.get("api_key")
+        if supplied_key is not None:
+            supplied_key = str(supplied_key).strip()
+            if supplied_key and not supplied_key.startswith("sk-"):
+                raise ValueError("OpenAI API key must start with sk-")
+            integration.ai_api_key_ciphertext = (
+                encrypt_capability(supplied_key) if supplied_key else b""
+            )
+        if data.get("clear_api_key"):
+            integration.ai_api_key_ciphertext = b""
+        if (
+            integration.ai_config.get("provider") == "api_key"
+            and not integration.ai_api_key_ciphertext
+        ):
+            raise ValueError("An OpenAI API key is required for this provider")
         integration.save()
     except (TypeError, ValueError) as exc:
         return _error(command, str(exc), 400)
@@ -1296,6 +1335,77 @@ def integration_usage(request):
         result = response.json()
     except (requests.RequestException, ValueError) as exc:
         return _error(command, f"Discord service unavailable: {exc}", 503)
+    result["provider"] = {
+        **DEFAULT_AI_CONFIG, **(integration.ai_config or {})
+    }.get("provider", "managed")
+    return api_response(command=command, failed=False, result=result)
+
+
+def _ai_service_request(integration, method: str, path: str):
+    if not integration.enabled or not integration.outbound_capability_ciphertext:
+        raise ValueError("Discord integration is not connected")
+    response = requests.request(
+        method,
+        (
+            f"{integration.service_url.rstrip('/')}/v1/ai/"
+            f"{integration.installation_id}/{path}"
+        ),
+        headers={
+            "Authorization": (
+                f"Bearer {decrypt_capability(integration.outbound_capability_ciphertext)}"
+            )
+        },
+        timeout=35,
+    )
+    if not response.ok:
+        raise requests.RequestException(
+            _service_error(response, "AI provider request failed"), response=response
+        )
+    return response.json()
+
+
+@csrf_exempt
+@login_required()
+@require_http_methods(["GET"])
+def ai_provider_status(request):
+    command = "discord_ai_provider_status"
+    if denied := _require_manager(request, command):
+        return denied
+    integration = _integration()
+    try:
+        result = _ai_service_request(integration, "GET", "status")
+    except (requests.RequestException, ValueError) as exc:
+        return _error(command, f"AI provider unavailable: {exc}", 503)
+    result["api_models"] = list(API_MODEL_OPTIONS)
+    result["has_api_key"] = bool(integration.ai_api_key_ciphertext)
+    return api_response(command=command, failed=False, result=result)
+
+
+@csrf_exempt
+@login_required()
+@require_http_methods(["POST"])
+def ai_provider_login(request):
+    command = "discord_ai_provider_login"
+    if denied := _require_manager(request, command):
+        return denied
+    try:
+        result = _ai_service_request(_integration(), "POST", "login")
+    except (requests.RequestException, ValueError) as exc:
+        return _error(command, f"ChatGPT login unavailable: {exc}", 503)
+    return api_response(command=command, failed=False, result=result)
+
+
+@csrf_exempt
+@login_required()
+@require_http_methods(["POST"])
+def ai_provider_logout(request):
+    command = "discord_ai_provider_logout"
+    if denied := _require_manager(request, command):
+        return denied
+    try:
+        result = _ai_service_request(_integration(), "POST", "logout")
+    except (requests.RequestException, ValueError) as exc:
+        return _error(command, f"ChatGPT logout unavailable: {exc}", 503)
     return api_response(command=command, failed=False, result=result)
 
 

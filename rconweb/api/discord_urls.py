@@ -70,5 +70,20 @@ urlpatterns = [
         name="discord-moderation-result",
     ),
     path("usage", discord_integration.integration_usage, name="discord-usage"),
+    path(
+        "ai/status",
+        discord_integration.ai_provider_status,
+        name="discord-ai-provider-status",
+    ),
+    path(
+        "ai/login",
+        discord_integration.ai_provider_login,
+        name="discord-ai-provider-login",
+    ),
+    path(
+        "ai/logout",
+        discord_integration.ai_provider_logout,
+        name="discord-ai-provider-logout",
+    ),
     path("test-message", discord_integration.test_message, name="discord-test-message"),
 ]
