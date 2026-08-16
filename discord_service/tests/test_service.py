@@ -355,6 +355,48 @@ def test_pairing_options_require_oauth_binding_for_installation():
     fallback.assert_not_called()
 
 
+def test_existing_installation_pairing_is_a_trusted_guild_binding():
+    installation_id = "11111111-1111-4111-8111-111111111111"
+    with SessionLocal() as session:
+        session.add(
+            Integration(
+                installation_id=installation_id,
+                crcon_base_url="https://crcon.example",
+                guild_id="123",
+                channel_id="456",
+                event_capability_digest=digest("events-test", "events"),
+                action_capability_ciphertext=encrypt("actions-test"),
+                enabled=True,
+            )
+        )
+        session.commit()
+    payload = {
+        "crcon_callback_url": "https://crcon.example/api/discord/v1/pairings/complete",
+        "pairing_id": "22222222-2222-4222-8222-222222222222",
+        "pairing_secret": "pair-secret-that-is-at-least-32-characters",
+        "installation_id": installation_id,
+    }
+    options = {
+        "guild": {"id": "123", "name": "Frontline"},
+        "channels": [],
+        "roles": [],
+    }
+    with (
+        patch("discord_service.app.main._validate_crcon_callback"),
+        patch("discord_service.app.main._verify_pending_pairing"),
+        patch(
+            "discord_service.app.main.DiscordClient.guild_options",
+            return_value=options,
+        ) as guild_options,
+        patch("discord_service.app.main._single_guild_options") as fallback,
+    ):
+        response = TestClient(app).post("/v1/pairing-options", json=payload)
+    assert response.status_code == 200
+    assert response.json() == options
+    guild_options.assert_called_once_with("123")
+    fallback.assert_not_called()
+
+
 def test_existing_server_side_binding_resolves_multiple_bot_guilds():
     settings = Settings(
         secret="test-secret-that-is-at-least-32-characters",
