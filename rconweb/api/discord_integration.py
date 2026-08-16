@@ -7,6 +7,7 @@ import os
 import re
 import secrets
 from datetime import timedelta
+from urllib.parse import urlsplit
 
 import requests
 from django.core.serializers.json import DjangoJSONEncoder
@@ -95,6 +96,8 @@ SQUAD_LEADER_ROLES = {
     "helicopterlogisticsofficer",
 }
 
+DISCORD_PAIRING_CALLBACK_PATH = "/api/discord/v1/pairings/complete"
+
 
 def _json_safe(value):
     """Normalize audited results before storing them in Django JSONFields."""
@@ -113,6 +116,38 @@ def _integration() -> DiscordReportIntegration:
     return integration
 
 
+def _pairing_callback_url(request) -> str:
+    """Return the externally reachable HTTPS callback behind reverse proxies.
+
+    ``request.build_absolute_uri`` reflects the internal HTTP hop when CRCON is
+    deployed behind the usual host Nginx and frontend container. The mobile
+    public base URL is already the installation's validated, operator-managed
+    HTTPS address, so it is also the authoritative Discord callback origin.
+    """
+
+    public_base_url = os.getenv("MOBILE_PUBLIC_BASE_URL", "").strip().rstrip("/")
+    if public_base_url:
+        try:
+            parsed = urlsplit(public_base_url)
+            port = parsed.port
+        except ValueError:
+            parsed = None
+            port = None
+        if (
+            parsed is not None
+            and parsed.scheme == "https"
+            and parsed.hostname
+            and not parsed.username
+            and not parsed.password
+            and not parsed.query
+            and not parsed.fragment
+            and port in {None, 443}
+            and parsed.path in {"", "/"}
+        ):
+            return f"{public_base_url}{DISCORD_PAIRING_CALLBACK_PATH}"
+    return request.build_absolute_uri(DISCORD_PAIRING_CALLBACK_PATH)
+
+
 def _new_pairing(request) -> tuple[DiscordPairing, str, dict]:
     DiscordPairing.objects.filter(state=DiscordPairing.State.PENDING).delete()
     secret = new_capability("pair")
@@ -121,9 +156,7 @@ def _new_pairing(request) -> tuple[DiscordPairing, str, dict]:
         expires_at=timezone.now() + timedelta(minutes=10),
     )
     payload = {
-        "crcon_callback_url": request.build_absolute_uri(
-            "/api/discord/v1/pairings/complete"
-        ),
+        "crcon_callback_url": _pairing_callback_url(request),
         "pairing_id": str(pairing.id),
         "pairing_secret": secret,
     }
@@ -684,9 +717,7 @@ def create_discord_pairing(request):
             "pairing_secret": secret,
             "expires_at": pairing.expires_at,
             "service_url": integration.service_url,
-            "crcon_callback_url": request.build_absolute_uri(
-                "/api/discord/v1/pairings/complete"
-            ),
+            "crcon_callback_url": _pairing_callback_url(request),
         },
     )
 
