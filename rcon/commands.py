@@ -852,6 +852,47 @@ class HLLServerCtl(ServerCtl):
 class HLLVServerCtl(ServerCtl):
     """Hell Let Loose: Vietnam controller extension point."""
 
+    def get_objective_rows(self) -> List[List[str]]:
+        details = self.exchange("GetClientReferenceData", 2, "SetSectorLayout")
+        parameters = details.content_dict.get("dialogueParameters") or []
+        parameters_by_id = {
+            str(parameter.get("iD")): parameter
+            for parameter in parameters
+            if isinstance(parameter, dict)
+        }
+        sectors = [
+            parameters_by_id.get(f"Sector_{index}") for index in range(1, 6)
+        ]
+        if any(
+            not sector or not isinstance(sector.get("valueMember"), str)
+            for sector in sectors
+        ):
+            raise HLLCommandFailedError("Received unexpected response from server.")
+        return [sector["valueMember"].split(",") for sector in sectors]
+
+    def set_game_layout(self, objectives: Sequence[str]):
+        if len(objectives) != 5:
+            raise ValueError("5 objectives must be provided")
+        try:
+            sector_indices = [int(objective) for objective in objectives]
+        except (TypeError, ValueError) as exc:
+            raise ValueError("HLL Vietnam objectives must use sector indices") from exc
+        if any(index not in range(3) for index in sector_indices):
+            raise ValueError("HLL Vietnam objective indices must be between 0 and 2")
+
+        self.exchange(
+            "SetSectorLayout",
+            2,
+            {
+                "MapId": self.get_map(),
+                **{
+                    f"Sector_{index}": value
+                    for index, value in enumerate(sector_indices, 1)
+                },
+            },
+        )
+        return list(objectives)
+
     def set_welcome_message(self, message):
         self.exchange("SetNoticeMessage", 2, {"Message": message})
 

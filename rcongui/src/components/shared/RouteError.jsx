@@ -57,16 +57,27 @@ export default function RouteError() {
     error.status >= 400 &&
     error.status < 500
   ) {
+    const errorData = error.data;
+    const errorMessage =
+      (typeof errorData === "object" && errorData !== null
+        ? errorData.text ?? errorData.message
+        : errorData) ?? error.statusText;
+    const errorCommand =
+      typeof errorData === "object" && errorData !== null
+        ? errorData.command
+        : null;
+    const errorName =
+      typeof errorData === "object" && errorData !== null
+        ? errorData.name ?? errorData.error
+        : null;
     // the response json is automatically parsed to
     // `error.data`, you also have access to the status
     return (
       <Stack spacing={2} alignItems={"center"} justifyContent={"center"}>
         <Typography variant="h3">{error.status}</Typography>
-        <Typography variant="h4">
-          {error.data.text ?? error.data.message ?? error.statusText}
-        </Typography>
-        <Typography>{error.data.command ?? error.data}</Typography>
-        <Typography>{error.data.name ?? error.data.error}</Typography>
+        <Typography variant="h4">{String(errorMessage ?? "")}</Typography>
+        {errorCommand ? <Typography>{String(errorCommand)}</Typography> : null}
+        {errorName ? <Typography>{String(errorName)}</Typography> : null}
         <Button variant="contained" LinkComponent={Link} to={location.pathname}>
           {t("errors.tryAgain")}
         </Button>

@@ -410,6 +410,54 @@ def test_timer_commands_validate_mode_against_profile():
         ctl.set_match_timer(GameMode.SKIRMISH, 30)
 
 
+def test_hllv_objective_rows_ignore_map_id_reference_parameter():
+    ctl = HLLVServerCtl(ServerInfo(game=GameEnum.HLL_VIETNAM), Mock())
+    ctl.exchange = Mock(
+        return_value=_response(
+            {
+                "dialogueParameters": [
+                    {"iD": "MapId", "valueMember": "wdevb_warfare_day"},
+                    *[
+                        {"iD": f"Sector_{index}", "valueMember": "0,1,2"}
+                        for index in range(1, 6)
+                    ],
+                ]
+            }
+        )
+    )
+
+    assert ctl.get_objective_rows() == [["0", "1", "2"]] * 5
+    ctl.exchange.assert_called_once_with(
+        "GetClientReferenceData", 2, "SetSectorLayout"
+    )
+
+
+def test_hllv_set_sector_layout_includes_current_map_id_and_integer_indices():
+    ctl = HLLVServerCtl(ServerInfo(game=GameEnum.HLL_VIETNAM), Mock())
+    ctl.get_map = Mock(return_value="wdeve_warfare_day")
+    ctl.exchange = Mock(return_value=_response({}))
+
+    assert ctl.set_game_layout(["0", "1", "2", "1", "0"]) == [
+        "0",
+        "1",
+        "2",
+        "1",
+        "0",
+    ]
+    ctl.exchange.assert_called_once_with(
+        "SetSectorLayout",
+        2,
+        {
+            "MapId": "wdeve_warfare_day",
+            "Sector_1": 0,
+            "Sector_2": 1,
+            "Sector_3": 2,
+            "Sector_4": 1,
+            "Sector_5": 0,
+        },
+    )
+
+
 @pytest.mark.parametrize(
     ("ctl_type", "game", "command"),
     [
