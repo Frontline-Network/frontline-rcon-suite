@@ -74,6 +74,15 @@ DEFAULT_AI_CONFIG = {
     "shadow_mode": True,
     "quality_opt_in": False,
 }
+SQUAD_LEADER_ROLES = {
+    "officer",
+    "squadleader",
+    "tankcommander",
+    "spotter",
+    "artilleryobserver",
+    "mortarobserver",
+    "helicopterlogisticsofficer",
+}
 
 
 def _json_safe(value):
@@ -221,6 +230,25 @@ def _normalize_action_subject(incident: dict, arguments: dict) -> dict:
         and subject.get("player_id")
     ):
         normalized["player_id"] = str(subject["player_id"])
+    if not normalized.get("player_id") and subject and subject.get("kind") == "squad":
+        snapshot = subject.get("snapshot") or {}
+        leader = snapshot.get("leader") or {}
+        candidates = [leader, *(snapshot.get("players") or [])]
+        for candidate in candidates:
+            role = re.sub(
+                r"[^a-z0-9]",
+                "",
+                str(candidate.get("role") or "").casefold(),
+            )
+            if candidate and (
+                candidate is leader
+                or role in SQUAD_LEADER_ROLES
+            ):
+                player_id = str(candidate.get("player_id") or "").strip()
+                if player_id:
+                    normalized["player_id"] = player_id
+                    normalized.setdefault("player_name", candidate.get("name"))
+                    break
     return normalized
 
 
@@ -356,11 +384,17 @@ def incident_logs(request):
         if incident.get("assigned_to") != actor_name:
             raise IncidentConflict("Incident is already claimed by another admin")
         subject = incident.get("primary_subject") or {}
-        player_id = str(subject.get("player_id") or incident.get("target_id") or "")
+        normalized = _normalize_action_subject(
+            incident, {"subject_id": str(subject.get("id") or "")}
+        )
+        player_id = str(normalized.get("player_id") or "")
         if not player_id:
             raise ValueError("Select a confirmed player before requesting logs")
         player_name = str(
-            subject.get("display_name") or incident.get("target_name") or "Spieler"
+            normalized.get("player_name")
+            or subject.get("display_name")
+            or incident.get("target_name")
+            or "Spieler"
         )
         from rcon.api_commands import get_rcon_api
 

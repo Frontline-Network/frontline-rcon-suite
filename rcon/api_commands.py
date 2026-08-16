@@ -2070,7 +2070,10 @@ class RconAPI(Rcon):
             )
 
         for player in squad_players:
-            super().remove_player_from_squad(player["player_id"], reason)
+            if not super().remove_player_from_squad(player["player_id"], reason):
+                raise HLLCommandFailedError(
+                    f"The game server rejected removing {player['player_id']} from squad {squad_name}."
+                )
 
         return {
             "team_name": team_name,

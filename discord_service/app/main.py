@@ -290,6 +290,9 @@ def _crcon_interaction_error(exc: httpx.HTTPError) -> str:
             "Incident is already claimed by another admin": (
                 "⛔ Dieser Report wird bereits von einem anderen Administrator bearbeitet."
             ),
+            "The game server rejected the action; the incident remains open": (
+                "Der Gameserver hat die Aktion abgelehnt. Der Report bleibt offen."
+            ),
         }
         if detail in known_details:
             return known_details[detail]

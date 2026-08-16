@@ -486,8 +486,8 @@ class ServerCtl:
         # TODO: player_name changed to player_id: Possibly the frontend needs to be changed as well
         return self.exchange_success("ForceTeamSwitch", 2, {"PlayerId": player_id, "ForceMode": 1})
 
-    def remove_player_from_squad(self, player_id: str, reason: str) -> None:
-        self.exchange_success("RemovePlayerFromPlatoon", 2, {"PlayerId": player_id, "Reason": reason})
+    def remove_player_from_squad(self, player_id: str, reason: str) -> bool:
+        return self.exchange_success("RemovePlayerFromPlatoon", 2, {"PlayerId": player_id, "Reason": reason})
 
     def disband_squad(self, team_index: int, squad_index: int, reason: str) -> None:
         self.exchange_success("DisbandPlatoon", 2, { "TeamIndex": team_index, "SquadIndex": squad_index, "Reason": reason })

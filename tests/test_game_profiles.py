@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 import pytest
 
@@ -192,6 +192,63 @@ def test_concrete_rcon_classes_share_commands_but_identify_their_game():
 
     assert HLLRcon.game_test_command(None) is GameEnum.HLL_WW2
     assert HLLVRcon.game_test_command(None) is GameEnum.HLL_VIETNAM
+
+
+@pytest.mark.parametrize(
+    ("controller_type", "game", "player_id"),
+    [
+        (HLLServerCtl, GameEnum.HLL_WW2, "76561198036685843"),
+        (
+            HLLVServerCtl,
+            GameEnum.HLL_VIETNAM,
+            "00026a3466a244829409f77af0a752d9",
+        ),
+    ],
+)
+def test_report_bot_moderation_commands_share_the_game_advertised_contract(
+    controller_type, game, player_id
+):
+    controller = controller_type(ServerInfo(game=game), Mock())
+    controller.exchange_success = Mock(return_value=True)
+
+    assert controller.message_player(player_id, "Message") is True
+    assert controller.punish(player_id, "Reason") is True
+    assert controller.kick(player_id, "Reason") is True
+    assert controller.temp_ban(player_id, 2, "Reason", "Moderator") is True
+    assert controller.perma_ban(player_id, "Reason", "Moderator") is True
+    assert controller.remove_player_from_squad(player_id, "Reason") is True
+
+    controller.exchange_success.assert_has_calls(
+        [
+            call("MessagePlayer", 2, {"Message": "Message", "PlayerId": player_id}),
+            call("PunishPlayer", 2, {"PlayerId": player_id, "Reason": "Reason"}),
+            call("KickPlayer", 2, {"PlayerId": player_id, "Reason": "Reason"}),
+            call(
+                "TemporaryBanPlayer",
+                2,
+                {
+                    "PlayerId": player_id,
+                    "Duration": 2,
+                    "Reason": "Reason",
+                    "AdminName": "Moderator",
+                },
+            ),
+            call(
+                "PermanentBanPlayer",
+                2,
+                {
+                    "PlayerId": player_id,
+                    "Reason": "Reason",
+                    "AdminName": "Moderator",
+                },
+            ),
+            call(
+                "RemovePlayerFromPlatoon",
+                2,
+                {"PlayerId": player_id, "Reason": "Reason"},
+            ),
+        ]
+    )
 
 
 def test_detailed_player_parser_receives_controller_game(monkeypatch):

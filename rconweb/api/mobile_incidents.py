@@ -377,6 +377,16 @@ def incident_subject_detail(request, incident_id, subject_id):
 def _execute_action(action: str, data: dict, user_name: str, incident: dict):
     from . import views
 
+    def require_success(result):
+        # Low-level RCON commands return False for a rejected command (for
+        # example a stale/offline player target).  False must not be audited as
+        # a successful action or auto-resolve the incident.
+        if result is False:
+            raise ValueError(
+                "The game server rejected the action; the incident remains open"
+            )
+        return result
+
     player_id = str(data.get("player_id") or incident.get("target_id") or "").strip()
     subject_id = str(data.get("subject_id") or "") or None
     if action == "disband_squad":
@@ -418,42 +428,61 @@ def _execute_action(action: str, data: dict, user_name: str, incident: dict):
         message = str(data.get("message") or "").strip()
         if not message:
             raise ValueError("Message is required")
-        return views.rcon_api.message_player(
-            player_id,
-            message=message,
-            by=user_name,
-            save_message=True,
-            player_name=player_name or None,
+        return require_success(
+            views.rcon_api.message_player(
+                player_id,
+                message=message,
+                by=user_name,
+                save_message=True,
+                player_name=player_name or None,
+            )
         )
     if action in {"punish", "kick", "temp_ban", "perma_ban"}:
         reason = str(data.get("reason") or "").strip()
         if not reason:
             raise ValueError("A reason is required")
         if action == "punish":
-            return views.rcon_api.punish(
-                player_id, reason=reason, by=user_name, player_name=player_name or None
+            return require_success(
+                views.rcon_api.punish(
+                    player_id,
+                    reason=reason,
+                    by=user_name,
+                    player_name=player_name or None,
+                )
             )
         if action == "kick":
             if data.get("confirmed") is not True:
                 raise ValueError("Kick requires explicit confirmation")
-            return views.rcon_api.kick(
-                player_id, reason=reason, by=user_name, player_name=player_name or None
+            return require_success(
+                views.rcon_api.kick(
+                    player_id,
+                    reason=reason,
+                    by=user_name,
+                    player_name=player_name or None,
+                )
             )
         if action == "perma_ban":
             if data.get("confirmed") is not True:
                 raise ValueError("Permanent ban requires explicit confirmation")
-            return views.rcon_api.perma_ban(
-                player_id, reason=reason, by=user_name, player_name=player_name or None
+            return require_success(
+                views.rcon_api.perma_ban(
+                    player_id,
+                    reason=reason,
+                    by=user_name,
+                    player_name=player_name or None,
+                )
             )
         duration_hours = int(data.get("duration_hours", 2))
         if data.get("confirmed") is not True or not 1 <= duration_hours <= 720:
             raise ValueError("Temp ban requires confirmation and 1-720 hours")
-        return views.rcon_api.temp_ban(
-            player_id,
-            duration_hours=duration_hours,
-            reason=reason,
-            by=user_name,
-            player_name=player_name or None,
+        return require_success(
+            views.rcon_api.temp_ban(
+                player_id,
+                duration_hours=duration_hours,
+                reason=reason,
+                by=user_name,
+                player_name=player_name or None,
+            )
         )
     if action == "blacklist":
         reason = str(data.get("reason") or "").strip()
@@ -485,7 +514,9 @@ def _execute_action(action: str, data: dict, user_name: str, incident: dict):
             raise ValueError(
                 "Removing a player from a squad requires a reason and confirmation"
             )
-        return views.rcon_api.remove_player_from_squad(player_id, reason)
+        return require_success(
+            views.rcon_api.remove_player_from_squad(player_id, reason)
+        )
     raise ValueError("Unsupported mobile action")
 
 

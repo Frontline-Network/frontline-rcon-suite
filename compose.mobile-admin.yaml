@@ -78,7 +78,19 @@ services:
       service: backend_1
     <<: *frontline-backend
     command: discord_report_worker
-    environment: *mobile-environment
+    environment:
+      <<: *mobile-environment
+      # This worker delivers incidents from every CRCON database partition,
+      # not only backend_1. Pass every game profile explicitly so Discord does
+      # not label HLL Vietnam incidents as HLL/WW2.
+      HLL_GAME: ${HLL_GAME:-hll}
+      HLL_GAME_2: ${HLL_GAME_2:-hll}
+      HLL_GAME_3: ${HLL_GAME_3:-hll}
+      HLL_GAME_4: ${HLL_GAME_4:-hll}
+      HLL_SERVER_NAME: ${HLL_SERVER_NAME:-CRCON Server 1}
+      HLL_SERVER_NAME_2: ${HLL_SERVER_NAME_2:-CRCON Server 2}
+      HLL_SERVER_NAME_3: ${HLL_SERVER_NAME_3:-CRCON Server 3}
+      HLL_SERVER_NAME_4: ${HLL_SERVER_NAME_4:-CRCON Server 4}
 
   backend_1:
     <<: *frontline-backend

@@ -7,6 +7,16 @@ import httpx
 from .config import Settings, get_settings
 from .contracts import IncidentEventEnvelope, ModerationAnalysis
 
+SQUAD_LEADER_ROLES = {
+    "officer",
+    "squadleader",
+    "tankcommander",
+    "spotter",
+    "artilleryobserver",
+    "mortarobserver",
+    "helicopterlogisticsofficer",
+}
+
 
 def _truncate(value: object, length: int) -> str:
     text = str(value or "-")
@@ -57,6 +67,26 @@ def _manual_processing(incident: dict) -> bool:
     )
 
 
+def _squad_leader(snapshot: dict) -> dict:
+    leader = snapshot.get("leader") or {}
+    if leader:
+        return leader
+    for player in snapshot.get("players") or []:
+        role = "".join(
+            character
+            for character in str(player.get("role") or "").casefold()
+            if character.isalnum()
+        )
+        if role in SQUAD_LEADER_ROLES:
+            return player
+    return {}
+
+
+def _display_unit(value: object) -> str:
+    text = str(value or "-").strip() or "-"
+    return text.title() if text.islower() or text.isupper() else text
+
+
 def render_message(
     envelope: IncidentEventEnvelope,
     analysis: ModerationAnalysis | None,
@@ -98,12 +128,10 @@ def render_message(
     }.get(language, {})
     snapshot = primary.get("snapshot") or {}
     is_squad_report = primary.get("kind") == "squad"
-    stat_snapshot = (
-        snapshot.get("leader") or {} if is_squad_report else snapshot
-    )
+    stat_snapshot = _squad_leader(snapshot) if is_squad_report else snapshot
     team = primary.get("team") or snapshot.get("team")
     target_name = (
-        primary.get("leader_name")
+        primary.get("leader_name") or stat_snapshot.get("name")
         if is_squad_report
         else primary.get("display_name")
     ) or incident.get("target_name") or "-"
@@ -391,7 +419,10 @@ def render_message(
     elif source == "ai_chat":
         title = labels["chat_title"].format(name=target_name)
     elif is_squad_report and source in {"chat", "manual"}:
-        title = f"{primary.get('squad_name') or primary.get('display_name') or '-'} | {team or '-'}"
+        title = (
+            f"{_display_unit(primary.get('squad_name') or primary.get('display_name'))}"
+            f" | {_display_unit(team)}"
+        )
     else:
         title = labels["report_title"].format(name=target_name)
     footer_parts = []

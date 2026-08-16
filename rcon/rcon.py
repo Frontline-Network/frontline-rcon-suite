@@ -764,7 +764,7 @@ class Rcon(ServerCtl):
                 message = f"{message}\n\n{message_footer}"
 
         res = super().message_player(player_id, message)
-        if save_message:
+        if save_message and res:
             safe_save_player_action(
                 player_id=player_id,
                 player_name=player_name,
@@ -1074,13 +1074,14 @@ class Rcon(ServerCtl):
 
     def punish(self, player_id: str, reason: str, by: str, player_name: str | None = None) -> bool:
         res = super().punish(player_id, reason)
-        safe_save_player_action(
-            player_id=player_id,
-            player_name=player_name,
-            action_type=PlayerActionState.PUNISH,
-            reason=reason,
-            by=by,
-        )
+        if res:
+            safe_save_player_action(
+                player_id=player_id,
+                player_name=player_name,
+                action_type=PlayerActionState.PUNISH,
+                reason=reason,
+                by=by,
+            )
         return res
 
     def switch_player_now(self, player_id: str) -> bool:
@@ -1093,13 +1094,14 @@ class Rcon(ServerCtl):
         with invalidates(Rcon.get_players):
             res = super().kick(player_id, reason)
 
-        safe_save_player_action(
-            player_id=player_id,
-            player_name=player_name,
-            action_type=PlayerActionState.KICK,
-            reason=reason,
-            by=by,
-        )
+        if res:
+            safe_save_player_action(
+                player_id=player_id,
+                player_name=player_name,
+                action_type=PlayerActionState.KICK,
+                reason=reason,
+                by=by,
+            )
         return res
 
     def temp_ban(
@@ -1115,13 +1117,14 @@ class Rcon(ServerCtl):
                 player_id, duration_hours, reason, admin_name=by
             )
 
-        safe_save_player_action(
-            player_id=player_id,
-            player_name=player_name,
-            action_type=PlayerActionState.TEMPBAN,
-            reason=reason,
-            by=by,
-        )
+        if res:
+            safe_save_player_action(
+                player_id=player_id,
+                player_name=player_name,
+                action_type=PlayerActionState.TEMPBAN,
+                reason=reason,
+                by=by,
+            )
         return res
 
     def remove_temp_ban(self, player_id: str) -> bool:
@@ -1140,13 +1143,14 @@ class Rcon(ServerCtl):
         with invalidates(Rcon.get_players, Rcon.get_perma_bans):
             res = super().perma_ban(player_id, reason, admin_name=by)
 
-        safe_save_player_action(
-            player_id=player_id,
-            player_name=player_name,
-            action_type=PlayerActionState.PERMABAN,
-            reason=reason,
-            by=by,
-        )
+        if res:
+            safe_save_player_action(
+                player_id=player_id,
+                player_name=player_name,
+                action_type=PlayerActionState.PERMABAN,
+                reason=reason,
+                by=by,
+            )
         return res
 
     @ttl_cache(60 * 5)

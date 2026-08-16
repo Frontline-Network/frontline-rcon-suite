@@ -17,7 +17,8 @@ from rcon.incident_settings import (
     incident_context_fuzzy_threshold,
     incident_context_mode,
 )
-from rcon.utils import get_server_number
+from rcon.types import GameEnum
+from rcon.utils import get_server_number, get_squad_leader_roles
 
 INCIDENT_STATUSES = {"new", "claimed", "resolved", "dismissed"}
 FINAL_STATUSES = {"resolved", "dismissed"}
@@ -26,6 +27,9 @@ SUBJECT_KINDS = {"player", "squad"}
 SUBJECT_STATES = {"suggested", "confirmed", "rejected"}
 PARSER_VERSION = "2.0.0"
 DEFAULT_FUZZY_THRESHOLD = 0.74
+SQUAD_LEADER_ROLES = get_squad_leader_roles(
+    GameEnum.HLL_WW2
+) | get_squad_leader_roles(GameEnum.HLL_VIETNAM)
 
 
 def _mobile_context_fuzzy_threshold() -> float:
@@ -93,8 +97,9 @@ def player_snapshot(player: dict | None) -> dict:
         "loadout",
         "level",
         "kills",
+        "kills_streak",
         "deaths",
-        "teamkills",
+        "teamkills_streak",
         "combat",
         "offense",
         "defense",
@@ -102,11 +107,29 @@ def player_snapshot(player: dict | None) -> dict:
         "map_playtime_seconds",
         "is_vip",
     )
-    return {
+    snapshot = {
         field: _simple_value(player.get(field))
         for field in fields
         if player.get(field) is not None
     }
+    # The live RCON player payload calls this field ``team_kills`` while the
+    # historical/statistics API calls it ``teamkills``.  Incidents expose one
+    # stable name so all consumers display the live value, including zero.
+    teamkills = player.get("teamkills")
+    if teamkills is None:
+        teamkills = player.get("team_kills")
+    if teamkills is not None:
+        snapshot["teamkills"] = _simple_value(teamkills)
+    return snapshot
+
+
+def _is_squad_leader(player: dict) -> bool:
+    role = re.sub(r"[^a-z0-9]", "", str(player.get("role") or "").casefold())
+    return role in SQUAD_LEADER_ROLES
+
+
+def _squad_leader(players: list[dict]) -> dict | None:
+    return next((player for player in players if _is_squad_leader(player)), None)
 
 
 def flatten_team_view(team_view: dict | None) -> list[dict]:
@@ -118,15 +141,7 @@ def flatten_team_view(team_view: dict | None) -> list[dict]:
             if not isinstance(squad, dict):
                 continue
             players = [player_snapshot(player) for player in squad.get("players", [])]
-            leader = next(
-                (
-                    player
-                    for player in players
-                    if str(player.get("role") or "").casefold()
-                    in {"officer", "tankcommander", "spotter"}
-                ),
-                None,
-            )
+            leader = _squad_leader(players)
             squads.append(
                 {
                     "name": str(squad_name or "Unassigned"),

@@ -399,6 +399,95 @@ def test_squad_report_uses_old_unit_report_layout():
     assert "HLL Unit Report" in embed["footer"]["text"]
 
 
+def test_squadleader_fallback_restores_existing_unit_report_target_and_actions():
+    event = _event()
+    event["incident"].update(
+        {
+            "discord_language": "de",
+            "allowed_actions": ["kick", "disband_squad"],
+            "discord_moderation_ready": True,
+            "target_id": None,
+            "target_name": None,
+            "primary_subject": {
+                "id": "33333333-3333-3333-3333-333333333333",
+                "kind": "squad",
+                "display_name": "able",
+                "squad_name": "able",
+                "team": "allies",
+                "leader_name": None,
+                "leader_player_id": None,
+                "snapshot": {
+                    "leader": {},
+                    "players": [
+                        {
+                            "player_id": "leader-id",
+                            "name": "Biene",
+                            "level": 8,
+                            "kills": 0,
+                            "deaths": 0,
+                            "teamkills": 0,
+                            "role": "squadleader",
+                        }
+                    ],
+                },
+            },
+        }
+    )
+
+    payload = render_message(IncidentEventEnvelope.model_validate(event), None)
+    embed = payload["embeds"][0]
+    assert embed["title"] == "🔵 Able | Allies"
+    assert "👤 **Biene** (Lvl 8)" in embed["description"]
+    assert "🆔 `leader-id`" in embed["description"]
+    custom_ids = [
+        component["custom_id"]
+        for row in payload["components"]
+        for component in row["components"]
+    ]
+    assert any(custom_id.endswith(":kick") for custom_id in custom_ids)
+    assert any(custom_id.endswith(":disband_squad") for custom_id in custom_ids)
+
+
+def test_player_report_displays_zero_live_teamkills():
+    event = _event()
+    event["incident"]["primary_subject"] = {
+        "id": "33333333-3333-3333-3333-333333333333",
+        "kind": "player",
+        "display_name": "Biene",
+        "player_id": "player-id",
+        "team": "allies",
+        "snapshot": {
+            "name": "Biene",
+            "player_id": "player-id",
+            "kills": 0,
+            "deaths": 0,
+            "teamkills": 0,
+        },
+    }
+    payload = render_message(IncidentEventEnvelope.model_validate(event), None)
+    teamkills = next(
+        field
+        for field in payload["embeds"][0]["fields"]
+        if "Teamkills" in field["name"]
+    )
+    assert "**Count:** 0" in teamkills["value"]
+
+
+def test_rejected_game_action_has_an_honest_discord_error():
+    request = httpx.Request("POST", "https://crcon.example/action")
+    response = httpx.Response(
+        400,
+        request=request,
+        json={
+            "error": "The game server rejected the action; the incident remains open"
+        },
+    )
+    error = httpx.HTTPStatusError("rejected", request=request, response=response)
+    message = _crcon_interaction_error(error)
+    assert "Gameserver hat die Aktion abgelehnt" in message
+    assert "bleibt offen" in message
+
+
 def test_embed_hides_actions_until_a_moderator_role_is_configured():
     event = _event()
     event["incident"]["allowed_actions"] = ["kick"]

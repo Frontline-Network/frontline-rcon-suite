@@ -778,6 +778,163 @@ class MobileContextTests(TestCase):
             player_name="Biene",
         )
 
+    @patch("api.mobile_incidents.confirmed_action_subject")
+    def test_rejected_rcon_action_is_not_treated_as_success(self, confirmed_subject):
+        from api.mobile_incidents import _execute_action
+
+        confirmed_subject.return_value = {
+            "display_name": "Biene",
+            "player_id": "biene-id",
+        }
+        kick = MagicMock(return_value=False)
+        fake_views = SimpleNamespace(rcon_api=SimpleNamespace(kick=kick))
+
+        with patch.dict(sys.modules, {"api.views": fake_views}):
+            with self.assertRaisesRegex(ValueError, "game server rejected"):
+                _execute_action(
+                    "kick",
+                    {
+                        "player_id": "biene-id",
+                        "reason": "Ping limit exceeded",
+                        "confirmed": True,
+                    },
+                    "context-admin",
+                    {"target_id": "biene-id", "target_name": "Biene"},
+                )
+
+    @patch("api.mobile_incidents.confirmed_action_subject")
+    def test_all_discord_game_actions_reach_the_expected_crcon_method(
+        self, confirmed_subject
+    ):
+        from api.mobile_incidents import _execute_action
+
+        confirmed_subject.return_value = {
+            "id": "player-subject",
+            "kind": "player",
+            "state": "confirmed",
+            "display_name": "Biene",
+            "player_id": "player-id",
+            "team": "allies",
+            "squad_name": "able",
+        }
+        api = SimpleNamespace(
+            message_player=MagicMock(return_value=True),
+            punish=MagicMock(return_value=True),
+            kick=MagicMock(return_value=True),
+            temp_ban=MagicMock(return_value=True),
+            perma_ban=MagicMock(return_value=True),
+            add_blacklist_record=MagicMock(return_value={"id": 9}),
+            remove_player_from_squad=MagicMock(return_value=True),
+            disband_squad_by_name=MagicMock(return_value={"squad_name": "able"}),
+        )
+        incident = {
+            "target_id": "player-id",
+            "target_name": "Biene",
+            "subjects": [
+                {
+                    "id": "player-subject",
+                    "kind": "player",
+                    "state": "confirmed",
+                    "player_id": "player-id",
+                    "display_name": "Biene",
+                    "team": "allies",
+                    "squad_name": "able",
+                }
+            ],
+        }
+
+        with patch.dict(sys.modules, {"api.views": SimpleNamespace(rcon_api=api)}):
+            self.assertTrue(
+                _execute_action(
+                    "message",
+                    {"player_id": "player-id", "message": "Hello"},
+                    "Moderator",
+                    incident,
+                )
+            )
+            self.assertTrue(
+                _execute_action(
+                    "punish",
+                    {"player_id": "player-id", "reason": "Reason"},
+                    "Moderator",
+                    incident,
+                )
+            )
+            for action in ("kick", "perma_ban"):
+                self.assertTrue(
+                    _execute_action(
+                        action,
+                        {
+                            "player_id": "player-id",
+                            "reason": "Reason",
+                            "confirmed": True,
+                        },
+                        "Moderator",
+                        incident,
+                    )
+                )
+            self.assertTrue(
+                _execute_action(
+                    "temp_ban",
+                    {
+                        "player_id": "player-id",
+                        "reason": "Reason",
+                        "duration_hours": 6,
+                        "confirmed": True,
+                    },
+                    "Moderator",
+                    incident,
+                )
+            )
+            self.assertEqual(
+                _execute_action(
+                    "blacklist",
+                    {
+                        "player_id": "player-id",
+                        "reason": "Reason",
+                        "blacklist_id": 4,
+                        "confirmed": True,
+                    },
+                    "Moderator",
+                    incident,
+                ),
+                {"id": 9},
+            )
+            self.assertTrue(
+                _execute_action(
+                    "remove_from_squad",
+                    {
+                        "player_id": "player-id",
+                        "reason": "Reason",
+                        "confirmed": True,
+                    },
+                    "Moderator",
+                    incident,
+                )
+            )
+            self.assertEqual(
+                _execute_action(
+                    "disband_squad",
+                    {
+                        "subject_id": "player-subject",
+                        "reason": "Reason",
+                        "confirmed": True,
+                    },
+                    "Moderator",
+                    incident,
+                ),
+                {"squad_name": "able"},
+            )
+
+        api.message_player.assert_called_once()
+        api.punish.assert_called_once()
+        api.kick.assert_called_once()
+        api.temp_ban.assert_called_once()
+        api.perma_ban.assert_called_once()
+        api.add_blacklist_record.assert_called_once()
+        api.remove_player_from_squad.assert_called_once_with("player-id", "Reason")
+        api.disband_squad_by_name.assert_called_once_with("allies", "able", "Reason")
+
 
 class DiscordActionTemplateTests(TestCase):
     def _discord_manager(self):
@@ -814,6 +971,33 @@ class DiscordActionTemplateTests(TestCase):
         )
         self.assertNotIn("confirm_subject_id", normalized)
         self.assertEqual(normalized["player_id"], "leader-id")
+
+        vietnam_squad = {
+            "target_id": None,
+            "subjects": [
+                {
+                    "id": "vietnam-squad",
+                    "kind": "squad",
+                    "state": "confirmed",
+                    "snapshot": {
+                        "leader": {},
+                        "players": [
+                            {
+                                "player_id": "eos-leader",
+                                "name": "Biene",
+                                "role": "squadleader",
+                            }
+                        ],
+                    },
+                }
+            ],
+        }
+        normalized = _normalize_action_subject(
+            vietnam_squad, {"subject_id": "vietnam-squad"}
+        )
+        self.assertEqual(normalized["player_id"], "eos-leader")
+        self.assertEqual(normalized["player_name"], "Biene")
+        _validate_prepared_action_target("kick", vietnam_squad, normalized)
 
         suggested_player = {
             "target_id": "player-id",
@@ -1015,16 +1199,12 @@ class DiscordActionTemplateTests(TestCase):
         )
         valid = self.client.post(
             "/api/discord/v1/pairings/verify",
-            data=json.dumps(
-                {"pairing_id": str(pairing.id), "pairing_secret": secret}
-            ),
+            data=json.dumps({"pairing_id": str(pairing.id), "pairing_secret": secret}),
             content_type="application/json",
         )
         invalid = self.client.post(
             "/api/discord/v1/pairings/verify",
-            data=json.dumps(
-                {"pairing_id": str(pairing.id), "pairing_secret": "wrong"}
-            ),
+            data=json.dumps({"pairing_id": str(pairing.id), "pairing_secret": "wrong"}),
             content_type="application/json",
         )
         self.assertEqual(valid.status_code, 200)

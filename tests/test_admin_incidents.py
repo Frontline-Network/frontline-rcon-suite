@@ -129,6 +129,34 @@ def test_parser_recognizes_reporter_team_squad_and_captures_members():
     assert len(subject["snapshot"]["players"]) == 2
 
 
+def test_team_view_recognizes_vietnam_squadleader_and_normalizes_teamkills():
+    squads = incidents.flatten_team_view(
+        {
+            "allies": {
+                "squads": {
+                    "able": {
+                        "type": "infantry",
+                        "has_leader": True,
+                        "players": [
+                            {
+                                "name": "Biene",
+                                "player_id": "eos-id",
+                                "role": "squadleader",
+                                "team_kills": 0,
+                            }
+                        ],
+                    }
+                }
+            },
+            "fail_count": 0,
+        }
+    )
+
+    assert squads[0]["leader"]["player_id"] == "eos-id"
+    assert squads[0]["leader"]["teamkills"] == 0
+    assert squads[0]["players"][0]["teamkills"] == 0
+
+
 @pytest.mark.parametrize(
     "squad_name",
     [
