@@ -96,6 +96,17 @@ def player_name_state_is_current(
     )
 
 
+def next_player_name_batch_at(now: datetime) -> datetime:
+    """Return the next UTC half-hour boundary for a newly observed name."""
+
+    boundary_minute = 30 if now.minute < 30 else 60
+    if boundary_minute == 60:
+        return (now + timedelta(hours=1)).replace(
+            minute=0, second=0, microsecond=0
+        )
+    return now.replace(minute=boundary_minute, second=0, microsecond=0)
+
+
 def enqueue_candidate(
     *,
     source: ModerationSource,
@@ -166,7 +177,11 @@ def enqueue_candidate(
             matched_rule_ids=prefilter.matched_rule_ids,
             policy=policy.model_dump(mode="json"),
             shadow_only=bool(ai_config.get("shadow_mode", True)),
-            next_attempt_at=now,
+            next_attempt_at=(
+                next_player_name_batch_at(now)
+                if source == ModerationSource.PLAYER_NAME
+                else now
+            ),
             created_at=now,
         )
         session.add(item)

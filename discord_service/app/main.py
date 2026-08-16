@@ -20,7 +20,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .ai import CodexAnalyzer, ManagedAnalyzer
+from .ai import CodexAnalyzer, ManagedAnalyzer, PlayerNameBatchInput
 from .codex_runtime import (
     CodexRuntimeError,
     account_status as codex_account_status,
@@ -33,6 +33,7 @@ from .contracts import (
     ModerationAnalysisJobEnvelope,
     ModerationPolicy,
     ModerationSource,
+    PlayerNameAnalysisBatchEnvelope,
 )
 from .db import Base, engine, session_dependency
 from .discord_client import DiscordClient, render_message
@@ -1061,6 +1062,160 @@ def receive_analysis_job(
     )
     session.commit()
     return {"accepted": True, "cached": False}
+
+
+@app.post(
+    "/v1/player-name-analysis-batches",
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def receive_player_name_analysis_batch(
+    batch: PlayerNameAnalysisBatchEnvelope,
+    authorization: str | None = Header(default=None),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    session: Session = Depends(session_dependency),
+):
+    """Analyze up to 50 changed names with one subscription/API model turn."""
+
+    if not idempotency_key or len(idempotency_key) > 160:
+        raise HTTPException(
+            status_code=400, detail="A valid Idempotency-Key is required"
+        )
+    integration = session.get(Integration, batch.installation_id)
+    if (
+        integration is None
+        or not integration.enabled
+        or not matches(
+            _bearer(authorization), integration.event_capability_digest, "events"
+        )
+    ):
+        raise HTTPException(status_code=404, detail="Unknown installation capability")
+    _check_rate_limit(f"analysis:{integration.installation_id}")
+    if session.get(EventReceipt, idempotency_key):
+        return {"accepted": True, "cached": True}
+
+    def job_receipt_key(job_id: str) -> str:
+        return f"name-analysis:{batch.installation_id}:{job_id}"
+
+    pending_jobs = [
+        job
+        for job in batch.jobs
+        if session.get(EventReceipt, job_receipt_key(job.job_id)) is None
+    ]
+    if not pending_jobs:
+        session.add(
+            EventReceipt(
+                idempotency_key=idempotency_key,
+                installation_id=batch.installation_id,
+                event_id=0,
+                event_type="player_name_analysis_batch",
+            )
+        )
+        session.commit()
+        return {"accepted": True, "cached": True, "count": len(batch.jobs)}
+
+    first_job = pending_jobs[0]
+    if first_job.ai_provider == "managed" and not _quota_available(
+        session, batch.installation_id
+    ):
+        raise HTTPException(status_code=429, detail="Monthly AI quota exhausted")
+    items = [
+        PlayerNameBatchInput(
+            text=job.candidate_text,
+            policy=job.policy,
+            player_ids=[job.player_id] if job.player_id else [],
+            matched_rule_ids=job.matched_rule_ids,
+        )
+        for job in pending_jobs
+    ]
+    if first_job.ai_provider == "codex":
+        result = CodexAnalyzer(batch.installation_id).analyze_player_names(
+            items=items,
+            model=first_job.player_name_model,
+        )
+    else:
+        api_key = (
+            first_job.api_key
+            if first_job.ai_provider == "api_key"
+            else get_settings().openai_api_key
+        )
+        if not api_key:
+            raise HTTPException(status_code=409, detail="OpenAI API key is not configured")
+        analyzer_settings = get_settings().model_copy(
+            update={
+                "openai_api_key": api_key,
+                "player_name_model": first_job.player_name_model,
+            }
+        )
+        result = ManagedAnalyzer(settings=analyzer_settings).analyze_player_names(items)
+    if result.analyses is None or len(result.analyses) != len(pending_jobs):
+        raise HTTPException(status_code=503, detail="AI batch analysis unavailable")
+
+    # Count every real model turn even when a later CRCON callback is unavailable.
+    session.add(
+        TechnicalUsageMetric(
+            installation_id=batch.installation_id,
+            kind="ai_player_name_batch",
+            model=first_job.player_name_model,
+            input_tokens=result.input_tokens,
+            output_tokens=result.output_tokens,
+            success=True,
+        )
+    )
+    session.commit()
+
+    for job, raw_analysis in zip(pending_jobs, result.analyses, strict=True):
+        local_hard_hit = _has_local_hard_rule(job.policy, job.matched_rule_ids)
+        supplied_rules = list(
+            dict.fromkeys([*raw_analysis.rule_ids, *job.matched_rule_ids])
+        )[:20]
+        analysis = raw_analysis.model_copy(
+            update={
+                "rule_ids": supplied_rules,
+                "hard_hit": raw_analysis.hard_hit or local_hard_hit,
+            }
+        )
+        try:
+            callback = httpx.post(
+                f"{integration.crcon_base_url}/api/discord/v1/moderation-results",
+                headers={
+                    "Authorization": (
+                        f"Bearer {decrypt(integration.action_capability_ciphertext)}"
+                    )
+                },
+                json={
+                    "installation_id": integration.installation_id,
+                    "analysis_id": str(uuid.uuid4()),
+                    "job_id": job.job_id,
+                    "analysis": analysis.model_dump(mode="json"),
+                    "policy": job.policy.model_dump(mode="json"),
+                },
+                timeout=10,
+            )
+            callback.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise HTTPException(
+                status_code=503, detail="CRCON analysis callback unavailable"
+            ) from exc
+        session.add(
+            EventReceipt(
+                idempotency_key=job_receipt_key(job.job_id),
+                installation_id=batch.installation_id,
+                event_id=0,
+                event_type="player_name_analysis_job",
+            )
+        )
+        session.commit()
+
+    session.add(
+        EventReceipt(
+            idempotency_key=idempotency_key,
+            installation_id=batch.installation_id,
+            event_id=0,
+            event_type="player_name_analysis_batch",
+        )
+    )
+    session.commit()
+    return {"accepted": True, "cached": False, "count": len(batch.jobs)}
 
 
 @app.post("/v1/test-messages", status_code=status.HTTP_202_ACCEPTED)

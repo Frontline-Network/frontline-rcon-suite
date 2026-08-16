@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import unicodedata
 from dataclasses import dataclass
 from typing import Literal
@@ -70,9 +71,39 @@ class PlayerNameDecision(BaseModel):
     suggested_player_response: str | None = Field(default=None, max_length=200)
 
 
+class PlayerNameBatchItemDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    index: int = Field(ge=0, le=49)
+    decision: PlayerNameDecision
+
+
+class PlayerNameBatchDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[PlayerNameBatchItemDecision] = Field(min_length=1, max_length=50)
+
+
+@dataclass(frozen=True)
+class PlayerNameBatchInput:
+    text: str
+    policy: ModerationPolicy
+    player_ids: list[str]
+    matched_rule_ids: list[str]
+
+
 @dataclass(frozen=True)
 class AnalysisResult:
     analysis: ModerationAnalysis | None
+    input_tokens: int = 0
+    output_tokens: int = 0
+    unavailable_reason: str | None = None
+    used_responses_model: bool = False
+
+
+@dataclass(frozen=True)
+class BatchAnalysisResult:
+    analyses: list[ModerationAnalysis] | None
     input_tokens: int = 0
     output_tokens: int = 0
     unavailable_reason: str | None = None
@@ -140,6 +171,48 @@ def _player_name_analysis(
     )
 
 
+def _player_name_batch_prompt(items: list[PlayerNameBatchInput]) -> str:
+    payload = [
+        {
+            "index": index,
+            "language": item.policy.language,
+            "player_name": item.text[:255],
+            "local_rule_ids": item.matched_rule_ids[:20],
+        }
+        for index, item in enumerate(items)
+    ]
+    return (
+        "Classify every item exactly once. Preserve each numeric index. "
+        "Set clear_violation=true only when the semantic evidence is clear; "
+        "then use risk_score >= 0.90. Return only the requested schema.\n"
+        f"PLAYER_NAMES_JSON: {json.dumps(payload, ensure_ascii=False, separators=(',', ':'))}"
+    )
+
+
+def _player_name_batch_analyses(
+    *,
+    batch: PlayerNameBatchDecision,
+    items: list[PlayerNameBatchInput],
+    model: str,
+    prompt_version: str,
+) -> list[ModerationAnalysis]:
+    decisions = {item.index: item.decision for item in batch.items}
+    if len(decisions) != len(batch.items) or set(decisions) != set(range(len(items))):
+        raise ValueError("Player-name batch output did not match every input")
+    return [
+        _player_name_analysis(
+            decision=decisions[index],
+            text=item.text,
+            source=ModerationSource.PLAYER_NAME,
+            policy=item.policy,
+            player_ids=item.player_ids,
+            model=model,
+            prompt_version=prompt_version,
+        )
+        for index, item in enumerate(items)
+    ]
+
+
 class ManagedAnalyzer:
     def __init__(self, settings: Settings | None = None, client=None):
         self.settings = settings or get_settings()
@@ -148,6 +221,49 @@ class ManagedAnalyzer:
             if self.settings.openai_api_key
             else None
         )
+
+    def analyze_player_names(
+        self, items: list[PlayerNameBatchInput]
+    ) -> BatchAnalysisResult:
+        if self.client is None:
+            return BatchAnalysisResult(
+                None, unavailable_reason="openai_not_configured"
+            )
+        try:
+            response = self.client.responses.parse(
+                model=self.settings.player_name_model,
+                store=False,
+                reasoning={"effort": "low"},
+                text={"verbosity": "low"},
+                max_output_tokens=min(12000, max(1200, len(items) * 450)),
+                input=[
+                    {"role": "system", "content": PLAYER_NAME_PROMPT},
+                    {"role": "user", "content": _player_name_batch_prompt(items)},
+                ],
+                text_format=PlayerNameBatchDecision,
+            )
+            parsed = response.output_parsed
+            if parsed is None:
+                return BatchAnalysisResult(
+                    None, unavailable_reason="empty_structured_output"
+                )
+            analyses = _player_name_batch_analyses(
+                batch=parsed,
+                items=items,
+                model=self.settings.player_name_model,
+                prompt_version=f"{self.settings.prompt_version}-player-name-batch",
+            )
+            usage = getattr(response, "usage", None)
+            return BatchAnalysisResult(
+                analyses,
+                input_tokens=int(getattr(usage, "input_tokens", 0) or 0),
+                output_tokens=int(getattr(usage, "output_tokens", 0) or 0),
+                used_responses_model=True,
+            )
+        except Exception as exc:
+            return BatchAnalysisResult(
+                None, unavailable_reason=f"{type(exc).__name__}:analysis_failed"
+            )
 
     def analyze(
         self,
@@ -317,6 +433,36 @@ class CodexAnalyzer:
             if self.settings.openai_api_key
             else None
         )
+
+    def analyze_player_names(
+        self, *, items: list[PlayerNameBatchInput], model: str
+    ) -> BatchAnalysisResult:
+        try:
+            raw = run_structured(
+                self.installation_id,
+                model=model,
+                prompt=(
+                    f"{PLAYER_NAME_PROMPT}\n\n{_player_name_batch_prompt(items)}\n"
+                    "Do not use tools or inspect files."
+                ),
+                output_schema=PlayerNameBatchDecision.model_json_schema(),
+            )
+            batch = PlayerNameBatchDecision.model_validate(raw)
+            return BatchAnalysisResult(
+                _player_name_batch_analyses(
+                    batch=batch,
+                    items=items,
+                    model=model,
+                    prompt_version=(
+                        f"{self.settings.prompt_version}-codex-player-name-batch"
+                    ),
+                ),
+                used_responses_model=True,
+            )
+        except (CodexRuntimeError, ValueError, TypeError) as exc:
+            return BatchAnalysisResult(
+                None, unavailable_reason=f"{type(exc).__name__}:analysis_failed"
+            )
 
     def analyze(
         self,

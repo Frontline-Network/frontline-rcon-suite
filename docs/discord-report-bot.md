@@ -41,14 +41,20 @@ Servernummer und Spiel (`hll` oder `hll_vietnam`) im Embed unterschieden.
 ## KI und Shadow-Rollout
 
 Reports, Chat und Namen sind getrennt schaltbar. Chat verlässt CRCON erst nach
-dem lokalen Begriffs-/Regex-/Ausnahmefilter. Namen werden pro Spieler,
-normalisiertem Namen, Modell und Regelprofil für 24 Stunden dedupliziert.
+dem lokalen Begriffs-/Regex-/Ausnahmefilter. Ein unveränderter Spielername wird
+pro Spieler, normalisiertem Namen, Modell und Regelprofil nicht erneut geprüft.
+Neue oder geänderte Namen warten bis zur nächsten UTC-Halbstundengrenze und
+werden dann in Gruppen von bis zu 50 Namen mit einem gemeinsamen Modellaufruf
+klassifiziert. Jedes Ergebnis wird anschließend wieder einzeln validiert und
+dem richtigen Spieler zugeordnet.
 
 Als KI-Anbieter sind Frontline-Kontingent, ein eigener verschlüsselt in CRCON
 gespeicherter API-Key und ein ChatGPT/Codex-Login auswählbar. API-Aufrufe
-verwenden zuerst `omni-moderation-latest` und anschließend die Responses API mit
-dem gewählten Modell, `store: false`, festem Systemprompt, ohne Tools und mit
-strengem Ausgabeschema. Der Codex-Modus verwendet den offiziellen
+schicken verdächtige Chatkandidaten zuerst an `omni-moderation-latest`; nur ein
+Omni-Treffer oder eine harte lokale Regel startet die ausführliche Modellanalyse.
+Die semantische Namensprüfung verwendet direkt das ausgewählte günstige
+Namensmodell mit `store: false`, festem Systemprompt, ohne Tools und mit strengem
+Ausgabeschema. Der Codex-Modus verwendet den offiziellen
 Device-Code-Login, liest die im Abonnement verfügbaren Modelle dynamisch und
 führt jede Analyse als isolierten, flüchtigen Read-only-Turn aus. Spieltext wird
 ausschließlich als nicht vertrauenswürdige Evidenz behandelt. Siehe die offiziellen Hinweise zu

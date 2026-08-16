@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -13,13 +14,17 @@ from rcon.moderation import (
     ModerationPolicy,
     ModerationSeverity,
     ModerationSource,
+    PlayerNameAnalysisBatchEnvelope,
     SuggestedAction,
     analysis_visibility,
     normalize_candidate,
     prefilter_candidate,
     validate_analysis_policy,
 )
-from rcon.moderation_candidates import player_name_state_is_current
+from rcon.moderation_candidates import (
+    next_player_name_batch_at,
+    player_name_state_is_current,
+)
 
 
 def _analysis(**overrides):
@@ -94,6 +99,50 @@ def test_candidate_jobs_default_to_shadow_only():
         created_at="2026-08-15T12:00:00Z",
     )
     assert job.shadow_only is True
+
+
+def test_player_name_jobs_wait_for_next_half_hour_boundary():
+    assert next_player_name_batch_at(
+        datetime(2026, 8, 16, 12, 7, 13, tzinfo=timezone.utc)
+    ) == datetime(2026, 8, 16, 12, 30, tzinfo=timezone.utc)
+    assert next_player_name_batch_at(
+        datetime(2026, 8, 16, 12, 30, tzinfo=timezone.utc)
+    ) == datetime(2026, 8, 16, 13, 0, tzinfo=timezone.utc)
+
+
+def test_player_name_batch_rejects_chat_and_mixed_provider_jobs():
+    base = dict(
+        installation_id="install",
+        job_id="22222222-2222-2222-2222-222222222222",
+        source=ModerationSource.PLAYER_NAME,
+        server_number=2,
+        candidate_text="name",
+        policy=ModerationPolicy(),
+        created_at="2026-08-15T12:00:00Z",
+    )
+    name_job = ModerationAnalysisJobEnvelope(**base)
+    batch = PlayerNameAnalysisBatchEnvelope(
+        installation_id="install", jobs=[name_job]
+    )
+    assert batch.jobs == [name_job]
+    with pytest.raises(ValidationError, match="only contain name jobs"):
+        PlayerNameAnalysisBatchEnvelope(
+            installation_id="install",
+            jobs=[name_job.model_copy(update={"source": ModerationSource.CHAT})],
+        )
+    with pytest.raises(ValidationError, match="configuration must match"):
+        PlayerNameAnalysisBatchEnvelope(
+            installation_id="install",
+            jobs=[
+                name_job,
+                name_job.model_copy(
+                    update={
+                        "job_id": "33333333-3333-3333-3333-333333333333",
+                        "ai_provider": "codex",
+                    }
+                ),
+            ],
+        )
 
 
 def test_unchanged_player_name_state_skips_another_ai_job():

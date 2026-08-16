@@ -12,7 +12,15 @@ os.environ.setdefault(
 )
 os.environ.setdefault("DISCORD_SERVICE_DRY_RUN", "true")
 
-from discord_service.app.ai import CodexAnalyzer, ManagedAnalyzer, PlayerNameDecision
+from discord_service.app.ai import (
+    BatchAnalysisResult,
+    CodexAnalyzer,
+    ManagedAnalyzer,
+    PlayerNameBatchDecision,
+    PlayerNameBatchInput,
+    PlayerNameBatchItemDecision,
+    PlayerNameDecision,
+)
 from discord_service.app.config import Settings, get_settings
 from discord_service.app.codex_runtime import _persist_credentials, _runtime_home
 from discord_service.app.contracts import (
@@ -903,7 +911,25 @@ class _Responses:
 
     def parse(self, **kwargs):
         self.kwargs = kwargs
-        if kwargs["text_format"] is PlayerNameDecision:
+        if kwargs["text_format"] is PlayerNameBatchDecision:
+            parsed = PlayerNameBatchDecision(
+                items=[
+                    PlayerNameBatchItemDecision(
+                        index=index,
+                        decision=PlayerNameDecision(
+                            category="none",
+                            target="none",
+                            clear_violation=False,
+                            severity="none",
+                            risk_score=0.1,
+                            rationale="No actionable name violation",
+                            suggested_action="none",
+                        ),
+                    )
+                    for index in range(2)
+                ]
+            )
+        elif kwargs["text_format"] is PlayerNameDecision:
             parsed = PlayerNameDecision(
                 category="targeted_hate" if self.clear_name else "none",
                 target="protected_group" if self.clear_name else "none",
@@ -978,6 +1004,109 @@ def test_player_names_use_nano_with_small_schema():
     assert fake.responses.kwargs["max_output_tokens"] == 1200
     assert fake.responses.kwargs["text_format"] is PlayerNameDecision
     assert PlayerNameDecision.model_config["extra"] == "forbid"
+
+
+def test_player_names_are_classified_in_one_bounded_batch_turn():
+    fake = _OpenAI()
+    policy = ModerationPolicy()
+    result = ManagedAnalyzer(
+        settings=get_settings(), client=fake
+    ).analyze_player_names(
+        [
+            PlayerNameBatchInput(
+                text=name,
+                policy=policy,
+                player_ids=[str(index)],
+                matched_rule_ids=[],
+            )
+            for index, name in enumerate(["Name One", "Name Two"])
+        ]
+    )
+    assert result.analyses is not None
+    assert len(result.analyses) == 2
+    assert [analysis.affected_player_ids for analysis in result.analyses] == [
+        ["0"],
+        ["1"],
+    ]
+    assert fake.responses.kwargs["text_format"] is PlayerNameBatchDecision
+    assert fake.responses.kwargs["model"] == "gpt-5.4-nano"
+    assert fake.responses.kwargs["store"] is False
+    assert fake.responses.kwargs["max_output_tokens"] == 1200
+
+
+def test_player_name_batch_endpoint_uses_one_model_turn_and_callbacks_each_job():
+    capability = _seed()
+    policy = ModerationPolicy()
+    analyses = [
+        ModerationAnalysis(
+            source=ModerationSource.PLAYER_NAME,
+            affected_player_ids=[str(index)],
+            severity="none",
+            risk_score=0.1,
+            rationale="No actionable name violation",
+            suggested_action="none",
+            model_version="gpt-5.4-nano",
+            prompt_version="moderation-v1-player-name-batch",
+            policy_profile_id=policy.profile_id,
+            policy_version=policy.version,
+        )
+        for index in range(2)
+    ]
+    jobs = [
+        {
+            "installation_id": "11111111-1111-1111-1111-111111111111",
+            "job_id": f"{index + 1:08d}-1111-1111-1111-111111111111",
+            "source": "ai_player_name",
+            "server_number": 3,
+            "player_id": str(index),
+            "player_name": f"Name {index}",
+            "candidate_text": f"Name {index}",
+            "policy": policy.model_dump(mode="json"),
+            "ai_provider": "api_key",
+            "api_key": "sk-test-key-that-is-long-enough",
+            "created_at": datetime.now(tz=timezone.utc).isoformat(),
+        }
+        for index in range(2)
+    ]
+    callback = MagicMock()
+    callback.raise_for_status.return_value = None
+    with (
+        patch.object(
+            ManagedAnalyzer,
+            "analyze_player_names",
+            return_value=BatchAnalysisResult(
+                analyses, input_tokens=100, output_tokens=20
+            ),
+        ) as analyze,
+        patch("discord_service.app.main.httpx.post", return_value=callback) as post,
+    ):
+        client = TestClient(app)
+        request_kwargs = {
+            "headers": {
+                "Authorization": f"Bearer {capability}",
+                "Idempotency-Key": "names:test-batch",
+            },
+            "json": {
+                "installation_id": "11111111-1111-1111-1111-111111111111",
+                "jobs": jobs,
+            },
+        }
+        response = client.post(
+            "/v1/player-name-analysis-batches",
+            **request_kwargs,
+        )
+        cached_response = client.post(
+            "/v1/player-name-analysis-batches", **request_kwargs
+        )
+    assert response.status_code == 202
+    assert response.json()["count"] == 2
+    assert cached_response.status_code == 202
+    assert cached_response.json()["cached"] is True
+    analyze.assert_called_once()
+    assert post.call_count == 2
+    assert {
+        call.kwargs["json"]["job_id"] for call in post.call_args_list
+    } == {job["job_id"] for job in jobs}
 
 
 def test_clear_semantic_player_name_violation_reaches_incident_threshold():

@@ -123,3 +123,30 @@ class ModerationAnalysisJobEnvelope(BaseModel):
     )
     api_key: str | None = Field(default=None, min_length=20, max_length=500, repr=False)
     created_at: datetime
+
+
+class PlayerNameAnalysisBatchEnvelope(BaseModel):
+    """A bounded group of name checks sharing one model invocation."""
+
+    model_config = ConfigDict(extra="forbid")
+    schema_version: Literal["1"] = "1"
+    installation_id: str = Field(min_length=1, max_length=64)
+    jobs: list[ModerationAnalysisJobEnvelope] = Field(
+        min_length=1, max_length=50
+    )
+
+    @model_validator(mode="after")
+    def jobs_are_compatible(self):
+        if len({job.job_id for job in self.jobs}) != len(self.jobs):
+            raise ValueError("Player-name batch job IDs must be unique")
+        for job in self.jobs:
+            if job.installation_id != self.installation_id:
+                raise ValueError("Player-name batch installation does not match")
+            if job.source != ModerationSource.PLAYER_NAME:
+                raise ValueError("Player-name batches may only contain name jobs")
+        providers = {job.ai_provider for job in self.jobs}
+        models = {job.player_name_model for job in self.jobs}
+        api_keys = {job.api_key for job in self.jobs}
+        if len(providers) != 1 or len(models) != 1 or len(api_keys) != 1:
+            raise ValueError("Player-name batch provider configuration must match")
+        return self

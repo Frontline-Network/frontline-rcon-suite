@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import time
 from datetime import datetime, timedelta, timezone
@@ -24,7 +25,9 @@ from rcon.moderation import (
     IncidentEventEnvelope,
     ModerationAnalysis,
     ModerationAnalysisJobEnvelope,
+    PlayerNameAnalysisBatchEnvelope,
 )
+from rcon.moderation_candidates import next_player_name_batch_at
 
 
 def _server_label(server_number: int) -> tuple[str, str]:
@@ -204,32 +207,33 @@ class Command(BaseCommand):
                 session.flush()
             if not deliver_moderation or not ai_moderation_enabled():
                 return delivered_count
-            candidates = session.execute(
-                select(ModerationCandidateOutbox)
-                .where(
-                    ModerationCandidateOutbox.delivered_at.is_(None),
-                    ModerationCandidateOutbox.next_attempt_at <= now,
+            candidates = list(
+                session.execute(
+                    select(ModerationCandidateOutbox)
+                    .where(
+                        ModerationCandidateOutbox.delivered_at.is_(None),
+                        ModerationCandidateOutbox.next_attempt_at <= now,
+                    )
+                    .order_by(ModerationCandidateOutbox.created_at.asc())
+                    .limit(50)
                 )
-                .order_by(ModerationCandidateOutbox.created_at.asc())
-                .limit(50)
-            ).scalars()
-            for candidate in candidates:
-                ai_config = {**{
+                .scalars()
+            )
+            ai_config = {
+                **{
                     "provider": "managed",
                     "ai_model": "gpt-5.6-luna",
                     "player_name_model": "gpt-5.4-nano",
-                }, **dict(integration.ai_config or {})}
-                provider = str(ai_config["provider"])
-                api_key = None
-                if provider == "api_key":
-                    if not integration.ai_api_key_ciphertext:
-                        candidate.attempts += 1
-                        candidate.last_error = "api_key_not_configured"
-                        candidate.next_attempt_at = now + timedelta(minutes=5)
-                        session.flush()
-                        continue
-                    api_key = decrypt_capability(integration.ai_api_key_ciphertext)
-                job = ModerationAnalysisJobEnvelope(
+                },
+                **dict(integration.ai_config or {}),
+            }
+            provider = str(ai_config["provider"])
+            api_key = None
+            if provider == "api_key" and integration.ai_api_key_ciphertext:
+                api_key = decrypt_capability(integration.ai_api_key_ciphertext)
+
+            def build_job(candidate):
+                return ModerationAnalysisJobEnvelope(
                     installation_id=str(integration.installation_id),
                     job_id=candidate.id,
                     source=candidate.source,
@@ -246,6 +250,69 @@ class Command(BaseCommand):
                     api_key=api_key,
                     created_at=candidate.created_at,
                 )
+
+            name_candidates = [
+                item for item in candidates if item.source == "ai_player_name"
+            ]
+            if name_candidates:
+                if provider == "api_key" and not api_key:
+                    for candidate in name_candidates:
+                        candidate.attempts += 1
+                        candidate.last_error = "api_key_not_configured"
+                        candidate.next_attempt_at = next_player_name_batch_at(now)
+                else:
+                    batch = PlayerNameAnalysisBatchEnvelope(
+                        installation_id=str(integration.installation_id),
+                        jobs=[build_job(candidate) for candidate in name_candidates],
+                    )
+                    batch_fingerprint = hashlib.sha256(
+                        ":".join(item.id for item in name_candidates).encode("utf-8")
+                    ).hexdigest()
+                    try:
+                        response = requests.post(
+                            (
+                                f"{integration.service_url.rstrip('/')}"
+                                "/v1/player-name-analysis-batches"
+                            ),
+                            headers={
+                                "Authorization": f"Bearer {capability}",
+                                "Idempotency-Key": (
+                                    f"{integration.installation_id}:names:"
+                                    f"{batch_fingerprint}"
+                                ),
+                            },
+                            json=batch.model_dump(mode="json"),
+                            timeout=180,
+                        )
+                        response.raise_for_status()
+                    except requests.RequestException as exc:
+                        for candidate in name_candidates:
+                            candidate.attempts += 1
+                            candidate.last_error = (
+                                f"{type(exc).__name__}:status="
+                                f"{getattr(exc.response, 'status_code', None)}"
+                            )[:500]
+                            # A failed batch is retried in the next window rather
+                            # than generating repeated model turns immediately.
+                            candidate.next_attempt_at = next_player_name_batch_at(now)
+                    else:
+                        for candidate in name_candidates:
+                            candidate.attempts += 1
+                            candidate.delivered_at = now
+                            candidate.last_error = None
+                            delivered_count += 1
+                session.flush()
+
+            for candidate in (
+                item for item in candidates if item.source != "ai_player_name"
+            ):
+                if provider == "api_key" and not api_key:
+                    candidate.attempts += 1
+                    candidate.last_error = "api_key_not_configured"
+                    candidate.next_attempt_at = now + timedelta(minutes=5)
+                    session.flush()
+                    continue
+                job = build_job(candidate)
                 try:
                     response = requests.post(
                         f"{integration.service_url.rstrip('/')}/v1/analysis-jobs",
