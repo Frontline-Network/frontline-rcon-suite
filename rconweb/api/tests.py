@@ -1019,7 +1019,6 @@ class DiscordActionTemplateTests(TestCase):
 
         with self.assertRaisesRegex(ValueError, "confirmed player"):
             _validate_prepared_action_target("message", {"subjects": []}, {})
-
     @patch("api.discord_integration.mutate_incident")
     @patch("api.discord_integration._validate_binding")
     @patch("api.discord_integration._authorized_integration")
@@ -1209,3 +1208,31 @@ class DiscordActionTemplateTests(TestCase):
         )
         self.assertEqual(valid.status_code, 200)
         self.assertEqual(invalid.status_code, 404)
+
+
+class DiscordOutboxWorkerModeTests(TestCase):
+    def test_event_worker_never_processes_moderation_jobs(self):
+        from api.management.commands.discord_report_worker import Command
+
+        command = Command()
+        with patch.object(
+            command, "_deliver_batch", side_effect=KeyboardInterrupt
+        ) as deliver:
+            with self.assertRaises(KeyboardInterrupt):
+                command.handle(events_only=True, moderation_only=False)
+        deliver.assert_called_once_with(
+            deliver_events=True, deliver_moderation=False
+        )
+
+    def test_moderation_worker_never_processes_incident_events(self):
+        from api.management.commands.discord_report_worker import Command
+
+        command = Command()
+        with patch.object(
+            command, "_deliver_batch", side_effect=KeyboardInterrupt
+        ) as deliver:
+            with self.assertRaises(KeyboardInterrupt):
+                command.handle(events_only=False, moderation_only=True)
+        deliver.assert_called_once_with(
+            deliver_events=False, deliver_moderation=True
+        )

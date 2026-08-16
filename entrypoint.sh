@@ -51,6 +51,18 @@ then
   exec python manage.py discord_report_worker
 fi
 
+if [ "$1" == 'discord_event_worker' ]
+then
+  cd rconweb
+  exec python manage.py discord_report_worker --events-only
+fi
+
+if [ "$1" == 'discord_moderation_worker' ]
+then
+  cd rconweb
+  exec python manage.py discord_report_worker --moderation-only
+fi
+
 # Check if we're in a backend container
 if [ "$1" == 'web' ]
 then

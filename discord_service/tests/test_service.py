@@ -502,7 +502,9 @@ def test_temporary_gameserver_error_is_not_reported_as_invalid_interaction():
     )
     error = httpx.HTTPStatusError("failed", request=request, response=response)
     message = _crcon_interaction_error(error)
-    assert "vorübergehend nicht ausführen" in message
+    assert "nicht bestätigen" in message
+    assert "nicht sofort" in message
+    assert "verzögert" in message
     assert "bleibt offen" in message
     assert "Interaktion" not in message
 
@@ -824,7 +826,8 @@ def test_non_destructive_action_executes_immediately_without_confirmation_button
             "/v1/discord/interactions", json=_modal_interaction("message")
         )
     assert response.status_code == 200
-    assert "ausgeführt" in response.json()["data"]["content"]
+    assert "Gameserver angenommen" in response.json()["data"]["content"]
+    assert "verzögern" in response.json()["data"]["content"]
     assert "components" not in response.json()["data"]
     assert post.call_count == 2
     assert post.call_args_list[1].kwargs["json"]["interaction_id"] == (

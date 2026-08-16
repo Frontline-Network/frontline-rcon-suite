@@ -7,7 +7,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 import requests
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from sqlalchemy import and_, or_, select
 
 from api.discord_capabilities import decrypt_capability
@@ -38,11 +38,35 @@ def _server_label(server_number: int) -> tuple[str, str]:
 class Command(BaseCommand):
     help = "Deliver complete incident events to the Frontline Discord service"
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--events-only",
+            action="store_true",
+            help="Deliver incident events without processing AI moderation jobs",
+        )
+        parser.add_argument(
+            "--moderation-only",
+            action="store_true",
+            help="Process AI moderation jobs without delivering incident events",
+        )
+
     def handle(self, *args, **options):
-        self.stdout.write("CRCON Discord report worker started")
+        events_only = bool(options.get("events_only"))
+        moderation_only = bool(options.get("moderation_only"))
+        if events_only and moderation_only:
+            raise CommandError(
+                "--events-only and --moderation-only cannot be used together"
+            )
+        self.stdout.write(
+            "CRCON Discord outbox worker started "
+            f"(events={not moderation_only}, moderation={not events_only})"
+        )
         while True:
             try:
-                delivered = self._deliver_batch()
+                delivered = self._deliver_batch(
+                    deliver_events=not moderation_only,
+                    deliver_moderation=not events_only,
+                )
             except Exception as exc:
                 # Never include payloads or capabilities in worker logs.
                 self.stderr.write(
@@ -51,7 +75,9 @@ class Command(BaseCommand):
                 delivered = 0
             time.sleep(0.25 if delivered else 1.0)
 
-    def _deliver_batch(self) -> int:
+    def _deliver_batch(
+        self, *, deliver_events: bool = True, deliver_moderation: bool = True
+    ) -> int:
         if not discord_reports_enabled():
             return 0
         integration = DiscordReportIntegration.objects.filter(
@@ -74,26 +100,29 @@ class Command(BaseCommand):
             return 0
         delivered_count = 0
         with enter_session() as session:
-            rows = session.execute(
-                select(AdminIncidentEvent, AdminIncidentDiscordDelivery)
-                .outerjoin(
-                    AdminIncidentDiscordDelivery,
-                    AdminIncidentDiscordDelivery.event_id == AdminIncidentEvent.id,
-                )
-                .where(
-                    AdminIncidentEvent.created_at >= delivery_started_at,
-                    AdminIncidentEvent.event_type != "action_started",
-                    or_(
-                        AdminIncidentDiscordDelivery.id.is_(None),
-                        and_(
-                            AdminIncidentDiscordDelivery.delivered_at.is_(None),
-                            AdminIncidentDiscordDelivery.next_attempt_at <= now,
+            rows = []
+            if deliver_events:
+                rows = session.execute(
+                    select(AdminIncidentEvent, AdminIncidentDiscordDelivery)
+                    .outerjoin(
+                        AdminIncidentDiscordDelivery,
+                        AdminIncidentDiscordDelivery.event_id
+                        == AdminIncidentEvent.id,
+                    )
+                    .where(
+                        AdminIncidentEvent.created_at >= delivery_started_at,
+                        AdminIncidentEvent.event_type != "action_started",
+                        or_(
+                            AdminIncidentDiscordDelivery.id.is_(None),
+                            and_(
+                                AdminIncidentDiscordDelivery.delivered_at.is_(None),
+                                AdminIncidentDiscordDelivery.next_attempt_at <= now,
+                            ),
                         ),
-                    ),
-                )
-                .order_by(AdminIncidentEvent.id.asc())
-                .limit(50)
-            ).all()
+                    )
+                    .order_by(AdminIncidentEvent.id.asc())
+                    .limit(50)
+                ).all()
             for event, delivery in rows:
                 if delivery is None:
                     delivery = AdminIncidentDiscordDelivery(
@@ -173,7 +202,7 @@ class Command(BaseCommand):
                     delivered_count += 1
                 delivery.updated_at = now
                 session.flush()
-            if not ai_moderation_enabled():
+            if not deliver_moderation or not ai_moderation_enabled():
                 return delivered_count
             candidates = session.execute(
                 select(ModerationCandidateOutbox)

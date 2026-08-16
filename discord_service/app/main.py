@@ -300,8 +300,9 @@ def _crcon_interaction_error(exc: httpx.HTTPError) -> str:
             "HLLCommandError" in detail or "HLLCommandFailedError" in detail
         ):
             return (
-                "Der Gameserver konnte die Aktion vorübergehend nicht ausführen. "
-                "Der Report bleibt offen; bitte versuche es erneut."
+                "Der Gameserver konnte die Ausführung nicht bestätigen. "
+                "Die Aktion kann im Spiel verzögert erscheinen; bitte nicht sofort "
+                "erneut ausführen. Der Report bleibt offen."
             )
         return {
             400: "CRCON hat die Interaktion als ungültig abgelehnt.",
@@ -1355,7 +1356,12 @@ async def discord_interaction(
             return {
                 "type": 4,
                 "data": {
-                    "content": "Aktion wurde in CRCON ausgeführt und protokolliert.",
+                    "content": (
+                        "Nachricht wurde vom Gameserver angenommen. Die Anzeige im "
+                        "Spiel kann sich insbesondere bei HLL Vietnam verzögern."
+                        if actual_action == "message"
+                        else "Aktion wurde in CRCON ausgeführt und protokolliert."
+                    ),
                     "flags": 64,
                 },
             }
