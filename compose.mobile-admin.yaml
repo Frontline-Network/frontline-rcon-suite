@@ -78,6 +78,12 @@ services:
       service: backend_1
     <<: *frontline-backend
     command: discord_event_worker
+    # Extending backend_1 also inherits its private-network alias "backend".
+    # Clear that alias or the frontend may send HTTP requests to this worker
+    # instead of the actual Django backend after a worker recreation.
+    networks:
+      server1:
+        aliases: !reset []
     environment:
       <<: *mobile-environment
       # This worker delivers incidents from every CRCON database partition,
@@ -100,6 +106,9 @@ services:
       service: backend_1
     <<: *frontline-backend
     command: discord_moderation_worker
+    networks:
+      server1:
+        aliases: !reset []
     environment:
       <<: *mobile-environment
       HLL_GAME: ${HLL_GAME:-hll}
