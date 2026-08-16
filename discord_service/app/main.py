@@ -308,6 +308,12 @@ def _pairing_guild_options(payload: PairingDiscoveryRequest, session: Session) -
                 raise HTTPException(
                     status_code=502, detail="Discord server options are unavailable"
                 ) from exc
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Install the Discord app for this CRCON before detecting its server"
+            ),
+        )
     return _single_guild_options(session)
 
 

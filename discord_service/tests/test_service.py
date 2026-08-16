@@ -321,6 +321,39 @@ def test_oauth_callback_uses_verified_discord_guild_for_pairing_options():
         )
         assert binding.guild_id == "987654321"
 
+    with (
+        patch("discord_service.app.main._validate_crcon_callback"),
+        patch("discord_service.app.main._verify_pending_pairing"),
+        patch(
+            "discord_service.app.main.DiscordClient.guild_options",
+            return_value=options,
+        ) as guild_options,
+    ):
+        discovery = TestClient(app).post("/v1/pairing-options", json=payload)
+    assert discovery.status_code == 200
+    assert discovery.json() == options
+    guild_options.assert_called_once_with("987654321")
+
+
+def test_pairing_options_require_oauth_binding_for_installation():
+    payload = {
+        "crcon_callback_url": "https://crcon.example/api/discord/v1/pairings/complete",
+        "pairing_id": "22222222-2222-4222-8222-222222222222",
+        "pairing_secret": "pair-secret-that-is-at-least-32-characters",
+        "installation_id": "11111111-1111-4111-8111-111111111111",
+    }
+    with (
+        patch("discord_service.app.main._validate_crcon_callback"),
+        patch("discord_service.app.main._verify_pending_pairing"),
+        patch("discord_service.app.main._single_guild_options") as fallback,
+    ):
+        response = TestClient(app).post("/v1/pairing-options", json=payload)
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "Install the Discord app for this CRCON before detecting its server"
+    }
+    fallback.assert_not_called()
+
 
 def test_existing_server_side_binding_resolves_multiple_bot_guilds():
     settings = Settings(
