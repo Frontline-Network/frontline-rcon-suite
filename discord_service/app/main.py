@@ -301,9 +301,14 @@ def _single_guild_options(session: Session) -> dict:
 def _pairing_guild_options(payload: PairingDiscoveryRequest, session: Session) -> dict:
     if payload.installation_id:
         binding = session.get(InstallationGuildBinding, payload.installation_id)
-        if binding and binding.authorized:
+        guild_id = binding.guild_id if binding and binding.authorized else ""
+        if not guild_id:
+            integration = session.get(Integration, payload.installation_id)
+            if integration and integration.enabled:
+                guild_id = integration.guild_id
+        if guild_id:
             try:
-                return DiscordClient().guild_options(binding.guild_id)
+                return DiscordClient().guild_options(guild_id)
             except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
                 raise HTTPException(
                     status_code=502, detail="Discord server options are unavailable"
