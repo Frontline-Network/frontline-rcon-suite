@@ -212,7 +212,7 @@ class Command(BaseCommand):
                 return delivered_count
             ai_config = {
                 **{
-                    "provider": "managed",
+                    "provider": "api_key",
                     "ai_model": "gpt-5.6-luna",
                     "player_name_model": "gpt-5.4-nano",
                     "chat_enabled": False,
@@ -220,6 +220,14 @@ class Command(BaseCommand):
                 },
                 **dict(integration.ai_config or {}),
             }
+            if ai_config.get("provider") not in {"api_key", "codex"}:
+                # Legacy managed configurations must not spend from the
+                # central Frontline project.
+                ai_config.update(
+                    provider="api_key",
+                    chat_enabled=False,
+                    names_enabled=False,
+                )
             candidate_query = select(ModerationCandidateOutbox).where(
                 ModerationCandidateOutbox.delivered_at.is_(None),
                 ModerationCandidateOutbox.next_attempt_at <= now,

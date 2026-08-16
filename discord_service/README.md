@@ -1,8 +1,9 @@
 # Frontline CRCON Discord Service
 
-Central Discord delivery and managed moderation analysis for CRCON. The service is
-deliberately a separate deployment: customers install the Frontline Discord app
-and do not manage a bot token or OpenAI key themselves.
+Central Discord delivery and customer-funded moderation analysis for CRCON. The
+service is deliberately a separate deployment: customers install the Frontline
+Discord app without managing a bot token, then connect either their own OpenAI
+API key or their ChatGPT/Codex account for optional AI checks.
 
 ## Local start
 
@@ -18,9 +19,6 @@ mappings, short-lived encrypted confirmation relays, idempotency receipts, and
 content-free usage metrics. It has no database column for report/chat/name text,
 action reasons, messages, or previews.
 
-`DISCORD_SERVICE_MONTHLY_TOKEN_QUOTA=0` means no fixed service-side quota. A
-positive value is enforced per CRCON installation and is displayed in CRCON.
-
 Player names use the separate `DISCORD_SERVICE_PLAYER_NAME_MODEL` (default:
 `gpt-5.4-nano`) with a compact schema and low reasoning; they do not call the
 generic moderation endpoint first. Chat candidates use `DISCORD_SERVICE_AI_MODEL`
@@ -35,7 +33,8 @@ name is not sent for another AI check.
   invalidates encrypted action capabilities and pending confirmations.
 - `DISCORD_SERVICE_DISCORD_PUBLIC_KEY`: verifies every Discord interaction.
 - `DISCORD_SERVICE_DISCORD_BOT_TOKEN`: the one Frontline-managed bot token.
-- `DISCORD_SERVICE_OPENAI_API_KEY`: the Frontline-managed OpenAI project key.
+- `DISCORD_SERVICE_OPENAI_API_KEY`: used only for the Omni moderation gate in
+  ChatGPT/Codex mode; it is never used for generative analysis or customer quota.
 - `DISCORD_SERVICE_DISCORD_INSTALL_URL`: OAuth installation URL for that app.
 - `DISCORD_SERVICE_ALLOWED_CRCON_HOSTS`: optional comma-separated exact host
   allowlist. Pairing always rejects private/link-local callback targets and any
@@ -48,10 +47,8 @@ stores the raw value encrypted.
 
 ## AI providers
 
-CRCON offers three provider modes per installation:
+CRCON offers two provider modes per installation:
 
-- **Frontline quota** uses `DISCORD_SERVICE_OPENAI_API_KEY` and the configured
-  service quota.
 - **Own API key** keeps the key encrypted in CRCON and sends it only with the
   individual analysis request over the existing authenticated HTTPS channel.
   The central service does not persist it.
@@ -67,6 +64,10 @@ ephemeral, uses a strict JSON schema, has no writable workspace or built-in
 execution/search tools, and runs with approval policy `never`. If authentication,
 plan quota, the selected model, or the runtime is unavailable, moderation is
 marked unavailable while ordinary Discord reports continue to work.
+
+The central service has no Frontline-funded AI fallback. Legacy installations
+that still contain `provider: managed` are migrated to disabled AI sources until
+the customer explicitly configures one of the two supported providers.
 
 ## Verification
 

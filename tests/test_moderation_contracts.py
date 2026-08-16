@@ -100,6 +100,21 @@ def test_candidate_jobs_default_to_shadow_only():
         created_at="2026-08-15T12:00:00Z",
     )
     assert job.shadow_only is True
+    assert job.ai_provider == "api_key"
+
+
+def test_frontline_managed_provider_is_not_part_of_the_job_contract():
+    with pytest.raises(ValidationError, match="api_key|codex"):
+        ModerationAnalysisJobEnvelope(
+            installation_id="install",
+            job_id="22222222-2222-2222-2222-222222222222",
+            source=ModerationSource.CHAT,
+            server_number=2,
+            candidate_text="candidate",
+            policy=ModerationPolicy(),
+            ai_provider="managed",
+            created_at="2026-08-15T12:00:00Z",
+        )
 
 
 def test_player_name_jobs_wait_for_next_half_hour_boundary():

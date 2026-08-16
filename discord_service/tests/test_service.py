@@ -149,11 +149,26 @@ def test_usage_is_content_free_and_capability_protected():
     assert client.get(path).status_code == 404
     response = client.get(path, headers={"Authorization": f"Bearer {capability}"})
     assert response.status_code == 200
-    assert response.json() == {
-        "used_tokens": 0,
-        "quota_tokens": None,
-        "remaining_tokens": None,
-    }
+    assert response.json() == {"used_tokens": 0}
+
+
+def test_event_delivery_never_falls_back_to_frontline_ai():
+    capability = _seed()
+    event = _event()
+    event["incident"]["source"] = "ai_chat"
+    event["incident"]["ai_config"] = {"chat_enabled": True}
+    with patch.object(ManagedAnalyzer, "analyze") as analyze:
+        response = TestClient(app).post(
+            "/v1/events",
+            headers={
+                "Authorization": f"Bearer {capability}",
+                "Idempotency-Key": "no-frontline-ai",
+            },
+            json=event,
+        )
+    assert response.status_code == 202
+    assert response.json()["ai_available"] is False
+    analyze.assert_not_called()
 
 
 def test_discord_options_are_capability_protected_and_scoped_to_paired_guild():

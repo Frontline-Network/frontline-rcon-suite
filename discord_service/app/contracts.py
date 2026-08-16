@@ -116,7 +116,7 @@ class ModerationAnalysisJobEnvelope(BaseModel):
     matched_rule_ids: list[str] = Field(default_factory=list, max_length=100)
     policy: ModerationPolicy
     shadow_only: bool = True
-    ai_provider: Literal["managed", "api_key", "codex"] = "managed"
+    ai_provider: Literal["api_key", "codex"] = "api_key"
     ai_model: str = Field(default="gpt-5.6-luna", min_length=1, max_length=100)
     player_name_model: str = Field(
         default="gpt-5.4-nano", min_length=1, max_length=100

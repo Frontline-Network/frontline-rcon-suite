@@ -48,8 +48,9 @@ werden dann in Gruppen von bis zu 50 Namen mit einem gemeinsamen Modellaufruf
 klassifiziert. Jedes Ergebnis wird anschließend wieder einzeln validiert und
 dem richtigen Spieler zugeordnet.
 
-Als KI-Anbieter sind Frontline-Kontingent, ein eigener verschlüsselt in CRCON
-gespeicherter API-Key und ein ChatGPT/Codex-Login auswählbar. API-Aufrufe
+Als KI-Anbieter sind ein eigener verschlüsselt in CRCON gespeicherter API-Key
+und ein ChatGPT/Codex-Login auswählbar. Frontline stellt kein KI-Kontingent und
+keinen kostenpflichtigen Fallback bereit. API-Aufrufe
 schicken verdächtige Chatkandidaten zuerst an `omni-moderation-latest`; nur ein
 Omni-Treffer oder eine harte lokale Regel startet die ausführliche Modellanalyse.
 Die semantische Namensprüfung verwendet direkt das ausgewählte günstige
@@ -90,7 +91,7 @@ eine zweite Bestätigung. Bestätigungen sind kurzlebig, an den vorbereitenden
 Discord-Nutzer gebunden und nur einmal verwendbar. Claiming verhindert parallele
 Bearbeitung.
 
-Fallen OpenAI oder das Kontingent aus, wird der Report weiterhin in Discord
+Fallen der kundeneigene KI-Zugang oder dessen Nutzungslimit aus, wird der Report weiterhin in Discord
 zugestellt und die KI als nicht verfügbar markiert. Fällt Discord oder der
 Frontline-Dienst aus, hält die Outbox das Ereignis mit exponentiellem Backoff zur
 erneuten Zustellung vor; CRCON und Mobile Admin bleiben funktionsfähig.

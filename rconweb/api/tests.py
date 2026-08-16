@@ -1046,11 +1046,27 @@ class DiscordActionTemplateTests(TestCase):
             _config_payload(
                 {
                     "ai_config": {
-                        "provider": "managed",
+                        "provider": "api_key",
                         "ai_model": "../../secret",
                     }
                 }
             )
+
+    def test_legacy_managed_provider_is_disabled_until_customer_configures_ai(self):
+        from api.discord_integration import _config_payload, _normalized_ai_config
+
+        normalized = _normalized_ai_config(
+            {
+                "provider": "managed",
+                "chat_enabled": True,
+                "names_enabled": True,
+            }
+        )
+        self.assertEqual(normalized["provider"], "api_key")
+        self.assertFalse(normalized["chat_enabled"])
+        self.assertFalse(normalized["names_enabled"])
+        with self.assertRaisesRegex(ValueError, "Unknown AI provider"):
+            _config_payload({"ai_config": {"provider": "managed"}})
 
     def test_action_subject_confirmation_is_derived_from_crcon_state(self):
         from api.discord_integration import (

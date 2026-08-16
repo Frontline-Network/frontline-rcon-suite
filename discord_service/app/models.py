@@ -60,7 +60,7 @@ class EventReceipt(Base):
 
 
 class TechnicalUsageMetric(Base):
-    """Content-free operational and quota accounting."""
+    """Content-free operational usage accounting."""
 
     __tablename__ = "discord_technical_usage"
 

@@ -85,7 +85,6 @@ export default function DiscordReportBotCard() {
   const [terms, setTerms] = useState("");
   const [exceptions, setExceptions] = useState("");
   const [regexes, setRegexes] = useState("");
-  const [usage, setUsage] = useState(null);
   const [aiStatus, setAiStatus] = useState(null);
   const [apiKey, setApiKey] = useState("");
   const [editingConnection, setEditingConnection] = useState(false);
@@ -122,9 +121,6 @@ export default function DiscordReportBotCard() {
       .then((next) => {
         apply(next);
         if (next.connected) {
-          discordRequest("usage")
-            .then(setUsage)
-            .catch(() => setUsage(null));
           loadAiStatus().catch(() => setAiStatus(null));
         }
         loadDiscordOptions().catch((requestError) =>
@@ -345,22 +341,9 @@ export default function DiscordReportBotCard() {
           )}
           {config?.connected && (
             <>
-              {usage &&
-                (config.ai_config?.provider || "managed") === "managed" && (
-                  <Alert severity="info">
-                    {t("settings.discordReports.usage", {
-                      used: usage.used_tokens.toLocaleString(),
-                      quota: usage.quota_tokens
-                        ? usage.quota_tokens.toLocaleString()
-                        : t("settings.discordReports.unlimited"),
-                    })}
-                  </Alert>
-                )}
-              {(config.ai_config?.provider || "managed") !== "managed" && (
-                <Alert severity="info">
-                  {t("settings.discordReports.externalBilling")}
-                </Alert>
-              )}
+              <Alert severity="info">
+                {t("settings.discordReports.externalBilling")}
+              </Alert>
               <SectionTitle
                 icon={<ConnectionIcon />}
                 title={t("settings.discordReports.sectionConnection")}
@@ -561,7 +544,7 @@ export default function DiscordReportBotCard() {
               <TextField
                 select
                 label={t("settings.discordReports.aiProvider")}
-                value={config.ai_config?.provider || "managed"}
+                value={config.ai_config?.provider || "api_key"}
                 onChange={(event) =>
                   setConfig({
                     ...config,
@@ -573,14 +556,11 @@ export default function DiscordReportBotCard() {
                 }
                 helperText={t(
                   `settings.discordReports.provider_${
-                    config.ai_config?.provider || "managed"
+                    config.ai_config?.provider || "api_key"
                   }_help`
                 )}
                 fullWidth
               >
-                <MenuItem value="managed">
-                  {t("settings.discordReports.provider_managed")}
-                </MenuItem>
                 <MenuItem value="api_key">
                   {t("settings.discordReports.provider_api_key")}
                 </MenuItem>
@@ -588,7 +568,7 @@ export default function DiscordReportBotCard() {
                   {t("settings.discordReports.provider_codex")}
                 </MenuItem>
               </TextField>
-              {(config.ai_config?.provider || "managed") === "api_key" && (
+              {(config.ai_config?.provider || "api_key") === "api_key" && (
                 <Stack spacing={1.25}>
                   <TextField
                     type="password"
@@ -610,7 +590,7 @@ export default function DiscordReportBotCard() {
                   />
                 </Stack>
               )}
-              {(config.ai_config?.provider || "managed") === "codex" && (
+              {(config.ai_config?.provider || "api_key") === "codex" && (
                 <Stack spacing={1.25}>
                   {aiStatus?.connected ? (
                     <Alert
@@ -698,7 +678,7 @@ export default function DiscordReportBotCard() {
               )}
               <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
                 {["ai_model", "player_name_model"].map((key) => {
-                  const provider = config.ai_config?.provider || "managed";
+                  const provider = config.ai_config?.provider || "api_key";
                   const options =
                     provider === "codex"
                       ? aiStatus?.models || []

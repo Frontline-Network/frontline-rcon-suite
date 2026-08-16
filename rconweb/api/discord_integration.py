@@ -73,11 +73,11 @@ DEFAULT_AI_CONFIG = {
     "names_enabled": False,
     "shadow_mode": True,
     "quality_opt_in": False,
-    "provider": "managed",
+    "provider": "api_key",
     "ai_model": "gpt-5.6-luna",
     "player_name_model": "gpt-5.4-nano",
 }
-AI_PROVIDERS = {"managed", "api_key", "codex"}
+AI_PROVIDERS = {"api_key", "codex"}
 API_MODEL_OPTIONS = (
     {"id": "gpt-5.4-nano", "name": "GPT-5.4 Nano"},
     {"id": "gpt-5.6-luna", "name": "GPT-5.6 Luna"},
@@ -140,6 +140,20 @@ def _service_error(response, fallback: str) -> str:
     return str(detail)[:500] if detail else fallback
 
 
+def _normalized_ai_config(raw_config: dict | None) -> dict:
+    config = {**DEFAULT_AI_CONFIG, **(raw_config or {})}
+    if config.get("provider") not in AI_PROVIDERS:
+        # Never let a legacy `managed` installation fall back to Frontline's
+        # OpenAI project. Ordinary reports remain available, but AI jobs stay
+        # disabled until the customer explicitly configures a provider.
+        config.update(
+            provider="api_key",
+            chat_enabled=False,
+            names_enabled=False,
+        )
+    return config
+
+
 def _serialized(integration: DiscordReportIntegration) -> dict:
     return {
         "installation_id": str(integration.installation_id),
@@ -158,7 +172,7 @@ def _serialized(integration: DiscordReportIntegration) -> dict:
         "moderator_role_ids": integration.moderator_role_ids,
         "allowed_actions": integration.allowed_actions,
         "language": integration.language,
-        "ai_config": {**DEFAULT_AI_CONFIG, **(integration.ai_config or {})},
+        "ai_config": _normalized_ai_config(integration.ai_config),
         "has_api_key": bool(integration.ai_api_key_ciphertext),
         "api_model_options": list(API_MODEL_OPTIONS),
         "policy": integration.policy,
@@ -593,6 +607,10 @@ def integration_detail(request):
             integration.ai_api_key_ciphertext = b""
         if (
             integration.ai_config.get("provider") == "api_key"
+            and (
+                integration.ai_config.get("chat_enabled")
+                or integration.ai_config.get("names_enabled")
+            )
             and not integration.ai_api_key_ciphertext
         ):
             raise ValueError("An OpenAI API key is required for this provider")
@@ -1335,9 +1353,7 @@ def integration_usage(request):
         result = response.json()
     except (requests.RequestException, ValueError) as exc:
         return _error(command, f"Discord service unavailable: {exc}", 503)
-    result["provider"] = {
-        **DEFAULT_AI_CONFIG, **(integration.ai_config or {})
-    }.get("provider", "managed")
+    result["provider"] = _normalized_ai_config(integration.ai_config)["provider"]
     return api_response(command=command, failed=False, result=result)
 
 

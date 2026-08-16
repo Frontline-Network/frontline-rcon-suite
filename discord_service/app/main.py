@@ -165,16 +165,11 @@ def _send_feedback(
         return
 
 
-def _policy_from_event(envelope: IncidentEventEnvelope) -> ModerationPolicy:
-    raw = envelope.incident.get("moderation_policy") or {}
-    return ModerationPolicy.model_validate(raw)
-
-
 def _has_local_hard_rule(policy: ModerationPolicy, rule_ids: list[str]) -> bool:
     return bool(policy.hard_rule_ids.intersection(rule_ids))
 
 
-def _usage_summary(session: Session, installation_id: str) -> dict[str, int | None]:
+def _usage_summary(session: Session, installation_id: str) -> dict[str, int]:
     now = datetime.now(tz=timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     used = int(
@@ -193,17 +188,7 @@ def _usage_summary(session: Session, installation_id: str) -> dict[str, int | No
             )
         ).scalar_one()
     )
-    quota = get_settings().monthly_token_quota
-    return {
-        "used_tokens": used,
-        "quota_tokens": quota or None,
-        "remaining_tokens": max(0, quota - used) if quota else None,
-    }
-
-
-def _quota_available(session: Session, installation_id: str) -> bool:
-    usage = _usage_summary(session, installation_id)
-    return usage["quota_tokens"] is None or bool(usage["remaining_tokens"])
+    return {"used_tokens": used}
 
 
 def _validate_crcon_callback(callback: str) -> None:
@@ -582,7 +567,12 @@ def _message_selection_update(
 
 @app.get("/healthz")
 def healthz():
-    return {"ok": True, "ai_configured": bool(get_settings().openai_api_key)}
+    return {
+        "ok": True,
+        # This key is only the zero-cost Omni moderation gate for subscription
+        # chat checks, never a Frontline-funded generative analysis provider.
+        "ai_configured": bool(get_settings().openai_api_key),
+    }
 
 
 @app.get("/v1/options/{installation_id}")
@@ -735,7 +725,6 @@ def receive_event(
         return {"accepted": True, "cached": True, "stale": True}
     analysis = envelope.analysis
     unavailable = False
-    usage = None
     ai_config = envelope.incident.get("ai_config") or {}
     raw_source = str(envelope.incident.get("source") or "")
     ai_toggle = {
@@ -743,65 +732,11 @@ def receive_event(
         "ai_player_name": "names_enabled",
     }.get(raw_source)
     source_ai_enabled = bool(ai_toggle and ai_config.get(ai_toggle, False))
-    quota_available = _quota_available(session, envelope.installation_id)
     if analysis is None and envelope.event_type == "created" and source_ai_enabled:
-        unavailable = not quota_available
-    if (
-        analysis is None
-        and envelope.event_type == "created"
-        and source_ai_enabled
-        and quota_available
-    ):
-        source = (
-            ModerationSource.REPORT
-            if raw_source in {"chat", "manual"}
-            else ModerationSource(raw_source)
-        )
-        result = ManagedAnalyzer().analyze(
-            text=str(envelope.incident.get("reason") or ""),
-            source=source,
-            policy=_policy_from_event(envelope),
-            player_ids=[
-                value for value in [envelope.incident.get("target_id")] if value
-            ],
-        )
-        analysis = result.analysis
-        unavailable = analysis is None
-        usage = TechnicalUsageMetric(
-            installation_id=envelope.installation_id,
-            kind="moderation_analysis",
-            model=(
-                result.analysis.model_version
-                if result.analysis
-                else get_settings().moderation_model
-            ),
-            input_tokens=result.input_tokens,
-            output_tokens=result.output_tokens,
-            success=analysis is not None,
-        )
-        if analysis is not None:
-            try:
-                callback = httpx.post(
-                    f"{integration.crcon_base_url}/api/discord/v1/moderation-results",
-                    headers={
-                        "Authorization": (
-                            f"Bearer {decrypt(integration.action_capability_ciphertext)}"
-                        )
-                    },
-                    json={
-                        "installation_id": integration.installation_id,
-                        "analysis_id": str(uuid.uuid4()),
-                        "incident_id": envelope.incident_id,
-                        "analysis": analysis.model_dump(mode="json"),
-                        "policy": _policy_from_event(envelope).model_dump(mode="json"),
-                    },
-                    timeout=10,
-                )
-                callback.raise_for_status()
-            except httpx.HTTPError:
-                # The normal Discord report remains available; CRCON's outbox
-                # will retry future events and AI is visibly best-effort.
-                pass
+        # Analysis is exclusively produced by CRCON jobs using a customer-owned
+        # API key or Codex login. The Discord service never falls back to a
+        # Frontline-funded model call while delivering an incident.
+        unavailable = True
     squad_subject_ids = _confirmed_squad_subject_ids(envelope.incident)
     is_multi_squad_report = (
         str(envelope.incident.get("source") or "") in {"chat", "manual"}
@@ -880,8 +815,6 @@ def receive_event(
             event_type=envelope.event_type,
         )
     )
-    if usage:
-        session.add(usage)
     try:
         session.commit()
     except IntegrityError:
@@ -967,10 +900,6 @@ def receive_analysis_job(
     _check_rate_limit(f"analysis:{integration.installation_id}")
     if session.get(EventReceipt, idempotency_key):
         return {"accepted": True, "cached": True}
-    if job.ai_provider == "managed" and not _quota_available(
-        session, job.installation_id
-    ):
-        raise HTTPException(status_code=429, detail="Monthly AI quota exhausted")
     local_hard_hit = _has_local_hard_rule(job.policy, job.matched_rule_ids)
     if job.ai_provider == "codex":
         selected_model = (
@@ -988,9 +917,7 @@ def receive_analysis_job(
             matched_rule_ids=job.matched_rule_ids,
         )
     else:
-        api_key = (
-            job.api_key if job.ai_provider == "api_key" else get_settings().openai_api_key
-        )
+        api_key = job.api_key
         if not api_key:
             raise HTTPException(status_code=409, detail="OpenAI API key is not configured")
         analyzer_settings = get_settings().model_copy(
@@ -1114,10 +1041,6 @@ def receive_player_name_analysis_batch(
         return {"accepted": True, "cached": True, "count": len(batch.jobs)}
 
     first_job = pending_jobs[0]
-    if first_job.ai_provider == "managed" and not _quota_available(
-        session, batch.installation_id
-    ):
-        raise HTTPException(status_code=429, detail="Monthly AI quota exhausted")
     items = [
         PlayerNameBatchInput(
             text=job.candidate_text,
@@ -1133,11 +1056,7 @@ def receive_player_name_analysis_batch(
             model=first_job.player_name_model,
         )
     else:
-        api_key = (
-            first_job.api_key
-            if first_job.ai_provider == "api_key"
-            else get_settings().openai_api_key
-        )
+        api_key = first_job.api_key
         if not api_key:
             raise HTTPException(status_code=409, detail="OpenAI API key is not configured")
         analyzer_settings = get_settings().model_copy(

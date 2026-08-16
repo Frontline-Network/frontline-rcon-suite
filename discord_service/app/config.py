@@ -25,7 +25,6 @@ class Settings(BaseSettings):
     codex_auth_root: str = "/var/lib/frontline-codex"
     codex_request_timeout_seconds: int = Field(default=90, ge=10, le=300)
     rate_limit_per_minute: int = Field(default=120, ge=1, le=10000)
-    monthly_token_quota: int = Field(default=0, ge=0)
     dry_run: bool = False
 
     def crcon_host_allowlist(self) -> set[str]:

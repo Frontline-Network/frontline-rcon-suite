@@ -1,7 +1,7 @@
 [project]
 name = "frontline-crcon-discord-service"
 version = "0.1.0"
-description = "Central Discord delivery and managed AI analysis for CRCON incidents"
+description = "Central Discord delivery and customer-funded AI analysis for CRCON incidents"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.116,<1",
