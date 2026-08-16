@@ -5,14 +5,15 @@ import ipaddress
 import re
 import socket
 import uuid
+import secrets
 from datetime import datetime, timedelta, timezone
 from threading import Lock
 from time import monotonic, time
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from nacl.exceptions import BadSignatureError
 from nacl.signing import VerifyKey
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
@@ -40,7 +41,9 @@ from .discord_client import DiscordClient, render_message
 from .models import (
     EventReceipt,
     IncidentMessage,
+    InstallationGuildBinding,
     Integration,
+    OAuthInstallIntent,
     PreparedActionRelay,
     TechnicalUsageMetric,
 )
@@ -76,6 +79,7 @@ class PairingDiscoveryRequest(BaseModel):
     crcon_callback_url: HttpUrl
     pairing_id: str = Field(min_length=1, max_length=36)
     pairing_secret: str = Field(min_length=32, max_length=255)
+    installation_id: str | None = Field(default=None, min_length=1, max_length=64)
 
 
 class PairingRequest(PairingDiscoveryRequest):
@@ -89,6 +93,21 @@ def _bearer(authorization: str | None) -> str:
         if authorization and authorization.startswith("Bearer ")
         else ""
     )
+
+
+def _crcon_post(url: str, **kwargs):
+    """POST to CRCON, authenticating the central broker when its URL is used."""
+
+    settings = get_settings()
+    broker_url = settings.callback_broker_url.strip().rstrip("/")
+    headers = dict(kwargs.pop("headers", {}) or {})
+    if broker_url and (url == broker_url or url.startswith(f"{broker_url}/")):
+        if not settings.callback_broker_token:
+            raise httpx.RequestError("Callback broker capability is not configured")
+        headers["X-Frontline-Broker-Authorization"] = (
+            f"Bearer {settings.callback_broker_token}"
+        )
+    return httpx.post(url, headers=headers, **kwargs)
 
 
 def _integration_for_event(
@@ -136,7 +155,7 @@ def _send_feedback(
     if not analysis_id:
         return
     try:
-        response = httpx.post(
+        response = _crcon_post(
             f"{integration.crcon_base_url}/api/discord/v1/moderation-feedback",
             headers={
                 "Authorization": (
@@ -196,6 +215,20 @@ def _validate_crcon_callback(callback: str) -> None:
     parsed = urlsplit(callback)
     if settings.dry_run:
         return
+    broker_url = settings.callback_broker_url.strip().rstrip("/")
+    broker = urlsplit(broker_url) if broker_url else None
+    broker_path_ok = bool(
+        broker
+        and parsed.scheme == broker.scheme
+        and parsed.hostname == broker.hostname
+        and parsed.port == broker.port
+        and re.fullmatch(
+            re.escape(broker.path.rstrip("/"))
+            + r"/v1/installations/[0-9a-fA-F-]{36}/api/discord/v1/pairings/complete",
+            parsed.path,
+        )
+    )
+    direct_path_ok = parsed.path == "/api/discord/v1/pairings/complete"
     if (
         parsed.scheme != "https"
         or not parsed.hostname
@@ -203,13 +236,13 @@ def _validate_crcon_callback(callback: str) -> None:
         or parsed.password
         or parsed.query
         or parsed.fragment
-        or parsed.path != "/api/discord/v1/pairings/complete"
+        or not (direct_path_ok or broker_path_ok)
         or parsed.port not in {None, 443}
     ):
         raise HTTPException(status_code=400, detail="Invalid CRCON callback URL")
     hostname = parsed.hostname.lower()
     allowed_hosts = settings.crcon_host_allowlist()
-    if allowed_hosts and hostname not in allowed_hosts:
+    if direct_path_ok and allowed_hosts and hostname not in allowed_hosts:
         raise HTTPException(status_code=400, detail="CRCON host is not allowed")
     try:
         addresses = {
@@ -231,7 +264,7 @@ def _validate_crcon_callback(callback: str) -> None:
 def _verify_pending_pairing(payload: PairingDiscoveryRequest, callback: str) -> None:
     verify_url = callback.removesuffix("/complete") + "/verify"
     try:
-        response = httpx.post(
+        response = _crcon_post(
             verify_url,
             json={
                 "pairing_id": payload.pairing_id,
@@ -263,6 +296,19 @@ def _single_guild_options(session: Session) -> dict:
         raise HTTPException(
             status_code=502, detail="Discord server options are unavailable"
         ) from exc
+
+
+def _pairing_guild_options(payload: PairingDiscoveryRequest, session: Session) -> dict:
+    if payload.installation_id:
+        binding = session.get(InstallationGuildBinding, payload.installation_id)
+        if binding and binding.authorized:
+            try:
+                return DiscordClient().guild_options(binding.guild_id)
+            except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
+                raise HTTPException(
+                    status_code=502, detail="Discord server options are unavailable"
+                ) from exc
+    return _single_guild_options(session)
 
 
 def _purge_expired_relays(session: Session) -> None:
@@ -331,7 +377,7 @@ def _execute_prepared_action(
     channel_id: str,
     actor: dict,
 ) -> None:
-    response = httpx.post(
+    response = _crcon_post(
         f"{integration.crcon_base_url}/api/discord/v1/actions/{preparation_id}/execute",
         headers={
             "Authorization": (
@@ -468,7 +514,7 @@ def _claim_from_first_button(
     actor: dict,
     payload: dict | None = None,
 ) -> dict:
-    response = httpx.post(
+    response = _crcon_post(
         f"{integration.crcon_base_url}/api/discord/v1/incidents/transition",
         headers={
             "Authorization": (
@@ -608,6 +654,105 @@ def oauth_install():
     return RedirectResponse(get_settings().discord_install_url, status_code=302)
 
 
+@app.post("/v1/install-intents", status_code=status.HTTP_201_CREATED)
+def create_install_intent(
+    payload: PairingDiscoveryRequest,
+    session: Session = Depends(session_dependency),
+):
+    callback = str(payload.crcon_callback_url)
+    _check_rate_limit(f"install-intent:{urlsplit(callback).hostname}")
+    _validate_crcon_callback(callback)
+    _verify_pending_pairing(payload, callback)
+    settings = get_settings()
+    if not payload.installation_id:
+        raise HTTPException(status_code=400, detail="CRCON installation ID is required")
+    if not (
+        settings.discord_application_id
+        and settings.discord_client_secret
+        and settings.discord_oauth_redirect_uri.startswith("https://")
+    ):
+        raise HTTPException(status_code=503, detail="Discord OAuth is not configured")
+    raw_state = secrets.token_urlsafe(32)
+    state_digest = digest(raw_state, "oauth-state")
+    session.add(
+        OAuthInstallIntent(
+            state_digest=state_digest,
+            installation_id=payload.installation_id,
+            expires_at=datetime.now(tz=timezone.utc) + timedelta(minutes=10),
+        )
+    )
+    session.commit()
+    query = urlencode(
+        {
+            "client_id": settings.discord_application_id,
+            "permissions": str(settings.discord_permissions),
+            "integration_type": "0",
+            "scope": "bot applications.commands identify",
+            "response_type": "code",
+            "redirect_uri": settings.discord_oauth_redirect_uri,
+            "state": raw_state,
+            "prompt": "consent",
+        }
+    )
+    return {"install_url": f"https://discord.com/oauth2/authorize?{query}"}
+
+
+@app.get("/oauth/callback", response_class=HTMLResponse)
+def oauth_callback(
+    code: str,
+    state: str,
+    session: Session = Depends(session_dependency),
+):
+    settings = get_settings()
+    intent = session.get(OAuthInstallIntent, digest(state, "oauth-state"))
+    now = datetime.now(tz=timezone.utc)
+    expires_at = intent.expires_at if intent is not None else None
+    if expires_at is not None and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if intent is None or intent.used_at is not None or expires_at <= now:
+        raise HTTPException(status_code=400, detail="Discord installation expired")
+    try:
+        response = httpx.post(
+            "https://discord.com/api/v10/oauth2/token",
+            data={
+                "client_id": settings.discord_application_id,
+                "client_secret": settings.discord_client_secret,
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": settings.discord_oauth_redirect_uri,
+            },
+            timeout=10,
+        )
+        response.raise_for_status()
+        token_result = response.json()
+        guild = token_result.get("guild") or {}
+        guild_id = str(guild.get("id") or "")
+        if not re.fullmatch(r"[0-9]+", guild_id):
+            raise ValueError("Discord did not return the installed server")
+        options = DiscordClient().guild_options(guild_id)
+    except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(status_code=502, detail="Discord installation could not be verified") from exc
+    binding = session.get(InstallationGuildBinding, intent.installation_id) or InstallationGuildBinding(
+        installation_id=intent.installation_id,
+        guild_id=guild_id,
+        guild_name=str((options.get("guild") or {}).get("name") or guild_id)[:128],
+    )
+    binding.guild_id = guild_id
+    binding.guild_name = str((options.get("guild") or {}).get("name") or guild_id)[:128]
+    binding.authorized = True
+    binding.updated_at = now
+    intent.used_at = now
+    session.add(binding)
+    session.commit()
+    return HTMLResponse(
+        "<!doctype html><meta charset='utf-8'><title>Frontline Discord</title>"
+        "<style>body{font-family:system-ui;background:#151713;color:#eee;padding:3rem}"
+        "main{max-width:38rem;margin:auto;padding:2rem;border:1px solid #5865f2;border-radius:16px}</style>"
+        "<main><h1>Discord-Server verbunden</h1><p>Du kannst dieses Fenster schließen "
+        "und im CRCON auf „Discord-Server erkennen“ klicken.</p></main>"
+    )
+
+
 @app.post("/v1/pairing-options")
 def pairing_options(
     payload: PairingDiscoveryRequest,
@@ -617,7 +762,7 @@ def pairing_options(
     _check_rate_limit(f"pairing-options:{urlsplit(callback).hostname}")
     _validate_crcon_callback(callback)
     _verify_pending_pairing(payload, callback)
-    return _single_guild_options(session)
+    return _pairing_guild_options(payload, session)
 
 
 @app.post("/v1/pairings", status_code=status.HTTP_201_CREATED)
@@ -627,7 +772,7 @@ def pair_installation(
     callback = str(payload.crcon_callback_url)
     _check_rate_limit(f"pairing:{urlsplit(callback).hostname}")
     _validate_crcon_callback(callback)
-    options = _single_guild_options(session)
+    options = _pairing_guild_options(payload, session)
     guild_id = str(options["guild"]["id"])
     guild_name = str(options["guild"].get("name") or guild_id)[:128]
     channel = next(
@@ -647,7 +792,7 @@ def pair_installation(
         ) from exc
     action_capability = derive_capability(payload.pairing_id, "actions")
     try:
-        response = httpx.post(
+        response = _crcon_post(
             callback,
             json={
                 "pairing_id": payload.pairing_id,
@@ -948,7 +1093,7 @@ def receive_analysis_job(
     )
     analysis_id = str(uuid.uuid4())
     try:
-        callback = httpx.post(
+        callback = _crcon_post(
             f"{integration.crcon_base_url}/api/discord/v1/moderation-results",
             headers={
                 "Authorization": (
@@ -1094,7 +1239,7 @@ def receive_player_name_analysis_batch(
             }
         )
         try:
-            callback = httpx.post(
+            callback = _crcon_post(
                 f"{integration.crcon_base_url}/api/discord/v1/moderation-results",
                 headers={
                     "Authorization": (
@@ -1429,7 +1574,7 @@ async def discord_interaction(
                 },
             }
         try:
-            selection_response = httpx.post(
+            selection_response = _crcon_post(
                 f"{integration.crcon_base_url}/api/discord/v1/incidents/select-subject",
                 headers={
                     "Authorization": (
@@ -1529,7 +1674,7 @@ async def discord_interaction(
             ),
         }
         try:
-            template_response = httpx.post(
+            template_response = _crcon_post(
                 f"{integration.crcon_base_url}/api/discord/v1/action-templates",
                 headers={
                     "Authorization": (
@@ -1574,7 +1719,7 @@ async def discord_interaction(
                 actor=actor,
                 payload={"via": "first_button", "button": "logs"},
             )
-            log_response = httpx.post(
+            log_response = _crcon_post(
                 f"{integration.crcon_base_url}/api/discord/v1/incidents/logs",
                 headers={
                     "Authorization": (
@@ -1669,7 +1814,7 @@ async def discord_interaction(
         ),
     }
     try:
-        response = httpx.post(
+        response = _crcon_post(
             f"{integration.crcon_base_url}/api/discord/v1/{endpoint}",
             headers={
                 "Authorization": f"Bearer {decrypt(integration.action_capability_ciphertext)}"

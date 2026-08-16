@@ -1,5 +1,6 @@
 import os
 import shutil
+from urllib.parse import parse_qs, urlsplit
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
@@ -42,6 +43,7 @@ from discord_service.app.models import (
     EventReceipt,
     IncidentMessage,
     Integration,
+    InstallationGuildBinding,
     PreparedActionRelay,
 )
 from discord_service.app.security import derive_capability, digest, encrypt
@@ -244,6 +246,80 @@ def test_pairing_derives_guild_from_discord_and_does_not_accept_client_guild():
 
     rejected = TestClient(app).post("/v1/pairings", json={**payload, "guild_id": "999"})
     assert rejected.status_code == 422
+
+
+def test_install_intent_binds_oauth_guild_to_installation_without_secret_in_url():
+    settings = Settings(
+        secret="test-secret-that-is-at-least-32-characters",
+        dry_run=True,
+        discord_application_id="1513616288810008706",
+        discord_client_secret="oauth-client-secret",
+        discord_oauth_redirect_uri="https://discord.example/oauth/callback",
+    )
+    payload = {
+        "crcon_callback_url": "https://crcon.example/api/discord/v1/pairings/complete",
+        "pairing_id": "22222222-2222-4222-8222-222222222222",
+        "pairing_secret": "pair-secret-that-is-at-least-32-characters",
+        "installation_id": "11111111-1111-4111-8111-111111111111",
+    }
+    with (
+        patch("discord_service.app.main.get_settings", return_value=settings),
+        patch("discord_service.app.main._verify_pending_pairing"),
+    ):
+        response = TestClient(app).post("/v1/install-intents", json=payload)
+    assert response.status_code == 201
+    install_url = response.json()["install_url"]
+    query = parse_qs(urlsplit(install_url).query)
+    assert query["client_id"] == ["1513616288810008706"]
+    assert query["redirect_uri"] == ["https://discord.example/oauth/callback"]
+    assert payload["pairing_secret"] not in install_url
+    assert len(query["state"][0]) >= 32
+
+
+def test_oauth_callback_uses_verified_discord_guild_for_pairing_options():
+    settings = Settings(
+        secret="test-secret-that-is-at-least-32-characters",
+        dry_run=True,
+        discord_application_id="1513616288810008706",
+        discord_client_secret="oauth-client-secret",
+        discord_oauth_redirect_uri="https://discord.example/oauth/callback",
+    )
+    payload = {
+        "crcon_callback_url": "https://crcon.example/api/discord/v1/pairings/complete",
+        "pairing_id": "22222222-2222-4222-8222-222222222222",
+        "pairing_secret": "pair-secret-that-is-at-least-32-characters",
+        "installation_id": "11111111-1111-4111-8111-111111111111",
+    }
+    with (
+        patch("discord_service.app.main.get_settings", return_value=settings),
+        patch("discord_service.app.main._verify_pending_pairing"),
+    ):
+        intent = TestClient(app).post("/v1/install-intents", json=payload)
+    state = parse_qs(urlsplit(intent.json()["install_url"]).query)["state"][0]
+    token_response = httpx.Response(
+        200,
+        request=httpx.Request("POST", "https://discord.com/api/v10/oauth2/token"),
+        json={"guild": {"id": "987654321", "name": "Customer Discord"}},
+    )
+    options = {
+        "guild": {"id": "987654321", "name": "Customer Discord"},
+        "channels": [],
+        "roles": [],
+    }
+    with (
+        patch("discord_service.app.main.get_settings", return_value=settings),
+        patch("discord_service.app.main.httpx.post", return_value=token_response),
+        patch("discord_service.app.main.DiscordClient.guild_options", return_value=options),
+    ):
+        callback = TestClient(app).get(
+            "/oauth/callback", params={"code": "discord-code", "state": state}
+        )
+    assert callback.status_code == 200
+    with SessionLocal() as session:
+        binding = session.get(
+            InstallationGuildBinding, "11111111-1111-4111-8111-111111111111"
+        )
+        assert binding.guild_id == "987654321"
 
 
 def test_existing_server_side_binding_resolves_multiple_bot_guilds():
