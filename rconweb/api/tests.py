@@ -1400,7 +1400,7 @@ class DiscordActionTemplateTests(TestCase):
         self.assertNotIn("guild_id", request_payload)
         self.assertEqual(
             request_payload["crcon_callback_url"],
-            "http://testserver/api/discord/v1/pairings/complete",
+            "https://crcon.example.org/api/discord/v1/pairings/complete",
         )
 
     @patch("api.discord_integration.requests.post")
