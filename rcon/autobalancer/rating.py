@@ -13,8 +13,16 @@ RATING_MODEL_VERSION = "role-aware-v2"
 ROLE_COHORT_MIN_SIZE = 8
 
 COMMANDER_ROLES = {"armycommander", "commander"}
-LEADER_ROLES = {"officer", "squadleader"}
-SUPPORT_ROLES = {"support", "engineer", "medic"}
+LEADER_ROLES = {
+    "officer",
+    "squadleader",
+    "tankcommander",
+    "spotter",
+    "artilleryobserver",
+    "mortarobserver",
+    "helicopterlogisticsofficer",
+}
+SUPPORT_ROLES = {"support", "engineer", "medic", "mortarsupport"}
 SPECIAL_ROLE_FAMILIES = {
     "tankcommander": "specialist",
     "crewman": "specialist",
@@ -22,8 +30,17 @@ SPECIAL_ROLE_FAMILIES = {
     "spotter": "specialist",
     "sniper": "specialist",
     "artilleryobserver": "specialist",
+    "mortargunner": "specialist",
+    "helicopterpilot": "specialist",
 }
-SPECIAL_UNITS = {"armor", "armour", "recon", "artillery"}
+SPECIAL_UNITS = {
+    "armor",
+    "armour",
+    "recon",
+    "artillery",
+    "mortar",
+    "helicopter",
+}
 ROLE_WEIGHTS = {
     "combat_infantry": (0.60, 0.40),
     "support": (0.35, 0.65),

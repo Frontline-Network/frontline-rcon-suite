@@ -136,6 +136,16 @@ def test_shadow_summary_detects_commander_rule_warning():
     assert result["pilot_goals"]["ready_for_manual"] is False
 
 
+def test_shadow_summary_flags_legacy_hllv_specialist_misclassification():
+    item = decision(1, role="helicopterpilot")
+
+    result = summarize_shadow_decisions([item])
+
+    warnings = result["decisions"][0]["audit_warnings"]
+    assert any("helicopter" in warning for warning in warnings)
+    assert result["pilot_goals"]["hard_rules_clean"] is False
+
+
 def test_shadow_summary_detects_simulated_team_size_overshoot():
     item = decision(1)
     item["before_snapshot"]["allies_count"] = 41

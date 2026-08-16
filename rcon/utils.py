@@ -75,6 +75,66 @@ def get_squad_leader_roles(game: GameEnum) -> frozenset[str]:
     )
 
 
+@cache
+def get_role_unit_types(game: GameEnum) -> dict[str, str]:
+    """Return CRCON squad categories for every role exposed by a game.
+
+    HLL Vietnam reports mortar and helicopter platoons as ordinary infantry in
+    the player payload. The role catalog is the authoritative way to retain
+    those specialist categories without hard-coding a transient live roster.
+    """
+
+    role_cls = game_switch(game, hllrcon.HLLRole, hllrcon.HLLVRole)
+    result: dict[str, str] = {}
+    for role in role_cls.all():
+        name = role.name.lower()
+        if name == "armycommander":
+            unit_type = "commander"
+        elif getattr(role, "is_tanker", False):
+            unit_type = "armor"
+        elif getattr(role, "is_recon", False):
+            unit_type = "recon"
+        elif getattr(role, "is_artillery", False):
+            unit_type = "artillery"
+        elif getattr(role, "is_mortar", False):
+            unit_type = "mortar"
+        elif getattr(role, "is_helicopter", False):
+            unit_type = "helicopter"
+        else:
+            unit_type = "infantry"
+        result[name] = unit_type
+    return result
+
+
+def get_role_unit_type(game: GameEnum, role: str | None) -> str:
+    """Resolve a live role to a stable CRCON squad category."""
+
+    normalized = str(role or "").replace(" ", "").lower()
+    return get_role_unit_types(game).get(normalized, "infantry")
+
+
+def get_team_labels(
+    game: GameEnum,
+    allied_faction_id: int | None,
+    axis_faction_id: int | None,
+) -> dict[str, str]:
+    """Return game-facing faction labels while preserving logical team keys."""
+
+    faction_cls = game_switch(game, hllrcon.HLLFaction, hllrcon.HLLVFaction)
+
+    def label(faction_id: int | None, fallback: str) -> str:
+        try:
+            faction = faction_cls.by_id(faction_id)
+        except (TypeError, ValueError):
+            return fallback
+        return str(faction.short_name or faction.name or fallback)
+
+    return {
+        "allies": label(allied_faction_id, "Allies"),
+        "axis": label(axis_faction_id, "Axis"),
+    }
+
+
 T = TypeVar("T")
 
 # Represents a redis stream ID, these are by default

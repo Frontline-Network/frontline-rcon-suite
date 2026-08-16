@@ -30,7 +30,7 @@ const ROLE_LABELS = {
   combat_infantry: "Combat Infantry",
   support: "Support / Engineer / Medic",
   leader: "Squad Leader",
-  specialist: "Armor / Recon / Artillery",
+  specialist: "Armor / Recon / Artillery / Mortar / Helicopter",
   legacy: "Legacy ohne Rollenbezug",
 };
 

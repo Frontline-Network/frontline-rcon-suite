@@ -51,7 +51,7 @@ const STRATEGY_LABELS = {
   "skill-first": "Stärke zuerst (Diagnose)",
 };
 
-const CandidateWhatIf = ({ analysis }) => {
+const CandidateWhatIf = ({ analysis, teamLabels }) => {
   const whatIf = analysis?.candidate_what_if;
   if (analysis?.quality?.source !== "live_snapshots") {
     return (
@@ -76,8 +76,9 @@ const CandidateWhatIf = ({ analysis }) => {
         Kandidaten-What-if aus exaktem Snapshot
       </Typography>
       <Typography variant="body2" color="text.secondary">
-        Stand {formatDate(whatIf.captured_at)} · Allies {whatIf.allies_count}:
-        {whatIf.axis_count} Axis · Modell {whatIf.rating_model_version}
+        Stand {formatDate(whatIf.captured_at)} · {teamLabels.allies}{" "}
+        {whatIf.allies_count}:{whatIf.axis_count} {teamLabels.axis} · Modell{" "}
+        {whatIf.rating_model_version}
       </Typography>
       <Box
         sx={{
@@ -123,7 +124,7 @@ const CandidateWhatIf = ({ analysis }) => {
   );
 };
 
-const HistoricalChart = ({ analysis, targetDifference }) => {
+const HistoricalChart = ({ analysis, targetDifference, teamLabels }) => {
   const points = (analysis?.timeline || [])
     .map((sample) => ({
       time: new Date(sample.updated_at),
@@ -172,9 +173,9 @@ const HistoricalChart = ({ analysis, targetDifference }) => {
           curve: "linear",
           valueFormatter: (value) =>
             value > 0
-              ? `Allies +${value}`
+              ? `${teamLabels.allies} +${value}`
               : value < 0
-              ? `Axis +${Math.abs(value)}`
+              ? `${teamLabels.axis} +${Math.abs(value)}`
               : "Gleichstand",
         },
       ]}
@@ -198,7 +199,7 @@ const HistoricalChart = ({ analysis, targetDifference }) => {
   );
 };
 
-const HistoricalAnalysis = ({ analysis, targetDifference }) => {
+const HistoricalAnalysis = ({ analysis, targetDifference, teamLabels }) => {
   if (!analysis) return null;
   const metrics = analysis.metrics || {};
   const quality = analysis.quality || {};
@@ -276,8 +277,9 @@ const HistoricalAnalysis = ({ analysis, targetDifference }) => {
       <HistoricalChart
         analysis={analysis}
         targetDifference={targetDifference}
+        teamLabels={teamLabels}
       />
-      <CandidateWhatIf analysis={analysis} />
+      <CandidateWhatIf analysis={analysis} teamLabels={teamLabels} />
       <Typography variant="caption" color="text.secondary">
         Datenquelle:{" "}
         {quality.source === "live_snapshots"
@@ -294,7 +296,7 @@ const HistoricalAnalysis = ({ analysis, targetDifference }) => {
   );
 };
 
-const AutobalancerRoundHistory = ({ config }) => {
+const AutobalancerRoundHistory = ({ config, teamLabels }) => {
   const [draft, setDraft] = useState({ search: "", dateFrom: "", dateTo: "" });
   const [filters, setFilters] = useState(draft);
   const [page, setPage] = useState(1);
@@ -417,6 +419,7 @@ const AutobalancerRoundHistory = ({ config }) => {
             <HistoricalAnalysis
               analysis={data.analysis}
               targetDifference={config?.target_difference ?? 2}
+              teamLabels={teamLabels}
             />
             <TableContainer sx={{ mt: 2 }}>
               <Table size="small">

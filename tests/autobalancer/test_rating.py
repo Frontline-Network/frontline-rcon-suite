@@ -76,6 +76,33 @@ def test_percentile_and_five_ninety_five_winsorization():
         (PlayerSnapshot("recon", "Recon", "allies", role="sniper"), "specialist"),
         (PlayerSnapshot("arty", "Arty", "allies", unit_type="artillery"), "specialist"),
         (
+            PlayerSnapshot("mortar", "Mortar", "allies", unit_type="mortar"),
+            "specialist",
+        ),
+        (
+            PlayerSnapshot("pilot", "Pilot", "allies", role="helicopterpilot"),
+            "specialist",
+        ),
+        (
+            PlayerSnapshot(
+                "observer",
+                "Observer",
+                "allies",
+                role="mortarobserver",
+                is_leader=True,
+            ),
+            "leader",
+        ),
+        (
+            PlayerSnapshot(
+                "mortar-support",
+                "Support",
+                "allies",
+                role="mortarsupport",
+            ),
+            "support",
+        ),
+        (
             PlayerSnapshot("commander", "Commander", "allies", role="armycommander"),
             "commander",
         ),

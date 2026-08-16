@@ -64,7 +64,7 @@ const ROLE_FAMILY_LABELS = {
   support: "Support / Engineer / Medic",
   commander: "Commander",
   leader: "Squad Leader",
-  specialist: "Armor / Recon / Artillery",
+  specialist: "Armor / Recon / Artillery / Mortar / Helicopter",
 };
 
 const REVIEW_CATEGORY_LABELS = {
@@ -98,6 +98,9 @@ const formatDate = (value) =>
 
 const formatMinutes = (seconds) =>
   Number.isFinite(seconds) ? `${Math.floor(seconds / 60)} Min.` : "unbekannt";
+
+const getTeamLabels = (value) =>
+  value?.team_labels || { allies: "Allies", axis: "Axis" };
 
 const getModeStatus = (mode) => {
   if (mode === "shadow") {
@@ -341,7 +344,7 @@ const ChecklistRow = ({ state, title, explanation, result }) => {
   );
 };
 
-const TeamBalance = ({ projection, gapBefore, gapAfter }) => {
+const TeamBalance = ({ projection, gapBefore, gapAfter, teamLabels }) => {
   if (!projection) {
     return (
       <Alert severity="warning">
@@ -390,10 +393,10 @@ const TeamBalance = ({ projection, gapBefore, gapAfter }) => {
               sx={{ mt: 0.75 }}
             >
               <Typography variant="body2" color="text.blue">
-                Allies {state.allies}
+                {teamLabels.allies} {state.allies}
               </Typography>
               <Typography variant="body2" color="text.red">
-                Axis {state.axis}
+                {teamLabels.axis} {state.axis}
               </Typography>
             </Stack>
             <Box
@@ -444,6 +447,7 @@ const ProposalDetail = ({
   onBack,
 }) => {
   const assessment = getDecisionAssessment(decision);
+  const teamLabels = getTeamLabels(decision);
   const plans = Object.entries(decision?.strategy_plans || {});
   const alternative = plans
     .filter(
@@ -481,8 +485,8 @@ const ProposalDetail = ({
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
             {decision.map_name || "Unbekannte Karte"} ·{" "}
-            {decision.source_team === "axis" ? "Axis" : "Allies"} →{" "}
-            {decision.target_team === "allies" ? "Allies" : "Axis"}
+            {teamLabels[decision.source_team]} →{" "}
+            {teamLabels[decision.target_team]}
           </Typography>
         </Box>
         <Chip
@@ -629,6 +633,7 @@ const ProposalDetail = ({
                 projection={assessment.projection}
                 gapBefore={assessment.gapBefore}
                 gapAfter={assessment.gapAfter}
+                teamLabels={teamLabels}
               />
               <Typography
                 variant="caption"
@@ -937,8 +942,8 @@ const ProposalQueue = ({
                     {decision.player_name || "Unbekannter Kandidat"}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {decision.source_team === "axis" ? "Axis" : "Allies"} →{" "}
-                    {decision.target_team === "allies" ? "Allies" : "Axis"} ·{" "}
+                    {getTeamLabels(decision)[decision.source_team]} →{" "}
+                    {getTeamLabels(decision)[decision.target_team]} ·{" "}
                     {formatDate(decision.created_at)}
                   </Typography>
                 </Box>
@@ -1016,6 +1021,7 @@ const AutobalancerModeratorDashboard = ({
   );
   const modeStatus = getModeStatus(config?.mode);
   const counts = status.team_counts || {};
+  const teamLabels = getTeamLabels(status);
   const hasCounts =
     Number.isFinite(counts.allies) && Number.isFinite(counts.axis);
   const difference = hasCounts ? Math.abs(counts.allies - counts.axis) : null;
@@ -1208,7 +1214,7 @@ const AutobalancerModeratorDashboard = ({
               }
               caption={
                 hasCounts
-                  ? `Allies ${counts.allies} · Axis ${counts.axis}`
+                  ? `${teamLabels.allies} ${counts.allies} · ${teamLabels.axis} ${counts.axis}`
                   : "Live-Snapshot unvollständig"
               }
             />
@@ -1398,7 +1404,10 @@ const AutobalancerModeratorDashboard = ({
 
       {section === "history" && (
         <Box sx={{ mt: 2 }}>
-          <AutobalancerRoundHistory config={config} />
+          <AutobalancerRoundHistory
+            config={config}
+            teamLabels={teamLabels}
+          />
         </Box>
       )}
     </Box>

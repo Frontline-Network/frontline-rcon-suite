@@ -9,8 +9,23 @@ from typing import Collection
 from .models import BalancePlan, BalanceSnapshot, Candidate, PlayerSnapshot
 
 COMMANDER_ROLES = {"armycommander", "commander"}
-LEADER_ROLES = {"officer", "tankcommander", "spotter", "artilleryobserver"}
-SPECIAL_UNITS = {"armor", "armour", "recon", "artillery"}
+LEADER_ROLES = {
+    "officer",
+    "squadleader",
+    "tankcommander",
+    "spotter",
+    "artilleryobserver",
+    "mortarobserver",
+    "helicopterlogisticsofficer",
+}
+SPECIAL_UNITS = {
+    "armor",
+    "armour",
+    "recon",
+    "artillery",
+    "mortar",
+    "helicopter",
+}
 STRATEGIES = ("squad-first", "balanced-v2", "skill-first")
 
 
@@ -29,7 +44,7 @@ def protection_tier(player: PlayerSnapshot) -> tuple[int | None, str]:
     if role in COMMANDER_ROLES or unit_type == "commander":
         return None, "Commander sind für automatische Wechsel gesperrt"
     if unit_type in SPECIAL_UNITS:
-        return 5, "Armor-, Recon- oder Artillery-Squad"
+        return 5, "Armor-, Recon-, Artillery-, Mortar- oder Helicopter-Squad"
     if player.is_leader or role in LEADER_ROLES:
         return 4, "Squad Leader"
     if not player.unit_name and player.unit_id is None:

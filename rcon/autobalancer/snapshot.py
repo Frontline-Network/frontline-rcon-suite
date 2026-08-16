@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from rcon.utils import MapsHistory
+from rcon.utils import MapsHistory, get_squad_leader_roles, get_team_labels
 
 from .models import BalanceSnapshot, PlayerSnapshot
 from .store import AutobalancerStore
@@ -48,6 +48,8 @@ def build_snapshot(
     now = now or datetime.now(timezone.utc)
     game_state = rcon.get_gamestate()
     team_view = rcon.get_team_view()
+    game = rcon.game_profile.game
+    leader_roles = get_squad_leader_roles(game)
     map_name = _map_name(game_state)
     round_id, elapsed, stable_map = _current_round(map_name, now)
     raw_players: list[tuple[str, dict[str, Any], str | None, dict[str, Any]]] = []
@@ -95,13 +97,7 @@ def build_snapshot(
                 unit_name=player.get("unit_name") or squad_name,
                 unit_type=squad.get("type"),
                 unit_size=len(squad.get("players") or []),
-                is_leader=role
-                in {
-                    "officer",
-                    "tankcommander",
-                    "spotter",
-                    "artilleryobserver",
-                },
+                is_leader=role in leader_roles,
                 connected_seconds=_as_int(profile.get("current_playtime_seconds")),
                 squad_seconds=squad_seconds.get(str(player.get("player_id")), 0),
                 map_playtime_seconds=_as_int(player.get("map_playtime_seconds")),
@@ -138,6 +134,7 @@ def build_snapshot(
         allies_count=allies_count,
         axis_count=axis_count,
         players=players,
+        game=game.value,
         fail_count=_as_int(team_view.get("fail_count")),
         counts_match=(
             allies_view_count == allies_count
@@ -147,4 +144,9 @@ def build_snapshot(
         stable_map=stable_map,
         native_autobalance_enabled=native_enabled,
         native_autobalance_threshold=native_threshold,
+        team_labels=get_team_labels(
+            game,
+            game_state.get("allied_faction_id", game_state.get("allied_faction")),
+            game_state.get("axis_faction_id", game_state.get("axis_faction")),
+        ),
     )

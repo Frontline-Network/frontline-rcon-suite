@@ -83,11 +83,15 @@ class BalanceSnapshot:
     allies_count: int
     axis_count: int
     players: list[PlayerSnapshot]
+    game: str = "hll"
     fail_count: int = 0
     counts_match: bool = True
     stable_map: bool = True
     native_autobalance_enabled: bool | None = None
     native_autobalance_threshold: int | None = None
+    team_labels: dict[str, str] = field(
+        default_factory=lambda: {"allies": "Allies", "axis": "Axis"}
+    )
 
     @property
     def team_counts(self) -> dict[str, int]:
@@ -118,6 +122,7 @@ class BalanceSnapshot:
             "round_id": self.round_id,
             "captured_at": self.captured_at.isoformat(),
             "map_name": self.map_name,
+            "game": self.game,
             "map_elapsed_seconds": self.map_elapsed_seconds,
             "time_remaining_seconds": self.time_remaining_seconds,
             "allies_count": self.allies_count,
@@ -125,6 +130,7 @@ class BalanceSnapshot:
             "fail_count": self.fail_count,
             "counts_match": self.counts_match,
             "stable_map": self.stable_map,
+            "team_labels": dict(self.team_labels),
         }
 
     def audit_dict(self) -> dict[str, Any]:

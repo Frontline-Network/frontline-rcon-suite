@@ -1,7 +1,12 @@
 import pytest
 
 from rcon.types import GetDetailedPlayer, GameEnum
-from rcon.utils import get_squad_leader_roles, parse_raw_player_info
+from rcon.utils import (
+    get_role_unit_type,
+    get_squad_leader_roles,
+    get_team_labels,
+    parse_raw_player_info,
+)
 
 
 def mock_get_detailed_player(
@@ -269,3 +274,27 @@ def test_hll_squad_leader_roles_keep_ww2_officers():
     leader_roles = get_squad_leader_roles(GameEnum.HLL_WW2)
 
     assert {"officer", "tankcommander", "spotter", "artilleryobserver"} <= leader_roles
+
+
+@pytest.mark.parametrize(
+    ("role", "unit_type"),
+    [
+        ("squadleader", "infantry"),
+        ("mortarobserver", "mortar"),
+        ("mortargunner", "mortar"),
+        ("helicopterlogisticsofficer", "helicopter"),
+        ("helicopterpilot", "helicopter"),
+        ("tankcommander", "armor"),
+        ("spotter", "recon"),
+        ("armycommander", "commander"),
+    ],
+)
+def test_hllv_role_unit_types_cover_special_platoons(role, unit_type):
+    assert get_role_unit_type(GameEnum.HLL_VIETNAM, role) == unit_type
+
+
+def test_hllv_team_labels_use_live_factions():
+    assert get_team_labels(GameEnum.HLL_VIETNAM, 1, 6) == {
+        "allies": "US",
+        "axis": "NVA",
+    }

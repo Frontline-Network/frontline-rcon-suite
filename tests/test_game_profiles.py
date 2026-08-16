@@ -83,6 +83,18 @@ def test_hllv_profile_loads_hllv_catalog_with_logical_sides():
     assert layer.attackers is Team.AXIS
 
 
+def test_hllv_profile_exposes_live_role_catalog():
+    assert {
+        "squadleader",
+        "mortarobserver",
+        "mortargunner",
+        "mortarsupport",
+        "helicopterlogisticsofficer",
+        "helicopterpilot",
+    } <= HLLV_PROFILE.roles
+    assert HLLV_PROFILE.role_labels["helicopterpilot"] == "Pilot"
+
+
 def test_profiles_only_accept_their_supported_game_modes():
     assert HLL_PROFILE.parse_game_mode("Skirmish") is GameMode.SKIRMISH
     assert HLLV_PROFILE.parse_game_mode("Domination") is GameMode.DOMINATION
