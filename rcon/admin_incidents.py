@@ -810,9 +810,18 @@ def mutate_incident(
         if not incident:
             raise IncidentNotFound("Incident not found")
         if incident.revision != expected_revision:
-            raise IncidentConflict(
-                f"Incident revision changed from {expected_revision} to {incident.revision}"
-            )
+            if operation == "claim" and incident.status == "claimed":
+                if incident.assigned_to == actor:
+                    if payload.get("mode") != "manual":
+                        return incident.to_dict(include_events=True)
+                else:
+                    raise IncidentConflict(
+                        "Incident is already claimed by another admin"
+                    )
+            else:
+                raise IncidentConflict(
+                    f"Incident revision changed from {expected_revision} to {incident.revision}"
+                )
 
         if operation == "claim":
             if incident.status not in {"new", "claimed"}:
@@ -833,6 +842,10 @@ def mutate_incident(
         elif operation in FINAL_STATUSES:
             if incident.status not in {"new", "claimed"}:
                 raise InvalidIncidentTransition("Incident is already closed")
+            if incident.assigned_to and incident.assigned_to != actor:
+                raise IncidentConflict("Incident is already claimed by another admin")
+            if not incident.assigned_to:
+                incident.assigned_to = actor
             incident.status = operation
             incident.resolved_at = now
         elif operation == "reopen":
@@ -1050,16 +1063,7 @@ def confirmed_action_subject(
     # a valid, explicit contact/action target, but must never silently become
     # an incident subject or the primary target.
     reporter_id = str(incident.get("reporter_id") or "").strip()
-    has_confirmed_subject = any(
-        subject.get("state") == "confirmed" for subject in subjects
-    )
-    if (
-        allow_reporter
-        and not subject_id
-        and reporter_id
-        and player_id == reporter_id
-        and not has_confirmed_subject
-    ):
+    if allow_reporter and not subject_id and reporter_id and player_id == reporter_id:
         return {
             "id": None,
             "kind": "reporter",
@@ -1122,9 +1126,14 @@ def reserve_incident_action(
             )
             if not subject:
                 raise IncidentNotFound("Incident subject not found")
-            if subject.kind != "squad" or subject.state != "confirmed":
+            if (
+                subject.state != "confirmed"
+                or subject.kind not in {"player", "squad"}
+                or not subject.team
+                or not subject.squad_name
+            ):
                 raise InvalidIncidentTransition(
-                    "Only a confirmed squad can be disbanded"
+                    "Only confirmed squad context can be disbanded"
                 )
         elif confirm_subject_id:
             subject = next(

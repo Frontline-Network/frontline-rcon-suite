@@ -214,15 +214,11 @@ def test_pairing_derives_guild_from_discord_and_does_not_accept_client_guild():
         response = TestClient(app).post("/v1/pairings", json=payload)
     assert response.status_code == 201
     with SessionLocal() as session:
-        integration = session.get(
-            Integration, "11111111-1111-1111-1111-111111111111"
-        )
+        integration = session.get(Integration, "11111111-1111-1111-1111-111111111111")
         assert integration.guild_id == "123"
         assert integration.channel_id == "456"
 
-    rejected = TestClient(app).post(
-        "/v1/pairings", json={**payload, "guild_id": "999"}
-    )
+    rejected = TestClient(app).post("/v1/pairings", json={**payload, "guild_id": "999"})
     assert rejected.status_code == 422
 
 
@@ -260,6 +256,7 @@ def test_embed_distinguishes_game_server_and_exposes_manual_actions():
     event["incident"]["allowed_actions"] = ["message", "kick"]
     event["incident"]["discord_moderation_ready"] = True
     event["incident"]["primary_subject"] = {
+        "id": "33333333-3333-3333-3333-333333333333",
         "display_name": "Target",
         "player_id": "steam-id",
         "team": "Allies",
@@ -267,6 +264,7 @@ def test_embed_distinguishes_game_server_and_exposes_manual_actions():
         "role": "Rifleman",
         "snapshot": {"kills": 12, "deaths": 4, "level": 99},
     }
+    event["incident"]["reporter_id"] = "reporter-steam-id"
     envelope = IncidentEventEnvelope.model_validate(event)
     analysis = ModerationAnalysis(
         source="report",
@@ -281,8 +279,8 @@ def test_embed_distinguishes_game_server_and_exposes_manual_actions():
     )
     payload = render_message(envelope, analysis)
     fields = payload["embeds"][0]["fields"]
-    assert "Ente 2 · #2 · HLL Vietnam" in payload["embeds"][0]["description"]
-    assert payload["embeds"][0]["title"] == "🔵 Admin report: Target"
+    assert "Ente 2 · #2 · HLL Vietnam" in payload["embeds"][0]["footer"]["text"]
+    assert payload["embeds"][0]["title"] == "🔵 Report for player: Target"
     assert any(
         field["name"] == "⚔️ Combat" and "**K/D:** 3.00" in field["value"]
         for field in fields
@@ -294,7 +292,16 @@ def test_embed_distinguishes_game_server_and_exposes_manual_actions():
         "message",
         "kick",
     ]
-    assert payload["components"][-1]["components"][0]["custom_id"].startswith("claim:")
+    assert all(
+        not component["custom_id"].startswith("claim:")
+        for row in payload["components"]
+        for component in row["components"]
+    )
+    assert [button["label"] for button in payload["components"][-1]["components"]] == [
+        "❎ Unjustified",
+        "🗑 Trash",
+        "👀 Process manually",
+    ]
 
 
 def test_targetless_report_does_not_offer_player_actions():
@@ -307,8 +314,89 @@ def test_targetless_report_does_not_offer_player_actions():
         for row in payload["components"]
         for component in row["components"]
     ]
-    assert not any(custom_id.startswith("recommend:") for custom_id in custom_ids)
-    assert any(custom_id.startswith("claim:") for custom_id in custom_ids)
+    assert not any(custom_id.startswith("action:") for custom_id in custom_ids)
+    assert not any(custom_id.startswith("claim:") for custom_id in custom_ids)
+    assert {custom_id.split(":", 1)[0] for custom_id in custom_ids} == {
+        "dismiss",
+        "trash",
+        "manual",
+    }
+
+
+def test_claimed_report_uses_old_green_footer_and_manual_finish_button():
+    event = _event()
+    event["incident"].update(
+        {
+            "discord_language": "de",
+            "discord_moderation_ready": True,
+            "status": "claimed",
+            "assigned_to": "discord:789:FLN | Biene",
+            "events": [
+                {
+                    "event_type": "claim",
+                    "payload": {"mode": "manual"},
+                }
+            ],
+        }
+    )
+    payload = render_message(IncidentEventEnvelope.model_validate(event), None)
+    embed = payload["embeds"][0]
+    assert embed["color"] == 0x2ECC71
+    assert embed["footer"]["text"].startswith("Bearbeitet von FLN | Biene")
+    buttons = payload["components"][0]["components"]
+    assert len(buttons) == 1
+    assert buttons[0]["custom_id"].startswith("finish:")
+
+
+def test_squad_report_uses_old_unit_report_layout():
+    event = _event()
+    event["incident"].update(
+        {
+            "discord_language": "de",
+            "primary_subject": {
+                "id": "33333333-3333-3333-3333-333333333333",
+                "kind": "squad",
+                "display_name": "Able",
+                "squad_name": "Able",
+                "team": "Allies",
+                "leader_name": "Officer",
+                "leader_player_id": "leader-id",
+                "snapshot": {
+                    "leader": {
+                        "player_id": "leader-id",
+                        "name": "Officer",
+                        "level": 120,
+                        "kills": 8,
+                        "deaths": 3,
+                        "map_playtime_seconds": 3600,
+                    },
+                    "players": [
+                        {
+                            "player_id": "leader-id",
+                            "name": "Officer",
+                            "level": 120,
+                            "kills": 8,
+                            "deaths": 3,
+                            "role": "officer",
+                        }
+                    ],
+                },
+            },
+            "target_id": "leader-id",
+            "target_name": "Officer",
+        }
+    )
+    payload = render_message(IncidentEventEnvelope.model_validate(event), None)
+    embed = payload["embeds"][0]
+    assert embed["title"] == "🔵 Able | Allies"
+    assert "👤 **Officer** (Lvl 120)" in embed["description"]
+    assert [field["name"] for field in embed["fields"][:4]] == [
+        "📣 Grund der Meldung",
+        "⚔️ Kills",
+        "💀 Deaths",
+        "⏱️ Gesamtspielzeit",
+    ]
+    assert "HLL Unit Report" in embed["footer"]["text"]
 
 
 def test_embed_hides_actions_until_a_moderator_role_is_configured():
@@ -354,9 +442,9 @@ def test_player_name_alert_is_compact_and_omits_empty_report_sections():
     embed = payload["embeds"][0]
     field_names = [field["name"] for field in embed["fields"]]
     rendered = str(embed)
-    assert embed["title"] == "🔎 Spielername prüfen: Gewaltlord"
+    assert embed["title"] == "🔎 KI-Namensprüfung: Gewaltlord"
     assert "📡" not in embed["description"]
-    assert field_names == ["🧠 Einschätzung", "💡 Empfehlung", "📌 Bearbeitung"]
+    assert field_names == ["📣 Grund der Meldung", "🤖 KI-Einschätzung"]
     assert "Gewalt" in rendered
     assert "Regeln" not in rendered
     assert "Relevante Textstellen" not in rendered
@@ -548,8 +636,7 @@ def _modal_interaction(action: str) -> dict:
         },
         "data": {
             "custom_id": (
-                "action-modal:22222222-2222-2222-2222-222222222222:1:"
-                f"{action}"
+                "action-modal:22222222-2222-2222-2222-222222222222:1:" f"{action}"
             ),
             "components": [
                 {
@@ -560,6 +647,44 @@ def _modal_interaction(action: str) -> dict:
             ],
         },
     }
+
+
+def test_first_action_button_claims_before_opening_crcon_templates():
+    _seed()
+    claim = httpx.Response(
+        200,
+        request=httpx.Request("POST", "https://crcon.example/transition"),
+        json={"result": {"revision": 2, "assigned_to": "discord:789:Moderator"}},
+    )
+    templates = httpx.Response(
+        200,
+        request=httpx.Request("POST", "https://crcon.example/templates"),
+        json={"result": {"templates": []}},
+    )
+    interaction = {
+        "id": "1538274085513994250",
+        "type": 3,
+        "guild_id": "123",
+        "channel_id": "456",
+        "member": {
+            "user": {"id": "789", "username": "Moderator"},
+            "roles": ["42"],
+        },
+        "data": {"custom_id": ("action:22222222-2222-2222-2222-222222222222:1:kick")},
+    }
+    with (
+        patch("discord_service.app.main._verify_discord_signature"),
+        patch(
+            "discord_service.app.main.httpx.post", side_effect=[claim, templates]
+        ) as post,
+    ):
+        response = TestClient(app).post("/v1/discord/interactions", json=interaction)
+    assert response.status_code == 200
+    assert response.json()["type"] == 9
+    assert response.json()["data"]["custom_id"].endswith(":2:kick")
+    assert post.call_args_list[0].kwargs["json"]["operation"] == "claim"
+    assert post.call_args_list[0].kwargs["json"]["payload"]["button"] == "kick"
+    assert post.call_args_list[1].kwargs["json"]["action"] == "kick"
 
 
 def test_non_destructive_action_executes_immediately_without_confirmation_button():
@@ -583,7 +708,9 @@ def test_non_destructive_action_executes_immediately_without_confirmation_button
     )
     with (
         patch("discord_service.app.main._verify_discord_signature"),
-        patch("discord_service.app.main.httpx.post", side_effect=[prepare, execute]) as post,
+        patch(
+            "discord_service.app.main.httpx.post", side_effect=[prepare, execute]
+        ) as post,
     ):
         response = TestClient(app).post(
             "/v1/discord/interactions", json=_modal_interaction("message")

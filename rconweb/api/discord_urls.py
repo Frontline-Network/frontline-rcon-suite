@@ -45,6 +45,11 @@ urlpatterns = [
         name="discord-incident-transition",
     ),
     path(
+        "incidents/logs",
+        discord_integration.incident_logs,
+        name="discord-incident-logs",
+    ),
+    path(
         "actions/<uuid:preparation_id>/execute",
         discord_integration.execute_action,
         name="discord-action-execute",

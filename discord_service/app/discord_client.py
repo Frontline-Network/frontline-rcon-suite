@@ -38,6 +38,25 @@ def _team_style(team: object, risk_score: float | None) -> tuple[str, int]:
     return "⚪", 0xD85F0E
 
 
+def _assigned_display_name(value: object) -> str | None:
+    assigned = str(value or "").strip()
+    if not assigned:
+        return None
+    if assigned.startswith("discord:"):
+        parts = assigned.split(":", 2)
+        if len(parts) == 3 and parts[2]:
+            return parts[2]
+    return assigned
+
+
+def _manual_processing(incident: dict) -> bool:
+    return any(
+        event.get("event_type") == "claim"
+        and (event.get("payload") or {}).get("mode") == "manual"
+        for event in incident.get("events") or []
+    )
+
+
 def render_message(
     envelope: IncidentEventEnvelope,
     analysis: ModerationAnalysis | None,
@@ -49,147 +68,86 @@ def render_message(
     language = incident.get("discord_language", "de")
     labels = {
         "de": {
-            "incident": "Admin-Meldung",
-            "name_alert": "Spielername prüfen",
-            "chat_alert": "Chatnachricht prüfen",
-            "server": "Server",
-            "source": "Quelle",
-            "reporter": "Reporter",
-            "affected": "Betroffen",
+            "report_title": "Bericht für Spieler: {name}",
+            "name_title": "KI-Namensprüfung: {name}",
+            "chat_title": "KI-Chatprüfung: {name}",
+            "check_match": "Bitte überprüfen, ob der Report zur Spielermeldung passt.",
             "reason": "📣 Grund der Meldung",
-            "combat": "⚔️ Kampf",
-            "performance": "⚡ Leistung",
-            "unit": "👥 Einheit",
-            "teamkills": "⚠️ Teamkills",
-            "status": "📌 Bearbeitung",
-            "ai_assessment": "🤖 KI-Einschätzung",
-            "rationale": "🧾 KI-Begründung",
-            "excerpts": "Relevante Textstellen",
-            "player_response": "💬 Antwortvorschlag (nicht gesendet)",
-            "unavailable": "Nicht verfügbar",
-            "claim": "🙋 Übernehmen",
-            "resolve": "✅ Abschließen",
-            "dismiss": "🚫 Ablehnen",
+            "reporter": "☎️ Melder",
+            "dismiss": "🙄 Ablehnen",
+            "trash": "🗑 Papierkorb",
+            "manual": "👀 Manuell bearbeiten",
+            "finish": "✅ Bearbeitung abschließen",
             "not_configured": "⚙️ Keine Moderatorrolle eingerichtet. Aktionen sind gesperrt.",
+            "unavailable": "Nicht verfügbar",
         },
         "en": {
-            "incident": "Admin report",
-            "name_alert": "Review player name",
-            "chat_alert": "Review chat message",
-            "server": "Server",
-            "source": "Source",
-            "reporter": "Reporter",
-            "affected": "Affected",
+            "report_title": "Report for player: {name}",
+            "name_title": "AI name review: {name}",
+            "chat_title": "AI chat review: {name}",
+            "check_match": "Please check if the report matches the player report.",
             "reason": "📣 Report reason",
-            "combat": "⚔️ Combat",
-            "performance": "⚡ Performance",
-            "unit": "👥 Unit",
-            "teamkills": "⚠️ Teamkills",
-            "status": "📌 Processing",
-            "ai_assessment": "🤖 AI assessment",
-            "rationale": "🧾 AI rationale",
-            "excerpts": "Relevant excerpts",
-            "player_response": "💬 Suggested reply (not sent)",
-            "unavailable": "Unavailable",
-            "claim": "🙋 Claim",
-            "resolve": "✅ Complete",
-            "dismiss": "🚫 Reject",
+            "reporter": "☎️ Reporter",
+            "dismiss": "❎ Unjustified",
+            "trash": "🗑 Trash",
+            "manual": "👀 Process manually",
+            "finish": "✅ Finish processing",
             "not_configured": "⚙️ No moderator role configured. Actions are locked.",
+            "unavailable": "Unavailable",
         },
     }.get(language, {})
     snapshot = primary.get("snapshot") or {}
+    is_squad_report = primary.get("kind") == "squad"
+    stat_snapshot = (
+        snapshot.get("leader") or {} if is_squad_report else snapshot
+    )
     team = primary.get("team") or snapshot.get("team")
-    target_name = primary.get("display_name") or incident.get("target_name") or "-"
+    target_name = (
+        primary.get("leader_name")
+        if is_squad_report
+        else primary.get("display_name")
+    ) or incident.get("target_name") or "-"
     player_id = (
         primary.get("player_id")
-        or snapshot.get("player_id")
+        or primary.get("leader_player_id")
+        or stat_snapshot.get("player_id")
         or incident.get("target_id")
     )
-    kills = snapshot.get("kills")
-    deaths = snapshot.get("deaths")
+    kills = stat_snapshot.get("kills")
+    deaths = stat_snapshot.get("deaths")
     kd = None
     if isinstance(kills, (int, float)) and isinstance(deaths, (int, float)):
         kd = f"{kills / max(deaths, 1):.2f}"
-    playtime = snapshot.get("map_playtime_seconds")
-    if isinstance(playtime, (int, float)):
-        playtime = f"{playtime / 60:.0f} min"
+    playtime_seconds = stat_snapshot.get("map_playtime_seconds")
+    playtime_hours = (
+        float(playtime_seconds) / 3600
+        if isinstance(playtime_seconds, (int, float))
+        else None
+    )
+    kpm = (
+        float(kills) / max(float(playtime_seconds) / 60, 1)
+        if isinstance(kills, (int, float))
+        and isinstance(playtime_seconds, (int, float))
+        else None
+    )
     game_label = "HLL Vietnam" if envelope.game == "hll_vietnam" else "Hell Let Loose"
-    source_labels = {
-        "chat": "!admin",
-        "manual": "Manuell" if language == "de" else "Manual",
-        "ai_chat": "KI-Chat" if language == "de" else "AI chat",
-        "ai_player_name": "KI-Spielername" if language == "de" else "AI player name",
-    }
-    status_labels = {
-        "new": "Neu" if language == "de" else "New",
-        "claimed": "Übernommen" if language == "de" else "Claimed",
-        "resolved": "Abgeschlossen" if language == "de" else "Completed",
-        "dismissed": "Abgelehnt" if language == "de" else "Rejected",
-    }
-    action_labels = {
-        "none": "Keine Aktion" if language == "de" else "No action",
-        "manual_review": "Manuell prüfen" if language == "de" else "Manual review",
-        "message": "Nachricht" if language == "de" else "Message",
-        "punish": "Punish",
-        "kick": "Kick",
-        "temp_ban": "Tempban",
-        "perma_ban": "Permaban",
-        "blacklist": "Blacklist",
-        "remove_from_squad": "Squad-Kick",
-        "disband_squad": "Squad auflösen" if language == "de" else "Disband squad",
-    }
-    severity_labels = {
-        "none": "kein Risiko" if language == "de" else "no risk",
-        "low": "niedrig" if language == "de" else "low",
-        "medium": "mittel" if language == "de" else "medium",
-        "high": "hoch" if language == "de" else "high",
-        "critical": "kritisch" if language == "de" else "critical",
-    }
-    category_labels = {
-        "violence": "Gewalt" if language == "de" else "Violence",
-        "harassment": "Belästigung" if language == "de" else "Harassment",
-        "hate": "Hassrede" if language == "de" else "Hate",
-        "sexual": "Sexuell" if language == "de" else "Sexual",
-        "self-harm": "Selbstverletzung" if language == "de" else "Self-harm",
-    }
     source = str(incident.get("source") or "manual")
-    title_kind = labels[
-        (
-            "name_alert"
-            if source == "ai_player_name"
-            else "chat_alert" if source == "ai_chat" else "incident"
-        )
-    ]
     team_emoji, color = _team_style(team, analysis.risk_score if analysis else None)
     if source == "ai_player_name":
         team_emoji = "🔎"
+    status = str(incident.get("status") or "new")
+    assigned_name = _assigned_display_name(incident.get("assigned_to"))
+    if assigned_name and status in {"claimed", "resolved", "dismissed"}:
+        color = 0x2ECC71
     identity = f"👤 **{_truncate(target_name, 200)}**"
+    if is_squad_report and _present(stat_snapshot.get("level")):
+        identity += f" (Lvl {stat_snapshot['level']})"
     if player_id:
         identity += f"\n🆔 `{_truncate(player_id, 100)}`"
-    identity += (
-        f"\n🎮 **{envelope.server_name} · #{envelope.server_number} · {game_label}**"
-    )
-    if source != "ai_player_name":
-        identity += f"\n📡 {source_labels.get(source, source)}"
     if source in {"chat", "manual"}:
-        unit_context = " · ".join(
-            str(value)
-            for value in [
-                team,
-                primary.get("squad_name")
-                or snapshot.get("unit_name")
-                or snapshot.get("squad_name"),
-                primary.get("role") or snapshot.get("role"),
-            ]
-            if _present(value)
-        )
-        if unit_context:
-            identity += f"\n👥 {unit_context}"
-    reporter_name = incident.get("reporter_name")
-    if reporter_name:
-        identity += f"\n👮 {labels['reporter']}: **{_truncate(reporter_name, 180)}**"
+        identity += f"\n\nℹ️ *{labels['check_match']}*"
     fields = []
-    if source != "ai_player_name":
+    if source in {"chat", "manual"}:
         fields.append(
             {
                 "name": labels["reason"],
@@ -197,148 +155,113 @@ def render_message(
                 "inline": False,
             }
         )
-        stat_groups = [
-            (
-                labels["combat"],
+        if is_squad_report:
+            fields.extend(
                 [
-                    _metric("Kills", kills),
-                    _metric("Deaths", deaths),
-                    _metric("K/D", kd),
-                ],
-            ),
-            (
-                labels["performance"],
+                    {
+                        "name": "⚔️ Kills",
+                        "value": f"**{kills if _present(kills) else '-'}**",
+                        "inline": True,
+                    },
+                    {
+                        "name": "💀 Deaths",
+                        "value": f"**{deaths if _present(deaths) else '-'}**",
+                        "inline": True,
+                    },
+                    {
+                        "name": "⏱️ Gesamtspielzeit" if language == "de" else "⏱️ Total playtime",
+                        "value": (
+                            f"{playtime_hours:.1f} h"
+                            if playtime_hours is not None
+                            else "-"
+                        ),
+                        "inline": True,
+                    },
+                ]
+            )
+            members = snapshot.get("players") or []
+            if members:
+                member_lines = []
+                for member in members:
+                    entry = (
+                        f"{member.get('name') or '-'} (Lvl {member.get('level') or 0})"
+                        f" • {member.get('kills') or 0}/{member.get('deaths') or 0}"
+                        f" • {member.get('role') or '-'}"
+                    )
+                    if str(member.get("player_id") or "") == str(player_id or ""):
+                        entry = f"**{entry}**"
+                    member_lines.append(entry)
+                fields.append(
+                    {
+                        "name": f"👥 Squad Members ({len(member_lines)})",
+                        "value": _truncate("\n".join(member_lines), 1024),
+                        "inline": False,
+                    }
+                )
+        else:
+            fields.extend(
                 [
-                    _metric("Level", snapshot.get("level")),
-                    _metric("Combat", snapshot.get("combat")),
-                    _metric("Spielzeit" if language == "de" else "Playtime", playtime),
-                ],
-            ),
-            (
-                labels["teamkills"],
-                [
-                    _metric(
-                        "Anzahl" if language == "de" else "Count",
-                        snapshot.get("teamkills"),
+                {
+                    "name": "⚔️ Combat",
+                    "value": _field_block(
+                        _metric("Kills", kills),
+                        _metric("Deaths", deaths),
+                        _metric("K/D", kd),
                     ),
-                ],
-            ),
-        ]
-        fields.extend(
-            {
-                "name": name,
-                "value": _field_block(*values),
-                "inline": True,
-            }
-            for name, values in stat_groups
-            if any(values)
-        )
-    if analysis and source == "ai_player_name":
-        categories = ", ".join(
-            category_labels.get(value, value.replace("_", " ").title())
-            for value in analysis.categories
-        )
-        assessment_lines = [
-            (
-                f"**{analysis.risk_score:.0%} · "
-                f"{severity_labels.get(analysis.severity.value, analysis.severity.value)}**"
-            ),
-            f"**Kategorie:** {categories}" if categories else None,
-            analysis.rationale,
-        ]
-        recommendation_lines = [
-            f"**{action_labels.get(analysis.suggested_action.value, analysis.suggested_action.value)}**",
-            analysis.suggested_player_response,
-        ]
+                    "inline": True,
+                },
+                {
+                    "name": "⚡ Performance",
+                    "value": _field_block(
+                        _metric("KPM", f"{kpm:.2f}" if kpm is not None else None),
+                        _metric("Streak", stat_snapshot.get("kills_streak")),
+                        _metric(
+                            "Time",
+                            (
+                                f"{playtime_hours:.1f} h"
+                                if playtime_hours is not None
+                                else None
+                            ),
+                        ),
+                    ),
+                    "inline": True,
+                },
+                {
+                    "name": "⚠️ Teamkills",
+                    "value": _field_block(
+                        _metric("Count", stat_snapshot.get("teamkills")),
+                        _metric("Streak", stat_snapshot.get("teamkills_streak")),
+                    ),
+                    "inline": True,
+                },
+                ]
+            )
+    elif analysis and source in {"ai_player_name", "ai_chat"}:
+        categories = ", ".join(analysis.categories) or "-"
         fields.extend(
             [
                 {
-                    "name": "🧠 Einschätzung" if language == "de" else "🧠 Assessment",
-                    "value": _truncate(_field_block(*assessment_lines), 1024),
+                    "name": labels["reason"],
+                    "value": _truncate(incident.get("reason"), 1024),
                     "inline": False,
                 },
                 {
                     "name": (
-                        "💡 Empfehlung" if language == "de" else "💡 Recommendation"
+                        "🤖 KI-Einschätzung" if language == "de" else "🤖 AI assessment"
                     ),
-                    "value": _truncate(_field_block(*recommendation_lines), 1024),
-                    "inline": False,
-                },
-            ]
-        )
-    elif analysis and source == "ai_chat":
-        fields.extend(
-            [
-                {
-                    "name": labels["ai_assessment"],
                     "value": _truncate(
-                        "\n".join(
-                            [
-                                f"**Risiko:** {severity_labels.get(analysis.severity.value, analysis.severity.value)} · {analysis.risk_score:.0%}",
-                                f"**Kategorie:** {', '.join(analysis.categories) or '-'}",
-                                f"**Regeln:** {', '.join(analysis.rule_ids) or '-'}",
-                                f"**Empfehlung:** {action_labels.get(analysis.suggested_action.value, analysis.suggested_action.value)}"
-                                + (
-                                    f" · {analysis.suggested_duration_hours} h"
-                                    if analysis.suggested_duration_hours
-                                    else ""
-                                ),
-                            ]
-                        ),
+                        f"**Risiko:** {analysis.risk_score:.0%}\n"
+                        f"**Kategorie:** {categories}\n{analysis.rationale}",
                         1024,
                     ),
                     "inline": False,
                 },
-                {
-                    "name": labels["rationale"],
-                    "value": _truncate(analysis.rationale, 1024),
-                    "inline": False,
-                },
             ]
         )
-        if analysis.relevant_excerpts:
-            fields.append(
-                {
-                    "name": labels["excerpts"],
-                    "value": _truncate(
-                        "\n".join(f"• {value}" for value in analysis.relevant_excerpts),
-                        1024,
-                    ),
-                    "inline": False,
-                }
-            )
-        if analysis.suggested_player_response:
-            fields.append(
-                {
-                    "name": labels["player_response"],
-                    "value": _truncate(analysis.suggested_player_response, 1024),
-                    "inline": False,
-                }
-            )
     elif ai_unavailable and source in {"ai_chat", "ai_player_name"}:
         fields.append(
             {"name": "KI / AI", "value": labels["unavailable"], "inline": False}
         )
-    fields.append(
-        {
-            "name": labels["status"],
-            "value": _truncate(
-                " · ".join(
-                    value
-                    for value in [
-                        status_labels.get(
-                            str(incident.get("status", "new")),
-                            str(incident.get("status", "new")),
-                        ),
-                        incident.get("assigned_to"),
-                    ]
-                    if value
-                ),
-                1024,
-            ),
-            "inline": False,
-        }
-    )
     revision = envelope.incident_revision
     incident_id = envelope.incident_id
     allowed_actions = [
@@ -358,7 +281,6 @@ def render_message(
     ]
     components = []
     moderation_ready = incident.get("discord_moderation_ready", True)
-    status = str(incident.get("status") or "new")
     has_action_target = bool(player_id)
     if status in {"resolved", "dismissed"}:
         pass
@@ -367,88 +289,130 @@ def render_message(
             {"name": "Discord", "value": labels["not_configured"], "inline": False}
         )
     else:
-        action_icons = {
-            "message": "💬",
-            "punish": "⚠️",
-            "kick": "👢",
-            "temp_ban": "⏱️",
-            "perma_ban": "🔨",
-            "blacklist": "⛔",
-            "remove_from_squad": "↪️",
-            "disband_squad": "💥",
-        }
-        recommended = (
-            analysis.suggested_action.value
-            if analysis and source in {"ai_chat", "ai_player_name"}
-            else None
-        )
-        action_buttons = [
-            {
-                "type": 2,
-                "style": (
-                    4
-                    if action in {"perma_ban", "blacklist", "disband_squad"}
-                    else 1 if action == recommended else 2
-                ),
-                "label": _truncate(
-                    f"{'✨' if action == recommended else action_icons[action]} {action_labels[action]}",
-                    80,
-                ),
-                "custom_id": f"recommend:{incident_id}:{revision}:{action}",
-            }
-            for action in allowed_actions
-            if has_action_target
-        ]
-        for offset in range(0, len(action_buttons), 5):
+        if _manual_processing(incident):
             components.append(
-                {"type": 1, "components": action_buttons[offset : offset + 5]}
+                {
+                    "type": 1,
+                    "components": [
+                        {
+                            "type": 2,
+                            "style": 3,
+                            "label": labels["finish"],
+                            "custom_id": f"finish:{incident_id}:{revision}",
+                        }
+                    ],
+                }
             )
-        components.append(
-            {
-                "type": 1,
-                "components": [
-                    {
-                        "type": 2,
-                        "style": 1,
-                        "label": labels["claim"],
-                        "custom_id": f"claim:{incident_id}:{revision}",
-                    },
-                    {
-                        "type": 2,
-                        "style": 3,
-                        "label": labels["resolve"],
-                        "custom_id": f"resolve:{incident_id}:{revision}",
-                    },
+        else:
+            old_actions = [
+                ("message", 2, f"📧 {_truncate(target_name, 65)}"),
+                ("punish", 1, "💀 Bestrafen" if language == "de" else "💀 Punish"),
+                ("kick", 3, "🤜 Kicken" if language == "de" else "🤜 Kick"),
+                ("temp_ban", 3, "⏰ TB"),
+                ("perma_ban", 4, "🔨 PB"),
+            ]
+            row = [
+                {
+                    "type": 2,
+                    "style": style,
+                    "label": label,
+                    "custom_id": f"action:{incident_id}:{revision}:{action}",
+                }
+                for action, style, label in old_actions
+                if has_action_target and action in allowed_actions
+            ]
+            if row:
+                components.append({"type": 1, "components": row})
+            context_row = []
+            if incident.get("reporter_id") and "message" in allowed_actions:
+                context_row.append(
                     {
                         "type": 2,
                         "style": 2,
-                        "label": labels["dismiss"],
-                        "custom_id": f"dismiss:{incident_id}:{revision}",
-                    },
-                ],
-            }
+                        "label": labels["reporter"],
+                        "custom_id": f"action:{incident_id}:{revision}:message_reporter",
+                    }
+                )
+            for action, style, label in [
+                ("remove_from_squad", 1, "🥾 Squad Kick"),
+                (
+                    "disband_squad",
+                    4,
+                    "💣 Squad auflösen" if language == "de" else "💣 Disband squad",
+                ),
+            ]:
+                if has_action_target and action in allowed_actions:
+                    context_row.append(
+                        {
+                            "type": 2,
+                            "style": style,
+                            "label": label,
+                            "custom_id": f"action:{incident_id}:{revision}:{action}",
+                        }
+                    )
+            if has_action_target:
+                context_row.append(
+                    {
+                        "type": 2,
+                        "style": 2,
+                        "label": "📄 Logs",
+                        "custom_id": f"logs:{incident_id}:{revision}",
+                    }
+                )
+            if context_row:
+                components.append({"type": 1, "components": context_row[:5]})
+            components.append(
+                {
+                    "type": 1,
+                    "components": [
+                        {
+                            "type": 2,
+                            "style": 2,
+                            "label": labels["dismiss"],
+                            "custom_id": f"dismiss:{incident_id}:{revision}",
+                        },
+                        {
+                            "type": 2,
+                            "style": 2,
+                            "label": labels["trash"],
+                            "custom_id": f"trash:{incident_id}:{revision}",
+                        },
+                        {
+                            "type": 2,
+                            "style": 2,
+                            "label": labels["manual"],
+                            "custom_id": f"manual:{incident_id}:{revision}",
+                        },
+                    ],
+                }
+            )
+    if source == "ai_player_name":
+        title = labels["name_title"].format(name=target_name)
+    elif source == "ai_chat":
+        title = labels["chat_title"].format(name=target_name)
+    elif is_squad_report and source in {"chat", "manual"}:
+        title = f"{primary.get('squad_name') or primary.get('display_name') or '-'} | {team or '-'}"
+    else:
+        title = labels["report_title"].format(name=target_name)
+    footer_parts = []
+    if assigned_name:
+        footer_parts.append(
+            ("Bearbeitet von " if language == "de" else "Handled by ") + assigned_name
         )
+    footer_parts.extend(
+        [
+            "HLL Unit Report" if is_squad_report else "HLL Player Report",
+            f"{envelope.server_name} · #{envelope.server_number} · {game_label}",
+        ]
+    )
     return {
         "embeds": [
             {
-                "title": _truncate(f"{team_emoji} {title_kind}: {target_name}", 256),
+                "title": _truncate(f"{team_emoji} {title}", 256),
                 "description": _truncate(identity, 4096),
                 "color": color,
                 "fields": fields[:25],
-                "footer": {
-                    "text": _truncate(
-                        " · ".join(
-                            value
-                            for value in [
-                                f"CRCON #{envelope.server_number}",
-                                f"Incident {incident_id[:8]}",
-                                f"Revision {revision}",
-                            ]
-                            if value
-                        ),
-                        2048,
-                    )
-                },
+                "footer": {"text": _truncate(" | ".join(footer_parts), 2048)},
             }
         ],
         "components": components,

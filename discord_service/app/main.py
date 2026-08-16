@@ -287,6 +287,9 @@ def _crcon_interaction_error(exc: httpx.HTTPError) -> str:
             "Only open incidents can be claimed": (
                 "Dieser Incident ist bereits abgeschlossen."
             ),
+            "Incident is already claimed by another admin": (
+                "⛔ Dieser Report wird bereits von einem anderen Administrator bearbeitet."
+            ),
         }
         if detail in known_details:
             return known_details[detail]
@@ -335,7 +338,7 @@ def _action_modal(
     *,
     initial_text: str = "",
 ) -> dict:
-    text_key = "message" if action == "message" else "reason"
+    text_key = "message" if action in {"message", "message_reporter"} else "reason"
     inputs = [
         {
             "type": 1,
@@ -433,6 +436,41 @@ def _template_picker(
             ],
         },
     }
+
+
+def _claim_from_first_button(
+    integration: Integration,
+    *,
+    interaction_id: str,
+    guild_id: str,
+    channel_id: str,
+    incident_id: str,
+    revision: int,
+    actor: dict,
+    payload: dict | None = None,
+) -> dict:
+    response = httpx.post(
+        f"{integration.crcon_base_url}/api/discord/v1/incidents/transition",
+        headers={
+            "Authorization": (
+                f"Bearer {decrypt(integration.action_capability_ciphertext)}"
+            )
+        },
+        json={
+            "interaction_id": interaction_id,
+            "installation_id": integration.installation_id,
+            "guild_id": guild_id,
+            "channel_id": channel_id,
+            "incident_id": incident_id,
+            "incident_revision": revision,
+            "actor": actor,
+            "operation": "claim",
+            "payload": payload or {"via": "first_button"},
+        },
+        timeout=10,
+    )
+    response.raise_for_status()
+    return response.json().get("result", response.json())
 
 
 @app.get("/healthz")
@@ -982,13 +1020,13 @@ async def discord_interaction(
     modal_values: dict[str, str | int] = {}
     selected_template_id: str | None = None
     if payload.get("type") == 3 and choice_match:
-        operation = "recommend"
+        operation = "action"
         incident_id, revision = choice_match.groups()
         selected = (payload.get("data") or {}).get("values") or []
         recommended_action = str(selected[0]) if selected else ""
         match = bool(re.fullmatch(r"[a-z_]+", recommended_action))
     elif payload.get("type") == 3 and template_match:
-        operation = "recommend"
+        operation = "action"
         incident_id, revision, recommended_action = template_match.groups()
         selected = (payload.get("data") or {}).get("values") or []
         selected_template_id = str(selected[0]) if selected else ""
@@ -996,7 +1034,7 @@ async def discord_interaction(
             re.fullmatch(r"[0-9]+", selected_template_id)
         )
     elif payload.get("type") == 5 and modal_match:
-        operation = "recommend"
+        operation = "action"
         incident_id, revision, recommended_action = modal_match.groups()
         rows = (payload.get("data") or {}).get("components") or []
         modal_values = {
@@ -1004,7 +1042,11 @@ async def discord_interaction(
             for row in rows
             for component in row.get("components", [])
         }
-        required_text_key = "message" if recommended_action == "message" else "reason"
+        required_text_key = (
+            "message"
+            if recommended_action in {"message", "message_reporter"}
+            else "reason"
+        )
         if not modal_values.get(required_text_key):
             return {
                 "type": 4,
@@ -1035,7 +1077,8 @@ async def discord_interaction(
         match = True
     else:
         match = re.fullmatch(
-            r"(claim|resolve|dismiss|recommend):([0-9a-f-]{36}):(\d+)(?::([a-z_]+))?",
+            r"(action|dismiss|trash|manual|finish|logs):"
+            r"([0-9a-f-]{36}):(\d+)(?::([a-z_]+))?",
             custom_id,
         )
         if match:
@@ -1074,14 +1117,38 @@ async def discord_interaction(
         ),
         "role_ids": [str(value) for value in member.get("roles") or []],
     }
-    if operation == "recommend" and payload.get("type") != 5:
+    if operation == "action" and custom_id.startswith("action:"):
+        try:
+            claimed = _claim_from_first_button(
+                integration,
+                interaction_id=str(payload.get("id")),
+                guild_id=guild_id,
+                channel_id=channel_id,
+                incident_id=incident_id,
+                revision=int(revision),
+                actor=actor,
+                payload={"via": "first_button", "button": recommended_action},
+            )
+            revision = str(claimed["revision"])
+        except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
+            if isinstance(exc, httpx.HTTPError):
+                message = _crcon_interaction_error(exc)
+            else:
+                message = "CRCON hat die Übernahme nicht bestätigt."
+            return {"type": 4, "data": {"content": message, "flags": 64}}
+    if operation == "action" and payload.get("type") != 5:
         if selected_template_id == "custom":
             return _action_modal(incident_id, revision, recommended_action)
+        crcon_action = (
+            "message"
+            if recommended_action == "message_reporter"
+            else recommended_action
+        )
         template_request = {
             "guild_id": guild_id,
             "channel_id": channel_id,
             "actor": actor,
-            "action": recommended_action,
+            "action": crcon_action,
             **(
                 {"template_id": int(selected_template_id)}
                 if selected_template_id
@@ -1122,8 +1189,68 @@ async def discord_interaction(
                 incident_id, revision, recommended_action, templates
             )
         return _action_modal(incident_id, revision, recommended_action)
-    endpoint = "actions/prepare" if operation == "recommend" else "incidents/transition"
-    outgoing_operation = "prepare_action" if operation == "recommend" else operation
+    if operation == "logs":
+        try:
+            claimed = _claim_from_first_button(
+                integration,
+                interaction_id=str(payload.get("id")),
+                guild_id=guild_id,
+                channel_id=channel_id,
+                incident_id=incident_id,
+                revision=int(revision),
+                actor=actor,
+                payload={"via": "first_button", "button": "logs"},
+            )
+            log_response = httpx.post(
+                f"{integration.crcon_base_url}/api/discord/v1/incidents/logs",
+                headers={
+                    "Authorization": (
+                        f"Bearer {decrypt(integration.action_capability_ciphertext)}"
+                    )
+                },
+                json={
+                    "guild_id": guild_id,
+                    "channel_id": channel_id,
+                    "incident_id": incident_id,
+                    "actor": actor,
+                },
+                timeout=10,
+            )
+            log_response.raise_for_status()
+            log_result = log_response.json().get("result", log_response.json())
+            lines = log_result.get("lines") or []
+            content = "\n".join(str(value) for value in lines) or "Keine Logs gefunden."
+            return {
+                "type": 4,
+                "data": {
+                    "content": f"📄 Logs für **{log_result.get('player_name') or 'Spieler'}**\n```\n{content[:1750]}\n```",
+                    "flags": 64,
+                },
+            }
+        except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
+            message = (
+                _crcon_interaction_error(exc)
+                if isinstance(exc, httpx.HTTPError)
+                else "Die Logs konnten nicht geladen werden."
+            )
+            return {"type": 4, "data": {"content": message, "flags": 64}}
+    endpoint = "actions/prepare" if operation == "action" else "incidents/transition"
+    outgoing_operation = {
+        "action": "prepare_action",
+        "finish": "resolve",
+        "trash": "dismiss",
+        "manual": "claim",
+    }.get(operation, operation)
+    actual_action = (
+        "message" if recommended_action == "message_reporter" else recommended_action
+    )
+    transition_payload = {}
+    if operation == "manual":
+        transition_payload = {"mode": "manual", "via": "first_button"}
+    elif operation == "trash":
+        transition_payload = {"reason": "wrong_player", "notify_reporter": False}
+    elif operation == "dismiss":
+        transition_payload = {"reason": "unjustified", "notify_reporter": True}
     data = {
         "interaction_id": str(payload.get("id")),
         "installation_id": integration.installation_id,
@@ -1135,25 +1262,32 @@ async def discord_interaction(
         "operation": outgoing_operation,
         "payload": (
             {
-                "action": recommended_action,
+                "action": actual_action,
                 **modal_values,
                 "discord_actor": actor,
                 "ai_suggested_action": (mapping.suggested_action if mapping else None),
                 "ai_decision": (
                     "accepted"
-                    if mapping and mapping.suggested_action == recommended_action
+                    if mapping and mapping.suggested_action == actual_action
                     else "overridden"
+                ),
+                **(
+                    {"reporter_action": True}
+                    if recommended_action == "message_reporter"
+                    else {}
                 ),
                 **(
                     {
                         "subject_id": mapping.primary_subject_id,
                     }
-                    if mapping and mapping.primary_subject_id
+                    if mapping
+                    and mapping.primary_subject_id
+                    and recommended_action != "message_reporter"
                     else {}
                 ),
             }
             if recommended_action
-            else {}
+            else transition_payload
         ),
     }
     try:
@@ -1172,8 +1306,8 @@ async def discord_interaction(
             "type": 4,
             "data": {"content": _crcon_interaction_error(exc), "flags": 64},
         }
-    if operation == "recommend":
-        preview = str(result.get("preview") or recommended_action)[:2000]
+    if operation == "action":
+        preview = str(result.get("preview") or actual_action)[:2000]
         if not result.get("requires_second_confirmation"):
             try:
                 _execute_prepared_action(
@@ -1203,10 +1337,10 @@ async def discord_interaction(
                 actor=actor,
                 decision=(
                     "accepted"
-                    if mapping and mapping.suggested_action == recommended_action
+                    if mapping and mapping.suggested_action == actual_action
                     else "overridden"
                 ),
-                actual_action=str(recommended_action),
+                actual_action=str(actual_action),
             )
             return {
                 "type": 4,
@@ -1226,7 +1360,7 @@ async def discord_interaction(
             channel_id=channel_id,
             analysis_id=mapping.analysis_id if mapping else None,
             suggested_action=mapping.suggested_action if mapping else None,
-            actual_action=str(recommended_action),
+            actual_action=str(actual_action),
             expires_at=datetime.now(tz=timezone.utc) + timedelta(minutes=5),
         )
         session.add(relay)
@@ -1253,8 +1387,13 @@ async def discord_interaction(
             },
         }
     else:
-        content = f"Incident aktualisiert: {operation}."
-        if operation == "dismiss":
+        content = {
+            "manual": "Du bearbeitest diesen Report jetzt manuell.",
+            "finish": "Die manuelle Bearbeitung wurde abgeschlossen.",
+            "dismiss": "Der Report wurde als unberechtigt abgelehnt.",
+            "trash": "Der Report wurde als Fehlmeldung geschlossen.",
+        }.get(operation, f"Incident aktualisiert: {operation}.")
+        if operation in {"dismiss", "trash"}:
             mapping = session.execute(
                 select(IncidentMessage).where(
                     IncidentMessage.installation_id == integration.installation_id,

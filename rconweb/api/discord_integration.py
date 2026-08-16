@@ -187,6 +187,14 @@ def _normalize_action_subject(incident: dict, arguments: dict) -> dict:
     """Derive confirmation state from CRCON data, never from Discord input."""
 
     normalized = dict(arguments)
+    if normalized.get("reporter_action") is True:
+        reporter_id = str(incident.get("reporter_id") or "").strip()
+        if not reporter_id:
+            raise ValueError("This incident has no in-game reporter")
+        normalized["player_id"] = reporter_id
+        normalized.pop("subject_id", None)
+        normalized.pop("confirm_subject_id", None)
+        return normalized
     subject_id = str(normalized.get("subject_id") or "").strip()
     subject = next(
         (
@@ -229,11 +237,14 @@ def _validate_prepared_action_target(action: str, incident: dict, arguments: dic
             ),
             None,
         )
-        if (
-            not subject
-            or subject.get("kind") != "squad"
-            or subject.get("state") != "confirmed"
-        ):
+        has_squad_context = bool(
+            subject
+            and subject.get("state") == "confirmed"
+            and subject.get("kind") in {"player", "squad"}
+            and subject.get("team")
+            and (subject.get("squad_name") or subject.get("display_name"))
+        )
+        if not has_squad_context:
             raise ValueError("Select a confirmed squad before running this action")
         return
     confirm_subject_id = str(arguments.get("confirm_subject_id") or "").strip()
@@ -319,6 +330,77 @@ def discord_action_templates(request):
         ) or exc.__class__.__module__.startswith("pydantic"):
             return _error(command, str(exc), 400)
         raise
+    return api_response(command=command, failed=False, result=result)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def incident_logs(request):
+    """Return a short, read-only 24 hour excerpt for the claimed report player."""
+
+    command = "discord_incident_logs"
+    integration, denied = _authorized_integration(request, command)
+    if denied:
+        return denied
+    try:
+        data = _json_body(request)
+        actor = DiscordActor.model_validate(data["actor"])
+        _validate_binding(
+            integration,
+            guild_id=str(data["guild_id"]),
+            channel_id=str(data["channel_id"]),
+            actor=actor,
+        )
+        incident = get_incident(str(data["incident_id"]))
+        actor_name = f"discord:{actor.discord_id}:{actor.display_name}"[:150]
+        if incident.get("assigned_to") != actor_name:
+            raise IncidentConflict("Incident is already claimed by another admin")
+        subject = incident.get("primary_subject") or {}
+        player_id = str(subject.get("player_id") or incident.get("target_id") or "")
+        if not player_id:
+            raise ValueError("Select a confirmed player before requesting logs")
+        player_name = str(
+            subject.get("display_name") or incident.get("target_name") or "Spieler"
+        )
+        from rcon.api_commands import get_rcon_api
+
+        records = get_rcon_api().get_historical_logs(
+            player_id=player_id,
+            from_=timezone.now() - timedelta(hours=24),
+            till=timezone.now(),
+            limit=25,
+            time_sort="desc",
+            exact_player_match=True,
+            server_filter=str(incident["server_number"]),
+        )
+        lines = []
+        for record in records or []:
+            occurred = record.get("event_time") or record.get("creation_time") or ""
+            occurred_text = str(occurred)
+            if "T" in occurred_text:
+                occurred_text = occurred_text.split("T", 1)[1][:8]
+            action = str(record.get("type") or "LOG")
+            first = str(record.get("player1_name") or "")
+            second = str(record.get("player2_name") or "")
+            content = str(record.get("content") or "")
+            details = " → ".join(value for value in [first, second] if value)
+            if content:
+                details = f"{details}: {content}" if details else content
+            lines.append(f"{occurred_text} [{action}] {details}".strip()[:240])
+        result = {
+            "incident_id": str(incident["id"]),
+            "player_id": player_id,
+            "player_name": player_name,
+            "lines": lines,
+        }
+    except PermissionError as exc:
+        return _error(command, str(exc), 403)
+    except IncidentNotFound as exc:
+        return _error(command, str(exc), 404)
+    except IncidentConflict as exc:
+        return _error(command, str(exc), 409)
+    except (KeyError, TypeError, ValueError) as exc:
+        return _error(command, str(exc), 400)
     return api_response(command=command, failed=False, result=result)
 
 
@@ -688,8 +770,13 @@ def prepare_action(request):
         if action in DESTRUCTIVE_ACTIONS and not reason:
             raise ValueError("Destructive actions require a reason")
         token = secrets.token_urlsafe(48)
+        preview_target = (
+            incident.get("reporter_name")
+            if arguments.get("reporter_action") is True
+            else incident.get("target_name")
+        ) or "selected subject"
         preview = (
-            f"{action} on {incident.get('target_name') or 'selected subject'}: "
+            f"{action} on {preview_target}: "
             f"{reason or interaction.payload.get('message') or ''}"
         )[:2000]
         prepared = DiscordPreparedAction.objects.create(
@@ -784,7 +871,8 @@ def transition_incident(request):
         template = (integration.reporter_templates or {}).get(
             template_key, DEFAULT_REPORTER_TEMPLATES.get(template_key or "")
         )
-        if template and result.get("reporter_id"):
+        notify_reporter = interaction.payload.get("notify_reporter", True) is not False
+        if notify_reporter and template and result.get("reporter_id"):
             try:
                 from . import views
 
@@ -874,6 +962,39 @@ def execute_action(request, preparation_id):
                 updated = complete_incident_action(
                     f"discord:{interaction_id}"[:64], result=action_result, error=None
                 )
+                if prepared.action != SuggestedAction.MESSAGE.value:
+                    try:
+                        updated = mutate_incident(
+                            str(prepared.incident_id),
+                            actor=actor_name,
+                            expected_revision=int(updated["revision"]),
+                            operation="resolved",
+                            payload={
+                                "via": "completed_action",
+                                "action": prepared.action,
+                            },
+                            idempotency_key=f"resolve:{interaction_id}"[:64],
+                        )
+                        template = (integration.reporter_templates or {}).get(
+                            "resolved", DEFAULT_REPORTER_TEMPLATES["resolved"]
+                        )
+                        if template and updated.get("reporter_id"):
+                            try:
+                                from . import views
+
+                                views.rcon_api.message_player(
+                                    updated["reporter_id"],
+                                    message=template,
+                                    by=actor_name,
+                                    save_message=True,
+                                    player_name=updated.get("reporter_name"),
+                                )
+                            except Exception:
+                                pass
+                    except Exception:
+                        # The game action succeeded and is already audited. A
+                        # concurrent state update must not report it as failed.
+                        pass
             except Exception as exc:
                 complete_incident_action(
                     f"discord:{interaction_id}"[:64], error=repr(exc)

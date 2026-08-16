@@ -385,7 +385,7 @@ def _execute_action(action: str, data: dict, user_name: str, incident: dict):
                 item
                 for item in incident.get("subjects") or []
                 if item.get("id") == subject_id
-                and item.get("kind") == "squad"
+                and item.get("kind") in {"player", "squad"}
                 and item.get("state") == "confirmed"
             ),
             None,
@@ -396,9 +396,7 @@ def _execute_action(action: str, data: dict, user_name: str, incident: dict):
         if not reason or data.get("confirmed") is not True:
             raise ValueError("Disbanding a squad requires a reason and confirmation")
         team = str(subject.get("team") or "").strip()
-        squad_name = str(
-            subject.get("squad_name") or subject.get("display_name") or ""
-        ).strip()
+        squad_name = str(subject.get("squad_name") or "").strip()
         if not team or not squad_name:
             raise ValueError("The confirmed squad has no team or squad name")
         return views.rcon_api.disband_squad_by_name(team, squad_name, reason)
@@ -478,7 +476,9 @@ def _execute_action(action: str, data: dict, user_name: str, incident: dict):
             player_id=player_id, comment=comment, by=user_name
         )
     if action == "remove_from_squad":
-        if subject.get("kind") != "squad":
+        if subject.get("kind") not in {"player", "squad"} or not subject.get(
+            "squad_name"
+        ):
             raise ValueError("Select a player from a confirmed squad")
         reason = str(data.get("reason") or "").strip()
         if not reason or data.get("confirmed") is not True:

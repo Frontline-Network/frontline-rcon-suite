@@ -65,6 +65,16 @@ Spielaktion aus. Discord-Interaktionen sind signiert; CRCON prüft anschließend
 noch einmal Installation, Guild, Kanal, aktuelle Rollen aus der signierten
 Interaktion, Aktionsfreigabe, Incident-Revision und Idempotenz.
 
+Normale Reports verwenden das Bedienmodell des bisherigen Frontline-Reportbots:
+Spieleraktionen stehen in der ersten Reihe, Melder-, Squad- und Log-Funktionen in
+der zweiten und Ablehnen, Papierkorb sowie manuelle Bearbeitung in der dritten.
+Es gibt keinen separaten Übernehmen-Schritt. Der erste zulässige Buttonklick
+beansprucht den Incident atomar in CRCON für diesen Discord-Administrator. Das
+Embed wird grün und zeigt den Bearbeiter im Footer; konkurrierende Administratoren
+können den Report danach nicht verändern. Nachrichten und Log-Abfragen lassen den
+Report offen, eine manuelle Bearbeitung erhält einen Abschluss-Button und
+erfolgreiche Spielmaßnahmen schließen den Report.
+
 Permaban, Blacklist und Squad-Auflösung benötigen einen Grund, eine Vorschau und
 eine zweite Bestätigung. Bestätigungen sind kurzlebig, an den vorbereitenden
 Discord-Nutzer gebunden und nur einmal verwendbar. Claiming verhindert parallele
