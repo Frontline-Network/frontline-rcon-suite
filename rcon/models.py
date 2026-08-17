@@ -135,12 +135,26 @@ def get_engine():
     if os.getenv("HLL_DB_DISABLE_CONNECTION_POOL") is not None:
         pool = NullPool
 
-    _ENGINE = create_engine(
-        url,
-        poolclass=pool,
-        echo=False,
-        connect_args={"application_name": _connection_name()},
-    )
+    engine_options: dict[str, Any] = {
+        "echo": False,
+        "connect_args": {"application_name": _connection_name()},
+    }
+    if pool is not None:
+        engine_options["poolclass"] = pool
+    elif os.getenv("HLL_SUPERVISOR_PROCESS") is not None:
+        # Supervisor commands are long-lived but overwhelmingly serial.  The
+        # SQLAlchemy default (five persistent connections plus ten overflow
+        # connections) is excessive when a host runs more than a dozen such
+        # commands per gameserver.  Keep one warm connection for latency and
+        # allow short bursts without retaining the overflow afterwards.
+        engine_options.update(
+            pool_size=max(1, int(os.getenv("HLL_DB_POOL_SIZE", "1"))),
+            max_overflow=max(0, int(os.getenv("HLL_DB_MAX_OVERFLOW", "2"))),
+            pool_recycle=max(60, int(os.getenv("HLL_DB_POOL_RECYCLE", "900"))),
+            pool_use_lifo=True,
+        )
+
+    _ENGINE = create_engine(url, **engine_options)
     return _ENGINE
 
 

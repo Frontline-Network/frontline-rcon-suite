@@ -1473,3 +1473,86 @@ class DiscordOutboxWorkerModeTests(TestCase):
             with self.assertRaises(KeyboardInterrupt):
                 command.handle(events_only=False, moderation_only=True)
         deliver.assert_called_once_with(deliver_events=False, deliver_moderation=True)
+
+
+class MobilePushWorkerPerformanceTests(TestCase):
+    @patch("api.management.commands.mobile_push_worker._installation_id")
+    @patch("api.management.commands.mobile_push_worker.enter_session")
+    def test_http_delivery_happens_outside_database_transaction(
+        self, enter_session, installation_id
+    ):
+        from api.management.commands.mobile_push_worker import Command
+
+        order = []
+        device = SimpleNamespace(
+            id="00000000-0000-0000-0000-000000000001",
+            pk="00000000-0000-0000-0000-000000000001",
+            push_handle="push-handle",
+            push_capability="push-capability",
+        )
+        event = {
+            "id": 7,
+            "incident_id": "00000000-0000-0000-0000-000000000002",
+            "event_type": "created",
+            "created_at": timezone.now(),
+        }
+        session = MagicMock()
+        context = MagicMock()
+        context.__enter__.side_effect = lambda: (order.append("db"), session)[1]
+        context.__exit__.return_value = False
+        enter_session.return_value = context
+        installation_id.return_value = "installation"
+
+        command = Command()
+        command._eligible_devices = MagicMock(return_value=[device])
+        command._load_pending_events = MagicMock(return_value=[(device, [event])])
+        response = MagicMock()
+        response.raise_for_status.return_value = None
+        command._http.post = MagicMock(
+            side_effect=lambda *args, **kwargs: (order.append("http"), response)[1]
+        )
+
+        self.assertTrue(command._deliver_batch("https://relay.example"))
+        self.assertEqual(order, ["http", "db"])
+        session.add_all.assert_called_once()
+
+
+class HistoricalScoreboardCacheTests(TestCase):
+    @staticmethod
+    def _session_with_end(end):
+        session = MagicMock()
+        session.query.return_value.filter.return_value.one_or_none.return_value = (
+            end,
+        )
+        context = MagicMock()
+        context.__enter__.return_value = session
+        context.__exit__.return_value = False
+        return context
+
+    @patch("api.scoreboards._get_historical_scoreboard")
+    @patch("api.scoreboards._build_map_scoreboard")
+    @patch("api.scoreboards.enter_session")
+    def test_completed_match_uses_shared_cache(self, enter_session, build, cached):
+        from api.scoreboards import _get_map_scoreboard_data
+
+        enter_session.return_value = self._session_with_end(timezone.now())
+        cached.return_value = {"id": 7}
+
+        self.assertEqual(_get_map_scoreboard_data(7), {"id": 7})
+        cached.assert_called_once_with(7)
+        build.assert_not_called()
+
+    @patch("api.scoreboards._get_historical_scoreboard")
+    @patch("api.scoreboards._build_map_scoreboard")
+    @patch("api.scoreboards.enter_session")
+    def test_running_match_bypasses_long_lived_cache(
+        self, enter_session, build, cached
+    ):
+        from api.scoreboards import _get_map_scoreboard_data
+
+        enter_session.return_value = self._session_with_end(None)
+        build.return_value = {"id": 8}
+
+        self.assertEqual(_get_map_scoreboard_data(8), {"id": 8})
+        build.assert_called_once_with(8)
+        cached.assert_not_called()

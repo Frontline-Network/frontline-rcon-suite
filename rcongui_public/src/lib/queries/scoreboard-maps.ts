@@ -50,6 +50,9 @@ export const gameQueries = {
         }
       },
       enabled: enabled ?? true,
+      // Completed matches are immutable. Avoid reloading and recomputing the
+      // full encounter graph whenever a component mounts or the tab refocuses.
+      staleTime: Infinity,
     }),
 }
 

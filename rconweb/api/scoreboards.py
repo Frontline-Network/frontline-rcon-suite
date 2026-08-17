@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import ratelimit
 
+from rcon.cache_utils import ttl_cache
 from rcon.maps import parse_layer
 from rcon.api_commands import get_rcon_api
 from rcon.models import Maps, enter_session
@@ -18,6 +19,87 @@ from .ratelimits import request_rate_limit_key
 from .views import _get_data
 
 logger = logging.getLogger("rconweb")
+
+HISTORICAL_SCOREBOARD_CACHE_SECONDS = max(
+    60, int(os.getenv("HLL_HISTORICAL_SCOREBOARD_CACHE_SECONDS", str(6 * 60 * 60)))
+)
+
+
+def _build_map_scoreboard(map_id: int):
+    with enter_session() as sess:
+        stored_game = sess.query(Maps).filter(Maps.id == map_id).one_or_none()
+        if not stored_game:
+            return None
+        game = stored_game.to_dict(with_stats=True)
+
+    game["map"] = parse_layer(game["map_name"])
+    logs = get_rcon_api().get_historical_logs(
+        action="KILL",
+        from_=game["start"],
+        till=game["end"],
+        limit=100000,
+        time_sort="asc",
+        exact_action=True,
+        server_filter=str(game["server_number"]),
+    )
+    encounters = {stats["player_id"]: [] for stats in game["player_stats"]}
+
+    for log in logs:
+        ts = int(
+            (
+                log["event_time"].replace(tzinfo=UTC)
+                - game["start"].replace(tzinfo=UTC)
+            ).total_seconds()
+        )
+        killer_id = log["player1_id"]
+        victim_id = log["player2_id"]
+        if killer_id in encounters:
+            encounters[killer_id].append(
+                {
+                    "action": "KILL",
+                    "player_id": victim_id,
+                    "player_name": log["player2_name"],
+                    "ts": ts,
+                    "weapon": log["weapon"],
+                }
+            )
+        if victim_id in encounters:
+            encounters[victim_id].append(
+                {
+                    "action": "DEATH",
+                    "player_id": killer_id,
+                    "player_name": log["player1_name"],
+                    "ts": ts,
+                    "weapon": log["weapon"],
+                }
+            )
+
+    for stats in game["player_stats"]:
+        stats["encounters"] = encounters[stats["player_id"]]
+    return game
+
+
+@ttl_cache(
+    ttl=HISTORICAL_SCOREBOARD_CACHE_SECONDS,
+    is_method=False,
+    cache_falsy=False,
+)
+def _get_historical_scoreboard(map_id: int):
+    """Build immutable match details once and share them across API workers."""
+
+    return _build_map_scoreboard(map_id)
+
+
+def _get_map_scoreboard_data(map_id: int):
+    # A current map can already have a map_history row, but its player stats
+    # still change. Only completed maps are safe for the long-lived cache.
+    with enter_session() as sess:
+        stored = sess.query(Maps.end).filter(Maps.id == map_id).one_or_none()
+    if stored is None:
+        return None
+    if stored[0] is None:
+        return _build_map_scoreboard(map_id)
+    return _get_historical_scoreboard(map_id)
 
 
 @csrf_exempt
@@ -107,57 +189,10 @@ def get_map_scoreboard(request):
 
     try:
         map_id = int(data.get("map_id", None))
-        with enter_session() as sess:
-            game = sess.query(Maps).filter(Maps.id == map_id).one_or_none()
-            if not game:
-                error = "No map for this ID"
-                failed = True
-            else:
-                game = game.to_dict(with_stats=True)
-                game["map"] = parse_layer(game["map_name"])
-
-                logs = get_rcon_api().get_historical_logs(
-                    action="KILL",
-                    from_=game["start"],
-                    till=game["end"],
-                    limit=100000,
-                    time_sort="asc",
-                    exact_action=True,
-                    server_filter=str(game["server_number"]),
-                )
-                encounters = {
-                    stats["player_id"]: [] for stats in game["player_stats"]
-                }
-
-                for log in logs:
-                    ts = int(
-                        (log["event_time"].replace(tzinfo=UTC) - game["start"].replace(tzinfo=UTC)).total_seconds()
-                    )
-                    killer_id = log["player1_id"]
-                    victim_id = log["player2_id"]
-                    if killer_id in encounters:
-                        encounters[killer_id].append(
-                            {
-                                "action": "KILL",
-                                "player_id": victim_id,
-                                "player_name": log["player2_name"],
-                                "ts": ts,
-                                "weapon": log["weapon"],
-                            }
-                        )
-                    if victim_id in encounters:
-                        encounters[victim_id].append(
-                            {
-                                "action": "DEATH",
-                                "player_id": killer_id,
-                                "player_name": log["player1_name"],
-                                "ts": ts,
-                                "weapon": log["weapon"],
-                            }
-                        )
-
-                for stats in game["player_stats"]:
-                    stats["encounters"] = encounters[stats["player_id"]]
+        game = _get_map_scoreboard_data(map_id)
+        if not game:
+            error = "No map for this ID"
+            failed = True
     except Exception as e:
         game = None
         error = repr(e)

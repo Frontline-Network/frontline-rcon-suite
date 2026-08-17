@@ -37,10 +37,12 @@ logger = logging.getLogger(__name__)
 PLAYER_ID = "player_id"
 NAME_KEY_PREFIX = "name:"
 
+
 class PlayerSessions(TypedDict):
     start: list[datetime.datetime]
     end: list[datetime.datetime]
     total: int
+
 
 def update_player_name_map(
     id_to_name: dict[str, str],
@@ -71,9 +73,11 @@ class Streaks:
     teamkills: int = 0
     deaths_by_tk: int = 0
 
+
 StatsUpdateHandler: TypeAlias = Callable[
     [PlayerStatsType, GetPlayersType, StructuredLogLineWithMetaData], None
 ]
+
 
 class BaseStats:
     _stat_handlers: dict[str, StatsUpdateHandler] = {}
@@ -83,7 +87,9 @@ class BaseStats:
         self.voted_yes_regex = re.compile(".*PV_Favour.*")
         self.voted_no_regex = re.compile(".*PV_Against.*")
         self.voted_ignore_regex = re.compile(".*PV_Ignored.*")
-        self.team_switch_regex = re.compile(r"\((Axis|Allies|None) > (Axis|Allies|None)\)")
+        self.team_switch_regex = re.compile(
+            r"\((Axis|Allies|None) > (Axis|Allies|None)\)"
+        )
         self.red = get_redis_client()
         self._stat_handlers = {
             AllLogTypes.kill: self._add_kill_handler,
@@ -126,8 +132,13 @@ class BaseStats:
             player_stats.update(
                 player=player["name"],
                 player_id=player["player_id"],
-                platform=player.get("platform") or (soldier.platform if soldier else None),
-                steaminfo=profile.steaminfo.to_dict() if profile and profile.steaminfo else None,
+                platform=player.get("platform")
+                or (soldier.platform if soldier else None),
+                steaminfo=(
+                    profile.steaminfo.to_dict()
+                    if profile and profile.steaminfo
+                    else None
+                ),
                 last_spawn=self._get_player_first_appearance(player),
                 time_seconds=int(self._get_player_session_time(player)),
             )
@@ -160,9 +171,13 @@ class BaseStats:
 
     def _calc_computed_stats(self, stats: PlayerStatsType) -> None:
         stats.update(
-            kills_per_minute=round(stats["kills"] / max(stats["time_seconds"] / 60, 1), 2),
-            deaths_per_minute=round(stats["deaths"] / max(stats["time_seconds"] / 60, 1), 2),
-            kill_death_ratio=round(stats["kills"] / max(stats["deaths"], 1), 2)
+            kills_per_minute=round(
+                stats["kills"] / max(stats["time_seconds"] / 60, 1), 2
+            ),
+            deaths_per_minute=round(
+                stats["deaths"] / max(stats["time_seconds"] / 60, 1), 2
+            ),
+            kill_death_ratio=round(stats["kills"] / max(stats["deaths"], 1), 2),
         )
 
     def _calc_streaks(
@@ -171,7 +186,7 @@ class BaseStats:
         player: GetPlayersType,
         log: StructuredLogLineWithMetaData,
         streaks: Streaks,
-        ) -> None:
+    ) -> None:
         action = log["action"]
 
         log_time = datetime.datetime.fromtimestamp(log["timestamp_ms"] / 1000)
@@ -206,7 +221,12 @@ class BaseStats:
         )
 
     # LOG HANDLERS
-    def _add_kill_handler(self, stats: PlayerStatsType, player: GetPlayersType, log: StructuredLogLineWithMetaData):
+    def _add_kill_handler(
+        self,
+        stats: PlayerStatsType,
+        player: GetPlayersType,
+        log: StructuredLogLineWithMetaData,
+    ):
         self._add_kd("kills", "deaths", stats, player, log)
         if self._is_player_kill(player, log):
             stats["weapons"][log["weapon"]] = stats["weapons"].get(log["weapon"], 0) + 1
@@ -221,10 +241,20 @@ class BaseStats:
                 stats["death_by"].get(log["player_id_1"], 0) + 1
             )
 
-    def _add_tk_handler(self, stats: PlayerStatsType, player: GetPlayersType, log: StructuredLogLineWithMetaData):
+    def _add_tk_handler(
+        self,
+        stats: PlayerStatsType,
+        player: GetPlayersType,
+        log: StructuredLogLineWithMetaData,
+    ):
         self._add_kd("teamkills", "deaths_by_tk", stats, player, log)
 
-    def _add_vote_handler(self, stats: PlayerStatsType, player: GetPlayersType, log: StructuredLogLineWithMetaData):
+    def _add_vote_handler(
+        self,
+        stats: PlayerStatsType,
+        player: GetPlayersType,
+        log: StructuredLogLineWithMetaData,
+    ):
         if self.voted_no_regex.match(log["raw"]):
             stats["nb_voted_no"] += 1
         elif self.voted_yes_regex.match(log["raw"]):
@@ -238,22 +268,38 @@ class BaseStats:
                 log["raw"],
             )
 
-    def _add_vote_started_handler(self, stats: PlayerStatsType, player: GetPlayersType, log: StructuredLogLineWithMetaData):
+    def _add_vote_started_handler(
+        self,
+        stats: PlayerStatsType,
+        player: GetPlayersType,
+        log: StructuredLogLineWithMetaData,
+    ):
         stats["nb_vote_started"] += 1
 
     # HELPERS
-    def _is_player_death(self, player: GetPlayersType, log: StructuredLogLineWithMetaData):
+    def _is_player_death(
+        self, player: GetPlayersType, log: StructuredLogLineWithMetaData
+    ):
         return is_same_log_player(player, log, 2)
 
-    def _is_player_kill(self, player: GetPlayersType, log: StructuredLogLineWithMetaData):
+    def _is_player_kill(
+        self, player: GetPlayersType, log: StructuredLogLineWithMetaData
+    ):
         return is_same_log_player(player, log, 1)
 
-    def _process_death_time(self, log_time: datetime.datetime, stats: PlayerStatsType, save_spawn=True):
+    def _process_death_time(
+        self, log_time: datetime.datetime, stats: PlayerStatsType, save_spawn=True
+    ):
         if not stats.get("last_spawn"):
             stats["last_spawn"] = log_time
             return
 
-        time_since_last_spawn = int((log_time.replace(tzinfo=datetime.UTC) - stats["last_spawn"].replace(tzinfo=datetime.UTC)).total_seconds())
+        time_since_last_spawn = int(
+            (
+                log_time.replace(tzinfo=datetime.UTC)
+                - stats["last_spawn"].replace(tzinfo=datetime.UTC)
+            ).total_seconds()
+        )
         stats["longest_life_secs"] = max(
             time_since_last_spawn,
             stats["longest_life_secs"],
@@ -265,7 +311,14 @@ class BaseStats:
         if save_spawn:
             stats["last_spawn"] = log_time
 
-    def _add_kd(self, attacker_key, victim_key, stats, player, log: StructuredLogLineWithMetaData):
+    def _add_kd(
+        self,
+        attacker_key,
+        victim_key,
+        stats,
+        player,
+        log: StructuredLogLineWithMetaData,
+    ):
         if self._is_player_kill(player, log):
             stats[attacker_key] += 1
         elif self._is_player_death(player, log):
@@ -281,7 +334,9 @@ class BaseStats:
     def _get_player_session_time(self, player: GetPlayersType) -> int:
         raise NotImplementedError("_get_player_session_time")
 
-    def _get_player_first_appearance(self, player: GetPlayersType) -> datetime.datetime | None:
+    def _get_player_first_appearance(
+        self, player: GetPlayersType
+    ) -> datetime.datetime | None:
         raise NotImplementedError("_get_player_first_appearance")
 
 
@@ -295,7 +350,9 @@ class LiveStats(BaseStats):
 
         return player_time_sec
 
-    def _get_player_first_appearance(self, player: GetPlayersType) -> datetime.datetime | None:
+    def _get_player_first_appearance(
+        self, player: GetPlayersType
+    ) -> datetime.datetime | None:
         if not player or not player.get("profile"):
             logger.warning("Can't use player profile")
             return None
@@ -312,27 +369,37 @@ class LiveStats(BaseStats):
 
         return session_start.replace(tzinfo=datetime.UTC)
 
-    def _is_log_from_current_session(self, now, player, log: StructuredLogLineWithMetaData):
+    def _is_log_from_current_session(
+        self, now, player, log: StructuredLogLineWithMetaData
+    ):
         return (
             log["timestamp_ms"]
             >= (now.timestamp() - self._get_player_session_time(player)) * 1000
         )
 
     def _get_indexed_logs_by_player_for_session(
-        self, now, indexed_players_by_id, indexed_players_by_name, logs: list[StructuredLogLineWithMetaData]
+        self,
+        now,
+        indexed_players_by_id,
+        indexed_players_by_name,
+        logs: list[StructuredLogLineWithMetaData],
     ) -> tuple[dict[str, list[StructuredLogLineWithMetaData]], dict[str, str]]:
         logs_indexed: dict[str, list[StructuredLogLineWithMetaData]] = {}
         id_to_name: dict[str, str] = {}
         for l in logs:
-            update_player_name_map(id_to_name, l.get("player_id_1"), l.get("player_name_1"))
-            update_player_name_map(id_to_name, l.get("player_id_2"), l.get("player_name_2"))
+            update_player_name_map(
+                id_to_name, l.get("player_id_1"), l.get("player_name_1")
+            )
+            update_player_name_map(
+                id_to_name, l.get("player_id_2"), l.get("player_name_2")
+            )
 
-            player = indexed_players_by_id.get(l.get("player_id_1")) or indexed_players_by_name.get(
-                l.get("player_name_1")
-            )
-            player2 = indexed_players_by_id.get(l.get("player_id_2")) or indexed_players_by_name.get(
-                l.get("player_name_2")
-            )
+            player = indexed_players_by_id.get(
+                l.get("player_id_1")
+            ) or indexed_players_by_name.get(l.get("player_name_1"))
+            player2 = indexed_players_by_id.get(
+                l.get("player_id_2")
+            ) or indexed_players_by_name.get(l.get("player_name_2"))
 
             try:
                 # Only consider stats for a player from his last connection (so a disconnect reconnect should reset stats) otherwise multiple sessions could be blended into one, even if they are far apart
@@ -350,7 +417,7 @@ class LiveStats(BaseStats):
         return logs_indexed, id_to_name
 
     def get_current_players_stats(self, log_history: LogsHistorySnapshot | None = None):
-        players: list[GetPlayersType]  = self.rcon.get_players()
+        players: list[GetPlayersType] = self.rcon.get_players()
         if not players:
             logger.debug("No players")
             return {}
@@ -388,9 +455,7 @@ class LiveStats(BaseStats):
 
             logger.info("%s log lines to process", len(logs["logs"]))
 
-            id_to_player = {
-                p[PLAYER_ID]: p for p in players if p.get(PLAYER_ID)
-            }
+            id_to_player = {p[PLAYER_ID]: p for p in players if p.get(PLAYER_ID)}
             name_to_player = {p["name"]: p for p in players}
             indexed_logs, id_to_name = self._get_indexed_logs_by_player_for_session(
                 now, id_to_player, name_to_player, list(reversed(logs["logs"]))
@@ -399,9 +464,7 @@ class LiveStats(BaseStats):
             for p in players:
                 update_player_name_map(id_to_name, p.get(PLAYER_ID), p.get("name"))
 
-            stats = self.get_stats_by_player(
-                indexed_logs, players, id_to_PlayerID
-            )
+            stats = self.get_stats_by_player(indexed_logs, players, id_to_PlayerID)
 
             # Enrich the log-derived stats with the richer per-unit stats stored on the current map.
             # This mirrors the behavior of `current_game_stats()`.
@@ -411,9 +474,7 @@ class LiveStats(BaseStats):
                 logger.error("No maps information available")
                 return stats
 
-            _apply_current_map_player_stats(
-                stats=stats, current_map=current_map
-            )
+            _apply_current_map_player_stats(stats=stats, current_map=current_map)
             return stats
 
     def set_live_stats(self, log_history: LogsHistorySnapshot | None = None):
@@ -441,7 +502,12 @@ class TimeWindowStats(BaseStats):
         )
 
     def _set_start_end_times(
-        self, player: str, players_times: dict[str, PlayerSessions], log: StructuredLogLineWithMetaData, from_: datetime.datetime, offset_warmup_time_seconds=180
+        self,
+        player: str,
+        players_times: dict[str, PlayerSessions],
+        log: StructuredLogLineWithMetaData,
+        from_: datetime.datetime,
+        offset_warmup_time_seconds=180,
     ):
         if not player:
             return
@@ -465,23 +531,31 @@ class TimeWindowStats(BaseStats):
             event_time = event_time.astimezone(datetime.UTC)
         # A CONNECT means the begining of a session for the player
         if log["action"] == AllLogTypes.connected:
-            return players_times.setdefault(player, PlayerSessions(start=[], end=[], total=0))["start"].append(event_time)
+            return players_times.setdefault(
+                player, PlayerSessions(start=[], end=[], total=0)
+            )["start"].append(event_time)
         # if the player is not already in the times record we add the start of the stats window as his session start time
         # we didn't see a CONNECTED before, so it means that the player was here before the current window.
         # For those we add the game warmup time to have a more accurate kill / min
         if player not in players_times and log["action"] != AllLogTypes.disconnected:
-            return players_times.setdefault(player, PlayerSessions(start=[], end=[], total=0))["start"].append(
+            return players_times.setdefault(
+                player, PlayerSessions(start=[], end=[], total=0)
+            )["start"].append(
                 from_ + datetime.timedelta(seconds=offset_warmup_time_seconds)
             )
         # if the player was already in the time record and we see a disconnect we log it as the end of his session
         if player in players_times and log["action"] == AllLogTypes.disconnected:
-            return players_times.setdefault(player, PlayerSessions(start=[], end=[], total=0))["end"].append(event_time)
+            return players_times.setdefault(
+                player, PlayerSessions(start=[], end=[], total=0)
+            )["end"].append(event_time)
         # if we had a player that disconnected but was not in the time record it means he did have any kill / death or other actions like chat, vote
         # This player won't have a session time (most likely and AFK one)
         # NOTE: if there is no session it is throwing errors so if the player's single log
         # for the match is DISCONNECT let's record it as 0 second session time
         if player not in players_times and log["action"] == AllLogTypes.disconnected:
-            return players_times.setdefault(player, PlayerSessions(start=[event_time], end=[event_time], total=0))
+            return players_times.setdefault(
+                player, PlayerSessions(start=[event_time], end=[event_time], total=0)
+            )
 
     def _get_player_session_time(self, player: GetPlayersType) -> int:
         player_key = player["player_id"]
@@ -492,7 +566,9 @@ class TimeWindowStats(BaseStats):
             return 0
         return self.times[player_key].get("total", 0)
 
-    def _get_player_first_appearance(self, player: GetPlayersType) -> datetime.datetime | None:
+    def _get_player_first_appearance(
+        self, player: GetPlayersType
+    ) -> datetime.datetime | None:
         player_key = player["player_id"]
         if not player_key or not self.times:
             return None
@@ -508,7 +584,7 @@ class TimeWindowStats(BaseStats):
         until: datetime.datetime,
         offset_warmup_time_seconds=120,
         offset_cooldown_time_seconds=100,
-        cached_players: dict[str, PlayerStat] = {}
+        cached_players: dict[str, PlayerStat] = {},
     ):
         indexed_logs: dict[str, list[StructuredLogLineWithMetaData]] = {}
         unique_players = set[tuple[str, str]]()
@@ -528,7 +604,10 @@ class TimeWindowStats(BaseStats):
                 elif player_name:
                     # This log does not contain player_id but does contain player_name detail
                     # Let's try to backtrack the player_id from previous logs or cached player stats(redis)
-                    logger.debug("This log contains player_name without player_id detail\n%s", log)
+                    logger.debug(
+                        "This log contains player_name without player_id detail\n%s",
+                        log,
+                    )
                     player_key = name_to_id.get(player_name)
                 else:
                     # Not a player related log
@@ -542,7 +621,12 @@ class TimeWindowStats(BaseStats):
                     unique_players.add((player_name, player_key))
                     prev_key = name_to_id.setdefault(player_name, player_key)
                     if prev_key != player_key:
-                        logger.warning("A log with the same player_name belonging to 1 or more players\nName: %s, ID: %s\n, Log: %s", player_name, prev_key, log)
+                        logger.warning(
+                            "A log with the same player_name belonging to 1 or more players\nName: %s, ID: %s\n, Log: %s",
+                            player_name,
+                            prev_key,
+                            log,
+                        )
 
                 self._set_start_end_times(player_key, players_times, log, from_)
                 indexed_logs.setdefault(player_key, []).append(log)
@@ -624,7 +708,10 @@ class TimeWindowStats(BaseStats):
             )
 
             return self._get_players_stats_from_logs(
-                [row.compatible_dict() for row in rows], from_, until, cached_players=cached_players
+                [row.compatible_dict() for row in rows],
+                from_,
+                until,
+                cached_players=cached_players,
             )
 
     def map_result(self, from_, until, server_number=None) -> dict[str, int]:
@@ -662,8 +749,23 @@ class TimeWindowStats(BaseStats):
             datetime.datetime.fromtimestamp(from_timestamp, datetime.UTC),
             datetime.datetime.now(datetime.UTC),
             offset_cooldown_time_seconds=0,
-            cached_players=cached_players
+            cached_players=cached_players,
         )
+
+
+def _next_live_stats_sleep(
+    *,
+    now: datetime.datetime,
+    last_session_refresh: datetime.datetime,
+    last_game_refresh: datetime.datetime,
+    session_interval: float,
+    game_interval: float,
+) -> float:
+    session_remaining = session_interval - (
+        now - last_session_refresh
+    ).total_seconds()
+    game_remaining = game_interval - (now - last_game_refresh).total_seconds()
+    return max(0.1, min(session_remaining, game_remaining))
 
 
 def live_stats_loop():
@@ -716,7 +818,21 @@ def live_stats_loop():
             except Exception:
                 logger.exception("Failed to compute live game stats")
 
-        time.sleep(0.1)
+        # Both refresh jobs normally run only every 15 seconds.  Polling ten
+        # times per second between runs needlessly wakes every CRCON instance
+        # and becomes noticeable on hosts with many gameservers.  Sleep until
+        # the first job is actually due, while retaining a small lower bound
+        # for zero/invalid legacy intervals.
+        now = datetime.datetime.now()
+        time.sleep(
+            _next_live_stats_sleep(
+                now=now,
+                last_session_refresh=last_loop_session,
+                last_game_refresh=last_loop_game,
+                session_interval=live_session_sleep_seconds,
+                game_interval=live_game_sleep_seconds,
+            )
+        )
 
 
 def current_game_stats(log_history: LogsHistorySnapshot | None = None):
@@ -733,9 +849,7 @@ def current_game_stats(log_history: LogsHistorySnapshot | None = None):
         current_map["player_stats"],
         log_history=log_history,
     )
-    _apply_current_map_player_stats(
-        stats=stats, current_map=current_map
-    )
+    _apply_current_map_player_stats(stats=stats, current_map=current_map)
     return stats
 
 
@@ -783,17 +897,20 @@ def _apply_current_map_player_stats(
         stat["support"] = map_stat.get("support", 0) + map_stat.get("p_support", 0)
 
         # Vehicles
-        stat["vehicle_kills"] = (
-            map_stat.get("vehicle_kills", 0) + map_stat.get("p_vehicle_kills", 0)
+        stat["vehicle_kills"] = map_stat.get("vehicle_kills", 0) + map_stat.get(
+            "p_vehicle_kills", 0
         )
-        stat["vehicles_destroyed"] = (
-            map_stat.get("vehicles_destroyed", 0)
-            + map_stat.get("p_vehicles_destroyed", 0)
-        )
+        stat["vehicles_destroyed"] = map_stat.get(
+            "vehicles_destroyed", 0
+        ) + map_stat.get("p_vehicles_destroyed", 0)
 
         # Misc
-        stat["kills_and_assists"] = map_stat.get("kills_and_assists", 0) + map_stat.get("p_kills_and_assists", 0)
-        stat["deaths_and_redeploys"] = map_stat.get("deaths_and_redeploys", 0) + map_stat.get("p_deaths_and_redeploys", 0)
+        stat["kills_and_assists"] = map_stat.get("kills_and_assists", 0) + map_stat.get(
+            "p_kills_and_assists", 0
+        )
+        stat["deaths_and_redeploys"] = map_stat.get(
+            "deaths_and_redeploys", 0
+        ) + map_stat.get("p_deaths_and_redeploys", 0)
         stat["level"] = map_stat.get("level", 0)
         stat["team"] = team_name
         stat["faction"] = faction_name

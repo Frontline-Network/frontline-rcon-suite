@@ -93,10 +93,17 @@ try:
 except (ValueError, TypeError):
     HLL_WH_LOOP_SLEEP_TIME = 0.006
 
+try:
+    HLL_WH_IDLE_SLEEP_TIME = float(os.getenv("HLL_WH_IDLE_SLEEP_TIME"))
+except (ValueError, TypeError):
+    HLL_WH_IDLE_SLEEP_TIME = 0.1
+
 # Queue contents still get checked every service loop. Redis key discovery is
 # intentionally slower because newly created webhook queues can tolerate this
 # small delay and SCAN is otherwise executed hundreds of times per second.
 QUEUE_KEY_REFRESH_INTERVAL_SECS = 1.0
+QUEUE_REGISTRY_SUFFIX = "queue_registry"
+QUEUE_REGISTRY_SENTINEL = "__initialized__"
 
 # Global datastructures to support associating hooks with locks
 _RATE_LIMIT_BUCKETS: defaultdict[str, asyncio.Lock | None] = defaultdict(lambda: None)
@@ -165,6 +172,7 @@ def handle_webhook_not_found(
         )
     else:
         red.delete(queue_id)
+        red.srem(get_queue_registry_key(), queue_id)
 
     set_webhook_error(
         red=red,
@@ -557,6 +565,7 @@ def enqueue_transient_message(
     # update is used
     key = f"{prefix}:{get_server_number()}:{transient_identifier}:{message.webhook_type}:{message.message_type}:{message.payload['webhook_id']}:{message_group_key}"
     red.set(key, orjson.dumps(message.model_dump_json()), ex=ttl)
+    red.sadd(get_queue_registry_key(prefix=prefix), QUEUE_REGISTRY_SENTINEL, key)
 
 
 def enqueue_message(
@@ -582,6 +591,7 @@ def enqueue_message(
     # of elements long
     queue_id = f"{prefix}:{get_server_number()}:{message.webhook_type}:{message.message_type}:{message.payload['webhook_id']}"
     red.rpush(queue_id, orjson.dumps(message.model_dump_json()))
+    red.sadd(get_queue_registry_key(prefix=prefix), QUEUE_REGISTRY_SENTINEL, queue_id)
 
 
 def construct_webhook(
@@ -824,33 +834,72 @@ async def dequeue_message(
             logger.exception(e)
 
 
+def get_queue_registry_key(prefix: str = PREFIX) -> str:
+    return f"{prefix}:{get_server_number()}:{QUEUE_REGISTRY_SUFFIX}"
+
+
+def _decode_queue_ids(values) -> set[str]:
+    return {
+        value.decode() if isinstance(value, bytes) else str(value) for value in values
+    }
+
+
+def _registered_queue_keys(red: redis.StrictRedis, prefix: str = PREFIX) -> set[str]:
+    """Return registered queues, importing pre-registry keys once on upgrade."""
+
+    registry_key = get_queue_registry_key(prefix=prefix)
+    registry_members = _decode_queue_ids(red.smembers(registry_key))
+    if QUEUE_REGISTRY_SENTINEL in registry_members:
+        return registry_members - {QUEUE_REGISTRY_SENTINEL}
+    if registry_members:
+        # A producer from this release may have registered a queue before the
+        # consumer performed its one-time legacy import. Preserve it while
+        # marking the registry as initialized.
+        red.sadd(registry_key, QUEUE_REGISTRY_SENTINEL)
+        return registry_members
+
+    # Existing installations can already contain queued messages when this
+    # version starts.  Discover those keys once, then all producers maintain
+    # the small registry directly and the hot path never needs another SCAN.
+    legacy_lists = _decode_queue_ids(red.scan_iter(match=f"{prefix}*", _type="list"))
+    legacy_transient = {
+        queue_id
+        for queue_id in _decode_queue_ids(
+            red.scan_iter(match=f"{prefix}*", _type="string")
+        )
+        if TRANSIENT_IDENTIFIER in queue_id
+    }
+    registered = legacy_lists | legacy_transient
+    red.sadd(registry_key, QUEUE_REGISTRY_SENTINEL, *registered)
+    return registered
+
+
 def get_all_queue_keys(
     red: redis.StrictRedis | None = None, prefix: str = PREFIX
 ) -> list[str]:
-    """Retrieve every queue key in redis that matches the service prefix"""
+    """Retrieve registered persistent webhook queue keys."""
     logger.debug("Getting all queue IDs from %s", PREFIX)
     if red is None:
         red = get_redis_client(decode_responses=False, global_pool=True)
 
-    queue_ids: list[str] = [
-        queue_id.decode()
-        for queue_id in red.scan_iter(match=f"{prefix}*", _type="list")
-    ]
-    return queue_ids
+    return sorted(
+        queue_id
+        for queue_id in _registered_queue_keys(red=red, prefix=prefix)
+        if TRANSIENT_IDENTIFIER not in queue_id
+    )
 
 
 def get_all_transient_message_keys(
     red: redis.StrictRedis | None = None, prefix: str = PREFIX
 ) -> list[str]:
-    """Retrieve each transient message key which acts as a queue_id"""
-    # Transient messages are stored as individual key/value pairs instead of a list
-    transient_message_keys: list[str] = [
-        queue_id.decode()
-        for queue_id in red.scan_iter(match=f"{prefix}*", _type="string")
-        if TRANSIENT_IDENTIFIER_BYTES in queue_id
-    ]
-
-    return transient_message_keys
+    """Retrieve each registered transient key which acts as a queue ID."""
+    if red is None:
+        red = get_redis_client(decode_responses=False, global_pool=True)
+    return sorted(
+        queue_id
+        for queue_id in _registered_queue_keys(red=red, prefix=prefix)
+        if TRANSIENT_IDENTIFIER in queue_id
+    )
 
 
 def get_all_queue_keys_and_lengths(
@@ -886,9 +935,20 @@ class WebhookQueueKeyCache:
     def get_not_empty(self, now: float | None = None) -> list[str]:
         now = time.monotonic() if now is None else now
         if now >= self.next_refresh_at:
-            self.queue_ids = tuple(get_all_queue_keys(red=self.red, prefix=self.prefix))
+            registered = _registered_queue_keys(red=self.red, prefix=self.prefix)
+            self.queue_ids = tuple(
+                sorted(
+                    queue_id
+                    for queue_id in registered
+                    if TRANSIENT_IDENTIFIER not in queue_id
+                )
+            )
             self.transient_message_keys = tuple(
-                get_all_transient_message_keys(red=self.red, prefix=self.prefix)
+                sorted(
+                    queue_id
+                    for queue_id in registered
+                    if TRANSIENT_IDENTIFIER in queue_id
+                )
             )
             self.next_refresh_at = now + self.refresh_interval_secs
 
@@ -900,6 +960,15 @@ class WebhookQueueKeyCache:
             for queue_id in self.transient_message_keys
             if self.red.exists(queue_id)
         ]
+        expired_transient_messages = set(self.transient_message_keys).difference(
+            populated_transient_messages
+        )
+        if expired_transient_messages:
+            self.red.srem(
+                get_queue_registry_key(prefix=self.prefix),
+                *expired_transient_messages,
+            )
+            self.transient_message_keys = tuple(populated_transient_messages)
         return populated_queues + populated_transient_messages
 
 
@@ -1258,7 +1327,9 @@ async def main():
         # runs far more often; we've limited the CPU usage by default to 1 core in
         # the webhook service definition in `docker-compose-common-components.yaml`
         # https://docs.python.org/3/library/asyncio-task.html#sleeping
-        await asyncio.sleep(HLL_WH_LOOP_SLEEP_TIME)
+        await asyncio.sleep(
+            HLL_WH_LOOP_SLEEP_TIME if queue_id else HLL_WH_IDLE_SLEEP_TIME
+        )
 
 
 if __name__ == "__main__":
