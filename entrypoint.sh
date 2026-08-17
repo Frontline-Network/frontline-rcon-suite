@@ -97,16 +97,31 @@ then
     echo "from django.contrib.auth.models import User; User.objects.create_superuser('admin', 'admin@example.com', 'admin') if not User.objects.filter(username='admin').first() else None" | python manage.py shell
   fi
   export LOGGING_FILENAME=api_$SERVER_NUMBER.log
-  daphne -b 0.0.0.0 -p 8001 rconweb.asgi:application &
-  # Successfully running gunicorn will create the pid file which is how Docker determines the container is healthy
-  GUNICORN_PRELOAD_ARGS=()
-  GUNICORN_PRELOAD_MODE="${HLL_GUNICORN_PRELOAD:-auto}"
-  if [[ "$GUNICORN_PRELOAD_MODE" =~ ^(1|true|yes)$ ]] || \
-     [[ "$GUNICORN_PRELOAD_MODE" == "auto" && "$NB_API_WORKERS" =~ ^[0-9]+$ && "$NB_API_WORKERS" -gt 1 ]]
+  API_SERVER_MODE="${HLL_API_SERVER_MODE:-auto}"
+  if [[ "$API_SERVER_MODE" == "unified" ]] || \
+     [[ "$API_SERVER_MODE" == "auto" && "$NB_API_WORKERS" == "1" ]]
   then
-    GUNICORN_PRELOAD_ARGS=(--preload)
+    # Daphne serves the same ASGI application over both ports expected by the
+    # existing Nginx config. With one API worker this avoids loading Django in
+    # separate Gunicorn and Daphne processes while preserving WebSockets.
+    touch gunicorn.pid
+    daphne \
+      -e tcp:port=8000:interface=0.0.0.0 \
+      -e tcp:port=8001:interface=0.0.0.0 \
+      -t 120 \
+      rconweb.asgi:application
+  else
+    daphne -b 0.0.0.0 -p 8001 rconweb.asgi:application &
+    # Successfully running gunicorn will create the pid file which is how Docker determines the container is healthy
+    GUNICORN_PRELOAD_ARGS=()
+    GUNICORN_PRELOAD_MODE="${HLL_GUNICORN_PRELOAD:-auto}"
+    if [[ "$GUNICORN_PRELOAD_MODE" =~ ^(1|true|yes)$ ]] || \
+       [[ "$GUNICORN_PRELOAD_MODE" == "auto" && "$NB_API_WORKERS" =~ ^[0-9]+$ && "$NB_API_WORKERS" -gt 1 ]]
+    then
+      GUNICORN_PRELOAD_ARGS=(--preload)
+    fi
+    gunicorn "${GUNICORN_PRELOAD_ARGS[@]}" --pid gunicorn.pid -w "$NB_API_WORKERS" -k gthread --threads "$NB_API_THREADS" -t 120 -b 0.0.0.0 rconweb.wsgi
   fi
-  gunicorn "${GUNICORN_PRELOAD_ARGS[@]}" --pid gunicorn.pid -w "$NB_API_WORKERS" -k gthread --threads "$NB_API_THREADS" -t 120 -b 0.0.0.0 rconweb.wsgi
   cd ..
   ./manage.py unregister_api
 else
