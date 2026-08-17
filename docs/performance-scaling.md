@@ -100,6 +100,36 @@ All four public endpoints returned HTTP 200 after this second rollout. RCON3
 and RCON4 supplied the HLL Vietnam coverage; RCON1 and RCON2 supplied HLL
 coverage.
 
+The dashboard previously requested and deserialized up to 15,000 complete log
+records even though it renders no more than 100 records per action plus the
+matching `!admin` messages. A dedicated summary endpoint now streams the same
+bounded Redis range, retains only those records, and projects only the seven
+fields used by the browser. Existing live-log endpoints and their permissions
+remain unchanged. On the HLL Vietnam RCON3 canary the serialized dashboard
+response fell from 14.09 MB to 275.7 KB (about 98%); processing time fell from
+118.7 ms to 100.0 ms. On the smaller HLL RCON1 history it fell from 93.7 KB to
+36.6 KB and from 4.6 ms to 1.5 ms. The title manager also no longer forces its
+30-second status and game-state polls while the browser tab is hidden; focus
+refresh still supplies current data when the user returns.
+
+This phase was canaried on RCON3 (HLL Vietnam), then RCON1 (HLL), before RCON2
+and RCON4. All four backends were healthy, their public URLs returned HTTP 200
+in 35-56 ms, and no new traceback, exception, or failed-operation log appeared
+during the rollout window. Frontend containers remained at about 3.5 MiB RAM.
+
+## Host-level load outside the suite
+
+Measurements must keep CRCON cost separate from colocated consumers. On the
+RCON1-4 host, `/opt/stats_discord_bot/.venv/bin/python -m hll_stats_bot`
+consumed about 38% CPU and 2.2-2.7 GiB RSS during the final canary. Its
+`hll-stats-discord-bot/0.1.0` client continuously paged through historical
+scoreboard maps and requested map scoreboards. A second remote client also
+polls game state, detailed players, live scoreboards and recent logs. The
+immutable scoreboard cache and bounded default recent-log response reduce the
+server-side cost of those calls, but the external bot's own CPU and memory are
+not part of the RCON Suite. It requires a separate optimization and rollout
+scope rather than an incompatible API change hidden in this phase.
+
 ## Process consolidation phase
 
 RQ's worker-side scheduler remains responsible for delayed queue jobs such as

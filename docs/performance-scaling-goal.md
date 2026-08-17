@@ -74,10 +74,10 @@ wenn Messung, Kompatibilität und Rückrollbarkeit belegt sind.
 2. Den externen Node-Client hinter `185.164.39.118` separat untersuchen. Er
    fragt zahlreiche API-Endpunkte alle 30 Sekunden ab; dies ist nicht mit dem
    Discord-Worker zu verwechseln.
-3. Dashboard-Logabrufe mit explizitem Bereich 15.000 serverseitig aggregieren,
-   bevor der Bereich verkleinert wird. Die Oberfläche zeigt höchstens 100
-   Einträge je Aktionsgruppe und sollte nicht den vollständigen Payload zum
-   Browser übertragen müssen.
+3. Die neue serverseitige Dashboard-Logaggregation über einen längeren
+   Beobachtungszeitraum messen. Der reale HLLV-Canary reduzierte die Antwort
+   bereits von 14,09 MB auf 275,7 KB; Live-Logs und `!admin`-Darstellung müssen
+   weiterhin funktional identisch bleiben.
 4. PostgreSQL-Index `ix_audit_log_creation_time` erst im Wartungsfenster
    aufbauen und Retention zunächst ausschließlich als Dry-Run auswerten.
 5. Langzeitmessung des Gunicorn-Recyclings durchführen: RSS vor/nach Recycling,
