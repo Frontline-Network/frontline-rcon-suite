@@ -184,14 +184,17 @@ docker compose --profile combined-workers \
 Do not run this profile concurrently with the split workers. Event and broker
 idempotency are still retained as a last-resort retry safeguard.
 
-The optional `config/supervisord_combined.conf` additionally groups six
+The optional `config/supervisord_combined.conf` additionally groups eight
 compatible, I/O-bound per-gameserver loops in one Python runtime: expiring VIPs,
 live statistics, autobalancer, blacklist commands, log persistence and routine
-jobs. Each loop runs in its own monitored thread and is restarted independently
-after an exception. The RCON controller already maintains one connection per
-thread. Log ingestion, Automod, scoreboard, RQ, broadcasts and auto settings
-remain separate until their latency and failure-isolation requirements have
-been measured independently.
+jobs, plus auto settings and automatic broadcasts. Each loop runs in its own
+monitored thread and is restarted independently after an exception. The RCON
+controller already maintains one connection per thread. Auto settings and
+broadcasts use cooperative waits, so the existing individual service controls
+can stop them without terminating the shared process. Log ingestion, Automod,
+scoreboard and RQ remain separate. Automod deliberately retains its own process
+because its stricter command-log level is process-scoped and must not suppress
+diagnostics for unrelated shared services.
 
 The service API expands those threads back into the original Supervisor service
 names. The settings UI therefore retains individual status and start/stop
@@ -214,7 +217,17 @@ RCON remained HTTP 200. No new runtime exceptions were logged.
 RCON2 and RCON4 measured 0.757 GiB and 0.678 GiB respectively shortly after
 their rollout. All four public endpoints returned HTTP 200 in 33-37 ms. The
 mode remains opt-in until the long observation window is complete. Never enable
-it while the six corresponding individual Supervisor programs are also running.
+it while the eight corresponding individual Supervisor programs are also running.
+
+Auto settings and broadcasts were added in a second, separately tested canary.
+RCON3 fell from 715.7 MiB to 496.8 MiB and RCON1 from 1.013 GiB to 801.3 MiB.
+The four supervisors together fell from roughly 3.26 GiB to 2.35 GiB, saving an
+additional 910 MiB. The final RCON2 and RCON4 samples were 563.7 MiB and 492.1
+MiB. Direct stop/start canaries for RCON1 auto settings and RCON3 broadcasts
+changed the shared process from nine to eight threads and back to nine while
+preserving the requested state. All services subsequently reported `RUNNING`,
+all four public URLs returned HTTP 200 in 34-51 ms, and no new supervisor error
+was logged.
 
 ## Configuration
 
@@ -305,6 +318,12 @@ To roll back combined delivery workers, stop `frontline_background_worker` and
 start `mobile_push_worker`, `discord_report_worker` and
 `discord_moderation_worker` with the normal Mobile Admin Compose stack. Never
 leave both modes running together.
+
+To roll back the shared supervisor runtime, restore the regular
+`config/supervisord.conf` (or the previous combined config) and recreate only
+the affected supervisor container. Do not start standalone auto-settings or
+broadcast processes while their same-named shared threads are running; the
+normal and combined configs are mutually exclusive by construction.
 
 Database retention and index replacement require their own migration, backup
 and rollback plans. Process consolidation must be canaried separately from
