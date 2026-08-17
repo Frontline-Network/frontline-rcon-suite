@@ -17,14 +17,21 @@ Including another URLconf
 import os
 
 from django.contrib import admin
+from django.http import HttpResponse
 from django.urls import include, path
 
 from api.browse_logsdir import list_logs
+
+
+def healthz(_request):
+    """Confirm that Django is ready without touching Redis, Postgres, or RCON."""
+    return HttpResponse(status=204)
 
 if not os.getenv("HLL_MAINTENANCE_CONTAINER") and not os.getenv(
     "HLL_WH_SERVICE_CONTAINER"
 ):
     urlpatterns = [
+        path("healthz", healthz, name="healthz"),
         path("admin/", admin.site.urls),
         path("accounts/", include("django.contrib.auth.urls")),
         path("api/", include("api.urls")),

@@ -42,11 +42,24 @@ def test_backend_start_removes_stale_pid_and_unified_mode_records_real_pid():
     assert "echo $$ > gunicorn.pid" in entrypoint
 
 
-def test_backend_healthchecks_validate_the_recorded_process():
+def test_backend_healthchecks_validate_http_and_websocket_readiness():
     for template_name in ("one-server.yaml", "ten-servers.yaml"):
         template = (REPO_ROOT / "docker-templates" / template_name).read_text(
             encoding="utf-8"
         )
 
-        assert "cat /code/rconweb/gunicorn.pid" in template
-        assert 'kill -0 \\"$$pid\\"' in template
+        assert '["CMD", "python", "/code/scripts/backend_healthcheck.py"]' in template
+
+
+def test_backend_health_endpoint_does_not_probe_external_dependencies():
+    urls = (REPO_ROOT / "rconweb" / "rconweb" / "urls.py").read_text(
+        encoding="utf-8"
+    )
+    healthcheck = (REPO_ROOT / "scripts" / "backend_healthcheck.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'path("healthz", healthz, name="healthz")' in urls
+    assert "HttpResponse(status=204)" in urls
+    assert "http://127.0.0.1:8000/healthz" in healthcheck
+    assert '("127.0.0.1", 8001)' in healthcheck
