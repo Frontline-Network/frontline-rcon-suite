@@ -68,6 +68,38 @@ canary.
 The measured Redis reduction is greater than 99.9% for the sampled windows.
 Supervisor RAM remains the largest scalable cost and is addressed separately.
 
+## API and proxy hardening
+
+Backend health now probes a dependency-free Django `/healthz` response and the
+local WebSocket listener. A PID alone was insufficient because Gunicorn can
+exist while Django is still importing and cannot serve requests. Compose only
+marks the backend healthy after both ports are ready.
+
+The frontend resolves its Compose `backend` alias through Docker DNS with a
+short cache lifetime. This prevents a recreated backend container from leaving
+Nginx pinned to its old address. The RCON3 canary moved the backend from
+`192.168.48.2` to `192.168.48.5`; the public API returned HTTP 200 without
+restarting the frontend, then recovered again after the normal address was
+restored.
+
+An external API client was observed requesting `get_recent_logs` without a
+range every 30 seconds. The previous public API default returned 10,000 log
+records and produced an 8.6-MiB JSON response. The public default is now 500,
+matching the established example payload, while explicit ranges and internal
+time-based automod scans remain unchanged. The same production response fell
+to 380 KiB, a 95.6% reduction.
+
+Each frontend serves one CRCON instance, so Nginx now uses one event-driven
+worker instead of one worker per host CPU. On the eight-core canary host this
+reduced one frontend from 10 to 3 processes and from about 8.9 MiB to 3.5 MiB.
+A 2,000-request, concurrency-50 static benchmark completed without errors:
+735 requests/second with one worker versus 751 requests/second with eight.
+The roughly 2% difference is immaterial at the measured production traffic.
+
+All four public endpoints returned HTTP 200 after this second rollout. RCON3
+and RCON4 supplied the HLL Vietnam coverage; RCON1 and RCON2 supplied HLL
+coverage.
+
 ## Process consolidation phase
 
 RQ's worker-side scheduler remains responsible for delayed queue jobs such as
