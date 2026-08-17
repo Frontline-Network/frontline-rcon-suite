@@ -107,6 +107,7 @@ def get_services(request):
         "log_event_loop": "Blacklist enforcement, chat/kill forwarding, player history, etc...",
         "log_stream": "Optionally store game server logs in a redis stream",
         "auto_settings": "Applies commands automaticaly based on your rules.",
+        "automod": "Applies the configured automatic moderation rules.",
         "cron": "The scheduler, cleans logs and whatever you added.",
         "expiring_vips": "Removes expired VIPs and reconciles active VIPs.",
         "live_stats_refresh": "Updates live player and game statistics.",

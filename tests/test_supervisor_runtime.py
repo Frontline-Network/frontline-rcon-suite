@@ -15,11 +15,19 @@ _RUNTIME = importlib.util.module_from_spec(_MODULE_SPEC)
 sys.modules[_MODULE_SPEC.name] = _RUNTIME
 _MODULE_SPEC.loader.exec_module(_RUNTIME)
 ServiceSpec = _RUNTIME.ServiceSpec
+DEFAULT_SERVICES = _RUNTIME.DEFAULT_SERVICES
 _service_loop = _RUNTIME._service_loop
 decode_service_state = _RUNTIME.decode_service_state
 
 
 class SharedSupervisorRuntimeTests(unittest.TestCase):
+    def test_default_services_keep_automod_isolated(self):
+        names = {service.name for service in DEFAULT_SERVICES}
+
+        self.assertIn("auto_settings", names)
+        self.assertIn("broadcasts", names)
+        self.assertNotIn("automod", names)
+
     def test_redis_state_decodes_bytes_from_shared_pool(self):
         self.assertEqual(
             decode_service_state(

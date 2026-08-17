@@ -171,12 +171,12 @@ print("RESULT:" + json.dumps({
             "live_stats_refresh",
             "log_recorder",
             "routines",
+            "auto_settings",
+            "broadcasts",
         }:
             self.assertNotIn(service, sections)
         for isolated_service in {
-            "auto_settings",
             "automod",
-            "broadcasts",
             "log_event_loop",
             "scoreboard",
             "workers",

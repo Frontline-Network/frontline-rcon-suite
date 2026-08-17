@@ -77,6 +77,18 @@ def _run_routines(stop_event: threading.Event) -> None:
     routines.run(stop_event=stop_event)
 
 
+def _run_auto_settings(stop_event: threading.Event) -> None:
+    from rcon import auto_settings
+
+    auto_settings.run(stop_event=stop_event)
+
+
+def _run_broadcasts(stop_event: threading.Event) -> None:
+    from rcon import broadcast
+
+    broadcast.run(stop_event=stop_event)
+
+
 DEFAULT_SERVICES: tuple[ServiceSpec, ...] = (
     ServiceSpec("expiring_vips", _run_expiring_vips),
     ServiceSpec("live_stats_refresh", _run_live_stats),
@@ -84,6 +96,8 @@ DEFAULT_SERVICES: tuple[ServiceSpec, ...] = (
     ServiceSpec("blacklists", _run_blacklists),
     ServiceSpec("log_recorder", _run_log_recorder),
     ServiceSpec("routines", _run_routines),
+    ServiceSpec("auto_settings", _run_auto_settings),
+    ServiceSpec("broadcasts", _run_broadcasts),
 )
 
 
