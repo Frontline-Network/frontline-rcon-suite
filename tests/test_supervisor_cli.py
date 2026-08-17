@@ -140,7 +140,6 @@ print("RESULT:" + json.dumps({
             "log_recorder",
             "log_stream",
             "routines",
-            "scheduler",
             "scoreboard",
             "seed_vip",
             "watch_killrate",
@@ -148,6 +147,8 @@ print("RESULT:" + json.dumps({
         }
         for program in expected_minimal:
             self.assertIn("HLL_SUPERVISOR_PROCESS=1", sections[program], program)
+
+        self.assertNotIn("scheduler", sections)
 
         # Cron must retain the full CLI for enrich_db_users and custom RCON
         # commands configured by administrators.

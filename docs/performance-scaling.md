@@ -44,6 +44,37 @@ consolidation is a separate phase because it changes failure isolation.
 - Completed historical scoreboards are cached across API workers. Current
   matches bypass this cache. Public UI queries treat completed matches as
   immutable.
+- Scalar server-setting changes delete their exact Redis cache key rather than
+  scanning the complete logical database. Full cache invalidations request 500
+  keys per scan step to reduce command amplification.
+
+## RCON1-4 canary result
+
+The phase-one images were rolled out server by server on the four-instance
+host. Both HLL and HLL Vietnam profiles remained reachable throughout the
+canary.
+
+| Check | Canary result |
+| --- | ---: |
+| Public RCON response | HTTP 200, 32-44 ms during verification |
+| Mobile push idle CPU | 0.00% in repeated samples |
+| Webhook idle CPU | 0.19-0.24% |
+| Redis SCAN before exact invalidation | 1,671 calls in 30 seconds |
+| Redis SCAN after exact invalidation | 2 calls in 40 seconds |
+| PostgreSQL mobile transaction | idle connection, no `idle in transaction` |
+| Backend RAM after warmup | 316-571 MiB per instance |
+| Supervisor RAM after warmup | 1.11-1.41 GiB per instance |
+
+The measured Redis reduction is greater than 99.9% for the sampled windows.
+Supervisor RAM remains the largest scalable cost and is addressed separately.
+
+## Process consolidation phase
+
+RQ's worker-side scheduler remains responsible for delayed queue jobs such as
+temporary broadcasts. The separate `rqscheduler` process existed only for the
+periodic performance-statistics dump. That dump now runs on its own monotonic
+deadline inside the existing routines service, preserving its configured
+interval while removing one Python process per gameserver.
 
 ## Configuration
 
@@ -84,6 +115,6 @@ deploying the previous image. The Redis queue registry is additive and harmless
 to older releases. To restore previous timing temporarily, set
 `HLL_WH_IDLE_SLEEP_TIME=0.006` and `MOBILE_PUSH_IDLE_POLL_SECONDS=1`.
 
-Database retention, index replacement and worker consolidation require their
-own migration, backup and rollback plans. They must not be combined with this
-canary phase.
+Database retention and index replacement require their own migration, backup
+and rollback plans. Process consolidation must be canaried separately from
+database lifecycle work.
