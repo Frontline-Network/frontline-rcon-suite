@@ -159,9 +159,28 @@ thread. Log ingestion, Automod, scoreboard, RQ, broadcasts and auto settings
 remain separate until their latency and failure-isolation requirements have
 been measured independently.
 
-This supervisor mode is canary-only until both games have completed a long
-observation window. Never enable it while the six corresponding individual
-Supervisor programs are also running.
+The service API expands those threads back into the original Supervisor service
+names. The settings UI therefore retains individual status and start/stop
+controls even though the processes share an interpreter. Each loop accepts a
+cooperative stop event; stopping the autobalancer also releases its leader
+lease. Redis control values are normalized from either bytes or strings because
+the application's shared Redis pool can be initialized in either mode.
+
+The mode was canaried first on RCON3 (HLL Vietnam), then RCON1 (HLL), before it
+was expanded to RCON2 and RCON4. `live_stats_refresh` was stopped and restarted
+on both game types: the shared runtime fell from seven to six threads and
+returned to seven, the service API reported each transition, and the public
+RCON remained HTTP 200. No new runtime exceptions were logged.
+
+| Instance | Game | Split supervisor | Shared supervisor | Reduction |
+| --- | --- | ---: | ---: | ---: |
+| RCON1 | HLL | 1.392 GiB | 0.966 GiB | 0.426 GiB (31%) |
+| RCON3 | HLL Vietnam | about 1.13 GiB | 0.680 GiB | about 0.45 GiB (40%) |
+
+RCON2 and RCON4 measured 0.757 GiB and 0.678 GiB respectively shortly after
+their rollout. All four public endpoints returned HTTP 200 in 33-37 ms. The
+mode remains opt-in until the long observation window is complete. Never enable
+it while the six corresponding individual Supervisor programs are also running.
 
 ## Configuration
 
@@ -177,6 +196,7 @@ defaults.
 | `HLL_GUNICORN_PRELOAD` | `auto` | Preload for multiple API workers; disabled automatically for one worker |
 | `HLL_GUNICORN_MAX_REQUESTS` | `1000` | Recycle a split Gunicorn worker after this many requests; zero disables recycling |
 | `HLL_GUNICORN_MAX_REQUESTS_JITTER` | `100` | Random extra requests before recycling to stagger instances |
+| `HLL_SUPERVISOR_CONFIG` | `/config/supervisord.conf` | Set to `/config/supervisord_combined.conf` for the opt-in shared supervisor runtime |
 | `HLL_WH_IDLE_SLEEP_TIME` | `0.1` | Webhook loop delay when no queue has work |
 | `HLL_HISTORICAL_SCOREBOARD_CACHE_SECONDS` | `21600` | Completed scoreboard cache lifetime |
 | `MOBILE_PUSH_ACTIVE_POLL_SECONDS` | `1` | Push polling delay after successful work |
