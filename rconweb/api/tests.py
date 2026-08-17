@@ -6,10 +6,60 @@ from unittest.mock import MagicMock, patch
 from urllib.parse import parse_qs, urlparse
 
 from django.contrib.auth.models import Group, User
-from django.test import Client, TestCase, override_settings
+from django.test import Client, SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
 from .models import MobileAccessToken, MobileDevice, MobilePairing
+
+
+class SharedRuntimeServiceApiTests(SimpleTestCase):
+    def _runtime_process(self):
+        return {
+            "name": "frontline_runtime",
+            "group": "frontline_runtime",
+            "statename": "RUNNING",
+            "state": 20,
+            "start": 100,
+            "stop": 0,
+            "now": 200,
+            "spawnerr": "",
+            "pid": 42,
+        }
+
+    @patch("api.services.time.time", return_value=300)
+    @patch("api.services.get_redis_client")
+    def test_shared_runtime_expands_to_original_service_names(self, get_redis, _time):
+        from api.services import SHARED_SERVICE_NAMES, _expand_shared_runtime
+
+        get_redis.return_value.hgetall.return_value = {
+            b"live_stats_refresh:state": b"STOPPED",
+            b"live_stats_refresh:stop": b"250",
+        }
+        processes = _expand_shared_runtime([self._runtime_process()])
+        by_name = {process["name"]: process for process in processes}
+
+        self.assertEqual(SHARED_SERVICE_NAMES, set(by_name))
+        self.assertEqual("STOPPED", by_name["live_stats_refresh"]["statename"])
+        self.assertEqual(0, by_name["live_stats_refresh"]["pid"])
+        self.assertEqual(250, by_name["live_stats_refresh"]["stop"])
+        self.assertEqual("RUNNING", by_name["autobalancer"]["statename"])
+
+    @patch("api.services.get_redis_client")
+    def test_shared_runtime_stop_sets_desired_and_visible_state(self, get_redis):
+        from api.services import _set_shared_service_state
+        from rcon.supervisor_runtime import STATE_KEY
+
+        self.assertTrue(
+            _set_shared_service_state("live_stats_refresh", "STOP", now=123)
+        )
+        get_redis.return_value.hset.assert_called_once_with(
+            STATE_KEY,
+            mapping={
+                "live_stats_refresh:desired": "STOPPED",
+                "live_stats_refresh:state": "STOPPED",
+                "live_stats_refresh:stop": 123,
+            },
+        )
 
 
 @patch.dict(

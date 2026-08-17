@@ -71,6 +71,20 @@ def _uses_shared_runtime(client) -> bool:
     )
 
 
+def _set_shared_service_state(service_name: str, action: str, now: int | None = None):
+    state = RUNNING if action == "START" else STOPPED
+    timestamp = int(time.time()) if now is None else now
+    get_redis_client().hset(
+        STATE_KEY,
+        mapping={
+            f"{service_name}:desired": state,
+            f"{service_name}:state": state,
+            f"{service_name}:{'start' if state == RUNNING else 'stop'}": timestamp,
+        },
+    )
+    return True
+
+
 def get_supervisor_client():
     global supervisor_client
 
@@ -161,15 +175,7 @@ def do_service(request):
     try:
         normalized_action = action.upper()
         if service_name in SHARED_SERVICE_NAMES and _uses_shared_runtime(client):
-            now = int(time.time())
-            state = RUNNING if normalized_action == "START" else STOPPED
-            mapping = {
-                f"{service_name}:desired": state,
-                f"{service_name}:state": state,
-                f"{service_name}:{'start' if state == RUNNING else 'stop'}": now,
-            }
-            get_redis_client().hset(STATE_KEY, mapping=mapping)
-            res = True
+            res = _set_shared_service_state(service_name, normalized_action)
         else:
             res = actions[normalized_action](service_name)
         send_to_discord_audit(
