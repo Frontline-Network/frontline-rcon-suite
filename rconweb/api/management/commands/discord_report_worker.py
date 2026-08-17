@@ -43,6 +43,19 @@ def _server_label(server_number: int) -> tuple[str, str]:
 
 class Command(BaseCommand):
     help = "Deliver complete incident events to the Frontline Discord service"
+    # This long-running worker never serves Django URLs. Running the default
+    # system checks imports the complete API/view graph and keeps it resident.
+    requires_system_checks = []
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._http = requests.Session()
+
+    def _post_after_commit(self, session, url: str, **kwargs):
+        """Never hold a SQL transaction while waiting on the broker or AI."""
+
+        session.commit()
+        return self._http.post(url, **kwargs)
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -56,6 +69,19 @@ class Command(BaseCommand):
             help="Process AI moderation jobs without delivering incident events",
         )
 
+    @staticmethod
+    def _poll_intervals(*, moderation_only: bool) -> tuple[float, float]:
+        active = max(
+            0.1,
+            float(os.getenv("DISCORD_WORKER_ACTIVE_POLL_SECONDS", "0.25")),
+        )
+        idle_default = "10" if moderation_only else "1"
+        idle = max(
+            active,
+            float(os.getenv("DISCORD_WORKER_IDLE_POLL_SECONDS", idle_default)),
+        )
+        return active, idle
+
     def handle(self, *args, **options):
         events_only = bool(options.get("events_only"))
         moderation_only = bool(options.get("moderation_only"))
@@ -63,6 +89,10 @@ class Command(BaseCommand):
             raise CommandError(
                 "--events-only and --moderation-only cannot be used together"
             )
+        active_sleep, maximum_idle_sleep = self._poll_intervals(
+            moderation_only=moderation_only
+        )
+        sleep_seconds = active_sleep
         self.stdout.write(
             "CRCON Discord outbox worker started "
             f"(events={not moderation_only}, moderation={not events_only})"
@@ -79,7 +109,11 @@ class Command(BaseCommand):
                     f"Discord outbox iteration failed: {type(exc).__name__}"
                 )
                 delivered = 0
-            time.sleep(0.25 if delivered else 1.0)
+            if delivered:
+                sleep_seconds = active_sleep
+            else:
+                sleep_seconds = min(maximum_idle_sleep, sleep_seconds * 2)
+            time.sleep(sleep_seconds)
 
     def _deliver_batch(
         self, *, deliver_events: bool = True, deliver_moderation: bool = True
@@ -106,6 +140,7 @@ class Command(BaseCommand):
             return 0
         delivered_count = 0
         with enter_session() as session:
+            incident_context_by_id = {}
             rows = []
             if deliver_events:
                 rows = session.execute(
@@ -137,35 +172,47 @@ class Command(BaseCommand):
                     session.add(delivery)
                     session.flush()
                 incident = event.incident
-                analysis_record = session.execute(
-                    select(ModerationAnalysisRecord)
-                    .where(ModerationAnalysisRecord.incident_id == incident.id)
-                    .order_by(ModerationAnalysisRecord.created_at.desc())
-                    .limit(1)
-                ).scalar_one_or_none()
-                server_name, game = _server_label(incident.server_number)
-                analysis = None
-                if analysis_record:
-                    analysis = ModerationAnalysis.model_validate(
-                        analysis_record.analysis
+                incident_context = incident_context_by_id.get(incident.id)
+                if incident_context is None:
+                    analysis_record = session.execute(
+                        select(ModerationAnalysisRecord)
+                        .where(ModerationAnalysisRecord.incident_id == incident.id)
+                        .order_by(ModerationAnalysisRecord.created_at.desc())
+                        .limit(1)
+                    ).scalar_one_or_none()
+                    server_name, game = _server_label(incident.server_number)
+                    analysis = None
+                    if analysis_record:
+                        analysis = ModerationAnalysis.model_validate(
+                            analysis_record.analysis
+                        )
+                    incident_payload = incident.to_dict(include_events=True)
+                    incident_payload["moderation_policy"] = integration.policy or {}
+                    ai_config = dict(integration.ai_config or {})
+                    if not ai_moderation_enabled():
+                        ai_config.update(
+                            reports_enabled=False,
+                            chat_enabled=False,
+                            names_enabled=False,
+                        )
+                    incident_payload["ai_config"] = ai_config
+                    incident_payload["discord_language"] = integration.language
+                    incident_payload["allowed_actions"] = (
+                        integration.allowed_actions or []
                     )
-                incident_payload = incident.to_dict(include_events=True)
-                incident_payload["moderation_policy"] = integration.policy or {}
-                ai_config = dict(integration.ai_config or {})
-                if not ai_moderation_enabled():
-                    ai_config.update(
-                        reports_enabled=False,
-                        chat_enabled=False,
-                        names_enabled=False,
+                    incident_payload["discord_moderation_ready"] = bool(
+                        integration.moderator_role_ids
                     )
-                incident_payload["ai_config"] = ai_config
-                incident_payload["discord_language"] = integration.language
-                incident_payload["allowed_actions"] = integration.allowed_actions or []
-                incident_payload["discord_moderation_ready"] = bool(
-                    integration.moderator_role_ids
-                )
-                if analysis_record:
-                    incident_payload["analysis_id"] = analysis_record.id
+                    if analysis_record:
+                        incident_payload["analysis_id"] = analysis_record.id
+                    incident_context = (
+                        server_name,
+                        game,
+                        analysis,
+                        incident_payload,
+                    )
+                    incident_context_by_id[incident.id] = incident_context
+                server_name, game, analysis, incident_payload = incident_context
                 envelope = IncidentEventEnvelope(
                     installation_id=str(integration.installation_id),
                     event_id=event.id,
@@ -180,7 +227,8 @@ class Command(BaseCommand):
                     analysis=analysis,
                 )
                 try:
-                    response = requests.post(
+                    response = self._post_after_commit(
+                        session,
                         f"{integration.service_url.rstrip('/')}/v1/events",
                         headers={
                             "Authorization": f"Bearer {capability}",
@@ -295,7 +343,8 @@ class Command(BaseCommand):
                         ":".join(item.id for item in name_candidates).encode("utf-8")
                     ).hexdigest()
                     try:
-                        response = requests.post(
+                        response = self._post_after_commit(
+                            session,
                             (
                                 f"{integration.service_url.rstrip('/')}"
                                 "/v1/player-name-analysis-batches"
@@ -340,7 +389,8 @@ class Command(BaseCommand):
                     continue
                 job = build_job(candidate)
                 try:
-                    response = requests.post(
+                    response = self._post_after_commit(
+                        session,
                         f"{integration.service_url.rstrip('/')}/v1/analysis-jobs",
                         headers={
                             "Authorization": f"Bearer {capability}",

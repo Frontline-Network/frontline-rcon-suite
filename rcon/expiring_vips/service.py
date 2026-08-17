@@ -1,4 +1,5 @@
 import logging
+import threading
 import time
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
@@ -178,11 +179,12 @@ def remove_expired_vips(rcon_hook: Rcon, webhook_url: Optional[HttpUrl] = None):
         logger.info("No expired VIPs found")
 
 
-def run():
+def run(stop_event: threading.Event | None = None):
+    stop_event = stop_event or threading.Event()
     rcon_hook = get_rcon()
     next_expiration_check = 0.0
 
-    while True:
+    while not stop_event.is_set():
         config = ExpiredVipsUserConfig.load_from_db()
         now = time.monotonic()
 
@@ -199,7 +201,7 @@ def run():
             except Exception:
                 logger.exception("Unable to reconcile Vietnam VIPs")
 
-        time.sleep(VIP_RECONCILE_INTERVAL_SECONDS)
+        stop_event.wait(VIP_RECONCILE_INTERVAL_SECONDS)
 
 
 if __name__ == "__main__":

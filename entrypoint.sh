@@ -63,9 +63,18 @@ then
   exec python manage.py discord_report_worker --moderation-only
 fi
 
+if [ "$1" == 'frontline_background_worker' ]
+then
+  cd rconweb
+  exec python manage.py frontline_background_worker
+fi
+
 # Check if we're in a backend container
 if [ "$1" == 'web' ]
 then
+  # A container restart may preserve this file through an image layer or
+  # mounted working directory. Health must describe the current process only.
+  rm -f /code/rconweb/gunicorn.pid
   # If the database password isn't set, bail early
   if [ "$HLL_DB_PASSWORD" == '' ]
   then
@@ -97,9 +106,45 @@ then
     echo "from django.contrib.auth.models import User; User.objects.create_superuser('admin', 'admin@example.com', 'admin') if not User.objects.filter(username='admin').first() else None" | python manage.py shell
   fi
   export LOGGING_FILENAME=api_$SERVER_NUMBER.log
-  daphne -b 0.0.0.0 -p 8001 rconweb.asgi:application &
-  # Successfully running gunicorn will create the pid file which is how Docker determines the container is healthy
-  gunicorn --preload --pid gunicorn.pid -w $NB_API_WORKERS -k gthread --threads $NB_API_THREADS -t 120 -b 0.0.0.0 rconweb.wsgi
+  API_SERVER_MODE="${HLL_API_SERVER_MODE:-split}"
+  if [[ "$API_SERVER_MODE" == "unified" ]]
+  then
+    # Daphne serves the same ASGI application over both ports expected by the
+    # existing Nginx config. With one API worker this avoids loading Django in
+    # separate Gunicorn and Daphne processes while preserving WebSockets.
+    # Daphne replaces this shell via exec, so the current PID remains valid.
+    echo $$ > gunicorn.pid
+    daphne \
+      -e tcp:port=8000:interface=0.0.0.0 \
+      -e tcp:port=8001:interface=0.0.0.0 \
+      -t 120 \
+      rconweb.asgi:application
+  else
+    daphne -b 0.0.0.0 -p 8001 rconweb.asgi:application &
+    # Successfully running gunicorn will create the pid file which is how Docker determines the container is healthy
+    GUNICORN_PRELOAD_ARGS=()
+    GUNICORN_PRELOAD_MODE="${HLL_GUNICORN_PRELOAD:-auto}"
+    if [[ "$GUNICORN_PRELOAD_MODE" =~ ^(1|true|yes)$ ]] || \
+       [[ "$GUNICORN_PRELOAD_MODE" == "auto" && "$NB_API_WORKERS" =~ ^[0-9]+$ && "$NB_API_WORKERS" -gt 1 ]]
+    then
+      GUNICORN_PRELOAD_ARGS=(--preload)
+    fi
+    GUNICORN_RECYCLE_ARGS=()
+    GUNICORN_MAX_REQUESTS="${HLL_GUNICORN_MAX_REQUESTS:-1000}"
+    GUNICORN_MAX_REQUESTS_JITTER="${HLL_GUNICORN_MAX_REQUESTS_JITTER:-100}"
+    if [[ "$GUNICORN_MAX_REQUESTS" =~ ^[0-9]+$ && "$GUNICORN_MAX_REQUESTS" -gt 0 ]]
+    then
+      if ! [[ "$GUNICORN_MAX_REQUESTS_JITTER" =~ ^[0-9]+$ ]]
+      then
+        GUNICORN_MAX_REQUESTS_JITTER=100
+      fi
+      GUNICORN_RECYCLE_ARGS=(
+        --max-requests "$GUNICORN_MAX_REQUESTS"
+        --max-requests-jitter "$GUNICORN_MAX_REQUESTS_JITTER"
+      )
+    fi
+    gunicorn "${GUNICORN_PRELOAD_ARGS[@]}" "${GUNICORN_RECYCLE_ARGS[@]}" --pid gunicorn.pid -w "$NB_API_WORKERS" -k gthread --threads "$NB_API_THREADS" -t 120 -b 0.0.0.0 rconweb.wsgi
+  fi
   cd ..
   ./manage.py unregister_api
 else
@@ -114,5 +159,10 @@ fi
   sleep 10
   env >> /etc/environment
   export LOGGING_FILENAME=supervisor_$SERVER_NUMBER.log
-  supervisord -c /config/supervisord_$SERVER_NUMBER.conf || supervisord -c /config/supervisord.conf
+  if [[ -n "${HLL_SUPERVISOR_CONFIG:-}" ]]
+  then
+    supervisord -c "$HLL_SUPERVISOR_CONFIG"
+  else
+    supervisord -c /config/supervisord_$SERVER_NUMBER.conf || supervisord -c /config/supervisord.conf
+  fi
 fi

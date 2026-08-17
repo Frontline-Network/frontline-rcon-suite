@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 _REDIS_POOL = None
 # We use the redis database with db number 0 as a shared database amongst all the containers
 _GLOBAL_REDIS_POOL = None
+REDIS_SCAN_COUNT = 500
 
 
 class RedisCached:
@@ -54,7 +55,9 @@ class RedisCached:
     @staticmethod
     def clear_all_caches(pool) -> bool:
         red = redis.Redis(connection_pool=pool)
-        keys = list(red.scan_iter(match=f"{RedisCached.PREFIX}*"))
+        keys = list(
+            red.scan_iter(match=f"{RedisCached.PREFIX}*", count=REDIS_SCAN_COUNT)
+        )
         logger.warning("Wiping cached values %s", keys)
         if not keys:
             return 0
@@ -189,7 +192,11 @@ class RedisCached:
 
     def clear_all(self):
         try:
-            keys = list(self.red.scan_iter(match=f"{self.key_prefix}*"))
+            keys = list(
+                self.red.scan_iter(
+                    match=f"{self.key_prefix}*", count=REDIS_SCAN_COUNT
+                )
+            )
             if keys:
                 self.red.delete(*keys)
         except redis.exceptions.RedisError:
@@ -270,16 +277,26 @@ def ttl_cache(
     **kwargs,
 ):
     pool = get_redis_pool(decode_responses=False)
+
+    def memory_cache_decorator(func):
+        cached = cachetools_ttl_cache(*args, ttl=ttl, **kwargs)(func)
+
+        # Keep the Redis-backed decorator contract available during tests,
+        # maintenance and Redis outages. cachetools cannot evict one computed
+        # key, so the safe local fallback clears only this function's cache.
+        cached.clear_for = lambda *call_args, **call_kwargs: cached.cache_clear()
+        return cached
+
     # Allow use of in memory cache and not redis when running tests
     # but still use redis when running the development web server
     if os.getenv("DEBUG") and not pool:
         logger.warning(f"Unable to connect to Redis, using memory cache")
-        return cachetools_ttl_cache(*args, ttl=ttl, **kwargs)
+        return memory_cache_decorator
     # the maintenance container does not use the redis cache but this method is imported
     # and it will fail if it can't connect to redis otherwise
     elif os.getenv("HLL_MAINTENANCE_CONTAINER") and not pool:
         # skip logging but still use the in memory cache tools to allow importing
-        return cachetools_ttl_cache(*args, ttl=ttl, **kwargs)
+        return memory_cache_decorator
     if not pool:
         logger.error("Unable to connect to Redis")
         raise ConnectionError("Unable to connect to Redis")

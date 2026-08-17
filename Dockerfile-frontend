@@ -31,6 +31,9 @@ RUN mv /code_public/dist /www_public
 FROM nginx:mainline-alpine
 
 RUN apk add --no-cache openssl
+# Each frontend serves one CRCON instance. A single event-driven Nginx worker
+# is sufficient and avoids multiplying idle processes by the host CPU count.
+RUN sed -i 's/^worker_processes[[:space:]]\+auto;/worker_processes 1;/' /etc/nginx/nginx.conf
 COPY rcongui/nginx.conf /etc/nginx/conf.d/default.conf
 
 WORKDIR /var/www

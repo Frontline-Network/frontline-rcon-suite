@@ -12,6 +12,7 @@ SUPERVISOR_COMMANDS = {
     "automod",
     "blacklists",
     "broadcast_loop",
+    "combined_runtime",
     "expiring_vips",
     "live_stats_loop",
     "log_loop",
@@ -140,7 +141,6 @@ print("RESULT:" + json.dumps({
             "log_recorder",
             "log_stream",
             "routines",
-            "scheduler",
             "scoreboard",
             "seed_vip",
             "watch_killrate",
@@ -149,9 +149,39 @@ print("RESULT:" + json.dumps({
         for program in expected_minimal:
             self.assertIn("HLL_SUPERVISOR_PROCESS=1", sections[program], program)
 
+        self.assertNotIn("scheduler", sections)
+
         # Cron must retain the full CLI for enrich_db_users and custom RCON
         # commands configured by administrators.
         self.assertNotIn("HLL_SUPERVISOR_PROCESS", sections["cron"])
+
+    def test_combined_config_replaces_only_compatible_services(self):
+        config = (REPO_ROOT / "config" / "supervisord_combined.conf").read_text(
+            encoding="utf-8"
+        )
+        sections = {
+            chunk.split("]", 1)[0]: chunk for chunk in config.split("[program:")[1:]
+        }
+
+        self.assertIn("frontline_runtime", sections)
+        for service in {
+            "autobalancer",
+            "blacklists",
+            "expiring_vips",
+            "live_stats_refresh",
+            "log_recorder",
+            "routines",
+            "auto_settings",
+            "broadcasts",
+        }:
+            self.assertNotIn(service, sections)
+        for isolated_service in {
+            "automod",
+            "log_event_loop",
+            "scoreboard",
+            "workers",
+        }:
+            self.assertIn(isolated_service, sections)
 
 
 if __name__ == "__main__":

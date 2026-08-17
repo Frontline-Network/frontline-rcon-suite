@@ -655,7 +655,7 @@ class RconAPI(Rcon):
         filter_action: list[str] = [],
         inclusive_filter: bool = True,
         start: int = 0,
-        end: int = 10000,
+        end: int = 500,
         exact_player_match: bool = True,
         exact_action: bool = False,
     ) -> ParsedLogsType:
@@ -667,6 +667,17 @@ class RconAPI(Rcon):
             exact_player_match=exact_player_match,
             exact_action=exact_action,
             inclusive_filter=inclusive_filter,
+        )
+
+    def get_recent_logs_summary(
+        self,
+        end: int = 15_000,
+        per_action_limit: int = 100,
+    ) -> dict:
+        """Return the bounded log projection used by the dashboard."""
+        return game_logs.get_recent_logs_summary(
+            end=end,
+            per_action_limit=per_action_limit,
         )
 
     def get_votemap_status(self):

@@ -3,7 +3,6 @@ import logging
 import os
 import secrets
 import time
-import uuid
 from datetime import timedelta
 from urllib.parse import urlencode, urlparse
 
@@ -17,7 +16,7 @@ from rcon.admin_incidents import latest_incident_event_cursor
 from rcon.user_config.rcon_server_settings import RconServerSettingsUserConfig
 from rcon.user_config.webhooks import AdminPingWebhooksUserConfig
 from rcon.utils import get_server_number
-from rconweb.settings import DEBUG, SECRET_KEY, TAG_VERSION
+from rconweb.settings import DEBUG, TAG_VERSION
 
 from .auth import api_response, login_required
 from .decorators import permission_required, require_http_methods
@@ -31,6 +30,7 @@ from .mobile_tokens import (
     token_digest,
 )
 from .models import MobileDevice, MobilePairing
+from .mobile_settings import mobile_installation_id, mobile_integration_enabled
 from .multi_servers import mobile_server_list
 
 PAIRING_LIFETIME = timedelta(seconds=120)
@@ -54,15 +54,6 @@ def _json_body(request: HttpRequest) -> dict:
 
 def _error(command: str, message: str, status: int):
     return api_response(command=command, failed=True, error=message, status_code=status)
-
-
-def mobile_integration_enabled() -> bool:
-    return os.getenv("MOBILE_INTEGRATION_ENABLED", "false").lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
 
 
 def mobile_feature_enabled(name: str) -> bool:
@@ -117,11 +108,7 @@ def _require_enabled(command: str):
 
 
 def _installation_id() -> str:
-    configured = os.getenv("MOBILE_INSTALLATION_ID")
-    if configured:
-        return configured
-    database_name = os.getenv("HLL_DB_NAME", "rcon")
-    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"crcon:{SECRET_KEY}:{database_name}"))
+    return mobile_installation_id()
 
 
 def _public_base_url(request: HttpRequest) -> str:

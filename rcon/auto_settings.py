@@ -1,5 +1,5 @@
 import logging
-import time
+import threading
 
 import pytz
 
@@ -11,11 +11,14 @@ from rcon.user_config.auto_settings import AutoSettingsConfig
 logger = logging.getLogger(__name__)
 
 
-def run():
+def run(stop_event: threading.Event | None = None):
+    stop_event = stop_event or threading.Event()
+    if stop_event.is_set():
+        return
     rcon = get_rcon_api()
     config = AutoSettingsConfig().get_settings()
 
-    while True:
+    while not stop_event.is_set():
         always_apply_defaults = config.get("always_apply_defaults", False)
         can_invoke_multiple_rules = config.get("can_invoke_multiple_rules", False)
         default_commands = config.get("defaults", {})
@@ -80,7 +83,7 @@ def run():
                 do_run_commands(rcon, saved_commands)
             else:
                 do_run_commands(rcon, default_commands)
-        time.sleep(60)
+        stop_event.wait(60)
 
 
 if __name__ == "__main__":

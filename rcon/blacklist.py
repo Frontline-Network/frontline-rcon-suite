@@ -1,6 +1,7 @@
 import logging
 import os
 import struct
+import threading
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum, auto
 from typing import Literal, Sequence, overload
@@ -944,15 +945,21 @@ class BlacklistCommandHandler:
         self.pubsub = self.red.pubsub(ignore_subscribe_messages=True)
         self.rcon = get_rcon()
 
-    def run(self):
+    def run(self, stop_event: threading.Event | None = None):
         """Run the command handler loop. This is a blocking call."""
+        stop_event = stop_event or threading.Event()
         logger.info("Starting blacklist command handler loop")
 
         # Subscribe to channel
         self.pubsub.subscribe(self.CHANNEL)
 
-        # Start listening
-        for message in self.pubsub.listen():
+        # A bounded wait makes the service cooperatively stoppable when it runs
+        # as a thread in the shared supervisor runtime. The standalone command
+        # keeps its original indefinite behavior because its event is never set.
+        while not stop_event.is_set():
+            message = self.pubsub.get_message(timeout=1.0)
+            if message is None:
+                continue
             try:
                 data: bytes = message["data"]
                 cmd = BlacklistCommand.decode(data)
@@ -1007,6 +1014,7 @@ class BlacklistCommandHandler:
             except:
                 logger.exception("Failed to parse data %s", data)
             logger.info("Ready for next message!")
+        self.pubsub.close()
 
     @staticmethod
     def send(cmd: BlacklistCommand):

@@ -7,18 +7,22 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
 from django.conf import settings as django_settings
-django_settings.configure(CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [
-                {
-                    "address": os.getenv("HLL_REDIS_URL"),
-                }
-            ],
-        },
-    },
-})
+
+if not django_settings.configured:
+    django_settings.configure(
+        CHANNEL_LAYERS={
+            "default": {
+                "BACKEND": "channels_redis.core.RedisChannelLayer",
+                "CONFIG": {
+                    "hosts": [
+                        {
+                            "address": os.getenv("HLL_REDIS_URL"),
+                        }
+                    ],
+                },
+            }
+        }
+    )
 
 GROUP_NAME = "barricade"
 

@@ -1,7 +1,7 @@
 import logging
 import random
 import re
-import time
+import threading
 
 from rcon.commands import HLLCommandFailedError
 from rcon.message_variables import format_message_string, populate_message_variables
@@ -120,19 +120,22 @@ def manual_broadcast_is_active(ctl, campaigns: list[AutoBroadcastMessage]) -> bo
     return current not in managed_messages
 
 
-def run():
+def run(stop_event: threading.Event | None = None):
     # avoid circular import
     from rcon.rcon import get_rcon
 
+    stop_event = stop_event or threading.Event()
+    if stop_event.is_set():
+        return
     ctl = get_rcon()
 
-    while True:
+    while not stop_event.is_set():
         config = AutoBroadcastUserConfig.load_from_db()
         if not config.enabled or not config.messages:
             logger.debug(
                 "Auto broadcasts are disabled. Sleeping %s seconds", CHECK_INTERVAL
             )
-            time.sleep(CHECK_INTERVAL)
+            stop_event.wait(CHECK_INTERVAL)
             continue
 
         campaigns = list(config.messages)
@@ -152,12 +155,12 @@ def run():
             player_count = int(ctl.get_slots()["current_players"])
         except (HLLCommandFailedError, KeyError, TypeError, ValueError):
             logger.exception("Unable to determine player count for campaigns")
-            time.sleep(CHECK_INTERVAL)
+            stop_event.wait(CHECK_INTERVAL)
             continue
 
         if manual_broadcast_is_active(ctl, campaigns):
             logger.info("A manual broadcast is active; campaign cycle deferred")
-            time.sleep(CHECK_INTERVAL)
+            stop_event.wait(CHECK_INTERVAL)
             continue
 
         for msg in campaigns:
@@ -184,10 +187,11 @@ def run():
                 sent_campaign = True
             except HLLCommandFailedError:
                 logger.exception("Unable to broadcast %s %s", msg.time_sec, msg.message)
-            time.sleep(int(msg.time_sec))
+            if stop_event.wait(int(msg.time_sec)):
+                return
 
         if not sent_campaign:
-            time.sleep(CHECK_INTERVAL)
+            stop_event.wait(CHECK_INTERVAL)
 
 
 if __name__ == "__main__":

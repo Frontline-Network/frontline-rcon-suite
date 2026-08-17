@@ -863,7 +863,7 @@ class Rcon(ServerCtl):
         return int(super().get_team_switch_cooldown())
 
     def set_team_switch_cooldown(self, minutes: int) -> bool:
-        with invalidates(Rcon.get_team_switch_cooldown):
+        with invalidates_for(Rcon.get_team_switch_cooldown):
             return super().set_team_switch_cooldown(minutes)
 
     @ttl_cache(ttl=60 * 10)
@@ -887,7 +887,7 @@ class Rcon(ServerCtl):
         return int(super().get_max_ping_autokick())
 
     def set_max_ping_autokick(self, max_ms) -> bool:
-        with invalidates(Rcon.get_max_ping_autokick):
+        with invalidates_for(Rcon.get_max_ping_autokick):
             return super().set_max_ping_autokick(max_ms)
 
     @ttl_cache(ttl=60 * 10)
@@ -895,7 +895,7 @@ class Rcon(ServerCtl):
         return int(super().get_queue_length())
 
     def set_queue_length(self, value: int) -> bool:
-        with invalidates(Rcon.get_queue_length):
+        with invalidates_for(Rcon.get_queue_length):
             return super().set_queue_length(value)
 
     @ttl_cache(ttl=60 * 10)
@@ -903,7 +903,7 @@ class Rcon(ServerCtl):
         return int(super().get_vip_slots_num())
 
     def set_vip_slots_num(self, value: int) -> bool:
-        with invalidates(Rcon.get_vip_slots_num):
+        with invalidates_for(Rcon.get_vip_slots_num):
             return super().set_vip_slots_num(value)
 
     def get_welcome_message(self):

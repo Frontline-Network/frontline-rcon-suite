@@ -9,7 +9,6 @@ from typing_extensions import TypeIs
 
 from rq import Queue
 from rq.job import Dependency, Job, Retry
-from rq_scheduler import Scheduler
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
@@ -56,11 +55,6 @@ def update_player_steaminfo_on_connect_worker(player_name: str, player_id: str) 
 def get_queue(redis_client=None):
     red = get_redis_client()
     return Queue(connection=red, default_timeout=60 * 20)
-
-
-def get_scheduler(redis_client=None):
-    red = get_redis_client()
-    return Scheduler(connection=red)
 
 
 def broadcast(msg):

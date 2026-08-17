@@ -6,10 +6,60 @@ from unittest.mock import MagicMock, patch
 from urllib.parse import parse_qs, urlparse
 
 from django.contrib.auth.models import Group, User
-from django.test import Client, TestCase, override_settings
+from django.test import Client, SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
 from .models import MobileAccessToken, MobileDevice, MobilePairing
+
+
+class SharedRuntimeServiceApiTests(SimpleTestCase):
+    def _runtime_process(self):
+        return {
+            "name": "frontline_runtime",
+            "group": "frontline_runtime",
+            "statename": "RUNNING",
+            "state": 20,
+            "start": 100,
+            "stop": 0,
+            "now": 200,
+            "spawnerr": "",
+            "pid": 42,
+        }
+
+    @patch("api.services.time.time", return_value=300)
+    @patch("api.services.get_redis_client")
+    def test_shared_runtime_expands_to_original_service_names(self, get_redis, _time):
+        from api.services import SHARED_SERVICE_NAMES, _expand_shared_runtime
+
+        get_redis.return_value.hgetall.return_value = {
+            b"live_stats_refresh:state": b"STOPPED",
+            b"live_stats_refresh:stop": b"250",
+        }
+        processes = _expand_shared_runtime([self._runtime_process()])
+        by_name = {process["name"]: process for process in processes}
+
+        self.assertEqual(SHARED_SERVICE_NAMES, set(by_name))
+        self.assertEqual("STOPPED", by_name["live_stats_refresh"]["statename"])
+        self.assertEqual(0, by_name["live_stats_refresh"]["pid"])
+        self.assertEqual(250, by_name["live_stats_refresh"]["stop"])
+        self.assertEqual("RUNNING", by_name["autobalancer"]["statename"])
+
+    @patch("api.services.get_redis_client")
+    def test_shared_runtime_stop_sets_desired_and_visible_state(self, get_redis):
+        from api.services import _set_shared_service_state
+        from rcon.supervisor_runtime import STATE_KEY
+
+        self.assertTrue(
+            _set_shared_service_state("live_stats_refresh", "STOP", now=123)
+        )
+        get_redis.return_value.hset.assert_called_once_with(
+            STATE_KEY,
+            mapping={
+                "live_stats_refresh:desired": "STOPPED",
+                "live_stats_refresh:state": "STOPPED",
+                "live_stats_refresh:stop": 123,
+            },
+        )
 
 
 @patch.dict(
@@ -1452,6 +1502,44 @@ class DiscordActionTemplateTests(TestCase):
 
 
 class DiscordOutboxWorkerModeTests(TestCase):
+    def test_worker_skips_unrelated_django_system_checks(self):
+        from api.management.commands.discord_report_worker import Command
+
+        self.assertEqual(Command.requires_system_checks, [])
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_moderation_worker_uses_longer_idle_backoff(self):
+        from api.management.commands.discord_report_worker import Command
+
+        self.assertEqual(
+            Command._poll_intervals(moderation_only=False), (0.25, 1.0)
+        )
+        self.assertEqual(
+            Command._poll_intervals(moderation_only=True), (0.25, 10.0)
+        )
+
+    def test_http_delivery_commits_database_transaction_first(self):
+        from api.management.commands.discord_report_worker import Command
+
+        order = []
+        session = MagicMock()
+        session.commit.side_effect = lambda: order.append("commit")
+        response = MagicMock()
+        command = Command()
+        command._http.post = MagicMock(
+            side_effect=lambda *args, **kwargs: (order.append("http"), response)[1]
+        )
+
+        self.assertIs(
+            command._post_after_commit(
+                session,
+                "https://discord.example/v1/events",
+                json={"event": 1},
+            ),
+            response,
+        )
+        self.assertEqual(order, ["commit", "http"])
+
     def test_event_worker_never_processes_moderation_jobs(self):
         from api.management.commands.discord_report_worker import Command
 
@@ -1473,3 +1561,136 @@ class DiscordOutboxWorkerModeTests(TestCase):
             with self.assertRaises(KeyboardInterrupt):
                 command.handle(events_only=False, moderation_only=True)
         deliver.assert_called_once_with(deliver_events=False, deliver_moderation=True)
+
+
+class MobilePushWorkerPerformanceTests(TestCase):
+    def test_worker_skips_unrelated_django_system_checks(self):
+        from api.management.commands.mobile_push_worker import Command
+
+        self.assertEqual(Command.requires_system_checks, [])
+
+    @patch("api.management.commands.mobile_push_worker.mobile_installation_id")
+    @patch("api.management.commands.mobile_push_worker.enter_session")
+    def test_http_delivery_happens_outside_database_transaction(
+        self, enter_session, installation_id
+    ):
+        from api.management.commands.mobile_push_worker import Command
+
+        order = []
+        device = SimpleNamespace(
+            id="00000000-0000-0000-0000-000000000001",
+            pk="00000000-0000-0000-0000-000000000001",
+            push_handle="push-handle",
+            push_capability="push-capability",
+        )
+        event = {
+            "id": 7,
+            "incident_id": "00000000-0000-0000-0000-000000000002",
+            "event_type": "created",
+            "created_at": timezone.now(),
+        }
+        session = MagicMock()
+        context = MagicMock()
+        context.__enter__.side_effect = lambda: (order.append("db"), session)[1]
+        context.__exit__.return_value = False
+        enter_session.return_value = context
+        installation_id.return_value = "installation"
+
+        command = Command()
+        command._eligible_devices = MagicMock(return_value=[device])
+        command._load_pending_events = MagicMock(return_value=[(device, [event])])
+        response = MagicMock()
+        response.raise_for_status.return_value = None
+        command._http.post = MagicMock(
+            side_effect=lambda *args, **kwargs: (order.append("http"), response)[1]
+        )
+
+        self.assertTrue(command._deliver_batch("https://relay.example"))
+        self.assertEqual(order, ["http", "db"])
+        session.add_all.assert_called_once()
+
+
+class FrontlineBackgroundWorkerTests(TestCase):
+    @patch.dict(
+        "os.environ",
+        {
+            "MOBILE_PUSH_RELAY_URL": "https://push.example",
+        },
+    )
+    @patch(
+        "api.management.commands.frontline_background_worker.ai_moderation_enabled",
+        return_value=True,
+    )
+    @patch(
+        "api.management.commands.frontline_background_worker.discord_reports_enabled",
+        return_value=True,
+    )
+    @patch(
+        "api.management.commands.frontline_background_worker.mobile_integration_enabled",
+        return_value=True,
+    )
+    def test_enabled_loops_are_independent_threads(
+        self, _mobile_enabled, _discord_enabled, _ai_enabled
+    ):
+        from api.management.commands.discord_report_worker import (
+            Command as DiscordCommand,
+        )
+        from api.management.commands.frontline_background_worker import Command
+        from api.management.commands.mobile_push_worker import Command as MobileCommand
+
+        specs = Command()._worker_specs()
+
+        self.assertEqual(
+            [name for name, _command, _options in specs],
+            ["mobile-push", "discord-events", "discord-moderation"],
+        )
+        self.assertIsInstance(specs[0][1], MobileCommand)
+        self.assertIsInstance(specs[1][1], DiscordCommand)
+        self.assertIsInstance(specs[2][1], DiscordCommand)
+        self.assertEqual(
+            specs[1][2], {"events_only": True, "moderation_only": False}
+        )
+        self.assertEqual(
+            specs[2][2], {"events_only": False, "moderation_only": True}
+        )
+
+
+class HistoricalScoreboardCacheTests(TestCase):
+    @staticmethod
+    def _session_with_end(end):
+        session = MagicMock()
+        session.query.return_value.filter.return_value.one_or_none.return_value = (
+            end,
+        )
+        context = MagicMock()
+        context.__enter__.return_value = session
+        context.__exit__.return_value = False
+        return context
+
+    @patch("api.scoreboards._get_historical_scoreboard")
+    @patch("api.scoreboards._build_map_scoreboard")
+    @patch("api.scoreboards.enter_session")
+    def test_completed_match_uses_shared_cache(self, enter_session, build, cached):
+        from api.scoreboards import _get_map_scoreboard_data
+
+        enter_session.return_value = self._session_with_end(timezone.now())
+        cached.return_value = {"id": 7}
+
+        self.assertEqual(_get_map_scoreboard_data(7), {"id": 7})
+        cached.assert_called_once_with(7)
+        build.assert_not_called()
+
+    @patch("api.scoreboards._get_historical_scoreboard")
+    @patch("api.scoreboards._build_map_scoreboard")
+    @patch("api.scoreboards.enter_session")
+    def test_running_match_bypasses_long_lived_cache(
+        self, enter_session, build, cached
+    ):
+        from api.scoreboards import _get_map_scoreboard_data
+
+        enter_session.return_value = self._session_with_end(None)
+        build.return_value = {"id": 8}
+
+        self.assertEqual(_get_map_scoreboard_data(8), {"id": 8})
+        build.assert_called_once_with(8)
+        cached.assert_not_called()
