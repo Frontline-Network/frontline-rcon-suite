@@ -1,8 +1,21 @@
+import importlib.util
+from pathlib import Path
+import sys
 import threading
 import time
 import unittest
 
-from rcon.supervisor_runtime import ServiceSpec, _service_loop
+
+_MODULE_SPEC = importlib.util.spec_from_file_location(
+    "frontline_supervisor_runtime",
+    Path(__file__).parents[1] / "rcon" / "supervisor_runtime.py",
+)
+assert _MODULE_SPEC and _MODULE_SPEC.loader
+_RUNTIME = importlib.util.module_from_spec(_MODULE_SPEC)
+sys.modules[_MODULE_SPEC.name] = _RUNTIME
+_MODULE_SPEC.loader.exec_module(_RUNTIME)
+ServiceSpec = _RUNTIME.ServiceSpec
+_service_loop = _RUNTIME._service_loop
 
 
 class SharedSupervisorRuntimeTests(unittest.TestCase):
