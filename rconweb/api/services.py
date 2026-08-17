@@ -13,6 +13,7 @@ from rcon.supervisor_runtime import (
     RUNNING,
     STATE_KEY,
     STOPPED,
+    decode_service_state,
 )
 
 from .audit_log import record_audit
@@ -33,7 +34,7 @@ def _expand_shared_runtime(processes):
         return processes
 
     try:
-        state = get_redis_client().hgetall(STATE_KEY)
+        state = decode_service_state(get_redis_client().hgetall(STATE_KEY))
     except Exception:
         logger.exception("Unable to read shared supervisor service state")
         state = {}

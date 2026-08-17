@@ -22,6 +22,19 @@ RUNNING = "RUNNING"
 STOPPED = "STOPPED"
 
 
+def redis_text(value):
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
+    return value
+
+
+def decode_service_state(raw_state: dict) -> dict[str, str]:
+    return {
+        str(redis_text(key)): str(redis_text(value))
+        for key, value in raw_state.items()
+    }
+
+
 @dataclass(frozen=True)
 class ServiceSpec:
     name: str
@@ -135,7 +148,7 @@ def run(services: Sequence[ServiceSpec] = DEFAULT_SERVICES) -> None:
         )
 
     for name in service_specs:
-        if red.hget(STATE_KEY, f"{name}:desired") != STOPPED:
+        if redis_text(red.hget(STATE_KEY, f"{name}:desired")) != STOPPED:
             start_service(name)
         else:
             red.hset(STATE_KEY, f"{name}:state", STOPPED)
@@ -143,7 +156,9 @@ def run(services: Sequence[ServiceSpec] = DEFAULT_SERVICES) -> None:
     try:
         while not runtime_stop_event.wait(MONITOR_INTERVAL_SECONDS):
             for name in service_specs:
-                desired = red.hget(STATE_KEY, f"{name}:desired") or RUNNING
+                desired = (
+                    redis_text(red.hget(STATE_KEY, f"{name}:desired")) or RUNNING
+                )
                 thread = threads.get(name)
 
                 if desired == STOPPED:
