@@ -125,7 +125,21 @@ then
     then
       GUNICORN_PRELOAD_ARGS=(--preload)
     fi
-    gunicorn "${GUNICORN_PRELOAD_ARGS[@]}" --pid gunicorn.pid -w "$NB_API_WORKERS" -k gthread --threads "$NB_API_THREADS" -t 120 -b 0.0.0.0 rconweb.wsgi
+    GUNICORN_RECYCLE_ARGS=()
+    GUNICORN_MAX_REQUESTS="${HLL_GUNICORN_MAX_REQUESTS:-1000}"
+    GUNICORN_MAX_REQUESTS_JITTER="${HLL_GUNICORN_MAX_REQUESTS_JITTER:-100}"
+    if [[ "$GUNICORN_MAX_REQUESTS" =~ ^[0-9]+$ && "$GUNICORN_MAX_REQUESTS" -gt 0 ]]
+    then
+      if ! [[ "$GUNICORN_MAX_REQUESTS_JITTER" =~ ^[0-9]+$ ]]
+      then
+        GUNICORN_MAX_REQUESTS_JITTER=100
+      fi
+      GUNICORN_RECYCLE_ARGS=(
+        --max-requests "$GUNICORN_MAX_REQUESTS"
+        --max-requests-jitter "$GUNICORN_MAX_REQUESTS_JITTER"
+      )
+    fi
+    gunicorn "${GUNICORN_PRELOAD_ARGS[@]}" "${GUNICORN_RECYCLE_ARGS[@]}" --pid gunicorn.pid -w "$NB_API_WORKERS" -k gthread --threads "$NB_API_THREADS" -t 120 -b 0.0.0.0 rconweb.wsgi
   fi
   cd ..
   ./manage.py unregister_api

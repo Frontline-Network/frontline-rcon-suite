@@ -80,6 +80,12 @@ Gunicorn preload is also skipped by default when only one worker is configured.
 This retained the split HTTP/WebSocket architecture while reducing backend RAM
 materially on busy instances.
 
+Long-lived Gunicorn workers recycle after a bounded number of requests. The
+master starts a replacement before retiring the old worker, while jitter keeps
+multiple CRCON instances from recycling simultaneously. This bounds RSS after
+large history/scoreboard responses whose temporary Python allocations are not
+returned to the operating system.
+
 A single Daphne process serving ports 8000 and 8001 was measured as an explicit
 low-memory mode. It reduced the HLLV backend from about 304 MiB to 147-165 MiB,
 but a ten-client unauthorized API benchmark dropped from about 180 to 96
@@ -124,6 +130,8 @@ defaults.
 | `HLL_DB_POOL_RECYCLE` | `900` | Seconds before a retained connection is recycled |
 | `HLL_API_SERVER_MODE` | `split` | `unified` is an opt-in low-memory ASGI mode; split Gunicorn + Daphne retains higher concurrency |
 | `HLL_GUNICORN_PRELOAD` | `auto` | Preload for multiple API workers; disabled automatically for one worker |
+| `HLL_GUNICORN_MAX_REQUESTS` | `1000` | Recycle a split Gunicorn worker after this many requests; zero disables recycling |
+| `HLL_GUNICORN_MAX_REQUESTS_JITTER` | `100` | Random extra requests before recycling to stagger instances |
 | `HLL_WH_IDLE_SLEEP_TIME` | `0.1` | Webhook loop delay when no queue has work |
 | `HLL_HISTORICAL_SCOREBOARD_CACHE_SECONDS` | `21600` | Completed scoreboard cache lifetime |
 | `MOBILE_PUSH_ACTIVE_POLL_SECONDS` | `1` | Push polling delay after successful work |
