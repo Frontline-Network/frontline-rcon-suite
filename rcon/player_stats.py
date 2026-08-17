@@ -3,6 +3,7 @@ import logging
 import os
 import pickle
 import re
+import threading
 import time
 from dataclasses import dataclass
 from typing import Callable, Iterable, Mapping, TypeAlias, TypedDict
@@ -768,7 +769,8 @@ def _next_live_stats_sleep(
     return max(0.1, min(session_remaining, game_remaining))
 
 
-def live_stats_loop():
+def live_stats_loop(stop_event=None):
+    stop_event = stop_event or threading.Event()
     live = LiveStats()
     config = RconServerSettingsUserConfig.load_from_db()
     last_loop_session = datetime.datetime(year=2020, month=1, day=1)
@@ -779,7 +781,7 @@ def live_stats_loop():
     logger.debug("live_game_sleep_seconds: {}".format(live_game_sleep_seconds))
     red = get_redis_client()
 
-    while True:
+    while not stop_event.is_set():
         # Keep track of session and game timers seperately
         last_loop_session_seconds = (
             datetime.datetime.now() - last_loop_session
@@ -824,7 +826,7 @@ def live_stats_loop():
         # the first job is actually due, while retaining a small lower bound
         # for zero/invalid legacy intervals.
         now = datetime.datetime.now()
-        time.sleep(
+        stop_event.wait(
             _next_live_stats_sleep(
                 now=now,
                 last_session_refresh=last_loop_session,

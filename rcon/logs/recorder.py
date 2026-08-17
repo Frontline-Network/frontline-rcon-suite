@@ -1,6 +1,7 @@
 import datetime
 import logging
 import os
+import threading
 import time
 from typing import Callable, Iterable
 
@@ -130,16 +131,17 @@ class LogRecorder:
             sess.rollback()
             logger.exception("Unable to record log batch")
 
-    def run(self, run_immediately=False, one_off=False):
+    def run(self, run_immediately=False, one_off=False, stop_event=None):
+        stop_event = stop_event or threading.Event()
         last_run = datetime.datetime.now()
         if run_immediately or one_off:
             last_run = last_run - datetime.timedelta(seconds=self.dump_frequency_seconds + 1)
 
-        while True:
+        while not stop_event.is_set():
             now = datetime.datetime.now()
             if not (now - last_run).total_seconds() > self.dump_frequency_seconds:
                 logger.debug("Not due for recording yet")
-                time.sleep(5)
+                stop_event.wait(5)
                 continue
             with enter_session() as sess:
                 to_store = self._get_new_logs(sess)

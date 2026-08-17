@@ -10,7 +10,7 @@ class SharedSupervisorRuntimeTests(unittest.TestCase):
         calls = 0
         stop_event = threading.Event()
 
-        def target():
+        def target(_stop_event):
             nonlocal calls
             calls += 1
             if calls == 1:
@@ -25,7 +25,7 @@ class SharedSupervisorRuntimeTests(unittest.TestCase):
         calls = 0
         stop_event = threading.Event()
 
-        def target():
+        def target(_stop_event):
             nonlocal calls
             calls += 1
 

@@ -9,55 +9,59 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
 RESTART_DELAY_SECONDS = 5.0
-MONITOR_INTERVAL_SECONDS = 5.0
+MONITOR_INTERVAL_SECONDS = 1.0
+STATE_KEY = "frontline:supervisor_runtime:services"
+RUNNING = "RUNNING"
+STOPPED = "STOPPED"
 
 
 @dataclass(frozen=True)
 class ServiceSpec:
     name: str
-    target: Callable[[], None]
+    target: Callable[[threading.Event], None]
 
 
-def _run_expiring_vips() -> None:
+def _run_expiring_vips(stop_event: threading.Event) -> None:
     from rcon.expiring_vips import service
 
-    service.run()
+    service.run(stop_event=stop_event)
 
 
-def _run_live_stats() -> None:
+def _run_live_stats(stop_event: threading.Event) -> None:
     from rcon.player_stats import live_stats_loop
 
-    live_stats_loop()
+    live_stats_loop(stop_event=stop_event)
 
 
-def _run_autobalancer() -> None:
+def _run_autobalancer(stop_event: threading.Event) -> None:
     from rcon.autobalancer import service
 
-    service.run()
+    service.run(stop_event=stop_event)
 
 
-def _run_blacklists() -> None:
+def _run_blacklists(stop_event: threading.Event) -> None:
     from rcon.blacklist import BlacklistCommandHandler
 
-    BlacklistCommandHandler().run()
+    BlacklistCommandHandler().run(stop_event=stop_event)
 
 
-def _run_log_recorder() -> None:
+def _run_log_recorder(stop_event: threading.Event) -> None:
     from rcon.logs.recorder import LogRecorder
 
-    LogRecorder(10).run()
+    LogRecorder(10).run(stop_event=stop_event)
 
 
-def _run_routines() -> None:
+def _run_routines(stop_event: threading.Event) -> None:
     from rcon import routines
 
-    routines.run()
+    routines.run(stop_event=stop_event)
 
 
 DEFAULT_SERVICES: tuple[ServiceSpec, ...] = (
@@ -78,8 +82,9 @@ def _service_loop(
     while not stop_event.is_set():
         try:
             logger.info("Starting shared supervisor service %s", spec.name)
-            spec.target()
-            logger.warning("Shared supervisor service %s returned", spec.name)
+            spec.target(stop_event)
+            if not stop_event.is_set():
+                logger.warning("Shared supervisor service %s returned", spec.name)
         except Exception:
             logger.exception("Shared supervisor service %s stopped", spec.name)
 
@@ -87,9 +92,7 @@ def _service_loop(
             return
 
 
-def _start_service(
-    spec: ServiceSpec, stop_event: threading.Event
-) -> threading.Thread:
+def _start_service(spec: ServiceSpec, stop_event: threading.Event) -> threading.Thread:
     thread = threading.Thread(
         target=_service_loop,
         args=(spec, stop_event),
@@ -107,23 +110,70 @@ def run(services: Sequence[ServiceSpec] = DEFAULT_SERVICES) -> None:
     from rcon.rcon import get_rcon
 
     get_rcon()
-    get_redis_client()
+    red = get_redis_client()
 
-    stop_event = threading.Event()
-    threads = {spec.name: _start_service(spec, stop_event) for spec in services}
+    runtime_stop_event = threading.Event()
+    threads: dict[str, threading.Thread] = {}
+    stop_events: dict[str, threading.Event] = {}
+    service_specs = {spec.name: spec for spec in services}
+
+    for name in service_specs:
+        red.hsetnx(STATE_KEY, f"{name}:desired", RUNNING)
+
+    def start_service(name: str) -> None:
+        stop_event = threading.Event()
+        stop_events[name] = stop_event
+        threads[name] = _start_service(service_specs[name], stop_event)
+        now = int(time.time())
+        red.hset(
+            STATE_KEY,
+            mapping={
+                f"{name}:state": RUNNING,
+                f"{name}:start": now,
+                f"{name}:spawnerr": "",
+            },
+        )
+
+    for name in service_specs:
+        if red.hget(STATE_KEY, f"{name}:desired") != STOPPED:
+            start_service(name)
+        else:
+            red.hset(STATE_KEY, f"{name}:state", STOPPED)
 
     try:
-        while not stop_event.wait(MONITOR_INTERVAL_SECONDS):
-            for spec in services:
-                thread = threads[spec.name]
-                if not thread.is_alive():
+        while not runtime_stop_event.wait(MONITOR_INTERVAL_SECONDS):
+            for name in service_specs:
+                desired = red.hget(STATE_KEY, f"{name}:desired") or RUNNING
+                thread = threads.get(name)
+
+                if desired == STOPPED:
+                    if thread and thread.is_alive():
+                        stop_events[name].set()
+                        thread.join(timeout=MONITOR_INTERVAL_SECONDS)
+                    if not thread or not thread.is_alive():
+                        threads.pop(name, None)
+                        stop_events.pop(name, None)
+                        red.hset(
+                            STATE_KEY,
+                            mapping={
+                                f"{name}:state": STOPPED,
+                                f"{name}:stop": int(time.time()),
+                            },
+                        )
+                    continue
+
+                if not thread or not thread.is_alive():
                     logger.error(
-                        "Shared supervisor thread %s died; restarting", spec.name
+                        "Shared supervisor thread %s died; restarting", name
                     )
-                    threads[spec.name] = _start_service(spec, stop_event)
+                    start_service(name)
+                else:
+                    red.hset(STATE_KEY, f"{name}:state", RUNNING)
     except KeyboardInterrupt:
         logger.info("Stopping shared supervisor runtime")
     finally:
-        stop_event.set()
-        for thread in threads.values():
+        runtime_stop_event.set()
+        for stop_event in stop_events.values():
+            stop_event.set()
+        for thread in list(threads.values()):
             thread.join(timeout=1)

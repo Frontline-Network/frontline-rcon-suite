@@ -1,4 +1,5 @@
 import logging
+import threading
 import time
 
 from rcon.audit import ingame_mods, online_mods
@@ -61,7 +62,8 @@ def _sleep_until_next_deadline(
     return max(0.1, min(30.0, min(active_deadlines) - now))
 
 
-def run():
+def run(stop_event: threading.Event | None = None):
+    stop_event = stop_event or threading.Event()
     max_fails = 5
     rcon = get_rcon()
     performance_interval = float(rcon.performance_stats_interval())
@@ -70,7 +72,7 @@ def run():
     )
     next_routines_run = time.monotonic()
 
-    while True:
+    while not stop_event.is_set():
         now = time.monotonic()
         if next_performance_dump is not None and now >= next_performance_dump:
             try:
@@ -93,7 +95,7 @@ def run():
                     raise
             next_routines_run = _next_deadline(30.0)
 
-        time.sleep(
+        stop_event.wait(
             _sleep_until_next_deadline(
                 next_routines_run,
                 next_performance_dump,

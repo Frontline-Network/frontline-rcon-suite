@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 import uuid
 from datetime import datetime, timezone
@@ -38,8 +39,9 @@ class AutobalancerService:
         self.token = new_instance_token()
         self._is_leader = False
 
-    def run(self) -> None:
-        while True:
+    def run(self, stop_event: threading.Event | None = None) -> None:
+        stop_event = stop_event or threading.Event()
+        while not stop_event.is_set():
             config = AutobalancerUserConfig.load_from_db()
             try:
                 if not self._is_leader:
@@ -72,7 +74,10 @@ class AutobalancerService:
                     )
                 except Exception:
                     logger.exception("Unable to publish autobalancer failure status")
-            time.sleep(config.poll_interval_seconds)
+            if stop_event.wait(config.poll_interval_seconds):
+                break
+        if self._is_leader:
+            self.store.release_leader(self.token)
 
     def tick(
         self,
@@ -875,5 +880,5 @@ class AutobalancerService:
         }
 
 
-def run() -> None:
-    AutobalancerService().run()
+def run(stop_event: threading.Event | None = None) -> None:
+    AutobalancerService().run(stop_event=stop_event)
