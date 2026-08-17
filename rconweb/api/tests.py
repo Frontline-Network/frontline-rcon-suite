@@ -1452,6 +1452,28 @@ class DiscordActionTemplateTests(TestCase):
 
 
 class DiscordOutboxWorkerModeTests(TestCase):
+    def test_http_delivery_commits_database_transaction_first(self):
+        from api.management.commands.discord_report_worker import Command
+
+        order = []
+        session = MagicMock()
+        session.commit.side_effect = lambda: order.append("commit")
+        response = MagicMock()
+        command = Command()
+        command._http.post = MagicMock(
+            side_effect=lambda *args, **kwargs: (order.append("http"), response)[1]
+        )
+
+        self.assertIs(
+            command._post_after_commit(
+                session,
+                "https://discord.example/v1/events",
+                json={"event": 1},
+            ),
+            response,
+        )
+        self.assertEqual(order, ["commit", "http"])
+
     def test_event_worker_never_processes_moderation_jobs(self):
         from api.management.commands.discord_report_worker import Command
 
