@@ -7,11 +7,17 @@ import os
 TRUE_VALUES = {"1", "true", "yes", "on", "enabled"}
 
 
-def _enabled(name: str, fallback: str | None = None) -> bool:
+def _value(name: str, fallback: str | None = None, default: str = "") -> str:
+    """Return a setting while treating an empty Compose value as unset."""
+
     value = os.getenv(name)
-    if value is None and fallback:
+    if (value is None or not value.strip()) and fallback:
         value = os.getenv(fallback)
-    return str(value or "").strip().lower() in TRUE_VALUES
+    return str(value if value is not None else default).strip()
+
+
+def _enabled(name: str, fallback: str | None = None) -> bool:
+    return _value(name, fallback).lower() in TRUE_VALUES
 
 
 def incident_capture_enabled() -> bool:
@@ -35,20 +41,14 @@ def ai_moderation_enabled() -> bool:
 
 
 def incident_triggers() -> tuple[str, ...]:
-    raw = os.getenv("INCIDENT_TRIGGERS")
-    if raw is None:
-        raw = os.getenv("MOBILE_INCIDENT_TRIGGERS", "")
+    raw = _value("INCIDENT_TRIGGERS", "MOBILE_INCIDENT_TRIGGERS")
     return tuple(
         dict.fromkeys(item.strip().lower() for item in raw.split(",") if item.strip())
     )
 
 
 def incident_context_mode() -> str:
-    raw = (
-        os.getenv("INCIDENT_CONTEXT_MODE", os.getenv("MOBILE_CONTEXT_V2", "disabled"))
-        .strip()
-        .lower()
-    )
+    raw = _value("INCIDENT_CONTEXT_MODE", "MOBILE_CONTEXT_V2", "disabled").lower()
     if raw in TRUE_VALUES:
         return "enabled"
     if raw == "shadow":
@@ -57,9 +57,10 @@ def incident_context_mode() -> str:
 
 
 def incident_context_fuzzy_threshold(default: float = 0.74) -> float:
-    raw = os.getenv(
+    raw = _value(
         "INCIDENT_CONTEXT_FUZZY_THRESHOLD",
-        os.getenv("MOBILE_CONTEXT_FUZZY_THRESHOLD", str(default)),
+        "MOBILE_CONTEXT_FUZZY_THRESHOLD",
+        str(default),
     )
     try:
         value = float(raw)
@@ -69,9 +70,10 @@ def incident_context_fuzzy_threshold(default: float = 0.74) -> float:
 
 
 def incident_retention_days(default: int = 90) -> int:
-    raw = os.getenv(
+    raw = _value(
         "INCIDENT_RETENTION_DAYS",
-        os.getenv("MOBILE_INCIDENT_RETENTION_DAYS", str(default)),
+        "MOBILE_INCIDENT_RETENTION_DAYS",
+        str(default),
     )
     try:
         return max(1, min(int(raw), 3650))

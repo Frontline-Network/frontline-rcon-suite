@@ -99,6 +99,85 @@ def test_parser_recognizes_multiple_players_anywhere_in_message():
     assert parsed["target_id"] == "charlie"
 
 
+def test_parser_keeps_live_player_stats_in_confirmed_subject():
+    parsed = incidents.parse_chat_report(
+        "!admin Biene test",
+        reporter_context={"team": "Allies"},
+        current_players=[
+            {
+                "name": "Biene",
+                "player_id": "biene-id",
+                "team": "allies",
+                "unit_name": "able",
+                "role": "officer",
+                "kills": 7,
+                "deaths": 3,
+                "team_kills": 0,
+                "map_playtime_seconds": 1200,
+            }
+        ],
+    )
+
+    subject = parsed["primary_subject"]
+    assert subject["player_id"] == "biene-id"
+    assert subject["squad_name"] == "able"
+    assert subject["snapshot"]["kills"] == 7
+    assert subject["snapshot"]["deaths"] == 3
+    assert subject["snapshot"]["teamkills"] == 0
+    assert subject["snapshot"]["map_playtime_seconds"] == 1200
+
+
+def test_parser_maps_commander_alias_to_reporter_team_with_stats():
+    parsed = incidents.parse_chat_report(
+        "!admin commander macht wieder Sachen",
+        reporter_context={"team": "Allies"},
+        current_players=[
+            {
+                "name": "Allied Commander",
+                "player_id": "allied-command",
+                "team": "allies",
+                "role": "armycommander",
+                "kills": 4,
+                "deaths": 2,
+                "map_playtime_seconds": 900,
+            },
+            {
+                "name": "Axis Commander",
+                "player_id": "axis-command",
+                "team": "axis",
+                "role": "armycommander",
+                "kills": 8,
+            },
+        ],
+    )
+
+    subject = parsed["primary_subject"]
+    assert subject["player_id"] == "allied-command"
+    assert subject["state"] == "confirmed"
+    assert subject["match_method"] == "team_commander"
+    assert subject["snapshot"]["kills"] == 4
+    assert subject["snapshot"]["deaths"] == 2
+    assert subject["snapshot"]["map_playtime_seconds"] == 900
+
+
+def test_parser_maps_vietnam_commander_role_to_reporter_team():
+    parsed = incidents.parse_chat_report(
+        "!admin Kommandant sabotiert das Team",
+        reporter_context={"team": "axis"},
+        current_players=[
+            {
+                "name": "Vietnam Commander",
+                "player_id": "hllv-command",
+                "team": "axis",
+                "role": "commander",
+            }
+        ],
+    )
+
+    assert parsed["target_id"] == "hllv-command"
+    assert parsed["primary_subject"]["role"] == "commander"
+
+
 def test_parser_recognizes_reporter_team_squad_and_captures_members():
     parsed = incidents.parse_chat_report(
         "!admin Item keine Kommunikation",

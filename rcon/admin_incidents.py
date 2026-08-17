@@ -30,6 +30,8 @@ DEFAULT_FUZZY_THRESHOLD = 0.74
 SQUAD_LEADER_ROLES = get_squad_leader_roles(
     GameEnum.HLL_WW2
 ) | get_squad_leader_roles(GameEnum.HLL_VIETNAM)
+COMMANDER_ROLES = {"armycommander", "commander"}
+COMMANDER_ALIASES = ("commander", "kommandant", "kommandeur")
 
 
 def _mobile_context_fuzzy_threshold() -> float:
@@ -126,6 +128,14 @@ def player_snapshot(player: dict | None) -> dict:
 def _is_squad_leader(player: dict) -> bool:
     role = re.sub(r"[^a-z0-9]", "", str(player.get("role") or "").casefold())
     return role in SQUAD_LEADER_ROLES
+
+
+def _is_commander(player: dict) -> bool:
+    role = re.sub(r"[^a-z0-9]", "", str(player.get("role") or "").casefold())
+    unit_type = re.sub(
+        r"[^a-z0-9]", "", str(player.get("unit_type") or "").casefold()
+    )
+    return role in COMMANDER_ROLES or unit_type == "commander"
 
 
 def _squad_leader(players: list[dict]) -> dict | None:
@@ -245,6 +255,48 @@ def _resolve_subjects(
                         else normalized_message.find(matched_text)
                     ),
                     "_match_length": len(matched_text),
+                }
+            )
+
+    commander_match = re.search(
+        rf"(?<!\w)(?:{'|'.join(map(re.escape, COMMANDER_ALIASES))})(?!\w)",
+        normalized_message,
+    )
+    if commander_match:
+        reporter_team = _normalize_team(reporter_context.get("team"))
+        commanders = [
+            player
+            for player in current_players
+            if _is_commander(player) and player.get("player_id")
+        ]
+        matching_commanders = [
+            player
+            for player in commanders
+            if reporter_team and _normalize_team(player.get("team")) == reporter_team
+        ]
+        unique = len(matching_commanders) == 1
+        for player in matching_commanders:
+            snapshot = player_snapshot(player)
+            candidates.append(
+                {
+                    "kind": "player",
+                    "state": "suggested" if shadow or not unique else "confirmed",
+                    "is_primary": False,
+                    "display_name": str(
+                        player.get("name") or player.get("player_name") or "Commander"
+                    ),
+                    "player_id": str(player.get("player_id")),
+                    "team": player.get("team"),
+                    "squad_name": player.get("unit_name"),
+                    "squad_id": _simple_value(player.get("unit_id")),
+                    "role": player.get("role"),
+                    "confidence": 1.0,
+                    "match_method": "team_commander",
+                    "matched_text": commander_match.group(0),
+                    "parser_version": PARSER_VERSION,
+                    "snapshot": snapshot,
+                    "_position": commander_match.start(),
+                    "_match_length": len(commander_match.group(0)),
                 }
             )
 

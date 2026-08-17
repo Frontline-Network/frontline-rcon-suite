@@ -49,3 +49,21 @@ def test_generic_values_override_legacy_values():
     ):
         assert incident_triggers() == ("!help",)
         assert incident_context_mode() == "enabled"
+
+
+def test_empty_generic_values_fall_back_to_legacy_values():
+    with patch.dict(
+        "os.environ",
+        {
+            "INCIDENT_TRIGGERS": "",
+            "MOBILE_INCIDENT_TRIGGERS": "!admin",
+            "INCIDENT_CONTEXT_MODE": "",
+            "MOBILE_CONTEXT_V2": "enabled",
+            "INCIDENT_RETENTION_DAYS": "",
+            "MOBILE_INCIDENT_RETENTION_DAYS": "45",
+        },
+        clear=True,
+    ):
+        assert incident_triggers() == ("!admin",)
+        assert incident_context_mode() == "enabled"
+        assert incident_retention_days() == 45
