@@ -76,6 +76,17 @@ periodic performance-statistics dump. That dump now runs on its own monotonic
 deadline inside the existing routines service, preserving its configured
 interval while removing one Python process per gameserver.
 
+Gunicorn preload is also skipped by default when only one worker is configured.
+This retained the split HTTP/WebSocket architecture while reducing backend RAM
+materially on busy instances.
+
+A single Daphne process serving ports 8000 and 8001 was measured as an explicit
+low-memory mode. It reduced the HLLV backend from about 304 MiB to 147-165 MiB,
+but a ten-client unauthorized API benchmark dropped from about 180 to 96
+requests/second. A 200-OK documentation benchmark also favored split mode
+(18.25 versus 16.34 requests/second). `unified` therefore remains opt-in and
+must not be the production default.
+
 ## Configuration
 
 All settings are optional and existing installations receive conservative
@@ -86,7 +97,7 @@ defaults.
 | `HLL_DB_POOL_SIZE` | `1` | Persistent SQLAlchemy connections per supervisor process |
 | `HLL_DB_MAX_OVERFLOW` | `2` | Temporary connections allowed during a short burst |
 | `HLL_DB_POOL_RECYCLE` | `900` | Seconds before a retained connection is recycled |
-| `HLL_API_SERVER_MODE` | `auto` | One-worker APIs use one ASGI process for HTTP and WebSockets; `split` restores Gunicorn + Daphne |
+| `HLL_API_SERVER_MODE` | `split` | `unified` is an opt-in low-memory ASGI mode; split Gunicorn + Daphne retains higher concurrency |
 | `HLL_GUNICORN_PRELOAD` | `auto` | Preload for multiple API workers; disabled automatically for one worker |
 | `HLL_WH_IDLE_SLEEP_TIME` | `0.1` | Webhook loop delay when no queue has work |
 | `HLL_HISTORICAL_SCOREBOARD_CACHE_SECONDS` | `21600` | Completed scoreboard cache lifetime |

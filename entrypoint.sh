@@ -97,9 +97,8 @@ then
     echo "from django.contrib.auth.models import User; User.objects.create_superuser('admin', 'admin@example.com', 'admin') if not User.objects.filter(username='admin').first() else None" | python manage.py shell
   fi
   export LOGGING_FILENAME=api_$SERVER_NUMBER.log
-  API_SERVER_MODE="${HLL_API_SERVER_MODE:-auto}"
-  if [[ "$API_SERVER_MODE" == "unified" ]] || \
-     [[ "$API_SERVER_MODE" == "auto" && "$NB_API_WORKERS" == "1" ]]
+  API_SERVER_MODE="${HLL_API_SERVER_MODE:-split}"
+  if [[ "$API_SERVER_MODE" == "unified" ]]
   then
     # Daphne serves the same ASGI application over both ports expected by the
     # existing Nginx config. With one API worker this avoids loading Django in

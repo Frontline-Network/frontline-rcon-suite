@@ -13,11 +13,11 @@ def test_single_worker_gunicorn_preload_is_not_unconditional():
     assert "gunicorn --preload" not in entrypoint
 
 
-def test_single_worker_api_uses_one_asgi_process_on_both_existing_ports():
+def test_unified_api_mode_is_explicit_opt_in_and_uses_both_existing_ports():
     entrypoint = (REPO_ROOT / "entrypoint.sh").read_text(encoding="utf-8")
 
-    assert 'API_SERVER_MODE="${HLL_API_SERVER_MODE:-auto}"' in entrypoint
-    assert '"$API_SERVER_MODE" == "auto" && "$NB_API_WORKERS" == "1"' in entrypoint
+    assert 'API_SERVER_MODE="${HLL_API_SERVER_MODE:-split}"' in entrypoint
+    assert '[[ "$API_SERVER_MODE" == "unified" ]]' in entrypoint
     assert "-e tcp:port=8000:interface=0.0.0.0" in entrypoint
     assert "-e tcp:port=8001:interface=0.0.0.0" in entrypoint
     assert "rconweb.asgi:application" in entrypoint
