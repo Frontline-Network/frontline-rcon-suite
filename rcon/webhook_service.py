@@ -835,7 +835,10 @@ async def dequeue_message(
 
 
 def get_queue_registry_key(prefix: str = PREFIX) -> str:
-    return f"{prefix}:{get_server_number()}:{QUEUE_REGISTRY_SUFFIX}"
+    # The webhook consumer is installation-wide and intentionally has no
+    # SERVER_NUMBER. Queue keys still contain their originating server number,
+    # while this single registry indexes queues from every configured server.
+    return f"{prefix}:{QUEUE_REGISTRY_SUFFIX}"
 
 
 def _decode_queue_ids(values) -> set[str]:

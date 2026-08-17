@@ -27,6 +27,10 @@ def _message(message_type=WebhookMessageType.AUDIT):
     )
 
 
+def test_queue_registry_is_installation_wide():
+    assert get_queue_registry_key(prefix="whs") == "whs:queue_registry"
+
+
 def test_webhook_404_without_message_id_marks_error_and_purges_webhook_queue():
     red = Mock()
 
