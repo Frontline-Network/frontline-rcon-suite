@@ -87,6 +87,31 @@ requests/second. A 200-OK documentation benchmark also favored split mode
 (18.25 versus 16.34 requests/second). `unified` therefore remains opt-in and
 must not be the production default.
 
+The Mobile Push, Discord event and Discord moderation loops can be run in one
+shared process with `compose.combined-workers.yaml`. The loops remain isolated
+in three threads with their own HTTP and database sessions, so a 180-second AI
+request cannot block a report or push notification. The Discord outbox commits
+its SQL transaction before every broker or AI request. Background-only Django
+commands also skip URL/view system checks.
+
+On the RCON1-4 canary, the three split workers consumed about 165 MiB each
+(about 495 MiB total). The combined process consumed 164.3 MiB with all three
+threads running, saving about 331 MiB (67%) for this worker group. Its five
+database clients were all `idle`; none was `idle in transaction`. All four
+public RCON endpoints returned HTTP 200 in 33-37 ms during the switch.
+
+Enable the opt-in mode with:
+
+```bash
+docker compose --profile combined-workers \
+  -f compose.yaml \
+  -f compose.mobile-admin.yaml \
+  -f compose.combined-workers.yaml up -d --remove-orphans
+```
+
+Do not run this profile concurrently with the split workers. Event and broker
+idempotency are still retained as a last-resort retry safeguard.
+
 ## Configuration
 
 All settings are optional and existing installations receive conservative
@@ -104,6 +129,8 @@ defaults.
 | `MOBILE_PUSH_ACTIVE_POLL_SECONDS` | `1` | Push polling delay after successful work |
 | `MOBILE_PUSH_IDLE_POLL_SECONDS` | `10` | Maximum push polling delay while idle |
 | `MOBILE_PUSH_DEVICE_CACHE_SECONDS` | `60` | Device and permission cache lifetime |
+| `DISCORD_WORKER_ACTIVE_POLL_SECONDS` | `0.25` | Delay after successful Discord outbox work |
+| `DISCORD_WORKER_IDLE_POLL_SECONDS` | `1` for event/mixed workers, `10` for moderation-only | Maximum idle polling delay |
 
 ## Canary measurement
 
@@ -127,6 +154,11 @@ The phase has no schema migration and does not delete data. Roll back by
 deploying the previous image. The Redis queue registry is additive and harmless
 to older releases. To restore previous timing temporarily, set
 `HLL_WH_IDLE_SLEEP_TIME=0.006` and `MOBILE_PUSH_IDLE_POLL_SECONDS=1`.
+
+To roll back combined delivery workers, stop `frontline_background_worker` and
+start `mobile_push_worker`, `discord_report_worker` and
+`discord_moderation_worker` with the normal Mobile Admin Compose stack. Never
+leave both modes running together.
 
 Database retention and index replacement require their own migration, backup
 and rollback plans. Process consolidation must be canaried separately from

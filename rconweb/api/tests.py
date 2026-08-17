@@ -1457,6 +1457,17 @@ class DiscordOutboxWorkerModeTests(TestCase):
 
         self.assertEqual(Command.requires_system_checks, [])
 
+    @patch.dict("os.environ", {}, clear=True)
+    def test_moderation_worker_uses_longer_idle_backoff(self):
+        from api.management.commands.discord_report_worker import Command
+
+        self.assertEqual(
+            Command._poll_intervals(moderation_only=False), (0.25, 1.0)
+        )
+        self.assertEqual(
+            Command._poll_intervals(moderation_only=True), (0.25, 10.0)
+        )
+
     def test_http_delivery_commits_database_transaction_first(self):
         from api.management.commands.discord_report_worker import Command
 

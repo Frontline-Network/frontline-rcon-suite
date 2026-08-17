@@ -69,6 +69,19 @@ class Command(BaseCommand):
             help="Process AI moderation jobs without delivering incident events",
         )
 
+    @staticmethod
+    def _poll_intervals(*, moderation_only: bool) -> tuple[float, float]:
+        active = max(
+            0.1,
+            float(os.getenv("DISCORD_WORKER_ACTIVE_POLL_SECONDS", "0.25")),
+        )
+        idle_default = "10" if moderation_only else "1"
+        idle = max(
+            active,
+            float(os.getenv("DISCORD_WORKER_IDLE_POLL_SECONDS", idle_default)),
+        )
+        return active, idle
+
     def handle(self, *args, **options):
         events_only = bool(options.get("events_only"))
         moderation_only = bool(options.get("moderation_only"))
@@ -76,6 +89,10 @@ class Command(BaseCommand):
             raise CommandError(
                 "--events-only and --moderation-only cannot be used together"
             )
+        active_sleep, maximum_idle_sleep = self._poll_intervals(
+            moderation_only=moderation_only
+        )
+        sleep_seconds = active_sleep
         self.stdout.write(
             "CRCON Discord outbox worker started "
             f"(events={not moderation_only}, moderation={not events_only})"
@@ -92,7 +109,11 @@ class Command(BaseCommand):
                     f"Discord outbox iteration failed: {type(exc).__name__}"
                 )
                 delivered = 0
-            time.sleep(0.25 if delivered else 1.0)
+            if delivered:
+                sleep_seconds = active_sleep
+            else:
+                sleep_seconds = min(maximum_idle_sleep, sleep_seconds * 2)
+            time.sleep(sleep_seconds)
 
     def _deliver_batch(
         self, *, deliver_events: bool = True, deliver_moderation: bool = True
