@@ -116,6 +116,10 @@ This phase was canaried on RCON3 (HLL Vietnam), then RCON1 (HLL), before RCON2
 and RCON4. All four backends were healthy, their public URLs returned HTTP 200
 in 35-56 ms, and no new traceback, exception, or failed-operation log appeared
 during the rollout window. Frontend containers remained at about 3.5 MiB RAM.
+A later 30-second stability sample recorded one Redis `SCAN`, 47 idle CRCON
+database clients (down from the 63-connection baseline), and no client `idle in
+transaction`. The four public responses completed in 39-62 ms and the host
+still had about 16 GiB available memory.
 
 ## Host-level load outside the suite
 
