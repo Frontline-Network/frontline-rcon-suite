@@ -5,7 +5,7 @@ from unittest import mock
 import redis
 import redis.exceptions
 
-from rcon.cache_utils import RedisCached, invalidates_for, ttl_cache
+from rcon.cache_utils import REDIS_SCAN_COUNT, RedisCached, invalidates_for, ttl_cache
 
 logger = getLogger(__name__)
 
@@ -89,6 +89,24 @@ def test_clear_for_tolerates_unavailable_redis():
     )
 
     cached.clear_for()
+
+
+def test_clear_all_scans_cache_keys_in_larger_batches():
+    red = mock.Mock()
+    red.scan_iter.return_value = iter([])
+    cached_func = mock.Mock(spec=_needs_qual_name)
+    cached = RedisCached(
+        pool=None,
+        red=red,
+        ttl_seconds=1,
+        function=cached_func,
+    )
+
+    cached.clear_all()
+
+    red.scan_iter.assert_called_once_with(
+        match=f"{cached.key_prefix}*", count=REDIS_SCAN_COUNT
+    )
 
 
 def test_invalidates_for_clears_exact_key_before_and_after():
