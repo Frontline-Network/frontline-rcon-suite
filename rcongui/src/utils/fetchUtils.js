@@ -250,6 +250,12 @@ export const cmd = {
   // Yes, it is POST request, but it is not a POST command => it's not mutating the server state
   GET_LIVE_LOGS: (params) =>
     requestFactory({ method: "POST", cmd: "get_recent_logs", ...params }),
+  GET_DASHBOARD_LOGS: (params) =>
+    requestFactory({
+      method: "POST",
+      cmd: "get_recent_logs_summary",
+      ...params,
+    }),
   GET_LIVE_SESSIONS: (params) =>
     requestFactory({ method: "GET", cmd: "get_live_scoreboard", ...params }),
   GET_LIVE_TEAMS: (params) =>

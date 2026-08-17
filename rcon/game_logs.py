@@ -172,6 +172,62 @@ def get_recent_logs(
     }
 
 
+def get_recent_logs_summary(
+    end: int = 15_000,
+    per_action_limit: int = 100,
+    log_history=None,
+) -> dict:
+    """Build the dashboard projection without retaining a full log payload."""
+    if not isinstance(end, int):
+        end = 15_000
+    if not isinstance(per_action_limit, int):
+        per_action_limit = 100
+    end = min(max(end, 0), 100_000)
+    per_action_limit = min(max(per_action_limit, 1), 500)
+
+    log_list = log_history if log_history is not None else LogLoop.get_log_history_list()
+    iter_range = getattr(log_list, "iter_range", None)
+    if callable(iter_range):
+        source = iter_range(start=0, stop=end)
+    else:
+        source = iter(log_list[:end])
+
+    groups: dict[str, list[dict]] = {}
+    admin_logs: list[dict] = []
+
+    def project(line):
+        return {
+            "player_id_1": line.get("player_id_1"),
+            "player_name_1": line.get("player_name_1"),
+            "player_id_2": line.get("player_id_2"),
+            "player_name_2": line.get("player_name_2"),
+            "message": line.get("message"),
+            "timestamp_ms": line.get("timestamp_ms"),
+            "action": line.get("action"),
+        }
+
+    for line in source:
+        if not isinstance(line, dict):
+            continue
+        action = line.get("action")
+        if not action:
+            continue
+        bucket = groups.setdefault(action, [])
+        projected = None
+        if len(bucket) < per_action_limit:
+            projected = project(line)
+            bucket.append(projected)
+        if action.startswith("CHAT") and "!admin" in (line.get("message") or ""):
+            admin_logs.append(projected or project(line))
+
+    return {
+        "groups": [
+            {"group": action, "logs": logs} for action, logs in groups.items()
+        ],
+        "admin_logs": admin_logs,
+    }
+
+
 def get_historical_logs_records(
     sess: Session,
     player_name: str | None = None,

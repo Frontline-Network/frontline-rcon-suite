@@ -24,6 +24,51 @@ def test_recent_logs_reads_only_requested_page(monkeypatch):
     log_history.__iter__.assert_not_called()
 
 
+def test_dashboard_log_summary_bounds_and_projects_payload():
+    def line(index, action="KILL", message=""):
+        return {
+            "timestamp_ms": 2_000 - index,
+            "action": action,
+            "message": message,
+            "player_name_1": "one",
+            "player_id_1": "1",
+            "player_name_2": "two",
+            "player_id_2": "2",
+            "raw": "large field not needed by dashboard",
+            "weapon": "not needed",
+        }
+
+    source = [line(index) for index in range(150)]
+    source.extend(
+        [
+            line(151, "CHAT[Team]", "normal"),
+            line(152, "CHAT[Team]", "!admin help"),
+        ]
+    )
+    history = mock.Mock()
+    history.iter_range.return_value = iter(source)
+
+    result = game_logs.get_recent_logs_summary(
+        end=15_000,
+        per_action_limit=100,
+        log_history=history,
+    )
+    groups = {item["group"]: item["logs"] for item in result["groups"]}
+
+    assert len(groups["KILL"]) == 100
+    assert groups["KILL"][0] == {
+        "player_id_1": "1",
+        "player_name_1": "one",
+        "player_id_2": "2",
+        "player_name_2": "two",
+        "message": "",
+        "timestamp_ms": 2_000,
+        "action": "KILL",
+    }
+    assert [item["message"] for item in result["admin_logs"]] == ["!admin help"]
+    history.iter_range.assert_called_once_with(start=0, stop=15_000)
+
+
 def test_fixed_len_list_iter_range_stops_after_short_page():
     history = LogsHistory.__new__(LogsHistory)
     history.red = mock.Mock()

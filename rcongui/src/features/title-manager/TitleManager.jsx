@@ -20,32 +20,24 @@ const blinkInterval = 500;
 
 const TitleManager = () => {
   const { t } = useTranslation();
-  const {
-    data: gameState,
-    isLoading: isGameLoading,
-  } = useQuery({
+  const { data: gameState, isLoading: isGameLoading } = useQuery({
     queryKey: [{ queryIdentifier: "get_gamestate" }],
     queryFn: cmd.GET_GAME_STATE,
-    refetchIntervalInBackground: true,
     refetchInterval: 30_000,
   });
 
-  const {
-    data: serverState,
-    isLoading: isServerLoading,
-  } = useQuery({
+  const { data: serverState, isLoading: isServerLoading } = useQuery({
     queryKey: [{ queryIdentifier: "get_status" }],
     queryFn: async () => {
       let result;
       try {
-        result = await cmd.GET_GAME_SERVER_STATUS()
+        result = await cmd.GET_GAME_SERVER_STATUS();
         useGlobalStore.setState((state) => ({ status: result }));
       } catch (error) {
         useGlobalStore.setState((state) => ({ status: null }));
       }
-      return result
+      return result;
     },
-    refetchIntervalInBackground: true,
     refetchInterval: 30_000,
     retry: 1,
   });

@@ -40,23 +40,16 @@ const Dashboard = () => {
   const { data: logs = [] } = useQuery({
     queryKey: ["logs", "dashboard"],
     queryFn: async () => {
-      const rawLogs = await cmd.GET_LIVE_LOGS({
+      const rawLogs = await cmd.GET_DASHBOARD_LOGS({
         payload: {
           end: 15000,
-          filter_action: [],
-          filter_player: [],
-          inclusive_filter: true,
+          per_action_limit: 100,
         },
       });
 
-      const logs = Object.entries(
-        rawLogs.result.logs.reduce((acc, log) => {
-          acc[log.action] = (acc[log.action] || []).concat(log);
-          return acc;
-        }, {})
-      ).map(([action, logs]) => ({
-        group: action,
-        logs: logs.slice(0, 100).map((log) => ({
+      const logs = rawLogs.result.groups.map(({ group, logs }) => ({
+        group,
+        logs: logs.map((log) => ({
           user_1: {
             id: log.player_id_1,
             name: log.player_name_1,
@@ -71,24 +64,19 @@ const Dashboard = () => {
         })),
       }));
 
-      const adminLogs = rawLogs.result.logs
-        .filter(
-          (log) =>
-            log.action.startsWith("CHAT") && log.message.includes("!admin")
-        )
-        .map((log) => ({
-          user_1: {
-            id: log.player_id_1,
-            name: log.player_name_1,
-          },
-          user_2: {
-            id: log.player_id_2,
-            name: log.player_name_2,
-          },
-          message: log.message,
-          timestamp: log.timestamp_ms,
-          action: log.action,
-        }));
+      const adminLogs = rawLogs.result.admin_logs.map((log) => ({
+        user_1: {
+          id: log.player_id_1,
+          name: log.player_name_1,
+        },
+        user_2: {
+          id: log.player_id_2,
+          name: log.player_name_2,
+        },
+        message: log.message,
+        timestamp: log.timestamp_ms,
+        action: log.action,
+      }));
 
       logs.push({
         group: "ADMIN",
@@ -117,61 +105,80 @@ const Dashboard = () => {
 
   return (
     <Box sx={{ py: { xs: 2, md: 2.5 } }}>
-      <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ sm: "end" }} sx={{ mb: 2 }}>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        justifyContent="space-between"
+        alignItems={{ sm: "end" }}
+        sx={{ mb: 2 }}
+      >
         <Box>
-          <Typography variant="h3" sx={{ textTransform: "uppercase" }}>{t("dashboard.title")}</Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase" }}>{t("dashboard.subtitle")}</Typography>
+          <Typography variant="h3" sx={{ textTransform: "uppercase" }}>
+            {t("dashboard.title")}
+          </Typography>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ textTransform: "uppercase" }}
+          >
+            {t("dashboard.subtitle")}
+          </Typography>
         </Box>
-        <Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase", mt: { xs: 1, sm: 0 } }}>
-          {dayjs().locale(i18n.resolvedLanguage || "de").format("dddd, D. MMMM YYYY")}
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ textTransform: "uppercase", mt: { xs: 1, sm: 0 } }}
+        >
+          {dayjs()
+            .locale(i18n.resolvedLanguage || "de")
+            .format("dddd, D. MMMM YYYY")}
         </Typography>
       </Stack>
 
       <BattleOverview />
 
       <Grid container sx={{ overflow: "hidden", mt: 2 }} spacing={2}>
-      <Grid size={LARGE_CARD_SIZE}>
-        <FrontlineAppCard />
-      </Grid>
-      <Grid size={SMALL_CARD_SIZE}>
-        <ServerSettingsCard />
-      </Grid>
+        <Grid size={LARGE_CARD_SIZE}>
+          <FrontlineAppCard />
+        </Grid>
+        <Grid size={SMALL_CARD_SIZE}>
+          <ServerSettingsCard />
+        </Grid>
 
-      <Grid size={SMALL_CARD_SIZE}>
-        <AutomodsCard />
-      </Grid>
+        <Grid size={SMALL_CARD_SIZE}>
+          <AutomodsCard />
+        </Grid>
 
-      <Grid size={MEDIUM_CARD_SIZE}>
-        <ServicesCard />
-      </Grid>
+        <Grid size={MEDIUM_CARD_SIZE}>
+          <ServicesCard />
+        </Grid>
 
-      <Grid size={SMALL_CARD_SIZE}>
-        <MapRotationCard />
-      </Grid>
+        <Grid size={SMALL_CARD_SIZE}>
+          <MapRotationCard />
+        </Grid>
 
-      <Grid size={SMALL_CARD_SIZE}>
-        <VIPWatchedCard />
-      </Grid>
+        <Grid size={SMALL_CARD_SIZE}>
+          <VIPWatchedCard />
+        </Grid>
 
-      <Grid size={SMALL_CARD_SIZE}>
-        <FlaggedPlayersCard />
-      </Grid>
+        <Grid size={SMALL_CARD_SIZE}>
+          <FlaggedPlayersCard />
+        </Grid>
 
-      <Grid size={SMALL_CARD_SIZE}>
-        <ModeratorsCard />
-      </Grid>
+        <Grid size={SMALL_CARD_SIZE}>
+          <ModeratorsCard />
+        </Grid>
 
-      <Grid size={LARGE_CARD_SIZE}>
-        <LogsCard logs={logs} />
-      </Grid>
+        <Grid size={LARGE_CARD_SIZE}>
+          <LogsCard logs={logs} />
+        </Grid>
 
-      <Grid size={MEDIUM_CARD_SIZE}>
-        <GamesCard games={games.slice(0, 15)} />
-      </Grid>
+        <Grid size={MEDIUM_CARD_SIZE}>
+          <GamesCard games={games.slice(0, 15)} />
+        </Grid>
 
-      <Grid size={MEDIUM_CARD_SIZE}>
-        <MapStatsCard games={games} />
-      </Grid>
+        <Grid size={MEDIUM_CARD_SIZE}>
+          <MapStatsCard games={games} />
+        </Grid>
       </Grid>
     </Box>
   );
