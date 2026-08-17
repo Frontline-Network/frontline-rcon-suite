@@ -118,7 +118,7 @@ def test_parser_keeps_live_player_stats_in_confirmed_subject():
         ],
     )
 
-    subject = parsed["primary_subject"]
+    subject = parsed["subjects"][0]
     assert subject["player_id"] == "biene-id"
     assert subject["squad_name"] == "able"
     assert subject["snapshot"]["kills"] == 7
@@ -151,7 +151,7 @@ def test_parser_maps_commander_alias_to_reporter_team_with_stats():
         ],
     )
 
-    subject = parsed["primary_subject"]
+    subject = parsed["subjects"][0]
     assert subject["player_id"] == "allied-command"
     assert subject["state"] == "confirmed"
     assert subject["match_method"] == "team_commander"
@@ -175,7 +175,7 @@ def test_parser_maps_vietnam_commander_role_to_reporter_team():
     )
 
     assert parsed["target_id"] == "hllv-command"
-    assert parsed["primary_subject"]["role"] == "commander"
+    assert parsed["subjects"][0]["role"] == "commander"
 
 
 def test_parser_recognizes_reporter_team_squad_and_captures_members():
