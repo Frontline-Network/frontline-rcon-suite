@@ -72,6 +72,9 @@ fi
 # Check if we're in a backend container
 if [ "$1" == 'web' ]
 then
+  # A container restart may preserve this file through an image layer or
+  # mounted working directory. Health must describe the current process only.
+  rm -f /code/rconweb/gunicorn.pid
   # If the database password isn't set, bail early
   if [ "$HLL_DB_PASSWORD" == '' ]
   then
@@ -109,7 +112,8 @@ then
     # Daphne serves the same ASGI application over both ports expected by the
     # existing Nginx config. With one API worker this avoids loading Django in
     # separate Gunicorn and Daphne processes while preserving WebSockets.
-    touch gunicorn.pid
+    # Daphne replaces this shell via exec, so the current PID remains valid.
+    echo $$ > gunicorn.pid
     daphne \
       -e tcp:port=8000:interface=0.0.0.0 \
       -e tcp:port=8001:interface=0.0.0.0 \

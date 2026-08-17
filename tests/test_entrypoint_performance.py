@@ -33,3 +33,20 @@ def test_split_api_workers_recycle_after_bounded_request_count():
     )
     assert '--max-requests "$GUNICORN_MAX_REQUESTS"' in entrypoint
     assert '--max-requests-jitter "$GUNICORN_MAX_REQUESTS_JITTER"' in entrypoint
+
+
+def test_backend_start_removes_stale_pid_and_unified_mode_records_real_pid():
+    entrypoint = (REPO_ROOT / "entrypoint.sh").read_text(encoding="utf-8")
+
+    assert "rm -f /code/rconweb/gunicorn.pid" in entrypoint
+    assert "echo $$ > gunicorn.pid" in entrypoint
+
+
+def test_backend_healthchecks_validate_the_recorded_process():
+    for template_name in ("one-server.yaml", "ten-servers.yaml"):
+        template = (REPO_ROOT / "docker-templates" / template_name).read_text(
+            encoding="utf-8"
+        )
+
+        assert "cat /code/rconweb/gunicorn.pid" in template
+        assert 'kill -0 \\"$$pid\\"' in template
