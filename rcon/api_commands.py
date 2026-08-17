@@ -655,7 +655,7 @@ class RconAPI(Rcon):
         filter_action: list[str] = [],
         inclusive_filter: bool = True,
         start: int = 0,
-        end: int = 10000,
+        end: int = 500,
         exact_player_match: bool = True,
         exact_action: bool = False,
     ) -> ParsedLogsType:

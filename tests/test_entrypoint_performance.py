@@ -63,3 +63,19 @@ def test_backend_health_endpoint_does_not_probe_external_dependencies():
     assert "HttpResponse(status=204)" in urls
     assert "http://127.0.0.1:8000/healthz" in healthcheck
     assert '("127.0.0.1", 8001)' in healthcheck
+
+
+def test_frontend_uses_one_event_driven_nginx_worker_per_instance():
+    dockerfile = (REPO_ROOT / "Dockerfile-frontend").read_text(encoding="utf-8")
+
+    assert "worker_processes 1" in dockerfile
+
+
+def test_public_recent_logs_default_is_bounded_without_changing_internal_scan():
+    api_commands = (REPO_ROOT / "rcon" / "api_commands.py").read_text(
+        encoding="utf-8"
+    )
+    game_logs = (REPO_ROOT / "rcon" / "game_logs.py").read_text(encoding="utf-8")
+
+    assert "        end: int = 500," in api_commands
+    assert "    end: int = 100000," in game_logs
