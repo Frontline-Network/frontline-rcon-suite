@@ -10,7 +10,18 @@ def test_alembic_has_one_production_compatible_head():
     config = Config(str(ROOT / "alembic.ini"))
     config.set_main_option("script_location", str(ROOT / "alembic"))
 
-    assert ScriptDirectory.from_config(config).get_heads() == ["a4c7e9f2b681"]
+    assert ScriptDirectory.from_config(config).get_heads() == ["b8e3a1f4c6d2"]
+
+
+def test_audit_time_index_is_created_concurrently():
+    migration = (
+        ROOT / "alembic/versions/b8e3a1f4c6d2_index_audit_log_creation_time.py"
+    ).read_text(encoding="utf-8")
+
+    assert 'down_revision = "a4c7e9f2b681"' in migration
+    assert '"ix_audit_log_creation_time"' in migration
+    assert "postgresql_concurrently=True" in migration
+    assert "autocommit_block" in migration
 
 
 def test_django_mobile_and_autobalancer_branches_merge_before_frontline_permissions():

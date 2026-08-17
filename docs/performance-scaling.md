@@ -132,6 +132,45 @@ defaults.
 | `DISCORD_WORKER_ACTIVE_POLL_SECONDS` | `0.25` | Delay after successful Discord outbox work |
 | `DISCORD_WORKER_IDLE_POLL_SECONDS` | `1` for event/mixed workers, `10` for moderation-only | Maximum idle polling delay |
 
+## Database lifecycle phase
+
+The RCON1-4 database contained an estimated 1.05 million `log_lines` rows but
+used 12 GiB: 6.1 GiB heap and 6.7 GiB indexes. The 4.8-GiB
+`unique_log_line` index had 943,425 recorded scans, so it must not simply be
+dropped. Replacing its large raw-text key with a compact fingerprint requires
+a dedicated compatibility migration and is not part of the low-risk phase.
+
+`audit_log` contained 2.54 million rows and used 1.45 GiB. It had no index on
+`creation_time`; requesting the newest 50 rows therefore planned a parallel
+full-table scan and sort (estimated plan cost about 200,401). Migration
+`b8e3a1f4c6d2` creates `ix_audit_log_creation_time` concurrently so reads and
+writes are not blocked while the index is built. Schedule this migration for a
+low-I/O maintenance window and verify free disk space first.
+
+The `runtime_data_retention` command is disabled unless a retention period is
+configured and is always a dry-run unless `--execute` is supplied. It samples
+only the maximum bounded work set and deletes in separately committed batches:
+
+```bash
+python rconweb/manage.py runtime_data_retention \
+  --log-days 180 --audit-days 365 --batch-size 1000 --max-batches 10
+
+# Only after reviewing the dry-run and taking a backup:
+python rconweb/manage.py runtime_data_retention \
+  --log-days 180 --audit-days 365 --batch-size 1000 --max-batches 10 --execute
+```
+
+| Variable | Default | Purpose |
+| --- | ---: | --- |
+| `HLL_LOG_RETENTION_DAYS` | `0` | Raw game-log retention; zero disables it |
+| `HLL_AUDIT_RETENTION_DAYS` | `0` | CRCON audit retention; zero disables it |
+| `HLL_RETENTION_BATCH_SIZE` | `1000` | Rows committed per delete transaction, capped at 10,000 |
+| `HLL_RETENTION_MAX_BATCHES` | `10` | Maximum batches per invocation, capped at 1,000 |
+
+Normal batched deletes make space reusable inside PostgreSQL but do not shrink
+the data files. Disk reclamation (`VACUUM FULL`, `REINDEX`, or `pg_repack`) is a
+separate maintenance operation with its own capacity and rollback plan.
+
 ## Canary measurement
 
 Capture at least five minutes before and after a restart, excluding image

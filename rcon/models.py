@@ -16,6 +16,7 @@ from sqlalchemy import (
     Engine,
     Enum,
     ForeignKey,
+    Index,
     NullPool,
     Pool,
     String,
@@ -1352,6 +1353,7 @@ class PlayerVIP(Base):
 
 class AuditLog(Base):
     __tablename__: str = "audit_log"
+    __table_args__ = (Index("ix_audit_log_creation_time", "creation_time"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(nullable=False, index=True)

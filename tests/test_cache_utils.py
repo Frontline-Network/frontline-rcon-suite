@@ -5,6 +5,7 @@ from unittest import mock
 import redis
 import redis.exceptions
 
+from rcon import cache_utils
 from rcon.cache_utils import REDIS_SCAN_COUNT, RedisCached, invalidates_for, ttl_cache
 
 logger = getLogger(__name__)
@@ -89,6 +90,20 @@ def test_clear_for_tolerates_unavailable_redis():
     )
 
     cached.clear_for()
+
+
+def test_memory_cache_exposes_compatible_clear_for(monkeypatch):
+    monkeypatch.setenv("DEBUG", "1")
+    monkeypatch.setattr(cache_utils, "get_redis_pool", lambda **kwargs: None)
+
+    @cache_utils.ttl_cache(60, is_method=False)
+    def cached_value():
+        return object()
+
+    first = cached_value()
+    assert cached_value() is first
+    cached_value.clear_for()
+    assert cached_value() is not first
 
 
 def test_clear_all_scans_cache_keys_in_larger_batches():
