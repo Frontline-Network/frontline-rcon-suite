@@ -86,6 +86,7 @@ defaults.
 | `HLL_DB_POOL_SIZE` | `1` | Persistent SQLAlchemy connections per supervisor process |
 | `HLL_DB_MAX_OVERFLOW` | `2` | Temporary connections allowed during a short burst |
 | `HLL_DB_POOL_RECYCLE` | `900` | Seconds before a retained connection is recycled |
+| `HLL_GUNICORN_PRELOAD` | `auto` | Preload for multiple API workers; disabled automatically for one worker |
 | `HLL_WH_IDLE_SLEEP_TIME` | `0.1` | Webhook loop delay when no queue has work |
 | `HLL_HISTORICAL_SCOREBOARD_CACHE_SECONDS` | `21600` | Completed scoreboard cache lifetime |
 | `MOBILE_PUSH_ACTIVE_POLL_SECONDS` | `1` | Push polling delay after successful work |

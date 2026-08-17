@@ -99,7 +99,14 @@ then
   export LOGGING_FILENAME=api_$SERVER_NUMBER.log
   daphne -b 0.0.0.0 -p 8001 rconweb.asgi:application &
   # Successfully running gunicorn will create the pid file which is how Docker determines the container is healthy
-  gunicorn --preload --pid gunicorn.pid -w $NB_API_WORKERS -k gthread --threads $NB_API_THREADS -t 120 -b 0.0.0.0 rconweb.wsgi
+  GUNICORN_PRELOAD_ARGS=()
+  GUNICORN_PRELOAD_MODE="${HLL_GUNICORN_PRELOAD:-auto}"
+  if [[ "$GUNICORN_PRELOAD_MODE" =~ ^(1|true|yes)$ ]] || \
+     [[ "$GUNICORN_PRELOAD_MODE" == "auto" && "$NB_API_WORKERS" =~ ^[0-9]+$ && "$NB_API_WORKERS" -gt 1 ]]
+  then
+    GUNICORN_PRELOAD_ARGS=(--preload)
+  fi
+  gunicorn "${GUNICORN_PRELOAD_ARGS[@]}" --pid gunicorn.pid -w "$NB_API_WORKERS" -k gthread --threads "$NB_API_THREADS" -t 120 -b 0.0.0.0 rconweb.wsgi
   cd ..
   ./manage.py unregister_api
 else
