@@ -8,7 +8,7 @@ from django.urls import path
 from rcon.admin_incidents import list_incident_changes
 
 from .auth import APITokenAuthMiddleware, has_perms
-from .mobile import mobile_integration_enabled
+from .mobile_settings import mobile_integration_enabled
 
 
 def _json_value(value):

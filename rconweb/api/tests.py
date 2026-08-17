@@ -1508,7 +1508,7 @@ class MobilePushWorkerPerformanceTests(TestCase):
 
         self.assertEqual(Command.requires_system_checks, [])
 
-    @patch("api.management.commands.mobile_push_worker._installation_id")
+    @patch("api.management.commands.mobile_push_worker.mobile_installation_id")
     @patch("api.management.commands.mobile_push_worker.enter_session")
     def test_http_delivery_happens_outside_database_transaction(
         self, enter_session, installation_id
@@ -1547,6 +1547,51 @@ class MobilePushWorkerPerformanceTests(TestCase):
         self.assertTrue(command._deliver_batch("https://relay.example"))
         self.assertEqual(order, ["http", "db"])
         session.add_all.assert_called_once()
+
+
+class FrontlineBackgroundWorkerTests(TestCase):
+    @patch.dict(
+        "os.environ",
+        {
+            "MOBILE_PUSH_RELAY_URL": "https://push.example",
+        },
+    )
+    @patch(
+        "api.management.commands.frontline_background_worker.ai_moderation_enabled",
+        return_value=True,
+    )
+    @patch(
+        "api.management.commands.frontline_background_worker.discord_reports_enabled",
+        return_value=True,
+    )
+    @patch(
+        "api.management.commands.frontline_background_worker.mobile_integration_enabled",
+        return_value=True,
+    )
+    def test_enabled_loops_are_independent_threads(
+        self, _mobile_enabled, _discord_enabled, _ai_enabled
+    ):
+        from api.management.commands.discord_report_worker import (
+            Command as DiscordCommand,
+        )
+        from api.management.commands.frontline_background_worker import Command
+        from api.management.commands.mobile_push_worker import Command as MobileCommand
+
+        specs = Command()._worker_specs()
+
+        self.assertEqual(
+            [name for name, _command, _options in specs],
+            ["mobile-push", "discord-events", "discord-moderation"],
+        )
+        self.assertIsInstance(specs[0][1], MobileCommand)
+        self.assertIsInstance(specs[1][1], DiscordCommand)
+        self.assertIsInstance(specs[2][1], DiscordCommand)
+        self.assertEqual(
+            specs[1][2], {"events_only": True, "moderation_only": False}
+        )
+        self.assertEqual(
+            specs[2][2], {"events_only": False, "moderation_only": True}
+        )
 
 
 class HistoricalScoreboardCacheTests(TestCase):

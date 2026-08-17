@@ -6,8 +6,8 @@ import requests
 from django.core.management.base import BaseCommand
 from sqlalchemy import exists, select
 
-from api.mobile import _installation_id, mobile_integration_enabled
 from api.models import MobileDevice
+from api.mobile_settings import mobile_installation_id, mobile_integration_enabled
 from rcon.models import (
     AdminIncidentEvent,
     AdminIncidentPushDelivery,
@@ -93,7 +93,7 @@ class Command(BaseCommand):
                         f"{relay_url}/v1/notify/{device.push_handle}",
                         headers={"Authorization": f"Bearer {device.push_capability}"},
                         json={
-                            "connection_key": _installation_id(),
+                            "connection_key": mobile_installation_id(),
                             "incident_id": event["incident_id"],
                             "event_type": event["event_type"],
                             "timestamp": event["created_at"].isoformat(),

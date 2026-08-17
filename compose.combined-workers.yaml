@@ -1,0 +1,13 @@
+# Add this override and activate the combined-workers profile to replace the
+# three standalone delivery processes with one shared Python/Django runtime:
+# docker compose --profile combined-workers -f compose.yaml \
+#   -f compose.mobile-admin.yaml -f compose.combined-workers.yaml up -d
+services:
+  mobile_push_worker:
+    profiles: ["split-background-workers"]
+
+  discord_report_worker:
+    profiles: ["split-background-workers"]
+
+  discord_moderation_worker:
+    profiles: ["split-background-workers"]

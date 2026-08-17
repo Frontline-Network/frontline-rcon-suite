@@ -63,6 +63,12 @@ then
   exec python manage.py discord_report_worker --moderation-only
 fi
 
+if [ "$1" == 'frontline_background_worker' ]
+then
+  cd rconweb
+  exec python manage.py frontline_background_worker
+fi
+
 # Check if we're in a backend container
 if [ "$1" == 'web' ]
 then

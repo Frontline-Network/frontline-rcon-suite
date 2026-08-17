@@ -121,6 +121,40 @@ services:
       HLL_SERVER_NAME_3: ${HLL_SERVER_NAME_3:-CRCON Server 3}
       HLL_SERVER_NAME_4: ${HLL_SERVER_NAME_4:-CRCON Server 4}
 
+  frontline_background_worker:
+    # Opt-in replacement for the three standalone delivery workers. Each loop
+    # keeps its own thread/session so slow AI calls cannot block reports or push.
+    profiles: ["combined-workers"]
+    extends:
+      file: compose.yaml
+      service: backend_1
+    <<: *frontline-backend
+    command: frontline_background_worker
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pgrep -f 'manage.py frontline_background_worker' >/dev/null",
+        ]
+      start_period: 30s
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      server1:
+        aliases: !reset []
+    environment:
+      <<: *mobile-environment
+      HLL_GAME: ${HLL_GAME:-hll}
+      HLL_GAME_2: ${HLL_GAME_2:-hll}
+      HLL_GAME_3: ${HLL_GAME_3:-hll}
+      HLL_GAME_4: ${HLL_GAME_4:-hll}
+      HLL_SERVER_NAME: ${HLL_SERVER_NAME:-CRCON Server 1}
+      HLL_SERVER_NAME_2: ${HLL_SERVER_NAME_2:-CRCON Server 2}
+      HLL_SERVER_NAME_3: ${HLL_SERVER_NAME_3:-CRCON Server 3}
+      HLL_SERVER_NAME_4: ${HLL_SERVER_NAME_4:-CRCON Server 4}
+
   backend_1:
     <<: *frontline-backend
     environment: *mobile-environment
