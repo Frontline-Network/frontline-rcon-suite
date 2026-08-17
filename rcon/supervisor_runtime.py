@@ -178,9 +178,14 @@ def run(services: Sequence[ServiceSpec] = DEFAULT_SERVICES) -> None:
                     continue
 
                 if not thread or not thread.is_alive():
-                    logger.error(
-                        "Shared supervisor thread %s died; restarting", name
-                    )
+                    if thread is None:
+                        logger.info(
+                            "Starting requested shared supervisor service %s", name
+                        )
+                    else:
+                        logger.error(
+                            "Shared supervisor thread %s died; restarting", name
+                        )
                     start_service(name)
                 else:
                     red.hset(STATE_KEY, f"{name}:state", RUNNING)
