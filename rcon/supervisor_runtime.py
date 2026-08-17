@@ -79,7 +79,7 @@ def _run_routines(stop_event: threading.Event) -> None:
 
 DEFAULT_SERVICES: tuple[ServiceSpec, ...] = (
     ServiceSpec("expiring_vips", _run_expiring_vips),
-    ServiceSpec("live_stats", _run_live_stats),
+    ServiceSpec("live_stats_refresh", _run_live_stats),
     ServiceSpec("autobalancer", _run_autobalancer),
     ServiceSpec("blacklists", _run_blacklists),
     ServiceSpec("log_recorder", _run_log_recorder),

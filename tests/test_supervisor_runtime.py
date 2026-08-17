@@ -23,9 +23,15 @@ class SharedSupervisorRuntimeTests(unittest.TestCase):
     def test_redis_state_decodes_bytes_from_shared_pool(self):
         self.assertEqual(
             decode_service_state(
-                {b"live_stats:desired": b"STOPPED", "routines:state": "RUNNING"}
+                {
+                    b"live_stats_refresh:desired": b"STOPPED",
+                    "routines:state": "RUNNING",
+                }
             ),
-            {"live_stats:desired": "STOPPED", "routines:state": "RUNNING"},
+            {
+                "live_stats_refresh:desired": "STOPPED",
+                "routines:state": "RUNNING",
+            },
         )
 
     def test_shared_service_restarts_after_failure_and_clean_return(self):

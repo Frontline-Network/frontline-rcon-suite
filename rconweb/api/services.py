@@ -95,7 +95,7 @@ def get_services(request):
         "auto_settings": "Applies commands automaticaly based on your rules.",
         "cron": "The scheduler, cleans logs and whatever you added.",
         "expiring_vips": "Removes expired VIPs and reconciles active VIPs.",
-        "live_stats": "Updates live player and game statistics.",
+        "live_stats_refresh": "Updates live player and game statistics.",
         "autobalancer": "Monitors and balances the teams.",
         "blacklists": "Processes shared blacklist updates.",
         "log_recorder": "Persists game-server logs.",
