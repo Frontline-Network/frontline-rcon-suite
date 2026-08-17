@@ -1452,6 +1452,11 @@ class DiscordActionTemplateTests(TestCase):
 
 
 class DiscordOutboxWorkerModeTests(TestCase):
+    def test_worker_skips_unrelated_django_system_checks(self):
+        from api.management.commands.discord_report_worker import Command
+
+        self.assertEqual(Command.requires_system_checks, [])
+
     def test_http_delivery_commits_database_transaction_first(self):
         from api.management.commands.discord_report_worker import Command
 
@@ -1498,6 +1503,11 @@ class DiscordOutboxWorkerModeTests(TestCase):
 
 
 class MobilePushWorkerPerformanceTests(TestCase):
+    def test_worker_skips_unrelated_django_system_checks(self):
+        from api.management.commands.mobile_push_worker import Command
+
+        self.assertEqual(Command.requires_system_checks, [])
+
     @patch("api.management.commands.mobile_push_worker._installation_id")
     @patch("api.management.commands.mobile_push_worker.enter_session")
     def test_http_delivery_happens_outside_database_transaction(

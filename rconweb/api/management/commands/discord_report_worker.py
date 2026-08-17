@@ -43,6 +43,9 @@ def _server_label(server_number: int) -> tuple[str, str]:
 
 class Command(BaseCommand):
     help = "Deliver complete incident events to the Frontline Discord service"
+    # This long-running worker never serves Django URLs. Running the default
+    # system checks imports the complete API/view graph and keeps it resident.
+    requires_system_checks = []
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

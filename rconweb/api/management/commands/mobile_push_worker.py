@@ -17,6 +17,8 @@ from rcon.models import (
 
 class Command(BaseCommand):
     help = "Deliver opaque CRCON incident notifications to the push relay"
+    # Avoid importing the full API/view graph into a background-only process.
+    requires_system_checks = []
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
