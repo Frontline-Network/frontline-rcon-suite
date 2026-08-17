@@ -1,5 +1,7 @@
 FROM python:3.12-slim
 
+ARG CRCON_VERSION=unknown
+
 WORKDIR /code
 RUN apt-get update -y && apt-get install -y cron logrotate git procps
 COPY requirements.txt .
@@ -8,6 +10,8 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt --no-compile --no-cache-dir
 RUN pip install gunicorn daphne supervisor --no-compile --no-cache-dir
 COPY . .
+RUN printf '%s\n' "$CRCON_VERSION" > /code/tag_version
+ENV CRCON_VERSION=$CRCON_VERSION
 ENV PYTHONPATH=/code/
 RUN chmod +x entrypoint.sh
 RUN chmod +x manage.py

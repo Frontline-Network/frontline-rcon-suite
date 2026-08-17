@@ -14,7 +14,6 @@ import logging
 import os
 import re
 import socket
-from subprocess import PIPE, run
 
 import sentry_sdk
 from sentry_sdk import configure_scope
@@ -22,15 +21,9 @@ from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 
 from rcon.user_config.rcon_server_settings import RconServerSettingsUserConfig
+from rcon.version import get_version
 
-try:
-    TAG_VERSION = (
-        run(["git", "describe", "--tags"], stdout=PIPE, stderr=PIPE)
-        .stdout.decode()
-        .strip()
-    )
-except Exception:
-    TAG_VERSION = "unknown"
+TAG_VERSION = get_version()
 
 HLL_MAINTENANCE_CONTAINER = os.getenv("HLL_MAINTENANCE_CONTAINER")
 HLL_WH_SERVICE_CONTAINER = os.getenv("HLL_WH_SERVICE_CONTAINER")

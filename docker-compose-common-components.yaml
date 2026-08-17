@@ -44,8 +44,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        CRCON_VERSION: ${TAGGED_VERSION:-unknown}
     image: ${BACKEND_DOCKER_REPOSITORY}:${TAGGED_VERSION}
     environment:
+      CRCON_VERSION: ${TAGGED_VERSION:-unknown}
       HLL_MAINTENANCE_CONTAINER: true
       HLL_DB_USER: ${HLL_DB_USER}
       HLL_DB_PASSWORD: ${HLL_DB_PASSWORD}
@@ -76,8 +79,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        CRCON_VERSION: ${TAGGED_VERSION:-unknown}
     image: ${BACKEND_DOCKER_REPOSITORY}:${TAGGED_VERSION}
     environment:
+      CRCON_VERSION: ${TAGGED_VERSION:-unknown}
       HLL_WH_SERVICE_CONTAINER: true
       LOGGING_LEVEL: "INFO"
       LOGGING_PATH: /logs/
@@ -123,10 +129,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        CRCON_VERSION: ${TAGGED_VERSION:-unknown}
     image: ${BACKEND_DOCKER_REPOSITORY}:${TAGGED_VERSION}
     command: mobile_push_worker
     restart: unless-stopped
     environment:
+      CRCON_VERSION: ${TAGGED_VERSION:-unknown}
       SERVER_NUMBER: 1
       LOGGING_PATH: /logs/
       HLL_DB_USER: ${HLL_DB_USER}
@@ -154,10 +163,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        CRCON_VERSION: ${TAGGED_VERSION:-unknown}
     image: ${BACKEND_DOCKER_REPOSITORY}:${TAGGED_VERSION}
     command: discord_report_worker
     restart: unless-stopped
     environment:
+      CRCON_VERSION: ${TAGGED_VERSION:-unknown}
       SERVER_NUMBER: 1
       LOGGING_PATH: /logs/
       HLL_DB_USER: ${HLL_DB_USER}

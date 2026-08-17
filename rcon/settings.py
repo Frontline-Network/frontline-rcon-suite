@@ -1,22 +1,15 @@
-import os
 import re
 import socket
 from dataclasses import dataclass
 import colorlog
 from logging.config import dictConfig
-from subprocess import PIPE, run
+
+from rcon.version import get_version
 
 from rcon.types import ServerInfo
 from rcon.user_config.rcon_server_settings import RconServerSettingsUserConfig
 
-try:
-    TAG_VERSION = (
-        run(["git", "describe", "--tags"], stdout=PIPE, stderr=PIPE)
-        .stdout.decode()
-        .strip()
-    )
-except Exception:
-    TAG_VERSION = "unknown"
+TAG_VERSION = get_version()
 
 try:
     config = RconServerSettingsUserConfig.load_from_db()

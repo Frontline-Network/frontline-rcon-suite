@@ -37,11 +37,17 @@ export default function AboutDialog() {
   const theme = useTheme();
   const isSmallScreen = useMediaQuery(theme.breakpoints.down('md'));
 
-  const { data: apiVersion, isLoading } = useQuery({
+  const bundledVersion = process.env.REACT_APP_VERSION || 'unknown';
+  const { data: apiVersion } = useQuery({
     queryKey: ['apiVersion'],
     queryFn: cmd.GET_VERSION,
-    initialData: '0.0.0'
+    initialData: bundledVersion
   })
+
+  const reportedVersion = typeof apiVersion === 'string' ? apiVersion.trim() : '';
+  const displayVersion = reportedVersion && reportedVersion !== 'unknown'
+    ? reportedVersion
+    : bundledVersion;
 
   const handleClickOpen = () => {
     markAsRead();
@@ -63,7 +69,7 @@ export default function AboutDialog() {
   }, [open])
 
   const latestReleaseVersion = (releases?.[0]?.tag_name || releases?.[0]?.name)  ?? ''
-  const isUpToDate = isNewerVersion(apiVersion.trim(), latestReleaseVersion.trim())
+  const isUpToDate = isNewerVersion(displayVersion.trim(), latestReleaseVersion.trim())
 
   return (
     <React.Fragment>
@@ -72,7 +78,7 @@ export default function AboutDialog() {
           <ListItemText
             primary={
               <Stack direction={"row"} justifyContent={"space-between"} alignItems={"center"}>
-                <Stack alignItems={"center"} direction={"row"} gap={0.5}><FontAwesomeIcon icon={faCircleQuestion} color={unreadCount > 0 ? HIGHLIGHT.danger : ""} />Version: {apiVersion}</Stack>
+                <Stack alignItems={"center"} direction={"row"} gap={0.5}><FontAwesomeIcon icon={faCircleQuestion} color={unreadCount > 0 ? HIGHLIGHT.danger : ""} />Version: {displayVersion}</Stack>
               </Stack>
             }
           />
@@ -129,7 +135,7 @@ export default function AboutDialog() {
               {t('about.description')}
             </Typography>
             <Divider sx={{ my: 2 }} />
-            <Typography variant='body1'>{t('about.apiVersion')}: {isLoading ? t('common.loading') : apiVersion}</Typography>
+            <Typography variant='body1'>{t('about.apiVersion')}: {displayVersion}</Typography>
             <Typography variant='subtitle2'>
                 {isUpToDate ? t('about.upToDate') : t('about.updateAvailable')}
             </Typography>

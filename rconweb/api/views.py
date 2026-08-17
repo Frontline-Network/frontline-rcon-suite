@@ -4,7 +4,6 @@ import os
 import sys
 import traceback
 from functools import wraps
-from subprocess import PIPE, run
 from typing import Any, Callable
 import psutil
 
@@ -83,8 +82,7 @@ def set_temp_msg(request, func, name):
 @require_http_methods(["GET"])
 @ratelimit(key=request_rate_limit_key, rate="30/m", block=True)
 def get_version(request):
-    res = run(["git", "describe", "--tags"], stdout=PIPE, stderr=PIPE)
-    return api_response(res.stdout.decode(), failed=False, command="get_version")
+    return api_response(TAG_VERSION, failed=False, command="get_version")
 
 
 @csrf_exempt

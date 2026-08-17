@@ -15,6 +15,7 @@ volumes:
 x-backend: &backend
   image: ${BACKEND_DOCKER_REPOSITORY}:${TAGGED_VERSION}
   environment: &backend-env
+    CRCON_VERSION: ${TAGGED_VERSION:-unknown}
     LOGGING_LEVEL: "INFO"
     LOGGING_PATH: /logs/
     CONFIG_DIR: /config/
@@ -81,6 +82,8 @@ x-frontend: &frontend
   build:
     context: .
     dockerfile: Dockerfile-frontend
+    args:
+      CRCON_VERSION: ${TAGGED_VERSION:-unknown}
   image: ${FRONTEND_DOCKER_REPOSITORY}:${TAGGED_VERSION}
   environment:
     RCONWEB_EXTERNAL_ADDRESS: ${RCONWEB_EXTERNAL_ADDRESS}

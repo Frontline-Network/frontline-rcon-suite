@@ -68,6 +68,7 @@ export default defineConfig(({ command, mode }) => {
     define: {
       "process.env.DEBUG": JSON.stringify(DEBUG),
       "process.env.REACT_APP_API_URL": JSON.stringify(REACT_APP_API_URL),
+      "process.env.REACT_APP_VERSION": JSON.stringify(env.REACT_APP_VERSION ?? "unknown"),
     },
     resolve: {
       extensions: [".js", ".jsx"],
