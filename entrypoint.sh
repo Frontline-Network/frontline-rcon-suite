@@ -159,5 +159,10 @@ fi
   sleep 10
   env >> /etc/environment
   export LOGGING_FILENAME=supervisor_$SERVER_NUMBER.log
-  supervisord -c /config/supervisord_$SERVER_NUMBER.conf || supervisord -c /config/supervisord.conf
+  if [[ -n "${HLL_SUPERVISOR_CONFIG:-}" ]]
+  then
+    supervisord -c "$HLL_SUPERVISOR_CONFIG"
+  else
+    supervisord -c /config/supervisord_$SERVER_NUMBER.conf || supervisord -c /config/supervisord.conf
+  fi
 fi

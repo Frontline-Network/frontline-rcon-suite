@@ -150,6 +150,19 @@ docker compose --profile combined-workers \
 Do not run this profile concurrently with the split workers. Event and broker
 idempotency are still retained as a last-resort retry safeguard.
 
+The optional `config/supervisord_combined.conf` additionally groups six
+compatible, I/O-bound per-gameserver loops in one Python runtime: expiring VIPs,
+live statistics, autobalancer, blacklist commands, log persistence and routine
+jobs. Each loop runs in its own monitored thread and is restarted independently
+after an exception. The RCON controller already maintains one connection per
+thread. Log ingestion, Automod, scoreboard, RQ, broadcasts and auto settings
+remain separate until their latency and failure-isolation requirements have
+been measured independently.
+
+This supervisor mode is canary-only until both games have completed a long
+observation window. Never enable it while the six corresponding individual
+Supervisor programs are also running.
+
 ## Configuration
 
 All settings are optional and existing installations receive conservative

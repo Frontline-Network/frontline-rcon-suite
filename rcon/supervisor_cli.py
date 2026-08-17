@@ -100,6 +100,13 @@ def run_routines():
     routines.run()
 
 
+@cli.command(name="combined_runtime")
+def run_combined_runtime():
+    from rcon import supervisor_runtime
+
+    supervisor_runtime.run()
+
+
 @cli.command(name="expiring_vips")
 def run_expiring_vips():
     from rcon.expiring_vips import service

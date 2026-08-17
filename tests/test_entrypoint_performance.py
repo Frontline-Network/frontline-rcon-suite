@@ -71,6 +71,14 @@ def test_frontend_uses_one_event_driven_nginx_worker_per_instance():
     assert "worker_processes 1" in dockerfile
 
 
+def test_combined_supervisor_runtime_is_explicit_opt_in():
+    entrypoint = (REPO_ROOT / "entrypoint.sh").read_text(encoding="utf-8")
+
+    assert '[[ -n "${HLL_SUPERVISOR_CONFIG:-}" ]]' in entrypoint
+    assert 'supervisord -c "$HLL_SUPERVISOR_CONFIG"' in entrypoint
+    assert "supervisord -c /config/supervisord.conf" in entrypoint
+
+
 def test_public_recent_logs_default_is_bounded_without_changing_internal_scan():
     api_commands = (REPO_ROOT / "rcon" / "api_commands.py").read_text(
         encoding="utf-8"
