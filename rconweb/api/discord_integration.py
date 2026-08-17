@@ -25,6 +25,7 @@ from rcon.admin_incidents import (
     mutate_incident,
     reserve_incident_action,
 )
+from rcon.incident_notifications import notify_incident_reporter
 from rcon.message_templates import get_message_templates
 from rcon.moderation import (
     DiscordActor,
@@ -1159,16 +1160,16 @@ def transition_incident(request):
             template_key, DEFAULT_REPORTER_TEMPLATES.get(template_key or "")
         )
         notify_reporter = interaction.payload.get("notify_reporter", True) is not False
-        if notify_reporter and template and result.get("reporter_id"):
+        if notify_reporter and template:
             try:
                 from . import views
 
-                views.rcon_api.message_player(
-                    result["reporter_id"],
+                notify_incident_reporter(
+                    views.rcon_api,
+                    result,
                     message=template,
                     by=actor_name,
                     save_message=True,
-                    player_name=result.get("reporter_name"),
                 )
             except Exception:
                 # Reporter feedback is best effort and cannot roll back the
@@ -1268,16 +1269,16 @@ def execute_action(request, preparation_id):
                         template = (integration.reporter_templates or {}).get(
                             "resolved", DEFAULT_REPORTER_TEMPLATES["resolved"]
                         )
-                        if template and updated.get("reporter_id"):
+                        if template:
                             try:
                                 from . import views
 
-                                views.rcon_api.message_player(
-                                    updated["reporter_id"],
+                                notify_incident_reporter(
+                                    views.rcon_api,
+                                    updated,
                                     message=template,
                                     by=actor_name,
                                     save_message=True,
-                                    player_name=updated.get("reporter_name"),
                                 )
                             except Exception:
                                 pass

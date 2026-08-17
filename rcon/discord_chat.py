@@ -314,10 +314,13 @@ def handle_on_chat(rcon, log):
             )
             captured_report = incident is not None
             if created and incident.get("reporter_id"):
-                from rcon.incident_notifications import received_reporter_template
+                from rcon.incident_notifications import (
+                    notify_incident_reporter,
+                    received_reporter_template,
+                )
 
                 if template := received_reporter_template():
-                    rcon.message_player(incident["reporter_id"], message=template)
+                    notify_incident_reporter(rcon, incident, message=template)
         except Exception:
             # Incident persistence must never interrupt the game log loop or
             # existing Discord notifications.
