@@ -20,6 +20,7 @@ from rcon.cache_utils import invalidates, get_redis_client
 from rcon.commands import HLLCommandFailedError
 from rcon.discord import get_prepared_discord_hooks, send_to_discord_audit
 from rcon.frontline_vip_verification import handle_chat_verification
+from rcon.hllv_admin_refresh import refresh_hllv_admin_role_on_connect
 from rcon.logs.loop import (
     on_camera,
     on_chat,
@@ -597,6 +598,28 @@ def handle_on_disconnect(rcon, struct_log, _, player_id: str):
         logger.debug("Ignoring anonymous disconnect event: %s", struct_log["raw"])
         return
     save_end_player_session(player_id, struct_log["timestamp_ms"] / 1000)
+
+
+@on_connected()
+@inject_player_ids
+def refresh_hllv_spectator_on_connect(
+    rcon: Rcon,
+    struct_log: StructuredLogLineWithMetaData,
+    name: str,
+    player_id: str,
+):
+    """Work around HLLV not restoring spectator rights after reconnect."""
+
+    try:
+        refresh_hllv_admin_role_on_connect(rcon, player_id, name)
+    except Exception:
+        # A privilege refresh must never interrupt CONNECTED log processing or
+        # affect the player's otherwise valid server session.
+        logger.exception(
+            "Unable to refresh HLLV spectator privileges for %s (%s)",
+            name,
+            player_id,
+        )
 
 
 # Steam enrichment is queued so a slow external API cannot block log processing.
