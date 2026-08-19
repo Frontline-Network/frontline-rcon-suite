@@ -13,6 +13,7 @@ SUPERVISOR_COMMANDS = {
     "blacklists",
     "broadcast_loop",
     "combined_runtime",
+    "campaign_message_loop",
     "expiring_vips",
     "live_stats_loop",
     "log_loop",
@@ -135,6 +136,7 @@ print("RESULT:" + json.dumps({
             "automod",
             "blacklists",
             "broadcasts",
+            "campaign_messages",
             "expiring_vips",
             "live_stats_refresh",
             "log_event_loop",
@@ -177,6 +179,7 @@ print("RESULT:" + json.dumps({
             self.assertNotIn(service, sections)
         for isolated_service in {
             "automod",
+            "campaign_messages",
             "log_event_loop",
             "scoreboard",
             "workers",

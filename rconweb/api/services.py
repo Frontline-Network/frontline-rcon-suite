@@ -104,6 +104,7 @@ def get_supervisor_client():
 def get_services(request):
     info = {
         "broadcasts": "The automatic broadcasts.",
+        "campaign_messages": "Staggered campaign messages to individual players.",
         "log_event_loop": "Blacklist enforcement, chat/kill forwarding, player history, etc...",
         "log_stream": "Optionally store game server logs in a redis stream",
         "auto_settings": "Applies commands automaticaly based on your rules.",

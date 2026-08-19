@@ -47,7 +47,10 @@ from rcon.types import (
     PlayerProfileTypeEnriched,
     ServerInfo,
 )
-from rcon.user_config.auto_broadcast import AutoBroadcastUserConfig
+from rcon.user_config.auto_broadcast import (
+    AutoBroadcastMessage,
+    AutoBroadcastUserConfig,
+)
 from rcon.user_config.auto_kick import AutoVoteKickUserConfig
 from rcon.user_config.auto_mod_level import AutoModLevelUserConfig
 from rcon.user_config.auto_mod_no_leader import AutoModNoLeaderUserConfig
@@ -700,7 +703,13 @@ class RconAPI(Rcon):
         v = VoteMap()
         v.guarantee_next_map(self.game_profile.parse_layer(map_name))
 
-    def add_votemap_vote(self, player_id: str, player_name: str, map_name: str, vote_count: int | None = None):
+    def add_votemap_vote(
+        self,
+        player_id: str,
+        player_name: str,
+        map_name: str,
+        vote_count: int | None = None,
+    ):
         v = VoteMap()
         v.add_vote(
             self.game_profile.parse_layer(map_name),
@@ -806,6 +815,19 @@ class RconAPI(Rcon):
 
     def get_auto_broadcasts_config(self) -> AutoBroadcastUserConfig:
         return AutoBroadcastUserConfig.load_from_db()
+
+    def get_campaign_delivery_status(self, limit: int = 20) -> dict[str, Any]:
+        from rcon.campaign_delivery import get_delivery_status
+
+        return get_delivery_status(limit=limit)
+
+    def test_player_campaign(
+        self, player_id: str, campaign: dict[str, Any], by: str = ""
+    ) -> str:
+        from rcon.campaign_delivery import send_test_message
+
+        validated = AutoBroadcastMessage.model_validate(campaign)
+        return send_test_message(self, validated, player_id)
 
     def validate_auto_broadcasts_config(
         self,
@@ -2162,7 +2184,7 @@ class RconAPI(Rcon):
                 return HLLCommandFailedError(
                     f"Player {player_id} was not found. The account could not be updated."
                 )
-            
+
             return {
                 "account": account_db.to_dict(),
                 "msg": "Successfully updated account details.",

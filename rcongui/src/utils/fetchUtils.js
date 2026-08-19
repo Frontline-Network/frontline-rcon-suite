@@ -136,6 +136,8 @@ export const cmd = {
     requestFactory({ method: "POST", cmd: "login", ...params }),
   MESSAGE_PLAYER: (params) =>
     requestFactory({ method: "POST", cmd: "message_player", ...params }),
+  TEST_PLAYER_CAMPAIGN: (params) =>
+    requestFactory({ method: "POST", cmd: "test_player_campaign", ...params }),
   MESSAGE_ALL_PLAYERS: (params) =>
     requestFactory({ method: "POST", cmd: "message_all_players", ...params }),
   BULK_MESSAGE_PLAYERS: (params) =>
@@ -210,6 +212,12 @@ export const cmd = {
     requestFactory({
       method: "GET",
       cmd: "get_auto_broadcasts_config",
+      ...params,
+    }),
+  GET_CAMPAIGN_DELIVERY_STATUS: (params) =>
+    requestFactory({
+      method: "GET",
+      cmd: "get_campaign_delivery_status",
       ...params,
     }),
   GET_BROADCAST_MESSAGE: (params) =>

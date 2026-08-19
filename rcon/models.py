@@ -706,6 +706,45 @@ class PlayerSession(Base):
         }
 
 
+class CampaignDelivery(Base):
+    """Durable delivery state for one campaign in one player session."""
+
+    __tablename__ = "campaign_deliveries"
+    __table_args__ = (
+        UniqueConstraint(
+            "server_number",
+            "campaign_id",
+            "player_session_id",
+            name="unique_campaign_delivery_session",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    server_number: Mapped[int] = mapped_column(nullable=False, index=True)
+    campaign_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    player_id_id: Mapped[int] = mapped_column(
+        ForeignKey("steam_id_64.id"), nullable=False, index=True
+    )
+    player_session_id: Mapped[int] = mapped_column(
+        ForeignKey("player_sessions.id"), nullable=False, index=True
+    )
+    player_name: Mapped[str] = mapped_column(String, nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    attempt_count: Mapped[int] = mapped_column(nullable=False, default=0)
+    eligible_at: Mapped[datetime] = mapped_column(TIMESTAMP, nullable=False, index=True)
+    next_attempt_at: Mapped[datetime | None] = mapped_column(TIMESTAMP, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP, nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP, nullable=False, default=datetime.utcnow
+    )
+    last_attempt_at: Mapped[datetime | None] = mapped_column(TIMESTAMP, nullable=True)
+    sent_at: Mapped[datetime | None] = mapped_column(TIMESTAMP, nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 class PlayersAction(Base):
     __tablename__ = "players_actions"
 

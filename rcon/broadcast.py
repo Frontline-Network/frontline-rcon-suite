@@ -43,23 +43,23 @@ subs = {
 }
 
 
-def format_message(ctl, msg):
+def format_message(ctl, msg, player_id=None, context=None):
     for sub in subs:
         msg = msg.replace(f"{{{sub}}}", f"{{{subs[sub].value}}}")
     message_vars: list[str] = re.findall(MESSAGE_VAR_RE, msg)
     populated_variables = populate_message_variables(
-        vars=message_vars, player_id=None, rcon=ctl
+        vars=message_vars, player_id=player_id, rcon=ctl
     )
 
     try:
         return format_message_string(
             msg,
             populated_variables=populated_variables,
-            context={},
+            context=context or {},
         )
     except KeyError as e:
         logger.warning(
-            "Can't broadcast message correctly, variable does not exists %s", e
+            "Can't format campaign message correctly, variable does not exist %s", e
         )
         return msg
 
@@ -138,7 +138,14 @@ def run(stop_event: threading.Event | None = None):
             stop_event.wait(CHECK_INTERVAL)
             continue
 
-        campaigns = list(config.messages)
+        campaigns = [
+            campaign
+            for campaign in config.messages
+            if campaign.delivery_mode == "broadcast"
+        ]
+        if not campaigns:
+            time.sleep(CHECK_INTERVAL)
+            continue
         if config.randomize:
             logger.debug("Auto broadcasts. Radomizing")
             random.shuffle(campaigns)
@@ -146,9 +153,7 @@ def run(stop_event: threading.Event | None = None):
         sent_campaign = False
         needs_seeding_state = any(msg.pause_during_seeding for msg in campaigns)
         seeding_config = (
-            AutoModSeedingUserConfig.load_from_db()
-            if needs_seeding_state
-            else None
+            AutoModSeedingUserConfig.load_from_db() if needs_seeding_state else None
         )
 
         try:

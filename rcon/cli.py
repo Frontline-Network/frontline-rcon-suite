@@ -17,7 +17,7 @@ import rcon.seed_vip.service
 import rcon.user_config
 import rcon.user_config.utils
 import rcon.watch_killrate
-from rcon import auto_settings, broadcast, routines
+from rcon import auto_settings, broadcast, campaign_delivery, routines
 from rcon.autobalancer import service as autobalancer_service
 from rcon.automods import automod
 from rcon.blacklist import BlacklistCommandHandler
@@ -115,6 +115,11 @@ def run_log_stream():
 @cli.command(name="broadcast_loop")
 def run_broadcast_loop():
     broadcast.run()
+
+
+@cli.command(name="campaign_message_loop")
+def run_campaign_message_loop():
+    campaign_delivery.run()
 
 
 @cli.command(name="auto_settings")
