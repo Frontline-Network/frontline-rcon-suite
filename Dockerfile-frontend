@@ -2,6 +2,8 @@ ARG buildImage=node:20-bookworm-slim
 
 FROM $buildImage AS adminbuild
 
+ARG CRCON_VERSION=unknown
+
 RUN apt update && apt install -y git
 
 WORKDIR /code
@@ -9,10 +11,10 @@ WORKDIR /code
 COPY rcongui/ .
 RUN npm ci
 ENV REACT_APP_API_URL=/api/
-COPY .git/ .git/
+ENV REACT_APP_VERSION=$CRCON_VERSION
 COPY assets/images/ /code/public
 COPY assets/rcongui/ /code/public
-RUN (git describe --tags || git rev-parse --short HEAD) > /code/tag_version && rm -rf .git
+RUN printf '%s\n' "$CRCON_VERSION" > /code/tag_version
 RUN npx browserslist@latest --update-db
 RUN npm run build
 RUN mv /code/dist /www

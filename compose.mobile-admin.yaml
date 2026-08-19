@@ -51,6 +51,8 @@ x-frontline-frontend: &frontline-frontend
   build:
     context: .
     dockerfile: Dockerfile-frontend
+    args:
+      CRCON_VERSION: ${CRCON_VERSION:-development}
 
 services:
   maintenance:

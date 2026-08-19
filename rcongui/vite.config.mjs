@@ -31,6 +31,10 @@ export default defineConfig(({ command, mode }) => {
   }
 
   const REACT_APP_API_URL = env.REACT_APP_API_URL;
+  const REACT_APP_VERSION =
+    process.env.REACT_APP_VERSION || env.REACT_APP_VERSION || "unknown";
+  const REACT_APP_PUBLIC_BUILD =
+    process.env.REACT_APP_PUBLIC_BUILD || env.REACT_APP_PUBLIC_BUILD || "";
   const VITE_CRCON_SERVER_URL = env.VITE_CRCON_SERVER_URL ?? DEFAULT_CRCON_SERVER_URL;
   const VITE_CRCON_API_ENDPOINT = env.VITE_CRCON_API_ENDPOINT ?? DEFAULT_CRCON_API_ENDPOINT;
   const DEBUG = env.DEBUG;
@@ -68,6 +72,10 @@ export default defineConfig(({ command, mode }) => {
     define: {
       "process.env.DEBUG": JSON.stringify(DEBUG),
       "process.env.REACT_APP_API_URL": JSON.stringify(REACT_APP_API_URL),
+      "process.env.REACT_APP_VERSION": JSON.stringify(REACT_APP_VERSION),
+      "process.env.REACT_APP_PUBLIC_BUILD": JSON.stringify(
+        REACT_APP_PUBLIC_BUILD
+      ),
     },
     resolve: {
       extensions: [".js", ".jsx"],

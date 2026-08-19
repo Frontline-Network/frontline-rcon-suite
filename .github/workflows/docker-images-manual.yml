@@ -47,6 +47,8 @@ jobs:
         with:
           file: Dockerfile-frontend
           context: .
+          build-args: |
+            CRCON_VERSION=${{ github.event.inputs.tag }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:latest,${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ github.event.inputs.tag }}
