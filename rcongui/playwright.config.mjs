@@ -7,11 +7,13 @@ export default defineConfig({
   outputDir: "./test-results",
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 2 : undefined,
-  timeout: 45_000,
+  // CI failures should surface quickly and deterministically. Retrying every
+  // failing route can turn a broken shell into an hour-long feedback loop.
+  retries: 0,
+  workers: process.env.CI ? 4 : undefined,
+  timeout: 30_000,
   expect: {
-    timeout: 12_000,
+    timeout: 8_000,
     toHaveScreenshot: {
       animations: "disabled",
       caret: "hide",

@@ -8,6 +8,7 @@ on:
 jobs:
   build-admin-ui:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       REACT_APP_API_URL: /api/
     defaults:
