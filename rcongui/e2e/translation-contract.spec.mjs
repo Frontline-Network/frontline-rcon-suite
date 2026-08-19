@@ -2,6 +2,12 @@ import { expect, test } from "@playwright/test";
 import de from "../src/i18n/locales/de.js";
 import en from "../src/i18n/locales/en.js";
 
+// Playwright's transform can retain an additional default-export wrapper for
+// typeless .js modules while native Node imports do not. Validate the actual
+// locale object in both environments.
+const germanResources = de?.default ?? de;
+const englishResources = en?.default ?? en;
+
 const getPath = (source, path) =>
   path.split(".").reduce((value, key) => value?.[key], source);
 
@@ -30,8 +36,8 @@ const criticalTranslationKeys = [
 
 test("critical QA and state labels exist in German and English", () => {
   for (const key of criticalTranslationKeys) {
-    const german = getPath(de, key);
-    const english = getPath(en, key);
+    const german = getPath(germanResources, key);
+    const english = getPath(englishResources, key);
 
     expect(german, `missing German translation: ${key}`).toEqual(expect.any(String));
     expect(english, `missing English translation: ${key}`).toEqual(expect.any(String));
