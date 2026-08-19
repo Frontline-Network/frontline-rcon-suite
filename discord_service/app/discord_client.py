@@ -446,6 +446,7 @@ def render_message(
     snapshot = primary.get("snapshot") or {}
     is_squad_report = primary.get("kind") == "squad"
     stat_snapshot = _squad_leader(snapshot) if is_squad_report else snapshot
+    target_online = stat_snapshot.get("online") is not False
     team = primary.get("team") or snapshot.get("team")
     target_name = (
         (
@@ -493,6 +494,11 @@ def render_message(
         identity += f" (Lvl {stat_snapshot['level']})"
     if player_id:
         identity += f"\n🆔 `{_truncate(player_id, 100)}`"
+    unit_name = primary.get("squad_name") or stat_snapshot.get("unit_name")
+    if not is_squad_report and _present(unit_name):
+        identity += f"\n👥 **{_display_unit(unit_name)}**"
+    if not target_online:
+        identity += "\n🔴 **Offline**"
     if source in {"chat", "manual"}:
         identity += f"\n\nℹ️ *{labels['check_match']}*"
     fields = []
@@ -589,6 +595,33 @@ def render_message(
                     },
                 ]
             )
+            recent_teamkill = stat_snapshot.get("recent_teamkill")
+            if isinstance(recent_teamkill, dict):
+                victim = recent_teamkill.get("victim_name") or "-"
+                weapon = recent_teamkill.get("weapon") or "-"
+                seconds = recent_teamkill.get("seconds_before_report")
+                timing = (
+                    f"{seconds} Sekunden vor dem Report"
+                    if language == "de" and _present(seconds)
+                    else (
+                        f"{seconds} seconds before the report"
+                        if _present(seconds)
+                        else "-"
+                    )
+                )
+                fields.append(
+                    {
+                        "name": (
+                            "🧾 Passender Teamkill im Serverlog"
+                            if language == "de"
+                            else "🧾 Matching teamkill in server log"
+                        ),
+                        "value": _truncate(
+                            f"{target_name} → {victim}\n{weapon} · {timing}", 1024
+                        ),
+                        "inline": False,
+                    }
+                )
     elif analysis and source in {"ai_player_name", "ai_chat"}:
         categories = ", ".join(analysis.categories) or "-"
         fields.extend(
@@ -757,7 +790,9 @@ def render_message(
                     "custom_id": f"action:{incident_id}:{revision}:{action}",
                 }
                 for action, style, label in old_actions
-                if has_player_target and action in allowed_actions
+                if has_player_target
+                and action in allowed_actions
+                and (target_online or action in {"temp_ban", "perma_ban"})
             ]
             if row:
                 components.append({"type": 1, "components": row})
@@ -790,7 +825,7 @@ def render_message(
             ]:
                 if (
                     has_squad_target if action == "disband_squad" else has_player_target
-                ) and action in allowed_actions:
+                ) and action in allowed_actions and target_online:
                     context_row.append(
                         {
                             "type": 2,

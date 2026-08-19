@@ -967,6 +967,71 @@ def test_player_report_displays_zero_live_teamkills():
     assert "**Count:** 0" in teamkills["value"]
 
 
+def test_offline_report_target_shows_evidence_and_only_safe_actions():
+    event = _event()
+    event["incident"].update(
+        {
+            "discord_language": "de",
+            "discord_moderation_ready": True,
+            "reporter_id": "reporter-id",
+            "allowed_actions": [
+                "message",
+                "punish",
+                "kick",
+                "temp_ban",
+                "perma_ban",
+                "blacklist",
+                "remove_from_squad",
+            ],
+            "primary_subject": {
+                "kind": "player",
+                "display_name": "Bube01",
+                "player_id": "target-id",
+                "team": "Allies",
+                "snapshot": {
+                    "online": False,
+                    "unit_name": "b",
+                    "kills": 9,
+                    "deaths": 4,
+                    "teamkills": 1,
+                    "recent_teamkill": {
+                        "victim_name": "Reporter",
+                        "weapon": "M3 KNIFE",
+                        "seconds_before_report": 12,
+                    },
+                },
+            },
+        }
+    )
+
+    payload = render_message(IncidentEventEnvelope.model_validate(event), None)
+    embed = payload["embeds"][0]
+    assert "🔴 **Offline**" in embed["description"]
+    assert "👥 **B**" in embed["description"]
+    evidence = next(
+        field for field in embed["fields"] if "Serverlog" in field["name"]
+    )
+    assert "Bube01 → Reporter" in evidence["value"]
+    assert "M3 KNIFE · 12 Sekunden vor dem Report" in evidence["value"]
+    action_ids = {
+        button["custom_id"].rsplit(":", 1)[-1]
+        for row in payload["components"]
+        for button in row["components"]
+        if button["custom_id"].startswith("action:")
+    }
+    assert action_ids == {
+        "message_reporter",
+        "temp_ban",
+        "perma_ban",
+        "blacklist",
+    }
+    assert any(
+        button["custom_id"].startswith("logs:")
+        for row in payload["components"]
+        for button in row["components"]
+    )
+
+
 def test_rejected_game_action_has_an_honest_discord_error():
     request = httpx.Request("POST", "https://crcon.example/action")
     response = httpx.Response(

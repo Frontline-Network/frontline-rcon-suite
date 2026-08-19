@@ -127,6 +127,142 @@ def test_parser_keeps_live_player_stats_in_confirmed_subject():
     assert subject["snapshot"]["map_playtime_seconds"] == 1200
 
 
+def test_recent_teamkill_recovers_disconnected_target_with_cached_stats():
+    report_timestamp_ms = 1_000_000
+    recent = incidents.recent_report_players(
+        "!admin Bube01 absichtlicher TK",
+        reporter_id="reporter-id",
+        report_timestamp_ms=report_timestamp_ms,
+        current_players=[{"player_id": "reporter-id", "name": "Reporter"}],
+        recent_logs=[
+            {
+                "timestamp_ms": 988_000,
+                "action": "DISCONNECTED",
+                "player_id_1": "target-id",
+                "player_name_1": "Bube01",
+                "raw": "DISCONNECTED Bube01 (target-id)",
+            },
+            {
+                "timestamp_ms": 980_000,
+                "action": "TEAM KILL",
+                "player_id_1": "target-id",
+                "player_name_1": "Bube01",
+                "player_id_2": "reporter-id",
+                "player_name_2": "Reporter",
+                "weapon": "M3 KNIFE",
+                "raw": "Bube01(Allies/target-id) -> Reporter(Allies/reporter-id)",
+            },
+        ],
+        cached_stats=[
+            {
+                "player_id": "target-id",
+                "player": "Bube01",
+                "kills": 9,
+                "deaths": 4,
+                "teamkills": 1,
+                "time_seconds": 1200,
+            }
+        ],
+        cached_player_context={
+            "target-id": {"p_unit": {"team": 1, "squad": 1, "role": 2}}
+        },
+    )
+
+    assert len(recent) == 1
+    target = recent[0]
+    assert target["player_id"] == "target-id"
+    assert target["online"] is False
+    assert target["kills"] == 9
+    assert target["map_playtime_seconds"] == 1200
+    assert target["unit_id"] == 1
+    assert target["unit_name"] == "b"
+    assert target["recent_teamkill"]["victim_id"] == "reporter-id"
+    assert target["recent_teamkill"]["seconds_before_report"] == 20
+
+
+def test_chat_ingestion_links_recent_offline_teamkiller(
+    incident_database, monkeypatch
+):
+    monkeypatch.setenv("INCIDENT_CONTEXT_MODE", "enabled")
+    monkeypatch.setattr(incidents, "get_server_number", lambda: 1)
+    incident, created = incidents.create_incident_from_chat(
+        {
+            "sub_content": "!admin Bube01 absichtlicher TK",
+            "player_id_1": "reporter-id",
+            "player_name_1": "Reporter",
+        },
+        current_players=[
+            {"player_id": "reporter-id", "name": "Reporter", "team": "Allies"}
+        ],
+        recent_players=[
+            {
+                "player_id": "target-id",
+                "name": "Bube01",
+                "team": "Allies",
+                "online": False,
+                "kills": 9,
+                "teamkills": 1,
+                "_incident_recent": True,
+                "_incident_direct_evidence": True,
+                "recent_teamkill": {
+                    "victim_id": "reporter-id",
+                    "victim_name": "Reporter",
+                    "weapon": "M3 KNIFE",
+                    "seconds_before_report": 12,
+                },
+            }
+        ],
+    )
+
+    assert created is True
+    assert incident["target_id"] == "target-id"
+    subject = incident["primary_subject"]
+    assert subject["match_method"] == "recent_teamkill"
+    assert subject["snapshot"]["online"] is False
+    assert subject["snapshot"]["kills"] == 9
+    assert subject["snapshot"]["recent_teamkill"]["weapon"] == "M3 KNIFE"
+
+
+def test_recent_offline_commander_is_resolved_by_team_alias():
+    report_timestamp_ms = 1_000_000
+    current_players = [
+        {"player_id": "reporter-id", "name": "Reporter", "team": "Allies"}
+    ]
+    recent = incidents.recent_report_players(
+        "!admin commander sabotiert das Team",
+        reporter_id="reporter-id",
+        report_timestamp_ms=report_timestamp_ms,
+        current_players=current_players,
+        recent_logs=[
+            {
+                "timestamp_ms": 990_000,
+                "action": "DISCONNECTED",
+                "player_id_1": "commander-id",
+                "player_name_1": "Old Commander",
+            }
+        ],
+        cached_stats=[
+            {
+                "player_id": "commander-id",
+                "player": "Old Commander",
+                "team": "allies",
+            }
+        ],
+        cached_player_context={
+            "commander-id": {"p_unit": {"team": 1, "squad": -1, "role": 0}}
+        },
+    )
+    parsed = incidents.parse_chat_report(
+        "!admin commander sabotiert das Team",
+        current_players=[*current_players, *recent],
+        reporter_context={"player_id": "reporter-id", "team": "Allies"},
+    )
+
+    assert parsed["target_id"] == "commander-id"
+    assert parsed["subjects"][0]["match_method"] == "team_commander"
+    assert parsed["subjects"][0]["snapshot"]["online"] is False
+
+
 def test_parser_maps_commander_alias_to_reporter_team_with_stats():
     parsed = incidents.parse_chat_report(
         "!admin commander macht wieder Sachen",

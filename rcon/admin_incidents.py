@@ -3,7 +3,7 @@ import re
 import unicodedata
 from datetime import datetime, timedelta, timezone
 from difflib import SequenceMatcher
-from typing import Any, Iterable, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 from sqlalchemy import delete, func, select
 
@@ -25,8 +25,10 @@ FINAL_STATUSES = {"resolved", "dismissed"}
 DEFAULT_TRIGGER_WORDS = ("!admin",)
 SUBJECT_KINDS = {"player", "squad"}
 SUBJECT_STATES = {"suggested", "confirmed", "rejected"}
-PARSER_VERSION = "2.0.0"
+PARSER_VERSION = "2.1.0"
 DEFAULT_FUZZY_THRESHOLD = 0.74
+RECENT_PLAYER_LOOKBACK_SECONDS = 5 * 60
+RECENT_PLAYER_LOG_LIMIT = 2_500
 SQUAD_LEADER_ROLES = get_squad_leader_roles(
     GameEnum.HLL_WW2
 ) | get_squad_leader_roles(GameEnum.HLL_VIETNAM)
@@ -108,6 +110,8 @@ def player_snapshot(player: dict | None) -> dict:
         "support",
         "map_playtime_seconds",
         "is_vip",
+        "online",
+        "last_seen_at",
     )
     snapshot = {
         field: _simple_value(player.get(field))
@@ -122,7 +126,227 @@ def player_snapshot(player: dict | None) -> dict:
         teamkills = player.get("team_kills")
     if teamkills is not None:
         snapshot["teamkills"] = _simple_value(teamkills)
+    recent_teamkill = player.get("recent_teamkill")
+    if isinstance(recent_teamkill, dict):
+        snapshot["recent_teamkill"] = {
+            str(key): _simple_value(value) for key, value in recent_teamkill.items()
+        }
     return snapshot
+
+
+def _name_is_mentioned(normalized_message: str, name: str) -> bool:
+    normalized_name = _normalize_message(name)
+    return bool(
+        len(normalized_name) >= 3
+        and re.search(
+            rf"(?<!\w){re.escape(normalized_name)}(?!\w)", normalized_message
+        )
+    )
+
+
+def _log_timestamp_ms(log: dict) -> int | None:
+    timestamp = log.get("timestamp_ms")
+    if isinstance(timestamp, (int, float)):
+        return int(timestamp)
+    event_time = log.get("event_time")
+    if isinstance(event_time, datetime):
+        if event_time.tzinfo is None:
+            event_time = event_time.replace(tzinfo=timezone.utc)
+        return int(event_time.timestamp() * 1000)
+    if isinstance(event_time, str):
+        try:
+            parsed = datetime.fromisoformat(event_time.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return int(parsed.timestamp() * 1000)
+        except ValueError:
+            return None
+    return None
+
+
+def _log_team(log: dict, player_id: str) -> str | None:
+    raw = str(log.get("raw") or log.get("line_without_time") or "")
+    match = re.search(
+        rf"\((Allies|Axis)/{re.escape(player_id)}\)", raw, flags=re.IGNORECASE
+    )
+    return match.group(1) if match else None
+
+
+def _cached_stat_snapshot(
+    stat: dict | None, player_context: Mapping[str, Any] | None = None
+) -> dict:
+    if not stat and not player_context:
+        return {}
+    stat = stat or {}
+    snapshot = {
+        "player_id": stat.get("player_id"),
+        "name": stat.get("player") or stat.get("name"),
+        "team": stat.get("team"),
+        "level": stat.get("level"),
+        "kills": stat.get("kills"),
+        "kills_streak": stat.get("kills_streak"),
+        "deaths": stat.get("deaths"),
+        "teamkills": stat.get("teamkills"),
+        "teamkills_streak": stat.get("teamkills_streak"),
+        "combat": stat.get("combat"),
+        "offense": stat.get("offense"),
+        "defense": stat.get("defense"),
+        "support": stat.get("support"),
+        "map_playtime_seconds": stat.get("time_seconds"),
+    }
+    unit = (player_context or {}).get("p_unit") or {}
+    squad_id = unit.get("squad")
+    if isinstance(squad_id, int) and squad_id >= -1:
+        snapshot["unit_id"] = squad_id
+        if squad_id == -1:
+            snapshot["unit_name"] = "command"
+            snapshot["role"] = "commander"
+        elif squad_id < 26:
+            snapshot["unit_name"] = chr(ord("a") + squad_id)
+    return {key: value for key, value in snapshot.items() if value is not None}
+
+
+def recent_report_players(
+    message: str,
+    *,
+    recent_logs: Iterable[dict],
+    current_players: Sequence[dict] = (),
+    reporter_id: str | None = None,
+    report_timestamp_ms: int | None = None,
+    cached_stats: Sequence[dict] = (),
+    cached_player_context: Mapping[str, Mapping[str, Any]] | None = None,
+    lookback_seconds: int = RECENT_PLAYER_LOOKBACK_SECONDS,
+) -> list[dict]:
+    """Recover explicitly named players who left immediately before a report.
+
+    Historical candidates are deliberately never fuzzy-matched. A direct recent
+    teamkill against the reporter is retained as evidence and disambiguates an
+    otherwise duplicated player name.
+    """
+
+    normalized_message = _normalize_message(message)
+    if not normalized_message:
+        return []
+    commander_requested = bool(
+        re.search(
+            rf"(?<!\w)(?:{'|'.join(map(re.escape, COMMANDER_ALIASES))})(?!\w)",
+            normalized_message,
+        )
+    )
+    report_timestamp_ms = report_timestamp_ms or int(_utcnow().timestamp() * 1000)
+    cutoff_ms = report_timestamp_ms - max(1, int(lookback_seconds)) * 1000
+    reporter_id = str(reporter_id or "") or None
+    live_ids = {
+        str(player.get("player_id"))
+        for player in current_players
+        if player.get("player_id")
+    }
+    live_names = {
+        _normalize_message(str(player.get("name") or player.get("player_name") or ""))
+        for player in current_players
+    }
+    reporter = next(
+        (
+            player
+            for player in current_players
+            if str(player.get("player_id") or "") == reporter_id
+        ),
+        {},
+    )
+    reporter_team = _normalize_team(reporter.get("team"))
+    live_commander_present = any(
+        _is_commander(player)
+        and (not reporter_team or _normalize_team(player.get("team")) == reporter_team)
+        for player in current_players
+    )
+    stats_by_id = {
+        str(stat.get("player_id")): stat
+        for stat in cached_stats
+        if stat.get("player_id")
+    }
+    cached_player_context = cached_player_context or {}
+    candidates: dict[str, dict] = {}
+
+    for log in recent_logs:
+        timestamp_ms = _log_timestamp_ms(log)
+        if timestamp_ms is None or timestamp_ms > report_timestamp_ms:
+            continue
+        if timestamp_ms < cutoff_ms:
+            # LogsHistory is newest-first; stop decoding once the lookback
+            # boundary is crossed.
+            break
+        action = str(log.get("action") or "").upper()
+        for slot in (1, 2):
+            player_id = str(log.get(f"player_id_{slot}") or "")
+            name = str(log.get(f"player_name_{slot}") or "").strip()
+            normalized_name = _normalize_message(name)
+            player_context = cached_player_context.get(player_id) or {}
+            unit = player_context.get("p_unit") or {}
+            matches_commander_alias = (
+                commander_requested
+                and not live_commander_present
+                and unit.get("squad") == -1
+            )
+            if (
+                not player_id
+                or not name
+                or player_id == reporter_id
+                or player_id in live_ids
+                or normalized_name in live_names
+                or not (
+                    _name_is_mentioned(normalized_message, name)
+                    or matches_commander_alias
+                )
+            ):
+                continue
+            candidate = candidates.setdefault(
+                player_id,
+                {
+                    **_cached_stat_snapshot(
+                        stats_by_id.get(player_id), player_context
+                    ),
+                    "player_id": player_id,
+                    "name": name,
+                    "online": False,
+                    "_incident_recent": True,
+                },
+            )
+            candidate.setdefault("team", _log_team(log, player_id))
+            last_seen_ms = candidate.get("_incident_last_seen_ms", -1)
+            if timestamp_ms > last_seen_ms:
+                candidate["_incident_last_seen_ms"] = timestamp_ms
+                candidate["last_seen_at"] = datetime.fromtimestamp(
+                    timestamp_ms / 1000, tz=timezone.utc
+                ).isoformat()
+            if (
+                slot == 1
+                and action == "TEAM KILL"
+                and reporter_id
+                and str(log.get("player_id_2") or "") == reporter_id
+                and not candidate.get("_incident_direct_evidence")
+            ):
+                seconds_before = max(0, (report_timestamp_ms - timestamp_ms) // 1000)
+                candidate["_incident_direct_evidence"] = True
+                candidate["recent_teamkill"] = {
+                    "victim_id": reporter_id,
+                    "victim_name": log.get("player_name_2"),
+                    "weapon": log.get("weapon"),
+                    "occurred_at": datetime.fromtimestamp(
+                        timestamp_ms / 1000, tz=timezone.utc
+                    ).isoformat(),
+                    "seconds_before_report": int(seconds_before),
+                }
+
+    result = sorted(
+        candidates.values(),
+        key=lambda candidate: (
+            not bool(candidate.get("_incident_direct_evidence")),
+            str(candidate.get("last_seen_at") or ""),
+        ),
+    )
+    for candidate in result:
+        candidate.pop("_incident_last_seen_ms", None)
+    return result
 
 
 def _is_squad_leader(player: dict) -> bool:
@@ -212,8 +436,18 @@ def _resolve_subjects(
         )
         for player in matching_players:
             name = str(player.get("name") or player.get("player_name") or "").strip()
-            state = "confirmed" if exact and len(matching_players) == 1 else "suggested"
-            method = "name_contained" if exact else ""
+            recent = bool(player.get("_incident_recent"))
+            direct_evidence = bool(player.get("_incident_direct_evidence"))
+            state = (
+                "confirmed"
+                if exact and (len(matching_players) == 1 or direct_evidence)
+                else "suggested"
+            )
+            method = (
+                "recent_teamkill"
+                if exact and direct_evidence
+                else ("recent_name" if exact and recent else "name_contained")
+            ) if exact else ""
             confidence = 1.0 if exact else 0.0
             matched_text = exact.group(0) if exact else ""
             if not exact:
@@ -222,10 +456,12 @@ def _resolve_subjects(
                     rf"(?<!\w){re.escape(stripped)}(?!\w)", normalized_message
                 )
                 if clan_match and stripped != normalized_name:
-                    method = "clan_tag_variant"
+                    method = "recent_clan_tag" if recent else "clan_tag_variant"
                     confidence = 0.9
                     matched_text = clan_match.group(0)
                 else:
+                    if recent:
+                        continue
                     confidence, matched_text = _best_fuzzy_window(
                         stripped or normalized_name, normalized_message
                     )
@@ -436,6 +672,15 @@ def _trigger_match(message: str, trigger_words: Iterable[str]):
         if match:
             return trigger_word, match
     return None, None
+
+
+def chat_report_triggered(
+    message: str, trigger_words: Iterable[str] = DEFAULT_TRIGGER_WORDS
+) -> bool:
+    """Cheap trigger check used before collecting expensive player context."""
+
+    _, match = _trigger_match(message, trigger_words)
+    return match is not None
 
 
 def _legacy_player_target(
@@ -721,10 +966,22 @@ def create_incident_from_chat(
     log: dict,
     *,
     current_players: Sequence[dict] | None = None,
+    recent_players: Sequence[dict] | None = None,
     current_squads: Sequence[dict] | None = None,
     trigger_words: Iterable[str] = DEFAULT_TRIGGER_WORDS,
 ) -> tuple[dict, bool] | None:
-    players = list(current_players or ())
+    players = [
+        dict(player, online=player.get("online", True))
+        for player in current_players or ()
+    ]
+    live_ids = {
+        str(player.get("player_id")) for player in players if player.get("player_id")
+    }
+    players.extend(
+        dict(player, online=False)
+        for player in recent_players or ()
+        if str(player.get("player_id") or "") not in live_ids
+    )
     reporter_id = str(log.get("player_id_1") or "") or None
     reporter = next(
         (player for player in players if str(player.get("player_id")) == reporter_id),
@@ -736,7 +993,7 @@ def create_incident_from_chat(
     parsed = parse_chat_report(
         str(log.get("sub_content") or ""),
         trigger_words=trigger_words,
-        current_players=current_players,
+        current_players=players,
         current_squads=current_squads if context_mode != "disabled" else (),
         reporter_context=reporter_context,
         fuzzy_threshold=_mobile_context_fuzzy_threshold(),

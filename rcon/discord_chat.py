@@ -287,8 +287,11 @@ def handle_on_chat(rcon, log):
     if incident_capture_enabled():
         try:
             from rcon.admin_incidents import (
+                RECENT_PLAYER_LOG_LIMIT,
+                chat_report_triggered,
                 create_incident_from_chat,
                 flatten_team_view,
+                recent_report_players,
             )
 
             triggers = incident_triggers()
@@ -298,29 +301,57 @@ def handle_on_chat(rcon, log):
                     for word in AdminPingWebhooksUserConfig.load_from_db().trigger_words
                     if word.strip()
                 ) or ("!admin",)
-            context_mode = incident_context_mode()
-            if context_mode in {"enabled", "shadow"}:
-                detailed = rcon.get_detailed_players()
-                current_players = list((detailed.get("players") or {}).values())
-                current_squads = flatten_team_view(rcon.get_team_view())
-            else:
-                current_players = rcon.get_players()
-                current_squads = []
-            incident, created = create_incident_from_chat(
-                log,
-                current_players=current_players,
-                current_squads=current_squads,
-                trigger_words=triggers,
-            )
-            captured_report = incident is not None
-            if created and incident.get("reporter_id"):
-                from rcon.incident_notifications import (
-                    notify_incident_reporter,
-                    received_reporter_template,
-                )
+            message = str(log.get("sub_content") or "")
+            if chat_report_triggered(message, triggers):
+                context_mode = incident_context_mode()
+                recent_players = []
+                if context_mode in {"enabled", "shadow"}:
+                    detailed = rcon.get_detailed_players()
+                    current_players = list((detailed.get("players") or {}).values())
+                    current_squads = flatten_team_view(rcon.get_team_view())
 
-                if template := received_reporter_template():
-                    notify_incident_reporter(rcon, incident, message=template)
+                    try:
+                        from rcon.player_stats import get_cached_live_game_stats
+                        from rcon.utils import LogsHistorySnapshot, MapsHistory
+
+                        cached = get_cached_live_game_stats() or {}
+                        current_map = MapsHistory().get_current_map() or {}
+                        recent_players = recent_report_players(
+                            message,
+                            recent_logs=LogsHistorySnapshot().iter_range(
+                                stop=RECENT_PLAYER_LOG_LIMIT
+                            ),
+                            current_players=current_players,
+                            reporter_id=str(log.get("player_id_1") or "") or None,
+                            report_timestamp_ms=log.get("timestamp_ms"),
+                            cached_stats=cached.get("stats") or (),
+                            cached_player_context=current_map.get("player_stats") or {},
+                        )
+                    except Exception:
+                        # The historical context is an optional enhancement. A
+                        # cache problem must never suppress the report itself.
+                        logger.exception("Unable to recover recent report players")
+                else:
+                    current_players = rcon.get_players()
+                    current_squads = []
+                result = create_incident_from_chat(
+                    log,
+                    current_players=current_players,
+                    recent_players=recent_players,
+                    current_squads=current_squads,
+                    trigger_words=triggers,
+                )
+                if result:
+                    incident, created = result
+                    captured_report = True
+                    if created and incident.get("reporter_id"):
+                        from rcon.incident_notifications import (
+                            notify_incident_reporter,
+                            received_reporter_template,
+                        )
+
+                        if template := received_reporter_template():
+                            notify_incident_reporter(rcon, incident, message=template)
         except Exception:
             # Incident persistence must never interrupt the game log loop or
             # existing Discord notifications.
