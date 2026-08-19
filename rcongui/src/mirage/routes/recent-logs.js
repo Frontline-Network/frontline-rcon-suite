@@ -74,3 +74,45 @@ export const handleRecentLogs = (gameState, params = {}) => {
     }
   };
 };
+
+export const handleRecentLogsSummary = (gameState, params = {}) => {
+  const perActionLimit = Math.min(
+    Math.max(Number.parseInt(params.per_action_limit, 10) || 100, 1),
+    500
+  );
+  const recentLogs = handleRecentLogs(gameState, {
+    end: Math.min(Math.max(Number.parseInt(params.end, 10) || 15_000, 0), 100_000),
+  }).result.logs;
+  const groups = new Map();
+  const adminLogs = [];
+
+  const project = (log) => ({
+    player_id_1: log.player_id_1,
+    player_name_1: log.player_name_1,
+    player_id_2: log.player_id_2,
+    player_name_2: log.player_name_2,
+    message: log.message,
+    timestamp_ms: log.timestamp_ms,
+    action: log.action,
+  });
+
+  recentLogs.forEach((log) => {
+    if (!log?.action) return;
+
+    if (!groups.has(log.action)) groups.set(log.action, []);
+    const group = groups.get(log.action);
+    const projected = project(log);
+    if (group.length < perActionLimit) group.push(projected);
+
+    if (log.action.startsWith("CHAT") && (log.message || "").includes("!admin")) {
+      adminLogs.push(projected);
+    }
+  });
+
+  return {
+    result: {
+      groups: [...groups].map(([group, logs]) => ({ group, logs })),
+      admin_logs: adminLogs,
+    },
+  };
+};

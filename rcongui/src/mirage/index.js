@@ -1,7 +1,10 @@
 import { createServer } from "miragejs";
 import { handleTeamView } from "./routes/team-view";
 import { createGameState } from "./state/game";
-import { handleRecentLogs } from "./routes/recent-logs";
+import {
+  handleRecentLogs,
+  handleRecentLogsSummary,
+} from "./routes/recent-logs";
 import {
   autobalancerConfig,
   autobalancerHistoryDashboard,
@@ -436,6 +439,13 @@ export function makeServer({ environment = "development" } = {}) {
           filter_player: asArray(params.filter_player),
           inclusive_filter: params.inclusive_filter === true || params.inclusive_filter === "true",
         });
+      });
+
+      this.post("/get_recent_logs_summary", (schema, request) => {
+        const params = request.requestBody
+          ? JSON.parse(request.requestBody)
+          : request.queryParams;
+        return handleRecentLogsSummary(gameState, params);
       });
 
       const playerActionCommands = [
