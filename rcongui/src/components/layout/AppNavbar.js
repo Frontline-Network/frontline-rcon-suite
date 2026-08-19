@@ -9,9 +9,9 @@ import MenuButton from "./MenuButton";
 import NavbarBreadcrumbs from "./NavbarBreadcrumbs";
 import { useMediaQuery, useTheme } from "@mui/system";
 import ServerStatus from "../Header/server-status";
-import { useAppStore } from "@/stores/app-state";
 import FrontlineBrand from "./FrontlineBrand";
 import { useTranslation } from "react-i18next";
+import { useState } from "react";
 
 const Toolbar = styled(MuiToolbar)({
   width: "100%",
@@ -72,8 +72,8 @@ const AppNavbarBase = ({ toggleDrawer, open, isSmallScreen }) => {
 };
 
 export default function AppNavbar() {
-  const openDrawer = useAppStore((state) => state.openDrawer);
-  const toggleDrawer = useAppStore((state) => state.toggleDrawer);
+  const [openDrawer, setOpenDrawer] = useState(false);
+  const toggleDrawer = () => setOpenDrawer((current) => !current);
   const theme = useTheme();
   const isSmallScreen = useMediaQuery(theme.breakpoints.down("lg"));
 
@@ -91,3 +91,4 @@ export default function AppNavbar() {
     </>
   );
 }
+

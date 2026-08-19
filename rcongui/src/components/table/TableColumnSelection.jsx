@@ -22,7 +22,12 @@ const TableColumnSelection = ({ table, onColumnVisibilityChange }) => {
       id="column-picker"
       description={t("selection.columnsDescription")}
       renderButton={(props) => (
-        <IconButton {...props} size="small" sx={{ borderRadius: 0 }}>
+        <IconButton
+          {...props}
+          aria-label={t("selection.columns")}
+          size="small"
+          sx={{ borderRadius: 0 }}
+        >
           <Tooltip title={t("selection.columns")}>
             <ViewColumnIcon sx={{ fontSize: 16 }} />
           </Tooltip>
@@ -90,3 +95,4 @@ const TableColumnSelection = ({ table, onColumnVisibilityChange }) => {
 };
 
 export default TableColumnSelection;
+

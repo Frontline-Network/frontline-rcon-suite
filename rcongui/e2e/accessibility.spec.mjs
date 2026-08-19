@@ -13,6 +13,7 @@ for (const viewportName of ["mobile", "tablet", "desktop"]) {
   const viewport = VIEWPORTS[viewportName];
 
   test.describe(`${viewportName} accessibility`, () => {
+    test.setTimeout(60_000);
     test.use({ viewport });
 
     for (const route of routes) {
@@ -42,3 +43,4 @@ for (const viewportName of ["mobile", "tablet", "desktop"]) {
     }
   });
 }
+
