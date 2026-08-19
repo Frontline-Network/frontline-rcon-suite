@@ -7,6 +7,7 @@ test.describe("player-action permissions", () => {
   test("does not expose protected game actions to a viewer", async ({ page }) => {
     await openDemoPage(page, "/views/team", { query: { demo_role: "viewer" } });
 
+    await page.getByRole("button", { name: "Alle auswählen" }).click();
     await page.getByRole("button", { name: "Spieleraktionen" }).first().click();
     await expect(
       page.getByText("Dir fehlt die erforderliche Berechtigung für diese Aktionen.", { exact: true }),
@@ -18,6 +19,7 @@ test.describe("player-action permissions", () => {
   test("keeps protected game actions available to a superuser", async ({ page }) => {
     await openDemoPage(page, "/views/team");
 
+    await page.getByRole("button", { name: "Alle auswählen" }).click();
     await page.getByRole("button", { name: "Spieleraktionen" }).first().click();
     await expect(page.getByRole("menuitem", { name: "Spieler bestrafen" })).toBeVisible();
     await expect(page.getByRole("menuitem", { name: "Spieler kicken" })).toBeVisible();
