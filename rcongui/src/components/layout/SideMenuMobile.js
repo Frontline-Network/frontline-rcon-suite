@@ -21,11 +21,9 @@ const MobileDrawer = ({ open, toggleDrawer, children }) => {
       anchor="left"
       open={open}
       onClose={toggleDrawer}
-      slotProps={{
-        paper: {
-          component: "nav",
-          "aria-label": t("navigation.primary"),
-        },
+      PaperProps={{
+        component: "nav",
+        "aria-label": t("navigation.primary"),
       }}
       sx={{
         zIndex: (theme) => theme.zIndex.drawer + 1,

@@ -38,22 +38,29 @@ const SystemUsage = () => {
         {t("sidebar.system")}
       </Typography>
       <Stack spacing={0.8}>
-        {(isLoading ? ["CPU", "RAM", "SSD"].map((key) => ({ key, value: 0 })) : metrics).map((metric) => (
-          <Tooltip key={metric.key} title={metric.tooltip || t("common.loading")} placement="right">
-            <Box>
-              <Stack direction="row" alignItems="center" spacing={0.8}>
-                {metric.icon && <FontAwesomeIcon icon={metric.icon} color={byUsage(metric.value || 0)} />}
-                <Typography variant="caption" sx={{ width: 28 }}>{metric.key}</Typography>
-                <LinearProgress
-                  variant="determinate"
-                  value={metric.value || 0}
-                  sx={{ flexGrow: 1, height: 4, bgcolor: "grey.800", "& .MuiLinearProgress-bar": { bgcolor: "secondary.main" } }}
-                />
-                <Typography variant="caption" sx={{ width: 32, textAlign: "right" }}>{Math.round(metric.value || 0)}%</Typography>
-              </Stack>
-            </Box>
-          </Tooltip>
-        ))}
+        {(isLoading ? ["CPU", "RAM", "SSD"].map((key) => ({ key, value: 0 })) : metrics).map((metric) => {
+          const roundedValue = Math.round(metric.value || 0);
+          const valueText = isLoading ? t("common.loading") : `${roundedValue}%`;
+
+          return (
+            <Tooltip key={metric.key} title={metric.tooltip || t("common.loading")} placement="right">
+              <Box>
+                <Stack direction="row" alignItems="center" spacing={0.8}>
+                  {metric.icon && <FontAwesomeIcon icon={metric.icon} color={byUsage(metric.value || 0)} />}
+                  <Typography variant="caption" sx={{ width: 28 }}>{metric.key}</Typography>
+                  <LinearProgress
+                    aria-label={metric.key}
+                    aria-valuetext={valueText}
+                    variant="determinate"
+                    value={metric.value || 0}
+                    sx={{ flexGrow: 1, height: 4, bgcolor: "grey.800", "& .MuiLinearProgress-bar": { bgcolor: "secondary.main" } }}
+                  />
+                  <Typography variant="caption" sx={{ width: 32, textAlign: "right" }}>{roundedValue}%</Typography>
+                </Stack>
+              </Box>
+            </Tooltip>
+          );
+        })}
       </Stack>
     </ListItem>
   );

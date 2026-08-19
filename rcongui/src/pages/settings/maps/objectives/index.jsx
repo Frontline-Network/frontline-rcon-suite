@@ -266,34 +266,43 @@ function MapObjectivesPage() {
           <FormControl component="fieldset" sx={{ px: 1, mt: 1 }}>
             <FormLabel component="legend">{t("maps.selectByName")}</FormLabel>
             <Stack spacing={2} sx={{ py: 2 }}>
-              {objectiveNames.map((names, index) => (
-                <FormControl
-                  key={`Objective #${index}`}
-                  size="small"
-                  sx={{ minWidth: 180 }}
-                >
-                  <InputLabel>{t("maps.objectiveNumber", { number: index + 1 })}</InputLabel>
-                  <Select
-                    value={selectedObjectives[index]}
-                    onChange={(e) =>
-                      handleObjectiveNamePick(
-                        index,
-                        names.indexOf(e.target.value)
-                      )
-                    }
-                    label={`Objective #${index}`}
+              {objectiveNames.map((names, index) => {
+                const objectiveLabel = t("maps.objectiveNumber", {
+                  number: index + 1,
+                });
+                const labelId = `objective-${index + 1}-label`;
+
+                return (
+                  <FormControl
+                    key={`Objective #${index}`}
+                    size="small"
+                    sx={{ minWidth: 180 }}
                   >
-                    <MenuItem value="random" name={"objective"}>
-                      {t("maps.random")}
-                    </MenuItem>
-                    {names.map((name) => (
-                      <MenuItem key={name} value={name} name={"objective"}>
-                        {name}
+                    <InputLabel id={labelId}>{objectiveLabel}</InputLabel>
+                    <Select
+                      id={`objective-${index + 1}`}
+                      labelId={labelId}
+                      value={selectedObjectives[index]}
+                      onChange={(e) =>
+                        handleObjectiveNamePick(
+                          index,
+                          names.indexOf(e.target.value)
+                        )
+                      }
+                      label={objectiveLabel}
+                    >
+                      <MenuItem value="random" name={"objective"}>
+                        {t("maps.random")}
                       </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              ))}
+                      {names.map((name) => (
+                        <MenuItem key={name} value={name} name={"objective"}>
+                          {name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                );
+              })}
             </Stack>
           </FormControl>
           <FormControl component="fieldset" sx={{ px: 1, mt: 1 }}>

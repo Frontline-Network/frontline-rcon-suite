@@ -40,11 +40,9 @@ export const MenuDrawer = ({ open, children }) => {
     <Drawer
       variant="permanent"
       open={open}
-      slotProps={{
-        paper: {
-          component: "nav",
-          "aria-label": t("navigation.primary"),
-        },
+      PaperProps={{
+        component: "nav",
+        "aria-label": t("navigation.primary"),
       }}
       sx={{
         width: open ? drawerWidth : 0,
