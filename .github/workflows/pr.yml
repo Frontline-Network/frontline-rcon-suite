@@ -5,6 +5,10 @@ on:
     branches:
       - 'master'
 
+concurrency:
+  group: pr-${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   build-admin-ui:
     runs-on: ubuntu-latest
