@@ -10,7 +10,10 @@ export default defineConfig({
   // CI failures should surface quickly and deterministically. Retrying every
   // failing route can turn a broken shell into an hour-long feedback loop.
   retries: 0,
-  workers: process.env.CI ? 4 : undefined,
+  // The Vite development transform and four browser workers compete for the
+  // same small CI runner. Two workers keep route startup deterministic while
+  // still exercising the suite in parallel.
+  workers: process.env.CI ? 2 : undefined,
   timeout: 30_000,
   expect: {
     timeout: 8_000,
