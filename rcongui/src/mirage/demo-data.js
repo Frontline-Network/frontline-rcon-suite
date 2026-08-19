@@ -167,11 +167,56 @@ export const demoServerConnection = {
   port: 4174,
 };
 
+const readDemoParameter = (name) => {
+  if (typeof window === "undefined") return null;
+  return new URLSearchParams(window.location.search).get(name);
+};
+
+export const getDemoConnectionMode = () =>
+  readDemoParameter("demo_connection") || "online";
+
+export const getDemoRole = () => readDemoParameter("demo_role") || "admin";
+
+const normalizeDemoGame = (value, fallback = "hll") => {
+  const game = String(value ?? "").trim().toLowerCase();
+  if (!game) return fallback;
+  if (game === "hll") return "hll";
+  if (["hllv", "hll_vietnam", "vietnam"].includes(game)) return "hll_vietnam";
+  return null;
+};
+
+export const getDemoServerConnection = () => ({
+  ...demoServerConnection,
+  game: normalizeDemoGame(readDemoParameter("demo_game")),
+});
+
+export const getDemoServerList = () => {
+  if (readDemoParameter("demo_multiserver") !== "1") return [];
+
+  return [
+    {
+      name: "[GER] Frontline Network | Vietnam #3",
+      short_name: "Frontline Vietnam #3",
+      server_number: 3,
+      game: normalizeDemoGame(readDemoParameter("demo_other_game"), "hll_vietnam"),
+      current_players: 72,
+      max_players: 100,
+      port: 4175,
+      link: typeof window === "undefined" ? "http://localhost:4175" : window.location.origin,
+    },
+  ];
+};
+
 export const demoServerStatus = {
   ...demoServerConnection,
   queue_players: 4,
   version: "11.2.0",
 };
+
+export const getDemoServerStatus = () => ({
+  ...demoServerStatus,
+  game: getDemoServerConnection().game,
+});
 
 export const demoSystemUsage = {
   cpu_usage: { percent: 18 },

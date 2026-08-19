@@ -15,10 +15,23 @@ jobs:
         working-directory: rcongui
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: rcongui/package-lock.json
       - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
       - run: npm run build
+      - name: upload admin UI test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-ui-playwright-report
+          path: rcongui/playwright-report
+          retention-days: 7
 
   build-public-ui:
     runs-on: ubuntu-latest
@@ -27,8 +40,12 @@ jobs:
         working-directory: rcongui_public
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: rcongui_public/package-lock.json
       - run: npm ci
       - run: npm run build
 
@@ -49,7 +66,7 @@ jobs:
       REDIS_IMAGE: redis:alpine
       POSTGRES_IMAGE: postgres:12-alpine
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

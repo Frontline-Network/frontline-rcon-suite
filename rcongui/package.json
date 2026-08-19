@@ -16,7 +16,10 @@
     "serve": "vite preview",
     "preview": "vite build && vite preview",
     "preview:debug": "DEBUG=true vite build && vite preview",
-    "test": "jest",
+    "test": "playwright test",
+    "test:e2e": "playwright test",
+    "test:e2e:update": "playwright test --update-snapshots",
+    "test:e2e:headed": "playwright test --headed",
     "format:write": "prettier src/ --write",
     "lint": "eslint src/"
   },
@@ -76,7 +79,9 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@faker-js/faker": "^9.4.0",
+    "@playwright/test": "^1.62.1",
     "@testing-library/jest-dom": "^4.2.4",
     "@testing-library/react": "^9.3.2",
     "@testing-library/user-event": "^7.1.2",

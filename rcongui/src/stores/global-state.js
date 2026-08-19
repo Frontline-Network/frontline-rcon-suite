@@ -5,8 +5,10 @@ import { useEffect } from "react";
 import { create } from "zustand";
 import {
   demoGameState,
-  demoServerConnection,
-  demoServerStatus,
+  getDemoConnectionMode,
+  getDemoServerConnection,
+  getDemoServerList,
+  getDemoServerStatus,
   isFakeMode,
 } from "@/mirage/demo-data";
 
@@ -40,8 +42,11 @@ const globalQueries = [
     queryFn: async () => {
       let result;
       try {
+        if (isFakeMode() && getDemoConnectionMode() === "gameserver_offline") {
+          throw new Error("Demo game server is offline");
+        }
         result = isFakeMode()
-          ? demoServerStatus
+          ? getDemoServerStatus()
           : await cmd.GET_GAME_SERVER_STATUS()
         useGlobalStore.setState((state) => ({ status: result }));
       } catch (error) {
@@ -61,7 +66,7 @@ const globalQueries = [
   }),
   queryOptions({
     queryKey: [{ queryIdentifier: "get_server_list" }],
-    queryFn: isFakeMode() ? () => Promise.resolve([]) : cmd.GET_GAME_SERVER_LIST,
+    queryFn: isFakeMode() ? () => Promise.resolve(getDemoServerList()) : cmd.GET_GAME_SERVER_LIST,
     select: (data) => {
       useGlobalStore.setState((state) => ({ servers: data }));
       return data;
@@ -90,10 +95,15 @@ export const GlobalState = () => {
   const { data, isSuccess: isCrconConnected } = useQuery({
     queryKey: [{ queryIdentifier: "get_connection_info" }],
     queryFn: isFakeMode()
-      ? () => Promise.resolve(demoServerConnection)
+      ? () => {
+          if (getDemoConnectionMode() === "crcon_offline") {
+            return Promise.reject(new Error("Demo CRCON is offline"));
+          }
+          return Promise.resolve(getDemoServerConnection());
+        }
       : cmd.GET_CRCON_SERVER_CONNECTION,
     refetchInterval,
-    retry: 1,
+    retry: isFakeMode() ? 0 : 1,
   });
 
   useEffect(() => {

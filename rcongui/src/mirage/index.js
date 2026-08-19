@@ -11,6 +11,12 @@ import {
   autobalancerStatus,
   reviewAutobalancerShadowDecision,
 } from "./data/autobalancer";
+import {
+  getDemoServerConnection,
+  getDemoServerList,
+  getDemoServerStatus,
+  getDemoRole,
+} from "./demo-data";
 
 export function makeServer({ environment = "development" } = {}) {
   let gameState = createGameState();
@@ -141,28 +147,19 @@ export function makeServer({ environment = "development" } = {}) {
       // A complete, deterministic shell for visual development and demos.
       this.get("/is_logged_in", () => ok({ authenticated: true, username: "Frontline Admin" }));
       this.post("/login", () => ok({ authenticated: true, username: "Frontline Admin" }));
-      this.get("/get_own_user_permissions", () => ok({
-        user_name: "Frontline Admin",
-        is_superuser: true,
-        permissions: [],
-      }));
+      this.get("/get_own_user_permissions", () => {
+        const isViewer = getDemoRole() === "viewer";
+        return ok({
+          user_name: isViewer ? "Frontline Viewer" : "Frontline Admin",
+          is_superuser: !isViewer,
+          permissions: [],
+        });
+      });
       this.get("/logout", () => ok(true));
 
-      this.get("/get_connection_info", () => ok({
-        name: "[GER] Frontline Network | #2",
-        short_name: "Frontline #2",
-        server_number: 2,
-        port: 8010,
-      }));
-      this.get("/get_server_list", () => ok([]));
-      this.get("/get_status", () => ok({
-        name: "[GER] Frontline Network | #2",
-        short_name: "Frontline #2",
-        server_number: 2,
-        current_players: 86,
-        max_players: 100,
-        queue_length: 4,
-      }));
+      this.get("/get_connection_info", () => ok(getDemoServerConnection()));
+      this.get("/get_server_list", () => ok(getDemoServerList()));
+      this.get("/get_status", () => ok(getDemoServerStatus()));
       this.get("/get_gamestate", () => ok({
         current_map: currentLayer,
         next_map: nextLayer,
@@ -181,6 +178,55 @@ export function makeServer({ environment = "development" } = {}) {
         disk_usage: { percent: 62 },
       }));
       this.get("/get_version", () => ok("11.2.0"));
+
+      this.get("/mobile/v1/devices", () => ok([]));
+      this.get("/mobile/v1/bootstrap", () => ok({
+        user: { permissions: [] },
+        mobile_configuration: {
+          public_base_url: "https://demo.crcon.invalid",
+          incident_triggers: ["!admin"],
+          incident_retention_days: 30,
+          push_relay_configured: false,
+        },
+      }));
+
+      this.get("/discord/v1/integration", () => ok({
+        enabled: false,
+        connected: false,
+        guild_id: "",
+        guild_name: "",
+        channel_id: "",
+        channel_name: "",
+        moderator_role_ids: [],
+        allowed_actions: ["message", "punish", "kick", "temp_ban", "perma_ban"],
+        language: "de",
+        has_api_key: false,
+        api_model_options: [],
+        ai_config: {
+          reports_enabled: false,
+          chat_enabled: false,
+          player_names_enabled: false,
+          shadow_mode: true,
+        },
+        policy: {
+          custom_terms: [],
+          exceptions: [],
+          custom_regexes: [],
+          hard_rule_ids: [],
+        },
+        reporter_templates: {},
+      }));
+      this.get("/discord/v1/options", () => ok({
+        guild: null,
+        channels: [],
+        roles: [],
+      }));
+      this.get("/discord/v1/ai/status", () => ok({
+        state: "disabled",
+        available: false,
+        connected: false,
+        models: [],
+      }));
 
       this.get("/get_server_settings", () => ok({
         autobalance_enabled: true,
