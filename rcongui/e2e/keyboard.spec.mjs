@@ -30,7 +30,11 @@ test.describe("mobile navigation", () => {
     await openDemoPage(page, "/");
 
     await page.getByRole("button", { name: "Navigation öffnen" }).click();
-    await expect(page.getByRole("navigation", { name: "Hauptnavigation" })).toBeVisible();
-    await expect(page.getByPlaceholder("Navigation durchsuchen …")).toBeVisible();
+    const navigation = page.getByRole("navigation", { name: "Hauptnavigation" });
+    await expect(navigation).toBeVisible();
+    await expect(
+      navigation.getByPlaceholder("Navigation durchsuchen …"),
+    ).toBeVisible();
   });
 });
+
