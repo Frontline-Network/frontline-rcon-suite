@@ -34,10 +34,18 @@ const Drawer = styled(MuiDrawer, {
 }));
 
 export const MenuDrawer = ({ open, children }) => {
+  const { t } = useTranslation();
+
   return (
     <Drawer
       variant="permanent"
       open={open}
+      slotProps={{
+        paper: {
+          component: "nav",
+          "aria-label": t("navigation.primary"),
+        },
+      }}
       sx={{
         width: open ? drawerWidth : 0,
         display: { xs: "none", lg: "block" },

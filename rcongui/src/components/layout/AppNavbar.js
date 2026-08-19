@@ -11,6 +11,7 @@ import { useMediaQuery, useTheme } from "@mui/system";
 import ServerStatus from "../Header/server-status";
 import { useAppStore } from "@/stores/app-state";
 import FrontlineBrand from "./FrontlineBrand";
+import { useTranslation } from "react-i18next";
 
 const Toolbar = styled(MuiToolbar)({
   width: "100%",
@@ -29,6 +30,8 @@ const Toolbar = styled(MuiToolbar)({
 });
 
 const AppNavbarBase = ({ toggleDrawer, open, isSmallScreen }) => {
+  const { t } = useTranslation();
+
   return (
     <AppBar
       position="fixed"
@@ -50,7 +53,7 @@ const AppNavbarBase = ({ toggleDrawer, open, isSmallScreen }) => {
             width: "100%",
           }}
         >
-          <MenuButton aria-label="menu" onClick={toggleDrawer}>
+          <MenuButton aria-label={t("navigation.openMenu")} onClick={toggleDrawer}>
             <MenuRoundedIcon />
           </MenuButton>
           <FrontlineBrand compact />

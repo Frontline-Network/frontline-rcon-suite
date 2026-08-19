@@ -109,7 +109,9 @@ export function ActionMenu({
         </MenuItem>
       ))}
       {filteredActionList.length === 0 && (
-        <MenuItem onClick={handleClose}>{t("actions.none")}</MenuItem>
+        <MenuItem disabled>
+          {actions.length > 0 ? t("actions.missingPermission") : t("actions.none")}
+        </MenuItem>
       )}
       {accountModal}
       {soldierModal}
@@ -225,17 +227,20 @@ export function ActionIconButton({
   const { t } = useTranslation();
   const { permissions: user } = useAuth();
   const { openDialog } = useActionDialog();
+  const actionLabel = label || (action.translationKey ? t(`${action.translationKey}.name`) : action.name);
+  const allowed = hasPermission(user)(action);
 
   const handleActionClick = (action) => () => {
     openDialog(action, recipients, params);
   };
 
   return (
-    <Tooltip title={label || (action.translationKey ? t(`${action.translationKey}.name`) : action.name)} key={action.name}>
+    <Tooltip title={allowed ? actionLabel : t("actions.missingPermission")} key={action.name}>
       <span>
         <IconButton
           key={action.name}
-          disabled={!hasPermission(user)}
+          aria-label={actionLabel}
+          disabled={!allowed}
           size="small"
           onClick={handleActionClick(action)}
           sx={{ opacity: action.deprecated ? 0.5 : 1 }}

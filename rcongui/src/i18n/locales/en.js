@@ -17,6 +17,8 @@ const en = {
     information: "Information",
     webhookConfigured: "Webhook configured",
     close: "Close",
+    skipToContent: "Skip to main content",
+    toggleContentWidth: "Toggle content width",
     cancel: "Cancel",
     confirm: "Confirm",
     processing: "Processing...",
@@ -240,7 +242,7 @@ const en = {
     },
   },
   actions: {
-    menu: "Player actions", none: "No actions available", noRecipients: "No recipients selected", noFlags: "This player has no flags.", viewProfile: "View profile",
+    menu: "Player actions", none: "No actions available", missingPermission: "You do not have the required permission for these actions.", noRecipients: "No recipients selected", noFlags: "This player has no flags.", viewProfile: "View profile",
     types: { TEMPBAN: "Temporary ban", PERMABAN: "Permanent ban", PUNISH: "Punishment", KICK: "Kick", MESSAGE: "Message" },
     editSoldier: "Edit soldier", editAccount: "Edit account", deprecated: "Deprecated action",
     deprecatedNote: "We recommend blacklists for more reliable ban management.",
@@ -607,6 +609,9 @@ const en = {
     gameDetails: { title: "Game details", score: "Score", duration: "Duration", gameId: "Game ID", loadError: "Could not load game details: {{message}}", topStat: "Top {{stat}}", deaths: "Deaths", killsPerMinute: "Kills/min.", teamKills: "Team kills", teamKillStreak: "Team kill streak", deathsByTeamKill: "Deaths by team kill", teamDeathStreak: "Team death streak", offensiveKills: "Offensive kills", defensiveKills: "Defensive kills", combatStats: "Combat stats", teamworkStats: "Teamwork stats", objectiveStats: "Objective stats", killsByPlayer: "Kills by player", killsByWeapon: "Kills by weapon", deathsByWeapon: "Deaths by weapon", deathsByPlayer: "Deaths by player", download: "Download game statistics", metrics: { kills: "Kills", combat: "Combat", support: "Support", offense: "Offense", defense: "Defense", kills_streak: "Kill streak" }, csv: { playerId: "Player ID", name: "Name", maxKillStreak: "Max kill streak", killsPerMinute: "Kills / minute", deathsPerMinute: "Deaths / minute", maxDeathStreak: "Max death streak", maxTeamKillStreak: "Max team kill streak", deathByTeamKill: "Death by team kill", deathByTeamKillStreak: "Death-by-team-kill streak", longestLife: "Longest life (approx., min.)", shortestLife: "Shortest life (approx., sec.)", nemesis: "Nemesis", victim: "Victim", combat: "Combat effectiveness", support: "Support points", defense: "Defensive points", offense: "Offensive points", weapons: "Weapons", deathByWeapons: "Deaths by weapon" } },
   },
   navigation: {
+    primary: "Primary navigation",
+    openMenu: "Open navigation",
+    toggleMenu: "Toggle navigation",
     search: "Search navigation...",
     navigateTo: "Navigate to",
     groups: {
@@ -684,6 +689,10 @@ const en = {
     connected: "Connected",
     crconConnected: "CRCON connected",
     hllConnected: "Game server connected",
+    gameServerConnected: "Game server connected",
+    gameServerOffline: "CRCON is connected, but the game server is offline.",
+    gameServerUnknown: "The game-server connection is unknown because CRCON is offline.",
+    crconOffline: "The connection to CRCON has not been established.",
     selectServer: "Select server",
     serverNumber: "Server {{number}}",
     changePassword: "Change password",

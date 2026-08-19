@@ -22,10 +22,10 @@ const ConnectionStatus = () => {
                 enterNextDelay={500}
                 title={
                   gameConnected
-                    ? t("sidebar.hllConnected")
+                    ? t("sidebar.gameServerConnected")
                     : !backendConnected
-                    ? "Connection between CRCON and HLL server is unknown"
-                    : "CRCON is not connected to the HLL server"
+                    ? t("sidebar.gameServerUnknown")
+                    : t("sidebar.gameServerOffline")
                 }
               >
                 <Stack direction="row" alignItems="center" gap={1}>
@@ -53,7 +53,7 @@ const ConnectionStatus = () => {
                 title={
                   backendConnected
                     ? t("sidebar.crconConnected")
-                    : "The connection to CRCON has not been established"
+                    : t("sidebar.crconOffline")
                 }
               >
                 <Stack direction="row" alignItems="center" gap={1}>

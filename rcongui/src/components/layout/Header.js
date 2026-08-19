@@ -7,8 +7,10 @@ import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import MenuOpenIcon from "@mui/icons-material/MenuOpen";
 import { useAppStore } from "@/stores/app-state";
 import ServerStatus from "../Header/server-status";
+import { useTranslation } from "react-i18next";
 
 export default function Header() {
+  const { t } = useTranslation();
   const openDrawer = useAppStore((state) => state.openDrawer);
   const toggleDrawer = useAppStore((state) => state.toggleDrawer);
 
@@ -30,7 +32,7 @@ export default function Header() {
     >
       <Stack direction="row" sx={{ gap: 1, flex: 1, minWidth: 0 }}>
         <MenuButton
-          aria-label="toggle-menu"
+          aria-label={t("navigation.toggleMenu")}
           onClick={toggleDrawer}
           sx={{ display: { xs: "none", lg: "inline-flex" } }}
         >

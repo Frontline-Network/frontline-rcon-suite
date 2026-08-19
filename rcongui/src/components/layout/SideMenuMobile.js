@@ -11,13 +11,22 @@ import { UserActions } from "./sidebar/UserActions";
 import SystemUsage from "./sidebar/SystemUsage";
 import FrontlineBrand from "./FrontlineBrand";
 import LanguageSelector from "./LanguageSelector";
+import { useTranslation } from "react-i18next";
 
 const MobileDrawer = ({ open, toggleDrawer, children }) => {
+  const { t } = useTranslation();
+
   return (
     <Drawer
       anchor="left"
       open={open}
       onClose={toggleDrawer}
+      slotProps={{
+        paper: {
+          component: "nav",
+          "aria-label": t("navigation.primary"),
+        },
+      }}
       sx={{
         zIndex: (theme) => theme.zIndex.drawer + 1,
         [`& .${drawerClasses.paper}`]: {

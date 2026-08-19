@@ -25,7 +25,7 @@ const NavigationLink = ({ to, icon, text, onClick }) => {
         sx={{
           borderLeft: "2px solid transparent",
           borderRadius: 0,
-          minHeight: 38,
+          minHeight: 44,
           "&.active": {
             color: "primary.light",
             borderLeftColor: "primary.main",
@@ -225,7 +225,12 @@ export default function MenuContent({ navigationTree, isMobile }) {
           }}
         />
         {isMobile && (
-          <IconButton size="small" onClick={toggleDrawer} aria-label={t("common.close")}>
+          <IconButton
+            size="small"
+            onClick={toggleDrawer}
+            aria-label={t("common.close")}
+            sx={{ minWidth: 44, minHeight: 44 }}
+          >
             <CloseIcon sx={{ fontSize: 24 }} />
           </IconButton>
         )}
