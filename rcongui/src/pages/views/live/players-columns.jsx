@@ -98,6 +98,7 @@ export const getColumns = (t) => [
     id: "select",
     header: ({ table }) => (
       <Checkbox
+        inputProps={{ "aria-label": t("common.selectAll") }}
         checked={table.getIsAllRowsSelected()}
         indeterminate={table.getIsSomePageRowsSelected()}
         onChange={table.getToggleAllRowsSelectedHandler()}
@@ -110,6 +111,11 @@ export const getColumns = (t) => [
     cell: ({ row }) => (
       <div>
         <Checkbox
+          inputProps={{
+            "aria-label": t("common.selectPlayer", {
+              name: row.original.name,
+            }),
+          }}
           checked={row.getIsSelected()}
           disabled={!row.getCanSelect()}
           indeterminate={row.getIsSomeSelected()}

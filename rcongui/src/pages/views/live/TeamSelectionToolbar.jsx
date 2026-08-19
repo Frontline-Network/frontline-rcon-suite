@@ -156,21 +156,31 @@ export const TeamSelectionToolbar = ({ table, teamData }) => {
   return (
     <TableAddons>
       <Tooltip title={t("views.team.selectAxis")}>
-        <Button onClick={() => handleTeamSelect("axis")}>
+        <Button
+          aria-label={t("views.team.selectAxis")}
+          onClick={() => handleTeamSelect("axis")}
+        >
           <img
             src={themedImg.getFactionIconSrc("ger")}
             width={16}
             height={16}
+            alt=""
+            aria-hidden="true"
             style={{ marginRight: 1 }}
           />
         </Button>
       </Tooltip>
       <Tooltip title={t("views.team.selectAllies")}>
-        <Button onClick={() => handleTeamSelect("allies")}>
+        <Button
+          aria-label={t("views.team.selectAllies")}
+          onClick={() => handleTeamSelect("allies")}
+        >
           <img
             src={themedImg.getFactionIconSrc("us")}
             width={16}
             height={16}
+            alt=""
+            aria-hidden="true"
             style={{ marginRight: 1 }}
           />
         </Button>

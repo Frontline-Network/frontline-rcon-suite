@@ -92,11 +92,12 @@ export default function MessageAllDialog() {
   return (
     <React.Fragment>
       <Tooltip title={t("actions.messageAll")}>
-        <span>
-          <IconButton onClick={handleDialogClickOpen}>
-            <ThreePIcon />
-          </IconButton>
-        </span>
+        <IconButton
+          aria-label={t("actions.messageAll")}
+          onClick={handleDialogClickOpen}
+        >
+          <ThreePIcon />
+        </IconButton>
       </Tooltip>
       <Dialog
         open={dialogOpen}

@@ -285,25 +285,28 @@ const Live = () => {
                 }}
               >
                 <Tooltip title={visibleElements.includes('players') ? t("views.live.hidePlayers") : t("views.live.showPlayers")}>
-                  <span>
-                    <ToggleButton value="players">
-                      <TableChartIcon sx={{ fontSize: { xs: '1rem', lg: '1.25rem' } }} />
-                    </ToggleButton>
-                  </span>
+                  <ToggleButton
+                    value="players"
+                    aria-label={visibleElements.includes('players') ? t("views.live.hidePlayers") : t("views.live.showPlayers")}
+                  >
+                    <TableChartIcon sx={{ fontSize: { xs: '1rem', lg: '1.25rem' } }} />
+                  </ToggleButton>
                 </Tooltip>
                 <Tooltip title={visibleElements.includes('logs') ? t("views.live.hideLogs") : t("views.live.showLogs")}>
-                  <span>
-                    <ToggleButton value="logs">
-                      <AssessmentIcon sx={{ fontSize: { xs: '1rem', lg: '1.25rem' } }} />
-                    </ToggleButton>
-                  </span>
+                  <ToggleButton
+                    value="logs"
+                    aria-label={visibleElements.includes('logs') ? t("views.live.hideLogs") : t("views.live.showLogs")}
+                  >
+                    <AssessmentIcon sx={{ fontSize: { xs: '1rem', lg: '1.25rem' } }} />
+                  </ToggleButton>
                 </Tooltip>
                 <Tooltip title={visibleElements.includes('header') ? t("views.live.hideHeader") : t("views.live.showHeader")}>
-                  <span>
-                    <ToggleButton value="header">
-                      <ScoreboardIcon sx={{ fontSize: { xs: '1rem', lg: '1.25rem' } }} />
-                    </ToggleButton>
-                  </span>
+                  <ToggleButton
+                    value="header"
+                    aria-label={visibleElements.includes('header') ? t("views.live.hideHeader") : t("views.live.showHeader")}
+                  >
+                    <ScoreboardIcon sx={{ fontSize: { xs: '1rem', lg: '1.25rem' } }} />
+                  </ToggleButton>
                 </Tooltip>
           </ToggleButtonGroup>
           </Stack>

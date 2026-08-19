@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Box, Button, TextField, Tooltip } from "@mui/material";
 import HistoryIcon from "@mui/icons-material/History";
 import { PopoverMenu } from "@/components/shared/PopoverMenu";
+import { useTranslation } from "react-i18next";
 
 /**
  * @typedef {Object} VisitsSelectionMenuProps
@@ -15,6 +16,7 @@ import { PopoverMenu } from "@/components/shared/PopoverMenu";
  * @returns {JSX.Element}
  */
 export const VisitsSelectionMenu = ({ onVisitsChange }) => {
+  const { t } = useTranslation();
   const [value, setValue] = useState("");
 
   const handleChange = (event) => {
@@ -37,10 +39,10 @@ export const VisitsSelectionMenu = ({ onVisitsChange }) => {
   return (
     <PopoverMenu
       id="visits-picker"
-      description="Select all players with this many visits or fewer"
+      description={t("selection.visitsDescription")}
       renderButton={(props) => (
-        <Button {...props}>
-          <Tooltip title="Select by visits">
+        <Button {...props} aria-label={t("selection.visits")}>
+          <Tooltip title={t("selection.visits")}>
             <HistoryIcon />
           </Tooltip>
         </Button>
@@ -48,7 +50,7 @@ export const VisitsSelectionMenu = ({ onVisitsChange }) => {
     >
       <Box sx={{ p: 2, minWidth: 220 }}>
         <TextField
-          label="Max player visits"
+          label={t("selection.maxVisits")}
           type="number"
           fullWidth
           value={value}

@@ -71,7 +71,7 @@ export const TablePagination = ({ table }) => {
         onChange={(e) => table.setPageSize(e.target.value)}
         size="small"
         sx={{ borderRadius: 0 }}
-        aria-label={t("common.pagination.pageSize")}
+        inputProps={{ "aria-label": t("common.pagination.pageSize") }}
       >
         {[50, 100, 150, 250, 500].map((pageSize) => (
           <MenuItem key={pageSize} value={pageSize}>

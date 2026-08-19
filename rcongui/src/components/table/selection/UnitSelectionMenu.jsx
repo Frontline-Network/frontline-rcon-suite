@@ -29,7 +29,7 @@ export const UnitSelectionMenu = ({ unitOptions, onUnitSelect }) => {
       id="unit-picker"
       description={t("selection.unitDescription")}
       renderButton={(props) => (
-        <Button {...props}>
+        <Button {...props} aria-label={t("selection.unit")}>
           <Tooltip title={t("selection.unit")}>
             <GroupIcon />
           </Tooltip>

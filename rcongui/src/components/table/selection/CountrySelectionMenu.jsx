@@ -23,7 +23,7 @@ export const CountrySelectionMenu = ({ countryOptions, onCountrySelect }) => {
     id="country-picker"
     description={t("selection.countryDescription")}
     renderButton={(props) => (
-      <Button {...props}>
+      <Button {...props} aria-label={t("selection.country")}>
         <Tooltip title={t("selection.country")}>
           <FlagIcon />
         </Tooltip>

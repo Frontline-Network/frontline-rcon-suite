@@ -257,9 +257,10 @@ export default function DisbandSquadDialog() {
 
   return (
     <React.Fragment>
-      <Tooltip title={t("actions.disbandSquad")}>
+      <Tooltip title={t("actions.disbandSquad")} describeChild>
         <span>
           <IconButton
+            aria-label={t("actions.disbandSquad")}
             onClick={handleDialogClickOpen}
             disabled={unitOptions.length === 0}
           >
