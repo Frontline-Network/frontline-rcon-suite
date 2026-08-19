@@ -9,8 +9,12 @@ import { styled } from "@mui/material/styles";
 import DevicesRoundedIcon from "@mui/icons-material/DevicesRounded";
 import { useGlobalStore } from "@/stores/global-state";
 import { useTranslation } from "react-i18next";
+import { getGameLabel } from "@/utils/game";
 
-export function getServerHref(selectedServer, currentHref = window.location.href) {
+export function getServerHref(
+  selectedServer,
+  currentHref = window.location.href
+) {
   const currentUrl = new URL(currentHref);
   let targetUrl;
 
@@ -41,13 +45,6 @@ const ListItemAvatar = styled(MuiListItemAvatar)({
   minWidth: 0,
   marginRight: 12,
 });
-
-const GAME_LABELS = {
-  hll: "HLL",
-  hllv: "HLL: Vietnam",
-};
-
-export const getGameLabel = (game) => GAME_LABELS[game] ?? null;
 
 export default function SelectContent() {
   const { t } = useTranslation();
@@ -130,9 +127,9 @@ export default function SelectContent() {
                   whiteSpace: "nowrap",
                 }}
                 primary={server.name ?? "<server_name>"}
-                secondary={
-                  t("sidebar.serverNumber", { number: server.server_number })
-                }
+                secondary={t("sidebar.serverNumber", {
+                  number: server.server_number,
+                })}
               />
               {gameLabel ? (
                 <Chip

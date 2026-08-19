@@ -17,6 +17,7 @@
     "preview": "vite build && vite preview",
     "preview:debug": "DEBUG=true vite build && vite preview",
     "test": "jest",
+    "test:unit": "node --test tests/*.test.mjs",
     "format:write": "prettier src/ --write",
     "lint": "eslint src/"
   },
