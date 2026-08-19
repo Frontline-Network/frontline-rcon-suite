@@ -1,5 +1,6 @@
 import os
 
+import pytest
 from pydantic import ValidationError
 
 os.environ.setdefault("SERVER_NUMBER", "1")
@@ -24,6 +25,9 @@ def test_legacy_broadcast_message_keeps_existing_defaults():
     assert campaign.min_players == 0
     assert campaign.max_players == 100
     assert campaign.pause_during_seeding is False
+    assert campaign.delivery_mode == "broadcast"
+    assert campaign.min_session_minutes == 5
+    assert campaign.recipient_group == "all"
 
 
 def test_campaign_rejects_inverted_player_range():
@@ -156,3 +160,57 @@ def test_legacy_string_config_remains_supported(monkeypatch):
     assert campaign.time_sec == 120
     assert campaign.message == "Legacy broadcast"
     assert campaign.enabled is True
+    assert campaign.id.startswith("campaign-")
+    assert campaign.delivery_mode == "broadcast"
+
+
+def test_player_message_config_and_global_throttles_are_persisted(monkeypatch):
+    persisted = {}
+    monkeypatch.setattr(
+        "rcon.user_config.auto_broadcast.set_user_config",
+        lambda key, value: persisted.update({"value": value}),
+    )
+
+    AutoBroadcastUserConfig.save_to_db(
+        {
+            "enabled": True,
+            "randomize": False,
+            "player_message_interval_sec": 15,
+            "player_message_gap_sec": 600,
+            "messages": [
+                {
+                    "time_sec": 900,
+                    "message": "Hello {player_name}",
+                    "delivery_mode": "player_message",
+                    "min_session_minutes": 8,
+                    "recipient_group": "non_vip",
+                }
+            ],
+        }
+    )
+
+    config = persisted["value"]
+    campaign = config.messages[0]
+    assert config.player_message_interval_sec == 15
+    assert config.player_message_gap_sec == 600
+    assert campaign.id.startswith("campaign-")
+    assert campaign.delivery_mode == "player_message"
+    assert campaign.min_session_minutes == 8
+    assert campaign.recipient_group == "non_vip"
+
+
+def test_duplicate_campaign_ids_are_rejected(monkeypatch):
+    monkeypatch.setattr(
+        "rcon.user_config.auto_broadcast.set_user_config", lambda key, value: None
+    )
+    with pytest.raises(ValueError, match="must be unique"):
+        AutoBroadcastUserConfig.save_to_db(
+            {
+                "enabled": True,
+                "randomize": False,
+                "messages": [
+                    {"id": "same", "time_sec": 60, "message": "One"},
+                    {"id": "same", "time_sec": 60, "message": "Two"},
+                ],
+            }
+        )

@@ -15,9 +15,14 @@ import {
   Card,
   CardContent,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   FormControlLabel,
   IconButton,
+  MenuItem,
   Paper,
   Skeleton,
   Stack,
@@ -51,11 +56,18 @@ const createCampaign = (index = 0) => ({
   min_players: 0,
   max_players: 100,
   pause_during_seeding: false,
+  delivery_mode: "broadcast",
+  min_session_minutes: 5,
+  recipient_group: "all",
 });
 
 const normalizeConfig = (config) => ({
   enabled: Boolean(config?.enabled),
   randomize: Boolean(config?.randomize),
+  player_message_interval_sec: Number(
+    config?.player_message_interval_sec ?? 10
+  ),
+  player_message_gap_sec: Number(config?.player_message_gap_sec ?? 300),
   messages: (config?.messages ?? []).map((campaign, index) => ({
     ...createCampaign(index),
     ...campaign,
@@ -94,11 +106,16 @@ let fakeCampaignConfig = normalizeConfig({
 
 export const loader = async () => {
   if (isFakeMode()) {
-    return defer({ config: fakeCampaignConfig, templates: Promise.resolve([]) });
+    return defer({
+      config: fakeCampaignConfig,
+      templates: Promise.resolve([]),
+      deliveryStatus: { campaigns: [] },
+    });
   }
 
   return defer({
     config: normalizeConfig(await cmd.GET_BROADCAST_CONFIG()),
+    deliveryStatus: await cmd.GET_CAMPAIGN_DELIVERY_STATUS(),
     templates: cmd.GET_MESSAGE_TEMPLATES({
       params: { category: TEMPLATE_CATEGORY.BROADCAST },
     }),
@@ -126,10 +143,16 @@ const CampaignCard = ({
   onDelete,
   onTest,
   testing,
+  deliveryStatus,
 }) => {
   const { t } = useTranslation();
-  const update = (field, value) => onChange(index, { ...campaign, [field]: value });
-  const intervalMinutes = Math.max(1, Math.round(Number(campaign.time_sec) / 60));
+  const update = (field, value) =>
+    onChange(index, { ...campaign, [field]: value });
+  const intervalMinutes = Math.max(
+    1,
+    Math.round(Number(campaign.time_sec) / 60)
+  );
+  const isPlayerMessage = campaign.delivery_mode === "player_message";
 
   return (
     <Card
@@ -168,12 +191,18 @@ const CampaignCard = ({
                 )}
               />
             </Stack>
-            <Stack direction="row" alignItems="center" justifyContent="flex-end">
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="flex-end"
+            >
               <FormControlLabel
                 control={
                   <Switch
                     checked={campaign.enabled}
-                    onChange={(event) => update("enabled", event.target.checked)}
+                    onChange={(event) =>
+                      update("enabled", event.target.checked)
+                    }
                   />
                 }
                 label={t("common.enabled")}
@@ -199,24 +228,80 @@ const CampaignCard = ({
             minRows={3}
             fullWidth
             required
-            helperText={t("settings.campaigns.messageHelp")}
+            helperText={t(
+              isPlayerMessage
+                ? "settings.campaigns.playerMessageHelp"
+                : "settings.campaigns.messageHelp"
+            )}
           />
 
           <Stack direction={{ xs: "column", md: "row" }} gap={1.5}>
             <TextField
-              label={t("settings.campaigns.interval")}
-              type="number"
-              value={intervalMinutes}
-              onChange={(event) => update("time_sec", Number(event.target.value) * 60)}
-              slotProps={{ htmlInput: { min: 1, max: 1440 } }}
-              helperText={t("settings.campaigns.intervalUnit")}
-              sx={{ minWidth: 190 }}
-            />
+              select
+              label={t("settings.campaigns.deliveryMode")}
+              value={campaign.delivery_mode}
+              onChange={(event) => update("delivery_mode", event.target.value)}
+              sx={{ minWidth: 210 }}
+            >
+              <MenuItem value="broadcast">
+                {t("settings.campaigns.deliveryBroadcast")}
+              </MenuItem>
+              <MenuItem value="player_message">
+                {t("settings.campaigns.deliveryPlayerMessage")}
+              </MenuItem>
+            </TextField>
+            {isPlayerMessage ? (
+              <>
+                <TextField
+                  label={t("settings.campaigns.minSessionMinutes")}
+                  type="number"
+                  value={campaign.min_session_minutes}
+                  onChange={(event) =>
+                    update("min_session_minutes", Number(event.target.value))
+                  }
+                  slotProps={{ htmlInput: { min: 1, max: 1440 } }}
+                  sx={{ minWidth: 190 }}
+                />
+                <TextField
+                  select
+                  label={t("settings.campaigns.recipientGroup")}
+                  value={campaign.recipient_group}
+                  onChange={(event) =>
+                    update("recipient_group", event.target.value)
+                  }
+                  sx={{ minWidth: 170 }}
+                >
+                  <MenuItem value="all">
+                    {t("settings.campaigns.allPlayers")}
+                  </MenuItem>
+                  <MenuItem value="vip">
+                    {t("settings.campaigns.vipPlayers")}
+                  </MenuItem>
+                  <MenuItem value="non_vip">
+                    {t("settings.campaigns.nonVipPlayers")}
+                  </MenuItem>
+                </TextField>
+              </>
+            ) : (
+              <TextField
+                label={t("settings.campaigns.interval")}
+                type="number"
+                value={intervalMinutes}
+                onChange={(event) =>
+                  update("time_sec", Number(event.target.value) * 60)
+                }
+                slotProps={{ htmlInput: { min: 1, max: 1440 } }}
+                helperText={t("settings.campaigns.intervalUnit")}
+                sx={{ minWidth: 190 }}
+              />
+            )}
             <TextField
               label={t("settings.campaigns.minPlayers")}
               type="number"
               value={campaign.min_players}
-              onChange={(event) => update("min_players", Number(event.target.value))}
+              onChange={(event) =>
+                update("min_players", Number(event.target.value))
+              }
               slotProps={{ htmlInput: { min: 0, max: 100 } }}
               sx={{ width: { xs: "100%", md: 150 } }}
             />
@@ -224,7 +309,9 @@ const CampaignCard = ({
               label={t("settings.campaigns.maxPlayers")}
               type="number"
               value={campaign.max_players}
-              onChange={(event) => update("max_players", Number(event.target.value))}
+              onChange={(event) =>
+                update("max_players", Number(event.target.value))
+              }
               slotProps={{ htmlInput: { min: 0, max: 100 } }}
               sx={{ width: { xs: "100%", md: 150 } }}
             />
@@ -241,6 +328,77 @@ const CampaignCard = ({
               label={t("settings.campaigns.pauseDuringSeeding")}
             />
           </Stack>
+
+          {isPlayerMessage && deliveryStatus && (
+            <Stack gap={1}>
+              <Stack direction="row" gap={1} flexWrap="wrap">
+                <Chip
+                  size="small"
+                  label={t("settings.campaigns.pending", {
+                    count: deliveryStatus.pending,
+                  })}
+                />
+                <Chip
+                  size="small"
+                  color="success"
+                  variant="outlined"
+                  label={t("settings.campaigns.sent24h", {
+                    count: deliveryStatus.sent_24h,
+                  })}
+                />
+                <Chip
+                  size="small"
+                  color={deliveryStatus.failed_24h ? "error" : "default"}
+                  variant="outlined"
+                  label={t("settings.campaigns.failed24h", {
+                    count: deliveryStatus.failed_24h,
+                  })}
+                />
+                {deliveryStatus.last_sent_at && (
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    label={t("settings.campaigns.lastSent", {
+                      time: new Date(
+                        deliveryStatus.last_sent_at
+                      ).toLocaleString(),
+                    })}
+                  />
+                )}
+              </Stack>
+              {deliveryStatus.recent?.length > 0 && (
+                <Box component="details">
+                  <Typography
+                    component="summary"
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ cursor: "pointer" }}
+                  >
+                    {t("settings.campaigns.recentDeliveries")}
+                  </Typography>
+                  <Stack spacing={0.5} sx={{ mt: 1 }}>
+                    {deliveryStatus.recent.map((delivery) => (
+                      <Typography
+                        key={delivery.id}
+                        variant="caption"
+                        color={
+                          delivery.status === "failed"
+                            ? "error"
+                            : "text.secondary"
+                        }
+                      >
+                        {delivery.player_name} ·{" "}
+                        {t(
+                          `settings.campaigns.deliveryStatus.${delivery.status}`
+                        )}{" "}
+                        · {new Date(delivery.updated_at).toLocaleString()}
+                      </Typography>
+                    ))}
+                  </Stack>
+                </Box>
+              )}
+            </Stack>
+          )}
 
           <Box>
             <Button
@@ -270,24 +428,52 @@ const BroadcastCampaignPage = () => {
   const [config, setConfig] = useState(() => normalizeConfig(data.config));
   const [testingId, setTestingId] = useState(null);
   const [testResult, setTestResult] = useState(null);
+  const [testCampaign, setTestCampaign] = useState(null);
+  const [onlinePlayers, setOnlinePlayers] = useState([]);
+  const [selectedPlayerId, setSelectedPlayerId] = useState("");
+  const [loadingPlayers, setLoadingPlayers] = useState(false);
+  const [deliveryStatus, setDeliveryStatus] = useState(data.deliveryStatus);
 
   useEffect(() => {
     setConfig(normalizeConfig(data.config));
   }, [data.config]);
 
-  const activeCount = config.messages.filter((campaign) => campaign.enabled).length;
+  useEffect(() => {
+    setDeliveryStatus(data.deliveryStatus);
+    if (isFakeMode()) return undefined;
+    const interval = window.setInterval(async () => {
+      try {
+        setDeliveryStatus(await cmd.GET_CAMPAIGN_DELIVERY_STATUS());
+      } catch {
+        // Keep the last good snapshot; route-level errors would disrupt editing.
+      }
+    }, 30000);
+    return () => window.clearInterval(interval);
+  }, [data.deliveryStatus]);
+
+  const activeCount = config.messages.filter(
+    (campaign) => campaign.enabled
+  ).length;
   const hasChanges = useMemo(
     () => !isEqual(config, normalizeConfig(data.config)),
     [config, data.config]
   );
-  const isValid = config.messages.every(
-    (campaign) =>
-      campaign.message.trim() &&
-      Number(campaign.time_sec) > 0 &&
-      campaign.min_players >= 0 &&
-      campaign.max_players <= 100 &&
-      campaign.min_players <= campaign.max_players
-  );
+  const isValid =
+    config.messages.every(
+      (campaign) =>
+        campaign.message.trim() &&
+        Number(campaign.time_sec) > 0 &&
+        campaign.min_players >= 0 &&
+        campaign.max_players <= 100 &&
+        campaign.min_players <= campaign.max_players &&
+        (campaign.delivery_mode !== "player_message" ||
+          (campaign.min_session_minutes >= 1 &&
+            campaign.min_session_minutes <= 1440))
+    ) &&
+    config.player_message_interval_sec >= 5 &&
+    config.player_message_interval_sec <= 300 &&
+    config.player_message_gap_sec >= 60 &&
+    config.player_message_gap_sec <= 3600;
   const saving = navigation.state === "submitting";
 
   const handleCampaignChange = (index, campaign) => {
@@ -302,7 +488,10 @@ const BroadcastCampaignPage = () => {
   const handleAdd = () => {
     setConfig((previous) => ({
       ...previous,
-      messages: [...previous.messages, createCampaign(previous.messages.length)],
+      messages: [
+        ...previous.messages,
+        createCampaign(previous.messages.length),
+      ],
     }));
   };
 
@@ -351,13 +540,71 @@ const BroadcastCampaignPage = () => {
   };
 
   const handleTest = async (campaign) => {
+    if (campaign.delivery_mode === "player_message") {
+      setTestCampaign(campaign);
+      setSelectedPlayerId("");
+      setLoadingPlayers(true);
+      try {
+        const players = isFakeMode()
+          ? [
+              { player_id: "76561198000000001", name: "FLN_Raven" },
+              { player_id: "76561198000000002", name: "FrontlinePlayer" },
+            ]
+          : await cmd.GET_ONLINE_PLAYERS();
+        setOnlinePlayers(players ?? []);
+      } catch (error) {
+        setTestCampaign(null);
+        setTestResult({
+          severity: "error",
+          text: t("settings.campaigns.testFailed", {
+            message: error?.message || t("errors.unknown"),
+          }),
+        });
+      } finally {
+        setLoadingPlayers(false);
+      }
+      return;
+    }
+
     setTestingId(campaign.id);
     setTestResult(null);
     try {
       if (!isFakeMode()) {
-        await cmd.SET_BROADCAST_MESSAGE({ payload: { message: campaign.message } });
+        await cmd.SET_BROADCAST_MESSAGE({
+          payload: { message: campaign.message },
+        });
       }
-      setTestResult({ severity: "success", text: t("settings.campaigns.testSent") });
+      setTestResult({
+        severity: "success",
+        text: t("settings.campaigns.testSent"),
+      });
+    } catch (error) {
+      setTestResult({
+        severity: "error",
+        text: t("settings.campaigns.testFailed", {
+          message: error?.message || t("errors.unknown"),
+        }),
+      });
+    } finally {
+      setTestingId(null);
+    }
+  };
+
+  const handlePlayerTest = async () => {
+    if (!testCampaign || !selectedPlayerId) return;
+    setTestingId(testCampaign.id);
+    setTestResult(null);
+    try {
+      if (!isFakeMode()) {
+        await cmd.TEST_PLAYER_CAMPAIGN({
+          payload: { campaign: testCampaign, player_id: selectedPlayerId },
+        });
+      }
+      setTestResult({
+        severity: "success",
+        text: t("settings.campaigns.playerTestSent"),
+      });
+      setTestCampaign(null);
     } catch (error) {
       setTestResult({
         severity: "error",
@@ -395,7 +642,11 @@ const BroadcastCampaignPage = () => {
           alignItems={{ xs: "stretch", md: "center" }}
           gap={2}
         >
-          <Stack direction={{ xs: "column", sm: "row" }} gap={2} alignItems={{ sm: "center" }}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            gap={2}
+            alignItems={{ sm: "center" }}
+          >
             <Padlock
               label={t(
                 config.enabled
@@ -428,11 +679,17 @@ const BroadcastCampaignPage = () => {
             />
             <Chip
               color={activeCount ? "success" : "default"}
-              label={t("settings.campaigns.activeCount", { count: activeCount })}
+              label={t("settings.campaigns.activeCount", {
+                count: activeCount,
+              })}
             />
           </Stack>
           <Stack direction={{ xs: "column", sm: "row" }} gap={1}>
-            <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAdd}>
+            <Button
+              variant="outlined"
+              startIcon={<AddIcon />}
+              onClick={handleAdd}
+            >
               {t("settings.campaigns.add")}
             </Button>
             <Button
@@ -445,6 +702,37 @@ const BroadcastCampaignPage = () => {
             </Button>
           </Stack>
         </Stack>
+        <Divider sx={{ my: 2 }} />
+        <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
+          <TextField
+            label={t("settings.campaigns.globalSendInterval")}
+            type="number"
+            value={config.player_message_interval_sec}
+            onChange={(event) =>
+              setConfig((previous) => ({
+                ...previous,
+                player_message_interval_sec: Number(event.target.value),
+              }))
+            }
+            slotProps={{ htmlInput: { min: 5, max: 300 } }}
+            helperText={t("settings.campaigns.seconds")}
+            sx={{ minWidth: 230 }}
+          />
+          <TextField
+            label={t("settings.campaigns.playerGap")}
+            type="number"
+            value={Math.round(config.player_message_gap_sec / 60)}
+            onChange={(event) =>
+              setConfig((previous) => ({
+                ...previous,
+                player_message_gap_sec: Number(event.target.value) * 60,
+              }))
+            }
+            slotProps={{ htmlInput: { min: 1, max: 60 } }}
+            helperText={t("settings.campaigns.minutes")}
+            sx={{ minWidth: 230 }}
+          />
+        </Stack>
       </Paper>
 
       {!isValid && (
@@ -453,12 +741,16 @@ const BroadcastCampaignPage = () => {
       {actionData?.saved && (
         <Alert severity="success">{t("settings.campaigns.saved")}</Alert>
       )}
-      {testResult && <Alert severity={testResult.severity}>{testResult.text}</Alert>}
+      {testResult && (
+        <Alert severity={testResult.severity}>{testResult.text}</Alert>
+      )}
 
       <Suspense fallback={<TemplateSkeleton />}>
         <Await
           resolve={data.templates}
-          errorElement={<AsyncClientError title={t("settings.broadcast.templates")} />}
+          errorElement={
+            <AsyncClientError title={t("settings.broadcast.templates")} />
+          }
         >
           {(templates) =>
             templates.length > 0 ? (
@@ -489,6 +781,9 @@ const BroadcastCampaignPage = () => {
             onDelete={handleDelete}
             onTest={handleTest}
             testing={testingId === campaign.id}
+            deliveryStatus={deliveryStatus?.campaigns?.find(
+              (status) => status.campaign_id === campaign.id
+            )}
           />
         ))}
       </Stack>
@@ -502,7 +797,11 @@ const BroadcastCampaignPage = () => {
           <Typography color="text.secondary" sx={{ mb: 2 }}>
             {t("settings.campaigns.emptyText")}
           </Typography>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={handleAdd}>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={handleAdd}
+          >
             {t("settings.campaigns.addFirst")}
           </Button>
         </Paper>
@@ -512,6 +811,56 @@ const BroadcastCampaignPage = () => {
       <Typography variant="body2" color="text.secondary">
         {t("settings.campaigns.priorityNote")}
       </Typography>
+
+      <Dialog
+        open={Boolean(testCampaign)}
+        onClose={() => !testingId && setTestCampaign(null)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>{t("settings.campaigns.selectTestPlayer")}</DialogTitle>
+        <DialogContent>
+          <TextField
+            select
+            fullWidth
+            sx={{ mt: 1 }}
+            label={t("settings.campaigns.onlinePlayer")}
+            value={selectedPlayerId}
+            onChange={(event) => setSelectedPlayerId(event.target.value)}
+            disabled={loadingPlayers}
+            helperText={
+              loadingPlayers
+                ? t("common.loading")
+                : onlinePlayers.length === 0
+                ? t("settings.campaigns.noOnlinePlayers")
+                : t("settings.campaigns.testDoesNotCount")
+            }
+          >
+            {onlinePlayers.map((player) => (
+              <MenuItem key={player.player_id} value={player.player_id}>
+                {player.name} · {player.player_id}
+              </MenuItem>
+            ))}
+          </TextField>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setTestCampaign(null)}
+            disabled={Boolean(testingId)}
+          >
+            {t("common.cancel")}
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handlePlayerTest}
+            disabled={!selectedPlayerId || Boolean(testingId)}
+          >
+            {testingId
+              ? t("settings.campaigns.testing")
+              : t("settings.campaigns.testNow")}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 };

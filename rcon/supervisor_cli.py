@@ -86,6 +86,13 @@ def run_broadcast_loop():
     broadcast.run()
 
 
+@cli.command(name="campaign_message_loop")
+def run_campaign_message_loop():
+    from rcon import campaign_delivery
+
+    campaign_delivery.run()
+
+
 @cli.command(name="auto_settings")
 def auto_settings_loop():
     from rcon import auto_settings
