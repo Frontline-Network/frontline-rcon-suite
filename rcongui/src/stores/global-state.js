@@ -51,6 +51,7 @@ const globalQueries = [
         useGlobalStore.setState((state) => ({ status: result }));
       } catch (error) {
         useGlobalStore.setState((state) => ({ status: null }));
+        return null;
       }
       return result
     },
@@ -110,9 +111,16 @@ export const GlobalState = () => {
     if (isCrconConnected) {
       useGlobalStore.setState({ serverState: data });
     } else {
-      useGlobalStore.setState({ serverState: null });
+      useGlobalStore.setState({
+        serverState: null,
+        status: null,
+        gameState: null,
+        onlineIngameMods: [],
+        onlineCrconMods: [],
+        onlinePlayers: [],
+      });
     }
-  }, [isCrconConnected]);
+  }, [data, isCrconConnected]);
 
   useQueries({
     queries: globalQueries.map((query) => queryOptions({

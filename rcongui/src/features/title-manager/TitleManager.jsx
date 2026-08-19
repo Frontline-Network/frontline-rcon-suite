@@ -1,9 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
 import { useGlobalStore } from "@/stores/global-state";
-import { gameQueryOptions } from "@/queries/game-query";
-import { useQuery } from "@tanstack/react-query";
-import { cmd } from "@/utils/fetchUtils";
 import { useTranslation } from "react-i18next";
 
 const icons = {
@@ -20,27 +17,8 @@ const blinkInterval = 500;
 
 const TitleManager = () => {
   const { t } = useTranslation();
-  const { data: gameState, isLoading: isGameLoading } = useQuery({
-    queryKey: [{ queryIdentifier: "get_gamestate" }],
-    queryFn: cmd.GET_GAME_STATE,
-    refetchInterval: 30_000,
-  });
-
-  const { data: serverState, isLoading: isServerLoading } = useQuery({
-    queryKey: [{ queryIdentifier: "get_status" }],
-    queryFn: async () => {
-      let result;
-      try {
-        result = await cmd.GET_GAME_SERVER_STATUS();
-        useGlobalStore.setState((state) => ({ status: result }));
-      } catch (error) {
-        useGlobalStore.setState((state) => ({ status: null }));
-      }
-      return result;
-    },
-    refetchInterval: 30_000,
-    retry: 1,
-  });
+  const serverState = useGlobalStore((state) => state.status);
+  const gameState = useGlobalStore((state) => state.gameState);
 
   const [pendingTitleIcon, setPendingTitleIcon] = useState("");
   const [titleIcon, setTitleIcon] = useState(icons.loading);
@@ -51,10 +29,7 @@ const TitleManager = () => {
     let text = "";
     let icon = icons.normal;
 
-    if (isGameLoading || isServerLoading) {
-      text = t("common.loading");
-      icon = icons.loading;
-    } else if (!serverState || !gameState?.current_map) {
+    if (!serverState || !gameState?.current_map) {
       text = t("errors.sectionUnavailable");
       icon = icons.error;
     } else {
@@ -80,7 +55,7 @@ const TitleManager = () => {
 
     setTitleText(text);
     setPendingTitleIcon(icon);
-  }, [serverState, gameState, isGameLoading, isServerLoading, t]);
+  }, [serverState, gameState, t]);
 
   useEffect(() => {
     let counter = 0;
