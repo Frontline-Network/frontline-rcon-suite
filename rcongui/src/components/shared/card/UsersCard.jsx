@@ -98,6 +98,7 @@ const EmptyState = () => {
  * @returns {JSX.Element} - Rendered component
  */
 const OnlineUsersCard = ({ onlineUsers, title }) => {
+  const { t } = useTranslation();
   const { openWithId } = usePlayerSidebar();
   const [selectedTab, setSelectedTab] = useState(0);
   const scrollableContentRef = useRef();
