@@ -1,4 +1,3 @@
-import { minWidth } from "@mui/system";
 import { getMapLayerImageSrc, getTacMapImageSrc } from "./helpers";
 import { styled } from "@mui/material";
 import { useTranslation } from "react-i18next";
@@ -144,12 +143,25 @@ export function MapObjectivesPicker({ objectives, map, onClick, loading }) {
             <LoadingOverlay>{t("common.loading")}</LoadingOverlay>
           ) : (
             objectives.flat().map((state, index) => {
+              const row = Math.floor(index / 5) + 1;
+              const column = (index % 5) + 1;
+              const stateLabel = state === true
+                ? t("maps.objectiveSelected")
+                : state === false
+                  ? t("maps.objectiveAvailable")
+                  : t("maps.objectiveUnavailable");
               return (
                 <ControlButton
                   key={`${index}${state}`}
                   onClick={() => onClick(index)}
                   disabled={isButtonDisabled(state, index, map, objectives)}
                   state={`${state}`}
+                  aria-label={t("maps.objectiveGridCell", {
+                    row,
+                    column,
+                    state: stateLabel,
+                  })}
+                  aria-pressed={state === null ? undefined : state}
                 ></ControlButton>
               );
             })

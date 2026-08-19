@@ -1,5 +1,5 @@
 import { styled } from "@mui/material/styles";
-import { Card, CardHeader, Tabs, Tab, List, ListItem, Divider, Box } from "@mui/material";
+import { Card, CardHeader, Tabs, Tab, List, ListItem, Divider, Box, Link } from "@mui/material";
 import { usePlayerSidebar } from "@/hooks/usePlayerSidebar";
 import dayjs from "dayjs";
 import { logActions } from "@/utils/lib";
@@ -83,15 +83,14 @@ const LogsCard = ({ logs }) => {
     };
 
     return (
-      <span 
+      <Link
+        component="button"
+        type="button"
         onClick={handleClick}
-        style={{ 
-          cursor: 'pointer',
-          textDecoration: 'underline',
-        }}
+        sx={{ font: "inherit", verticalAlign: "baseline" }}
       >
         {children}
-      </span>
+      </Link>
     );
   };
 
@@ -106,16 +105,20 @@ const LogsCard = ({ logs }) => {
         onChange={handleTabChange}
         variant="scrollable"
         scrollButtons="auto"
-        aria-label="log groups"
+        aria-label={t("dashboard.logGroups")}
       >
         {sortedLogs.map((group, index) => (
           <Tab 
             key={group.group} 
-            label={`${logActions[group.group] || ""} ${group.group} (${group.logs.length})`}
+            label={`${group.icon || logActions[group.group] || ""} ${group.labelKey ? t(group.labelKey) : group.label || group.group} (${group.logs.length})`}
           />
         ))}
       </Tabs>
-      <ScrollableContent>
+      <ScrollableContent
+        tabIndex={0}
+        role="region"
+        aria-label={t("dashboard.logEntries")}
+      >
         <List disablePadding>
           {sortedLogs[selectedTab]?.logs.map((log, index) => {
 

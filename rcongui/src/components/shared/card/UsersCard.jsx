@@ -7,6 +7,7 @@ import {
   Avatar,
   List,
   ListItem,
+  ListItemButton,
   ListItemAvatar,
   ListItemText,
   Typography,
@@ -41,13 +42,12 @@ const ScrollableContent = styled(CardContent)({
   scrollbarWidth: "none",
 });
 
-const StyledListItem = styled(ListItem)(({ theme }) => ({
+const StyledListItemButton = styled(ListItemButton)(({ theme }) => ({
   borderRadius: theme.shape.borderRadius,
   margin: theme.spacing(0.5, 0),
   padding: theme.spacing(0.5, 1),
   
-  // Only apply interactive styles when aria-disabled is false
-  '&[aria-disabled="false"]': {
+  "&:not(.Mui-disabled)": {
     cursor: "pointer",
     "&:hover": {
       backgroundColor: theme.palette.action.hover,
@@ -120,7 +120,7 @@ const OnlineUsersCard = ({ onlineUsers, title }) => {
             onChange={handleTabChange}
             variant="scrollable"
             scrollButtons="auto"
-            aria-label="user groups"
+            aria-label={t("dashboard.userGroups")}
           >
             {onlineUsers.map((group, index) => (
               <Tab
@@ -135,34 +135,33 @@ const OnlineUsersCard = ({ onlineUsers, title }) => {
             ) : (
               <List disablePadding sx={{ p: 0 }}>
                 {onlineUsers[selectedTab]?.users.map((user, index) => (
-                  <StyledListItem
-                    key={user.id + index}
-                    onClick={() => handleUserClick(user.id)}
-                    role="button"
-                    aria-disabled={!user.id}
-                    tabIndex={user.id ? 0 : -1}
-                  >
-                    <ListItemAvatar>
-                      <Avatar
-                        src={user.avatar || undefined}
-                        alt={user.name}
-                        sx={{ width: 24, height: 24 }}
-                      >
-                        {user.name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")
-                          .toUpperCase()}
-                      </Avatar>
-                    </ListItemAvatar>
-                    <ListItemText
-                      primary={user.name}
-                      primaryTypographyProps={{
-                        variant: "body2",
-                        fontWeight: "medium",
-                      }}
-                    />
-                  </StyledListItem>
+                  <ListItem key={`${user.id || user.name}-${index}`} disablePadding>
+                    <StyledListItemButton
+                      onClick={() => handleUserClick(user.id)}
+                      disabled={!user.id}
+                    >
+                      <ListItemAvatar>
+                        <Avatar
+                          src={user.avatar || undefined}
+                          alt=""
+                          sx={{ width: 24, height: 24 }}
+                        >
+                          {user.name
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")
+                            .toUpperCase()}
+                        </Avatar>
+                      </ListItemAvatar>
+                      <ListItemText
+                        primary={user.name}
+                        primaryTypographyProps={{
+                          variant: "body2",
+                          fontWeight: "medium",
+                        }}
+                      />
+                    </StyledListItemButton>
+                  </ListItem>
                 ))}
               </List>
             )}

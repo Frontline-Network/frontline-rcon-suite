@@ -79,8 +79,9 @@ const Dashboard = () => {
       }));
 
       logs.push({
-        group: "ADMIN",
-        label: `Admin (${adminLogs.length})`,
+        group: "ADMIN_REPORTS",
+        labelKey: "dashboard.adminReports",
+        icon: "🚨",
         logs: adminLogs,
       });
 

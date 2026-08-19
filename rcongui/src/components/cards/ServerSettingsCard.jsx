@@ -51,6 +51,7 @@ const ServerSettingsCard = () => {
             component={Link} 
             to="/settings"
             size="small"
+            aria-label={t("dashboard.openServerSettings")}
             sx={{ color: 'text.secondary' }}
           >
             <SettingsIcon />
