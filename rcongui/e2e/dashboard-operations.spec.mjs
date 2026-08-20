@@ -25,9 +25,11 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
       expect(positions[index].top, `${positions[index].testId} must follow ${positions[index - 1].testId}`).toBeGreaterThan(positions[index - 1].top);
     }
 
-    await expect(page.getByTestId("global-match-status")).toContainText(
-      "HLL: Vietnam"
-    );
+    const visibleMatchStatus = page
+      .getByTestId("global-match-status")
+      .filter({ visible: true })
+      .first();
+    await expect(visibleMatchStatus).toContainText("HLL: Vietnam");
     await expect(page.getByText("Zentrale Übersicht des ausgewählten Gameservers")).toBeVisible();
     await expectNoHorizontalPageOverflow(page);
   });
