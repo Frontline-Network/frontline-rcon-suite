@@ -26,6 +26,7 @@ _rate_lock = Lock()
 _PATH_RE = re.compile(
     r"^/api/discord/v1/(?:"
     r"pairings/(?:verify|complete)|moderation-(?:feedback|results)|"
+    r"diagnostics/ping|"
     r"incidents/(?:transition|select-subject|logs)|action-templates|"
     r"actions/prepare|"
     r"actions/[0-9a-fA-F-]{36}/(?:prepare|execute)|"
@@ -71,17 +72,35 @@ def _rate_limit(key: str) -> None:
 def _validated_target(value: str) -> str:
     parsed = urlsplit(value.strip().rstrip("/"))
     if (
-        parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password
-        or parsed.query or parsed.fragment or parsed.path not in {"", "/"} or parsed.port not in {None, 443}
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+        or parsed.path not in {"", "/"}
+        or parsed.port not in {None, 443}
     ):
         raise HTTPException(status_code=400, detail="Invalid public CRCON target URL")
     if not get_settings().allow_private_targets:
         try:
-            addresses = {item[4][0].split("%", 1)[0] for item in socket.getaddrinfo(parsed.hostname, 443, type=socket.SOCK_STREAM)}
+            addresses = {
+                item[4][0].split("%", 1)[0]
+                for item in socket.getaddrinfo(
+                    parsed.hostname, 443, type=socket.SOCK_STREAM
+                )
+            }
         except socket.gaierror as exc:
-            raise HTTPException(status_code=400, detail="CRCON target cannot be resolved") from exc
-        if not addresses or any(not ipaddress.ip_address(item).is_global for item in addresses):
-            raise HTTPException(status_code=400, detail="CRCON target must resolve only to public addresses")
+            raise HTTPException(
+                status_code=400, detail="CRCON target cannot be resolved"
+            ) from exc
+        if not addresses or any(
+            not ipaddress.ip_address(item).is_global for item in addresses
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="CRCON target must resolve only to public addresses",
+            )
     return f"https://{parsed.hostname.lower()}"
 
 
@@ -102,7 +121,10 @@ def upsert_route(
     target = _validated_target(payload.target_base_url)
     key = str(installation_id)
     route = session.get(InstallationRoute, key) or InstallationRoute(
-        installation_id=key, target_base_url=target, service_id=payload.service_id, game=payload.game
+        installation_id=key,
+        target_base_url=target,
+        service_id=payload.service_id,
+        game=payload.game,
     )
     route.target_base_url = target
     route.service_id = payload.service_id
@@ -131,7 +153,9 @@ def set_route_state(
     return {"installation_id": route.installation_id, "enabled": route.enabled}
 
 
-@app.delete("/v1/installations/{installation_id}", status_code=status.HTTP_204_NO_CONTENT)
+@app.delete(
+    "/v1/installations/{installation_id}", status_code=status.HTTP_204_NO_CONTENT
+)
 def delete_route(
     installation_id: uuid.UUID,
     authorization: str | None = Header(default=None),
@@ -153,7 +177,9 @@ async def forward_callback(
     installation_id: uuid.UUID,
     crcon_path: str,
     request: Request,
-    broker_authorization: str | None = Header(default=None, alias="X-Frontline-Broker-Authorization"),
+    broker_authorization: str | None = Header(
+        default=None, alias="X-Frontline-Broker-Authorization"
+    ),
     session: Session = Depends(session_dependency),
 ):
     _require(get_settings().discord_token, broker_authorization)
@@ -170,15 +196,30 @@ async def forward_callback(
     body = await request.body()
     if len(body) > get_settings().max_body_bytes:
         raise HTTPException(status_code=413, detail="Callback payload is too large")
-    headers = {key: value for key, value in request.headers.items() if key.lower() in _FORWARDED_HEADERS}
+    headers = {
+        key: value
+        for key, value in request.headers.items()
+        if key.lower() in _FORWARDED_HEADERS
+    }
     try:
-        timeout = httpx.Timeout(get_settings().request_timeout_seconds, connect=get_settings().connect_timeout_seconds)
+        timeout = httpx.Timeout(
+            get_settings().request_timeout_seconds,
+            connect=get_settings().connect_timeout_seconds,
+        )
         async with httpx.AsyncClient(follow_redirects=False, timeout=timeout) as client:
-            upstream = await client.post(f"{target}{path}", content=body, headers=headers)
+            upstream = await client.post(
+                f"{target}{path}", content=body, headers=headers
+            )
     except httpx.HTTPError as exc:
-        raise HTTPException(status_code=502, detail="CRCON callback is unavailable") from exc
+        raise HTTPException(
+            status_code=502, detail="CRCON callback is unavailable"
+        ) from exc
     response_headers = {}
     content_type = upstream.headers.get("content-type")
     if content_type:
         response_headers["content-type"] = content_type
-    return Response(content=upstream.content, status_code=upstream.status_code, headers=response_headers)
+    return Response(
+        content=upstream.content,
+        status_code=upstream.status_code,
+        headers=response_headers,
+    )
