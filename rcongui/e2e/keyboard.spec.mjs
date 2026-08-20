@@ -37,4 +37,3 @@ test.describe("mobile navigation", () => {
     ).toBeVisible();
   });
 });
-

@@ -43,4 +43,3 @@ for (const viewportName of ["mobile", "tablet", "desktop"]) {
     }
   });
 }
-

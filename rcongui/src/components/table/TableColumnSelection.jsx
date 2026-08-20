@@ -95,4 +95,3 @@ const TableColumnSelection = ({ table, onColumnVisibilityChange }) => {
 };
 
 export default TableColumnSelection;
-
