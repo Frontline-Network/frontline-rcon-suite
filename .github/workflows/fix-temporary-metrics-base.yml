@@ -1,0 +1,23 @@
+name: Fix temporary metrics base
+on:
+  push:
+    branches: [metrics/org-scan-2026-08-20]
+    paths: [.github/workflows/fix-temporary-metrics-base.yml]
+permissions: {contents: write}
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bind analyzer to the exact default-branch head
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('.github/workflows/temporary-repository-metrics.yml'); s=p.read_text(); marker='      - name: Analyze exact Git history, source lines and authorship\n'; block='      - name: Resolve exact default-branch commit\n        run: |\n          git fetch origin "${{ github.event.repository.default_branch }}" --force\n          echo "EVENT_BEFORE=$(git rev-parse origin/${{ github.event.repository.default_branch }})" >> "$GITHUB_ENV"\n\n'
+          if block not in s: p.write_text(s.replace(marker,block+marker,1))
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/workflows/temporary-repository-metrics.yml
+          git commit -m 'ci: measure exact default-branch commit'
+          git push origin HEAD:${GITHUB_REF_NAME}
