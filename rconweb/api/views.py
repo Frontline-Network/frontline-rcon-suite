@@ -5,7 +5,6 @@ import sys
 import traceback
 from functools import wraps
 from typing import Any, Callable
-import psutil
 
 import pydantic
 from django.http import (
@@ -21,6 +20,7 @@ from discord.utils import escape_markdown
 from rcon.api_commands import get_rcon_api
 from rcon.commands import HLLCommandFailedError
 from rcon.discord import send_to_discord_audit
+from rcon.system_usage import system_usage_sampler
 from rcon.types import (
     PublicInfoMapType,
     PublicInfoNameType,
@@ -159,41 +159,13 @@ def get_public_info(request):
         command="get_public_info",
     )
 
+
 @login_required()
 @csrf_exempt
 @require_http_methods(["GET"])
 def get_system_usage(request):
-    # CPU usage (percentage)
-    cpu_percent = psutil.cpu_percent(interval=None)
-    process_count = len(list(psutil.process_iter()))
-    cpu_usage = {
-        "cores": psutil.cpu_count(),
-        "percent": cpu_percent,
-        "process_count": process_count,
-    }
-
-    # RAM usage
-    memory = psutil.virtual_memory()
-    ram_usage = {
-        "total": memory.total / (1024**3),  # Convert to GB
-        "used": memory.used / (1024**3),
-        "percent": memory.percent,
-    }
-
-    # Disk usage
-    disk = psutil.disk_usage("/")
-    disk_usage = {
-        "total": disk.total / (1024**3),  # Convert to GB
-        "used": disk.used / (1024**3),
-        "percent": disk.percent,
-    }
-
     return api_response(
-        result={
-            "cpu_usage": cpu_usage,
-            "ram_usage": ram_usage,
-            "disk_usage": disk_usage,
-        },
+        result=system_usage_sampler.get_snapshot(),
         failed=False,
         command="get_system_usage",
     )

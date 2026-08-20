@@ -8,10 +8,50 @@ from urllib.parse import parse_qs, urlparse
 
 import requests
 from django.contrib.auth.models import Group, User
-from django.test import Client, SimpleTestCase, TestCase, override_settings
+from django.test import (
+    Client,
+    RequestFactory,
+    SimpleTestCase,
+    TestCase,
+    override_settings,
+)
 from django.utils import timezone
 
 from .models import MobileAccessToken, MobileDevice, MobilePairing
+
+
+@patch.dict("os.environ", {"SERVER_NUMBER": "1"})
+class SystemUsageApiTests(SimpleTestCase):
+    @patch("api.views.system_usage_sampler")
+    def test_endpoint_returns_versioned_sampler_contract(self, sampler):
+        from api.views import get_system_usage
+
+        sampler.get_snapshot.return_value = {
+            "schema_version": 2,
+            "sampled_at": "2026-08-20T12:00:00+00:00",
+            "generated_at": "2026-08-20T12:00:05+00:00",
+            "data_age_seconds": 5.0,
+            "poll_after_seconds": 15,
+            "status": "partial",
+            "warnings": [],
+            "cpu_usage": {"available": False, "percent": None},
+            "ram_usage": {"available": True, "percent": 50.0},
+            "disk_usage": {"available": True, "percent": 60.0},
+            "history": [],
+            "range": {"seconds": 0.0},
+        }
+
+        request = RequestFactory().get("/api/get_system_usage")
+        request.user = SimpleNamespace(is_authenticated=True)
+        with patch("api.auth.check_api_key"):
+            response = get_system_usage(request)
+
+        self.assertEqual(response.status_code, 200)
+        payload = json.loads(response.content)
+        self.assertFalse(payload["failed"])
+        self.assertEqual(payload["command"], "get_system_usage")
+        self.assertEqual(payload["result"], sampler.get_snapshot.return_value)
+        sampler.get_snapshot.assert_called_once_with()
 
 
 class SharedRuntimeServiceApiTests(SimpleTestCase):

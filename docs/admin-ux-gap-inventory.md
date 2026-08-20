@@ -39,6 +39,9 @@ because the in-app browser connection could not be established.
 7. Auto Settings now have a pure preview API contract that can explain rule
    priority, effective commands, missing scenario values, duplicate maps,
    unavailable game-profile maps, and overlaps without sending RCON commands.
+8. Resource telemetry now has a bounded, container-aware API contract with
+   measurement timestamps, data age, history, source, warnings, and a client
+   polling cadence. The operations-first dashboard presentation is still open.
 
 ## Prioritized gap matrix
 
@@ -50,7 +53,7 @@ because the in-app browser connection could not be established.
 | P0 | Discord diagnostics | The card supports pairing, guild/channel/roles, provider/model, enable, save, and test; it has no explicit callback/broker health, last successful delivery, repair action, or expandable technical details | Administrators see generic errors and cannot locate whether CRCON, callback, broker, Discord, or AI caused the failure | Seven-step setup assistant and operational health panel with component states, timestamps, test outcome, repair action, provider/model/cost, and safe technical details | Pairing, wrong host, callback, broker, Discord rate-limit, AI unavailable, reconnect, multiserver, and two-Guild tests |
 | P1 | Legacy Automods | Level, No Leader, Seeding, and No Solo Tank use the generic schema form and long English code notes; only Autobalancer exposes mode/decision history | Administrators cannot consistently tell what will happen, what last happened, or how to test safely | Unified Off / Observe / Manual / Automatic model where supported, last run, decision, reason, affected players, preview, and guardrails | Status API contracts, decision fixtures, DE/EN, HLL/HLLV role compatibility, and no-action shadow tests |
 | P1 | Dashboard hierarchy | `dashboard.jsx` renders the large Frontline App promotion before settings, Automods, services, maps, moderation, and logs | Operational problems can be pushed below promotional content | Incidents, CRCON/game-server health, moderation, automation, map status, and resources first; promotion after operating state | Live screenshots at all target widths, offline/stale/partial fixtures, task-step comparison |
-| P1 | Resource visibility | No CPU/RAM resource endpoint or dashboard component was found | Capacity and runaway-process problems cannot be understood from CRCON | Used/total CPU and RAM, time range, samples, data timestamp, source, thresholds, and explainable warning; no invented value when unavailable | Backend sampling/polling budget, stale/partial states, container-limit tests, and responsive chart tests |
+| P1 | Resource visibility | `get_system_usage` now returns a cached, container-aware v2 contract and the sidebar respects its polling cadence; the dashboard still lacks a resource history and operational explanation | Capacity and runaway-process problems remain hard to investigate from the main operating view | Present used/total CPU and RAM, time range, samples, data timestamp, source, thresholds, and explainable warnings on the dashboard; preserve unknown values when unavailable | Live container sampling, stale/partial states, responsive chart tests, and current screenshots |
 | P1 | Translation quality | Autobalancer help, dashboards, round history, and parts of config mode labels contain extensive hard-coded German strings | English UI becomes mixed-language and new copy is outside translation checks | Move changed operator-facing strings into locale resources and extend the translation contract beyond a hand-picked key list | Hard-coded-string check plus DE/EN route render tests |
 | P1 | Accessibility coverage | axe covers four routes at three widths; keyboard tests focus on shell navigation; touch-target coverage focuses on important navigation controls | Critical dialogs, settings, Automods, and Discord can regress unnoticed | Extend axe, keyboard, focus-return, announcement, zoom/reflow, and touch-target tests to every changed critical flow | No serious/critical axe results, documented manual 200% zoom and screen-reader spot checks |
 | P1 | HLL/HLLV coverage | Identity normalization and selected action/context tests exist; broad settings/Automod/map-action matrices do not | A feature may silently work for only one protocol/profile | Feature capability matrix sourced from server profile, visible compatibility labels, and paired E2E fixtures for both games | HLL and HLLV fixtures for every changed command and setting; unknown future profile remains unknown |
@@ -88,8 +91,8 @@ The following work must wait for current screenshots from the chosen browser:
 5. Add Discord component-health diagnostics before reshaping setup into a
    seven-step assistant.
 6. Standardize legacy Automods using Autobalancer's explanation model.
-7. Add resource telemetry and reorder the dashboard around incidents and
-   operating health.
+7. Present the resource telemetry contract and reorder the dashboard around
+   incidents and operating health.
 8. Finish component documentation, broad accessibility coverage, HLL/HLLV
    matrices, polling budgets, visual regressions, merge gates, and release.
 
