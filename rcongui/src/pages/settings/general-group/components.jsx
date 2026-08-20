@@ -15,6 +15,7 @@ import {
   Select,
   Slider,
   Stack,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import SaveIcon from "@mui/icons-material/Save";
@@ -34,6 +35,9 @@ import { toast } from "react-toastify";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import MapAutocomplete from "@/components/shared/MapAutocomplete";
+import SettingEffectSummary from "./SettingEffectSummary";
+import { useAuth } from "@/hooks/useAuth";
+import { getGeneralSettingMetadata } from "./setting-metadata";
 
 export const AUTOKICK_KEY = {
   condition: "condition",
@@ -285,8 +289,16 @@ export const SliderSetting = ({
 }) => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const { permissions } = useAuth();
+  const metadata = getGeneralSettingMetadata(settingKey);
+  const canChange = Boolean(
+    permissions?.is_superuser ||
+      permissions?.permissions?.some(
+        (item) => item.permission === metadata?.changePermission
+      )
+  );
 
-  const { data } = useQuery({
+  const { data, dataUpdatedAt } = useQuery({
     queryKey: [queryKey],
     queryFn: () => cmd.GET_SERVER_SETTINGS(),
     initialData,
@@ -305,7 +317,7 @@ export const SliderSetting = ({
       mutationFn({ payload: { [payloadKey]: value }, throwRouteError: false }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [queryKey] });
-      toast.success(t("settings.general.updated", { name: title }));
+      toast.success(t("settingEffect.commandSent", { name: title }));
     },
     onError: (error) =>
       toast.error(
@@ -325,6 +337,7 @@ export const SliderSetting = ({
   }, [data, form]);
 
   const onSubmit = form.handleSubmit((values) => mutate(values[settingKey]));
+  const draftValue = form.watch(settingKey);
 
   return (
     <Grid size={{ xs: 12, md: 6 }}>
@@ -339,16 +352,24 @@ export const SliderSetting = ({
           title={title}
           subheader={subheader}
           action={
-            <Button
-              type="submit"
-              form={`${settingKey}-form`}
-              variant="contained"
-              size="small"
-              startIcon={<SaveIcon />}
-              disabled={form.formState.isSubmitting || isPending}
+            <Tooltip
+              title={canChange ? "" : t("settingEffect.permissionMissing")}
             >
-              {isPending ? t("common.processing") : t("common.save")}
-            </Button>
+              <span>
+                <Button
+                  type="submit"
+                  form={`${settingKey}-form`}
+                  variant="contained"
+                  size="small"
+                  startIcon={<SaveIcon />}
+                  disabled={
+                    form.formState.isSubmitting || isPending || !canChange
+                  }
+                >
+                  {isPending ? t("common.processing") : t("common.save")}
+                </Button>
+              </span>
+            </Tooltip>
           }
         />
         <Divider flexItem sx={{ mt: 1, mb: 2 }} />
@@ -357,10 +378,22 @@ export const SliderSetting = ({
             <SliderInput
               keyName={settingKey}
               title={""}
-              value={form.watch(settingKey)}
-              onChange={(value) => form.setValue(settingKey, value)}
+              value={draftValue}
+              onChange={(value) =>
+                form.setValue(settingKey, value, { shouldDirty: true })
+              }
             />
           </Box>
+          <SettingEffectSummary
+            settingKey={settingKey}
+            serverValue={data}
+            draftValue={draftValue}
+            dataUpdatedAt={dataUpdatedAt}
+            canChange={canChange}
+            onUseRecommended={(value) =>
+              form.setValue(settingKey, value, { shouldDirty: true })
+            }
+          />
         </CardContent>
       </Card>
     </Grid>
@@ -379,8 +412,16 @@ export const ToggleSetting = ({
 }) => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const { permissions } = useAuth();
+  const metadata = getGeneralSettingMetadata(settingKey);
+  const canChange = Boolean(
+    permissions?.is_superuser ||
+      permissions?.permissions?.some(
+        (item) => item.permission === metadata?.changePermission
+      )
+  );
 
-  const { data } = useQuery({
+  const { data, dataUpdatedAt } = useQuery({
     queryKey: [queryKey],
     queryFn: () => cmd.GET_SERVER_SETTINGS(),
     initialData,
@@ -399,7 +440,7 @@ export const ToggleSetting = ({
       mutationFn({ payload: { [payloadKey]: value }, throwRouteError: false }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [queryKey] });
-      toast.success(t("settings.general.updated", { name: title }));
+      toast.success(t("settingEffect.commandSent", { name: title }));
     },
     onError: (error) =>
       toast.error(
@@ -419,6 +460,7 @@ export const ToggleSetting = ({
   }, [data, form]);
 
   const onSubmit = form.handleSubmit((values) => mutate(values[settingKey]));
+  const draftValue = form.watch(settingKey);
 
   return (
     <Grid size={{ xs: 12, md: 6 }}>
@@ -433,16 +475,24 @@ export const ToggleSetting = ({
           title={title}
           subheader={subheader}
           action={
-            <Button
-              type="submit"
-              form={`${settingKey}-form`}
-              variant="contained"
-              size="small"
-              startIcon={<SaveIcon />}
-              disabled={form.formState.isSubmitting || isPending}
+            <Tooltip
+              title={canChange ? "" : t("settingEffect.permissionMissing")}
             >
-              {isPending ? t("common.processing") : t("common.save")}
-            </Button>
+              <span>
+                <Button
+                  type="submit"
+                  form={`${settingKey}-form`}
+                  variant="contained"
+                  size="small"
+                  startIcon={<SaveIcon />}
+                  disabled={
+                    form.formState.isSubmitting || isPending || !canChange
+                  }
+                >
+                  {isPending ? t("common.processing") : t("common.save")}
+                </Button>
+              </span>
+            </Tooltip>
           }
         />
         <Divider flexItem sx={{ mt: 1, mb: 2 }} />
@@ -451,10 +501,22 @@ export const ToggleSetting = ({
             <ToggleInput
               keyName={settingKey}
               title={""}
-              value={form.watch(settingKey)}
-              onChange={(checked) => form.setValue(settingKey, checked)}
+              value={draftValue}
+              onChange={(checked) =>
+                form.setValue(settingKey, checked, { shouldDirty: true })
+              }
             />
           </Box>
+          <SettingEffectSummary
+            settingKey={settingKey}
+            serverValue={data}
+            draftValue={draftValue}
+            dataUpdatedAt={dataUpdatedAt}
+            canChange={canChange}
+            onUseRecommended={(value) =>
+              form.setValue(settingKey, value, { shouldDirty: true })
+            }
+          />
         </CardContent>
       </Card>
     </Grid>
@@ -473,8 +535,16 @@ export const ThresholdsSetting = ({
 }) => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const { permissions } = useAuth();
+  const metadata = getGeneralSettingMetadata(settingKey);
+  const canChange = Boolean(
+    permissions?.is_superuser ||
+      permissions?.permissions?.some(
+        (item) => item.permission === metadata?.changePermission
+      )
+  );
 
-  const { data } = useQuery({
+  const { data, dataUpdatedAt } = useQuery({
     queryKey: [queryKey],
     queryFn: () => cmd.GET_SERVER_SETTINGS(),
     initialData,
@@ -496,7 +566,7 @@ export const ThresholdsSetting = ({
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [queryKey] });
-      toast.success(t("settings.general.updated", { name: title }));
+      toast.success(t("settingEffect.commandSent", { name: title }));
     },
     onError: (error) =>
       toast.error(
@@ -516,6 +586,7 @@ export const ThresholdsSetting = ({
   }, [data, form]);
 
   const onSubmit = form.handleSubmit((values) => mutate(values[settingKey]));
+  const draftValue = form.watch(settingKey);
 
   return (
     <Grid size={{ xs: 12, md: 6 }}>
@@ -530,16 +601,24 @@ export const ThresholdsSetting = ({
           title={title}
           subheader={subheader}
           action={
-            <Button
-              type="submit"
-              form={`${settingKey}-form`}
-              variant="contained"
-              size="small"
-              startIcon={<SaveIcon />}
-              disabled={form.formState.isSubmitting || isPending}
+            <Tooltip
+              title={canChange ? "" : t("settingEffect.permissionMissing")}
             >
-              {isPending ? t("common.processing") : t("common.save")}
-            </Button>
+              <span>
+                <Button
+                  type="submit"
+                  form={`${settingKey}-form`}
+                  variant="contained"
+                  size="small"
+                  startIcon={<SaveIcon />}
+                  disabled={
+                    form.formState.isSubmitting || isPending || !canChange
+                  }
+                >
+                  {isPending ? t("common.processing") : t("common.save")}
+                </Button>
+              </span>
+            </Tooltip>
           }
         />
         <Divider flexItem sx={{ mt: 1, mb: 2 }} />
@@ -548,10 +627,22 @@ export const ThresholdsSetting = ({
             <ThresholdsInput
               keyName={settingKey}
               title={""}
-              value={form.watch(settingKey)}
-              onChange={(value) => form.setValue(settingKey, value)}
+              value={draftValue}
+              onChange={(value) =>
+                form.setValue(settingKey, value, { shouldDirty: true })
+              }
             />
           </Box>
+          <SettingEffectSummary
+            settingKey={settingKey}
+            serverValue={data}
+            draftValue={draftValue}
+            dataUpdatedAt={dataUpdatedAt}
+            canChange={canChange}
+            onUseRecommended={(value) =>
+              form.setValue(settingKey, value, { shouldDirty: true })
+            }
+          />
         </CardContent>
       </Card>
     </Grid>

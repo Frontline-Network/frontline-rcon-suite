@@ -232,16 +232,30 @@ export function makeServer({ environment = "development" } = {}) {
         models: [],
       }));
 
-      this.get("/get_server_settings", () => ok({
-        autobalance_enabled: true,
-        votekick_enabled: true,
-        team_switch_cooldown: 15,
-        autobalance_threshold: 3,
-        idle_autokick_time: 15,
-        max_ping_autokick: 250,
-        queue_length: 6,
-        vip_slots_num: 2,
-      }));
+      this.get("/get_server_settings", () => {
+        const unavailable =
+          typeof window !== "undefined" &&
+          new URLSearchParams(window.location.search).get(
+            "demo_settings_error"
+          ) === "1";
+        if (unavailable) {
+          return new Response(
+            503,
+            { "Content-Type": "application/json" },
+            { error: "Demo server settings unavailable" }
+          );
+        }
+        return ok({
+          autobalance_enabled: true,
+          votekick_enabled: true,
+          team_switch_cooldown: 15,
+          autobalance_threshold: 3,
+          idle_autokick_time: 15,
+          max_ping_autokick: 250,
+          queue_length: 6,
+          vip_slots_num: 2,
+        });
+      });
       this.get("/get_services", () => ok([
         { name: "rcon", statename: "RUNNING", start: 1775205000, stop: 0, now: 1775210400, info: "RCON-Verbindung zum Gameserver" },
         { name: "worker", statename: "RUNNING", start: 1775205000, stop: 0, now: 1775210400, info: "CRCON-Auftragsverarbeitung" },
