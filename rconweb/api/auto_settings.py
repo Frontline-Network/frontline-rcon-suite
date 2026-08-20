@@ -3,6 +3,7 @@ import os
 
 from django.views.decorators.csrf import csrf_exempt
 
+from rcon.auto_settings_preview import analyze_auto_settings
 from rcon.user_config.auto_settings import AutoSettingsConfig
 
 from .audit_log import record_audit
@@ -51,6 +52,65 @@ def get_auto_settings(request):
         result=ordered_config,
         command="get_auto_settings",
         arguments=dict(server_number=server_number),
+        failed=False,
+    )
+
+
+@csrf_exempt
+@login_required()
+@permission_required("api.can_view_auto_settings", raise_exception=True)
+@require_http_methods(["POST"])
+@require_content_type()
+def preview_auto_settings(request):
+    """Validate and simulate Auto Settings without executing RCON commands."""
+
+    data = _get_data(request)
+    settings = data.get("settings")
+    scenario = data.get("scenario", {})
+    known_map_ids = data.get("known_map_ids")
+
+    if isinstance(settings, str):
+        try:
+            settings = json.loads(settings)
+        except json.JSONDecodeError as error:
+            return api_response(
+                error=f"No valid JSON provided: {error.msg}",
+                command="preview_auto_settings",
+                failed=True,
+                status_code=400,
+            )
+    if settings is None:
+        return api_response(
+            error="No auto settings provided",
+            command="preview_auto_settings",
+            failed=True,
+            status_code=400,
+        )
+    if not isinstance(scenario, dict):
+        return api_response(
+            error="scenario needs to be an object",
+            command="preview_auto_settings",
+            failed=True,
+            status_code=400,
+        )
+    if known_map_ids is not None and (
+        not isinstance(known_map_ids, list)
+        or not all(isinstance(map_id, str) for map_id in known_map_ids)
+    ):
+        return api_response(
+            error="known_map_ids needs to be an array of strings",
+            command="preview_auto_settings",
+            failed=True,
+            status_code=400,
+        )
+
+    return api_response(
+        result=analyze_auto_settings(
+            settings,
+            scenario=scenario,
+            known_map_ids=known_map_ids,
+        ),
+        command="preview_auto_settings",
         failed=False,
     )
 
