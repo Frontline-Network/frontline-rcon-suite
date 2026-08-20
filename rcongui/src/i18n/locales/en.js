@@ -861,6 +861,7 @@ const en = {
   },
   login: {
     title: "Sign in",
+    documentTitle: "Frontline Network · Sign in",
     eyebrow: "Frontline operations",
     intro: "Secure access to server management, moderation and live operations.",
     username: "Username",

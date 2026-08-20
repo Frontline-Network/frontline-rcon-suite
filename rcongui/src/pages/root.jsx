@@ -12,6 +12,7 @@ import { PlayerSidebarProvider } from "@/hooks/usePlayerSidebar";
 import { useAppStore } from "@/stores/app-state";
 import NavigationProgress from "@/components/layout/NavigationProgress";
 import { useTranslation } from "react-i18next";
+import TitleManager from "@/features/title-manager/TitleManager";
 
 export const loader = async () => {
   return null;
@@ -35,6 +36,7 @@ export default function Root() {
 
   return (
     <>
+      <TitleManager />
       <NavigationProgress />
       <Box
         component="a"

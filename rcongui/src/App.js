@@ -14,7 +14,6 @@ import {StrictMode} from "react";
 import AppTheme from "@/themes/AppTheme";
 import { CssBaseline } from '@mui/material';
 import { useAppStore } from './stores/app-state';
-import TitleManager from './features/title-manager/TitleManager';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { deDE, enUS } from '@mui/x-date-pickers/locales';
@@ -52,10 +51,11 @@ const App = () => {
           <AppTheme selectedScheme={colorScheme}>
             <CssBaseline enableColorScheme />
             <RouterProvider router={adminRouter} />
-            <ReactQueryDevtools initialIsOpen={false} />
+            {import.meta.env.MODE !== "fake" ? (
+              <ReactQueryDevtools initialIsOpen={false} />
+            ) : null}
           </AppTheme>
         </LocalizationProvider>
-        <TitleManager />
       </QueryClientProvider>
     </StrictMode>
   );

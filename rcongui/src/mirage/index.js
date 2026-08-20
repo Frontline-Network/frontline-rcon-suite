@@ -19,6 +19,7 @@ import {
   getDemoServerList,
   getDemoServerStatus,
   getDemoRole,
+  isDemoAuthenticated,
   demoSystemUsage,
 } from "./demo-data";
 
@@ -26,6 +27,14 @@ export function makeServer({ environment = "development" } = {}) {
   let gameState = createGameState();
   const disbandAttempts = new Map();
   const ok = (result) => ({ result });
+  const protectedRequestLog = [];
+  const trackProtectedRequest = (path, handler) => (...args) => {
+    protectedRequestLog.push(path);
+    return handler(...args);
+  };
+  if (typeof window !== "undefined") {
+    window.__CRCON_DEMO_PROTECTED_REQUESTS__ = protectedRequestLog;
+  }
   const currentLayer = {
     id: "foy_warfare_night",
     name: "foy_warfare_night",
@@ -150,7 +159,13 @@ export function makeServer({ environment = "development" } = {}) {
       this.urlPrefix = process.env.REACT_APP_API_URL;
 
       // A complete, deterministic shell for visual development and demos.
-      this.get("/is_logged_in", () => ok({ authenticated: true, username: "Frontline Admin" }));
+      this.get("/is_logged_in", () => {
+        const authenticated = isDemoAuthenticated();
+        return ok({
+          authenticated,
+          username: authenticated ? "Frontline Admin" : "",
+        });
+      });
       this.post("/login", () => ok({ authenticated: true, username: "Frontline Admin" }));
       this.get("/get_own_user_permissions", () => {
         const isViewer = getDemoRole() === "viewer";
@@ -162,21 +177,47 @@ export function makeServer({ environment = "development" } = {}) {
       });
       this.get("/logout", () => ok(true));
 
-      this.get("/get_connection_info", () => ok(getDemoServerConnection()));
-      this.get("/get_server_list", () => ok(getDemoServerList()));
-      this.get("/get_status", () => ok(getDemoServerStatus()));
-      this.get("/get_gamestate", () => ok({
-        current_map: currentLayer,
-        next_map: nextLayer,
-        raw_time_remaining: "00:57:07",
-        time_remaining: 3427,
-        allied_score: 3,
-        axis_score: 2,
-        num_allied_players: 43,
-        num_axis_players: 43,
-      }));
-      this.get("/get_ingame_mods", () => ok([]));
-      this.get("/get_online_mods", () => ok([]));
+      this.get(
+        "/get_connection_info",
+        trackProtectedRequest("/api/get_connection_info", () =>
+          ok(getDemoServerConnection())
+        )
+      );
+      this.get(
+        "/get_server_list",
+        trackProtectedRequest("/api/get_server_list", () =>
+          ok(getDemoServerList())
+        )
+      );
+      this.get(
+        "/get_status",
+        trackProtectedRequest("/api/get_status", () =>
+          ok(getDemoServerStatus())
+        )
+      );
+      this.get(
+        "/get_gamestate",
+        trackProtectedRequest("/api/get_gamestate", () =>
+          ok({
+            current_map: currentLayer,
+            next_map: nextLayer,
+            raw_time_remaining: "00:57:07",
+            time_remaining: 3427,
+            allied_score: 3,
+            axis_score: 2,
+            num_allied_players: 43,
+            num_axis_players: 43,
+          })
+        )
+      );
+      this.get(
+        "/get_ingame_mods",
+        trackProtectedRequest("/api/get_ingame_mods", () => ok([]))
+      );
+      this.get(
+        "/get_online_mods",
+        trackProtectedRequest("/api/get_online_mods", () => ok([]))
+      );
       this.get("/get_system_usage", () => ok({ ...demoSystemUsage }));
       this.get("/get_version", () => ok("11.2.0"));
 
@@ -442,9 +483,12 @@ export function makeServer({ environment = "development" } = {}) {
         return ok(decision);
       });
       
-      this.get("/get_team_view", () => {
-        return handleTeamView(gameState);
-      });
+      this.get(
+        "/get_team_view",
+        trackProtectedRequest("/api/get_team_view", () =>
+          handleTeamView(gameState)
+        )
+      );
 
       this.post("/get_recent_logs", (schema, request) => {
         const params = request.requestBody ? JSON.parse(request.requestBody) : request.queryParams;

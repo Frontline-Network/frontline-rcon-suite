@@ -177,6 +177,20 @@ export const getDemoConnectionMode = () =>
 
 export const getDemoRole = () => readDemoParameter("demo_role") || "admin";
 
+export const isDemoAuthenticated = () => {
+  if (readDemoParameter("demo_auth") === "anonymous") return false;
+
+  const returnTarget = readDemoParameter("from");
+  if (!returnTarget || typeof window === "undefined") return true;
+
+  try {
+    const returnUrl = new URL(returnTarget, window.location.origin);
+    return returnUrl.searchParams.get("demo_auth") !== "anonymous";
+  } catch {
+    return true;
+  }
+};
+
 export const shouldFailDemoServerSettings = () =>
   readDemoParameter("demo_settings_error") === "1";
 

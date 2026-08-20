@@ -921,6 +921,7 @@ const de = {
   },
   login: {
     title: "Anmelden",
+    documentTitle: "Frontline Network · Anmelden",
     eyebrow: "Frontline Einsatzleitung",
     intro: "Sicherer Zugang zu Serververwaltung, Moderation und Live-Betrieb.",
     username: "Benutzername",
