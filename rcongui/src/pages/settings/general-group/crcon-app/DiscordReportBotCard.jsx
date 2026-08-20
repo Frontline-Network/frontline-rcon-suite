@@ -489,8 +489,12 @@ export default function DiscordReportBotCard() {
                   setConfig({ ...config, language: event.target.value })
                 }
               >
-                <MenuItem value="de">Deutsch</MenuItem>
-                <MenuItem value="en">English</MenuItem>
+                <MenuItem value="de">
+                  {t("settings.discordReports.languageGerman")}
+                </MenuItem>
+                <MenuItem value="en">
+                  {t("settings.discordReports.languageEnglish")}
+                </MenuItem>
               </TextField>
               <Stack direction="row" spacing={2} useFlexGap flexWrap="wrap">
                 <FormControlLabel

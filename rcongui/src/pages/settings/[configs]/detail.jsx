@@ -277,8 +277,10 @@ const ConfigPage = () => {
           }}
         >
           {settingsOpen
-            ? "Einstellungen schließen"
-            : `Einstellungen öffnen · Modus ${jsonData?.mode || "unbekannt"}`}
+            ? t("settings.config.closeAutobalancerSettings")
+            : t("settings.config.openAutobalancerSettings", {
+                mode: jsonData?.mode || t("common.unknown"),
+              })}
         </Button>
       )}
       <Collapse
@@ -296,7 +298,7 @@ const ConfigPage = () => {
                   onClick={() => updateMode("visual")}
                 >
                   {isAutobalancer
-                    ? "Einfache Ansicht"
+                    ? t("settings.config.basicMode")
                     : t("settings.config.visual")}
                 </Button>
                 <Button
@@ -304,7 +306,7 @@ const ConfigPage = () => {
                   onClick={() => updateMode("code")}
                 >
                   {isAutobalancer
-                    ? "Erweitert (JSON)"
+                    ? t("settings.config.advancedJsonMode")
                     : t("settings.config.code")}
                 </Button>
               </ButtonGroup>
@@ -363,11 +365,13 @@ const ConfigPage = () => {
               )}
               <Stack direction={"row"} spacing={1}>
                 <Button variant={"outlined"} onClick={handleRefresh}>
-                  {isAutobalancer ? "Neu laden" : t("common.refresh")}
+                  {isAutobalancer
+                    ? t("settings.config.reload")
+                    : t("common.refresh")}
                 </Button>
                 <Button variant={"contained"} type="submit">
                   {isAutobalancer
-                    ? "Einstellungen speichern"
+                    ? t("settings.config.saveSettings")
                     : t("settings.config.submit")}
                 </Button>
               </Stack>
@@ -377,7 +381,7 @@ const ConfigPage = () => {
             <>
               <Typography variant="h4">
                 {isAutobalancer
-                  ? "Erklärung"
+                  ? t("settings.config.explanation")
                   : t("settings.config.documentation")}
               </Typography>
               <CopyBlock
@@ -389,7 +393,7 @@ const ConfigPage = () => {
               />
               <Typography variant="h4">
                 {isAutobalancer
-                  ? "Technisches Schema"
+                  ? t("settings.config.technicalSchema")
                   : t("settings.config.modelSchema")}
               </Typography>
               <CopyBlock
