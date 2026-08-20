@@ -1,4 +1,3 @@
-import { cmd } from "@/utils/fetchUtils";
 import {
   ListItem,
   Tooltip,
@@ -7,27 +6,17 @@ import {
   Box,
   LinearProgress,
 } from "@mui/material";
-import { useQuery } from "@tanstack/react-query";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMicrochip } from "@fortawesome/free-solid-svg-icons/faMicrochip";
 import { faHardDrive } from "@fortawesome/free-solid-svg-icons/faHardDrive";
 import { faMemory } from "@fortawesome/free-solid-svg-icons/faMemory";
 import { byUsage } from "./utils";
 import { useTranslation } from "react-i18next";
-import { demoSystemUsage, isFakeMode } from "@/mirage/demo-data";
+import { useSystemUsage } from "@/features/system-usage/SystemUsageProvider";
 
 const SystemUsage = () => {
   const { t } = useTranslation();
-  const { data: system, isLoading } = useQuery({
-    queryKey: [{ queryIdentified: "get_system_usage" }],
-    queryFn: isFakeMode()
-      ? () => Promise.resolve(demoSystemUsage)
-      : cmd.GET_SYSTEM_USAGE,
-    staleTime: 10 * 1000,
-    refetchInterval: (query) =>
-      Math.max(10, Number(query.state.data?.poll_after_seconds) || 15) * 1000,
-    refetchIntervalInBackground: false,
-  });
+  const { data: system, isLoading } = useSystemUsage();
 
   const metrics = system
     ? [

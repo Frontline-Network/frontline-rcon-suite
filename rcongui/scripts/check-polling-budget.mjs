@@ -70,6 +70,39 @@ requireText(titleManagerSource, "useGlobalStore", "Title manager");
 forbidText(titleManagerSource, "useQuery(", "Title manager");
 forbidText(titleManagerSource, "refetchInterval", "Title manager");
 
+const systemUsageProviderSource = readSource(
+  "features/system-usage/SystemUsageProvider.jsx"
+);
+requireText(
+  systemUsageProviderSource,
+  'queryIdentified: "get_system_usage"',
+  "System usage provider"
+);
+requireText(
+  systemUsageProviderSource,
+  "refetchIntervalInBackground: false",
+  "System usage provider"
+);
+
+for (const relativePath of [
+  "components/layout/sidebar/SystemUsage.jsx",
+  "components/cards/ResourceTelemetryCard.jsx",
+]) {
+  const source = readSource(relativePath);
+  requireText(source, "useSystemUsage", relativePath);
+  forbidText(source, "useQuery(", relativePath);
+  forbidText(source, "GET_SYSTEM_USAGE", relativePath);
+}
+
+const systemUsageRegistrations = (
+  allSources.match(/queryIdentified:\s*["']get_system_usage["']/g) || []
+).length;
+if (systemUsageRegistrations !== 1) {
+  throw new Error(
+    `System usage must have one polling registration, found ${systemUsageRegistrations}`
+  );
+}
+
 console.log(
-  "Polling budget contract passed: hidden tabs stop polling and one route-aware game-state stream serves global, live and team views."
+  "Polling budget contract passed: hidden tabs stop polling; one route-aware game-state stream and one shared system-usage stream serve all consumers."
 );

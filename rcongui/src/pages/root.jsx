@@ -13,6 +13,7 @@ import { useAppStore } from "@/stores/app-state";
 import NavigationProgress from "@/components/layout/NavigationProgress";
 import { useTranslation } from "react-i18next";
 import TitleManager from "@/features/title-manager/TitleManager";
+import { SystemUsageProvider } from "@/features/system-usage/SystemUsageProvider";
 
 export const loader = async () => {
   return null;
@@ -35,7 +36,7 @@ export default function Root() {
   const { t } = useTranslation();
 
   return (
-    <>
+    <SystemUsageProvider>
       <TitleManager />
       <NavigationProgress />
       <Box
@@ -85,7 +86,9 @@ export default function Root() {
               alignItems: "center",
               mx: 0,
               pb: 4,
-              mt: { xs: 13, lg: 0 },
+              // The compact navbar has two rows (navigation + live server state).
+              // Keep the first page heading below the fixed bar at every mobile width.
+              mt: { xs: 16, lg: 0 },
               minHeight: "100%",
             }}
           >
@@ -113,6 +116,6 @@ export default function Root() {
         </Box>
       </Box>
       <ToastContainer />
-    </>
+    </SystemUsageProvider>
   );
 }

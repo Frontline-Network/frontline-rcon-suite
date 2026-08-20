@@ -249,6 +249,14 @@ export const getDemoServerStatus = () => ({
         },
 });
 
+const demoSystemUsageHistory = Array.from({ length: 12 }, (_, index) => ({
+  sampled_at: new Date(now - (11 - index) * 15_000).toISOString(),
+  cpu_percent: [11, 15, 17, 14, 19, 23, 21, 18, 16, 20, 17, 18][index],
+  ram_percent: [42, 42, 43, 43, 44, 44, 45, 45, 45, 46, 46, 46][index],
+  disk_percent: 62,
+  status: "ok",
+}));
+
 export const demoSystemUsage = {
   schema_version: 2,
   sampled_at: new Date(now).toISOString(),
@@ -285,14 +293,88 @@ export const demoSystemUsage = {
     source: "filesystem",
     severity: "ok",
   },
-  history: [],
+  history: demoSystemUsageHistory,
   range: {
-    from: new Date(now).toISOString(),
+    from: demoSystemUsageHistory[0].sampled_at,
     to: new Date(now).toISOString(),
-    seconds: 0,
+    seconds: 165,
     sample_interval_seconds: 15,
     max_samples: 61,
   },
+};
+
+export const getDemoSystemUsage = () => {
+  const result = JSON.parse(JSON.stringify(demoSystemUsage));
+  const mode = readDemoParameter("demo_resources") || "ok";
+
+  if (mode === "warning") {
+    result.status = "warning";
+    result.ram_usage.percent = 86;
+    result.ram_usage.used = 6.88;
+    result.ram_usage.severity = "warning";
+    result.warnings = [
+      {
+        metric: "ram",
+        severity: "warning",
+        code: "ram_warning",
+        threshold_percent: 80,
+      },
+    ];
+  }
+
+  if (mode === "critical") {
+    result.status = "critical";
+    result.cpu_usage.percent = 92;
+    result.cpu_usage.used = 3.68;
+    result.cpu_usage.severity = "critical";
+    result.warnings = [
+      {
+        metric: "cpu",
+        severity: "critical",
+        code: "cpu_critical",
+        threshold_percent: 90,
+      },
+    ];
+  }
+
+  if (mode === "partial") {
+    result.status = "partial";
+    result.disk_usage = {
+      available: false,
+      percent: null,
+      used: null,
+      total: null,
+      unit: "GiB",
+      source: "unavailable",
+      severity: "unknown",
+    };
+  }
+
+  if (mode === "unavailable") {
+    result.status = "unavailable";
+    result.warnings = [];
+    result.history = [];
+    for (const key of ["cpu_usage", "ram_usage", "disk_usage"]) {
+      result[key] = {
+        available: false,
+        percent: null,
+        used: null,
+        total: null,
+        unit: key === "cpu_usage" ? "cores" : "GiB",
+        source: "unavailable",
+        severity: "unknown",
+      };
+    }
+  }
+
+  if (mode === "stale") {
+    const sampledAt = new Date(now - 5 * 60_000).toISOString();
+    result.sampled_at = sampledAt;
+    result.data_age_seconds = 300;
+    result.range.to = sampledAt;
+  }
+
+  return result;
 };
 
 export const demoServerSettings = {

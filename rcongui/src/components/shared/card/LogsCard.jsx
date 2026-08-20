@@ -56,7 +56,11 @@ const StyledListItem = styled(ListItem)(({ theme }) => ({
  */
 const LogsCard = ({ logs }) => {
   const { t } = useTranslation();
-  const sortedLogs = [...logs].sort((a, b) => a.group.localeCompare(b.group));
+  const sortedLogs = [...logs].sort((a, b) => {
+    if (a.group === "ADMIN_REPORTS") return -1;
+    if (b.group === "ADMIN_REPORTS") return 1;
+    return a.group.localeCompare(b.group);
+  });
   const [selectedTab, setSelectedTab] = useState(0);
 
   const handleTabChange = (event, newValue) => {

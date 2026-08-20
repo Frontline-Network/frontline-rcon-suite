@@ -20,7 +20,7 @@ import {
   getDemoServerStatus,
   getDemoRole,
   isDemoAuthenticated,
-  demoSystemUsage,
+  getDemoSystemUsage,
 } from "./demo-data";
 
 export function makeServer({ environment = "development" } = {}) {
@@ -218,7 +218,7 @@ export function makeServer({ environment = "development" } = {}) {
         "/get_online_mods",
         trackProtectedRequest("/api/get_online_mods", () => ok([]))
       );
-      this.get("/get_system_usage", () => ok({ ...demoSystemUsage }));
+      this.get("/get_system_usage", () => ok(getDemoSystemUsage()));
       this.get("/get_version", () => ok("11.2.0"));
 
       this.get("/mobile/v1/devices", () => ok([]));

@@ -6,10 +6,14 @@ export const VIEWPORTS = {
   desktop: { width: 1440, height: 1000 },
 };
 
-export async function openDemoPage(page, path, { query = {} } = {}) {
-  await page.addInitScript(() => {
-    window.localStorage.setItem("crcon.language", "de");
-  });
+export async function openDemoPage(
+  page,
+  path,
+  { query = {}, language = "de" } = {},
+) {
+  await page.addInitScript((selectedLanguage) => {
+    window.localStorage.setItem("crcon.language", selectedLanguage);
+  }, language);
 
   const url = new URL(path, "http://127.0.0.1:3000");
   Object.entries(query).forEach(([key, value]) => {
