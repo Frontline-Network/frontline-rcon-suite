@@ -1,69 +1,90 @@
 import * as React from "react";
-import Button from "@mui/material/Button";
-import Dialog from "@mui/material/Dialog";
-import DialogActions from "@mui/material/DialogActions";
-import DialogContent from "@mui/material/DialogContent";
-import DialogContentText from "@mui/material/DialogContentText";
-import DialogTitle from "@mui/material/DialogTitle";
-import GroupRemoveIcon from "@mui/icons-material/GroupRemove";
 import {
+  Alert,
   Box,
+  Button,
   Checkbox,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Divider,
   FormControlLabel,
   IconButton,
   List,
   ListItem,
   ListItemButton,
+  ListItemText,
   Stack,
   Tooltip,
   Typography,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { teamsLiveQueryOptions } from "@/queries/teams-live-query";
-import { gameQueryOptions } from "@/queries/game-query";
-import { ReasonField } from "./fields/ReasonField";
-import { useForm } from "react-hook-form";
-import { cmd } from "@/utils/fetchUtils";
+import GroupRemoveIcon from "@mui/icons-material/GroupRemove";
 import ErrorIcon from "@mui/icons-material/Error";
 import CheckIcon from "@mui/icons-material/Check";
-import ErrorBrowser from "@/components/shared/ErrorBrowser";
-import debug from "@/utils/debug";
-import { useThemedImages } from "@/hooks/useThemedImages";
+import ReplayRoundedIcon from "@mui/icons-material/ReplayRounded";
+import FactCheckRoundedIcon from "@mui/icons-material/FactCheckRounded";
+import { Link } from "react-router-dom";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { teamsLiveQueryOptions } from "@/queries/teams-live-query";
+import { gameQueryOptions } from "@/queries/game-query";
+import { cmd } from "@/utils/fetchUtils";
+import { useThemedImages } from "@/hooks/useThemedImages";
+import { useAuth } from "@/hooks/useAuth";
+import AdminActionContext, {
+  useAdminActionContext,
+} from "@/components/shared/AdminActionContext";
+import { ReasonField } from "./fields/ReasonField";
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const logger = debug("DISBAND SQUAD DIALOG");
+const UNASSIGNED = "unassigned";
+const OUTCOME = Object.freeze({
+  PENDING: "pending",
+  ERROR: "error",
+  SUCCESS: "success",
+});
 
-// Disband Squad Dialog with react-hook-form integration
+const getOptionId = (option) => `${option.team}-${option.unit_name}`;
+
 export default function DisbandSquadDialog() {
   const { t } = useTranslation();
-  const themedImg = useThemedImages()
-  const theme = useTheme()
-  const UNASSIGNED = "unassigned";
-  const [PENDING, ERROR, SUCCESS] = [0, 1, 2];
-  const [dialogOpen, setDialogOpen] = React.useState(false);
-  const cachedUnitOptions = React.useRef(null);
-  const [pendingOptionStates, setPendingOptionStates] = React.useState(
-    new Map()
-  );
-  const [errors, setErrors] = React.useState([]);
+  const themedImg = useThemedImages();
+  const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down("md"));
-  const queryClient = useQueryClient();
+  const { permissions } = useAuth();
+  const actionContext = useAdminActionContext();
+  const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [step, setStep] = React.useState("selection");
+  const [reviewTargets, setReviewTargets] = React.useState([]);
+  const [reviewReason, setReviewReason] = React.useState("");
+  const [outcomes, setOutcomes] = React.useState(new Map());
+  const [isExecuting, setIsExecuting] = React.useState(false);
 
   const { data: teamData, refetch: refetchTeamData } = useQuery({
     ...teamsLiveQueryOptions,
   });
+  const { data: gameState } = useQuery({ ...gameQueryOptions.state() });
 
-  const { data: gameState } = useQuery({
-    ...gameQueryOptions.state(),
-  });
+  const canDisband = Boolean(
+    permissions?.is_superuser ||
+      permissions?.permissions?.some(
+        (entry) => entry.permission === "can_disband_squad"
+      )
+  );
+  const canViewAudit = Boolean(
+    permissions?.is_superuser ||
+      permissions?.permissions?.some(
+        (entry) => entry.permission === "can_view_audit_logs"
+      )
+  );
 
-  const { mutate: disbandSquad, isPending } = useMutation({
-    mutationFn: async (data) =>
+  const { mutateAsync: disbandSquad } = useMutation({
+    mutationFn: (data) =>
       cmd.DISBAND_SQUAD({
         payload: {
           team_name: data.team,
@@ -72,66 +93,18 @@ export default function DisbandSquadDialog() {
         },
         throwRouteError: false,
       }),
-    onMutate: async (variables) => {
-      queryClient.cancelQueries({ queryKey: [teamsLiveQueryOptions.queryKey] });
-      logger(
-        "Disbanding squad:",
-        variables.id,
-        "with reason:",
-        variables.reason
-      );
-      setPendingOptionStates((prev) => {
-        const newStates = new Map(prev);
-        newStates.set(variables.id, PENDING);
-        return newStates;
-      });
-    },
-    onSuccess: async (data, variables) => {
-      setPendingOptionStates((prev) => {
-        const newStates = new Map(prev);
-        newStates.set(variables.id, SUCCESS);
-        return newStates;
-      });
-    },
-    onError: async (error, variables) => {
-      console.error(
-        "Failed to disband squad:",
-        variables.team,
-        variables.unit_name,
-        error
-      );
-      setPendingOptionStates((prev) => {
-        const newStates = new Map(prev);
-        newStates.set(variables.id, ERROR);
-        return newStates;
-      });
-      setErrors((prev) => [...prev, error.message]);
-    },
-    onSettled: async (data, error, variables) => {
-      await sleep(2000);
-      await refetchTeamData();
-      setPendingOptionStates((prev) => {
-        const newStates = new Map(prev);
-        newStates.delete(variables.id);
-        return newStates;
-      });
-      cachedUnitOptions.current = null;
-    },
   });
 
   const unitOptions = React.useMemo(() => {
-    if (cachedUnitOptions.current) {
-      return cachedUnitOptions.current;
-    }
     const units = [];
-    for (const team in teamData) {
-      for (const unit_name in teamData[team].squads) {
-        const unit = teamData[team].squads[unit_name];
-        if (unit_name === UNASSIGNED) continue;
+    for (const team in teamData || {}) {
+      for (const unitName in teamData[team].squads) {
+        const unit = teamData[team].squads[unitName];
+        if (unitName === UNASSIGNED) continue;
         units.push({
           team,
           faction: gameState?.current_map?.map?.[team]?.name,
-          unit_name,
+          unit_name: unitName,
           type: unit.type,
           count: unit.players.length,
           leader:
@@ -141,128 +114,144 @@ export default function DisbandSquadDialog() {
         });
       }
     }
-    units.sort((a, b) =>
+    return units.sort((a, b) =>
       `${a.team}-${a.unit_name}`.localeCompare(`${b.team}-${b.unit_name}`)
     );
-    return units;
-  }, [teamData, gameState, cachedUnitOptions.current]);
+  }, [teamData, gameState]);
 
   const {
     handleSubmit,
     formState: { errors: formErrors },
     setValue,
     watch,
+    reset,
     ...formProps
-  } = useForm({
-    defaultValues: {
-      reason: "",
-      squads: [], // Array of selected squad IDs
-    },
-  });
-
-  // Watch the squads field to get current selections
+  } = useForm({ defaultValues: { reason: "", squads: [] } });
   const selectedSquads = watch("squads");
-
-  // Convert array to Set for easier checking
   const selectedSquadsSet = new Set(selectedSquads);
-
-  const getOptionId = (option) => `${option.team}-${option.unit_name}`;
-
-  const getIdOption = (id) =>
-    unitOptions.find((option) => getOptionId(option) === id);
+  const getIdOption = React.useCallback(
+    (id) => unitOptions.find((option) => getOptionId(option) === id),
+    [unitOptions]
+  );
 
   React.useEffect(() => {
-    const availableOptions = new Set(
-      unitOptions.map((option) => getOptionId(option))
-    );
-    // Filter out unavailable squads from selection
-    const filteredSquads = selectedSquads.filter((id) =>
-      availableOptions.has(id)
-    );
-    if (filteredSquads.length !== selectedSquads.length) {
-      setValue("squads", filteredSquads);
-    }
+    const available = new Set(unitOptions.map(getOptionId));
+    const filtered = selectedSquads.filter((id) => available.has(id));
+    if (filtered.length !== selectedSquads.length) setValue("squads", filtered);
   }, [unitOptions, selectedSquads, setValue]);
 
-  const handleDialogClickOpen = () => {
-    clearSelection();
-    setValue("reason", "");
-    setPendingOptionStates(new Map());
-    cachedUnitOptions.current = null;
-    setErrors([]);
+  const openDialog = () => {
+    reset({ reason: "", squads: [] });
+    setReviewTargets([]);
+    setReviewReason("");
+    setOutcomes(new Map());
+    setStep("selection");
     setDialogOpen(true);
   };
 
-  const clearSelection = (team) => {
-    if (!team) {
-      setValue("squads", []);
-    } else {
-      const filteredSquads = selectedSquads.filter(
-        (id) => getIdOption(id)?.team !== team
-      );
-      setValue("squads", filteredSquads);
-    }
+  const closeDialog = () => {
+    if (!isExecuting) setDialogOpen(false);
   };
 
-  const handleDialogClose = () => {
-    setDialogOpen(false);
-  };
-
-  const handleUnitSelect = (option) => {
+  const toggleUnit = (option) => {
     const id = getOptionId(option);
-    const newSquads = selectedSquadsSet.has(id)
-      ? selectedSquads.filter((squadId) => squadId !== id)
-      : [...selectedSquads, id];
-    setValue("squads", newSquads);
-  };
-
-  const handleAllToggle = (team) => () => {
-    const teamOptions = unitOptions.filter((option) => option.team === team);
-    const teamSquadIds = teamOptions.map((option) => getOptionId(option));
-    const selectedTeamSquads = selectedSquads.filter((id) =>
-      teamSquadIds.includes(id)
+    setValue(
+      "squads",
+      selectedSquadsSet.has(id)
+        ? selectedSquads.filter((value) => value !== id)
+        : [...selectedSquads, id],
+      { shouldValidate: true }
     );
-
-    let newSquads;
-    if (
-      selectedTeamSquads.length === 0 ||
-      selectedTeamSquads.length < teamOptions.length
-    ) {
-      // Select all for this team
-      const unselectedTeamSquads = teamSquadIds.filter(
-        (id) => !selectedSquadsSet.has(id)
-      );
-      newSquads = [...selectedSquads, ...unselectedTeamSquads];
-    } else {
-      // Deselect all for this team
-      newSquads = selectedSquads.filter((id) => !teamSquadIds.includes(id));
-    }
-
-    setValue("squads", newSquads);
   };
 
-  const handleFormSubmit = (data) => {
-    // Handle the form submission with selected squads
-    logger("Form data:", data);
-    cachedUnitOptions.current = unitOptions;
-    setErrors([]);
-    data.squads.forEach((id) =>
-      disbandSquad({
-        ...getIdOption(id),
-        reason: data.reason,
-        id,
+  const toggleTeam = (team) => () => {
+    const ids = unitOptions
+      .filter((option) => option.team === team)
+      .map(getOptionId);
+    const allSelected = ids.every((id) => selectedSquadsSet.has(id));
+    setValue(
+      "squads",
+      allSelected
+        ? selectedSquads.filter((id) => !ids.includes(id))
+        : [...new Set([...selectedSquads, ...ids])],
+      { shouldValidate: true }
+    );
+  };
+
+  const prepareReview = (data) => {
+    const targets = data.squads.map(getIdOption).filter(Boolean);
+    setReviewTargets(targets);
+    setReviewReason(data.reason);
+    setOutcomes(new Map());
+    setStep("review");
+  };
+
+  const executeTargets = async (targets) => {
+    if (!actionContext.canExecute || targets.length === 0) return;
+    setIsExecuting(true);
+    setOutcomes((previous) => {
+      const next = new Map(previous);
+      targets.forEach((target) =>
+        next.set(getOptionId(target), { state: OUTCOME.PENDING, message: null })
+      );
+      return next;
+    });
+
+    await Promise.all(
+      targets.map(async (target) => {
+        const id = getOptionId(target);
+        try {
+          const result = await disbandSquad({
+            ...target,
+            reason: reviewReason,
+          });
+          if (result?.failed) {
+            throw new Error(result.error || t("actions.disband.commandFailed"));
+          }
+          setOutcomes((previous) => {
+            const next = new Map(previous);
+            next.set(id, { state: OUTCOME.SUCCESS, message: null });
+            return next;
+          });
+        } catch (error) {
+          setOutcomes((previous) => {
+            const next = new Map(previous);
+            next.set(id, {
+              state: OUTCOME.ERROR,
+              message: error?.message || t("errors.unexpected"),
+            });
+            return next;
+          });
+        }
       })
     );
+
+    setIsExecuting(false);
+    setStep("results");
+    await refetchTeamData();
   };
 
+  const failedTargets = reviewTargets.filter(
+    (target) => outcomes.get(getOptionId(target))?.state === OUTCOME.ERROR
+  );
+  const successfulCount = reviewTargets.filter(
+    (target) => outcomes.get(getOptionId(target))?.state === OUTCOME.SUCCESS
+  ).length;
+
+  const tooltip = !canDisband
+    ? t("actions.disband.permissionMissing")
+    : unitOptions.length === 0
+    ? t("actions.disband.noSquads")
+    : t("actions.disbandSquad");
+
   return (
-    <React.Fragment>
-      <Tooltip title={t("actions.disbandSquad")} describeChild>
+    <>
+      <Tooltip title={tooltip} describeChild>
         <span>
           <IconButton
             aria-label={t("actions.disbandSquad")}
-            onClick={handleDialogClickOpen}
-            disabled={unitOptions.length === 0}
+            onClick={openDialog}
+            disabled={!canDisband || unitOptions.length === 0}
           >
             <GroupRemoveIcon />
           </IconButton>
@@ -271,230 +260,289 @@ export default function DisbandSquadDialog() {
       <Dialog
         open={dialogOpen}
         fullScreen={fullScreen}
-        onClose={handleDialogClose}
+        maxWidth="md"
+        fullWidth
+        onClose={closeDialog}
         slotProps={{
           paper: {
             component: "form",
-            onSubmit: handleSubmit(handleFormSubmit),
+            onSubmit: handleSubmit(prepareReview),
           },
         }}
       >
-        <DialogTitle>{t("actions.disbandSquad")}</DialogTitle>
+        <DialogTitle>{t("actions.disband.title")}</DialogTitle>
         <DialogContent>
-          <DialogContentText>
-            {`This command will redeploy(10s) all affected players and free the squad slot(s) for reassignment.`}
-          </DialogContentText>
-          <Stack spacing={2} marginTop={2}>
-            <Stack
-              direction={"row"}
-              divider={<Divider flexItem orientation="vertical" />}
-              sx={{
-                border: (theme) => `1px solid ${theme.palette.divider}`,
-                borderRadius: 2,
-              }}
-            >
-              {["allies", "axis"].map((team) => {
-                const teamOptions = unitOptions.filter(
-                  (option) => option.team === team
-                ).length;
-                const selectedTeamOptions = selectedSquads.filter(
-                  (id) => getIdOption(id)?.team === team
-                ).length;
-                return (
-                  <Stack minWidth={"50%"} maxWidth={"50%"} key={team}>
-                    <FormControlLabel
-                      label={
-                        <Typography
-                          variant="h6"
-                          alignSelf={"center"}
-                          textAlign={"center"}
-                          width={"100%"}
-                        >
-                          {team.toUpperCase()}
-                        </Typography>
-                      }
-                      sx={{ px: 3 }}
-                      control={
-                        <Checkbox
-                          disabled={teamOptions === 0}
-                          checked={
-                            teamOptions !== 0 &&
-                            teamOptions === selectedTeamOptions
+          <Stack spacing={2}>
+            <AdminActionContext context={actionContext} />
+
+            {step === "selection" && (
+              <>
+                <DialogContentText>
+                  {t("actions.disband.effect")}
+                </DialogContentText>
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  divider={<Divider flexItem orientation="vertical" />}
+                  sx={{
+                    border: "1px solid",
+                    borderColor: "divider",
+                    borderRadius: 2,
+                  }}
+                >
+                  {["allies", "axis"].map((team) => {
+                    const teamUnits = unitOptions.filter(
+                      (option) => option.team === team
+                    );
+                    const selectedCount = teamUnits.filter((option) =>
+                      selectedSquadsSet.has(getOptionId(option))
+                    ).length;
+                    return (
+                      <Stack flex="1 1 50%" minWidth={0} key={team}>
+                        <FormControlLabel
+                          sx={{ px: 2, minHeight: 48 }}
+                          label={
+                            <Typography variant="h6">
+                              {t(`views.team.factions.${team}`)}
+                            </Typography>
                           }
-                          indeterminate={
-                            selectedTeamOptions > 0 &&
-                            selectedTeamOptions < teamOptions
+                          control={
+                            <Checkbox
+                              disabled={teamUnits.length === 0}
+                              checked={
+                                teamUnits.length > 0 &&
+                                selectedCount === teamUnits.length
+                              }
+                              indeterminate={
+                                selectedCount > 0 &&
+                                selectedCount < teamUnits.length
+                              }
+                              onChange={toggleTeam(team)}
+                            />
                           }
-                          onClick={handleAllToggle(team)}
                         />
-                      }
-                    />
-                    <Divider flexItem />
-                    <List
-                      key={team}
-                      sx={{
-                        width: "100%",
-                        position: "relative",
-                        overflowY: "auto",
-                        overflowX: "hidden",
-                        maxHeight: fullScreen ? "unset" : 300,
-                        "& ul": { padding: 0 },
-                      }}
-                    >
-                      {teamOptions === 0 && (
-                        <Typography variant="caption">
-                          No squads available
-                        </Typography>
-                      )}
-                      {teamOptions > 0 &&
-                        unitOptions
-                          .filter((option) => option.team === team)
-                          .map((option) => {
-                            let InteractiveComponent;
-
-                            switch (
-                              pendingOptionStates.get(getOptionId(option))
-                            ) {
-                              case PENDING:
-                                InteractiveComponent = (
-                                  <CircularProgress
-                                    size={16}
-                                    sx={{ fontSize: "1em", mx: 1 }}
-                                  />
-                                );
-                                break;
-                              case SUCCESS:
-                                InteractiveComponent = (
-                                  <CheckIcon
-                                    sx={{ fontSize: "1em", mx: 1 }}
-                                    color="success"
-                                  />
-                                );
-                                break;
-                              case ERROR:
-                                InteractiveComponent = (
-                                  <ErrorIcon
-                                    sx={{ fontSize: "1em", mx: 1 }}
-                                    color="warning"
-                                  />
-                                );
-                                break;
-
-                              default:
-                                InteractiveComponent = (
-                                  <Checkbox
-                                    checked={selectedSquadsSet.has(
-                                      getOptionId(option)
-                                    )}
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      handleUnitSelect(option);
-                                    }}
-                                    disabled={pendingOptionStates.size > 0}
-                                  />
-                                );
-                                break;
-                            }
-
-                            return (
-                              <ListItem
-                                key={getOptionId(option)}
-                                dense
-                                disableGutters
-                                sx={{ "& .MuiButtonBase-root": { opacity: 1 } }}
+                        <Divider />
+                        <List
+                          sx={{
+                            maxHeight: fullScreen ? "unset" : 300,
+                            overflowY: "auto",
+                          }}
+                        >
+                          {teamUnits.length === 0 && (
+                            <ListItem>
+                              <ListItemText
+                                secondary={t("actions.disband.noSquads")}
+                              />
+                            </ListItem>
+                          )}
+                          {teamUnits.map((option) => (
+                            <ListItem key={getOptionId(option)} disablePadding>
+                              <ListItemButton
+                                onClick={() => toggleUnit(option)}
                               >
-                                <ListItemButton
-                                  onClick={() => handleUnitSelect(option)}
-                                >
-                                  {InteractiveComponent}
-                                  <Box
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      overflow: "hidden",
-                                      px: 0,
-                                      py: 0.25,
-                                      gap: 0.25,
-                                    }}
-                                  >
-                                    <img
-                                      src={themedImg}
-                                      width={16}
-                                      height={16}
-                                    />
-                                    <img
-                                      src={themedImg.getRoleIconSrc(option.type)}
-                                      width={16}
-                                      height={16}
-                                    />
-                                    <Box
-                                      sx={{
-                                        overflow: "hidden",
-                                        whiteSpace: "nowrap",
-                                        textOverflow: "ellipsis",
-                                      }}
-                                    >
-                                      <Box
-                                        component="span"
-                                        fontWeight="bold"
-                                        textTransform="uppercase"
-                                      >
-                                        {option.unit_name}
-                                        {option.count
-                                          ? ` (${option.count})`
-                                          : ""}
-                                      </Box>
-                                      {option.leader && (
-                                        <Box component="span">
-                                          {` - ${option.leader}`}
-                                        </Box>
-                                      )}
-                                    </Box>
-                                    {!option.leader && (
-                                      <Box
-                                        component={"img"}
-                                        src="/icons/ping.webp"
-                                        alt={t("views.live.noSquadLeader")}
-                                        title={t("views.live.noSquadLeader")}
-                                        width={16}
-                                        height={16}
-                                        sx={{ opacity: 0.7, ml: 0.5 }}
-                                      />
-                                    )}
-                                  </Box>
-                                </ListItemButton>
-                              </ListItem>
-                            );
-                          })}
-                    </List>
-                  </Stack>
-                );
-              })}
-            </Stack>
-            {errors.length > 0 && (
-              <ErrorBrowser errors={errors} onClose={() => setErrors([])} />
+                                <Checkbox
+                                  checked={selectedSquadsSet.has(
+                                    getOptionId(option)
+                                  )}
+                                  tabIndex={-1}
+                                  disableRipple
+                                />
+                                <Box
+                                  component="img"
+                                  src={themedImg.getRoleIconSrc(option.type)}
+                                  alt=""
+                                  width={20}
+                                  height={20}
+                                  sx={{ mr: 1 }}
+                                />
+                                <ListItemText
+                                  primary={`${option.unit_name}${
+                                    option.count ? ` (${option.count})` : ""
+                                  }`}
+                                  secondary={
+                                    option.leader ||
+                                    t("views.live.noSquadLeader")
+                                  }
+                                />
+                              </ListItemButton>
+                            </ListItem>
+                          ))}
+                        </List>
+                      </Stack>
+                    );
+                  })}
+                </Stack>
+                <ReasonField
+                  errors={formErrors}
+                  setValue={setValue}
+                  {...formProps}
+                />
+              </>
             )}
-            <ReasonField
-              errors={formErrors}
-              setValue={setValue}
-              {...formProps}
-            />
+
+            {step === "review" && (
+              <>
+                <Alert severity="error" icon={<FactCheckRoundedIcon />}>
+                  {t("actions.disband.reviewWarning", {
+                    count: reviewTargets.length,
+                  })}
+                </Alert>
+                <Box>
+                  <Typography variant="overline" color="primary.light">
+                    {t("actions.disband.targets")}
+                  </Typography>
+                  <List dense>
+                    {reviewTargets.map((target) => (
+                      <ListItem key={getOptionId(target)}>
+                        <ListItemText
+                          primary={`${t(
+                            `views.team.factions.${target.team}`
+                          )} · ${target.unit_name}`}
+                          secondary={t("actions.disband.targetDetails", {
+                            count: target.count,
+                            leader:
+                              target.leader || t("views.live.noSquadLeader"),
+                          })}
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Box>
+                <Box>
+                  <Typography variant="overline" color="primary.light">
+                    {t("fields.reason")}
+                  </Typography>
+                  <Typography sx={{ whiteSpace: "pre-wrap" }}>
+                    {reviewReason}
+                  </Typography>
+                </Box>
+                <Alert severity="warning">
+                  {t("actions.disband.irreversible")}
+                </Alert>
+              </>
+            )}
+
+            {step === "results" && (
+              <>
+                <Alert severity={failedTargets.length ? "warning" : "success"}>
+                  {t("actions.disband.resultSummary", {
+                    success: successfulCount,
+                    failed: failedTargets.length,
+                  })}
+                </Alert>
+                <List aria-label={t("actions.disband.results")}>
+                  {reviewTargets.map((target) => {
+                    const outcome = outcomes.get(getOptionId(target));
+                    return (
+                      <ListItem key={getOptionId(target)}>
+                        <Box sx={{ display: "flex", mr: 1 }}>
+                          {outcome?.state === OUTCOME.SUCCESS ? (
+                            <CheckIcon color="success" />
+                          ) : outcome?.state === OUTCOME.ERROR ? (
+                            <ErrorIcon color="error" />
+                          ) : (
+                            <CircularProgress size={20} />
+                          )}
+                        </Box>
+                        <ListItemText
+                          primary={`${t(
+                            `views.team.factions.${target.team}`
+                          )} · ${target.unit_name}`}
+                          secondary={
+                            outcome?.state === OUTCOME.ERROR
+                              ? outcome.message
+                              : t(
+                                  `actions.disband.outcome.${
+                                    outcome?.state || OUTCOME.PENDING
+                                  }`
+                                )
+                          }
+                        />
+                      </ListItem>
+                    );
+                  })}
+                </List>
+              </>
+            )}
           </Stack>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleDialogClose}>{t("common.cancel")}</Button>
-          <Button
-            type="submit"
-            disabled={
-              isPending ||
-              unitOptions.length === 0 ||
-              selectedSquads.length === 0
-            }
-          >
-            {t("common.confirm")}
-          </Button>
+        <DialogActions sx={{ flexWrap: "wrap" }}>
+          {step === "selection" && (
+            <>
+              <Button onClick={closeDialog}>{t("common.cancel")}</Button>
+              <Button
+                type="submit"
+                variant="contained"
+                disabled={selectedSquads.length === 0}
+              >
+                {t("actions.disband.review")}
+              </Button>
+            </>
+          )}
+          {step === "review" && (
+            <>
+              <Button
+                onClick={() => setStep("selection")}
+                disabled={isExecuting}
+              >
+                {t("common.previous")}
+              </Button>
+              <Button
+                type="button"
+                color="error"
+                variant="contained"
+                onClick={() => executeTargets(reviewTargets)}
+                disabled={isExecuting || !actionContext.canExecute}
+              >
+                {isExecuting
+                  ? t("common.processing")
+                  : t("actions.disband.execute", {
+                      count: reviewTargets.length,
+                    })}
+              </Button>
+            </>
+          )}
+          {step === "results" && (
+            <>
+              <Tooltip
+                title={
+                  canViewAudit
+                    ? ""
+                    : t("actions.disband.auditPermissionMissing")
+                }
+              >
+                <span>
+                  <Button
+                    component={canViewAudit ? Link : "button"}
+                    to={
+                      canViewAudit
+                        ? "/records/audit-logs?commands=disband_squad_by_name"
+                        : undefined
+                    }
+                    onClick={canViewAudit ? closeDialog : undefined}
+                    disabled={!canViewAudit}
+                  >
+                    {t("actions.disband.openAudit")}
+                  </Button>
+                </span>
+              </Tooltip>
+              {failedTargets.length > 0 && (
+                <Button
+                  startIcon={<ReplayRoundedIcon />}
+                  onClick={() => executeTargets(failedTargets)}
+                  disabled={isExecuting || !actionContext.canExecute}
+                >
+                  {t("actions.disband.retryFailed", {
+                    count: failedTargets.length,
+                  })}
+                </Button>
+              )}
+              <Button variant="contained" onClick={closeDialog}>
+                {t("common.close")}
+              </Button>
+            </>
+          )}
         </DialogActions>
       </Dialog>
-    </React.Fragment>
+    </>
   );
 }
