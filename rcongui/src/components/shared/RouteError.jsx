@@ -3,7 +3,7 @@ import { useRouteError, useLocation } from "react-router-dom";
 import { Stack, Typography, Button, Paper } from "@mui/material";
 import { Link } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faDiscord } from "@fortawesome/free-brands-svg-icons";
+import { faDiscord } from "@fortawesome/free-brands-svg-icons/faDiscord";
 import siteConfig from "@/config/siteConfig";
 import { useTranslation } from "react-i18next";
 import { useEffect } from "react";
@@ -93,16 +93,16 @@ export default function RouteError() {
       justifyContent={"center"}
       sx={{ textAlign: "center" }}
     >
-      <Typography variant="overline" color="primary.main" sx={{ fontWeight: 800, letterSpacing: "0.14em" }}>
+      <Typography
+        variant="overline"
+        color="primary.main"
+        sx={{ fontWeight: 800, letterSpacing: "0.14em" }}
+      >
         Frontline Network
       </Typography>
       <Typography variant="h2">{t("errors.title")}</Typography>
-      <Typography variant="h2">
-        {t("errors.unexpected")}
-      </Typography>
-      <Typography variant="h3">
-        {t("errors.persistent")}
-      </Typography>
+      <Typography variant="h2">{t("errors.unexpected")}</Typography>
+      <Typography variant="h3">{t("errors.persistent")}</Typography>
       <Paper elevation={4} variant="outlined" sx={{ padding: 2 }}>
         <Typography variant="h4">
           {error.name ?? t("errors.unknown")}

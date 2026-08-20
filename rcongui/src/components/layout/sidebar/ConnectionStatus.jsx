@@ -1,7 +1,8 @@
 import { useGlobalStore } from "@/stores/global-state";
 import { Box, ListItem, Stack, Tooltip, Typography } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faServer, faDesktop } from "@fortawesome/free-solid-svg-icons";
+import { faServer } from "@fortawesome/free-solid-svg-icons/faServer";
+import { faDesktop } from "@fortawesome/free-solid-svg-icons/faDesktop";
 import { HIGHLIGHT } from "./utils";
 import { useTranslation } from "react-i18next";
 import { CONNECTION_STATE } from "@/utils/connectionHealth";

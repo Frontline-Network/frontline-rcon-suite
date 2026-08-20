@@ -6,7 +6,9 @@ import {
   mapsManagerQueryOptions,
 } from "../../queries";
 import { useEffect, useRef, useState } from "react";
-import _ from "lodash";
+import cloneDeep from "lodash/cloneDeep";
+import isEqual from "lodash/isEqual";
+import transform from "lodash/transform";
 import { toast } from "react-toastify";
 import { VotemapChangeNotification } from "./VotemapChangeNotification";
 import {
@@ -97,10 +99,10 @@ function VotemapSettingsPage() {
   // Compare incoming config changes
   const handleIncomingConfigChange = () => {
     // check how the configs differ (deep comparison)
-    const diff = _.transform(
+    const diff = transform(
       prevConfig.current,
       (result, value, key) => {
-        if (!_.isEqual(value, config[key])) {
+        if (!isEqual(value, config[key])) {
           result.push(key);
         }
       },
@@ -115,7 +117,7 @@ function VotemapSettingsPage() {
 
     // update reference
     // this will also prevent infinite toasting for the same changes
-    prevConfig.current = _.cloneDeep(config);
+    prevConfig.current = cloneDeep(config);
 
     // if only 'enabled' changed do nothing
     if (enabledOnly) return;
@@ -131,7 +133,7 @@ function VotemapSettingsPage() {
           setWorkingConfig((prev) => {
             const combined = { ...prev };
             diff.forEach((key) => {
-              combined[key] = _.cloneDeep(config[key]);
+              combined[key] = cloneDeep(config[key]);
             });
             return combined;
           });

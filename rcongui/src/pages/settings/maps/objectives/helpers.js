@@ -1,4 +1,4 @@
-import { zip } from "lodash";
+import zip from "lodash/zip";
 
 // a little function to help us with reordering the result
 export const reorder = (list, startIndex, endIndex) => {
