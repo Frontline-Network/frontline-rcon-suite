@@ -189,15 +189,15 @@ def forward_mobile_request_to_server(
         if key == my_key:
             continue
         try:
-            connection_response = requests.get(
-                f"http://{host}/api/get_connection_info",
-                timeout=5,
-                headers=headers,
-            )
-            if not connection_response.ok:
+            # ApiKey registrations are stored as ``frontend_<server number>``.
+            # Derive the target from that trusted Redis registration instead of
+            # probing get_connection_info with the caller's bearer token. A
+            # Discord capability is intentionally not a normal CRCON API key,
+            # so the old probe could never discover a Discord incident's peer.
+            prefix, separator, registered_number = host.rpartition("_")
+            if separator != "_" or prefix != api_key.key_prefix.rstrip("_"):
                 continue
-            connection_info = connection_response.json().get("result") or {}
-            if int(connection_info.get("server_number", -1)) != int(server_number):
+            if int(registered_number) != int(server_number):
                 continue
             payload = deepcopy(data) or {}
             query = deepcopy(params) or {}

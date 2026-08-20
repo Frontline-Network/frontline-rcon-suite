@@ -43,6 +43,7 @@ from rcon.moderation import (
 from rcon.moderation_candidates import persist_candidate_analysis
 from rcon.moderation_store import persist_analysis
 from rcon.types import MessageTemplateCategory
+from rcon.utils import get_server_number
 
 from .auth import api_response, login_required
 from .decorators import require_http_methods
@@ -55,6 +56,7 @@ from .discord_capabilities import (
 )
 from .mobile import _error, _json_body
 from .mobile_incidents import _execute_action
+from .multi_servers import forward_mobile_request_to_server
 from .models import (
     DiscordInteractionReceipt,
     DiscordModerationFeedback,
@@ -428,6 +430,37 @@ def _authorized_integration(request, command: str):
     ):
         return None, _error(command, "Unknown Discord capability", 404)
     return integration, None
+
+
+def _forward_discord_incident_request(
+    request, command: str, incident: dict, data: dict
+) -> HttpResponse | None:
+    """Route game-affecting Discord work to the incident's CRCON profile.
+
+    A multi-server installation has one public Discord callback, normally on
+    server 1, while an incident can belong to any game-server profile. The
+    incident's persisted server number is authoritative; caller input cannot
+    choose another target.
+    """
+
+    server_number = int(incident["server_number"])
+    if server_number == int(get_server_number()) or data.get("forwarded"):
+        return None
+    try:
+        response = forward_mobile_request_to_server(
+            request,
+            server_number,
+            request.path,
+            data=data,
+            method=request.method,
+        )
+    except ValueError as exc:
+        return _error(command, str(exc), 503)
+    return HttpResponse(
+        content=response.content,
+        status=response.status_code,
+        content_type=response.headers.get("content-type", "application/json"),
+    )
 
 
 def _validate_binding(
@@ -1370,7 +1403,8 @@ def transition_incident(request):
     if denied:
         return denied
     try:
-        interaction = DiscordInteractionRequest.model_validate(_json_body(request))
+        data = _json_body(request)
+        interaction = DiscordInteractionRequest.model_validate(data)
         if interaction.operation not in {"claim", "unclaim", "resolve", "dismiss"}:
             raise ValueError("Unsupported Discord incident transition")
         _validate_binding(
@@ -1379,6 +1413,12 @@ def transition_incident(request):
             channel_id=interaction.channel_id,
             actor=interaction.actor,
         )
+        incident = get_incident(interaction.incident_id)
+        forwarded = _forward_discord_incident_request(
+            request, command, incident, data
+        )
+        if forwarded is not None:
+            return forwarded
         cached = DiscordInteractionReceipt.objects.filter(
             interaction_id=interaction.interaction_id
         ).first()
@@ -1481,6 +1521,11 @@ def execute_action(request, preparation_id):
         ):
             raise PermissionError("Invalid action confirmation")
         incident = get_incident(str(prepared.incident_id))
+        forwarded = _forward_discord_incident_request(
+            request, command, incident, data
+        )
+        if forwarded is not None:
+            return forwarded
         actor_name = f"discord:{actor.discord_id}:{actor.display_name}"[:150]
         arguments = _normalize_action_subject(incident, dict(prepared.arguments))
         arguments["discord_actor"] = actor.model_dump(mode="json")

@@ -1523,15 +1523,29 @@ class DiscordActionTemplateTests(TestCase):
         validate_binding.assert_called_once()
         get_incident.assert_called_once_with("22222222-2222-2222-2222-222222222222")
 
+    @patch(
+        "api.discord_integration._forward_discord_incident_request",
+        return_value=None,
+    )
+    @patch("api.discord_integration.get_incident")
     @patch("api.discord_integration.mutate_incident")
     @patch("api.discord_integration._validate_binding")
     @patch("api.discord_integration._authorized_integration")
     def test_transition_persists_datetime_result_as_idempotency_receipt(
-        self, authorized, validate_binding, mutate_incident
+        self,
+        authorized,
+        validate_binding,
+        mutate_incident,
+        get_incident,
+        _forward_incident,
     ):
         from api.models import DiscordInteractionReceipt
 
         authorized.return_value = (SimpleNamespace(reporter_templates={}), None)
+        get_incident.return_value = {
+            "id": "22222222-2222-2222-2222-222222222222",
+            "server_number": 1,
+        }
         mutate_incident.return_value = {
             "id": "22222222-2222-2222-2222-222222222222",
             "status": "resolved",
@@ -1567,6 +1581,172 @@ class DiscordActionTemplateTests(TestCase):
         self.assertIsInstance(receipt.result["updated_at"], str)
         self.assertEqual(receipt.result["status"], "resolved")
         validate_binding.assert_called_once()
+
+    @patch("api.discord_integration.mutate_incident")
+    @patch("api.discord_integration._forward_discord_incident_request")
+    @patch("api.discord_integration.get_incident")
+    @patch("api.discord_integration._validate_binding")
+    @patch("api.discord_integration._authorized_integration")
+    def test_transition_for_remote_incident_is_forwarded_before_mutation(
+        self,
+        authorized,
+        validate_binding,
+        get_incident,
+        forward_incident,
+        mutate_incident,
+    ):
+        from django.http import HttpResponse
+
+        authorized.return_value = (SimpleNamespace(reporter_templates={}), None)
+        get_incident.return_value = {
+            "id": "22222222-2222-2222-2222-222222222222",
+            "server_number": 3,
+        }
+        forward_incident.return_value = HttpResponse(
+            b'{"forwarded":true}',
+            status=202,
+            content_type="application/json",
+        )
+
+        response = self.client.post(
+            "/api/discord/v1/incidents/transition",
+            data=json.dumps(
+                {
+                    "interaction_id": "1538274085513995999",
+                    "installation_id": "11111111-1111-1111-1111-111111111111",
+                    "guild_id": "123",
+                    "channel_id": "456",
+                    "incident_id": "22222222-2222-2222-2222-222222222222",
+                    "incident_revision": 1,
+                    "actor": {
+                        "discord_id": "789",
+                        "display_name": "Moderator",
+                        "role_ids": ["42"],
+                    },
+                    "operation": "claim",
+                    "payload": {},
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 202)
+        self.assertJSONEqual(response.content, {"forwarded": True})
+        forward_incident.assert_called_once()
+        mutate_incident.assert_not_called()
+
+    @patch("api.discord_integration.reserve_incident_action")
+    @patch("api.discord_integration._forward_discord_incident_request")
+    @patch("api.discord_integration.get_incident")
+    @patch("api.discord_integration.capability_matches", return_value=True)
+    @patch("api.discord_integration._validate_binding")
+    @patch("api.discord_integration._authorized_integration")
+    def test_execution_for_remote_incident_is_forwarded_before_game_action(
+        self,
+        authorized,
+        validate_binding,
+        _capability_matches,
+        get_incident,
+        forward_incident,
+        reserve_action,
+    ):
+        from django.http import HttpResponse
+
+        from api.models import DiscordPreparedAction
+
+        authorized.return_value = (SimpleNamespace(), None)
+        get_incident.return_value = {
+            "id": "22222222-2222-2222-2222-222222222222",
+            "server_number": 3,
+        }
+        forward_incident.return_value = HttpResponse(
+            b'{"forwarded":true}',
+            status=202,
+            content_type="application/json",
+        )
+        prepared = DiscordPreparedAction.objects.create(
+            incident_id="22222222-2222-2222-2222-222222222222",
+            incident_revision=2,
+            interaction_id="1538274085513996999",
+            action="kick",
+            actor={
+                "discord_id": "789",
+                "display_name": "Moderator",
+                "role_ids": ["42"],
+            },
+            arguments={"player_id": "eos-player", "reason": "Reason"},
+            confirmation_digest="digest",
+            confirmation_ciphertext=b"ciphertext",
+            preview="kick on player",
+            expires_at=timezone.now() + timedelta(minutes=5),
+        )
+
+        response = self.client.post(
+            f"/api/discord/v1/actions/{prepared.id}/execute",
+            data=json.dumps(
+                {
+                    "interaction_id": "1538274085513997999",
+                    "guild_id": "123",
+                    "channel_id": "456",
+                    "actor": {
+                        "discord_id": "789",
+                        "display_name": "Moderator",
+                        "role_ids": ["42"],
+                    },
+                    "confirmation_token": "token",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 202)
+        self.assertJSONEqual(response.content, {"forwarded": True})
+        forward_incident.assert_called_once()
+        reserve_action.assert_not_called()
+
+    @patch("api.multi_servers.requests.request")
+    @patch("api.multi_servers.requests.get")
+    @patch("api.multi_servers.get_server_number", return_value="1")
+    @patch("api.multi_servers.ApiKey")
+    def test_discord_capability_is_forwarded_using_registered_server_number(
+        self, api_key_class, _server_number, get, request_call
+    ):
+        from api.multi_servers import forward_mobile_request_to_server
+
+        api_key_class.return_value = SimpleNamespace(
+            key_prefix="frontend_",
+            get_key=MagicMock(return_value="key-1"),
+            get_all_keys=MagicMock(
+                return_value={
+                    "frontend_1": "key-1",
+                    "frontend_3": "key-3",
+                }
+            ),
+        )
+        request_call.return_value = SimpleNamespace(
+            content=b"{}",
+            status_code=200,
+            headers={"content-type": "application/json"},
+        )
+        request = SimpleNamespace(headers={"AUTHORIZATION": "Bearer discord-cap"})
+
+        response = forward_mobile_request_to_server(
+            request,
+            3,
+            "/api/discord/v1/actions/action-id/execute",
+            data={"interaction_id": "123"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        get.assert_not_called()
+        request_call.assert_called_once_with(
+            "POST",
+            "http://frontend_3/api/discord/v1/actions/action-id/execute",
+            json={"interaction_id": "123", "forwarded": True},
+            params={},
+            timeout=10,
+            headers={"AUTHORIZATION": "Bearer discord-cap"},
+        )
 
     @patch("api.discord_integration._validate_binding")
     @patch("api.discord_integration._authorized_integration")
