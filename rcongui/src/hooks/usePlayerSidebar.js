@@ -1,10 +1,22 @@
-import { PlayerDetailDrawer } from "@/components/PlayerProfileDrawer";
 import { cmd } from "@/utils/fetchUtils";
-import {createContext, useContext, useMemo, useState} from "react";
+import {
+  createContext,
+  lazy,
+  Suspense,
+  useContext,
+  useMemo,
+  useState,
+} from "react";
 import { useGlobalStore } from "@/stores/global-state";
 import dayjs from "dayjs";
 import { useQuery } from "@tanstack/react-query";
 import { playerProfileQueryOptions } from "@/queries/player-profile-query";
+
+const PlayerDetailDrawer = lazy(() =>
+  import("@/components/PlayerProfileDrawer").then((module) => ({
+    default: module.PlayerDetailDrawer,
+  }))
+);
 
 /**
  * @typedef {Object} PlayerVIP
@@ -153,7 +165,7 @@ export const PlayerSidebarProvider = ({ children }) => {
     } else {
       return null;
     }
-    
+
     aPlayer.messages = messages ?? [];
     aPlayer.comments = comments ?? [];
     aPlayer.bans = bans ?? [];
@@ -164,7 +176,11 @@ export const PlayerSidebarProvider = ({ children }) => {
     aPlayer.vip = aPlayer.profile.vips.find(
       (v) => v.server_number === serverStatus?.server_number
     );
-    if (aPlayer.vip && (aPlayer.vip.expiration === null || dayjs().isBefore(aPlayer.vip.expiration))) {
+    if (
+      aPlayer.vip &&
+      (aPlayer.vip.expiration === null ||
+        dayjs().isBefore(aPlayer.vip.expiration))
+    ) {
       aPlayer.is_vip = true;
     }
 
@@ -182,9 +198,19 @@ export const PlayerSidebarProvider = ({ children }) => {
     aPlayer.name = aPlayer.name ?? aPlayer.profile.names[0]?.name;
 
     return aPlayer;
-  }, [open, playerId, onlinePlayers, serverStatus, comments, bans, profile, messages]);
+  }, [
+    open,
+    playerId,
+    onlinePlayers,
+    serverStatus,
+    comments,
+    bans,
+    profile,
+    messages,
+  ]);
 
-  const isLoading = isLoadingComments || isLoadingBans || isLoadingProfile || isLoadingMessages;
+  const isLoading =
+    isLoadingComments || isLoadingBans || isLoadingProfile || isLoadingMessages;
 
   const contextValue = useMemo(
     () => ({
@@ -199,13 +225,26 @@ export const PlayerSidebarProvider = ({ children }) => {
       profileError,
       messagesError,
     }),
-    [open, player, playerId, isLoading, commentsError, bansError, profileError, messagesError]
+    [
+      open,
+      player,
+      playerId,
+      isLoading,
+      commentsError,
+      bansError,
+      profileError,
+      messagesError,
+    ]
   );
 
   return (
     <SidebarContext.Provider value={contextValue}>
       {children}
-      {open && <PlayerDetailDrawer />}
+      {open && (
+        <Suspense fallback={null}>
+          <PlayerDetailDrawer />
+        </Suspense>
+      )}
     </SidebarContext.Provider>
   );
 };
