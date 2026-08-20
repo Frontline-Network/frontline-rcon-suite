@@ -51,6 +51,19 @@ test.describe("connection-health API contract", () => {
       lastSuccessAt: 1000,
       lastAttemptAt: 2000,
     });
+    expect(
+      createConnectionHealth({
+        data: { current_players: 20 },
+        dataUpdatedAt: 1000,
+        errorUpdatedAt: 2000,
+        isError: false,
+        isRefetchError: true,
+      })
+    ).toMatchObject({
+      state: CONNECTION_STATE.STALE,
+      lastSuccessAt: 1000,
+      lastAttemptAt: 2000,
+    });
     expect(createConnectionHealth(undefined, { enabled: false }).state).toBe(
       CONNECTION_STATE.UNKNOWN
     );
