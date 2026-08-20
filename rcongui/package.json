@@ -21,6 +21,7 @@
     "test:e2e:update": "playwright test --update-snapshots",
     "test:e2e:headed": "playwright test --headed",
     "check:bundle": "node scripts/check-initial-bundle-budget.mjs",
+    "check:operator-copy": "node scripts/check-operator-copy.mjs",
     "format:write": "prettier src/ --write",
     "lint": "eslint src/"
   },
