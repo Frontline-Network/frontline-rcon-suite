@@ -1,8 +1,8 @@
 import os
 import shutil
-from urllib.parse import parse_qs, urlsplit
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
+from urllib.parse import parse_qs, urlsplit
 
 import httpx
 import pytest
@@ -22,8 +22,8 @@ from discord_service.app.ai import (
     PlayerNameBatchItemDecision,
     PlayerNameDecision,
 )
-from discord_service.app.config import Settings, get_settings
 from discord_service.app.codex_runtime import _persist_credentials, _runtime_home
+from discord_service.app.config import Settings, get_settings
 from discord_service.app.contracts import (
     IncidentEventEnvelope,
     ModerationAnalysis,
@@ -42,8 +42,8 @@ from discord_service.app.main import (
 from discord_service.app.models import (
     EventReceipt,
     IncidentMessage,
-    Integration,
     InstallationGuildBinding,
+    Integration,
     PreparedActionRelay,
 )
 from discord_service.app.security import derive_capability, digest, encrypt
@@ -194,6 +194,142 @@ def test_discord_options_are_capability_protected_and_scoped_to_paired_guild():
     guild_options.assert_called_once_with("123")
 
 
+def test_diagnostics_check_discord_binding_and_callback_round_trip():
+    capability = _seed()
+    callback_response = MagicMock()
+    callback_response.raise_for_status.return_value = None
+    options = {
+        "guild": {"id": "123", "name": "Frontline"},
+        "channels": [{"id": "456", "name": "admin-reports", "position": 1}],
+        "roles": [],
+    }
+    with (
+        patch(
+            "discord_service.app.main.DiscordClient.guild_options",
+            return_value=options,
+        ),
+        patch(
+            "discord_service.app.main._crcon_post",
+            return_value=callback_response,
+        ) as crcon_post,
+    ):
+        unauthorized = TestClient(app).post(
+            "/v1/diagnostics",
+            json={"installation_id": "11111111-1111-1111-1111-111111111111"},
+        )
+        response = TestClient(app).post(
+            "/v1/diagnostics",
+            headers={"Authorization": f"Bearer {capability}"},
+            json={"installation_id": "11111111-1111-1111-1111-111111111111"},
+        )
+
+    assert unauthorized.status_code == 404
+    assert response.status_code == 200
+    result = response.json()
+    assert result["state"] == "healthy"
+    assert result["discord_binding"]["channel_name"] == "admin-reports"
+    assert result["callback"]["state"] == "online"
+    assert result["callback"]["transport"] == "direct"
+    crcon_post.assert_called_once_with(
+        "https://crcon.example/api/discord/v1/diagnostics/ping",
+        headers={"Authorization": "Bearer actions-test"},
+        json={"installation_id": "11111111-1111-1111-1111-111111111111"},
+        timeout=5,
+    )
+
+
+def test_diagnostics_return_degraded_without_exposing_callback_exception_text():
+    capability = _seed()
+    with (
+        patch(
+            "discord_service.app.main.DiscordClient.guild_options",
+            return_value={
+                "guild": {"id": "123", "name": "Frontline"},
+                "channels": [{"id": "456", "name": "reports"}],
+                "roles": [],
+            },
+        ),
+        patch(
+            "discord_service.app.main._crcon_post",
+            side_effect=httpx.ConnectError("secret upstream detail"),
+        ),
+    ):
+        response = TestClient(app).post(
+            "/v1/diagnostics",
+            headers={"Authorization": f"Bearer {capability}"},
+            json={"installation_id": "11111111-1111-1111-1111-111111111111"},
+        )
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["state"] == "degraded"
+    assert result["callback"]["state"] == "offline"
+    assert result["callback"]["error_code"] == "connection_failed"
+    assert "secret upstream detail" not in str(result)
+
+
+def test_diagnostics_report_a_removed_channel_with_a_stable_error_code():
+    capability = _seed()
+    callback_response = MagicMock()
+    callback_response.raise_for_status.return_value = None
+    with (
+        patch(
+            "discord_service.app.main.DiscordClient.guild_options",
+            return_value={
+                "guild": {"id": "123", "name": "Frontline"},
+                "channels": [{"id": "999", "name": "other-channel"}],
+                "roles": [],
+            },
+        ),
+        patch(
+            "discord_service.app.main._crcon_post",
+            return_value=callback_response,
+        ),
+    ):
+        response = TestClient(app).post(
+            "/v1/diagnostics",
+            headers={"Authorization": f"Bearer {capability}"},
+            json={"installation_id": "11111111-1111-1111-1111-111111111111"},
+        )
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["state"] == "degraded"
+    assert result["discord_binding"] == {
+        "state": "offline",
+        "latency_ms": result["discord_binding"]["latency_ms"],
+        "error_code": "configured_channel_missing",
+    }
+    assert result["callback"]["state"] == "online"
+
+
+def test_diagnostics_report_an_invalid_callback_capability_without_crashing():
+    capability = _seed()
+    with SessionLocal() as session:
+        integration = session.get(Integration, "11111111-1111-1111-1111-111111111111")
+        integration.action_capability_ciphertext = "invalid-ciphertext"
+        session.commit()
+
+    with patch(
+        "discord_service.app.main.DiscordClient.guild_options",
+        return_value={
+            "guild": {"id": "123", "name": "Frontline"},
+            "channels": [{"id": "456", "name": "reports"}],
+            "roles": [],
+        },
+    ):
+        response = TestClient(app).post(
+            "/v1/diagnostics",
+            headers={"Authorization": f"Bearer {capability}"},
+            json={"installation_id": "11111111-1111-1111-1111-111111111111"},
+        )
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["state"] == "degraded"
+    assert result["callback"]["error_code"] == "capability_invalid"
+
+
 def test_pairing_rejects_private_callback_targets():
     settings = Settings(
         secret="test-secret-that-is-at-least-32-characters",
@@ -309,7 +445,9 @@ def test_oauth_callback_uses_verified_discord_guild_for_pairing_options():
     with (
         patch("discord_service.app.main.get_settings", return_value=settings),
         patch("discord_service.app.main.httpx.post", return_value=token_response),
-        patch("discord_service.app.main.DiscordClient.guild_options", return_value=options),
+        patch(
+            "discord_service.app.main.DiscordClient.guild_options", return_value=options
+        ),
     ):
         callback = TestClient(app).get(
             "/oauth/callback", params={"code": "discord-code", "state": state}
@@ -1008,9 +1146,7 @@ def test_offline_report_target_shows_evidence_and_only_safe_actions():
     embed = payload["embeds"][0]
     assert "🔴 **Offline**" in embed["description"]
     assert "👥 **B**" in embed["description"]
-    evidence = next(
-        field for field in embed["fields"] if "Serverlog" in field["name"]
-    )
+    evidence = next(field for field in embed["fields"] if "Serverlog" in field["name"])
     assert "Bube01 → Reporter" in evidence["value"]
     assert "M3 KNIFE · 12 Sekunden vor dem Report" in evidence["value"]
     action_ids = {
@@ -1240,9 +1376,7 @@ def test_player_names_use_nano_with_small_schema():
 def test_player_names_are_classified_in_one_bounded_batch_turn():
     fake = _OpenAI()
     policy = ModerationPolicy()
-    result = ManagedAnalyzer(
-        settings=get_settings(), client=fake
-    ).analyze_player_names(
+    result = ManagedAnalyzer(settings=get_settings(), client=fake).analyze_player_names(
         [
             PlayerNameBatchInput(
                 text=name,
@@ -1335,9 +1469,9 @@ def test_player_name_batch_endpoint_uses_one_model_turn_and_callbacks_each_job()
     assert cached_response.json()["cached"] is True
     analyze.assert_called_once()
     assert post.call_count == 2
-    assert {
-        call.kwargs["json"]["job_id"] for call in post.call_args_list
-    } == {job["job_id"] for job in jobs}
+    assert {call.kwargs["json"]["job_id"] for call in post.call_args_list} == {
+        job["job_id"] for job in jobs
+    }
 
 
 def test_clear_semantic_player_name_violation_reaches_incident_threshold():
@@ -1394,9 +1528,7 @@ def test_codex_status_endpoint_is_capability_protected():
         "state": "connected",
         "models": [{"id": "gpt-test", "name": "GPT Test"}],
     }
-    with patch(
-        "discord_service.app.main.codex_account_status", return_value=expected
-    ):
+    with patch("discord_service.app.main.codex_account_status", return_value=expected):
         response = TestClient(app).get(
             path, headers={"Authorization": f"Bearer {capability}"}
         )

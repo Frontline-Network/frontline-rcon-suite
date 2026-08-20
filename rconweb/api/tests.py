@@ -1,10 +1,12 @@
 import json
+import os
 import sys
 from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from urllib.parse import parse_qs, urlparse
 
+import requests
 from django.contrib.auth.models import Group, User
 from django.test import Client, SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
@@ -1047,12 +1049,15 @@ class MobileContextTests(TestCase):
 
 class DiscordActionTemplateTests(TestCase):
     def _discord_manager(self):
-        user = User.objects.create_superuser(
-            username="discord-manager",
-            email="manager@example.org",
-            password="secret",
-        )
-        self.client.force_login(user)
+        # User saves normally refresh the live moderator cache. These endpoint
+        # tests do not exercise Redis and must stay deterministic without it.
+        with patch("api.auth.set_registered_mods"):
+            user = User.objects.create_superuser(
+                username="discord-manager",
+                email="manager@example.org",
+                password="secret",
+            )
+            self.client.force_login(user)
         return user
 
     def test_ai_provider_config_encrypts_api_key_and_never_serializes_it(self):
@@ -1422,6 +1427,10 @@ class DiscordActionTemplateTests(TestCase):
             timeout=10,
         )
 
+    @patch.dict(
+        os.environ,
+        {"MOBILE_PUBLIC_BASE_URL": "https://crcon.example.org"},
+    )
     @patch("api.discord_integration.requests.post")
     @patch("api.discord_integration._integration")
     def test_disconnected_options_use_authenticated_pairing_discovery(
@@ -1432,6 +1441,7 @@ class DiscordActionTemplateTests(TestCase):
             enabled=False,
             outbound_capability_ciphertext=b"",
             service_url="https://discord.example",
+            installation_id="11111111-1111-1111-1111-111111111111",
         )
         post.return_value.ok = True
         post.return_value.status_code = 200
@@ -1460,7 +1470,8 @@ class DiscordActionTemplateTests(TestCase):
     ):
         self._discord_manager()
         integration.return_value = SimpleNamespace(
-            service_url="https://discord.example"
+            service_url="https://discord.example",
+            installation_id="11111111-1111-1111-1111-111111111111",
         )
         post.return_value.ok = False
         post.return_value.status_code = 400
@@ -1500,6 +1511,224 @@ class DiscordActionTemplateTests(TestCase):
         self.assertEqual(valid.status_code, 200)
         self.assertEqual(invalid.status_code, 404)
 
+    @patch.dict(
+        os.environ,
+        {"DISCORD_CALLBACK_BASE_URL": "https://callback.example.org"},
+    )
+    @patch("api.discord_integration._delivery_summary")
+    def test_operational_status_is_content_free_and_does_not_probe_network(
+        self, delivery_summary
+    ):
+        from api.models import DiscordReportIntegration
+
+        self._discord_manager()
+        checked_at = timezone.now()
+        DiscordReportIntegration.objects.create(
+            pk=1,
+            enabled=True,
+            service_url="https://discord.example",
+            guild_id="123",
+            channel_id="456",
+            inbound_capability_digest="digest",
+            outbound_capability_ciphertext=b"ciphertext",
+            last_test_at=checked_at,
+            last_test_success=True,
+        )
+        delivery_summary.return_value = {
+            "state": "delivered",
+            "last_delivered_at": checked_at,
+            "last_attempt_at": checked_at,
+            "pending_count": 0,
+            "error_code": None,
+        }
+
+        with (
+            patch("api.discord_integration.requests.get") as get,
+            patch("api.discord_integration.requests.post") as post,
+        ):
+            response = self.client.get("/api/discord/v1/status")
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()["result"]
+        self.assertEqual(result["setup_state"], "active")
+        self.assertEqual(result["callback_mode"], "broker")
+        self.assertEqual(result["delivery"]["state"], "delivered")
+        self.assertEqual(result["last_test"]["state"], "succeeded")
+        self.assertNotIn("reason", str(result))
+        get.assert_not_called()
+        post.assert_not_called()
+
+    def test_operational_status_requires_discord_manager_permission(self):
+        with patch("api.auth.set_registered_mods"):
+            user = User.objects.create_user(
+                username="ordinary-user",
+                password="secret",
+            )
+            self.client.force_login(user)
+
+        response = self.client.get("/api/discord/v1/status")
+
+        self.assertEqual(response.status_code, 403)
+
+    @patch("api.discord_integration.decrypt_capability", return_value="events-test")
+    @patch("api.discord_integration.requests.post")
+    def test_test_message_persists_success_without_secret_data(self, post, _decrypt):
+        from api.models import DiscordReportIntegration
+
+        self._discord_manager()
+        integration = DiscordReportIntegration.objects.create(
+            pk=1,
+            enabled=True,
+            service_url="https://discord.example",
+            guild_id="123",
+            channel_id="456",
+            outbound_capability_ciphertext=b"ciphertext",
+        )
+        post.return_value.raise_for_status.return_value = None
+
+        response = self.client.post("/api/discord/v1/test-message")
+
+        self.assertEqual(response.status_code, 200)
+        integration.refresh_from_db()
+        self.assertTrue(integration.last_test_success)
+        self.assertIsNotNone(integration.last_test_at)
+        self.assertEqual(integration.last_test_error, "")
+
+    @patch("api.discord_integration.decrypt_capability", return_value="events-test")
+    @patch(
+        "api.discord_integration.requests.post",
+        side_effect=requests.ConnectionError("secret upstream detail"),
+    )
+    def test_test_message_persists_safe_failure_code(self, _post, _decrypt):
+        from api.models import DiscordReportIntegration
+
+        self._discord_manager()
+        integration = DiscordReportIntegration.objects.create(
+            pk=1,
+            enabled=True,
+            service_url="https://discord.example",
+            guild_id="123",
+            channel_id="456",
+            outbound_capability_ciphertext=b"ciphertext",
+        )
+
+        response = self.client.post("/api/discord/v1/test-message")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertNotIn("secret upstream detail", str(response.json()))
+        integration.refresh_from_db()
+        self.assertFalse(integration.last_test_success)
+        self.assertEqual(integration.last_test_error, "connectionerror")
+
+    @patch("api.discord_integration.decrypt_capability", return_value="events-test")
+    @patch("api.discord_integration.requests.post")
+    def test_diagnostics_are_normalized_and_persisted(self, post, _decrypt):
+        from api.models import DiscordReportIntegration
+
+        self._discord_manager()
+        integration = DiscordReportIntegration.objects.create(
+            pk=1,
+            enabled=True,
+            service_url="https://discord.example",
+            guild_id="123",
+            channel_id="456",
+            outbound_capability_ciphertext=b"ciphertext",
+        )
+        post.return_value.raise_for_status.return_value = None
+        post.return_value.json.return_value = {
+            "state": "healthy",
+            "checked_at": timezone.now().isoformat(),
+            "service": {"state": "online"},
+            "discord_binding": {
+                "state": "online",
+                "latency_ms": 12,
+                "guild_name": "Frontline",
+                "channel_name": "reports",
+                "ignored": "not persisted",
+            },
+            "callback": {
+                "state": "online",
+                "transport": "broker",
+                "latency_ms": 18,
+            },
+        }
+
+        response = self.client.post("/api/discord/v1/diagnostics")
+
+        self.assertEqual(response.status_code, 200)
+        integration.refresh_from_db()
+        self.assertEqual(integration.last_diagnostic_result["state"], "healthy")
+        self.assertNotIn(
+            "ignored", integration.last_diagnostic_result["discord_binding"]
+        )
+        self.assertIsNotNone(integration.last_diagnostic_at)
+
+    @patch("api.discord_integration.decrypt_capability", return_value="events-test")
+    @patch("api.discord_integration.requests.post")
+    def test_diagnostics_reject_invalid_remote_shapes_and_persist_safe_state(
+        self, post, _decrypt
+    ):
+        from api.models import DiscordReportIntegration
+
+        self._discord_manager()
+        integration = DiscordReportIntegration.objects.create(
+            pk=1,
+            enabled=True,
+            service_url="https://discord.example",
+            guild_id="123",
+            channel_id="456",
+            outbound_capability_ciphertext=b"ciphertext",
+        )
+        post.return_value.raise_for_status.return_value = None
+        post.return_value.json.return_value = {
+            "state": "healthy",
+            "checked_at": "not-a-timestamp",
+            "service": {"state": "online"},
+            "discord_binding": {"state": "online"},
+            "callback": {"state": "online"},
+        }
+
+        response = self.client.post("/api/discord/v1/diagnostics")
+
+        self.assertEqual(response.status_code, 503)
+        integration.refresh_from_db()
+        self.assertEqual(integration.last_diagnostic_result["state"], "degraded")
+        self.assertEqual(
+            integration.last_diagnostic_result["service"]["error_code"],
+            "valueerror",
+        )
+        self.assertNotIn("not-a-timestamp", str(response.json()))
+
+    def test_diagnostic_callback_ping_requires_current_inbound_capability(self):
+        from api.discord_capabilities import capability_digest
+        from api.models import DiscordReportIntegration
+
+        capability = "actions-test-capability-that-is-long-enough"
+        integration = DiscordReportIntegration.objects.create(
+            pk=1,
+            enabled=True,
+            inbound_capability_digest=capability_digest(capability),
+        )
+        path = "/api/discord/v1/diagnostics/ping"
+        payload = {"installation_id": str(integration.installation_id)}
+
+        unauthorized = self.client.post(
+            path, data=json.dumps(payload), content_type="application/json"
+        )
+        authorized = self.client.post(
+            path,
+            data=json.dumps(payload),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {capability}",
+        )
+
+        self.assertEqual(unauthorized.status_code, 404)
+        self.assertEqual(authorized.status_code, 200)
+        self.assertEqual(
+            authorized.json()["result"]["installation_id"],
+            str(integration.installation_id),
+        )
+
 
 class DiscordOutboxWorkerModeTests(TestCase):
     def test_worker_skips_unrelated_django_system_checks(self):
@@ -1511,12 +1740,8 @@ class DiscordOutboxWorkerModeTests(TestCase):
     def test_moderation_worker_uses_longer_idle_backoff(self):
         from api.management.commands.discord_report_worker import Command
 
-        self.assertEqual(
-            Command._poll_intervals(moderation_only=False), (0.25, 1.0)
-        )
-        self.assertEqual(
-            Command._poll_intervals(moderation_only=True), (0.25, 10.0)
-        )
+        self.assertEqual(Command._poll_intervals(moderation_only=False), (0.25, 1.0))
+        self.assertEqual(Command._poll_intervals(moderation_only=True), (0.25, 10.0))
 
     def test_http_delivery_commits_database_transaction_first(self):
         from api.management.commands.discord_report_worker import Command
@@ -1647,21 +1872,15 @@ class FrontlineBackgroundWorkerTests(TestCase):
         self.assertIsInstance(specs[0][1], MobileCommand)
         self.assertIsInstance(specs[1][1], DiscordCommand)
         self.assertIsInstance(specs[2][1], DiscordCommand)
-        self.assertEqual(
-            specs[1][2], {"events_only": True, "moderation_only": False}
-        )
-        self.assertEqual(
-            specs[2][2], {"events_only": False, "moderation_only": True}
-        )
+        self.assertEqual(specs[1][2], {"events_only": True, "moderation_only": False})
+        self.assertEqual(specs[2][2], {"events_only": False, "moderation_only": True})
 
 
 class HistoricalScoreboardCacheTests(TestCase):
     @staticmethod
     def _session_with_end(end):
         session = MagicMock()
-        session.query.return_value.filter.return_value.one_or_none.return_value = (
-            end,
-        )
+        session.query.return_value.filter.return_value.one_or_none.return_value = (end,)
         context = MagicMock()
         context.__enter__.return_value = session
         context.__exit__.return_value = False

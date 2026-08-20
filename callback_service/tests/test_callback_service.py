@@ -2,16 +2,18 @@ import os
 from unittest.mock import patch
 
 os.environ.setdefault("CALLBACK_SERVICE_DATABASE_URL", "sqlite:///:memory:")
-os.environ.setdefault("CALLBACK_SERVICE_ADMIN_TOKEN", "admin-test-capability-that-is-long-enough")
-os.environ.setdefault("CALLBACK_SERVICE_DISCORD_TOKEN", "discord-test-capability-that-is-long-enough")
+os.environ.setdefault(
+    "CALLBACK_SERVICE_ADMIN_TOKEN", "admin-test-capability-that-is-long-enough"
+)
+os.environ.setdefault(
+    "CALLBACK_SERVICE_DISCORD_TOKEN", "discord-test-capability-that-is-long-enough"
+)
 os.environ.setdefault("CALLBACK_SERVICE_ALLOW_PRIVATE_TARGETS", "true")
 
-from fastapi.testclient import TestClient
-
 from callback_service.app.db import Base, SessionLocal, engine
-from callback_service.app.main import app
+from callback_service.app.main import _PATH_RE, app
 from callback_service.app.models import InstallationRoute
-
+from fastapi.testclient import TestClient
 
 INSTALLATION = "11111111-1111-4111-8111-111111111111"
 
@@ -88,3 +90,8 @@ def test_invalid_uuid_never_reaches_storage():
         },
     )
     assert response.status_code == 422
+
+
+def test_diagnostic_callback_path_is_explicitly_allowlisted():
+    assert _PATH_RE.fullmatch("/api/discord/v1/diagnostics/ping")
+    assert not _PATH_RE.fullmatch("/api/discord/v1/diagnostics/anything-else")
