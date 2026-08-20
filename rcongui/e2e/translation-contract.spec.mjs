@@ -48,6 +48,21 @@ const criticalTranslationKeys = [
   "actions.disband.openAudit",
   "settings.discordReports.title",
   "settings.discordReports.subtitle",
+  "settingEffect.serverValue",
+  "settingEffect.draftValue",
+  "settingEffect.recommendedValue",
+  "settingEffect.unverified",
+  "settingEffect.commandSent",
+  "settingEffect.notDocumented",
+  "settingEffect.permissionMissing",
+  "settingEffect.discardDraft",
+  "settingEffect.conflicts.autoSettings",
+  "settingEffect.conflicts.vipAutomation",
+  "settingEffect.conflicts.autobalancer",
+  "settingEffect.conflicts.autoVotekick",
+  "serverSettings.loading",
+  "serverSettings.unavailable",
+  "serverSettings.lastRead",
 ];
 
 test("critical QA and state labels exist in German and English", () => {
