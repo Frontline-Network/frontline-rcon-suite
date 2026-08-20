@@ -44,6 +44,49 @@ export const useGlobalStore = create((set) => ({
 
 const staleTime = 15 * 1000;
 const refetchInterval = 30 * 1000;
+const demoHealthLastAttemptAt = Date.now();
+const demoHealthLastSuccessAt = demoHealthLastAttemptAt - 30_000;
+
+const applyDemoHealth = (health, target) => {
+  if (!isFakeMode()) return health;
+
+  const mode = getDemoConnectionMode();
+  const lastSuccessAt = health.lastSuccessAt || demoHealthLastSuccessAt;
+  const lastAttemptAt = health.lastAttemptAt || demoHealthLastAttemptAt;
+
+  if (target === "crcon") {
+    if (mode === "crcon_offline") {
+      return { ...health, state: CONNECTION_STATE.OFFLINE };
+    }
+    if (mode === "crcon_stale") {
+      return {
+        ...health,
+        state: CONNECTION_STATE.STALE,
+        lastSuccessAt,
+        lastAttemptAt,
+      };
+    }
+  }
+
+  if (target === "gameServer") {
+    if (["crcon_offline", "crcon_stale"].includes(mode)) {
+      return { ...health, state: CONNECTION_STATE.UNKNOWN };
+    }
+    if (mode === "gameserver_offline") {
+      return { ...health, state: CONNECTION_STATE.OFFLINE };
+    }
+    if (mode === "gameserver_stale") {
+      return {
+        ...health,
+        state: CONNECTION_STATE.STALE,
+        lastSuccessAt,
+        lastAttemptAt,
+      };
+    }
+  }
+
+  return health;
+};
 
 // Define your global queries with onSuccess callbacks
 const globalQueries = [
@@ -124,7 +167,10 @@ export const GlobalState = () => {
     refetchInterval,
     retry: isFakeMode() ? 0 : 1,
   });
-  const crconHealth = createConnectionHealth(crconQuery);
+  const crconHealth = applyDemoHealth(
+    createConnectionHealth(crconQuery),
+    "crcon"
+  );
   const canQueryGameServer = crconHealth.state === CONNECTION_STATE.ONLINE;
 
   const queryResults = useQueries({
@@ -157,9 +203,12 @@ export const GlobalState = () => {
         : [],
       connectionHealth: {
         crcon: crconHealth,
-        gameServer: createConnectionHealth(statusQuery, {
-          enabled: canQueryGameServer,
-        }),
+        gameServer: applyDemoHealth(
+          createConnectionHealth(statusQuery, {
+            enabled: canQueryGameServer,
+          }),
+          "gameServer"
+        ),
         gameState: createConnectionHealth(gameStateQuery, {
           enabled: canQueryGameServer,
         }),

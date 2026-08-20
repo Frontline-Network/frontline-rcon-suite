@@ -36,7 +36,14 @@ const ConnectionStatus = () => {
           enterNextDelay={500}
           title={t(`sidebar.gameServerState.${gameServerState}`)}
         >
-          <Stack direction="row" alignItems="center" gap={1} role="status">
+          <Stack
+            direction="row"
+            alignItems="center"
+            gap={1}
+            role="status"
+            data-testid="gameserver-connection-status"
+            data-connection-state={gameServerState}
+          >
             <FontAwesomeIcon
               icon={faServer}
               color={
@@ -64,7 +71,14 @@ const ConnectionStatus = () => {
           enterNextDelay={500}
           title={t(`sidebar.crconState.${crconState}`)}
         >
-          <Stack direction="row" alignItems="center" gap={1} role="status">
+          <Stack
+            direction="row"
+            alignItems="center"
+            gap={1}
+            role="status"
+            data-testid="crcon-connection-status"
+            data-connection-state={crconState}
+          >
             <FontAwesomeIcon
               icon={faDesktop}
               color={
