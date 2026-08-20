@@ -1635,6 +1635,57 @@ class DiscordActionTemplateTests(TestCase):
         forward_incident.assert_called_once()
         mutate_incident.assert_not_called()
 
+    @patch("api.discord_integration.mutate_incident")
+    @patch("api.discord_integration.get_incident")
+    @patch("api.discord_integration._validate_binding")
+    @patch("api.discord_integration._authorized_integration")
+    def test_forwarded_transition_accepts_internal_transport_marker(
+        self,
+        authorized,
+        validate_binding,
+        get_incident,
+        mutate_incident,
+    ):
+        authorized.return_value = (SimpleNamespace(reporter_templates={}), None)
+        get_incident.return_value = {
+            "id": "22222222-2222-2222-2222-222222222222",
+            "server_number": 3,
+        }
+        mutate_incident.return_value = {
+            "id": "22222222-2222-2222-2222-222222222222",
+            "status": "claimed",
+            "revision": 2,
+            "reporter_id": None,
+        }
+
+        response = self.client.post(
+            "/api/discord/v1/incidents/transition",
+            data=json.dumps(
+                {
+                    "interaction_id": "1538274085513996998",
+                    "installation_id": "11111111-1111-1111-1111-111111111111",
+                    "guild_id": "123",
+                    "channel_id": "456",
+                    "incident_id": "22222222-2222-2222-2222-222222222222",
+                    "incident_revision": 1,
+                    "actor": {
+                        "discord_id": "789",
+                        "display_name": "Moderator",
+                        "role_ids": ["42"],
+                    },
+                    "operation": "claim",
+                    "payload": {},
+                    "forwarded": True,
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["result"]["status"], "claimed")
+        validate_binding.assert_called_once()
+        mutate_incident.assert_called_once()
+
     @patch("api.discord_integration.reserve_incident_action")
     @patch("api.discord_integration._forward_discord_incident_request")
     @patch("api.discord_integration.get_incident")

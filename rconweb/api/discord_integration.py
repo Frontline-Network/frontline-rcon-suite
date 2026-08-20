@@ -1404,7 +1404,12 @@ def transition_incident(request):
         return denied
     try:
         data = _json_body(request)
-        interaction = DiscordInteractionRequest.model_validate(data)
+        # ``forwarded`` is an internal multi-server transport marker, not part
+        # of the public Discord interaction contract. Keep it available for
+        # loop prevention while validating only the signed interaction data.
+        interaction_data = dict(data)
+        interaction_data.pop("forwarded", None)
+        interaction = DiscordInteractionRequest.model_validate(interaction_data)
         if interaction.operation not in {"claim", "unclaim", "resolve", "dismiss"}:
             raise ValueError("Unsupported Discord incident transition")
         _validate_binding(
