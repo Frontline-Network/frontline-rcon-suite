@@ -1612,13 +1612,13 @@ class DiscordActionTemplateTests(TestCase):
 
     @patch("api.discord_integration.decrypt_capability", return_value="events-test")
     @patch("api.discord_integration.requests.post")
-    def test_test_message_persists_success_without_secret_data(self, post, _decrypt):
+    def test_test_message_works_while_connected_in_paused_mode(self, post, _decrypt):
         from api.models import DiscordReportIntegration
 
         self._discord_manager()
         integration = DiscordReportIntegration.objects.create(
             pk=1,
-            enabled=True,
+            enabled=False,
             service_url="https://discord.example",
             guild_id="123",
             channel_id="456",
@@ -1662,13 +1662,13 @@ class DiscordActionTemplateTests(TestCase):
 
     @patch("api.discord_integration.decrypt_capability", return_value="events-test")
     @patch("api.discord_integration.requests.post")
-    def test_diagnostics_are_normalized_and_persisted(self, post, _decrypt):
+    def test_diagnostics_work_while_connected_in_paused_mode(self, post, _decrypt):
         from api.models import DiscordReportIntegration
 
         self._discord_manager()
         integration = DiscordReportIntegration.objects.create(
             pk=1,
-            enabled=True,
+            enabled=False,
             service_url="https://discord.example",
             guild_id="123",
             channel_id="456",

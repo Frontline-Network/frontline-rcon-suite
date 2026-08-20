@@ -28,6 +28,8 @@ export function makeServer({ environment = "development" } = {}) {
   const disbandAttempts = new Map();
   const ok = (result) => ({ result });
   const protectedRequestLog = [];
+  let demoDiscordLastTest = null;
+  let demoDiscordEnabled = true;
   const trackProtectedRequest = (path, handler) => (...args) => {
     protectedRequestLog.push(path);
     return handler(...args);
@@ -232,43 +234,146 @@ export function makeServer({ environment = "development" } = {}) {
         },
       }));
 
-      this.get("/discord/v1/integration", () => ok({
-        enabled: false,
-        connected: false,
-        guild_id: "",
-        guild_name: "",
-        channel_id: "",
-        channel_name: "",
-        moderator_role_ids: [],
-        allowed_actions: ["message", "punish", "kick", "temp_ban", "perma_ban"],
-        language: "de",
-        has_api_key: false,
-        api_model_options: [],
-        ai_config: {
-          reports_enabled: false,
-          chat_enabled: false,
-          player_names_enabled: false,
-          shadow_mode: true,
-        },
-        policy: {
-          custom_terms: [],
-          exceptions: [],
-          custom_regexes: [],
-          hard_rule_ids: [],
-        },
-        reporter_templates: {},
-      }));
-      this.get("/discord/v1/options", () => ok({
-        guild: null,
-        channels: [],
-        roles: [],
-      }));
-      this.get("/discord/v1/ai/status", () => ok({
-        state: "disabled",
-        available: false,
-        connected: false,
-        models: [],
-      }));
+      const isDiscordDemoConnected = () =>
+        typeof window !== "undefined" &&
+        new URLSearchParams(window.location.search).get("demo_discord") ===
+          "connected";
+      const demoDiscordIntegration = () => {
+        const connected = isDiscordDemoConnected();
+        return {
+          installation_id: "00000000-0000-4000-8000-000000000002",
+          enabled: connected && demoDiscordEnabled,
+          connected,
+          guild_id: connected ? "123456789012345678" : "",
+          guild_name: connected ? "Frontline Network" : "",
+          channel_id: connected ? "234567890123456789" : "",
+          channel_name: connected ? "admin-reports" : "",
+          moderator_role_ids: connected ? ["345678901234567890"] : [],
+          allowed_actions: [
+            "message",
+            "punish",
+            "kick",
+            "temp_ban",
+            "perma_ban",
+          ],
+          language: "de",
+          has_api_key: false,
+          api_model_options: [
+            { id: "gpt-5.6-luna", name: "GPT-5.6 Luna" },
+            { id: "gpt-5.4-nano", name: "GPT-5.4 Nano" },
+          ],
+          ai_config: {
+            chat_enabled: false,
+            names_enabled: false,
+            shadow_mode: true,
+            quality_opt_in: false,
+            provider: "api_key",
+          },
+          policy: {
+            custom_terms: [],
+            exceptions: [],
+            custom_regexes: [],
+            hard_rule_ids: [],
+          },
+          reporter_templates: {},
+        };
+      };
+      this.get("/discord/v1/integration", () => ok(demoDiscordIntegration()));
+      this.put("/discord/v1/integration", (schema, request) => {
+        const payload = JSON.parse(request.requestBody || "{}");
+        demoDiscordEnabled = Boolean(payload.enabled);
+        return ok({
+          ...demoDiscordIntegration(),
+          ...payload,
+          connected: isDiscordDemoConnected(),
+        });
+      });
+      this.del("/discord/v1/integration", () => {
+        demoDiscordEnabled = false;
+        return ok({
+          ...demoDiscordIntegration(),
+          enabled: false,
+          connected: false,
+        });
+      });
+      this.get("/discord/v1/options", () =>
+        ok({
+          guild: isDiscordDemoConnected()
+            ? { id: "123456789012345678", name: "Frontline Network" }
+            : null,
+          channels: isDiscordDemoConnected()
+            ? [
+                { id: "234567890123456789", name: "admin-reports" },
+                { id: "234567890123456790", name: "moderation" },
+              ]
+            : [],
+          roles: isDiscordDemoConnected()
+            ? [
+                { id: "345678901234567890", name: "Moderator" },
+                { id: "345678901234567891", name: "Discord Admin" },
+              ]
+            : [],
+        })
+      );
+      this.get("/discord/v1/status", () =>
+        ok({
+          setup_state: demoDiscordEnabled ? "active" : "paused",
+          enabled: demoDiscordEnabled,
+          connected: isDiscordDemoConnected(),
+          service_configured: true,
+          callback_mode: "broker",
+          delivery: {
+            state: "delivered",
+            last_delivered_at: new Date(Date.now() - 120000).toISOString(),
+            last_attempt_at: new Date(Date.now() - 120000).toISOString(),
+            pending_count: 0,
+            error_code: null,
+          },
+          last_test: demoDiscordLastTest || {
+            state: "unknown",
+            checked_at: null,
+            error_code: null,
+          },
+          last_diagnostic: {
+            checked_at: new Date().toISOString(),
+            result: isDiscordDemoConnected()
+              ? {
+                  state: "healthy",
+                  checked_at: new Date().toISOString(),
+                  service: { state: "online", latency_ms: 18 },
+                  discord_binding: {
+                    state: "online",
+                    guild_name: "Frontline Network",
+                    channel_name: "admin-reports",
+                    latency_ms: 24,
+                  },
+                  callback: {
+                    state: "online",
+                    transport: "broker",
+                    latency_ms: 31,
+                  },
+                }
+              : null,
+          },
+        })
+      );
+      this.post("/discord/v1/diagnostics", () => ok({ state: "healthy" }));
+      this.post("/discord/v1/test-message", () => {
+        demoDiscordLastTest = {
+          state: "succeeded",
+          checked_at: new Date().toISOString(),
+          error_code: null,
+        };
+        return ok({ sent: true });
+      });
+      this.get("/discord/v1/ai/status", () =>
+        ok({
+          state: "disabled",
+          available: false,
+          connected: false,
+          models: [],
+        })
+      );
 
       this.get("/get_server_settings", () => {
         const unavailable =

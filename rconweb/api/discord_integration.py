@@ -869,8 +869,8 @@ def run_integration_diagnostics(request):
     if denied := _require_manager(request, command):
         return denied
     integration = _integration()
-    if not integration.enabled or not integration.outbound_capability_ciphertext:
-        return _error(command, "Discord integration is not active", 409)
+    if not integration.outbound_capability_ciphertext:
+        return _error(command, "Discord integration is not connected", 409)
 
     checked_at = timezone.now()
     try:
@@ -1767,7 +1767,7 @@ def test_message(request):
     if denied := _require_manager(request, command):
         return denied
     integration = _integration()
-    if not integration.enabled or not integration.outbound_capability_ciphertext:
+    if not integration.outbound_capability_ciphertext:
         return _error(command, "Discord integration is not connected", 409)
     checked_at = timezone.now()
     try:
