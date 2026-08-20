@@ -16,7 +16,11 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import { useTranslation } from "react-i18next";
-import { demoServerSettings, isFakeMode } from "@/mirage/demo-data";
+import {
+  demoServerSettings,
+  isFakeMode,
+  shouldFailDemoServerSettings,
+} from "@/mirage/demo-data";
 
 const ServerSettingsCard = () => {
   const { t } = useTranslation();
@@ -29,6 +33,9 @@ const ServerSettingsCard = () => {
     queryKey: ["settings", "server"],
     retry: false,
     queryFn: async () => {
+      if (isFakeMode() && shouldFailDemoServerSettings()) {
+        throw new Error("Demo server settings unavailable");
+      }
       const result = isFakeMode()
         ? demoServerSettings
         : await cmd.GET_SERVER_SETTINGS();

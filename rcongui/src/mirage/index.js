@@ -313,6 +313,14 @@ export function makeServer({ environment = "development" } = {}) {
             });
       });
       this.get("/get_player_messages", () => ok([]));
+      this.get("/get_message_templates", () => ok([
+        {
+          id: 1,
+          title: "Regelhinweis",
+          category: "MESSAGE",
+          message: "Bitte beachte die Serverregeln.",
+        },
+      ]));
       this.post("/post_player_comment", (schema, request) => {
         const payload = JSON.parse(request.requestBody || "{}");
         if (!payload.player_id || !payload.comment?.trim()) {
