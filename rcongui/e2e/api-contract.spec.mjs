@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { getGameLabel, normalizeGame } from "../src/utils/game-context.js";
 import {
   CONNECTION_STATE,
+  createAggregateConnectionHealth,
   createConnectionHealth,
 } from "../src/utils/connectionHealth.js";
 
@@ -67,5 +68,39 @@ test.describe("connection-health API contract", () => {
     expect(createConnectionHealth(undefined, { enabled: false }).state).toBe(
       CONNECTION_STATE.UNKNOWN
     );
+    expect(createConnectionHealth(undefined, { disabled: true }).state).toBe(
+      CONNECTION_STATE.DISABLED
+    );
+  });
+
+  test("summarizes independently refreshed sources as partially available", () => {
+    expect(
+      createAggregateConnectionHealth(
+        {
+          state: CONNECTION_STATE.ONLINE,
+          lastSuccessAt: 2000,
+          lastAttemptAt: 2000,
+          isRefreshing: false,
+        },
+        {
+          state: CONNECTION_STATE.STALE,
+          lastSuccessAt: 1000,
+          lastAttemptAt: 3000,
+          isRefreshing: true,
+        }
+      )
+    ).toEqual({
+      state: CONNECTION_STATE.PARTIAL,
+      lastSuccessAt: 2000,
+      lastAttemptAt: 3000,
+      isRefreshing: true,
+    });
+
+    expect(
+      createAggregateConnectionHealth(
+        { state: CONNECTION_STATE.DISABLED },
+        { state: CONNECTION_STATE.DISABLED }
+      ).state
+    ).toBe(CONNECTION_STATE.DISABLED);
   });
 });

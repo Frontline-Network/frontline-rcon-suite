@@ -50,6 +50,31 @@ test.describe("connection state contract", () => {
     ).toBeVisible();
   });
 
+  test("marks mixed live and cached sources as partial and freezes stale time", async ({
+    page,
+  }) => {
+    await openDemoPage(page, "/", {
+      query: { demo_connection: "game_state_stale" },
+    });
+
+    const status = page.getByTestId("global-match-status");
+    await expect(status).toHaveAttribute("data-connection-state", "partial");
+    await expect(status.getByText("86/100", { exact: true })).toBeVisible();
+    await expect(
+      status.getByText("Foy · Warfare · Nacht · Daten veraltet", {
+        exact: true,
+      })
+    ).toBeVisible();
+
+    const staleTime = status.getByText("00:57:07 · Daten veraltet", {
+      exact: true,
+    });
+    await expect(staleTime).toBeVisible();
+    await page.waitForTimeout(1_200);
+    await expect(staleTime).toHaveText("00:57:07 · Daten veraltet");
+    await expect(page).toHaveTitle(/Teilweise verfügbar/);
+  });
+
   test("does not replace missing live data with believable example values", async ({
     page,
   }) => {
