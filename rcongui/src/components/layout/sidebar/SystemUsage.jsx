@@ -23,7 +23,10 @@ const SystemUsage = () => {
     queryFn: isFakeMode()
       ? () => Promise.resolve(demoSystemUsage)
       : cmd.GET_SYSTEM_USAGE,
-    refetchInterval: 15 * 1000,
+    staleTime: 10 * 1000,
+    refetchInterval: (query) =>
+      Math.max(10, Number(query.state.data?.poll_after_seconds) || 15) * 1000,
+    refetchIntervalInBackground: false,
   });
 
   const metrics = system
@@ -32,19 +35,31 @@ const SystemUsage = () => {
           key: "CPU",
           icon: faMicrochip,
           value: system.cpu_usage?.percent,
-          tooltip: `CPU: ${system.cpu_usage?.percent ?? 0}%`,
+          available: system.cpu_usage?.available !== false,
+          tooltip:
+            system.cpu_usage?.percent == null
+              ? t("common.unknown")
+              : `CPU: ${system.cpu_usage.percent}%`,
         },
         {
           key: "RAM",
           icon: faMemory,
           value: system.ram_usage?.percent,
-          tooltip: `RAM: ${system.ram_usage?.percent ?? 0}%`,
+          available: system.ram_usage?.available !== false,
+          tooltip:
+            system.ram_usage?.percent == null
+              ? t("common.unknown")
+              : `RAM: ${system.ram_usage.percent}%`,
         },
         {
           key: "SSD",
           icon: faHardDrive,
           value: system.disk_usage?.percent,
-          tooltip: `SSD: ${system.disk_usage?.percent ?? 0}%`,
+          available: system.disk_usage?.available !== false,
+          tooltip:
+            system.disk_usage?.percent == null
+              ? t("common.unknown")
+              : `SSD: ${system.disk_usage.percent}%`,
         },
       ]
     : [];
@@ -60,13 +75,21 @@ const SystemUsage = () => {
       </Typography>
       <Stack spacing={0.8}>
         {(isLoading
-          ? ["CPU", "RAM", "SSD"].map((key) => ({ key, value: 0 }))
+          ? ["CPU", "RAM", "SSD"].map((key) => ({
+              key,
+              value: null,
+              available: false,
+            }))
           : metrics
         ).map((metric) => {
-          const roundedValue = Math.round(metric.value || 0);
+          const available =
+            metric.available !== false && Number.isFinite(metric.value);
+          const roundedValue = available ? Math.round(metric.value) : null;
           const valueText = isLoading
             ? t("common.loading")
-            : `${roundedValue}%`;
+            : available
+            ? `${roundedValue}%`
+            : t("common.unknown");
 
           return (
             <Tooltip
@@ -79,7 +102,7 @@ const SystemUsage = () => {
                   {metric.icon && (
                     <FontAwesomeIcon
                       icon={metric.icon}
-                      color={byUsage(metric.value || 0)}
+                      color={byUsage(available ? metric.value : null)}
                     />
                   )}
                   <Typography variant="caption" sx={{ width: 28 }}>
@@ -89,7 +112,7 @@ const SystemUsage = () => {
                     aria-label={metric.key}
                     aria-valuetext={valueText}
                     variant="determinate"
-                    value={metric.value || 0}
+                    value={available ? metric.value : 0}
                     sx={{
                       flexGrow: 1,
                       height: 4,
@@ -101,7 +124,7 @@ const SystemUsage = () => {
                     variant="caption"
                     sx={{ width: 32, textAlign: "right" }}
                   >
-                    {roundedValue}%
+                    {available ? `${roundedValue}%` : "—"}
                   </Typography>
                 </Stack>
               </Box>

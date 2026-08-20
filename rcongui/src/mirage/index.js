@@ -19,6 +19,7 @@ import {
   getDemoServerList,
   getDemoServerStatus,
   getDemoRole,
+  demoSystemUsage,
 } from "./demo-data";
 
 export function makeServer({ environment = "development" } = {}) {
@@ -176,11 +177,7 @@ export function makeServer({ environment = "development" } = {}) {
       }));
       this.get("/get_ingame_mods", () => ok([]));
       this.get("/get_online_mods", () => ok([]));
-      this.get("/get_system_usage", () => ok({
-        cpu_usage: { percent: 18 },
-        ram_usage: { percent: 46 },
-        disk_usage: { percent: 62 },
-      }));
+      this.get("/get_system_usage", () => ok({ ...demoSystemUsage }));
       this.get("/get_version", () => ok("11.2.0"));
 
       this.get("/mobile/v1/devices", () => ok([]));

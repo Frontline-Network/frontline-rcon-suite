@@ -222,9 +222,49 @@ export const getDemoServerStatus = () => ({
 });
 
 export const demoSystemUsage = {
-  cpu_usage: { percent: 18 },
-  ram_usage: { percent: 46 },
-  disk_usage: { percent: 62 },
+  schema_version: 2,
+  sampled_at: new Date(now).toISOString(),
+  generated_at: new Date(now).toISOString(),
+  data_age_seconds: 0,
+  cache_hit: false,
+  poll_after_seconds: 15,
+  status: "ok",
+  warnings: [],
+  cpu_usage: {
+    available: true,
+    percent: 18,
+    used: 0.72,
+    total: 4,
+    unit: "cores",
+    source: "cgroup_v2",
+    severity: "ok",
+  },
+  ram_usage: {
+    available: true,
+    percent: 46,
+    used: 3.68,
+    total: 8,
+    unit: "GiB",
+    source: "cgroup_v2",
+    severity: "ok",
+  },
+  disk_usage: {
+    available: true,
+    percent: 62,
+    used: 62,
+    total: 100,
+    unit: "GiB",
+    source: "filesystem",
+    severity: "ok",
+  },
+  history: [],
+  range: {
+    from: new Date(now).toISOString(),
+    to: new Date(now).toISOString(),
+    seconds: 0,
+    sample_interval_seconds: 15,
+    max_samples: 61,
+  },
 };
 
 export const demoServerSettings = {
