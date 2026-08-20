@@ -992,6 +992,10 @@ class Rcon(ServerCtl):
             "max_players": max_players,
             "short_name": config.short_name,
             "server_number": int(get_server_number()),
+            "game": self.game_profile.game.value,
+            "supported_game_modes": sorted(
+                mode.value for mode in self.game_profile.supported_game_modes
+            ),
         }
 
     @ttl_cache(ttl=60 * 60 * 24)

@@ -324,6 +324,8 @@ class StatusType(TypedDict):
     max_players: int
     short_name: str
     server_number: int
+    game: Literal["hll", "hllv"]
+    supported_game_modes: list[str]
 
 
 class VipIdType(TypedDict):
