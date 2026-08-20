@@ -14,7 +14,9 @@ test.describe("connection state contract", () => {
     await expect(
       page.getByText("CRCON · Offline", { exact: true })
     ).toBeVisible();
-    await expect(page.getByText("Unbekannt", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText("Gameserver · Unbekannt", { exact: true })
+    ).toBeVisible();
   });
 
   test("shows CRCON online while the game server is offline", async ({
@@ -53,7 +55,7 @@ test.describe("connection state contract", () => {
     });
 
     await expect(
-      main.getByText("Unbekannter Server", { exact: true })
+      main.getByRole("heading", { name: "Unbekannter Server", exact: true })
     ).toBeVisible();
     await expect(
       main.getByText("Unbekannte Karte", { exact: true }).first()

@@ -23,6 +23,11 @@ export function createConnectionHealth(query, { enabled = true } = {}) {
   const lastSuccessAt = query?.dataUpdatedAt || null;
   const lastAttemptAt =
     Math.max(query?.dataUpdatedAt || 0, query?.errorUpdatedAt || 0) || null;
+  const hasFailedRefresh = Boolean(
+    hasData &&
+      (query?.isRefetchError ||
+        (query?.errorUpdatedAt || 0) > (query?.dataUpdatedAt || 0))
+  );
 
   let state = CONNECTION_STATE.UNKNOWN;
 
@@ -30,7 +35,7 @@ export function createConnectionHealth(query, { enabled = true } = {}) {
     state = hasData ? CONNECTION_STATE.STALE : CONNECTION_STATE.UNKNOWN;
   } else if (query?.isPending && !hasData) {
     state = CONNECTION_STATE.LOADING;
-  } else if (query?.isError) {
+  } else if (query?.isError || hasFailedRefresh) {
     state = hasData ? CONNECTION_STATE.STALE : CONNECTION_STATE.OFFLINE;
   } else if (hasData) {
     state = CONNECTION_STATE.ONLINE;
