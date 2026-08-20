@@ -135,6 +135,7 @@ export default function BattleOverview() {
 
   return (
     <Box
+      data-testid="battle-overview"
       sx={{
         border: "1px solid",
         borderColor: "divider",

@@ -15,8 +15,8 @@ test.describe("connection state contract", () => {
       page.getByText("CRCON · Offline", { exact: true })
     ).toBeVisible();
     await expect(
-      page.getByText("Gameserver · Unbekannt", { exact: true })
-    ).toBeVisible();
+      page.getByTestId("gameserver-connection-status")
+    ).toHaveAttribute("data-connection-state", "unknown");
   });
 
   test("shows CRCON online while the game server is offline", async ({
@@ -40,6 +40,9 @@ test.describe("connection state contract", () => {
     });
 
     await expect(
+      page.getByTestId("gameserver-connection-status")
+    ).toHaveAttribute("data-connection-state", "stale");
+    await expect(
       page.getByText("Daten veraltet", { exact: true }).first()
     ).toBeVisible();
     await expect(
@@ -53,17 +56,18 @@ test.describe("connection state contract", () => {
     const main = await openDemoPage(page, "/", {
       query: { demo_connection: "crcon_offline" },
     });
+    const overview = main.getByTestId("battle-overview");
 
     await expect(
-      main.getByRole("heading", { name: "Unbekannter Server", exact: true })
+      overview.getByRole("heading", { name: "Unbekannter Server", exact: true })
     ).toBeVisible();
     await expect(
-      main.getByText("Unbekannte Karte", { exact: true }).first()
+      overview.getByText("Unbekannte Karte", { exact: true }).first()
     ).toBeVisible();
-    await expect(main.getByText("Foy", { exact: true })).toHaveCount(0);
-    await expect(main.getByText("warfare", { exact: true })).toHaveCount(0);
+    await expect(overview.getByText("Foy", { exact: true })).toHaveCount(0);
+    await expect(overview.getByText("warfare", { exact: true })).toHaveCount(0);
     await expect(
-      main.getByText("[GER] Frontline Network | #2", { exact: true })
+      overview.getByText("[GER] Frontline Network | #2", { exact: true })
     ).toHaveCount(0);
   });
 });
