@@ -1,0 +1,118 @@
+import { expect, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+import { openDemoPage, VIEWPORTS } from "./helpers.mjs";
+
+const currentDirectory = dirname(fileURLToPath(import.meta.url));
+const navigationSource = readFileSync(
+  resolve(currentDirectory, "../src/components/Header/nav-data.js"),
+  "utf8"
+);
+
+test.describe("task-oriented navigation contract", () => {
+  test("groups every existing destination once without a catch-all section", () => {
+    const rawDefinitions = navigationSource.slice(
+      navigationSource.indexOf("const rawNavMenus"),
+      navigationSource.indexOf("const linkTranslationKeys")
+    );
+    const definitions = navigationSource.slice(
+      navigationSource.indexOf("const taskGroupDefinitions"),
+      navigationSource.indexOf("const linkPermissionKeys")
+    );
+    const rawRoutes = [...rawDefinitions.matchAll(/to: "(\/[^\"]*)"/g)].map(
+      ([, route]) => route
+    );
+    const routes = [...definitions.matchAll(/"(\/[^\"]+)"/g)].map(
+      ([, route]) => route
+    );
+
+    expect(definitions).not.toContain('id: "others"');
+    expect(new Set(routes).size).toBe(routes.length);
+    expect([...routes, "/"].sort()).toEqual(rawRoutes.sort());
+    expect(routes).toEqual(
+      expect.arrayContaining([
+        "/views/live",
+        "/records/players",
+        "/settings/maps/rotation",
+        "/apps/discord-report-bot",
+        "/settings/general",
+        "/records/audit-logs",
+        "/settings/others/game-server",
+      ])
+    );
+  });
+
+  test("uses absolute statistics routes", () => {
+    expect(navigationSource).toContain('to: "/stats/live-sessions"');
+    expect(navigationSource).toContain('to: "/stats/live-game"');
+    expect(navigationSource).toContain('to: "/stats/games"');
+    expect(navigationSource).not.toMatch(/to: "stats\//);
+  });
+});
+
+test.describe("permission-aware navigation", () => {
+  test.use({ viewport: VIEWPORTS.desktop });
+
+  test("keeps a protected destination discoverable and explains why a viewer cannot open it", async ({
+    page,
+  }) => {
+    await openDemoPage(page, "/", { query: { demo_role: "viewer" } });
+
+    const navigation = page.getByRole("navigation", {
+      name: "Hauptnavigation",
+    });
+    await navigation.getByRole("button", { name: "Live-Betrieb" }).click();
+
+    const liveView = navigation.getByRole("button", { name: "Live-Ansicht" });
+    await expect(liveView).toHaveAttribute("aria-disabled", "true");
+    await expect(
+      navigation.getByRole("link", { name: "Live-Ansicht" })
+    ).toHaveCount(0);
+
+    await liveView.focus();
+    await expect(
+      page.getByRole("tooltip", {
+        name: "Diese Seite ist sichtbar, aber dir fehlt die erforderliche Berechtigung.",
+      })
+    ).toBeVisible();
+  });
+
+  test("keeps protected destinations as links for a superuser", async ({
+    page,
+  }) => {
+    await openDemoPage(page, "/");
+
+    const navigation = page.getByRole("navigation", {
+      name: "Hauptnavigation",
+    });
+    await navigation.getByRole("button", { name: "Live-Betrieb" }).click();
+    await expect(
+      navigation.getByRole("link", { name: "Live-Ansicht" })
+    ).toHaveAttribute("href", "/views/live");
+  });
+});
+
+test.describe("task-oriented mobile navigation", () => {
+  test.use({ viewport: VIEWPORTS.mobile });
+
+  test("keeps the task groups usable in the full-width drawer", async ({
+    page,
+  }) => {
+    await openDemoPage(page, "/");
+    await page.getByRole("button", { name: "Navigation öffnen" }).click();
+
+    const navigation = page.getByRole("navigation", {
+      name: "Hauptnavigation",
+    });
+    const playersGroup = navigation.getByRole("button", {
+      name: "Spieler & Moderation",
+    });
+    await expect(playersGroup).toBeVisible();
+    await expect(playersGroup).toHaveCSS("min-height", "44px");
+    await playersGroup.click();
+    await expect(
+      navigation.getByRole("link", { name: "Spieler" })
+    ).toBeVisible();
+  });
+});
