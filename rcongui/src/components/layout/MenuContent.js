@@ -25,48 +25,61 @@ import { useAuth } from "@/hooks/useAuth";
 import { canAccessNavLink } from "@/components/Header/nav-data";
 
 const NavigationLink = ({ to, icon, text, onClick, locked, lockedReason }) => {
+  const [lockedReasonOpen, setLockedReasonOpen] = useState(false);
   const button = (
-    <ListItem key={to} disablePadding sx={{ display: "block" }}>
-      <ListItemButton
-        {...(!locked && { component: NavLink, to, end: to === "/" })}
-        aria-disabled={locked || undefined}
-        onClick={(event) => {
-          if (locked) {
-            event.preventDefault();
-            return;
-          }
-          onClick();
-        }}
-        sx={{
-          borderLeft: "2px solid transparent",
-          borderRadius: 0,
-          minHeight: 44,
-          ...(locked && {
-            color: "text.disabled",
-            cursor: "not-allowed",
-          }),
-          "&.active": {
-            color: "primary.light",
-            borderLeftColor: "primary.main",
-            bgcolor: "action.selected",
-          },
-        }}
-      >
-        {icon && <ListItemIcon>{icon}</ListItemIcon>}
-        <ListItemText primary={text} />
-        {locked && (
-          <LockOutlinedIcon aria-hidden fontSize="small" sx={{ ml: 1 }} />
-        )}
-      </ListItemButton>
-    </ListItem>
+    <ListItemButton
+      {...(!locked && { component: NavLink, to, end: to === "/" })}
+      aria-disabled={locked || undefined}
+      onFocus={() => locked && setLockedReasonOpen(true)}
+      onBlur={() => setLockedReasonOpen(false)}
+      onClick={(event) => {
+        if (locked) {
+          event.preventDefault();
+          return;
+        }
+        onClick();
+      }}
+      sx={{
+        borderLeft: "2px solid transparent",
+        borderRadius: 0,
+        minHeight: 44,
+        ...(locked && {
+          color: "text.disabled",
+          cursor: "not-allowed",
+        }),
+        "&.active": {
+          color: "primary.light",
+          borderLeftColor: "primary.main",
+          bgcolor: "action.selected",
+        },
+      }}
+    >
+      {icon && <ListItemIcon>{icon}</ListItemIcon>}
+      <ListItemText primary={text} />
+      {locked && (
+        <LockOutlinedIcon aria-hidden fontSize="small" sx={{ ml: 1 }} />
+      )}
+    </ListItemButton>
   );
 
-  if (!locked) return button;
-
   return (
-    <Tooltip title={lockedReason} placement="right" arrow>
-      {button}
-    </Tooltip>
+    <ListItem key={to} disablePadding sx={{ display: "block" }}>
+      {locked ? (
+        <Tooltip
+          title={lockedReason}
+          placement="right"
+          arrow
+          describeChild
+          open={lockedReasonOpen}
+          onOpen={() => setLockedReasonOpen(true)}
+          onClose={() => setLockedReasonOpen(false)}
+        >
+          {button}
+        </Tooltip>
+      ) : (
+        button
+      )}
+    </ListItem>
   );
 };
 

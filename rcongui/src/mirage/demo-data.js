@@ -177,6 +177,9 @@ export const getDemoConnectionMode = () =>
 
 export const getDemoRole = () => readDemoParameter("demo_role") || "admin";
 
+export const shouldFailDemoServerSettings = () =>
+  readDemoParameter("demo_settings_error") === "1";
+
 const normalizeDemoGame = (value, fallback = "hll") => {
   const game = String(value ?? "").trim().toLowerCase();
   if (!game) return fallback;
