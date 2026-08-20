@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
-import { Box, Divider, Skeleton, Stack, Typography } from "@mui/material";
+import { Box, Skeleton, Stack, Typography } from "@mui/material";
 import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 import MapRoundedIcon from "@mui/icons-material/MapRounded";
 import TimerRoundedIcon from "@mui/icons-material/TimerRounded";
+import DnsRoundedIcon from "@mui/icons-material/DnsRounded";
 import { alpha } from "@mui/material/styles";
 import { useTranslation } from "react-i18next";
 import { useGlobalStore } from "@/stores/global-state";
+import { CONNECTION_STATE } from "@/utils/connectionHealth";
+import { getGameLabel } from "@/utils/game-context";
 
 const formatRemainingTime = (seconds) => {
   const value = Math.max(0, Math.floor(Number(seconds) || 0));
@@ -18,7 +21,13 @@ const formatRemainingTime = (seconds) => {
     .join(":");
 };
 
-const StatusItem = ({ icon, label, value, grow = false }) => (
+const StatusItem = ({
+  icon,
+  label,
+  value,
+  grow = false,
+  tone = "primary.main",
+}) => (
   <Stack
     direction="row"
     spacing={0.75}
@@ -32,7 +41,7 @@ const StatusItem = ({ icon, label, value, grow = false }) => (
     <Box
       sx={{
         display: "flex",
-        color: "primary.main",
+        color: tone,
         flexShrink: 0,
         "& svg": { fontSize: { xs: 17, sm: 19 } },
       }}
@@ -73,10 +82,12 @@ const StatusItem = ({ icon, label, value, grow = false }) => (
 
 const ServerStatus = ({ compact = false }) => {
   const { t } = useTranslation();
-  const serverState = useGlobalStore((state) => state.status);
+  const serverStatus = useGlobalStore((state) => state.status);
+  const serverConnection = useGlobalStore((state) => state.serverState);
   const gameState = useGlobalStore((state) => state.gameState);
+  const connectionHealth = useGlobalStore((state) => state.connectionHealth);
   const [timeRemaining, setTimeRemaining] = useState(
-    Number(gameState?.time_remaining) || 0,
+    Number(gameState?.time_remaining) || 0
   );
 
   useEffect(() => {
@@ -93,11 +104,29 @@ const ServerStatus = ({ compact = false }) => {
     return () => window.clearInterval(interval);
   }, [gameState, timeRemaining <= 0]);
 
-  const hasLiveData = Boolean(serverState && gameState);
-  const players = hasLiveData
-    ? `${serverState.current_players ?? 0}/${serverState.max_players ?? 100}`
-    : null;
-  const mapName = gameState?.current_map?.pretty_name ?? t("matchStatus.unknownMap");
+  const hasPlayerData =
+    serverStatus?.current_players != null && serverStatus?.max_players != null;
+  const players = hasPlayerData
+    ? `${serverStatus.current_players}/${serverStatus.max_players}`
+    : t("common.unknown");
+  const mapName =
+    gameState?.current_map?.pretty_name ?? t("matchStatus.unknownMap");
+  const identity = serverConnection || serverStatus;
+  const gameLabel = getGameLabel(identity?.game) || t("common.unknown");
+  const serverLabel =
+    identity?.short_name || identity?.name || t("dashboard.unknownServer");
+  const serverNumber =
+    identity?.server_number != null
+      ? t("sidebar.serverNumber", { number: identity.server_number })
+      : t("matchStatus.unknownServerNumber");
+  const isInitialLoading =
+    connectionHealth.crcon.state === CONNECTION_STATE.LOADING && !identity;
+  const gameServerTone =
+    {
+      [CONNECTION_STATE.ONLINE]: "success.main",
+      [CONNECTION_STATE.STALE]: "warning.main",
+      [CONNECTION_STATE.OFFLINE]: "error.main",
+    }[connectionHealth.gameServer.state] || "text.disabled";
 
   return (
     <Box
@@ -105,7 +134,7 @@ const ServerStatus = ({ compact = false }) => {
       aria-label={t("matchStatus.ariaLabel")}
       data-testid="global-match-status"
       sx={(theme) => ({
-        width: compact ? "100%" : "min(100%, 560px)",
+        width: compact ? "100%" : "min(100%, 680px)",
         minWidth: 0,
         px: { xs: 1.25, sm: 1.5 },
         py: 0.75,
@@ -116,14 +145,27 @@ const ServerStatus = ({ compact = false }) => {
         boxShadow: `inset 3px 0 0 ${theme.palette.primary.main}`,
       })}
     >
-      <Stack
-        direction="row"
-        divider={<Divider orientation="vertical" flexItem />}
-        spacing={{ xs: 1, sm: 1.5 }}
-        sx={{ alignItems: "center", minWidth: 0 }}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: compact
+            ? "minmax(0, 1fr) minmax(82px, auto)"
+            : "minmax(150px, 1.4fr) auto minmax(110px, 1fr) auto",
+          alignItems: "center",
+          columnGap: { xs: 1, sm: 1.5 },
+          rowGap: 1,
+          minWidth: 0,
+        }}
       >
-        {hasLiveData ? (
+        {!isInitialLoading ? (
           <>
+            <StatusItem
+              icon={<DnsRoundedIcon />}
+              label={`${serverNumber} · ${gameLabel}`}
+              value={serverLabel}
+              grow
+              tone={gameServerTone}
+            />
             <StatusItem
               icon={<GroupsRoundedIcon />}
               label={t("matchStatus.players")}
@@ -138,7 +180,11 @@ const ServerStatus = ({ compact = false }) => {
             <StatusItem
               icon={<TimerRoundedIcon />}
               label={t("matchStatus.remaining")}
-              value={formatRemainingTime(timeRemaining)}
+              value={
+                gameState
+                  ? formatRemainingTime(timeRemaining)
+                  : t("common.unknown")
+              }
             />
           </>
         ) : (
@@ -146,9 +192,10 @@ const ServerStatus = ({ compact = false }) => {
             <Skeleton variant="rounded" width={74} height={30} />
             <Skeleton variant="rounded" sx={{ flex: 1 }} height={30} />
             <Skeleton variant="rounded" width={82} height={30} />
+            <Skeleton variant="rounded" width={82} height={30} />
           </>
         )}
-      </Stack>
+      </Box>
     </Box>
   );
 };

@@ -11,6 +11,11 @@ import {
   getDemoServerStatus,
   isFakeMode,
 } from "@/mirage/demo-data";
+import {
+  CONNECTION_STATE,
+  createConnectionHealth,
+  EMPTY_CONNECTION_HEALTH,
+} from "@/utils/connectionHealth";
 
 // Create the Zustand store
 export const useGlobalStore = create((set) => ({
@@ -22,6 +27,11 @@ export const useGlobalStore = create((set) => ({
   onlineIngameMods: [],
   onlineCrconMods: [],
   onlinePlayers: [],
+  connectionHealth: {
+    crcon: EMPTY_CONNECTION_HEALTH,
+    gameServer: EMPTY_CONNECTION_HEALTH,
+    gameState: EMPTY_CONNECTION_HEALTH,
+  },
   // Actions to update state
   updateStatus: (data) => set(() => ({ status: data })),
   updateServerState: (data) => set(() => ({ serverState: data })),
@@ -40,96 +50,142 @@ const globalQueries = [
   queryOptions({
     queryKey: [{ queryIdentifier: "get_status" }],
     queryFn: async () => {
-      let result;
-      try {
-        if (isFakeMode() && getDemoConnectionMode() === "gameserver_offline") {
-          throw new Error("Demo game server is offline");
-        }
-        result = isFakeMode()
-          ? getDemoServerStatus()
-          : await cmd.GET_GAME_SERVER_STATUS()
-        useGlobalStore.setState((state) => ({ status: result }));
-      } catch (error) {
-        useGlobalStore.setState((state) => ({ status: null }));
-        return null;
+      if (
+        isFakeMode() &&
+        ["gameserver_offline", "gameserver_stale"].includes(
+          getDemoConnectionMode()
+        )
+      ) {
+        throw new Error("Demo game server is unavailable");
       }
-      return result
+      return isFakeMode()
+        ? getDemoServerStatus()
+        : cmd.GET_GAME_SERVER_STATUS();
     },
+    initialData:
+      isFakeMode() && getDemoConnectionMode() === "gameserver_stale"
+        ? getDemoServerStatus()
+        : undefined,
     retry: 1,
   }),
   queryOptions({
     queryKey: [{ queryIdentifier: "get_gamestate" }],
-    queryFn: isFakeMode() ? () => Promise.resolve(demoGameState) : cmd.GET_GAME_STATE,
-    select: (data) => {
-      useGlobalStore.setState((state) => ({ gameState: data }));
-      return data;
+    queryFn: async () => {
+      if (
+        isFakeMode() &&
+        ["gameserver_offline", "gameserver_stale"].includes(
+          getDemoConnectionMode()
+        )
+      ) {
+        throw new Error("Demo game state is unavailable");
+      }
+      return isFakeMode() ? demoGameState : cmd.GET_GAME_STATE();
     },
+    initialData:
+      isFakeMode() && getDemoConnectionMode() === "gameserver_stale"
+        ? demoGameState
+        : undefined,
   }),
   queryOptions({
     queryKey: [{ queryIdentifier: "get_server_list" }],
-    queryFn: isFakeMode() ? () => Promise.resolve(getDemoServerList()) : cmd.GET_GAME_SERVER_LIST,
-    select: (data) => {
-      useGlobalStore.setState((state) => ({ servers: data }));
-      return data;
-    },
+    queryFn: isFakeMode()
+      ? () => Promise.resolve(getDemoServerList())
+      : cmd.GET_GAME_SERVER_LIST,
   }),
   queryOptions({
     queryKey: [{ queryIdentifier: "get_ingame_mods" }],
     queryFn: isFakeMode() ? () => Promise.resolve([]) : cmd.GET_INGAME_MODS,
-    select: (data) => {
-      useGlobalStore.setState((state) => ({ onlineIngameMods: data }));
-      return data;
-    },
   }),
   queryOptions({
     queryKey: [{ queryIdentifier: "get_online_mods" }],
     queryFn: isFakeMode() ? () => Promise.resolve([]) : cmd.GET_CRCON_MODS,
-    select: (data) => {
-      useGlobalStore.setState((state) => ({ onlineCrconMods: data }));
-      return data;
-    },
   }),
   teamsLiveQueryOptions,
 ];
 
 export const GlobalState = () => {
-  const { data, isSuccess: isCrconConnected } = useQuery({
+  const crconQuery = useQuery({
     queryKey: [{ queryIdentifier: "get_connection_info" }],
-    queryFn: isFakeMode()
-      ? () => {
-          if (getDemoConnectionMode() === "crcon_offline") {
-            return Promise.reject(new Error("Demo CRCON is offline"));
-          }
-          return Promise.resolve(getDemoServerConnection());
-        }
-      : cmd.GET_CRCON_SERVER_CONNECTION,
+    queryFn: async () => {
+      if (
+        isFakeMode() &&
+        ["crcon_offline", "crcon_stale"].includes(getDemoConnectionMode())
+      ) {
+        throw new Error("Demo CRCON is unavailable");
+      }
+      return isFakeMode()
+        ? getDemoServerConnection()
+        : cmd.GET_CRCON_SERVER_CONNECTION();
+    },
+    initialData:
+      isFakeMode() && getDemoConnectionMode() === "crcon_stale"
+        ? getDemoServerConnection()
+        : undefined,
     refetchInterval,
     retry: isFakeMode() ? 0 : 1,
   });
+  const crconHealth = createConnectionHealth(crconQuery);
+  const canQueryGameServer = crconHealth.state === CONNECTION_STATE.ONLINE;
+
+  const queryResults = useQueries({
+    queries: globalQueries.map((query) =>
+      queryOptions({
+        staleTime,
+        refetchInterval,
+        enabled: canQueryGameServer,
+        ...query,
+      })
+    ),
+  });
+
+  const statusQuery = queryResults[0];
+  const gameStateQuery = queryResults[1];
+  const serversQuery = queryResults[2];
+  const ingameModsQuery = queryResults[3];
+  const crconModsQuery = queryResults[4];
 
   useEffect(() => {
-    if (isCrconConnected) {
-      useGlobalStore.setState({ serverState: data });
-    } else {
-      useGlobalStore.setState({
-        serverState: null,
-        status: null,
-        gameState: null,
-        onlineIngameMods: [],
-        onlineCrconMods: [],
-        onlinePlayers: [],
-      });
-    }
-  }, [data, isCrconConnected]);
-
-  useQueries({
-    queries: globalQueries.map((query) => queryOptions({
-      staleTime,
-      refetchInterval,
-      enabled: isCrconConnected,
-      ...query,
-    })),
-  });
+    useGlobalStore.setState({
+      serverState: crconQuery.data ?? null,
+      status: statusQuery?.data ?? null,
+      gameState: gameStateQuery?.data ?? null,
+      servers: serversQuery?.data ?? [],
+      onlineIngameMods: ingameModsQuery?.data ?? [],
+      onlineCrconMods: crconModsQuery?.data ?? [],
+      onlinePlayers: canQueryGameServer
+        ? useGlobalStore.getState().onlinePlayers
+        : [],
+      connectionHealth: {
+        crcon: crconHealth,
+        gameServer: createConnectionHealth(statusQuery, {
+          enabled: canQueryGameServer,
+        }),
+        gameState: createConnectionHealth(gameStateQuery, {
+          enabled: canQueryGameServer,
+        }),
+      },
+    });
+  }, [
+    canQueryGameServer,
+    crconHealth.state,
+    crconHealth.lastSuccessAt,
+    crconHealth.lastAttemptAt,
+    crconHealth.isRefreshing,
+    crconQuery.data,
+    statusQuery?.data,
+    statusQuery?.status,
+    statusQuery?.fetchStatus,
+    statusQuery?.dataUpdatedAt,
+    statusQuery?.errorUpdatedAt,
+    gameStateQuery?.data,
+    gameStateQuery?.status,
+    gameStateQuery?.fetchStatus,
+    gameStateQuery?.dataUpdatedAt,
+    gameStateQuery?.errorUpdatedAt,
+    serversQuery?.data,
+    ingameModsQuery?.data,
+    crconModsQuery?.data,
+  ]);
 
   return null;
 };

@@ -24,6 +24,16 @@ const criticalTranslationKeys = [
   "sidebar.gameServerOffline",
   "sidebar.gameServerUnknown",
   "sidebar.crconOffline",
+  "connectionStates.loading",
+  "connectionStates.online",
+  "connectionStates.offline",
+  "connectionStates.stale",
+  "connectionStates.unknown",
+  "sidebar.gameServerState.stale",
+  "sidebar.crconState.stale",
+  "dashboard.lastUpdated",
+  "dashboard.noLiveData",
+  "dashboard.mapImageUnavailable",
   "common.online",
   "common.offline",
   "common.unknown",
@@ -39,8 +49,12 @@ test("critical QA and state labels exist in German and English", () => {
     const german = getPath(germanResources, key);
     const english = getPath(englishResources, key);
 
-    expect(german, `missing German translation: ${key}`).toEqual(expect.any(String));
-    expect(english, `missing English translation: ${key}`).toEqual(expect.any(String));
+    expect(german, `missing German translation: ${key}`).toEqual(
+      expect.any(String)
+    );
+    expect(english, `missing English translation: ${key}`).toEqual(
+      expect.any(String)
+    );
     expect(german.trim(), `empty German translation: ${key}`).not.toBe("");
     expect(english.trim(), `empty English translation: ${key}`).not.toBe("");
   }
