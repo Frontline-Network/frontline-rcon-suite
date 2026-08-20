@@ -440,7 +440,7 @@ const taskGroupDefinitions = [
     id: "live-operations",
     translationKey: "navigation.groups.liveOperations",
     icon: <BoltIcon />,
-    routes: ["/views/live", "/views/team", "/settings/maps/change"],
+    routes: ["/views/live", "/views/team"],
   },
   {
     id: "players-moderation",
@@ -460,6 +460,7 @@ const taskGroupDefinitions = [
     translationKey: "navigation.groups.mapsGameOperations",
     icon: <MapIcon />,
     routes: [
+      "/settings/maps/change",
       "/settings/maps/rotation",
       "/settings/maps/objectives",
       "/settings/maps/votemap",

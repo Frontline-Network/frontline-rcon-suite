@@ -49,6 +49,20 @@ test.describe("task-oriented navigation contract", () => {
     expect(navigationSource).toContain('to: "/stats/games"');
     expect(navigationSource).not.toMatch(/to: "stats\//);
   });
+
+  test("groups map changes with maps and game operations", () => {
+    const liveOperations = navigationSource.slice(
+      navigationSource.indexOf('id: "live-operations"'),
+      navigationSource.indexOf('id: "players-moderation"')
+    );
+    const mapsGameOperations = navigationSource.slice(
+      navigationSource.indexOf('id: "maps-game-operations"'),
+      navigationSource.indexOf('id: "automation"')
+    );
+
+    expect(liveOperations).not.toContain('"/settings/maps/change"');
+    expect(mapsGameOperations).toContain('"/settings/maps/change"');
+  });
 });
 
 test.describe("permission-aware navigation", () => {
@@ -91,6 +105,25 @@ test.describe("permission-aware navigation", () => {
       navigation.getByRole("link", { name: "Live-Ansicht" })
     ).toHaveAttribute("href", "/views/live");
   });
+
+  test("shows map changes under maps and game operations", async ({ page }) => {
+    await openDemoPage(page, "/");
+
+    const navigation = page.getByRole("navigation", {
+      name: "Hauptnavigation",
+    });
+    await navigation.getByRole("button", { name: "Live-Betrieb" }).click();
+    await expect(
+      navigation.getByRole("link", { name: "Karte wechseln" })
+    ).toHaveCount(0);
+
+    await navigation
+      .getByRole("button", { name: "Karten & Spielbetrieb" })
+      .click();
+    await expect(
+      navigation.getByRole("link", { name: "Karte wechseln" })
+    ).toHaveAttribute("href", "/settings/maps/change");
+  });
 });
 
 test.describe("task-oriented mobile navigation", () => {
@@ -113,6 +146,13 @@ test.describe("task-oriented mobile navigation", () => {
     await playersGroup.click();
     await expect(
       navigation.getByRole("link", { name: "Spieler" })
+    ).toBeVisible();
+
+    await navigation
+      .getByRole("button", { name: "Karten & Spielbetrieb" })
+      .click();
+    await expect(
+      navigation.getByRole("link", { name: "Karte wechseln" })
     ).toBeVisible();
   });
 });
