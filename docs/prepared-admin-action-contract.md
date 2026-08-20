@@ -69,6 +69,27 @@ The pull-request workflow runs this gate before the browser suite. The action
 adapter now copies and normalises a payload instead of mutating the reviewed
 object.
 
+## Multi-server execution substrate
+
+The backend now returns a deterministic result envelope for every forwarded
+CRCON target instead of dropping HTTP and connection failures. Each entry
+contains the registered server number, internal host, HTTP status where
+available, and a sanitised CRCON response. A forwarding outage is represented
+as a failed target result rather than silently disappearing from the response.
+
+Prepared actions may send `forward_server_numbers` to address an exact subset.
+That is the backend primitive for retrying only failed servers without repeating
+an action that already succeeded elsewhere. Invalid, non-positive or oversized
+target lists are rejected before the local game action runs. The current server,
+an empty target list and an already-forwarded request skip Redis discovery and
+network calls entirely.
+
+The API serialises the response only after forwarding completes, so
+`forward_results` is no longer permanently `null`. Twenty-six focused tests
+cover target validation, stable ordering, retry subsets, response sanitisation,
+unregistered and unreachable targets, no-op forwarding and the wrapper order.
+The change adds no polling, scheduler or background worker.
+
 ## Required visible integration
 
 The next vertical slice must consume this contract in the generic dialog and
