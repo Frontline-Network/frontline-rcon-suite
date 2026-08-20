@@ -55,7 +55,7 @@ function AdminSideMenuMobile({ open, toggleDrawer }) {
         <AboutDialog />
       </List>
       <Stack direction="row" sx={{ gap: 1, px: 1.5, py: 0.5 }}>
-        <LanguageSelector />
+        <LanguageSelector touchSafe />
       </Stack>
       <Divider />
       <UserActions />
