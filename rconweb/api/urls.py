@@ -147,6 +147,7 @@ endpoints: list[tuple[str, Callable]] = [
     ("get_scoreboard_maps", scoreboards.get_scoreboard_maps),
     ("get_map_scoreboard", scoreboards.get_map_scoreboard),
     ("get_map_history", scoreboards.get_map_history),
+    ("get_map_history_summary", scoreboards.get_map_history_summary),
     ("get_previous_map", scoreboards.get_previous_map),
     ("get_live_game_stats", scoreboards.get_live_game_stats),
     ("describe_votemap_config", user_settings.describe_votemap_config),

@@ -112,6 +112,19 @@ response fell from 14.09 MB to 275.7 KB (about 98%); processing time fell from
 30-second status and game-state polls while the browser tab is hidden; focus
 refresh still supplies current data when the user returns.
 
+The legacy `get_map_history` endpoint can contain the complete player stats,
+layout and capture history for as many as 500 matches. A live RCON2 sample with
+496 entries serialized to 8.88 MB; projecting all entries down to the fields
+needed for a history list required only 48.6 KB. Clients that do not need match
+details should use `get_map_history_summary?page=1&limit=50`. The new endpoint
+defaults to 50 entries, rejects limits above 100 and reads only the requested
+Redis slice. It returns numeric timestamps and leaves HLL and HLL Vietnam map
+identifiers unchanged. The legacy endpoint remains response-compatible and
+advertises the summary endpoint through its `Link` and `Deprecation` headers,
+so existing mobile and third-party clients are not silently broken. Replacing
+the observed legacy caller remains a separate client-side migration before the
+8.88-MB transfer itself disappears.
+
 This phase was canaried on RCON3 (HLL Vietnam), then RCON1 (HLL), before RCON2
 and RCON4. All four backends were healthy, their public URLs returned HTTP 200
 in 35-56 ms, and no new traceback, exception, or failed-operation log appeared
