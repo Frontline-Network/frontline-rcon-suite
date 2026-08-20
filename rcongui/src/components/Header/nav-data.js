@@ -487,12 +487,16 @@ const taskGroupDefinitions = [
     ],
   },
   {
+    id: "apps-setup",
+    translationKey: "navigation.groups.appsSetup",
+    icon: <PhoneAndroidIcon />,
+    routes: ["/apps", "/apps/discord-report-bot"],
+  },
+  {
     id: "integrations",
     translationKey: "navigation.groups.integrations",
     icon: <WebhookIcon />,
     routes: [
-      "/apps",
-      "/apps/discord-report-bot",
       "/settings/webhooks/audit",
       "/settings/webhooks/admin-ping",
       "/settings/webhooks/watchlist",

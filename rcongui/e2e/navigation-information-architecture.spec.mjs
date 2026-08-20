@@ -63,6 +63,23 @@ test.describe("task-oriented navigation contract", () => {
     expect(liveOperations).not.toContain('"/settings/maps/change"');
     expect(mapsGameOperations).toContain('"/settings/maps/change"');
   });
+
+  test("keeps app setup separate from webhook integrations", () => {
+    const appSetup = navigationSource.slice(
+      navigationSource.indexOf('id: "apps-setup"'),
+      navigationSource.indexOf('id: "integrations"')
+    );
+    const integrations = navigationSource.slice(
+      navigationSource.indexOf('id: "integrations"'),
+      navigationSource.indexOf('id: "server-configuration"')
+    );
+
+    expect(appSetup).toContain('translationKey: "navigation.groups.appsSetup"');
+    expect(appSetup).toContain('"/apps"');
+    expect(appSetup).toContain('"/apps/discord-report-bot"');
+    expect(integrations).not.toContain('"/apps"');
+    expect(integrations).not.toContain('"/apps/discord-report-bot"');
+  });
 });
 
 test.describe("permission-aware navigation", () => {
@@ -123,6 +140,27 @@ test.describe("permission-aware navigation", () => {
     await expect(
       navigation.getByRole("link", { name: "Karte wechseln" })
     ).toHaveAttribute("href", "/settings/maps/change");
+  });
+
+  test("selects only the current app entry", async ({ page }) => {
+    await openDemoPage(page, "/apps/discord-report-bot");
+
+    const navigation = page.getByRole("navigation", {
+      name: "Hauptnavigation",
+    });
+    await navigation.getByRole("button", { name: "Apps einrichten" }).click();
+
+    const frontlineApp = navigation.getByRole("link", {
+      name: "Frontline App",
+    });
+    const discordReportBot = navigation.getByRole("link", {
+      name: "Discord Report Bot",
+    });
+
+    await expect(frontlineApp).not.toHaveClass(/active/);
+    await expect(frontlineApp).not.toHaveAttribute("aria-current", "page");
+    await expect(discordReportBot).toHaveClass(/active/);
+    await expect(discordReportBot).toHaveAttribute("aria-current", "page");
   });
 });
 

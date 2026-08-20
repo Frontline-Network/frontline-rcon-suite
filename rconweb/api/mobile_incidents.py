@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 from datetime import datetime
 
 from django.contrib.auth.models import User
@@ -21,6 +22,12 @@ from rcon.admin_incidents import (
     parse_chat_report,
     reserve_incident_action,
 )
+from rcon.commands import HLLCommandFailedError
+from rcon.connection import (
+    HLLCommandError,
+    HLLCommandFailedError as HLLConnectionCommandFailedError,
+)
+from rcon.types import GameEnum
 from rcon.utils import get_server_number
 
 from .auth import api_response, login_required
@@ -43,6 +50,118 @@ ACTION_PERMISSIONS = {
     "disband_squad": "api.can_disband_squad",
     "remove_from_squad": "api.can_remove_player_from_squad",
 }
+
+# HLL Vietnam occasionally answers a correctly formed moderation command with
+# a transient rejection even though the same command succeeds immediately
+# afterwards. Only actions whose effect is safe to repeat are retried. A
+# message or punish may already have reached the player despite the ambiguous
+# response and must therefore never be sent a second time automatically.
+HLLV_RETRYABLE_ACTIONS = {
+    "kick",
+    "temp_ban",
+    "perma_ban",
+    "remove_from_squad",
+    "disband_squad",
+}
+HLLV_ACTION_RETRY_DELAY_SECONDS = 0.75
+
+
+class GameServerActionRejected(ValueError):
+    """A syntactically valid game action was rejected by the game server."""
+
+
+def _is_hll_vietnam(rcon_api) -> bool:
+    try:
+        return GameEnum(rcon_api.config.game) == GameEnum.HLL_VIETNAM
+    except (AttributeError, TypeError, ValueError):
+        return False
+
+
+def _contains_player_id(value, player_id: str) -> bool:
+    """Inspect the stable public RCON result shapes without assuming one game."""
+
+    if isinstance(value, dict):
+        direct = value.get("player_id") or value.get("playerId") or value.get("id")
+        if str(direct or "").strip() == player_id:
+            return True
+        return any(_contains_player_id(item, player_id) for item in value.values())
+    if isinstance(value, (list, tuple, set)):
+        return any(_contains_player_id(item, player_id) for item in value)
+    return False
+
+
+def _player_is_offline(rcon_api, player_id: str) -> bool:
+    try:
+        return not _contains_player_id(rcon_api.get_players(), player_id)
+    except Exception:
+        return False
+
+
+def _player_has_ban(rcon_api, player_id: str, *, permanent: bool) -> bool:
+    try:
+        bans = (
+            rcon_api.get_perma_bans()
+            if permanent
+            else rcon_api.get_temp_bans()
+        )
+        return _contains_player_id(bans, player_id)
+    except Exception:
+        return False
+
+
+def _run_game_action(action: str, rcon_api, operation, *, verify=None):
+    """Execute an action with the narrow HLLV retry policy.
+
+    HLL keeps its existing one-shot semantics. For HLLV, retryable actions are
+    first verified after an ambiguous response and are then attempted exactly
+    once more. This fixes transient HLLV command rejections without risking
+    duplicate messages or punishments.
+    """
+
+    retryable = _is_hll_vietnam(rcon_api) and action in HLLV_RETRYABLE_ACTIONS
+    first_error = None
+    try:
+        result = operation()
+    except (
+        HLLCommandError,
+        HLLCommandFailedError,
+        HLLConnectionCommandFailedError,
+    ) as exc:
+        if not retryable:
+            raise
+        first_error = exc
+        result = False
+
+    if result is not False:
+        return result
+    if not retryable:
+        raise GameServerActionRejected(
+            "The game server rejected the action; the incident remains open"
+        )
+    if verify is not None and verify():
+        return True
+
+    time.sleep(HLLV_ACTION_RETRY_DELAY_SECONDS)
+    try:
+        result = operation()
+    except (
+        HLLCommandError,
+        HLLCommandFailedError,
+        HLLConnectionCommandFailedError,
+    ):
+        if first_error is not None:
+            raise first_error
+        raise
+    if result is not False:
+        return result
+    if verify is not None and verify():
+        return True
+    logger.warning(
+        "HLL Vietnam %s action was rejected after one controlled retry", action
+    )
+    raise GameServerActionRejected(
+        "The game server rejected the action; the incident remains open"
+    )
 
 
 def _parse_csv(value: str | None) -> list[str]:
@@ -377,16 +496,6 @@ def incident_subject_detail(request, incident_id, subject_id):
 def _execute_action(action: str, data: dict, user_name: str, incident: dict):
     from . import views
 
-    def require_success(result):
-        # Low-level RCON commands return False for a rejected command (for
-        # example a stale/offline player target).  False must not be audited as
-        # a successful action or auto-resolve the incident.
-        if result is False:
-            raise ValueError(
-                "The game server rejected the action; the incident remains open"
-            )
-        return result
-
     player_id = str(data.get("player_id") or incident.get("target_id") or "").strip()
     subject_id = str(data.get("subject_id") or "") or None
     if action == "disband_squad":
@@ -409,8 +518,10 @@ def _execute_action(action: str, data: dict, user_name: str, incident: dict):
         squad_name = str(subject.get("squad_name") or "").strip()
         if not team or not squad_name:
             raise ValueError("The confirmed squad has no team or squad name")
-        return require_success(
-            views.rcon_api.disband_squad_by_name(team, squad_name, reason)
+        return _run_game_action(
+            action,
+            views.rcon_api,
+            lambda: views.rcon_api.disband_squad_by_name(team, squad_name, reason),
         )
 
     subject = confirmed_action_subject(
@@ -430,8 +541,10 @@ def _execute_action(action: str, data: dict, user_name: str, incident: dict):
         message = str(data.get("message") or "").strip()
         if not message:
             raise ValueError("Message is required")
-        return require_success(
-            views.rcon_api.message_player(
+        return _run_game_action(
+            action,
+            views.rcon_api,
+            lambda: views.rcon_api.message_player(
                 player_id,
                 message=message,
                 by=user_name,
@@ -444,8 +557,10 @@ def _execute_action(action: str, data: dict, user_name: str, incident: dict):
         if not reason:
             raise ValueError("A reason is required")
         if action == "punish":
-            return require_success(
-                views.rcon_api.punish(
+            return _run_game_action(
+                action,
+                views.rcon_api,
+                lambda: views.rcon_api.punish(
                     player_id,
                     reason=reason,
                     by=user_name,
@@ -455,36 +570,49 @@ def _execute_action(action: str, data: dict, user_name: str, incident: dict):
         if action == "kick":
             if data.get("confirmed") is not True:
                 raise ValueError("Kick requires explicit confirmation")
-            return require_success(
-                views.rcon_api.kick(
+            return _run_game_action(
+                action,
+                views.rcon_api,
+                lambda: views.rcon_api.kick(
                     player_id,
                     reason=reason,
                     by=user_name,
                     player_name=player_name or None,
-                )
+                ),
+                verify=lambda: _player_is_offline(views.rcon_api, player_id),
             )
         if action == "perma_ban":
             if data.get("confirmed") is not True:
                 raise ValueError("Permanent ban requires explicit confirmation")
-            return require_success(
-                views.rcon_api.perma_ban(
+            return _run_game_action(
+                action,
+                views.rcon_api,
+                lambda: views.rcon_api.perma_ban(
                     player_id,
                     reason=reason,
                     by=user_name,
                     player_name=player_name or None,
-                )
+                ),
+                verify=lambda: _player_has_ban(
+                    views.rcon_api, player_id, permanent=True
+                ),
             )
         duration_hours = int(data.get("duration_hours", 2))
         if data.get("confirmed") is not True or not 1 <= duration_hours <= 720:
             raise ValueError("Temp ban requires confirmation and 1-720 hours")
-        return require_success(
-            views.rcon_api.temp_ban(
+        return _run_game_action(
+            action,
+            views.rcon_api,
+            lambda: views.rcon_api.temp_ban(
                 player_id,
                 duration_hours=duration_hours,
                 reason=reason,
                 by=user_name,
                 player_name=player_name or None,
-            )
+            ),
+            verify=lambda: _player_has_ban(
+                views.rcon_api, player_id, permanent=False
+            ),
         )
     if action == "blacklist":
         reason = str(data.get("reason") or "").strip()
@@ -493,8 +621,10 @@ def _execute_action(action: str, data: dict, user_name: str, incident: dict):
             raise ValueError(
                 "Blacklist requires a reason, blacklist_id and explicit confirmation"
             )
-        return require_success(
-            views.rcon_api.add_blacklist_record(
+        return _run_game_action(
+            action,
+            views.rcon_api,
+            lambda: views.rcon_api.add_blacklist_record(
                 player_id=player_id,
                 blacklist_id=blacklist_id,
                 reason=reason,
@@ -518,8 +648,10 @@ def _execute_action(action: str, data: dict, user_name: str, incident: dict):
             raise ValueError(
                 "Removing a player from a squad requires a reason and confirmation"
             )
-        return require_success(
-            views.rcon_api.remove_player_from_squad(player_id, reason)
+        return _run_game_action(
+            action,
+            views.rcon_api,
+            lambda: views.rcon_api.remove_player_from_squad(player_id, reason),
         )
     raise ValueError("Unsupported mobile action")
 

@@ -894,6 +894,174 @@ class MobileContextTests(TestCase):
                     {"target_id": "biene-id", "target_name": "Biene"},
                 )
 
+    @patch("api.mobile_incidents.time.sleep")
+    @patch("api.mobile_incidents.confirmed_action_subject")
+    def test_hllv_kick_retries_one_transient_rejection(
+        self, confirmed_subject, sleep
+    ):
+        from api.mobile_incidents import _execute_action
+        from rcon.types import GameEnum
+
+        confirmed_subject.return_value = {
+            "display_name": "Biene",
+            "player_id": "biene-id",
+        }
+        kick = MagicMock(side_effect=[False, True])
+        api = SimpleNamespace(
+            config=SimpleNamespace(game=GameEnum.HLL_VIETNAM),
+            kick=kick,
+            get_players=MagicMock(
+                return_value=[{"player_id": "biene-id", "name": "Biene"}]
+            ),
+        )
+
+        with patch.dict(sys.modules, {"api.views": SimpleNamespace(rcon_api=api)}):
+            result = _execute_action(
+                "kick",
+                {
+                    "player_id": "biene-id",
+                    "reason": "Ping limit exceeded",
+                    "confirmed": True,
+                },
+                "context-admin",
+                {"target_id": "biene-id", "target_name": "Biene"},
+            )
+
+        self.assertTrue(result)
+        self.assertEqual(kick.call_count, 2)
+        sleep.assert_called_once_with(0.75)
+
+    @patch("api.mobile_incidents.time.sleep")
+    @patch("api.mobile_incidents.confirmed_action_subject")
+    def test_hll_kick_keeps_one_shot_rejection_semantics(
+        self, confirmed_subject, sleep
+    ):
+        from api.mobile_incidents import _execute_action
+        from rcon.types import GameEnum
+
+        confirmed_subject.return_value = {
+            "display_name": "Biene",
+            "player_id": "biene-id",
+        }
+        kick = MagicMock(return_value=False)
+        api = SimpleNamespace(
+            config=SimpleNamespace(game=GameEnum.HLL_WW2),
+            kick=kick,
+        )
+
+        with patch.dict(sys.modules, {"api.views": SimpleNamespace(rcon_api=api)}):
+            with self.assertRaisesRegex(ValueError, "game server rejected"):
+                _execute_action(
+                    "kick",
+                    {
+                        "player_id": "biene-id",
+                        "reason": "Ping limit exceeded",
+                        "confirmed": True,
+                    },
+                    "context-admin",
+                    {"target_id": "biene-id", "target_name": "Biene"},
+                )
+
+        kick.assert_called_once()
+        sleep.assert_not_called()
+
+    @patch("api.mobile_incidents.time.sleep")
+    @patch("api.mobile_incidents.confirmed_action_subject")
+    def test_hllv_message_is_never_duplicated_after_ambiguous_rejection(
+        self, confirmed_subject, sleep
+    ):
+        from api.mobile_incidents import _execute_action
+        from rcon.types import GameEnum
+
+        confirmed_subject.return_value = {
+            "display_name": "Biene",
+            "player_id": "biene-id",
+        }
+        message_player = MagicMock(return_value=False)
+        api = SimpleNamespace(
+            config=SimpleNamespace(game=GameEnum.HLL_VIETNAM),
+            message_player=message_player,
+        )
+
+        with patch.dict(sys.modules, {"api.views": SimpleNamespace(rcon_api=api)}):
+            with self.assertRaisesRegex(ValueError, "game server rejected"):
+                _execute_action(
+                    "message",
+                    {"player_id": "biene-id", "message": "Hallo"},
+                    "context-admin",
+                    {"target_id": "biene-id", "target_name": "Biene"},
+                )
+
+        message_player.assert_called_once()
+        sleep.assert_not_called()
+
+    @patch("api.mobile_incidents.time.sleep")
+    @patch("api.mobile_incidents.confirmed_action_subject")
+    def test_hllv_kick_accepts_verified_offline_state_without_duplicate(
+        self, confirmed_subject, sleep
+    ):
+        from api.mobile_incidents import _execute_action
+        from rcon.types import GameEnum
+
+        confirmed_subject.return_value = {
+            "display_name": "Biene",
+            "player_id": "biene-id",
+        }
+        kick = MagicMock(return_value=False)
+        api = SimpleNamespace(
+            config=SimpleNamespace(game=GameEnum.HLL_VIETNAM),
+            kick=kick,
+            get_players=MagicMock(return_value=[]),
+        )
+
+        with patch.dict(sys.modules, {"api.views": SimpleNamespace(rcon_api=api)}):
+            result = _execute_action(
+                "kick",
+                {
+                    "player_id": "biene-id",
+                    "reason": "Ping limit exceeded",
+                    "confirmed": True,
+                },
+                "context-admin",
+                {"target_id": "biene-id", "target_name": "Biene"},
+            )
+
+        self.assertTrue(result)
+        kick.assert_called_once()
+        sleep.assert_not_called()
+
+    @patch("api.mobile_incidents.time.sleep")
+    def test_hllv_retry_policy_covers_all_repeat_safe_discord_actions(self, sleep):
+        from api.mobile_incidents import (
+            HLLV_RETRYABLE_ACTIONS,
+            _run_game_action,
+        )
+        from rcon.types import GameEnum
+
+        api = SimpleNamespace(config=SimpleNamespace(game=GameEnum.HLL_VIETNAM))
+        self.assertEqual(
+            HLLV_RETRYABLE_ACTIONS,
+            {
+                "kick",
+                "temp_ban",
+                "perma_ban",
+                "remove_from_squad",
+                "disband_squad",
+            },
+        )
+        for action in HLLV_RETRYABLE_ACTIONS:
+            operation = MagicMock(side_effect=[False, True])
+            self.assertTrue(_run_game_action(action, api, operation))
+            self.assertEqual(operation.call_count, 2)
+
+        for action in {"message", "punish", "blacklist"}:
+            operation = MagicMock(return_value=False)
+            with self.assertRaisesRegex(ValueError, "game server rejected"):
+                _run_game_action(action, api, operation)
+            operation.assert_called_once()
+
+        self.assertEqual(sleep.call_count, len(HLLV_RETRYABLE_ACTIONS))
+
     @patch("api.mobile_incidents.confirmed_action_subject")
     def test_rejected_blacklist_is_not_treated_as_success(self, confirmed_subject):
         from api.mobile_incidents import _execute_action

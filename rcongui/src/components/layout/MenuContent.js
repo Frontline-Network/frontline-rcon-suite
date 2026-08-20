@@ -26,9 +26,13 @@ import { canAccessNavLink } from "@/components/Header/nav-data";
 
 const NavigationLink = ({ to, icon, text, onClick, locked, lockedReason }) => {
   const [lockedReasonOpen, setLockedReasonOpen] = useState(false);
+  // `/apps` is an index page next to more specific app routes. Without an
+  // exact match React Router also marks it active on `/apps/...`, which makes
+  // two app entries look selected at the same time.
+  const requiresExactMatch = to === "/" || to === "/apps";
   const button = (
     <ListItemButton
-      {...(!locked && { component: NavLink, to, end: to === "/" })}
+      {...(!locked && { component: NavLink, to, end: requiresExactMatch })}
       aria-disabled={locked || undefined}
       onFocus={() => locked && setLockedReasonOpen(true)}
       onBlur={() => setLockedReasonOpen(false)}
