@@ -648,6 +648,7 @@ const en = {
     toggleMenu: "Toggle navigation",
     search: "Search navigation...",
     navigateTo: "Navigate to",
+    permissionMissing: "This page is visible, but you do not have the required permission.",
     groups: {
       appsSetup: "Set up apps",
       views: "Views",
@@ -658,6 +659,14 @@ const en = {
       automods: "Automods",
       others: "Others",
       stats: "Statistics",
+      liveOperations: "Live operations",
+      playersModeration: "Players & moderation",
+      mapsGameOperations: "Maps & game operations",
+      automation: "Automation",
+      integrations: "Integrations",
+      serverConfiguration: "Server configuration",
+      logsAnalytics: "Logs & analytics",
+      systemDiagnostics: "System & diagnostics",
     },
     links: {
       home: "Overview",
