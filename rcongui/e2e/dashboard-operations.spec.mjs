@@ -25,7 +25,9 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
       expect(positions[index].top, `${positions[index].testId} must follow ${positions[index - 1].testId}`).toBeGreaterThan(positions[index - 1].top);
     }
 
-    await expect(page.getByText("HLL: Vietnam", { exact: true })).toBeVisible();
+    await expect(page.getByTestId("global-match-status")).toContainText(
+      "HLL: Vietnam"
+    );
     await expect(page.getByText("Zentrale Übersicht des ausgewählten Gameservers")).toBeVisible();
     await expectNoHorizontalPageOverflow(page);
   });
@@ -46,39 +48,39 @@ test.describe("dashboard resource states", () => {
     await expect(card.getByRole("progressbar", { name: "CPU" })).toHaveAttribute("aria-valuetext", "18 Prozent verwendet");
   });
 
-  test("explains warning, stale, partial and unavailable states", async ({ page }) => {
-    const states = [
-      {
-        mode: "warning",
-        label: "Warnung",
-        message: /RAM liegt bei 86 %/,
-      },
-      {
-        mode: "stale",
-        label: "Daten veraltet",
-        message: /letzte erfolgreiche Messung bleibt sichtbar/,
-      },
-      {
-        mode: "partial",
-        label: "Teilweise verfügbar",
-        message: /Teil der Ressourcenmessung ist nicht verfügbar/,
-      },
-      {
-        mode: "unavailable",
-        label: "Nicht verfügbar",
-        message: /keine belastbaren Ressourcenwerte/,
-      },
-    ];
+  const resourceStates = [
+    {
+      mode: "warning",
+      label: "Warnung",
+      message: /RAM liegt bei 86 %/,
+    },
+    {
+      mode: "stale",
+      label: "Daten veraltet",
+      message: /letzte erfolgreiche Messung bleibt sichtbar/,
+    },
+    {
+      mode: "partial",
+      label: "Teilweise verfügbar",
+      message: /Teil der Ressourcenmessung ist nicht verfügbar/,
+    },
+    {
+      mode: "unavailable",
+      label: "Nicht verfügbar",
+      message: /keine belastbaren Ressourcenwerte/,
+    },
+  ];
 
-    for (const state of states) {
+  for (const state of resourceStates) {
+    test(`explains the ${state.mode} resource state`, async ({ page }) => {
       await openDemoPage(page, "/", {
         query: { demo_resources: state.mode },
       });
       const card = page.getByTestId("resource-telemetry-card");
       await expect(card.getByTestId("resource-status")).toHaveText(state.label);
       await expect(card.getByText(state.message)).toBeVisible();
-    }
-  });
+    });
+  }
 
   test("opens moderation incidents as the first log category", async ({ page }) => {
     await openDemoPage(page, "/");
