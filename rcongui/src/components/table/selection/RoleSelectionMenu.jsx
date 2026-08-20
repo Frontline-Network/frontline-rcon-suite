@@ -23,7 +23,7 @@ export const RoleSelectionMenu = ({ roleOptions, onRoleSelect }) => {
     id="role-picker"
     description={t("selection.roleDescription")}
     renderButton={(props) => (
-      <Button {...props}>
+      <Button {...props} aria-label={t("selection.role")}>
         <Tooltip title={t("selection.role")}>
           <WorkIcon />
         </Tooltip>

@@ -9,6 +9,7 @@ import { styled } from "@mui/material/styles";
 import DevicesRoundedIcon from "@mui/icons-material/DevicesRounded";
 import { useGlobalStore } from "@/stores/global-state";
 import { useTranslation } from "react-i18next";
+import { getGameLabel, normalizeGame } from "@/utils/game-context";
 
 export function getServerHref(selectedServer, currentHref = window.location.href) {
   const currentUrl = new URL(currentHref);
@@ -41,13 +42,6 @@ const ListItemAvatar = styled(MuiListItemAvatar)({
   minWidth: 0,
   marginRight: 12,
 });
-
-const GAME_LABELS = {
-  hll: "HLL",
-  hllv: "HLL: Vietnam",
-};
-
-export const getGameLabel = (game) => GAME_LABELS[game] ?? null;
 
 export default function SelectContent() {
   const { t } = useTranslation();
@@ -106,7 +100,8 @@ export default function SelectContent() {
       <ListSubheader sx={{ pt: 0 }}>{t("sidebar.servers")}</ListSubheader>
       {servers ? (
         servers.map((server) => {
-          const gameLabel = getGameLabel(server.game);
+          const normalizedGame = normalizeGame(server.game);
+          const gameLabel = getGameLabel(normalizedGame);
 
           return (
             <MenuItem
@@ -138,8 +133,8 @@ export default function SelectContent() {
                 <Chip
                   label={gameLabel}
                   size="small"
-                  color={server.game === "hllv" ? "warning" : "default"}
-                  variant={server.game === "hllv" ? "filled" : "outlined"}
+                  color={normalizedGame === "hllv" ? "warning" : "default"}
+                  variant={normalizedGame === "hllv" ? "filled" : "outlined"}
                   sx={{
                     flexShrink: 0,
                     height: 22,

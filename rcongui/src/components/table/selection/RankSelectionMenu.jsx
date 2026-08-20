@@ -24,7 +24,7 @@ export const RankSelectionMenu = ({ rankOptions, onRankSelect }) => {
     id="rank-picker"
     description={t("selection.rankDescription")}
     renderButton={(props) => (
-      <Button {...props}>
+      <Button {...props} aria-label={t("selection.rank")}>
         <Tooltip title={t("selection.rank")}>
           <MilitaryTechIcon />
         </Tooltip>

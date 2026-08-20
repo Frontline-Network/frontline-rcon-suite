@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { debounce } from "lodash";
+import debounce from "lodash/debounce";
 import { cmd } from "@/utils/fetchUtils";
 import Typography from "@mui/material/Typography";
 import {

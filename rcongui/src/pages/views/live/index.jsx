@@ -29,8 +29,8 @@ import DisbandSquadDialog from "@/features/player-action/DisbandSquad";
 import MessageAllDialog from "@/features/player-action/MessageAll";
 import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/shared/PageHeader";
-import { demoGameState, isFakeMode } from "@/mirage/demo-data";
 import { getActiveBanStatus } from "./active-ban";
+import { useGlobalStore } from "@/stores/global-state";
 
 const interval = 15 * 1000; // 15 seconds
 const UNASSIGNED = "unassigned"
@@ -116,12 +116,7 @@ const Live = () => {
   });
 
   // ---------------- GAME HEADER DATA -----------------
-  const { data: gameState } = useQuery({
-    queryKey: ["game", "state"],
-    queryFn: isFakeMode() ? () => Promise.resolve(demoGameState) : cmd.GET_GAME_STATE,
-    staleTime: 5 * 1000,
-    refetchInterval: 10 * 1000,
-  });
+  const gameState = useGlobalStore((state) => state.gameState);
 
   const gameData = useMemo(() => {
     if (gameState && teamData) {
@@ -252,7 +247,20 @@ const Live = () => {
   };
 
   return (
-    <>
+    <Box
+      data-testid="live-operations"
+      sx={(theme) => ({
+        [theme.breakpoints.down("lg")]: {
+          "& .MuiButton-root, & .MuiIconButton-root, & .MuiToggleButton-root": {
+            minWidth: 44,
+            minHeight: 44,
+          },
+          "& .MuiInputBase-root": {
+            minHeight: 44,
+          },
+        },
+      })}
+    >
       <PageHeader
         eyebrow={t("views.live.eyebrow")}
         title={t("views.live.title")}
@@ -261,56 +269,68 @@ const Live = () => {
       <Grid container spacing={1}>
 
         <Grid size={12} sx={{ bgcolor: 'background.paper' }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
-            <DebouncedSearchInput
-              placeholder={t("views.live.globalSearch")}
-              onChange={handleSearch}
-            />
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            justifyContent="space-between"
+            alignItems={{ xs: "stretch", sm: "center" }}
+            spacing={1}
+          >
+            <Box sx={{ minWidth: 0, flexGrow: 1 }}>
+              <DebouncedSearchInput
+                placeholder={t("views.live.globalSearch")}
+                onChange={handleSearch}
+              />
+            </Box>
             <ToggleButtonGroup
-                value={visibleElements}
-                onChange={handleVisibility}
-                aria-label={t("common.show")}
-                multiple
-                size="small"
-                sx={{ 
-                  '& .MuiToggleButton-root': {
-                    border: 'none',
-                    p: 0.5,
-                    color: 'text.secondary',
-                    '&.Mui-selected': {
-                      bgcolor: 'transparent',
-                      color: 'text.primary',
-                    }
+              value={visibleElements}
+              onChange={handleVisibility}
+              aria-label={t("common.show")}
+              multiple
+              size="small"
+              sx={{
+                alignSelf: { xs: "flex-end", sm: "auto" },
+                flexShrink: 0,
+                '& .MuiToggleButton-root': {
+                  border: 'none',
+                  p: 0.5,
+                  color: 'text.secondary',
+                  '&.Mui-selected': {
+                    bgcolor: 'transparent',
+                    color: 'text.primary',
                   }
-                }}
-              >
-                <Tooltip title={visibleElements.includes('players') ? t("views.live.hidePlayers") : t("views.live.showPlayers")}>
-                  <span>
-                    <ToggleButton value="players">
-                      <TableChartIcon sx={{ fontSize: { xs: '1rem', lg: '1.25rem' } }} />
-                    </ToggleButton>
-                  </span>
-                </Tooltip>
-                <Tooltip title={visibleElements.includes('logs') ? t("views.live.hideLogs") : t("views.live.showLogs")}>
-                  <span>
-                    <ToggleButton value="logs">
-                      <AssessmentIcon sx={{ fontSize: { xs: '1rem', lg: '1.25rem' } }} />
-                    </ToggleButton>
-                  </span>
-                </Tooltip>
-                <Tooltip title={visibleElements.includes('header') ? t("views.live.hideHeader") : t("views.live.showHeader")}>
-                  <span>
-                    <ToggleButton value="header">
-                      <ScoreboardIcon sx={{ fontSize: { xs: '1rem', lg: '1.25rem' } }} />
-                    </ToggleButton>
-                  </span>
-                </Tooltip>
-          </ToggleButtonGroup>
+                }
+              }}
+            >
+              <Tooltip title={visibleElements.includes('players') ? t("views.live.hidePlayers") : t("views.live.showPlayers")}>
+                <ToggleButton
+                  value="players"
+                  aria-label={visibleElements.includes('players') ? t("views.live.hidePlayers") : t("views.live.showPlayers")}
+                >
+                  <TableChartIcon sx={{ fontSize: { xs: '1rem', lg: '1.25rem' } }} />
+                </ToggleButton>
+              </Tooltip>
+              <Tooltip title={visibleElements.includes('logs') ? t("views.live.hideLogs") : t("views.live.showLogs")}>
+                <ToggleButton
+                  value="logs"
+                  aria-label={visibleElements.includes('logs') ? t("views.live.hideLogs") : t("views.live.showLogs")}
+                >
+                  <AssessmentIcon sx={{ fontSize: { xs: '1rem', lg: '1.25rem' } }} />
+                </ToggleButton>
+              </Tooltip>
+              <Tooltip title={visibleElements.includes('header') ? t("views.live.hideHeader") : t("views.live.showHeader")}>
+                <ToggleButton
+                  value="header"
+                  aria-label={visibleElements.includes('header') ? t("views.live.hideHeader") : t("views.live.showHeader")}
+                >
+                  <ScoreboardIcon sx={{ fontSize: { xs: '1rem', lg: '1.25rem' } }} />
+                </ToggleButton>
+              </Tooltip>
+            </ToggleButtonGroup>
           </Stack>
           <InfoPanel gameData={gameData} playersData={playersData} />
           <Stack direction="row" alignItems="center" spacing={1}>
-              <MessageAllDialog />
-              <DisbandSquadDialog />
+            <MessageAllDialog />
+            <DisbandSquadDialog />
           </Stack>
         </Grid>
 
@@ -319,7 +339,7 @@ const Live = () => {
             <Header data={gameData} />
           </Grid>
         )}
-        
+
         {visibleElements.includes('players') && (
           <Grid
             size={{
@@ -336,7 +356,7 @@ const Live = () => {
             />
           </Grid>
         )}
-        
+
         {visibleElements.includes('logs') && (
           <Grid
             size={{
@@ -355,7 +375,7 @@ const Live = () => {
           </Grid>
         )}
       </Grid>
-    </>
+    </Box>
   );
 };
 

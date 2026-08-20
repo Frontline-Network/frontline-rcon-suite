@@ -112,6 +112,29 @@ zugestellt und die KI als nicht verfügbar markiert. Fällt Discord oder der
 Frontline-Dienst aus, hält die Outbox das Ereignis mit exponentiellem Backoff zur
 erneuten Zustellung vor; CRCON und Mobile Admin bleiben funktionsfähig.
 
+## Betriebsstatus und Diagnose
+
+`GET /api/discord/v1/status` liefert ausschließlich technische Zustände aus
+lokalen Daten: Einrichtungsstatus, Direkt-/Broker-Modus, letzten Test, letzte
+erfolgreiche Outbox-Zustellung, letzten Zustellversuch und Anzahl wartender
+Ereignisse. Dieser Abruf startet keine Discord-, Broker- oder KI-Anfrage und
+enthält weder Reporttexte noch Fähigkeiten oder Schlüssel.
+
+Ein Administrator kann mit `POST /api/discord/v1/diagnostics` bewusst einen
+Rundtest auslösen. Dabei prüft der zentrale Dienst die installierte Guild und den
+konfigurierten Kanal und sendet anschließend einen authentifizierten,
+inhaltsfreien Ping über denselben direkten Callback oder Callback-Broker zurück
+an CRCON. Das Ergebnis unterscheidet zentralen Dienst, Discord-Bindung und
+Callback. Es speichert nur Zustand, Zeitpunkt, Laufzeit und einen begrenzten
+Fehlercode. Freie Fehlermeldungen externer Dienste werden nicht persistiert.
+
+Der Rundtest läuft nur auf Anforderung, ist rate-limitiert und erzeugt kein
+Hintergrund-Polling. `POST /api/discord/v1/test-message` speichert analog den
+Zeitpunkt und den Erfolg der letzten Testnachricht. Dadurch kann die Oberfläche
+später zwischen „noch nie getestet“, „erfolgreich“, „fehlgeschlagen“ und
+„Diagnose teilweise verfügbar“ unterscheiden, ohne glaubwürdige Beispieldaten
+zu erfinden.
+
 ## Datenschutz und Evals
 
 `chat_classifications.db`, Bot-Logs und Klassifikationsdaten werden nicht

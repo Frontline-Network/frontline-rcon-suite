@@ -14,6 +14,21 @@ urlpatterns = [
         name="discord-options",
     ),
     path(
+        "status",
+        discord_integration.integration_status,
+        name="discord-status",
+    ),
+    path(
+        "diagnostics",
+        discord_integration.run_integration_diagnostics,
+        name="discord-diagnostics",
+    ),
+    path(
+        "diagnostics/ping",
+        discord_integration.diagnostic_callback_ping,
+        name="discord-diagnostic-ping",
+    ),
+    path(
         "pairings",
         discord_integration.create_discord_pairing,
         name="discord-pairing",

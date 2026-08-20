@@ -140,6 +140,7 @@ const ServicesCard = () => {
             component={Link} 
             to="/settings/services"
             size="small"
+            aria-label={t("dashboard.openServices")}
             sx={{ color: 'text.secondary' }}
           >
             <SettingsIcon />

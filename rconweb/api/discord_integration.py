@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import secrets
 from datetime import timedelta
+from datetime import timezone as datetime_timezone
 from urllib.parse import urlsplit
 
 import requests
@@ -14,7 +16,9 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
 from django.http import HttpResponse
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.views.decorators.csrf import csrf_exempt
+from sqlalchemy import case, func, select
 
 from rcon.admin_incidents import (
     IncidentConflict,
@@ -27,6 +31,7 @@ from rcon.admin_incidents import (
 )
 from rcon.incident_notifications import notify_incident_reporter
 from rcon.message_templates import get_message_templates
+from rcon.models import AdminIncidentDiscordDelivery, enter_session
 from rcon.moderation import (
     DiscordActor,
     DiscordInteractionRequest,
@@ -243,6 +248,166 @@ def _serialized(integration: DiscordReportIntegration) -> dict:
             **(integration.reporter_templates or {}),
         },
     }
+
+
+def _safe_error_code(value: object, fallback: str = "unknown_error") -> str:
+    normalized = re.sub(r"[^a-z0-9_.:=-]+", "_", str(value or "").casefold())
+    return (normalized.strip("_") or fallback)[:128]
+
+
+def _delivery_summary() -> dict:
+    """Return content-free outbox health without triggering any network work."""
+
+    try:
+        with enter_session() as session:
+            last_delivered_at, last_attempt_at, pending_count = session.execute(
+                select(
+                    func.max(AdminIncidentDiscordDelivery.delivered_at),
+                    func.max(AdminIncidentDiscordDelivery.updated_at),
+                    func.coalesce(
+                        func.sum(
+                            case(
+                                (
+                                    AdminIncidentDiscordDelivery.delivered_at.is_(None),
+                                    1,
+                                ),
+                                else_=0,
+                            )
+                        ),
+                        0,
+                    ),
+                )
+            ).one()
+            latest_error = session.execute(
+                select(AdminIncidentDiscordDelivery.last_error)
+                .where(AdminIncidentDiscordDelivery.last_error.is_not(None))
+                .order_by(AdminIncidentDiscordDelivery.updated_at.desc())
+                .limit(1)
+            ).scalar_one_or_none()
+    except Exception:
+        return {
+            "state": "unknown",
+            "last_delivered_at": None,
+            "last_attempt_at": None,
+            "pending_count": None,
+            "error_code": "outbox_status_unavailable",
+        }
+
+    pending_count = int(pending_count or 0)
+    if pending_count and latest_error:
+        state = "retrying"
+    elif pending_count:
+        state = "pending"
+    elif last_delivered_at:
+        state = "delivered"
+    else:
+        state = "idle"
+    return {
+        "state": state,
+        "last_delivered_at": last_delivered_at,
+        "last_attempt_at": last_attempt_at,
+        "pending_count": pending_count,
+        "error_code": _safe_error_code(latest_error) if pending_count else None,
+    }
+
+
+def _operational_status(integration: DiscordReportIntegration) -> dict:
+    connected = bool(
+        integration.guild_id
+        and integration.channel_id
+        and integration.inbound_capability_digest
+        and integration.outbound_capability_ciphertext
+    )
+    if not connected:
+        setup_state = "not_connected"
+    elif not integration.enabled:
+        setup_state = "paused"
+    else:
+        setup_state = "active"
+    callback_base = os.getenv("DISCORD_CALLBACK_BASE_URL", "").strip().rstrip("/")
+    return {
+        "setup_state": setup_state,
+        "enabled": integration.enabled,
+        "connected": connected,
+        "service_configured": integration.service_url.startswith("https://"),
+        "callback_mode": (
+            "broker" if callback_base.startswith("https://") else "direct"
+        ),
+        "delivery": _delivery_summary(),
+        "last_test": {
+            "state": (
+                "unknown"
+                if integration.last_test_success is None
+                else "succeeded" if integration.last_test_success else "failed"
+            ),
+            "checked_at": integration.last_test_at,
+            "error_code": integration.last_test_error or None,
+        },
+        "last_diagnostic": {
+            "checked_at": integration.last_diagnostic_at,
+            "result": integration.last_diagnostic_result or None,
+        },
+    }
+
+
+def _remote_error_code(exc: Exception) -> str:
+    response = getattr(exc, "response", None)
+    status_code = getattr(response, "status_code", None)
+    return _safe_error_code(
+        f"http_{status_code}" if isinstance(status_code, int) else type(exc).__name__
+    )
+
+
+def _normalized_diagnostic_result(raw: dict) -> dict:
+    if not isinstance(raw, dict):
+        raise ValueError("Invalid diagnostics response")
+    if str(raw.get("state")) not in {"healthy", "degraded"}:
+        raise ValueError("Invalid diagnostics state")
+    checked_at = parse_datetime(str(raw.get("checked_at") or ""))
+    if checked_at is None or not timezone.is_aware(checked_at):
+        raise ValueError("Invalid diagnostics timestamp")
+    result = {
+        "state": str(raw["state"]),
+        "checked_at": checked_at.astimezone(datetime_timezone.utc).isoformat(),
+    }
+    for key in ("service", "discord_binding", "callback"):
+        component = dict(raw.get(key) or {})
+        state = str(component.get("state") or "unknown")
+        if state not in {"online", "offline", "unknown"}:
+            raise ValueError("Invalid diagnostics component state")
+        normalized = {"state": state}
+        if component.get("error_code") is not None:
+            normalized["error_code"] = _safe_error_code(component["error_code"])
+        transport = component.get("transport")
+        if transport is not None:
+            if transport not in {"direct", "broker"}:
+                raise ValueError("Invalid diagnostics transport")
+            normalized["transport"] = transport
+        for id_key in ("guild_id", "channel_id"):
+            identifier = component.get(id_key)
+            if identifier is not None:
+                if not isinstance(identifier, str) or not re.fullmatch(
+                    r"[0-9]{1,32}", identifier
+                ):
+                    raise ValueError("Invalid diagnostics identifier")
+                normalized[id_key] = identifier
+        for name_key in ("guild_name", "channel_name"):
+            name = component.get(name_key)
+            if name is not None:
+                if not isinstance(name, str):
+                    raise ValueError("Invalid diagnostics name")
+                normalized[name_key] = name[:128]
+        latency = component.get("latency_ms")
+        if latency is not None:
+            if (
+                isinstance(latency, bool)
+                or not isinstance(latency, (int, float))
+                or not math.isfinite(latency)
+            ):
+                raise ValueError("Invalid diagnostics latency")
+            normalized["latency_ms"] = max(0, min(60_000, round(latency)))
+        result[key] = normalized
+    return result
 
 
 def _require_manager(request, command: str) -> HttpResponse | None:
@@ -680,6 +845,95 @@ def integration_detail(request):
     except (TypeError, ValueError) as exc:
         return _error(command, str(exc), 400)
     return api_response(command=command, failed=False, result=_serialized(integration))
+
+
+@csrf_exempt
+@login_required()
+@require_http_methods(["GET"])
+def integration_status(request):
+    command = "discord_report_status"
+    if denied := _require_manager(request, command):
+        return denied
+    return api_response(
+        command=command,
+        failed=False,
+        result=_operational_status(_integration()),
+    )
+
+
+@csrf_exempt
+@login_required()
+@require_http_methods(["POST"])
+def run_integration_diagnostics(request):
+    command = "discord_report_diagnostics"
+    if denied := _require_manager(request, command):
+        return denied
+    integration = _integration()
+    if not integration.outbound_capability_ciphertext:
+        return _error(command, "Discord integration is not connected", 409)
+
+    checked_at = timezone.now()
+    try:
+        response = requests.post(
+            f"{integration.service_url.rstrip('/')}/v1/diagnostics",
+            headers={
+                "Authorization": (
+                    f"Bearer {decrypt_capability(integration.outbound_capability_ciphertext)}"
+                )
+            },
+            json={"installation_id": str(integration.installation_id)},
+            timeout=12,
+        )
+        response.raise_for_status()
+        result = _normalized_diagnostic_result(response.json())
+    except (requests.RequestException, TypeError, ValueError) as exc:
+        result = {
+            "state": "degraded",
+            "checked_at": checked_at.isoformat(),
+            "service": {"state": "offline", "error_code": _remote_error_code(exc)},
+            "discord_binding": {"state": "unknown"},
+            "callback": {"state": "unknown"},
+        }
+        integration.last_diagnostic_at = checked_at
+        integration.last_diagnostic_result = result
+        integration.save(
+            update_fields=[
+                "last_diagnostic_at",
+                "last_diagnostic_result",
+                "updated_at",
+            ]
+        )
+        return _error(command, "Discord diagnostics could not be completed", 503)
+
+    integration.last_diagnostic_at = checked_at
+    integration.last_diagnostic_result = result
+    integration.save(
+        update_fields=["last_diagnostic_at", "last_diagnostic_result", "updated_at"]
+    )
+    return api_response(command=command, failed=False, result=result)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def diagnostic_callback_ping(request):
+    command = "discord_report_diagnostic_ping"
+    integration, denied = _authorized_integration(request, command)
+    if denied:
+        return denied
+    try:
+        data = _json_body(request)
+        if str(data.get("installation_id") or "") != str(integration.installation_id):
+            raise ValueError("Installation does not match capability")
+    except (TypeError, ValueError) as exc:
+        return _error(command, str(exc), 400)
+    return api_response(
+        command=command,
+        failed=False,
+        result={
+            "installation_id": str(integration.installation_id),
+            "received_at": timezone.now(),
+        },
+    )
 
 
 @csrf_exempt
@@ -1513,8 +1767,9 @@ def test_message(request):
     if denied := _require_manager(request, command):
         return denied
     integration = _integration()
-    if not integration.enabled or not integration.outbound_capability_ciphertext:
+    if not integration.outbound_capability_ciphertext:
         return _error(command, "Discord integration is not connected", 409)
+    checked_at = timezone.now()
     try:
         response = requests.post(
             f"{integration.service_url.rstrip('/')}/v1/test-messages",
@@ -1528,5 +1783,27 @@ def test_message(request):
         )
         response.raise_for_status()
     except (requests.RequestException, ValueError) as exc:
-        return _error(command, f"Discord service unavailable: {exc}", 503)
+        integration.last_test_at = checked_at
+        integration.last_test_success = False
+        integration.last_test_error = _remote_error_code(exc)
+        integration.save(
+            update_fields=[
+                "last_test_at",
+                "last_test_success",
+                "last_test_error",
+                "updated_at",
+            ]
+        )
+        return _error(command, "Discord test message could not be delivered", 503)
+    integration.last_test_at = checked_at
+    integration.last_test_success = True
+    integration.last_test_error = ""
+    integration.save(
+        update_fields=[
+            "last_test_at",
+            "last_test_success",
+            "last_test_error",
+            "updated_at",
+        ]
+    )
     return api_response(command=command, failed=False, result={"sent": True})

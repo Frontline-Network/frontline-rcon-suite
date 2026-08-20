@@ -15,7 +15,6 @@ import { useQuery } from "@tanstack/react-query";
 import { teamsLiveQueryOptions } from "@/queries/teams-live-query";
 import { TeamSection, UNASSIGNED } from "./team-section";
 import { LobbyContainer, TeamContainer } from "./styled";
-import { cmd } from "@/utils/fetchUtils";
 import GameOverview from "@/components/game/overview";
 import { OverviewSkeleton } from "./skeletons";
 import PlaylistAddCheckIcon from "@mui/icons-material/PlaylistAddCheck";
@@ -28,8 +27,8 @@ import { DebouncedSearchInput } from "@/components/shared/DebouncedSearchInput";
 import MessageAllDialog from "@/features/player-action/MessageAll";
 import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/shared/PageHeader";
-import { demoGameState, isFakeMode } from "@/mirage/demo-data";
 import AutobalancerCard from "./autobalancer-card";
+import { useGlobalStore } from "@/stores/global-state";
 
 const TeamViewPage = () => {
   const { t } = useTranslation();
@@ -39,12 +38,7 @@ const TeamViewPage = () => {
     refetchInterval: 10 * 1000,
   });
 
-  const { data: gameState } = useQuery({
-    queryKey: ["game", "state"],
-    queryFn: isFakeMode() ? () => Promise.resolve(demoGameState) : cmd.GET_GAME_STATE,
-    staleTime: 5 * 1000,
-    refetchInterval: 10 * 1000,
-  });
+  const gameState = useGlobalStore((state) => state.gameState);
 
   const gameData = useMemo(() => {
     if (gameState && teams) {

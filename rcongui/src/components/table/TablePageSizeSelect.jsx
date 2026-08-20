@@ -10,7 +10,7 @@ export const TablePageSizeSelect = ({
   return (
     <Select
       value={pageSize}
-      aria-label={t("common.pagination.pageSize")}
+      inputProps={{ "aria-label": t("common.pagination.pageSize") }}
       onChange={(e) => setPageSize(e.target.value)}
       size="small"
       MenuProps={{

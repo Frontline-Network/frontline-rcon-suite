@@ -5,7 +5,6 @@ import sys
 import traceback
 from functools import wraps
 from typing import Any, Callable
-import psutil
 
 import pydantic
 from django.http import (
@@ -21,6 +20,7 @@ from discord.utils import escape_markdown
 from rcon.api_commands import get_rcon_api
 from rcon.commands import HLLCommandFailedError
 from rcon.discord import send_to_discord_audit
+from rcon.system_usage import system_usage_sampler
 from rcon.types import (
     PublicInfoMapType,
     PublicInfoNameType,
@@ -36,7 +36,11 @@ from rconweb.settings import TAG_VERSION
 from .audit_log import auto_record_audit, record_audit
 from .auth import AUTHORIZATION, RconJsonResponse, api_response, login_required
 from .decorators import permission_required, require_content_type, require_http_methods
-from .multi_servers import forward_command
+from .forwarding import (
+    forward_command,
+    forwarding_unavailable_results,
+    normalize_forward_server_numbers,
+)
 from .ratelimits import request_rate_limit_key
 from .utils import _get_data
 
@@ -159,41 +163,13 @@ def get_public_info(request):
         command="get_public_info",
     )
 
+
 @login_required()
 @csrf_exempt
 @require_http_methods(["GET"])
 def get_system_usage(request):
-    # CPU usage (percentage)
-    cpu_percent = psutil.cpu_percent(interval=None)
-    process_count = len(list(psutil.process_iter()))
-    cpu_usage = {
-        "cores": psutil.cpu_count(),
-        "percent": cpu_percent,
-        "process_count": process_count,
-    }
-
-    # RAM usage
-    memory = psutil.virtual_memory()
-    ram_usage = {
-        "total": memory.total / (1024**3),  # Convert to GB
-        "used": memory.used / (1024**3),
-        "percent": memory.percent,
-    }
-
-    # Disk usage
-    disk = psutil.disk_usage("/")
-    disk_usage = {
-        "total": disk.total / (1024**3),  # Convert to GB
-        "used": disk.used / (1024**3),
-        "percent": disk.percent,
-    }
-
     return api_response(
-        result={
-            "cpu_usage": cpu_usage,
-            "ram_usage": ram_usage,
-            "disk_usage": disk_usage,
-        },
+        result=system_usage_sampler.get_snapshot(),
         failed=False,
         command="get_system_usage",
     )
@@ -250,6 +226,29 @@ def expose_api_endpoint(
         errors_as_json: bool = False
         res: Any = None
         data = _get_data(request)
+
+        if isinstance(data, dict) and (
+            data.get("forward") or "forward_server_numbers" in data
+        ):
+            try:
+                forward_server_numbers = normalize_forward_server_numbers(
+                    data.get("forward_server_numbers")
+                )
+            except ValueError as exc:
+                return RconJsonResponse(
+                    {
+                        "result": None,
+                        "command": command_name,
+                        "arguments": data,
+                        "failed": True,
+                        "error": str(exc),
+                        "forward_results": None,
+                        "version": TAG_VERSION,
+                    },
+                    status=400,
+                )
+            if forward_server_numbers is not None:
+                data["forward_server_numbers"] = list(forward_server_numbers)
 
         json_invalid_content_type_error = f"InvalidContentType: {request.method} {request.path} was called with {request.content_type}, expected one of {','.join(['application/json'])}"
         if request.method not in endpoint_allowed_http_methods[func]:
@@ -320,10 +319,46 @@ def expose_api_endpoint(
             failure = True
             error = e.args[0] if e.args else None
         except (TimeoutError, OSError):
-            logger.exception("RCON command %s timed out or could not reach the game server", command_name)
+            logger.exception(
+                "RCON command %s timed out or could not reach the game server",
+                command_name,
+            )
             failure = True
             rcon_unavailable = True
             error = "The game server did not respond in time. Please try again shortly."
+
+        # Handle all the special cases of forwarding commands here so we don't
+        # have to pass in HTTP requests, sessionids, auth headers, etc. to RconAPI
+        # using forward_command and not forward_request so that the `forwarded`parameter
+        # is passed to avoid infinite loops of forwarding
+        config = RconServerSettingsUserConfig.load_from_db()
+        if config.broadcast_unbans and func == rcon_api.unban:
+            try:
+                others = forward_command(
+                    path=request.path,
+                    sessionid=request.COOKIES.get("sessionid"),
+                    auth_header=request.headers.get(AUTHORIZATION),
+                    json=data,
+                )
+            except Exception as e:
+                logger.exception("Unexpected error while forwarding request: %s", e)
+                others = forwarding_unavailable_results(
+                    data.get("forward_server_numbers")
+                )
+        # Handle all the other non special case forwarding
+        elif data.get("forward"):
+            try:
+                others = forward_command(
+                    path=request.path,
+                    sessionid=request.COOKIES.get("sessionid"),
+                    auth_header=request.headers.get(AUTHORIZATION),
+                    json=data,
+                )
+            except Exception as e:
+                logger.exception("Unexpected error while forwarding request: %s", e)
+                others = forwarding_unavailable_results(
+                    data.get("forward_server_numbers")
+                )
 
         response = RconJsonResponse(
             dict(
@@ -337,33 +372,6 @@ def expose_api_endpoint(
             ),
             status=504 if rcon_unavailable else (400 if error is not None else 200),
         )
-
-        # Handle all the special cases of forwarding commands here so we don't
-        # have to pass in HTTP requests, sessionids, auth headers, etc. to RconAPI
-        # using forward_command and not forward_request so that the `forwarded`parameter
-        # is passed to avoid infinite loops of forwarding
-        config = RconServerSettingsUserConfig.load_from_db()
-        if config.broadcast_unbans and func == rcon_api.unban:
-            try:
-                forward_command(
-                    path=request.path,
-                    sessionid=request.COOKIES.get("sessionid"),
-                    auth_header=request.headers.get(AUTHORIZATION),
-                    json=data,
-                )
-            except Exception as e:
-                logger.error("Unexpected error while forwarding request: %s", e)
-        # Handle all the other non special case forwarding
-        elif data.get("forward"):
-            try:
-                forward_command(
-                    path=request.path,
-                    sessionid=request.COOKIES.get("sessionid"),
-                    auth_header=request.headers.get(AUTHORIZATION),
-                    json=data,
-                )
-            except Exception as e:
-                logger.error("Unexpected error while forwarding request: %s", e)
 
         return response
 
@@ -989,7 +997,7 @@ commands = [
     ("get_connection_info", get_connection_info),
     ("get_public_info", get_public_info),
     ("run_raw_command", run_raw_command),
-    ("get_system_usage", get_system_usage)
+    ("get_system_usage", get_system_usage),
 ]
 
 if not os.getenv("HLL_MAINTENANCE_CONTAINER") and not os.getenv(

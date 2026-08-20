@@ -350,34 +350,22 @@ const rawNavMenus = [
     links: [
       {
         name: "Live Sessions",
-        to: "stats/live-sessions",
+        to: "/stats/live-sessions",
         icon: <BrowseGalleryIcon />,
       },
       {
         name: "Live Game",
-        to: "stats/live-game",
+        to: "/stats/live-game",
         icon: <SportsEsportsIcon />,
       },
       {
         name: "Games",
-        to: "stats/games",
+        to: "/stats/games",
         icon: <HourglassBottomIcon />,
       },
     ],
   },
 ];
-
-const groupTranslationKeys = {
-  "Apps setup": "navigation.groups.appsSetup",
-  Views: "navigation.groups.views",
-  Maps: "navigation.groups.maps",
-  Records: "navigation.groups.records",
-  Settings: "navigation.groups.settings",
-  Webhooks: "navigation.groups.webhooks",
-  Automods: "navigation.groups.automods",
-  Others: "navigation.groups.others",
-  Stats: "navigation.groups.stats",
-};
 
 const linkTranslationKeys = {
   "/": "navigation.links.home",
@@ -427,17 +415,221 @@ const linkTranslationKeys = {
   "/settings/others/gtx-server": "navigation.links.gtxServer",
   "/settings/others/log-stream": "navigation.links.logStream",
   "/settings/others/watch-kill-rate": "navigation.links.watchKillRate",
-  "stats/live-sessions": "navigation.links.liveSessions",
-  "stats/live-game": "navigation.links.liveGame",
-  "stats/games": "navigation.links.games",
+  "/stats/live-sessions": "navigation.links.liveSessions",
+  "/stats/live-game": "navigation.links.liveGame",
+  "/stats/games": "navigation.links.games",
 };
 
-export const navMenus = rawNavMenus.map((menu, index) => ({
-  ...menu,
-  id: menu.name?.toLowerCase() || `root-${index}`,
-  translationKey: groupTranslationKeys[menu.name],
-  links: menu.links.map((link) => ({
-    ...link,
-    translationKey: linkTranslationKeys[link.to],
+const linksByRoute = Object.fromEntries(
+  rawNavMenus
+    .flatMap((menu) => menu.links)
+    .map((link) => [
+      link.to,
+      {
+        ...link,
+        translationKey: linkTranslationKeys[link.to],
+      },
+    ])
+);
+
+// Navigation follows the jobs administrators perform. The routes stay stable;
+// this is deliberately only a clearer information architecture on top of the
+// existing pages.
+const taskGroupDefinitions = [
+  {
+    id: "live-operations",
+    translationKey: "navigation.groups.liveOperations",
+    icon: <BoltIcon />,
+    routes: ["/views/live", "/views/team"],
+  },
+  {
+    id: "players-moderation",
+    translationKey: "navigation.groups.playersModeration",
+    icon: <PeopleIcon />,
+    routes: [
+      "/records/players",
+      "/records/vips",
+      "/records/blacklists",
+      "/settings/console-admins",
+      "/settings/templates/message",
+      "/settings/profanity-filter",
+    ],
+  },
+  {
+    id: "maps-game-operations",
+    translationKey: "navigation.groups.mapsGameOperations",
+    icon: <MapIcon />,
+    routes: [
+      "/settings/maps/change",
+      "/settings/maps/rotation",
+      "/settings/maps/objectives",
+      "/settings/maps/votemap",
+      "/settings/welcome-message",
+      "/settings/broadcast-message",
+    ],
+  },
+  {
+    id: "automation",
+    translationKey: "navigation.groups.automation",
+    icon: <SmartToyIcon />,
+    routes: [
+      "/views/autobalancer",
+      "/settings/autosettings",
+      "/settings/automods/level",
+      "/settings/automods/no-leader",
+      "/settings/automods/seeding",
+      "/settings/automods/no-solo-tank",
+      "/settings/others/vac-bans",
+      "/settings/others/tk-bans",
+      "/settings/others/name-kicks",
+      "/settings/others/seed-vip",
+      "/settings/others/expired-vip",
+    ],
+  },
+  {
+    id: "integrations",
+    translationKey: "navigation.groups.integrations",
+    icon: <WebhookIcon />,
+    routes: [
+      "/apps",
+      "/apps/discord-report-bot",
+      "/settings/webhooks/audit",
+      "/settings/webhooks/admin-ping",
+      "/settings/webhooks/watchlist",
+      "/settings/webhooks/camera",
+      "/settings/webhooks/chat",
+      "/settings/webhooks/kills",
+      "/settings/webhooks/log-line",
+      "/settings/others/gtx-server",
+    ],
+  },
+  {
+    id: "server-configuration",
+    translationKey: "navigation.groups.serverConfiguration",
+    icon: <SettingsIcon />,
+    routes: [
+      "/settings/general",
+      "/settings/others/chat-commands",
+      "/settings/others/rcon-chat-commands",
+      "/settings/others/scoreboard",
+    ],
+  },
+  {
+    id: "logs-analytics",
+    translationKey: "navigation.groups.logsAnalytics",
+    icon: <AnalyticsIcon />,
+    routes: [
+      "/records/game-logs",
+      "/records/audit-logs",
+      "/stats/live-sessions",
+      "/stats/live-game",
+      "/stats/games",
+    ],
+  },
+  {
+    id: "system-diagnostics",
+    translationKey: "navigation.groups.systemDiagnostics",
+    icon: <MiscellaneousServicesIcon />,
+    routes: [
+      "/settings/services",
+      "/settings/others/game-server",
+      "/settings/others/crcon",
+      "/settings/others/steam",
+      "/settings/others/log-stream",
+      "/settings/others/watch-kill-rate",
+    ],
+  },
+];
+
+const linkPermissionKeys = {
+  "/views/live": ["can_view_recent_logs"],
+  "/views/team": ["can_view_team_view"],
+  "/settings/maps/change": ["can_view_current_map", "can_change_current_map"],
+  "/records/players": ["can_view_player_history", "can_view_player_info"],
+  "/records/vips": ["can_view_vip_ids"],
+  "/records/blacklists": ["can_view_blacklists"],
+  "/settings/console-admins": ["can_view_admins"],
+  "/settings/templates/message": ["can_view_message_templates"],
+  "/settings/profanity-filter": ["can_view_profanities"],
+  "/settings/maps/rotation": ["can_view_map_rotation"],
+  "/settings/maps/objectives": ["can_view_all_maps"],
+  "/settings/maps/votemap": [
+    "can_view_votemap_status",
+    "can_view_votemap_config",
+  ],
+  "/settings/welcome-message": ["can_view_welcome_message"],
+  "/settings/broadcast-message": ["can_view_broadcast_message"],
+  "/settings/autosettings": ["can_view_auto_settings"],
+  "/settings/automods/level": ["can_view_auto_mod_level_config"],
+  "/settings/automods/no-leader": ["can_view_auto_mod_no_leader_config"],
+  "/settings/automods/seeding": ["can_view_auto_mod_seeding_config"],
+  "/settings/automods/no-solo-tank": ["can_view_auto_mod_solo_tank_config"],
+  "/settings/others/vac-bans": ["can_view_vac_game_bans_config"],
+  "/settings/others/tk-bans": ["can_view_tk_ban_on_connect_config"],
+  "/settings/others/name-kicks": ["can_view_name_kick_config"],
+  "/settings/others/expired-vip": ["can_view_expired_vip_config"],
+  "/settings/webhooks/audit": ["can_view_audit_discord_webhooks_config"],
+  "/settings/webhooks/admin-ping": [
+    "can_view_admin_pings_discord_webhooks_config",
+  ],
+  "/settings/webhooks/watchlist": [
+    "can_view_watchlist_discord_webhooks_config",
+  ],
+  "/settings/webhooks/camera": [
+    "can_view_camera_discord_webhooks_config",
+    "can_view_camera_config",
+  ],
+  "/settings/webhooks/chat": ["can_view_chat_discord_webhooks_config"],
+  "/settings/webhooks/kills": ["can_view_kills_discord_webhooks_config"],
+  "/settings/webhooks/log-line": ["can_view_log_line_discord_webhook_config"],
+  "/settings/others/gtx-server": ["can_view_server_name_change_config"],
+  "/settings/general": [
+    "can_view_team_switch_cooldown",
+    "can_view_queue_length",
+    "can_view_idle_autokick_time",
+    "can_view_autobalance_enabled",
+    "can_view_votekick_enabled",
+    "can_view_vip_slots",
+  ],
+  "/settings/others/chat-commands": ["can_view_chat_commands_config"],
+  "/settings/others/scoreboard": ["can_view_scorebot_config"],
+  "/records/game-logs": ["can_view_game_logs"],
+  "/records/audit-logs": ["can_view_audit_logs"],
+  "/settings/services": ["can_view_available_services"],
+  "/settings/others/game-server": ["can_view_rcon_connection_settings_config"],
+  "/settings/others/crcon": ["can_view_rcon_server_settings_config"],
+  "/settings/others/steam": ["can_view_steam_config"],
+  "/settings/others/log-stream": ["can_view_log_stream_config"],
+  "/settings/others/watch-kill-rate": ["can_view_watch_killrate_config"],
+};
+
+const withPermissions = (link) => ({
+  ...link,
+  requiredPermissions: linkPermissionKeys[link.to] || [],
+});
+
+export const canAccessNavLink = (link, permissions) => {
+  if (permissions?.is_superuser) return true;
+  if (!link?.requiredPermissions?.length) return true;
+
+  const grantedPermissions = new Set(
+    (permissions?.permissions || []).map((entry) =>
+      typeof entry === "string" ? entry : entry.permission
+    )
+  );
+  return link.requiredPermissions.some((permission) =>
+    grantedPermissions.has(permission)
+  );
+};
+
+export const navMenus = [
+  {
+    id: "root",
+    links: [withPermissions(linksByRoute["/"])],
+  },
+  ...taskGroupDefinitions.map(({ routes, ...group }) => ({
+    ...group,
+    name: group.id,
+    links: routes.map((route) => withPermissions(linksByRoute[route])),
   })),
-}));
+];

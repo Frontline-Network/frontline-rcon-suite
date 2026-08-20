@@ -1,11 +1,8 @@
-import {
-    faEdgeLegacy,
-  faFortAwesome,
-  faPlaystation,
-  faSteam,
-  faXbox,
-} from "@fortawesome/free-brands-svg-icons";
-import { faGamepad } from "@fortawesome/free-solid-svg-icons";
+import { faEdgeLegacy } from "@fortawesome/free-brands-svg-icons/faEdgeLegacy";
+import { faPlaystation } from "@fortawesome/free-brands-svg-icons/faPlaystation";
+import { faSteam } from "@fortawesome/free-brands-svg-icons/faSteam";
+import { faXbox } from "@fortawesome/free-brands-svg-icons/faXbox";
+import { faGamepad } from "@fortawesome/free-solid-svg-icons/faGamepad";
 
 export const PLATFORMS = {
   STEAM: "steam",
@@ -72,5 +69,5 @@ export const getPlatformLabel = (platformValue) => {
 };
 
 export const getPlatformIcon = (platformValue) => {
-    return PLATFORMS_TO_ICON[platformValue] || faGamepad;
+  return PLATFORMS_TO_ICON[platformValue] || faGamepad;
 };

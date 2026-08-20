@@ -14,7 +14,7 @@ const languages = [
   { code: "en", key: "language.en" },
 ];
 
-export default function LanguageSelector() {
+export default function LanguageSelector({ touchSafe = false }) {
   const { i18n, t } = useTranslation();
   const [anchorEl, setAnchorEl] = useState(null);
   const language = i18n.resolvedLanguage || "de";
@@ -32,6 +32,7 @@ export default function LanguageSelector() {
           size="small"
           aria-label={t("language.label")}
           onClick={(event) => setAnchorEl(event.currentTarget)}
+          sx={touchSafe ? { minWidth: 44, minHeight: 44 } : undefined}
         >
           <TranslateRoundedIcon />
         </IconButton>

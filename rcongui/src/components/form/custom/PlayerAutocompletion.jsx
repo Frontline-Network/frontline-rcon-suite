@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { debounce } from "lodash";
+import debounce from "lodash/debounce";
 import { handle_http_errors, postData, showResponse } from "@/utils/fetchUtils";
 import Autocomplete from "@mui/material/Autocomplete";
 import Typography from "@mui/material/Typography";
@@ -84,7 +84,12 @@ export default function PlayerAutocompletion({ player, setPlayer }) {
         setPlayer((prev) => ({ ...prev, name: value }))
       }
       renderInput={(params) => (
-        <TextField {...params} value={player.name} label={t("records.players.playerName")} type="text" />
+        <TextField
+          {...params}
+          value={player.name}
+          label={t("records.players.playerName")}
+          type="text"
+        />
       )}
     />
   );

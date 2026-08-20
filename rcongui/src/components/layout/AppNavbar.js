@@ -9,8 +9,9 @@ import MenuButton from "./MenuButton";
 import NavbarBreadcrumbs from "./NavbarBreadcrumbs";
 import { useMediaQuery, useTheme } from "@mui/system";
 import ServerStatus from "../Header/server-status";
-import { useAppStore } from "@/stores/app-state";
 import FrontlineBrand from "./FrontlineBrand";
+import { useTranslation } from "react-i18next";
+import { useState } from "react";
 
 const Toolbar = styled(MuiToolbar)({
   width: "100%",
@@ -29,6 +30,8 @@ const Toolbar = styled(MuiToolbar)({
 });
 
 const AppNavbarBase = ({ toggleDrawer, open, isSmallScreen }) => {
+  const { t } = useTranslation();
+
   return (
     <AppBar
       position="fixed"
@@ -50,16 +53,22 @@ const AppNavbarBase = ({ toggleDrawer, open, isSmallScreen }) => {
             width: "100%",
           }}
         >
-          <MenuButton aria-label="menu" onClick={toggleDrawer}>
+          <MenuButton aria-label={t("navigation.openMenu")} onClick={toggleDrawer}>
             <MenuRoundedIcon />
           </MenuButton>
           <FrontlineBrand compact />
           <Stack
             direction="row"
             spacing={1}
-            sx={{ justifyContent: "end", flexShrink: 0, flexGrow: 1, pl: 1 }}
+            sx={{
+              justifyContent: "end",
+              flexGrow: 1,
+              minWidth: 0,
+              overflow: "hidden",
+              pl: 1,
+            }}
           >
-            <NavbarBreadcrumbs />
+            <NavbarBreadcrumbs mobileCompact />
           </Stack>
         </Stack>
         {isSmallScreen && <ServerStatus compact={isSmallScreen || !open} />}
@@ -69,8 +78,8 @@ const AppNavbarBase = ({ toggleDrawer, open, isSmallScreen }) => {
 };
 
 export default function AppNavbar() {
-  const openDrawer = useAppStore((state) => state.openDrawer);
-  const toggleDrawer = useAppStore((state) => state.toggleDrawer);
+  const [openDrawer, setOpenDrawer] = useState(false);
+  const toggleDrawer = () => setOpenDrawer((current) => !current);
   const theme = useTheme();
   const isSmallScreen = useMediaQuery(theme.breakpoints.down("lg"));
 

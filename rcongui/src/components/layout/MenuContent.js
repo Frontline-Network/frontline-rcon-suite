@@ -6,46 +6,97 @@ import ListItemText from "@mui/material/ListItemText";
 import Stack from "@mui/material/Stack";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import { NavLink } from "react-router-dom";
-import { Collapse, TextField, InputAdornment, IconButton, Box } from "@mui/material";
+import {
+  Collapse,
+  TextField,
+  InputAdornment,
+  IconButton,
+  Box,
+  Tooltip,
+} from "@mui/material";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "@/stores/app-state";
 import SearchIcon from "@mui/icons-material/Search";
 import CloseIcon from "@mui/icons-material/Close";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "@/hooks/useAuth";
+import { canAccessNavLink } from "@/components/Header/nav-data";
 
-const NavigationLink = ({ to, icon, text, onClick }) => {
+const NavigationLink = ({ to, icon, text, onClick, locked, lockedReason }) => {
+  const [lockedReasonOpen, setLockedReasonOpen] = useState(false);
+  const button = (
+    <ListItemButton
+      {...(!locked && { component: NavLink, to, end: to === "/" })}
+      aria-disabled={locked || undefined}
+      onFocus={() => locked && setLockedReasonOpen(true)}
+      onBlur={() => setLockedReasonOpen(false)}
+      onClick={(event) => {
+        if (locked) {
+          event.preventDefault();
+          return;
+        }
+        onClick();
+      }}
+      sx={{
+        borderLeft: "2px solid transparent",
+        borderRadius: 0,
+        minHeight: 44,
+        ...(locked && {
+          color: "text.disabled",
+          cursor: "not-allowed",
+        }),
+        "&.active": {
+          color: "primary.light",
+          borderLeftColor: "primary.main",
+          bgcolor: "action.selected",
+        },
+      }}
+    >
+      {icon && <ListItemIcon>{icon}</ListItemIcon>}
+      <ListItemText primary={text} />
+      {locked && (
+        <LockOutlinedIcon aria-hidden fontSize="small" sx={{ ml: 1 }} />
+      )}
+    </ListItemButton>
+  );
 
   return (
-    <ListItem key={to} onClick={onClick} disablePadding sx={{ display: "block" }}>
-      <ListItemButton
-        component={NavLink}
-        to={to}
-        end={to === "/"}
-        sx={{
-          borderLeft: "2px solid transparent",
-          borderRadius: 0,
-          minHeight: 38,
-          "&.active": {
-            color: "primary.light",
-            borderLeftColor: "primary.main",
-            bgcolor: "action.selected",
-          },
-        }}
-      >
-        {icon && <ListItemIcon>{icon}</ListItemIcon>}
-        <ListItemText primary={text} />
-      </ListItemButton>
+    <ListItem key={to} disablePadding sx={{ display: "block" }}>
+      {locked ? (
+        <Tooltip
+          title={lockedReason}
+          placement="right"
+          arrow
+          describeChild
+          open={lockedReasonOpen}
+          onOpen={() => setLockedReasonOpen(true)}
+          onClose={() => setLockedReasonOpen(false)}
+        >
+          {button}
+        </Tooltip>
+      ) : (
+        button
+      )}
     </ListItem>
   );
 };
 
-const Group = ({ groupName, icon, level = 1, open, forceOpen = false, onToggle, children }) => {
+const Group = ({
+  groupName,
+  icon,
+  level = 1,
+  open,
+  forceOpen = false,
+  onToggle,
+  children,
+}) => {
   const isOpen = forceOpen || open;
 
   return (
     <ListItem key={groupName} disablePadding sx={{ display: "block" }}>
-      <ListItemButton onClick={onToggle}>
+      <ListItemButton onClick={onToggle} sx={{ minHeight: 44 }}>
         {icon && <ListItemIcon>{icon}</ListItemIcon>}
         <ListItemText primary={groupName} />
         {isOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
@@ -65,6 +116,7 @@ const Group = ({ groupName, icon, level = 1, open, forceOpen = false, onToggle, 
 
 export default function MenuContent({ navigationTree, isMobile }) {
   const { t } = useTranslation();
+  const { permissions } = useAuth();
   const toggleDrawer = useAppStore((state) => state.toggleDrawer);
   const groupOpenState = useAppStore((state) => state.groupOpenState);
   const toggleMenuGroupOpen = useAppStore((state) => state.toggleMenuGroupOpen);
@@ -75,7 +127,10 @@ export default function MenuContent({ navigationTree, isMobile }) {
     if (typeof navigator === "undefined") return false;
     const ua = navigator.userAgent || "";
     const uaPlatform = navigator.userAgentData?.platform || "";
-    return /mac|iphone|ipad|ipod/i.test(uaPlatform) || /Mac OS X|Macintosh|iPhone|iPad|iPod/i.test(ua);
+    return (
+      /mac|iphone|ipad|ipod/i.test(uaPlatform) ||
+      /Mac OS X|Macintosh|iPhone|iPad|iPod/i.test(ua)
+    );
   }, []);
 
   const keyHintLabel = isApplePlatform ? "⌘K" : "Ctrl+K";
@@ -98,7 +153,8 @@ export default function MenuContent({ navigationTree, isMobile }) {
     };
 
     window.addEventListener("keydown", onKeyDown, { capture: true });
-    return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
+    return () =>
+      window.removeEventListener("keydown", onKeyDown, { capture: true });
   }, [isApplePlatform]);
 
   const toggleGroup = (groupId) => {
@@ -114,7 +170,8 @@ export default function MenuContent({ navigationTree, isMobile }) {
   };
 
   // Filter navigation tree based on search term
-  const getLabel = (item) => item.translationKey ? t(item.translationKey) : item.name;
+  const getLabel = (item) =>
+    item.translationKey ? t(item.translationKey) : item.name;
 
   const filterNavigationTree = (tree, searchTerm) => {
     if (!searchTerm.trim()) {
@@ -127,8 +184,10 @@ export default function MenuContent({ navigationTree, isMobile }) {
       .map((group) => {
         // Check if group has a name (it's a group)
         if ("name" in group) {
-          const groupNameMatches = getLabel(group).toLowerCase().includes(lowerSearchTerm);
-          
+          const groupNameMatches = getLabel(group)
+            .toLowerCase()
+            .includes(lowerSearchTerm);
+
           // Filter links that match
           const matchingLinks = group.links.filter((link) =>
             getLabel(link).toLowerCase().includes(lowerSearchTerm)
@@ -221,11 +280,16 @@ export default function MenuContent({ navigationTree, isMobile }) {
                   </Box>
                 </InputAdornment>
               ),
-            }
+            },
           }}
         />
         {isMobile && (
-          <IconButton size="small" onClick={toggleDrawer} aria-label={t("common.close")}>
+          <IconButton
+            size="small"
+            onClick={toggleDrawer}
+            aria-label={t("common.close")}
+            sx={{ minWidth: 44, minHeight: 44 }}
+          >
             <CloseIcon sx={{ fontSize: 24 }} />
           </IconButton>
         )}
@@ -241,6 +305,8 @@ export default function MenuContent({ navigationTree, isMobile }) {
                 text={getLabel(link)}
                 icon={link.icon}
                 onClick={handleLinkClick}
+                locked={!canAccessNavLink(link, permissions)}
+                lockedReason={t("navigation.permissionMissing")}
               />
             ))
           )}
@@ -263,6 +329,8 @@ export default function MenuContent({ navigationTree, isMobile }) {
                   text={getLabel(link)}
                   icon={link.icon}
                   onClick={handleLinkClick}
+                  locked={!canAccessNavLink(link, permissions)}
+                  lockedReason={t("navigation.permissionMissing")}
                 />
               ))}
             </Group>

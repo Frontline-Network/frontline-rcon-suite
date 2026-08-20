@@ -180,6 +180,12 @@ export const cmd = {
     }),
   GET_AUTOSETTINGS: (params) =>
     requestFactory({ method: "GET", cmd: "get_auto_settings", ...params }),
+  PREVIEW_AUTOSETTINGS: (params) =>
+    requestFactory({
+      method: "POST",
+      cmd: "preview_auto_settings",
+      ...params,
+    }),
   GET_AUTOBALANCER_STATUS: (params) =>
     requestFactory({
       method: "GET",
@@ -367,6 +373,12 @@ export const cmd = {
     }),
   GET_SERVER_SETTINGS: (params) =>
     requestFactory({ method: "GET", cmd: "get_server_settings", ...params }),
+  GET_GENERAL_SETTING_EFFECTS: (params) =>
+    requestFactory({
+      method: "GET",
+      cmd: "get_general_setting_effects",
+      ...params,
+    }),
   GET_SERVICES: (params) =>
     requestFactory({ method: "GET", cmd: "get_services", ...params }),
   GET_SYSTEM_USAGE: (params) =>

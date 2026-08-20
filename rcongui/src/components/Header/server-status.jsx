@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
-import { Box, Divider, Skeleton, Stack, Typography } from "@mui/material";
+import { Box, Skeleton, Stack, Typography } from "@mui/material";
 import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 import MapRoundedIcon from "@mui/icons-material/MapRounded";
 import TimerRoundedIcon from "@mui/icons-material/TimerRounded";
+import DnsRoundedIcon from "@mui/icons-material/DnsRounded";
 import { alpha } from "@mui/material/styles";
 import { useTranslation } from "react-i18next";
 import { useGlobalStore } from "@/stores/global-state";
+import { CONNECTION_STATE } from "@/utils/connectionHealth";
+import { getGameLabel } from "@/utils/game-context";
 
 const formatRemainingTime = (seconds) => {
   const value = Math.max(0, Math.floor(Number(seconds) || 0));
@@ -18,7 +21,23 @@ const formatRemainingTime = (seconds) => {
     .join(":");
 };
 
-const StatusItem = ({ icon, label, value, grow = false }) => (
+const stateTones = {
+  [CONNECTION_STATE.ONLINE]: "success.main",
+  [CONNECTION_STATE.PARTIAL]: "warning.main",
+  [CONNECTION_STATE.STALE]: "warning.main",
+  [CONNECTION_STATE.OFFLINE]: "error.main",
+  [CONNECTION_STATE.LOADING]: "info.main",
+  [CONNECTION_STATE.UNKNOWN]: "text.disabled",
+  [CONNECTION_STATE.DISABLED]: "text.disabled",
+};
+
+const StatusItem = ({
+  icon,
+  label,
+  value,
+  grow = false,
+  tone = "primary.main",
+}) => (
   <Stack
     direction="row"
     spacing={0.75}
@@ -32,7 +51,7 @@ const StatusItem = ({ icon, label, value, grow = false }) => (
     <Box
       sx={{
         display: "flex",
-        color: "primary.main",
+        color: tone,
         flexShrink: 0,
         "& svg": { fontSize: { xs: 17, sm: 19 } },
       }}
@@ -73,10 +92,12 @@ const StatusItem = ({ icon, label, value, grow = false }) => (
 
 const ServerStatus = ({ compact = false }) => {
   const { t } = useTranslation();
-  const serverState = useGlobalStore((state) => state.status);
+  const serverStatus = useGlobalStore((state) => state.status);
+  const serverConnection = useGlobalStore((state) => state.serverState);
   const gameState = useGlobalStore((state) => state.gameState);
+  const connectionHealth = useGlobalStore((state) => state.connectionHealth);
   const [timeRemaining, setTimeRemaining] = useState(
-    Number(gameState?.time_remaining) || 0,
+    Number(gameState?.time_remaining) || 0
   );
 
   useEffect(() => {
@@ -84,28 +105,69 @@ const ServerStatus = ({ compact = false }) => {
   }, [gameState?.time_remaining]);
 
   useEffect(() => {
-    if (!gameState || timeRemaining <= 0) return undefined;
+    if (
+      !gameState ||
+      timeRemaining <= 0 ||
+      connectionHealth.gameState.state !== CONNECTION_STATE.ONLINE
+    ) {
+      return undefined;
+    }
 
     const interval = window.setInterval(() => {
       setTimeRemaining((value) => Math.max(0, value - 1));
     }, 1000);
 
     return () => window.clearInterval(interval);
-  }, [gameState, timeRemaining <= 0]);
+  }, [connectionHealth.gameState.state, gameState, timeRemaining <= 0]);
 
-  const hasLiveData = Boolean(serverState && gameState);
-  const players = hasLiveData
-    ? `${serverState.current_players ?? 0}/${serverState.max_players ?? 100}`
-    : null;
-  const mapName = gameState?.current_map?.pretty_name ?? t("matchStatus.unknownMap");
+  const displayLiveValue = (value, health) => {
+    if (value === null || value === undefined || value === "") {
+      return t("common.unknown");
+    }
+    if (health.state === CONNECTION_STATE.ONLINE) return value;
+    if (health.state === CONNECTION_STATE.STALE) {
+      return `${value} · ${t("connectionStates.stale")}`;
+    }
+    return t("common.unknown");
+  };
+
+  const hasPlayerData =
+    serverStatus?.current_players != null && serverStatus?.max_players != null;
+  const players = displayLiveValue(
+    hasPlayerData
+      ? `${serverStatus.current_players}/${serverStatus.max_players}`
+      : null,
+    connectionHealth.gameServer
+  );
+  const currentMapName = gameState?.current_map?.pretty_name;
+  const mapName = currentMapName
+    ? displayLiveValue(currentMapName, connectionHealth.gameState)
+    : t("matchStatus.unknownMap");
+  const identity = serverConnection || serverStatus;
+  const gameLabel = getGameLabel(identity?.game) || t("common.unknown");
+  const currentServerLabel = identity?.short_name || identity?.name;
+  const serverLabel = currentServerLabel
+    ? displayLiveValue(currentServerLabel, connectionHealth.crcon)
+    : t("dashboard.unknownServer");
+  const serverNumber =
+    identity?.server_number != null
+      ? t("sidebar.serverNumber", { number: identity.server_number })
+      : t("matchStatus.unknownServerNumber");
+  const isInitialLoading =
+    connectionHealth.crcon.state === CONNECTION_STATE.LOADING && !identity;
+  const identityTone =
+    stateTones[connectionHealth.crcon.state] || "text.disabled";
+  const gameDataState =
+    connectionHealth.gameData?.state ?? CONNECTION_STATE.UNKNOWN;
 
   return (
     <Box
       role="status"
       aria-label={t("matchStatus.ariaLabel")}
       data-testid="global-match-status"
+      data-connection-state={gameDataState}
       sx={(theme) => ({
-        width: compact ? "100%" : "min(100%, 560px)",
+        width: compact ? "100%" : "min(100%, 680px)",
         minWidth: 0,
         px: { xs: 1.25, sm: 1.5 },
         py: 0.75,
@@ -116,14 +178,27 @@ const ServerStatus = ({ compact = false }) => {
         boxShadow: `inset 3px 0 0 ${theme.palette.primary.main}`,
       })}
     >
-      <Stack
-        direction="row"
-        divider={<Divider orientation="vertical" flexItem />}
-        spacing={{ xs: 1, sm: 1.5 }}
-        sx={{ alignItems: "center", minWidth: 0 }}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: compact
+            ? "minmax(0, 1fr) minmax(82px, auto)"
+            : "minmax(150px, 1.4fr) auto minmax(110px, 1fr) auto",
+          alignItems: "center",
+          columnGap: { xs: 1, sm: 1.5 },
+          rowGap: 1,
+          minWidth: 0,
+        }}
       >
-        {hasLiveData ? (
+        {!isInitialLoading ? (
           <>
+            <StatusItem
+              icon={<DnsRoundedIcon />}
+              label={`${serverNumber} · ${gameLabel}`}
+              value={serverLabel}
+              grow
+              tone={identityTone}
+            />
             <StatusItem
               icon={<GroupsRoundedIcon />}
               label={t("matchStatus.players")}
@@ -138,7 +213,10 @@ const ServerStatus = ({ compact = false }) => {
             <StatusItem
               icon={<TimerRoundedIcon />}
               label={t("matchStatus.remaining")}
-              value={formatRemainingTime(timeRemaining)}
+              value={displayLiveValue(
+                gameState ? formatRemainingTime(timeRemaining) : null,
+                connectionHealth.gameState
+              )}
             />
           </>
         ) : (
@@ -146,9 +224,10 @@ const ServerStatus = ({ compact = false }) => {
             <Skeleton variant="rounded" width={74} height={30} />
             <Skeleton variant="rounded" sx={{ flex: 1 }} height={30} />
             <Skeleton variant="rounded" width={82} height={30} />
+            <Skeleton variant="rounded" width={82} height={30} />
           </>
         )}
-      </Stack>
+      </Box>
     </Box>
   );
 };

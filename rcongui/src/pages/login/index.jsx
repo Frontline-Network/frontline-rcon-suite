@@ -163,6 +163,10 @@ export default function Login() {
 
   useEffect(() => setLoading(false), [authError]);
 
+  useEffect(() => {
+    document.title = t("login.documentTitle");
+  }, [t]);
+
   const onSubmit = (values, e) => {
     setLoading(true);
     submit(e.target);

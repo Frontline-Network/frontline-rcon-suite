@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
 import { useGlobalStore } from "@/stores/global-state";
-import { gameQueryOptions } from "@/queries/game-query";
-import { useQuery } from "@tanstack/react-query";
-import { cmd } from "@/utils/fetchUtils";
 import { useTranslation } from "react-i18next";
+import { CONNECTION_STATE } from "@/utils/connectionHealth";
 
 const icons = {
   idle: "⚫",
@@ -20,27 +18,10 @@ const blinkInterval = 500;
 
 const TitleManager = () => {
   const { t } = useTranslation();
-  const { data: gameState, isLoading: isGameLoading } = useQuery({
-    queryKey: [{ queryIdentifier: "get_gamestate" }],
-    queryFn: cmd.GET_GAME_STATE,
-    refetchInterval: 30_000,
-  });
-
-  const { data: serverState, isLoading: isServerLoading } = useQuery({
-    queryKey: [{ queryIdentifier: "get_status" }],
-    queryFn: async () => {
-      let result;
-      try {
-        result = await cmd.GET_GAME_SERVER_STATUS();
-        useGlobalStore.setState((state) => ({ status: result }));
-      } catch (error) {
-        useGlobalStore.setState((state) => ({ status: null }));
-      }
-      return result;
-    },
-    refetchInterval: 30_000,
-    retry: 1,
-  });
+  const serverStatus = useGlobalStore((state) => state.status);
+  const serverIdentity = useGlobalStore((state) => state.serverState);
+  const gameState = useGlobalStore((state) => state.gameState);
+  const connectionHealth = useGlobalStore((state) => state.connectionHealth);
 
   const [pendingTitleIcon, setPendingTitleIcon] = useState("");
   const [titleIcon, setTitleIcon] = useState(icons.loading);
@@ -51,16 +32,42 @@ const TitleManager = () => {
     let text = "";
     let icon = icons.normal;
 
-    if (isGameLoading || isServerLoading) {
-      text = t("common.loading");
-      icon = icons.loading;
-    } else if (!serverState || !gameState?.current_map) {
-      text = t("errors.sectionUnavailable");
-      icon = icons.error;
+    const serverName =
+      serverIdentity?.short_name ||
+      serverIdentity?.name ||
+      serverStatus?.short_name ||
+      serverStatus?.name ||
+      t("dashboard.unknownServer");
+    const crconState = connectionHealth.crcon.state;
+    const gameDataState =
+      connectionHealth.gameData?.state ?? CONNECTION_STATE.UNKNOWN;
+    const stateLabel = (state) => t(`connectionStates.${state}`);
+
+    if (crconState !== CONNECTION_STATE.ONLINE) {
+      text = `${serverName} | CRCON · ${stateLabel(crconState)}`;
+      icon =
+        crconState === CONNECTION_STATE.OFFLINE ? icons.error : icons.loading;
+    } else if (
+      gameDataState !== CONNECTION_STATE.ONLINE ||
+      !serverStatus ||
+      !gameState?.current_map
+    ) {
+      const details = [];
+      if (serverStatus?.current_players != null) {
+        details.push(`(${serverStatus.current_players})`);
+      }
+      if (gameState?.current_map?.pretty_name) {
+        details.push(gameState.current_map.pretty_name);
+      }
+      text = `${serverName} | ${t("sidebar.gameServer")} · ${stateLabel(
+        gameDataState
+      )}${details.length ? ` | ${details.join(" | ")}` : ""}`;
+      icon =
+        gameDataState === CONNECTION_STATE.OFFLINE
+          ? icons.error
+          : icons.loading;
     } else {
-      const serverName = serverState.short_name;
-      const numCurrentPlayers = serverState.current_players;
-      const map = gameState.current_map.map;
+      const numCurrentPlayers = serverStatus.current_players;
       const mapName = gameState.current_map.pretty_name;
 
       if (gameState.time_remaining === 0) {
@@ -80,7 +87,7 @@ const TitleManager = () => {
 
     setTitleText(text);
     setPendingTitleIcon(icon);
-  }, [serverState, gameState, isGameLoading, isServerLoading, t]);
+  }, [connectionHealth, gameState, serverIdentity, serverStatus, t]);
 
   useEffect(() => {
     let counter = 0;

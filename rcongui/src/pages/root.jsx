@@ -11,6 +11,9 @@ import { ActionDialogProvider } from "@/hooks/useActionDialog";
 import { PlayerSidebarProvider } from "@/hooks/usePlayerSidebar";
 import { useAppStore } from "@/stores/app-state";
 import NavigationProgress from "@/components/layout/NavigationProgress";
+import { useTranslation } from "react-i18next";
+import TitleManager from "@/features/title-manager/TitleManager";
+import { SystemUsageProvider } from "@/features/system-usage/SystemUsageProvider";
 
 export const loader = async () => {
   return null;
@@ -30,16 +33,47 @@ export const action = async ({ request }) => {
 
 export default function Root() {
   const widthMode = useAppStore((state) => state.widthMode);
+  const { t } = useTranslation();
 
   return (
-    <>
+    <SystemUsageProvider>
+      <TitleManager />
       <NavigationProgress />
+      <Box
+        component="a"
+        href="#main-content"
+        sx={(theme) => ({
+          position: "fixed",
+          top: 8,
+          left: 8,
+          zIndex: theme.zIndex.tooltip + 1,
+          px: 2,
+          py: 1,
+          borderRadius: 1,
+          bgcolor: "background.paper",
+          color: "text.primary",
+          border: "2px solid",
+          borderColor: "primary.main",
+          boxShadow: theme.shadows[8],
+          transform: "translateY(-160%)",
+          transition: theme.transitions.create("transform", {
+            duration: theme.transitions.duration.shortest,
+          }),
+          "&:focus": {
+            transform: "translateY(0)",
+          },
+        })}
+      >
+        {t("common.skipToContent")}
+      </Box>
       <Box sx={{ display: "flex" }}>
         <SideMenu />
         <AppNavbar />
         {/* Main content */}
         <Box
           component="main"
+          id="main-content"
+          tabIndex={-1}
           sx={(theme) => ({
             flexGrow: 1,
             backgroundColor: theme.palette.background.default,
@@ -52,7 +86,9 @@ export default function Root() {
               alignItems: "center",
               mx: 0,
               pb: 4,
-              mt: { xs: 13, lg: 0 },
+              // The compact navbar has two rows (navigation + live server state).
+              // Keep the first page heading below the fixed bar at every mobile width.
+              mt: { xs: 16, lg: 0 },
               minHeight: "100%",
             }}
           >
@@ -80,6 +116,6 @@ export default function Root() {
         </Box>
       </Box>
       <ToastContainer />
-    </>
+    </SystemUsageProvider>
   );
 }

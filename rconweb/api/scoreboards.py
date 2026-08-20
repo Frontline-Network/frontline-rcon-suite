@@ -5,9 +5,10 @@ from datetime import UTC, datetime
 from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import ratelimit
 
-from rcon.cache_utils import ttl_cache
-from rcon.maps import parse_layer
 from rcon.api_commands import get_rcon_api
+from rcon.cache_utils import ttl_cache
+from rcon.map_history_payloads import build_map_history_summary
+from rcon.maps import parse_layer
 from rcon.models import Maps, enter_session
 from rcon.player_stats import LiveStats, get_cached_live_game_stats
 from rcon.user_config.rcon_server_settings import RconServerSettingsUserConfig
@@ -249,9 +250,47 @@ def get_map_history(request):
             )
             for i in res
         ]
-    return api_response(
+    response = api_response(
         result=res, command="get_map_history", arguments={}, failed=False
     )
+    response["Deprecation"] = "true"
+    response["Link"] = '</api/get_map_history_summary>; rel="successor-version"'
+    response["X-CRCON-Payload-Profile"] = "legacy-full"
+    return response
+
+
+@csrf_exempt
+@ratelimit(key=request_rate_limit_key, rate="60/m", block=True)
+@stats_login_required
+@require_http_methods(["GET"])
+def get_map_history_summary(request):
+    """Return a bounded map-history projection without embedded player stats."""
+
+    command_name = "get_map_history_summary"
+    data = _get_data(request)
+    try:
+        result = build_map_history_summary(
+            MapsHistory(), page=data.get("page"), limit=data.get("limit")
+        )
+    except ValueError as exc:
+        return api_response(
+            result=None,
+            command=command_name,
+            arguments=data,
+            error=str(exc),
+            failed=True,
+            status_code=400,
+        )
+
+    response = api_response(
+        result=result,
+        command=command_name,
+        arguments={"page": result["page"], "limit": result["page_size"]},
+        failed=False,
+    )
+    response["Cache-Control"] = "private, no-store"
+    response["X-CRCON-Payload-Profile"] = "summary-v1"
+    return response
 
 
 @csrf_exempt

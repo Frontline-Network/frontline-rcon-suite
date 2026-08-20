@@ -2,16 +2,15 @@ import json
 import logging
 import os
 from copy import deepcopy
-from typing import Any
 
 import requests
-from django.http import QueryDict
 from django.views.decorators.csrf import csrf_exempt
 
 from rcon.utils import ApiKey, get_server_number
 
 from .auth import AUTHORIZATION, api_response, login_required
 from .decorators import permission_required, require_http_methods
+from .forwarding import forward_command
 
 logger = logging.getLogger("rcon")
 
@@ -159,70 +158,6 @@ def forward_request(request):
                 logger.warning(f"Forwarding to {host} failed %s", res.text)
         except requests.exceptions.RequestException:
             logger.warning(f"Unable to connect with {url=}")
-
-    return results
-
-
-def forward_command(
-    path: str,
-    sessionid: str | None,
-    auth_header: str | None,
-    params: dict[str, Any] | None = None,
-    json: dict[str, Any] | QueryDict | None = None,
-):
-    server_api_key = ApiKey()
-    keys = server_api_key.get_all_keys()
-    my_key = server_api_key.get_key()
-    params = deepcopy(params) or {}
-    data = deepcopy(json) or {}
-    cookies = {"sessionid": sessionid} if sessionid else {}
-    headers = {"AUTHORIZATION": auth_header} if auth_header else {}
-    results = []
-
-    if "forwarded" in params or "forwarded" in data:
-        logger.debug("The request was already forwarded")
-        return []
-    if params:
-        params.pop("forward", None)
-        params["forwarded"] = True
-    if data:
-        data.pop("forward", None)
-        data["forwarded"] = True
-
-    for host, key in keys.items():
-        if key == my_key:
-            continue
-        try:
-            url = f"http://{host}{path}"
-
-            logger.info("Forwarding command: %s %s %s", url, params, data)
-            res = requests.post(
-                url,
-                params=params,
-                json=data,
-                timeout=5,
-                cookies=cookies,
-                headers=headers,
-            )
-            # Automatically retry HttpResponseNotAllowed errors as GET requests
-            if res.status_code == 405:
-                res = requests.get(
-                    url,
-                    params=params,
-                    json=data,
-                    timeout=5,
-                    cookies=cookies,
-                    headers=headers,
-                )
-
-            if res.ok:
-                r = {"host": host, "response": res.json()}
-                results.append(r)
-            else:
-                # todo add failure to results
-                logger.warning(f"Forwarding to {host} failed %s", res.text)
-        except requests.exceptions.RequestException as e:
-            logger.warning("Unable to connect with %s: %s", host, e)
 
     return results
 

@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { BadgeList } from "./BadgeList";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import PlayerSearchField from "@/components/form/custom/PlayerSearchField";
 import { executeQueued } from "./executionQueue.mjs";
 
@@ -31,6 +32,7 @@ const initRecipients = (recipients) =>
   });
 
 export const ActionForm = ({ state: actionState, actionHandlers }) => {
+  const { t } = useTranslation();
   const {
     handleSubmit,
     formState: { errors },
@@ -193,7 +195,7 @@ export const ActionForm = ({ state: actionState, actionHandlers }) => {
           sx={{ display: submitRef && "none" }}
           disabled={!recipientStates || recipientStates.length === 0}
         >
-          Submit
+          {t("common.submit")}
         </Button>
       </form>
     </Stack>

@@ -10,7 +10,9 @@ import {
 import { MapFilter } from "./MapFilter";
 import { MapList } from "./MapList";
 import { styled, useTheme } from "@mui/material";
-import _ from "lodash";
+import debounce from "lodash/debounce";
+import throttle from "lodash/throttle";
+import uniqBy from "lodash/uniqBy";
 import { useTranslation } from "react-i18next";
 
 const MobileToggleGroup = styled(Grid)(({ theme }) => ({
@@ -76,14 +78,14 @@ export function MapListBuilder({
 
   // Add map to selection
   const addSelectionItem = exclusive
-    ? _.debounce((mapLayer) => {
-        const nextSelection = _.uniqBy(
+    ? debounce((mapLayer) => {
+        const nextSelection = uniqBy(
           [...mapSelection, withSelectionId(mapLayer)],
           "id"
         );
         setMapSelection(nextSelection);
       }, 300)
-    : _.throttle((mapLayer) => {
+    : throttle((mapLayer) => {
         const nextSelection = [...mapSelection, withSelectionId(mapLayer)];
         setMapSelection(nextSelection);
       }, 500);

@@ -3,15 +3,16 @@ from __future__ import annotations
 import copy
 import ipaddress
 import re
+import secrets
 import socket
 import uuid
-import secrets
 from datetime import datetime, timedelta, timezone
 from threading import Lock
 from time import monotonic, time
 from urllib.parse import urlencode, urlsplit
 
 import httpx
+from cryptography.fernet import InvalidToken
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from nacl.exceptions import BadSignatureError
@@ -24,8 +25,10 @@ from sqlalchemy.orm import Session
 from .ai import CodexAnalyzer, ManagedAnalyzer, PlayerNameBatchInput
 from .codex_runtime import (
     CodexRuntimeError,
-    account_status as codex_account_status,
-    logout as codex_logout,
+)
+from .codex_runtime import account_status as codex_account_status
+from .codex_runtime import logout as codex_logout
+from .codex_runtime import (
     start_device_login,
 )
 from .config import get_settings
@@ -87,6 +90,11 @@ class PairingRequest(PairingDiscoveryRequest):
     channel_name: str = Field(default="", max_length=128)
 
 
+class DiagnosticsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    installation_id: str = Field(min_length=1, max_length=64)
+
+
 def _bearer(authorization: str | None) -> str:
     return (
         authorization[7:]
@@ -108,6 +116,22 @@ def _crcon_post(url: str, **kwargs):
             f"Bearer {settings.callback_broker_token}"
         )
     return httpx.post(url, headers=headers, **kwargs)
+
+
+def _external_error_code(exc: Exception, fallback: str) -> str:
+    """Return a stable external-service error code without response content."""
+
+    response = getattr(exc, "response", None)
+    status_code = getattr(response, "status_code", None)
+    if isinstance(status_code, int):
+        return f"http_{status_code}"
+    if isinstance(exc, httpx.TimeoutException):
+        return "timeout"
+    if isinstance(exc, httpx.RequestError):
+        return "connection_failed"
+    if isinstance(exc, (InvalidToken, UnicodeError)):
+        return "capability_invalid"
+    return fallback
 
 
 def _integration_for_event(
@@ -656,6 +680,97 @@ def discord_options(
         ) from exc
 
 
+@app.post("/v1/diagnostics")
+def integration_diagnostics(
+    payload: DiagnosticsRequest,
+    authorization: str | None = Header(default=None),
+    session: Session = Depends(session_dependency),
+):
+    """Run an explicit, content-free Discord and callback round-trip check."""
+
+    integration = _integration_for_capability(
+        session, payload.installation_id, authorization
+    )
+    _check_rate_limit(f"diagnostics:{integration.installation_id}")
+    checked_at = datetime.now(tz=timezone.utc)
+
+    discord_started = monotonic()
+    try:
+        options = DiscordClient().guild_options(integration.guild_id)
+        channel = next(
+            (
+                item
+                for item in options.get("channels", [])
+                if str(item.get("id")) == integration.channel_id
+            ),
+            None,
+        )
+        discord_error_code = "configured_channel_missing" if channel is None else ""
+    except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
+        discord_error_code = _external_error_code(exc, "invalid_discord_response")
+        channel = None
+
+    if channel is None:
+        discord_binding = {
+            "state": "offline",
+            "latency_ms": round((monotonic() - discord_started) * 1000),
+            "error_code": discord_error_code,
+        }
+    else:
+        discord_binding = {
+            "state": "online",
+            "latency_ms": round((monotonic() - discord_started) * 1000),
+            "guild_id": integration.guild_id,
+            "guild_name": str((options.get("guild") or {}).get("name") or "")[:128],
+            "channel_id": integration.channel_id,
+            "channel_name": str(channel.get("name") or "")[:128],
+        }
+
+    callback_started = monotonic()
+    try:
+        response = _crcon_post(
+            f"{integration.crcon_base_url}/api/discord/v1/diagnostics/ping",
+            headers={
+                "Authorization": (
+                    f"Bearer {decrypt(integration.action_capability_ciphertext)}"
+                )
+            },
+            json={"installation_id": integration.installation_id},
+            timeout=5,
+        )
+        response.raise_for_status()
+    except (httpx.HTTPError, InvalidToken, UnicodeError, ValueError) as exc:
+        callback = {
+            "state": "offline",
+            "latency_ms": round((monotonic() - callback_started) * 1000),
+            "error_code": _external_error_code(exc, "invalid_callback_response"),
+        }
+    else:
+        callback = {
+            "state": "online",
+            "latency_ms": round((monotonic() - callback_started) * 1000),
+            "transport": (
+                "broker"
+                if get_settings().callback_broker_url.strip().rstrip("/")
+                and integration.crcon_base_url.startswith(
+                    f"{get_settings().callback_broker_url.strip().rstrip('/')}/"
+                )
+                else "direct"
+            ),
+        }
+
+    healthy = all(
+        component["state"] == "online" for component in (discord_binding, callback)
+    )
+    return {
+        "state": "healthy" if healthy else "degraded",
+        "checked_at": checked_at,
+        "service": {"state": "online"},
+        "discord_binding": discord_binding,
+        "callback": callback,
+    }
+
+
 @app.get("/oauth/install")
 def oauth_install():
     if not get_settings().discord_install_url:
@@ -742,8 +857,12 @@ def oauth_callback(
             raise ValueError("Discord did not return the installed server")
         options = DiscordClient().guild_options(guild_id)
     except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
-        raise HTTPException(status_code=502, detail="Discord installation could not be verified") from exc
-    binding = session.get(InstallationGuildBinding, intent.installation_id) or InstallationGuildBinding(
+        raise HTTPException(
+            status_code=502, detail="Discord installation could not be verified"
+        ) from exc
+    binding = session.get(
+        InstallationGuildBinding, intent.installation_id
+    ) or InstallationGuildBinding(
         installation_id=intent.installation_id,
         guild_id=guild_id,
         guild_name=str((options.get("guild") or {}).get("name") or guild_id)[:128],
@@ -1075,7 +1194,9 @@ def receive_analysis_job(
     else:
         api_key = job.api_key
         if not api_key:
-            raise HTTPException(status_code=409, detail="OpenAI API key is not configured")
+            raise HTTPException(
+                status_code=409, detail="OpenAI API key is not configured"
+            )
         analyzer_settings = get_settings().model_copy(
             update={
                 "openai_api_key": api_key,
@@ -1214,7 +1335,9 @@ def receive_player_name_analysis_batch(
     else:
         api_key = first_job.api_key
         if not api_key:
-            raise HTTPException(status_code=409, detail="OpenAI API key is not configured")
+            raise HTTPException(
+                status_code=409, detail="OpenAI API key is not configured"
+            )
         analyzer_settings = get_settings().model_copy(
             update={
                 "openai_api_key": api_key,

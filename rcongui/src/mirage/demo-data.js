@@ -167,16 +167,214 @@ export const demoServerConnection = {
   port: 4174,
 };
 
+const readDemoParameter = (name) => {
+  if (typeof window === "undefined") return null;
+  return new URLSearchParams(window.location.search).get(name);
+};
+
+export const getDemoConnectionMode = () =>
+  readDemoParameter("demo_connection") || "online";
+
+export const getDemoRole = () => readDemoParameter("demo_role") || "admin";
+
+export const isDemoAuthenticated = () => {
+  if (readDemoParameter("demo_auth") === "anonymous") return false;
+
+  const returnTarget = readDemoParameter("from");
+  if (!returnTarget || typeof window === "undefined") return true;
+
+  try {
+    const returnUrl = new URL(returnTarget, window.location.origin);
+    return returnUrl.searchParams.get("demo_auth") !== "anonymous";
+  } catch {
+    return true;
+  }
+};
+
+export const shouldFailDemoServerSettings = () =>
+  readDemoParameter("demo_settings_error") === "1";
+
+const normalizeDemoGame = (value, fallback = "hll") => {
+  const game = String(value ?? "").trim().toLowerCase();
+  if (!game) return fallback;
+  if (game === "hll") return "hll";
+  if (["hllv", "hll_vietnam", "vietnam"].includes(game)) return "hll_vietnam";
+  return null;
+};
+
+export const getDemoServerConnection = () => ({
+  ...demoServerConnection,
+  game: normalizeDemoGame(readDemoParameter("demo_game")),
+});
+
+export const getDemoServerList = () => {
+  if (readDemoParameter("demo_multiserver") !== "1") return [];
+
+  return [
+    {
+      name: "[GER] Frontline Network | Vietnam #3",
+      short_name: "Frontline Vietnam #3",
+      server_number: 3,
+      game: normalizeDemoGame(readDemoParameter("demo_other_game"), "hll_vietnam"),
+      current_players: 72,
+      max_players: 100,
+      port: 4175,
+      link: typeof window === "undefined" ? "http://localhost:4175" : window.location.origin,
+    },
+  ];
+};
+
 export const demoServerStatus = {
   ...demoServerConnection,
   queue_players: 4,
   version: "11.2.0",
 };
 
+export const getDemoServerStatus = () => ({
+  ...demoServerStatus,
+  game: getDemoServerConnection().game,
+  supported_game_modes:
+    getDemoServerConnection().game === "hll_vietnam"
+      ? ["warfare", "offensive", "conquest", "domination"]
+      : ["warfare", "offensive", "conquest", "skirmish", "phased", "majority"],
+  game_capabilities:
+    getDemoServerConnection().game === "hll_vietnam"
+      ? {
+          match_timer_modes: ["warfare", "offensive"],
+          warmup_timer_modes: ["warfare"],
+        }
+      : {
+          match_timer_modes: ["warfare", "offensive", "skirmish"],
+          warmup_timer_modes: ["warfare", "skirmish"],
+        },
+});
+
+const demoSystemUsageHistory = Array.from({ length: 12 }, (_, index) => ({
+  sampled_at: new Date(now - (11 - index) * 15_000).toISOString(),
+  cpu_percent: [11, 15, 17, 14, 19, 23, 21, 18, 16, 20, 17, 18][index],
+  ram_percent: [42, 42, 43, 43, 44, 44, 45, 45, 45, 46, 46, 46][index],
+  disk_percent: 62,
+  status: "ok",
+}));
+
 export const demoSystemUsage = {
-  cpu_usage: { percent: 18 },
-  ram_usage: { percent: 46 },
-  disk_usage: { percent: 62 },
+  schema_version: 2,
+  sampled_at: new Date(now).toISOString(),
+  generated_at: new Date(now).toISOString(),
+  data_age_seconds: 0,
+  cache_hit: false,
+  poll_after_seconds: 15,
+  status: "ok",
+  warnings: [],
+  cpu_usage: {
+    available: true,
+    percent: 18,
+    used: 0.72,
+    total: 4,
+    unit: "cores",
+    source: "cgroup_v2",
+    severity: "ok",
+  },
+  ram_usage: {
+    available: true,
+    percent: 46,
+    used: 3.68,
+    total: 8,
+    unit: "GiB",
+    source: "cgroup_v2",
+    severity: "ok",
+  },
+  disk_usage: {
+    available: true,
+    percent: 62,
+    used: 62,
+    total: 100,
+    unit: "GiB",
+    source: "filesystem",
+    severity: "ok",
+  },
+  history: demoSystemUsageHistory,
+  range: {
+    from: demoSystemUsageHistory[0].sampled_at,
+    to: new Date(now).toISOString(),
+    seconds: 165,
+    sample_interval_seconds: 15,
+    max_samples: 61,
+  },
+};
+
+export const getDemoSystemUsage = () => {
+  const result = JSON.parse(JSON.stringify(demoSystemUsage));
+  const mode = readDemoParameter("demo_resources") || "ok";
+
+  if (mode === "warning") {
+    result.status = "warning";
+    result.ram_usage.percent = 86;
+    result.ram_usage.used = 6.88;
+    result.ram_usage.severity = "warning";
+    result.warnings = [
+      {
+        metric: "ram",
+        severity: "warning",
+        code: "ram_warning",
+        threshold_percent: 80,
+      },
+    ];
+  }
+
+  if (mode === "critical") {
+    result.status = "critical";
+    result.cpu_usage.percent = 92;
+    result.cpu_usage.used = 3.68;
+    result.cpu_usage.severity = "critical";
+    result.warnings = [
+      {
+        metric: "cpu",
+        severity: "critical",
+        code: "cpu_critical",
+        threshold_percent: 90,
+      },
+    ];
+  }
+
+  if (mode === "partial") {
+    result.status = "partial";
+    result.disk_usage = {
+      available: false,
+      percent: null,
+      used: null,
+      total: null,
+      unit: "GiB",
+      source: "unavailable",
+      severity: "unknown",
+    };
+  }
+
+  if (mode === "unavailable") {
+    result.status = "unavailable";
+    result.warnings = [];
+    result.history = [];
+    for (const key of ["cpu_usage", "ram_usage", "disk_usage"]) {
+      result[key] = {
+        available: false,
+        percent: null,
+        used: null,
+        total: null,
+        unit: key === "cpu_usage" ? "cores" : "GiB",
+        source: "unavailable",
+        severity: "unknown",
+      };
+    }
+  }
+
+  if (mode === "stale") {
+    const sampledAt = new Date(now - 5 * 60_000).toISOString();
+    result.sampled_at = sampledAt;
+    result.data_age_seconds = 300;
+    result.range.to = sampledAt;
+  }
+
+  return result;
 };
 
 export const demoServerSettings = {

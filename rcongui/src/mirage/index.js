@@ -1,7 +1,10 @@
-import { createServer } from "miragejs";
+import { createServer, Response } from "miragejs";
 import { handleTeamView } from "./routes/team-view";
 import { createGameState } from "./state/game";
-import { handleRecentLogs } from "./routes/recent-logs";
+import {
+  handleRecentLogs,
+  handleRecentLogsSummary,
+} from "./routes/recent-logs";
 import {
   autobalancerConfig,
   autobalancerHistoryDashboard,
@@ -11,10 +14,29 @@ import {
   autobalancerStatus,
   reviewAutobalancerShadowDecision,
 } from "./data/autobalancer";
+import {
+  getDemoServerConnection,
+  getDemoServerList,
+  getDemoServerStatus,
+  getDemoRole,
+  isDemoAuthenticated,
+  getDemoSystemUsage,
+} from "./demo-data";
 
 export function makeServer({ environment = "development" } = {}) {
   let gameState = createGameState();
+  const disbandAttempts = new Map();
   const ok = (result) => ({ result });
+  const protectedRequestLog = [];
+  let demoDiscordLastTest = null;
+  let demoDiscordEnabled = true;
+  const trackProtectedRequest = (path, handler) => (...args) => {
+    protectedRequestLog.push(path);
+    return handler(...args);
+  };
+  if (typeof window !== "undefined") {
+    window.__CRCON_DEMO_PROTECTED_REQUESTS__ = protectedRequestLog;
+  }
   const currentLayer = {
     id: "foy_warfare_night",
     name: "foy_warfare_night",
@@ -139,59 +161,244 @@ export function makeServer({ environment = "development" } = {}) {
       this.urlPrefix = process.env.REACT_APP_API_URL;
 
       // A complete, deterministic shell for visual development and demos.
-      this.get("/is_logged_in", () => ok({ authenticated: true, username: "Frontline Admin" }));
+      this.get("/is_logged_in", () => {
+        const authenticated = isDemoAuthenticated();
+        return ok({
+          authenticated,
+          username: authenticated ? "Frontline Admin" : "",
+        });
+      });
       this.post("/login", () => ok({ authenticated: true, username: "Frontline Admin" }));
-      this.get("/get_own_user_permissions", () => ok({
-        user_name: "Frontline Admin",
-        is_superuser: true,
-        permissions: [],
-      }));
+      this.get("/get_own_user_permissions", () => {
+        const isViewer = getDemoRole() === "viewer";
+        return ok({
+          user_name: isViewer ? "Frontline Viewer" : "Frontline Admin",
+          is_superuser: !isViewer,
+          permissions: [],
+        });
+      });
       this.get("/logout", () => ok(true));
 
-      this.get("/get_connection_info", () => ok({
-        name: "[GER] Frontline Network | #2",
-        short_name: "Frontline #2",
-        server_number: 2,
-        port: 8010,
-      }));
-      this.get("/get_server_list", () => ok([]));
-      this.get("/get_status", () => ok({
-        name: "[GER] Frontline Network | #2",
-        short_name: "Frontline #2",
-        server_number: 2,
-        current_players: 86,
-        max_players: 100,
-        queue_length: 4,
-      }));
-      this.get("/get_gamestate", () => ok({
-        current_map: currentLayer,
-        next_map: nextLayer,
-        raw_time_remaining: "00:57:07",
-        time_remaining: 3427,
-        allied_score: 3,
-        axis_score: 2,
-        num_allied_players: 43,
-        num_axis_players: 43,
-      }));
-      this.get("/get_ingame_mods", () => ok([]));
-      this.get("/get_online_mods", () => ok([]));
-      this.get("/get_system_usage", () => ok({
-        cpu_usage: { percent: 18 },
-        ram_usage: { percent: 46 },
-        disk_usage: { percent: 62 },
-      }));
+      this.get(
+        "/get_connection_info",
+        trackProtectedRequest("/api/get_connection_info", () =>
+          ok(getDemoServerConnection())
+        )
+      );
+      this.get(
+        "/get_server_list",
+        trackProtectedRequest("/api/get_server_list", () =>
+          ok(getDemoServerList())
+        )
+      );
+      this.get(
+        "/get_status",
+        trackProtectedRequest("/api/get_status", () =>
+          ok(getDemoServerStatus())
+        )
+      );
+      this.get(
+        "/get_gamestate",
+        trackProtectedRequest("/api/get_gamestate", () =>
+          ok({
+            current_map: currentLayer,
+            next_map: nextLayer,
+            raw_time_remaining: "00:57:07",
+            time_remaining: 3427,
+            allied_score: 3,
+            axis_score: 2,
+            num_allied_players: 43,
+            num_axis_players: 43,
+          })
+        )
+      );
+      this.get(
+        "/get_ingame_mods",
+        trackProtectedRequest("/api/get_ingame_mods", () => ok([]))
+      );
+      this.get(
+        "/get_online_mods",
+        trackProtectedRequest("/api/get_online_mods", () => ok([]))
+      );
+      this.get("/get_system_usage", () => ok(getDemoSystemUsage()));
       this.get("/get_version", () => ok("11.2.0"));
 
-      this.get("/get_server_settings", () => ok({
-        autobalance_enabled: true,
-        votekick_enabled: true,
-        team_switch_cooldown: 15,
-        autobalance_threshold: 3,
-        idle_autokick_time: 15,
-        max_ping_autokick: 250,
-        queue_length: 6,
-        vip_slots_num: 2,
+      this.get("/mobile/v1/devices", () => ok([]));
+      this.get("/mobile/v1/bootstrap", () => ok({
+        user: { permissions: [] },
+        mobile_configuration: {
+          public_base_url: "https://demo.crcon.invalid",
+          incident_triggers: ["!admin"],
+          incident_retention_days: 30,
+          push_relay_configured: false,
+        },
       }));
+
+      const isDiscordDemoConnected = () =>
+        typeof window !== "undefined" &&
+        new URLSearchParams(window.location.search).get("demo_discord") ===
+          "connected";
+      const demoDiscordIntegration = () => {
+        const connected = isDiscordDemoConnected();
+        return {
+          installation_id: "00000000-0000-4000-8000-000000000002",
+          enabled: connected && demoDiscordEnabled,
+          connected,
+          guild_id: connected ? "123456789012345678" : "",
+          guild_name: connected ? "Frontline Network" : "",
+          channel_id: connected ? "234567890123456789" : "",
+          channel_name: connected ? "admin-reports" : "",
+          moderator_role_ids: connected ? ["345678901234567890"] : [],
+          allowed_actions: [
+            "message",
+            "punish",
+            "kick",
+            "temp_ban",
+            "perma_ban",
+          ],
+          language: "de",
+          has_api_key: false,
+          api_model_options: [
+            { id: "gpt-5.6-luna", name: "GPT-5.6 Luna" },
+            { id: "gpt-5.4-nano", name: "GPT-5.4 Nano" },
+          ],
+          ai_config: {
+            chat_enabled: false,
+            names_enabled: false,
+            shadow_mode: true,
+            quality_opt_in: false,
+            provider: "api_key",
+          },
+          policy: {
+            custom_terms: [],
+            exceptions: [],
+            custom_regexes: [],
+            hard_rule_ids: [],
+          },
+          reporter_templates: {},
+        };
+      };
+      this.get("/discord/v1/integration", () => ok(demoDiscordIntegration()));
+      this.put("/discord/v1/integration", (schema, request) => {
+        const payload = JSON.parse(request.requestBody || "{}");
+        demoDiscordEnabled = Boolean(payload.enabled);
+        return ok({
+          ...demoDiscordIntegration(),
+          ...payload,
+          connected: isDiscordDemoConnected(),
+        });
+      });
+      this.del("/discord/v1/integration", () => {
+        demoDiscordEnabled = false;
+        return ok({
+          ...demoDiscordIntegration(),
+          enabled: false,
+          connected: false,
+        });
+      });
+      this.get("/discord/v1/options", () =>
+        ok({
+          guild: isDiscordDemoConnected()
+            ? { id: "123456789012345678", name: "Frontline Network" }
+            : null,
+          channels: isDiscordDemoConnected()
+            ? [
+                { id: "234567890123456789", name: "admin-reports" },
+                { id: "234567890123456790", name: "moderation" },
+              ]
+            : [],
+          roles: isDiscordDemoConnected()
+            ? [
+                { id: "345678901234567890", name: "Moderator" },
+                { id: "345678901234567891", name: "Discord Admin" },
+              ]
+            : [],
+        })
+      );
+      this.get("/discord/v1/status", () =>
+        ok({
+          setup_state: demoDiscordEnabled ? "active" : "paused",
+          enabled: demoDiscordEnabled,
+          connected: isDiscordDemoConnected(),
+          service_configured: true,
+          callback_mode: "broker",
+          delivery: {
+            state: "delivered",
+            last_delivered_at: new Date(Date.now() - 120000).toISOString(),
+            last_attempt_at: new Date(Date.now() - 120000).toISOString(),
+            pending_count: 0,
+            error_code: null,
+          },
+          last_test: demoDiscordLastTest || {
+            state: "unknown",
+            checked_at: null,
+            error_code: null,
+          },
+          last_diagnostic: {
+            checked_at: new Date().toISOString(),
+            result: isDiscordDemoConnected()
+              ? {
+                  state: "healthy",
+                  checked_at: new Date().toISOString(),
+                  service: { state: "online", latency_ms: 18 },
+                  discord_binding: {
+                    state: "online",
+                    guild_name: "Frontline Network",
+                    channel_name: "admin-reports",
+                    latency_ms: 24,
+                  },
+                  callback: {
+                    state: "online",
+                    transport: "broker",
+                    latency_ms: 31,
+                  },
+                }
+              : null,
+          },
+        })
+      );
+      this.post("/discord/v1/diagnostics", () => ok({ state: "healthy" }));
+      this.post("/discord/v1/test-message", () => {
+        demoDiscordLastTest = {
+          state: "succeeded",
+          checked_at: new Date().toISOString(),
+          error_code: null,
+        };
+        return ok({ sent: true });
+      });
+      this.get("/discord/v1/ai/status", () =>
+        ok({
+          state: "disabled",
+          available: false,
+          connected: false,
+          models: [],
+        })
+      );
+
+      this.get("/get_server_settings", () => {
+        const unavailable =
+          typeof window !== "undefined" &&
+          new URLSearchParams(window.location.search).get(
+            "demo_settings_error"
+          ) === "1";
+        if (unavailable) {
+          return new Response(
+            503,
+            { "Content-Type": "application/json" },
+            { error: "Demo server settings unavailable" }
+          );
+        }
+        return ok({
+          autobalance_enabled: true,
+          votekick_enabled: true,
+          team_switch_cooldown: 15,
+          autobalance_threshold: 3,
+          idle_autokick_time: 15,
+          max_ping_autokick: 250,
+          queue_length: 6,
+          vip_slots_num: 2,
+        });
+      });
       this.get("/get_services", () => ok([
         { name: "rcon", statename: "RUNNING", start: 1775205000, stop: 0, now: 1775210400, info: "RCON-Verbindung zum Gameserver" },
         { name: "worker", statename: "RUNNING", start: 1775205000, stop: 0, now: 1775210400, info: "CRCON-Auftragsverarbeitung" },
@@ -249,6 +456,14 @@ export function makeServer({ environment = "development" } = {}) {
             });
       });
       this.get("/get_player_messages", () => ok([]));
+      this.get("/get_message_templates", () => ok([
+        {
+          id: 1,
+          title: "Regelhinweis",
+          category: "MESSAGE",
+          message: "Bitte beachte die Serverregeln.",
+        },
+      ]));
       this.post("/post_player_comment", (schema, request) => {
         const payload = JSON.parse(request.requestBody || "{}");
         if (!payload.player_id || !payload.comment?.trim()) {
@@ -373,9 +588,12 @@ export function makeServer({ environment = "development" } = {}) {
         return ok(decision);
       });
       
-      this.get("/get_team_view", () => {
-        return handleTeamView(gameState);
-      });
+      this.get(
+        "/get_team_view",
+        trackProtectedRequest("/api/get_team_view", () =>
+          handleTeamView(gameState)
+        )
+      );
 
       this.post("/get_recent_logs", (schema, request) => {
         const params = request.requestBody ? JSON.parse(request.requestBody) : request.queryParams;
@@ -392,6 +610,13 @@ export function makeServer({ environment = "development" } = {}) {
         });
       });
 
+      this.post("/get_recent_logs_summary", (schema, request) => {
+        const params = request.requestBody
+          ? JSON.parse(request.requestBody)
+          : request.queryParams;
+        return handleRecentLogsSummary(gameState, params);
+      });
+
       const playerActionCommands = [
         "message_player", "message_all_players", "bulk_message_players", "set_broadcast",
         "watch_player", "unwatch_player", "add_vip", "remove_vip",
@@ -405,6 +630,16 @@ export function makeServer({ environment = "development" } = {}) {
       playerActionCommands.forEach((command) => {
         this.post(`/${command}`, (schema, request) => {
           const args = request.requestBody ? JSON.parse(request.requestBody) : {};
+          if (command === "disband_squad_by_name") {
+            const failingSquad = new URLSearchParams(window.location.search).get("demo_disband_failure");
+            const attempts = disbandAttempts.get(args.squad_name) || 0;
+            disbandAttempts.set(args.squad_name, attempts + 1);
+            if (failingSquad === args.squad_name && attempts === 0) {
+              return new Response(500, { "Content-Type": "application/json" }, {
+                error: "Demo: Gameserver hat die Truppauflösung abgelehnt.",
+              });
+            }
+          }
           return { failed: false, result: "OK", arguments: args };
         });
       });

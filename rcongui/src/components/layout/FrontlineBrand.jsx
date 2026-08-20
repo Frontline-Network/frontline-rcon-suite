@@ -3,10 +3,16 @@ import { Box, Stack, Typography } from "@mui/material";
 export default function FrontlineBrand({ compact = false }) {
   return (
     <Stack
+      data-testid={compact ? "compact-frontline-brand" : "frontline-brand"}
       direction="row"
       alignItems="center"
       spacing={1.1}
-      sx={{ minWidth: 0, px: compact ? 0 : 1.75, py: compact ? 0 : 1.5 }}
+      sx={{
+        minWidth: 0,
+        flexShrink: 0,
+        px: compact ? 0 : 1.75,
+        py: compact ? 0 : 1.5,
+      }}
     >
       <Box
         component="img"

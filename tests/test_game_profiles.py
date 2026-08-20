@@ -106,6 +106,67 @@ def test_profiles_only_accept_their_supported_game_modes():
         HLLV_PROFILE.parse_game_mode("Skirmish")
 
 
+@pytest.mark.parametrize(
+    (
+        "controller_type",
+        "game",
+        "expected_modes",
+        "unsupported_mode",
+        "match_timer_modes",
+        "warmup_timer_modes",
+    ),
+    [
+        (
+            HLLRcon,
+            GameEnum.HLL_WW2,
+            {"warfare", "offensive", "conquest", "skirmish", "phased", "majority"},
+            "domination",
+            ["offensive", "skirmish", "warfare"],
+            ["skirmish", "warfare"],
+        ),
+        (
+            HLLVRcon,
+            GameEnum.HLL_VIETNAM,
+            {"warfare", "offensive", "conquest", "domination"},
+            "skirmish",
+            ["offensive", "warfare"],
+            ["warfare"],
+        ),
+    ],
+)
+def test_status_exposes_game_profile_without_requiring_connection_info_permission(
+    monkeypatch,
+    controller_type,
+    game,
+    expected_modes,
+    unsupported_mode,
+    match_timer_modes,
+    warmup_timer_modes,
+):
+    controller = controller_type(ServerInfo(game=game))
+    controller.get_name = Mock(return_value="Profile test")
+    controller.get_slots = Mock(
+        return_value={"current_players": 42, "max_players": 100}
+    )
+    controller.get_gamestate = Mock(return_value={"current_map": {"id": "map"}})
+    monkeypatch.setattr(
+        "rcon.rcon.RconServerSettingsUserConfig.load_from_db",
+        lambda: SimpleNamespace(short_name="Profile"),
+    )
+    monkeypatch.setattr("rcon.rcon.get_server_number", lambda: 3)
+
+    status = Rcon.get_status.__wrapped__(controller)
+
+    assert status["game"] == game.value
+    assert set(status["supported_game_modes"]) == expected_modes
+    assert unsupported_mode not in status["supported_game_modes"]
+    assert status["game_capabilities"] == {
+        "match_timer_modes": match_timer_modes,
+        "warmup_timer_modes": warmup_timer_modes,
+    }
+    assert status["server_number"] == 3
+
+
 @pytest.mark.parametrize("raw_mode", ["NVA Offensive", "US Offensive"])
 def test_hllv_profile_accepts_faction_specific_offensive_modes(raw_mode):
     assert HLLV_PROFILE.parse_game_mode(raw_mode) is GameMode.OFFENSIVE

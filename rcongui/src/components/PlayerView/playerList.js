@@ -1,17 +1,16 @@
-import {Fragment, useState} from "react";
+import { Fragment, useState } from "react";
 import ListItem from "@mui/material/ListItem";
 import ListItemSecondaryAction from "@mui/material/ListItemSecondaryAction";
 import ListItemText from "@mui/material/ListItemText";
 import "react-toastify/dist/ReactToastify.css";
 import { PlayerActions } from "./playerActions";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faExclamationCircle,
-  faLock,
-  faQuestionCircle,
-  faStar,
-} from "@fortawesome/free-solid-svg-icons";
-import { faSteam, faWindows } from "@fortawesome/free-brands-svg-icons";
+import { faExclamationCircle } from "@fortawesome/free-solid-svg-icons/faExclamationCircle";
+import { faLock } from "@fortawesome/free-solid-svg-icons/faLock";
+import { faQuestionCircle } from "@fortawesome/free-solid-svg-icons/faQuestionCircle";
+import { faStar } from "@fortawesome/free-solid-svg-icons/faStar";
+import { faSteam } from "@fortawesome/free-brands-svg-icons/faSteam";
+import { faWindows } from "@fortawesome/free-brands-svg-icons/faWindows";
 import Link from "@mui/material/Link";
 import Icon from "@mui/material/Icon";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
@@ -21,19 +20,12 @@ import { getName } from "country-list";
 import Popover from "@mui/material/Popover";
 import Typography from "@mui/material/Typography";
 import { Link as RouterLink } from "react-router-dom";
-import {
-  Avatar,
-  Badge,
-  Checkbox,
-  Chip,
-  ListItemAvatar,
-} from "@mui/material";
+import { Avatar, Badge, Checkbox, Chip, ListItemAvatar } from "@mui/material";
 import makePlayerProfileUrl from "../../utils/makePlayerProfileUrl";
 import moment from "moment";
 import Grid from "@mui/material/Grid2";
 import { useTheme } from "@mui/material/styles";
 import { getRoleIconKey } from "@/constants/roles";
-
 
 const zeroPad = (num, places) => String(num).padStart(places, "0");
 
@@ -140,7 +132,7 @@ const Flag = ({ data, onDeleteFlag }) => {
         {getEmoji(data.get("flag"), 22)}
       </WithPopOver>
     </Link>
-  )
+  );
 };
 
 const formatPunitions = (profile) => {
@@ -181,12 +173,7 @@ const ScoreChips = ({ player }) => {
         <Chip
           size="small"
           variant="outlined"
-          avatar={
-            <Avatar
-              alt="Combat"
-              src={getScoreIconSrc("combat", mode)}
-            />
-          }
+          avatar={<Avatar alt="Combat" src={getScoreIconSrc("combat", mode)} />}
           label={player.get("combat", 0)}
         />
       </Grid>
@@ -195,10 +182,7 @@ const ScoreChips = ({ player }) => {
           size="small"
           variant="outlined"
           avatar={
-            <Avatar
-              alt="Offensive"
-              src={getScoreIconSrc("offensive", mode)}
-            />
+            <Avatar alt="Offensive" src={getScoreIconSrc("offensive", mode)} />
           }
           label={player.get("offense", 0)}
         />
@@ -208,10 +192,7 @@ const ScoreChips = ({ player }) => {
           size="small"
           variant="outlined"
           avatar={
-            <Avatar
-              alt="Defensive"
-              src={getScoreIconSrc("defensive", mode)}
-            />
+            <Avatar alt="Defensive" src={getScoreIconSrc("defensive", mode)} />
           }
           label={player.get("defense", 0)}
         />
@@ -221,10 +202,7 @@ const ScoreChips = ({ player }) => {
           size="small"
           variant="outlined"
           avatar={
-            <Avatar
-              alt="Support"
-              src={getScoreIconSrc("support", mode)}
-            />
+            <Avatar alt="Support" src={getScoreIconSrc("support", mode)} />
           }
           label={player.get("support", 0)}
         />
@@ -234,7 +212,6 @@ const ScoreChips = ({ player }) => {
 };
 
 const KDChips = ({ player }) => {
-
   return (
     <Fragment>
       <Grid>
@@ -272,14 +249,11 @@ const KDChips = ({ player }) => {
 };
 
 const ScoreListText = ({ player }) => {
-
   return (
     <ListItemText
       primary={
         <Grid container spacing={1}>
-          <ScoreChips
-            player={player}
-          />
+          <ScoreChips player={player} />
         </Grid>
       }
       secondary={
@@ -379,11 +353,7 @@ const PlayerItem = ({
           </Fragment>
         }
       />
-      {playerHasExtraInfo ? (
-        <ScoreListText player={player} />
-      ) : (
-        ""
-      )}
+      {playerHasExtraInfo ? <ScoreListText player={player} /> : ""}
 
       {handleAction ? (
         <ListItemSecondaryAction>
