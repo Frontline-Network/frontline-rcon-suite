@@ -121,6 +121,37 @@ database clients (down from the 63-connection baseline), and no client `idle in
 transaction`. The four public responses completed in 39-62 ms and the host
 still had about 16 GiB available memory.
 
+## Admin UI delivery
+
+The admin router previously imported almost every page before the first screen
+could render. The initial bundle therefore included specialist configuration
+editors, charts, player-management forms, release-note Markdown rendering and
+the player-detail drawer even when none of them was open.
+
+Routes now load their component, loader, action and route-specific error UI on
+demand. Release notes load only when the About dialog needs them, and the
+player-detail drawer loads on its first use. Font Awesome and Lodash imports
+also use their individual modules so the bundler does not retain complete icon
+or utility indexes.
+
+| Fake-mode entry bundle | Before | After | Reduction |
+| --- | ---: | ---: | ---: |
+| Minified JavaScript | 4,806.55 kB | 957.43 kB | 80.1% |
+| Gzip estimate | 1,367.11 kB | 320.15 kB | 76.6% |
+
+Fake mode is used for the before/after comparison because it provides the same
+deterministic application and data path on both revisions. It includes Mirage
+and Faker, which production does not ship. The final production build measured
+374.84 kB raw / 114.69 kB gzip for its entry chunk. Including every JavaScript
+file referenced by the initial HTML, the production load measured 1,187.09 kB
+raw / 397.00 kB gzip.
+
+`npm run check:bundle` verifies the generated `dist/` directory and fails when
+the entry or complete initial JavaScript set exceeds its recorded budget. This
+prevents a future route import from silently returning the application to one
+large startup bundle. Deferred route chunks remain outside that initial budget
+and are still covered by the route smoke and accessibility tests.
+
 ## Host-level load outside the suite
 
 Measurements must keep CRCON cost separate from colocated consumers. On the

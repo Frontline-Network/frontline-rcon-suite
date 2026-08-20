@@ -27,6 +27,8 @@ From `rcongui/`:
 npm ci
 npx playwright install chromium
 npm test
+REACT_APP_API_URL=https://rcon.example.org/api/ npm run build
+npm run check:bundle
 ```
 
 Useful focused commands:
