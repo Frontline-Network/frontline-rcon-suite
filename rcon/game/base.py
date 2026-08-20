@@ -21,6 +21,8 @@ class GameProfile:
     weapons: Mapping[str, WeaponType] = field(default_factory=dict)
     weapon_sides: Mapping[str, Team] = field(default_factory=dict)
     supported_game_modes: frozenset[GameMode] = field(default_factory=frozenset)
+    match_timer_modes: frozenset[GameMode] = field(default_factory=frozenset)
+    warmup_timer_modes: frozenset[GameMode] = field(default_factory=frozenset)
     game_mode_aliases: Mapping[str, GameMode] = field(default_factory=dict)
 
     def parse_layer(self, layer_name: str | Layer) -> Layer:

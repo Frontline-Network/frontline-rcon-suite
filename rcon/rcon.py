@@ -996,6 +996,14 @@ class Rcon(ServerCtl):
             "supported_game_modes": sorted(
                 mode.value for mode in self.game_profile.supported_game_modes
             ),
+            "game_capabilities": {
+                "match_timer_modes": sorted(
+                    mode.value for mode in self.game_profile.match_timer_modes
+                ),
+                "warmup_timer_modes": sorted(
+                    mode.value for mode in self.game_profile.warmup_timer_modes
+                ),
+            },
         }
 
     @ttl_cache(ttl=60 * 60 * 24)

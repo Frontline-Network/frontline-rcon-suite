@@ -22,6 +22,8 @@ HLLV_PROFILE = GameProfile(
             GameMode.DOMINATION,
         }
     ),
+    match_timer_modes=frozenset({GameMode.WARFARE, GameMode.OFFENSIVE}),
+    warmup_timer_modes=frozenset({GameMode.WARFARE}),
     game_mode_aliases={
         "nva offensive": GameMode.OFFENSIVE,
         "us offensive": GameMode.OFFENSIVE,

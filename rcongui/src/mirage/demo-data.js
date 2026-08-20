@@ -219,6 +219,20 @@ export const demoServerStatus = {
 export const getDemoServerStatus = () => ({
   ...demoServerStatus,
   game: getDemoServerConnection().game,
+  supported_game_modes:
+    getDemoServerConnection().game === "hll_vietnam"
+      ? ["warfare", "offensive", "conquest", "domination"]
+      : ["warfare", "offensive", "conquest", "skirmish", "phased", "majority"],
+  game_capabilities:
+    getDemoServerConnection().game === "hll_vietnam"
+      ? {
+          match_timer_modes: ["warfare", "offensive"],
+          warmup_timer_modes: ["warfare"],
+        }
+      : {
+          match_timer_modes: ["warfare", "offensive", "skirmish"],
+          warmup_timer_modes: ["warfare", "skirmish"],
+        },
 });
 
 export const demoSystemUsage = {

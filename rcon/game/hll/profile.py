@@ -24,4 +24,8 @@ HLL_PROFILE = GameProfile(
             GameMode.MAJORITY,
         }
     ),
+    match_timer_modes=frozenset(
+        {GameMode.WARFARE, GameMode.OFFENSIVE, GameMode.SKIRMISH}
+    ),
+    warmup_timer_modes=frozenset({GameMode.WARFARE, GameMode.SKIRMISH}),
 )

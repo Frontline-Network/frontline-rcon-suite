@@ -8,9 +8,9 @@ import {
   getDemoConnectionMode,
   getDemoServerConnection,
   getDemoServerList,
-  getDemoServerStatus,
   isFakeMode,
 } from "@/mirage/demo-data";
+import { gameStatusQueryOptions } from "@/queries/status-query";
 import {
   CONNECTION_STATE,
   createAggregateConnectionHealth,
@@ -109,27 +109,7 @@ const applyDemoHealth = (health, target) => {
 
 // Define your global queries with onSuccess callbacks
 const globalQueries = [
-  queryOptions({
-    queryKey: [{ queryIdentifier: "get_status" }],
-    queryFn: async () => {
-      if (
-        isFakeMode() &&
-        ["gameserver_offline", "gameserver_stale"].includes(
-          getDemoConnectionMode()
-        )
-      ) {
-        throw new Error("Demo game server is unavailable");
-      }
-      return isFakeMode()
-        ? getDemoServerStatus()
-        : cmd.GET_GAME_SERVER_STATUS();
-    },
-    initialData:
-      isFakeMode() && getDemoConnectionMode() === "gameserver_stale"
-        ? getDemoServerStatus()
-        : undefined,
-    retry: 1,
-  }),
+  gameStatusQueryOptions(),
   queryOptions({
     queryKey: [{ queryIdentifier: "get_gamestate" }],
     queryFn: async () => {

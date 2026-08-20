@@ -326,6 +326,12 @@ class StatusType(TypedDict):
     server_number: int
     game: Literal["hll", "hllv"]
     supported_game_modes: list[str]
+    game_capabilities: "GameCapabilitiesType"
+
+
+class GameCapabilitiesType(TypedDict):
+    match_timer_modes: list[str]
+    warmup_timer_modes: list[str]
 
 
 class VipIdType(TypedDict):

@@ -107,24 +107,41 @@ def test_profiles_only_accept_their_supported_game_modes():
 
 
 @pytest.mark.parametrize(
-    ("controller_type", "game", "expected_modes", "unsupported_mode"),
+    (
+        "controller_type",
+        "game",
+        "expected_modes",
+        "unsupported_mode",
+        "match_timer_modes",
+        "warmup_timer_modes",
+    ),
     [
         (
             HLLRcon,
             GameEnum.HLL_WW2,
             {"warfare", "offensive", "conquest", "skirmish", "phased", "majority"},
             "domination",
+            ["offensive", "skirmish", "warfare"],
+            ["skirmish", "warfare"],
         ),
         (
             HLLVRcon,
             GameEnum.HLL_VIETNAM,
             {"warfare", "offensive", "conquest", "domination"},
             "skirmish",
+            ["offensive", "warfare"],
+            ["warfare"],
         ),
     ],
 )
 def test_status_exposes_game_profile_without_requiring_connection_info_permission(
-    monkeypatch, controller_type, game, expected_modes, unsupported_mode
+    monkeypatch,
+    controller_type,
+    game,
+    expected_modes,
+    unsupported_mode,
+    match_timer_modes,
+    warmup_timer_modes,
 ):
     controller = controller_type(ServerInfo(game=game))
     controller.get_name = Mock(return_value="Profile test")
@@ -143,6 +160,10 @@ def test_status_exposes_game_profile_without_requiring_connection_info_permissio
     assert status["game"] == game.value
     assert set(status["supported_game_modes"]) == expected_modes
     assert unsupported_mode not in status["supported_game_modes"]
+    assert status["game_capabilities"] == {
+        "match_timer_modes": match_timer_modes,
+        "warmup_timer_modes": warmup_timer_modes,
+    }
     assert status["server_number"] == 3
 
 
