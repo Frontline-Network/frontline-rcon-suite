@@ -21,7 +21,9 @@ export default defineConfig({
     toHaveScreenshot: {
       animations: "disabled",
       caret: "hide",
-      maxDiffPixelRatio: 0.01,
+      // Chromium's font rasterization differs slightly between Windows and
+      // the Linux CI runner. Structural and semantic assertions remain strict.
+      maxDiffPixelRatio: 0.025,
     },
   },
   reporter: process.env.CI
@@ -49,7 +51,9 @@ export default defineConfig({
   webServer: {
     command: "npm run dev:fake -- --host 127.0.0.1 --port 3000",
     url: baseURL,
-    reuseExistingServer: !process.env.CI,
+    // Reusing an arbitrary local server can silently capture snapshots from
+    // the normal live mode instead of the deterministic fake backend.
+    reuseExistingServer: false,
     timeout: 120_000,
     stdout: "pipe",
     stderr: "pipe",
