@@ -11,6 +11,8 @@ This milestone turns the admin interface's most important usability guarantees i
 - A 44 px minimum-target check for the important mobile navigation controls.
 - HLL, HLL Vietnam, and multi-server context checks, including the API aliases `hllv`, `hll_vietnam`, and `vietnam`.
 - Contract checks that distinguish a CRCON outage from a game-server outage.
+- Explicit loading, online, offline, stale and unknown connection-state contracts, including cached-data timestamps.
+- Dashboard regression checks that reject believable fallback values when live data is missing.
 - German/English contract checks for the critical navigation, connection, error, and integration labels changed by this milestone.
 - A limited-permission scenario proving protected player actions are unavailable to viewers and remain available to superusers.
 - Runtime and console error collection during route checks.
@@ -49,6 +51,9 @@ The admin UI pull-request job now uses Node 22, installs Chromium, runs the Play
 - Translated accessible names and 44 px targets for the important navigation controls.
 - Safe normalization of HLL Vietnam identifiers in the server selector.
 - Fully translated connection explanations that do not assume the game is always HLL.
+- Dashboard and header values now come only from confirmed API data; missing server, map, mode, player and image data is labelled unknown or unavailable.
+- Cached data is retained after a failed refresh but clearly marked stale with its last successful timestamp.
+- Dependent game-server polling stops while CRCON is unavailable, avoiding requests that cannot succeed.
 - Permission-denied action menus now explain why no protected action is available; icon-only action buttons receive accessible names.
 - Fake-mode switches for deterministic single-game, HLL Vietnam, unknown-game, and multi-server scenarios.
 
