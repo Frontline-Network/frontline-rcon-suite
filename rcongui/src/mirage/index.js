@@ -1,4 +1,4 @@
-import { createServer } from "miragejs";
+import { createServer, Response } from "miragejs";
 import { handleTeamView } from "./routes/team-view";
 import { createGameState } from "./state/game";
 import {
@@ -23,6 +23,7 @@ import {
 
 export function makeServer({ environment = "development" } = {}) {
   let gameState = createGameState();
+  const disbandAttempts = new Map();
   const ok = (result) => ({ result });
   const currentLayer = {
     id: "foy_warfare_night",
@@ -461,6 +462,16 @@ export function makeServer({ environment = "development" } = {}) {
       playerActionCommands.forEach((command) => {
         this.post(`/${command}`, (schema, request) => {
           const args = request.requestBody ? JSON.parse(request.requestBody) : {};
+          if (command === "disband_squad_by_name") {
+            const failingSquad = new URLSearchParams(window.location.search).get("demo_disband_failure");
+            const attempts = disbandAttempts.get(args.squad_name) || 0;
+            disbandAttempts.set(args.squad_name, attempts + 1);
+            if (failingSquad === args.squad_name && attempts === 0) {
+              return new Response(500, { "Content-Type": "application/json" }, {
+                error: "Demo: Gameserver hat die Truppauflösung abgelehnt.",
+              });
+            }
+          }
           return { failed: false, result: "OK", arguments: args };
         });
       });

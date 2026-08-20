@@ -7,6 +7,8 @@ test.describe("player-action permissions", () => {
   test("does not expose protected game actions to a viewer", async ({ page }) => {
     await openDemoPage(page, "/views/team", { query: { demo_role: "viewer" } });
 
+    await expect(page.getByRole("button", { name: "Trupp auflösen" })).toBeDisabled();
+
     await page.getByRole("button", { name: "Alle auswählen" }).click();
     await page.getByRole("button", { name: "Spieleraktionen" }).first().click();
     await expect(
