@@ -17,6 +17,8 @@ import {
   createConnectionHealth,
   EMPTY_CONNECTION_HEALTH,
 } from "@/utils/connectionHealth";
+import { useLocation } from "react-router-dom";
+import { getGameStatePollingInterval } from "@/queries/polling-policy";
 
 // Create the Zustand store
 export const useGlobalStore = create((set) => ({
@@ -45,7 +47,7 @@ export const useGlobalStore = create((set) => ({
 }));
 
 const staleTime = 15 * 1000;
-const refetchInterval = 30 * 1000;
+const defaultRefetchInterval = 30 * 1000;
 const demoHealthLastAttemptAt = Date.now();
 const demoHealthLastSuccessAt = demoHealthLastAttemptAt - 30_000;
 
@@ -150,6 +152,10 @@ const globalQueries = [
 ];
 
 export const GlobalState = () => {
+  const location = useLocation();
+  const gameStateRefetchInterval = getGameStatePollingInterval(
+    location.pathname
+  );
   const crconQuery = useQuery({
     queryKey: [{ queryIdentifier: "get_connection_info" }],
     queryFn: async () => {
@@ -167,7 +173,7 @@ export const GlobalState = () => {
       isFakeMode() && getDemoConnectionMode() === "crcon_stale"
         ? getDemoServerConnection()
         : undefined,
-    refetchInterval,
+    refetchInterval: defaultRefetchInterval,
     retry: isFakeMode() ? 0 : 1,
   });
   const crconHealth = applyDemoHealth(
@@ -177,14 +183,18 @@ export const GlobalState = () => {
   const canQueryGameServer = crconHealth.state === CONNECTION_STATE.ONLINE;
 
   const queryResults = useQueries({
-    queries: globalQueries.map((query) =>
-      queryOptions({
+    queries: globalQueries.map((query) => {
+      const queryIdentifier = query.queryKey?.[0]?.queryIdentifier;
+      return queryOptions({
         staleTime,
-        refetchInterval,
+        refetchInterval:
+          queryIdentifier === "get_gamestate"
+            ? gameStateRefetchInterval
+            : defaultRefetchInterval,
         enabled: canQueryGameServer,
         ...query,
-      })
-    ),
+      });
+    }),
   });
 
   const statusQuery = queryResults[0];

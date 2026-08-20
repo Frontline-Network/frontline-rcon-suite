@@ -5,6 +5,10 @@ import {
   createAggregateConnectionHealth,
   createConnectionHealth,
 } from "../src/utils/connectionHealth.js";
+import {
+  GAME_STATE_POLLING,
+  getGameStatePollingInterval,
+} from "../src/queries/polling-policy.js";
 
 test.describe("game context API contract", () => {
   const hllVietnamAliases = ["hllv", "hll_vietnam", "vietnam", " HLL_VIETNAM "];
@@ -102,5 +106,22 @@ test.describe("connection-health API contract", () => {
         { state: CONNECTION_STATE.DISABLED }
       ).state
     ).toBe(CONNECTION_STATE.DISABLED);
+  });
+});
+
+test.describe("game-state polling policy", () => {
+  test("uses one faster stream only on live operation routes", () => {
+    expect(getGameStatePollingInterval("/views/live")).toBe(
+      GAME_STATE_POLLING.liveOperationsIntervalMs
+    );
+    expect(getGameStatePollingInterval("/views/team")).toBe(
+      GAME_STATE_POLLING.liveOperationsIntervalMs
+    );
+    expect(getGameStatePollingInterval("/")).toBe(
+      GAME_STATE_POLLING.defaultIntervalMs
+    );
+    expect(getGameStatePollingInterval("/settings/general")).toBe(
+      GAME_STATE_POLLING.defaultIntervalMs
+    );
   });
 });

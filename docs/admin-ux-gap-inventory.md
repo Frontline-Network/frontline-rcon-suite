@@ -53,6 +53,12 @@ because the in-app browser connection could not be established.
     reports Auto Settings candidates without claiming an active rule, and
     distinguishes failed audit attempts from successful changes. The existing
     cards do not consume this contract yet.
+11. Admin interval polling is now explicitly paused in hidden tabs. Global
+    state owns the only `get_gamestate` request stream; Live View, Team View,
+    and the document title consume its cached state. The stream refreshes every
+    10 seconds on the two live-operation routes and every 30 seconds elsewhere,
+    instead of running parallel 10-second and 30-second observers. A regression
+    contract blocks background polling and duplicate route-level requests.
 
 ## Prioritized gap matrix
 
@@ -69,7 +75,7 @@ because the in-app browser connection could not be established.
 | P1 | Accessibility coverage | axe covers four routes at three widths; keyboard tests focus on shell navigation; touch-target coverage focuses on important navigation controls | Critical dialogs, settings, Automods, and Discord can regress unnoticed | Extend axe, keyboard, focus-return, announcement, zoom/reflow, and touch-target tests to every changed critical flow | No serious/critical axe results, documented manual 200% zoom and screen-reader spot checks |
 | P1 | HLL/HLLV coverage | Status identity and supported modes now come from the active profile; timer controls additionally use protocol-backed capabilities, and selected action/context tests exist; broad settings/Automod/map-action matrices do not | A feature may silently work for only one protocol/profile | Extend the timer pattern to remaining feature capabilities, add visible compatibility labels, and pair E2E fixtures for both games | HLL and HLLV fixtures for every changed command and setting; unknown future profile remains unknown |
 | P2 | Component documentation | No Storybook or comparable component catalogue was found | Status, setting, confirmation, empty, and error patterns can drift between pages | Lightweight component states catalogue using real components and fixtures, not a second design system | Documented states for connection, setting effect, destructive review/result, diagnostics, and empty/error/loading |
-| P2 | Polling and request budgets | Dashboard requests up to 100 games and broad log groups; no request-count or polling regression budget was found | More instances can amplify avoidable backend, CPU, RAM, and network load | Per-route request budget, shared cache policy, bounded payloads, and explicit refresh cadence | Request-count snapshots, payload sizes, cache hit evidence, and before/after CPU/RAM sampling |
+| P2 | Polling and request budgets | Hidden-tab interval polling and duplicate `get_gamestate` keys are now blocked by contract; dashboard requests up to 100 games and broad log groups still lack payload budgets | More instances can amplify avoidable backend, CPU, RAM, and network load | Extend the shared cache policy with per-route request and payload budgets while retaining explicit refresh cadence | Runtime request-count snapshots, payload sizes, cache hit evidence, and before/after CPU/RAM sampling |
 
 ## Structural versus visual work
 
