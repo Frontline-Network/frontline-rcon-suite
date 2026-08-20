@@ -708,6 +708,7 @@ const de = {
     toggleMenu: "Navigation ein- oder ausblenden",
     search: "Navigation durchsuchen …",
     navigateTo: "Navigieren zu",
+    permissionMissing: "Diese Seite ist sichtbar, aber dir fehlt die erforderliche Berechtigung.",
     groups: {
       appsSetup: "Apps einrichten",
       views: "Ansichten",
@@ -718,6 +719,14 @@ const de = {
       automods: "Automods",
       others: "Sonstiges",
       stats: "Statistiken",
+      liveOperations: "Live-Betrieb",
+      playersModeration: "Spieler & Moderation",
+      mapsGameOperations: "Karten & Spielbetrieb",
+      automation: "Automatisierung",
+      integrations: "Integrationen",
+      serverConfiguration: "Serverkonfiguration",
+      logsAnalytics: "Protokolle & Auswertung",
+      systemDiagnostics: "System & Diagnose",
     },
     links: {
       home: "Übersicht",
