@@ -1,162 +1,64 @@
 # Frontline RCON Suite
 
-Die Frontline RCON Suite ist der stark erweiterte Frontline-Fork von **Hell Let Loose Community RCON (CRCON / hll_rcon_tool)**. Die ursprüngliche CRCON-Basis bleibt erhalten, wurde aber um zahlreiche Frontline-spezifische Funktionen für Hell Let Loose und Hell Let Loose: Vietnam erweitert.
+Die **Frontline RCON Suite** ist der private Frontline-Fork von Hell Let Loose Community RCON (CRCON). Das Repository enthält die klassische CRCON-Serververwaltung und erweitert sie um Frontline-spezifische Funktionen für Hell Let Loose und Hell Let Loose: Vietnam, Moderation, Reports/Incidents, Mobile Admin, Discord-Integration, AI-gestützte Moderationsanalyse, Player-Message-Campaigns, Frontline-VIP-Integration und gehärteten Produktionsbetrieb.
 
-Das Repository ist inzwischen deutlich mehr als ein klassisches RCON-Webpanel. Es umfasst unter anderem:
-
-- Multi-Server-RCON und Serveradministration
-- HLL- und HLL-Vietnam-Unterstützung
-- Player-/Session-/Admin-Daten
-- Reports und Incident-Workflows
-- Mobile-Admin-Anbindung
-- Discord-Report-/Incident-Integration
-- verwaltete AI-Moderationsanalyse
-- Broadcast- und Player-Message-Kampagnen
-- VoteMap und HLL-spezifische Automationen
-- VIP-/Admin-/Spectator-Workarounds
-- Produktions-Deployment, Migrationen, Backups und Rollback
-
-Diese README ersetzt bewusst die bisherige fast unveränderte Upstream-README als Einstieg in den **Frontline-Fork**. Upstream-Provenienz und Lizenz bleiben dabei ausdrücklich erhalten.
-
-Diese README ist zweigeteilt:
-
-- **Teil 1 – Für Menschen:** Was die Suite für Spieler, Moderation und Serverbetrieb macht – ohne Endpointlisten, Ports oder Frameworkdetails.
-- **Teil 2 – Technische Dokumentation:** Architektur, Datenmodell, Worker, Incidents, Mobile Admin, Discord-Service, AI-Moderation, HLLV-Besonderheiten, Campaign Delivery, Deployment, Migrationen und Sicherheitsgrenzen.
+Das Projekt basiert auf dem ursprünglichen CRCON von Julien Marechal und behält dessen MIT-Lizenz und Provenienz. Die Frontline-Erweiterungen ersetzen diese Herkunft nicht; sie bauen darauf auf.
 
 ---
 
 # Teil 1 – Was macht die Frontline RCON Suite?
 
-## Serververwaltung für Hell Let Loose
+## Serververwaltung für HLL und HLL Vietnam
 
-Die Suite stellt die zentrale RCON-basierte Verwaltungsoberfläche für Hell-Let-Loose-Server bereit.
+Die Plattform verbindet RCON, Spieler-/Rundeninformationen, Moderation und Verwaltungsoberflächen. Frontline betreibt damit mehrere CRCON-Instanzen beziehungsweise Serverprofile.
 
-Administratoren können damit – abhängig von Rolle und Serverprofil – typische Aufgaben erledigen wie:
+## Moderation und Spielerakten
 
-- Serverstatus prüfen
-- Spieler sehen
-- Admin-/VIP-Listen verwalten
-- Spieler moderieren
-- Karten und Rotation verwalten
-- VoteMap verwenden
-- Chat-/Serverereignisse auswerten
-- Statistiken und historische Informationen ansehen
+Administratoren können Spielerinformationen, Livekontext, historische Daten, VIP-/Adminzustände und Moderationsaktionen über die CRCON-Funktionen verwalten.
 
-Die Frontline-Erweiterungen bauen auf dieser bestehenden CRCON-Basis auf.
+## Reports und Incidents
 
-## Hell Let Loose und Hell Let Loose: Vietnam
+Spieler können über definierte Chat-Trigger Reports erzeugen. Daraus entstehen Incidents mit Reporter-, Ziel- und Kontextinformationen.
 
-Der Fork unterstützt nicht nur klassisches Hell Let Loose, sondern enthält inzwischen auch HLL-Vietnam-spezifische Anpassungen.
-
-Dabei wird nicht vorausgesetzt, dass beide Spiele technisch identisch reagieren. Wo sich Identitäten, Adminlisten oder Serververhalten unterscheiden, existieren explizite Kompatibilitäts- und Sicherheitslogiken.
-
-Ein Beispiel ist die HLLV-Spectator-Berechtigung: Der Gameserver kann nach einem Reconnect eine weiterhin vorhandene Adminzuordnung nicht korrekt aktivieren. Der Frontline-Fork prüft deshalb bei einem passenden HLLV-Reconnect erneut die aktuelle Adminliste und kann eine bestätigte Spectator-Zuordnung additiv neu anwenden.
-
-## Spielerreports und Incidents
-
-Spieler können Moderationsprobleme melden. Aus solchen Reports entstehen strukturierte Incidents.
-
-Ein Incident kann Kontext enthalten wie:
-
-- meldender Spieler
-- betroffener Spieler
-- mehrere mögliche Spieler-/Squadbezüge
-- Reportgrund
-- Serverkontext
-- aktuelle und historische Zustände
-- Adminnotizen
-- Status und Bearbeiter
-
-Mehrdeutige Namenszuordnungen werden nicht automatisch als sichere Zielidentität behandelt.
+Die Incident-Schicht kann mehrere betroffene Spieler beziehungsweise Squads enthalten und bewahrt Snapshots des Zustands zum Reportzeitpunkt.
 
 ## Mobile Admin
 
-Die Suite besitzt eine optionale Mobile-Admin-Integration.
+Eine separate Mobile-Admin-Integration erlaubt Administratoren, ihre eigene CRCON-Identität sicher mit einem mobilen Client zu koppeln.
 
-Ein Administrator koppelt sein eigenes Gerät mit seinem eigenen CRCON-Konto. Es gibt keinen gemeinsamen universellen QR-Code für alle Admins.
-
-Die Mobile-App kann – abhängig von den CRCON-Berechtigungen des jeweiligen Administrators – unter anderem:
-
-- Incident-Inbox anzeigen
-- Incidents claimen und bearbeiten
-- Kontext und Dossiers ansehen
-- Spieler-/Squadbezüge prüfen
-- Notizen hinzufügen
-- erlaubte Moderationsaktionen ausführen
-
-Fehlende CRCON-Rechte werden nicht durch die Mobile-App erweitert.
-
-## Sichere Geräte-Paarung
-
-Die Kopplung ist kurzlebig und muss im bereits authentifizierten CRCON-Webinterface bestätigt werden.
-
-Der Administrator vergleicht einen Code auf beiden Geräten und bestätigt die Kopplung bewusst.
-
-Mobile-Token sind kurzlebig beziehungsweise rotierend und können entzogen werden.
+Die App verwendet keine gemeinsamen QR-Codes oder geteilten Adminaccounts. Jeder Administrator koppelt sein eigenes Gerät.
 
 ## Discord-Integration
 
-Der Frontline-Fork kann Incidents und Moderationsereignisse an einen getrennten Frontline-Discord-Service übergeben.
+Incidents und Moderationsinformationen können über einen zentralen Frontline-Discord-Service an Discord ausgeliefert werden.
 
-Dadurch müssen einzelne CRCON-Installationen nicht jeweils ihren eigenen Discord-Bot-Token verwalten.
+Der zentrale Dienst ermöglicht, dass einzelne CRCON-Installationen nicht selbst Discord-Bot-Tokens oder OpenAI-Keys verwalten müssen.
 
-Der zentrale Dienst kann Reports in Discord darstellen und kontrollierte Rückaktionen an die gebundene CRCON-Instanz vermitteln.
+## AI-Moderationsanalyse
 
-## Verwaltete AI-Moderation
+Die Frontline-Erweiterung kann Report-/Chat-/Namenskandidaten über einen verwalteten Analysepfad klassifizieren.
 
-Die Suite enthält zusätzlich eine optional aktivierbare Moderationsanalyse.
+Wichtig: Das AI-System **führt keine Moderationsaktion selbst aus**. Es liefert strukturierte Analyse für menschliche beziehungsweise nachgelagerte Policy-Entscheidung.
 
-Dabei können beispielsweise Chattexte oder Spielernamen als Moderationskandidaten analysiert werden.
+## Kampagnen und Player Messages
 
-Wichtig: Die AI trifft nicht automatisch die Moderationsentscheidung und behauptet nicht, eine Aktion ausgeführt zu haben.
+Neben klassischen Broadcasts existiert eine persistente Campaign-Delivery-Schicht für gestaffelte Direktnachrichten an Spieler.
 
-Die Architektur behandelt den analysierten Text ausdrücklich als **untrusted input**. Darin enthaltene Anweisungen oder Prompt-Injection-Versuche sollen nicht befolgt werden.
+Diese kann Empfängergruppen, Mindest-Sessionzeit und Abstände berücksichtigen und speichert Zustellversuche dauerhaft.
 
-Die Analyse liefert strukturierte Empfehlungen beziehungsweise Einordnungen für Review-Workflows.
+## HLLV-spezifische Workarounds
 
-## Schutz vor Incident-Fluten
+Hell Let Loose: Vietnam besitzt andere Identitäten und teilweise anderes Serververhalten. Der Frontline-Fork enthält deshalb gezielte HLLV-Anpassungen, beispielsweise für EOS-IDs und das erneute Aktivieren bestätigter Spectatorrechte nach Reconnect.
 
-Reports und automatisierte Moderationskandidaten können schnell sehr viele Ereignisse erzeugen.
+## Was dieses Repo nicht ist
 
-Der Fork enthält deshalb Deduplizierung, Delivery-State und Retrylogik, damit wiederholte oder identische Ereignisse nicht unkontrolliert Discord oder Adminoberflächen fluten.
+Nicht zuständig für:
 
-## Broadcasts und Player-Kampagnen
-
-Neben klassischen Serverbroadcasts unterstützt der Fork auch gezielte Player-Message-Kampagnen.
-
-Eine Kampagne kann Regeln besitzen wie:
-
-- erst nach bestimmter Sessiondauer
-- nur VIP oder Nicht-VIP
-- nur in bestimmten Serverzuständen
-- Mindestabstand zwischen Nachrichten
-- globaler Versandabstand
-
-Die Zustellung wird persistent pro Spielersession erfasst. Dadurch kann ein Prozessneustart nicht einfach vergessen, wem eine Kampagnennachricht bereits zugestellt wurde.
-
-## VoteMap und Layoutgrenzen
-
-CRCON bleibt der Eigentümer von VoteMap und Kartenwahl.
-
-Andere Frontline-Dienste wie HLL Telemetry beobachten und analysieren Layouts, sollen aber nicht heimlich CRCONs Mapsteuerung ersetzen.
-
-Diese Ownership-Grenze ist wichtig, weil mehrere Systeme dieselbe HLL-Runde beobachten, aber nicht alle davon Control-Rechte besitzen sollen.
-
-## Performance und Skalierung
-
-Der Fork wurde in mehreren Bereichen auf dauerhaften Multi-Server-Betrieb optimiert.
-
-Dazu gehören unter anderem:
-
-- Worker-/Supervisor-Konsolidierung
-- begrenzte Log-/Payloadgrößen
-- Runtime-Retention
-- kontrollierte Datenbankverbindungen
-- Hintergrundjobs
-- Health-/Readiness-Prüfungen
-- dedizierte Delivery-Tabellen für neue Automationen
-
-Die Root-README beschreibt diese Prinzipien; konkrete Messwerte und einzelne Canary-Ergebnisse bleiben in Commits und Detaildokumentation.
+- Discord-Level-/Communitysystem → `frontline-level`
+- globale Server-/Sessionerfassung → `frontline-game-tracker`
+- Positions-/Heatmaptelemetrie → `hll-telemetry`
+- HLL-Seeding-/VIP-Lifecycle → `seeding-suite`
+- Host-/Dockerorchestrierung → `frontline-gamehost`
 
 ---
 
@@ -164,123 +66,463 @@ Die Root-README beschreibt diese Prinzipien; konkrete Messwerte und einzelne Can
 
 ## 1. Upstream und Lizenz
 
-Die Frontline RCON Suite basiert auf dem Open-Source-Projekt **Hell Let Loose Community RCON / hll_rcon_tool** von Julien Marechal und weiteren Contributors.
+Das Repository basiert auf Hell Let Loose Community RCON.
 
-Die vorhandene `LICENSE` ist eine MIT-Lizenz mit Copyright-Hinweis auf Julien Marechal (2020).
+Die vorhandene `LICENSE` ist MIT und nennt Julien Marechal als ursprünglichen Copyrightinhaber.
 
-Diese Upstream-Provenienz muss erhalten bleiben.
+Frontline-spezifische Erweiterungen müssen diese Provenienz bei Weitergabe des Codes erhalten.
 
-Der Frontline-Fork ergänzt die bestehende CRCON-Architektur, ersetzt aber nicht die Lizenz- und Attribution-Pflichten der Upstream-Basis.
+## 2. Default Branch
 
-## 2. Repository-Grundstruktur
-
-Der Python-Code ist laut `pyproject.toml` insbesondere in folgenden Bereichen organisiert:
+Der aktuelle Default Branch des Repositories ist:
 
 ```text
-rcon/        RCON-, Domain-, Worker- und Serverlogik
-rconweb/     Django-Webanwendung / Adminoberfläche
-server/      Server-/Runtime-bezogene Komponenten
-tests/       Regressionen
+master
 ```
 
-Zusätzlich existieren unter anderem:
+Das unterscheidet dieses Repo von vielen anderen Frontline-Repositories auf `main`.
 
-```text
-alembic/ bzw. Migrationen
-mobile_app/              Flutter Mobile Admin
-push_relay/              selbst hostbarer Push Relay
-callback_service/        Callback-/Integrationskomponente
-discord_service/         zentrale Discord-/Moderationsintegration
-docs/                    Frontline-spezifische Betriebsdokumentation
-scripts/                 Deployment-, Test- und Betriebshelfer
-Dockerfile
-Frontend-/Builddateien
-Compose-Definitionen
-```
+Deployskripte und Dokumentation müssen deshalb nicht automatisch `main` annehmen.
 
-## 3. Technologie
+## 3. Technologiestack
 
-Die Upstream-/Fork-Architektur kombiniert mehrere Technologien:
+Die Plattform besteht aus mehreren Technologien:
 
-- Python 3
-- Django für Web-/Adminlogik
-- SQLAlchemy/Alembic für Teile des Datenmodells und Migrationen
+- Python Backend / RCON-Logik
+- Django-Web-/API-Schicht
+- SQLAlchemy-/Alembic-Migrationen
 - PostgreSQL
-- RCON-/Gameserverkommunikation
-- Supervisor-/Workerprozesse
-- Frontend/Weboberfläche
-- optional Flutter für Mobile Admin
-- separater Python-Webservice für Discord-/AI-Integration
+- Frontend/Web-UI
+- Supervisor-Prozesse für Hintergrundloops
+- Docker / Compose
+- optionaler Flutter-Mobile-Client
+- separater Discord-/AI-Service
 
-`pyproject.toml` konfiguriert unter anderem Black und isort mit Python-3.11-Ziel.
+`pyproject.toml` konfiguriert unter anderem Black und isort für Python 3.11.
 
-## 4. CRCON bleibt Source of Truth für Serveradministration
+## 4. Wichtige Sourcebereiche
 
-Mobile Admin, Discord-Service und andere Frontline-Komponenten dürfen CRCON-Berechtigungen nicht umgehen.
+```text
+rcon/                 Kern-RCON, Models, Loops, Policies, Campaigns
+rconweb/              Django/Web/API
+alembic/              Schema-Migrationen
+frontend/             Weboberfläche
+callback_service/     Integrations-/Callbackkomponente
+push_relay/           Mobile Push Relay
+discord_service/      zentraler Discord-/AI-Service
+scripts/              Deployment, E2E, Diagnose
+supervisor/           Hintergrundprozesskonfiguration
+tests/                umfangreiche Regressionen
+docs/                 Mobile Admin, Production Deploy usw.
+```
 
-CRCON bleibt maßgeblich für:
+Die genaue Verzeichnisstruktur kann sich weiterentwickeln; diese Bereiche sind aus dem geprüften Source-/Doku-Stand belegt.
 
-- Nutzer
-- Rollen
-- Permissions
-- Serverprofile
-- Playerdaten
-- Admin-/VIP-Daten
-- eigentliche RCON-/Moderationsaktionen
+## 5. CRCON-Core bleibt Grundlage
 
-Externe Oberflächen erhalten nur die Fähigkeiten, die der zugrunde liegende CRCON-Nutzer tatsächlich besitzt.
+Frontline ersetzt nicht die grundlegende CRCON-Architektur.
 
-## 5. Multi-Server-Modell
+Weiterhin zentral sind:
 
-CRCON wird pro konfigurierter Serverinstanz beziehungsweise Servernummer betrieben.
+- RCON-Verbindung
+- Spielerlisten
+- Serverzustand
+- Moderationsaktionen
+- User/Permissions
+- Scoreboards/History
+- Serverkonfiguration
+- Hintergrundloops
 
-Viele Frontline-Erweiterungen speichern `server_number`, damit Ereignisse, Incidents, Kampagnen und Aktionen eindeutig der richtigen Serverinstanz zugeordnet bleiben.
+Frontline-Erweiterungen bauen auf diesen bestehenden Contracts auf.
 
-Serverübergreifende Oberflächen müssen diese Trennung respektieren.
+## 6. Mehrere Serverinstanzen
 
-## 6. Datenbank und Migrationen
+CRCON wird serverbezogen betrieben. Viele Tabellen und Abläufe besitzen eine `server_number`-Beziehung.
 
-Der Fork verwendet Datenbankmigrationen für neue Features.
+Dadurch kann dieselbe Codebasis mehrere getrennte HLL-/HLLV-Server verwalten, ohne deren Zustände zu vermischen.
 
-Neue Frontline-Funktionen wie Mobile Incidents, AI-Moderationsanalyse und Kampagnenzustellung besitzen eigene Tabellen beziehungsweise Migrationen.
+## 7. HLL und HLL Vietnam
 
-Produktionsdeployments müssen sowohl die bestehende Django-Migrationshistorie als auch die Alembic-Migrationskette berücksichtigen.
+Der Fork unterstützt sowohl klassisches Hell Let Loose als auch Hell Let Loose: Vietnam.
 
-Migrationen werden nicht als beiläufige Dateikopie behandelt.
+Dabei dürfen Identitäts-/Protocolldetails nicht blind gleichgesetzt werden.
 
-## 7. Player Sessions
+Beispiel:
 
-CRCON führt Spielersessions und Playeridentitäten, die auch von Frontline-Erweiterungen verwendet werden können.
+- klassisches HLL verwendet typischerweise SteamID64 im entsprechenden Pfad;
+- HLLV-Adminoperationen können EOS Product User IDs verwenden.
 
-Player-Message-Kampagnen referenzieren beispielsweise konkrete `player_session`-Datensätze, damit Zustellung an eine reale aktuelle Session gebunden ist.
+## 8. EOS-ID-Schutz
 
-Eine neue Session ist damit ein neuer möglicher Kampagnenkontext; die alte Zustellung wird nicht einfach global auf unbestimmte Zeit mitgeschleppt.
+Der HLLV-Spectator-Workaround prüft explizit die erwartete 32-Zeichen-EOS-ID und lehnt eine klassische 17-stellige SteamID in diesem Pfad ab.
 
-## 8. Campaign Delivery
+Damit soll keine falsche Identitätsform an HLLV-Admincommands gesendet werden.
 
-Die jüngste Frontline-Erweiterung führt persistente Campaign-Delivery-Daten ein.
+## 9. HLLV Spectator Reconnect Fix
 
-Eine Delivery speichert unter anderem:
+HLLV kann einen Spectator-Eintrag in `GetAdminUsers` behalten, obwohl die tatsächlichen Spectatorrechte nach Reconnect nicht wirksam sind.
 
+Der Frontline-Fix arbeitet deshalb additiv:
+
+1. nur HLLV;
+2. nur definierte Rolle `spectator`;
+3. zunächst vorhandenen Adminzustand prüfen;
+4. Cache löschen beziehungsweise Fresh Read erzwingen;
+5. Rolle erneut live bestätigen;
+6. erst dann `AddAdmin` erneut ausführen.
+
+## 10. Warum Fresh Read vor AddAdmin?
+
+Ohne frischen Read könnte ein veralteter Cache eine Rolle wiederherstellen, die ein Administrator inzwischen bewusst direkt am Server entfernt hat.
+
+Der Fix soll deshalb **keine gelöschte Berechtigung auferstehen lassen**.
+
+## 11. Additiv statt destruktiv
+
+Der Reconnect-Fix ruft kein `remove_admin` auf.
+
+Wenn Reapply fehlschlägt, bleibt der Fehler isoliert und unterbricht nicht die normale CONNECTED-Logverarbeitung.
+
+## 12. Incident-System
+
+Reports werden nicht nur als Discord-Nachricht behandelt, sondern als persistenter Incidentzustand.
+
+Ein Incident kann enthalten:
+
+- Quelle
+- Reporter
+- Grund / Snapshotkontext
+- bestätigte oder vorgeschlagene Subjects
+- Squads
+- Status / Claim / Resolution
+- Events/Notes
+- Discord Delivery State
+
+## 13. Incident Sources
+
+Der aktuelle Schema-Stand unterstützt unter anderem Quellen wie:
+
+```text
+chat
+manual
+ai_chat
+ai_player_name
+```
+
+Damit wird zwischen klassischem Spielerreport und automatisch erzeugtem Analyse-/Moderationskandidaten unterschieden.
+
+## 14. Report-Trigger
+
+Mit aktivierter Incident-Integration können Chatnachrichten wie:
+
+```text
+!admin Player Name reason
+```
+
+Incidents erzeugen.
+
+Mehrere Triggerwörter können konfiguriert werden.
+
+## 15. Deduplizierung von Reports
+
+Identische Reports desselben Spielers und Servers werden für ein kurzes Zeitfenster dedupliziert.
+
+Das schützt den Incidentbereich vor versehentlichen oder absichtlichen Wiederholungsfluten.
+
+## 16. Incident Context V2
+
+Der Mobile-/Incident-Pfad besitzt einen konfigurierbaren Context-Modus:
+
+```text
+disabled
+shadow
+enabled
+```
+
+### disabled
+
+ursprünglicher beziehungsweise begrenzter Resolver.
+
+### shadow
+
+reichere Kandidaten werden gespeichert, aber nicht automatisch bestätigt.
+
+### enabled
+
+nur eindeutig exakte Matches können automatisch bestätigt werden; fuzzy Matches bleiben Vorschläge.
+
+## 17. Multi-Subject-Incidents
+
+Ein Incident kann mehrere Spieler- und Squad-Subjects enthalten.
+
+Das ist wichtig für Reports, die sich auf mehrere Personen oder eine Squad-Situation beziehen.
+
+## 18. Keine implizite Squad-Aktion
+
+Squadmitglieder müssen einzeln ausgewählt werden.
+
+Es existiert keine implizite „Aktion gegen das gesamte Squad“, und der Squadleader wird nicht automatisch als Ziel einer Moderationsaktion interpretiert.
+
+## 19. Immutable Snapshots
+
+Incidents bewahren Reporter-/Subject-Snapshots vom Reportzeitpunkt.
+
+Die UI kann zusätzlich aktuellen Serverzustand anzeigen.
+
+Damit werden zwei unterschiedliche Wahrheiten getrennt:
+
+```text
+Was war beim Report bekannt?
+Was ist jetzt live?
+```
+
+## 20. Kürzlich disconnectete Targets
+
+Der aktuelle Fork enthält eine Reparatur, um kürzlich getrennte Reporttargets wieder aufzulösen.
+
+Das adressiert die Race Condition, dass ein Spieler zwischen Report und Contextauflösung den Server verlässt.
+
+## 21. Mobile Admin Pairing
+
+Die Mobile-Admin-Integration ist opt-in und standardmäßig deaktiviert.
+
+Pairing wird aus einer bereits authentifizierten CRCON-Websession gestartet.
+
+Ein Administrator erzeugt einen kurzlebigen One-Time-QR-Code und bestätigt einen auf beiden Geräten sichtbaren Code.
+
+## 22. Kein Shared Mobile Account
+
+Jedes Gerät wird an das individuelle CRCON-Konto gekoppelt.
+
+Es gibt keinen gemeinsamen Team-QR-Code oder einen universellen Mobile-Adminaccount.
+
+Dadurch bleiben CRCON-User, Rollen und Permissions maßgeblich.
+
+## 23. Mobile Token Lifecycle
+
+Die Dokumentation beschreibt:
+
+- opaque Access Tokens
+- gehashte Speicherung in CRCON
+- kurze Access-Token-Laufzeit
+- Refresh-Token-Rotation
+- Idle-Lifetime
+- absolute Lifetime
+
+Damit ist Mobile Auth nicht nur ein langlebiger statischer API-Key.
+
+## 24. Permission Changes wirken weiter
+
+Gerätebindung friert Berechtigungen nicht für Monate ein.
+
+User-Deaktivierung, Device Revocation und Permissionänderungen werden bei nachfolgenden Requests berücksichtigt.
+
+## 25. Mobile Secrets auf dem Gerät
+
+Mobile Secrets werden in Keychain beziehungsweise Android Secure Storage gespeichert.
+
+Der lokale Drift-Cache verwendet einen getrennten Schlüssel aus dem OS-Keystore.
+
+## 26. Keine Offline-Moderationswrites
+
+Schreibende Mobile-Aktionen werden nicht offline gequeued oder später blind wiederholt.
+
+Das verhindert, dass ein alter Kick/Ban nach Wiederverbindung unerwartet ausgeführt wird.
+
+## 27. Action Confirmation
+
+Kick und temporärer Ban verlangen laut Doku Grund und explizite Bestätigung.
+
+Der Mobile-E2E-Runner führt standardmäßig keine Spieleraktion aus.
+
+## 28. Mobile E2E Gate
+
+`scripts/mobile_admin_beta_e2e.py` kann einen sicheren Workflow prüfen:
+
+- Incident lesen
+- claimen
+- optional Note
+- resolve
+
+Eine tatsächliche Spieleraktion benötigt einen expliziten `--allow-action`-Gate und ein bestätigtes Ziel.
+
+## 29. Mobile Push Relay
+
+Push ist als separate Komponente implementiert.
+
+CRCON übermittelt keine vollständigen Moderationsinhalte an den Relay.
+
+Der dokumentierte Payload enthält nur minimale IDs/Ereignisinformationen und keine Playernamen, IDs, Reportgründe oder Adminnotes.
+
+## 30. Push Permission Check
+
+Der Mobile Push Worker prüft aktive CRCON-Permissions für Deliveries.
+
+Ein früher einmal berechtigtes Gerät soll nicht dauerhaft Push-/Adminmacht behalten, wenn der User später Rechte verliert.
+
+## 31. Push Registration Limits
+
+Der Relay besitzt Rate-/Capacity-Grenzen für Device Registration.
+
+Retry desselben Push Tokens ist idempotent.
+
+## 32. Zentraler Discord Service
+
+Frontline betreibt einen separaten Discord-Integrationsservice.
+
+Zweck:
+
+- ein zentral verwalteter Bot Token
+- zentrale Discord App
+- zentral verwalteter OpenAI-Key
+- CRCON-Installationen pairen sich mit diesem Dienst
+
+Kunden-/Einzelinstanzen müssen dadurch nicht eigene Bot-/AI-Secrets verwalten.
+
+## 33. Separate Deploymentgrenze
+
+Der Discord Service ist **nicht** einfach ein weiterer Thread im CRCON-Prozess.
+
+Er besitzt einen eigenen Deployment-/DB-/Secretkontext.
+
+Das reduziert den Blast Radius eines CRCON-Instanzfehlers.
+
+## 34. Discord Service Datenhaltung
+
+Der Service speichert Integrations-/Capability-/Mapping-/Idempotenzdaten.
+
+Die eigene Doku betont, dass er keine DB-Spalten für vollständige Report-/Chat-/Namensinhalte, Aktionsgründe, Nachrichten oder Previews benötigt.
+
+## 35. Capability-Modell
+
+Beim Pairing werden getrennte zufällige Capabilities für:
+
+- CRCON -> Service Events
+- Service -> CRCON Actions
+
+erzeugt.
+
+Empfänger speichern nur Digest; Sender kann die benötigte rohe Capability verschlüsselt halten.
+
+## 36. Capabilities nicht in URLs
+
+Die Service-Doku verbietet, Capabilities in URLs oder Logs zu platzieren.
+
+Dadurch sollen Reverse-Proxy-/Accesslogs keine langlebigen Aktionsberechtigungen enthalten.
+
+## 37. Callback-Zielschutz
+
+Pairing kann Callbackhosts allowlisten und lehnt private/link-local Ziele sowie falsche Callbackpfade ab.
+
+Damit wird der zentrale Service nicht als SSRF-Proxy zu beliebigen internen Zielen verwendet.
+
+## 38. Discord Interaction Verification
+
+Der zentrale Service verwendet den Discord Public Key zur Verifikation eingehender Interactions.
+
+Discord-Requests werden damit nicht allein aufgrund der URL als vertrauenswürdig behandelt.
+
+## 39. AI-Moderation: zwei Stufen
+
+Der verwaltete Analyzer verwendet:
+
+1. Moderation Model / Safety Gate
+2. strukturierten generativen Analysecall
+
+Das hard-hit-Sicherheitsbit wird aus dem Moderation Gate gesetzt und nicht aus untrusted Text oder generativem Output übernommen.
+
+## 40. Prompt-Injection-Grenze
+
+Der Systemprompt behandelt Report-/Chat-/Namensinhalte ausdrücklich als **untrusted evidence**.
+
+Anweisungen innerhalb dieses Textes sollen nicht ausgeführt werden.
+
+## 41. Structured Output
+
+Die AI-Antwort wird gegen ein definiertes `ModerationAnalysis`-Schema geparst.
+
+Dadurch soll ein freier Prosatext nicht direkt als Maschinencommand interpretiert werden.
+
+## 42. AI führt keine Aktion aus
+
+Der Analyzer besitzt keine Tools für direkte Serveradministration.
+
+Er klassifiziert und empfiehlt für Review.
+
+Moderationsausführung bleibt in den CRCON-/Adminpfaden.
+
+## 43. Moderation Analysis Records
+
+Die CRCON-Datenbank speichert Analysemetadaten, darunter abhängig vom Schema:
+
+- Source
+- Incident
+- Player
+- Candidate Fingerprint
+- Analysis JSON
+- Visibility
+- Model Version
+- Prompt Version
+- Policy Profile/Version
+- Dedupe-Zeit
+
+Damit ist AI-Ausgabe versionierbar und auditierbar.
+
+## 44. Candidate Outbox
+
+AI-Kandidaten werden über eine Outbox transportiert.
+
+Felder umfassen unter anderem:
+
+- Source
 - Server
-- Campaign-ID
-- Player-ID
-- konkrete Player-Session
-- Spielername
-- Nachricht
-- Status
-- Attempt Count
-- Eligible-Zeitpunkt
+- Player
+- Fingerprint
+- gematchte Rule IDs
+- Policy
+- Shadow Flag
+- Attempts
 - Next Attempt
-- letzte Ausführung
-- Versandzeit
-- letzten Fehler
+- Delivery/Analysis Status
 
-Eine Unique Constraint auf Server + Campaign + Player Session verhindert doppelte Zustellung derselben Kampagne innerhalb derselben Session.
+## 45. AI Shadow Mode
 
-## 9. Campaign Delivery States
+Kandidaten können `shadow_only` sein.
 
-Der Code unterscheidet Zustände wie:
+Damit kann neue Analyse zunächst beobachtet werden, ohne sofort sichtbare Incidents oder operative Folgen zu erzeugen.
+
+## 46. Discord Incident Delivery
+
+Incident-Events besitzen einen eigenen Delivery-State mit:
+
+- Attempts
+- Next Attempt
+- Delivered At
+- Last Error
+
+Damit ist Discord-Zustellung retrybar und nicht an die Transaktion gekoppelt, die den Incident erzeugt hat.
+
+## 47. Campaign Delivery
+
+Der Fork besitzt persistente Direct-Player-Campaigns.
+
+Die Migration erzeugt `campaign_deliveries` mit server-, campaign-, player- und sessionbezogenen Daten.
+
+## 48. Warum Delivery pro Session?
+
+Die Unique Constraint bindet Delivery an:
+
+```text
+server_number
+campaign_id
+player_session_id
+```
+
+Damit kann dieselbe Kampagne in einer späteren echten neuen Session wieder relevant sein, ohne innerhalb derselben Session doppelt gesendet zu werden.
+
+## 49. Campaign States
+
+Der Code verwendet Zustände wie:
 
 ```text
 queued
@@ -290,447 +532,286 @@ failed
 expired
 ```
 
-Zusätzlich existieren:
+und speichert Attempt-/Retryinformationen.
 
-- Retrydelays
-- maximales Attempt-Limit
-- Recovery für stale `sending`-Zustände
-- Retention älterer Deliverydaten
+## 50. Stale Sending Recovery
 
-Damit ist die Kampagnenzustellung restart- und retryfähig.
+Es existiert eine Schwelle für zu lange `sending`-Zustände.
 
-## 10. Campaign Targeting
+Damit kann ein Workerabbruch nach Claim einer Delivery später erkannt werden, statt den Datensatz für immer im Zwischenzustand zu lassen.
 
-Player-Kampagnen können nach dokumentiertem Code unter anderem filtern nach:
+## 51. Campaign Retry
 
-- VIP
-- Nicht-VIP
-- alle
-- Mindestdauer der aktuellen Session
-- Kampagnenintervall
-- Player-spezifischem Mindestabstand
-- Server-/Seedingzustand
+Direktnachrichten besitzen begrenzte Retryanzahl und definierte Retrydelays.
 
-Die tatsächliche Eligibility wird unmittelbar aus aktuellem Spieler-/Sessionzustand berechnet.
+Damit wird ein temporärer Fehler nicht sofort endgültig, aber auch nicht unendlich oft wiederholt.
 
-## 11. Broadcast vs. Player Message
+## 52. Recipient Groups
 
-Der bisherige Auto-Broadcast-Mechanismus und neue Player-Messages werden getrennt behandelt.
-
-Broadcast-Kampagnen gehen über den klassischen Serverbroadcast-Weg.
-
-`player_message`-Kampagnen erzeugen dagegen persistente individuelle Delivery-Einträge.
-
-Diese Trennung verhindert, dass ein individueller Delivery-Workflow die bestehende Broadcastschleife unkontrolliert verändert.
-
-## 12. Incidents
-
-Die Incident-Architektur kann unterschiedliche Quellen unterscheiden, darunter:
-
-- Chatreport
-- manuell erzeugt
-- AI-basierter Chatkandidat
-- AI-basierter Spielernamenkandidat
-
-Incidents besitzen Eventhistorie und können mehrere Subjekte beziehungsweise Kontextkandidaten enthalten.
-
-## 13. Incident Context
-
-Der Mobile-/Incident-Resolver unterstützt mehrere Kontextmodi.
-
-Sinngemäß:
+Campaigns können Zielgruppen unterscheiden, beispielsweise:
 
 ```text
-disabled
-  alte/einfache Resolverlogik
-
-shadow
-  Kandidaten werden gespeichert, aber nicht automatisch bestätigt
-
-enabled
-  nur eindeutige exakte Matches können automatisch bestätigt werden
+vip
+non_vip
+all
 ```
 
-Fuzzy Matches bleiben Vorschläge und dürfen nicht als Action Target verwendet werden, bis ein Administrator sie bestätigt.
+Dafür liest der Worker Onlineplayer und VIPzustand.
 
-## 14. Multi-Subject Incidents
+## 53. Minimum Session Time
 
-Ein Incident kann mehrere Spieler- und Squadsubjekte enthalten.
+Eine Campaign kann eine Mindest-Sessiondauer verlangen.
 
-Squad-Mitglieder müssen einzeln ausgewählt werden.
+Damit wird ein Spieler nicht zwangsläufig direkt beim Connect mit Kampagnenmeldungen überschüttet.
 
-Es existieren keine impliziten Squad-weiten Actions und ein Squadleader wird nicht automatisch als Stellvertreter für den gesamten Squad als Ziel gewählt.
+## 54. Player Gap / Global Interval
 
-Das reduziert das Risiko, dass ein mehrdeutiger Report zu einer Aktion gegen die falsche Person führt.
+Der Campaign-Code besitzt sowohl globale Sendeintervalle als auch Abstände pro Spieler.
 
-## 15. Immutable Snapshots vs. Live State
+Dadurch können Serverlast und Nutzerfrequenz getrennt begrenzt werden.
 
-Incidents behalten immutable Reporter-/Subject-Snapshots aus dem Zeitpunkt des Ereignisses.
+## 55. Sessionbezug
 
-Die Oberfläche kann parallel den aktuellen Serverzustand anzeigen.
+Campaign Delivery verwendet aktive PlayerSessions aus der CRCON-Datenbank.
 
-Damit wird unterschieden zwischen:
+Das verbindet Direct Messaging mit dem tatsächlichen aktuellen Spielaufenthalt.
 
-```text
-Was wurde zum Reportzeitpunkt gemeldet?
+## 56. Broadcast vs. Direct Campaign
 
-und
+Klassische Autobroadcasts und direkte Player Messages verwenden dieselbe Konfigurationsfamilie, aber unterschiedliche Delivery Modes.
 
-Wie sieht der Spieler/Server jetzt aus?
-```
+Der klassische Broadcastloop filtert auf `broadcast`; der Campaign Worker verarbeitet `player_message`.
 
-Aktuelle Änderungen überschreiben nicht die historische Incident-Evidenz.
+Damit werden beide Versandarten nicht doppelt ausgeführt.
 
-## 16. Incident Deduplizierung
+## 57. Supervisor Worker
 
-Identische Reports desselben Spielers und Servers können für ein kurzes Fenster dedupliziert werden.
+Der Fork startet Campaign Messages als eigenen Supervisor-Prozess.
 
-Zusätzliche Discord-Delivery- und Candidate-Outbox-Tabellen verhindern, dass Events bei Retries mehrfach zugestellt werden.
+Weitere CRCON-Hintergrundprozesse laufen ebenfalls unter Supervisor.
 
-## 17. Discord Incident Delivery
+Dies erlaubt Restart-Isolation einzelner Loops.
 
-CRCON besitzt eine Delivery-Tabelle für Discord-Reportevents.
+## 58. Consolidated Loops / Scaling
 
-Sie speichert unter anderem:
+Aktuelle Commits dokumentieren Konsolidierung von Settings-/Broadcastloops und Performance-/Scalingoptimierungen.
 
-- Eventbezug
-- Attempts
-- Next Attempt
-- Delivered-Zeitpunkt
-- Fehler
+Das Ziel ist, bei mehreren RCON-Instanzen unnötige Poller, DB-Verbindungen und Dashboardlast zu reduzieren.
 
-Damit wird die Zustellung asynchron und retrybar, ohne den RCON-/Logprozess direkt von Discord abhängig zu machen.
+## 59. DB Connection Pool in Workerprozessen
 
-## 18. Zentraler Discord Service
+Bestimmte Supervisorprozesse setzen `HLL_DB_DISABLE_CONNECTION_POOL=1`.
 
-Der Frontline-Fork enthält einen separaten `discord_service`.
+Damit können kurz-/loopbasierte Worker vermeiden, jeweils einen großen Pool zu halten.
 
-Seine Aufgabe ist zentrale Discord-Zustellung und verwaltete Moderationsanalyse für gebundene CRCON-Installationen.
+## 60. Dashboard Performance
 
-Das ermöglicht ein Modell, in dem Kunden-/Serverinstanzen nicht jeweils eigene Bot- und AI-Credentials verwalten müssen.
+Der Fork enthält gezielte Änderungen zur Reduktion von Dashboardlog-/Background-Polling-Last.
 
-## 19. Discord-Service-Datensparsamkeit
+Performance wurde über Canary-/Stability-Samples dokumentiert.
 
-Die dokumentierte Servicearchitektur speichert technische Bindungs- und Capabilitydaten, aber soll keine dauerhafte Datenbankspalte für eigentliche Report-/Chat-/Namens-Texte, Action-Gründe oder Previewtexte besitzen.
+## 61. Shared Runtime Compatibility
 
-Persistiert werden stattdessen unter anderem:
+Commits und Tests decken gemeinsam genutzte Runtime-/Supervisor-Konfigurationen ab.
 
-- Integrationsbindungen
-- Capability-Material
-- Incident-/Message-Mappings
-- kurzlebige Bestätigungsrelays
-- Idempotenzreceipts
-- content-free Usage Metrics
+Damit soll Optimierung nicht versehentlich einzelne Serverprofile funktional brechen.
 
-Dadurch wird die zentrale Infrastruktur nicht automatisch zur dauerhaften Kopie aller Moderationstexte.
+## 62. Reports: Reporterbenachrichtigung
 
-## 20. Discord-Service-Pairing
+Ein aktueller Fix begrenzt bestimmte Reportbenachrichtigungen auf den tatsächlichen Reporting Player.
 
-Die Servicebindung erzeugt getrennte zufällige Capabilities für:
+Das verhindert, dass Kontext-/Bestätigungsnachrichten unnötig andere Spieler erreichen.
 
-```text
-CRCON -> Service Events
-Service -> CRCON Actions
-```
+## 63. Recently Disconnected Target Recovery
 
-Der Empfänger speichert nur einen keyed Digest; der Sender hält den Raw-Wert verschlüsselt.
+Bei Reportauflösung kann ein Ziel kurz zuvor disconnected sein.
 
-Capabilities sollen nicht in URLs oder Logs landen.
+Der aktuelle Fork versucht solche Targets aus jüngster Session-/Kontexthistorie zu rekonstruieren, statt den Report sofort kontextlos zu machen.
 
-Callback-Ziele werden eingeschränkt; private/link-local Ziele und unzulässige Pfade werden abgewiesen.
+## 64. Frontline VIP Verification
 
-## 21. AI Moderation Candidate Outbox
+Der Source enthält `frontline_vip_verification`-Integration im Hookpfad.
 
-CRCON kann potenzielle Chat-/Namensfälle in eine eigene Moderation-Outbox schreiben.
+Damit kann CRCON mit dem Frontline-VIP-/Identity-Ökosystem zusammenarbeiten, ohne die Seeding-Suite-Domain vollständig zu übernehmen.
 
-Ein Candidate enthält unter anderem:
+## 65. VoteMap Ownership
 
-- Quelle
-- Server
-- Playerbezug
-- Candidate-Fingerprint
-- Text
-- gematchte Policy-Regeln
-- Policy
-- Shadow-Flag
-- Retry-/Deliveryzustand
+VoteMap und Mapwahl bleiben in CRCON.
 
-Analyseergebnis und Incident-Erzeugung werden davon getrennt verarbeitet.
+HLL Telemetry kann Layouts analysieren, soll aber nicht VoteMap umgehen.
 
-## 22. AI-Analyse
+Diese Grenze ist für die Zusammenarbeit mit `hll-telemetry` und `seeding-suite` wichtig.
 
-Der zentrale Analyzer verwendet einen fest definierten Systemprompt und ein strukturiertes Output-Schema.
+## 66. Django API Keys / Permissions
 
-Wichtige Sicherheitsregeln im Code:
+CRCONs API ist an Nutzer-/Permissionmodelle gebunden.
 
-- Inputtext wird als untrusted evidence behandelt.
-- Anweisungen im Text werden nicht befolgt.
-- das Modell hat keine Tools in diesem Analysepfad.
-- Ausgabe muss dem erwarteten Schema entsprechen.
-- Action wird nur empfohlen, nicht als ausgeführt behauptet.
-- Rule IDs müssen aus der mitgegebenen Policy stammen.
+Integrationen sollen dedizierte API-Keys beziehungsweise Serviceaccounts mit minimal erforderlichen Permissions verwenden.
 
-## 23. Separate Moderation Gate
+## 67. Mobile API Permission Awareness
 
-Vor beziehungsweise neben generativer Analyse wird eine Moderationprüfung verwendet.
+Player Search, Dossiers und Incidentactions berücksichtigen aktive CRCON-Permissions.
 
-Ein `hard_hit`-Signal wird aus diesem separaten Moderationsgate übernommen und **nicht** vom untrusted Text oder generativen Modell selbst gesetzt.
+Fehlende Rechte führen dazu, dass Abschnitte fehlen oder gesperrt sind, nicht dass die Mobile API großzügigere Rechte erfindet.
 
-Dadurch kann der analysierte Text nicht einfach behaupten „ich bin ein Hard Hit“ und diese interne Sicherheitsflagge manipulieren.
+## 68. Production Deployment
 
-## 24. AI Privacy / Store-Verhalten
+`docs/production-deploy.md` beschreibt einen guarded GitHub-Deploymentweg.
 
-Der Analyzer verwendet den Responses-Aufruf mit deaktivierter Speicherung (`store=False`).
+Produktiv soll aus einem sauberen Checkout des privaten Frontline-Repositories deployt werden.
 
-Die lokale Servicearchitektur speichert Analysemetadaten und strukturierte Ergebnisse entsprechend ihrem eigenen Datenmodell; der externe Modellrequest soll nicht als allgemeiner Konversationsspeicher verwendet werden.
+Tracked Files sollen nicht direkt auf dem Server editiert werden.
 
-## 25. AI Visibility
+## 69. Deploy Key
 
-Analyseergebnisse unterscheiden Sichtbarkeits-/Verarbeitungszustände wie:
+Die Doku empfiehlt einen dedizierten read-only Deploy Key für die Produktionsmaschine.
 
-```text
-incident
-shadow
-ignore
-```
+Der Server benötigt damit keine allgemeinen Org-Schreibrechte.
 
-Damit kann Moderationslogik zunächst im Shadow-Modus evaluiert werden, ohne jeden Treffer als echten Incident zu behandeln.
+## 70. Preflight-Deploy-Gates
 
-## 26. Mobile Admin Pairing
+Der Deployhelper verweigert unter anderem:
 
-Mobile Admin ist opt-in und standardmäßig deaktiviert.
+- dirty checkout
+- falschen Branch
+- non-fast-forward Update
+- ungültiges Compose-Modell
 
-Der Pairingflow:
+## 71. Pre-Deploy DB Backup
 
-1. Administrator ist bereits in CRCON authentifiziert.
-2. CRCON erzeugt kurzlebigen One-Time-QR.
-3. Mobile Gerät liest Pairingdaten.
-4. sechsstelliger Code wird auf beiden Seiten verglichen.
-5. Admin bestätigt im Browser.
-6. Gerät erhält eigene Credentials.
+Vor dem Rollout wird ein PostgreSQL Custom-Format-Backup erzeugt.
 
-Shared Pairing-Codes für mehrere Admins sind nicht vorgesehen.
+Damit existiert eine Recoverybasis, falls eine Migration oder Releaseänderung Daten beschädigt.
 
-## 27. Mobile Token Lifecycle
+## 72. Commit-addressed Images
 
-`docs/mobile-admin.md` dokumentiert:
+Der Deployprozess baut Images mit Commitbezug und taggt vorhandene Images für Rollback.
 
-- opaque Access Tokens
-- gehashte Speicherung in CRCON
-- kurze Access-Token-Laufzeit
-- rotierende Refresh Tokens
-- Idle- und absolute Refresh-Lifetime
-- Revocation bei Geräteentzug
-- unmittelbare Berücksichtigung von User-Deaktivierung/Permissionänderungen beim nächsten Request
+Dadurch ist später nachvollziehbar, welcher Source-Commit tatsächlich im Container lief.
 
-## 28. Mobile Secret Storage
+## 73. Migration State
 
-Mobile Secrets werden im OS-Secure-Storage gehalten.
+Nach dem Start wird der Migrationszustand ausgegeben beziehungsweise geprüft.
 
-Der lokale verschlüsselte Cache verwendet einen getrennten Schlüssel aus dem OS-KeyStore.
+Ein gesunder Container mit falschem DB-Schema ist kein erfolgreicher Rollout.
 
-Damit soll ein Appdaten-Backup nicht automatisch alle Authentifizierungssecrets im Klartext enthalten.
+## 74. Rollback
 
-## 29. Mobile Actions
+Die Doku rät ausdrücklich davon ab, DB-Migrationen automatisch herunterzustufen.
 
-Schreibende Mobile-Aktionen werden nicht offline gequeued oder blind retried.
+Vorgehen:
 
-Kick und temporärer Ban verlangen Reason und explizite Bestätigung.
+1. vorheriges App/Image wiederherstellen;
+2. DB nur dann zurücksetzen, wenn Daten inkompatibel verändert wurden;
+3. Restore vorher separat prüfen.
 
-Ein Beta-E2E-Runner ist standardmäßig safe und führt keine Playeraktion aus, solange kein expliziter Action-Gate und ein bestätigtes Ziel angegeben wurden.
+## 75. Release-Version im Produktionsimage
 
-## 30. Push Relay
+Ein aktueller Fix sorgt dafür, dass die Releaseversion tatsächlich in Production Images exponiert wird.
 
-Push ist eine optionale getrennte Komponente.
+Damit kann Runtime-/UI-Version mit Buildzustand abgeglichen werden.
 
-Pushpayloads sind bewusst minimal und enthalten keine normalen Playernamen, IDs, Reportgründe oder Adminnotizen.
+## 76. Datenbankmigrationen
 
-Der Worker prüft aktive CRCON-Permissions bei Delivery.
+Frontline-Erweiterungen verwenden Alembic für Schemaänderungen.
 
-Device Registration ist rate-limited und besitzt eine konfigurierbare Obergrenze.
+Neue Features wie Incidents, AI-Analyse und Campaign Delivery werden über additive beziehungsweise kontrollierte Migrationen eingeführt.
 
-## 31. HLL Vietnam Identity
+## 77. Django-/Alembic-Koordination
 
-HLL Vietnam kann EOS-basierte Identitäten verwenden, die sich von klassischen 17-stelligen SteamIDs unterscheiden.
+Die Mobile-Doku verlangt, sowohl Django- als auch Alembic-Migrationen im normalen Wartungsstart auszuführen.
 
-Der HLLV-Spectator-Refresh prüft ausdrücklich auf den erwarteten EOS-Identifier-Typ und verweigert die Aktion bei einem klassischen SteamID-Format.
+Damit dürfen die beiden Schemaverantwortlichkeiten nicht gegeneinander vergessen werden.
 
-Damit wird verhindert, dass HLL- und HLLV-Identitäten unkontrolliert vermischt werden.
+## 78. Tests
 
-## 32. HLLV Spectator Reconnect Workaround
+Das Repository besitzt eine umfangreiche Testbasis für:
 
-Der Workaround ist bewusst additiv:
-
-1. nur HLL Vietnam
-2. nur definierte Rolle(n), aktuell Spectator
-3. bestehende Adminzuordnung muss zunächst vorhanden sein
-4. Cache wird verworfen
-5. frische Live-Adminliste wird erneut gelesen
-6. nur wenn Rolle weiterhin existiert, wird `AddAdmin` erneut gesendet
-7. es wird nie automatisch eine Rolle entfernt
-
-Damit kann eine in CRCON oder auf dem Gameserver bewusst entfernte Rolle nicht aus einem alten Cache wiederauferstehen.
-
-## 33. Supervisor-/Worker-Modell
-
-CRCON verwendet mehrere Hintergrundprozesse für dauerhafte Aufgaben.
-
-Frontline-Erweiterungen fügen eigene Worker hinzu, beispielsweise:
-
-- Campaign Messages
-- Discord Report Delivery
-- Mobile Push
-- bestehende CRCON-Log-/Automation-Worker
-
-Mehrere Performance-Commits haben gemeinsame Runtime-/Supervisorlogik konsolidiert und unnötige Parallelität reduziert.
-
-## 34. Datenbankverbindungen in Workern
-
-Einige dauerhafte Worker laufen explizit mit deaktiviertem DB-Connection-Pool.
-
-Das reduziert bei vielen Supervisorprozessen die Anzahl langlebiger paralleler Datenbankverbindungen.
-
-Diese Optimierung darf nicht pauschal auf jeden Prozess übertragen werden, ohne dessen Zugriffsmuster zu prüfen.
-
-## 35. Runtime Retention
-
-Der Fork enthält begrenzte Aufbewahrung für bestimmte Runtime-Daten.
-
-Ziel ist, dass Log-/Event-/Delivery-/Zwischenzustände bei dauerhaftem Betrieb nicht unbegrenzt wachsen.
-
-Fachlich benötigte historische Daten und kurzfristige Operational-State-Daten müssen dabei getrennt behandelt werden.
-
-## 36. Backend Readiness
-
-Der Produktionspfad prüft nicht nur, ob ein Container existiert.
-
-Neuere Änderungen härten Backend-Health gegen den tatsächlich laufenden Prozess und Proxy-/Service-Discovery-Zustand.
-
-Damit soll ein Supervisor-/Proxy-Container nicht „gesund“ erscheinen, wenn der eigentliche Backendprozess nicht funktionsfähig ist.
-
-## 37. Produktions-Deployment
-
-`docs/production-deploy.md` definiert einen guarded Deploymentflow.
-
-Wesentliche Regeln:
-
-- Produktion läuft aus einem sauberen Checkout.
-- Tracked Files werden nicht direkt auf dem Server editiert.
-- Runtimekonfiguration bleibt in ignorierten `.env`-/generated Dateien.
-- Deploy verweigert dirty checkout.
-- erwarteter Branch muss aktiv sein.
-- kein nicht-fast-forward Update.
-- Composemodell wird vor Start validiert.
-- vor Rollout wird ein PostgreSQL-Backup erzeugt.
-- laufende Images werden für Rollback getaggt.
-- neue Images sind commitadressiert.
-- Healthchecks werden nach Start abgewartet.
-- Migrationszustand wird ausgegeben.
-
-## 38. Produktions-Remote-Historie
-
-Die vorhandene Deploymentdokumentation enthält noch einen älteren Repositorynamen (`hll_rcon_tool-mobile-admin`) für den privaten Deploy-Key-/Remote-Setup.
-
-Der aktuelle Repositoryname ist `Frontline-Network/frontline-rcon-suite`.
-
-Dieser Migrationsrest sollte bei einer späteren Detaildoku-Bereinigung korrigiert werden; die Root-README verwendet deshalb den aktuellen Namen.
-
-## 39. Rollback
-
-Ein normaler Applikationsrollback soll nicht automatisch Datenbankmigrationen downgraden.
-
-Der dokumentierte Ansatz:
-
-- vorherigen Commit / Rollback-Images verwenden
-- DB-Backup nur dann zurückspielen, wenn tatsächlich inkompatible Datenänderungen vorliegen
-- Restore zuerst separat verifizieren
-
-Das schützt aktuelle Betriebsdaten vor unnötigem Datenbankrollback.
-
-## 40. Tests
-
-Der Fork besitzt Tests für Upstream- und Frontline-Funktionen.
-
-Neue Frontline-Komponenten werden mit Regressionen abgesichert, unter anderem für:
-
-- HLLV Admin/Spectator Refresh
-- Incident Context
+- RCON-Core
+- API
+- Incidents
 - Mobile Admin
+- HLLV
 - Campaign Delivery
-- Runtime-/Supervisorverhalten
-- Discord-/Moderationsintegration
+- Permissions
+- Migrations
+- Performance-/Compatibilityänderungen
 
-Schreibende Features müssen insbesondere Idempotenz, Berechtigungsgrenzen und falsche Zielidentitäten testen.
+Aktuelle Commits ergänzen gezielt Regressionen für Incident Subjects und HLLV Spectator Refresh.
 
-## 41. Failure Modes
+## 79. Failure Modes
 
-### Reportname ist mehrdeutig
+### RCON offline
 
-Schutz: nur Vorschlag; keine Action bis Admin bestätigt.
+Web/API kann teilweise verfügbar sein, Live-/Writeaktionen aber nicht.
 
-### Incident wird mehrfach geliefert
+### Incident Context mehrdeutig
 
-Schutz: persistente Delivery-/Outboxzustände und Deduplizierung.
+Nicht automatisch fuzzy Ziel bestätigen.
 
-### Discord ist temporär nicht erreichbar
+### Discord Service offline
 
-Schutz: asynchrone Delivery mit Attempt-/Retryzustand.
+Incident bleibt in CRCON; Delivery State retryt beziehungsweise zeigt Fehler.
 
-### AI-Input enthält Prompt Injection
+### AI Provider offline
 
-Schutz: Text als untrusted evidence, kein Toolzugriff, strukturiertes Schema.
+Incident-/Moderationsworkflow darf nicht komplett verschwinden. Analyzer kann `unavailable_reason` liefern.
 
-### AI behauptet selbst einen Hard Hit
+### Mobile Push offline
 
-Schutz: Hard-Hit-Bit stammt nur aus separatem Moderation Gate.
+Admin kann weiterhin über Web/API arbeiten; Push ist Zusatzkanal.
 
-### HLLV Spectatorrolle wurde bewusst entfernt
+### Campaign Worker crash
 
-Schutz: frische Adminliste vor Reapply; alte Cachezuordnung reicht nicht.
+Persistente Deliveryrows und stale-sending-Recovery ermöglichen Wiederaufnahme.
 
-### Kampagnenworker startet neu
+### HLLV Reconnect Refresh fehlschlägt
 
-Schutz: persistente Deliverytabelle pro Campaign/Session.
+CONNECT-Logverarbeitung darf nicht abbrechen.
 
-### gleiche Kampagne wird innerhalb einer Session doppelt eingequeued
+## 80. Security Summary
 
-Schutz: Unique Constraint auf Server + Campaign + Player Session.
+- Upstream CRCON Permissionmodell bleibt maßgeblich
+- Mobile Tokens rotieren und sind revokierbar
+- Pushpayload minimal
+- Discord Service separat
+- Capabilities gehasht/verschlüsselt
+- Callbackziele eingeschränkt
+- Discord Interactions verifiziert
+- AI Input untrusted
+- Structured Output
+- AI ohne direkte Admin-Tools
+- idempotente Mobile-/Campaignwrites
+- guarded Production Deploy
+- read-only Deploy Key
 
-### fehlende CRCON-Berechtigung im Mobile Client
+## 81. Ownership gegenüber Frontline-Systemen
 
-Schutz: Funktion wird verborgen/gesperrt, Rechte werden nicht erweitert.
+| Bereich | Owner |
+| --- | --- |
+| HLL RCON/Admin/Moderation | `frontline-rcon-suite` |
+| Reports/Incidents | `frontline-rcon-suite` |
+| Mobile Admin | `frontline-rcon-suite` |
+| CRCON Campaign Delivery | `frontline-rcon-suite` |
+| HLL Movement/Layouts | `hll-telemetry` |
+| HLL VIP/Seeding/Switch | `seeding-suite` |
+| globale Server-/Sessiondaten | `frontline-game-tracker` |
+| Discord Community | `frontline-level` |
+| Host/Gateway | `frontline-gamehost` |
 
-### Produktionsdeploy hat dirty files
+## 82. Weiterführende Dokumentation
 
-Schutz: Deploy helper bricht ab.
+- `docs/mobile-admin.md`
+- `docs/production-deploy.md`
+- `LICENSE`
+- `rcon/`
+- `rconweb/`
+- `alembic/`
+- `discord_service/`
+- `push_relay/`
+- `scripts/`
+- `tests/`
 
-## 42. Ownership im Frontline-System
+## 83. Dokumentationsregel
 
-- **CRCON / frontline-rcon-suite:** HLL-/HLLV-RCON, Serveradministration, VoteMap, Player-/Admin-/VIP-nahe HLL-Daten, Incidents und RCON-Aktionen.
-- **HLL Telemetry:** hochfrequente Positionen, Bewegung, Heatmaps und Layoutanalyse.
-- **Seeding Suite:** VIP-Automation, `!switch`, Geofence, Broadcast und separater Layoutcontroller.
-- **Game Tracker:** globale/operative Server-/Session-Sicht und Identity-Matching-Projektionen.
-- **Player CRM:** kanonische plattformübergreifende Identität.
-- **Levelbot:** Discord-Community-UI außerhalb des CRCON-spezifischen Discord-Services.
-
-## 43. Relevante Dokumentation
-
-```text
-docs/mobile-admin.md
-docs/production-deploy.md
-LICENSE
-pyproject.toml
-rcon/
-rconweb/
-mobile_app/
-push_relay/
-discord_service/
-scripts/
-tests/
-```
-
-## 44. Pflege dieser README
-
-Diese README beschreibt den Frontline-Fork. Upstream-Dokumentation kann weiterhin für allgemeine CRCON-Bedienung relevant sein, darf aber nicht mehr die einzige Root-Erklärung darstellen.
-
-Neue Frontline-Funktionen sollen hier nur dann aufgenommen werden, wenn ihr Zweck und ihre Verantwortungsgrenze dauerhaft relevant sind. Einzelne Hotfixes, Canary-Messungen und Releasechroniken gehören in Commits und Spezialdokumentation.
+Die Root-README dokumentiert den Frontline-Fork als Gesamtplattform. Upstream-Anleitungen, einzelne API-Endpunkte und Release-Details können in Spezialdokumenten bleiben. Neue Moderationsmodelle, Mobile-Auth-Änderungen, HLLV-Workarounds, Campaign-Zustände oder neue externe Dienste müssen hier als Architekturänderung aufgenommen werden.
