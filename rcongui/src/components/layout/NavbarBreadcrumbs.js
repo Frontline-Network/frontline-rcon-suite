@@ -119,7 +119,7 @@ function GroupBreadcrumb({ menu, permissions }) {
   );
 }
 
-export default function NavbarBreadcrumbs() {
+export default function NavbarBreadcrumbs({ mobileCompact = false }) {
   const { t } = useTranslation();
   const { permissions } = useAuth();
   const location = useLocation();
@@ -144,27 +144,51 @@ export default function NavbarBreadcrumbs() {
     );
   }, [location.pathname]);
 
+  const currentLabel = current.link
+    ? translatedLabel(current.link, t)
+    : t("navigation.links.home");
+
   return (
-    <StyledBreadcrumbs
-      aria-label="breadcrumb"
-      separator={<NavigateNextRoundedIcon fontSize="small" />}
-    >
-      <Typography
-        component={Link}
-        to="/"
-        color={location.pathname === "/" ? "primary.light" : "text.secondary"}
-        sx={{ textDecoration: "none" }}
-      >
-        {t("navigation.links.home")}
-      </Typography>
-      {current.menu?.name && (
-        <GroupBreadcrumb menu={current.menu} permissions={permissions} />
-      )}
-      {current.link && (
-        <Typography color="text.primary" sx={{ fontWeight: 700 }}>
-          {translatedLabel(current.link, t)}
+    <Box sx={{ minWidth: 0, maxWidth: "100%" }}>
+      {mobileCompact && (
+        <Typography
+          data-testid="mobile-current-route"
+          aria-current="page"
+          color="text.primary"
+          sx={{
+            display: { xs: "block", sm: "none" },
+            maxWidth: "100%",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            fontWeight: 700,
+          }}
+        >
+          {currentLabel}
         </Typography>
       )}
-    </StyledBreadcrumbs>
+      <StyledBreadcrumbs
+        aria-label="breadcrumb"
+        separator={<NavigateNextRoundedIcon fontSize="small" />}
+        sx={{ display: mobileCompact ? { xs: "none", sm: "flex" } : "flex" }}
+      >
+        <Typography
+          component={Link}
+          to="/"
+          color={location.pathname === "/" ? "primary.light" : "text.secondary"}
+          sx={{ textDecoration: "none" }}
+        >
+          {t("navigation.links.home")}
+        </Typography>
+        {current.menu?.name && (
+          <GroupBreadcrumb menu={current.menu} permissions={permissions} />
+        )}
+        {current.link && (
+          <Typography color="text.primary" sx={{ fontWeight: 700 }}>
+            {translatedLabel(current.link, t)}
+          </Typography>
+        )}
+      </StyledBreadcrumbs>
+    </Box>
   );
 }

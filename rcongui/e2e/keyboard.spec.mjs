@@ -36,4 +36,26 @@ test.describe("mobile navigation", () => {
       navigation.getByPlaceholder("Navigation durchsuchen …"),
     ).toBeVisible();
   });
+
+  test("map operations are reachable with the keyboard", async ({ page }) => {
+    await openDemoPage(page, "/views/live");
+
+    const menuButton = page.getByRole("button", { name: "Navigation öffnen" });
+    await menuButton.focus();
+    await page.keyboard.press("Enter");
+
+    const navigation = page.getByRole("navigation", {
+      name: "Hauptnavigation",
+    });
+    const mapsGroup = navigation.getByRole("button", {
+      name: "Karten & Spielbetrieb",
+    });
+    await mapsGroup.focus();
+    await page.keyboard.press("Enter");
+
+    const changeMap = navigation.getByRole("link", { name: "Karte wechseln" });
+    await expect(changeMap).toBeVisible();
+    await changeMap.focus();
+    await expect(changeMap).toBeFocused();
+  });
 });

@@ -60,9 +60,15 @@ const AppNavbarBase = ({ toggleDrawer, open, isSmallScreen }) => {
           <Stack
             direction="row"
             spacing={1}
-            sx={{ justifyContent: "end", flexShrink: 0, flexGrow: 1, pl: 1 }}
+            sx={{
+              justifyContent: "end",
+              flexGrow: 1,
+              minWidth: 0,
+              overflow: "hidden",
+              pl: 1,
+            }}
           >
-            <NavbarBreadcrumbs />
+            <NavbarBreadcrumbs mobileCompact />
           </Stack>
         </Stack>
         {isSmallScreen && <ServerStatus compact={isSmallScreen || !open} />}

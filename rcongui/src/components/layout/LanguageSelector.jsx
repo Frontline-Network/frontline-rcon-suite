@@ -32,6 +32,7 @@ export default function LanguageSelector() {
           size="small"
           aria-label={t("language.label")}
           onClick={(event) => setAnchorEl(event.currentTarget)}
+          sx={{ minWidth: 44, minHeight: 44 }}
         >
           <TranslateRoundedIcon />
         </IconButton>
