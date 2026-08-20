@@ -13,6 +13,7 @@ import {
 } from "@/mirage/demo-data";
 import {
   CONNECTION_STATE,
+  createAggregateConnectionHealth,
   createConnectionHealth,
   EMPTY_CONNECTION_HEALTH,
 } from "@/utils/connectionHealth";
@@ -31,6 +32,7 @@ export const useGlobalStore = create((set) => ({
     crcon: EMPTY_CONNECTION_HEALTH,
     gameServer: EMPTY_CONNECTION_HEALTH,
     gameState: EMPTY_CONNECTION_HEALTH,
+    gameData: EMPTY_CONNECTION_HEALTH,
   },
   // Actions to update state
   updateStatus: (data) => set(() => ({ status: data })),
@@ -85,6 +87,23 @@ const applyDemoHealth = (health, target) => {
     }
   }
 
+  if (target === "gameState") {
+    if (["crcon_offline", "crcon_stale"].includes(mode)) {
+      return { ...health, state: CONNECTION_STATE.UNKNOWN };
+    }
+    if (["gameserver_offline", "game_state_offline"].includes(mode)) {
+      return { ...health, state: CONNECTION_STATE.OFFLINE };
+    }
+    if (["gameserver_stale", "game_state_stale"].includes(mode)) {
+      return {
+        ...health,
+        state: CONNECTION_STATE.STALE,
+        lastSuccessAt,
+        lastAttemptAt,
+      };
+    }
+  }
+
   return health;
 };
 
@@ -116,16 +135,20 @@ const globalQueries = [
     queryFn: async () => {
       if (
         isFakeMode() &&
-        ["gameserver_offline", "gameserver_stale"].includes(
-          getDemoConnectionMode()
-        )
+        [
+          "gameserver_offline",
+          "gameserver_stale",
+          "game_state_offline",
+          "game_state_stale",
+        ].includes(getDemoConnectionMode())
       ) {
         throw new Error("Demo game state is unavailable");
       }
       return isFakeMode() ? demoGameState : cmd.GET_GAME_STATE();
     },
     initialData:
-      isFakeMode() && getDemoConnectionMode() === "gameserver_stale"
+      isFakeMode() &&
+      ["gameserver_stale", "game_state_stale"].includes(getDemoConnectionMode())
         ? demoGameState
         : undefined,
   }),
@@ -191,6 +214,19 @@ export const GlobalState = () => {
   const crconModsQuery = queryResults[4];
 
   useEffect(() => {
+    const gameServerHealth = applyDemoHealth(
+      createConnectionHealth(statusQuery, {
+        enabled: canQueryGameServer,
+      }),
+      "gameServer"
+    );
+    const gameStateHealth = applyDemoHealth(
+      createConnectionHealth(gameStateQuery, {
+        enabled: canQueryGameServer,
+      }),
+      "gameState"
+    );
+
     useGlobalStore.setState({
       serverState: crconQuery.data ?? null,
       status: statusQuery?.data ?? null,
@@ -203,15 +239,12 @@ export const GlobalState = () => {
         : [],
       connectionHealth: {
         crcon: crconHealth,
-        gameServer: applyDemoHealth(
-          createConnectionHealth(statusQuery, {
-            enabled: canQueryGameServer,
-          }),
-          "gameServer"
+        gameServer: gameServerHealth,
+        gameState: gameStateHealth,
+        gameData: createAggregateConnectionHealth(
+          gameServerHealth,
+          gameStateHealth
         ),
-        gameState: createConnectionHealth(gameStateQuery, {
-          enabled: canQueryGameServer,
-        }),
       },
     });
   }, [

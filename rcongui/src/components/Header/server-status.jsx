@@ -21,6 +21,16 @@ const formatRemainingTime = (seconds) => {
     .join(":");
 };
 
+const stateTones = {
+  [CONNECTION_STATE.ONLINE]: "success.main",
+  [CONNECTION_STATE.PARTIAL]: "warning.main",
+  [CONNECTION_STATE.STALE]: "warning.main",
+  [CONNECTION_STATE.OFFLINE]: "error.main",
+  [CONNECTION_STATE.LOADING]: "info.main",
+  [CONNECTION_STATE.UNKNOWN]: "text.disabled",
+  [CONNECTION_STATE.DISABLED]: "text.disabled",
+};
+
 const StatusItem = ({
   icon,
   label,
@@ -95,44 +105,67 @@ const ServerStatus = ({ compact = false }) => {
   }, [gameState?.time_remaining]);
 
   useEffect(() => {
-    if (!gameState || timeRemaining <= 0) return undefined;
+    if (
+      !gameState ||
+      timeRemaining <= 0 ||
+      connectionHealth.gameState.state !== CONNECTION_STATE.ONLINE
+    ) {
+      return undefined;
+    }
 
     const interval = window.setInterval(() => {
       setTimeRemaining((value) => Math.max(0, value - 1));
     }, 1000);
 
     return () => window.clearInterval(interval);
-  }, [gameState, timeRemaining <= 0]);
+  }, [connectionHealth.gameState.state, gameState, timeRemaining <= 0]);
+
+  const displayLiveValue = (value, health) => {
+    if (value === null || value === undefined || value === "") {
+      return t("common.unknown");
+    }
+    if (health.state === CONNECTION_STATE.ONLINE) return value;
+    if (health.state === CONNECTION_STATE.STALE) {
+      return `${value} · ${t("connectionStates.stale")}`;
+    }
+    return t("common.unknown");
+  };
 
   const hasPlayerData =
     serverStatus?.current_players != null && serverStatus?.max_players != null;
-  const players = hasPlayerData
-    ? `${serverStatus.current_players}/${serverStatus.max_players}`
-    : t("common.unknown");
-  const mapName =
-    gameState?.current_map?.pretty_name ?? t("matchStatus.unknownMap");
+  const players = displayLiveValue(
+    hasPlayerData
+      ? `${serverStatus.current_players}/${serverStatus.max_players}`
+      : null,
+    connectionHealth.gameServer
+  );
+  const currentMapName = gameState?.current_map?.pretty_name;
+  const mapName = currentMapName
+    ? displayLiveValue(currentMapName, connectionHealth.gameState)
+    : t("matchStatus.unknownMap");
   const identity = serverConnection || serverStatus;
   const gameLabel = getGameLabel(identity?.game) || t("common.unknown");
-  const serverLabel =
-    identity?.short_name || identity?.name || t("dashboard.unknownServer");
+  const currentServerLabel = identity?.short_name || identity?.name;
+  const serverLabel = currentServerLabel
+    ? displayLiveValue(currentServerLabel, connectionHealth.crcon)
+    : t("dashboard.unknownServer");
   const serverNumber =
     identity?.server_number != null
       ? t("sidebar.serverNumber", { number: identity.server_number })
       : t("matchStatus.unknownServerNumber");
   const isInitialLoading =
     connectionHealth.crcon.state === CONNECTION_STATE.LOADING && !identity;
-  const gameServerTone =
-    {
-      [CONNECTION_STATE.ONLINE]: "success.main",
-      [CONNECTION_STATE.STALE]: "warning.main",
-      [CONNECTION_STATE.OFFLINE]: "error.main",
-    }[connectionHealth.gameServer.state] || "text.disabled";
+  const identityTone =
+    stateTones[connectionHealth.crcon.state] || "text.disabled";
+  const gameDataState =
+    connectionHealth.gameData?.state ?? CONNECTION_STATE.UNKNOWN;
 
   return (
     <Box
       role="status"
       aria-label={t("matchStatus.ariaLabel")}
       data-testid="global-match-status"
+      data-connection-state={gameDataState}
       sx={(theme) => ({
         width: compact ? "100%" : "min(100%, 680px)",
         minWidth: 0,
@@ -164,7 +197,7 @@ const ServerStatus = ({ compact = false }) => {
               label={`${serverNumber} · ${gameLabel}`}
               value={serverLabel}
               grow
-              tone={gameServerTone}
+              tone={identityTone}
             />
             <StatusItem
               icon={<GroupsRoundedIcon />}
@@ -180,11 +213,10 @@ const ServerStatus = ({ compact = false }) => {
             <StatusItem
               icon={<TimerRoundedIcon />}
               label={t("matchStatus.remaining")}
-              value={
-                gameState
-                  ? formatRemainingTime(timeRemaining)
-                  : t("common.unknown")
-              }
+              value={displayLiveValue(
+                gameState ? formatRemainingTime(timeRemaining) : null,
+                connectionHealth.gameState
+              )}
             />
           </>
         ) : (

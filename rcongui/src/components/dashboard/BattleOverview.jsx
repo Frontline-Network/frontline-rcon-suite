@@ -118,6 +118,7 @@ export default function BattleOverview() {
   const statusTone =
     {
       [CONNECTION_STATE.ONLINE]: "success",
+      [CONNECTION_STATE.PARTIAL]: "warning",
       [CONNECTION_STATE.STALE]: "warning",
       [CONNECTION_STATE.OFFLINE]: "error",
     }[statusKey] || "neutral";

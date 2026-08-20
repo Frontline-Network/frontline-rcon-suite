@@ -8,10 +8,12 @@ import { CONNECTION_STATE } from "@/utils/connectionHealth";
 
 const stateColors = {
   [CONNECTION_STATE.ONLINE]: "success.main",
+  [CONNECTION_STATE.PARTIAL]: "warning.main",
   [CONNECTION_STATE.STALE]: "warning.main",
   [CONNECTION_STATE.OFFLINE]: "error.main",
   [CONNECTION_STATE.LOADING]: "info.main",
   [CONNECTION_STATE.UNKNOWN]: "text.disabled",
+  [CONNECTION_STATE.DISABLED]: "text.disabled",
 };
 
 const ConnectionStatus = () => {
