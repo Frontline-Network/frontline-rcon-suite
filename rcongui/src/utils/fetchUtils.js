@@ -373,6 +373,12 @@ export const cmd = {
     }),
   GET_SERVER_SETTINGS: (params) =>
     requestFactory({ method: "GET", cmd: "get_server_settings", ...params }),
+  GET_GENERAL_SETTING_EFFECTS: (params) =>
+    requestFactory({
+      method: "GET",
+      cmd: "get_general_setting_effects",
+      ...params,
+    }),
   GET_SERVICES: (params) =>
     requestFactory({ method: "GET", cmd: "get_services", ...params }),
   GET_SYSTEM_USAGE: (params) =>

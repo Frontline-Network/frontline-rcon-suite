@@ -47,6 +47,12 @@ because the in-app browser connection could not be established.
    connection-info permission still receive a truthful HLL/HLLV context, and
    HLLV no longer receives the invalid Skirmish timer controls. Remaining
    features still need the same capability treatment and visible labels.
+10. `get_general_setting_effects` now supplies a versioned, permission-aware
+    state matrix for the nine direct game-server settings. It preserves partial
+    results, separates recommended values from unknown protocol defaults,
+    reports Auto Settings candidates without claiming an active rule, and
+    distinguishes failed audit attempts from successful changes. The existing
+    cards do not consume this contract yet.
 
 ## Prioritized gap matrix
 
@@ -54,7 +60,7 @@ because the in-app browser connection could not be established.
 | --- | --- | --- | --- | --- | --- |
 | P0 | Generic player actions | `ActionDialog.jsx` and `ActionForm.jsx` use one generic confirmation; only squad dissolution uses the full safe flow | Kick, punish, ban, blacklist, message, or bulk action can be confirmed without a complete server/game/effect review; failed targets cannot be retried selectively and no audit link is offered | Move critical and bulk actions onto a shared prepared-action contract with target, server, game, reason, duration, message, scope, reversibility, result per target, retry failed, and audit link | HLL/HLLV, bulk partial-failure, permission, stale/offline, keyboard, 390 px, and audit-link tests |
 | P0 | Auto Settings | `settings/autosettings/index.jsx` is a Monaco JSON editor; the preview contract is not yet visible | Rule order, defaults, overlaps, duplicate maps, and effective values remain hard to understand | Basic rule builder as default, Advanced JSON retained, explicit simulation context, priority and effective-value preview, conflict resolution, and map-profile validation | Current RCON3 screenshots, DE/EN, HLL/HLLV maps, invalid JSON, overlap, duplicate, no-data, keyboard, axe, and responsive tests |
-| P0 | Generic settings | Schema pages still call their modes Visual/Code and most fields lack effective/default/recommended/side-effect/restart/audit metadata | A saved value can be mistaken for the value currently enforced by the game server or automation | A shared setting-effect contract for configured, effective, default, recommended, dependencies, conflicts, compatibility, activation requirement, last actor/time, and restore | API contract plus setting-state matrix for HLL/HLLV, permission, stale/offline, reset, and translations |
+| P0 | Generic settings | A shared setting-effect API now covers the nine direct game-server settings, but schema pages still call their modes Visual/Code and the cards do not consume configured/effective/default/recommended/side-effect/restart/audit metadata | A saved value can be mistaken for the value currently enforced by the game server or automation | Connect the contract to shared setting summaries, then extend it to schema settings with Basic/Advanced modes | Current screenshots plus HLL/HLLV, permission, stale/offline, reset, audit, translation, keyboard and responsive tests |
 | P0 | Discord diagnostics | The card supports pairing, guild/channel/roles, provider/model, enable, save, and test; it has no explicit callback/broker health, last successful delivery, repair action, or expandable technical details | Administrators see generic errors and cannot locate whether CRCON, callback, broker, Discord, or AI caused the failure | Seven-step setup assistant and operational health panel with component states, timestamps, test outcome, repair action, provider/model/cost, and safe technical details | Pairing, wrong host, callback, broker, Discord rate-limit, AI unavailable, reconnect, multiserver, and two-Guild tests |
 | P1 | Legacy Automods | Level, No Leader, Seeding, and No Solo Tank use the generic schema form and long English code notes; only Autobalancer exposes mode/decision history | Administrators cannot consistently tell what will happen, what last happened, or how to test safely | Unified Off / Observe / Manual / Automatic model where supported, last run, decision, reason, affected players, preview, and guardrails | Status API contracts, decision fixtures, DE/EN, HLL/HLLV role compatibility, and no-action shadow tests |
 | P1 | Dashboard hierarchy | `dashboard.jsx` renders the large Frontline App promotion before settings, Automods, services, maps, moderation, and logs | Operational problems can be pushed below promotional content | Incidents, CRCON/game-server health, moderation, automation, map status, and resources first; promotion after operating state | Live screenshots at all target widths, offline/stale/partial fixtures, task-step comparison |
@@ -69,7 +75,7 @@ because the in-app browser connection could not be established.
 
 The following work is safe to continue without inventing a visual direction:
 
-- API contracts for prepared actions, effective settings, Automod decisions,
+- API contracts for prepared actions, remaining effective settings, Automod decisions,
   Discord health, and resources;
 - deterministic fake fixtures for offline, stale, partial, permission, HLL,
   HLLV, and multiserver states;
