@@ -30,34 +30,41 @@ import { playerProfileQueryOptions } from "@/queries/player-profile-query";
 import { RemoveFlagFormFields } from "./forms/RemoveFlagFormFields";
 import { AddConsoleAdminFormFields } from "./forms/AddConsoleAdminFormFields";
 import { RemoveVipFormFields } from "./forms/RemoveVipFormFIelds";
+import { getAdminActionContract } from "./action-contracts.mjs";
 
 const executeAction = (command) => async (payload) => {
+  // Keep the prepared/reviewed payload immutable. The same snapshot is needed
+  // for per-target results, retry-failed-only and audit correlation.
+  const normalizedPayload = { ...payload };
   // In the UI, it does not make sense to ask for a reason and message
   // at the same time as they are the same thing. However, the API
   // expects both in the payload.
-  if ("reason" in payload && command !== "message_player") {
-    payload.message = payload.reason;
+  if ("reason" in normalizedPayload && command !== "message_player") {
+    normalizedPayload.message = normalizedPayload.reason;
   }
-  if ("player" in payload) {
-    payload.name = payload.player;
+  if ("player" in normalizedPayload) {
+    normalizedPayload.name = normalizedPayload.player;
   }
   // v10.x.x 'add_vip' change param from 'name' to 'description'
   if (command === "add_admin") {
-    payload.description = payload.player_name;
+    normalizedPayload.description = normalizedPayload.player_name;
   }
   if (command === "add_vip") {
-    if ("prefix" in payload && "suffix" in payload) {
-      payload.description =
-        (payload.prefix ?? "") + payload.player_name + (payload.suffix ?? "");
+    if ("prefix" in normalizedPayload && "suffix" in normalizedPayload) {
+      normalizedPayload.description =
+        (normalizedPayload.prefix ?? "") +
+        normalizedPayload.player_name +
+        (normalizedPayload.suffix ?? "");
     } else {
-      payload.description = payload.player_name;
+      normalizedPayload.description = normalizedPayload.player_name;
     }
   }
-  return await execute(command, payload);
+  return await execute(command, normalizedPayload);
 };
 
 // Define each action
 export const messageAction = {
+  safety: getAdminActionContract("message_player"),
   translationKey: "actions.sendMessage",
   name: "Send Message",
   description: "Show message in top right corner of game interface.",
@@ -76,6 +83,7 @@ export const messageAction = {
 };
 
 export const watchAction = {
+  safety: getAdminActionContract("watch_player"),
   translationKey: "actions.addWatch",
   name: "Add Watch",
   description:
@@ -87,6 +95,7 @@ export const watchAction = {
 };
 
 export const removeWatchAction = {
+  safety: getAdminActionContract("unwatch_player"),
   translationKey: "actions.removeWatch",
   name: "Remove Watch",
   description: "Remove from Watchlist.",
@@ -97,6 +106,7 @@ export const removeWatchAction = {
 };
 
 export const vipAction = {
+  safety: getAdminActionContract("add_vip"),
   translationKey: "actions.addVip",
   name: "Add VIP",
   description: "Add or Update VIP.",
@@ -107,6 +117,7 @@ export const vipAction = {
 };
 
 export const removeVipAction = {
+  safety: getAdminActionContract("remove_vip"),
   translationKey: "actions.removeVip",
   name: "Remove VIP",
   description: "Remove VIP.",
@@ -117,6 +128,7 @@ export const removeVipAction = {
 };
 
 export const switchAction = {
+  safety: getAdminActionContract("switch_player_now"),
   translationKey: "actions.switchPlayer",
   name: "Switch player",
   description: "Move player to opposite team.",
@@ -127,6 +139,7 @@ export const switchAction = {
 };
 
 export const switchOnDeathAction = {
+  safety: getAdminActionContract("switch_player_on_death"),
   translationKey: "actions.switchOnDeath",
   name: "Switch Player On Death",
   description: "Move player to opposite team upon death.",
@@ -137,6 +150,7 @@ export const switchOnDeathAction = {
 };
 
 export const punishAction = {
+  safety: getAdminActionContract("punish"),
   translationKey: "actions.punish",
   name: "Punish player",
   description: "Kill player in-game if alive.",
@@ -147,6 +161,7 @@ export const punishAction = {
 };
 
 export const kickAction = {
+  safety: getAdminActionContract("kick"),
   translationKey: "actions.kick",
   name: "Kick player",
   description: "Remove player from server.",
@@ -157,6 +172,7 @@ export const kickAction = {
 };
 
 export const tempBanAction = {
+  safety: getAdminActionContract("temp_ban"),
   translationKey: "actions.tempBan",
   name: "Temp Ban",
   description: "Issue immediate temporary ban to player.",
@@ -170,6 +186,7 @@ export const tempBanAction = {
 };
 
 export const removeBanAction = {
+  safety: getAdminActionContract("unban"),
   translationKey: "actions.removeBans",
   name: "Remove bans",
   description: "Remove all bans associated with the player account.",
@@ -180,6 +197,7 @@ export const removeBanAction = {
 };
 
 export const permaBanAction = {
+  safety: getAdminActionContract("perma_ban"),
   translationKey: "actions.permaBan",
   name: "Perma Ban",
   description: "Initiate immediate indefinite ban to player.",
@@ -193,6 +211,7 @@ export const permaBanAction = {
 };
 
 export const blacklistAction = {
+  safety: getAdminActionContract("add_blacklist_record"),
   translationKey: "actions.blacklist",
   name: "Add Blacklist",
   description: "Add player to a blacklist.",
@@ -212,6 +231,7 @@ export const blacklistAction = {
 };
 
 export const flagAction = {
+  safety: getAdminActionContract("flag_player"),
   translationKey: "actions.addFlag",
   name: "Add Flag",
   description: "Assign a flag to the player.",
@@ -222,6 +242,7 @@ export const flagAction = {
 };
 
 export const removeFlagsAction = {
+  safety: getAdminActionContract("unflag_player"),
   translationKey: "actions.removeFlags",
   name: "Remove Flags",
   description: "Remove a flag from the player.",
@@ -242,6 +263,7 @@ export const removeFlagsAction = {
 };
 
 export const removeFlagAction = {
+  safety: getAdminActionContract("unflag_player"),
   translationKey: "actions.removeFlags",
   name: "Remove Flag",
   description: "Remove a flag from the player.",
@@ -252,6 +274,7 @@ export const removeFlagAction = {
 };
 
 export const commentAction = {
+  safety: getAdminActionContract("post_player_comment"),
   translationKey: "actions.addComment",
   name: "Add Comment",
   description: "Add a comment to the player profile.",
@@ -262,6 +285,7 @@ export const commentAction = {
 };
 
 export const clearAccountAction = {
+  safety: getAdminActionContract("unban"),
   translationKey: "actions.removeBans",
   name: "Clear Bans",
   description: "Remove all bans associated with the player account.",
@@ -272,6 +296,7 @@ export const clearAccountAction = {
 };
 
 export const addConsoleAdminAction = {
+  safety: getAdminActionContract("add_admin"),
   translationKey: "actions.addAdmin",
   name: "Add Admin",
   description: "Add a console admin to the player.",
@@ -291,6 +316,7 @@ export const addConsoleAdminAction = {
 };
 
 export const removeFromSquadAction = {
+  safety: getAdminActionContract("remove_player_from_squad"),
   translationKey: "actions.removeFromSquad",
   name: "Remove from a squad",
   description: "Redeploys and moves a player from his current squad.",

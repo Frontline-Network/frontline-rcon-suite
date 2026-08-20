@@ -22,6 +22,7 @@
     "test:e2e:headed": "playwright test --headed",
     "check:bundle": "node scripts/check-initial-bundle-budget.mjs",
     "check:game-capabilities": "node scripts/check-game-timer-capabilities.mjs",
+    "check:admin-actions": "node scripts/check-admin-action-contract.mjs",
     "check:operator-copy": "node scripts/check-operator-copy.mjs",
     "format:write": "prettier src/ --write",
     "lint": "eslint src/"

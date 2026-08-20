@@ -26,6 +26,7 @@ jobs:
           cache-dependency-path: rcongui/package-lock.json
       - run: npm ci
       - run: npm run check:operator-copy
+      - run: npm run check:admin-actions
       - run: npx playwright install --with-deps chromium
       - run: npm test
       - run: npm run build
