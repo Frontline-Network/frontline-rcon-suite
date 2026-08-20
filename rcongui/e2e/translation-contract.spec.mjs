@@ -40,6 +40,12 @@ const criticalTranslationKeys = [
   "errors.title",
   "errors.requestFailed",
   "actions.missingPermission",
+  "actions.context.connectionBlocked",
+  "actions.disband.permissionMissing",
+  "actions.disband.review",
+  "actions.disband.execute",
+  "actions.disband.retryFailed",
+  "actions.disband.openAudit",
   "settings.discordReports.title",
   "settings.discordReports.subtitle",
 ];
