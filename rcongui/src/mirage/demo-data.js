@@ -247,10 +247,12 @@ export const getDemoServerStatus = () => ({
       ? {
           match_timer_modes: ["warfare", "offensive"],
           warmup_timer_modes: ["warfare"],
+          sector_layout: { read: true, set: true, remove: false },
         }
       : {
           match_timer_modes: ["warfare", "offensive", "skirmish"],
           warmup_timer_modes: ["warfare", "skirmish"],
+          sector_layout: { read: true, set: true, remove: false },
         },
 });
 

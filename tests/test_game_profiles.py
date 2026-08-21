@@ -4,7 +4,7 @@ from unittest.mock import Mock, call
 
 import pytest
 
-from rcon.commands import HLLServerCtl, HLLVServerCtl
+from rcon.commands import HLLCommandFailedError, HLLServerCtl, HLLVServerCtl
 from rcon.connection import HLLBrokenConnectionError, HLLCommandError
 from rcon.api_commands import (
     HLLRconAPI,
@@ -204,6 +204,7 @@ def test_status_exposes_game_profile_without_requiring_connection_info_permissio
     assert status["game_capabilities"] == {
         "match_timer_modes": match_timer_modes,
         "warmup_timer_modes": warmup_timer_modes,
+        "sector_layout": {"read": True, "set": True, "remove": False},
     }
     assert status["server_number"] == 3
 
@@ -548,6 +549,30 @@ def test_hllv_objective_rows_ignore_map_id_reference_parameter():
     ctl.exchange.assert_called_once_with(
         "GetClientReferenceData", 2, "SetSectorLayout"
     )
+
+
+def test_hllv_objective_rows_fail_with_actionable_protocol_error():
+    ctl = HLLVServerCtl(ServerInfo(game=GameEnum.HLL_VIETNAM), Mock())
+    ctl.exchange = Mock(return_value=_response({"dialogueParameters": []}))
+
+    with pytest.raises(
+        HLLCommandFailedError,
+        match="did not expose selectable sector-layout values",
+    ):
+        ctl.get_objective_rows()
+
+
+def test_profiles_expose_sector_layout_capability_matrix():
+    assert HLL_PROFILE.sector_layout.as_dict() == {
+        "read": True,
+        "set": True,
+        "remove": False,
+    }
+    assert HLLV_PROFILE.sector_layout.as_dict() == {
+        "read": True,
+        "set": True,
+        "remove": False,
+    }
 
 
 def test_hllv_set_sector_layout_includes_current_map_id_and_integer_indices():

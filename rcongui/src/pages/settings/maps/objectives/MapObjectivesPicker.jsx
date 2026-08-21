@@ -125,7 +125,13 @@ const isButtonDisabled = (state, index, map, objectives) => {
   return false;
 };
 
-export function MapObjectivesPicker({ objectives, map, onClick, loading }) {
+export function MapObjectivesPicker({
+  objectives,
+  map,
+  onClick,
+  loading,
+  disabled = false,
+}) {
   const { t } = useTranslation();
   return (
     <ObjectivesContainer>
@@ -154,7 +160,7 @@ export function MapObjectivesPicker({ objectives, map, onClick, loading }) {
                 <ControlButton
                   key={`${index}${state}`}
                   onClick={() => onClick(index)}
-                  disabled={isButtonDisabled(state, index, map, objectives)}
+                  disabled={disabled || isButtonDisabled(state, index, map, objectives)}
                   state={`${state}`}
                   aria-label={t("maps.objectiveGridCell", {
                     row,

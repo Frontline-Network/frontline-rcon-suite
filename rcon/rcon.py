@@ -1033,6 +1033,7 @@ class Rcon(ServerCtl):
                 "warmup_timer_modes": sorted(
                     mode.value for mode in self.game_profile.warmup_timer_modes
                 ),
+                "sector_layout": self.game_profile.sector_layout.as_dict(),
             },
         }
 

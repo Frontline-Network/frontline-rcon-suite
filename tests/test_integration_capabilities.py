@@ -31,6 +31,11 @@ def test_capabilities_describe_the_active_game_without_rcon_io(
     assert contract["schema_version"] == CAPABILITIES_SCHEMA_VERSION
     assert contract["game"]["id"] == profile.game.value
     assert set(contract["game"]["supported_game_modes"]) == expected_modes
+    assert contract["game"]["sector_layout"] == {
+        "read": True,
+        "set": True,
+        "remove": False,
+    }
     assert set(contract["game"]["timer_controls"]["warmup_timer_modes"]) == expected_warmup_modes
     assert all(item["available"] for item in contract["operations"].values())
 

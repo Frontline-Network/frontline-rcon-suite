@@ -1,4 +1,4 @@
-from rcon.game.base import GameProfile
+from rcon.game.base import GameProfile, SectorLayoutCapabilities
 from rcon.game.hll.maps import HLL_LAYERS, HLL_MAPS, parse_layer
 from rcon.game.hll.player_adapter import HLLPlayerInfoAdapter
 from rcon.game.hll.roles import HLL_ROLE_LABELS, HLL_ROLES
@@ -29,6 +29,7 @@ HLL_PROFILE = GameProfile(
         {GameMode.WARFARE, GameMode.OFFENSIVE, GameMode.SKIRMISH}
     ),
     warmup_timer_modes=frozenset({GameMode.WARFARE, GameMode.SKIRMISH}),
+    sector_layout=SectorLayoutCapabilities(read=True, set=True),
     player_adapter=HLLPlayerInfoAdapter(),
     team_ids={Team.ALLIES: 1, Team.AXIS: 2},
 )

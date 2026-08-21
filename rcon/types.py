@@ -332,6 +332,13 @@ class StatusType(TypedDict):
 class GameCapabilitiesType(TypedDict):
     match_timer_modes: list[str]
     warmup_timer_modes: list[str]
+    sector_layout: "SectorLayoutCapabilitiesType"
+
+
+class SectorLayoutCapabilitiesType(TypedDict):
+    read: bool
+    set: bool
+    remove: bool
 
 
 class VipIdType(TypedDict):

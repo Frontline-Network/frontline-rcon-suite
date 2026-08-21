@@ -13,6 +13,23 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True)
+class SectorLayoutCapabilities:
+    """Protocol operations available for selecting a five-sector layout.
+
+    ``remove`` is deliberately separate from ``set``.  Neither supported game
+    currently documents a command that clears a sector layout independently,
+    so clients must not present a destructive reset action as if it existed.
+    """
+
+    read: bool = False
+    set: bool = False
+    remove: bool = False
+
+    def as_dict(self) -> dict[str, bool]:
+        return {"read": self.read, "set": self.set, "remove": self.remove}
+
+
+@dataclass(frozen=True)
 class GameProfile:
     """Game-specific reference data and parsing behind a stable interface."""
 
@@ -27,6 +44,9 @@ class GameProfile:
     supported_game_modes: frozenset[GameMode] = field(default_factory=frozenset)
     match_timer_modes: frozenset[GameMode] = field(default_factory=frozenset)
     warmup_timer_modes: frozenset[GameMode] = field(default_factory=frozenset)
+    sector_layout: SectorLayoutCapabilities = field(
+        default_factory=SectorLayoutCapabilities
+    )
     game_mode_aliases: Mapping[str, GameMode] = field(default_factory=dict)
     player_adapter: "PlayerInfoAdapter | None" = None
     # Persisted unit history uses stable CRCON side IDs, not faction IDs. Both

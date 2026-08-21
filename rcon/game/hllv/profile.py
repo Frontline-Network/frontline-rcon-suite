@@ -1,4 +1,4 @@
-from rcon.game.base import GameProfile
+from rcon.game.base import GameProfile, SectorLayoutCapabilities
 from rcon.game.hllv.maps import HLLV_LAYERS, HLLV_MAPS, parse_layer
 from rcon.game.hllv.player_adapter import HLLVPlayerInfoAdapter
 from rcon.game.hllv.roles import HLLV_ROLE_LABELS, HLLV_ROLES
@@ -25,6 +25,10 @@ HLLV_PROFILE = GameProfile(
     ),
     match_timer_modes=frozenset({GameMode.WARFARE, GameMode.OFFENSIVE}),
     warmup_timer_modes=frozenset({GameMode.WARFARE}),
+    # HLLV exposes the selectable indices through GetClientReferenceData and
+    # accepts SetSectorLayout with the current MapId.  Its V2 protocol has no
+    # independent remove/reset command.
+    sector_layout=SectorLayoutCapabilities(read=True, set=True),
     game_mode_aliases={
         "nva offensive": GameMode.OFFENSIVE,
         "us offensive": GameMode.OFFENSIVE,

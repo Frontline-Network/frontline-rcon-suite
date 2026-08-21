@@ -854,7 +854,6 @@ class ServerCtl:
             raise HLLCommandFailedError("Received unexpected response from server.")
         return [p["valueMember"].split(",") for p in parameters[:5]]
 
-    # TODO: HLLV: Objective names are replaced with indices (0 to 2)
     def set_game_layout(self, objectives: Sequence[str]):
         if len(objectives) != 5:
             raise ValueError("5 objectives must be provided")
@@ -865,8 +864,6 @@ class ServerCtl:
         )
         print(response.content)
         return list(objectives)
-
-    # TODO: HLLV: Add commands to get and remove sector layouts
 
     def set_dynamic_weather_enabled(self, map_name: str, enabled: bool):
         self.exchange(
@@ -896,7 +893,9 @@ class HLLVServerCtl(ServerCtl):
             not sector or not isinstance(sector.get("valueMember"), str)
             for sector in sectors
         ):
-            raise HLLCommandFailedError("Received unexpected response from server.")
+            raise HLLCommandFailedError(
+                "HLL Vietnam did not expose selectable sector-layout values."
+            )
         return [sector["valueMember"].split(",") for sector in sectors]
 
     def set_game_layout(self, objectives: Sequence[str]):

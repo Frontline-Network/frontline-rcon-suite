@@ -41,6 +41,11 @@ import { useTranslation } from "react-i18next";
 function MapObjectivesPage() {
   const { t } = useTranslation();
   const initialData = useLoaderData();
+  const sectorLayout = initialData.sectorLayout || {
+    read: true,
+    set: true,
+    remove: false,
+  };
   const [currentMap, setCurrentMap] = useState(
     initialData.gameState.current_map
   );
@@ -57,14 +62,13 @@ function MapObjectivesPage() {
   const { data: objectiveNames, refetch: refetchObjectiveNames } = useQuery({
     ...mapsManagerQueryOptions.objectives(),
     initialData: initialData.objectives,
+    enabled: sectorLayout.read,
   });
 
   const mapOrientation = currentMap.map.orientation;
-  const selectedObjectives = getSelectedObjectives(
-    objectives,
-    objectiveNames,
-    mapOrientation
-  );
+  const selectedObjectives = objectiveNames
+    ? getSelectedObjectives(objectives, objectiveNames, mapOrientation)
+    : [];
 
   const { refetch: refetchGameState } = useQuery({
     ...mapsManagerQueryOptions.gameState(),
@@ -182,6 +186,7 @@ function MapObjectivesPage() {
   // Watch for map changes
   // Reset states on map change
   useEffect(() => {
+    if (!sectorLayout.read) return;
     const local = currentMap;
     const global = gameState?.current_map;
     // when globally stored map has not loaded yet
@@ -199,10 +204,23 @@ function MapObjectivesPage() {
     setObjectives(generateObjectivesGrid(global.map.orientation));
     setConfirmDialogOpen(false);
     refetchObjectiveNames();
-  }, [currentMap, gameState?.current_map]);
+  }, [currentMap, gameState?.current_map, sectorLayout.read]);
 
   if (unifiedGamemodeName(currentMap.game_mode) === "skirmish") {
     throw new Error("skirmish")
+  }
+
+  if (!sectorLayout.read) {
+    return (
+      <Box sx={{ py: 1 }}>
+        <Typography variant="h5" gutterBottom>
+          {t("maps.objectives")}
+        </Typography>
+        <Typography variant="body2" color="textSecondary">
+          {t("maps.objectivesUnavailable")}
+        </Typography>
+      </Box>
+    );
   }
 
   return (
@@ -222,6 +240,7 @@ function MapObjectivesPage() {
             map={currentMap}
             onClick={handleObjectiveClick}
             loading={(objectives === null) & (currentMap === null)}
+            disabled={!sectorLayout.set}
           />
         </Box>
         <Stack
@@ -242,6 +261,7 @@ function MapObjectivesPage() {
             <Button
               variant="outlined"
               color="error"
+              disabled={!sectorLayout.set}
               onClick={handleClearClick}
               startIcon={<DeleteIcon />}
             >
@@ -250,7 +270,7 @@ function MapObjectivesPage() {
             <Button
               variant="contained"
               color="primary"
-              disabled={false}
+              disabled={!sectorLayout.set}
               onClick={handleConfirmClick}
               startIcon={
                 false ? (
@@ -266,7 +286,7 @@ function MapObjectivesPage() {
           <FormControl component="fieldset" sx={{ px: 1, mt: 1 }}>
             <FormLabel component="legend">{t("maps.selectByName")}</FormLabel>
             <Stack spacing={2} sx={{ py: 2 }}>
-              {objectiveNames.map((names, index) => {
+              {(objectiveNames || []).map((names, index) => {
                 const objectiveLabel = t("maps.objectiveNumber", {
                   number: index + 1,
                 });
@@ -283,6 +303,7 @@ function MapObjectivesPage() {
                       id={`objective-${index + 1}`}
                       labelId={labelId}
                       value={selectedObjectives[index]}
+                      disabled={!sectorLayout.set}
                       onChange={(e) =>
                         handleObjectiveNamePick(
                           index,
@@ -312,6 +333,7 @@ function MapObjectivesPage() {
                 control={
                   <Checkbox
                     checked={randomConstraint["1"]}
+                    disabled={!sectorLayout.set}
                     name={"1"}
                     onChange={handleConstraintChange}
                   />
@@ -322,6 +344,7 @@ function MapObjectivesPage() {
                 control={
                   <Checkbox
                     checked={randomConstraint["2"]}
+                    disabled={!sectorLayout.set}
                     name={"2"}
                     onChange={handleConstraintChange}
                   />
@@ -376,6 +399,7 @@ function MapObjectivesPage() {
           </Button>
           <Button
             onClick={handleDialogConfirmationClick}
+            disabled={!sectorLayout.set}
             color="primary"
             variant="contained"
             startIcon={<CheckCircleIcon />}
