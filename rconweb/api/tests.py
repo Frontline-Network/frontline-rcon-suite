@@ -51,7 +51,7 @@ class SystemUsageApiTests(SimpleTestCase):
         self.assertFalse(payload["failed"])
         self.assertEqual(payload["command"], "get_system_usage")
         self.assertEqual(payload["result"], sampler.get_snapshot.return_value)
-        sampler.get_snapshot.assert_called_once_with()
+        sampler.get_snapshot.assert_called_once_with(window_seconds=15 * 60)
 
 
 class SharedRuntimeServiceApiTests(SimpleTestCase):

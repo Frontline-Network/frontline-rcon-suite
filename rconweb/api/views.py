@@ -2,6 +2,7 @@ import inspect
 import logging
 import os
 import sys
+import time
 import traceback
 from functools import wraps
 from typing import Any, Callable
@@ -20,6 +21,7 @@ from discord.utils import escape_markdown
 from rcon.api_commands import get_rcon_api
 from rcon.commands import HLLCommandFailedError
 from rcon.discord import send_to_discord_audit
+from rcon.operational_health import rcon_latency_tracker
 from rcon.system_usage import system_usage_sampler
 from rcon.types import (
     PublicInfoMapType,
@@ -168,8 +170,19 @@ def get_public_info(request):
 @csrf_exempt
 @require_http_methods(["GET"])
 def get_system_usage(request):
+    try:
+        window_minutes = int(request.GET.get("window_minutes", "15"))
+    except ValueError:
+        window_minutes = 15
+    if window_minutes not in {5, 15, 60}:
+        return api_response(
+            error="window_minutes must be one of 5, 15 or 60",
+            command="get_system_usage",
+            failed=True,
+            status_code=400,
+        )
     return api_response(
-        result=system_usage_sampler.get_snapshot(),
+        result=system_usage_sampler.get_snapshot(window_seconds=window_minutes * 60),
         failed=False,
         command="get_system_usage",
     )
@@ -216,6 +229,7 @@ def expose_api_endpoint(
     @require_http_methods(endpoint_allowed_http_methods[func])
     @wraps(func)
     def wrapper(request: HttpRequest):
+        request_started = time.monotonic()
         parameters = inspect.signature(func).parameters
         aliases = getattr(func, "_parameter_aliases", {})
         arguments = {}
@@ -373,6 +387,10 @@ def expose_api_endpoint(
             status=504 if rcon_unavailable else (400 if error is not None else 200),
         )
 
+        rcon_latency_tracker.record(
+            time.monotonic() - request_started,
+            failed=failure or rcon_unavailable or error is not None,
+        )
         return response
 
     return wrapper

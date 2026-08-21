@@ -137,6 +137,7 @@ endpoints: list[tuple[str, Callable]] = [
     ("is_logged_in", auth.is_logged_in),
     ("get_own_user_permissions", auth.get_own_user_permissions),
     ("get_services", services.get_services),
+    ("get_operational_health", services.get_operational_health),
     ("get_support_diagnostics_preview", services.get_support_diagnostics_preview),
     ("download_support_diagnostics", services.download_support_diagnostics),
     ("do_service", services.do_service),

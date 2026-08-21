@@ -12,6 +12,7 @@ from rcon.api_commands import get_rcon_api
 from rcon.discord import send_to_discord_audit
 from rcon.cache_utils import get_redis_client
 from rcon.support_diagnostics import build_support_diagnostics, preview_support_diagnostics
+from rcon.operational_health import rcon_latency_tracker
 from rcon.supervisor_runtime import (
     DEFAULT_SERVICES,
     RUNNING,
@@ -135,6 +136,83 @@ def _support_diagnostics_package():
             "log_recorder",
             "routines",
         },
+    )
+
+
+def _operational_health(window_minutes: int) -> dict:
+    """Return bounded component health without a new RCON probe."""
+
+    system = system_usage_sampler.get_snapshot(window_seconds=window_minutes * 60)
+    try:
+        redis_state = "healthy" if get_redis_client().ping() else "degraded"
+    except Exception:
+        redis_state = "offline"
+    try:
+        processes = _expand_shared_runtime(
+            get_supervisor_client().supervisor.getAllProcessInfo()
+        )
+        service_states = [process.get("statename") for process in processes]
+        services = {
+            "state": (
+                "degraded"
+                if any(state in {"FATAL", "EXITED"} for state in service_states)
+                else "healthy"
+            ),
+            "running": sum(state == RUNNING for state in service_states),
+            "failed": sum(state in {"FATAL", "EXITED"} for state in service_states),
+        }
+    except Exception:
+        services = {"state": "unknown", "running": None, "failed": None}
+    try:
+        from .discord_integration import _delivery_summary
+
+        outbox = _delivery_summary()
+    except Exception:
+        outbox = {"state": "unknown", "pending_count": None}
+    return {
+        "schema_version": 1,
+        "generated_at": system["generated_at"],
+        "window_minutes": window_minutes,
+        "overall_state": (
+            "critical"
+            if system["status"] == "critical" or redis_state == "offline"
+            else "degraded"
+            if system["status"] in {"warning", "partial"}
+            or services["state"] == "degraded"
+            or outbox.get("state") in {"pending", "retrying"}
+            else "healthy"
+        ),
+        "components": {
+            "process": {"state": system["status"], "last_checked_at": system["sampled_at"]},
+            "redis": {"state": redis_state, "last_checked_at": system["generated_at"]},
+            "services": services,
+            "rcon": rcon_latency_tracker.snapshot(window_seconds=window_minutes * 60),
+            "discord_outbox": outbox,
+        },
+        "system_usage": system,
+    }
+
+
+@csrf_exempt
+@login_required()
+@permission_required("api.can_view_available_services", raise_exception=True)
+@require_http_methods(["GET"])
+def get_operational_health(request):
+    try:
+        window_minutes = int(request.GET.get("window_minutes", "15"))
+    except ValueError:
+        window_minutes = 15
+    if window_minutes not in {5, 15, 60}:
+        return api_response(
+            command="get_operational_health",
+            failed=True,
+            error="window_minutes must be one of 5, 15 or 60",
+            status_code=400,
+        )
+    return api_response(
+        result=_operational_health(window_minutes),
+        command="get_operational_health",
+        failed=False,
     )
 
 

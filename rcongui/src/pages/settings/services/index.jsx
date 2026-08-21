@@ -30,6 +30,7 @@ export const loader = async () => {
   const services = isFakeMode() ? demoServices : await cmd.GET_SERVICES();
   let deadLetters = [];
   let diagnosticsPreview = null;
+  let operationalHealth = null;
   if (!isFakeMode()) {
     try {
       deadLetters = await cmd.GET_WEBHOOK_DEAD_LETTERS();
@@ -41,6 +42,13 @@ export const loader = async () => {
       diagnosticsPreview = await cmd.GET_SUPPORT_DIAGNOSTICS_PREVIEW();
     } catch {
       // Keep service controls available for older installations and custom roles.
+    }
+    try {
+      operationalHealth = await cmd.GET_OPERATIONAL_HEALTH({
+        params: { window_minutes: 15 },
+      });
+    } catch {
+      // A missing health endpoint must not make service controls unavailable.
     }
   }
   return {
@@ -54,6 +62,7 @@ export const loader = async () => {
     })),
     deadLetters,
     diagnosticsPreview,
+    operationalHealth,
   };
 };
 
@@ -73,10 +82,23 @@ const stateColor = {
 const isRunning = (service) => service.statename === "RUNNING";
 
 const Services = () => {
-  const { services, deadLetters: initialDeadLetters, diagnosticsPreview } = useLoaderData();
+  const { services, deadLetters: initialDeadLetters, diagnosticsPreview, operationalHealth: initialOperationalHealth } = useLoaderData();
   const { t } = useTranslation();
   const [deadLetters, setDeadLetters] = useState(initialDeadLetters);
   const [retryingId, setRetryingId] = useState(null);
+  const [operationalHealth, setOperationalHealth] = useState(initialOperationalHealth);
+  const [healthWindow, setHealthWindow] = useState(15);
+
+  const refreshOperationalHealth = async (windowMinutes) => {
+    setHealthWindow(windowMinutes);
+    try {
+      setOperationalHealth(
+        await cmd.GET_OPERATIONAL_HEALTH({ params: { window_minutes: windowMinutes } })
+      );
+    } catch (error) {
+      toast.error(error?.message || t("settings.services.health.failed"));
+    }
+  };
 
   const retryDeadLetter = async (id) => {
     setRetryingId(id);
@@ -115,6 +137,24 @@ const Services = () => {
       >
         {t("settings.services.hint")}
       </Alert>
+      {operationalHealth && (
+        <Alert severity={operationalHealth.overall_state === "healthy" ? "success" : operationalHealth.overall_state === "critical" ? "error" : "warning"} sx={{ mb: 2 }}>
+          <AlertTitle>{t("settings.services.health.title")}</AlertTitle>
+          <Stack direction={{ xs: "column", sm: "row" }} gap={1} alignItems={{ sm: "center" }} flexWrap="wrap">
+            {[5, 15, 60].map((minutes) => (
+              <Button key={minutes} size="small" variant={healthWindow === minutes ? "contained" : "outlined"} onClick={() => refreshOperationalHealth(minutes)}>
+                {t("settings.services.health.window", { minutes })}
+              </Button>
+            ))}
+            {Object.entries(operationalHealth.components).map(([name, component]) => (
+              <Chip key={name} size="small" color={component.state === "healthy" ? "success" : component.state === "offline" ? "error" : "warning"} label={t(`settings.services.health.components.${name}`, { defaultValue: name }) + ": " + component.state} />
+            ))}
+          </Stack>
+          <Typography variant="body2" sx={{ mt: 1 }}>
+            {t("settings.services.health.lastCheck", { time: new Date(operationalHealth.generated_at).toLocaleString() })}
+          </Typography>
+        </Alert>
+      )}
       {diagnosticsPreview && (
         <Alert
           severity="info"
