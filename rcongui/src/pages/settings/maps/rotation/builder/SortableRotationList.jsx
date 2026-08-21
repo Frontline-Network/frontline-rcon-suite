@@ -32,6 +32,11 @@ export function SortableRotationList({
   isDisabled,
   actions,
   params,
+  title,
+  emptyTitle,
+  emptyDescription,
+  removeTooltip,
+  showNext = true,
 }) {
   const { t } = useTranslation();
   // Set up DnD sensors
@@ -84,7 +89,7 @@ export function SortableRotationList({
           alignItems={{ sx: "flex-start", md: "center" }}
           justifyContent={"space-between"}
         >
-          <Typography variant="h6">{t("maps.rotation")} ({maps.length})</Typography>
+          <Typography variant="h6">{title || t("maps.rotation")} ({maps.length})</Typography>
           <Stack
             direction="row"
             spacing={1}
@@ -177,13 +182,12 @@ export function SortableRotationList({
               strategy={verticalListSortingStrategy}
             >
               {maps.map((item, index, tempRotation) => {
-                console.log(tempRotation, params, index)
                 let isNext = false;
-                if (tempRotation.length === 1) {
+                if (showNext && tempRotation.length === 1) {
                   isNext = true
-                } else if (params.currentMapIndex === params.nextMapIndex) {
+                } else if (showNext && params.currentMapIndex === params.nextMapIndex) {
                   isNext = (index + 1) === params.nextMapIndex
-                } else {
+                } else if (showNext) {
                   isNext = index === params.nextMapIndex
                 }
 
@@ -193,6 +197,7 @@ export function SortableRotationList({
                     item={item}
                     onRemove={onRemove}
                     isNext={isNext}
+                    removeTooltip={removeTooltip}
                   />
                 )
               })}
@@ -218,10 +223,10 @@ export function SortableRotationList({
               </svg>
             </Box>
             <Typography variant="h6" gutterBottom>
-              No maps in rotation
+              {emptyTitle || t("maps.noMapsInRotation")}
             </Typography>
             <Typography variant="body2">
-              Add maps to build your rotation
+              {emptyDescription || t("maps.addMapsToRotation")}
             </Typography>
           </Box>
         )}

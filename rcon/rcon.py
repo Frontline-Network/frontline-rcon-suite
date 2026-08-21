@@ -1345,7 +1345,82 @@ class Rcon(ServerCtl):
             # Remove the first map
             super().remove_map_from_rotation_at_index(0)
 
-    # TODO: Repeat above map rotation-related commands for the map sequence
+    def add_map_to_sequence_at_index(self, map_name: str, map_index: int) -> None:
+        sequence = self.get_map_sequence()["maps"]
+        if map_index < 0:
+            map_index = len(sequence) + map_index + 1
+        if not 0 <= map_index <= len(sequence):
+            raise ValueError("Map sequence insertion index is out of range")
+
+        with invalidates(
+            Rcon.get_map_sequence,
+            Rcon.get_map_rotation,
+            Rcon.get_next_map,
+        ):
+            return super().add_map_to_sequence_at_index(map_name, map_index)
+
+    def remove_map_from_sequence_at_index(self, map_index: int) -> None:
+        sequence = self.get_map_sequence()["maps"]
+        if map_index < 0:
+            map_index = len(sequence) + map_index
+        if not 0 <= map_index < len(sequence):
+            raise ValueError("Map sequence removal index is out of range")
+
+        with invalidates(
+            Rcon.get_map_sequence,
+            Rcon.get_map_rotation,
+            Rcon.get_next_map,
+        ):
+            return super().remove_map_from_sequence_at_index(map_index)
+
+    def move_map_in_sequence(self, current_index: int, new_index: int) -> None:
+        sequence_size = len(self.get_map_sequence()["maps"])
+        if not 0 <= current_index < sequence_size:
+            raise ValueError("Current map sequence index is out of range")
+        if not 0 <= new_index < sequence_size:
+            raise ValueError("New map sequence index is out of range")
+        if current_index == new_index:
+            return
+
+        with invalidates(
+            Rcon.get_map_sequence,
+            Rcon.get_map_rotation,
+            Rcon.get_next_map,
+        ):
+            return super().move_map_in_sequence(current_index, new_index)
+
+    def set_map_sequence(self, map_names: list[str]) -> None:
+        """Replace the complete sequence with validated, cache-safe operations.
+
+        The game protocol offers add/remove/move primitives but no atomic
+        replace.  Validate the complete request before mutating and retain one
+        existing entry while building the replacement so a non-empty server
+        sequence is maintained throughout the operation.
+        """
+        if not map_names:
+            raise HLLCommandFailedError("Empty map sequence")
+
+        requested = list(map_names)
+        sequence = self.get_map_sequence()["maps"]
+        current = [map_.id for map_ in sequence]
+        if requested == current:
+            return
+
+        with invalidates(
+            Rcon.get_map_sequence,
+            Rcon.get_map_rotation,
+            Rcon.get_next_map,
+        ):
+            if not sequence:
+                for index, map_name in enumerate(requested):
+                    super().add_map_to_sequence_at_index(map_name, index)
+                return
+
+            for _ in range(len(sequence) - 1):
+                super().remove_map_from_sequence_at_index(1)
+            for index, map_name in enumerate(requested, start=1):
+                super().add_map_to_sequence_at_index(map_name, index)
+            super().remove_map_from_sequence_at_index(0)
 
     def get_objective_rows(self) -> List[List[str]]:
         return super().get_objective_rows()

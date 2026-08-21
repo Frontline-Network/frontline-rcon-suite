@@ -343,6 +343,8 @@ export const cmd = {
     requestFactory({ method: "GET", cmd: "get_maps", ...params }),
   GET_MAP_ROTATION: (params) =>
     requestFactory({ method: "GET", cmd: "get_map_rotation", ...params }),
+  GET_MAP_SEQUENCE: (params) =>
+    requestFactory({ method: "GET", cmd: "get_map_sequence", ...params }),
   GET_MAP_OBJECTIVES: (params) =>
     requestFactory({ method: "GET", cmd: "get_objective_rows", ...params }),
   GET_MAP_ROTATION_SHUFFLE: (params) =>
@@ -572,6 +574,8 @@ export const cmd = {
     requestFactory({ method: "POST", cmd: "set_game_layout", ...params }),
   SET_MAP_ROTATION: (params) =>
     requestFactory({ method: "POST", cmd: "set_map_rotation", ...params }),
+  SET_MAP_SEQUENCE: (params) =>
+    requestFactory({ method: "POST", cmd: "set_map_sequence", ...params }),
   SET_MAP_ROTATION_SHUFFLE: (params) =>
     requestFactory({
       method: "POST",

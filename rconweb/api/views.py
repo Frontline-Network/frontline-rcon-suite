@@ -608,6 +608,11 @@ ENDPOINT_PERMISSIONS: dict[Callable, list[str] | set[str] | str] = {
         "api.can_remove_map_from_rotation",
         "api.can_view_map_rotation",
     },
+    rcon_api.set_map_sequence: {
+        "api.can_add_map_to_rotation",
+        "api.can_remove_map_from_rotation",
+        "api.can_view_current_map_sequence",
+    },
     rcon_api.set_max_ping_autokick: "api.can_change_max_ping_autokick",
     rcon_api.set_name_kick_config: "api.can_change_name_kick_config",
     rcon_api.set_profanities: {
@@ -885,6 +890,7 @@ RCON_ENDPOINT_HTTP_METHODS: dict[Callable, list[str]] = {
     rcon_api.set_votemap_whitelist: ["POST"],
     rcon_api.set_map: ["POST"],
     rcon_api.set_map_rotation: ["POST"],
+    rcon_api.set_map_sequence: ["POST"],
     rcon_api.set_max_ping_autokick: ["POST"],
     rcon_api.set_name_kick_config: ["POST"],
     rcon_api.set_profanities: ["POST"],
