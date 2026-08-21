@@ -50,6 +50,18 @@ class SessionCsrfProtectionMiddlewareTests(TestCase):
 
         self.assertIsNone(response)
 
+    def test_read_only_post_routes_keep_browser_session_compatibility(self):
+        request = self.factory.post(
+            "/api/get_recent_logs", data="{}", content_type="application/json"
+        )
+        request.COOKIES[settings.SESSION_COOKIE_NAME] = "browser-session"
+
+        response = self.middleware.process_view(
+            request, historically_exempt_view, (), {}
+        )
+
+        self.assertIsNone(response)
+
     @patch("rconweb.api.auth.heartbeat")
     @patch("rconweb.api.auth.get_token")
     def test_authenticated_session_check_issues_a_csrf_cookie(

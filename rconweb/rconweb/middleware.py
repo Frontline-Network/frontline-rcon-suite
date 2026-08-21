@@ -4,6 +4,21 @@ from django.conf import settings
 from django.middleware.csrf import CsrfViewMiddleware
 
 
+# These historical API endpoints use POST for filter payloads, but only return
+# data. They are explicitly kept outside session CSRF enforcement so an
+# already-authenticated operator can open the live/log views without requiring
+# a CSRF token for a non-mutating request. Server and moderation actions are
+# deliberately not listed here.
+READ_ONLY_POST_PATHS = frozenset(
+    {
+        "/api/get_historical_logs",
+        "/api/get_players_history",
+        "/api/get_recent_logs",
+        "/api/get_recent_logs_summary",
+    }
+)
+
+
 class SessionCsrfProtectionMiddleware(CsrfViewMiddleware):
     """Enforce CSRF for every unsafe request authenticated by a browser session.
 
@@ -16,6 +31,8 @@ class SessionCsrfProtectionMiddleware(CsrfViewMiddleware):
 
     def process_view(self, request, callback, callback_args, callback_kwargs):
         if request.method in {"GET", "HEAD", "OPTIONS", "TRACE"}:
+            return None
+        if request.path.rstrip("/") in READ_ONLY_POST_PATHS:
             return None
         if not request.COOKIES.get(settings.SESSION_COOKIE_NAME):
             return None
