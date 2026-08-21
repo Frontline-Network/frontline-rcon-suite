@@ -29,12 +29,18 @@ dayjs.extend(localizedFormat);
 export const loader = async () => {
   const services = isFakeMode() ? demoServices : await cmd.GET_SERVICES();
   let deadLetters = [];
+  let diagnosticsPreview = null;
   if (!isFakeMode()) {
     try {
       deadLetters = await cmd.GET_WEBHOOK_DEAD_LETTERS();
     } catch {
       // Webhook queues are deliberately a separate permission. Operators who
       // cannot inspect them must still be able to use the services page.
+    }
+    try {
+      diagnosticsPreview = await cmd.GET_SUPPORT_DIAGNOSTICS_PREVIEW();
+    } catch {
+      // Keep service controls available for older installations and custom roles.
     }
   }
   return {
@@ -47,6 +53,7 @@ export const loader = async () => {
       now: dayjs(service.now * 1000).format("LLL"),
     })),
     deadLetters,
+    diagnosticsPreview,
   };
 };
 
@@ -66,7 +73,7 @@ const stateColor = {
 const isRunning = (service) => service.statename === "RUNNING";
 
 const Services = () => {
-  const { services, deadLetters: initialDeadLetters } = useLoaderData();
+  const { services, deadLetters: initialDeadLetters, diagnosticsPreview } = useLoaderData();
   const { t } = useTranslation();
   const [deadLetters, setDeadLetters] = useState(initialDeadLetters);
   const [retryingId, setRetryingId] = useState(null);
@@ -108,6 +115,29 @@ const Services = () => {
       >
         {t("settings.services.hint")}
       </Alert>
+      {diagnosticsPreview && (
+        <Alert
+          severity="info"
+          sx={{ mb: 2 }}
+          action={
+            <Button href="/api/download_support_diagnostics" component="a">
+              {t("settings.services.diagnostics.download")}
+            </Button>
+          }
+        >
+          <AlertTitle>{t("settings.services.diagnostics.title")}</AlertTitle>
+          <Typography variant="body2">
+            {t("settings.services.diagnostics.scope", {
+              bytes: diagnosticsPreview.estimated_bytes,
+              services: diagnosticsPreview.service_count,
+              history: diagnosticsPreview.history_samples,
+            })}
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 0.5 }}>
+            {t("settings.services.diagnostics.omitted")}
+          </Typography>
+        </Alert>
+      )}
       {deadLetters.length > 0 && (
         <Alert severity="warning" sx={{ mb: 2 }}>
           <AlertTitle>{t("settings.services.webhooks.title")}</AlertTitle>

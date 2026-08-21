@@ -446,6 +446,8 @@ export const cmd = {
     }),
   GET_SERVICES: (params) =>
     requestFactory({ method: "GET", cmd: "get_services", ...params }),
+  GET_SUPPORT_DIAGNOSTICS_PREVIEW: (params) =>
+    requestFactory({ method: "GET", cmd: "get_support_diagnostics_preview", ...params }),
   GET_WEBHOOK_DEAD_LETTERS: (params) =>
     requestFactory({ method: "GET", cmd: "get_webhook_dead_letters", ...params }),
   RETRY_WEBHOOK_DEAD_LETTER: (params) =>
