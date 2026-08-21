@@ -29,6 +29,9 @@ class GameProfile:
     warmup_timer_modes: frozenset[GameMode] = field(default_factory=frozenset)
     game_mode_aliases: Mapping[str, GameMode] = field(default_factory=dict)
     player_adapter: "PlayerInfoAdapter | None" = None
+    # Persisted unit history uses stable CRCON side IDs, not faction IDs. Both
+    # games use 1/2 for Allies/Axis even though their live faction IDs differ.
+    team_ids: Mapping[Team, int] = field(default_factory=dict)
 
     def parse_layer(self, layer_name: str | Layer) -> Layer:
         return self.layer_parser(layer_name)
@@ -52,3 +55,22 @@ class GameProfile:
                 f"Game mode {mode.value!r} is not supported by the '{self.game.value}' game profile"
             )
         return mode
+
+    def team_id_for(self, team: Team | str | None) -> int | None:
+        """Return the persisted side ID for a logical CRCON team."""
+        try:
+            side = team if isinstance(team, Team) else Team(team or Team.UNKNOWN)
+        except ValueError:
+            return None
+        return self.team_ids.get(side)
+
+    def team_for_id(self, team_id: object) -> Team | None:
+        """Resolve a persisted side ID without assuming a game-specific enum."""
+        try:
+            normalized = int(team_id)
+        except (TypeError, ValueError):
+            return None
+        return next(
+            (team for team, value in self.team_ids.items() if value == normalized),
+            None,
+        )

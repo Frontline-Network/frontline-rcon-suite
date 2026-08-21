@@ -8,12 +8,10 @@ import time
 from dataclasses import dataclass
 from typing import Callable, Iterable, Mapping, TypeAlias, TypedDict
 
-from hllrcon import HLLTeam
-
 from rcon.cache_utils import get_redis_client
 from rcon.game.registry import game_switch
 from rcon.game_logs import get_historical_logs_records, get_recent_logs
-from rcon.maps import parse_layer
+from rcon.maps import Layer, Team
 from rcon.models import enter_session
 from rcon.player_history import _get_profiles, get_player_profile_by_player_ids
 from rcon.rcon import get_rcon
@@ -37,6 +35,18 @@ logger = logging.getLogger(__name__)
 
 PLAYER_ID = "player_id"
 NAME_KEY_PREFIX = "name:"
+
+
+def _resolve_map_stat_team(
+    *, game_profile, map_layer: Layer, persisted_team_id: object
+) -> tuple[str | None, str | None]:
+    """Return stable team and current-map faction for one persisted unit side."""
+    team = game_profile.team_for_id(persisted_team_id)
+    if team is Team.ALLIES:
+        return team.value, map_layer.map.allies.name.lower()
+    if team is Team.AXIS:
+        return team.value, map_layer.map.axis.name.lower()
+    return None, None
 
 
 class PlayerSessions(TypedDict):
@@ -864,7 +874,9 @@ def _apply_current_map_player_stats(
     `player_stats` is `MapsHistory()[0]["player_stats"]` and keys are player IDs.
     """
     player_stats = current_map.get("player_stats", dict())
-    map_layer = parse_layer(current_map["name"])
+    rcon = get_rcon()
+    game_profile = rcon.game_profile
+    map_layer = game_profile.parse_layer_or_unknown(current_map["name"])
 
     for stat in stats.values():
         player_id = stat.get(PLAYER_ID)
@@ -881,16 +893,11 @@ def _apply_current_map_player_stats(
         faction_name = None
         unit = map_stat.get("p_unit", None)
         if unit:
-            try:
-                # TODO: This relies on the assumption that HLLTeam and HLLVTeam are equal enough
-                team = HLLTeam.by_id(unit["team"])
-                team_name = team.name.lower()
-                if team == HLLTeam.ALLIES:
-                    faction_name = map_layer.map.allies.name.lower()
-                elif team == HLLTeam.AXIS:
-                    faction_name = map_layer.map.axis.name.lower()
-            except ValueError:
-                pass
+            team_name, faction_name = _resolve_map_stat_team(
+                game_profile=game_profile,
+                map_layer=map_layer,
+                persisted_team_id=unit.get("team"),
+            )
 
         # Combat stats
         stat["combat"] = map_stat.get("combat", 0) + map_stat.get("p_combat", 0)
