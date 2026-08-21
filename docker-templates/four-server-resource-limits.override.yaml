@@ -1,0 +1,44 @@
+# Resource envelope for the legacy dynamic Compose layout with four CRCON
+# profiles. Frontline supports a maximum of four CRCON profiles on one host.
+#
+# Apply this after the installation's base Compose files, for example:
+#   docker compose -f compose.yaml -f docker-templates/four-server-resource-limits.override.yaml up -d
+#
+# Do not use this file for a host with more than four profiles. That is outside
+# the supported Frontline deployment envelope and requires a separate capacity
+# plan.
+services:
+  backend_1: &backend
+    restart: on-failure:5
+    deploy:
+      resources:
+        limits:
+          cpus: '${BACKEND_CPU_LIMIT:-1.0}'
+          memory: ${BACKEND_MEMORY_LIMIT:-1024M}
+        reservations:
+          cpus: '0.10'
+          memory: 256M
+
+  supervisor_1: &supervisor
+    restart: on-failure:5
+    deploy:
+      resources:
+        limits:
+          cpus: '${SUPERVISOR_CPU_LIMIT:-1.5}'
+          memory: ${SUPERVISOR_MEMORY_LIMIT:-2048M}
+        reservations:
+          cpus: '0.20'
+          memory: 512M
+
+  backend_2:
+    <<: *backend
+  supervisor_2:
+    <<: *supervisor
+  backend_3:
+    <<: *backend
+  supervisor_3:
+    <<: *supervisor
+  backend_4:
+    <<: *backend
+  supervisor_4:
+    <<: *supervisor
