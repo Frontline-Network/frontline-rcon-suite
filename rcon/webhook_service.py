@@ -4,7 +4,6 @@ import os
 import random
 import time
 import uuid
-from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import StrEnum
@@ -41,6 +40,9 @@ BUCKET_ID = f"{PREFIX}"
 WH_ID_TO_RATE_LIMIT_BUCKET = f"{PREFIX}:wh_id_rl_bucket"
 BUCKET_RL = f"{PREFIX}:rl"
 BUCKET_RL_COUNT = f"{BUCKET_RL}:count"
+RATE_LIMIT_LOCK_WAIT_MS = f"{PREFIX}:metrics:rate_limit_lock_wait_ms"
+RATE_LIMIT_LOCK_WAIT_COUNT = f"{PREFIX}:metrics:rate_limit_lock_wait_count"
+RATE_LIMIT_LOCK_METRICS_TTL_SECS = 60 * 60
 
 GLOBAL_RATE_LIMIT = f"{PREFIX}:global_rl"
 GLOBAL_RATE_LIMIT_RESET_AFTER = f"{GLOBAL_RATE_LIMIT}:reset_after"
@@ -131,8 +133,10 @@ try:
 except (ValueError, TypeError):
     WH_DEAD_LETTER_MAX_LENGTH = 500
 
-# Global datastructures to support associating hooks with locks
-_RATE_LIMIT_BUCKETS: defaultdict[str, asyncio.Lock | None] = defaultdict(lambda: None)
+# Global data structures to support associating hooks with locks.  Discord can
+# report the same bucket for different webhook URLs after either URL has
+# already been used, so this registry must be canonical by bucket ID.
+_RATE_LIMIT_BUCKETS: dict[str, asyncio.Lock] = {}
 _SHARED_LOCK: asyncio.Lock | None = None
 
 
@@ -509,29 +513,61 @@ def set_rate_limit_bucket_data(
     red.set(name, orjson.dumps(bucket.model_dump_json()))
 
 
+def get_or_create_bucket_lock(bucket_id: str) -> asyncio.Lock:
+    """Return the canonical in-process lock for a Discord rate-limit bucket.
+
+    This function has no await point, so the lookup-and-create sequence is
+    atomic within a webhook-service worker process.
+    """
+    global _RATE_LIMIT_BUCKETS
+    lock = _RATE_LIMIT_BUCKETS.get(bucket_id)
+    if lock is None:
+        lock = asyncio.Lock()
+        _RATE_LIMIT_BUCKETS[bucket_id] = lock
+    return lock
+
+
 def get_bucket_lock(
     red: redis.StrictRedis,
     bucket_id: str,
-) -> tuple[DiscordRateLimitData, asyncio.Lock | None]:
-    """Get the lock for a rate limit bucket"""
+) -> tuple[DiscordRateLimitData, asyncio.Lock]:
+    """Get rate-limit data and the canonical lock for a known bucket."""
     bucket_data = get_rate_limit_bucket_data(red=red, bucket_id=bucket_id)
-
-    global _RATE_LIMIT_BUCKETS
-    return bucket_data, _RATE_LIMIT_BUCKETS[bucket_id]
+    return bucket_data, get_or_create_bucket_lock(bucket_id=bucket_id)
 
 
 def set_bucket_data(
     red: redis.StrictRedis, bucket: DiscordRateLimitData, lock: asyncio.Lock
 ) -> None:
-    """Set the bucket data and lock using the bucket ID"""
+    """Persist bucket data without replacing its canonical lock."""
     logger.debug("Updating bucket data: %s", bucket)
-    global _RATE_LIMIT_BUCKETS
 
     if bucket.id:
-        _RATE_LIMIT_BUCKETS[bucket.id] = lock
+        canonical_lock = get_or_create_bucket_lock(bucket_id=bucket.id)
+        if canonical_lock is not lock:
+            logger.debug("Retaining canonical rate-limit lock for bucket %s", bucket.id)
         set_rate_limit_bucket_data(red=red, bucket=bucket)
     else:
         logger.error("Received a None bucket ID: %s", bucket)
+
+
+def record_bucket_lock_wait(
+    red: redis.StrictRedis,
+    bucket_id: str,
+    wait_seconds: float,
+    prefix: str = RATE_LIMIT_LOCK_WAIT_MS,
+) -> None:
+    """Record contended Discord bucket-lock waits as bounded Redis metrics."""
+    if wait_seconds <= 0:
+        return
+
+    wait_ms = max(1, math.ceil(wait_seconds * 1000))
+    pipe = red.pipeline()
+    pipe.hincrby(prefix, bucket_id, wait_ms)
+    pipe.hincrby(RATE_LIMIT_LOCK_WAIT_COUNT, bucket_id, 1)
+    pipe.expire(prefix, RATE_LIMIT_LOCK_METRICS_TTL_SECS)
+    pipe.expire(RATE_LIMIT_LOCK_WAIT_COUNT, RATE_LIMIT_LOCK_METRICS_TTL_SECS)
+    pipe.execute()
 
 
 def set_webhook_error(
@@ -934,14 +970,12 @@ async def dequeue_message(
             datetime.now().timestamp() + bucket_data.reset_after_secs
         )
 
-        if lock == get_shared_lock():
-            # Once we get a response for a webhook we know what rate limit bucket it's in and we can
-            # associate it with a lock so that all shared limits use the same lock and don't process
-            # concurrently
-            # TODO: what if we add another webhook after that then shares a rate limit bucket with one
-            # that's already been created, will it find it?
-            lock = asyncio.Lock()
-            logger.debug("Created %s for %s", lock, queue_id)
+        if bucket_data.id:
+            # A later webhook can resolve to the same Discord bucket.  Always
+            # replace the discovery/shared lock with the registry's canonical
+            # lock, rather than allocating a second lock for that bucket.
+            lock = get_or_create_bucket_lock(bucket_id=bucket_data.id)
+            logger.debug("Using rate-limit lock %s for %s", lock, queue_id)
 
         if res.status_code == 429:
             bucket_data.rate_limited = True
@@ -1057,7 +1091,14 @@ async def dequeue_message(
             bucket_id=bucket_data.id,
         )
 
+    wait_started = time.monotonic() if lock.locked() else None
     async with lock:
+        if wait_started is not None and bucket_data.id:
+            record_bucket_lock_wait(
+                red=red,
+                bucket_id=bucket_data.id,
+                wait_seconds=time.monotonic() - wait_started,
+            )
         try:
             await _dequeue_message(
                 red=red,
