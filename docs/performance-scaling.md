@@ -330,22 +330,27 @@ already enforced the limits.
 The following is a capacity envelope for CRCON application containers only. It
 does **not** include the gameservers, PostgreSQL disk/cache, Redis, Nginx, the
 host operating system or a safety margin; provision those separately. The
-four-instance figures are validated canary measurements above. One- and
-ten-instance rows are repeatable measurement targets, not claimed production
-measurements.
+four-instance figures are validated canary measurements above. Frontline's
+supported deployment envelope ends at **four CRCON profiles per host**. The
+legacy `docker-templates/ten-servers.yaml` remains a reference template; it is
+not a supported Frontline capacity profile and must not be deployed without a
+separate engineering and capacity plan.
 
 | Profile | Backends + supervisors (limit envelope) | Shared workers (limit envelope) | Required measurement before production |
 | --- | ---: | ---: | --- |
 | 1 gameserver | 3.0 GiB / 2.5 CPU | 1.5 GiB / 2.0 CPU | idle, normal admin use, webhook burst |
 | 4 gameservers | 12.0 GiB / 10.0 CPU | 1.5 GiB / 2.0 CPU | baseline canary plus concurrent dashboard and Discord actions |
-| 10 gameservers | 30.0 GiB / 25.0 CPU | 1.5 GiB / 2.0 CPU | staged load profile; use shared-supervisor mode or a larger host before rollout |
 
 For each profile, capture five minutes of idle and five minutes of a
 representative event burst. Run `docker compose config` first to confirm the
 resolved limits, then sample `docker stats --no-stream` every 30 seconds and
 record `docker inspect` values for `Memory`, `MemoryReservation` and
 `NanoCpus`. Test both HLL and HLL Vietnam, including a webhook/Discord event,
-before moving from 1 to 4 and from 4 to 10 gameservers.
+before moving from 1 to 4 gameservers. Existing dynamic four-profile
+installations must add
+`docker-templates/four-server-resource-limits.override.yaml` after their
+existing Compose overrides so the budget is enforced by Docker as well as
+documented by the templates.
 
 | Variable | Default | Purpose |
 | --- | ---: | --- |
