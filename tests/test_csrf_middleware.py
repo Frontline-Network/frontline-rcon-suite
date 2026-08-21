@@ -1,5 +1,6 @@
 import os
 from unittest import TestCase
+from unittest.mock import patch
 
 os.environ.setdefault("HLL_MAINTENANCE_CONTAINER", "1")
 os.environ.setdefault("RCONWEB_TEST_MODE", "1")
@@ -15,6 +16,7 @@ from django.http import HttpResponse
 from django.test import RequestFactory
 from django.views.decorators.csrf import csrf_exempt
 
+from rconweb.api import auth
 from rconweb.rconweb.middleware import SessionCsrfProtectionMiddleware
 
 
@@ -46,3 +48,18 @@ class SessionCsrfProtectionMiddlewareTests(TestCase):
         )
 
         self.assertIsNone(response)
+
+    @patch("rconweb.api.auth.heartbeat")
+    @patch("rconweb.api.auth.get_token")
+    def test_authenticated_session_check_issues_a_csrf_cookie(
+        self, get_token, _heartbeat
+    ):
+        request = self.factory.get("/api/is_logged_in")
+        request.user = type(
+            "User", (), {"is_authenticated": True, "username": "admin"}
+        )()
+
+        response = auth.is_logged_in(request)
+
+        self.assertEqual(response.status_code, 200)
+        get_token.assert_called_once_with(request)

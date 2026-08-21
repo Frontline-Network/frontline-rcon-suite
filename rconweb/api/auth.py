@@ -292,6 +292,11 @@ def get_moderators_accounts() -> list[tuple[str, str]]:
 def is_logged_in(request):
     is_auth = request.user.is_authenticated
     if is_auth:
+        # Existing browser sessions can predate a CSRF-cookie rotation or a
+        # deployment that enabled session CSRF enforcement.  This endpoint is
+        # called during application startup, so issue a fresh readable token
+        # before the frontend performs its first session-authenticated POST.
+        get_token(request)
         try:
             player_id = None
             try:
