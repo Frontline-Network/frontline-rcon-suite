@@ -8,6 +8,29 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _load_settings(environment_updates: dict[str, str | None]):
+    environment = os.environ.copy()
+    for key, value in environment_updates.items():
+        if value is None:
+            environment.pop(key, None)
+        else:
+            environment[key] = value
+    environment["PYTHONPATH"] = os.pathsep.join(
+        filter(None, (str(ROOT), environment.get("PYTHONPATH")))
+    )
+    return subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from rconweb import settings; print('SETTINGS_LOADED')",
+        ],
+        cwd=ROOT / "rconweb",
+        env=environment,
+        capture_output=True,
+        text=True,
+    )
+
+
 def test_explicit_cors_origins_are_normalized_and_deduplicated():
     environment = os.environ.copy()
     environment.update(
@@ -17,6 +40,7 @@ def test_explicit_cors_origins_are_normalized_and_deduplicated():
                 "https://webapp.fln.gg "
             ),
             "HLL_MAINTENANCE_CONTAINER": "true",
+            "RCONWEB_TEST_MODE": "true",
         }
     )
     environment["PYTHONPATH"] = os.pathsep.join(
@@ -46,3 +70,61 @@ def test_explicit_cors_origins_are_normalized_and_deduplicated():
 
     assert origins.count("https://webapp.fln.gg") == 1
     assert "https://ops.fln.gg" in origins
+
+
+def test_debug_flag_uses_explicit_boolean_values_only():
+    result = _load_settings(
+        {
+            "HLL_MAINTENANCE_CONTAINER": "true",
+            "RCONWEB_TEST_MODE": "true",
+            "DJANGO_DEBUG": "false",
+        }
+    )
+    assert result.returncode == 0, result.stderr
+
+    invalid = _load_settings(
+        {
+            "HLL_MAINTENANCE_CONTAINER": "true",
+            "RCONWEB_TEST_MODE": "true",
+            "DJANGO_DEBUG": "definitely",
+        }
+    )
+    assert invalid.returncode != 0
+    assert "DJANGO_DEBUG must be one of" in invalid.stderr
+
+
+def test_production_settings_require_a_non_default_secret():
+    missing = _load_settings(
+        {
+            "HLL_MAINTENANCE_CONTAINER": "true",
+            "RCONWEB_TEST_MODE": "false",
+            "RCONWEB_API_SECRET": None,
+            "DJANGO_DEBUG": "false",
+        }
+    )
+    assert missing.returncode != 0
+    assert "RCONWEB_API_SECRET must be set" in missing.stderr
+
+    too_short = _load_settings(
+        {
+            "HLL_MAINTENANCE_CONTAINER": "true",
+            "RCONWEB_TEST_MODE": "false",
+            "RCONWEB_API_SECRET": "too-short",
+            "DJANGO_DEBUG": "false",
+        }
+    )
+    assert too_short.returncode != 0
+    assert "RCONWEB_API_SECRET must contain at least 32 characters" in too_short.stderr
+
+
+def test_credentialed_cors_rejects_http_outside_debug_mode():
+    result = _load_settings(
+        {
+            "HLL_MAINTENANCE_CONTAINER": "true",
+            "RCONWEB_TEST_MODE": "true",
+            "DJANGO_DEBUG": "false",
+            "CORS_ALLOWED_ORIGINS": "http://webapp.fln.gg",
+        }
+    )
+    assert result.returncode != 0
+    assert "may only contain HTTPS origins" in result.stderr
