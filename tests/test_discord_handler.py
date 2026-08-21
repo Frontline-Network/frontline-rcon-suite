@@ -3,6 +3,7 @@ from pydantic import HttpUrl
 from rcon.discord_chat import DiscordWebhookHandler
 from rcon.user_config.webhooks import (
     AdminPingWebhooksUserConfig,
+    ChatDiscordWebhook,
     ChatWebhooksUserConfig,
     DiscordMentionWebhook,
     DiscordWebhook,
@@ -10,13 +11,12 @@ from rcon.user_config.webhooks import (
 )
 
 
-def test_no_mentions():
+def test_no_mentions(monkeypatch):
+    monkeypatch.setattr(DiscordWebhookHandler, "_make_hook", staticmethod(lambda hooks: []))
     config = ChatWebhooksUserConfig(
         hooks=[
-            DiscordMentionWebhook(
-                url=HttpUrl("http://example.com"),
-                user_mentions=["<@1212>"],
-                role_mentions=[],
+            ChatDiscordWebhook(
+                url=HttpUrl("https://discord.com/api/webhooks/123/token"),
             )
         ],
         allow_mentions=True,
@@ -34,13 +34,12 @@ def test_no_mentions():
     assert embed.description == "test message"
 
 
-def test_chat_mentions_are_escaped():
+def test_chat_mentions_are_escaped(monkeypatch):
+    monkeypatch.setattr(DiscordWebhookHandler, "_make_hook", staticmethod(lambda hooks: []))
     config = ChatWebhooksUserConfig(
         hooks=[
-            DiscordMentionWebhook(
-                url=HttpUrl("http://example.com"),
-                user_mentions=["<@1212>"],
-                role_mentions=[],
+            ChatDiscordWebhook(
+                url=HttpUrl("https://discord.com/api/webhooks/123/token"),
             )
         ],
         allow_mentions=False,
@@ -74,18 +73,16 @@ def test_admin_ping_mentions_always_escaped():
     assert embed.description == "test message @\u200bhere"
 
 
-def test_mentions_are_not_escaped():
+def test_mentions_are_not_escaped(monkeypatch):
+    monkeypatch.setattr(DiscordWebhookHandler, "_make_hook", staticmethod(lambda hooks: []))
     config = ChatWebhooksUserConfig(
         hooks=[
-            DiscordMentionWebhook(
-                url=HttpUrl("http://example.com"),
-                user_mentions=["<@1212>"],
-                role_mentions=[],
+            ChatDiscordWebhook(
+                url=HttpUrl("https://discord.com/api/webhooks/123/token"),
             )
         ],
         allow_mentions=True,
     )
-    # monkeypatch.setattr(DiscordWebhookHandler, "_make_hook", lambda: [])
     handler = DiscordWebhookHandler(chat_wh_config=config)
     embed = handler.create_chat_message(
         log={

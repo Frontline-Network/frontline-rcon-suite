@@ -6,11 +6,14 @@ import {
   useRevalidator,
   useSubmit,
 } from "react-router-dom";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { execute, get, handleHttpError } from "@/utils/fetchUtils";
 import {
   Box,
   Button,
+  Card,
+  CardContent,
+  Chip,
   Collapse,
   Stack,
   Typography,
@@ -37,6 +40,113 @@ import AutobalancerHelp from "@/pages/settings/[configs]/autobalancer-help";
 import AutobalancerShadowOverview from "@/pages/settings/[configs]/autobalancer-shadow-overview";
 
 const Editor = lazy(() => import("@monaco-editor/react"));
+
+const diagnosticColor = {
+  valid: "success",
+  invalid: "error",
+  unreachable: "warning",
+  unverified: "default",
+};
+
+const ChatWebhookDiagnostics = () => {
+  const { t } = useTranslation();
+  const [diagnostics, setDiagnostics] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const response = await get("get_chat_webhook_diagnostics");
+      const payload = await response.json();
+      setDiagnostics(payload?.result || []);
+    } catch (error) {
+      handleHttpError(error);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const run = async (command, successMessage) => {
+    setLoading(true);
+    try {
+      const response = await execute(command);
+      const payload = await response.json();
+      if (payload?.failed) throw new Error(payload.error);
+      setDiagnostics(payload?.result || []);
+      toast.success(t(successMessage));
+    } catch (error) {
+      handleHttpError(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card variant="outlined">
+      <CardContent>
+        <Stack spacing={1.5}>
+          <Box>
+            <Typography variant="h6">
+              {t("settings.config.webhookDiagnostics.title")}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {t("settings.config.webhookDiagnostics.help")}
+            </Typography>
+          </Box>
+          {diagnostics.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              {t("settings.config.webhookDiagnostics.empty")}
+            </Typography>
+          ) : (
+            diagnostics.map((diagnostic) => (
+              <Stack
+                direction="row"
+                spacing={1}
+                alignItems="center"
+                key={diagnostic.index}
+              >
+                <Typography variant="body2" sx={{ minWidth: 100 }}>
+                  {t("settings.config.webhookDiagnostics.webhook", {
+                    number: diagnostic.index + 1,
+                  })}
+                </Typography>
+                <Chip
+                  size="small"
+                  color={diagnosticColor[diagnostic.status] || "default"}
+                  label={t(
+                    `settings.config.webhookDiagnostics.status_${diagnostic.status || "unverified"}`
+                  )}
+                />
+                {diagnostic.last_error && (
+                  <Typography variant="body2" color="text.secondary">
+                    {diagnostic.last_error}
+                  </Typography>
+                )}
+              </Stack>
+            ))
+          )}
+          <Stack direction="row" spacing={1} flexWrap="wrap">
+            <Button
+              variant="outlined"
+              disabled={loading}
+              onClick={() => run("diagnose_chat_webhooks", "settings.config.webhookDiagnostics.checked")}
+            >
+              {t("settings.config.webhookDiagnostics.check")}
+            </Button>
+            <Button
+              variant="contained"
+              disabled={loading || diagnostics.length === 0}
+              onClick={() => run("test_chat_webhooks", "settings.config.webhookDiagnostics.testSent")}
+            >
+              {t("settings.config.webhookDiagnostics.test")}
+            </Button>
+          </Stack>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+};
 
 export const loader = async ({ params }) => {
   const { category, type } = params;
@@ -194,6 +304,7 @@ const ConfigPage = () => {
   const submit = useSubmit();
   const theme = useTheme();
   const isAutobalancer = command === "autobalancer_config";
+  const isChatWebhookConfig = command === "chat_discord_webhooks_config";
 
   useEffect(() => {
     setEditorContent(JSON.stringify(data, null, 2));
@@ -257,6 +368,7 @@ const ConfigPage = () => {
           onOpenSettings={handleOpenAutobalancerSettings}
         />
       )}
+      {isChatWebhookConfig && <ChatWebhookDiagnostics />}
       {isAutobalancer && (
         <Button
           id="autobalancer-settings"
