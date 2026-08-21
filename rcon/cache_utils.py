@@ -20,6 +20,28 @@ _GLOBAL_REDIS_POOL = None
 REDIS_SCAN_COUNT = 500
 
 
+def validate_ttl_seconds(ttl_seconds: object, *, setting: str = "ttl_seconds") -> int:
+    """Return a Redis/cachetools-safe TTL or raise a configuration error.
+
+    Redis expiry and cachetools have subtly different behaviour for floats,
+    booleans and zero.  Accepting those values defers a deployment/configuration
+    error to an arbitrary cache write, so validate at every public cache entry
+    point instead.
+    """
+
+    if isinstance(ttl_seconds, bool) or not isinstance(ttl_seconds, int):
+        raise ValueError(
+            f"{setting} must be a positive whole number of seconds; "
+            f"received {ttl_seconds!r}"
+        )
+    if ttl_seconds <= 0:
+        raise ValueError(
+            f"{setting} must be a positive whole number of seconds; "
+            f"received {ttl_seconds!r}"
+        )
+    return ttl_seconds
+
+
 class RedisCached:
     PREFIX = "cached_"
 
@@ -35,8 +57,7 @@ class RedisCached:
         serializer=simplejson.dumps,
         deserializer=simplejson.loads,
     ):
-        # TODO: isinstance check ttl_seconds it must be an int
-        # not a float or anything else
+        ttl_seconds = validate_ttl_seconds(ttl_seconds)
         if pool is None:
             pool = get_redis_pool()
 
@@ -276,6 +297,7 @@ def ttl_cache(
     function_cache_unavailable=None,
     **kwargs,
 ):
+    ttl = validate_ttl_seconds(ttl, setting="ttl")
     pool = get_redis_pool(decode_responses=False)
 
     def memory_cache_decorator(func):

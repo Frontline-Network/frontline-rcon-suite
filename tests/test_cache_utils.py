@@ -4,6 +4,7 @@ from unittest import mock
 
 import redis
 import redis.exceptions
+import pytest
 
 from rcon import cache_utils
 from rcon.cache_utils import REDIS_SCAN_COUNT, RedisCached, invalidates_for, ttl_cache
@@ -29,6 +30,34 @@ class MockRedisDeleteUnavailable(MockRedis):
 
 def _needs_qual_name():
     pass
+
+
+@pytest.mark.parametrize("ttl", [0, -1, 0.5, "60", None, False, True])
+def test_redis_cached_rejects_invalid_ttl_before_cache_initialization(ttl):
+    with pytest.raises(ValueError, match="positive whole number of seconds"):
+        RedisCached(
+            pool=None,
+            red=mock.Mock(),
+            ttl_seconds=ttl,
+            function=_needs_qual_name,
+        )
+
+
+@pytest.mark.parametrize("ttl", [0, -1, 0.5, "60", None, False, True])
+def test_ttl_cache_rejects_invalid_ttl_before_selecting_backend(ttl):
+    with pytest.raises(ValueError, match="positive whole number of seconds"):
+        ttl_cache(ttl)
+
+
+def test_redis_cached_accepts_positive_integer_ttl():
+    cached = RedisCached(
+        pool=None,
+        red=mock.Mock(),
+        ttl_seconds=60,
+        function=_needs_qual_name,
+    )
+
+    assert cached.ttl_seconds == 60
 
 
 def test_cache_unavailable(monkeypatch):
