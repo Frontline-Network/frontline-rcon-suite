@@ -143,7 +143,9 @@ then
         --max-requests-jitter "$GUNICORN_MAX_REQUESTS_JITTER"
       )
     fi
-    gunicorn "${GUNICORN_PRELOAD_ARGS[@]}" "${GUNICORN_RECYCLE_ARGS[@]}" --pid gunicorn.pid -w "$NB_API_WORKERS" -k gthread --threads "$NB_API_THREADS" -t 120 -b 0.0.0.0 rconweb.wsgi
+    # Gunicorn 25.1 enables a threaded control socket before forking workers.
+    # The inherited thread state can deadlock gthread workers during startup.
+    gunicorn --no-control-socket "${GUNICORN_PRELOAD_ARGS[@]}" "${GUNICORN_RECYCLE_ARGS[@]}" --pid gunicorn.pid -w "$NB_API_WORKERS" -k gthread --threads "$NB_API_THREADS" -t 120 -b 0.0.0.0 rconweb.wsgi
   fi
   cd ..
   ./manage.py unregister_api

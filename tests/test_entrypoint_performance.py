@@ -9,8 +9,15 @@ def test_single_worker_gunicorn_preload_is_not_unconditional():
 
     assert "GUNICORN_PRELOAD_MODE=\"${HLL_GUNICORN_PRELOAD:-auto}\"" in entrypoint
     assert '"$NB_API_WORKERS" -gt 1' in entrypoint
-    assert 'gunicorn "${GUNICORN_PRELOAD_ARGS[@]}"' in entrypoint
+    assert 'gunicorn --no-control-socket "${GUNICORN_PRELOAD_ARGS[@]}"' in entrypoint
     assert "gunicorn --preload" not in entrypoint
+
+
+def test_split_api_disables_gunicorn_control_socket_before_gthread_fork():
+    entrypoint = (REPO_ROOT / "entrypoint.sh").read_text(encoding="utf-8")
+
+    assert "gunicorn --no-control-socket" in entrypoint
+    assert "-k gthread" in entrypoint
 
 
 def test_unified_api_mode_is_explicit_opt_in_and_uses_both_existing_ports():
