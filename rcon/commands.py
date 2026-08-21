@@ -21,7 +21,6 @@ from rcon.transport import CommandRetryGate, classify_transport_failure
 from rcon.types import (
     MapRotationResponse,
     MapSequenceResponse,
-    PlayerInfoType,
     PublicConfig,
     ServerInfo,
     SlotsType,
@@ -406,14 +405,14 @@ class ServerCtl:
             ).content_dict["players"]
         }
 
-    # TODO: HLLV: Update response type and everything that depends on it
-    def get_all_player_info(self) -> list[PlayerInfoType]:
+    def get_all_player_info(self) -> list[dict[str, Any]]:
+        """Return raw game-server packets; ``Rcon`` adapts them per game profile."""
         return self.exchange(
             "GetServerInformation", 2, {"Name": "players", "Value": ""}
         ).content_dict["players"]
 
-    # TODO: HLLV: Update response type and everything that depends on it
-    def get_player_info(self, player_id: str) -> PlayerInfoType | None:
+    def get_player_info(self, player_id: str) -> dict[str, Any] | None:
+        """Return a raw game-server packet; callers must use the game adapter."""
         return self.exchange(
             "GetServerInformation", 2, {"Name": "player", "Value": player_id}
         ).content_dict

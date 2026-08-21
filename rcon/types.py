@@ -1151,7 +1151,9 @@ class WorldPositionType(TypedDict):
     z: float
 
 
-class PlayerInfoType(TypedDict):
+class CanonicalPlayerInfo(TypedDict):
+    """Validated player payload shared by HLL and HLL Vietnam feature code."""
+
     iD: str
     team: int
     role: int
@@ -1167,3 +1169,8 @@ class PlayerInfoType(TypedDict):
     eosId: NotRequired[str]
     steamId: NotRequired[str | None]
     worldPosition: WorldPositionType
+
+
+# Compatibility alias for existing integrations. New code should use the
+# explicit canonical name to avoid treating game-server packets as HLL-only.
+PlayerInfoType = CanonicalPlayerInfo

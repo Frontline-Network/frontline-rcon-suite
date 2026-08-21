@@ -1,5 +1,6 @@
 from rcon.game.base import GameProfile
 from rcon.game.hll.maps import HLL_LAYERS, HLL_MAPS, parse_layer
+from rcon.game.hll.player_adapter import HLLPlayerInfoAdapter
 from rcon.game.hll.roles import HLL_ROLE_LABELS, HLL_ROLES
 from rcon.game.hll.weapons import HLL_WEAPON_SIDES, HLL_WEAPONS
 from rcon.maps import GameMode
@@ -28,4 +29,5 @@ HLL_PROFILE = GameProfile(
         {GameMode.WARFARE, GameMode.OFFENSIVE, GameMode.SKIRMISH}
     ),
     warmup_timer_modes=frozenset({GameMode.WARFARE, GameMode.SKIRMISH}),
+    player_adapter=HLLPlayerInfoAdapter(),
 )

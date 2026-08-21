@@ -1,5 +1,6 @@
 from rcon.game.base import GameProfile
 from rcon.game.hllv.maps import HLLV_LAYERS, HLLV_MAPS, parse_layer
+from rcon.game.hllv.player_adapter import HLLVPlayerInfoAdapter
 from rcon.game.hllv.roles import HLLV_ROLE_LABELS, HLLV_ROLES
 from rcon.game.hllv.weapons import HLLV_WEAPON_SIDES, HLLV_WEAPONS
 from rcon.maps import GameMode
@@ -28,4 +29,5 @@ HLLV_PROFILE = GameProfile(
         "nva offensive": GameMode.OFFENSIVE,
         "us offensive": GameMode.OFFENSIVE,
     },
+    player_adapter=HLLVPlayerInfoAdapter(),
 )

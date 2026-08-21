@@ -14,6 +14,7 @@ from dateutil import parser
 from rcon.connection import HLLCommandError
 import rcon.steam_utils
 from rcon.cache_utils import get_redis_client, invalidates, invalidates_for, ttl_cache
+from rcon.game.player_adapter import PlayerResponseAdapterError
 from rcon.commands import (
     HLLCommandFailedError,
     HLLServerCtl,
@@ -39,7 +40,7 @@ from rcon.types import (
     GetPlayersType,
     ParsedLogsType,
     PlayerActionState,
-    PlayerInfoType,
+    CanonicalPlayerInfo,
     ServerInfo,
     SlotsType,
     StatusType,
@@ -291,6 +292,33 @@ class Rcon(ServerCtl):
 
         return [p for p in players.values()]
 
+    def get_all_player_info(self) -> list[CanonicalPlayerInfo]:
+        """Expose only validated, game-neutral player DTOs above the RCON boundary."""
+        adapter = self.game_profile.player_adapter
+        if adapter is None:  # Defensive guard for third-party game profiles.
+            raise RuntimeError(f"No player adapter configured for {self.config.game!r}")
+
+        players: list[CanonicalPlayerInfo] = []
+        for raw in super().get_all_player_info():
+            try:
+                players.append(adapter.adapt(raw))
+            except PlayerResponseAdapterError as exc:
+                logger.warning("Ignoring invalid player response from %s: %s", self.config.game, exc)
+        return players
+
+    def _get_adapted_player_info(self, player_id: str) -> CanonicalPlayerInfo | None:
+        adapter = self.game_profile.player_adapter
+        if adapter is None:
+            raise RuntimeError(f"No player adapter configured for {self.config.game!r}")
+        raw = super().get_player_info(player_id)
+        if raw is None:
+            return None
+        try:
+            return adapter.adapt(raw)
+        except PlayerResponseAdapterError as exc:
+            logger.warning("Invalid player response for %s from %s: %s", player_id, self.config.game, exc)
+            return None
+
     def get_detailed_players(self) -> GetDetailedPlayers:
         try:
             current_map_start = MapsHistory()[0]["start"]
@@ -310,7 +338,7 @@ class Rcon(ServerCtl):
 
         all_player_info = {
             p["iD"]: p
-            for p in super().get_all_player_info()
+            for p in self.get_all_player_info()
         }
 
         for player in players:
@@ -488,7 +516,7 @@ class Rcon(ServerCtl):
     def get_player_info(self, player_id: str, can_fail=False):
         try:
             try:
-                player = super().get_player_info(player_id)
+                player = self._get_adapted_player_info(player_id)
             except HLLCommandError:
                 return {}
 
@@ -502,11 +530,11 @@ class Rcon(ServerCtl):
             # logger.exception("Can't get player info for %s", player)
             return {}
 
-        if player["iD"] != player_id:
+        if player is None or player["iD"] != player_id:
             logger.error(
                 "get_player_info('%s') returned for a different id: %s %s",
                 player_id,
-                player["iD"],
+                player["iD"] if player else None,
                 player_id,
             )
             return {}
@@ -520,12 +548,14 @@ class Rcon(ServerCtl):
     @ttl_cache(ttl=2, cache_falsy=False)
     def get_detailed_player_info(self, player_id: str, player: GetPlayersType | None = None) -> GetDetailedPlayer:
         try:
-            player_info = super().get_player_info(player_id)
+            player_info = self._get_adapted_player_info(player_id)
         except HLLCommandError:
             raise HLLCommandFailedError("Player is not online")
+        if player_info is None:
+            raise HLLCommandFailedError("Player response is invalid or player is not online")
         return self._get_detailed_player_info(player_info, player)
 
-    def _get_detailed_player_info(self, player_info: PlayerInfoType, player: GetPlayersType | None = None) -> GetDetailedPlayer:
+    def _get_detailed_player_info(self, player_info: CanonicalPlayerInfo, player: GetPlayersType | None = None) -> GetDetailedPlayer:
         player_data = parse_raw_player_info(player_info, self.config.game)
         if player is not None and 'is_vip' in player:
             player_data["is_vip"] = player.get('is_vip')

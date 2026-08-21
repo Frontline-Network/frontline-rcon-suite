@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from rcon.maps import GameMode, Layer, Map, Team
 from rcon.types import GameEnum
 from rcon.weapons import WeaponType
+
+if TYPE_CHECKING:
+    from rcon.game.player_adapter import PlayerInfoAdapter
 
 
 @dataclass(frozen=True)
@@ -24,6 +28,7 @@ class GameProfile:
     match_timer_modes: frozenset[GameMode] = field(default_factory=frozenset)
     warmup_timer_modes: frozenset[GameMode] = field(default_factory=frozenset)
     game_mode_aliases: Mapping[str, GameMode] = field(default_factory=dict)
+    player_adapter: "PlayerInfoAdapter | None" = None
 
     def parse_layer(self, layer_name: str | Layer) -> Layer:
         return self.layer_parser(layer_name)
