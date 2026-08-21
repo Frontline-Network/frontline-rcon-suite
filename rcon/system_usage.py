@@ -11,7 +11,7 @@ from typing import Any, Callable
 import psutil
 
 SAMPLE_INTERVAL_SECONDS = 15
-HISTORY_WINDOW_SECONDS = 15 * 60
+HISTORY_WINDOW_SECONDS = 60 * 60
 MAX_HISTORY_SAMPLES = HISTORY_WINDOW_SECONDS // SAMPLE_INTERVAL_SECONDS + 1
 WARNING_THRESHOLD_PERCENT = 80.0
 CRITICAL_THRESHOLD_PERCENT = 90.0
@@ -375,12 +375,25 @@ class SystemUsageSampler:
         self._last_monotonic: float | None = None
         self._lock = threading.Lock()
 
-    def _response(self, *, cache_hit: bool, generated_at: datetime) -> dict[str, Any]:
+    def _response(
+        self,
+        *,
+        cache_hit: bool,
+        generated_at: datetime,
+        window_seconds: int | None = None,
+    ) -> dict[str, Any]:
         if self._last_sample is None:
             raise RuntimeError("No system-usage sample is available")
         response = copy.deepcopy(self._last_sample)
         sampled_at = datetime.fromisoformat(response["sampled_at"])
         history = copy.deepcopy(list(self._history))
+        if window_seconds is not None:
+            cutoff = generated_at.timestamp() - window_seconds
+            history = [
+                entry
+                for entry in history
+                if datetime.fromisoformat(entry["sampled_at"]).timestamp() >= cutoff
+            ]
         history_from = history[0]["sampled_at"] if history else response["sampled_at"]
         response.update(
             {
@@ -409,7 +422,7 @@ class SystemUsageSampler:
         )
         return response
 
-    def get_snapshot(self) -> dict[str, Any]:
+    def get_snapshot(self, *, window_seconds: int | None = None) -> dict[str, Any]:
         with self._lock:
             monotonic_now = self._monotonic()
             generated_at = self._now()
@@ -418,7 +431,11 @@ class SystemUsageSampler:
                 and self._last_monotonic is not None
                 and monotonic_now - self._last_monotonic < self.interval_seconds
             ):
-                return self._response(cache_hit=True, generated_at=generated_at)
+                return self._response(
+                    cache_hit=True,
+                    generated_at=generated_at,
+                    window_seconds=window_seconds,
+                )
 
             sample, raw = self._collector(
                 self._last_raw,
@@ -437,7 +454,11 @@ class SystemUsageSampler:
                     "status": sample["status"],
                 }
             )
-            return self._response(cache_hit=False, generated_at=generated_at)
+            return self._response(
+                cache_hit=False,
+                generated_at=generated_at,
+                window_seconds=window_seconds,
+            )
 
 
 system_usage_sampler = SystemUsageSampler()
