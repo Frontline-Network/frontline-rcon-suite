@@ -3,7 +3,7 @@ from rcon.game.hll.maps import HLL_LAYERS, HLL_MAPS, parse_layer
 from rcon.game.hll.player_adapter import HLLPlayerInfoAdapter
 from rcon.game.hll.roles import HLL_ROLE_LABELS, HLL_ROLES
 from rcon.game.hll.weapons import HLL_WEAPON_SIDES, HLL_WEAPONS
-from rcon.maps import GameMode
+from rcon.maps import GameMode, Team
 from rcon.types import GameEnum
 
 HLL_PROFILE = GameProfile(
@@ -30,4 +30,5 @@ HLL_PROFILE = GameProfile(
     ),
     warmup_timer_modes=frozenset({GameMode.WARFARE, GameMode.SKIRMISH}),
     player_adapter=HLLPlayerInfoAdapter(),
+    team_ids={Team.ALLIES: 1, Team.AXIS: 2},
 )

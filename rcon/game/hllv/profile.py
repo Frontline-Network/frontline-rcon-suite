@@ -3,7 +3,7 @@ from rcon.game.hllv.maps import HLLV_LAYERS, HLLV_MAPS, parse_layer
 from rcon.game.hllv.player_adapter import HLLVPlayerInfoAdapter
 from rcon.game.hllv.roles import HLLV_ROLE_LABELS, HLLV_ROLES
 from rcon.game.hllv.weapons import HLLV_WEAPON_SIDES, HLLV_WEAPONS
-from rcon.maps import GameMode
+from rcon.maps import GameMode, Team
 from rcon.types import GameEnum
 
 HLLV_PROFILE = GameProfile(
@@ -30,4 +30,5 @@ HLLV_PROFILE = GameProfile(
         "us offensive": GameMode.OFFENSIVE,
     },
     player_adapter=HLLVPlayerInfoAdapter(),
+    team_ids={Team.ALLIES: 1, Team.AXIS: 2},
 )
