@@ -26,6 +26,7 @@ class Series:
         retention_days=60,
         max_fails=5,
         slices=None,
+        clock=None,
     ):
         self.client: redis.Redis = client or get_redis_client()
         self.slices = slices or {
@@ -41,6 +42,7 @@ class Series:
         self.last_error: str | None = None
         self.last_error_at: float | None = None
         self.next_retry_at = 0.0
+        self._clock = clock or time.time
 
     def migrate(self):
         try:
@@ -115,7 +117,7 @@ class Series:
             logger.exception(message, self.NAME, self.last_error, self.fails, retry_delay)
 
     def run_on_time(self, rcon):
-        now = time.time()
+        now = self._clock()
         if now - self.last_run_time <= self.min_resolution_ms:
             return
         if now < self.next_retry_at:
