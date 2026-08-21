@@ -43,6 +43,7 @@ export function MapListBuilder({
   exclusive = false,
   actions,
   params = {},
+  selectedMapListProps = {},
 }) {
   const { t } = useTranslation();
   const [mapSelection, setMapSelection] = useState(
@@ -198,6 +199,7 @@ export function MapListBuilder({
               isSaving={isSaving}
               actions={actions}
               params={params}
+              {...selectedMapListProps}
             />
           </Grid>
         )}

@@ -6,6 +6,7 @@ export const mapsManagerQueryKeys = {
   currentMap: [{ queryIdentifier: "get_map" }],
   maps: [{ queryIdentifier: "get_maps" }],
   mapRotation: [{ queryIdentifier: "get_map_rotation" }],
+  mapSequence: [{ queryIdentifier: "get_map_sequence" }],
   mapRotationShuffle: [{ queryIdentifier: "get_map_rotation_shuffle" }],
   gameState: [{ queryIdentifier: "get_gamestate" }],
   votemapStatus: [{ queryIdentifier: "get_votemap_status" }],
@@ -34,6 +35,12 @@ export const mapsManagerQueryOptions = {
     queryOptions({
       queryKey: mapsManagerQueryKeys.mapRotation,
       queryFn: cmd.GET_MAP_ROTATION,
+    }),
+
+  mapSequence: () =>
+    queryOptions({
+      queryKey: mapsManagerQueryKeys.mapSequence,
+      queryFn: cmd.GET_MAP_SEQUENCE,
     }),
 
   // Get map rotation shuffle config
@@ -98,6 +105,14 @@ export const mapsManagerMutationOptions = {
   setMapRotation: {
     mutationFn: (mapNames) =>
       cmd.SET_MAP_ROTATION({
+        payload: { map_names: mapNames },
+        throwRouteError: false,
+      }),
+  },
+
+  setMapSequence: {
+    mutationFn: (mapNames) =>
+      cmd.SET_MAP_SEQUENCE({
         payload: { map_names: mapNames },
         throwRouteError: false,
       }),

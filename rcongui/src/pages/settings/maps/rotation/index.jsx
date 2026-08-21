@@ -12,6 +12,7 @@ function MapRotation() {
   const location = useLocation();
   const tabs = [
     { label: t("maps.builder"), href: "/settings/maps/rotation" },
+    { label: t("maps.sequence"), href: "/settings/maps/rotation/sequence" },
     { label: t("maps.settings"), href: "/settings/maps/rotation/settings" },
   ];
   const activeTab = tabs.findIndex(({ href }) =>
@@ -22,6 +23,7 @@ function MapRotation() {
     <>
       <Tabs value={activeTab}>
         <NavLinkTab label={t("maps.builder")} to={""} />
+        <NavLinkTab label={t("maps.sequence")} to={"sequence"} />
         <NavLinkTab label={t("maps.settings")} to={"settings"} />
       </Tabs>
       {/* Move to Outlet */}

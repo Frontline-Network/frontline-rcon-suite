@@ -366,6 +366,16 @@ const router = createBrowserRouter([
                 ),
               },
               {
+                path: "sequence",
+                lazy: lazyPage(
+                  () => import("./pages/settings/maps/rotation/sequence"),
+                  {
+                    loaderImport: () =>
+                      import("./pages/settings/maps/rotation/sequence/loader"),
+                  }
+                ),
+              },
+              {
                 path: "settings",
                 lazy: lazyPage(
                   () => import("./pages/settings/maps/rotation/settings"),

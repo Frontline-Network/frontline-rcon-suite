@@ -27,6 +27,7 @@ OPERATION_REQUIREMENTS = {
     "player_context": ("get_player_info", "get_player_profile"),
     "player_moderation": ("punish", "kick", "temp_ban", "perma_ban"),
     "map_rotation": ("get_map_rotation", "set_map_rotation"),
+    "map_sequence": ("get_map_sequence", "set_map_sequence"),
     "map_vote": ("get_votemap_status", "set_votemap_config"),
     "sector_layout": ("get_objective_rows", "set_game_layout"),
     "auto_settings": (

@@ -5,7 +5,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { MapDetailsCard } from "../../MapDetailsCard";
 import { useTranslation } from "react-i18next";
 
-function SortableRotationItem({ item, onRemove, isNext }) {
+function SortableRotationItem({ item, onRemove, isNext, removeTooltip }) {
   const { t } = useTranslation();
   const {
     attributes,
@@ -68,7 +68,7 @@ function SortableRotationItem({ item, onRemove, isNext }) {
       </Box>
       <Stack direction={"row"} gap={0.25} alignItems={"center"}>
         {isNext && <Chip color="secondary" label={t("maps.next")} />}
-        <Tooltip title={t("maps.removeFromRotation")}>
+        <Tooltip title={removeTooltip || t("maps.removeFromRotation")}>
           <IconButton size="small" onClick={() => onRemove(mapLayer)} color="error">
             <CloseIcon fontSize="small" />
           </IconButton>

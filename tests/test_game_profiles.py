@@ -602,6 +602,127 @@ def test_hllv_set_sector_layout_includes_current_map_id_and_integer_indices():
 
 
 @pytest.mark.parametrize(
+    ("ctl_type", "game"),
+    [
+        (HLLRcon, GameEnum.HLL_WW2),
+        (HLLVRcon, GameEnum.HLL_VIETNAM),
+    ],
+)
+def test_map_sequence_replacement_keeps_one_entry_until_the_replacement_is_ready(
+    monkeypatch, ctl_type, game
+):
+    ctl = ctl_type(ServerInfo(game=game))
+    ctl.get_map_sequence = Mock(
+        return_value={
+            "maps": [SimpleNamespace(id="old_a"), SimpleNamespace(id="old_b")],
+            "current_index": 0,
+        }
+    )
+    remove = Mock()
+    add = Mock()
+    monkeypatch.setattr("rcon.rcon.ServerCtl.remove_map_from_sequence_at_index", remove)
+    monkeypatch.setattr("rcon.rcon.ServerCtl.add_map_to_sequence_at_index", add)
+
+    ctl.set_map_sequence(["new_a", "new_b", "new_c", "new_d", "new_e"])
+
+    remove.assert_has_calls([call(1), call(0)])
+    add.assert_has_calls(
+        [
+            call("new_a", 1),
+            call("new_b", 2),
+            call("new_c", 3),
+            call("new_d", 4),
+            call("new_e", 5),
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    ("ctl_type", "game"),
+    [
+        (HLLRcon, GameEnum.HLL_WW2),
+        (HLLVRcon, GameEnum.HLL_VIETNAM),
+    ],
+)
+def test_map_sequence_replacement_rejects_empty_requests_before_mutation(ctl_type, game):
+    ctl = ctl_type(ServerInfo(game=game))
+
+    with pytest.raises(HLLCommandFailedError, match="Empty map sequence"):
+        ctl.set_map_sequence([])
+
+
+@pytest.mark.parametrize(
+    ("ctl_type", "game"),
+    [
+        (HLLRcon, GameEnum.HLL_WW2),
+        (HLLVRcon, GameEnum.HLL_VIETNAM),
+    ],
+)
+def test_map_sequence_replacement_handles_a_single_existing_entry(
+    monkeypatch, ctl_type, game
+):
+    ctl = ctl_type(ServerInfo(game=game))
+    ctl.get_map_sequence = Mock(
+        return_value={
+            "maps": [SimpleNamespace(id="old_a")],
+            "current_index": 0,
+        }
+    )
+    remove = Mock()
+    add = Mock()
+    monkeypatch.setattr("rcon.rcon.ServerCtl.remove_map_from_sequence_at_index", remove)
+    monkeypatch.setattr("rcon.rcon.ServerCtl.add_map_to_sequence_at_index", add)
+
+    ctl.set_map_sequence(["new_a"])
+
+    add.assert_called_once_with("new_a", 1)
+    remove.assert_called_once_with(0)
+
+
+@pytest.mark.parametrize(
+    ("ctl_type", "game"),
+    [
+        (HLLRcon, GameEnum.HLL_WW2),
+        (HLLVRcon, GameEnum.HLL_VIETNAM),
+    ],
+)
+def test_map_sequence_primitives_validate_and_normalize_indices(
+    monkeypatch, ctl_type, game
+):
+    ctl = ctl_type(ServerInfo(game=game))
+    ctl.get_map_sequence = Mock(
+        return_value={
+            "maps": [
+                SimpleNamespace(id="first"),
+                SimpleNamespace(id="second"),
+                SimpleNamespace(id="third"),
+            ],
+            "current_index": 0,
+        }
+    )
+    add = Mock()
+    remove = Mock()
+    move = Mock()
+    monkeypatch.setattr("rcon.rcon.ServerCtl.add_map_to_sequence_at_index", add)
+    monkeypatch.setattr("rcon.rcon.ServerCtl.remove_map_from_sequence_at_index", remove)
+    monkeypatch.setattr("rcon.rcon.ServerCtl.move_map_in_sequence", move)
+
+    ctl.add_map_to_sequence_at_index("last", -1)
+    ctl.remove_map_from_sequence_at_index(-1)
+    ctl.move_map_in_sequence(0, 2)
+
+    add.assert_called_once_with("last", 3)
+    remove.assert_called_once_with(2)
+    move.assert_called_once_with(0, 2)
+    with pytest.raises(ValueError, match="insertion index"):
+        ctl.add_map_to_sequence_at_index("bad", 5)
+    with pytest.raises(ValueError, match="removal index"):
+        ctl.remove_map_from_sequence_at_index(3)
+    with pytest.raises(ValueError, match="Current map sequence index"):
+        ctl.move_map_in_sequence(3, 0)
+
+
+@pytest.mark.parametrize(
     ("ctl_type", "game", "command"),
     [
         (HLLServerCtl, GameEnum.HLL_WW2, "SetWelcomeMessage"),
