@@ -17,6 +17,7 @@ from django.test import RequestFactory
 from django.views.decorators.csrf import csrf_exempt
 
 from rconweb.api import auth
+from rconweb.rconweb.csrf import csrf_failure
 from rconweb.rconweb.middleware import SessionCsrfProtectionMiddleware
 
 
@@ -63,3 +64,12 @@ class SessionCsrfProtectionMiddlewareTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         get_token.assert_called_once_with(request)
+
+    def test_csrf_failure_reissues_cookie_for_the_next_retry(self):
+        request = self.factory.post("/api/change", data="{}", content_type="application/json")
+
+        response = csrf_failure(request, reason="invalid token")
+        response = self.middleware.process_response(request, response)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertIn(settings.CSRF_COOKIE_NAME, response.cookies)
