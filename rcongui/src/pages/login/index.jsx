@@ -24,6 +24,7 @@ export const loader = async ({ request }) => {
   let user;
   const url = new URL(request.url);
   const from = url.searchParams.get("from") || "/";
+  const sessionExpired = url.searchParams.get("session_expired") === "1";
 
   try {
     user = await cmd.IS_AUTHENTICATED({ throwRouteError: false });
@@ -32,7 +33,8 @@ export const loader = async ({ request }) => {
     if (error.status === 401) {
       return {
         error: error.name,
-        messageKey: "login.invalid",
+        messageKey: sessionExpired ? "login.sessionExpired" : "login.invalid",
+        from,
       };
     }
 
@@ -53,7 +55,13 @@ export const loader = async ({ request }) => {
     return redirect(from);
   }
 
-  return { authenticated: user.authenticated, from };
+  return {
+    authenticated: user.authenticated,
+    from,
+    ...(sessionExpired
+      ? { error: "session_expired", messageKey: "login.sessionExpired" }
+      : {}),
+  };
 };
 
 export const action = async ({ request }) => {

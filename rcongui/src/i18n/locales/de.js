@@ -1034,6 +1034,7 @@ const de = {
     submit: "Anmelden",
     submitting: "Anmeldung läuft …",
     invalid: "Die Anmeldedaten sind ungültig. Bitte erneut versuchen.",
+    sessionExpired: "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.",
     unavailable: "Die CRCON-Serveranwendung antwortet nicht.",
     unknownError: "Ein unbekannter Fehler ist aufgetreten. Bitte das Netzwerkprotokoll prüfen und den Support kontaktieren.",
   },

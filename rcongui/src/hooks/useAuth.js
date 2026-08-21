@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Box, CircularProgress, Typography } from "@mui/material";
 import SettingsIcon from "@mui/icons-material/Settings";
-import { AuthError, cmd } from "@/utils/fetchUtils";
+import { AuthError, cmd, SESSION_EXPIRY_EVENT } from "@/utils/fetchUtils";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
@@ -50,6 +50,19 @@ export const AuthProvider = ({ children }) => {
       navigate(`/login?from=${from}`);
     }
   }, [isAuthError, isPermissionsError, navigate, location]);
+
+  useEffect(() => {
+    const redirectToLoginAfterSessionExpiry = () => {
+      const from = encodeURIComponent(location.pathname + location.search);
+      navigate(`/login?from=${from}&session_expired=1`);
+    };
+    window.addEventListener(SESSION_EXPIRY_EVENT, redirectToLoginAfterSessionExpiry);
+    return () =>
+      window.removeEventListener(
+        SESSION_EXPIRY_EVENT,
+        redirectToLoginAfterSessionExpiry
+      );
+  }, [location, navigate]);
 
   // Handle loading state
   const isLoading = isAuthLoading || isPermissionsLoading;

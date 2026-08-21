@@ -7,6 +7,39 @@ import { toast } from "react-toastify";
 const configuredApi = process.env.REACT_APP_API_URL;
 const CRCON_API =
   configuredApi && configuredApi !== "undefined" ? configuredApi : "/";
+const SESSION_EXPIRY_EVENT = "crcon:session-expired";
+const SESSION_RECOVERY_COMMANDS = new Set([
+  "login",
+  "is_logged_in",
+  "logout",
+]);
+
+let sessionExpired = false;
+
+const isSessionRecoveryCommand = (command) =>
+  SESSION_RECOVERY_COMMANDS.has(String(command ?? "").replace(/^\//, ""));
+
+export const isSessionExpired = () => sessionExpired;
+
+export const clearExpiredSession = () => {
+  sessionExpired = false;
+};
+
+const markSessionExpired = (command) => {
+  if (sessionExpired || isSessionRecoveryCommand(command)) return;
+
+  sessionExpired = true;
+  if (typeof window !== "undefined") {
+    // Let the mounted auth boundary subscribe before the first fast API
+    // response from a local/fake backend asks it to redirect.
+    window.setTimeout(
+      () => window.dispatchEvent(new CustomEvent(SESSION_EXPIRY_EVENT)),
+      0
+    );
+  }
+};
+
+export { SESSION_EXPIRY_EVENT };
 
 function getCookie(name) {
   const prefix = `${name}=`;
@@ -25,6 +58,10 @@ async function requestFactory({
   throwRouteError = true,
   headers = { "Content-Type": "application/json" },
 } = {}) {
+  if (sessionExpired && !isSessionRecoveryCommand(cmd)) {
+    throw new AuthError("Your session has expired. Please sign in again.", cmd);
+  }
+
   // Construct the full URL using the URL API
   const base = new URL(CRCON_API, document.location.origin);
   const url = new URL(cmd, base);
@@ -119,6 +156,7 @@ async function handleFetchResponse(req, res, cmd) {
     }
     switch (res.status) {
       case 401:
+        markSessionExpired(cmd);
         throw new AuthError("You are not authenticated.", cmd);
       case 403:
         throw new PermissionError("You are not authorized.", cmd);
@@ -131,6 +169,9 @@ async function handleFetchResponse(req, res, cmd) {
     }
   }
 
+  if (cmd === "login") {
+    clearExpiredSession();
+  }
   return data;
 }
 
@@ -700,11 +741,12 @@ export function handleHttpError(error) {
 }
 
 class AuthError extends Error {
-  constructor(message) {
+  constructor(message, command) {
     super(message ?? "You are not authenticated.");
     this.name = "AuthError";
     this.status = 401;
     this.text = message;
+    this.command = command;
   }
 }
 

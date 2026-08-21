@@ -20,6 +20,7 @@ import {
   getDemoServerStatus,
   getDemoRole,
   isDemoAuthenticated,
+  isDemoSessionExpired,
   getDemoSystemUsage,
 } from "./demo-data";
 
@@ -32,6 +33,13 @@ export function makeServer({ environment = "development" } = {}) {
   let demoDiscordEnabled = true;
   const trackProtectedRequest = (path, handler) => (...args) => {
     protectedRequestLog.push(path);
+    if (isDemoSessionExpired()) {
+      return new Response(
+        401,
+        { "Content-Type": "application/json" },
+        JSON.stringify({ error: "Session expired" })
+      );
+    }
     return handler(...args);
   };
   if (typeof window !== "undefined") {

@@ -86,6 +86,24 @@ test("redirects an anonymous root entry without protected requests", async ({
     .toEqual([]);
 });
 
+test("stops protected polling after an expired session", async ({ page }) => {
+  await page.setViewportSize(VIEWPORTS.desktop);
+  await page.goto("/?demo_auth=expired", { waitUntil: "domcontentloaded" });
+
+  await expect(page).toHaveURL(/\/login\?from=.*session_expired=1/);
+  await expect(
+    page.getByText("Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.")
+  ).toBeVisible();
+
+  await page.waitForTimeout(750);
+  const protectedRequests = await page.evaluate(
+    () => window.__CRCON_DEMO_PROTECTED_REQUESTS__ ?? []
+  );
+  expect(
+    protectedRequests.filter((path) => path === "/api/get_status")
+  ).toHaveLength(1);
+});
+
 test("keeps the login form keyboard-operable", async ({ page }) => {
   await page.setViewportSize(VIEWPORTS.mobile);
   await page.goto("/login?demo_auth=anonymous", {
