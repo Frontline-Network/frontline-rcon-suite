@@ -3,6 +3,7 @@ import math
 import os
 import random
 import time
+import uuid
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -105,6 +106,30 @@ QUEUE_KEY_REFRESH_INTERVAL_SECS = 1.0
 QUEUE_REGISTRY_SUFFIX = "queue_registry"
 QUEUE_REGISTRY_SENTINEL = "__initialized__"
 EMPTY_DEQUEUE_COUNT = f"{PREFIX}:metrics:empty_dequeues"
+DEAD_LETTER_QUEUE = f"{PREFIX}:dead_letter"
+
+# A webhook should not keep a worker busy forever when Discord or the target
+# endpoint is unavailable.  Failed payloads remain available to an operator in
+# the dead-letter queue, but that queue is bounded and expires by itself.
+try:
+    WH_MAX_RETRY_ATTEMPTS = int(os.getenv("HLL_WH_MAX_RETRY_ATTEMPTS", 5))
+except (ValueError, TypeError):
+    WH_MAX_RETRY_ATTEMPTS = 5
+
+try:
+    WH_MAX_MESSAGE_AGE_SECS = int(os.getenv("HLL_WH_MAX_MESSAGE_AGE_SECS", 60 * 60))
+except (ValueError, TypeError):
+    WH_MAX_MESSAGE_AGE_SECS = 60 * 60
+
+try:
+    WH_DEAD_LETTER_TTL_SECS = int(os.getenv("HLL_WH_DEAD_LETTER_TTL_SECS", 30 * 24 * 60 * 60))
+except (ValueError, TypeError):
+    WH_DEAD_LETTER_TTL_SECS = 30 * 24 * 60 * 60
+
+try:
+    WH_DEAD_LETTER_MAX_LENGTH = int(os.getenv("HLL_WH_DEAD_LETTER_MAX_LENGTH", 500))
+except (ValueError, TypeError):
+    WH_DEAD_LETTER_MAX_LENGTH = 500
 
 # Global datastructures to support associating hooks with locks
 _RATE_LIMIT_BUCKETS: defaultdict[str, asyncio.Lock | None] = defaultdict(lambda: None)
@@ -273,6 +298,22 @@ class TransientMessageStatus(TypedDict):
     redis_key: str
 
 
+class DeadLetterStatus(TypedDict):
+    """Redacted operator-facing state for a failed webhook delivery.
+
+    The actual message remains in Redis so it can be retried, but its payload
+    may contain a Discord webhook token and must never be returned by the API.
+    """
+
+    id: str
+    server_number: int
+    webhook_type: WebhookType
+    message_type: WebhookMessageType
+    retry_attempts: int
+    reason: str
+    failed_at: datetime
+
+
 class WebhookMessage(BaseModel):
     """Format for enqueing messages into Redis for the webhook service"""
 
@@ -307,6 +348,16 @@ class WebhookMessage(BaseModel):
     payload: DiscordWebhookDict = Field(
         description="The parameters that will be used to construct the webhook of appropriate type by the service"
     )
+
+
+class DeadLetterWebhookMessage(BaseModel):
+    """A retryable failed message kept outside the live delivery queues."""
+
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex)
+    message: WebhookMessage
+    source_queue_id: str
+    reason: str
+    failed_at: datetime = Field(default_factory=lambda: datetime.now(tz=timezone.utc))
 
 
 class DiscordRateLimitData(BaseModel):
@@ -612,6 +663,105 @@ def unpack_message(raw_message: bytes) -> WebhookMessage:
     return message
 
 
+def _message_age_seconds(message: WebhookMessage) -> float:
+    sent_at = message.sent_at
+    if sent_at.tzinfo is None:
+        sent_at = sent_at.replace(tzinfo=timezone.utc)
+    return max(0.0, (datetime.now(tz=timezone.utc) - sent_at).total_seconds())
+
+
+def _dead_letter_status(entry: DeadLetterWebhookMessage) -> DeadLetterStatus:
+    """Return metadata that is safe to show to a CRCON administrator."""
+    return {
+        "id": entry.id,
+        "server_number": entry.message.server_number,
+        "webhook_type": entry.message.webhook_type,
+        "message_type": entry.message.message_type,
+        "retry_attempts": entry.message.retry_attempts,
+        "reason": entry.reason,
+        "failed_at": entry.failed_at,
+    }
+
+
+def move_to_dead_letter(
+    message: WebhookMessage,
+    queue_id: str,
+    reason: str,
+    red: redis.StrictRedis | None = None,
+) -> DeadLetterStatus:
+    """Persist one failed delivery without leaking its webhook token in logs/UI."""
+    if red is None:
+        red = get_redis_client(decode_responses=False, global_pool=True)
+
+    entry = DeadLetterWebhookMessage(
+        message=message,
+        source_queue_id=queue_id,
+        reason=reason,
+    )
+    red.lpush(DEAD_LETTER_QUEUE, entry.model_dump_json())  # type: ignore
+    red.ltrim(DEAD_LETTER_QUEUE, 0, WH_DEAD_LETTER_MAX_LENGTH - 1)  # type: ignore
+    red.expire(DEAD_LETTER_QUEUE, WH_DEAD_LETTER_TTL_SECS)  # type: ignore
+    logger.warning(
+        "Moved webhook delivery to dead-letter queue: server=%s type=%s reason=%s",
+        message.server_number,
+        message.message_type,
+        reason,
+    )
+    return _dead_letter_status(entry)
+
+
+def get_dead_letter_messages(
+    red: redis.StrictRedis | None = None,
+    limit: int = 100,
+) -> list[DeadLetterStatus]:
+    """List redacted failed deliveries, newest first, for authorised operators."""
+    if red is None:
+        red = get_redis_client(decode_responses=False, global_pool=True)
+    limit = max(1, min(limit, WH_DEAD_LETTER_MAX_LENGTH))
+    entries: list[DeadLetterStatus] = []
+    for raw_entry in red.lrange(DEAD_LETTER_QUEUE, 0, limit - 1):  # type: ignore
+        try:
+            entries.append(_dead_letter_status(DeadLetterWebhookMessage.model_validate_json(raw_entry)))
+        except pydantic.ValidationError:
+            logger.warning("Ignoring invalid dead-letter webhook entry")
+    return entries
+
+
+def _restore_dead_letter_entry(entry: DeadLetterWebhookMessage, red: redis.StrictRedis) -> None:
+    """Place an operator-approved retry back into the appropriate live queue."""
+    message = entry.message.model_copy(update={"retry_attempts": 0, "sent_at": datetime.now(tz=timezone.utc)})
+    if TRANSIENT_IDENTIFIER in entry.source_queue_id:
+        parts = _split_transient_message_key(queue_id=entry.source_queue_id)
+        if parts is None:
+            raise ValueError("Invalid transient webhook queue")
+        enqueue_transient_message(message=message, message_group_key=parts.message_group_key, red=red)
+        return
+    enqueue_message(message=message, red=red)
+
+
+def retry_dead_letter_message(
+    dead_letter_id: str,
+    red: redis.StrictRedis | None = None,
+) -> bool:
+    """Retry exactly one retained message, returning False when it has expired."""
+    if red is None:
+        red = get_redis_client(decode_responses=False, global_pool=True)
+
+    for raw_entry in red.lrange(DEAD_LETTER_QUEUE, 0, -1):  # type: ignore
+        try:
+            entry = DeadLetterWebhookMessage.model_validate_json(raw_entry)
+        except pydantic.ValidationError:
+            continue
+        if entry.id != dead_letter_id:
+            continue
+        # Remove first so an immediate worker cannot deliver the same payload twice.
+        if not red.lrem(DEAD_LETTER_QUEUE, 1, raw_entry):  # type: ignore
+            return False
+        _restore_dead_letter_entry(entry=entry, red=red)
+        return True
+    return False
+
+
 def record_empty_dequeue(red: redis.StrictRedis, queue_id: str) -> None:
     """Record a harmless dequeue race without trying to parse ``None`` as JSON."""
 
@@ -681,14 +831,33 @@ async def dequeue_message(
             logger.exception(e)
             return
 
+        if _message_age_seconds(message) >= WH_MAX_MESSAGE_AGE_SECS:
+            move_to_dead_letter(
+                message=message,
+                queue_id=queue_id,
+                reason="message_expired",
+                red=red,
+            )
+            return
+
         wh = construct_webhook(
             payload=message.payload, webhook_type=message.webhook_type
         )
 
-        if message.edit:
-            res: httpx.Response = await wh.edit(client=client)
-        else:
-            res: httpx.Response = await wh.execute(client=client)  # type: ignore
+        try:
+            if message.edit:
+                res: httpx.Response = await wh.edit(client=client)
+            else:
+                res = await wh.execute(client=client)  # type: ignore
+        except httpx.HTTPError:
+            move_to_dead_letter(
+                message=message,
+                queue_id=queue_id,
+                reason="transport_error",
+                red=red,
+            )
+            logger.exception("Webhook delivery failed with a transport error")
+            return
 
         # If a webhook ID is incorrect it will return 401 which we already handle
         # but if a message ID doesn't exist it will return 404 and not have rate
@@ -718,6 +887,12 @@ async def dequeue_message(
                 webhook_type=message.webhook_type,
                 webhook_id=wh.webhook_id,
             )
+            move_to_dead_letter(
+                message=message,
+                queue_id=queue_id,
+                reason="not_found",
+                red=red,
+            )
 
             return
 
@@ -726,16 +901,28 @@ async def dequeue_message(
         # it will occur
         if res.status_code == 400:
             logger.error("%s is not a valid webhook URL", wh.url)
+            move_to_dead_letter(
+                message=message,
+                queue_id=queue_id,
+                reason="invalid_request",
+                red=red,
+            )
             return
 
         # We handle these status codes below; we want an error message if
         # we encounter an unknown status code so we can update this appropriately
-        if res.status_code not in (200, 401, 403, 429):
+        if not (200 <= res.status_code < 300) and res.status_code not in (401, 403, 429):
             logger.error(
                 "Received HTTP %s from Discord, headers:%s: %s",
                 res.headers,
                 res.status_code,
                 message.model_dump(),
+            )
+            move_to_dead_letter(
+                message=message,
+                queue_id=queue_id,
+                reason=f"http_{res.status_code}",
+                red=red,
             )
             return
 
@@ -795,7 +982,14 @@ async def dequeue_message(
                 datetime.fromtimestamp(bucket_data.reset_timestamp),
             )
 
-            if not message.discardable:
+            if message.retry_attempts >= WH_MAX_RETRY_ATTEMPTS:
+                move_to_dead_letter(
+                    message=message,
+                    queue_id=queue_id,
+                    reason="retry_limit_reached",
+                    red=red,
+                )
+            elif not message.discardable:
                 logger.info(
                     "Re-enqueing webhook ID: %s due to rate limit",
                     message.payload["webhook_id"],
@@ -803,6 +997,13 @@ async def dequeue_message(
                 message.retry_attempts += 1
                 red.lpush(queue_id, orjson.dumps(message.model_dump_json()))  # type: ignore
                 red.ltrim(queue_id, 0, WH_MAX_QUEUE_LENGTH - 1)
+            else:
+                move_to_dead_letter(
+                    message=message,
+                    queue_id=queue_id,
+                    reason="discardable_rate_limited",
+                    red=red,
+                )
         elif res.status_code == 401:
             set_webhook_error(
                 red=red,
@@ -813,6 +1014,12 @@ async def dequeue_message(
             logger.error(
                 "%s does not appear to be a valid webhook (unknown ID); check the URL",
                 wh.url,
+            )
+            move_to_dead_letter(
+                message=message,
+                queue_id=queue_id,
+                reason="unauthorized",
+                red=red,
             )
         elif res.status_code == 403:
             set_webhook_error(
@@ -825,7 +1032,13 @@ async def dequeue_message(
                 "%s does not appear to be a valid webhook (invalid token); check the URL",
                 wh.url,
             )
-        elif res.status_code == 200:
+            move_to_dead_letter(
+                message=message,
+                queue_id=queue_id,
+                reason="forbidden",
+                red=red,
+            )
+        elif 200 <= res.status_code < 300:
             bucket_data.rate_limited = False
             clear_webhook_errors(
                 red=red,
@@ -1097,6 +1310,9 @@ def webhook_service_summary(red: redis.StrictRedis | None = None):
     data["is_globally_rate_limited"] = is_globally_rate_limited(red=red)
     data["global_rate_limit_reset_after"] = get_global_rate_limit_reset_after(red=red)
     data["empty_dequeues"] = get_empty_dequeue_count(red=red)
+    data["dead_letters"] = get_dead_letter_messages(red=red, limit=20)
+    data["dead_letter_count"] = red.llen(DEAD_LETTER_QUEUE)  # type: ignore
+    data["dead_letter_ttl_seconds"] = max(0, red.ttl(DEAD_LETTER_QUEUE))  # type: ignore
 
     queue_ids = get_all_queue_keys(red=red)
     queues: defaultdict[int, dict[str, dict[str, list[QueueStatus]]]] = defaultdict(

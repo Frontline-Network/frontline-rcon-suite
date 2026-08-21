@@ -1,8 +1,11 @@
 import asyncio
+from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock
 
 from rcon.webhook_service import (
     WebhookQueueKeyCache,
+    DEAD_LETTER_QUEUE,
+    DeadLetterWebhookMessage,
     EMPTY_DEQUEUE_COUNT,
     WebhookMessage,
     WebhookMessageType,
@@ -12,6 +15,9 @@ from rcon.webhook_service import (
     enqueue_transient_message,
     get_queue_registry_key,
     handle_webhook_not_found,
+    get_dead_letter_messages,
+    move_to_dead_letter,
+    retry_dead_letter_message,
 )
 
 
@@ -189,3 +195,88 @@ def test_empty_webhook_registry_only_scans_during_initial_migration():
     assert cache.get_not_empty(now=11.0) == []
     assert red.scan_iter.call_count == 2
     red.sadd.assert_called_once()
+
+
+def test_dead_letter_list_is_redacted_for_operator_views():
+    message = _message()
+    entry = DeadLetterWebhookMessage(
+        id="failed-delivery",
+        message=message,
+        source_queue_id="whs:1:discord:audit:123",
+        reason="retry_limit_reached",
+    )
+    red = Mock()
+    red.lrange.return_value = [entry.model_dump_json()]
+
+    entries = get_dead_letter_messages(red=red)
+
+    assert entries == [
+        {
+            "id": "failed-delivery",
+            "server_number": 1,
+            "webhook_type": WebhookType.DISCORD,
+            "message_type": WebhookMessageType.AUDIT,
+            "retry_attempts": 0,
+            "reason": "retry_limit_reached",
+            "failed_at": entry.failed_at,
+        }
+    ]
+    assert "payload" not in entries[0]
+    assert "token" not in str(entries[0])
+
+
+def test_dead_letter_is_bounded_and_expires():
+    red = Mock()
+
+    status = move_to_dead_letter(
+        message=_message(),
+        queue_id="whs:1:discord:audit:123",
+        reason="transport_error",
+        red=red,
+    )
+
+    assert status["reason"] == "transport_error"
+    assert red.lpush.call_args.args[0] == DEAD_LETTER_QUEUE
+    red.ltrim.assert_called_once()
+    red.expire.assert_called_once()
+
+
+def test_dead_letter_retry_removes_entry_before_requeueing():
+    entry = DeadLetterWebhookMessage(
+        id="retry-me",
+        message=_message(),
+        source_queue_id="whs:1:discord:audit:123",
+        reason="transport_error",
+    )
+    red = Mock()
+    raw_entry = entry.model_dump_json()
+    red.lrange.return_value = [raw_entry]
+    red.lrem.return_value = 1
+
+    assert retry_dead_letter_message("retry-me", red=red) is True
+    red.lrem.assert_called_once_with(DEAD_LETTER_QUEUE, 1, raw_entry)
+    assert red.rpush.call_args.args[0] == "whs:1:discord:audit:123"
+    assert red.sadd.call_args.args[0] == get_queue_registry_key()
+
+
+def test_expired_message_moves_to_dead_letter_without_contacting_discord(monkeypatch):
+    message = _message().model_copy(
+        update={"sent_at": datetime.now(tz=timezone.utc) - timedelta(hours=2)}
+    )
+    red = Mock()
+    red.lpop.return_value = message.model_dump_json().encode()
+    construct = Mock()
+    monkeypatch.setattr("rcon.webhook_service.construct_webhook", construct)
+
+    asyncio.run(
+        dequeue_message(
+            red=red,
+            client=Mock(),
+            queue_id="whs:1:discord:audit:123",
+            bucket_data=None,
+            lock=asyncio.Lock(),
+        )
+    )
+
+    construct.assert_not_called()
+    assert red.lpush.call_args.args[0] == DEAD_LETTER_QUEUE

@@ -2036,6 +2036,14 @@ class RconAPI(Rcon):
         """
         return webhook_service.webhook_service_summary()
 
+    def get_webhook_dead_letters(self, limit: int = 100):
+        """Return redacted webhook deliveries that require operator attention."""
+        return webhook_service.get_dead_letter_messages(limit=limit)
+
+    def retry_webhook_dead_letter(self, dead_letter_id: str) -> bool:
+        """Requeue a single failed webhook delivery after the configuration is fixed."""
+        return webhook_service.retry_dead_letter_message(dead_letter_id=dead_letter_id)
+
     def reset_webhook_queues(self) -> int:
         """Delete each queue; unprocessed messages may be lost depending on timing"""
         return webhook_service.reset_webhook_queues()
