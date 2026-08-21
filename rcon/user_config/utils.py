@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Any, Iterable, Self, Type
+from typing import Any, ClassVar, Iterable, Self, Type
 
 import pydantic
 from sqlalchemy.exc import SQLAlchemyError
@@ -78,6 +78,11 @@ class InvalidKeysConfigurationError(Exception):
 class BaseUserConfig(pydantic.BaseModel):
     """The interface UI config settings should adhere to in addition to pydantic.BaseModel"""
 
+    # Most configurations are seeded at backend startup, so a missing record
+    # normally signals an operational problem. Legacy, optional configurations
+    # may lower this level when their default is an expected migration fallback.
+    MISSING_CONFIG_LOG_LEVEL: ClassVar[int] = logging.ERROR
+
     @classmethod
     def KEY(cls) -> str:
         """The database primary key for a setting"""
@@ -118,7 +123,11 @@ class BaseUserConfig(pydantic.BaseModel):
             # Now models are only persisted to the database when they're either explicitly seeded
             # during backend startup, or if the `save_to_db` method is explicitly called, for
             # instance through the API, or CLI
-            logger.error(f"{cls.KEY()} not found, returning defaults")
+            logger.log(
+                cls.MISSING_CONFIG_LOG_LEVEL,
+                "%s not found, returning defaults",
+                cls.KEY(),
+            )
 
         return cls()
 
