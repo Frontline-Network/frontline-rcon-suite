@@ -55,7 +55,7 @@ from .discord_capabilities import (
     new_capability,
 )
 from .mobile import _error, _json_body
-from .mobile_incidents import _execute_action
+from .mobile_incidents import DISCORD_GAME_ACTIONS, _execute_action
 from .multi_servers import forward_mobile_request_to_server
 from .models import (
     DiscordInteractionReceipt,
@@ -65,10 +65,10 @@ from .models import (
     DiscordReportIntegration,
 )
 
-ALL_ACTIONS = {item.value for item in SuggestedAction} - {
-    SuggestedAction.NONE.value,
-    SuggestedAction.MANUAL_REVIEW.value,
-}
+# The Discord UI must only expose actions for which CRCON has a validated
+# execution handler. New SuggestedAction values remain unavailable to Discord
+# until they are deliberately added to this CRCON-side contract and its tests.
+ALL_ACTIONS = set(DISCORD_GAME_ACTIONS)
 DESTRUCTIVE_ACTIONS = {"perma_ban", "blacklist", "disband_squad"}
 DEFAULT_REPORTER_TEMPLATES = {
     "received": "Dein Admin-Report ist eingegangen.",

@@ -51,6 +51,13 @@ ACTION_PERMISSIONS = {
     "remove_from_squad": "api.can_remove_player_from_squad",
 }
 
+# This is the single CRCON-side contract for actions that the Discord Report
+# Bot may offer. ``comment`` deliberately remains a Mobile/Admin-only action:
+# Discord moderation always needs an incident subject and an auditable game
+# operation. Keep this separate from ACTION_PERMISSIONS so a newly added
+# permission cannot accidentally expose an unimplemented Discord button.
+DISCORD_GAME_ACTIONS = frozenset(ACTION_PERMISSIONS) - {"comment"}
+
 # HLL Vietnam occasionally answers a correctly formed moderation command with
 # a transient rejection even though the same command succeeds immediately
 # afterwards. Only actions whose effect is safe to repeat are retried. A

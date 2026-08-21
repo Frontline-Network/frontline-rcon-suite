@@ -1254,6 +1254,110 @@ class MobileContextTests(TestCase):
         api.remove_player_from_squad.assert_called_once_with("player-id", "Reason")
         api.disband_squad_by_name.assert_called_once_with("allies", "able", "Reason")
 
+    @patch("api.mobile_incidents.confirmed_action_subject")
+    def test_discord_action_contract_executes_every_offer_for_hll_and_hllv(
+        self, confirmed_subject
+    ):
+        """Keep Discord's advertised actions aligned with both game profiles.
+
+        This is intentionally a cross-game contract test rather than a UI
+        snapshot: it exercises the same CRCON execution path reached after a
+        Discord interaction has been authorized, prepared and confirmed.
+        """
+
+        from api.discord_integration import ALL_ACTIONS
+        from api.mobile_incidents import DISCORD_GAME_ACTIONS, _execute_action
+        from rcon.types import GameEnum
+
+        confirmed_subject.return_value = {
+            "id": "player-subject",
+            "kind": "player",
+            "state": "confirmed",
+            "display_name": "Biene",
+            "player_id": "player-id",
+            "team": "allies",
+            "squad_name": "able",
+        }
+        incident = {
+            "target_id": "player-id",
+            "target_name": "Biene",
+            "subjects": [confirmed_subject.return_value],
+        }
+        cases = {
+            "message": {"player_id": "player-id", "message": "Hallo"},
+            "punish": {"player_id": "player-id", "reason": "Reason"},
+            "kick": {
+                "player_id": "player-id",
+                "reason": "Reason",
+                "confirmed": True,
+            },
+            "temp_ban": {
+                "player_id": "player-id",
+                "reason": "Reason",
+                "duration_hours": 6,
+                "confirmed": True,
+            },
+            "perma_ban": {
+                "player_id": "player-id",
+                "reason": "Reason",
+                "confirmed": True,
+            },
+            "blacklist": {
+                "player_id": "player-id",
+                "reason": "Reason",
+                "blacklist_id": 4,
+                "confirmed": True,
+            },
+            "remove_from_squad": {
+                "player_id": "player-id",
+                "reason": "Reason",
+                "confirmed": True,
+            },
+            "disband_squad": {
+                "subject_id": "player-subject",
+                "reason": "Reason",
+                "confirmed": True,
+            },
+        }
+        self.assertEqual(set(cases), set(DISCORD_GAME_ACTIONS))
+        self.assertEqual(ALL_ACTIONS, set(DISCORD_GAME_ACTIONS))
+
+        for game in (GameEnum.HLL_WW2, GameEnum.HLL_VIETNAM):
+            for action, arguments in cases.items():
+                with self.subTest(game=game.value, action=action):
+                    api = SimpleNamespace(
+                        config=SimpleNamespace(game=game),
+                        message_player=MagicMock(return_value=True),
+                        punish=MagicMock(return_value=True),
+                        kick=MagicMock(return_value=True),
+                        temp_ban=MagicMock(return_value=True),
+                        perma_ban=MagicMock(return_value=True),
+                        add_blacklist_record=MagicMock(return_value=True),
+                        remove_player_from_squad=MagicMock(return_value=True),
+                        disband_squad_by_name=MagicMock(return_value=True),
+                    )
+                    with patch.dict(
+                        sys.modules, {"api.views": SimpleNamespace(rcon_api=api)}
+                    ):
+                        self.assertTrue(
+                            _execute_action(action, arguments, "Moderator", incident)
+                        )
+                    if action == "disband_squad":
+                        api.disband_squad_by_name.assert_called_once_with(
+                            "allies", "able", "Reason"
+                        )
+                    else:
+                        expected_method = {
+                            "message": "message_player",
+                            "punish": "punish",
+                            "kick": "kick",
+                            "temp_ban": "temp_ban",
+                            "perma_ban": "perma_ban",
+                            "blacklist": "add_blacklist_record",
+                            "remove_from_squad": "remove_player_from_squad",
+                        }[action]
+                        getattr(api, expected_method).assert_called_once()
+
 
 class DiscordActionTemplateTests(TestCase):
     def _discord_manager(self):
