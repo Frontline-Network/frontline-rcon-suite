@@ -177,14 +177,17 @@ export function makeServer({ environment = "development" } = {}) {
         });
       });
       this.post("/login", () => ok({ authenticated: true, username: "Frontline Admin" }));
-      this.get("/get_own_user_permissions", () => {
-        const isViewer = getDemoRole() === "viewer";
-        return ok({
-          user_name: isViewer ? "Frontline Viewer" : "Frontline Admin",
-          is_superuser: !isViewer,
-          permissions: [],
-        });
-      });
+      this.get(
+        "/get_own_user_permissions",
+        trackProtectedRequest("/api/get_own_user_permissions", () => {
+          const isViewer = getDemoRole() === "viewer";
+          return ok({
+            user_name: isViewer ? "Frontline Viewer" : "Frontline Admin",
+            is_superuser: !isViewer,
+            permissions: [],
+          });
+        })
+      );
       this.get("/logout", () => ok(true));
 
       this.get(

@@ -100,7 +100,9 @@ test("stops protected polling after an expired session", async ({ page }) => {
     () => window.__CRCON_DEMO_PROTECTED_REQUESTS__ ?? []
   );
   expect(
-    protectedRequests.filter((path) => path === "/api/get_status")
+    protectedRequests.filter(
+      (path) => path === "/api/get_own_user_permissions"
+    )
   ).toHaveLength(1);
 });
 
