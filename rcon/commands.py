@@ -83,6 +83,9 @@ class ServerCtl:
         self.auto_retry = auto_retry
         self.mu = threading.Lock()
         self.conns: dict[int, HLLConnection] = {}
+        # Thread IDs can be reused after a worker has exited. Keep the owning
+        # Thread as well, so a new worker never inherits an old worker's socket.
+        self._connection_threads: dict[int, threading.Thread] = {}
         self._retry_gates: dict[str, CommandRetryGate] = {}
         self._retry_gates_mu = threading.Lock()
 
@@ -115,17 +118,72 @@ class ServerCtl:
         if gate is not None:
             gate.record_success()
 
+    def _publish_connection_pool_size_locked(self) -> None:
+        """Expose the current per-controller socket count when metrics allow it."""
+
+        publish = getattr(self.perf_stats, "set", None)
+        if callable(publish):
+            publish("connection_pool_size", len(self.conns))
+        logger.debug("RCON connection pool size=%d", len(self.conns))
+
+    def _close_connection_locked(self, thread_id: int, *, reason: str) -> bool:
+        """Remove and close one pooled connection while ``self.mu`` is held."""
+
+        conn = self.conns.pop(thread_id, None)
+        self._connection_threads.pop(thread_id, None)
+        if conn is None:
+            return False
+
+        try:
+            conn.close()
+        except Exception:
+            # A dead socket should not prevent other leaked sockets from being
+            # removed from the pool. It has already been detached above.
+            logger.exception(
+                "Unable to close RCON connection from thread %s during %s cleanup",
+                thread_id,
+                reason,
+            )
+        self.perf_stats.increment("connection_closed")
+        self.perf_stats.increment(f"connection_closed_{reason}")
+        self._publish_connection_pool_size_locked()
+        return True
+
+    def _cleanup_dead_thread_connections_locked(
+        self, current_thread: threading.Thread
+    ) -> int:
+        """Close sockets owned by workers that have already terminated."""
+
+        stale_thread_ids = [
+            thread_id
+            for thread_id, owner in self._connection_threads.items()
+            if owner is not current_thread and not owner.is_alive()
+        ]
+        for thread_id in stale_thread_ids:
+            self._close_connection_locked(thread_id, reason="dead_thread")
+        if stale_thread_ids:
+            logger.info(
+                "Cleaned up %d RCON connection(s) from terminated threads",
+                len(stale_thread_ids),
+            )
+        return len(stale_thread_ids)
+
     @contextmanager
     def with_connection(self) -> Generator[HLLConnection, None, None]:
-        # TODO: Cleanup connections from threads that no longer exist
-
         thread_id = threading.get_ident()
+        current_thread = threading.current_thread()
         logger.debug("Waiting to acquire lock %s", thread_id)
         if not self.mu.acquire(timeout=30):
             raise TimeoutError()
 
         try:
+            self._cleanup_dead_thread_connections_locked(current_thread)
             conn = self.conns.get(thread_id)
+            if conn is not None and self._connection_threads.get(thread_id) is not current_thread:
+                # Thread IDs are reusable, so do not let a replacement thread
+                # take ownership of a socket created by a former thread.
+                self._close_connection_locked(thread_id, reason="thread_id_reused")
+                conn = None
             if conn is None:
                 conn = HLLConnection()
                 try:
@@ -133,7 +191,9 @@ class ServerCtl:
                 except Exception:
                     raise
                 self.conns[thread_id] = conn
+                self._connection_threads[thread_id] = current_thread
                 self.perf_stats.increment("connection_established")
+                self._publish_connection_pool_size_locked()
             else:
                 self.perf_stats.increment("connection_from_pool")
         finally:
@@ -159,9 +219,7 @@ class ServerCtl:
                     raise TimeoutError()
 
                 try:
-                    conn.close()
-                    self.conns.pop(thread_id, None)
-                    self.perf_stats.increment("connection_closed")
+                    self._close_connection_locked(thread_id, reason="error")
                 finally:
                     self.mu.release()
 
@@ -178,9 +236,7 @@ class ServerCtl:
                     raise TimeoutError()
 
                 try:
-                    conn.close()
-                    self.conns.pop(thread_id, None)
-                    self.perf_stats.increment("connection_closed")
+                    self._close_connection_locked(thread_id, reason="broken")
                 finally:
                     self.mu.release()
 
