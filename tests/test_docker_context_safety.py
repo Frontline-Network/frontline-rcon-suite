@@ -16,3 +16,14 @@ def test_docker_context_excludes_runtime_secrets_and_backups():
         "static/",
         "supervisor_data/",
     } <= patterns
+
+
+def test_maintenance_receives_the_django_application_secret():
+    compose = Path("docker-compose-common-components.yaml").read_text(
+        encoding="utf-8"
+    )
+    maintenance = compose.split("  maintenance:", 1)[1].split(
+        "  # This is used to handle webhooks", 1
+    )[0]
+
+    assert "RCONWEB_API_SECRET: ${RCONWEB_API_SECRET}" in maintenance

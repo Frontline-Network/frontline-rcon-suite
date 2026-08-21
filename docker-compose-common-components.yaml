@@ -47,6 +47,9 @@ services:
     image: ${BACKEND_DOCKER_REPOSITORY}:${TAGGED_VERSION}
     environment:
       HLL_MAINTENANCE_CONTAINER: true
+      # Django management commands run during maintenance and require the
+      # same application secret as the web backends.
+      RCONWEB_API_SECRET: ${RCONWEB_API_SECRET}
       HLL_DB_USER: ${HLL_DB_USER}
       HLL_DB_PASSWORD: ${HLL_DB_PASSWORD}
       HLL_DB_NAME: ${HLL_DB_NAME}
