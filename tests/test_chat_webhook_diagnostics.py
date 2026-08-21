@@ -3,7 +3,7 @@ from unittest.mock import Mock
 import pydantic
 import pytest
 
-from rcon.discord import probe_chat_webhook, test_chat_webhook
+from rcon.discord import probe_chat_webhook, test_chat_webhook as send_test_chat_webhook
 from rcon.user_config.webhooks import ChatDiscordWebhook
 
 
@@ -58,7 +58,7 @@ def test_test_message_disables_all_mentions(monkeypatch):
     monkeypatch.setattr("rcon.discord.requests.post", post)
     monkeypatch.setattr("rcon.discord.get_redis_client", lambda: redis)
 
-    result = test_chat_webhook("https://discord.com/api/webhooks/123/token")
+    result = send_test_chat_webhook("https://discord.com/api/webhooks/123/token")
 
     assert result["status"] == "valid"
     assert result["test_message_delivered"] is True
