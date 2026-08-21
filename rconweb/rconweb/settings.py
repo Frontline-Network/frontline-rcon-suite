@@ -189,6 +189,7 @@ CSRF_COOKIE_DOMAIN = os.getenv("CSRF_COOKIE_DOMAIN") or None
 # Cross-origin browser clients must be listed explicitly above. Same-origin
 # requests do not need a CSRF trusted-origin exception.
 CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS.copy()
+CSRF_FAILURE_VIEW = "rconweb.csrf.csrf_failure"
 
 if DEBUG:
     # Chrome requires these to be set or it won't allow cookies to save between
