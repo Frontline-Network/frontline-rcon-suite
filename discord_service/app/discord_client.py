@@ -38,6 +38,86 @@ def _field_block(*values: str | None) -> str:
     return "\n".join(value for value in values if value) or "-"
 
 
+def _reporter_context_field(incident: dict, language: str) -> dict:
+    """Render the reporter snapshot when a chat report has no safe target.
+
+    A report without a resolved player is still actionable as a workflow item,
+    but it must not look as if CRCON failed to collect the live information.
+    Keep this deliberately separate from the moderation target: actions may
+    only be offered for an explicit target, while the reporter can still be
+    contacted through the existing reporter-message action.
+    """
+
+    context = incident.get("reporter_context") or {}
+    if not isinstance(context, dict):
+        context = {}
+    reporter_name = context.get("name") or incident.get("reporter_name") or "-"
+    reporter_id = context.get("player_id") or incident.get("reporter_id")
+    team = context.get("team")
+    unit_name = context.get("unit_name")
+    role = context.get("role")
+    level = context.get("level")
+    kills = context.get("kills")
+    deaths = context.get("deaths")
+    teamkills = context.get("teamkills")
+    playtime_seconds = context.get("map_playtime_seconds")
+    playtime_hours = (
+        float(playtime_seconds) / 3600
+        if isinstance(playtime_seconds, (int, float))
+        else None
+    )
+    labels = {
+        "de": {
+            "name": "Name",
+            "id": "ID",
+            "team": "Team",
+            "unit": "Einheit",
+            "role": "Rolle",
+            "level": "Level",
+            "combat": "Kills/Deaths",
+            "teamkills": "Teamkills",
+            "playtime": "Spielzeit",
+            "title": "👤 Kontext des Melders",
+        },
+        "en": {
+            "name": "Name",
+            "id": "ID",
+            "team": "Team",
+            "unit": "Unit",
+            "role": "Role",
+            "level": "Level",
+            "combat": "Kills/Deaths",
+            "teamkills": "Teamkills",
+            "playtime": "Playtime",
+            "title": "👤 Reporter context",
+        },
+    }.get(language, {})
+    details = [_metric(labels["name"], reporter_name)]
+    if reporter_id:
+        details.append(_metric(labels["id"], f"`{_truncate(reporter_id, 100)}`"))
+    details.extend(
+        [
+            _metric(labels["team"], _display_unit(team) if _present(team) else None),
+            _metric(
+                labels["unit"],
+                _display_unit(unit_name) if _present(unit_name) else None,
+            ),
+            _metric(labels["role"], role),
+            _metric(labels["level"], level),
+            _metric(
+                labels["combat"],
+                f"{kills}/{deaths}" if _present(kills) and _present(deaths) else None,
+            ),
+            _metric(labels["teamkills"], teamkills),
+            _metric(
+                labels["playtime"],
+                f"{playtime_hours:.1f} h" if playtime_hours is not None else None,
+            ),
+        ]
+    )
+    return {"name": labels["title"], "value": _field_block(*details), "inline": False}
+
+
 def _team_style(team: object, risk_score: float | None) -> tuple[str, int]:
     normalized = str(team or "").casefold()
     if "all" in normalized:
@@ -427,6 +507,8 @@ def render_message(
             "finish": "✅ Bearbeitung abschließen",
             "not_configured": "⚙️ Keine Moderatorrolle eingerichtet. Aktionen sind gesperrt.",
             "unavailable": "Nicht verfügbar",
+            "unresolved_target": "Kein eindeutiger Zielspieler",
+            "unresolved_target_note": "Kein eindeutiger Zielspieler erkannt. Moderationsaktionen sind gesperrt.",
         },
         "en": {
             "report_title": "Report for player: {name}",
@@ -441,21 +523,31 @@ def render_message(
             "finish": "✅ Finish processing",
             "not_configured": "⚙️ No moderator role configured. Actions are locked.",
             "unavailable": "Unavailable",
+            "unresolved_target": "No unambiguous reported player",
+            "unresolved_target_note": "No unambiguous reported player was found. Moderation actions are locked.",
         },
     }.get(language, {})
+    source = str(incident.get("source") or "manual")
+    targetless_report = (
+        source in {"chat", "manual"} and not primary and not incident.get("target_id")
+    )
     snapshot = primary.get("snapshot") or {}
     is_squad_report = primary.get("kind") == "squad"
     stat_snapshot = _squad_leader(snapshot) if is_squad_report else snapshot
     target_online = stat_snapshot.get("online") is not False
     team = primary.get("team") or snapshot.get("team")
     target_name = (
-        (
-            primary.get("leader_name") or stat_snapshot.get("name")
-            if is_squad_report
-            else primary.get("display_name")
+        labels["unresolved_target"]
+        if targetless_report
+        else (
+            (
+                primary.get("leader_name") or stat_snapshot.get("name")
+                if is_squad_report
+                else primary.get("display_name")
+            )
+            or incident.get("target_name")
+            or "-"
         )
-        or incident.get("target_name")
-        or "-"
     )
     player_id = (
         primary.get("player_id")
@@ -481,7 +573,6 @@ def render_message(
         else None
     )
     game_label = "HLL Vietnam" if envelope.game == "hll_vietnam" else "Hell Let Loose"
-    source = str(incident.get("source") or "manual")
     team_emoji, color = _team_style(team, analysis.risk_score if analysis else None)
     if source == "ai_player_name":
         team_emoji = "🔎"
@@ -489,7 +580,11 @@ def render_message(
     assigned_name = _assigned_display_name(incident.get("assigned_to"))
     if assigned_name and status in {"claimed", "resolved", "dismissed"}:
         color = 0x2ECC71
-    identity = f"👤 **{_truncate(target_name, 200)}**"
+    identity = (
+        f"⚠️ **{labels['unresolved_target_note']}**"
+        if targetless_report
+        else f"👤 **{_truncate(target_name, 200)}**"
+    )
     if is_squad_report and _present(stat_snapshot.get("level")):
         identity += f" (Lvl {stat_snapshot['level']})"
     if player_id:
@@ -510,7 +605,9 @@ def render_message(
                 "inline": False,
             }
         )
-        if is_squad_report:
+        if targetless_report:
+            fields.append(_reporter_context_field(incident, language))
+        elif is_squad_report:
             fields.extend(
                 [
                     {
