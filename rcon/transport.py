@@ -14,7 +14,11 @@ import time
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from rcon.connection import HLLBrokenConnectionError, HLLCommandError
+from rcon.connection import (
+    HLLBrokenConnectionError,
+    HLLCommandError,
+    HLLCommandFailedError,
+)
 
 
 class TransportErrorKind(StrEnum):
