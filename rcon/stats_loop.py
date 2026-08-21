@@ -5,11 +5,14 @@ import redis
 import redis.exceptions
 
 from rcon.cache_utils import get_redis_client
+from rcon.connection import HLLServerError
 from rcon.rcon import Rcon, get_rcon
 
 logger = getLogger(__name__)
 
 LOOP_FREQUENCY_SEC = 0.5
+MAX_RETRY_DELAY_SEC = 60
+EXPECTED_SNAPSHOT_ERRORS = (HLLServerError, OSError, TimeoutError, redis.exceptions.RedisError)
 
 
 class Series:
@@ -23,6 +26,7 @@ class Series:
         retention_days=60,
         max_fails=5,
         slices=None,
+        clock=None,
     ):
         self.client: redis.Redis = client or get_redis_client()
         self.slices = slices or {
@@ -35,6 +39,10 @@ class Series:
         self.last_run_time = 0
         self.fails = 0
         self.max_fails = max_fails
+        self.last_error: str | None = None
+        self.last_error_at: float | None = None
+        self.next_retry_at = 0.0
+        self._clock = clock or time.time
 
     def migrate(self):
         try:
@@ -80,19 +88,58 @@ class Series:
     def snapshot(self, rcon: Rcon):
         raise NotImplementedError
 
+    def health(self) -> dict[str, float | int | str | None | bool]:
+        """Return a lightweight health signal for monitoring and diagnostics."""
+        return {
+            "name": self.NAME,
+            "degraded": self.fails > 0,
+            "consecutive_failures": self.fails,
+            "last_error": self.last_error,
+            "last_error_at": self.last_error_at,
+            "next_retry_at": self.next_retry_at or None,
+            "last_success_at": self.last_run_time or None,
+        }
+
+    def _record_snapshot_failure(
+        self, error: Exception, now: float, *, expected: bool
+    ) -> None:
+        self.fails += 1
+        self.last_error = f"{type(error).__name__}: {error}"
+        self.last_error_at = now
+        retry_delay = min(MAX_RETRY_DELAY_SEC, 2 ** min(self.fails - 1, 6))
+        self.next_retry_at = now + retry_delay
+        message = (
+            "Timeseries snapshot %s failed (%s, consecutive=%s); retrying in %ss"
+        )
+        if expected:
+            logger.warning(message, self.NAME, self.last_error, self.fails, retry_delay)
+        else:
+            logger.exception(message, self.NAME, self.last_error, self.fails, retry_delay)
+
     def run_on_time(self, rcon):
-        now = time.time()
+        now = self._clock()
         if now - self.last_run_time <= self.min_resolution_ms:
+            return
+        if now < self.next_retry_at:
             return
         logger.debug("Taking snaphost for %s", self.NAME)
         try:
             self.snapshot(rcon)
-        except:
-            self.fails += 1
+        except EXPECTED_SNAPSHOT_ERRORS as error:
+            self._record_snapshot_failure(error, now, expected=True)
+            if self.fails > self.max_fails:
+                raise
+            return
+        except Exception as error:
+            self._record_snapshot_failure(error, now, expected=False)
             if self.fails > self.max_fails:
                 raise
             return
         self.last_run_time = now
+        self.fails = 0
+        self.last_error = None
+        self.last_error_at = None
+        self.next_retry_at = 0.0
         return now
 
 
