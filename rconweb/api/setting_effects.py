@@ -18,7 +18,9 @@ from rcon.user_config.auto_settings import AutoSettingsConfig
 from rcon.utils import get_server_number
 
 from .auth import api_response, login_required
-from .decorators import require_http_methods
+from .audit_log import record_audit
+from .decorators import permission_required, require_http_methods
+from .utils import _get_data
 
 logger = logging.getLogger("rconweb")
 
@@ -96,3 +98,53 @@ def get_general_setting_effects(request):
         command="get_general_setting_effects",
         failed=False,
     )
+
+
+def _apply_and_confirm(request, *, setting_key: str):
+    """Set a value and immediately read the authoritative game-server value."""
+    metadata = GENERAL_SETTING_EFFECTS[setting_key]
+    data = _get_data(request)
+    requested = int(data[metadata["value_parameter"]])
+    setter = getattr(rcon_api, metadata["setter"])
+    getter = getattr(rcon_api, metadata["getter"])
+
+    setter(requested)
+    observed = getter()
+    state = "confirmed" if observed == requested else "pending"
+    return api_response(
+        result={
+            "setting": setting_key,
+            "requested": requested,
+            "observed": observed,
+            "state": state,
+            "reconcile": (
+                "next_map_or_server_restart" if state == "pending" else None
+            ),
+        },
+        command=f"apply_{setting_key}",
+        failed=False,
+    )
+
+
+@csrf_exempt
+@login_required()
+@record_audit
+@permission_required(
+    {"api.can_change_queue_length", "api.can_view_queue_length"},
+    raise_exception=True,
+)
+@require_http_methods(["POST"])
+def apply_queue_length(request):
+    return _apply_and_confirm(request, setting_key="queue_length")
+
+
+@csrf_exempt
+@login_required()
+@record_audit
+@permission_required(
+    {"api.can_change_vip_slots", "api.can_view_vip_slots"},
+    raise_exception=True,
+)
+@require_http_methods(["POST"])
+def apply_vip_slots_num(request):
+    return _apply_and_confirm(request, setting_key="vip_slots_num")

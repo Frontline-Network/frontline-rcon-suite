@@ -989,6 +989,7 @@ const de = {
     recommendedValue: "FLN-Empfehlung",
     unsaved: "Der Wert im Formular wurde noch nicht an den Gameserver gesendet.",
     commandSent: "„{{name}}“ wurde an den Gameserver gesendet. Der wirksame Wert kann nicht automatisch bestätigt werden.",
+    pendingServerApply: "„{{name}}“ wurde gesendet, der Gameserver meldet noch einen abweichenden Wert. CRCON prüft ihn nach dem nächsten Kartenwechsel oder Serverneustart erneut.",
     unverified: "Das aktuelle Spielprotokoll bestätigt den tatsächlich wirksamen Wert nicht zuverlässig. Ein erfolgreicher Speichervorgang bestätigt deshalb nur, dass CRCON den Befehl gesendet hat.",
     games: "Im RCON-Protokoll: HLL und HLL Vietnam",
     appliesImmediately: "Befehl wirkt ohne CRCON-Neustart",

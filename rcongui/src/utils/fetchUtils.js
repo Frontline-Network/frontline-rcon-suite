@@ -143,6 +143,10 @@ async function parseJsonResponse(response) {
 }
 
 export const cmd = {
+  APPLY_QUEUE_LENGTH: (params) =>
+    requestFactory({ method: "POST", cmd: "apply_queue_length", ...params }),
+  APPLY_VIP_SLOTS_NUM: (params) =>
+    requestFactory({ method: "POST", cmd: "apply_vip_slots_num", ...params }),
   ADD_CONSOLE_ADMIN: (params) =>
     requestFactory({ method: "POST", cmd: "add_admin", ...params }),
   ADD_MAP_TO_VOTEMAP: (params) =>

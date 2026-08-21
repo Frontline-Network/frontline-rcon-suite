@@ -140,6 +140,8 @@ endpoints: list[tuple[str, Callable]] = [
     ("do_service", services.do_service),
     ("get_server_list", multi_servers.get_server_list),
     ("get_general_setting_effects", setting_effects.get_general_setting_effects),
+    ("apply_queue_length", setting_effects.apply_queue_length),
+    ("apply_vip_slots_num", setting_effects.apply_vip_slots_num),
     ("upload_vips", vips.upload_vips),
     ("upload_vips_result", vips.upload_vips_result),
     ("download_vips", vips.download_vips),

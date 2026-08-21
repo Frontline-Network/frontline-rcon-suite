@@ -315,9 +315,17 @@ export const SliderSetting = ({
   const { mutate, isPending } = useMutation({
     mutationFn: (value) =>
       mutationFn({ payload: { [payloadKey]: value }, throwRouteError: false }),
-    onSuccess: () => {
+    onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: [queryKey] });
-      toast.success(t("settingEffect.commandSent", { name: title }));
+      if (
+        (settingKey === GENERAL_KEY.queue_length ||
+          settingKey === GENERAL_KEY.vip_slots_num) &&
+        response?.result?.state === "pending"
+      ) {
+        toast.info(t("settingEffect.pendingServerApply", { name: title }));
+      } else {
+        toast.success(t("settingEffect.commandSent", { name: title }));
+      }
     },
     onError: (error) =>
       toast.error(
