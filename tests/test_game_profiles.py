@@ -14,6 +14,7 @@ from rcon.api_commands import (
 )
 from rcon.game import get_game_profile
 from rcon.game.hll.profile import HLL_PROFILE
+from rcon.game.hllv import legacy_layers
 from rcon.game.hllv.profile import HLLV_PROFILE
 from rcon.game.hllv.legacy_layers import (
     HLLV_LEGACY_CATALOG_VERSION,
@@ -105,20 +106,22 @@ def test_hllv_legacy_alias_migrates_to_canonical_executable_layer():
     assert layer.attackers is Team.AXIS
 
 
-def test_hllv_unknown_layers_emit_bounded_catalog_telemetry(caplog):
+def test_hllv_unknown_layers_emit_bounded_catalog_telemetry(monkeypatch):
     report_unknown_hllv_layer.cache_clear()
+    calls = []
+    monkeypatch.setattr(
+        legacy_layers.logger,
+        "warning",
+        lambda message, *args: calls.append(message % args),
+    )
 
     first = HLLV_PROFILE.parse_layer("future_hllv_layer")
     second = HLLV_PROFILE.parse_layer("future_hllv_layer")
 
     assert first.id == second.id == "future_hllv_layer"
-    warnings = [
-        record
-        for record in caplog.records
-        if "Unknown HLLV layer id" in record.getMessage()
-    ]
-    assert len(warnings) == 1
-    assert HLLV_LEGACY_CATALOG_VERSION in warnings[0].getMessage()
+    assert len(calls) == 1
+    assert "Unknown HLLV layer id" in calls[0]
+    assert HLLV_LEGACY_CATALOG_VERSION in calls[0]
 
 
 def test_hllv_profile_exposes_live_role_catalog():
