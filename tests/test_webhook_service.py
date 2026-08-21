@@ -9,6 +9,10 @@ from rcon.webhook_service import (
     DEAD_LETTER_QUEUE,
     DeadLetterWebhookMessage,
     EMPTY_DEQUEUE_COUNT,
+    RATE_LIMIT_LOCK_METRICS_TTL_SECS,
+    RATE_LIMIT_LOCK_WAIT_COUNT,
+    RATE_LIMIT_LOCK_WAIT_MS,
+    DiscordRateLimitData,
     WebhookMessage,
     WebhookMessageType,
     WebhookType,
@@ -18,9 +22,14 @@ from rcon.webhook_service import (
     get_queue_registry_key,
     handle_webhook_not_found,
     get_dead_letter_messages,
+    get_bucket_lock,
+    get_or_create_bucket_lock,
     move_to_dead_letter,
     retry_dead_letter_message,
+    record_bucket_lock_wait,
+    set_bucket_data,
 )
+from rcon import webhook_service
 
 
 def _message(message_type=WebhookMessageType.AUDIT):
@@ -40,6 +49,53 @@ def _message(message_type=WebhookMessageType.AUDIT):
 
 def test_queue_registry_is_installation_wide():
     assert get_queue_registry_key(prefix="whs") == "whs:queue_registry"
+
+
+def test_known_and_late_discovered_webhooks_share_one_bucket_lock():
+    webhook_service._RATE_LIMIT_BUCKETS.clear()
+    red = Mock()
+    red.get.return_value = None
+
+    _, first_lock = get_bucket_lock(red=red, bucket_id="discord-shared")
+    discovered_lock = get_or_create_bucket_lock(bucket_id="discord-shared")
+    set_bucket_data(
+        red=red,
+        bucket=DiscordRateLimitData(id="discord-shared"),
+        lock=discovered_lock,
+    )
+    _, late_lock = get_bucket_lock(red=red, bucket_id="discord-shared")
+
+    assert first_lock is discovered_lock is late_lock
+
+
+def test_contended_bucket_lock_wait_is_recorded_as_expiring_metrics():
+    red = Mock()
+    pipe = Mock()
+    red.pipeline.return_value = pipe
+
+    record_bucket_lock_wait(
+        red=red,
+        bucket_id="discord-shared",
+        wait_seconds=0.042,
+    )
+
+    pipe.hincrby.assert_any_call(RATE_LIMIT_LOCK_WAIT_MS, "discord-shared", 42)
+    pipe.hincrby.assert_any_call(RATE_LIMIT_LOCK_WAIT_COUNT, "discord-shared", 1)
+    pipe.expire.assert_any_call(
+        RATE_LIMIT_LOCK_WAIT_MS, RATE_LIMIT_LOCK_METRICS_TTL_SECS
+    )
+    pipe.expire.assert_any_call(
+        RATE_LIMIT_LOCK_WAIT_COUNT, RATE_LIMIT_LOCK_METRICS_TTL_SECS
+    )
+    pipe.execute.assert_called_once()
+
+
+def test_uncontended_bucket_lock_wait_does_not_write_metrics():
+    red = Mock()
+
+    record_bucket_lock_wait(red=red, bucket_id="discord-shared", wait_seconds=0)
+
+    red.pipeline.assert_not_called()
 
 
 def test_webhook_404_without_message_id_marks_error_and_purges_webhook_queue():
