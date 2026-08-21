@@ -22,6 +22,11 @@ Vertrag steht in `result`:
       "timer_controls": {
         "match_timer_modes": ["offensive", "warfare"],
         "warmup_timer_modes": ["warfare"]
+      },
+      "sector_layout": {
+        "read": true,
+        "set": true,
+        "remove": false
       }
     },
     "operations": {
@@ -43,6 +48,11 @@ Funktionsgruppen. Nicht aufgeführte historische Routen sind keine v1-Zusage.
 Für die Argumente, HTTP-Methoden und Berechtigungen der Legacy-Operationen
 liefert der in `interfaces.legacy_api.documentation_path` genannte Endpunkt
 `/api/get_api_documentation` die maschinenlesbare Bestandsdokumentation.
+
+`game.sector_layout` ist die spielprofilspezifische Matrix für die fünf
+Sektoren. HLL und HLLV können Layouts lesen und setzen. Das jeweilige
+protokoll bietet jedoch keine einzelne "Layout entfernen"-Operation; Clients
+dürfen daher bei `remove: false` keinen Reset- oder Entfernen-Button anzeigen.
 
 ## Beispielclient
 

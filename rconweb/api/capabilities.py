@@ -28,6 +28,7 @@ OPERATION_REQUIREMENTS = {
     "player_moderation": ("punish", "kick", "temp_ban", "perma_ban"),
     "map_rotation": ("get_map_rotation", "set_map_rotation"),
     "map_vote": ("get_votemap_status", "set_votemap_config"),
+    "sector_layout": ("get_objective_rows", "set_game_layout"),
     "auto_settings": (
         "get_auto_settings",
         "preview_auto_settings",
@@ -58,6 +59,7 @@ def build_capabilities(
                     game_mode.value for game_mode in profile.warmup_timer_modes
                 ),
             },
+            "sector_layout": profile.sector_layout.as_dict(),
         },
         "operations": {
             operation: {

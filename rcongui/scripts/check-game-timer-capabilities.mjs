@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import { resolveTimerSettings } from "../src/pages/settings/general-group/game/timer-capabilities.mjs";
+import { resolveSectorLayoutCapabilities } from "../src/pages/settings/maps/objectives/layout-capabilities.mjs";
 
 const check = (capability, actual, expected) => {
   try {
@@ -57,4 +58,28 @@ const defensive = resolveTimerSettings({
 check("unsupported HLLV match modes", Object.keys(defensive.match), ["warfare"]);
 check("unsupported HLLV warmup modes", defensive.warmup, {});
 
-console.log("Game timer capability contract passed for HLL and HLL Vietnam.");
+check(
+  "sector layout is supported by HLLV",
+  resolveSectorLayoutCapabilities({
+    game_capabilities: {
+      sector_layout: { read: true, set: true, remove: false },
+    },
+  }),
+  { read: true, set: true, remove: false }
+);
+check(
+  "explicitly unsupported sector layout stays unavailable",
+  resolveSectorLayoutCapabilities({
+    game_capabilities: {
+      sector_layout: { read: false, set: false, remove: false },
+    },
+  }),
+  { read: false, set: false, remove: false }
+);
+check(
+  "legacy sector layout fallback",
+  resolveSectorLayoutCapabilities({}),
+  { read: true, set: true, remove: false }
+);
+
+console.log("Game capability contract passed for HLL and HLL Vietnam.");
