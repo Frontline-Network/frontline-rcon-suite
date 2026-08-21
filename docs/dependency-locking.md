@@ -15,7 +15,11 @@ werden mit `--require-hashes` installiert. Die einzige Ausnahme ist
 `89ae25140b30a6747de70e5bf16bc5ba04a9b238` unveränderlich festgelegt; Git
 liefert für einen Checkout keinen von pip verwendbaren Distributions-Hash.
 
-## Installation
+## Python-Version und Installation
+
+Die Lockfiles gelten für Python 3.12, dieselbe Version, die der
+Backend-Workflow verwendet. Ein Lockfile darf nur mit dieser Python-Version
+regeneriert werden.
 
 Container und CI installieren zuerst die commit-fixierte VCS-Abhängigkeit ohne
 deren transitive Abhängigkeiten und danach das jeweilige Lockfile mit
@@ -36,8 +40,8 @@ angepasst. Danach beide Lockfiles in einer Python-3.12-Umgebung regenerieren,
 den Diff prüfen und die Tests ausführen:
 
 ```powershell
-uv pip compile --generate-hashes --output-file requirements.lock requirements.txt
-uv pip compile --generate-hashes --output-file requirements-dev.lock requirements.txt requirements-dev.txt
+uv pip compile --python 3.12 --generate-hashes --output-file requirements.lock requirements.txt
+uv pip compile --python 3.12 --generate-hashes --output-file requirements-dev.lock requirements.txt requirements-dev.txt
 python -m pip install --no-deps -r requirements-vcs.txt --no-compile
 python -m pip install --require-hashes --no-deps -r requirements-dev.lock --no-compile
 python -m pytest tests/
