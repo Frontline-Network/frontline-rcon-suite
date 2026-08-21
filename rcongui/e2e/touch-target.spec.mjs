@@ -27,7 +27,7 @@ test("the mobile app shell stays within a 320px viewport and keeps navigation av
   await page.setViewportSize(viewport);
   await openDemoPage(page, "/");
 
-  await expect(page.getByTestId("global-match-status")).toBeVisible();
+  await expect(page.getByTestId("global-match-status").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Navigation öffnen" })).toBeVisible();
   await expect
     .poll(() =>
