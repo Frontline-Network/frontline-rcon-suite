@@ -759,6 +759,59 @@ def test_targetless_report_does_not_offer_player_actions():
     }
 
 
+def test_targetless_report_shows_reporter_context_and_keeps_reporter_message():
+    event = _event()
+    event["incident"].update(
+        {
+            "discord_language": "de",
+            "target_id": None,
+            "target_name": None,
+            "primary_subject": None,
+            "reporter_id": "reporter-id",
+            "reporter_name": "Nils yaboy",
+            "reporter_context": {
+                "player_id": "reporter-id",
+                "name": "Nils yaboy",
+                "team": "axis",
+                "unit_name": "king",
+                "role": "heavymachinegunner",
+                "level": 20,
+                "kills": 8,
+                "deaths": 7,
+                "teamkills": 0,
+                "map_playtime_seconds": 1616,
+            },
+            "allowed_actions": ["message", "kick", "perma_ban"],
+            "discord_moderation_ready": True,
+        }
+    )
+
+    payload = render_message(IncidentEventEnvelope.model_validate(event), None)
+    embed = payload["embeds"][0]
+    assert "Kein eindeutiger Zielspieler" in embed["title"]
+    assert "Moderationsaktionen sind gesperrt" in embed["description"]
+    reporter_context = next(
+        field for field in embed["fields"] if field["name"] == "👤 Kontext des Melders"
+    )
+    assert "**Name:** Nils yaboy" in reporter_context["value"]
+    assert "**ID:** `reporter-id`" in reporter_context["value"]
+    assert "**Team:** Axis" in reporter_context["value"]
+    assert "**Einheit:** King" in reporter_context["value"]
+    assert "**Kills/Deaths:** 8/7" in reporter_context["value"]
+    assert "**Spielzeit:** 0.4 h" in reporter_context["value"]
+    custom_ids = [
+        component["custom_id"]
+        for row in payload["components"]
+        for component in row["components"]
+    ]
+    assert any(custom_id.endswith(":message_reporter") for custom_id in custom_ids)
+    assert not any(custom_id.endswith(":kick") for custom_id in custom_ids)
+    assert not any(custom_id.endswith(":perma_ban") for custom_id in custom_ids)
+    assert {"dismiss", "trash", "manual"}.issubset(
+        {custom_id.split(":", 1)[0] for custom_id in custom_ids}
+    )
+
+
 def test_claimed_report_uses_old_green_footer_and_manual_finish_button():
     event = _event()
     event["incident"].update(
