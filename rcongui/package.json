@@ -25,6 +25,7 @@
     "check:admin-actions": "node scripts/check-admin-action-contract.mjs",
     "check:operator-copy": "node scripts/check-operator-copy.mjs",
     "check:polling": "node scripts/check-polling-budget.mjs",
+    "check:teamkill-risk": "node scripts/check-teamkill-risk.mjs",
     "format:write": "prettier src/ --write",
     "lint": "eslint src/"
   },
