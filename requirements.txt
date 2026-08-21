@@ -23,7 +23,7 @@ pydantic==2.13.4
 cryptography==46.0.7
 discord.py==2.7.1
 pre-commit==4.6.2
-humanize==4.15.0
+humanize==4.16.0
 httpx==0.28.1
 psutil==7.2.2
 hllrcon==2.0.0.0
