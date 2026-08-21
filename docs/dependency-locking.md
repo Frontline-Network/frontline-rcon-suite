@@ -1,29 +1,31 @@
 # Reproduzierbare Python-Abhängigkeiten
 
 `requirements.txt` und `requirements-dev.txt` beschreiben die bewusst
-gewählten direkten Abhängigkeiten. Alle direkten PyPI-Abhängigkeiten müssen
-auf eine exakte Version festgelegt sein. Die vollständigen, transitiven
-Auflösungen werden versioniert:
+gewählten direkten PyPI-Abhängigkeiten. Alle müssen auf eine exakte Version
+festgelegt sein. Die vollständigen, transitiven Auflösungen werden versioniert:
 
 - `requirements.lock` für den Produktionscontainer
 - `requirements-dev.lock` für CI und Entwicklung (Produktion plus Test- und
   Formatierungswerkzeuge)
 
-Beide Dateien enthalten die verfügbaren SHA-256-Hashes der PyPI-Artefakte. Die
-einzige Ausnahme ist `discord-webhook`: Das Projekt benötigt weiterhin den
-Upstream-Fork. Er ist mit dem vollständigen Git-Commit
+Beide Dateien enthalten die verfügbaren SHA-256-Hashes der PyPI-Artefakte und
+werden mit `--require-hashes` installiert. Die einzige Ausnahme ist
+`requirements-vcs.txt`: Das Projekt benötigt weiterhin den Upstream-Fork
+`discord-webhook`. Er ist mit dem vollständigen Git-Commit
 `89ae25140b30a6747de70e5bf16bc5ba04a9b238` unveränderlich festgelegt; Git
 liefert für einen Checkout keinen von pip verwendbaren Distributions-Hash.
 
 ## Installation
 
-Container und CI installieren immer das jeweilige Lockfile mit `--no-deps`.
-Damit darf pip keine weitere Version auflösen; alle Pakete einschließlich der
-Transitiven stehen bereits im Lockfile. Bei Paketen mit `--hash` prüft pip das
-geladene Artefakt gegen die hinterlegte Hash-Liste.
+Container und CI installieren zuerst die commit-fixierte VCS-Abhängigkeit ohne
+deren transitive Abhängigkeiten und danach das jeweilige Lockfile mit
+`--require-hashes --no-deps`. Damit darf pip keine weitere Version auflösen;
+alle PyPI-Pakete einschließlich der Transitiven stehen bereits im Lockfile und
+jedes geladene Artefakt wird gegen die hinterlegte Hash-Liste geprüft.
 
 ```powershell
-python -m pip install --no-deps -r requirements-dev.lock --no-compile
+python -m pip install --no-deps -r requirements-vcs.txt --no-compile
+python -m pip install --require-hashes --no-deps -r requirements-dev.lock --no-compile
 ```
 
 ## Geplanter Abhängigkeits-Update
@@ -36,7 +38,8 @@ den Diff prüfen und die Tests ausführen:
 ```powershell
 uv pip compile --generate-hashes --output-file requirements.lock requirements.txt
 uv pip compile --generate-hashes --output-file requirements-dev.lock requirements.txt requirements-dev.txt
-python -m pip install --no-deps -r requirements-dev.lock --no-compile
+python -m pip install --no-deps -r requirements-vcs.txt --no-compile
+python -m pip install --require-hashes --no-deps -r requirements-dev.lock --no-compile
 python -m pytest tests/
 ```
 
