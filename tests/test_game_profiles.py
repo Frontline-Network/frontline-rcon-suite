@@ -15,6 +15,10 @@ from rcon.api_commands import (
 from rcon.game import get_game_profile
 from rcon.game.hll.profile import HLL_PROFILE
 from rcon.game.hllv.profile import HLLV_PROFILE
+from rcon.game.hllv.legacy_layers import (
+    HLLV_LEGACY_CATALOG_VERSION,
+    report_unknown_hllv_layer,
+)
 from rcon.maps import GameMode, Team, UNKNOWN_MAP_NAME
 from rcon.rcon import HLLRcon, HLLVRcon, Rcon, create_rcon
 from rcon.types import GameEnum, ServerInfo
@@ -81,6 +85,40 @@ def test_hllv_profile_loads_hllv_catalog_with_logical_sides():
     assert layer.map.allies.team is Team.ALLIES
     assert layer.map.axis.team is Team.AXIS
     assert layer.attackers is Team.AXIS
+
+
+def test_hllv_legacy_catalog_preserves_historical_layer_metadata():
+    layer = HLLV_PROFILE.parse_layer("wdevc_warfare_day")
+
+    assert layer.map.pretty_name == "Huế Outskirts"
+    assert layer.map.allies.name == "us"
+    assert layer.map.axis.name == "nva"
+    assert layer.game_mode is GameMode.WARFARE
+
+
+def test_hllv_legacy_alias_migrates_to_canonical_executable_layer():
+    layer = HLLV_PROFILE.parse_layer("hue_outskirts_offensive_nva")
+
+    assert layer.id == "wdevc_offensivenva_day"
+    assert layer.map.pretty_name == "Huế Outskirts"
+    assert layer.game_mode is GameMode.OFFENSIVE
+    assert layer.attackers is Team.AXIS
+
+
+def test_hllv_unknown_layers_emit_bounded_catalog_telemetry(caplog):
+    report_unknown_hllv_layer.cache_clear()
+
+    first = HLLV_PROFILE.parse_layer("future_hllv_layer")
+    second = HLLV_PROFILE.parse_layer("future_hllv_layer")
+
+    assert first.id == second.id == "future_hllv_layer"
+    warnings = [
+        record
+        for record in caplog.records
+        if "Unknown HLLV layer id" in record.getMessage()
+    ]
+    assert len(warnings) == 1
+    assert HLLV_LEGACY_CATALOG_VERSION in warnings[0].getMessage()
 
 
 def test_hllv_profile_exposes_live_role_catalog():

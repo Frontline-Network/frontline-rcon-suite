@@ -7,6 +7,12 @@ RCON command code or risking a lookup in the WW2 catalog.
 
 import hllrcon
 
+from rcon.game.hllv.legacy_layers import (
+    HLLV_LEGACY_LAYER_ALIASES,
+    HLLV_LEGACY_LAYERS,
+    HLLV_LEGACY_MAPS,
+    report_unknown_hllv_layer,
+)
 from rcon.maps import (
     UNKNOWN_MAP_NAME,
     Environment,
@@ -34,6 +40,9 @@ HLLV_MAPS: dict[str, Map] = {
 for map_data in hllrcon.HLLVMap.all():
     map_ = Map.from_hllrcon(map_data)
     HLLV_MAPS[map_.id.lower()] = map_
+# Retain the known launch catalogue even when a later hllrcon release removes
+# an obsolete live ID.  Historical rounds must not degrade to ``unknown``.
+HLLV_MAPS.update(HLLV_LEGACY_MAPS)
 
 HLLV_LAYERS: dict[str, Layer] = {
     UNKNOWN_MAP_NAME: Layer(
@@ -47,6 +56,7 @@ HLLV_LAYERS: dict[str, Layer] = {
 for layer_data in hllrcon.HLLVLayer.all():
     layer = Layer.from_hllrcon(layer_data, map_catalog=HLLV_MAPS)
     HLLV_LAYERS[layer.id] = layer
+HLLV_LAYERS.update(HLLV_LEGACY_LAYERS)
 
 def parse_layer(layer_name: str | Layer) -> Layer:
     if isinstance(layer_name, Layer):
@@ -54,9 +64,16 @@ def parse_layer(layer_name: str | Layer) -> Layer:
     if is_server_loading_map(layer_name):
         return HLLV_LAYERS[UNKNOWN_MAP_NAME]
 
-    layer = HLLV_LAYERS.get(layer_name.lower())
+    normalized_layer_name = layer_name.lower()
+    layer = HLLV_LAYERS.get(normalized_layer_name)
     if layer is not None:
         return layer
+
+    canonical_layer_id = HLLV_LEGACY_LAYER_ALIASES.get(normalized_layer_name)
+    if canonical_layer_id is not None:
+        return HLLV_LAYERS[canonical_layer_id]
+
+    report_unknown_hllv_layer(normalized_layer_name)
 
     game_mode = GameMode.DOMINATION
 
