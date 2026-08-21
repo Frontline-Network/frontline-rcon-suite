@@ -26,7 +26,9 @@ a wildcard for authenticated mobile API requests.
 
 `RCONWEB_API_SECRET` is mandatory outside the explicit test setting
 `RCONWEB_TEST_MODE=true`. Use a unique, randomly generated value with at least
-32 characters for every installation; CRCON now refuses to start without one.
+32 characters for every installation. Short legacy values remain temporarily
+compatible so an update does not cause an outage, but CRCON logs a warning and
+they should be rotated during planned maintenance.
 
 Credentialed browser origins must be explicit HTTPS origins in production. Do
 not derive them from hostnames and do not include paths, query strings or HTTP

@@ -23,10 +23,11 @@ def test_load_secret_requires_configured_value_outside_test_mode(monkeypatch):
     assert load_secret(test_mode=True) == "test-only-rconweb-secret-not-for-production"
 
 
-def test_load_secret_rejects_short_values(monkeypatch):
+def test_load_secret_accepts_legacy_short_values_with_a_warning(monkeypatch, caplog):
     monkeypatch.setenv("RCONWEB_API_SECRET", "too-short")
-    with pytest.raises(ValueError, match="at least 32"):
-        load_secret(test_mode=False)
+    assert load_secret(test_mode=False) == "too-short"
+    assert "shorter than 32 characters" in caplog.text
+    assert "too-short" not in caplog.text
 
 
 def test_normalize_cors_origin_requires_https_in_production():
