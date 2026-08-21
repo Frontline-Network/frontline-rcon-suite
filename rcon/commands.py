@@ -17,6 +17,7 @@ from rcon.connection import (
 from rcon.game import get_game_profile
 from rcon.maps import GameMode
 from rcon.perf_statistics import PerformanceStatistics
+from rcon.transport import CommandRetryGate, classify_transport_failure
 from rcon.types import (
     MapRotationResponse,
     MapSequenceResponse,
@@ -83,6 +84,37 @@ class ServerCtl:
         self.auto_retry = auto_retry
         self.mu = threading.Lock()
         self.conns: dict[int, HLLConnection] = {}
+        self._retry_gates: dict[str, CommandRetryGate] = {}
+        self._retry_gates_mu = threading.Lock()
+
+    def _retry_delay(self, command: str, error: BaseException) -> float | None:
+        """Reserve one safe retry, or return ``None`` for terminal failures."""
+        failure = classify_transport_failure(error)
+        if not failure.retryable:
+            logger.warning(
+                "RCON command %s failed with non-retryable %s error",
+                command,
+                failure.kind,
+            )
+            return None
+
+        with self._retry_gates_mu:
+            gate = self._retry_gates.setdefault(command, CommandRetryGate())
+        delay = gate.begin_retry()
+        logger.warning(
+            "RCON command %s failed with %s; retrying in %.2fs",
+            command,
+            failure.kind,
+            delay,
+        )
+        self.perf_stats.increment(f"transport_failure_{failure.kind}")
+        return delay
+
+    def _record_command_success(self, command: str) -> None:
+        with self._retry_gates_mu:
+            gate = self._retry_gates.get(command)
+        if gate is not None:
+            gate.record_success()
 
     @contextmanager
     def with_connection(self) -> Generator[HLLConnection, None, None]:
@@ -198,17 +230,14 @@ class ServerCtl:
             RuntimeError,
             UnicodeDecodeError,
             OSError,
-        ):
+        ) as error:
             if self.auto_retry is False or provided_conn is not None:
                 raise
 
-            logger.exception(
-                "Auto retrying send %s %s %s after 1 second",
-                command,
-                version,
-                content,
-            )
-            time.sleep(1)
+            retry_delay = self._retry_delay(command, error)
+            if retry_delay is None:
+                raise
+            time.sleep(retry_delay)
 
             with self.with_connection() as retry_conn:
                 return retry_conn.send(command, version, content)
@@ -221,6 +250,7 @@ class ServerCtl:
             response = handle.receive()
             self.perf_stats.increment("receive_size", len(response.content))
             response.raise_for_status()
+            self._record_command_success(handle.request.name)
             return response
 
         except (
@@ -234,16 +264,11 @@ class ServerCtl:
             if not self.auto_retry:
                 raise
 
-            if (
-                isinstance(e, HLLCommandError)
-                and e.status_code >= 400
-                and e.status_code < 500
-            ):
-                # Client error, do not retry
+            retry_delay = self._retry_delay(handle.request.name, e)
+            if retry_delay is None:
                 raise
 
-            logger.exception("Failed %s, resending after 1 second", handle.request)
-            time.sleep(1)
+            time.sleep(retry_delay)
 
             with self.with_connection() as conn:
                 response = conn.exchange(
@@ -253,6 +278,7 @@ class ServerCtl:
                 )
                 handle._response = response
                 response.raise_for_status()
+                self._record_command_success(handle.request.name)
                 return response
 
     def receive_optional(
@@ -263,7 +289,9 @@ class ServerCtl:
         try:
             response = handle.receive()
             self.perf_stats.increment("receive_size", len(response.content))
-            return response if response.is_successful() else None
+            result = response if response.is_successful() else None
+            self._record_command_success(handle.request.name)
+            return result
 
         except (
             HLLCommandFailedError,
@@ -276,14 +304,14 @@ class ServerCtl:
             if isinstance(e, HLLCommandError):
                 if ignore_internal_errors:
                     return None
-                if 400 <= e.status_code < 500:
-                    raise
 
             if not self.auto_retry:
                 raise
 
-            logger.exception("Failed %s, resending after 1 second", handle.request)
-            time.sleep(1)
+            retry_delay = self._retry_delay(handle.request.name, e)
+            if retry_delay is None:
+                raise
+            time.sleep(retry_delay)
 
             with self.with_connection() as conn:
                 response = conn.exchange(
@@ -294,7 +322,9 @@ class ServerCtl:
                 handle._response = response
 
                 try:
-                    return response if response.is_successful() else None
+                    result = response if response.is_successful() else None
+                    self._record_command_success(handle.request.name)
+                    return result
                 except HLLCommandError:
                     if ignore_internal_errors:
                         return None

@@ -346,7 +346,8 @@ def test_rcon_internal_error_retries_message_player_once(monkeypatch):
     monkeypatch.setattr("rcon.commands.time.sleep", sleep)
 
     assert controller.receive_success(handle) is True
-    sleep.assert_called_once_with(1)
+    sleep.assert_called_once()
+    assert 0 < sleep.call_args.args[0] <= 8
     retry_connection.exchange.assert_called_once_with(
         "MessagePlayer",
         2,
@@ -404,7 +405,10 @@ def test_broken_connection_retries_send_with_a_fresh_connection(monkeypatch):
     assert (
         controller.send("MessagePlayer", 2, {"PlayerId": "player-id"}) is retry_handle
     )
-    sleep.assert_called_once_with(1)
+    # Retries deliberately use a bounded jittered backoff so several CRCON
+    # workers do not reconnect to the game server in lockstep.
+    sleep.assert_called_once()
+    assert 0 < sleep.call_args.args[0] <= 1
     retry_connection.send.assert_called_once_with(
         "MessagePlayer", 2, {"PlayerId": "player-id"}
     )

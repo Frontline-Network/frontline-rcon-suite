@@ -100,6 +100,9 @@ class ResponseStatus(IntEnum):
     INTERNAL_ERROR = 500
     """An internal server error occurred."""
 
+    GATEWAY_TIMEOUT = 504
+    """The server or an upstream service timed out."""
+
 
 class Handle:
     def __init__(self, conn: "HLLConnection", request: "Request") -> None:
