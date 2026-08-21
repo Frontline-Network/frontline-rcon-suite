@@ -28,6 +28,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Emoji from "@/components/shared/Emoji";
 import { useThemedImages } from "@/hooks/useThemedImages";
 import { getPlatformIcon, getPlatformLabel, PLATFORMS } from "@/constants/platforms";
+import { getTeamkillRisk } from "@/utils/teamkill-risk.mjs";
 
 export const Square = styled(Box)(({ theme }) => ({
   display: "flex",
@@ -91,6 +92,58 @@ const getBanDetailText = (t, detail) => {
     name: detail.account?.name,
     list: detail.record?.blacklist?.name ?? "–",
   });
+};
+
+const TeamkillRisk = ({ value, t }) => {
+  const risk = getTeamkillRisk(value);
+  const levelLabel = t(`views.table.teamKillRisk.${risk.level}`);
+  const description = t("views.table.teamKillRisk.description", {
+    count: risk.count,
+    level: levelLabel,
+  });
+  const color =
+    risk.level === "high"
+      ? "error.main"
+      : risk.level === "caution"
+        ? "warning.main"
+        : "success.main";
+  const Icon = risk.level === "high" ? ErrorOutline : Warning;
+
+  return (
+    <Tooltip
+      arrow
+      title={
+        <Stack spacing={0.25}>
+          <Typography variant="caption" fontWeight="bold">
+            {description}
+          </Typography>
+          <Typography variant="caption">
+            {t("views.table.teamKillRisk.thresholds")}
+          </Typography>
+        </Stack>
+      }
+    >
+      <Box
+        aria-label={description}
+        sx={{
+          alignItems: "center",
+          color,
+          display: "inline-flex",
+          fontVariantNumeric: "tabular-nums",
+          fontWeight: 700,
+          gap: 0.25,
+          whiteSpace: "nowrap",
+        }}
+      >
+        {risk.level !== "none" ? (
+          <Icon aria-hidden="true" sx={{ fontSize: "1em" }} />
+        ) : null}
+        <Typography component="span" variant="caption" fontWeight="inherit">
+          {`${risk.count} ${levelLabel}`}
+        </Typography>
+      </Box>
+    </Tooltip>
+  );
 };
 
 export const getColumns = (t) => [
@@ -246,10 +299,12 @@ export const getColumns = (t) => [
   {
     id: "team_kills",
     header: SortableHeader("TK", t("views.table.teamKills")),
-    accessorKey: "team_kills",
+    accessorFn: (row) => getTeamkillRisk(row).count,
     cell: (props) => {
-      const value = props.getValue()
-      return value
+      return <TeamkillRisk value={props.getValue()} t={t} />;
+    },
+    meta: {
+      variant: "short",
     },
   },
   {

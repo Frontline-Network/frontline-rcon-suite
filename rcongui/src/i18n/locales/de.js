@@ -246,6 +246,13 @@ const de = {
       deaths: "Tode",
       killsPerMinute: "Kills pro Minute",
       teamKills: "Teamkills",
+      teamKillRisk: {
+        none: "OK",
+        caution: "PRÜFEN",
+        high: "HOCH",
+        description: "{{count}} Teamkills · Risiko: {{level}}",
+        thresholds: "Hinweis: ab 1 Teamkill prüfen, ab 3 Teamkills hohes Risiko.",
+      },
       vehicleKills: "Fahrzeug-Kills",
       vehiclesDestroyed: "Zerstörte Fahrzeuge",
       combat: "Kampfeffektivität",

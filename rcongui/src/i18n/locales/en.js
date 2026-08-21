@@ -229,6 +229,13 @@ const en = {
     table: {
       team: "Team", unit: "Unit", role: "Role", level: "Level", kills: "Kills", deaths: "Deaths",
       killsPerMinute: "Kills per minute", teamKills: "Team kills",
+      teamKillRisk: {
+        none: "OK",
+        caution: "REVIEW",
+        high: "HIGH",
+        description: "{{count}} team kills · Risk: {{level}}",
+        thresholds: "Guidance: review from 1 team kill; high risk from 3 team kills.",
+      },
       vehicleKills: "Vehicle kills", vehiclesDestroyed: "Vehicles destroyed",
       combat: "Combat effectiveness",
       offense: "Offensive effectiveness", defense: "Defensive effectiveness",
