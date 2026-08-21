@@ -94,7 +94,7 @@ def test_migrate_versions_changed_aggregation_without_deleting_history():
     )
     # The legacy destination is deliberately retained: Redis only aggregates
     # new samples after a rule is created, so deleting it would lose history.
-    assert ts.delete.assert_not_called()
+    ts.delete.assert_not_called()
 
 
 def test_migrate_reuses_existing_versioned_aggregation_after_restart():
