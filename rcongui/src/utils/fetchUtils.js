@@ -404,6 +404,10 @@ export const cmd = {
     }),
   GET_SERVICES: (params) =>
     requestFactory({ method: "GET", cmd: "get_services", ...params }),
+  GET_WEBHOOK_DEAD_LETTERS: (params) =>
+    requestFactory({ method: "GET", cmd: "get_webhook_dead_letters", ...params }),
+  RETRY_WEBHOOK_DEAD_LETTER: (params) =>
+    requestFactory({ method: "POST", cmd: "retry_webhook_dead_letter", ...params }),
   GET_SYSTEM_USAGE: (params) =>
     requestFactory({ method: "GET", cmd: "get_system_usage", ...params }),
   GET_VERSION: (params) =>
