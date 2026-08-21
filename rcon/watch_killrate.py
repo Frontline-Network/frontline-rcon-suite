@@ -140,6 +140,11 @@ ARMOR: dict[str, bool] = {
     "Bedford OYD (Supply)": True,
 }
 
+# Weapons in a specialized category are excluded from the base KPM.  Keep the
+# membership set at module scope: the watcher runs frequently and has no need
+# to rebuild the same union for every player.
+NOT_BASE_WEAPONS = frozenset(ARMOR) | frozenset(ARTILLERY) | frozenset(MGS)
+
 
 _LAST_REPORTED_CACHE: defaultdict[str, datetime | None] = defaultdict(lambda: None)
 
@@ -219,16 +224,34 @@ def make_embed(
     return embed
 
 
+def aggregate_weapon_kills(
+    used_weapons: Counter[str],
+) -> tuple[int, int, int, int]:
+    """Aggregate base, armor, artillery and MG kills in one weapon pass.
+
+    Categories intentionally use independent membership checks.  That keeps
+    the historical behavior if a future weapon is listed in more than one
+    specialized category while the base category remains their shared
+    complement.
+    """
+    base_kills = armor_kills = artillery_kills = mg_kills = 0
+    for weapon, kill_count in used_weapons.items():
+        if weapon not in NOT_BASE_WEAPONS:
+            base_kills += kill_count
+        if weapon in ARMOR:
+            armor_kills += kill_count
+        if weapon in ARTILLERY:
+            artillery_kills += kill_count
+        if weapon in MGS:
+            mg_kills += kill_count
+    return base_kills, armor_kills, artillery_kills, mg_kills
+
+
 def watch_killrate(
     api: RconAPI, config: WatchKillRateUserConfig, server_name: str
 ) -> None:
     """Observe all players and report them if they hit k/r thresholds"""
     player_stats: dict = current_game_stats()
-
-    # Allow us to check if a weapon is any of ARMOR or ARTILLERY or MGS
-    # so that we can track a base KPM rate that doesn't include any of these
-    # because we track those KPMs separately.
-    not_base_weapons: dict[str, bool] = {} | ARMOR | ARTILLERY | MGS
 
     if len(player_stats) < 2:
         logger.info("Fewer than 2 players, skipping")
@@ -290,77 +313,37 @@ def watch_killrate(
             timestamp = datetime.now()
             used_weapons = Counter(stats["weapons"])
 
-            # TODO: redo this section so we aren't looping over used_weapons 4 different times
-            # Recalculate the players KPM after filtering out any weapon that is tracked
-            # under a specific category (armor, artillery, mgs)
-            # So we can avoid triggerings when a specific category has a KPM > than the base rate
-            # For instance a killrate threshold of 2.0 and arilltery threshold of 4.0
+            # Recalculate the base and specialized KPMs without scanning the
+            # same weapons four times.  A specialized rate can exceed the
+            # base threshold without triggering a false base-rate report.
+            (
+                base_kills,
+                armor_kills,
+                artillery_kills,
+                mg_kills,
+            ) = aggregate_weapon_kills(used_weapons)
             filtered_kpm: float = round(
-                (
-                    (
-                        sum(
-                            kill_count
-                            for weapon, kill_count in used_weapons.items()
-                            if weapon not in not_base_weapons
-                        )
-                        / playtime_secs
-                        * 60
-                    )
-                ),
+                base_kills / playtime_secs * 60,
                 2,
             )
 
             # Armor
             armor_kpm: float = round(
-                (
-                    (
-                        sum(
-                            kill_count
-                            for weapon, kill_count in used_weapons.items()
-                            if weapon in ARMOR
-                        )
-                        / playtime_secs
-                        * 60
-                    )
-                    if not config.ignore_armor
-                    else 0.0
-                ),
+                armor_kills / playtime_secs * 60 if not config.ignore_armor else 0.0,
                 2,
             )
 
             # Artillery
             artillery_kpm: float = round(
-                (
-                    (
-                        sum(
-                            kill_count
-                            for weapon, kill_count in used_weapons.most_common()
-                            if weapon in ARTILLERY
-                        )
-                        / playtime_secs
-                        * 60
-                    )
-                    if not config.ignore_artillery
-                    else 0.0
-                ),
+                artillery_kills / playtime_secs * 60
+                if not config.ignore_artillery
+                else 0.0,
                 2,
             )
 
             # Machineguns
             mg_kpm: float = round(
-                (
-                    (
-                        sum(
-                            kill_count
-                            for weapon, kill_count in used_weapons.items()
-                            if weapon in MGS
-                        )
-                        / playtime_secs
-                        * 60
-                    )
-                    if not config.ignore_mg
-                    else 0.0
-                ),
+                mg_kills / playtime_secs * 60 if not config.ignore_mg else 0.0,
                 2,
             )
 
