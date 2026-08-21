@@ -1,5 +1,6 @@
 import { json } from "react-router-dom";
 import { toast } from "react-toastify";
+import { createHttpErrorToastBudget } from "./httpErrorToastBudget";
 
 // Vite does not define the legacy CRA environment variable in fake mode.
 // Keep legacy loader calls rooted at the local Mirage API instead of creating
@@ -14,6 +15,41 @@ const SESSION_RECOVERY_COMMANDS = new Set([
 ]);
 
 let sessionExpired = false;
+const HTTP_ERROR_TOAST_SUMMARY_ID = "crcon:http-error-summary";
+const httpErrorToastBudget = createHttpErrorToastBudget();
+
+// Intended for a diagnostics page/support bundle.  Return copies so callers
+// cannot mutate the bounded, privacy-safe in-memory history.
+export const getRecentHttpErrorDiagnostics = () =>
+  httpErrorToastBudget.diagnostics();
+
+const showBoundedHttpErrorToast = ({ signature, message, level = "error" }) => {
+  const result = httpErrorToastBudget.record(signature);
+  const toastId = `crcon:http-error:${signature}`;
+  const toastMethod = level === "warn" ? toast.warn : toast.error;
+  const toastType = level === "warn" ? "warning" : "error";
+  if (result.kind === "repeat") {
+    if (toast.isActive(toastId)) {
+      toast.update(toastId, {
+        render: `${message} (wiederholt: ${result.count}×)`,
+        type: toastType,
+      });
+    }
+    return;
+  }
+
+  if (result.kind === "new") {
+    toastMethod(message, { toastId });
+    return;
+  }
+
+  const summary = `Weitere technische Fehler werden gesammelt (${result.suppressed}). Öffne die Diagnoseansicht für Details.`;
+  if (toast.isActive(HTTP_ERROR_TOAST_SUMMARY_ID)) {
+    toast.update(HTTP_ERROR_TOAST_SUMMARY_ID, { render: summary, type: "warning" });
+  } else {
+    toast.warn(summary, { toastId: HTTP_ERROR_TOAST_SUMMARY_ID });
+  }
+};
 
 const isSessionRecoveryCommand = (command) =>
   SESSION_RECOVERY_COMMANDS.has(String(command ?? "").replace(/^\//, ""));
@@ -844,35 +880,38 @@ async function handle_response_status(response) {
 }
 
 async function handle_http_errors(error) {
-  // TODO: uncomment and limit amount of toasts
-  if (error.name === "AuthError") {
-    toast.warn("Please login!", {
-      toastId: "Must login",
-      position: toast.POSITION.BOTTOM_RIGHT,
+  const name = String(error?.name ?? "UnknownError");
+  const status = Number.isFinite(error?.status) ? error.status : "none";
+  const command = String(error?.command ?? "none").replace(/[^a-zA-Z0-9_/-]/g, "");
+
+  if (name === "AuthError") {
+    showBoundedHttpErrorToast({
+      signature: "auth",
+      message: "Please login!",
+      level: "warn",
     });
-  } else if (error.name === "PermissionError") {
-    toast.warn(`You are not allowed to use ${error.command}`, {
-      toastId: "Not allowed",
+  } else if (name === "PermissionError") {
+    showBoundedHttpErrorToast({
+      signature: `permission:${command || "unknown"}`,
+      message: `You are not allowed to use ${command || "this action"}`,
+      level: "warn",
     });
-  } else if (error.name === "InvalidLogin") {
-    toast.warn(
-      <img
-        src="https://media.giphy.com/media/wSSooF0fJM97W/giphy.gif"
-        alt="bad login"
-      />,
-      {
-        toastId: "Bad login",
-      }
-    );
-  } else if (error.name === "TypeError" || error.name === "SyntaxError") {
-    toast.error(
-      "Your RCON Api is not reachable. Check your config and start it again",
-      {
-        toastId: "Api down",
-      }
-    );
+  } else if (name === "InvalidLogin") {
+    showBoundedHttpErrorToast({
+      signature: "invalid-login",
+      message: "Login failed. Please check your credentials.",
+      level: "warn",
+    });
+  } else if (name === "TypeError" || name === "SyntaxError") {
+    showBoundedHttpErrorToast({
+      signature: "api-unreachable",
+      message: "Your RCON API is not reachable. Check your configuration and start it again.",
+    });
   } else {
-    toast.error("Unable to connect to API " + error);
+    showBoundedHttpErrorToast({
+      signature: `${name}:${status}:${command || "none"}`,
+      message: "Unable to complete the API request. Open the diagnostics view for details.",
+    });
   }
 }
 
