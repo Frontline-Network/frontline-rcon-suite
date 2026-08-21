@@ -1,5 +1,6 @@
 import enum
-from typing import Optional, TypedDict
+import logging
+from typing import ClassVar, Optional, TypedDict
 
 from pydantic import BaseModel, Field, HttpUrl, field_serializer, field_validator
 
@@ -119,6 +120,10 @@ class ScorebotConfigType(TypedDict):
 
 
 class ScorebotUserConfig(BaseUserConfig):
+    # Scorebot is a retired optional integration. A missing legacy record is a
+    # successful default/migration fallback, not an operator-facing error.
+    MISSING_CONFIG_LOG_LEVEL: ClassVar[int] = logging.INFO
+
     all_stats_text: str = Field(default=ALL_STATS)
     author_name_text: str = Field(default=AUTHOR_NAME)
     author_icon_url: str = Field(default=AUTHOR_ICON_URL)

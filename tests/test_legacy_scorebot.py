@@ -1,5 +1,8 @@
+import logging
+
 from rcon.types import PlayerStatsEnum
 from rcon.user_config.legacy_scorebot import ScorebotUserConfig
+from rcon.user_config import utils as user_config_utils
 
 
 def test_legacy_scorebot_stat_names_are_normalized():
@@ -32,3 +35,20 @@ def test_current_scorebot_stat_names_remain_unchanged():
         PlayerStatsEnum.KILLS,
         PlayerStatsEnum.TIME_SECONDS,
     ]
+
+
+def test_missing_legacy_scorebot_config_is_an_info_fallback(monkeypatch, caplog):
+    monkeypatch.setenv("HLL_DB_URL", "postgresql://example.invalid/crcon")
+    monkeypatch.setattr(user_config_utils, "get_user_config", lambda *_args, **_kwargs: None)
+
+    with caplog.at_level(logging.INFO):
+        config = ScorebotUserConfig.load_from_db()
+
+    assert config == ScorebotUserConfig()
+    matching_records = [
+        record
+        for record in caplog.records
+        if ScorebotUserConfig.KEY() in record.getMessage()
+    ]
+    assert matching_records
+    assert all(record.levelno < logging.ERROR for record in matching_records)
