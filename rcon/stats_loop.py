@@ -44,16 +44,54 @@ class Series:
         self.next_retry_at = 0.0
         self._clock = clock or time.time
 
+    @staticmethod
+    def _as_text(value) -> str:
+        return value.decode() if isinstance(value, bytes) else str(value)
+
+    def _source_rules(self) -> list[tuple[str, int, str]]:
+        """Normalize TS.INFO compaction rules across Redis client versions."""
+        info = self.client.ts().info(self.NAME)
+        rules = info.get("rules", []) if isinstance(info, dict) else info.rules
+        normalized = []
+        for rule in rules or []:
+            if isinstance(rule, dict):
+                destination = rule.get("destKey", rule.get("key"))
+                duration = rule.get("bucketDuration", rule.get("timeBucket"))
+                aggregation = rule.get("aggregationType", rule.get("aggregator"))
+            else:
+                destination, duration, aggregation, *_ = rule
+            normalized.append(
+                (
+                    self._as_text(destination),
+                    int(duration),
+                    self._as_text(aggregation).lower(),
+                )
+            )
+        return normalized
+
+    @staticmethod
+    def _versioned_rule_name(rule_name: str, aggregation: str, duration: int) -> str:
+        """Build a deterministic destination name for a changed aggregation."""
+        return f"{rule_name}__v_{aggregation.lower()}_{duration}"
+
+    def _create_aggregation_rule(
+        self, rule_name: str, aggregation: str, duration: int
+    ) -> None:
+        try:
+            self.client.ts().create(rule_name)
+        except redis.exceptions.ResponseError:
+            logger.debug("Aggregation destination already exists: %s", rule_name)
+        self.client.ts().createrule(self.NAME, rule_name, aggregation, duration)
+
     def migrate(self):
+        self.ts = self.client.ts()
         try:
             logger.debug(
                 "Creating timeseries %s with ms retention %s",
                 self.NAME,
                 self.retention_msecs,
             )
-            self.ts = self.client.ts().create(
-                self.NAME, retention_msecs=self.retention_msecs
-            )
+            self.ts.create(self.NAME, retention_msecs=self.retention_msecs)
         except redis.exceptions.ResponseError:
             logger.debug(
                 "Already exists. Updating timeseries %s with ms retention %s",
@@ -62,17 +100,53 @@ class Series:
             )
             self.ts.alter(self.NAME, retention_msecs=self.retention_msecs)
 
-        for rule_name, agg_method, time_resolution in self.slices.values():
-            logger.debug("Creating timeseries aggregation %s", rule_name)
-            try:
-                self.client.ts().create(rule_name)
-                self.client.ts().createrule(
-                    self.NAME, rule_name, agg_method, time_resolution
+        existing_rules = self._source_rules()
+        for slice_name, (rule_name, agg_method, time_resolution) in list(
+            self.slices.items()
+        ):
+            expected = (rule_name, time_resolution, agg_method.lower())
+            if expected in existing_rules:
+                continue
+
+            configured_rule = next(
+                (rule for rule in existing_rules if rule[0] == rule_name), None
+            )
+            if configured_rule is not None:
+                versioned_name = self._versioned_rule_name(
+                    rule_name, agg_method, time_resolution
                 )
-            except redis.exceptions.ResponseError:
-                logger.debug("Already exists timeseries aggregation %s", rule_name)
-                pass  # rule already exists
-                # TODO: Handle change
+                versioned_expected = (versioned_name, time_resolution, agg_method.lower())
+                self.slices[slice_name] = (
+                    versioned_name,
+                    agg_method,
+                    time_resolution,
+                )
+                if versioned_expected in existing_rules:
+                    logger.info(
+                        "Using existing migrated aggregation %s for legacy rule %s",
+                        versioned_name,
+                        rule_name,
+                    )
+                    continue
+                logger.warning(
+                    "Aggregation rule %s is %s/%sms, expected %s/%sms; "
+                    "creating versioned rule %s and retaining historical data",
+                    rule_name,
+                    configured_rule[2],
+                    configured_rule[1],
+                    agg_method,
+                    time_resolution,
+                    versioned_name,
+                )
+                self._create_aggregation_rule(
+                    versioned_name, agg_method, time_resolution
+                )
+                existing_rules.append(versioned_expected)
+                continue
+
+            logger.debug("Creating timeseries aggregation %s", rule_name)
+            self._create_aggregation_rule(rule_name, agg_method, time_resolution)
+            existing_rules.append(expected)
 
     def get_last(self):
         return self.client.get(self.NAME)
