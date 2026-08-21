@@ -14,7 +14,7 @@ def test_no_mentions():
     config = ChatWebhooksUserConfig(
         hooks=[
             DiscordMentionWebhook(
-                url=HttpUrl("http://example.com"),
+                url=HttpUrl("https://discord.com/api/webhooks/123/token"),
                 user_mentions=["<@1212>"],
                 role_mentions=[],
             )
@@ -38,7 +38,7 @@ def test_chat_mentions_are_escaped():
     config = ChatWebhooksUserConfig(
         hooks=[
             DiscordMentionWebhook(
-                url=HttpUrl("http://example.com"),
+                url=HttpUrl("https://discord.com/api/webhooks/123/token"),
                 user_mentions=["<@1212>"],
                 role_mentions=[],
             )
@@ -78,7 +78,7 @@ def test_mentions_are_not_escaped():
     config = ChatWebhooksUserConfig(
         hooks=[
             DiscordMentionWebhook(
-                url=HttpUrl("http://example.com"),
+                url=HttpUrl("https://discord.com/api/webhooks/123/token"),
                 user_mentions=["<@1212>"],
                 role_mentions=[],
             )

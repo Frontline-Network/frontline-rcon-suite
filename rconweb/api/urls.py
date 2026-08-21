@@ -233,6 +233,9 @@ endpoints: list[tuple[str, Callable]] = [
         "describe_chat_discord_webhooks_config",
         user_settings.describe_chat_discord_webhooks_config,
     ),
+    ("get_chat_webhook_diagnostics", user_settings.get_chat_webhook_diagnostics),
+    ("diagnose_chat_webhooks", user_settings.diagnose_chat_webhooks),
+    ("test_chat_webhooks", user_settings.test_chat_webhooks),
     (
         "describe_kills_discord_webhooks_config",
         user_settings.describe_kills_discord_webhooks_config,

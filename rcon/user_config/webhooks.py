@@ -7,6 +7,13 @@ from rcon.user_config.utils import BaseUserConfig, _listType, key_check, set_use
 
 DISCORD_USER_ID_PATTERN = re.compile(r"<@\d+>")
 DISCORD_ROLE_ID_PATTERN = re.compile(r"<@&\d+>")
+DISCORD_WEBHOOK_HOSTS = {
+    "discord.com",
+    "discordapp.com",
+    "canary.discord.com",
+    "ptb.discord.com",
+}
+DISCORD_WEBHOOK_PATH_PATTERN = re.compile(r"^/api/webhooks/[^/]+/[^/]+$")
 
 
 class WebhookMentionType(TypedDict):
@@ -46,6 +53,27 @@ class DiscordWebhook(pydantic.BaseModel):
     @pydantic.field_serializer("url")
     def serialize_url(self, server_url: pydantic.HttpUrl, _info):
         return str(server_url)
+
+
+class ChatDiscordWebhook(DiscordWebhook):
+
+    @pydantic.field_validator("url")
+    @classmethod
+    def validate_discord_webhook_url(
+        cls, url: pydantic.HttpUrl
+    ) -> pydantic.HttpUrl:
+        """Accept only canonical HTTPS Discord webhook URLs.
+
+        Webhook URLs carry a capability token. Limiting this configuration to
+        Discord's webhook endpoint both catches common copy/paste mistakes at
+        save time and prevents a configured webhook from becoming an arbitrary
+        outbound HTTP request target.
+        """
+        if url.scheme != "https" or url.host not in DISCORD_WEBHOOK_HOSTS:
+            raise ValueError("URL must use an official HTTPS Discord webhook host")
+        if not DISCORD_WEBHOOK_PATH_PATTERN.match(url.path or ""):
+            raise ValueError("URL must be a Discord /api/webhooks/<id>/<token> URL")
+        return url
 
 
 class DiscordMentionWebhook(DiscordWebhook):
@@ -182,6 +210,7 @@ class AdminPingWebhooksUserConfig(BaseMentionWebhookUserConfig):
 
 
 class ChatWebhooksUserConfig(BaseWebhookUserConfig):
+    hooks: list[ChatDiscordWebhook] = pydantic.Field(default_factory=list)
     allow_mentions: bool = pydantic.Field(default=False)
 
     @staticmethod
@@ -194,7 +223,7 @@ class ChatWebhooksUserConfig(BaseWebhookUserConfig):
                 WebhookType.__required_keys__, WebhookType.__optional_keys__, obj.keys()
             )
 
-        validated_hooks = [DiscordWebhook(url=obj.get("url")) for obj in raw_hooks]
+        validated_hooks = [ChatDiscordWebhook(url=obj.get("url")) for obj in raw_hooks]
         validated_conf = ChatWebhooksUserConfig(
             allow_mentions=values.get("allow_mentions"),
             hooks=validated_hooks,

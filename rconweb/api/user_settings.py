@@ -2,6 +2,11 @@ from logging import getLogger
 
 from django.views.decorators.csrf import csrf_exempt
 
+from rcon.discord import (
+    diagnose_chat_webhooks as diagnose_configured_chat_webhooks,
+    get_chat_webhook_diagnostics as read_chat_webhook_diagnostics,
+    test_chat_webhook as deliver_chat_webhook_test,
+)
 from rcon.user_config.auto_broadcast import AutoBroadcastUserConfig
 from rcon.user_config.auto_kick import AutoVoteKickUserConfig
 from rcon.user_config.auto_mod_level import AutoModLevelUserConfig
@@ -43,6 +48,7 @@ from rcon.user_config.webhooks import (
 )
 
 from .auth import api_response, login_required
+from .audit_log import record_audit
 from .decorators import permission_required, require_http_methods
 
 logger = getLogger(__name__)
@@ -399,6 +405,66 @@ def describe_chat_discord_webhooks_config(request):
 
     return api_response(
         result=ChatWebhooksUserConfig.model_json_schema(),
+        command=command_name,
+        failed=False,
+    )
+
+
+def _configured_chat_webhook_urls() -> list[str]:
+    return [
+        str(hook.url) for hook in ChatWebhooksUserConfig.load_from_db().hooks
+    ]
+
+
+@csrf_exempt
+@login_required()
+@permission_required(
+    "api.can_view_chat_discord_webhooks_config", raise_exception=True
+)
+@require_http_methods(["GET"])
+def get_chat_webhook_diagnostics(request):
+    """Return previously recorded safe webhook health without contacting Discord."""
+    command_name = "get_chat_webhook_diagnostics"
+    return api_response(
+        result=read_chat_webhook_diagnostics(_configured_chat_webhook_urls()),
+        command=command_name,
+        failed=False,
+    )
+
+
+@csrf_exempt
+@login_required()
+@record_audit
+@permission_required(
+    "api.can_change_chat_discord_webhooks_config", raise_exception=True
+)
+@require_http_methods(["POST"])
+def diagnose_chat_webhooks(request):
+    """Explicitly re-check configured webhook URLs without sending a message."""
+    command_name = "diagnose_chat_webhooks"
+    return api_response(
+        result=diagnose_configured_chat_webhooks(_configured_chat_webhook_urls()),
+        command=command_name,
+        failed=False,
+    )
+
+
+@csrf_exempt
+@login_required()
+@record_audit
+@permission_required(
+    "api.can_change_chat_discord_webhooks_config", raise_exception=True
+)
+@require_http_methods(["POST"])
+def test_chat_webhooks(request):
+    """Send one opt-in, non-mentioning diagnostic message per configured hook."""
+    command_name = "test_chat_webhooks"
+    urls = _configured_chat_webhook_urls()
+    return api_response(
+        result=[
+            {"index": index, **deliver_chat_webhook_test(url)}
+            for index, url in enumerate(urls)
+        ],
         command=command_name,
         failed=False,
     )
