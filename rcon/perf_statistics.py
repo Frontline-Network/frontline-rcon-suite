@@ -21,6 +21,13 @@ class PerformanceStatistics:
             return
         self.red.incr(self.metric_key(metric), value)
 
+    def set(self, metric: str, value: int) -> None:
+        """Publish a current gauge value alongside cumulative counters."""
+
+        if not self.enabled:
+            return
+        self.red.set(self.metric_key(metric), value)
+
     def dump(self) -> dict[str, int]:
         """
         Returns the current set of metrics collected for the configured namespace. This will also indicate the
