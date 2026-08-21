@@ -178,6 +178,7 @@ export const getDemoConnectionMode = () =>
 export const getDemoRole = () => readDemoParameter("demo_role") || "admin";
 
 export const isDemoAuthenticated = () => {
+  if (readDemoParameter("session_expired") === "1") return false;
   if (readDemoParameter("demo_auth") === "anonymous") return false;
 
   const returnTarget = readDemoParameter("from");
@@ -190,6 +191,10 @@ export const isDemoAuthenticated = () => {
     return true;
   }
 };
+
+export const isDemoSessionExpired = () =>
+  readDemoParameter("demo_auth") === "expired" &&
+  readDemoParameter("session_expired") !== "1";
 
 export const shouldFailDemoServerSettings = () =>
   readDemoParameter("demo_settings_error") === "1";

@@ -973,6 +973,7 @@ const en = {
     submit: "Sign in",
     submitting: "Authenticating...",
     invalid: "Invalid login credentials. Please try again.",
+    sessionExpired: "Your session has expired. Please sign in again.",
     unavailable: "The CRCON server application is not responding.",
     unknownError: "An unknown error occurred. Please check the browser network log and contact support.",
   },
