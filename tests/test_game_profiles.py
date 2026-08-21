@@ -57,6 +57,63 @@ def test_server_info_defaults_game_even_without_port():
 
 
 @pytest.mark.parametrize(
+    ("controller_type", "game"),
+    [
+        (HLLServerCtl, GameEnum.HLL_WW2),
+        (HLLVServerCtl, GameEnum.HLL_VIETNAM),
+    ],
+)
+def test_get_slots_keeps_plausible_counts_without_player_list_lookup(
+    controller_type, game
+):
+    controller = controller_type(ServerInfo(game=game), Mock())
+    controller.exchange = Mock(
+        return_value=_response({"playerCount": 42, "maxPlayerCount": 100})
+    )
+
+    assert controller.get_slots() == {
+        "current_players": 42,
+        "max_players": 100,
+    }
+    controller.exchange.assert_called_once_with(
+        "GetServerInformation", 2, {"Name": "session", "Value": ""}
+    )
+
+
+def test_get_slots_replaces_implausible_hll_count_with_connected_player_count(
+    caplog,
+):
+    controller = HLLServerCtl(ServerInfo(game=GameEnum.HLL_WW2), Mock())
+    controller.exchange = Mock(
+        side_effect=[
+            _response({"playerCount": 10031, "maxPlayerCount": 100}),
+            _response(
+                {
+                    "players": [
+                        {"name": "Player 1", "iD": "1"},
+                        {"name": "Player 2", "iD": "2"},
+                        {"name": "Player 3", "iD": "3"},
+                        {"name": "Player 4", "iD": "4"},
+                        {"name": "Player 5", "iD": "5"},
+                        {"name": "Player 6", "iD": "6"},
+                    ]
+                }
+            ),
+        ]
+    )
+
+    assert controller.get_slots() == {
+        "current_players": 6,
+        "max_players": 100,
+    }
+    assert controller.exchange.call_args_list == [
+        call("GetServerInformation", 2, {"Name": "session", "Value": ""}),
+        call("GetServerInformation", 2, {"Name": "players", "Value": ""}),
+    ]
+    assert "current=10031, max=100" in caplog.text
+
+
+@pytest.mark.parametrize(
     ("game", "expected"),
     [
         (GameEnum.HLL_WW2, HLL_PROFILE),
