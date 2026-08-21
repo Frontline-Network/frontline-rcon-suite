@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from urllib.parse import urlparse
+
+
+logger = logging.getLogger(__name__)
 
 
 def read_bool_env(name: str, default: bool = False) -> bool:
@@ -22,7 +26,11 @@ def read_bool_env(name: str, default: bool = False) -> bool:
 
 
 def load_secret(*, test_mode: bool) -> str:
-    """Return the configured secret or reject non-test startup without one."""
+    """Return the configured secret or reject non-test startup without one.
+
+    Existing deployments with a short legacy secret remain available during the
+    migration.  They receive a warning only; the secret itself is never logged.
+    """
 
     secret = os.getenv("RCONWEB_API_SECRET", "").strip()
     if not secret:
@@ -30,7 +38,11 @@ def load_secret(*, test_mode: bool) -> str:
             return "test-only-rconweb-secret-not-for-production"
         raise ValueError("RCONWEB_API_SECRET must be set for every non-test RCON deployment.")
     if len(secret) < 32:
-        raise ValueError("RCONWEB_API_SECRET must contain at least 32 characters.")
+        logger.warning(
+            "RCONWEB_API_SECRET is shorter than 32 characters; accepting this legacy "
+            "deployment value temporarily. Rotate it to a unique 32+ character secret "
+            "during planned maintenance."
+        )
     return secret
 
 
