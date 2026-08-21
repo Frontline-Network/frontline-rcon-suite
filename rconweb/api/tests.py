@@ -2,6 +2,7 @@ import json
 import os
 import sys
 from datetime import timedelta
+from inspect import unwrap
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from urllib.parse import parse_qs, urlparse
@@ -52,6 +53,55 @@ class SystemUsageApiTests(SimpleTestCase):
         self.assertEqual(payload["command"], "get_system_usage")
         self.assertEqual(payload["result"], sampler.get_snapshot.return_value)
         sampler.get_snapshot.assert_called_once_with(window_seconds=15 * 60)
+
+
+class LegacyStatsEndpointTests(SimpleTestCase):
+    def _request(self):
+        request = RequestFactory().get("/api/get_player_list")
+        request.user = SimpleNamespace(is_authenticated=False)
+        return request
+
+    @patch("api.legacy_stats.logger.info")
+    @patch("api.legacy_stats.cache.add", return_value=True)
+    def test_player_list_returns_actionable_retirement_response(self, cache_add, log):
+        from api.legacy_stats import get_player_list
+
+        response = unwrap(get_player_list)(self._request())
+
+        self.assertEqual(response.status_code, 410)
+        self.assertEqual(response["Deprecation"], "true")
+        self.assertEqual(
+            response["Link"],
+            '</api/get_detailed_players>; rel="successor-version"',
+        )
+        self.assertEqual(response["Retry-After"], "300")
+        payload = json.loads(response.content)
+        self.assertTrue(payload["failed"])
+        self.assertEqual(payload["result"]["successor"], "/api/get_detailed_players")
+        cache_add.assert_called_once()
+        log.assert_called_once()
+
+    @patch("api.legacy_stats.cache.add", return_value=False)
+    def test_scoreboard_does_not_log_repeated_client_probe(self, cache_add):
+        from api.legacy_stats import get_scoreboard
+
+        request = self._request()
+        request.path = "/api/get_scoreboard"
+        with patch("api.legacy_stats.logger.info") as log:
+            response = unwrap(get_scoreboard)(request)
+
+        self.assertEqual(response.status_code, 410)
+        payload = json.loads(response.content)
+        self.assertEqual(payload["result"]["successor"], "/api/get_live_scoreboard")
+        cache_add.assert_called_once()
+        log.assert_not_called()
+
+    def test_retired_stats_routes_are_in_api_documentation(self):
+        from api.urls import endpoints
+
+        routes = dict(endpoints)
+        self.assertIn("get_player_list", routes)
+        self.assertIn("get_scoreboard", routes)
 
 
 class SharedRuntimeServiceApiTests(SimpleTestCase):
