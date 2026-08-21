@@ -42,6 +42,52 @@ def validate_ttl_seconds(ttl_seconds: object, *, setting: str = "ttl_seconds") -
     return ttl_seconds
 
 
+def _clear_matching_cache_keys(red, match: str) -> int:
+    """Delete matching keys incrementally without materialising their values.
+
+    A large cache can contain hundreds of thousands of serialized request keys.
+    Keeping them in a Python list is both unnecessary and potentially exposes
+    request metadata in logs.  ``SCAN`` stays incremental while each bounded
+    batch is deleted immediately.
+    """
+
+    started_at = time.monotonic()
+    scanned = deleted = batches = 0
+    pending: list[str | bytes] = []
+
+    def flush_pending() -> None:
+        nonlocal deleted, batches
+        if not pending:
+            return
+        deleted += int(red.delete(*pending) or 0)
+        batches += 1
+        pending.clear()
+
+    try:
+        for key in red.scan_iter(match=match, count=REDIS_SCAN_COUNT):
+            pending.append(key)
+            scanned += 1
+            if len(pending) >= REDIS_SCAN_COUNT:
+                flush_pending()
+        flush_pending()
+    except redis.exceptions.RedisError:
+        logger.exception(
+            "Cache purge interrupted: scanned=%d deleted=%d batches=%d",
+            scanned,
+            deleted,
+            batches,
+        )
+    finally:
+        logger.info(
+            "Cache purge completed: scanned=%d deleted=%d batches=%d duration_ms=%d",
+            scanned,
+            deleted,
+            batches,
+            int((time.monotonic() - started_at) * 1000),
+        )
+    return deleted
+
+
 class RedisCached:
     PREFIX = "cached_"
 
@@ -74,15 +120,9 @@ class RedisCached:
         self.cache_falsy = cache_falsy
 
     @staticmethod
-    def clear_all_caches(pool) -> bool:
+    def clear_all_caches(pool) -> int:
         red = redis.Redis(connection_pool=pool)
-        keys = list(
-            red.scan_iter(match=f"{RedisCached.PREFIX}*", count=REDIS_SCAN_COUNT)
-        )
-        logger.warning("Wiping cached values %s", keys)
-        if not keys:
-            return 0
-        return red.delete(*keys)
+        return _clear_matching_cache_keys(red, f"{RedisCached.PREFIX}*")
 
     @property
     def key_prefix(self):
@@ -211,19 +251,8 @@ class RedisCached:
         except redis.exceptions.RedisError:
             logger.exception("Unable to clear cache key %s", key)
 
-    def clear_all(self):
-        try:
-            keys = list(
-                self.red.scan_iter(
-                    match=f"{self.key_prefix}*", count=REDIS_SCAN_COUNT
-                )
-            )
-            if keys:
-                self.red.delete(*keys)
-        except redis.exceptions.RedisError:
-            logger.exception("Unable to clear cache")
-        # else:
-        #   logger.debug("Cache CLEARED for %s", keys)
+    def clear_all(self) -> int:
+        return _clear_matching_cache_keys(self.red, f"{self.key_prefix}*")
 
 
 def construct_redis_url(db_number: int = 0) -> str:
