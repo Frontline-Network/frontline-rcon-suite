@@ -1,13 +1,17 @@
+import json
 import os
 import time
 from http.client import CannotSendRequest
 from logging import getLogger
 from xmlrpc.client import Fault, ServerProxy
 
+from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 
+from rcon.api_commands import get_rcon_api
 from rcon.discord import send_to_discord_audit
 from rcon.cache_utils import get_redis_client
+from rcon.support_diagnostics import build_support_diagnostics, preview_support_diagnostics
 from rcon.supervisor_runtime import (
     DEFAULT_SERVICES,
     RUNNING,
@@ -15,6 +19,9 @@ from rcon.supervisor_runtime import (
     STOPPED,
     decode_service_state,
 )
+from rcon.system_usage import system_usage_sampler
+from rcon.utils import get_server_number
+from rconweb.settings import TAG_VERSION
 
 from .audit_log import record_audit
 from .auth import api_response, login_required
@@ -95,6 +102,68 @@ def get_supervisor_client():
         supervisor_client = ServerProxy(url)
 
     return supervisor_client
+
+
+def _support_diagnostics_package():
+    """Assemble only allowlisted aggregate values for a support export."""
+
+    client = get_supervisor_client()
+    processes = _expand_shared_runtime(client.supervisor.getAllProcessInfo())
+    try:
+        game = get_rcon_api().config.game.value
+    except Exception:
+        logger.warning("Unable to determine the game profile for support diagnostics")
+        game = None
+
+    return build_support_diagnostics(
+        version=TAG_VERSION,
+        game=game,
+        server_number=int(get_server_number()),
+        system_usage=system_usage_sampler.get_snapshot(),
+        services=processes,
+        known_service_names=SHARED_SERVICE_NAMES | {
+            "frontline_runtime",
+            "log_stream",
+            "campaign_messages",
+            "auto_settings",
+            "automod",
+            "cron",
+            "expiring_vips",
+            "live_stats_refresh",
+            "autobalancer",
+            "blacklists",
+            "log_recorder",
+            "routines",
+        },
+    )
+
+
+@csrf_exempt
+@login_required()
+@permission_required("api.can_view_available_services", raise_exception=True)
+@require_http_methods(["GET"])
+def get_support_diagnostics_preview(request):
+    package = _support_diagnostics_package()
+    return api_response(
+        result=preview_support_diagnostics(package),
+        command="get_support_diagnostics_preview",
+        failed=False,
+    )
+
+
+@csrf_exempt
+@login_required()
+@permission_required("api.can_view_available_services", raise_exception=True)
+@require_http_methods(["GET"])
+def download_support_diagnostics(request):
+    package = _support_diagnostics_package()
+    response = HttpResponse(
+        json.dumps(package, separators=(",", ":"), ensure_ascii=False),
+        content_type="application/json; charset=utf-8",
+    )
+    response["Content-Disposition"] = "attachment; filename=frontline-rcon-support-diagnostics.json"
+    response["Cache-Control"] = "no-store"
+    return response
 
 
 @csrf_exempt
