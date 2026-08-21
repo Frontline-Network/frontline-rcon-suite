@@ -20,6 +20,36 @@ const expectInsideViewport = async (locator, viewport, label) => {
   ).toBeLessThanOrEqual(viewport.width);
 };
 
+test("the mobile app shell stays within a 320px viewport and keeps navigation available", async ({
+  page,
+}) => {
+  const viewport = { width: 320, height: 720 };
+  await page.setViewportSize(viewport);
+  await openDemoPage(page, "/");
+
+  await expect(page.getByTestId("global-match-status")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Navigation öffnen" })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+    )
+    .toBe(true);
+
+  await page.getByRole("button", { name: "Navigation öffnen" }).click();
+  const navigation = page.getByRole("navigation", {
+    name: "Hauptnavigation",
+  });
+  await expect(navigation).toBeVisible();
+  await expect(
+    navigation.getByRole("button", { name: "Spieler & Moderation" })
+  ).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+    )
+    .toBe(true);
+});
+
 test("important mobile navigation controls meet the 44px target size", async ({ page }) => {
   await page.setViewportSize(VIEWPORTS.mobile);
   await openDemoPage(page, "/");
