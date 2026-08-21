@@ -93,6 +93,32 @@ def test_debug_flag_uses_explicit_boolean_values_only():
     assert "DJANGO_DEBUG must be one of" in invalid.stderr
 
 
+def test_browser_session_cookie_is_not_readable_by_javascript():
+    command = (
+        "from rconweb import settings; "
+        "assert settings.SESSION_COOKIE_HTTPONLY is True; "
+        "print('SESSION_COOKIE_HTTPONLY=true')"
+    )
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "HLL_MAINTENANCE_CONTAINER": "true",
+            "RCONWEB_TEST_MODE": "true",
+        }
+    )
+    environment["PYTHONPATH"] = os.pathsep.join(
+        filter(None, (str(ROOT), environment.get("PYTHONPATH")))
+    )
+    verification = subprocess.run(
+        [sys.executable, "-c", command],
+        cwd=ROOT / "rconweb",
+        env=environment,
+        capture_output=True,
+        text=True,
+    )
+    assert verification.returncode == 0, verification.stderr
+
+
 def test_production_settings_require_a_non_default_secret():
     missing = _load_settings(
         {

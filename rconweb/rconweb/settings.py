@@ -178,7 +178,9 @@ CORS_ALLOW_CREDENTIALS = bool(CORS_ALLOWED_ORIGINS)
 
 CORS_ORIGIN_ALLOW_ALL = False
 # Application definition
-SESSION_COOKIE_HTTPONLY = False
+# The browser never needs to inspect the authenticated Django session.  The
+# CSRF cookie remains readable so the frontend can send it as a request header.
+SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_DOMAIN = os.getenv("SESSION_COOKIE_DOMAIN") or None
