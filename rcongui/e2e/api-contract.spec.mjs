@@ -9,6 +9,10 @@ import {
   GAME_STATE_POLLING,
   getGameStatePollingInterval,
 } from "../src/queries/polling-policy.js";
+import {
+  HTTP_ERROR_TOAST_WINDOW_MS,
+  createHttpErrorToastBudget,
+} from "../src/utils/httpErrorToastBudget.js";
 
 test.describe("game context API contract", () => {
   const hllVietnamAliases = ["hllv", "hll_vietnam", "vietnam", " HLL_VIETNAM "];
@@ -106,6 +110,47 @@ test.describe("connection-health API contract", () => {
         { state: CONNECTION_STATE.DISABLED }
       ).state
     ).toBe(CONNECTION_STATE.DISABLED);
+  });
+});
+
+test.describe("HTTP error toast budget", () => {
+  test("updates repeated errors and collapses a burst of distinct errors", () => {
+    const budget = createHttpErrorToastBudget();
+    const now = 1_000;
+
+    expect(budget.record("api-unreachable", now)).toEqual({
+      kind: "new",
+      count: 1,
+    });
+    expect(budget.record("api-unreachable", now + 1)).toEqual({
+      kind: "repeat",
+      count: 2,
+    });
+    expect(budget.record("permission:map", now + 2).kind).toBe("new");
+    expect(budget.record("auth", now + 3).kind).toBe("new");
+    expect(budget.record("api:500:command", now + 4)).toEqual({
+      kind: "suppressed",
+      suppressed: 1,
+    });
+    expect(budget.diagnostics()).toEqual([
+      expect.objectContaining({ signature: "api-unreachable", count: 2 }),
+      expect.objectContaining({ signature: "permission:map", count: 1 }),
+      expect.objectContaining({ signature: "auth", count: 1 }),
+      expect.objectContaining({ signature: "api:500:command", count: 1 }),
+    ]);
+  });
+
+  test("reopens the toast budget after the bounded error window", () => {
+    const budget = createHttpErrorToastBudget();
+    const now = 1_000;
+
+    for (const signature of ["one", "two", "three", "four"]) {
+      budget.record(signature, now);
+    }
+
+    expect(
+      budget.record("fresh", now + HTTP_ERROR_TOAST_WINDOW_MS + 1)
+    ).toEqual({ kind: "new", count: 1 });
   });
 });
 
