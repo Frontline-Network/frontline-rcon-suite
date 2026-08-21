@@ -2,6 +2,8 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock
 
+import orjson
+
 from rcon.webhook_service import (
     WebhookQueueKeyCache,
     DEAD_LETTER_QUEUE,
@@ -264,7 +266,9 @@ def test_expired_message_moves_to_dead_letter_without_contacting_discord(monkeyp
         update={"sent_at": datetime.now(tz=timezone.utc) - timedelta(hours=2)}
     )
     red = Mock()
-    red.lpop.return_value = message.model_dump_json().encode()
+    # Persistent webhook queues keep the Pydantic JSON string as a Redis JSON
+    # value, matching ``enqueue_message``.
+    red.lpop.return_value = orjson.dumps(message.model_dump_json())
     construct = Mock()
     monkeypatch.setattr("rcon.webhook_service.construct_webhook", construct)
 
