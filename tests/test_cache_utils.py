@@ -101,6 +101,53 @@ def test_cache_available():
         uncached_func.assert_not_called()
 
 
+def test_stale_cache_miss_returns_immediately_and_refreshes_once_in_background():
+    red = mock.Mock()
+    cached = RedisCached(
+        pool=None,
+        red=red,
+        ttl_seconds=60,
+        function=_needs_qual_name,
+        is_method=False,
+    )
+
+    def get_value(key):
+        return '"stale"' if str(key).endswith("__stale") else None
+
+    red.get.side_effect = get_value
+    red.set.side_effect = [True, False]
+
+    with (
+        mock.patch.object(cached, "_refresh_stale_in_background") as refresh,
+        mock.patch.object(cache_utils.time, "sleep", side_effect=AssertionError),
+    ):
+        assert cached() == "stale"
+        assert cached() == "stale"
+
+    refresh.assert_called_once()
+
+
+def test_cold_lock_contention_does_not_sleep_before_fallback_execution():
+    red = mock.Mock()
+    red.get.return_value = None
+    red.set.return_value = False
+    function = mock.Mock(return_value="fresh")
+    function.__name__ = "cold_refresh"
+    function.__qualname__ = "cold_refresh"
+    cached = RedisCached(
+        pool=None,
+        red=red,
+        ttl_seconds=60,
+        function=function,
+        is_method=False,
+    )
+
+    with mock.patch.object(cache_utils.time, "sleep", side_effect=AssertionError):
+        assert cached() == "fresh"
+
+    function.assert_called_once_with()
+
+
 def test_mem_cache_used(monkeypatch):
     monkeypatch.setenv("DEBUG", "True")
     # This is kind of janky but cachetools returns a decorated function not a class instance

@@ -2,6 +2,7 @@ import functools
 import logging
 import os
 import pickle
+import threading
 import time
 import uuid
 from contextlib import contextmanager
@@ -18,6 +19,8 @@ _REDIS_POOL = None
 # We use the redis database with db number 0 as a shared database amongst all the containers
 _GLOBAL_REDIS_POOL = None
 REDIS_SCAN_COUNT = 500
+STALE_CACHE_MIN_GRACE_SECONDS = 5
+STALE_CACHE_MAX_GRACE_SECONDS = 300
 
 
 def validate_ttl_seconds(ttl_seconds: object, *, setting: str = "ttl_seconds") -> int:
@@ -141,6 +144,23 @@ class RedisCached:
             return b"lock_" + key
         return f"lock_{key}"
 
+    def stale_key(self, key):
+        """Keep the stale value under the same clearable cache prefix."""
+
+        if isinstance(key, bytes):
+            return key + b"__stale"
+        return f"{key}__stale"
+
+    @property
+    def stale_ttl_seconds(self) -> int:
+        """Bound stale serving to a short grace period after fresh expiry."""
+
+        grace = max(
+            STALE_CACHE_MIN_GRACE_SECONDS,
+            min(STALE_CACHE_MAX_GRACE_SECONDS, self.ttl_seconds),
+        )
+        return self.ttl_seconds + grace
+
     @property
     def __name__(self):
         return self.function.__name__
@@ -163,8 +183,50 @@ class RedisCached:
         except redis.exceptions.RedisError:
             logger.exception("Unable to release cache refresh lock")
 
+    def _store_cached_value(self, key, value) -> None:
+        serialized = self.serializer(value)
+        self.red.setex(key, self.ttl_seconds, serialized)
+        self.red.setex(self.stale_key(key), self.stale_ttl_seconds, serialized)
+
+    def _refresh_cached_value(self, func, key):
+        value = func()
+        if not value and not self.cache_falsy:
+            logger.debug("Caching falsy result is disabled for %s", self.__name__)
+            return value
+        try:
+            self._store_cached_value(key, value)
+        except redis.exceptions.RedisError:
+            # The RCON call succeeded, so continue serving its result even if
+            # Redis disappears between the read and the write.
+            logger.exception("Unable to set cache")
+        return value
+
+    def _refresh_stale_in_background(self, func, key, lock_key, lock_token) -> None:
+        """Refresh a stale key without holding the request thread open."""
+
+        def refresh() -> None:
+            try:
+                self._refresh_cached_value(func, key)
+            except Exception:
+                logger.exception("Unable to refresh stale cache value")
+            finally:
+                self._release_lock(lock_key, lock_token)
+
+        worker = threading.Thread(
+            target=refresh,
+            name=f"cache-refresh-{self.__name__}",
+            daemon=True,
+        )
+        try:
+            worker.start()
+        except RuntimeError:
+            # Do not leave an NX lock behind when process shutdown prevents
+            # starting the refresh thread. The stale value remains usable.
+            logger.exception("Unable to start stale cache refresh")
+            self._release_lock(lock_key, lock_token)
+
     def __call__(self, *args, **kwargs):
-        val = None
+        val = stale_val = None
         key = self.key(*args, **kwargs)
         lock_key = self.lock_key(key)
         lock_token = str(uuid.uuid4())
@@ -188,6 +250,11 @@ class RedisCached:
         if not cache_available:
             return func(*args, **kwargs)
 
+        try:
+            stale_val = self.red.get(self.stale_key(key))
+        except redis.exceptions.RedisError:
+            logger.exception("Unable to use stale cache value")
+
         # logger.debug("Cache MISS for %s", self.key(*args, **kwargs))
         try:
             lock_acquired = bool(
@@ -202,30 +269,21 @@ class RedisCached:
             logger.exception("Unable to acquire cache refresh lock")
             refresh_without_lock = True
 
+        if stale_val is not None:
+            if lock_acquired:
+                self._refresh_stale_in_background(
+                    lambda: func(*args, **kwargs), key, lock_key, lock_token
+                )
+            return self.deserializer(stale_val)
+
         if not lock_acquired and not refresh_without_lock:
-            deadline = time.monotonic() + max(0.25, min(5, self.ttl_seconds))
-            while time.monotonic() < deadline:
-                time.sleep(0.05)
-                try:
-                    val = self.red.get(key)
-                except redis.exceptions.RedisError:
-                    logger.exception("Unable to use cache while waiting for refresh")
-                    break
-                if val is not None:
-                    return self.deserializer(val)
+            # A cold cache has no safe stale result to return. Do not sleep in
+            # a request worker: retain availability while the lock owner
+            # refreshes. Warm cache misses use stale-while-revalidate above.
+            logger.debug("Cold cache refresh already in progress for %s", self.__name__)
 
         try:
-            val = func(*args, **kwargs)
-
-            if not val and not self.cache_falsy:
-                logger.debug("Caching falsy result is disabled for %s", self.__name__)
-                return val
-
-            try:
-                self.red.setex(key, self.ttl_seconds, self.serializer(val))
-                # logger.debug("Cache SET for %s", self.key(*args, **kwargs))
-            except redis.exceptions.RedisError:
-                logger.exception("Unable to set cache")
+            val = self._refresh_cached_value(lambda: func(*args, **kwargs), key)
         finally:
             if lock_acquired:
                 self._release_lock(lock_key, lock_token)
@@ -247,7 +305,7 @@ class RedisCached:
         logger.debug("Invalidating cache for %s", key)
         try:
             if key:
-                self.red.delete(key)
+                self.red.delete(key, self.stale_key(key))
         except redis.exceptions.RedisError:
             logger.exception("Unable to clear cache key %s", key)
 
