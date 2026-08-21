@@ -59,7 +59,7 @@ function GeneralSettings() {
           subheader={t("settings.general.cards.queueLength.subtitle")}
           icon={QueueIcon}
           queryKey={{ queryIdentifier: "get_server_settings" }}
-          mutationFn={cmd.SET_QUEUE_LENGTH}
+          mutationFn={cmd.APPLY_QUEUE_LENGTH}
           initialData={loaderData.settings}
         />
 
@@ -70,7 +70,7 @@ function GeneralSettings() {
           subheader={t("settings.general.cards.vipSlots.subtitle")}
           icon={StarIcon}
           queryKey={{ queryIdentifier: "get_server_settings" }}
-          mutationFn={cmd.SET_VIP_SLOTS_NUM}
+          mutationFn={cmd.APPLY_VIP_SLOTS_NUM}
           initialData={loaderData.settings}
         />
 

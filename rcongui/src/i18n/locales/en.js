@@ -927,6 +927,7 @@ const en = {
     recommendedValue: "FLN recommendation",
     unsaved: "The value in the form has not been sent to the game server yet.",
     commandSent: "{{name}} was sent to the game server. The effective value cannot be confirmed automatically.",
+    pendingServerApply: "{{name}} was sent, but the game server still reports a different value. CRCON will reconcile it after the next map change or server restart.",
     unverified: "The current game protocol does not reliably confirm the value that is actually effective. A successful save therefore only confirms that CRCON sent the command.",
     games: "In the RCON protocol: HLL and HLL Vietnam",
     appliesImmediately: "Command applies without a CRCON restart",
