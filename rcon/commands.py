@@ -529,9 +529,36 @@ class ServerCtl:
             "GetServerInformation", 2, {"Name": "session", "Value": ""}
         ).content_dict
 
+        current_players = int(resp["playerCount"])
+        max_players = int(resp["maxPlayerCount"])
+
+        if max_players < 0:
+            raise HLLCommandFailedError(
+                f"Game server returned an invalid maximum player count: {max_players}"
+            )
+
+        if current_players < 0 or current_players > max_players:
+            raw_players = self.exchange(
+                "GetServerInformation", 2, {"Name": "players", "Value": ""}
+            ).content_dict["players"]
+            corrected_player_count = len(raw_players)
+            if corrected_player_count > max_players:
+                raise HLLCommandFailedError(
+                    "Game server returned inconsistent slot and player-list counts "
+                    f"(players={corrected_player_count}, max={max_players})"
+                )
+            logger.warning(
+                "Game server returned implausible slot counts "
+                "(current=%s, max=%s); using %s connected players instead",
+                current_players,
+                max_players,
+                corrected_player_count,
+            )
+            current_players = corrected_player_count
+
         return SlotsType(
-            current_players=resp["playerCount"],
-            max_players=resp["maxPlayerCount"],
+            current_players=current_players,
+            max_players=max_players,
         )
 
     def get_vip_ids(self) -> list[VipId]:
