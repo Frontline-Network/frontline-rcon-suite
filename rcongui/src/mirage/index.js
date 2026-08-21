@@ -170,6 +170,13 @@ export function makeServer({ environment = "development" } = {}) {
 
       // A complete, deterministic shell for visual development and demos.
       this.get("/is_logged_in", () => {
+        if (isDemoSessionExpired()) {
+          return new Response(
+            401,
+            { "Content-Type": "application/json" },
+            JSON.stringify({ error: "Session expired" })
+          );
+        }
         const authenticated = isDemoAuthenticated();
         return ok({
           authenticated,

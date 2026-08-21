@@ -10,7 +10,6 @@ const CRCON_API =
 const SESSION_EXPIRY_EVENT = "crcon:session-expired";
 const SESSION_RECOVERY_COMMANDS = new Set([
   "login",
-  "is_logged_in",
   "logout",
 ]);
 
