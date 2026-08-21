@@ -1,10 +1,13 @@
+import asyncio
 from unittest.mock import Mock
 
 from rcon.webhook_service import (
     WebhookQueueKeyCache,
+    EMPTY_DEQUEUE_COUNT,
     WebhookMessage,
     WebhookMessageType,
     WebhookType,
+    dequeue_message,
     enqueue_message,
     enqueue_transient_message,
     get_queue_registry_key,
@@ -127,7 +130,7 @@ def test_webhook_queue_key_cache_filters_queues_deleted_between_scans():
         b"whs:transient_identifier:1",
     }
     red.llen.side_effect = [1, 0]
-    red.exists.side_effect = [1, 0]
+    red.exists.side_effect = [1, 0, 0]
     cache = WebhookQueueKeyCache(red=red, refresh_interval_secs=1.0)
 
     assert cache.get_not_empty(now=10.0) == [
@@ -137,6 +140,23 @@ def test_webhook_queue_key_cache_filters_queues_deleted_between_scans():
     assert cache.get_not_empty(now=10.5) == []
     red.scan_iter.assert_not_called()
     red.srem.assert_called_once()
+
+
+def test_dequeue_lpop_race_is_counted_without_json_error():
+    red = Mock()
+    red.lpop.return_value = None
+
+    asyncio.run(
+        dequeue_message(
+            red=red,
+            client=Mock(),
+            queue_id="whs:1:discord:audit:123",
+            bucket_data=None,
+            lock=asyncio.Lock(),
+        )
+    )
+
+    red.incr.assert_called_once_with(EMPTY_DEQUEUE_COUNT)
 
 
 def test_webhook_registry_imports_legacy_queues_once():

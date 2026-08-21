@@ -104,6 +104,7 @@ except (ValueError, TypeError):
 QUEUE_KEY_REFRESH_INTERVAL_SECS = 1.0
 QUEUE_REGISTRY_SUFFIX = "queue_registry"
 QUEUE_REGISTRY_SENTINEL = "__initialized__"
+EMPTY_DEQUEUE_COUNT = f"{PREFIX}:metrics:empty_dequeues"
 
 # Global datastructures to support associating hooks with locks
 _RATE_LIMIT_BUCKETS: defaultdict[str, asyncio.Lock | None] = defaultdict(lambda: None)
@@ -611,6 +612,24 @@ def unpack_message(raw_message: bytes) -> WebhookMessage:
     return message
 
 
+def record_empty_dequeue(red: redis.StrictRedis, queue_id: str) -> None:
+    """Record a harmless dequeue race without trying to parse ``None`` as JSON."""
+
+    red.incr(EMPTY_DEQUEUE_COUNT)
+    logger.debug("Skipping empty webhook dequeue from %s", queue_id)
+
+
+def get_empty_dequeue_count(red: redis.StrictRedis) -> int:
+    """Return the installation-wide count of dequeue races skipped safely."""
+
+    raw_count = red.get(EMPTY_DEQUEUE_COUNT)
+    try:
+        return int(raw_count or 0)
+    except (TypeError, ValueError):
+        logger.warning("Invalid empty-dequeue metric value: %r", raw_count)
+        return 0
+
+
 async def dequeue_message(
     red: redis.StrictRedis,
     client: httpx.AsyncClient,
@@ -636,7 +655,7 @@ async def dequeue_message(
         if TRANSIENT_IDENTIFIER in queue_id:
             # Old style messages may still be in the redis queue and we can't GET those
             try:
-                raw_message: bytes = red.getdel(queue_id)  # type: ignore
+                raw_message: bytes | None = red.getdel(queue_id)  # type: ignore
                 # If we don't get a message at all; return
                 if raw_message is None:
                     return
@@ -647,9 +666,14 @@ async def dequeue_message(
                 red.lpop(queue_id)
                 return
         else:
-            raw_message: bytes = red.lpop(queue_id)  # type: ignore
+            raw_message: bytes | None = red.lpop(queue_id)  # type: ignore
 
-        # If we somehow get a `None` message; log it and return gracefully
+        # Another worker may consume the final list item after discovery but
+        # before this LPOP.  That is an expected Redis race, not malformed JSON.
+        if raw_message is None:
+            record_empty_dequeue(red=red, queue_id=queue_id)
+            return
+
         try:
             message = unpack_message(raw_message=raw_message)
         except orjson.JSONDecodeError as e:
@@ -955,9 +979,15 @@ class WebhookQueueKeyCache:
             )
             self.next_refresh_at = now + self.refresh_interval_secs
 
-        populated_queues = [
-            queue_id for queue_id in self.queue_ids if self.red.llen(queue_id) > 0
-        ]
+        populated_queues: list[str] = []
+        orphaned_queues: list[str] = []
+        for queue_id in self.queue_ids:
+            if self.red.llen(queue_id) > 0:
+                populated_queues.append(queue_id)
+            elif not self.red.exists(queue_id):
+                # A deleted list stays in the registry until we remove it. Do
+                # not remove merely empty lists: producers reuse them.
+                orphaned_queues.append(queue_id)
         populated_transient_messages = [
             queue_id
             for queue_id in self.transient_message_keys
@@ -966,11 +996,19 @@ class WebhookQueueKeyCache:
         expired_transient_messages = set(self.transient_message_keys).difference(
             populated_transient_messages
         )
-        if expired_transient_messages:
+        expired_registry_entries = (*orphaned_queues, *expired_transient_messages)
+        if expired_registry_entries:
             self.red.srem(
                 get_queue_registry_key(prefix=self.prefix),
-                *expired_transient_messages,
+                *expired_registry_entries,
             )
+        if orphaned_queues:
+            self.queue_ids = tuple(
+                queue_id
+                for queue_id in self.queue_ids
+                if queue_id not in orphaned_queues
+            )
+        if expired_transient_messages:
             self.transient_message_keys = tuple(populated_transient_messages)
         return populated_queues + populated_transient_messages
 
@@ -1058,6 +1096,7 @@ def webhook_service_summary(red: redis.StrictRedis | None = None):
 
     data["is_globally_rate_limited"] = is_globally_rate_limited(red=red)
     data["global_rate_limit_reset_after"] = get_global_rate_limit_reset_after(red=red)
+    data["empty_dequeues"] = get_empty_dequeue_count(red=red)
 
     queue_ids = get_all_queue_keys(red=red)
     queues: defaultdict[int, dict[str, dict[str, list[QueueStatus]]]] = defaultdict(
