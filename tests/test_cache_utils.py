@@ -137,7 +137,9 @@ def test_memory_cache_exposes_compatible_clear_for(monkeypatch):
 
 def test_clear_all_scans_cache_keys_in_larger_batches():
     red = mock.Mock()
-    red.scan_iter.return_value = iter([])
+    keys = [f"cached_value:{index}" for index in range(REDIS_SCAN_COUNT * 2 + 1)]
+    red.scan_iter.return_value = iter(keys)
+    red.delete.side_effect = [REDIS_SCAN_COUNT, REDIS_SCAN_COUNT, 1]
     cached_func = mock.Mock(spec=_needs_qual_name)
     cached = RedisCached(
         pool=None,
@@ -146,11 +148,45 @@ def test_clear_all_scans_cache_keys_in_larger_batches():
         function=cached_func,
     )
 
-    cached.clear_all()
+    with mock.patch.object(cache_utils.logger, "info") as log:
+        deleted = cached.clear_all()
 
     red.scan_iter.assert_called_once_with(
         match=f"{cached.key_prefix}*", count=REDIS_SCAN_COUNT
     )
+    assert deleted == len(keys)
+    assert [len(call.args) for call in red.delete.call_args_list] == [
+        REDIS_SCAN_COUNT,
+        REDIS_SCAN_COUNT,
+        1,
+    ]
+    assert all("cached_value:" not in str(call) for call in log.call_args_list)
+    log.assert_called_once()
+    assert "scanned=%d deleted=%d batches=%d duration_ms=%d" in log.call_args.args[0]
+
+
+def test_clear_all_returns_completed_batches_when_scan_is_interrupted():
+    def interrupted_scan():
+        yield from (f"cached_value:{index}" for index in range(REDIS_SCAN_COUNT))
+        raise redis.exceptions.RedisError("connection dropped")
+
+    red = mock.Mock()
+    red.scan_iter.return_value = interrupted_scan()
+    red.delete.return_value = REDIS_SCAN_COUNT
+    cached = RedisCached(
+        pool=None,
+        red=red,
+        ttl_seconds=1,
+        function=mock.Mock(spec=_needs_qual_name),
+    )
+
+    with mock.patch.object(cache_utils.logger, "exception") as interrupted:
+        deleted = cached.clear_all()
+
+    assert deleted == REDIS_SCAN_COUNT
+    red.delete.assert_called_once()
+    assert len(red.delete.call_args.args) == REDIS_SCAN_COUNT
+    assert "scanned=%d deleted=%d batches=%d" in interrupted.call_args.args[0]
 
 
 def test_invalidates_for_clears_exact_key_before_and_after():
