@@ -22,6 +22,21 @@ MOBILE_CONTEXT_FUZZY_THRESHOLD=0.74
 trusted browser frontends that need to call this CRCON installation; do not use
 a wildcard for authenticated mobile API requests.
 
+## Deployment security
+
+`RCONWEB_API_SECRET` is mandatory outside the explicit test setting
+`RCONWEB_TEST_MODE=true`. Use a unique, randomly generated value with at least
+32 characters for every installation; CRCON now refuses to start without one.
+
+Credentialed browser origins must be explicit HTTPS origins in production. Do
+not derive them from hostnames and do not include paths, query strings or HTTP
+origins. For example:
+
+```env
+RCONWEB_API_SECRET=<unique-random-secret-with-at-least-32-characters>
+CORS_ALLOWED_ORIGINS=https://webapp.example.org,https://ops.example.org
+```
+
 Run both Django and Alembic migrations during the normal maintenance startup.
 For Frontline production hosts, follow the guarded GitHub deployment workflow in
 [`production-deploy.md`](production-deploy.md); it preserves the migration graph

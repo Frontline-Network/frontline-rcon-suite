@@ -8,6 +8,15 @@ const configuredApi = process.env.REACT_APP_API_URL;
 const CRCON_API =
   configuredApi && configuredApi !== "undefined" ? configuredApi : "/";
 
+function getCookie(name) {
+  const prefix = `${name}=`;
+  return document.cookie
+    .split(";")
+    .map((entry) => entry.trim())
+    .find((entry) => entry.startsWith(prefix))
+    ?.slice(prefix.length);
+}
+
 async function requestFactory({
   method = "GET",
   cmd,
@@ -37,6 +46,16 @@ async function requestFactory({
     redirect: "follow",
     referrerPolicy: "origin",
   };
+
+  if (method !== "GET" && method !== "HEAD") {
+    const csrfToken = getCookie("csrftoken");
+    if (csrfToken) {
+      requestOptions.headers = {
+        ...headers,
+        "X-CSRFToken": decodeURIComponent(csrfToken),
+      };
+    }
+  }
 
   // Add a body for all mutating JSON requests.
   if (method !== "GET" && method !== "HEAD") {

@@ -16,12 +16,15 @@ import re
 import socket
 
 import sentry_sdk
+from django.core.exceptions import ImproperlyConfigured
 from sentry_sdk import configure_scope
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 
 from rcon.user_config.rcon_server_settings import RconServerSettingsUserConfig
 from rcon.version import resolve_version
+
+from .environment import load_secret, normalize_cors_origin, read_bool_env
 
 TAG_VERSION = resolve_version()
 
@@ -141,15 +144,18 @@ CHANNEL_LAYERS = {
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
 
-# TODO: move that to env. We don't need it yet but we might
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = (
-    os.getenv("RCONWEB_API_SECRET", None)
-    or "9*i9zm1jx(5y-ns=*r6p%#6-q!bst98u3o3pw6joyf#-e(bh(0"
-)
-
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DJANGO_DEBUG", False) is not False
+try:
+    DEBUG = read_bool_env("DJANGO_DEBUG")
+except ValueError as exc:
+    raise ImproperlyConfigured(str(exc)) from exc
+
+# A known fallback secret is never acceptable for a deployed RCON instance.
+# Tests opt in explicitly so that an omitted deployment secret is always fatal.
+try:
+    SECRET_KEY = load_secret(test_mode=read_bool_env("RCONWEB_TEST_MODE"))
+except ValueError as exc:
+    raise ImproperlyConfigured(str(exc)) from exc
 
 ALLOWED_HOSTS = [
     "backend:8000",
@@ -158,22 +164,18 @@ ALLOWED_HOSTS = [
     "127.0.0.1:3000",
     "localhost",
     "localhost:3000",
-] + os.getenv("DOMAINS", "").split(",")
-configured_cors_origins = [
-    origin.strip().rstrip("/")
-    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
-    if origin.strip()
 ]
-CORS_ALLOWED_ORIGINS = list(
-    dict.fromkeys(
-        ["http://{}".format(h) for h in ALLOWED_HOSTS if h]
-        + ["https://{}".format(h) for h in ALLOWED_HOSTS if h]
-        + configured_cors_origins
-    )
-)
-CORS_ALLOW_CREDENTIALS = True
+try:
+    configured_cors_origins = [
+        normalize_cors_origin(origin, allow_insecure=DEBUG)
+        for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+        if origin.strip()
+    ]
+except ValueError as exc:
+    raise ImproperlyConfigured(str(exc)) from exc
+CORS_ALLOWED_ORIGINS = list(dict.fromkeys(configured_cors_origins))
+CORS_ALLOW_CREDENTIALS = bool(CORS_ALLOWED_ORIGINS)
 
-# TODO: You might not want that. Think XSS
 CORS_ORIGIN_ALLOW_ALL = False
 # Application definition
 SESSION_COOKIE_HTTPONLY = False
@@ -182,21 +184,9 @@ SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_DOMAIN = os.getenv("SESSION_COOKIE_DOMAIN") or None
 CSRF_COOKIE_DOMAIN = os.getenv("CSRF_COOKIE_DOMAIN") or None
 
-# Required as of Django 4.0 otherwise it causes CSRF issues
-# if we don't include the origin
+# Cross-origin browser clients must be listed explicitly above. Same-origin
+# requests do not need a CSRF trusted-origin exception.
 CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS.copy()
-
-if not HLL_MAINTENANCE_CONTAINER and not HLL_WH_SERVICE_CONTAINER:
-    from rcon.user_config.rcon_server_settings import RconServerSettingsUserConfig
-
-    rcon_config = RconServerSettingsUserConfig.load_from_db()
-    if host := rcon_config.server_url:
-        host = str(host)
-        # Django doesn't like the trailing / in a URL
-        if host[-1] == "/":
-            CSRF_TRUSTED_ORIGINS.append(host[:-1])
-        else:
-            CSRF_TRUSTED_ORIGINS.append(host)
 
 if DEBUG:
     # Chrome requires these to be set or it won't allow cookies to save between
@@ -223,7 +213,7 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
+    "rconweb.middleware.SessionCsrfProtectionMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",

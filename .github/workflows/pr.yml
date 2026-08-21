@@ -70,6 +70,8 @@ jobs:
       HLL_REDIS_HOST_PORT: '6379'
       HLL_REDIS_DB: '1'
       SERVER_NUMBER: '1'
+      # Deliberately non-production fixture. Production has no fallback secret.
+      RCONWEB_API_SECRET: ci-only-rconweb-secret-not-for-production-0001
       REDIS_IMAGE: redis:alpine
       POSTGRES_IMAGE: postgres:12-alpine
     steps:

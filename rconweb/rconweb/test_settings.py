@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 
 os.environ.setdefault("HLL_MAINTENANCE_CONTAINER", "1")
+os.environ.setdefault("RCONWEB_TEST_MODE", "1")
 os.environ.setdefault("SERVER_NUMBER", "1")
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 

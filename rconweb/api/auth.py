@@ -17,6 +17,7 @@ from django.contrib.sessions.backends.db import SessionStore
 from django.core.exceptions import PermissionDenied
 from django.db.models.signals import post_delete, post_save
 from django.http import HttpResponse, QueryDict, parse_cookie
+from django.middleware.csrf import get_token
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import ratelimit
@@ -260,6 +261,9 @@ def do_login(request):
         user = authenticate(request, username=name, password=password)
         if user is not None:
             login(request, user)
+            # The frontend uses this token for subsequent session-authenticated
+            # writes. get_token() marks the CSRF cookie for the response.
+            get_token(request)
             logger.info("Successful login: %s", name)
             return api_response(
                 result=True, command="login", arguments=name, failed=False
