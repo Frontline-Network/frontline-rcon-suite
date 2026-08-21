@@ -3,13 +3,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLoaderData, useRouteLoaderData } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useTranslation } from "react-i18next";
-import MapListBuilder from "../../../MapListBuilder";
-import { MapBuilderListItem } from "../../../MapListItem";
+import MapListBuilder from "../../MapListBuilder";
+import { MapBuilderListItem } from "../../MapListItem";
 import { SortableRotationList } from "../builder/SortableRotationList";
 import {
   mapsManagerMutationOptions,
   mapsManagerQueryKeys,
-} from "../../../queries";
+} from "../../queries";
 import { cmd } from "@/utils/fetchUtils";
 
 function MapSequenceBuilder() {
