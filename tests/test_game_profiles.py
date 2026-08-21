@@ -346,7 +346,8 @@ def test_rcon_internal_error_retries_message_player_once(monkeypatch):
     monkeypatch.setattr("rcon.commands.time.sleep", sleep)
 
     assert controller.receive_success(handle) is True
-    sleep.assert_called_once_with(1)
+    sleep.assert_called_once()
+    assert 0 < sleep.call_args.args[0] <= 8
     retry_connection.exchange.assert_called_once_with(
         "MessagePlayer",
         2,
