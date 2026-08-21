@@ -49,7 +49,17 @@ x-backend: &backend
     SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN}
     CSRF_COOKIE_DOMAIN: ${CSRF_COOKIE_DOMAIN}
   command: web
-  restart: on-failure
+  # Bound a failing instance without turning an OOM or import error into a
+  # permanent restart storm. Start it explicitly again after investigating.
+  restart: on-failure:5
+  deploy:
+    resources:
+      limits:
+        cpus: '${BACKEND_CPU_LIMIT:-1.0}'
+        memory: ${BACKEND_MEMORY_LIMIT:-1024M}
+      reservations:
+        cpus: '0.10'
+        memory: 256M
   healthcheck:
     test: ["CMD", "python", "/code/scripts/backend_healthcheck.py"]
     start_period: 30s
@@ -70,8 +80,16 @@ x-backend: &backend
     - ./config:/config/
 x-supervisor: &supervisor
   image: ${BACKEND_DOCKER_REPOSITORY}:${TAGGED_VERSION}
-  restart: on-failure
+  restart: on-failure:5
   command: supervisor
+  deploy:
+    resources:
+      limits:
+        cpus: '${SUPERVISOR_CPU_LIMIT:-1.5}'
+        memory: ${SUPERVISOR_MEMORY_LIMIT:-2048M}
+      reservations:
+        cpus: '0.20'
+        memory: 512M
   volumes:
     - ./logs:/logs/
     - ./supervisor_data:/data

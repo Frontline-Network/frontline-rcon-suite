@@ -278,6 +278,75 @@ was logged.
 All settings are optional and existing installations receive conservative
 defaults.
 
+## Container resource budgets
+
+The deployment templates now give every per-server backend and supervisor an
+explicit resource envelope. These values are intentionally above the measured
+warm figures: a limit is a fault-isolation boundary, not a target to run at.
+Docker stops an over-limit process instead of allowing one problematic CRCON
+instance to evict unrelated instances on the same host.
+
+| Service | CPU limit | Memory limit | Reservation | Why |
+| --- | ---: | ---: | --- | --- |
+| Per-server backend | 1.0 CPU | 1024 MiB | 0.10 CPU / 256 MiB | 316-571 MiB observed after warmup; leaves controlled headroom for requests and imports |
+| Per-server supervisor | 1.5 CPU | 2048 MiB | 0.20 CPU / 512 MiB | split runtime observed at 1.11-1.41 GiB; protects the host while preserving recovery headroom |
+| Webhook service | 1.0 CPU | 512 MiB | 0.10 CPU / 128 MiB | delivery is I/O-bound and the queue has its own bounded retry policy |
+| Mobile/Discord worker | 0.5 CPU | 512 MiB | 0.05 CPU / 128 MiB | isolates remote relay/API latency from game administration |
+
+The variables `BACKEND_CPU_LIMIT`, `BACKEND_MEMORY_LIMIT`,
+`SUPERVISOR_CPU_LIMIT`, `SUPERVISOR_MEMORY_LIMIT`, `WEBHOOK_MEMORY_LIMIT`,
+`BACKGROUND_WORKER_CPU_LIMIT` and `BACKGROUND_WORKER_MEMORY_LIMIT` override
+these defaults. Do not raise a limit in response to a single OOM without first
+capturing the container's `docker stats`, service logs and the active server
+count.
+
+`backend_*` and `supervisor_*` use `restart: on-failure:5`. A process that
+repeatedly exits or is OOM-killed is therefore contained after five retries
+instead of consuming host CPU indefinitely. Fix the cause, then restart only
+the affected service with `docker compose up -d backend_N supervisor_N`.
+
+### Four-server production revalidation
+
+The budget proposal was rechecked against a read-only `docker stats` sample
+from the live four-profile host on 2026-08-21. The host had 31 GiB RAM, about
+17 GiB available memory and a load average of 1.40 at capture time. The
+profiles were serving both HLL and HLL Vietnam.
+
+| Component | Per-profile observation | Four-profile total |
+| --- | ---: | ---: |
+| Backends | 313-567 MiB | 1.69 GiB |
+| Supervisors | 632-934 MiB | 2.90 GiB |
+| Backends + supervisors | 0.95-1.50 GiB | 4.59 GiB |
+| Shared CRCON delivery workers | — | 282 MiB |
+
+This confirms that the 1 GiB backend and 2 GiB supervisor limits retain
+meaningful burst/recovery room while establishing a hard isolation boundary.
+The baseline was captured before these new template limits are deployed, so
+the values are an input to the rollout rather than evidence that Docker has
+already enforced the limits.
+
+### Capacity profile and measurement procedure
+
+The following is a capacity envelope for CRCON application containers only. It
+does **not** include the gameservers, PostgreSQL disk/cache, Redis, Nginx, the
+host operating system or a safety margin; provision those separately. The
+four-instance figures are validated canary measurements above. One- and
+ten-instance rows are repeatable measurement targets, not claimed production
+measurements.
+
+| Profile | Backends + supervisors (limit envelope) | Shared workers (limit envelope) | Required measurement before production |
+| --- | ---: | ---: | --- |
+| 1 gameserver | 3.0 GiB / 2.5 CPU | 1.5 GiB / 2.0 CPU | idle, normal admin use, webhook burst |
+| 4 gameservers | 12.0 GiB / 10.0 CPU | 1.5 GiB / 2.0 CPU | baseline canary plus concurrent dashboard and Discord actions |
+| 10 gameservers | 30.0 GiB / 25.0 CPU | 1.5 GiB / 2.0 CPU | staged load profile; use shared-supervisor mode or a larger host before rollout |
+
+For each profile, capture five minutes of idle and five minutes of a
+representative event burst. Run `docker compose config` first to confirm the
+resolved limits, then sample `docker stats --no-stream` every 30 seconds and
+record `docker inspect` values for `Memory`, `MemoryReservation` and
+`NanoCpus`. Test both HLL and HLL Vietnam, including a webhook/Discord event,
+before moving from 1 to 4 and from 4 to 10 gameservers.
+
 | Variable | Default | Purpose |
 | --- | ---: | --- |
 | `HLL_DB_POOL_SIZE` | `1` | Persistent SQLAlchemy connections per supervisor process |

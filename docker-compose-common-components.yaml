@@ -118,6 +118,10 @@ services:
       resources:
         limits:
           cpus: '1.0'
+          memory: ${WEBHOOK_MEMORY_LIMIT:-512M}
+        reservations:
+          cpus: '0.10'
+          memory: 128M
   mobile_push_worker:
     profiles: ["mobile"]
     build:
@@ -126,6 +130,14 @@ services:
     image: ${BACKEND_DOCKER_REPOSITORY}:${TAGGED_VERSION}
     command: mobile_push_worker
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '${BACKGROUND_WORKER_CPU_LIMIT:-0.50}'
+          memory: ${BACKGROUND_WORKER_MEMORY_LIMIT:-512M}
+        reservations:
+          cpus: '0.05'
+          memory: 128M
     environment:
       SERVER_NUMBER: 1
       LOGGING_PATH: /logs/
@@ -157,6 +169,14 @@ services:
     image: ${BACKEND_DOCKER_REPOSITORY}:${TAGGED_VERSION}
     command: discord_report_worker
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '${BACKGROUND_WORKER_CPU_LIMIT:-0.50}'
+          memory: ${BACKGROUND_WORKER_MEMORY_LIMIT:-512M}
+        reservations:
+          cpus: '0.05'
+          memory: 128M
     environment:
       SERVER_NUMBER: 1
       LOGGING_PATH: /logs/
