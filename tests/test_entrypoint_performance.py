@@ -51,6 +51,29 @@ def test_backend_healthchecks_validate_http_and_websocket_readiness():
         assert '["CMD", "python", "/code/scripts/backend_healthcheck.py"]' in template
 
 
+def test_every_template_profile_has_bounded_backend_and_supervisor_resources():
+    expected_profile_sizes = {"one-server.yaml": 1, "ten-servers.yaml": 10}
+
+    for template_name, server_count in expected_profile_sizes.items():
+        template = (REPO_ROOT / "docker-templates" / template_name).read_text(
+            encoding="utf-8"
+        )
+
+        assert "restart: on-failure:5" in template
+        assert "cpus: '${BACKEND_CPU_LIMIT:-1.0}'" in template
+        assert "memory: ${BACKEND_MEMORY_LIMIT:-1024M}" in template
+        assert "cpus: '${SUPERVISOR_CPU_LIMIT:-1.5}'" in template
+        assert "memory: ${SUPERVISOR_MEMORY_LIMIT:-2048M}" in template
+        assert "cpus: '0.10'" in template
+        assert "cpus: '0.20'" in template
+        assert "memory: 256M" in template
+        assert "memory: 512M" in template
+
+        for server_number in range(1, server_count + 1):
+            assert f"backend_{server_number}:" in template
+            assert f"supervisor_{server_number}:" in template
+
+
 def test_backend_health_endpoint_does_not_probe_external_dependencies():
     urls = (REPO_ROOT / "rconweb" / "rconweb" / "urls.py").read_text(
         encoding="utf-8"
