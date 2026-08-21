@@ -85,6 +85,27 @@ function getCookie(name) {
     ?.slice(prefix.length);
 }
 
+async function refreshCsrfCookie(base) {
+  // An already-open browser tab can retain an old CSRF cookie across a backend
+  // deployment. Ask the authenticated session endpoint for a fresh cookie
+  // before retrying the *same* failed request once. No action is retried until
+  // this safe GET completed successfully.
+  const url = new URL("is_logged_in", base);
+  try {
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      cache: "no-store",
+      credentials: "include",
+      headers: { Accept: "application/json" },
+      redirect: "follow",
+      referrerPolicy: "origin",
+    });
+    return response.ok && Boolean(getCookie("csrftoken"));
+  } catch {
+    return false;
+  }
+}
+
 async function requestFactory({
   method = "GET",
   cmd,
@@ -108,7 +129,8 @@ async function requestFactory({
     url.search = new URLSearchParams(params).toString();
   }
 
-  // Define request options
+  // Define request options shared by the original request and a possible
+  // CSRF-only recovery retry.
   const requestOptions = {
     method,
     mode: "cors",
@@ -119,28 +141,38 @@ async function requestFactory({
     referrerPolicy: "origin",
   };
 
-  if (method !== "GET" && method !== "HEAD") {
-    const csrfToken = getCookie("csrftoken");
-    if (csrfToken) {
-      requestOptions.headers = {
-        ...headers,
-        "X-CSRFToken": decodeURIComponent(csrfToken),
-      };
+  const isUnsafeRequest = method !== "GET" && method !== "HEAD";
+  const createRequest = () => {
+    const requestHeaders = { ...headers };
+    if (isUnsafeRequest) {
+      const csrfToken = getCookie("csrftoken");
+      if (csrfToken) {
+        requestHeaders["X-CSRFToken"] = decodeURIComponent(csrfToken);
+      }
     }
-  }
 
-  // Add a body for all mutating JSON requests.
-  if (method !== "GET" && method !== "HEAD") {
-    requestOptions.body =
-      headers["Content-Type"] === "application/json"
-        ? JSON.stringify(payload)
-        : payload;
-  }
+    const options = { ...requestOptions, headers: requestHeaders };
+    if (isUnsafeRequest) {
+      options.body =
+        headers["Content-Type"] === "application/json"
+          ? JSON.stringify(payload)
+          : payload;
+    }
+    return new Request(url.toString(), options);
+  };
 
-  // Create a Request object
-  const req = new Request(url.toString(), requestOptions);
   try {
-    const res = await fetch(req);
+    let req = createRequest();
+    let res = await fetch(req);
+
+    if (res.status === 403 && isUnsafeRequest && !isSessionRecoveryCommand(cmd)) {
+      const recovered = await refreshCsrfCookie(base);
+      if (recovered) {
+        req = createRequest();
+        res = await fetch(req);
+      }
+    }
+
     return await handleFetchResponse(req, res, cmd);
   } catch (error) {
     if (throwRouteError) {
