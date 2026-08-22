@@ -402,6 +402,9 @@ def _crcon_interaction_error(exc: httpx.HTTPError) -> str:
     return "CRCON ist derzeit nicht erreichbar."
 
 
+PUNISH_MESSAGE_FALLBACK_OUTCOME = "punish_not_confirmed_message_sent"
+
+
 def _execute_prepared_action(
     integration: Integration,
     *,
@@ -411,7 +414,7 @@ def _execute_prepared_action(
     guild_id: str,
     channel_id: str,
     actor: dict,
-) -> None:
+) -> dict:
     response = _crcon_post(
         f"{integration.crcon_base_url}/api/discord/v1/actions/{preparation_id}/execute",
         headers={
@@ -429,6 +432,31 @@ def _execute_prepared_action(
         timeout=10,
     )
     response.raise_for_status()
+    payload = response.json()
+    result = payload.get("result", payload) if isinstance(payload, dict) else {}
+    return result if isinstance(result, dict) else {}
+
+
+def _action_execution_message(result: dict, action: str) -> str:
+    action_result = result.get("action_result")
+    if (
+        action == "punish"
+        and isinstance(action_result, dict)
+        and action_result.get("outcome") == PUNISH_MESSAGE_FALLBACK_OUTCOME
+        and action_result.get("message_sent") is True
+        and action_result.get("punished") is False
+    ):
+        return (
+            "Der Gameserver konnte die Bestrafung nicht bestätigen. Der Spieler "
+            "war möglicherweise bereits tot. Der Bestrafungsgrund wurde ihm "
+            "stattdessen als Nachricht gesendet; der Report bleibt offen."
+        )
+    if action == "message":
+        return (
+            "Nachricht wurde vom Gameserver angenommen. Die Anzeige im Spiel "
+            "kann sich insbesondere bei HLL Vietnam verzögern."
+        )
+    return "Aktion wurde in CRCON ausgeführt und protokolliert."
 
 
 def _action_modal(
@@ -1519,7 +1547,7 @@ async def discord_interaction(
             "role_ids": [str(value) for value in member.get("roles") or []],
         }
         try:
-            _execute_prepared_action(
+            execution_result = _execute_prepared_action(
                 integration,
                 preparation_id=relay.preparation_id,
                 confirmation_token=decrypt(relay.confirmation_ciphertext),
@@ -1556,7 +1584,9 @@ async def discord_interaction(
         return {
             "type": 4,
             "data": {
-                "content": "Aktion wurde in CRCON ausgeführt und protokolliert.",
+                "content": _action_execution_message(
+                    execution_result, relay.actual_action
+                ),
                 "flags": 64,
             },
         }
@@ -1967,7 +1997,7 @@ async def discord_interaction(
         preview = str(result.get("preview") or actual_action)[:2000]
         if not result.get("requires_second_confirmation"):
             try:
-                _execute_prepared_action(
+                execution_result = _execute_prepared_action(
                     integration,
                     preparation_id=str(result["preparation_id"]),
                     confirmation_token=str(result["confirmation_token"]),
@@ -2003,10 +2033,7 @@ async def discord_interaction(
                 "type": 4,
                 "data": {
                     "content": (
-                        "Nachricht wurde vom Gameserver angenommen. Die Anzeige im "
-                        "Spiel kann sich insbesondere bei HLL Vietnam verzögern."
-                        if actual_action == "message"
-                        else "Aktion wurde in CRCON ausgeführt und protokolliert."
+                        _action_execution_message(execution_result, str(actual_action))
                     ),
                     "flags": 64,
                 },
