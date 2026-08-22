@@ -9,10 +9,7 @@ const configuredApi = process.env.REACT_APP_API_URL;
 const CRCON_API =
   configuredApi && configuredApi !== "undefined" ? configuredApi : "/";
 const SESSION_EXPIRY_EVENT = "crcon:session-expired";
-const SESSION_RECOVERY_COMMANDS = new Set([
-  "login",
-  "logout",
-]);
+const SESSION_RECOVERY_COMMANDS = new Set(["login", "logout"]);
 
 let sessionExpired = false;
 const HTTP_ERROR_TOAST_SUMMARY_ID = "crcon:http-error-summary";
@@ -45,7 +42,10 @@ const showBoundedHttpErrorToast = ({ signature, message, level = "error" }) => {
 
   const summary = `Weitere technische Fehler werden gesammelt (${result.suppressed}). Öffne die Diagnoseansicht für Details.`;
   if (toast.isActive(HTTP_ERROR_TOAST_SUMMARY_ID)) {
-    toast.update(HTTP_ERROR_TOAST_SUMMARY_ID, { render: summary, type: "warning" });
+    toast.update(HTTP_ERROR_TOAST_SUMMARY_ID, {
+      render: summary,
+      type: "warning",
+    });
   } else {
     toast.warn(summary, { toastId: HTTP_ERROR_TOAST_SUMMARY_ID });
   }
@@ -87,15 +87,16 @@ function getCookie(name) {
 
 const SAFE_HTTP_METHODS = new Set(["GET", "HEAD", "OPTIONS", "TRACE"]);
 const CSRF_RECOVERY_HEADER = "X-CRCON-CSRF-Recovery";
+const CSRF_TOKEN_HEADER = "X-CRCON-CSRF-Token";
 
 function isUnsafeMethod(method) {
   return !SAFE_HTTP_METHODS.has(String(method || "GET").toUpperCase());
 }
 
-function requestHeadersWithCsrf(method, headers) {
+function requestHeadersWithCsrf(method, headers, tokenOverride) {
   const requestHeaders = new Headers(headers || {});
   if (isUnsafeMethod(method)) {
-    const csrfToken = getCookie("csrftoken");
+    const csrfToken = tokenOverride || getCookie("csrftoken");
     if (csrfToken) {
       requestHeaders.set("X-CSRFToken", decodeURIComponent(csrfToken));
     }
@@ -113,12 +114,12 @@ function requestHeadersWithCsrf(method, headers) {
  */
 export async function fetchWithCsrf(input, options = {}) {
   const method = String(options.method || "GET").toUpperCase();
-  const send = () =>
+  const send = (tokenOverride) =>
     fetch(input, {
       ...options,
       method,
       credentials: options.credentials || "include",
-      headers: requestHeadersWithCsrf(method, options.headers),
+      headers: requestHeadersWithCsrf(method, options.headers, tokenOverride),
     });
 
   let response = await send();
@@ -127,7 +128,8 @@ export async function fetchWithCsrf(input, options = {}) {
     response.status === 403 &&
     response.headers.get(CSRF_RECOVERY_HEADER) === "1"
   ) {
-    response = await send();
+    const recoveryToken = response.headers.get(CSRF_TOKEN_HEADER);
+    response = await send(recoveryToken);
   }
   return response;
 }
@@ -521,11 +523,23 @@ export const cmd = {
   GET_OPERATIONAL_HEALTH: (params) =>
     requestFactory({ method: "GET", cmd: "get_operational_health", ...params }),
   GET_SUPPORT_DIAGNOSTICS_PREVIEW: (params) =>
-    requestFactory({ method: "GET", cmd: "get_support_diagnostics_preview", ...params }),
+    requestFactory({
+      method: "GET",
+      cmd: "get_support_diagnostics_preview",
+      ...params,
+    }),
   GET_WEBHOOK_DEAD_LETTERS: (params) =>
-    requestFactory({ method: "GET", cmd: "get_webhook_dead_letters", ...params }),
+    requestFactory({
+      method: "GET",
+      cmd: "get_webhook_dead_letters",
+      ...params,
+    }),
   RETRY_WEBHOOK_DEAD_LETTER: (params) =>
-    requestFactory({ method: "POST", cmd: "retry_webhook_dead_letter", ...params }),
+    requestFactory({
+      method: "POST",
+      cmd: "retry_webhook_dead_letter",
+      ...params,
+    }),
   GET_SYSTEM_USAGE: (params) =>
     requestFactory({ method: "GET", cmd: "get_system_usage", ...params }),
   GET_VERSION: (params) =>
@@ -918,7 +932,10 @@ async function handle_response_status(response) {
 async function handle_http_errors(error) {
   const name = String(error?.name ?? "UnknownError");
   const status = Number.isFinite(error?.status) ? error.status : "none";
-  const command = String(error?.command ?? "none").replace(/[^a-zA-Z0-9_/-]/g, "");
+  const command = String(error?.command ?? "none").replace(
+    /[^a-zA-Z0-9_/-]/g,
+    ""
+  );
 
   if (name === "AuthError") {
     showBoundedHttpErrorToast({
@@ -941,12 +958,14 @@ async function handle_http_errors(error) {
   } else if (name === "TypeError" || name === "SyntaxError") {
     showBoundedHttpErrorToast({
       signature: "api-unreachable",
-      message: "Your RCON API is not reachable. Check your configuration and start it again.",
+      message:
+        "Your RCON API is not reachable. Check your configuration and start it again.",
     });
   } else {
     showBoundedHttpErrorToast({
       signature: `${name}:${status}:${command || "none"}`,
-      message: "Unable to complete the API request. Open the diagnostics view for details.",
+      message:
+        "Unable to complete the API request. Open the diagnostics view for details.",
     });
   }
 }

@@ -147,6 +147,11 @@ def run(services: Sequence[ServiceSpec] = DEFAULT_SERVICES) -> None:
     for name in service_specs:
         red.hsetnx(STATE_KEY, f"{name}:desired", RUNNING)
 
+    restart_tokens = {
+        name: redis_text(red.hget(STATE_KEY, f"{name}:restart")) or ""
+        for name in service_specs
+    }
+
     def start_service(name: str) -> None:
         stop_event = threading.Event()
         stop_events[name] = stop_event
@@ -174,6 +179,24 @@ def run(services: Sequence[ServiceSpec] = DEFAULT_SERVICES) -> None:
                     redis_text(red.hget(STATE_KEY, f"{name}:desired")) or RUNNING
                 )
                 thread = threads.get(name)
+                restart_token = (
+                    redis_text(red.hget(STATE_KEY, f"{name}:restart")) or ""
+                )
+
+                if restart_token != restart_tokens[name]:
+                    if thread and thread.is_alive():
+                        logger.info("Restarting requested shared service %s", name)
+                        stop_events[name].set()
+                        thread.join(timeout=MONITOR_INTERVAL_SECONDS)
+                        if thread.is_alive():
+                            # Never start a duplicate worker. The cooperative
+                            # service will be checked again on the next monitor
+                            # iteration until it has stopped completely.
+                            continue
+                    threads.pop(name, None)
+                    stop_events.pop(name, None)
+                    thread = None
+                    restart_tokens[name] = restart_token
 
                 if desired == STOPPED:
                     if thread and thread.is_alive():

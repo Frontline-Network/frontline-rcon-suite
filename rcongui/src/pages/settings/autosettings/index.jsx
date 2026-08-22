@@ -1,11 +1,28 @@
 import Padlock from "@/components/shared/Padlock";
 import SplitButton from "@/components/shared/SplitButton";
-import {cmd} from "@/utils/fetchUtils";
-import {TEMPLATE_CATEGORY} from "@/utils/lib";
-import {Alert, Autocomplete, Box, Button, Paper, Skeleton, TextField, Stack, useTheme} from "@mui/material";
-import {lazy, Suspense, useEffect, useState} from "react";
-import {Await, defer, json, useActionData, useLoaderData, useSubmit,} from "react-router-dom";
-import {AsyncClientError} from "@/components/shared/AsyncClientError";
+import { cmd } from "@/utils/fetchUtils";
+import { TEMPLATE_CATEGORY } from "@/utils/lib";
+import {
+  Alert,
+  Autocomplete,
+  Box,
+  Button,
+  Paper,
+  Skeleton,
+  TextField,
+  Stack,
+  useTheme,
+} from "@mui/material";
+import { lazy, Suspense, useEffect, useState } from "react";
+import {
+  Await,
+  defer,
+  json,
+  useActionData,
+  useLoaderData,
+  useSubmit,
+} from "react-router-dom";
+import { AsyncClientError } from "@/components/shared/AsyncClientError";
 import { isFakeMode } from "@/mirage/demo-data";
 import { useTranslation } from "react-i18next";
 
@@ -19,12 +36,16 @@ const INTENT = {
 
 export const loader = async () => {
   if (isFakeMode()) {
-    return defer({ service: { name: "auto_settings", statename: "RUNNING" }, autosettings: { version: 1, enabled: true, rules: [] }, templates: Promise.resolve([]) });
+    return defer({
+      service: { name: "auto_settings", statename: "RUNNING" },
+      autosettings: { version: 1, enabled: true, rules: [] },
+      templates: Promise.resolve([]),
+    });
   }
   const autosettings = await cmd.GET_AUTOSETTINGS();
   const services = await cmd.GET_SERVICES();
   const templates = cmd.GET_MESSAGE_TEMPLATES({
-    params: {category: TEMPLATE_CATEGORY.AUTO_SETTINGS},
+    params: { category: TEMPLATE_CATEGORY.AUTO_SETTINGS },
   });
   return defer({
     service: services.find((service) => service.name === "auto_settings"),
@@ -33,43 +54,57 @@ export const loader = async () => {
   });
 };
 
-export const action = async ({request}) => {
+export const action = async ({ request }) => {
   const formData = Object.fromEntries(await request.formData());
-  const {intent, ...data} = formData;
+  const { intent, ...data } = formData;
   let result;
 
   try {
     switch (intent) {
       case INTENT.APPLY_ALL:
       case INTENT.APPLY_SINGLE:
-        result = await cmd.SET_AUTOSETTINGS({payload: data});
+        result = await cmd.SET_AUTOSETTINGS({ payload: data });
         break;
       case INTENT.TOGGLE_SERVICE:
-        result = await cmd.TOGGLE_SERVICE({payload: data});
+        result = await cmd.TOGGLE_SERVICE({ payload: data });
         break;
       default:
         return json(
           {
             error: "InvalidIntent",
           },
-          {status: 400}
+          { status: 400 }
         );
     }
   } catch (error) {
+    let responseError = null;
+    if (error instanceof Response) {
+      responseError = await error
+        .clone()
+        .json()
+        .catch(() => null);
+    }
     return json(
       {
-        error: error,
+        error: {
+          message:
+            responseError?.message ||
+            error?.message ||
+            error?.text ||
+            "Die Aktion konnte nicht ausgef\u00fchrt werden.",
+          status: error?.status || 500,
+        },
       },
-      {status: 400}
+      { status: 400 }
     );
   }
 
   return result;
 };
 
-const isRunning = (service) => service.statename === "RUNNING";
+const isRunning = (service) => service?.statename === "RUNNING";
 
-const TemplateSkeleton = () => <Skeleton height={80}/>;
+const TemplateSkeleton = () => <Skeleton height={80} />;
 
 const Autosettings = () => {
   const { t } = useTranslation();
@@ -87,7 +122,7 @@ const Autosettings = () => {
     formData.append("intent", intent);
     formData.append("forward", intent === INTENT.APPLY_ALL ? "true" : "false");
     formData.append("settings", editorContent);
-    submit(formData, {method: "post"});
+    submit(formData, { method: "post" });
   };
 
   const handleToggleService = (checked) => {
@@ -95,11 +130,13 @@ const Autosettings = () => {
     formData.append("intent", INTENT.TOGGLE_SERVICE);
     formData.append("action", checked ? "start" : "stop");
     formData.append("service_name", "auto_settings");
-    submit(formData, {method: "post"});
+    submit(formData, { method: "post" });
   };
 
   const handleTemplateChange = (e, message) => {
-    setEditorContent(message ? message.content : JSON.stringify(data.autosettings, null, 2));
+    setEditorContent(
+      message ? message.content : JSON.stringify(data.autosettings, null, 2)
+    );
   };
 
   useEffect(() => {
@@ -112,7 +149,7 @@ const Autosettings = () => {
     setSubmitting(false);
     if (actionData) {
       if (actionData.error) {
-        setError(actionData.error.text);
+        setError(actionData.error.message);
       } else {
         setError(null);
       }
@@ -123,13 +160,15 @@ const Autosettings = () => {
     <Stack gap={2}>
       <Stack
         component={Paper}
-        sx={{p: 1, mb: 1}}
+        sx={{ p: 1, mb: 1 }}
         direction={"row"}
         justifyContent={"space-between"}
         gap={1}
       >
         <Padlock
-          label={t(isRunning(data.service) ? "common.enabled" : "common.disabled")}
+          label={t(
+            isRunning(data.service) ? "common.enabled" : "common.disabled"
+          )}
           checked={isRunning(data.service)}
           handleChange={handleToggleService}
         />
@@ -146,14 +185,18 @@ const Autosettings = () => {
             disabled={submitting}
             options={[
               {
-                name: submitting ? t("common.processing") : t("settings.autosettings.apply"),
+                name: submitting
+                  ? t("common.processing")
+                  : t("settings.autosettings.apply"),
                 buttonProps: {
                   onClick: handleApplyClick(INTENT.APPLY_SINGLE),
                   disabled: submitting,
                 },
               },
               {
-                name: submitting ? t("common.processing") : t("settings.autosettings.applyAllServers"),
+                name: submitting
+                  ? t("common.processing")
+                  : t("settings.autosettings.applyAllServers"),
                 buttonProps: {
                   onClick: handleApplyClick(INTENT.APPLY_ALL),
                   disabled: submitting,
@@ -174,10 +217,12 @@ const Autosettings = () => {
           onChange={(value) => setEditorContent(value)}
         />
       </Suspense>
-      <Suspense fallback={<TemplateSkeleton/>}>
+      <Suspense fallback={<TemplateSkeleton />}>
         <Await
           resolve={data.templates}
-          errorElement={<AsyncClientError title={t("settings.autosettings.templates")}/>}
+          errorElement={
+            <AsyncClientError title={t("settings.autosettings.templates")} />
+          }
         >
           {(templates) => {
             return (
@@ -189,7 +234,7 @@ const Autosettings = () => {
                 autoHighlight
                 getOptionLabel={(option) => option.title}
                 renderOption={(props, option) => {
-                  const {key, ...optionProps} = props;
+                  const { key, ...optionProps } = props;
                   return (
                     <Box key={key} component="li" {...optionProps}>
                       #{option.id} {option.title}

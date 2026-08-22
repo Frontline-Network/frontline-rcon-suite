@@ -51,11 +51,28 @@ const requiredTransports = [
     "legacy POST transport",
     /fetchWithCsrf\(url\s*,\s*\{\s*method:\s*"POST"/,
   ],
+  ["mobile integration transport", /mobileRequest[\s\S]*fetchWithCsrf\(url,/],
+  ["Discord integration transport", /discordRequest[\s\S]*fetchWithCsrf\(url,/],
+];
+
+const requiredRecoveryContracts = [
+  ["recovery marker", /X-CRCON-CSRF-Recovery/],
+  ["server-derived recovery token", /X-CRCON-CSRF-Token/],
+  [
+    "recovery token handoff",
+    /response\.headers\.get\(CSRF_TOKEN_HEADER\)[\s\S]*send\(recoveryToken\)/,
+  ],
 ];
 
 for (const [name, pattern] of requiredTransports) {
   if (!pattern.test(fetchUtils)) {
     violations.push(`${name} is not CSRF guarded`);
+  }
+}
+
+for (const [name, pattern] of requiredRecoveryContracts) {
+  if (!pattern.test(fetchUtils)) {
+    violations.push(`${name} is missing from the CSRF recovery path`);
   }
 }
 

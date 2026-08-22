@@ -44,6 +44,7 @@ RUN mkdir /var/www_public/
 COPY --from=publicbuild /www_public /var/www_public/
 COPY --from=adminbuild /www /var/www/
 COPY --from=adminbuild /code/tag_version /code/tag_version
+COPY --from=adminbuild /code/tag_version /var/www/tag_version
 
 VOLUME /certs
 COPY rcongui/entrypoint.sh /code/entrypoint.sh

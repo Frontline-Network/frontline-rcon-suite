@@ -78,6 +78,12 @@ class SharedSupervisorRuntimeTests(unittest.TestCase):
         self.assertFalse(thread.is_alive())
         self.assertEqual(calls, 1)
 
+    def test_restart_state_is_part_of_runtime_contract(self):
+        source = (Path(__file__).parents[1] / "rcon" / "supervisor_runtime.py").read_text()
+
+        self.assertIn('f"{name}:restart"', source)
+        self.assertIn("Restarting requested shared service", source)
+
 
 if __name__ == "__main__":
     unittest.main()
