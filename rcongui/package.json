@@ -23,6 +23,7 @@
     "check:bundle": "node scripts/check-initial-bundle-budget.mjs",
     "check:game-capabilities": "node scripts/check-game-timer-capabilities.mjs",
     "check:admin-actions": "node scripts/check-admin-action-contract.mjs",
+    "check:csrf": "node scripts/check-csrf-request-contract.mjs",
     "check:operator-copy": "node scripts/check-operator-copy.mjs",
     "check:polling": "node scripts/check-polling-budget.mjs",
     "check:teamkill-risk": "node scripts/check-teamkill-risk.mjs",

@@ -13,4 +13,6 @@ def csrf_failure(request, reason=""):
     """
 
     get_token(request)
-    return django_csrf_failure(request, reason=reason)
+    response = django_csrf_failure(request, reason=reason)
+    response["X-CRCON-CSRF-Recovery"] = "1"
+    return response

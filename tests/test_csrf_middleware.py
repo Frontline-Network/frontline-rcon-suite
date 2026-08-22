@@ -16,9 +16,16 @@ from django.http import HttpResponse
 from django.test import RequestFactory
 from django.views.decorators.csrf import csrf_exempt
 
-from rconweb.api import auth
-from rconweb.rconweb.csrf import csrf_failure
-from rconweb.rconweb.middleware import SessionCsrfProtectionMiddleware
+try:
+    # Repository-root test runs use the outer namespace package.
+    from rconweb.api import auth
+    from rconweb.rconweb.csrf import csrf_failure
+    from rconweb.rconweb.middleware import SessionCsrfProtectionMiddleware
+except ModuleNotFoundError:
+    # Django's manage.py adds ``rconweb/`` directly to sys.path.
+    from api import auth
+    from rconweb.csrf import csrf_failure
+    from rconweb.middleware import SessionCsrfProtectionMiddleware
 
 
 @csrf_exempt
@@ -29,20 +36,29 @@ def historically_exempt_view(_request):
 class SessionCsrfProtectionMiddlewareTests(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
-        self.middleware = SessionCsrfProtectionMiddleware(lambda request: HttpResponse())
+        self.middleware = SessionCsrfProtectionMiddleware(
+            lambda request: HttpResponse()
+        )
 
     def test_exempt_view_rejects_unsafe_browser_session_request_without_token(self):
-        request = self.factory.post("/api/change", data="{}", content_type="application/json")
+        request = self.factory.post(
+            "/api/change", data="{}", content_type="application/json"
+        )
         request.COOKIES[settings.SESSION_COOKIE_NAME] = "browser-session"
 
         response = self.middleware.process_view(
             request, historically_exempt_view, (), {}
         )
+        response = self.middleware.process_response(request, response)
 
         self.assertEqual(response.status_code, 403)
+        self.assertEqual(response["X-CRCON-CSRF-Recovery"], "1")
+        self.assertIn(settings.CSRF_COOKIE_NAME, response.cookies)
 
     def test_exempt_view_keeps_non_session_service_contract(self):
-        request = self.factory.post("/api/change", data="{}", content_type="application/json")
+        request = self.factory.post(
+            "/api/change", data="{}", content_type="application/json"
+        )
 
         response = self.middleware.process_view(
             request, historically_exempt_view, (), {}
@@ -62,14 +78,14 @@ class SessionCsrfProtectionMiddlewareTests(TestCase):
 
         self.assertIsNone(response)
 
-    @patch("rconweb.api.auth.heartbeat")
-    @patch("rconweb.api.auth.get_token")
+    @patch.object(auth, "heartbeat")
+    @patch.object(auth, "get_token")
     def test_authenticated_session_check_issues_a_csrf_cookie(
         self, get_token, _heartbeat
     ):
         request = self.factory.get("/api/is_logged_in")
         request.user = type(
-            "User", (), {"is_authenticated": True, "username": "admin"}
+            "User", (), {"is_authenticated": True, "username": "admin", "pk": 1}
         )()
 
         response = auth.is_logged_in(request)
@@ -77,11 +93,14 @@ class SessionCsrfProtectionMiddlewareTests(TestCase):
         self.assertEqual(response.status_code, 200)
         get_token.assert_called_once_with(request)
 
-    def test_csrf_failure_reissues_cookie_for_the_next_retry(self):
-        request = self.factory.post("/api/change", data="{}", content_type="application/json")
+    def test_csrf_failure_marks_response_and_reissues_cookie_for_retry(self):
+        request = self.factory.post(
+            "/api/change", data="{}", content_type="application/json"
+        )
 
         response = csrf_failure(request, reason="invalid token")
         response = self.middleware.process_response(request, response)
 
         self.assertEqual(response.status_code, 403)
+        self.assertEqual(response["X-CRCON-CSRF-Recovery"], "1")
         self.assertIn(settings.CSRF_COOKIE_NAME, response.cookies)
