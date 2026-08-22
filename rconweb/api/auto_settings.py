@@ -10,7 +10,11 @@ from .audit_log import record_audit
 from .auth import api_response, login_required
 from .decorators import permission_required, require_content_type, require_http_methods
 from .multi_servers import forward_request
-from .services import get_supervisor_client
+from .services import (
+    _uses_shared_runtime,
+    get_supervisor_client,
+    restart_shared_service,
+)
 from .utils import _get_data
 from .views import audit
 
@@ -24,6 +28,19 @@ AUTO_SETTINGS_KEY_ORDER = [
     "_available_conditions",
 ]
 AUTO_SETTINGS_KEY_INDEX_MAP = {v: i for i, v in enumerate(AUTO_SETTINGS_KEY_ORDER)}
+
+
+def _restart_auto_settings_service(client):
+    """Restart auto settings on shared and legacy Supervisor deployments."""
+
+    if _uses_shared_runtime(client):
+        return restart_shared_service("auto_settings")
+
+    process = client.supervisor.getProcessInfo("auto_settings")
+    if process["state"] == 20:  # The process is running
+        client.supervisor.stopProcess("auto_settings")
+        client.supervisor.startProcess("auto_settings")
+    return True
 
 
 @csrf_exempt
@@ -163,10 +180,12 @@ def set_auto_settings(request):
 
     if do_restart_service:
         client = get_supervisor_client()
-        process = client.supervisor.getProcessInfo("auto_settings")
-        if process["state"] == 20:  # The process is running
-            client.supervisor.stopProcess("auto_settings")
-            client.supervisor.startProcess("auto_settings")
+        # Compatible services run as threads in the shared Frontline runtime.
+        # They are deliberately absent from Supervisor's process table, so a
+        # legacy getProcessInfo call raises BAD_NAME. Request a cooperative
+        # restart when the shared runtime is active and keep the legacy path
+        # for older/isolated deployments.
+        _restart_auto_settings_service(client)
 
     if do_forward:
         forward_request(request)

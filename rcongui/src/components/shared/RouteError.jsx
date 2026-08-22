@@ -8,8 +8,8 @@ import siteConfig from "@/config/siteConfig";
 import { useTranslation } from "react-i18next";
 import { useEffect } from "react";
 
-const chunkLoadErrorPattern =
-  /failed to fetch dynamically imported module|importing a module script failed|chunkloaderror/i;
+const staleBundleErrorPattern =
+  /failed to fetch dynamically imported module|importing a module script failed|chunkloaderror|\(\s*0\s*,\s*[\w$]+\.isFunction\s*\)\s*is not a function/i;
 const chunkReloadKeyPrefix = "crcon.chunk-load-retry:";
 
 const getChunkReloadKey = (errorDetail) => {
@@ -35,10 +35,12 @@ export default function RouteError() {
       }
     })();
   const normalizedErrorDetail = String(errorDetail ?? "");
-  const isChunkLoadError = chunkLoadErrorPattern.test(normalizedErrorDetail);
+  const isStaleBundleError = staleBundleErrorPattern.test(
+    normalizedErrorDetail
+  );
 
   useEffect(() => {
-    if (!isChunkLoadError) return;
+    if (!isStaleBundleError) return;
 
     const reloadKey = getChunkReloadKey(normalizedErrorDetail);
     try {
@@ -49,7 +51,7 @@ export default function RouteError() {
       // If session storage is not available, keep the error visible instead of
       // risking a reload loop.
     }
-  }, [isChunkLoadError, normalizedErrorDetail]);
+  }, [isStaleBundleError, normalizedErrorDetail]);
 
   console.error(error);
   if (

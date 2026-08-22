@@ -93,6 +93,13 @@ def _set_shared_service_state(service_name: str, action: str, now: int | None = 
     return True
 
 
+def restart_shared_service(service_name: str):
+    """Request a cooperative restart from the shared supervisor runtime."""
+
+    get_redis_client().hset(STATE_KEY, f"{service_name}:restart", time.time_ns())
+    return True
+
+
 def get_supervisor_client():
     global supervisor_client
 
@@ -334,9 +341,11 @@ def do_service(request):
         )
     except CannotSendRequest as e:
         error = "Service request already sent"
+        failed = True
         logger.info(f"{error=}")
     except Fault as e:
         error = repr(e)
+        failed = True
 
     return api_response(
         command=command_name,
