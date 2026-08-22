@@ -85,25 +85,51 @@ function getCookie(name) {
     ?.slice(prefix.length);
 }
 
-async function refreshCsrfCookie(base) {
-  // An already-open browser tab can retain an old CSRF cookie across a backend
-  // deployment. Ask the authenticated session endpoint for a fresh cookie
-  // before retrying the *same* failed request once. No action is retried until
-  // this safe GET completed successfully.
-  const url = new URL("is_logged_in", base);
-  try {
-    const response = await fetch(url.toString(), {
-      method: "GET",
-      cache: "no-store",
-      credentials: "include",
-      headers: { Accept: "application/json" },
-      redirect: "follow",
-      referrerPolicy: "origin",
-    });
-    return response.ok && Boolean(getCookie("csrftoken"));
-  } catch {
-    return false;
+const SAFE_HTTP_METHODS = new Set(["GET", "HEAD", "OPTIONS", "TRACE"]);
+const CSRF_RECOVERY_HEADER = "X-CRCON-CSRF-Recovery";
+
+function isUnsafeMethod(method) {
+  return !SAFE_HTTP_METHODS.has(String(method || "GET").toUpperCase());
+}
+
+function requestHeadersWithCsrf(method, headers) {
+  const requestHeaders = new Headers(headers || {});
+  if (isUnsafeMethod(method)) {
+    const csrfToken = getCookie("csrftoken");
+    if (csrfToken) {
+      requestHeaders.set("X-CSRFToken", decodeURIComponent(csrfToken));
+    }
   }
+  return requestHeaders;
+}
+
+/**
+ * Send a browser request with the session CSRF token.
+ *
+ * A CSRF-rejected request has not executed on the backend. The dedicated
+ * response marker therefore allows exactly one safe retry with the fresh
+ * cookie issued by Django. Normal permission-related 403 responses are never
+ * retried.
+ */
+export async function fetchWithCsrf(input, options = {}) {
+  const method = String(options.method || "GET").toUpperCase();
+  const send = () =>
+    fetch(input, {
+      ...options,
+      method,
+      credentials: options.credentials || "include",
+      headers: requestHeadersWithCsrf(method, options.headers),
+    });
+
+  let response = await send();
+  if (
+    isUnsafeMethod(method) &&
+    response.status === 403 &&
+    response.headers.get(CSRF_RECOVERY_HEADER) === "1"
+  ) {
+    response = await send();
+  }
+  return response;
 }
 
 async function requestFactory({
@@ -141,38 +167,16 @@ async function requestFactory({
     referrerPolicy: "origin",
   };
 
-  const isUnsafeRequest = method !== "GET" && method !== "HEAD";
-  const createRequest = () => {
-    const requestHeaders = { ...headers };
-    if (isUnsafeRequest) {
-      const csrfToken = getCookie("csrftoken");
-      if (csrfToken) {
-        requestHeaders["X-CSRFToken"] = decodeURIComponent(csrfToken);
-      }
-    }
+  // Add a body for all mutating JSON requests.
+  if (isUnsafeMethod(method)) {
+    const contentType = new Headers(headers).get("Content-Type");
+    requestOptions.body =
+      contentType === "application/json" ? JSON.stringify(payload) : payload;
+  }
 
-    const options = { ...requestOptions, headers: requestHeaders };
-    if (isUnsafeRequest) {
-      options.body =
-        headers["Content-Type"] === "application/json"
-          ? JSON.stringify(payload)
-          : payload;
-    }
-    return new Request(url.toString(), options);
-  };
-
+  const req = { method: String(method).toUpperCase() };
   try {
-    let req = createRequest();
-    let res = await fetch(req);
-
-    if (res.status === 403 && isUnsafeRequest && !isSessionRecoveryCommand(cmd)) {
-      const recovered = await refreshCsrfCookie(base);
-      if (recovered) {
-        req = createRequest();
-        res = await fetch(req);
-      }
-    }
-
+    const res = await fetchWithCsrf(url.toString(), requestOptions);
     return await handleFetchResponse(req, res, cmd);
   } catch (error) {
     if (throwRouteError) {
@@ -720,7 +724,7 @@ export const cmd = {
 export async function mobileRequest(path, { method = "GET", payload } = {}) {
   const apiBase = new URL(CRCON_API, document.location.origin);
   const url = new URL(`mobile/v1/${path}`, apiBase);
-  const response = await fetch(url, {
+  const response = await fetchWithCsrf(url, {
     method,
     mode: "cors",
     cache: "no-store",
@@ -746,7 +750,7 @@ export async function mobileRequest(path, { method = "GET", payload } = {}) {
 export async function discordRequest(path, { method = "GET", payload } = {}) {
   const apiBase = new URL(CRCON_API, document.location.origin);
   const url = new URL(`discord/v1/${path}`, apiBase);
-  const response = await fetch(url, {
+  const response = await fetchWithCsrf(url, {
     method,
     mode: "cors",
     cache: "no-store",
@@ -948,7 +952,7 @@ async function handle_http_errors(error) {
 }
 
 async function get(path) {
-  const response = await fetch(`${CRCON_API}${path}`, {
+  const response = await fetchWithCsrf(`${CRCON_API}${path}`, {
     method: "GET", // *GET, POST, PUT, DELETE, etc.
     mode: "cors", // no-cors, *cors, same-origin
     cache: "default", // *default, no-cache, reload, force-cache, only-if-cached
@@ -962,7 +966,7 @@ async function get(path) {
 
 async function postData(url = "", data = {}) {
   // Default options are marked with *
-  const response = await fetch(url, {
+  const response = await fetchWithCsrf(url, {
     method: "POST", // *GET, POST, PUT, DELETE, etc.
     mode: "cors", // no-cors, *cors, same-origin
     cache: "default", // *default, no-cache, reload, force-cache, only-if-cached

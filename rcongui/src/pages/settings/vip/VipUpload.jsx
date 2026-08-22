@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { cmd } from "@/utils/fetchUtils";
+import { cmd, fetchWithCsrf } from "@/utils/fetchUtils";
 import { Alert, Button, Stack, CircularProgress, Typography } from "@mui/material";
 import { CloudUpload } from "@mui/icons-material";
 import { InputFileUpload } from "@/components/shared/InputFileUpload";
@@ -24,7 +24,7 @@ const VipUpload = () => {
 
       queryClient.invalidateQueries({ queryKey: [{ queryIdentifier: "vip_upload_status" }] });
 
-      const response = await fetch(
+      const response = await fetchWithCsrf(
         `${process.env.REACT_APP_API_URL}upload_vips`,
         {
           method: "POST",
