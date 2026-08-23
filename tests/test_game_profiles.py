@@ -4,23 +4,23 @@ from unittest.mock import Mock, call
 
 import pytest
 
-from rcon.commands import HLLCommandFailedError, HLLServerCtl, HLLVServerCtl
-from rcon.connection import HLLBrokenConnectionError, HLLCommandError
 from rcon.api_commands import (
     HLLRconAPI,
     HLLVRconAPI,
     RconAPI,
     create_rcon_api,
 )
+from rcon.commands import HLLCommandFailedError, HLLServerCtl, HLLVServerCtl
+from rcon.connection import HLLBrokenConnectionError, HLLCommandError
 from rcon.game import get_game_profile
 from rcon.game.hll.profile import HLL_PROFILE
 from rcon.game.hllv import legacy_layers
-from rcon.game.hllv.profile import HLLV_PROFILE
 from rcon.game.hllv.legacy_layers import (
     HLLV_LEGACY_CATALOG_VERSION,
     report_unknown_hllv_layer,
 )
-from rcon.maps import GameMode, Team, UNKNOWN_MAP_NAME
+from rcon.game.hllv.profile import HLLV_PROFILE
+from rcon.maps import UNKNOWN_MAP_NAME, GameMode, Team
 from rcon.rcon import HLLRcon, HLLVRcon, Rcon, create_rcon
 from rcon.types import GameEnum, ServerInfo
 
@@ -54,6 +54,26 @@ def _session(map_id: str, game_mode: str = "Warfare") -> dict:
 
 def test_server_info_defaults_game_even_without_port():
     assert ServerInfo().game is GameEnum.HLL_WW2
+
+
+@pytest.mark.parametrize(
+    ("controller_type", "leader_role"),
+    [
+        (HLLRcon, "officer"),
+        (HLLRcon, "artilleryobserver"),
+        (HLLVRcon, "squadleader"),
+        (HLLVRcon, "mortarobserver"),
+        (HLLVRcon, "helicopterlogisticsofficer"),
+    ],
+)
+def test_no_leader_automod_detects_game_specific_squad_leaders(
+    controller_type, leader_role
+):
+    controller = controller_type.__new__(controller_type)
+    controller.config = SimpleNamespace(game=controller_type.game_test_command(None))
+
+    assert controller._has_leader({"players": [{"role": leader_role}]}) is True
+    assert controller._has_leader({"players": [{"role": "rifleman"}]}) is False
 
 
 @pytest.mark.parametrize(

@@ -8,10 +8,10 @@ const NoLeaderAutoMod = `
                 - 4. kick
 
                 Note :
-                The state cycle for a given squad only resets once it finally has an officer.
+                The state cycle for a given squad only resets once it finally has a squad leader.
                 So, for example, if you disabled the kick and have 3 punishes configured,
                 once the 3 punishes are through, that's it : nothing will happen anymore for that squad,
-                even if they still don't have an officer.
+                even if they still don't have a squad leader.
 
                 Note 2:
                 notes, warnings, punishes and kicks are tracked per player, not at the squad level.
@@ -45,6 +45,8 @@ const NoLeaderAutoMod = `
             /*
                 Roles that are immune to punishes and kicks
                 (this must be a list, the syntax is important)
+                The role names use CRCON's shared HLL/HLLV catalog. In both games,
+                'officer' represents the infantry squad-leader responsibility.
                 Available roles are : 'armycommander', 'officer', 'rifleman', 'assault',
                 'automaticrifleman', 'medic', 'support', 'heavymachinegunner', 'antitank',
                 'engineer', 'tankcommander', 'crewman', 'spotter', 'sniper'
@@ -74,9 +76,9 @@ const NoLeaderAutoMod = `
 
             /*
                 Step 1 of 4
-                If a squad has no officer all members are noted internally but no action is taken.
+                If a squad has no squad leader all members are noted internally but no action is taken.
                 Since we sometimes receive wrong data from the game server, we note those players
-                and see if these squads still don't have an officer the next time we check.
+                and see if these squads still don't have a squad leader the next time we check.
                 - set to 0 to disable (it will directly move to warn) ;
                 - set to 1 to X to note the squad X times before moving to the warning step.
                 Recommended : 1
@@ -92,7 +94,7 @@ const NoLeaderAutoMod = `
 
             /*
                 Step 2 of 4
-                Send a direct warning message to the squads that don't have an officer.
+                Send a direct warning message to the squads that don't have a squad leader.
                 - set to 0 to disable (directly move to punish step) ;
                 - set to -1 for infinite warnings (will never go to punish step) ;
                 - set to 1 or Y to warn squad Y times before moving to punish step.
@@ -115,11 +117,11 @@ const NoLeaderAutoMod = `
                 - {max_warnings} ;
                 - {next_check_seconds}.
             */
-            "warning_message": "Warning, {player_name}! Your squad ({squad_name}) does not have an officer. Players of squads without an officer will be punished after {max_warnings} warnings (you already received {received_warnings}), then kicked.\\nNext check will happen automatically in {next_check_seconds}s.",
+            "warning_message": "Warning, {player_name}! Your squad ({squad_name}) does not have a squad leader. Players in squads without a squad leader will be punished after {max_warnings} warnings (you already received {received_warnings}), then kicked.\\nNext check will happen automatically in {next_check_seconds}s.",
         
             /*
                 Step 3 of 4
-                Starts punishing if the squad still doesn't have an officer
+                Starts punishing if the squad still doesn't have a squad leader
                 after 'number_of_warnings' * 'warning_interval_seconds'
                 - set to 0 to disable to punish entirely ;
                 - set to -1 for infinite punish (will never go to kick step) ;
@@ -156,7 +158,7 @@ const NoLeaderAutoMod = `
                 - {max_punishes} ;
                 - {next_check_seconds}.
             */
-            "punish_message": "Your squad ({squad_name}) must have an officer.\\nYou're being punished by a bot ({received_punishes}/{max_punishes}).\\nNext check in {next_check_seconds} seconds",
+            "punish_message": "Your squad ({squad_name}) must have a squad leader.\\nYou're being punished by a bot ({received_punishes}/{max_punishes}).\\nNext check in {next_check_seconds} seconds",
 
             /*
                 Step 4 of 4
@@ -193,8 +195,8 @@ const NoLeaderAutoMod = `
                 - {squad_name} ;
                 - {kick_grace_period}.
             */
-            "kick_message": "Your Squad ({squad_name}) must have an officer.\\nYour grace period of {kick_grace_period}s has passed.\\nYou failed to comply with the previous warnings.",
+            "kick_message": "Your squad ({squad_name}) must have a squad leader.\\nYour grace period of {kick_grace_period}s has passed.\\nYou failed to comply with the previous warnings.",
         }
-    `
+    `;
 
-    export default NoLeaderAutoMod;
+export default NoLeaderAutoMod;
