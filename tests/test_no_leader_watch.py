@@ -19,7 +19,12 @@ from rcon.automods.models import (
 )
 from rcon.automods.no_leader import NoLeaderAutomod
 from rcon.types import GameStateType, Roles
-from rcon.user_config.auto_mod_no_leader import AutoModNoLeaderUserConfig
+from rcon.user_config.auto_mod_no_leader import (
+    KICK_MESSAGE,
+    PUNISH_MESSAGE,
+    WARNING_MESSAGE,
+    AutoModNoLeaderUserConfig,
+)
 
 state = {}
 redis_store = {}
@@ -602,6 +607,63 @@ def test_should_not_note(team_view):
         watch_status, "able", aplayer
     )
     assert WatchStatus() == watch_status
+
+
+def test_hll_and_hllv_squad_leaders_share_officer_immunity(team_view):
+    config = AutoModNoLeaderUserConfig(
+        number_of_notes=1,
+        number_of_warnings=1,
+        number_of_punishments=1,
+        kick_after_max_punish=True,
+        immune_roles=[Roles.squad_lead],
+    )
+    mod = mod_with_config(config)
+    squad = team_view["allies"]["squads"]["able"]
+
+    for live_role in ("officer", "squadleader"):
+        watch_status = WatchStatus()
+        player = dict(team_view["allies"]["squads"]["able"]["players"][0])
+        player["role"] = live_role
+        aplayer = construct_aplayer(player)
+        watch_status.punished.setdefault(aplayer.name, []).append(datetime.now())
+
+        assert (
+            mod.should_note_player(watch_status, "able", aplayer)
+            is PunishStepState.IMMUNED
+        )
+        assert (
+            mod.should_warn_player(watch_status, "able", aplayer)
+            is PunishStepState.IMMUNED
+        )
+        assert (
+            mod.should_punish_player(watch_status, team_view, "able", squad, aplayer)
+            is PunishStepState.IMMUNED
+        )
+        assert (
+            mod.should_kick_player(watch_status, team_view, "able", squad, aplayer)
+            is PunishStepState.IMMUNED
+        )
+
+
+def test_unknown_hllv_role_does_not_abort_automod(team_view):
+    config = AutoModNoLeaderUserConfig(
+        number_of_notes=1,
+        immune_roles=[Roles.squad_lead],
+    )
+    mod = mod_with_config(config)
+    player = dict(team_view["allies"]["squads"]["able"]["players"][0])
+    player["role"] = "futurevietnamrole"
+
+    assert (
+        mod.should_note_player(WatchStatus(), "able", construct_aplayer(player))
+        is PunishStepState.APPLY
+    )
+
+
+def test_default_messages_are_game_neutral():
+    for message in (WARNING_MESSAGE, PUNISH_MESSAGE, KICK_MESSAGE):
+        assert "squad leader" in message.lower()
+        assert "officer" not in message.lower()
 
 
 def test_should_note_twice(team_view):
