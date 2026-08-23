@@ -1,5 +1,6 @@
 import os
 from contextlib import contextmanager
+from datetime import datetime, timezone
 
 import pytest
 from sqlalchemy import create_engine
@@ -180,9 +181,7 @@ def test_recent_teamkill_recovers_disconnected_target_with_cached_stats():
     assert target["recent_teamkill"]["seconds_before_report"] == 20
 
 
-def test_chat_ingestion_links_recent_offline_teamkiller(
-    incident_database, monkeypatch
-):
+def test_chat_ingestion_links_recent_offline_teamkiller(incident_database, monkeypatch):
     monkeypatch.setenv("INCIDENT_CONTEXT_MODE", "enabled")
     monkeypatch.setattr(incidents, "get_server_number", lambda: 1)
     incident, created = incidents.create_incident_from_chat(
@@ -774,6 +773,34 @@ def test_action_idempotency_key_is_reserved_once(incident_database):
     assert next_cursor > cursor
     assert retry_created is False
     assert outcome["event_type"] == "action"
+
+
+def test_action_result_datetimes_are_json_safe(incident_database):
+    incident, _ = incidents.create_incident(
+        server_number=1,
+        source="manual",
+        reason="blacklist action test",
+        actor="alice",
+    )
+    incidents.reserve_incident_action(
+        incident["id"],
+        actor="alice",
+        action="blacklist",
+        arguments={"reason": "Cheating", "blacklist_id": 0},
+        idempotency_key="blacklist-action-json-safe",
+    )
+    created_at = datetime(2026, 8, 23, 19, 50, tzinfo=timezone.utc)
+
+    completed = incidents.complete_incident_action(
+        "blacklist-action-json-safe",
+        result={"id": 42, "created_at": created_at},
+    )
+
+    assert completed["events"][-1]["event_type"] == "action"
+    assert completed["events"][-1]["payload"]["result"] == {
+        "id": 42,
+        "created_at": created_at.isoformat(),
+    }
 
 
 def test_action_reservation_claims_incident_and_confirms_selected_suggestion(
