@@ -1668,6 +1668,15 @@ def test_crcon_templates_are_selected_before_editable_action_modal():
     assert text_input["custom_id"] == "reason"
     assert text_input["value"] == "Gespeicherter CRCON-Grund"
 
+    blacklist_modal = _action_modal(
+        "22222222-2222-2222-2222-222222222222",
+        "3",
+        "blacklist",
+        initial_text="Cheating",
+    )
+    assert len(blacklist_modal["data"]["components"]) == 1
+    assert "blacklist_id" not in str(blacklist_modal)
+
 
 def _modal_interaction(action: str) -> dict:
     text_key = "message" if action == "message" else "reason"

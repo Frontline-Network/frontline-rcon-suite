@@ -473,22 +473,6 @@ def _action_modal(
                 ],
             }
         )
-    if action == "blacklist":
-        inputs.append(
-            {
-                "type": 1,
-                "components": [
-                    {
-                        "type": 4,
-                        "custom_id": "blacklist_id",
-                        "label": "Blacklist-ID",
-                        "style": 1,
-                        "required": True,
-                        "max_length": 10,
-                    }
-                ],
-            }
-        )
     return {
         "type": 9,
         "data": {
@@ -1623,16 +1607,9 @@ async def discord_interaction(
                     "data": {"content": "Die Dauer muss eine Zahl sein.", "flags": 64},
                 }
         if recommended_action == "blacklist":
-            try:
-                modal_values["blacklist_id"] = int(modal_values["blacklist_id"])
-            except (KeyError, ValueError):
-                return {
-                    "type": 4,
-                    "data": {
-                        "content": "Die Blacklist-ID muss eine Zahl sein.",
-                        "flags": 64,
-                    },
-                }
+            # CRCON's built-in Default blacklist always has ID 0.  Discord
+            # moderators should not need to know or type an internal DB ID.
+            modal_values["blacklist_id"] = 0
         match = True
     else:
         match = re.fullmatch(
