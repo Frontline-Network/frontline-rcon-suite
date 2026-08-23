@@ -40,6 +40,8 @@ export default function ConfigFormSection({
         borderRadius: plain ? 0 : undefined,
         bgcolor: plain ? "transparent" : undefined,
         boxShadow: plain ? "none" : undefined,
+        p: plain ? 0 : undefined,
+        gap: plain ? 0 : undefined,
         ...sx,
       }}
     >
@@ -87,7 +89,7 @@ export default function ConfigFormSection({
               <Typography
                 id={headingId}
                 component="h2"
-                variant={plain ? "subtitle1" : "h6"}
+                variant="h6"
                 fontWeight={800}
                 sx={
                   plain
@@ -118,7 +120,7 @@ export default function ConfigFormSection({
       {!plain && <Divider sx={{ my: 2 }} />}
       <CardContent
         aria-disabled={disabled}
-        sx={plain ? { p: 0, pt: 2.5, "&:last-child": { pb: 0 } } : undefined}
+        sx={plain ? { p: 0, pt: 0.5, "&:last-child": { pb: 0 } } : undefined}
       >
         {children}
       </CardContent>

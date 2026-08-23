@@ -1,7 +1,7 @@
 export const noLeaderConfig = {
   enabled: true,
-  dry_run: false,
-  discord_webhook_url: "",
+  dry_run: true,
+  discord_webhook_url: null,
   whitelist_flags: [],
   immune_roles: [],
   immune_player_level: 1,
@@ -11,7 +11,7 @@ export const noLeaderConfig = {
   number_of_warnings: 2,
   warning_interval_seconds: 60,
   warning_message:
-    "Dein Trupp {squad_name} hat keinen Truppführer. Bitte bestimme einen Truppführer, sonst folgt eine Bestrafung.",
+    "{player_name}, euer Trupp „{squad_name}“ hat keinen Truppführer.\nBitte bestimmt einen Truppführer, sonst folgt eine Bestrafung.",
   number_of_punishments: 5,
   min_squad_players_for_punish: 1,
   min_server_players_for_punish: 40,

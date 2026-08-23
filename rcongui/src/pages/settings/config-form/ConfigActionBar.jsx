@@ -29,6 +29,7 @@ const renderAction = (action, fallbackVariant, fullWidth = false) => {
       onClick={action.onClick}
       disabled={action.disabled || action.loading}
       fullWidth={fullWidth}
+      sx={{ textTransform: "none", whiteSpace: "nowrap", ...action.sx }}
     >
       {action.loading && action.loadingLabel
         ? action.loadingLabel
@@ -57,13 +58,14 @@ export default function ConfigActionBar({
         zIndex: (theme) => theme.zIndex.appBar - 1,
         mt: 0,
         mx: { xs: -1, sm: 0 },
-        px: { xs: 1, sm: 1.5 },
-        py: 1.25,
+        px: { xs: 1.5, sm: 3 },
+        py: { xs: 1.5, sm: 2 },
         border: "1px solid",
         borderTop: 0,
         borderColor: "divider",
         bgcolor: "background.paper",
-        boxShadow: sticky ? "0 -10px 24px rgba(0,0,0,0.12)" : 0,
+        borderRadius: "0 0 8px 8px",
+        boxShadow: sticky ? "0 -4px 12px rgba(0,0,0,0.06)" : 0,
       }}
     >
       <Stack
@@ -78,14 +80,28 @@ export default function ConfigActionBar({
           alignItems="center"
           sx={{ minWidth: 0 }}
         >
-          {stateIcon}
+          {stateIcon && (
+            <Box
+              sx={{
+                display: "grid",
+                placeItems: "center",
+                flex: "0 0 auto",
+                width: 30,
+                height: 30,
+                bgcolor: dirty ? "rgba(214, 170, 77, 0.08)" : "action.hover",
+                borderRadius: 0.75,
+              }}
+            >
+              {stateIcon}
+            </Box>
+          )}
           <Box sx={{ minWidth: 0 }}>
             {dirty && dirtyLabel && (
               <Typography
                 variant="overline"
                 color="warning.main"
                 data-testid="config-dirty-indicator"
-                sx={{ display: "block" }}
+                sx={{ display: "block", textTransform: "none" }}
               >
                 {dirtyLabel}
               </Typography>
@@ -120,7 +136,7 @@ export default function ConfigActionBar({
                 }
               : null,
             "contained",
-            true
+            false
           )}
         </Stack>
       </Stack>

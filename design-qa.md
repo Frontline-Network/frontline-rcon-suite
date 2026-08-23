@@ -2,10 +2,12 @@
 
 ## Vergleichsbasis
 
-- Referenz: gewählte Variante 2 (`exec-3b5661b8-d5d3-446f-96a4-470936ff7afa.png`)
+- Referenz: finale Nutzervorlage (`codex-clipboard-79491ed8-28e5-4c2b-b580-7dfa4d38f2fb.png`)
 - Referenzgröße: 1683 × 935 Pixel
 - Implementierung: `/settings/automods/no-leader` im lokalen Demo-Modus
 - Prüfzustand: Deutsch, Formularmodus, Abschnitt „Warnen“, Testbetrieb, ungespeicherte Änderung
+- Implementierungsaufnahme: `no-leader-warning-final-qa-v3.png`
+- Gemeinsamer Vergleich: `no-leader-reference-vs-implementation-final-v2.png`
 
 ## Visueller Vergleich
 
@@ -23,13 +25,22 @@ Referenz und Implementierung wurden bei identischer Viewportgröße in einer gem
 
 Die bestehenden globalen Navigations- und Matchstatus-Komponenten bleiben unverändert und folgen weiterhin dem aktuellen CRCON-Layout.
 
+Die Vorlage zeigt im rechten Bereich exemplarisch „Kick kann nicht erreicht werden“. Die Implementierung berechnet diesen Status dagegen aus den tatsächlich gewählten Warn-, Bestrafungs- und Kick-Zeiten. Im geprüften Zustand ist „Kick ist erreichbar“ daher die fachlich korrekte, bewusst beibehaltene Ausgabe.
+
 ## Responsive und funktionale Prüfung
 
 - 1683 × 935: Drei-Spalten-Layout und sticky Aktionsleiste geprüft.
 - 768 × 900: Formular und Zusammenfassung umbrechen ohne abgeschnittene Inhalte.
 - 390 × 844: mobile Abschnittsnavigation, Formularelemente und Aktionsbereich geprüft.
-- Formular → JSON → Formular: Entwurf bleibt erhalten.
+- 1440 Pixel und 390 Pixel: kein horizontaler Seitenüberlauf.
+- Formular → JSON → Formular: Entwurf und rohe Backend-Platzhalter bleiben erhalten.
+- Deutsche Anzeigenamen wie `{Spielername}` und `{Truppname}` werden bidirektional auf die unveränderten Backend-Platzhalter abgebildet.
+- Abschnittsnavigation: Vorschau und Zusammenfassung reagieren auf Warnmodus, Anzahl und Intervall.
 - Änderung → Zurücksetzen: Dirty-State wird gesetzt und anschließend korrekt entfernt.
+- Speichern im lokalen Demo-Modus: Werte bleiben nach einem erneuten Laden erhalten.
+- Ungültiges JSON: Editor meldet den Fehler, ohne den letzten gültigen Entwurf zu verlieren.
+- HLL und HLL: Vietnam: beide Spielprofile durch den gleichen Formular- und Validierungsfluss geprüft.
+- Zielgerichtete E2E-Suite: 12 von 12 Tests erfolgreich.
 - Produktions-Build: erfolgreich.
 - `git diff --check`: erfolgreich.
 

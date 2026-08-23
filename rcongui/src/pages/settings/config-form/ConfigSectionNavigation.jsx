@@ -7,6 +7,16 @@ import {
   Tabs,
   Typography,
 } from "@mui/material";
+import CheckIcon from "@mui/icons-material/Check";
+import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
+import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
+import CheckBoxOutlinedIcon from "@mui/icons-material/CheckBoxOutlined";
+
+const completedSectionIcons = {
+  operation: <ShieldOutlinedIcon sx={{ fontSize: 15 }} />,
+  exemptions: <WarningAmberOutlinedIcon sx={{ fontSize: 15 }} />,
+  observation: <CheckBoxOutlinedIcon sx={{ fontSize: 15 }} />,
+};
 
 const getSectionLabel = (section) =>
   typeof section.label === "string" ? section.label : section.id;
@@ -75,22 +85,16 @@ export default function ConfigSectionNavigation({
       <Box
         sx={{
           display: { xs: "none", md: "block" },
-          p: 3,
+          px: 1.5,
+          py: 2.125,
         }}
       >
-        {label && (
-          <Typography
-            variant="overline"
-            color="text.secondary"
-            sx={{ display: "block", mb: 2 }}
-          >
-            {label}
-          </Typography>
-        )}
         <List
           disablePadding
           sx={{
             bgcolor: "transparent",
+            px: "0 !important",
+            ml: 0.25,
             "& .MuiListItemButton-root, & .MuiListItemText-root": {
               bgcolor: "transparent !important",
             },
@@ -98,6 +102,7 @@ export default function ConfigSectionNavigation({
         >
           {sections.map((section, index) => {
             const selected = section.id === selectedSection;
+            const complete = section.status === "complete" && !selected;
 
             return (
               <ListItemButton
@@ -108,7 +113,7 @@ export default function ConfigSectionNavigation({
                 aria-current={selected ? "step" : undefined}
                 sx={{
                   position: "relative",
-                  minHeight: 60,
+                  minHeight: 72,
                   p: 0,
                   pl: 5.25,
                   alignItems: "flex-start",
@@ -116,13 +121,17 @@ export default function ConfigSectionNavigation({
                   "&:hover, &.Mui-selected, &.Mui-selected:hover": {
                     bgcolor: "transparent",
                   },
+                  "&.Mui-focusVisible": {
+                    bgcolor: "transparent",
+                    boxShadow: "none",
+                  },
                   "&::before": {
                     content: '""',
                     position: "absolute",
                     left: 15,
                     top: index === 0 ? 21 : 0,
-                    bottom: index === sections.length - 1 ? 39 : 0,
-                    width: 1,
+                    bottom: index === sections.length - 1 ? 51 : 0,
+                    width: "1px",
                     bgcolor: "divider",
                   },
                 }}
@@ -147,9 +156,21 @@ export default function ConfigSectionNavigation({
                     fontWeight: 900,
                   }}
                 >
-                  {index + 1}
+                  {complete
+                    ? completedSectionIcons[section.id] || (
+                        <CheckIcon sx={{ fontSize: 17 }} />
+                      )
+                    : index + 1}
                 </Box>
                 <ListItemText
+                  sx={{
+                    m: 0,
+                    mt: 0.5,
+                    bgcolor: "transparent !important",
+                    "& .MuiTypography-root": {
+                      bgcolor: "transparent !important",
+                    },
+                  }}
                   primary={section.label}
                   secondary={section.description}
                   primaryTypographyProps={{

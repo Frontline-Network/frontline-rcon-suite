@@ -77,7 +77,7 @@ function NumberStepper({
         alignItems="center"
         sx={{
           width: "100%",
-          minHeight: 46,
+          minHeight: 40,
           border: "1px solid",
           borderColor: "divider",
           bgcolor: "background.default",
@@ -88,7 +88,7 @@ function NumberStepper({
           disabled={disabled || Number(value) <= (minimum ?? 0)}
           onClick={() => update(Number(value) - 1)}
           aria-label={`${ariaLabel} -`}
-          sx={{ borderRadius: 0, width: 44, alignSelf: "stretch" }}
+          sx={{ borderRadius: 0, width: 40, alignSelf: "stretch" }}
         >
           <RemoveIcon fontSize="small" />
         </IconButton>
@@ -108,20 +108,28 @@ function NumberStepper({
           }
           onClick={() => update(Number(value) + 1)}
           aria-label={`${ariaLabel} +`}
-          sx={{ borderRadius: 0, width: 44, alignSelf: "stretch" }}
+          sx={{ borderRadius: 0, width: 40, alignSelf: "stretch" }}
         >
           <AddIcon fontSize="small" />
         </IconButton>
+        {unit && (
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{
+              display: "grid",
+              placeItems: "center",
+              alignSelf: "stretch",
+              minWidth: 88,
+              px: 1.25,
+              borderLeft: "1px solid",
+              borderColor: "divider",
+            }}
+          >
+            {unit}
+          </Typography>
+        )}
       </Stack>
-      {unit && (
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ mt: 0.5, display: "block" }}
-        >
-          {unit}
-        </Typography>
-      )}
     </Box>
   );
 }
@@ -189,6 +197,59 @@ export const validateProfiledConfig = (schema, data, profile, t) => {
           label,
           message: t("settings.configForms.workbench.validation.maximum", {
             value: property.maximum,
+          }),
+          sectionId,
+        });
+      }
+    }
+
+    if (metadata?.kind === "url" && typeof value === "string") {
+      try {
+        const parsed = new URL(value);
+        if (!["http:", "https:"].includes(parsed.protocol)) throw new Error();
+      } catch {
+        errors.push({
+          id: `${name}-url`,
+          label,
+          message: t("settings.configForms.workbench.validation.url"),
+          sectionId,
+        });
+      }
+    }
+
+    if (type === "array" && Array.isArray(value)) {
+      const allowedValues =
+        property.items?.enum instanceof Array
+          ? new Set(property.items.enum)
+          : null;
+      if (allowedValues && value.some((item) => !allowedValues.has(item))) {
+        errors.push({
+          id: `${name}-enum`,
+          label,
+          message: t("settings.configForms.workbench.validation.enum"),
+          sectionId,
+        });
+      }
+      if (new Set(value).size !== value.length) {
+        errors.push({
+          id: `${name}-duplicate`,
+          label,
+          message: t("settings.configForms.workbench.validation.duplicate"),
+          sectionId,
+        });
+      }
+    }
+
+    if (metadata?.placeholders && typeof value === "string") {
+      const allowed = new Set(metadata.placeholders);
+      const used = value.match(/\{[^{}]+\}/g) || [];
+      const invalid = [...new Set(used.filter((token) => !allowed.has(token)))];
+      if (invalid.length) {
+        errors.push({
+          id: `${name}-placeholder`,
+          label,
+          message: t("settings.configForms.workbench.validation.placeholder", {
+            values: invalid.join(", "),
           }),
           sectionId,
         });
@@ -307,6 +368,36 @@ function CountChoiceField({
 function MessageField({ name, value, metadata, disabled, onChange, data }) {
   const { t } = useTranslation();
   const placeholders = metadata.placeholders || [];
+  const localizedPlaceholder = (placeholder) =>
+    `{${t(
+      `settings.configForms.workbench.placeholders.${placeholder.replace(
+        /[{}]/g,
+        ""
+      )}`,
+      { defaultValue: placeholder.replace(/[{}]/g, "") }
+    )}}`;
+  const displayValue = placeholders.reduce(
+    (message, placeholder) =>
+      message.replaceAll(placeholder, localizedPlaceholder(placeholder)),
+    value || ""
+  );
+  const toStoredValue = (message) =>
+    placeholders.reduce(
+      (storedMessage, placeholder) =>
+        storedMessage.replaceAll(
+          localizedPlaceholder(placeholder),
+          placeholder
+        ),
+      message
+    );
+  const nextCheckSeconds =
+    name === "punish_message"
+      ? data?.punish_interval_seconds
+      : data?.warning_interval_seconds;
+  const warningTotal =
+    Number(data?.number_of_warnings) === -1
+      ? "∞"
+      : data?.number_of_warnings ?? 2;
 
   const insertPlaceholder = (placeholder) => {
     const current = value || "";
@@ -321,10 +412,7 @@ function MessageField({ name, value, metadata, disabled, onChange, data }) {
     .replaceAll("{received_warnings}", "1")
     .replaceAll("{max_punishes}", String(data?.number_of_punishments ?? 2))
     .replaceAll("{received_punishes}", "1")
-    .replaceAll(
-      "{next_check_seconds}",
-      String(data?.warning_interval_seconds ?? 60)
-    )
+    .replaceAll("{next_check_seconds}", String(nextCheckSeconds ?? 60))
     .replaceAll(
       "{kick_grace_period}",
       String(data?.kick_grace_period_seconds ?? 60)
@@ -333,24 +421,49 @@ function MessageField({ name, value, metadata, disabled, onChange, data }) {
   return (
     <Stack spacing={1.25}>
       <Box>
-        <Typography variant="body2" fontWeight={800}>
+        <Typography
+          variant="overline"
+          fontWeight={800}
+          sx={{ display: "block", lineHeight: 1.25 }}
+        >
           {t(metadata.labelKey)}
         </Typography>
-        <Typography variant="caption" color="text.secondary">
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: "block", lineHeight: 1.35, mt: 0.4 }}
+        >
           {t(metadata.helpKey)}
         </Typography>
       </Box>
       <TextField
         name={name}
         aria-label={t(metadata.labelKey)}
-        value={value || ""}
+        value={displayValue}
         disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => onChange(toStoredValue(event.target.value))}
         multiline
-        minRows={3}
+        minRows={name === "warning_message" ? 2 : 3}
         fullWidth
+        sx={
+          name === "warning_message"
+            ? {
+                mt: "4px !important",
+                "& .MuiInputBase-root": { minHeight: 82 },
+              }
+            : undefined
+        }
       />
-      <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
+      <Typography variant="caption" color="text.secondary">
+        {t("settings.configForms.workbench.availablePlaceholders")}
+      </Typography>
+      <Stack
+        direction="row"
+        spacing={0.75}
+        useFlexGap
+        flexWrap="wrap"
+        sx={{ mt: "2px !important" }}
+      >
         {placeholders.map((placeholder) => (
           <Chip
             key={placeholder}
@@ -365,36 +478,51 @@ function MessageField({ name, value, metadata, disabled, onChange, data }) {
             variant="outlined"
             disabled={disabled}
             onClick={() => insertPlaceholder(placeholder)}
+            sx={{ height: 24, "& .MuiChip-label": { px: 1 } }}
           />
         ))}
       </Stack>
-      <Box
-        sx={{
-          p: 1.25,
-          borderLeft: "3px solid",
-          borderColor: "primary.main",
-          bgcolor: "action.hover",
-        }}
-      >
-        <Typography variant="overline" color="text.secondary">
+      <Box sx={{ pt: 4.625 }}>
+        <Typography
+          variant="overline"
+          color="text.primary"
+          sx={{ display: "block", lineHeight: 1.25, mb: 0.75 }}
+        >
           {t("settings.configForms.workbench.messagePreview")}
         </Typography>
-        <Typography variant="body2" sx={{ overflowWrap: "anywhere" }}>
-          {preview || t("settings.configForms.workbench.messagePreviewEmpty")}
-        </Typography>
-        {name === "warning_message" && (
+        <Box
+          sx={{
+            p: 1.5,
+            minHeight: name === "warning_message" ? 93 : undefined,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            border: "1px solid",
+            borderColor: "divider",
+            bgcolor: "action.hover",
+            borderRadius: 0.75,
+          }}
+        >
           <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ display: "block", mt: 0.75 }}
+            variant="body2"
+            sx={{ overflowWrap: "anywhere", whiteSpace: "pre-line" }}
           >
-            {t("settings.configForms.workbench.warningPreviewMeta", {
-              current: 1,
-              total: data?.number_of_warnings ?? 2,
-              seconds: data?.warning_interval_seconds ?? 60,
-            })}
+            {preview || t("settings.configForms.workbench.messagePreviewEmpty")}
           </Typography>
-        )}
+          {name === "warning_message" && (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: "block", mt: 0.75 }}
+            >
+              {t("settings.configForms.workbench.warningPreviewMeta", {
+                current: 1,
+                total: warningTotal,
+                seconds: data?.warning_interval_seconds ?? 60,
+              })}
+            </Typography>
+          )}
+        </Box>
       </Box>
     </Stack>
   );
@@ -535,7 +663,11 @@ function FieldControl({
       disabled={disabled}
       onChange={(event) =>
         onChange(
-          type === "integer" ? Number(event.target.value) : event.target.value
+          type === "integer"
+            ? Number(event.target.value)
+            : metadata.kind === "url" && event.target.value === ""
+            ? null
+            : event.target.value
         )
       }
       fullWidth
@@ -565,84 +697,104 @@ function WarningFields({ profile, schema, data, disabled, onChange }) {
 
   return (
     <Stack spacing={2.5}>
-      <Box>
-        <Typography variant="body2" fontWeight={800}>
+      <Stack spacing={0}>
+        <Typography
+          variant="overline"
+          fontWeight={800}
+          sx={{ display: "block" }}
+        >
           {t("settings.configForms.workbench.warningMode")}
         </Typography>
-        <Typography variant="caption" color="text.secondary">
-          {t("settings.configForms.workbench.warningModeHelp")}
-        </Typography>
-      </Box>
-      <ToggleButtonGroup
-        exclusive
-        fullWidth
-        size="small"
-        value={countChoice}
-        disabled={disabled}
-        onChange={(_, nextChoice) => {
-          if (!nextChoice) return;
-          if (nextChoice === "skip") onChange("number_of_warnings", 0);
-          if (nextChoice === "unlimited") onChange("number_of_warnings", -1);
-          if (nextChoice === "count") {
-            onChange(
-              "number_of_warnings",
-              Number(data.number_of_warnings) > 0 ? data.number_of_warnings : 1
-            );
-          }
-        }}
-        aria-label={t(countMetadata.labelKey)}
-        sx={{
-          "& .MuiToggleButton-root": { borderRadius: 0, py: 0.9 },
-          "& .Mui-selected": {
-            bgcolor: "rgba(214, 170, 77, 0.08) !important",
-            color: "primary.main !important",
-            borderColor: "primary.main !important",
-          },
-        }}
-      >
-        {["skip", "count", "unlimited"].map((choice) => (
-          <ToggleButton key={choice} value={choice}>
-            <Box>
-              <Typography variant="body2" fontWeight={850}>
-                {t(`settings.configForms.workbench.choices.${choice}`)}
-              </Typography>
-              <Typography
-                component="span"
-                variant="caption"
-                color="text.secondary"
-              >
-                {t(`settings.configForms.workbench.choiceHelp.${choice}`)}
-              </Typography>
-            </Box>
-          </ToggleButton>
-        ))}
-      </ToggleButtonGroup>
+        <ToggleButtonGroup
+          exclusive
+          fullWidth
+          size="small"
+          value={countChoice}
+          disabled={disabled}
+          onChange={(_, nextChoice) => {
+            if (!nextChoice) return;
+            if (nextChoice === "skip") onChange("number_of_warnings", 0);
+            if (nextChoice === "unlimited") onChange("number_of_warnings", -1);
+            if (nextChoice === "count") {
+              onChange(
+                "number_of_warnings",
+                Number(data.number_of_warnings) > 0
+                  ? data.number_of_warnings
+                  : 1
+              );
+            }
+          }}
+          aria-label={t(countMetadata.labelKey)}
+          sx={{
+            borderRadius: 0.75,
+            overflow: "hidden",
+            "& .MuiToggleButton-root": {
+              borderRadius: 0,
+              py: 0.9,
+              textTransform: "none",
+            },
+            "& .Mui-selected": {
+              bgcolor: "rgba(214, 170, 77, 0.08) !important",
+              color: "primary.main !important",
+              borderColor: "primary.main !important",
+              borderRadius: "6px !important",
+            },
+          }}
+        >
+          {["skip", "count", "unlimited"].map((choice) => (
+            <ToggleButton key={choice} value={choice}>
+              <Box>
+                <Typography variant="body2" fontWeight={850}>
+                  {t(`settings.configForms.workbench.choices.${choice}`)}
+                </Typography>
+                <Typography
+                  component="span"
+                  variant="caption"
+                  color="text.secondary"
+                >
+                  {t(`settings.configForms.workbench.choiceHelp.${choice}`)}
+                </Typography>
+              </Box>
+            </ToggleButton>
+          ))}
+        </ToggleButtonGroup>
+      </Stack>
 
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-          gap: 2,
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "minmax(0, 323px) minmax(0, 280px)",
+          },
+          gap: { xs: 2, sm: 3.25 },
+          maxWidth: { sm: 629 },
         }}
       >
         {countChoice === "count" && (
           <Box>
-            <Typography variant="body2" fontWeight={800} sx={{ mb: 0.75 }}>
+            <Typography variant="overline" fontWeight={800} sx={{ mb: 0.75 }}>
               {t("settings.configForms.workbench.warningsBeforePunish")}
             </Typography>
             <NumberStepper
               value={data.number_of_warnings}
               minimum={Math.max(1, countProperty.minimum || 1)}
               maximum={countProperty.maximum}
-              unit={t(countMetadata.unitKey)}
               disabled={disabled}
               onChange={(value) => onChange("number_of_warnings", value)}
               ariaLabel={t(countMetadata.labelKey)}
             />
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: "block", mt: 0.75 }}
+            >
+              {t("settings.configForms.workbench.warningsBeforePunishHelp")}
+            </Typography>
           </Box>
         )}
         <Box>
-          <Typography variant="body2" fontWeight={800} sx={{ mb: 0.75 }}>
+          <Typography variant="overline" fontWeight={800} sx={{ mb: 0.75 }}>
             {t(profile.fields.warning_interval_seconds.labelKey)}
           </Typography>
           <NumberStepper
@@ -654,6 +806,13 @@ function WarningFields({ profile, schema, data, disabled, onChange }) {
             onChange={(value) => onChange("warning_interval_seconds", value)}
             ariaLabel={t(profile.fields.warning_interval_seconds.labelKey)}
           />
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: "block", mt: 0.75 }}
+          >
+            {t("settings.configForms.workbench.warningIntervalHelp")}
+          </Typography>
         </Box>
       </Box>
 

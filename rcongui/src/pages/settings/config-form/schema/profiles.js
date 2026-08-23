@@ -101,7 +101,6 @@ const noLeaderProfile = {
       placeholders: [
         "{player_name}",
         "{squad_name}",
-        "{max_warnings}",
         "{received_warnings}",
         "{next_check_seconds}",
       ],

@@ -127,9 +127,66 @@ test("switches between the guided form and advanced JSON without losing the draf
     .getByRole("button", { name: noLeaderFormContract.de.tabs[0] })
     .click();
   await expect(form).toBeVisible();
+  await main
+    .getByRole("button", { name: "Warnen Warnungen konfigurieren" })
+    .click();
   await expect(
-    form.getByText("Anzahl Warnungen", { exact: true })
-  ).toBeAttached();
+    form.getByText("Warnungen vor der Bestrafung", { exact: true })
+  ).toBeVisible();
+});
+
+test("shows localized message placeholders while keeping backend tokens in JSON", async ({
+  page,
+}) => {
+  const main = await openDemoPage(page, path);
+  const shell = main.getByTestId("config-page-shell");
+
+  await shell
+    .getByRole("button", { name: "Warnen Warnungen konfigurieren" })
+    .click();
+
+  const warningMessage = shell
+    .getByTestId("config-section-warnings")
+    .locator("textarea")
+    .first();
+  await expect(warningMessage).toHaveValue(/\{Spielername\}/);
+  await expect(warningMessage).toHaveValue(/\{Truppname\}/);
+  await expect(warningMessage).not.toHaveValue(/\{player_name\}/);
+
+  await warningMessage.fill("Hallo {Spielername} aus {Truppname}");
+  await shell
+    .getByTestId("config-mode-toggle")
+    .getByRole("button", { name: noLeaderFormContract.de.tabs[1] })
+    .click();
+  await expect(shell.getByTestId("config-json-editor")).toContainText(
+    "Hallo {player_name} aus {squad_name}"
+  );
+
+  await shell
+    .getByTestId("config-mode-toggle")
+    .getByRole("button", { name: noLeaderFormContract.de.tabs[0] })
+    .click();
+  await shell
+    .getByRole("button", { name: "Warnen Warnungen konfigurieren" })
+    .click();
+  await expect(warningMessage).toHaveValue(
+    "Hallo {Spielername} aus {Truppname}"
+  );
+});
+
+test("updates the warning preview and action sequence from the stepper", async ({
+  page,
+}) => {
+  const main = await openDemoPage(page, path);
+  const shell = main.getByTestId("config-page-shell");
+
+  await shell
+    .getByRole("button", { name: "Warnen Warnungen konfigurieren" })
+    .click();
+  await shell.getByRole("button", { name: "Anzahl Warnungen +" }).click();
+
+  await expect(shell).toContainText("Warnung 1 von 3");
+  await expect(shell).toContainText("3× · alle 60 Sekunden");
 });
 
 test("makes unsaved changes explicit and lets the operator discard the draft", async ({
@@ -151,6 +208,31 @@ test("makes unsaved changes explicit and lets the operator discard the draft", a
   await expect(save).toBeDisabled();
 });
 
+test("persists guided changes through the fake save action", async ({
+  page,
+}) => {
+  const main = await openDemoPage(page, path);
+  const form = main.getByTestId("config-guided-form");
+  const save = main.getByTestId("config-save-button");
+  const dryRun = form.getByRole("checkbox").nth(1);
+  const wasDryRun = await dryRun.isChecked();
+
+  await dryRun.click();
+  await expect(main.getByTestId("config-dirty-indicator")).toBeVisible();
+  await save.click();
+
+  await expect(main.getByTestId("config-dirty-indicator")).toHaveCount(0);
+  await expect(save).toBeDisabled();
+  await expect(
+    main.getByText(wasDryRun ? "Aktiv" : "Testbetrieb", { exact: true }).first()
+  ).toBeVisible();
+  if (wasDryRun) {
+    await expect(dryRun).not.toBeChecked();
+  } else {
+    await expect(dryRun).toBeChecked();
+  }
+});
+
 test("keeps invalid JSON visible and does not submit it", async ({ page }) => {
   const main = await openDemoPage(page, path);
   await main
@@ -160,9 +242,9 @@ test("keeps invalid JSON visible and does not submit it", async ({ page }) => {
 
   const editorInput = main
     .getByTestId("config-json-editor")
-    .locator("textarea.inputarea")
+    .locator('[role="textbox"][aria-label="Editor content"]')
     .first();
-  await editorInput.click();
+  await editorInput.focus();
   await page.keyboard.press("ControlOrMeta+A");
   await page.keyboard.insertText('{"enabled": true');
 

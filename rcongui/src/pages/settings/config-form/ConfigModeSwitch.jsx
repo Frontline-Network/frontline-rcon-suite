@@ -47,11 +47,14 @@ export default function ConfigModeSwitch({
         sx={{
           width: fullWidth ? "100%" : "fit-content",
           "& .MuiToggleButton-root": {
-            minWidth: 105,
+            minWidth: "auto",
+            minHeight: 31,
             borderRadius: 0,
-            px: 2.25,
-            py: 0.9,
+            px: 1.625,
+            py: 0.45,
+            fontSize: 10.5,
             fontWeight: 800,
+            textTransform: "none",
           },
           "& .MuiToggleButton-root.Mui-selected": {
             bgcolor: "primary.main",

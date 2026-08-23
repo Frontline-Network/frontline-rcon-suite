@@ -24,9 +24,14 @@ export default function ConfigFormLayout({
   return (
     <Box
       data-testid={testId}
-      sx={{ maxWidth: hasNavigation ? 1310 : undefined, ...sx }}
+      sx={{
+        width: "100%",
+        maxWidth: hasNavigation ? 1304 : undefined,
+        mx: hasNavigation ? { xs: 0, xl: 1.5 } : undefined,
+        ...sx,
+      }}
     >
-      <Stack spacing={1.5} sx={{ mb: 2 }}>
+      <Stack spacing={1.5} sx={{ mb: 1 }}>
         <Box>
           {eyebrow && (
             <Typography
@@ -77,7 +82,7 @@ export default function ConfigFormLayout({
               ? {
                   xs: "minmax(0, 1fr)",
                   md: "minmax(190px, 0.8fr) minmax(0, 2.2fr)",
-                  lg: "minmax(230px, 0.9fr) minmax(0, 3fr) minmax(240px, 1fr)",
+                  lg: "242px minmax(0, 802px) 260px",
                 }
               : hasNavigation
               ? {
@@ -99,10 +104,13 @@ export default function ConfigFormLayout({
                 }
               : '"content"',
           alignItems: "stretch",
+          minHeight: hasNavigation && hasSummary ? { lg: 676 } : undefined,
           gap: 0,
           border: "1px solid",
           borderColor: "divider",
           bgcolor: "background.paper",
+          borderRadius: actionBar ? "8px 8px 0 0" : 1,
+          overflow: "hidden",
         }}
       >
         {hasNavigation && (
@@ -129,8 +137,9 @@ export default function ConfigFormLayout({
           sx={{
             gridArea: "content",
             minWidth: 0,
-            px: { xs: 2, md: 3 },
-            pt: { xs: 2, md: 3 },
+            pl: { xs: 2, md: 3 },
+            pr: { xs: 2, md: 3, lg: 9 },
+            pt: { xs: 2, md: 1, lg: 0.625 },
             pb: { xs: 2, md: 1.5 },
           }}
           spacing={2}
@@ -143,7 +152,7 @@ export default function ConfigFormLayout({
             sx={{
               gridArea: "summary",
               minWidth: 0,
-              p: { xs: 2, md: 3 },
+              p: { xs: 2, md: 3, lg: 2.5 },
               borderTop: { xs: "1px solid", lg: 0 },
               borderLeft: { lg: "1px solid" },
               borderColor: { xs: "divider", lg: "divider" },

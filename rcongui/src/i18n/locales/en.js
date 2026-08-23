@@ -1654,10 +1654,10 @@ const en = {
         sectionEyebrow: "Section {{current}} of {{total}}",
         statusActive: "Active",
         statusInactive: "Disabled",
-        statusTest: "Test run",
+        statusTest: "Test mode",
         save: "Save changes",
         saving: "Saving …",
-        reset: "Reset",
+        reset: "Restore saved values",
         dirty: "Unsaved changes",
         dirtyDescription: "Review the summary and save to apply the new rule.",
         saved: "All changes saved",
@@ -1680,9 +1680,12 @@ const en = {
         },
         warningMode: "Warning mode",
         warningModeHelp:
-          "Choose whether and how often players are warned before punishment.",
+          "Choose how and when players are warned before punishment.",
         warningsBeforePunish: "Warnings before punishment",
-        messagePreview: "In-game message preview",
+        warningsBeforePunishHelp: "Number of warnings sent before punishment.",
+        warningIntervalHelp: "Time between two warnings.",
+        availablePlaceholders: "Available placeholders",
+        messagePreview: "Player preview",
         messagePreviewEmpty: "No message entered yet.",
         warningPreviewMeta:
           "Warning {{current}} of {{total}} · Next check in {{seconds}} seconds",
@@ -1703,7 +1706,7 @@ const en = {
           observation:
             "Choose how often a violation is confirmed internally before a visible warning follows.",
           warnings:
-            "Choose how often and at which interval players are warned.",
+            "Choose how and when players are warned before punishment. Warnings remind players to assign a squad leader.",
           punishments: "Set the consequences when warnings have no effect.",
           kick: "Configure the final escalation stage and grace period before a kick.",
           notifications:
@@ -1713,7 +1716,7 @@ const en = {
           player_name: "Player name",
           squad_name: "Squad name",
           max_warnings: "Maximum warnings",
-          received_warnings: "Warnings received",
+          received_warnings: "Previous warnings",
           next_check_seconds: "Next check",
           max_punishes: "Maximum punishments",
           received_punishes: "Punishments received",
@@ -1728,11 +1731,40 @@ const en = {
           count: "{{count}}× · every {{interval}} seconds",
           unlimited: "Unlimited · every {{interval}} seconds",
           afterSeconds: "after {{seconds}} seconds",
+          punishAction: "Remove squad-leader rights",
+          kickAfterSeconds: "Kick after {{seconds}} seconds",
           disabled: "Disabled",
           reachability: "Reachability",
           reachable: "All active stages are reachable in this order.",
           unreachable:
             "A later stage cannot be reached with the current values.",
+          reachabilityStates: {
+            reachable: {
+              title: "Kick is reachable",
+              description:
+                "Warnings and punishments finish before the kick stage begins.",
+            },
+            disabled: {
+              title: "Kick is disabled",
+              description:
+                "Enable the kick stage to remove players after punishments.",
+            },
+            warningsUnlimited: {
+              title: "Kick cannot be reached",
+              description:
+                "Unlimited warnings never advance to punishment. Choose a fixed warning count.",
+            },
+            punishmentsUnlimited: {
+              title: "Kick cannot be reached",
+              description:
+                "Unlimited punishments never advance to the kick stage. Choose a fixed punishment count.",
+            },
+            punishmentsSkipped: {
+              title: "Kick cannot be reached",
+              description:
+                "At least one punishment must run before a kick can happen.",
+            },
+          },
         },
         ruleDisabledNotice:
           "The rule is disabled. Your other values are retained and will be used again after enabling it.",
@@ -1767,12 +1799,18 @@ const en = {
           integer: "Enter a whole number.",
           minimum: "The minimum allowed value is {{value}}.",
           maximum: "The maximum allowed value is {{value}}.",
+          url: "Enter a valid HTTP or HTTPS address.",
+          enum: "At least one value is not supported by this server.",
+          duplicate: "Duplicate values are not allowed.",
+          placeholder:
+            "Unknown placeholders: {{values}}. Use one of the provided placeholders.",
         },
       },
       noLeader: {
         eyebrow: "Automation",
         title: "Squads without a leader",
-        intro: "This rule works for Hell Let Loose and HLL: Vietnam.",
+        intro:
+          "This rule works for Hell Let Loose and Hell Let Loose: Vietnam.",
         summary: {
           title: "Rule flow",
           description:
@@ -1801,12 +1839,11 @@ const en = {
           },
           kick: {
             title: "Kick",
-            description:
-              "Kick is the final stage and is reached only after at least one punishment was applied.",
+            description: "Kick rules",
           },
           notifications: {
             title: "Messages",
-            description: "Notifications and audit",
+            description: "Notifications",
           },
         },
         fields: {
@@ -1857,7 +1894,7 @@ const en = {
           },
           warning_message: {
             label: "Warning message",
-            help: "Message sent to affected players. Placeholders in braces are replaced before delivery.",
+            help: "Message players receive with every warning.",
           },
           number_of_punishments: {
             label: "Number of punishments",

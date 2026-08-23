@@ -125,10 +125,10 @@ export const noLeaderFormContract = Object.freeze({
     labels: [
       "Automod aktivieren",
       "Nur protokollieren (Testlauf)",
-      "Mindestanzahl Spieler",
-      "Anzahl Warnungen",
+      "Mindestanzahl Spieler auf dem Server",
+      "Warnungen vor der Bestrafung",
       "Warnnachricht",
-      "Nach maximalen Bestrafungen kicken",
+      "Nach den Bestrafungen kicken",
     ],
   },
   en: {
@@ -146,11 +146,11 @@ export const noLeaderFormContract = Object.freeze({
     ],
     labels: [
       "Enable automod",
-      "Log only (test run)",
-      "Minimum players",
-      "Number of warnings",
+      "Log only (dry run)",
+      "Minimum server population",
+      "Warnings before punishment",
       "Warning message",
-      "Kick after maximum punishments",
+      "Kick after punishments",
     ],
   },
 });

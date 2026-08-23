@@ -1716,10 +1716,10 @@ const de = {
         sectionEyebrow: "Abschnitt {{current}} von {{total}}",
         statusActive: "Aktiv",
         statusInactive: "Deaktiviert",
-        statusTest: "Testlauf",
+        statusTest: "Testbetrieb",
         save: "Änderungen speichern",
         saving: "Wird gespeichert …",
-        reset: "Zurücksetzen",
+        reset: "Gespeicherte Werte wiederherstellen",
         dirty: "Ungespeicherte Änderungen",
         dirtyDescription:
           "Prüfe die Zusammenfassung und speichere, damit die neue Regel wirksam wird.",
@@ -1745,9 +1745,12 @@ const de = {
         },
         warningMode: "Warnmodus",
         warningModeHelp:
-          "Lege fest, ob und wie oft vor einer Bestrafung gewarnt wird.",
+          "Lege fest, wie und wann Spieler vor einer Bestrafung gewarnt werden.",
         warningsBeforePunish: "Warnungen vor der Bestrafung",
-        messagePreview: "Vorschau der Spielnachricht",
+        warningsBeforePunishHelp: "Anzahl der Warnungen, bevor bestraft wird.",
+        warningIntervalHelp: "Zeit zwischen zwei Warnungen.",
+        availablePlaceholders: "Verfügbare Platzhalter",
+        messagePreview: "Vorschau für den Spieler",
         messagePreviewEmpty: "Noch keine Nachricht eingetragen.",
         warningPreviewMeta:
           "Warnung {{current}} von {{total}} · Nächste Prüfung in {{seconds}} Sekunden",
@@ -1768,7 +1771,7 @@ const de = {
           observation:
             "Bestimme, wie oft ein Verstoß intern bestätigt wird, bevor eine sichtbare Warnung folgt.",
           warnings:
-            "Bestimme, wie oft und in welchem Abstand Spieler gewarnt werden.",
+            "Lege fest, wie und wann Spieler vor einer Bestrafung gewarnt werden. Warnungen erinnern Spieler daran, einen Truppführer zu benennen.",
           punishments:
             "Lege die Konsequenzen fest, falls Warnungen ohne Wirkung bleiben.",
           kick: "Konfiguriere die letzte Eskalationsstufe und die Frist vor dem Kick.",
@@ -1779,7 +1782,7 @@ const de = {
           player_name: "Spielername",
           squad_name: "Truppname",
           max_warnings: "Max. Warnungen",
-          received_warnings: "Erhaltene Warnungen",
+          received_warnings: "Bisherige Warnungen",
           next_check_seconds: "Nächste Prüfung",
           max_punishes: "Max. Bestrafungen",
           received_punishes: "Erhaltene Bestrafungen",
@@ -1794,12 +1797,41 @@ const de = {
           count: "{{count}}× · alle {{interval}} Sekunden",
           unlimited: "Unbegrenzt · alle {{interval}} Sekunden",
           afterSeconds: "nach {{seconds}} Sekunden",
+          punishAction: "Kick Truppführerrechte",
+          kickAfterSeconds: "Kick nach {{seconds}} Sekunden",
           disabled: "Deaktiviert",
           reachability: "Erreichbarkeit",
           reachable:
             "Alle aktiven Stufen sind in dieser Reihenfolge erreichbar.",
           unreachable:
             "Eine spätere Stufe ist mit den aktuellen Werten nicht erreichbar.",
+          reachabilityStates: {
+            reachable: {
+              title: "Kick ist erreichbar",
+              description:
+                "Warnungen und Bestrafungen laufen vollständig ab, bevor die Kick-Stufe beginnt.",
+            },
+            disabled: {
+              title: "Kick ist deaktiviert",
+              description:
+                "Aktiviere die Kick-Stufe, wenn Spieler nach den Bestrafungen entfernt werden sollen.",
+            },
+            warningsUnlimited: {
+              title: "Kick kann nicht erreicht werden",
+              description:
+                "Unbegrenzte Warnungen wechseln nie zur Bestrafung. Wähle eine feste Anzahl von Warnungen.",
+            },
+            punishmentsUnlimited: {
+              title: "Kick kann nicht erreicht werden",
+              description:
+                "Unbegrenzte Bestrafungen wechseln nie zur Kick-Stufe. Wähle eine feste Anzahl von Bestrafungen.",
+            },
+            punishmentsSkipped: {
+              title: "Kick kann nicht erreicht werden",
+              description:
+                "Für einen Kick muss mindestens eine Bestrafung ausgeführt werden.",
+            },
+          },
         },
         ruleDisabledNotice:
           "Die Regel ist deaktiviert. Deine übrigen Einstellungen bleiben erhalten und werden nach dem Aktivieren wieder verwendet.",
@@ -1834,12 +1866,18 @@ const de = {
           integer: "Bitte gib eine ganze Zahl ein.",
           minimum: "Der kleinste erlaubte Wert ist {{value}}.",
           maximum: "Der größte erlaubte Wert ist {{value}}.",
+          url: "Bitte gib eine gültige HTTP- oder HTTPS-Adresse ein.",
+          enum: "Mindestens ein Wert wird von diesem Server nicht unterstützt.",
+          duplicate: "Doppelte Werte sind nicht erlaubt.",
+          placeholder:
+            "Unbekannte Platzhalter: {{values}}. Verwende einen der angebotenen Platzhalter.",
         },
       },
       noLeader: {
         eyebrow: "Automatisierung",
         title: "Trupps ohne Truppführer",
-        intro: "Diese Regel funktioniert für Hell Let Loose und HLL: Vietnam.",
+        intro:
+          "Diese Regel funktioniert für Hell Let Loose und Hell Let Loose: Vietnam.",
         summary: {
           title: "Ablauf der Regel",
           description:
@@ -1868,12 +1906,11 @@ const de = {
           },
           kick: {
             title: "Kick",
-            description:
-              "Der Kick ist die letzte Stufe und wird erst nach mindestens einer ausgeführten Bestrafung erreicht.",
+            description: "Kick-Regeln",
           },
           notifications: {
             title: "Nachrichten",
-            description: "Benachrichtigungen und Audit",
+            description: "Benachrichtigungen",
           },
         },
         fields: {
@@ -1924,7 +1961,7 @@ const de = {
           },
           warning_message: {
             label: "Warnnachricht",
-            help: "Nachricht an betroffene Spieler. Platzhalter in geschweiften Klammern werden beim Versand ersetzt.",
+            help: "Nachricht, die Spieler bei jeder Warnung erhalten.",
           },
           number_of_punishments: {
             label: "Anzahl Bestrafungen",

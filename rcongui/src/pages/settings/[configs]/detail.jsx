@@ -62,6 +62,9 @@ import {
 import { getConfigFormProfile } from "@/pages/settings/config-form/schema";
 
 const Editor = lazy(() => import("@monaco-editor/react"));
+// Fake-preview saves stay process-local so repeated form interactions are
+// deterministic without changing the production request path.
+const fakeConfigOverrides = new Map();
 
 const diagnosticColor = {
   valid: "success",
@@ -241,7 +244,7 @@ export const loader = async ({ params }) => {
       );
       return {
         note: note.default,
-        data: noLeaderConfig,
+        data: fakeConfigOverrides.get(details.command) || noLeaderConfig,
         schema: noLeaderSchema,
         ...details,
       };
@@ -311,6 +314,11 @@ export const action = async ({ request }) => {
         }),
       },
     };
+  }
+
+  if (isFakeMode()) {
+    fakeConfigOverrides.set(name, config);
+    return { ok: true };
   }
 
   try {
@@ -436,8 +444,7 @@ const ConfigPage = () => {
   const hasGuidedProfile = Boolean(formProfile?.sections?.length);
   const changePermission = `can_change_${command}`;
   const canChange = Boolean(
-    isFakeMode() ||
-      permissions?.is_superuser ||
+    permissions?.is_superuser ||
       permissions?.permissions?.some(
         (item) => item.permission === changePermission
       )
@@ -577,14 +584,25 @@ const ConfigPage = () => {
       : t("settings.configForms.workbench.statusActive")
     : t("settings.configForms.workbench.statusInactive");
   const ruleStatusColor = jsonData?.enabled ? "success" : "default";
-  const sectionNavigation = (formProfile?.sections || []).map((section) => ({
-    id: section.id,
-    label: t(section.titleKey),
-    description: t(section.descriptionKey),
-    status: allValidationErrors.some((error) => error.sectionId === section.id)
-      ? "error"
-      : "complete",
-  }));
+  const activeSectionIndex = (formProfile?.sections || []).findIndex(
+    (section) => section.id === activeSection
+  );
+  const sectionNavigation = (formProfile?.sections || []).map(
+    (section, index) => ({
+      id: section.id,
+      label: t(section.titleKey),
+      description: t(section.descriptionKey),
+      status: allValidationErrors.some(
+        (error) => error.sectionId === section.id
+      )
+        ? "error"
+        : index < activeSectionIndex
+        ? "complete"
+        : index === activeSectionIndex
+        ? "current"
+        : "upcoming",
+    })
+  );
 
   return (
     <Stack direction={"column"} spacing={4}>
@@ -628,6 +646,7 @@ const ConfigPage = () => {
       >
         <Form id="config-settings-form" method="post" onSubmit={handleSubmit}>
           <ConfigFormLayout
+            sx={hasGuidedProfile ? { mt: { xs: 0, lg: -2.625 } } : undefined}
             eyebrow={pageEyebrow}
             title={pageTitle}
             description={pageDescription}
@@ -679,11 +698,11 @@ const ConfigPage = () => {
                     ? undefined
                     : t("settings.configForms.workbench.saved")
                 }
-                stateDescription={t(
+                stateDescription={
                   isDirty
-                    ? "settings.configForms.workbench.dirtyDescription"
-                    : "settings.configForms.workbench.savedDescription"
-                )}
+                    ? undefined
+                    : t("settings.configForms.workbench.savedDescription")
+                }
                 stateIcon={
                   isDirty ? (
                     <WarningAmberOutlinedIcon color="warning" />
@@ -696,6 +715,7 @@ const ConfigPage = () => {
                     id: "reset",
                     label: t("settings.configForms.workbench.reset"),
                     startIcon: <RestartAltIcon />,
+                    variant: "text",
                     onClick: handleDiscard,
                     disabled: !isDirty || isSubmitting,
                     testId: "config-reset-button",
@@ -711,6 +731,7 @@ const ConfigPage = () => {
                   loadingLabel: t("settings.configForms.workbench.saving"),
                   loading: isSubmitting,
                   startIcon: <SaveOutlinedIcon />,
+                  sx: { width: 200, height: 40 },
                   disabled:
                     !canChange || !isDirty || hasBlockingErrors || isSubmitting,
                 }}
