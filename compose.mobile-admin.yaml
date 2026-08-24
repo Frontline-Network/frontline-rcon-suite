@@ -9,6 +9,7 @@ x-frontline-backend: &frontline-backend
     dockerfile: Dockerfile
 
 x-mobile-environment: &mobile-environment
+  CRCON_VERSION: ${CRCON_VERSION:-development}
   HLL_GAME: ${HLL_GAME:-hll}
   RATELIMIT_PROXY_DEPTH: ${RATELIMIT_PROXY_DEPTH:-1}
   MOBILE_INTEGRATION_ENABLED: ${MOBILE_INTEGRATION_ENABLED:-false}
