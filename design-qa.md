@@ -129,6 +129,21 @@ Rohkonfiguration bleibt im erweiterten JSON-Modus erreichbar.
 
 final result: passed
 
+## Live-Spielerdetails — einzeilige Tabelle mit Aufklappbereich
+
+- Referenz: `C:\Users\chris\AppData\Local\Temp\codex-clipboard-293adc55-14e9-4b10-887e-206a35b38935.png`.
+- Implementierung: `/views/live` im lokalen Demo-Modus mit genau einer kompakten Tabellenzeile pro Spieler und höchstens einem geöffneten Detailbereich.
+- Finalaufnahme: `C:\Users\chris\.codex\visualizations\2026\08\15\01a0052a-7e8d-7411-8b78-1a415453783b\live-player-list-implementation\04-expanded-anthracite.png`.
+- Gemeinsamer Vergleich: `C:\Users\chris\.codex\visualizations\2026\08\15\01a0052a-7e8d-7411-8b78-1a415453783b\live-player-list-implementation\reference-vs-anthracite.png`.
+- Geschlossene Spielerzeilen sind am Desktop 38 Pixel hoch; Identität, Truppzuordnung, Kampf/Risiko, Status, Aktionen und Zeit bleiben in einer Zeile.
+- Der geöffnete Bereich zeigt Identität, Werte, Status und die kompakten Aktionen Nachricht, Bestrafen, Kicken, Bannen und Profil. Die getrennten Temp-/Permabann-Aktionen und das redundante Drei-Punkte-Menü wurden entfernt.
+- Der Detailbereich verwendet dieselbe neutrale Anthrazitfläche wie die Trupp- und Spielerzeilen (`rgb(10, 13, 10)`); die goldene linke Kante kennzeichnet weiterhin den aktiven Datensatz.
+- Öffnen eines zweiten Spielers schließt den vorherigen Detailbereich; Escape schließt den Bereich und gibt den Fokus an den Auslöser zurück.
+- Produktions-Build sowie der HLL-/HLL-Vietnam-Teamkill-Vertragstest sind erfolgreich.
+- Der visuelle Side-by-Side-Vergleich zeigt keine offenen P0-, P1- oder P2-Abweichungen für die umgesetzte Spielerliste.
+
+final result: passed
+
 ## Teamübersicht — Option 1
 
 - Zielbild: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-8f0fad35-c9c7-4410-8440-541bfec882af.png`

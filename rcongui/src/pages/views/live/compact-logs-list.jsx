@@ -161,13 +161,15 @@ const PlayerName = ({ id, name, team, teamLabel }) => {
 
   return (
     <Tooltip title={teamLabel || ""} arrow disableHoverListener={!teamLabel}>
-      <PlayerDrawerLink
-        playerId={id}
-        aria-label={accessibleLabel}
-        sx={{ color, fontStyle: "normal", fontWeight: 700 }}
-      >
-        {label}
-      </PlayerDrawerLink>
+      <Box component="span" sx={{ display: "inline-flex" }}>
+        <PlayerDrawerLink
+          playerId={id}
+          aria-label={accessibleLabel}
+          sx={{ color, fontStyle: "normal", fontWeight: 700 }}
+        >
+          {label}
+        </PlayerDrawerLink>
+      </Box>
     </Tooltip>
   );
 };

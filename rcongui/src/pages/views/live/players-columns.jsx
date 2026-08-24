@@ -104,7 +104,7 @@ const getBanDetailText = (t, detail) => {
   });
 };
 
-const TeamkillRisk = ({ value, t }) => {
+const TeamkillRisk = ({ value, t, compact = false }) => {
   const risk = getTeamkillRisk(value);
   const levelLabel = t(`views.table.teamKillRisk.${risk.level}`);
   const description = t("views.table.teamKillRisk.description", {
@@ -149,7 +149,7 @@ const TeamkillRisk = ({ value, t }) => {
           <Icon aria-hidden="true" sx={{ fontSize: "1em" }} />
         ) : null}
         <Typography component="span" variant="caption" fontWeight="inherit">
-          {`${risk.count} ${levelLabel}`}
+          {compact ? `TK ${risk.count}` : `${risk.count} ${levelLabel}`}
         </Typography>
       </Box>
     </Tooltip>
@@ -203,44 +203,61 @@ export const getColumns = (t) => [
     cell: ({ row }) => {
       const { openWithId } = usePlayerSidebar();
       return (
-        <Stack spacing={0.15} sx={{ minWidth: "12ch", textAlign: "left" }}>
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={0.75}
+          sx={{
+            minWidth: "12ch",
+            maxWidth: "100%",
+            overflow: "hidden",
+            textAlign: "left",
+            whiteSpace: "nowrap",
+          }}
+        >
           <Tooltip arrow placement="top-start" title={row.original.name}>
-            <TextButton
-              onClick={() => openWithId(row.original.player_id)}
-              sx={{ maxWidth: "100%" }}
+            <Box
+              component="span"
+              sx={{ display: "inline-flex", minWidth: 0, overflow: "hidden" }}
             >
-              <Typography
-                component="span"
-                noWrap
-                variant="subtitle2"
-                sx={{
-                  color: getTeamNameColor(row.original.team),
-                  display: "block",
-                  maxWidth: "100%",
-                }}
+              <TextButton
+                onClick={() => openWithId(row.original.player_id)}
+                sx={{ minWidth: 0, maxWidth: "100%", overflow: "hidden" }}
               >
-                {row.original.name}
-              </Typography>
-            </TextButton>
+                <Typography
+                  component="span"
+                  noWrap
+                  variant="subtitle2"
+                  sx={{
+                    color: getTeamNameColor(row.original.team),
+                    display: "block",
+                    maxWidth: "100%",
+                  }}
+                >
+                  {row.original.name}
+                </Typography>
+              </TextButton>
+            </Box>
           </Tooltip>
-          <Typography variant="caption" sx={{ color: "text.secondary" }}>
-            {t("views.table.level")} {row.original.level ?? "–"}
-          </Typography>
-          <CopyableText
-            text={row.original.player_id}
-            size="0.7em"
+          <LevelColored
+            component="span"
+            level={row.original.level}
             sx={{
-              color: "text.secondary",
-              '[data-expanded-view="false"] &': { display: "none" },
+              flex: "0 0 auto",
+              fontSize: "0.72rem",
+              fontWeight: 700,
+              lineHeight: 1,
             }}
-          />
+          >
+            Lv {row.original.level ?? "–"}
+          </LevelColored>
         </Stack>
       );
     },
     meta: {
       variant: "playerName",
       sticky: "left",
-      stickyOffset: "2.25rem",
+      stickyOffset: "4.5rem",
     },
   },
   {
@@ -256,36 +273,46 @@ export const getColumns = (t) => [
       const role = row.original.role;
       const teamLabel = t(`views.team.${team}`, { defaultValue: team ?? "–" });
       const roleLabel = t(`roles.${role}`, { defaultValue: role ?? "–" });
+      const unitLabel = row.original.unit_name ?? "–";
+      const assignmentLabel = `${teamLabel} · ${unitLabel} · ${roleLabel}`;
       return (
-        <Stack spacing={0.2} sx={{ minWidth: "13ch" }}>
-          <Stack direction="row" alignItems="center" spacing={0.65}>
+        <Tooltip arrow placement="top" title={assignmentLabel}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            spacing={0.65}
+            sx={{
+              minWidth: "13ch",
+              maxWidth: "100%",
+              overflow: "hidden",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {role ? (
+              <img
+                src={themedImg.getRoleIconSrc(role)}
+                width={14}
+                height={14}
+                alt=""
+                aria-hidden="true"
+                style={{ flex: "0 0 auto" }}
+              />
+            ) : null}
             <Typography
               noWrap
-              title={`${teamLabel} · ${row.original.unit_name ?? "–"}`}
               variant="caption"
-              sx={{ color: "text.primary", maxWidth: "100%" }}
+              sx={{
+                color: "text.primary",
+                minWidth: 0,
+                maxWidth: "100%",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
             >
-              {teamLabel} · {row.original.unit_name ?? "–"}
+              {assignmentLabel}
             </Typography>
           </Stack>
-          <Stack direction="row" alignItems="center" spacing={0.65}>
-            <img
-              src={themedImg.getRoleIconSrc(role)}
-              width={14}
-              height={14}
-              alt=""
-              aria-hidden="true"
-            />
-            <Typography
-              noWrap
-              title={roleLabel}
-              variant="caption"
-              sx={{ color: "text.secondary", maxWidth: "100%" }}
-            >
-              {roleLabel}
-            </Typography>
-          </Stack>
-        </Stack>
+        </Tooltip>
       );
     },
     meta: { variant: "assignmentSummary" },
@@ -298,12 +325,27 @@ export const getColumns = (t) => [
     ),
     accessorFn: (row) => row.kills,
     cell: ({ row }) => (
-      <Stack spacing={0.2} sx={{ minWidth: "10ch" }}>
-        <Typography variant="caption" sx={{ color: "text.primary" }}>
-          {t("views.table.kills")}: {row.original.kills ?? 0} ·{" "}
-          {t("views.table.deaths")}: {row.original.deaths ?? 0}
-        </Typography>
-        <TeamkillRisk value={row.original} t={t} />
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={0.75}
+        sx={{ minWidth: "10ch", whiteSpace: "nowrap" }}
+      >
+        <Tooltip
+          arrow
+          title={`${t("views.table.kills")}: ${row.original.kills ?? 0} · ${t(
+            "views.table.deaths"
+          )}: ${row.original.deaths ?? 0}`}
+        >
+          <Typography
+            component="span"
+            variant="caption"
+            sx={{ color: "text.primary", whiteSpace: "nowrap" }}
+          >
+            K {row.original.kills ?? 0} · D {row.original.deaths ?? 0}
+          </Typography>
+        </Tooltip>
+        <TeamkillRisk value={row.original} t={t} compact />
       </Stack>
     ),
     meta: { variant: "performanceSummary" },

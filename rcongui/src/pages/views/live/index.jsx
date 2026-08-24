@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { cmd } from "@/utils/fetchUtils";
 import { getColumns as getPlayersColumns } from "./players-columns";
 import { extractPlayers, extractTeamState } from "@/utils/extractPlayers";
@@ -16,13 +16,16 @@ import { teamsLiveQueryOptions } from "@/queries/teams-live-query";
 import { normalizePlayerProfile } from "@/utils/lib";
 import {
   getCoreRowModel,
+  getExpandedRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
 import InfoPanel from "./info-panel";
-import { Box, Stack, Typography } from "@mui/material";
+import { Box, IconButton, Stack, Tooltip, Typography } from "@mui/material";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import DisbandSquadDialog from "@/features/player-action/DisbandSquad";
 import MessageAllDialog from "@/features/player-action/MessageAll";
 import { useTranslation } from "react-i18next";
@@ -36,6 +39,7 @@ const SPLIT_MIN_CONTENT_WIDTH = 1120;
 
 const PLAYER_COLUMN_IDS = [
   "select",
+  "details",
   "player_summary",
   "assignment",
   "performance_summary",
@@ -70,6 +74,7 @@ const PLAYER_COLUMN_IDS = [
 
 const OPERATIONS_COLUMNS = new Set([
   "select",
+  "details",
   "player_summary",
   "assignment",
   "performance_summary",
@@ -118,7 +123,53 @@ export const loader = async () => {
 const Live = () => {
   const { t } = useTranslation();
   const { initialLogsView } = useLoaderData();
-  const playersColumns = useMemo(() => getPlayersColumns(t), [t]);
+  const playersColumns = useMemo(() => {
+    const baseColumns = getPlayersColumns(t);
+    const detailsColumn = {
+      id: "details",
+      header: null,
+      cell: ({ row, table }) => {
+        const isExpanded = row.getIsExpanded();
+        const label = isExpanded
+          ? t("views.live.hidePlayerDetails", {
+              defaultValue: `Details zu ${row.original.name} schließen`,
+              name: row.original.name,
+            })
+          : t("views.live.showPlayerDetails", {
+              defaultValue: `Details zu ${row.original.name} anzeigen`,
+              name: row.original.name,
+            });
+
+        return (
+          <Tooltip arrow title={label}>
+            <IconButton
+              aria-controls={`live-player-details-${row.id}`}
+              aria-expanded={isExpanded}
+              aria-label={label}
+              onClick={() =>
+                table.setExpanded(isExpanded ? {} : { [row.id]: true })
+              }
+              size="small"
+              sx={{ p: 0.25 }}
+            >
+              {isExpanded ? (
+                <KeyboardArrowDownIcon fontSize="small" />
+              ) : (
+                <KeyboardArrowRightIcon fontSize="small" />
+              )}
+            </IconButton>
+          </Tooltip>
+        );
+      },
+      meta: {
+        variant: "icon",
+        sticky: "left",
+        stickyOffset: "2.25rem",
+      },
+    };
+
+    return [baseColumns[0], detailsColumn, ...baseColumns.slice(1)];
+  }, [t]);
   const logsColumns = useMemo(() => getLogsColumns(t), [t]);
   const workspaceRef = useRef(null);
   const [contentWidth, setContentWidth] = useState(null);
@@ -236,6 +287,7 @@ const Live = () => {
     { id: "time", desc: true },
   ]);
   const [playersRowSelection, setPlayersRowSelection] = useState({});
+  const [playersExpanded, setPlayersExpanded] = useState({});
   const [playersColumnFilters, setPlayersColumnFilters] = useState([]);
   const playersTableConfig = usePlayersTableStore();
   const setPlayersTableConfig = usePlayersTableStore(
@@ -264,6 +316,9 @@ const Live = () => {
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getCoreRowModel: getCoreRowModel(),
+    getExpandedRowModel: getExpandedRowModel(),
+    getRowCanExpand: () => true,
+    onExpandedChange: setPlayersExpanded,
     onRowSelectionChange: setPlayersRowSelection,
     onColumnFiltersChange: setPlayersColumnFilters,
     onColumnVisibilityChange: (updater) => {
@@ -278,10 +333,20 @@ const Live = () => {
     state: {
       sorting: playersSorting,
       rowSelection: playersRowSelection,
+      expanded: playersExpanded,
       columnFilters: playersColumnFilters,
       columnVisibility: playersColumnVisibility,
     },
   });
+
+  useEffect(() => {
+    const onlineIds = new Set(playersData.map((player) => player.player_id));
+    setPlayersExpanded((current) => {
+      const [expandedId] = Object.keys(current).filter((id) => current[id]);
+      if (!expandedId || onlineIds.has(expandedId)) return current;
+      return {};
+    });
+  }, [playersData]);
 
   const [logsFiltering, setLogsFiltering] = useState([]);
   const logsTableConfig = useLogsTableStore();
