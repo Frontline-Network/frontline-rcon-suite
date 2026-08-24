@@ -13,7 +13,11 @@ import {
 import ViewColumnIcon from "@mui/icons-material/ViewColumn";
 import { useTranslation } from "react-i18next";
 
-const TableColumnSelection = ({ table, onColumnVisibilityChange }) => {
+const TableColumnSelection = ({
+  table,
+  onColumnVisibilityChange,
+  getColumnLabel,
+}) => {
   const { t } = useTranslation();
   const columns = table.getAllColumns().filter((col) => col.getCanHide());
 
@@ -46,49 +50,64 @@ const TableColumnSelection = ({ table, onColumnVisibilityChange }) => {
           "& ul": { padding: 0 },
         }}
       >
-        {columns.map((column) => (
-          <ListItem
-            key={column.id}
-            dense
-            disableGutters
-            sx={{ "& .MuiButtonBase-root": { opacity: 1 } }}
-          >
-            <ListItemButton onClick={() => onColumnVisibilityChange(column.id, !column.getIsVisible())}>
-              <ListItemIcon>
-                <Checkbox
-                  edge="start"
-                  checked={column.getIsVisible()}
-                  disabled={!column.getCanHide()}
-                  tabIndex={-1}
-                  disableRipple
-                  inputProps={{ "aria-labelledby": `picker-${column.id}` }}
-                />
-              </ListItemIcon>
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  overflow: "hidden",
-                  px: 0,
-                  py: 0.25,
-                  gap: 1,
-                }}
+        {columns.map((column) => {
+          const label =
+            getColumnLabel?.(column) ??
+            (typeof column.columnDef.header === "string"
+              ? column.columnDef.header
+              : column.id);
+
+          return (
+            <ListItem
+              key={column.id}
+              dense
+              disableGutters
+              sx={{ "& .MuiButtonBase-root": { opacity: 1 } }}
+            >
+              <ListItemButton
+                onClick={() =>
+                  onColumnVisibilityChange(
+                    column.id,
+                    !column.getIsVisible()
+                  )
+                }
               >
+                <ListItemIcon>
+                  <Checkbox
+                    edge="start"
+                    checked={column.getIsVisible()}
+                    disabled={!column.getCanHide()}
+                    tabIndex={-1}
+                    disableRipple
+                    inputProps={{ "aria-labelledby": `picker-${column.id}` }}
+                  />
+                </ListItemIcon>
                 <Box
                   sx={{
+                    display: "flex",
+                    alignItems: "center",
                     overflow: "hidden",
-                    whiteSpace: "nowrap",
-                    textOverflow: "ellipsis",
+                    px: 0,
+                    py: 0.25,
+                    gap: 1,
                   }}
                 >
-                  <ListItemText id={`picker-${column.id}`}>
-                    {column.id}
-                  </ListItemText>
+                  <Box
+                    sx={{
+                      overflow: "hidden",
+                      whiteSpace: "nowrap",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    <ListItemText id={`picker-${column.id}`}>
+                      {label}
+                    </ListItemText>
+                  </Box>
                 </Box>
-              </Box>
-            </ListItemButton>
-          </ListItem>
-        ))}
+              </ListItemButton>
+            </ListItem>
+          );
+        })}
       </List>
     </PopoverMenu>
   );

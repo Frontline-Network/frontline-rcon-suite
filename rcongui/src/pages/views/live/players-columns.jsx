@@ -27,7 +27,11 @@ import CopyableText from "@/components/shared/CopyableText";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Emoji from "@/components/shared/Emoji";
 import { useThemedImages } from "@/hooks/useThemedImages";
-import { getPlatformIcon, getPlatformLabel, PLATFORMS } from "@/constants/platforms";
+import {
+  getPlatformIcon,
+  getPlatformLabel,
+  PLATFORMS,
+} from "@/constants/platforms";
 import { getTeamkillRisk } from "@/utils/teamkill-risk.mjs";
 
 export const Square = styled(Box)(({ theme }) => ({
@@ -70,6 +74,12 @@ const Center = styled(Box)(() => ({
 const iconFontSize = "1em";
 const emojiFontSize = "0.85em";
 
+const getTeamNameColor = (team) => {
+  if (team === "axis") return "error.light";
+  if (team === "allies") return "info.light";
+  return "text.primary";
+};
+
 const getBanDetailText = (t, detail) => {
   if (detail.scope === "direct" && detail.type === "gameServer") {
     return t("views.table.activeBanDirect");
@@ -105,8 +115,8 @@ const TeamkillRisk = ({ value, t }) => {
     risk.level === "high"
       ? "error.main"
       : risk.level === "caution"
-        ? "warning.main"
-        : "success.main";
+      ? "warning.main"
+      : "success.main";
   const Icon = risk.level === "high" ? ErrorOutline : Warning;
 
   return (
@@ -182,14 +192,202 @@ export const getColumns = (t) => [
     ),
     meta: {
       variant: "icon",
+      sticky: "left",
+      stickyOffset: 0,
     },
+  },
+  {
+    id: "player_summary",
+    header: SortableHeader(t("views.table.name"), t("views.table.name")),
+    accessorFn: (row) => row.name,
+    cell: ({ row }) => {
+      const { openWithId } = usePlayerSidebar();
+      return (
+        <Stack spacing={0.15} sx={{ minWidth: "12ch", textAlign: "left" }}>
+          <Tooltip arrow placement="top-start" title={row.original.name}>
+            <TextButton
+              onClick={() => openWithId(row.original.player_id)}
+              sx={{ maxWidth: "100%" }}
+            >
+              <Typography
+                component="span"
+                noWrap
+                variant="subtitle2"
+                sx={{
+                  color: getTeamNameColor(row.original.team),
+                  display: "block",
+                  maxWidth: "100%",
+                }}
+              >
+                {row.original.name}
+              </Typography>
+            </TextButton>
+          </Tooltip>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            {t("views.table.level")} {row.original.level ?? "–"}
+          </Typography>
+          <CopyableText
+            text={row.original.player_id}
+            size="0.7em"
+            sx={{
+              color: "text.secondary",
+              '[data-expanded-view="false"] &': { display: "none" },
+            }}
+          />
+        </Stack>
+      );
+    },
+    meta: {
+      variant: "playerName",
+      sticky: "left",
+      stickyOffset: "2.25rem",
+    },
+  },
+  {
+    id: "assignment",
+    header: SortableHeader(
+      t("views.live.assignment"),
+      t("views.live.assignment")
+    ),
+    accessorFn: (row) => `${row.team}-${row.unit_name}-${row.role}`,
+    cell: ({ row }) => {
+      const themedImg = useThemedImages();
+      const team = row.original.team;
+      const role = row.original.role;
+      const teamLabel = t(`views.team.${team}`, { defaultValue: team ?? "–" });
+      const roleLabel = t(`roles.${role}`, { defaultValue: role ?? "–" });
+      return (
+        <Stack spacing={0.2} sx={{ minWidth: "13ch" }}>
+          <Stack direction="row" alignItems="center" spacing={0.65}>
+            <Typography
+              noWrap
+              title={`${teamLabel} · ${row.original.unit_name ?? "–"}`}
+              variant="caption"
+              sx={{ color: "text.primary", maxWidth: "100%" }}
+            >
+              {teamLabel} · {row.original.unit_name ?? "–"}
+            </Typography>
+          </Stack>
+          <Stack direction="row" alignItems="center" spacing={0.65}>
+            <img
+              src={themedImg.getRoleIconSrc(role)}
+              width={14}
+              height={14}
+              alt=""
+              aria-hidden="true"
+            />
+            <Typography
+              noWrap
+              title={roleLabel}
+              variant="caption"
+              sx={{ color: "text.secondary", maxWidth: "100%" }}
+            >
+              {roleLabel}
+            </Typography>
+          </Stack>
+        </Stack>
+      );
+    },
+    meta: { variant: "assignmentSummary" },
+  },
+  {
+    id: "performance_summary",
+    header: SortableHeader(
+      t("views.live.performance"),
+      t("views.live.performance")
+    ),
+    accessorFn: (row) => row.kills,
+    cell: ({ row }) => (
+      <Stack spacing={0.2} sx={{ minWidth: "10ch" }}>
+        <Typography variant="caption" sx={{ color: "text.primary" }}>
+          {t("views.table.kills")}: {row.original.kills ?? 0} ·{" "}
+          {t("views.table.deaths")}: {row.original.deaths ?? 0}
+        </Typography>
+        <TeamkillRisk value={row.original} t={t} />
+      </Stack>
+    ),
+    meta: { variant: "performanceSummary" },
+  },
+  {
+    id: "status_summary",
+    header: t("views.live.status"),
+    accessorFn: (row) =>
+      [
+        row.is_vip,
+        row.profile?.watchlist?.is_watched,
+        hasRecentWarnings(row.profile?.received_actions ?? []),
+        row.activeBanStatus?.isActive,
+      ].filter(Boolean).length,
+    cell: ({ row }) => {
+      const items = [];
+      if (row.original.is_vip) {
+        items.push({
+          key: "vip",
+          icon: <Star sx={{ fontSize: "0.95rem" }} />,
+          label: "VIP",
+          color: "warning.light",
+        });
+      }
+      if (row.original.profile?.watchlist?.is_watched) {
+        items.push({
+          key: "watch",
+          icon: <RemoveRedEyeIcon sx={{ fontSize: "0.95rem" }} />,
+          label: t("views.live.watched"),
+          color: "primary.light",
+        });
+      }
+      if (hasRecentWarnings(row.original.profile?.received_actions ?? [])) {
+        items.push({
+          key: "warning",
+          icon: <Warning sx={{ fontSize: "0.95rem" }} />,
+          label: t("views.live.warned"),
+          color: "warning.light",
+        });
+      }
+      if (row.original.activeBanStatus?.isActive) {
+        items.push({
+          key: "ban",
+          icon: <ErrorOutline sx={{ fontSize: "0.95rem" }} />,
+          label: t("views.table.activeBan"),
+          color: "error.light",
+        });
+      }
+      if (items.length === 0) {
+        return (
+          <Typography variant="caption" sx={{ color: "text.disabled" }}>
+            –
+          </Typography>
+        );
+      }
+      return (
+        <Stack direction="row" flexWrap="wrap" gap={0.75}>
+          {items.map((item) => (
+            <Tooltip key={item.key} arrow title={item.label}>
+              <Box
+                component="span"
+                aria-label={item.label}
+                sx={{
+                  alignItems: "center",
+                  color: item.color,
+                  display: "inline-flex",
+                  minHeight: 24,
+                }}
+              >
+                {item.icon}
+              </Box>
+            </Tooltip>
+          ))}
+        </Stack>
+      );
+    },
+    meta: { variant: "statusSummary" },
   },
   {
     accessorKey: "team",
     id: "team",
     header: SortableHeader("T", t("views.table.team")),
     cell: ({ row }) => {
-      const themedImg = useThemedImages()
+      const themedImg = useThemedImages();
       return (
         <Center>
           <Square>
@@ -216,6 +414,11 @@ export const getColumns = (t) => [
     id: "unit",
     header: SortableHeader("U", t("views.table.unit")),
     accessorKey: "unit_name",
+    filterFn: (row, _columnId, value) => {
+      if (!value || (Array.isArray(value) && value.length === 0)) return true;
+      const values = Array.isArray(value) ? value : [value];
+      return values.includes(row.original.unit_name);
+    },
     // Group by unit name and team
     // getGroupingValue: (row) => `${row.original.unit_name ?? "-"}-${row.original.team}`,
     cell: ({ row }) => {
@@ -287,7 +490,7 @@ export const getColumns = (t) => [
     accessorFn: (row) => {
       const kills = Number(row.kills) || 0;
       const playtime = Number(
-        row.map_playtime_seconds ?? row.profile?.current_playtime_seconds ?? 0,
+        row.map_playtime_seconds ?? row.profile?.current_playtime_seconds ?? 0
       );
       if (!Number.isFinite(playtime) || playtime <= 0 || kills <= 0) return 0;
       return (kills / playtime) * 60;
@@ -300,6 +503,10 @@ export const getColumns = (t) => [
     id: "team_kills",
     header: SortableHeader("TK", t("views.table.teamKills")),
     accessorFn: (row) => getTeamkillRisk(row).count,
+    filterFn: (row, _columnId, value) => {
+      if (value !== "risk") return true;
+      return getTeamkillRisk(row.original).count > 0;
+    },
     cell: (props) => {
       return <TeamkillRisk value={props.getValue()} t={t} />;
     },
@@ -379,6 +586,8 @@ export const getColumns = (t) => [
     },
     meta: {
       variant: "icon",
+      sticky: "right",
+      stickyOffset: 0,
     },
   },
   {
@@ -386,7 +595,8 @@ export const getColumns = (t) => [
     header: SortableHeader("OS", t("views.table.platform")),
     accessorFn: (row) =>
       getPlatformLabel(
-        row.platform || (isSteamPlayer(row) ? PLATFORMS.STEAM : PLATFORMS.XBOX_LIVE),
+        row.platform ||
+          (isSteamPlayer(row) ? PLATFORMS.STEAM : PLATFORMS.XBOX_LIVE)
       ),
     cell: ({ row }) => {
       const platform = row.original.platform;
@@ -519,6 +729,8 @@ export const getColumns = (t) => [
     id: "watchlist",
     header: SortableHeader("W", t("views.table.watchlist")),
     accessorKey: "profile.watchlist",
+    filterFn: (row, _columnId, value) =>
+      !value || Boolean(row.original.profile?.watchlist?.is_watched),
     cell: ({ row }) => {
       return row.original.profile?.watchlist &&
         row.original.profile?.watchlist?.is_watched ? (
@@ -540,6 +752,7 @@ export const getColumns = (t) => [
     id: "vip",
     header: SortableHeader("VIP"),
     accessorKey: "is_vip",
+    filterFn: (row, _columnId, value) => !value || Boolean(row.original.is_vip),
     cell: ({ row }) => {
       return row.original.is_vip ? (
         <Star
@@ -589,7 +802,10 @@ export const getColumns = (t) => [
   },
   {
     id: "time",
-    header: SortableHeader(t("views.table.timeShort"), t("views.table.currentPlaytime")),
+    header: SortableHeader(
+      t("views.table.timeShort"),
+      t("views.table.currentPlaytime")
+    ),
     accessorKey: "profile.current_playtime_seconds",
     aggregationFn: "mean",
     cell: ({ row }) => {

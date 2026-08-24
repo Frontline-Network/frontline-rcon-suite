@@ -13,6 +13,14 @@ export function getVariantWidth(variant) {
       return "16ch";
     case "name":
       return "20ch";
+    case "playerName":
+      return "16ch";
+    case "assignmentSummary":
+      return "18ch";
+    case "performanceSummary":
+      return "15ch";
+    case "statusSummary":
+      return "11ch";
     case "fullname":
       return "30ch";
     case "action":
@@ -34,6 +42,14 @@ export function getVariantMinWidth(variant) {
       return "16ch";
     case "name":
       return "20ch";
+    case "playerName":
+      return "16ch";
+    case "assignmentSummary":
+      return "18ch";
+    case "performanceSummary":
+      return "15ch";
+    case "statusSummary":
+      return "11ch";
     case "fullname":
       return "30ch";
     case "action":
@@ -100,7 +116,7 @@ export const StyledTable = styled("table", {
     "& th": {
       ...getDensityPadding(density, theme),
       verticalAlign: "middle",
-      height: "3rem",  
+      height: "3rem",
     },
     "& tbody tr": {
       verticalAlign: "top",
@@ -113,27 +129,47 @@ export const StyledThead = styled("thead")(({ theme }) => ({
 }));
 
 export const StyledTh = styled("th", {
-  shouldForwardProp: (prop) => prop !== "variant" || prop !== "minWidth",
+  shouldForwardProp: (prop) =>
+    !["variant", "minWidth", "sticky", "stickyOffset"].includes(prop),
 })((styledProps) => {
   const variant = styledProps.variant;
+  const sticky = styledProps.sticky;
   return {
     width: getVariantWidth(variant),
     minWidth: getVariantMinWidth(variant),
     textAlign: variant === "icon" ? "center" : "left",
     paddingLeft: variant === "icon" ? 0 : undefined,
     paddingRight: variant === "icon" ? 0 : undefined,
+    ...(sticky
+      ? {
+          position: "sticky",
+          [sticky]: styledProps.stickyOffset ?? 0,
+          zIndex: 4,
+          backgroundColor: styledProps.theme.palette.background.paper,
+        }
+      : {}),
   };
 });
 
 export const StyledTd = styled("td", {
-  shouldForwardProp: (prop) => prop !== "variant" || prop !== "minWidth",
+  shouldForwardProp: (prop) =>
+    !["variant", "minWidth", "sticky", "stickyOffset"].includes(prop),
 })((styledProps) => {
   const variant = styledProps.variant;
+  const sticky = styledProps.sticky;
 
   return {
     width: getVariantWidth(variant),
     minWidth: getVariantMinWidth(variant),
     textAlign: variant === "icon" ? "center" : "left",
+    ...(sticky
+      ? {
+          position: "sticky",
+          [sticky]: styledProps.stickyOffset ?? 0,
+          zIndex: 2,
+          backgroundColor: styledProps.theme.palette.background.default,
+        }
+      : {}),
   };
 });
 

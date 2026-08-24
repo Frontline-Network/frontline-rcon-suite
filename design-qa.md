@@ -1,132 +1,130 @@
-# Design QA — Frontline Network CRCON
+# Design QA — Konfigurationsformulare und Live-Einsatz
 
-## Vergleichsbasis
+## Vergleichsbasis Konfigurationsformulare
 
-- Source visual truth: `C:\Users\chris\.codex\generated_images\019fcc8c-5bf7-7ca1-b168-4771dfd9dd7d\exec-24120397-ce90-40d1-b190-6700392fd017.png`
-- Implementation screenshot: `C:\Users\chris\.codex\visualizations\2026\08\04\019fcc8c-5bf7-7ca1-b168-4771dfd9dd7d\frontline-crcon-final-desktop.png`
-- Side-by-side evidence: `C:\Users\chris\.codex\visualizations\2026\08\04\019fcc8c-5bf7-7ca1-b168-4771dfd9dd7d\frontline-crcon-final-comparison.png`
-- Mobile evidence: `C:\Users\chris\.codex\visualizations\2026\08\04\019fcc8c-5bf7-7ca1-b168-4771dfd9dd7d\frontline-crcon-final-mobile.png`
-- Local implementation: `http://127.0.0.1:4174/`
-- Viewport: 1440 × 1024 CSS px, DPR 1
-- Source pixels: 1487 × 1058; für den Vergleich bikubisch auf 1440 × 1024 normalisiert
-- Implementation pixels: 1440 × 1024; keine Dichte-Normalisierung erforderlich
-- State: deutsches Dashboard, Dark Theme, Server online, 86/100 Spieler, Foy · Warfare · Nacht, Desktop-Seitenleiste geöffnet
-- Responsive evidence: 390 × 844 CSS px, DPR 1, mobiler Header und Drawer geprüft
+- Referenz: finale Nutzervorlage (`codex-clipboard-79491ed8-28e5-4c2b-b580-7dfa4d38f2fb.png`)
+- Referenzgröße: 1683 × 935 Pixel
+- Implementierung: `/settings/automods/no-leader` im lokalen Demo-Modus
+- Prüfzustand: Deutsch, Formularmodus, Abschnitt „Warnen“, Testbetrieb, ungespeicherte Änderung
+- Implementierungsaufnahme: `no-leader-warning-final-qa-v3.png`
+- Gemeinsamer Vergleich: `no-leader-reference-vs-implementation-final-v2.png`
 
-## Findings
+## Visueller Vergleich Konfigurationsformulare
 
-Keine verbleibenden P0-, P1- oder P2-Abweichungen. Die implementierte Oberfläche übernimmt die Informationshierarchie, das dunkle Olive-/Gold-System, die kondensierte Typografie, die Kartenstruktur, das Gefechtslage-Hero und die authentische Kartenbildsprache der gewählten Vorlage. Der finale Vergleich enthält die normalisierte Referenz links und die geprüfte Implementierung rechts in derselben Vergleichsdatei.
+Referenz und Implementierung wurden bei identischer Viewportgröße in einer gemeinsamen Side-by-Side-Grafik verglichen. Die Implementierung übernimmt die wesentlichen sichtbaren Merkmale der gewählten Richtung:
 
-## Pflichtflächen
+- kompakter Seitentitel mit Status direkt am Titel;
+- Formular/JSON-Umschaltung unterhalb des Kopfs;
+- zusammenhängende Drei-Spalten-Arbeitsfläche ohne getrennte Karten;
+- sieben nummerierte Konfigurationsschritte mit aktiver Stufe;
+- Warnmodus mit den Optionen Überspringen, Anzahl und Unbegrenzt;
+- numerische Schrittsteuerungen für Anzahl und Intervall;
+- verständliche Platzhalter und eine aufgelöste Spielnachrichten-Vorschau;
+- Wirkungskette und Erreichbarkeitsprüfung in der Zusammenfassung;
+- direkt angeschlossene, sticky Speicherleiste mit eindeutigem Entwurfsstatus.
 
-- Fonts und Typografie: Bahnschrift/Bahnschrift Condensed mit systemnahen Fallbacks; Gewicht, Versalien und Tracking entsprechen der FLN-Anmutung. Lange Server- und Navigationsnamen werden kontrolliert gekürzt.
-- Spacing und Layout: Hero, zweispaltige Statuskarten, feste Desktop-Seitenleiste und responsive Einspaltenansicht besitzen konsistenten Rhythmus. Kein horizontaler Overflow bei 1440 × 1024 oder 390 × 844.
-- Farben und Tokens: nahezu schwarzer Hintergrund, dunkle olivfarbene Flächen, gedämpftes FLN-Gold, helle Kreidetexte sowie grüne/rote Statusfarben sind zentral im Theme abgebildet.
-- Bildqualität und Assets: offizielles Frontline-Logo und gebündelte FLN-Bildassets werden verwendet; das Foy-Nachtbild ist scharf, korrekt zugeschnitten und ohne CSS-/SVG-Ersatzgrafik eingebunden.
-- Copy und Content: Dashboard, Login, globale Bedienung, Statuskarten, Kartenstatistik und komplette Navigationshierarchie sind auf Deutsch; Deutsch/Englisch lässt sich zur Laufzeit umschalten und bleibt nach Navigation/Neuladen erhalten.
-- Icons und Affordanzen: vorhandene MUI-/Font-Awesome-Icons wurden beibehalten und auf das FLN-Farbsystem abgestimmt. Aktive Navigation und aufklappbare Gruppen sind eindeutig erkennbar.
-- Responsive Verhalten: mobiler Header überlappt nicht; Drawer lässt sich öffnen/schließen, ist scrollbar und enthält dieselben Unterpunkte wie die Desktop-Navigation.
-- Accessibility: semantische Links/Buttons, beschrifteter Menü-Schließen-Button, Sprachmenü, Fokus-/Aktivzustände und ausreichende Kontraste geprüft.
+Die bestehenden globalen Navigations- und Matchstatus-Komponenten bleiben unverändert und folgen weiterhin dem aktuellen CRCON-Layout.
 
-## Focused region evidence
+Die Vorlage zeigt im rechten Bereich exemplarisch „Kick kann nicht erreicht werden“. Die Implementierung berechnet diesen Status dagegen aus den tatsächlich gewählten Warn-, Bestrafungs- und Kick-Zeiten. Im geprüften Zustand ist „Kick ist erreichbar“ daher die fachlich korrekte, bewusst beibehaltene Ausgabe.
 
-- Desktop-Hero und Sidebar wurden im kombinierten Vergleich auf Proportionen, Schrift, Statusmetriken, Buttons, Kartenbild-Crop und Goldlinien geprüft.
-- Dashboard-Demodaten wurden auf sichtbare Lade-/Fallback-Probleme geprüft: Servername, CRCON-/Gameserverstatus, CPU/RAM/SSD, Servereinstellungen, Automods und Dienste besitzen realistische Werte; kein `undefined` ist sichtbar.
-- Die Einstellungsgruppe wurde geöffnet; sichtbar und anklickbar waren Allgemein, Dienste, Willkommensnachricht, Servernachricht, Konsolen-Admins, Vorlagen, Wortfilter und Automatische Einstellungen.
-- Der mobile Drawer wurde bei 390 × 844 geöffnet und geschlossen. Die ausgewählte Vorlage enthält keinen mobilen Referenzzustand; dieser Teil wurde deshalb gegen die bestehende Mobile-Admin-Struktur und auf Überlappung/Overflow geprüft.
-- Der Betriebskern wurde als vollständiger Pfad getestet: Live-Ansicht → Spieler auswählen → „Nachricht senden“ → Nachricht eingeben → bestätigen → sichtbarer Erfolgszustand. Die Teamansicht lädt denselben Datenbestand ohne Route-Fehler.
+## Responsive und funktionale Prüfung Konfigurationsformulare
 
-## Comparison history
+- 1683 × 935: Drei-Spalten-Layout und sticky Aktionsleiste geprüft.
+- 768 × 900: Formular und Zusammenfassung umbrechen ohne abgeschnittene Inhalte.
+- 390 × 844: mobile Abschnittsnavigation, Formularelemente und Aktionsbereich geprüft.
+- 1440 Pixel und 390 Pixel: kein horizontaler Seitenüberlauf.
+- Formular → JSON → Formular: Entwurf und rohe Backend-Platzhalter bleiben erhalten.
+- Deutsche Anzeigenamen wie `{Spielername}` und `{Truppname}` werden bidirektional auf die unveränderten Backend-Platzhalter abgebildet.
+- Abschnittsnavigation: Vorschau und Zusammenfassung reagieren auf Warnmodus, Anzahl und Intervall.
+- Änderung → Zurücksetzen: Dirty-State wird gesetzt und anschließend korrekt entfernt.
+- Speichern im lokalen Demo-Modus: Werte bleiben nach einem erneuten Laden erhalten.
+- Ungültiges JSON: Editor meldet den Fehler, ohne den letzten gültigen Entwurf zu verlieren.
+- HLL und HLL: Vietnam: beide Spielprofile durch den gleichen Formular- und Validierungsfluss geprüft.
+- Zielgerichtete E2E-Suite: 12 von 12 Tests erfolgreich.
+- Produktions-Build: erfolgreich.
+- `git diff --check`: erfolgreich.
 
-1. Initialer Vergleich: P2 — die 284-px-Seitenleiste war im Verhältnis zur Vorlage zu breit und reduzierte die Hero-Fläche. Fix: Desktop-Breite auf 252 px reduziert und Kartenbild-Anteil auf 44 % erhöht. Post-fix evidence: `frontline-crcon-qa-final.png`.
-2. Initialer Mobile-Check: P1 — Serverstatus, FLN-Marke und Breadcrumb überlappten bei 390 px. Fix: der ausführliche Serverstatus wird unterhalb des `sm`-Breakpoints ausgeblendet; Marke, Menü und Breadcrumb bleiben erhalten. Post-fix evidence: Browser-Capture bei 390 × 844, ohne horizontalen Overflow.
-3. Sprach-/Interaktionscheck: Einstellungsgruppe auf/zu, Mobile-Drawer auf/zu und Deutsch/English/Deutsch-Wechsel erfolgreich; `document.documentElement.lang` wechselte korrekt. Während dieser Interaktionen trat kein `pageerror` auf und keine Route-Error-Oberfläche wurde angezeigt.
-4. Finaler Dashboard-Check: Ladeplatzhalter, CRCON-Offline, 0-%-Systemwerte, leere Dienste und `undefined`-Serverwerte durch deterministische Fake-Daten ersetzt. Post-fix evidence: `frontline-crcon-final-comparison.png`.
-5. Finaler Mobile-Check: Der lange Kartenname wurde im Metrikblock umbrechbar gemacht; 390 × 844 bleibt ohne horizontalen Overflow. Post-fix evidence: `frontline-crcon-final-mobile.png`.
-6. Einstellungen-/Lokalisierungscheck: Kartenabstimmung unter `/settings/maps/votemap/settings` und Allgemein unter `/settings/general` im laufenden Fake-Betrieb geprüft. Keine Fehleransicht, kein horizontaler Overflow bei 1280 px; alle sichtbaren Bedienelemente, Hilfetexte und Bestätigungen der geprüften Bereiche sind deutsch. Fake- und Produktionsbuild waren anschließend erfolgreich.
-7. Routenmatrix: 52 navigierbare Fake-Routen aus Akten, Karten, Einstellungen, Webhooks, Automods, weiteren Konfigurationen und Statistiken geprüft. Keine Route zeigte eine Fehleransicht oder Browser-Konsolenfehler; kein horizontaler Overflow bei Desktop-Breite. Die mobilen Kernrouten Live-Ansicht, Teamübersicht, Spielprotokolle, Allgemein, Kartenabstimmungs-Einstellungen und Live-Spiel blieben bei 390 × 844 ebenfalls ohne Fehler oder Overflow.
-8. Statistik-/Kartendaten-Check: Spieleliste, Spieldetails und Kartenwechsel im deutschen Fake-Betrieb geprüft. Datumswerte erscheinen lokal formatiert, Spielmodus und Wetter werden übersetzt, und die Detailtabelle zeigt keine `NaN`-Werte. Desktop-Überlauf trat nicht auf.
-9. Spielerakten-Check: Profil, Maßnahmen, Sitzungen, Namen, Kommentare und Protokolle für `FLN_Raven` im Fake-Betrieb einzeln geöffnet. Keine Fehleransicht und kein horizontaler Overflow; deutsche Datumssteuerungen tragen `Datum auswählen`. Die Demoakte enthält realistische Sitzungen, Maßnahmen, VIP-Status und Kommentare.
+## Ergebnis Konfigurationsformulare
 
-## Milestone status
+Keine offenen P0-, P1- oder P2-Designabweichungen im umgesetzten Formularfluss.
 
-Das Ergebnis auf dieser Seite belegt die produktweite Abnahme: Detailrouten und die vollständige Fake-Routenmatrix wurden geprüft, der Produktions-Webbuild ist erfolgreich, und der Flutter-Abgleich ist mit fehlerfreier Analyse, Widgettests und Debug-APK-Build dokumentiert. Die physische Gerätesichtprüfung bleibt eine optionale Nachprüfung, keine Voraussetzung für diesen Software-Abnahmelauf.
+## Formularfamilie
 
-## Open Questions
+Die freigegebene Arbeitsfläche wurde anschließend auf die weiteren schema-basierten
+Konfigurationsseiten übertragen. Visuell geprüft wurden die Referenz und die lokale
+Seeding-Seite in derselben Vergleichsansicht. Dabei bleiben Seitentitel, Status,
+Formular/JSON-Umschaltung, nummerierte Abschnittsnavigation, zusammenhängende
+Drei-Spalten-Arbeitsfläche, Wirkungskette und Speicherleiste konsistent. Der Inhalt
+der Schritte wird fachlich aus dem jeweiligen Schema gebildet und nicht künstlich
+an die No-Leader-Felder angeglichen.
 
-- Keine blockierenden Fragen. Die Seitenleiste ist absichtlich etwas breiter als im Konzept, damit die vollständige CRCON-Hierarchie und ihre deutschsprachigen Unterpunkte nutzbar bleiben.
+Direkt abgedeckte Seiten:
 
-## Implementation Checklist
+- Level-Regeln
+- Seeding-Regeln
+- Solo-Panzer verhindern
+- VAC- und Spielsperren prüfen
+- Teamkill-Sperre beim Beitritt
+- Namensfilter
+- Seeder-VIP-Belohnung
+- Abgelaufene VIPs bereinigen
 
-- [x] Offizielle FLN-Assets und Farb-/Typografie-Tokens
-- [x] Vollständige Desktop- und Mobile-Navigation mit Unterpunkten
-- [x] Deutsche Standardsprache plus englischer Laufzeitwechsel
-- [x] Dashboard, Login und zentrale Karten im FLN-Look
-- [x] Desktop- und Mobile-Viewport ohne Overflow
-- [x] Produktions- und Fake-Demo-Build
-- [x] Browser-Interaktionen und Laufzeitfehler geprüft
+Weitere Konfigurationen mit JSON-Schema verwenden denselben Arbeitsflächen-Rahmen
+und werden automatisch in verständliche Abschnitte gruppiert. Verschachtelte
+Seeder-VIP-Felder bleiben im visuellen Formular editierbar; die vollständige
+Rohkonfiguration bleibt im erweiterten JSON-Modus erreichbar.
 
-## Follow-up Polish
+- Acht benannte Desktop-Seiten: Navigation, Zusammenfassung und Speichern geprüft.
+- Seeding und Seeder-VIP: 390 × 844 ohne horizontalen Überlauf geprüft.
+- Neue Formularfamilie: 11 von 11 E2E-Tests erfolgreich.
+- Bestehende No-Leader-Seite: 12 von 12 Regressionstests erfolgreich.
+- Produktions-Build: erfolgreich.
 
-- [P3] Die bestehenden CRCON-Detailkarten unterhalb des sichtbaren Bereichs sind funktional dichter und inhaltlich umfangreicher als das Konzept. Bei Bedarf können einzelne Detailseiten in einem zweiten Durchgang noch stärker auf die tabellarische Dichte der Vorlage vereinheitlicht werden.
+## Live-Einsatz — Option 1
 
-milestone result: passed
-product final result: passed
+- Referenz: `exec-61a73ce0-5b1a-48a7-9aa9-4c09f0575469.png`
+- Implementierung: `/views/live` im lokalen Demo-Modus, 1683 × 935 Pixel
+- Gemeinsamer Vergleich: `frontline-live-design-qa.png`
+- Geteilte Spieler-/Protokoll-Arbeitsfläche, Schnellfilter und kompaktes Einsatzprofil geprüft.
+- Spieler-, Protokoll- und geteilte Ansicht wechseln ohne Datenverlust.
+- Spielerauswahl blendet Nachricht, Bestrafung, Kick und weitere Aktionen als sticky Aktionsleiste ein.
+- Aktionsdialog für ausgewählte Spieler öffnet korrekt, ohne bei der Prüfung eine Spielaktion auszuführen.
+- Unter 1100 Pixel wird die gleichzeitige Teilung deaktiviert; Spieler und Protokoll bleiben über die Ansichtsumschaltung erreichbar.
+- Produktions-Build erfolgreich; keine Browser-Laufzeitfehler festgestellt.
+- Keine offenen P0-, P1- oder P2-Designabweichungen.
 
-# Mobile Leitstelle QA
+## Live-Protokoll — kompakte Ereignisdarstellung
 
-## Vergleich
+- Die geteilte Arbeitsfläche priorisiert die Spielerliste mit einem Verhältnis von 72/28; das Protokoll kann weiterhin maximiert werden.
+- Die Seitenzuordnung wird platzsparend über die Farbe des Spielernamens dargestellt. Die redundante Angabe `(axis|allies/Spieler-ID)` wird unabhängig von Groß-/Kleinschreibung aus Anzeige und Kopiertext entfernt.
+- Spielernamen bleiben vollständig sichtbar, sind per Tastatur erreichbar und öffnen weiterhin das Spielerprofil.
+- Kill- und Teamkill-Ereignisse verwenden Pfeil und neutrales Waffensymbol; der unveränderte Waffenname steht als Tooltip bereit.
+- Chat-Ereignisse zeigen den Spieler in einer eigenen Zeile und die Nachricht darunter. Lange Texte brechen in der geteilten wie in der maximierten Ansicht um.
+- Der Kopierbutton übernimmt den bereinigten Nachrichtentext ohne versteckte Spieler-ID; bei nicht verfügbarer Clipboard-API bleibt der manuelle Fallback erreichbar.
+- Geteilte Ansicht visuell und per DOM-Messung geprüft: Protokollbreite 405 Pixel, keine horizontale Überbreite, lange Zeilen erhöhen die Ereignishöhe korrekt.
+- Maximierte Protokollansicht geprüft: kein horizontaler Seitenüberlauf und keine gekappten Nachrichten.
+- Frischer Browserstart: keine neuen Laufzeitfehler; verbleibend ist ausschließlich die bekannte React-Router-Zukunftswarnung.
+- Semantische Ereignissymbole im Live-Protokoll verwenden gezielt Font Awesome: Sprechblasen für Chat, Fadenkreuz für Kills, Totenkopf für Teamkills, Richterhammer für Admin-Aktionen und Flagge für Match-Ereignisse. Die Fraktion wird direkt am Spielernamen dargestellt; die übrige Bedienoberfläche bleibt bei MUI.
+- Kill-Darstellung mit Font-Awesome-Pfeil und -Waffensymbol geprüft; der exakte Waffenname bleibt im Tooltip erhalten. Auch Kopieren und Kopiert-Bestätigung verwenden innerhalb des Live-Protokolls die kompakteren Font-Awesome-Symbole.
+- Geteilte Ansicht mit Chat- und Kill-Filter erneut geprüft: alle neuen Symbole werden bei 405 Pixel Protokollbreite vollständig dargestellt; horizontaler Überlauf bleibt bei 0 Pixel.
+- Die separate Fraktionsmarke wurde zugunsten von mehr Textbreite wieder entfernt. Stattdessen sind die Spielernamen selbst eingefärbt: Achsenmächte rot, Alliierte blau; bei Kills wird jede beteiligte Person separat ausgewertet, bei Teamkills bleibt die gemeinsame Seite erhalten.
+- Die Fraktionszuordnung bleibt trotz der kompakten Darstellung über Tooltip und zugängliche Namensbeschriftung lesbar. Im Kill-Filter wurden 0 Lobby-Zuordnungen und 0 Pixel horizontaler Überlauf gemessen.
+- Die zusätzlichen Live-Protokoll-Symbole erhöhen den komprimierten Live-Chunk um rund 1,7 kB.
+- Produktions-Build erfolgreich.
 
-- Referenz: `C:/Users/chris/AppData/Local/Temp/codex-clipboard-1811d14f-368b-4a1c-8836-2c4304611d8c.png` (853x1844)
-- Implementierung: `mobile_app/leitstelle-device-v016-final.png` (1080x2340, Samsung S25, Android, APK 0.1.6+7)
+## Live-Spielertabelle — kompakte Einsatzansicht
 
-Die Implementierung wurde auf demselben mobilen Seitenverhältnis geprüft. Die Live-Daten unterscheiden sich erwartungsgemäß von der Referenz; deshalb wurden Inhalte und Statuswerte nicht als Layoutfehler bewertet.
-
-## Geprüfte Punkte
-
-- FLN-Branding, Leitstellenkopf und CRCON-/Online-Kontext
-- Zwei Statuskacheln mit ringförmigen Prioritäts-/Bestätigungsicons
-- Alle/Spieler/Squads-Segmentierung
-- Gemeinsame Inbox-Karte mit Überschrift und Sortierung
-- Meldungskarten mit Dringlichkeit/Zeit/CRCON links, Meldung und Zielen mittig sowie Status/Aktion rechts
-- Vollständig lesbare Status- und Meldungstitel auf 432 px Gerätebreite
-- Responsive Aktionszeile ohne `LayoutBuilder` innerhalb von `IntrinsicHeight`
-- Keine sichtbaren Render-Overflow-Markierungen
-- Kein relevanter `RenderFlex`, `IntrinsicHeight`, `TextEditingController`, `Duplicate GlobalKeys`- oder Build-Scope-Fehler im ADB-Log nach dem Start
-
-## Ergebnis
-
-passed
-
-# Spielerakten — Option 1 mit Karten-/Listenumschaltung
-
-## Vergleichsbasis
-
-- Designziel: `C:\Users\chris\.codex\generated_images\019fcc8c-5bf7-7ca1-b168-4771dfd9dd7d\exec-466bd42b-e644-4ff7-b43d-27a8e0e69fc7.png`
-- Implementierung: `C:\Users\chris\Documents\Codex\2026-06-12\files-mentioned-by-the-user-frontline\outputs\players-option1-implementation.png`
-- Kombinierter Direktvergleich: `C:\Users\chris\Documents\Codex\2026-06-12\files-mentioned-by-the-user-frontline\outputs\players-option1-comparison.png`
-- Geprüfte Route: `/records/players`
-- Viewports: 1440 × 1024 und 390 × 844 CSS px
-
-## Geprüfte Flächen und Interaktionen
-
-- Die Filter stehen auf dem Desktop in einer kompakten horizontalen Leiste; selten genutzte Kriterien sind unter „Weitere Filter“ erreichbar.
-- Ergebniszahl, Auswahlstatus, Seitennavigation und Ansichtsumschalter bilden eine gemeinsame Werkzeugleiste.
-- Die Kartenansicht zeigt drei gleich breite Akten pro Reihe und behält alle vorhandenen Profil- und Moderationsaktionen.
-- Die neue Listenansicht zeigt dieselben Spieler kompakt mit Plattform/Level, Verknüpfungsstatus, letzter Sichtung, Spielzeit, Maßnahmen und Aktionsmenü.
-- Karten-/Listenwahl funktioniert ohne Neuladen und bleibt nach einem Neuladen gespeichert.
-- Spielerauswahl aktualisiert den Auswahlzähler und bleibt mit den bestehenden Massenaktionen kompatibel.
-- „Weitere Filter“ öffnet alle vier Schalter sowie Markierungs- und Datumsfilter.
-- Auf kleinen Viewports wird bewusst die Kartenansicht verwendet und der Desktop-Umschalter ausgeblendet.
-- Mobile Kontrolle bei 390 × 844: `scrollWidth` entspricht `innerWidth` (390 px), kein horizontaler Overflow.
-- Browserkonsole: keine Fehler während Ansichtswechsel, Auswahl, Filter-Collapse und Reload.
-- Produktions-Webbuild mit `REACT_APP_API_URL=/api/`: erfolgreich.
-
-## Behobene QA-Findings
-
-1. [P1, Responsiveness] Die Desktop-Flex-Basis der drei Hauptfilter wurde in der mobilen Spaltenansicht als Höhe interpretiert und erzeugte große Leerflächen. Fix: breakpoint-spezifische Flexwerte und volle mobile Breite in `PlayerFiltersForm.jsx`. Nachprüfung bei 390 × 844 ohne Leerfläche oder Overflow bestanden.
-2. [P2, Layout] Die bestehende Mindestbreite der Spielerkarte verhinderte ein belastbares Drei-Spaltenraster. Fix: Karte auf `minWidth: 0` und volle Rasterhöhe gesetzt.
-
-Keine verbleibenden P0-, P1- oder P2-Abweichungen innerhalb der Spielerakten-Neuanordnung.
+- Die geteilte Spieler-/Protokollansicht ist bei jedem neuen Seitenaufruf der Standard; Fokusansichten bleiben innerhalb der laufenden Sitzung auswählbar.
+- Die Mindestbreiten der Sammelspalten wurden nach Inhalt priorisiert: Name, Team/Trupp/Rolle, Kampf/Risiko und Status benötigen keine pauschalen 30 Zeichen mehr.
+- Spielernamen zeigen ihre Seite direkt über die Textfarbe: Achsenmächte rot, Alliierte blau. Lange Namen werden gekürzt und bleiben vollständig per Tooltip lesbar.
+- Die redundante Fraktionsgrafik in der Zuordnung wurde entfernt; Team, Trupp und Rolle bleiben ausgeschrieben und bei langen Werten per Tooltip zugänglich.
+- Statuswerte verwenden kompakte, beschriftete Symbole mit Tooltip und `aria-label`; VIP, Beobachtung, Warnung und aktive Sperre bleiben unterscheidbar.
+- Schnellfilter können bei geringer Breite umbrechen, statt eine schwer erreichbare horizontale Scrollleiste zu erzeugen.
+- In der geteilten Ansicht gemessen: Spielertabelle 1069 Pixel breit, 0 Pixel horizontaler Überlauf, Name und Aktionsspalte bleiben sticky erreichbar.
+- Der Test erfolgt mit „Alle Spieler“, nicht mit dem leeren Filter „Auffällig“: Eine einzeln ausgewählte Zusatzspalte erzeugt exakt eine zusätzliche Tabellenspalte und wechselt nachvollziehbar zu „Eigene Ansicht“.
+- Der Spaltenwähler zeigt verständliche deutsche Bezeichnungen statt interner IDs; zusammengesetzter Spielername und einzelne Namensspalte sind eindeutig voneinander unterschieden.
+- Mit 27 eingeblendeten Spalten wurde eine Überbreite von 672 Pixeln erzeugt. Die synchronisierte obere Scrollleiste erscheint automatisch, entspricht mit 1741 Pixeln exakt der Tabellenbreite und lässt Name sowie Aktionen sticky erreichbar.
+- Bei einer einzelnen Zusatzspalte bleibt die Tabelle ohne Überbreite; die obere Scrollleiste wird dann automatisch ausgeblendet.
+- Produktions-Build und Browser-Laufzeittest erfolgreich.
 
 final result: passed
