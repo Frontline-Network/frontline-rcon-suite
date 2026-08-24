@@ -33,6 +33,7 @@ import {
   PLATFORMS,
 } from "@/constants/platforms";
 import { getTeamkillRisk } from "@/utils/teamkill-risk.mjs";
+import { formatRoleLabel, formatSquadLabel } from "./player-display-labels";
 
 export const Square = styled(Box)(({ theme }) => ({
   display: "flex",
@@ -272,8 +273,8 @@ export const getColumns = (t) => [
       const team = row.original.team;
       const role = row.original.role;
       const teamLabel = t(`views.team.${team}`, { defaultValue: team ?? "–" });
-      const roleLabel = t(`roles.${role}`, { defaultValue: role ?? "–" });
-      const unitLabel = row.original.unit_name ?? "–";
+      const roleLabel = formatRoleLabel(t, role);
+      const unitLabel = formatSquadLabel(row.original.unit_name);
       const assignmentLabel = `${teamLabel} · ${unitLabel} · ${roleLabel}`;
       return (
         <Tooltip arrow placement="top" title={assignmentLabel}>
@@ -520,10 +521,24 @@ export const getColumns = (t) => [
   },
   {
     id: "kills",
-    header: SortableHeader("K", t("views.table.kills")),
+    header: SortableHeader(t("views.table.kills"), t("views.table.kills")),
     accessorKey: "kills",
     cell: ({ row }) => {
       return <>{row.original.kills}</>;
+    },
+    meta: {
+      variant: "short",
+    },
+  },
+  {
+    id: "deaths",
+    header: SortableHeader(t("views.table.deaths"), t("views.table.deaths")),
+    accessorKey: "deaths",
+    cell: ({ row }) => {
+      return <>{row.original.deaths}</>;
+    },
+    meta: {
+      variant: "short",
     },
   },
   {
@@ -543,7 +558,10 @@ export const getColumns = (t) => [
   },
   {
     id: "team_kills",
-    header: SortableHeader("TK", t("views.table.teamKills")),
+    header: SortableHeader(
+      t("views.table.teamKillRiskLabel"),
+      t("views.table.teamKillRiskLabel")
+    ),
     accessorFn: (row) => getTeamkillRisk(row).count,
     filterFn: (row, _columnId, value) => {
       if (value !== "risk") return true;

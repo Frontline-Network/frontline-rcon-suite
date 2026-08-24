@@ -434,6 +434,7 @@ const en = {
     table: {
       selection: "Player selection",
       team: "Team",
+      faction: "Faction",
       unit: "Unit",
       role: "Role",
       level: "Level",
@@ -442,6 +443,7 @@ const en = {
       killsPerMinute: "Kills per minute",
       teamKills: "Team kills",
       teamKillsShort: "TKs",
+      teamKillRiskLabel: "TK risk",
       teamKillRisk: {
         none: "OK",
         caution: "REVIEW",
@@ -1762,6 +1764,14 @@ const en = {
         artilleryobserver: "Artillery observer",
         operator: "Operator",
         gunner: "Gunner",
+        squadleader: "Squad leader",
+        specialist: "Specialist",
+        grenadier: "Grenadier",
+        mortarsupport: "Mortar support",
+        mortarobserver: "Mortar squad leader",
+        mortargunner: "Mortar gunner",
+        helicopterpilot: "Helicopter pilot",
+        helicopterlogisticsofficer: "Helicopter logistics officer",
       },
       workbench: {
         defaultEyebrow: "Server configuration",

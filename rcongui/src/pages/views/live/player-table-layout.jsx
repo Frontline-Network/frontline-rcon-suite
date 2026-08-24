@@ -20,7 +20,7 @@ export const PlayerTableLayout = styled(Box, {
 })(({ theme }) => ({
   "--player-table-row-height": `${PLAYER_TABLE_LAYOUT.touchRowHeight}px`,
   "--player-table-header-height": `${PLAYER_TABLE_LAYOUT.headerHeight}px`,
-  "--player-table-max-height": "clamp(22rem, calc(100dvh - 15rem), 36rem)",
+  containerType: "inline-size",
   minWidth: 0,
   position: "relative",
 
@@ -32,31 +32,27 @@ export const PlayerTableLayout = styled(Box, {
     backgroundColor: theme.palette.background.paper,
   },
 
-  // Table currently owns horizontal scrolling. This wrapper adds only the
-  // player-specific vertical viewport and intentionally leaves logs untouched.
+  // Wide expert columns may still scroll horizontally. Vertically, the table
+  // remains in the document flow so the player list and live log move together.
   "&& > :last-child": {
-    maxHeight: "var(--player-table-max-height)",
     overflowX: "auto",
-    overflowY: "auto",
-    overscrollBehavior: "contain",
-    // Do not reserve an empty scrollbar column when fewer players are shown.
-    // Native overlay/auto scrollbars keep the detail row flush with the table.
-    scrollbarGutter: "auto",
+    overflowY: "visible",
+    overscrollBehaviorX: "contain",
     WebkitOverflowScrolling: "touch",
     isolation: "isolate",
   },
 
   "& table": {
+    borderLeft: 0,
+    borderRight: 0,
     borderCollapse: "separate",
     borderSpacing: 0,
+    boxSizing: "border-box",
   },
 
-  // Apply sticky positioning to every header cell. Existing sticky left/right
-  // metadata still works because top and the horizontal inset can coexist.
+  // Keep a stable header height without creating a second vertical scroll
+  // context. Horizontally sticky columns continue to come from table metadata.
   "& thead th": {
-    position: "sticky",
-    top: 0,
-    zIndex: 6,
     boxSizing: "border-box",
     height: "var(--player-table-header-height)",
     minHeight: "var(--player-table-header-height)",
@@ -112,24 +108,16 @@ export const PlayerTableLayout = styled(Box, {
 
   [theme.breakpoints.up("sm")]: {
     "--player-table-row-height": `${PLAYER_TABLE_LAYOUT.tabletRowHeight}px`,
-    "--player-table-max-height": "clamp(24rem, 60dvh, 40rem)",
   },
 
   [theme.breakpoints.up("lg")]: {
     "--player-table-row-height": `${PLAYER_TABLE_LAYOUT.desktopRowHeight}px`,
-    "--player-table-max-height": "clamp(26rem, calc(100dvh - 20rem), 48rem)",
 
     "& tbody td:not([colspan]) .MuiIconButton-root, & tbody td:not([colspan]) .MuiCheckbox-root":
       {
         minWidth: 32,
         minHeight: 32,
       },
-  },
-
-  "@media (prefers-reduced-motion: reduce)": {
-    "&& > :last-child": {
-      scrollBehavior: "auto",
-    },
   },
 }));
 

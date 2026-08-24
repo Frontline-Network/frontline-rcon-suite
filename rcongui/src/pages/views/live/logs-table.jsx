@@ -96,6 +96,7 @@ function LogsTable({
   isFetching,
   isExpanded = false,
   onToggleExpanded,
+  viewportSticky = false,
 }) {
   const { t } = useTranslation();
   const [tableConfigDrawerOpen, setTableConfigDrawerOpen] = useState(false);
@@ -290,7 +291,25 @@ function LogsTable({
       sx={(theme) => ({
         border: `1px solid ${theme.palette.divider}`,
         bgcolor: "background.paper",
+        display: "flex",
+        flexDirection: "column",
         minWidth: 0,
+        ...(viewportSticky
+          ? {
+              boxSizing: "border-box",
+              height: "calc(100dvh - 16px)",
+              maxHeight: "calc(100dvh - 16px)",
+              minHeight: 0,
+              overflow: "hidden",
+              position: "sticky",
+              top: theme.spacing(1),
+              [theme.breakpoints.down("lg")]: {
+                height: `calc(100dvh - ${theme.spacing(18)})`,
+                maxHeight: `calc(100dvh - ${theme.spacing(18)})`,
+                top: theme.spacing(17),
+              },
+            }
+          : {}),
       })}
     >
       <Stack
@@ -447,17 +466,31 @@ function LogsTable({
         </TableAddons>
       </Collapse>
 
-      <Stack direction="column" spacing={0}>
+      <Stack
+        direction="column"
+        spacing={0}
+        sx={
+          viewportSticky
+            ? {
+                flex: "1 1 auto",
+                minHeight: 0,
+                overflow: "hidden",
+              }
+            : undefined
+        }
+      >
         <CompactLogsList
           table={table}
           isFetching={isFetching}
           isExpanded={isExpanded}
+          scrollable={viewportSticky}
         />
         <TableToolbar
           sx={{
             borderBottomWidth: "1px",
             borderBottomStyle: "solid",
             borderTop: "none",
+            flex: "0 0 auto",
           }}
         >
           <TablePagination table={table} />

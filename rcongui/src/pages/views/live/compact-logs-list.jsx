@@ -276,6 +276,7 @@ export default function CompactLogsList({
   table,
   isFetching,
   isExpanded = false,
+  scrollable = false,
 }) {
   const { t } = useTranslation();
   const onlinePlayers = useGlobalStore((state) => state.onlinePlayers ?? []);
@@ -320,25 +321,44 @@ export default function CompactLogsList({
       component="section"
       role="region"
       aria-label={t("views.live.eventStream")}
-      tabIndex={0}
       data-testid="live-event-stream"
-      sx={{
-        minHeight: 280,
-        maxHeight: { xs: "58vh", lg: "calc(100vh - 330px)" },
-        overflowX: "hidden",
-        overflowY: "auto",
+      tabIndex={scrollable ? 0 : undefined}
+      sx={(theme) => ({
+        minHeight: 0,
+        outline: "none",
         position: "relative",
-        scrollbarWidth: "thin",
-        "&:focus-visible": {
-          outline: "2px solid",
-          outlineColor: "primary.main",
-          outlineOffset: -2,
-        },
-      }}
+        ...(scrollable
+          ? {
+              flex: "1 1 auto",
+              overflowX: "hidden",
+              overflowY: "auto",
+              overscrollBehaviorY: "contain",
+              scrollbarColor: `${alpha(
+                theme.palette.primary.main,
+                0.52
+              )} transparent`,
+              scrollbarGutter: "stable",
+              scrollbarWidth: "thin",
+              touchAction: "pan-y",
+              WebkitOverflowScrolling: "touch",
+              "&:hover, &:focus-visible": {
+                boxShadow: `inset 0 0 0 1px ${alpha(
+                  theme.palette.primary.main,
+                  0.42
+                )}`,
+              },
+            }
+          : { overflow: "visible" }),
+      })}
     >
       {isFetching ? (
         <LinearProgress
-          sx={{ position: "sticky", top: 0, zIndex: 3, height: 2 }}
+          sx={{
+            position: "absolute",
+            inset: "0 0 auto",
+            zIndex: 3,
+            height: 2,
+          }}
         />
       ) : null}
       <Box component="ol" role="list" sx={{ listStyle: "none", m: 0, p: 0 }}>

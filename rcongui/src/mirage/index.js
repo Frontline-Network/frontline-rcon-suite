@@ -218,8 +218,8 @@ export function makeServer({ environment = "development" } = {}) {
             time_remaining: 3427,
             allied_score: 3,
             axis_score: 2,
-            num_allied_players: 43,
-            num_axis_players: 43,
+            num_allied_players: 49,
+            num_axis_players: 49,
           })
         )
       );
@@ -451,7 +451,7 @@ export function makeServer({ environment = "development" } = {}) {
         time_remaining: 3427,
         score: { allied: 3, axis: 2 },
         current_map: currentLayer,
-        player_count_by_team: { allied: 43, axis: 43 },
+        player_count_by_team: { allied: 49, axis: 49 },
       }));
 
       this.post("/get_players_history", () => ({ result: { players: playerRecords(), total: playerRecords().length } }));

@@ -33,20 +33,47 @@ export const demoMapLayers = [
   },
 ];
 
-const demoNames = ["FLN_Raven", "FLN_Wolf", "FLN_Valkyrie", "FLN_Hawkeye", "FLN_Falcon", "FLN_Bravo"];
+const baseDemoNames = [
+  "FLN_Raven",
+  "FLN_Wolf",
+  "FLN_Valkyrie",
+  "FLN_Hawkeye",
+  "FLN_Falcon",
+  "FLN_Bravo",
+];
+const simulatedAlliesNames = Array.from(
+  { length: 46 },
+  (_, index) => `Demo_Allies_${String(index + 1).padStart(2, "0")}`,
+);
+const simulatedAxisNames = Array.from(
+  { length: 46 },
+  (_, index) => `Demo_Axis_${String(index + 1).padStart(2, "0")}`,
+);
+const demoNames = [
+  ...baseDemoNames,
+  ...simulatedAlliesNames,
+  ...simulatedAxisNames,
+];
+const demoPlayerId = (index) =>
+  `76561198${String(index + 1).padStart(9, "0")}`;
 
 export const demoPlayerRecords = demoNames.map((name, index) => ({
   id: index + 1,
-  player_id: `7656119800000000${index + 1}`,
+  player_id: demoPlayerId(index),
   names: [{ name, created: new Date(now - (index + 20) * 86400000).toISOString(), last_seen: new Date(now - index * 1800000).toISOString() }],
-  soldier: { name, level: 80 + index * 17, clan_tag: "FLN", platform: "steam" },
+  soldier: {
+    name,
+    level: 20 + ((index * 17) % 280),
+    clan_tag: "FLN",
+    platform: "steam",
+  },
   account: { name, country: index % 2 ? "AT" : "DE" },
   country: index % 2 ? "AT" : "DE",
   first_seen_timestamp_ms: now - (index + 20) * 86400000,
   last_seen_timestamp_ms: now - index * 1800000,
   created: new Date(now - (index + 20) * 86400000).toISOString(),
   total_playtime_seconds: 28800 + index * 3600,
-  current_playtime_seconds: index < 3 ? 3600 : 0,
+  current_playtime_seconds: 300 + (index % 18) * 240,
   penalty_count: { PUNISH: index, KICK: index % 2, TEMPBAN: 0, PERMABAN: 0 },
   flags: index === 2 ? [{ id: 1, flag: "Teamplay", comment: "Verlässlich", modified: new Date(now - 7200000).toISOString() }] : [],
   received_actions: index % 2
@@ -69,7 +96,7 @@ export const demoHistoricalLogs = demoNames.map((name, index) => ({
   event_time: new Date(now - index * 90000).toISOString(),
   creation_time: new Date(now - index * 90000).toISOString(),
   content: index % 3 === 0 ? `${name}: Bereit für den Einsatz.` : name,
-  player1_id: `7656119800000000${index + 1}`,
+  player1_id: demoPlayerId(index),
   player1_name: name,
   player2_id: null, player2_name: null, server: "2", raw: `[FLN] ${name}`,
 }));
@@ -83,14 +110,23 @@ export const demoAuditData = {
 };
 
 export const demoScorePlayers = demoNames.map((name, index) => ({
-  player_id: `7656119800000000${index + 1}`, player: name,
+  player_id: demoPlayerId(index), player: name,
   team: index % 2 ? "axis" : "allies", role: index === 0 ? "officer" : "rifleman", unit: index % 2 ? "Baker" : "Able",
-  level: 80 + index * 17, kills: 28 - index, deaths: 4 + index,
-  combat: 540 - index * 8, offense: 310 - index * 4, defense: 280 - index * 3, support: 420 - index * 5,
-  kills_streak: Math.max(1, 9 - index),
-  time_seconds: 4200 - index * 40,
-  kill_death_ratio: Number(((28 - index) / (4 + index)).toFixed(2)),
-  kills_per_minute: Number(((28 - index) / ((4200 - index * 40) / 60)).toFixed(2)),
+  level: 20 + ((index * 17) % 280),
+  kills: 5 + ((index * 7) % 24),
+  deaths: 4 + ((index * 5) % 13),
+  combat: 180 + ((index * 19) % 360),
+  offense: 90 + ((index * 13) % 230),
+  defense: 80 + ((index * 11) % 220),
+  support: 100 + ((index * 17) % 320),
+  kills_streak: 1 + (index % 9),
+  time_seconds: 1800 + (index % 50) * 60,
+  kill_death_ratio: Number(
+    ((5 + ((index * 7) % 24)) / (4 + ((index * 5) % 13))).toFixed(2),
+  ),
+  kills_per_minute: Number(
+    ((5 + ((index * 7) % 24)) / (30 + (index % 50))).toFixed(2),
+  ),
   teamkills: index % 3,
   teamkills_streak: index % 2,
   deaths_by_tk: index % 2,
@@ -123,21 +159,38 @@ const livePlayer = (record, index, team, unitName, role = "rifleman") => ({
   loadout: "standard issue",
   team,
   role,
-  kills: 14 - index,
-  deaths: 3 + index,
-  combat: 320 - index * 12,
-  offense: 180 - index * 8,
-  defense: 140 - index * 5,
-  support: 220 - index * 7,
+  kills: Math.max(0, 14 - (index % 15)),
+  deaths: 3 + (index % 12),
+  team_kills: index % 11 === 0 ? 3 : index % 7 === 0 ? 1 : 0,
+  combat: 160 + (index % 18) * 12,
+  offense: 90 + (index % 16) * 8,
+  defense: 80 + (index % 14) * 7,
+  support: 100 + (index % 20) * 6,
   level: record.soldier.level,
 });
 
-const alliesPlayers = demoPlayerRecords.slice(0, 3).map((record, index) =>
-  livePlayer(record, index, "allies", "able", index === 0 ? "officer" : "rifleman")
-);
-const axisPlayers = demoPlayerRecords.slice(3, 6).map((record, index) =>
-  livePlayer(record, index, "axis", "baker", index === 0 ? "officer" : "rifleman")
-);
+const demoUnits = ["able", "baker", "charlie", "dog", "easy", "fox", "george", "how"];
+const demoRoles = ["rifleman", "medic", "support", "engineer", "antitank"];
+const alliesRecords = [
+  ...demoPlayerRecords.slice(0, 3),
+  ...demoPlayerRecords.slice(6, 52),
+];
+const axisRecords = [
+  ...demoPlayerRecords.slice(3, 6),
+  ...demoPlayerRecords.slice(52, 98),
+];
+const mapLivePlayers = (records, team) =>
+  records.map((record, index) =>
+    livePlayer(
+      record,
+      index,
+      team,
+      demoUnits[Math.floor(index / 6) % demoUnits.length],
+      index % 6 === 0 ? "officer" : demoRoles[index % demoRoles.length],
+    ),
+  );
+const alliesPlayers = mapLivePlayers(alliesRecords, "allies");
+const axisPlayers = mapLivePlayers(axisRecords, "axis");
 
 export const demoTeamView = {
   fail_count: 0,
@@ -153,8 +206,8 @@ export const demoGameState = {
   time_remaining: 3427,
   allied_score: 3,
   axis_score: 2,
-  num_allied_players: 43,
-  num_axis_players: 43,
+  num_allied_players: 49,
+  num_axis_players: 49,
 };
 
 export const demoServerConnection = {
@@ -162,7 +215,7 @@ export const demoServerConnection = {
   short_name: "Frontline #2",
   server_number: 2,
   game: "hll",
-  current_players: 86,
+  current_players: 98,
   max_players: 100,
   port: 4174,
 };

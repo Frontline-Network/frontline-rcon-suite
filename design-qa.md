@@ -1,4 +1,4 @@
-# Design QA — Konfigurationsformulare und Live-Einsatz
++# Design QA — Konfigurationsformulare und Live-Einsatz
 
 ## Vergleichsbasis Konfigurationsformulare
 
@@ -129,6 +129,37 @@ Rohkonfiguration bleibt im erweiterten JSON-Modus erreichbar.
 
 final result: passed
 
+# Live-Ansicht: natürliche Spielerliste und festes Live-Protokoll
+
+## Vergleichsgrundlage
+
+- Ausgangszustand: `C:\Users\chris\.codex\visualizations\2026\08\15\01a0052a-7e8d-7411-8b78-1a415453783b\live-scroll-behavior-before.png`
+- Seitenscroll-Test: `C:\Users\chris\.codex\visualizations\2026\08\15\01a0052a-7e8d-7411-8b78-1a415453783b\live-scroll-behavior-after-page.png`
+- Protokollscroll-Test: `C:\Users\chris\.codex\visualizations\2026\08\15\01a0052a-7e8d-7411-8b78-1a415453783b\live-scroll-behavior-after-feed.png`
+- Lokale Route: `http://127.0.0.1:3001/views/live`
+- Testzustand: geteilte Desktopansicht mit 98 simulierten Spielern, davon 49 Alliierte und 49 Achsenmächte.
+
+## Korrigiertes Höhen- und Scrollmodell
+
+- Die Spielerliste besitzt keine feste oder an das Protokoll gekoppelte Höhe. Ihre Länge ergibt sich ausschließlich aus Suchergebnis, Filtern und Spielerzeilen.
+- Das Live-Protokoll besitzt in der geteilten Desktopansicht eine feste, viewportbezogene Höhe und bleibt als vollständige Card am rechten Rand klebend erreichbar.
+- Nur der Ereignisbereich des Live-Protokolls scrollt intern. Kopf, Filter und Seitennavigation bleiben innerhalb der festen Card sichtbar.
+- Ein Mausradereignis außerhalb des Protokoll-Feeds bewegt die Seite und damit die natürliche Spielerliste; das klebende Protokoll bleibt erreichbar.
+- Ein Mausradereignis über dem Feed bewegt ausschließlich dessen Ereignisse. `overscroll-behavior: contain` verhindert ungewolltes Weiterreichen an die Seite.
+- Auf schmalen beziehungsweise nicht geteilten Ansichten fällt die Card wieder in den normalen Seitenfluss zurück.
+- Diese Festlegung ersetzt die frühere QA-Annahme, beide Panels müssten dieselbe Höhe besitzen und gemeinsam über den Hauptbereich scrollen.
+
+## Testdaten und Prüfung
+
+- 92 zusätzliche lokale Demo-Spieler ergänzt; zusammen mit den sechs vorhandenen Spielern werden 98 von 100 Plätzen dargestellt.
+- Spieler-IDs, Level, Spielzeiten und Leistungswerte bleiben realistisch, positiv und reproduzierbar.
+- Browserprüfung Seitenscroll: bestanden; Spielerzeilen bewegen sich, die Protokoll-Card bleibt vollständig sichtbar.
+- Browserprüfung Feedscroll: bestanden; Spielerposition und Seitenstand bleiben unverändert, nur Protokollereignisse wechseln.
+- Produktionsbuild: bestanden.
+- Keine P0-, P1- oder P2-Abweichung im bearbeiteten Höhen- und Scrollverhalten.
+
+final result: passed
+
 ## Live-Spielerdetails — einzeilige Tabelle mit Aufklappbereich
 
 - Referenz: `C:\Users\chris\AppData\Local\Temp\codex-clipboard-293adc55-14e9-4b10-887e-206a35b38935.png`.
@@ -165,5 +196,87 @@ final result: passed
 - Vergleichsaufnahme: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\product-design-references\team-view\team-selection-actions-comparison.png`.
 - Bei 1280 × 900 liegen alle sieben sichtbaren Aktionsbuttons vollständig innerhalb der Leiste; es gibt keinen internen Überlauf. Bei 760 × 850 und 390 × 844 bleibt die Leiste vollständig im Viewport, die Aktionen sind horizontal erreichbar und die Seite erzeugt keinen horizontalen Überlauf.
 - Dieselbe Truppauswahl und Aktionsleiste wurde für HLL und HLL: Vietnam ohne Browserfehler geprüft.
+
+final result: passed
+
+# Design-QA: Live-Spielertabelle
+
+## Vergleichsgrundlage
+
+- Source Visual Truth (Detail-Mockup): `C:\Users\chris\AppData\Local\Temp\codex-clipboard-293adc55-14e9-4b10-887e-206a35b38935.png`
+- Source Visual Truth (produktiver Ausgangszustand): `C:\Users\chris\AppData\Local\Temp\codex-clipboard-d6f03925-9527-48ab-8ff9-03ca04147fc2.png`
+- Browser-gerenderte Umsetzung: `C:\Users\chris\.codex\visualizations\2026\08\15\01a0052a-7e8d-7411-8b78-1a415453783b\live-player-card-professional-final.png`
+- Lokale Route: `http://127.0.0.1:3001/views/live`
+- Zustand: Dark Theme, geteilte Ansicht, Operationsspalten, erster Spieler ausgeklappt, Fake-Daten.
+
+## Maße und Normalisierung
+
+- Detail-Mockup: 1487 × 1058 Pixel.
+- Produktiver Ausgangszustand: 3440 × 1440 Pixel.
+- Implementierung und finale Browseraufnahme: CSS-Viewport 1600 × 1000 Pixel.
+- Zusätzlich geprüft: 1024 × 900, 768 × 900 und 390 × 844 CSS-Pixel.
+- Weil Ausgangsbilder und Browseraufnahme unterschiedliche Datensätze, Dichten und Browserrahmen besitzen, erfolgte der Vergleich über dieselben sichtbaren Produktregionen: Split-Verhältnis, geschlossene Einzeiler, ausgeklapptes Detailband, Aktionsleiste, Panelunterkanten und Scrollverhalten.
+
+## Full-View-Vergleich
+
+- Die Spieler- und Protokollspalte behalten die gewünschte 72/28-Gewichtung.
+- Beide Panels reichen bis zu derselben Unterkante und bewegen sich über den zentralen Seiten-Scroller gemeinsam.
+- Weder Spielertabelle noch Live-Protokoll besitzen eine eigene vertikale Scrollfläche.
+- Die Spielerzeilen bleiben geschlossen einzeilig und entsprechen der Dichte des Mockups.
+- Horizontales Scrollen bleibt ausschließlich für tatsächlich zusätzliche Spalten erhalten.
+
+## Fokusvergleich: ausgeklappter Spieler
+
+- Das Detailband ist bündig mit der sichtbaren Tabellenfläche und überschreitet sie auch bei horizontal konfigurierten Zusatzspalten nicht.
+- Die aktive Tabellenzeile, der warme Chevron-Hintergrund und die goldene linke Detailkante bilden eine zusammenhängende Auswahlfläche.
+- Identität, Clan und Truppkontext bilden eine flache, klar getrennte Kopfzeile ohne unnötige Label-Leerflächen.
+- Leistungswerte stehen auf Desktop in einer einzigen ruhigen Zeile mit tabellarischen Zahlen; auf schmalen Ansichten brechen sie kontrolliert in gleichmäßige Raster um.
+- VIP-, Beobachtungs- und Warnstatus sind als kompakte Status-Chips von den Aktionen getrennt.
+- Nachricht, Bestrafen, Kicken, Bannen und Profil bleiben kompakt; die Bannaktion besitzt den vereinbarten Hammer und eine zurückhaltende Warnfarbe.
+- Bei 1024, 768 und 390 Pixeln gruppieren sich Identität, Kontext, Statistiken und Aktionen ohne abgeschnittene Inhalte und ohne horizontalen Überlauf neu.
+
+## Pflichtflächen
+
+- Typografie: bestehende Frontline-Familien, Gewichte und Großschreibung beibehalten; Zahlen mit tabellarischen Ziffern und lokalisierter Dezimaldarstellung.
+- Spacing/Layout: gleichmäßige 1-Pixel-Trenner, kompakte 30-Pixel-Aktionen auf Desktop, 44-Pixel-Ziele auf schmalen Ansichten; keine unnötige braune Detailfläche.
+- Farben/Tokens: ausschließlich bestehende MUI-/Frontline-Tokens; Gold als Auswahlkante, semantische Warn- und Fehlerfarben nur für Status und Bannaktion.
+- Assets/Icons: vorhandene MUI- und Font-Awesome-Icons weiterverwendet; keine Ersatzzeichnungen oder Platzhalter.
+- Copy/Inhalt: Fraktion statt generischem Team im Detailkopf; bestehende deutsche Kurzlabels (TKs, Kampf, Offensive, Defensive, Support, Zeit) beibehalten.
+
+## Vergleichshistorie
+
+1. P1 – Spieler- und Protokollbereich hatten voneinander unabhängige, höhenbegrenzte Scrollflächen.
+   - Fix: Maximalhöhen und internes vertikales Overflow entfernt; beide Panels an den zentralen Seiten-Scroller gebunden und im Grid auf gleiche Höhe gestreckt.
+   - Post-Fix-Evidenz: Browsermessung zeigt identische Panelunterkanten; Tabellenviewport und Eventstream haben jeweils `scrollHeight <= clientHeight`; der App-Hauptbereich besitzt den einzigen vertikalen Overflow.
+2. P2 – Das Spieler-Detail wirkte als lose Folge von Informationen und Aktionen.
+   - Fix: responsive Drei-Band-Struktur für Identität, Werte sowie Status/Aktionen; neutrale anthrazitfarbene Fläche und Goldkante für die Auswahl.
+   - Post-Fix-Evidenz: Desktop-, 1024- und 768-Pixel-Aufnahmen zeigen klare Gruppierung ohne Überdeckung oder abgeschnittene Aktionen.
+3. P2 – Die Tabelle erzeugte im Operationsmodus eine horizontale Zwei-Pixel-Scheinüberbreite.
+   - Fix: redundante linke/rechte Tabellenränder innerhalb des bereits umrandeten Spielerpanels entfernt und Box-Sizing stabilisiert.
+   - Post-Fix-Evidenz: Tabellenviewport `clientWidth = scrollWidth`; die obere horizontale Leiste ist im Standardmodus ausgeblendet.
+4. P2 – Das ausgeklappte Detailband wirkte im Vergleich zum Mockup noch technisch und visuell von seiner Tabellenzeile getrennt.
+   - Fix: aktive Tabellenzeile hervorgehoben, Chevron als Auswahlindikator gestaltet, neutrale Flächenhierarchie eingeführt, Status-Chips mit semantischen Icons ergänzt und Desktop-Statistiken auf eine Zeile verdichtet.
+   - Post-Fix-Evidenz: direkter Bildvergleich zwischen Referenz-Mockup und finaler Browseraufnahme zeigt dieselbe Informationshierarchie; die Umsetzung bleibt kompakter und respektiert die bereits vereinbarte gemeinsame Bannaktion.
+
+## Interaktionen und technische Prüfung
+
+- Spielerdetail öffnen, nächsten Spieler öffnen und wieder schließen: bestanden.
+- Spieler-ID kopieren sowie alle sechs Card-Buttons auf Fokus- und Zielgröße prüfen: bestanden.
+- Commander-/Statusfilter aktivieren und zurücksetzen: bestanden.
+- Gemeinsames Scrollen von Spieler- und Protokollpanel: bestanden.
+- Responsive Card-QA: kein horizontaler Überlauf bei 1024, 768 oder 390 Pixeln; alle interaktiven Ziele dort mindestens 44 Pixel hoch.
+- Browserkonsole: keine Fehler; nur bestehender React-Router-v7-Future-Flag-Hinweis.
+- Produktionsbuild: bestanden.
+- Admin-Aktionsvertrag: 20 Definitionen / 18 Commands bestanden.
+- Teamkill-Risikovertrag für HLL und HLL Vietnam: bestanden.
+- Touch-Target-Suite: 5 von 6 relevanten Prüfungen bestanden; eine bestehende Gleitkomma-Abweichung am globalen Sprachbutton (`43.999999 px`) liegt außerhalb dieser Änderung.
+
+## Findings
+
+- Keine verbleibenden P0-, P1- oder P2-Abweichungen in der bearbeiteten Live-Spielertabelle.
+
+## Follow-up Polish
+
+- P3: Der globale Sprachbutton kann separat auf eine explizite Mindestbreite von 44 Pixeln gehärtet werden; dies gehört nicht zur Live-Spielertabelle.
 
 final result: passed

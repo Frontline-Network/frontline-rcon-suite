@@ -76,6 +76,7 @@ const PlayersTable = ({
       role: t("views.table.role"),
       level: t("views.table.level"),
       kills: t("views.table.kills"),
+      deaths: t("views.table.deaths"),
       kpm: t("views.table.killsPerMinute"),
       team_kills: t("views.table.teamKills"),
       combat: t("views.table.combat"),
@@ -287,7 +288,7 @@ const PlayersTable = ({
         </Box>
       </Collapse>
 
-      <PlayerTableLayout>
+      <PlayerTableLayout data-testid="live-player-table-layout">
         <Table
           table={table}
           config={tableConfig}
@@ -297,13 +298,44 @@ const PlayersTable = ({
           rowProps={(row) => ({
             "data-player-row": "true",
             "data-expanded": String(row.getIsExpanded()),
-            sx: row.getIsExpanded()
-              ? {
-                  bgcolor: "background.paper",
-                  boxShadow: (theme) =>
-                    `inset 3px 0 0 ${theme.palette.primary.main}`,
-                }
-              : undefined,
+            sx: (theme) => ({
+              bgcolor: "background.paper",
+              borderBottom: `1px solid ${theme.vars
+                ? `rgba(${theme.vars.palette.text.primaryChannel} / 0.12)`
+                : theme.palette.divider}`,
+              transition: theme.transitions.create(
+                ["background-color", "border-color"],
+                { duration: theme.transitions.duration.shortest }
+              ),
+              "& > td": {
+                bgcolor: "background.paper",
+                transition: theme.transitions.create(
+                  ["background-color", "box-shadow"],
+                  { duration: theme.transitions.duration.shortest }
+                ),
+              },
+              "&:hover > td": {
+                boxShadow: `inset 0 0 0 9999px ${theme.palette.action.hover}`,
+              },
+              ...(row.getIsSelected() && {
+                borderBottomColor: "primary.dark",
+                "& > td": {
+                  boxShadow: `inset 0 0 0 9999px ${theme.palette.action.selected}`,
+                },
+              }),
+              ...(row.getIsExpanded() && {
+                borderBottomColor: "primary.main",
+                "& > td": {
+                  boxShadow: `inset 0 0 0 9999px ${theme.palette.action.selected}`,
+                },
+                "& > td:first-of-type": {
+                  boxShadow: `inset 3px 0 0 ${theme.palette.primary.main}, inset 0 0 0 9999px ${theme.palette.action.selected}`,
+                },
+                "& [aria-expanded='true']": {
+                  color: "primary.main",
+                },
+              }),
+            }),
           })}
           renderSubComponent={({ row }) => (
             <Box

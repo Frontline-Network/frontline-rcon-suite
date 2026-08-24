@@ -443,6 +443,7 @@ const de = {
     table: {
       selection: "Spielerauswahl",
       team: "Team",
+      faction: "Fraktion",
       unit: "Trupp",
       role: "Rolle",
       level: "Level",
@@ -451,6 +452,7 @@ const de = {
       killsPerMinute: "Kills pro Minute",
       teamKills: "Teamkills",
       teamKillsShort: "TKs",
+      teamKillRiskLabel: "TK-Risiko",
       teamKillRisk: {
         none: "OK",
         caution: "PRÜFEN",
@@ -1824,6 +1826,14 @@ const de = {
         artilleryobserver: "Artilleriebeobachter",
         operator: "Operator",
         gunner: "Richtschütze",
+        squadleader: "Truppführer",
+        specialist: "Spezialist",
+        grenadier: "Grenadier",
+        mortarsupport: "Mörser-Versorgung",
+        mortarobserver: "Mörsertruppführer",
+        mortargunner: "Mörserschütze",
+        helicopterpilot: "Hubschrauberpilot",
+        helicopterlogisticsofficer: "Hubschrauber-Logistikoffizier",
       },
       workbench: {
         defaultEyebrow: "Serverkonfiguration",

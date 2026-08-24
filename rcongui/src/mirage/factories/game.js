@@ -21,4 +21,4 @@ export const createInitialState = () => {
   }
 
   return state;
-}; 
+};

@@ -20,7 +20,7 @@ export function getVariantWidth(variant) {
     case "performanceSummary":
       return "15ch";
     case "statusSummary":
-      return "11ch";
+      return "10ch";
     case "fullname":
       return "30ch";
     case "action":
@@ -49,7 +49,7 @@ export function getVariantMinWidth(variant) {
     case "performanceSummary":
       return "15ch";
     case "statusSummary":
-      return "11ch";
+      return "10ch";
     case "fullname":
       return "30ch";
     case "action":

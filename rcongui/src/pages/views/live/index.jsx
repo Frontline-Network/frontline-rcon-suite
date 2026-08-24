@@ -49,6 +49,7 @@ const PLAYER_COLUMN_IDS = [
   "role",
   "level",
   "kills",
+  "deaths",
   "kpm",
   "team_kills",
   "combat",
@@ -77,7 +78,9 @@ const OPERATIONS_COLUMNS = new Set([
   "details",
   "player_summary",
   "assignment",
-  "performance_summary",
+  "kills",
+  "deaths",
+  "team_kills",
   "status_summary",
   "time",
   "actions",
@@ -489,13 +492,19 @@ const Live = () => {
         ) : null}
 
         {showLogs ? (
-          <LogsTable
-            table={logsTable}
-            logsViewData={logsView}
-            isFetching={isLogsFetching}
-            isExpanded={effectiveLayout === "logs"}
-            onToggleExpanded={handleToggleLogsExpanded}
-          />
+          <Box
+            data-testid="live-logs-rail"
+            sx={{ alignSelf: "stretch", minWidth: 0 }}
+          >
+            <LogsTable
+              table={logsTable}
+              logsViewData={logsView}
+              isFetching={isLogsFetching}
+              isExpanded={effectiveLayout === "logs"}
+              onToggleExpanded={handleToggleLogsExpanded}
+              viewportSticky={effectiveLayout === "split"}
+            />
+          </Box>
         ) : null}
       </Box>
     </Box>
