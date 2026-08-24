@@ -1655,6 +1655,7 @@ const en = {
         statusActive: "Active",
         statusInactive: "Disabled",
         statusTest: "Test mode",
+        statusConfigured: "Configured",
         save: "Save changes",
         saving: "Saving …",
         reset: "Restore saved values",
@@ -1691,26 +1692,71 @@ const en = {
           "Warning {{current}} of {{total}} · Next check in {{seconds}} seconds",
         sectionTitles: {
           operation: "Basics",
+          scope: "Scope",
+          requirements: "Requirements",
+          detection: "Detection",
+          rules: "Rules",
           exemptions: "Exceptions",
+          schedule: "Schedule",
+          announcements: "Announcements",
           observation: "Confirm",
           warnings: "Warnings",
           punishments: "Punishments",
           kick: "Kick",
-          notifications: "Messages",
+          actions: "Actions",
+          reward: "Reward",
+          messages: "Messages",
+          notifications: "Notifications",
+          advanced: "Additional settings",
         },
         sectionDescriptions: {
           operation:
             "Enable the rule and decide whether it should start in dry-run mode.",
+          scope:
+            "Choose when this feature applies and which players or game situations it covers.",
+          requirements:
+            "Define the conditions that must be met before this feature intervenes.",
+          detection:
+            "Choose which events are detected and when they count as a violation.",
+          rules:
+            "Set the rules, thresholds, and checks used by this configuration.",
           exemptions:
             "Define which players, roles, and flags are exempt from this rule.",
+          schedule: "Set the check intervals and timing for this service.",
+          announcements:
+            "Configure the notices players receive on connect or while the rule is active.",
           observation:
             "Choose how often a violation is confirmed internally before a visible warning follows.",
           warnings:
             "Choose how and when players are warned before punishment. Warnings remind players to assign a squad leader.",
           punishments: "Set the consequences when warnings have no effect.",
           kick: "Configure the final escalation stage and grace period before a kick.",
+          actions:
+            "Choose the action, its duration, and the reason shown to affected players.",
+          reward: "Set the amount, duration, and delivery of the reward.",
+          messages:
+            "Edit the messages players or administrators receive during this workflow.",
           notifications:
             "Optionally provide a Discord webhook for audit messages.",
+          advanced:
+            "Additional settings that do not belong to one of the main workflow stages.",
+        },
+        profileSummary: {
+          title: "Summary",
+          sequence: "Action sequence",
+          active: "Active – actions are performed",
+          inactive: "Disabled",
+          test: "Test mode – log only",
+          disabled: "Skipped or disabled",
+          unlimited: "Unlimited · every {{interval}} seconds",
+          count: "{{count}}× · every {{interval}} seconds",
+          kick: "Kick after {{seconds}} seconds",
+          intervalMinutes: "Check every {{count}} minutes",
+          configured: "{{configured}} of {{total}} values configured",
+          activeNotice:
+            "The settings shown will be used for this server after saving.",
+          inactiveNotice:
+            "This feature is disabled. All other values remain saved.",
         },
         placeholders: {
           player_name: "Player name",
@@ -1955,6 +2001,36 @@ const en = {
         title: "Prevent solo tanks",
         intro:
           "Choose how CRCON responds to one-person armor squads in Hell Let Loose and HLL: Vietnam.",
+      },
+      vacBans: {
+        eyebrow: "Security & bans",
+        title: "Check VAC and game bans",
+        intro:
+          "Choose which ban history is checked on connect and how CRCON handles affected players.",
+      },
+      tkBans: {
+        eyebrow: "Security & bans",
+        title: "Teamkill ban on connect",
+        intro:
+          "Detect early teamkills after connect, define exceptions, and configure the resulting ban.",
+      },
+      nameKicks: {
+        eyebrow: "Players & moderation",
+        title: "Name filter",
+        intro:
+          "Check player names against your rules, protect exempt players, and set a clear kick reason.",
+      },
+      seedVip: {
+        eyebrow: "Seeding & rewards",
+        title: "Seeder VIP reward",
+        intro:
+          "Choose when seeding counts as successful and which VIP reward eligible players receive.",
+      },
+      expiredVip: {
+        eyebrow: "VIP management",
+        title: "Clean up expired VIPs",
+        intro:
+          "Choose how often CRCON checks expired VIP entries and optionally sends a notification.",
       },
     },
     config: {

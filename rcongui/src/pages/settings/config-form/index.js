@@ -6,9 +6,11 @@ export { default as ConfigModeSwitch } from "./ConfigModeSwitch";
 export { default as ConfigSectionNav } from "./ConfigSectionNav";
 export { default as ConfigSectionNavigation } from "./ConfigSectionNavigation";
 export { default as ConfigSummaryPanel } from "./ConfigSummaryPanel";
+export { default as ConfigProfileSummaryPanel } from "./ConfigProfileSummaryPanel";
 export { default as ConfigValidationSummary } from "./ConfigValidationSummary";
 export {
   default as GuidedConfigForm,
   validateProfiledConfig,
 } from "./GuidedConfigForm";
 export { default as NoLeaderSummaryPanel } from "./NoLeaderSummaryPanel";
+export { default as SchemaConfigForm } from "./SchemaConfigForm";

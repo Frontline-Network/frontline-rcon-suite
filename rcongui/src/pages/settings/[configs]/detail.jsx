@@ -54,9 +54,11 @@ import {
   ConfigActionBar,
   ConfigFormLayout,
   ConfigModeSwitch,
+  ConfigProfileSummaryPanel,
   ConfigValidationSummary,
   GuidedConfigForm,
   NoLeaderSummaryPanel,
+  SchemaConfigForm,
   validateProfiledConfig,
 } from "@/pages/settings/config-form";
 import { getConfigFormProfile } from "@/pages/settings/config-form/schema";
@@ -246,6 +248,18 @@ export const loader = async ({ params }) => {
         note: note.default,
         data: fakeConfigOverrides.get(details.command) || noLeaderConfig,
         schema: noLeaderSchema,
+        ...details,
+      };
+    }
+    const { getConfigFormExample } = await import(
+      "@/mirage/data/configFormExamples"
+    );
+    const example = getConfigFormExample(details.command);
+    if (example) {
+      return {
+        note: note.default,
+        data: fakeConfigOverrides.get(details.command) || example.data,
+        schema: example.schema,
         ...details,
       };
     }
@@ -440,8 +454,12 @@ const ConfigPage = () => {
   const theme = useTheme();
   const isAutobalancer = command === "autobalancer_config";
   const isChatWebhookConfig = command === "chat_discord_webhooks_config";
-  const formProfile = getConfigFormProfile(command);
+  const formProfile = useMemo(
+    () => getConfigFormProfile(command, schema),
+    [command, schema]
+  );
   const hasGuidedProfile = Boolean(formProfile?.sections?.length);
+  const usesGuidedRenderer = formProfile?.renderer === "guided";
   const changePermission = `can_change_${command}`;
   const canChange = Boolean(
     permissions?.is_superuser ||
@@ -544,6 +562,13 @@ const ConfigPage = () => {
     setValidationErrors(null);
   };
 
+  const handleSchemaSectionChange = (sectionData) => {
+    const nextData = { ...jsonData, ...sectionData };
+    setJsonData(nextData);
+    setEditorContent(JSON.stringify(nextData, null, 2));
+    setValidationErrors(null);
+  };
+
   function updateMode(mode) {
     if (mode === "visual") {
       try {
@@ -578,12 +603,16 @@ const ConfigPage = () => {
   const pageDescription = formProfile?.introKey
     ? t(formProfile.introKey)
     : t("settings.configForms.workbench.defaultIntro");
-  const ruleStatus = jsonData?.enabled
-    ? jsonData?.dry_run
-      ? t("settings.configForms.workbench.statusTest")
-      : t("settings.configForms.workbench.statusActive")
-    : t("settings.configForms.workbench.statusInactive");
-  const ruleStatusColor = jsonData?.enabled ? "success" : "default";
+  const hasEnabledSetting = Boolean(schema?.properties?.enabled);
+  const ruleStatus = hasEnabledSetting
+    ? jsonData?.enabled
+      ? jsonData?.dry_run
+        ? t("settings.configForms.workbench.statusTest")
+        : t("settings.configForms.workbench.statusActive")
+      : t("settings.configForms.workbench.statusInactive")
+    : t("settings.configForms.workbench.statusConfigured");
+  const ruleStatusColor =
+    hasEnabledSetting && jsonData?.enabled ? "success" : "default";
   const activeSectionIndex = (formProfile?.sections || []).findIndex(
     (section) => section.id === activeSection
   );
@@ -686,7 +715,14 @@ const ConfigPage = () => {
             }
             summary={
               mode === "visual" && hasGuidedProfile ? (
-                <NoLeaderSummaryPanel data={jsonData} />
+                usesGuidedRenderer ? (
+                  <NoLeaderSummaryPanel data={jsonData} />
+                ) : (
+                  <ConfigProfileSummaryPanel
+                    profile={formProfile}
+                    data={jsonData}
+                  />
+                )
               ) : null
             }
             actionBar={
@@ -770,14 +806,25 @@ const ConfigPage = () => {
 
             {mode === "visual" ? (
               hasGuidedProfile ? (
-                <GuidedConfigForm
-                  profile={formProfile}
-                  schema={schema}
-                  data={jsonData}
-                  activeSection={activeSection}
-                  disabled={!canChange}
-                  onChange={handleGuidedChange}
-                />
+                usesGuidedRenderer ? (
+                  <GuidedConfigForm
+                    profile={formProfile}
+                    schema={schema}
+                    data={jsonData}
+                    activeSection={activeSection}
+                    disabled={!canChange}
+                    onChange={handleGuidedChange}
+                  />
+                ) : (
+                  <SchemaConfigForm
+                    profile={formProfile}
+                    schema={schema}
+                    data={jsonData}
+                    activeSection={activeSection}
+                    disabled={!canChange}
+                    onChange={handleSchemaSectionChange}
+                  />
+                )
               ) : (
                 <Box
                   sx={{

@@ -48,4 +48,36 @@ Die Vorlage zeigt im rechten Bereich exemplarisch „Kick kann nicht erreicht we
 
 Keine offenen P0-, P1- oder P2-Designabweichungen im umgesetzten Formularfluss.
 
+## Formularfamilie
+
+Die freigegebene Arbeitsfläche wurde anschließend auf die weiteren schema-basierten
+Konfigurationsseiten übertragen. Visuell geprüft wurden die Referenz und die lokale
+Seeding-Seite in derselben Vergleichsansicht. Dabei bleiben Seitentitel, Status,
+Formular/JSON-Umschaltung, nummerierte Abschnittsnavigation, zusammenhängende
+Drei-Spalten-Arbeitsfläche, Wirkungskette und Speicherleiste konsistent. Der Inhalt
+der Schritte wird fachlich aus dem jeweiligen Schema gebildet und nicht künstlich
+an die No-Leader-Felder angeglichen.
+
+Direkt abgedeckte Seiten:
+
+- Level-Regeln
+- Seeding-Regeln
+- Solo-Panzer verhindern
+- VAC- und Spielsperren prüfen
+- Teamkill-Sperre beim Beitritt
+- Namensfilter
+- Seeder-VIP-Belohnung
+- Abgelaufene VIPs bereinigen
+
+Weitere Konfigurationen mit JSON-Schema verwenden denselben Arbeitsflächen-Rahmen
+und werden automatisch in verständliche Abschnitte gruppiert. Verschachtelte
+Seeder-VIP-Felder bleiben im visuellen Formular editierbar; die vollständige
+Rohkonfiguration bleibt im erweiterten JSON-Modus erreichbar.
+
+- Acht benannte Desktop-Seiten: Navigation, Zusammenfassung und Speichern geprüft.
+- Seeding und Seeder-VIP: 390 × 844 ohne horizontalen Überlauf geprüft.
+- Neue Formularfamilie: 11 von 11 E2E-Tests erfolgreich.
+- Bestehende No-Leader-Seite: 12 von 12 Regressionstests erfolgreich.
+- Produktions-Build: erfolgreich.
+
 final result: passed

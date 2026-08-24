@@ -1717,6 +1717,7 @@ const de = {
         statusActive: "Aktiv",
         statusInactive: "Deaktiviert",
         statusTest: "Testbetrieb",
+        statusConfigured: "Konfiguriert",
         save: "Änderungen speichern",
         saving: "Wird gespeichert …",
         reset: "Gespeicherte Werte wiederherstellen",
@@ -1756,18 +1757,40 @@ const de = {
           "Warnung {{current}} von {{total}} · Nächste Prüfung in {{seconds}} Sekunden",
         sectionTitles: {
           operation: "Grundlagen",
+          scope: "Geltungsbereich",
+          requirements: "Voraussetzungen",
+          detection: "Erkennung",
+          rules: "Regeln",
           exemptions: "Ausnahmen",
+          schedule: "Zeitplan",
+          announcements: "Ankündigungen",
           observation: "Bestätigen",
           warnings: "Warnungen",
           punishments: "Bestrafungen",
           kick: "Kick",
-          notifications: "Nachrichten",
+          actions: "Maßnahmen",
+          reward: "Belohnung",
+          messages: "Nachrichten",
+          notifications: "Benachrichtigungen",
+          advanced: "Weitere Einstellungen",
         },
         sectionDescriptions: {
           operation:
             "Aktiviere die Regel und entscheide, ob sie zunächst im Testbetrieb laufen soll.",
+          scope:
+            "Lege fest, wann und für welche Spieler oder Spielsituationen die Funktion gilt.",
+          requirements:
+            "Definiere die Bedingungen, die erfüllt sein müssen, bevor die Funktion eingreift.",
+          detection:
+            "Bestimme, welche Ereignisse erkannt werden und ab wann daraus ein Verstoß entsteht.",
+          rules:
+            "Lege die fachlichen Regeln, Grenzwerte und Prüfungen für diesen Bereich fest.",
           exemptions:
             "Lege fest, welche Spieler, Rollen und Markierungen von der Regel ausgenommen sind.",
+          schedule:
+            "Lege Prüfintervalle und zeitliche Abläufe für diesen Dienst fest.",
+          announcements:
+            "Konfiguriere Hinweise, die Spieler beim Betreten oder während der Regel erhalten.",
           observation:
             "Bestimme, wie oft ein Verstoß intern bestätigt wird, bevor eine sichtbare Warnung folgt.",
           warnings:
@@ -1775,8 +1798,32 @@ const de = {
           punishments:
             "Lege die Konsequenzen fest, falls Warnungen ohne Wirkung bleiben.",
           kick: "Konfiguriere die letzte Eskalationsstufe und die Frist vor dem Kick.",
+          actions:
+            "Bestimme die Maßnahme, ihre Dauer und die Begründung für betroffene Spieler.",
+          reward: "Lege Umfang, Dauer und Weitergabe der Belohnung fest.",
+          messages:
+            "Bearbeite die Texte, die Spieler oder Administratoren in diesem Ablauf erhalten.",
           notifications:
             "Hinterlege optional einen Discord-Webhook für Audit-Meldungen.",
+          advanced:
+            "Weitere Einstellungen dieses Bereichs, die keiner Hauptphase zugeordnet sind.",
+        },
+        profileSummary: {
+          title: "Zusammenfassung",
+          sequence: "Wirkungskette",
+          active: "Aktiv – Maßnahmen werden ausgeführt",
+          inactive: "Deaktiviert",
+          test: "Testbetrieb – nur protokollieren",
+          disabled: "Übersprungen oder deaktiviert",
+          unlimited: "Unbegrenzt · alle {{interval}} Sekunden",
+          count: "{{count}}× · alle {{interval}} Sekunden",
+          kick: "Kick nach {{seconds}} Sekunden",
+          intervalMinutes: "Prüfung alle {{count}} Minuten",
+          configured: "{{configured}} von {{total}} Angaben gesetzt",
+          activeNotice:
+            "Die gezeigten Einstellungen werden nach dem Speichern für diesen Server verwendet.",
+          inactiveNotice:
+            "Die Funktion ist deaktiviert. Die übrigen Werte bleiben gespeichert.",
         },
         placeholders: {
           player_name: "Spielername",
@@ -2022,6 +2069,36 @@ const de = {
         title: "Solo-Panzer verhindern",
         intro:
           "Lege fest, wie CRCON auf allein besetzte Panzertrupps in Hell Let Loose und HLL: Vietnam reagiert.",
+      },
+      vacBans: {
+        eyebrow: "Sicherheit & Sperren",
+        title: "VAC- und Spielsperren prüfen",
+        intro:
+          "Lege fest, welche Sperrhistorie beim Beitritt geprüft wird und wie CRCON betroffene Spieler behandelt.",
+      },
+      tkBans: {
+        eyebrow: "Sicherheit & Sperren",
+        title: "Teamkill-Sperre beim Beitritt",
+        intro:
+          "Erkenne frühe Teamkills nach dem Beitritt, definiere Ausnahmen und konfiguriere die daraus entstehende Sperre.",
+      },
+      nameKicks: {
+        eyebrow: "Spieler & Moderation",
+        title: "Namensfilter",
+        intro:
+          "Prüfe Spielernamen anhand deiner Regeln, schütze ausgenommene Spieler und lege einen verständlichen Kick-Grund fest.",
+      },
+      seedVip: {
+        eyebrow: "Seeding & Belohnungen",
+        title: "Seeder-VIP-Belohnung",
+        intro:
+          "Lege fest, wann Seeding als erfolgreich gilt und welche VIP-Belohnung berechtigte Spieler erhalten.",
+      },
+      expiredVip: {
+        eyebrow: "VIP-Verwaltung",
+        title: "Abgelaufene VIPs bereinigen",
+        intro:
+          "Bestimme, wie oft CRCON abgelaufene VIP-Einträge prüft und optional darüber informiert.",
       },
     },
     config: {

@@ -877,14 +877,8 @@ export default function GuidedConfigForm({
             id={`config-form-${section.id}`}
             testId={`config-section-${section.id}`}
             icon={sectionIcons[section.id]}
-            title={t(
-              `settings.configForms.workbench.sectionTitles.${section.id}`,
-              { defaultValue: t(section.titleKey) }
-            )}
-            description={t(
-              `settings.configForms.workbench.sectionDescriptions.${section.id}`,
-              { defaultValue: t(section.descriptionKey) }
-            )}
+            title={t(section.titleKey)}
+            description={t(section.descriptionKey)}
             disabled={disabled}
             plain
           >

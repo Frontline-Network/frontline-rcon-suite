@@ -6,10 +6,17 @@ const pageKeys = (page) => ({
   introKey: `${ROOT}.${page}.intro`,
 });
 
-const section = (id, fields) => ({
+const noLeaderSection = (id, fields) => ({
   id,
   titleKey: `${ROOT}.noLeader.sections.${id}.title`,
   descriptionKey: `${ROOT}.noLeader.sections.${id}.description`,
+  fields,
+});
+
+const genericSection = (id, fields) => ({
+  id,
+  titleKey: `${ROOT}.workbench.sectionTitles.${id}`,
+  descriptionKey: `${ROOT}.workbench.sectionDescriptions.${id}`,
   fields,
 });
 
@@ -19,41 +26,53 @@ const field = (name, metadata = {}) => ({
   ...metadata,
 });
 
+const schemaProfile = (page, sections, summarySectionIds) => ({
+  ...pageKeys(page),
+  renderer: "schema",
+  sections: sections.map(([id, fields]) => genericSection(id, fields)),
+  fields: {},
+  summarySectionIds,
+});
+
 const noLeaderProfile = {
   ...pageKeys("noLeader"),
+  renderer: "guided",
   summary: {
     titleKey: `${ROOT}.noLeader.summary.title`,
     descriptionKey: `${ROOT}.noLeader.summary.description`,
   },
   sections: [
-    section("operation", ["enabled", "dry_run"]),
-    section("exemptions", [
+    noLeaderSection("operation", ["enabled", "dry_run"]),
+    noLeaderSection("exemptions", [
       "whitelist_flags",
       "immune_roles",
       "immune_player_level",
       "dont_do_anything_below_this_number_of_players",
     ]),
-    section("observation", ["number_of_notes", "notes_interval_seconds"]),
-    section("warnings", [
+    noLeaderSection("observation", [
+      "number_of_notes",
+      "notes_interval_seconds",
+    ]),
+    noLeaderSection("warnings", [
       "number_of_warnings",
       "warning_interval_seconds",
       "warning_message",
     ]),
-    section("punishments", [
+    noLeaderSection("punishments", [
       "number_of_punishments",
       "min_squad_players_for_punish",
       "min_server_players_for_punish",
       "punish_interval_seconds",
       "punish_message",
     ]),
-    section("kick", [
+    noLeaderSection("kick", [
       "kick_after_max_punish",
       "min_squad_players_for_kick",
       "min_server_players_for_kick",
       "kick_grace_period_seconds",
       "kick_message",
     ]),
-    section("notifications", ["discord_webhook_url"]),
+    noLeaderSection("notifications", ["discord_webhook_url"]),
   ],
   fields: {
     enabled: field("enabled", { kind: "toggle" }),
@@ -160,25 +179,297 @@ const noLeaderProfile = {
 
 const configFormProfiles = {
   auto_mod_no_leader_config: noLeaderProfile,
-  auto_mod_level_config: {
-    ...pageKeys("level"),
-    sections: [],
-    fields: {},
-  },
-  auto_mod_seeding_config: {
-    ...pageKeys("seeding"),
-    sections: [],
-    fields: {},
-  },
-  auto_mod_solo_tank_config: {
-    ...pageKeys("noSoloTank"),
-    sections: [],
-    fields: {},
-  },
+  auto_mod_level_config: schemaProfile(
+    "level",
+    [
+      ["operation", ["enabled", "dry_run"]],
+      [
+        "exemptions",
+        [
+          "whitelist_flags",
+          "dont_do_anything_below_this_number_of_players",
+          "levelbug_enabled",
+        ],
+      ],
+      [
+        "rules",
+        [
+          "min_level",
+          "max_level",
+          "level_thresholds",
+          "min_level_message",
+          "max_level_message",
+          "violation_message",
+          "force_kick_message",
+        ],
+      ],
+      [
+        "announcements",
+        [
+          "announcement_enabled",
+          "only_announce_impacted_players",
+          "announcement_message",
+        ],
+      ],
+      [
+        "warnings",
+        ["number_of_warnings", "warning_interval_seconds", "warning_message"],
+      ],
+      [
+        "punishments",
+        [
+          "number_of_punishments",
+          "min_squad_players_for_punish",
+          "min_server_players_for_punish",
+          "punish_interval_seconds",
+          "punish_message",
+        ],
+      ],
+      [
+        "kick",
+        [
+          "kick_after_max_punish",
+          "min_squad_players_for_kick",
+          "min_server_players_for_kick",
+          "kick_grace_period_seconds",
+          "kick_message",
+        ],
+      ],
+      ["notifications", ["discord_webhook_url"]],
+    ],
+    ["rules", "warnings", "punishments", "kick"]
+  ),
+  auto_mod_seeding_config: schemaProfile(
+    "seeding",
+    [
+      ["operation", ["enabled", "dry_run"]],
+      [
+        "exemptions",
+        [
+          "whitelist_flags",
+          "immune_roles",
+          "immune_player_level",
+          "dont_do_anything_below_this_number_of_players",
+        ],
+      ],
+      [
+        "rules",
+        ["disallowed_roles", "disallowed_weapons", "enforce_cap_fight"],
+      ],
+      ["announcements", ["announcement_enabled", "announcement_message"]],
+      [
+        "warnings",
+        ["number_of_warnings", "warning_interval_seconds", "warning_message"],
+      ],
+      [
+        "punishments",
+        [
+          "number_of_punishments",
+          "min_squad_players_for_punish",
+          "min_server_players_for_punish",
+          "punish_interval_seconds",
+          "punish_message",
+        ],
+      ],
+      [
+        "kick",
+        [
+          "kick_after_max_punish",
+          "min_squad_players_for_kick",
+          "min_server_players_for_kick",
+          "kick_grace_period_seconds",
+          "kick_message",
+        ],
+      ],
+      ["notifications", ["discord_webhook_url"]],
+    ],
+    ["rules", "warnings", "punishments", "kick"]
+  ),
+  auto_mod_solo_tank_config: schemaProfile(
+    "noSoloTank",
+    [
+      ["operation", ["enabled", "dry_run"]],
+      [
+        "exemptions",
+        [
+          "whitelist_flags",
+          "immune_player_level",
+          "dont_do_anything_below_this_number_of_players",
+        ],
+      ],
+      ["observation", ["number_of_notes", "notes_interval_seconds"]],
+      [
+        "warnings",
+        ["number_of_warnings", "warning_interval_seconds", "warning_message"],
+      ],
+      [
+        "punishments",
+        [
+          "number_of_punishments",
+          "min_server_players_for_punish",
+          "punish_interval_seconds",
+          "punish_message",
+        ],
+      ],
+      [
+        "kick",
+        [
+          "kick_after_max_punish",
+          "min_server_players_for_kick",
+          "kick_grace_period_seconds",
+          "kick_message",
+        ],
+      ],
+      ["notifications", ["discord_webhook_url"]],
+    ],
+    ["observation", "warnings", "punishments", "kick"]
+  ),
+  vac_game_bans_config: schemaProfile(
+    "vacBans",
+    [
+      ["rules", ["vac_history_days", "game_ban_threshhold"]],
+      ["actions", ["blacklist_id", "ban_on_vac_history_reason", "auto_expire"]],
+      ["exemptions", ["whitelist_flags"]],
+    ],
+    ["rules", "actions", "exemptions"]
+  ),
+  tk_ban_on_connect_config: schemaProfile(
+    "tkBans",
+    [
+      ["operation", ["enabled"]],
+      [
+        "detection",
+        [
+          "max_time_after_connect_minutes",
+          "ignore_tk_after_n_kills",
+          "ignore_tk_after_n_deaths",
+          "teamkill_tolerance_count",
+        ],
+      ],
+      ["exemptions", ["excluded_weapons", "whitelist_players"]],
+      ["actions", ["message", "author_name", "blacklist_id", "ban_duration"]],
+      ["notifications", ["discord_webhook_url", "discord_webhook_message"]],
+    ],
+    ["detection", "actions", "exemptions", "notifications"]
+  ),
+  name_kick_config: schemaProfile(
+    "nameKicks",
+    [
+      ["rules", ["regular_expressions"]],
+      ["exemptions", ["whitelist_flags"]],
+      ["actions", ["kick_reason"]],
+      ["notifications", ["discord_webhook_url"]],
+    ],
+    ["rules", "actions", "exemptions", "notifications"]
+  ),
+  seed_vip_config: schemaProfile(
+    "seedVip",
+    [
+      [
+        "operation",
+        [
+          "enabled",
+          "dry_run",
+          "language",
+          "poll_time_seeding",
+          "poll_time_seeded",
+        ],
+      ],
+      ["requirements", ["requirements", "player_announce_thresholds"]],
+      ["reward", ["reward", "nice_time_delta", "nice_expiration_date"]],
+      ["messages", ["player_messages"]],
+      ["notifications", ["hooks"]],
+    ],
+    ["requirements", "reward", "messages", "notifications"]
+  ),
+  expired_vip_config: schemaProfile(
+    "expiredVip",
+    [
+      ["operation", ["enabled"]],
+      ["schedule", ["interval_minutes"]],
+      ["notifications", ["discord_webhook_url"]],
+    ],
+    ["operation", "schedule", "notifications"]
+  ),
 };
 
-export const getConfigFormProfile = (command) =>
-  configFormProfiles[command] || null;
+const sectionOrder = [
+  "operation",
+  "scope",
+  "requirements",
+  "detection",
+  "rules",
+  "exemptions",
+  "schedule",
+  "announcements",
+  "warnings",
+  "punishments",
+  "kick",
+  "actions",
+  "reward",
+  "messages",
+  "notifications",
+  "advanced",
+];
+
+const classifyField = (name) => {
+  if (["enabled", "dry_run", "language", "mode"].includes(name))
+    return "operation";
+  if (/webhook|hooks|discord/i.test(name)) return "notifications";
+  if (/whitelist|immune|excluded|ignore_/i.test(name)) return "exemptions";
+  if (/message|reason|author/i.test(name)) return "messages";
+  if (/reward|vip/i.test(name)) return "reward";
+  if (/kick/i.test(name)) return "kick";
+  if (/punish/i.test(name)) return "punishments";
+  if (/ban|blacklist|action|expire/i.test(name)) return "actions";
+  if (/interval|poll|schedule|frequency/i.test(name)) return "schedule";
+  if (/threshold|requirement|condition|min_|max_/i.test(name))
+    return "requirements";
+  if (/detect|tolerance|watch|history/i.test(name)) return "detection";
+  if (/rule|weapon|role|expression|filter|word/i.test(name)) return "rules";
+  return "advanced";
+};
+
+const buildGenericProfile = (schema) => {
+  const groups = new Map(sectionOrder.map((id) => [id, []]));
+  Object.keys(schema?.properties || {}).forEach((name) => {
+    groups.get(classifyField(name)).push(name);
+  });
+  const sections = sectionOrder
+    .filter((id) => groups.get(id).length)
+    .map((id) => genericSection(id, groups.get(id)));
+  return {
+    renderer: "schema",
+    sections,
+    fields: {},
+    summarySectionIds: sections.slice(0, 4).map(({ id }) => id),
+  };
+};
+
+const finalizeProfile = (profile, schema) => {
+  if (!profile || !schema?.properties) return profile;
+  const available = new Set(Object.keys(schema.properties));
+  const known = new Set();
+  const sections = profile.sections
+    .map((entry) => ({
+      ...entry,
+      fields: entry.fields.filter((name) => available.has(name)),
+    }))
+    .filter((entry) => entry.fields.length)
+    .map((entry) => {
+      entry.fields.forEach((name) => known.add(name));
+      return entry;
+    });
+  const remaining = [...available].filter((name) => !known.has(name));
+  if (remaining.length) sections.push(genericSection("advanced", remaining));
+  return { ...profile, sections };
+};
+
+export const getConfigFormProfile = (command, schema) =>
+  finalizeProfile(
+    configFormProfiles[command] || buildGenericProfile(schema),
+    schema
+  );
 
 export const getProfileFieldOrder = (profile, fieldNames = []) => {
   if (!profile) return [...fieldNames];
