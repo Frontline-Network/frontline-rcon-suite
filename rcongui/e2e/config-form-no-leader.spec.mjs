@@ -153,13 +153,24 @@ test("shows localized message placeholders while keeping backend tokens in JSON"
   await expect(warningMessage).toHaveValue(/\{Truppname\}/);
   await expect(warningMessage).not.toHaveValue(/\{player_name\}/);
 
-  await warningMessage.fill("Hallo {Spielername} aus {Truppname}");
+  await shell
+    .getByTestId("config-section-warnings")
+    .getByText("Max. Warnungen", { exact: true })
+    .click();
+  await expect(warningMessage).toHaveValue(/\{Max\. Warnungen\}/);
+  await expect(
+    shell.getByText(/Unbekannte Platzhalter:.*max_warnings/)
+  ).toHaveCount(0);
+
+  await warningMessage.fill(
+    "Hallo {Spielername} aus {Truppname}: {Max. Warnungen}"
+  );
   await shell
     .getByTestId("config-mode-toggle")
     .getByRole("button", { name: noLeaderFormContract.de.tabs[1] })
     .click();
   await expect(shell.getByTestId("config-json-editor")).toContainText(
-    "Hallo {player_name} aus {squad_name}"
+    "Hallo {player_name} aus {squad_name}: {max_warnings}"
   );
 
   await shell
@@ -170,7 +181,7 @@ test("shows localized message placeholders while keeping backend tokens in JSON"
     .getByRole("button", { name: "Warnen Warnungen konfigurieren" })
     .click();
   await expect(warningMessage).toHaveValue(
-    "Hallo {Spielername} aus {Truppname}"
+    "Hallo {Spielername} aus {Truppname}: {Max. Warnungen}"
   );
 });
 
