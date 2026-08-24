@@ -2,297 +2,213 @@ import { Box, styled } from "@mui/material";
 import { getTierColors, getPlayerTier } from "@/utils/lib";
 
 export const TeamContainer = styled(Box)(({ theme }) => ({
-  display: "flex",
-  gap: theme.spacing(2),
-  flexDirection: "row",
-  marginLeft: theme.spacing(-2),
-  marginRight: theme.spacing(-2),
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: theme.spacing(1.5),
+  alignItems: "start",
+  minWidth: 0,
+  paddingBottom: theme.spacing(10),
   [theme.breakpoints.down("lg")]: {
-    flexDirection: "column",
-  },
-  fontFamily: "Roboto Mono, monospace",
-  backgroundColor: theme.palette.background.default,
-  overflow: "hidden",
-  [theme.breakpoints.up("lg")]: {
-    padding: theme.spacing(2, 4),
-    marginLeft: 0,
-    marginRight: 0,
+    gridTemplateColumns: "minmax(0, 1fr)",
   },
 }));
 
 export const LobbyContainer = styled(Box)(({ theme }) => ({
-  display: "flex",
-  gap: theme.spacing(2),
-  flexDirection: "row",
-  marginLeft: theme.spacing(-2),
-  marginRight: theme.spacing(-2),
-  [theme.breakpoints.down("lg")]: {
-    flexDirection: "column",
-  },
-  fontFamily: "Roboto Mono, monospace",
-  backgroundColor: theme.palette.background.default,
-  overflow: "hidden",
-  [theme.breakpoints.up("lg")]: {
-    padding: theme.spacing(0, 4),
-    marginLeft: 0,
-    marginRight: 0,
-  },
+  marginBottom: theme.spacing(1.5),
+  minWidth: 0,
 }));
 
-export const TeamBox = styled(Box)(({ theme }) => ({
-  flex: 1,
-  borderRadius: theme.shape.borderRadius,
+export const TeamBox = styled(Box, {
+  shouldForwardProp: (prop) => prop !== "teamName",
+})(({ theme, teamName }) => ({
   minWidth: 0,
-  display: "flex",
-  flexDirection: "column",
   overflow: "hidden",
+  border: `1px solid ${theme.palette.divider}`,
+  borderRadius: theme.shape.borderRadius,
+  backgroundColor: theme.palette.background.paper,
+  boxShadow:
+    teamName === "allies"
+      ? "inset 0 2px 0 rgba(66,165,245,.45)"
+      : teamName === "axis"
+      ? "inset 0 2px 0 rgba(239,83,80,.45)"
+      : "none",
 }));
 
 export const ScrollContainer = styled(Box)({
-  overflowX: "auto",
-  flex: 1,
-  display: "flex",
-  flexDirection: "column",
+  minWidth: 0,
+  overflowX: "clip",
 });
 
 export const ContentWrapper = styled(Box)({
   width: "100%",
-  minWidth: 624,
+  minWidth: 0,
 });
 
-export const gridTemplateColumns = {
-  default: "36px minmax(180px, 1fr) repeat(7, 56px)",
-  sm: "36px minmax(150px, 1fr) repeat(7, 56px)",
-  noScore: "35px minmax(150px, 200px) 1fr",
-};
+const rowGrid = "44px minmax(150px, 1.35fr) minmax(130px, 1fr) 64px 72px";
 
-export const SquadHeader = styled(Box, {
-  shouldForwardProp: (prop) => prop !== "selected",
-})(({ theme, selected }) => ({
-  padding: theme.spacing(0.5, 1),
-  backgroundColor: theme.palette.background.paper,
-  borderBottom: `1px solid ${theme.palette.divider}`,
+const responsiveRow = (theme) => ({
   display: "grid",
-  gridTemplateColumns: gridTemplateColumns.default,
+  gridTemplateColumns: rowGrid,
+  minWidth: 0,
   alignItems: "center",
-  cursor: "pointer",
-  "&:hover": {
-    backgroundColor: selected
-      ? theme.palette.action.selected
-      : theme.palette.action.hover,
+  [theme.breakpoints.down("sm")]: {
+    gridTemplateColumns: "44px minmax(0, 1fr) 64px",
+    "& .leader-cell, & .level-cell": {
+      display: "none",
+    },
   },
-  "& .squad-info": {
-    gridColumn: "1 / 3",
+});
+
+export const HeaderRow = styled(Box)(({ theme }) => ({
+  ...responsiveRow(theme),
+  minHeight: 34,
+  padding: theme.spacing(0, 1),
+  borderTop: `1px solid ${theme.palette.divider}`,
+  borderBottom: `1px solid ${theme.palette.divider}`,
+  backgroundColor: theme.palette.background.default,
+  color: theme.palette.text.secondary,
+  "& > *": {
+    padding: theme.spacing(0.5),
+    minWidth: 0,
+    fontSize: "0.7rem",
+    fontWeight: 700,
+    letterSpacing: ".04em",
+    textTransform: "uppercase",
+  },
+  "& > :not(:nth-of-type(2))": { textAlign: "center" },
+}));
+
+export const TeamHeaderRow = styled(Box)(({ theme }) => ({
+  minHeight: 58,
+  display: "flex",
+  alignItems: "center",
+  gap: theme.spacing(1.25),
+  padding: theme.spacing(1, 1.5),
+  background:
+    "linear-gradient(90deg, rgba(255,255,255,.035), rgba(255,255,255,0))",
+  "& .team-title": {
+    minWidth: 0,
+    flex: 1,
+  },
+  "& .team-summary": {
     display: "flex",
     alignItems: "center",
-    gap: theme.spacing(1),
+    gap: theme.spacing(1.5),
+    color: theme.palette.text.secondary,
+    whiteSpace: "nowrap",
+    [theme.breakpoints.down("sm")]: {
+      gap: theme.spacing(0.75),
+      "& .optional-summary": { display: "none" },
+    },
+  },
+}));
+
+export const SquadHeader = styled(Box, {
+  shouldForwardProp: (prop) => prop !== "selected" && prop !== "hasProblem",
+})(({ theme, selected, hasProblem }) => ({
+  ...responsiveRow(theme),
+  minHeight: 44,
+  padding: theme.spacing(0, 1),
+  borderBottom: `1px solid ${theme.palette.divider}`,
+  backgroundColor: selected
+    ? theme.palette.action.selected
+    : theme.palette.background.paper,
+  "&:hover": { backgroundColor: theme.palette.action.hover },
+  "& .squad-main": {
     minWidth: 0,
-    "& .squad-name-container": {
-      display: "flex",
-      alignItems: "center",
-      gap: theme.spacing(1),
-      minWidth: 0,
-      flex: 1,
-      "& .MuiTypography-root": {
-        color: selected ? theme.palette.primary.main : "inherit",
-      },
-    },
+    display: "flex",
+    alignItems: "center",
+    gap: theme.spacing(0.75),
   },
-  "& .squad-stats": {
-    display: "contents",
-    "& .stat": {
-      textAlign: "right",
-      fontFamily: "Roboto Mono, monospace",
-      whiteSpace: "nowrap",
-      fontSize: "0.75rem",
-      color: selected
-        ? theme.palette.primary.main
-        : theme.palette.text.secondary,
-    },
+  "& .squad-name": {
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    fontWeight: 800,
+    textTransform: "uppercase",
   },
-  [theme.breakpoints.down("sm")]: {
-    gridTemplateColumns: gridTemplateColumns.sm,
+  "& .leader-cell": {
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    color: hasProblem
+      ? theme.palette.warning.main
+      : theme.palette.text.secondary,
+  },
+  "& .level-cell, & .problem-cell": {
+    textAlign: "center",
+    whiteSpace: "nowrap",
+    color: theme.palette.text.secondary,
+  },
+  "& .problem-cell": {
+    color: hasProblem ? theme.palette.warning.main : theme.palette.success.main,
+    fontWeight: 700,
   },
 }));
 
 export const PlayerRow = styled(Box, {
   shouldForwardProp: (prop) =>
-    prop !== "isCommander" &&
-    prop !== "level" &&
-    prop !== "selected" &&
-    prop !== "timeOnly",
-})(({ theme, selected, level, isCommander, timeOnly }) => ({
-  display: "grid",
-  gridTemplateColumns: gridTemplateColumns[!timeOnly ? "default" : "noScore"],
-  padding: isCommander ? theme.spacing(2, 1) : theme.spacing(0.5, 1),
-  alignItems: "center",
+    prop !== "selected" && prop !== "level" && prop !== "isCommander",
+})(({ theme, selected, level, isCommander }) => ({
+  ...responsiveRow(theme),
+  minHeight: isCommander ? 52 : 44,
+  padding: theme.spacing(0, 1),
   borderBottom: `1px solid ${theme.palette.divider}`,
-  backgroundColor: theme.palette.background.paper,
-  cursor: "pointer",
-  "&:hover": {
-    backgroundColor: selected
-      ? theme.palette.action.selected
-      : theme.palette.action.hover,
-  },
-  "& .stat": {
-    textAlign: "right",
-    fontFamily: "Roboto Mono, monospace",
-    whiteSpace: "nowrap",
-    color: selected ? theme.palette.primary.main : "inherit",
-  },
+  backgroundColor: selected
+    ? theme.palette.action.selected
+    : isCommander
+    ? "rgba(255,255,255,.025)"
+    : theme.palette.background.paper,
+  "&:hover": { backgroundColor: theme.palette.action.hover },
   "& .player-info": {
     display: "flex",
     alignItems: "center",
-    gap: theme.spacing(1),
+    gap: theme.spacing(0.75),
     minWidth: 0,
-    "& .player-name": {
-      fontFamily: "Roboto",
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap",
-      color: selected ? theme.palette.primary.main : "inherit",
-      cursor: "pointer",
-      "&:hover": {
-        textDecoration: "underline",
-      },
-    },
   },
-  "& .level": {
-    fontWeight: "bold",
-    textAlign: "center",
-    color: selected
-      ? theme.palette.primary.main
-      : level
-      ? getTierColors(theme.palette.mode)[getPlayerTier(level)]
-      : "inherit",
-  },
-  [theme.breakpoints.down("sm")]: {
-    gridTemplateColumns: gridTemplateColumns.sm,
-    fontSize: "0.875rem",
-  },
-}));
-
-export const HeaderRow = styled(Box)(({ theme }) => ({
-  display: "grid",
-  gridTemplateColumns: gridTemplateColumns.default,
-  padding: theme.spacing(0.5, 1),
-  borderBottom: `1px solid ${theme.palette.divider}`,
-  backgroundColor: theme.palette.background.default,
-  position: "sticky",
-  top: 0,
-  zIndex: 1,
-  "& > *": {
-    textAlign: "right",
-    color: theme.palette.text.secondary,
-    fontSize: "0.75rem",
-    fontWeight: "bold",
-    whiteSpace: "nowrap",
+  "& .player-name": {
     minWidth: 0,
     overflow: "hidden",
     textOverflow: "ellipsis",
-  },
-  "& > :nth-of-type(1)": {
-    textAlign: "center",
-  },
-  "& > :nth-of-type(2)": {
-    textAlign: "left",
-  },
-  "& .metric-header": {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "fit-content",
-    justifySelf: "end",
-  },
-  [theme.breakpoints.down("sm")]: {
-    gridTemplateColumns: gridTemplateColumns.sm,
-    fontSize: "0.75rem",
-  },
-}));
-
-export const TeamHeaderRow = styled(Box)(({ theme }) => ({
-  display: "grid",
-  marginBottom: theme.spacing(1),
-  gridTemplateColumns: gridTemplateColumns.default,
-  padding: theme.spacing(0.5, 1),
-  alignItems: "center",
-  "& > *": {
-    textAlign: "right",
-    fontFamily: "Roboto Mono, monospace",
     whiteSpace: "nowrap",
-    fontSize: "0.75rem",
-    color: theme.palette.text.secondary,
-    fontWeight: "bold",
+    color: selected ? theme.palette.primary.main : theme.palette.text.primary,
   },
-  "& > :nth-of-type(1)": {
-    textAlign: "center",
-    color: theme.palette.primary.main,
-  },
-  "& > :nth-of-type(2)": {
-    textAlign: "left",
-  },
-  [theme.breakpoints.down("sm")]: {
-    gridTemplateColumns: gridTemplateColumns.sm,
-  },
-}));
-
-export const CommanderRow = styled(Box, {
-  shouldForwardProp: (prop) => prop !== "selected" && prop !== "level",
-})(({ theme, selected, level }) => ({
-  display: "grid",
-  gridTemplateColumns: gridTemplateColumns.default,
-  padding: theme.spacing(2, 1),
-  alignItems: "center",
-  borderBottom: `1px solid ${theme.palette.divider}`,
-  backgroundColor: theme.palette.background.paper,
-  cursor: "pointer",
-  "&:hover": {
-    backgroundColor: selected
-      ? theme.palette.action.selected
-      : theme.palette.action.hover,
-  },
-  "& .stat": {
-    textAlign: "right",
-    fontFamily: "Roboto Mono, monospace",
-    whiteSpace: "nowrap",
-    color: selected ? theme.palette.primary.main : "inherit",
-  },
-  "& .player-info": {
-    display: "flex",
-    alignItems: "center",
-    gap: theme.spacing(1),
+  "& .leader-cell": {
     minWidth: 0,
-    "& .player-name": {
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap",
-      color: selected ? theme.palette.primary.main : "inherit",
-      cursor: "pointer",
-      "&:hover": {
-        textDecoration: "underline",
-      },
-    },
-    "& .no-commander": {
-      display: "flex",
-      alignItems: "center",
-      gap: theme.spacing(1),
-      color: selected
-        ? theme.palette.primary.contrastText
-        : theme.palette.text.secondary,
-      fontStyle: "italic",
-    },
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    color: theme.palette.text.secondary,
   },
-  "& .level": {
-    fontWeight: "bold",
+  "& .level-cell": {
     textAlign: "center",
-    color: selected
-      ? theme.palette.primary.main
-      : level
+    color: level
       ? getTierColors(theme.palette.mode)[getPlayerTier(level)]
-      : "inherit",
+      : theme.palette.text.secondary,
   },
-  [theme.breakpoints.down("sm")]: {
-    gridTemplateColumns: gridTemplateColumns.sm,
-    fontSize: "0.875rem",
+  "& .problem-cell": {
+    display: "flex",
+    justifyContent: "center",
+    gap: theme.spacing(0.75),
+    color: theme.palette.text.secondary,
+    whiteSpace: "nowrap",
   },
+}));
+
+export const CommanderRow = PlayerRow;
+
+export const SquadGroupHeader = styled(Box)(({ theme }) => ({
+  minHeight: 32,
+  display: "flex",
+  alignItems: "center",
+  padding: theme.spacing(0.5, 1.5),
+  borderBottom: `1px solid ${theme.palette.divider}`,
+  backgroundColor: theme.palette.background.default,
+  color: theme.palette.text.secondary,
+  fontSize: "0.72rem",
+  fontWeight: 800,
+  letterSpacing: ".07em",
+  textTransform: "uppercase",
 }));

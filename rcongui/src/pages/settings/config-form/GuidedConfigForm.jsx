@@ -238,6 +238,19 @@ export const validateProfiledConfig = (schema, data, profile, t) => {
           sectionId,
         });
       }
+      if (
+        name === "regular_expressions" &&
+        value.some(
+          (expression) => typeof expression !== "string" || !expression.trim()
+        )
+      ) {
+        errors.push({
+          id: `${name}-empty-regex`,
+          label,
+          message: t("settings.configForms.workbench.validation.emptyRegex"),
+          sectionId,
+        });
+      }
     }
 
     if (metadata?.placeholders && typeof value === "string") {

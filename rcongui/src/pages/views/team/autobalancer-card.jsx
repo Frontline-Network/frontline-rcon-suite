@@ -1,19 +1,24 @@
+import { useEffect, useState } from "react";
 import {
   Alert,
   Box,
   Button,
-  Card,
-  CardActions,
-  CardContent,
   Chip,
+  Collapse,
+  IconButton,
   Stack,
+  Tooltip,
   Typography,
 } from "@mui/material";
+import BalanceOutlinedIcon from "@mui/icons-material/BalanceOutlined";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { cmd } from "@/utils/fetchUtils";
-import TeamBalanceBar from "@/components/shared/TeamBalanceBar";
-import { useAuth } from "@/hooks/useAuth";
 import { Link } from "react-router-dom";
+import TeamBalanceBar from "@/components/shared/TeamBalanceBar";
+import { cmd } from "@/utils/fetchUtils";
+import { useAuth } from "@/hooks/useAuth";
 
 const PHASE_LABELS = {
   idle: "Bereit",
@@ -26,24 +31,6 @@ const PHASE_LABELS = {
   blocked: "Blockiert",
 };
 
-const PHASE_EXPLANATIONS = {
-  idle: "Aktuell liegt kein zu bearbeitender Balance-Vorfall vor.",
-  observing:
-    "Die Teamdifferenz ist zu groß. Der Dienst prüft, ob sie lange genug in derselben Richtung bestehen bleibt.",
-  volunteer:
-    "Geeignete Spieler im größeren Team können sich jetzt mit !balance freiwillig melden.",
-  proposed:
-    "Ein Kandidat wurde berechnet. Im manuellen Modus wartet der Vorschlag auf eine Admin-Freigabe.",
-  armed:
-    "Der Kandidat ist vorgemerkt. Ein Wechsel ist nur nach seinem nächsten frischen Todesereignis möglich.",
-  verifying:
-    "Der RCON-Befehl wurde gesendet. Log und neuer Snapshot müssen den Wechsel jetzt bestätigen.",
-  cooldown:
-    "Der vorherige Vorfall ist beendet. Vor einem neuen Versuch muss die Differenz erneut stabil bestehen.",
-  blocked:
-    "Mindestens eine Sicherheitsbedingung ist nicht erfüllt. Deshalb plant der Dienst momentan keinen Wechsel.",
-};
-
 const MODE_LABELS = {
   disabled: "Aus",
   shadow: "Shadow – nur beobachten",
@@ -51,18 +38,10 @@ const MODE_LABELS = {
   auto: "Automatisch",
 };
 
-const MODE_EXPLANATIONS = {
-  disabled: "Der Autobalancer ist ausgeschaltet.",
-  shadow:
-    "Testbetrieb: Es werden nur Vorschläge protokolliert. Niemand erhält Nachrichten oder wird verschoben.",
-  manual:
-    "Ein Vorschlag muss von einem Admin freigegeben werden. Der Wechsel erfolgt anschließend nach dem Tod.",
-  auto: "Nach der Freiwilligenphase wird automatisch ausgewählt. Der Wechsel erfolgt nach dem Tod.",
-};
-
 const AutobalancerCard = () => {
   const queryClient = useQueryClient();
   const { permissions } = useAuth();
+  const [expanded, setExpanded] = useState(false);
   const canViewAutobalancer =
     permissions?.is_superuser ||
     permissions?.permissions?.some(
@@ -97,79 +76,141 @@ const AutobalancerCard = () => {
     onSuccess: refresh,
   });
 
+  const warnings = status?.warnings ?? [];
+  const blockReasons = status?.block_reasons ?? [];
+  const proposal = status?.proposal;
+  const needsAttention = Boolean(
+    proposal || warnings.length || blockReasons.length || status?.incident_id
+  );
+
+  useEffect(() => {
+    if (needsAttention) setExpanded(true);
+  }, [needsAttention]);
+
   if (!canViewAutobalancer || isError || !status) return null;
-  const proposal = status.proposal;
+
   const counts = status.team_counts || {};
-  const teamLabels = status.team_labels || { allies: "Allies", axis: "Axis" };
+  const teamLabels = status.team_labels || {
+    allies: "Alliierte",
+    axis: "Achsenmächte",
+  };
+  const balanced = !status.required_switches && !needsAttention;
+
   return (
-    <Card variant="outlined" sx={{ m: 1.5 }}>
-      <CardContent sx={{ pb: 1 }}>
-        <Stack
-          direction={{ xs: "column", md: "row" }}
-          spacing={1}
-          alignItems={{ md: "center" }}
-        >
-          <Typography variant="h6">Autobalancer</Typography>
-          <Chip
-            size="small"
-            label={MODE_LABELS[status.mode] || status.mode}
-            color={status.mode === "auto" ? "success" : "default"}
-          />
-          <Chip
-            size="small"
-            label={PHASE_LABELS[status.phase] || status.phase}
-          />
-          <Typography variant="body2" color="text.secondary">
-            {status.required_switches ?? 0} Wechsel nötig
+    <Box
+      component="section"
+      aria-label="Autobalancer"
+      sx={{
+        mb: 1.5,
+        border: "1px solid",
+        borderColor: needsAttention ? "warning.main" : "divider",
+        borderRadius: 1,
+        backgroundColor: "background.paper",
+        overflow: "hidden",
+      }}
+    >
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={1}
+        sx={{ minHeight: 52, px: 1.5, py: 0.5 }}
+      >
+        {balanced ? (
+          <CheckCircleOutlineIcon color="success" aria-hidden />
+        ) : needsAttention ? (
+          <ReportProblemOutlinedIcon color="warning" aria-hidden />
+        ) : (
+          <BalanceOutlinedIcon color="primary" aria-hidden />
+        )}
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            flexWrap="wrap"
+          >
+            <Typography variant="subtitle2">Autobalancer</Typography>
+            <Chip
+              size="small"
+              label={MODE_LABELS[status.mode] || status.mode}
+              color={status.mode === "auto" ? "success" : "default"}
+              sx={{ height: 22 }}
+            />
+            <Chip
+              size="small"
+              label={PHASE_LABELS[status.phase] || status.phase}
+              variant="outlined"
+              sx={{ height: 22 }}
+            />
+          </Stack>
+          <Typography variant="caption" color="text.secondary">
+            {balanced
+              ? "Aktuell ausgeglichen"
+              : `${status.required_switches ?? 0} Wechsel nötig`}
           </Typography>
-        </Stack>
-        <TeamBalanceBar
-          compact
-          allies={counts.allies}
-          axis={counts.axis}
-          alliesLabel={teamLabels.allies}
-          axisLabel={teamLabels.axis}
-          targetDifference={status.target_difference}
-        />
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          {MODE_EXPLANATIONS[status.mode]}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          <strong>Aktuelle Phase:</strong> {PHASE_EXPLANATIONS[status.phase]}
-        </Typography>
-        {proposal && (
-          <Box sx={{ mt: 1 }}>
-            <Typography variant="body2">
+        </Box>
+        <Tooltip title={expanded ? "Details schließen" : "Details öffnen"}>
+          <IconButton
+            aria-label={
+              expanded
+                ? "Autobalancer-Details schließen"
+                : "Autobalancer-Details öffnen"
+            }
+            aria-expanded={expanded}
+            onClick={() => setExpanded((value) => !value)}
+            sx={{ minWidth: 44, minHeight: 44 }}
+          >
+            <ExpandMoreIcon
+              sx={{
+                transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
+                transition: "transform 150ms ease",
+              }}
+            />
+          </IconButton>
+        </Tooltip>
+      </Stack>
+
+      <Collapse in={expanded}>
+        <Box
+          sx={{
+            px: 1.5,
+            pb: 1.5,
+            borderTop: "1px solid",
+            borderColor: "divider",
+          }}
+        >
+          <TeamBalanceBar
+            compact
+            allies={counts.allies}
+            axis={counts.axis}
+            alliesLabel={teamLabels.allies}
+            axisLabel={teamLabels.axis}
+            targetDifference={status.target_difference}
+          />
+          {proposal && (
+            <Alert severity="warning" sx={{ mt: 1 }}>
               Vorschlag: <strong>{proposal.player_name}</strong> nach{" "}
               {teamLabels[status.plan?.target_team] || "Gegenteam"}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Auswahlgrund: {proposal.reason} · Schutzstufe {proposal.base_tier}
-            </Typography>
-          </Box>
-        )}
-        {(status.warnings || []).map((warning) => (
-          <Alert key={warning} severity="warning" sx={{ mt: 1, py: 0 }}>
-            {warning}
-          </Alert>
-        ))}
-        {(status.block_reasons || []).length > 0 && (
-          <Typography variant="subtitle2" sx={{ mt: 1.5 }}>
-            Warum passiert gerade nichts?
-          </Typography>
-        )}
-        {(status.block_reasons || []).map((reason) => (
-          <Alert key={reason} severity="info" sx={{ mt: 1, py: 0 }}>
-            {reason}
-          </Alert>
-        ))}
-      </CardContent>
-      <CardActions>
-        <Button component={Link} to="/views/autobalancer" size="small">
-          Dashboard öffnen
-        </Button>
-        {status.incident_id && (
-          <>
+            </Alert>
+          )}
+          {warnings.map((warning) => (
+            <Alert key={warning} severity="warning" sx={{ mt: 1 }}>
+              {warning}
+            </Alert>
+          ))}
+          {blockReasons.map((reason) => (
+            <Alert key={reason} severity="info" sx={{ mt: 1 }}>
+              {reason}
+            </Alert>
+          ))}
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1}
+            sx={{ mt: 1.25 }}
+          >
+            <Button component={Link} to="/views/autobalancer" size="small">
+              Dashboard öffnen
+            </Button>
             {status.mode === "manual" && status.phase === "proposed" && (
               <Button
                 size="small"
@@ -180,18 +221,20 @@ const AutobalancerCard = () => {
                 Vorschlag freigeben
               </Button>
             )}
-            <Button
-              size="small"
-              color="warning"
-              disabled={cancel.isPending}
-              onClick={() => cancel.mutate()}
-            >
-              Incident abbrechen
-            </Button>
-          </>
-        )}
-      </CardActions>
-    </Card>
+            {status.incident_id && (
+              <Button
+                size="small"
+                color="warning"
+                disabled={cancel.isPending}
+                onClick={() => cancel.mutate()}
+              >
+                Incident abbrechen
+              </Button>
+            )}
+          </Stack>
+        </Box>
+      </Collapse>
+    </Box>
   );
 };
 

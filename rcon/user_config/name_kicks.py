@@ -32,6 +32,10 @@ class NameKickUserConfig(BaseUserConfig):
     @classmethod
     def compile_regexes(cls, vs):
         for idx, v in enumerate(vs):
+            if not v.strip():
+                raise ValueError(
+                    f"Regular expression at position {idx + 1} must not be empty"
+                )
             try:
                 re.compile(v)
             except re.error as e:
