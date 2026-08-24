@@ -121,6 +121,28 @@ if [[ "$mobile_push_worker_enabled" == false ]]; then
   echo "Mobile push worker disabled: integration or relay URL is not configured."
 fi
 
+# Preserve the installation's chosen Discord worker topology. These services
+# live only in the shared override, so the generated base compose file cannot
+# tell us which optional workers are active. Explicitly include every running
+# worker in the immutable build and restart set; otherwise a combined or legacy
+# Discord worker silently remains on the previous release.
+for optional_worker in \
+  discord_report_worker \
+  discord_moderation_worker \
+  frontline_background_worker; do
+  existing_worker_container="$(
+    docker compose \
+      --profile mobile \
+      --profile combined-workers \
+      -f compose.yaml \
+      -f compose.mobile-admin.yaml \
+      ps -q "$optional_worker"
+  )"
+  if [[ -n "$existing_worker_container" ]]; then
+    deployment_services+=("$optional_worker")
+  fi
+done
+
 echo "Preflight passed: $current_short -> $target_short"
 echo "Deployment services: ${deployment_services[*]}"
 if [[ "$mode" == "--check-only" ]]; then
