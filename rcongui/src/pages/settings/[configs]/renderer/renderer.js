@@ -5,8 +5,21 @@ import {
   levelThresholdsTester,
   renderer as levelThresholdsRenderer,
 } from "./levelThresholds";
+import {
+  stableIntegerControlTester,
+  stableNumberControlTester,
+  stableNumericControlRenderer,
+} from "@/pages/settings/config-form/StableNumericControl";
 
 export const schemaFormCustomRenderers = [
+  {
+    tester: stableIntegerControlTester,
+    renderer: stableNumericControlRenderer,
+  },
+  {
+    tester: stableNumberControlTester,
+    renderer: stableNumericControlRenderer,
+  },
   { tester: levelThresholdsTester, renderer: levelThresholdsRenderer },
   { tester: anyOfNullTester, renderer: anyOfNullRenderer },
 ];
