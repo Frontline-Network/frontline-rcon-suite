@@ -134,7 +134,7 @@ export const LiveCommandBar = ({
             border: 0,
             borderRadius: 0,
             gap: 0.75,
-            minHeight: 36,
+            minHeight: { xs: 44, lg: 36 },
             px: { xs: 1.25, sm: 2.5 },
           },
           "& .Mui-selected": {

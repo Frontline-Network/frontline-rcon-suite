@@ -441,6 +441,7 @@ const en = {
       deaths: "Deaths",
       killsPerMinute: "Kills per minute",
       teamKills: "Team kills",
+      teamKillsShort: "TKs",
       teamKillRisk: {
         none: "OK",
         caution: "REVIEW",
@@ -455,6 +456,10 @@ const en = {
       offense: "Offensive effectiveness",
       defense: "Defensive effectiveness",
       support: "Support effectiveness",
+      combatShort: "Combat",
+      offenseShort: "Offense",
+      defenseShort: "Defense",
+      supportShort: "Support",
       platform: "Platform",
       clanTag: "Clan tag",
       name: "Name",
@@ -497,6 +502,7 @@ const en = {
     noRecipients: "No recipients selected",
     noFlags: "This player has no flags.",
     viewProfile: "View profile",
+    viewProfileCompact: "Profile",
     types: {
       TEMPBAN: "Temporary ban",
       PERMABAN: "Permanent ban",
@@ -551,6 +557,7 @@ const en = {
     actionSucceeded: "The action completed successfully.",
     sendMessage: {
       name: "Send message",
+      compact: "Message",
       description: "Shows the message in the top-right corner of the game.",
     },
     addWatch: {
@@ -574,10 +581,12 @@ const en = {
     },
     punish: {
       name: "Punish player",
+      compact: "Punish",
       description: "Kills the player in-game when alive.",
     },
     kick: {
       name: "Kick player",
+      compact: "Kick",
       description: "Removes the player from the server.",
     },
     tempBan: {
@@ -594,6 +603,7 @@ const en = {
     },
     blacklist: {
       name: "Add to blacklist",
+      compact: "Ban",
       description: "Adds the player to a blacklist.",
     },
     addFlag: { name: "Add flag", description: "Assigns a flag to the player." },

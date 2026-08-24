@@ -35,6 +35,9 @@ import { TableToolbar } from "@/components/table/TableToolbar";
 import { usePlayersTableStore } from "@/stores/table-config";
 import { useTranslation } from "react-i18next";
 import { getTeamkillRisk } from "@/utils/teamkill-risk.mjs";
+import PlayerDetailPanel from "./player-detail-panel";
+import PlayerTableLayout from "./player-table-layout";
+import { usePlayerSidebar } from "@/hooks/usePlayerSidebar";
 
 const PlayersTable = ({
   table,
@@ -46,6 +49,7 @@ const PlayersTable = ({
   onPresetChange,
 }) => {
   const { t } = useTranslation();
+  const { openWithId } = usePlayerSidebar();
   const [tableConfigDrawerOpen, setTableConfigDrawerOpen] = useState(false);
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const activeColumnFilters = table.getState().columnFilters;
@@ -62,6 +66,7 @@ const PlayersTable = ({
   const columnLabels = useMemo(
     () => ({
       select: t("views.table.selection"),
+      details: t("common.details", { defaultValue: "Details" }),
       player_summary: t("views.table.playerSummary"),
       assignment: t("views.live.assignment"),
       performance_summary: t("views.live.performance"),
@@ -282,13 +287,53 @@ const PlayersTable = ({
         </Box>
       </Collapse>
 
-      <Table
-        table={table}
-        config={tableConfig}
-        isFetching={isFetching}
-        showTopScrollbar
-        topScrollbarLabel={t("views.live.horizontalTableScroll")}
-      />
+      <PlayerTableLayout>
+        <Table
+          table={table}
+          config={tableConfig}
+          isFetching={isFetching}
+          showTopScrollbar
+          topScrollbarLabel={t("views.live.horizontalTableScroll")}
+          rowProps={(row) => ({
+            "data-player-row": "true",
+            "data-expanded": String(row.getIsExpanded()),
+            sx: row.getIsExpanded()
+              ? {
+                  bgcolor: "background.paper",
+                  boxShadow: (theme) =>
+                    `inset 3px 0 0 ${theme.palette.primary.main}`,
+                }
+              : undefined,
+          })}
+          renderSubComponent={({ row }) => (
+            <Box
+              id={`live-player-details-${row.id}`}
+              role="region"
+              aria-label={t("views.live.playerDetails", {
+                defaultValue: `Details zu ${row.original.name}`,
+                name: row.original.name,
+              })}
+              onKeyDown={(event) => {
+                if (event.key !== "Escape") return;
+                event.stopPropagation();
+                table.setExpanded({});
+                window.requestAnimationFrame(() => {
+                  document
+                    .querySelector(
+                      `[aria-controls="live-player-details-${row.id}"]`
+                    )
+                    ?.focus();
+                });
+              }}
+            >
+              <PlayerDetailPanel
+                player={row.original}
+                onOpenProfile={(player) => openWithId(player.player_id)}
+              />
+            </Box>
+          )}
+        />
+      </PlayerTableLayout>
 
       {selectedPlayers.length > 0 ? (
         <Stack

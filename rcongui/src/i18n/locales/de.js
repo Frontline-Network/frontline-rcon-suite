@@ -450,6 +450,7 @@ const de = {
       deaths: "Tode",
       killsPerMinute: "Kills pro Minute",
       teamKills: "Teamkills",
+      teamKillsShort: "TKs",
       teamKillRisk: {
         none: "OK",
         caution: "PRÜFEN",
@@ -464,6 +465,10 @@ const de = {
       offense: "Offensive Effektivität",
       defense: "Defensive Effektivität",
       support: "Unterstützungseffektivität",
+      combatShort: "Kampf",
+      offenseShort: "Offensive",
+      defenseShort: "Defensive",
+      supportShort: "Support",
       platform: "Plattform",
       clanTag: "Clan-Tag",
       name: "Name",
@@ -514,6 +519,7 @@ const de = {
     noRecipients: "Keine Empfänger ausgewählt",
     noFlags: "Dieser Spieler hat keine Markierungen.",
     viewProfile: "Profil ansehen",
+    viewProfileCompact: "Profil",
     editSoldier: "Soldatenprofil bearbeiten",
     editAccount: "Konto bearbeiten",
     deprecated: "Veraltete Aktion",
@@ -563,6 +569,7 @@ const de = {
     },
     sendMessage: {
       name: "Nachricht senden",
+      compact: "Nachricht",
       description: "Zeigt die Nachricht oben rechts im Spiel an.",
     },
     addWatch: {
@@ -593,10 +600,12 @@ const de = {
     },
     punish: {
       name: "Spieler bestrafen",
+      compact: "Bestrafen",
       description: "Tötet den Spieler im Spiel, sofern er lebt.",
     },
     kick: {
       name: "Spieler kicken",
+      compact: "Kicken",
       description: "Entfernt den Spieler vom Server.",
     },
     tempBan: {
@@ -613,6 +622,7 @@ const de = {
     },
     blacklist: {
       name: "Zur Sperrliste hinzufügen",
+      compact: "Bannen",
       description: "Fügt den Spieler einer Sperrliste hinzu.",
     },
     addFlag: {
