@@ -185,6 +185,37 @@ test("shows localized message placeholders while keeping backend tokens in JSON"
   );
 });
 
+test("guided number fields keep the operator draft while replacing a value", async ({
+  page,
+}) => {
+  const main = await openDemoPage(page, path);
+  const shell = main.getByTestId("config-page-shell");
+
+  await shell
+    .getByRole("navigation", { name: "Konfigurationsbereiche" })
+    .getByRole("button", { name: /^Bestätigen/ })
+    .click();
+
+  const input = shell.getByRole("spinbutton", {
+    name: "Unsichtbare Prüfungen",
+  });
+  await input.click();
+  await input.press("ControlOrMeta+A");
+  await input.press("Backspace");
+  await expect(input).toHaveValue("");
+  await input.pressSequentially("12");
+  await page.waitForTimeout(400);
+  await expect(input).toHaveValue("12");
+
+  await shell
+    .getByTestId("config-mode-toggle")
+    .getByRole("button", { name: "JSON (erweitert)" })
+    .click();
+  await expect(shell.getByTestId("config-json-editor")).toContainText(
+    '"number_of_notes": 12'
+  );
+});
+
 test("updates the warning preview and action sequence from the stepper", async ({
   page,
 }) => {

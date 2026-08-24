@@ -26,6 +26,7 @@ import RemoveIcon from "@mui/icons-material/Remove";
 import { useTranslation } from "react-i18next";
 import { getAllRoles } from "@/constants/roles";
 import ConfigFormSection from "./ConfigFormSection";
+import StableNumberField from "./StableNumberField";
 
 const sectionIcons = {
   operation: <PowerSettingsNewIcon fontSize="small" />,
@@ -356,13 +357,12 @@ function CountChoiceField({
         </ToggleButton>
       </ToggleButtonGroup>
       {choice === "count" && (
-        <TextField
+        <StableNumberField
           name={name}
-          type="number"
           size="small"
           disabled={disabled}
           value={value}
-          onChange={(event) => onChange(Number(event.target.value))}
+          onChange={onChange}
           inputProps={{
             min: Math.max(1, property.minimum || 1),
             max: property.maximum,
@@ -661,12 +661,34 @@ function FieldControl({
       )}`
     : t(metadata.helpKey);
 
+  if (type === "integer") {
+    return (
+      <StableNumberField
+        name={name}
+        label={t(metadata.labelKey)}
+        helperText={helper}
+        value={value}
+        disabled={disabled}
+        onChange={onChange}
+        fullWidth
+        inputProps={{
+          min: property.minimum,
+          max: property.maximum,
+          lang: i18n.language,
+        }}
+        InputProps={{
+          endAdornment: unit ? (
+            <InputAdornment position="end">{unit}</InputAdornment>
+          ) : undefined,
+        }}
+      />
+    );
+  }
+
   return (
     <TextField
       name={name}
-      type={
-        type === "integer" ? "number" : metadata.kind === "url" ? "url" : "text"
-      }
+      type={metadata.kind === "url" ? "url" : "text"}
       label={t(metadata.labelKey)}
       helperText={helper}
       placeholder={
@@ -676,23 +698,12 @@ function FieldControl({
       disabled={disabled}
       onChange={(event) =>
         onChange(
-          type === "integer"
-            ? Number(event.target.value)
-            : metadata.kind === "url" && event.target.value === ""
+          metadata.kind === "url" && event.target.value === ""
             ? null
             : event.target.value
         )
       }
       fullWidth
-      inputProps={
-        type === "integer"
-          ? {
-              min: property.minimum,
-              max: property.maximum,
-              lang: i18n.language,
-            }
-          : undefined
-      }
       InputProps={{
         endAdornment: unit ? (
           <InputAdornment position="end">{unit}</InputAdornment>

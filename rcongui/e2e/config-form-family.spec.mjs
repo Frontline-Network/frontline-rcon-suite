@@ -128,6 +128,42 @@ test("nested Seeder-VIP settings stay editable in the visual form", async ({
   ).toEqual([]);
 });
 
+test("schema number fields can be cleared and replaced without restoring the old value", async ({
+  page,
+}) => {
+  const main = await openDemoPage(page, "/settings/automods/seeding");
+  const shell = main.getByTestId("config-page-shell");
+
+  await shell
+    .getByRole("navigation", { name: "Konfigurationsbereiche" })
+    .getByRole("button", { name: /^Ausnahmen/ })
+    .click();
+
+  const input = shell.getByRole("spinbutton", {
+    name: "Spieler bis Level ausnehmen",
+  });
+  await input.click();
+  await input.press("ControlOrMeta+A");
+  await input.press("Backspace");
+  await page.waitForTimeout(400);
+  await expect(input).toHaveValue("");
+  await input.pressSequentially("7");
+  await page.waitForTimeout(400);
+  await expect(input).toHaveValue("7");
+
+  await shell
+    .getByRole("navigation", { name: "Konfigurationsbereiche" })
+    .getByRole("button", { name: /^Grundlagen/ })
+    .click();
+  await shell
+    .getByRole("navigation", { name: "Konfigurationsbereiche" })
+    .getByRole("button", { name: /^Ausnahmen/ })
+    .click();
+  await expect(
+    shell.getByRole("spinbutton", { name: "Spieler bis Level ausnehmen" })
+  ).toHaveValue("7");
+});
+
 for (const path of [
   "/settings/automods/seeding",
   "/settings/others/seed-vip",
