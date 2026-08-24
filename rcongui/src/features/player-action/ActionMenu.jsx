@@ -19,7 +19,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useActionDialog } from "@/hooks/useActionDialog";
 import { usePlayerSidebar } from "@/hooks/usePlayerSidebar";
 import PersonIcon from "@mui/icons-material/Person";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { useEditAccountModal } from "@/hooks/useEditAccountModal";
 import { useEditSoldierModal } from "@/hooks/useEditSoldierModal";
 import { useTranslation } from "react-i18next";
@@ -34,6 +34,7 @@ export function ActionMenu({
   anchorEl,
   setAnchorEl,
   withProfile = false,
+  menuId,
 }) {
   const { t } = useTranslation();
   const { permissions: user } = useAuth();
@@ -65,7 +66,7 @@ export function ActionMenu({
 
   return (
     <Menu
-      id="long-menu"
+      id={menuId}
       anchorEl={anchorEl}
       open={open}
       onClose={handleClose}
@@ -156,8 +157,11 @@ export function ActionMenuButton({
   ...props
 }) {
   const { t } = useTranslation();
+  const generatedId = useId();
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
+  const buttonId = `player-action-button-${generatedId}`;
+  const menuId = `player-action-menu-${generatedId}`;
 
   const handleClick = (event) => {
     setAnchorEl(event.currentTarget);
@@ -165,8 +169,8 @@ export function ActionMenuButton({
 
   const buttonProps = {
     "aria-label": t("actions.menu"),
-    id: "default-action-menu-button",
-    "aria-controls": open ? "default-action-menu-button" : undefined,
+    id: buttonId,
+    "aria-controls": open ? menuId : undefined,
     "aria-expanded": open ? "true" : undefined,
     "aria-haspopup": "true",
     onClick: handleClick,
@@ -192,6 +196,7 @@ export function ActionMenuButton({
         withProfile={withProfile}
         anchorEl={anchorEl}
         setAnchorEl={setAnchorEl}
+        menuId={menuId}
       />
     </Box>
   );
@@ -269,14 +274,21 @@ export function ActionIconButton({
   );
 }
 
-export function ActionButton({ action, recipients, params, sx, ...props }) {
+export function ActionButton({
+  action,
+  recipients,
+  params,
+  sx,
+  label,
+  ...props
+}) {
   const { t } = useTranslation();
   const { permissions: user } = useAuth();
   const { openDialog } = useActionDialog();
   const allowed = hasPermission(user)(action);
-  const actionLabel = action.translationKey
-    ? t(`${action.translationKey}.name`)
-    : action.name;
+  const actionLabel =
+    label ||
+    (action.translationKey ? t(`${action.translationKey}.name`) : action.name);
 
   return (
     <Tooltip title={allowed ? actionLabel : t("actions.missingPermission")}>

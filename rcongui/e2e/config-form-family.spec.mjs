@@ -72,6 +72,15 @@ for (const configPage of pages) {
     await expect(
       shell.getByRole("heading", { name: configPage.title, exact: true })
     ).toBeVisible();
+    const [breadcrumbBox, shellBox] = await Promise.all([
+      main.getByRole("navigation", { name: "breadcrumb" }).boundingBox(),
+      shell.boundingBox(),
+    ]);
+    expect(breadcrumbBox).not.toBeNull();
+    expect(shellBox).not.toBeNull();
+    expect(shellBox.y).toBeGreaterThanOrEqual(
+      breadcrumbBox.y + breadcrumbBox.height
+    );
     await expect(navigation).toBeVisible();
     await expect(
       shell.getByRole("heading", { name: "Zusammenfassung" })

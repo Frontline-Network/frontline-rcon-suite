@@ -675,7 +675,6 @@ const ConfigPage = () => {
       >
         <Form id="config-settings-form" method="post" onSubmit={handleSubmit}>
           <ConfigFormLayout
-            sx={hasGuidedProfile ? { mt: { xs: 0, lg: -2.625 } } : undefined}
             eyebrow={pageEyebrow}
             title={pageTitle}
             description={pageDescription}

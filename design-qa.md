@@ -128,3 +128,27 @@ Rohkonfiguration bleibt im erweiterten JSON-Modus erreichbar.
 - Produktions-Build und Browser-Laufzeittest erfolgreich.
 
 final result: passed
+
+## Teamübersicht — Option 1
+
+- Zielbild: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-8f0fad35-c9c7-4410-8440-541bfec882af.png`
+- Implementierung: `/views/team` im lokalen Demo-Modus.
+- Implementierungsaufnahme: `team-implementation-final.png`
+- Gemeinsamer Vergleich: `team-design-comparison-final.png`
+- Visuelle Hierarchie entspricht Lösung 1: Gefechtslage, Problemlage, kompakter Autobalancer, Filterleiste und zweispaltige Teamkarten.
+- Trupps sind standardmäßig kompakt und lassen sich gezielt öffnen; Spielerwerte erscheinen erst in der Detailstufe.
+- Suche, Rollenfilter, Truppfilter und Statusfilter sind beschriftet und in der zentralen Arbeitsleiste gebündelt.
+- Truppauswahl, Mehrfachauswahl, feste Aktionsleiste und Zurücksetzen der Auswahl wurden im Browser ausgeführt.
+- HLL und HLL: Vietnam rendern ohne rohe Rollen- oder Trupptypen und ohne Browserfehler.
+- Desktop, Tablet und Mobilzustände wurden ohne horizontalen Seitenüberlauf geprüft; unterhalb des Desktop-Breakpoints wird auf ein Team mit Team-Tabs umgestellt.
+- Keine doppelten DOM-IDs und keine unbeschrifteten sichtbaren Buttons in der Teamansicht.
+- Deutsch und Englisch sind für alle neuen statischen Texte vorhanden.
+- Produktionsbuild mit Vite (`--mode fake`) und `git diff --check` erfolgreich.
+- Die lokale Fake-Datenquelle enthält nur einen Beispieltrupp pro Team; Raster, Gruppierung, Scrollverhalten und Aufklappmechanik sind für vollständige Serverbesetzungen ausgelegt.
+- Auswahlzustand erneut gegen das Zielbild geprüft: Die Aktionsleiste ist nun viewport-fest und erscheint unmittelbar nach der Auswahl eines Trupps, unabhängig von der Scrollposition.
+- Direkte Mehrfachaktionen sind ohne verborgenes Drei-Punkte-Menü erreichbar: Nachricht, Kick, Temp/Perma-Bann über die Sperrliste, Teamwechsel und Trupp-Kick; weitere berechtigte Aktionen bleiben unter „Weitere“ verfügbar. Die veralteten separaten Tempban- und Permaban-Einträge wurden dort entfernt.
+- Vergleichsaufnahme: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\product-design-references\team-view\team-selection-actions-comparison.png`.
+- Bei 1280 × 900 liegen alle sieben sichtbaren Aktionsbuttons vollständig innerhalb der Leiste; es gibt keinen internen Überlauf. Bei 760 × 850 und 390 × 844 bleibt die Leiste vollständig im Viewport, die Aktionen sind horizontal erreichbar und die Seite erzeugt keinen horizontalen Überlauf.
+- Dieselbe Truppauswahl und Aktionsleiste wurde für HLL und HLL: Vietnam ohne Browserfehler geprüft.
+
+final result: passed

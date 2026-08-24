@@ -20,6 +20,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { schemaFormCustomRenderers } from "@/pages/settings/[configs]/renderer/renderer";
 import ConfigFormSection from "./ConfigFormSection";
+import NameKickRulesField from "./NameKickRulesField";
 
 const sectionIcons = {
   operation: <PowerSettingsNewIcon fontSize="small" />,
@@ -123,6 +124,10 @@ export default function SchemaConfigForm({
 
   if (!section) return null;
 
+  const isNameKickRules =
+    profile?.titleKey === "settings.configForms.nameKicks.title" &&
+    section.id === "rules";
+
   return (
     <Box data-testid="config-schema-form">
       {schema?.properties?.enabled && data?.enabled === false && (
@@ -139,26 +144,36 @@ export default function SchemaConfigForm({
         disabled={disabled}
         plain
       >
-        <Box
-          sx={{
-            "& .MuiFormControl-root": { mt: 0.5 },
-            "& .MuiGrid-container": { rowGap: 0.5 },
-            "& .MuiInputBase-root": { bgcolor: "background.default" },
-            "& .MuiFormHelperText-root": { lineHeight: 1.45 },
-          }}
-        >
-          <JsonForms
-            data={activeData}
-            readonly={disabled}
-            onChange={({ data: nextSectionData }) =>
-              onChange?.(nextSectionData || {})
+        {isNameKickRules ? (
+          <NameKickRulesField
+            value={activeData.regular_expressions}
+            disabled={disabled}
+            onChange={(regularExpressions) =>
+              onChange?.({ regular_expressions: regularExpressions })
             }
-            schema={localizedActiveSchema}
-            uischema={Generate.uiSchema(localizedActiveSchema)}
-            renderers={[...schemaFormCustomRenderers, ...materialRenderers]}
-            cells={materialCells}
           />
-        </Box>
+        ) : (
+          <Box
+            sx={{
+              "& .MuiFormControl-root": { mt: 0.5 },
+              "& .MuiGrid-container": { rowGap: 0.5 },
+              "& .MuiInputBase-root": { bgcolor: "background.default" },
+              "& .MuiFormHelperText-root": { lineHeight: 1.45 },
+            }}
+          >
+            <JsonForms
+              data={activeData}
+              readonly={disabled}
+              onChange={({ data: nextSectionData }) =>
+                onChange?.(nextSectionData || {})
+              }
+              schema={localizedActiveSchema}
+              uischema={Generate.uiSchema(localizedActiveSchema)}
+              renderers={[...schemaFormCustomRenderers, ...materialRenderers]}
+              cells={materialCells}
+            />
+          </Box>
+        )}
       </ConfigFormSection>
     </Box>
   );
