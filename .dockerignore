@@ -4,6 +4,7 @@ servicediscovery/
 redis_data/
 .deploy-backups/
 .deploy-state/
+backups/
 .env
 certs/
 static/
