@@ -48,7 +48,16 @@ const PlayersTable = ({
   const { t } = useTranslation();
   const [tableConfigDrawerOpen, setTableConfigDrawerOpen] = useState(false);
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
-  const [quickFilter, setQuickFilter] = useState("all");
+  const activeColumnFilters = table.getState().columnFilters;
+  const teamFilter = table.getColumn("team")?.getFilterValue();
+  const teamkillFilter = table.getColumn("team_kills")?.getFilterValue();
+  const quickFilter = ["axis", "allies", "unassigned"].includes(teamFilter)
+    ? teamFilter
+    : teamkillFilter === "risk"
+    ? "risk"
+    : activeColumnFilters.length === 0
+    ? "all"
+    : null;
 
   const columnLabels = useMemo(
     () => ({
@@ -109,14 +118,19 @@ const PlayersTable = ({
   }, [table.options.data]);
 
   const handleQuickFilter = (_event, value) => {
-    if (!value) return;
-    setQuickFilter(value);
+    const nextValue = value ?? "all";
+
+    if (nextValue === "all") {
+      table.resetColumnFilters();
+      return;
+    }
+
     table.getColumn("team")?.setFilterValue(undefined);
     table.getColumn("team_kills")?.setFilterValue(undefined);
-    if (["axis", "allies", "unassigned"].includes(value)) {
-      table.getColumn("team")?.setFilterValue(value);
+    if (["axis", "allies", "unassigned"].includes(nextValue)) {
+      table.getColumn("team")?.setFilterValue(nextValue);
     }
-    if (value === "risk") {
+    if (nextValue === "risk") {
       table.getColumn("team_kills")?.setFilterValue("risk");
     }
   };

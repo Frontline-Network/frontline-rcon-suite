@@ -336,8 +336,17 @@ const Live = () => {
 
   const handleStatusFilter = ({ columnId, value }) => {
     setLayoutMode("players");
+
+    const currentFilters = playersTable.getState().columnFilters;
+    const isAlreadyActive =
+      currentFilters.length === 1 &&
+      currentFilters[0].id === columnId &&
+      JSON.stringify(currentFilters[0].value) === JSON.stringify(value);
+
     playersTable.resetColumnFilters();
-    playersTable.getColumn(columnId)?.setFilterValue(value);
+    if (!isAlreadyActive) {
+      playersTable.getColumn(columnId)?.setFilterValue(value);
+    }
   };
 
   return (
@@ -371,6 +380,7 @@ const Live = () => {
         gameData={gameData}
         playersData={playersData}
         onFilter={handleStatusFilter}
+        activeFilters={playersColumnFilters}
       />
 
       <Stack
@@ -423,7 +433,6 @@ const Live = () => {
           />
         ) : null}
       </Box>
-
     </Box>
   );
 };

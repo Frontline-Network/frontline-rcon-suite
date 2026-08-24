@@ -11,7 +11,10 @@ import { useTranslation } from "react-i18next";
 
 const UNASSIGNED = "unassigned";
 
-const AlertItem = ({ item, onFilter }) => {
+const filterValuesMatch = (left, right) =>
+  JSON.stringify(left) === JSON.stringify(right);
+
+const AlertItem = ({ item, onFilter, isActive }) => {
   const Icon = item.icon;
   const interactive = Boolean(item.filter && onFilter);
   const content = (
@@ -52,6 +55,15 @@ const AlertItem = ({ item, onFilter }) => {
     px: 1.25,
     py: 0.75,
     width: "100%",
+    ...(isActive
+      ? {
+          bgcolor: alpha(theme.palette[item.color].main, 0.16),
+          boxShadow: `inset 0 0 0 1px ${alpha(
+            theme.palette[item.color].main,
+            0.48
+          )}`,
+        }
+      : {}),
     ...(interactive
       ? {
           cursor: "pointer",
@@ -64,7 +76,11 @@ const AlertItem = ({ item, onFilter }) => {
   });
 
   return interactive ? (
-    <ButtonBase onClick={() => onFilter(item.filter)} sx={sx}>
+    <ButtonBase
+      aria-pressed={isActive}
+      onClick={() => onFilter(item.filter)}
+      sx={sx}
+    >
       {content}
     </ButtonBase>
   ) : (
@@ -72,7 +88,7 @@ const AlertItem = ({ item, onFilter }) => {
   );
 };
 
-const InfoPanel = ({ gameData, playersData, onFilter }) => {
+const InfoPanel = ({ gameData, playersData, onFilter, activeFilters = [] }) => {
   const { t } = useTranslation();
   const content = [];
   const teamLabel = (team) => {
@@ -158,7 +174,9 @@ const InfoPanel = ({ gameData, playersData, onFilter }) => {
   content.push({
     key: "score",
     type: "info",
-    label: `${t("views.live.score")} · ${t("views.team.allies")} : ${t("views.team.axis")}`,
+    label: `${t("views.live.score")} · ${t("views.team.allies")} : ${t(
+      "views.team.axis"
+    )}`,
     value: `${gameData?.allied_score ?? 0} : ${gameData?.axis_score ?? 0}`,
     color: "secondary",
     icon: SportsScoreOutlined,
@@ -190,9 +208,22 @@ const InfoPanel = ({ gameData, playersData, onFilter }) => {
     >
       {content
         .sort((a, b) => (a.type === b.type ? 0 : a.type === "warning" ? -1 : 1))
-        .map((item) => (
-          <AlertItem key={item.key} item={item} onFilter={onFilter} />
-        ))}
+        .map((item) => {
+          const isActive =
+            Boolean(item.filter) &&
+            activeFilters.length === 1 &&
+            activeFilters[0].id === item.filter.columnId &&
+            filterValuesMatch(activeFilters[0].value, item.filter.value);
+
+          return (
+            <AlertItem
+              key={item.key}
+              item={item}
+              onFilter={onFilter}
+              isActive={isActive}
+            />
+          );
+        })}
     </Box>
   );
 };
