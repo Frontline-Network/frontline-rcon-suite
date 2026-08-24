@@ -16,15 +16,20 @@ export default function CopyToClipboardButton({
   text,
   title,
   iconOnly = false,
+  copyIcon,
+  copiedIcon,
   ...props
 }) {
   const { t } = useTranslation();
   const { isClipboardAvailable, isCopied, copyToClipboard } = useClipboard();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const copyGlyph = copyIcon ?? <ContentCopyIcon />;
+  const copiedGlyph = copiedIcon ?? <DoneAllIcon />;
 
-  const handleClick = () => {
+  const handleClick = async () => {
     if (isClipboardAvailable) {
-      copyToClipboard(text);
+      const copied = await copyToClipboard(text);
+      if (!copied) setDialogOpen(true);
     } else {
       setDialogOpen(true);
     }
@@ -32,7 +37,9 @@ export default function CopyToClipboardButton({
 
   return (
     <>
-      <Tooltip title={isCopied ? t("common.copied") : (title ?? t("common.copy"))}>
+      <Tooltip
+        title={isCopied ? t("common.copied") : title ?? t("common.copy")}
+      >
         {iconOnly ? (
           <IconButton
             variant="outlined"
@@ -40,14 +47,14 @@ export default function CopyToClipboardButton({
             onClick={handleClick}
             {...props}
           >
-            {isCopied ? <DoneAllIcon /> : <ContentCopyIcon />}
+            {isCopied ? copiedGlyph : copyGlyph}
           </IconButton>
         ) : (
           <Button
             variant="outlined"
             color="warning"
             onClick={handleClick}
-            startIcon={isCopied ? <DoneAllIcon /> : <ContentCopyIcon />}
+            startIcon={isCopied ? copiedGlyph : copyGlyph}
             {...props}
           >
             {isCopied ? t("common.copied") : t("common.copy")}

@@ -3,8 +3,23 @@ import { getLogTeam, getTeamColor, removeLogPlayerIds } from "@/utils/lib";
 import { Box } from "@mui/material";
 import { Fragment } from "react";
 
-export const LogMessage = ({ log, colored = false, short = false, include_ids = false }) => {
+export const LogMessage = ({
+  log,
+  colored = false,
+  short = false,
+  include_ids = false,
+  wrap = false,
+}) => {
   const output = [];
+  const messageLayout = wrap
+    ? {
+        whiteSpace: "pre-wrap",
+        overflowWrap: "anywhere",
+        wordBreak: "break-word",
+        minWidth: 0,
+        maxWidth: "100%",
+      }
+    : { whiteSpace: "nowrap" };
   const teamPlayer1 = getLogTeam(log);
   const teamPlayer2 =
     log.action === "TEAM KILL"
@@ -17,7 +32,7 @@ export const LogMessage = ({ log, colored = false, short = false, include_ids = 
   } else {
     var message = log.message;
   }
-  
+
   message = message.split(log.player_name_1);
   // In between each element of the array, add the player link
   if (!short) {
@@ -52,7 +67,7 @@ export const LogMessage = ({ log, colored = false, short = false, include_ids = 
   }
 
   if (log.action === "MESSAGE") {
-    return <Box sx={{ whiteSpace: "nowrap" }}>{message.join("").slice(2)}</Box>;
+    return <Box sx={messageLayout}>{message.join("").slice(2)}</Box>;
   }
 
   if (message[message.length - 1] && message[message.length - 1] !== "") {
@@ -86,11 +101,11 @@ export const LogMessage = ({ log, colored = false, short = false, include_ids = 
           );
         }
         output.push(
-          <Fragment key={index + "c" + log.player_id_2}>{part}</Fragment>
+          <Fragment key={index + "c" + "player_id_2"}>{part}</Fragment>
         );
       }
     });
   }
 
-  return <Box sx={{ whiteSpace: "nowrap" }}>{output}</Box>;
+  return <Box sx={messageLayout}>{output}</Box>;
 };

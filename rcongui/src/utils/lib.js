@@ -259,18 +259,28 @@ export function getXboxProfileUrl(playerName) {
 }
 
 export function removeLogPlayerIds(message) {
-  const regex = /\((?:(?:Axis|Allies)\/)?(?:[0-9]{17}|[a-z0-9]{32})\)/g;
+  const regex = /\((?:(?:axis|allies)\/)?(?:[0-9]{17}|[a-z0-9]{32})\)/gi;
   return message.replace(regex, "");
 }
 
 export function getLogTeam(log) {
-  let searched = log.message;
-  if (log.action.startsWith("CHAT")) {
-    searched = log.action;
-  }
-  const regex = /(?<team>Allies|Axis)/;
-  const match = searched.match(regex);
-  return match?.groups?.team;
+  const explicitTeam = [
+    log?.team,
+    log?.player_team,
+    log?.player_team_1,
+    log?.team_name,
+  ].find((value) => /^(allies|axis)$/i.test(String(value ?? "").trim()));
+  const searched = [
+    explicitTeam,
+    log?.action,
+    log?.message,
+    log?.line_without_time,
+    log?.raw,
+    log?.sub_content,
+  ].join(" ");
+  const match = searched.match(/\b(allies|axis)\b/i)?.[1]?.toLowerCase();
+
+  return match === "axis" ? "Axis" : match === "allies" ? "Allies" : undefined;
 }
 
 export function getTeamColor(team) {

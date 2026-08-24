@@ -1,6 +1,6 @@
-# Design QA — Konfigurationsformulare
+# Design QA — Konfigurationsformulare und Live-Einsatz
 
-## Vergleichsbasis
+## Vergleichsbasis Konfigurationsformulare
 
 - Referenz: finale Nutzervorlage (`codex-clipboard-79491ed8-28e5-4c2b-b580-7dfa4d38f2fb.png`)
 - Referenzgröße: 1683 × 935 Pixel
@@ -9,7 +9,7 @@
 - Implementierungsaufnahme: `no-leader-warning-final-qa-v3.png`
 - Gemeinsamer Vergleich: `no-leader-reference-vs-implementation-final-v2.png`
 
-## Visueller Vergleich
+## Visueller Vergleich Konfigurationsformulare
 
 Referenz und Implementierung wurden bei identischer Viewportgröße in einer gemeinsamen Side-by-Side-Grafik verglichen. Die Implementierung übernimmt die wesentlichen sichtbaren Merkmale der gewählten Richtung:
 
@@ -27,7 +27,7 @@ Die bestehenden globalen Navigations- und Matchstatus-Komponenten bleiben unver�
 
 Die Vorlage zeigt im rechten Bereich exemplarisch „Kick kann nicht erreicht werden“. Die Implementierung berechnet diesen Status dagegen aus den tatsächlich gewählten Warn-, Bestrafungs- und Kick-Zeiten. Im geprüften Zustand ist „Kick ist erreichbar“ daher die fachlich korrekte, bewusst beibehaltene Ausgabe.
 
-## Responsive und funktionale Prüfung
+## Responsive und funktionale Prüfung Konfigurationsformulare
 
 - 1683 × 935: Drei-Spalten-Layout und sticky Aktionsleiste geprüft.
 - 768 × 900: Formular und Zusammenfassung umbrechen ohne abgeschnittene Inhalte.
@@ -44,7 +44,7 @@ Die Vorlage zeigt im rechten Bereich exemplarisch „Kick kann nicht erreicht we
 - Produktions-Build: erfolgreich.
 - `git diff --check`: erfolgreich.
 
-## Ergebnis
+## Ergebnis Konfigurationsformulare
 
 Keine offenen P0-, P1- oder P2-Designabweichungen im umgesetzten Formularfluss.
 
@@ -79,5 +79,52 @@ Rohkonfiguration bleibt im erweiterten JSON-Modus erreichbar.
 - Neue Formularfamilie: 11 von 11 E2E-Tests erfolgreich.
 - Bestehende No-Leader-Seite: 12 von 12 Regressionstests erfolgreich.
 - Produktions-Build: erfolgreich.
+
+## Live-Einsatz — Option 1
+
+- Referenz: `exec-61a73ce0-5b1a-48a7-9aa9-4c09f0575469.png`
+- Implementierung: `/views/live` im lokalen Demo-Modus, 1683 × 935 Pixel
+- Gemeinsamer Vergleich: `frontline-live-design-qa.png`
+- Geteilte Spieler-/Protokoll-Arbeitsfläche, Schnellfilter und kompaktes Einsatzprofil geprüft.
+- Spieler-, Protokoll- und geteilte Ansicht wechseln ohne Datenverlust.
+- Spielerauswahl blendet Nachricht, Bestrafung, Kick und weitere Aktionen als sticky Aktionsleiste ein.
+- Aktionsdialog für ausgewählte Spieler öffnet korrekt, ohne bei der Prüfung eine Spielaktion auszuführen.
+- Unter 1100 Pixel wird die gleichzeitige Teilung deaktiviert; Spieler und Protokoll bleiben über die Ansichtsumschaltung erreichbar.
+- Produktions-Build erfolgreich; keine Browser-Laufzeitfehler festgestellt.
+- Keine offenen P0-, P1- oder P2-Designabweichungen.
+
+## Live-Protokoll — kompakte Ereignisdarstellung
+
+- Die geteilte Arbeitsfläche priorisiert die Spielerliste mit einem Verhältnis von 72/28; das Protokoll kann weiterhin maximiert werden.
+- Die Seitenzuordnung wird platzsparend über die Farbe des Spielernamens dargestellt. Die redundante Angabe `(axis|allies/Spieler-ID)` wird unabhängig von Groß-/Kleinschreibung aus Anzeige und Kopiertext entfernt.
+- Spielernamen bleiben vollständig sichtbar, sind per Tastatur erreichbar und öffnen weiterhin das Spielerprofil.
+- Kill- und Teamkill-Ereignisse verwenden Pfeil und neutrales Waffensymbol; der unveränderte Waffenname steht als Tooltip bereit.
+- Chat-Ereignisse zeigen den Spieler in einer eigenen Zeile und die Nachricht darunter. Lange Texte brechen in der geteilten wie in der maximierten Ansicht um.
+- Der Kopierbutton übernimmt den bereinigten Nachrichtentext ohne versteckte Spieler-ID; bei nicht verfügbarer Clipboard-API bleibt der manuelle Fallback erreichbar.
+- Geteilte Ansicht visuell und per DOM-Messung geprüft: Protokollbreite 405 Pixel, keine horizontale Überbreite, lange Zeilen erhöhen die Ereignishöhe korrekt.
+- Maximierte Protokollansicht geprüft: kein horizontaler Seitenüberlauf und keine gekappten Nachrichten.
+- Frischer Browserstart: keine neuen Laufzeitfehler; verbleibend ist ausschließlich die bekannte React-Router-Zukunftswarnung.
+- Semantische Ereignissymbole im Live-Protokoll verwenden gezielt Font Awesome: Sprechblasen für Chat, Fadenkreuz für Kills, Totenkopf für Teamkills, Richterhammer für Admin-Aktionen und Flagge für Match-Ereignisse. Die Fraktion wird direkt am Spielernamen dargestellt; die übrige Bedienoberfläche bleibt bei MUI.
+- Kill-Darstellung mit Font-Awesome-Pfeil und -Waffensymbol geprüft; der exakte Waffenname bleibt im Tooltip erhalten. Auch Kopieren und Kopiert-Bestätigung verwenden innerhalb des Live-Protokolls die kompakteren Font-Awesome-Symbole.
+- Geteilte Ansicht mit Chat- und Kill-Filter erneut geprüft: alle neuen Symbole werden bei 405 Pixel Protokollbreite vollständig dargestellt; horizontaler Überlauf bleibt bei 0 Pixel.
+- Die separate Fraktionsmarke wurde zugunsten von mehr Textbreite wieder entfernt. Stattdessen sind die Spielernamen selbst eingefärbt: Achsenmächte rot, Alliierte blau; bei Kills wird jede beteiligte Person separat ausgewertet, bei Teamkills bleibt die gemeinsame Seite erhalten.
+- Die Fraktionszuordnung bleibt trotz der kompakten Darstellung über Tooltip und zugängliche Namensbeschriftung lesbar. Im Kill-Filter wurden 0 Lobby-Zuordnungen und 0 Pixel horizontaler Überlauf gemessen.
+- Die zusätzlichen Live-Protokoll-Symbole erhöhen den komprimierten Live-Chunk um rund 1,7 kB.
+- Produktions-Build erfolgreich.
+
+## Live-Spielertabelle — kompakte Einsatzansicht
+
+- Die geteilte Spieler-/Protokollansicht ist bei jedem neuen Seitenaufruf der Standard; Fokusansichten bleiben innerhalb der laufenden Sitzung auswählbar.
+- Die Mindestbreiten der Sammelspalten wurden nach Inhalt priorisiert: Name, Team/Trupp/Rolle, Kampf/Risiko und Status benötigen keine pauschalen 30 Zeichen mehr.
+- Spielernamen zeigen ihre Seite direkt über die Textfarbe: Achsenmächte rot, Alliierte blau. Lange Namen werden gekürzt und bleiben vollständig per Tooltip lesbar.
+- Die redundante Fraktionsgrafik in der Zuordnung wurde entfernt; Team, Trupp und Rolle bleiben ausgeschrieben und bei langen Werten per Tooltip zugänglich.
+- Statuswerte verwenden kompakte, beschriftete Symbole mit Tooltip und `aria-label`; VIP, Beobachtung, Warnung und aktive Sperre bleiben unterscheidbar.
+- Schnellfilter können bei geringer Breite umbrechen, statt eine schwer erreichbare horizontale Scrollleiste zu erzeugen.
+- In der geteilten Ansicht gemessen: Spielertabelle 1069 Pixel breit, 0 Pixel horizontaler Überlauf, Name und Aktionsspalte bleiben sticky erreichbar.
+- Der Test erfolgt mit „Alle Spieler“, nicht mit dem leeren Filter „Auffällig“: Eine einzeln ausgewählte Zusatzspalte erzeugt exakt eine zusätzliche Tabellenspalte und wechselt nachvollziehbar zu „Eigene Ansicht“.
+- Der Spaltenwähler zeigt verständliche deutsche Bezeichnungen statt interner IDs; zusammengesetzter Spielername und einzelne Namensspalte sind eindeutig voneinander unterschieden.
+- Mit 27 eingeblendeten Spalten wurde eine Überbreite von 672 Pixeln erzeugt. Die synchronisierte obere Scrollleiste erscheint automatisch, entspricht mit 1741 Pixeln exakt der Tabellenbreite und lässt Name sowie Aktionen sticky erreichbar.
+- Bei einer einzelnen Zusatzspalte bleibt die Tabelle ohne Überbreite; die obere Scrollleiste wird dann automatisch ausgeblendet.
+- Produktions-Build und Browser-Laufzeittest erfolgreich.
 
 final result: passed
