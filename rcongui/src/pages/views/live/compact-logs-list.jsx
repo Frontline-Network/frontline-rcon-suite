@@ -11,16 +11,9 @@ import {
   faSkull,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  Box,
-  LinearProgress,
-  Stack,
-  Tooltip,
-  Typography,
-  alpha,
-} from "@mui/material";
+import { Box, Stack, Tooltip, Typography, alpha } from "@mui/material";
 import dayjs from "dayjs";
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { LogMessage } from "@/components/shared/LogMessage";
 import { NoRowsOverlay } from "@/components/NoRowsOverlay";
 import { useTranslation } from "react-i18next";
@@ -28,6 +21,37 @@ import CopyToClipboardButton from "@/components/shared/CopyToClipboardButton";
 import { PlayerDrawerLink } from "@/components/shared/PlayerDrawerLink";
 import { useGlobalStore } from "@/stores/global-state";
 import { getLogTeam, removeLogPlayerIds } from "@/utils/lib";
+
+let previousOnlinePlayerSource;
+let previousOnlinePlayerContexts = [];
+
+const selectOnlinePlayerContexts = (state) => {
+  const source = state.onlinePlayers ?? [];
+  if (source === previousOnlinePlayerSource)
+    return previousOnlinePlayerContexts;
+
+  previousOnlinePlayerSource = source;
+  const next = source.map((player) => ({
+    player_id: player.player_id,
+    name: String(player.name ?? "").trim(),
+    team: player.team,
+    faction: player.faction,
+  }));
+  const unchanged =
+    next.length === previousOnlinePlayerContexts.length &&
+    next.every((player, index) => {
+      const previous = previousOnlinePlayerContexts[index];
+      return (
+        player.player_id === previous.player_id &&
+        player.name === previous.name &&
+        player.team === previous.team &&
+        player.faction === previous.faction
+      );
+    });
+
+  if (!unchanged) previousOnlinePlayerContexts = next;
+  return previousOnlinePlayerContexts;
+};
 
 const getEventMeta = (action = "") => {
   if (action === "TEAM KILL" || action.startsWith("TK ")) {
@@ -272,15 +296,9 @@ const ChatEvent = ({ event, team, t }) => {
   );
 };
 
-export default function CompactLogsList({
-  table,
-  isFetching,
-  isExpanded = false,
-  scrollable = false,
-}) {
+function CompactLogsList({ table, rows, scrollable = false }) {
   const { t } = useTranslation();
-  const onlinePlayers = useGlobalStore((state) => state.onlinePlayers ?? []);
-  const rows = table.getRowModel().rows;
+  const onlinePlayers = useGlobalStore(selectOnlinePlayerContexts);
   const playersById = useMemo(() => {
     const players = new Map();
     const remember = (id, details) => {
@@ -351,16 +369,6 @@ export default function CompactLogsList({
           : { overflow: "visible" }),
       })}
     >
-      {isFetching ? (
-        <LinearProgress
-          sx={{
-            position: "absolute",
-            inset: "0 0 auto",
-            zIndex: 3,
-            height: 2,
-          }}
-        />
-      ) : null}
       <Box component="ol" role="list" sx={{ listStyle: "none", m: 0, p: 0 }}>
         {rows.map((row) => {
           const event = row.original;
@@ -422,6 +430,8 @@ export default function CompactLogsList({
                 )}`,
                 px: 1.25,
                 py: 1,
+                contentVisibility: "auto",
+                containIntrinsicSize: "0 88px",
                 transition: "background-color 120ms ease",
                 "&:hover": { bgcolor: alpha(theme.palette[color].main, 0.055) },
               })}
@@ -539,3 +549,5 @@ export default function CompactLogsList({
     </Box>
   );
 }
+
+export default memo(CompactLogsList);

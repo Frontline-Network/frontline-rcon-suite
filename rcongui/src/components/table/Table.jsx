@@ -1,4 +1,4 @@
-import { Fragment, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, memo, useLayoutEffect, useRef, useState } from "react";
 import { flexRender } from "@tanstack/react-table";
 import { NoRowsOverlay } from "@/components/NoRowsOverlay";
 import {
@@ -11,11 +11,59 @@ import {
 import { Box, LinearProgress } from "@mui/material";
 import LoadingOverlay from "./LoadingOverlay";
 
+const EMPTY_ROW_PROPS = () => ({});
+
+const hasSameTableState = (previous = {}, next = {}) => {
+  const keys = new Set([...Object.keys(previous), ...Object.keys(next)]);
+  for (const key of keys) {
+    if (previous[key] !== next[key]) return false;
+  }
+  return true;
+};
+
+const MemoizedTableBody = memo(
+  function MemoizedTableBody({ rows, rowProps, renderSubComponent }) {
+    return (
+      <tbody>
+        {rows.map((row) => (
+          <Fragment key={row.id}>
+            <StyledTr {...rowProps(row)}>
+              {row.getVisibleCells().map((cell) => (
+                <StyledTd
+                  key={cell.id}
+                  variant={cell.column.columnDef?.meta?.variant}
+                  sticky={cell.column.columnDef?.meta?.sticky}
+                  stickyOffset={cell.column.columnDef?.meta?.stickyOffset}
+                >
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </StyledTd>
+              ))}
+            </StyledTr>
+            {row.getIsExpanded() && renderSubComponent && (
+              <StyledTr>
+                <StyledTd colSpan={row.getVisibleCells().length}>
+                  {renderSubComponent({ row })}
+                </StyledTd>
+              </StyledTr>
+            )}
+          </Fragment>
+        ))}
+      </tbody>
+    );
+  },
+  (previous, next) =>
+    previous.rows === next.rows &&
+    previous.visibleColumns === next.visibleColumns &&
+    hasSameTableState(previous.tableState, next.tableState) &&
+    previous.rowProps === next.rowProps &&
+    previous.renderSubComponent === next.renderSubComponent
+);
+
 const Table = ({
   table,
   config = {},
   renderSubComponent,
-  rowProps = () => ({}),
+  rowProps = EMPTY_ROW_PROPS,
   isLoading,
   isFetching,
   showTopScrollbar = false,
@@ -66,6 +114,9 @@ const Table = ({
   }, [showTopScrollbar, table.getVisibleLeafColumns().length]);
 
   const hasHorizontalOverflow = scrollWidth > viewportWidth + 1;
+  const rows = table.getRowModel().rows;
+  const tableState = table.getState();
+  const visibleColumns = table.getVisibleLeafColumns();
 
   return (
     <>
@@ -141,40 +192,16 @@ const Table = ({
               </StyledTr>
             ))}
           </StyledThead>
-          <tbody>
-            {table.getRowModel().rows.map((row) => (
-              <Fragment key={row.id}>
-                <StyledTr {...rowProps(row)}>
-                  {row.getVisibleCells().map((cell) => (
-                    <StyledTd
-                      key={cell.id}
-                      variant={cell.column.columnDef?.meta?.variant}
-                      sticky={cell.column.columnDef?.meta?.sticky}
-                      stickyOffset={cell.column.columnDef?.meta?.stickyOffset}
-                    >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </StyledTd>
-                  ))}
-                </StyledTr>
-                {row.getIsExpanded() && renderSubComponent && (
-                  <StyledTr>
-                    {/* 2nd row is a custom 1 cell row */}
-                    <StyledTd colSpan={row.getVisibleCells().length}>
-                      {renderSubComponent({ row })}
-                    </StyledTd>
-                  </StyledTr>
-                )}
-              </Fragment>
-            ))}
-          </tbody>
+          <MemoizedTableBody
+            rows={rows}
+            visibleColumns={visibleColumns}
+            tableState={tableState}
+            rowProps={rowProps}
+            renderSubComponent={renderSubComponent}
+          />
         </StyledTable>
         {isLoading && <LoadingOverlay />}
-        {!isLoading && table.getRowModel().rows.length === 0 && (
-          <NoRowsOverlay />
-        )}
+        {!isLoading && rows.length === 0 && <NoRowsOverlay />}
       </Box>
     </>
   );

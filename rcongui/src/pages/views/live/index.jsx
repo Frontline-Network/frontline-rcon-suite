@@ -40,12 +40,11 @@ const SPLIT_MIN_CONTENT_WIDTH = 1120;
 const PLAYER_COLUMN_IDS = [
   "select",
   "details",
-  "player_summary",
-  "assignment",
-  "performance_summary",
-  "status_summary",
   "team",
   "unit",
+  "player_summary",
+  "performance_summary",
+  "status_summary",
   "role",
   "level",
   "kills",
@@ -76,8 +75,9 @@ const PLAYER_COLUMN_IDS = [
 const OPERATIONS_COLUMNS = new Set([
   "select",
   "details",
+  "team",
+  "unit",
   "player_summary",
-  "assignment",
   "kills",
   "deaths",
   "team_kills",
@@ -87,7 +87,6 @@ const OPERATIONS_COLUMNS = new Set([
 ]);
 
 const COMPOSITE_COLUMNS = new Set([
-  "assignment",
   "performance_summary",
   "status_summary",
 ]);
@@ -126,8 +125,20 @@ export const loader = async () => {
 const Live = () => {
   const { t } = useTranslation();
   const { initialLogsView } = useLoaderData();
+  const gameState = useGlobalStore((state) => state.gameState);
+  const factionByTeam = useMemo(
+    () => ({
+      allies: gameState?.current_map?.map?.allies?.name ?? "allies",
+      axis: gameState?.current_map?.map?.axis?.name ?? "axis",
+      unassigned: "unknown",
+    }),
+    [
+      gameState?.current_map?.map?.allies?.name,
+      gameState?.current_map?.map?.axis?.name,
+    ]
+  );
   const playersColumns = useMemo(() => {
-    const baseColumns = getPlayersColumns(t);
+    const baseColumns = getPlayersColumns(t, factionByTeam);
     const detailsColumn = {
       id: "details",
       header: null,
@@ -171,8 +182,17 @@ const Live = () => {
       },
     };
 
-    return [baseColumns[0], detailsColumn, ...baseColumns.slice(1)];
-  }, [t]);
+    const leadingColumnIds = ["select", "team", "unit", "player_summary"];
+    const columnsById = new Map(
+      baseColumns.map((column) => [column.id, column])
+    );
+    const orderedColumns = [
+      ...leadingColumnIds.map((id) => columnsById.get(id)).filter(Boolean),
+      ...baseColumns.filter((column) => !leadingColumnIds.includes(column.id)),
+    ];
+
+    return [orderedColumns[0], detailsColumn, ...orderedColumns.slice(1)];
+  }, [factionByTeam, t]);
   const logsColumns = useMemo(() => getLogsColumns(t), [t]);
   const workspaceRef = useRef(null);
   const [contentWidth, setContentWidth] = useState(null);
@@ -262,8 +282,6 @@ const Live = () => {
     initialData: initialLogsView,
     refetchInterval: interval,
   });
-
-  const gameState = useGlobalStore((state) => state.gameState);
 
   const gameData = useMemo(() => {
     if (gameState && teamData) {

@@ -14,7 +14,7 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import { memo, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { DebouncedSearchInput } from "@/components/shared/DebouncedSearchInput";
 import SettingsIcon from "@mui/icons-material/Settings";
 import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
@@ -41,6 +41,44 @@ import PlayerDetailPanel from "./player-detail-panel";
 import PlayerTableLayout from "./player-table-layout";
 import { usePlayerSidebar } from "@/hooks/usePlayerSidebar";
 import MobilePlayerList from "./mobile-player-list";
+
+const getPlayerRowProps = (row) => ({
+  "data-player-row": "true",
+  "data-expanded": String(row.getIsExpanded()),
+  sx: (theme) => ({
+    bgcolor: "background.paper",
+    borderBottom: `1px solid ${
+      theme.vars
+        ? `rgba(${theme.vars.palette.text.primaryChannel} / 0.12)`
+        : theme.palette.divider
+    }`,
+    "& > td": {
+      bgcolor: "background.paper",
+    },
+    "&:hover > td": {
+      bgcolor: "action.hover",
+    },
+    ...(row.getIsSelected() && {
+      borderBottomColor: "primary.dark",
+      "& > td": {
+        bgcolor: "action.selected",
+      },
+    }),
+    ...(row.getIsExpanded() && {
+      borderBottomColor: "primary.main",
+      "& > td": {
+        bgcolor: "action.selected",
+      },
+      "& > td:first-of-type": {
+        bgcolor: "action.selected",
+        boxShadow: `inset 3px 0 0 ${theme.palette.primary.main}`,
+      },
+      "& [aria-expanded='true']": {
+        color: "primary.main",
+      },
+    }),
+  }),
+});
 
 const PlayersTable = ({
   table,
@@ -76,7 +114,6 @@ const PlayersTable = ({
       select: t("views.table.selection"),
       details: t("common.details", { defaultValue: "Details" }),
       player_summary: t("views.table.playerSummary"),
-      assignment: t("views.live.assignment"),
       performance_summary: t("views.live.performance"),
       status_summary: t("views.live.status"),
       team: t("views.table.team"),
@@ -148,6 +185,35 @@ const PlayersTable = ({
       table.getColumn("team_kills")?.setFilterValue("risk");
     }
   };
+
+  const renderPlayerDetails = useCallback(
+    ({ row }) => (
+      <Box
+        id={`live-player-details-${row.id}`}
+        role="region"
+        aria-label={t("views.live.playerDetails", {
+          defaultValue: `Details zu ${row.original.name}`,
+          name: row.original.name,
+        })}
+        onKeyDown={(event) => {
+          if (event.key !== "Escape") return;
+          event.stopPropagation();
+          table.setExpanded({});
+          window.requestAnimationFrame(() => {
+            document
+              .querySelector(`[aria-controls="live-player-details-${row.id}"]`)
+              ?.focus();
+          });
+        }}
+      >
+        <PlayerDetailPanel
+          player={row.original}
+          onOpenProfile={(player) => openWithId(player.player_id)}
+        />
+      </Box>
+    ),
+    [openWithId, t, table]
+  );
 
   return (
     <Box
@@ -333,80 +399,13 @@ const PlayersTable = ({
       ) : (
         <PlayerTableLayout data-testid="live-player-table-layout">
           <Table
-          table={table}
-          config={tableConfig}
-          isFetching={isFetching}
-          showTopScrollbar
-          topScrollbarLabel={t("views.live.horizontalTableScroll")}
-          rowProps={(row) => ({
-            "data-player-row": "true",
-            "data-expanded": String(row.getIsExpanded()),
-            sx: (theme) => ({
-              bgcolor: "background.paper",
-              borderBottom: `1px solid ${theme.vars
-                ? `rgba(${theme.vars.palette.text.primaryChannel} / 0.12)`
-                : theme.palette.divider}`,
-              transition: theme.transitions.create(
-                ["background-color", "border-color"],
-                { duration: theme.transitions.duration.shortest }
-              ),
-              "& > td": {
-                bgcolor: "background.paper",
-                transition: theme.transitions.create(
-                  ["background-color", "box-shadow"],
-                  { duration: theme.transitions.duration.shortest }
-                ),
-              },
-              "&:hover > td": {
-                boxShadow: `inset 0 0 0 9999px ${theme.palette.action.hover}`,
-              },
-              ...(row.getIsSelected() && {
-                borderBottomColor: "primary.dark",
-                "& > td": {
-                  boxShadow: `inset 0 0 0 9999px ${theme.palette.action.selected}`,
-                },
-              }),
-              ...(row.getIsExpanded() && {
-                borderBottomColor: "primary.main",
-                "& > td": {
-                  boxShadow: `inset 0 0 0 9999px ${theme.palette.action.selected}`,
-                },
-                "& > td:first-of-type": {
-                  boxShadow: `inset 3px 0 0 ${theme.palette.primary.main}, inset 0 0 0 9999px ${theme.palette.action.selected}`,
-                },
-                "& [aria-expanded='true']": {
-                  color: "primary.main",
-                },
-              }),
-            }),
-          })}
-          renderSubComponent={({ row }) => (
-            <Box
-              id={`live-player-details-${row.id}`}
-              role="region"
-              aria-label={t("views.live.playerDetails", {
-                defaultValue: `Details zu ${row.original.name}`,
-                name: row.original.name,
-              })}
-              onKeyDown={(event) => {
-                if (event.key !== "Escape") return;
-                event.stopPropagation();
-                table.setExpanded({});
-                window.requestAnimationFrame(() => {
-                  document
-                    .querySelector(
-                      `[aria-controls="live-player-details-${row.id}"]`
-                    )
-                    ?.focus();
-                });
-              }}
-            >
-              <PlayerDetailPanel
-                player={row.original}
-                onOpenProfile={(player) => openWithId(player.player_id)}
-              />
-            </Box>
-          )}
+            table={table}
+            config={tableConfig}
+            isFetching={isFetching}
+            showTopScrollbar
+            topScrollbarLabel={t("views.live.horizontalTableScroll")}
+            rowProps={getPlayerRowProps}
+            renderSubComponent={renderPlayerDetails}
           />
         </PlayerTableLayout>
       )}

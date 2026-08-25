@@ -8,6 +8,7 @@ import {
 } from "@mui/material";
 import { ErrorOutline, Star, Warning } from "@mui/icons-material";
 import { yellow } from "@mui/material/colors";
+import { alpha } from "@mui/material/styles";
 import dayjs from "dayjs";
 import { ActionMenuButton } from "@/features/player-action/ActionMenu";
 import { generatePlayerActions } from "@/features/player-action/actions";
@@ -18,7 +19,6 @@ import {
   hasRecentWarnings,
   isSteamPlayer,
   getTierColors,
-  getColoredFactionIconSrc,
 } from "@/utils/lib";
 import { SortableHeader, TextButton } from "@/components/table/styles";
 import RemoveRedEyeIcon from "@mui/icons-material/RemoveRedEye";
@@ -33,7 +33,8 @@ import {
   PLATFORMS,
 } from "@/constants/platforms";
 import { getTeamkillRisk } from "@/utils/teamkill-risk.mjs";
-import { formatRoleLabel, formatSquadLabel } from "./player-display-labels";
+import { getFactionIconSrc } from "@/utils/factionIcons";
+import { formatSquadLabel } from "./player-display-labels";
 
 export const Square = styled(Box)(({ theme }) => ({
   display: "flex",
@@ -74,12 +75,10 @@ const Center = styled(Box)(() => ({
 
 const iconFontSize = "1em";
 const emojiFontSize = "0.85em";
-
-const getTeamNameColor = (team) => {
-  if (team === "axis") return "error.light";
-  if (team === "allies") return "info.light";
-  return "text.primary";
-};
+const onlinePlayerActions = generatePlayerActions({
+  multiAction: false,
+  onlineAction: true,
+});
 
 const getBanDetailText = (t, detail) => {
   if (detail.scope === "direct" && detail.type === "gameServer") {
@@ -157,7 +156,7 @@ const TeamkillRisk = ({ value, t, compact = false }) => {
   );
 };
 
-export const getColumns = (t) => [
+export const getColumns = (t, factionByTeam = {}) => [
   {
     id: "select",
     header: ({ table }) => (
@@ -228,10 +227,11 @@ export const getColumns = (t) => [
                 <Typography
                   component="span"
                   noWrap
-                  variant="subtitle2"
+                  variant="body2"
                   sx={{
-                    color: getTeamNameColor(row.original.team),
+                    color: (theme) => alpha(theme.palette.text.primary, 0.82),
                     display: "block",
+                    fontWeight: 300,
                     maxWidth: "100%",
                   }}
                 >
@@ -260,63 +260,6 @@ export const getColumns = (t) => [
       sticky: "left",
       stickyOffset: "4.5rem",
     },
-  },
-  {
-    id: "assignment",
-    header: SortableHeader(
-      t("views.live.assignment"),
-      t("views.live.assignment")
-    ),
-    accessorFn: (row) => `${row.team}-${row.unit_name}-${row.role}`,
-    cell: ({ row }) => {
-      const themedImg = useThemedImages();
-      const team = row.original.team;
-      const role = row.original.role;
-      const teamLabel = t(`views.team.${team}`, { defaultValue: team ?? "–" });
-      const roleLabel = formatRoleLabel(t, role);
-      const unitLabel = formatSquadLabel(row.original.unit_name);
-      const assignmentLabel = `${teamLabel} · ${unitLabel} · ${roleLabel}`;
-      return (
-        <Tooltip arrow placement="top" title={assignmentLabel}>
-          <Stack
-            direction="row"
-            alignItems="center"
-            spacing={0.65}
-            sx={{
-              minWidth: "13ch",
-              maxWidth: "100%",
-              overflow: "hidden",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {role ? (
-              <img
-                src={themedImg.getRoleIconSrc(role)}
-                width={14}
-                height={14}
-                alt=""
-                aria-hidden="true"
-                style={{ flex: "0 0 auto" }}
-              />
-            ) : null}
-            <Typography
-              noWrap
-              variant="caption"
-              sx={{
-                color: "text.primary",
-                minWidth: 0,
-                maxWidth: "100%",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {assignmentLabel}
-            </Typography>
-          </Stack>
-        </Tooltip>
-      );
-    },
-    meta: { variant: "assignmentSummary" },
   },
   {
     id: "performance_summary",
@@ -428,34 +371,40 @@ export const getColumns = (t) => [
   {
     accessorKey: "team",
     id: "team",
-    header: SortableHeader("T", t("views.table.team")),
+    header: SortableHeader(t("views.table.team"), t("views.table.team")),
     cell: ({ row }) => {
-      const themedImg = useThemedImages();
+      const team = row.original.team;
+      const teamLabel = t(`views.team.${team}`, {
+        defaultValue: team ?? "–",
+      });
+      const faction = factionByTeam[team] ?? team ?? "unknown";
       return (
-        <Center>
-          <Square>
-            {row.original.faction ? (
-              <img
-                src={getColoredFactionIconSrc(row.original.faction)}
-                width={16}
-                height={16}
-                alt={row.original.faction}
-                title={row.original.faction}
-              />
-            ) : (
-              "-"
-            )}
-          </Square>
-        </Center>
+        <Tooltip arrow placement="top" title={teamLabel}>
+          <Box
+            component="img"
+            src={getFactionIconSrc(faction, "colored")}
+            alt={teamLabel}
+            sx={{
+              display: "block",
+              height: 20,
+              mx: "auto",
+              objectFit: "contain",
+              width: 20,
+            }}
+            onError={(event) => {
+              event.currentTarget.src = getFactionIconSrc("unknown", "colored");
+            }}
+          />
+        </Tooltip>
       );
     },
     meta: {
-      variant: "icon",
+      variant: "teamCompact",
     },
   },
   {
     id: "unit",
-    header: SortableHeader("U", t("views.table.unit")),
+    header: SortableHeader(t("views.table.unit"), t("views.table.unit")),
     accessorKey: "unit_name",
     filterFn: (row, _columnId, value) => {
       if (!value || (Array.isArray(value) && value.length === 0)) return true;
@@ -465,18 +414,21 @@ export const getColumns = (t) => [
     // Group by unit name and team
     // getGroupingValue: (row) => `${row.original.unit_name ?? "-"}-${row.original.team}`,
     cell: ({ row }) => {
+      const unitLabel = formatSquadLabel(row.original.unit_name);
       return (
-        <Center>
-          <Square>
-            {row.original.unit_name !== "unassigned"
-              ? row.original.unit_name?.charAt(0)?.toUpperCase()
-              : "-"}
-          </Square>
-        </Center>
+        <Tooltip arrow placement="top" title={unitLabel}>
+          <Typography
+            noWrap
+            variant="caption"
+            sx={{ color: "text.primary", fontWeight: 600 }}
+          >
+            {unitLabel}
+          </Typography>
+        </Tooltip>
       );
     },
     meta: {
-      variant: "icon",
+      variant: "squadCompact",
     },
   },
   {
@@ -629,10 +581,7 @@ export const getColumns = (t) => [
     cell: ({ row }) => {
       return (
         <ActionMenuButton
-          actions={generatePlayerActions({
-            multiAction: false,
-            onlineAction: true,
-          })}
+          actions={onlinePlayerActions}
           recipients={row.original}
           orientation="horizontal"
           disableRipple={true}

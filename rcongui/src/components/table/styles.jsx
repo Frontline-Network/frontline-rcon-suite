@@ -15,6 +15,10 @@ export function getVariantWidth(variant) {
       return "20ch";
     case "playerName":
       return "16ch";
+    case "teamCompact":
+      return "4rem";
+    case "squadCompact":
+      return "6.5rem";
     case "assignmentSummary":
       return "18ch";
     case "performanceSummary":
@@ -44,6 +48,10 @@ export function getVariantMinWidth(variant) {
       return "20ch";
     case "playerName":
       return "16ch";
+    case "teamCompact":
+      return "4rem";
+    case "squadCompact":
+      return "6.5rem";
     case "assignmentSummary":
       return "18ch";
     case "performanceSummary":
@@ -58,6 +66,17 @@ export function getVariantMinWidth(variant) {
       return "50ch";
     default:
       return "auto";
+  }
+}
+
+export function getVariantMaxWidth(variant) {
+  switch (variant) {
+    case "teamCompact":
+      return "4rem";
+    case "squadCompact":
+      return "6.5rem";
+    default:
+      return undefined;
   }
 }
 
@@ -137,6 +156,7 @@ export const StyledTh = styled("th", {
   return {
     width: getVariantWidth(variant),
     minWidth: getVariantMinWidth(variant),
+    maxWidth: getVariantMaxWidth(variant),
     textAlign: variant === "icon" ? "center" : "left",
     paddingLeft: variant === "icon" ? 0 : undefined,
     paddingRight: variant === "icon" ? 0 : undefined,
@@ -161,6 +181,7 @@ export const StyledTd = styled("td", {
   return {
     width: getVariantWidth(variant),
     minWidth: getVariantMinWidth(variant),
+    maxWidth: getVariantMaxWidth(variant),
     textAlign: variant === "icon" ? "center" : "left",
     ...(sticky
       ? {
