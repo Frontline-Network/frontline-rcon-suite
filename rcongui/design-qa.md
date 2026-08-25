@@ -86,4 +86,46 @@ Results:
 4. Captured reference and implementation at 426 x 923, combined them, and identified the oversized sheet/navigation conflict.
 5. Moved the sheet above the persistent navigation, reduced its height, repeated the same-state comparison and reran responsive, touch, contract and production-build checks.
 
+## Server context bar redesign QA
+
+- Source visual truth: `C:\Users\chris\AppData\Local\Temp\codex-clipboard-c4a93fbe-5c21-49b9-8ae8-bc633e3871ee.png`
+- Desktop implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\status-bar-desktop-after.png`
+- Mobile implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\status-bar-mobile-after.png`
+- Focused comparison: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\status-bar-qa-comparison.png`
+- Full-view evidence: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\status-bar-desktop-full.png` and `C:\Users\chris\OneDrive\Dokumente\Autobalancer\status-bar-mobile-full.png`
+- Viewports: 1280 x 720 CSS px and 390 x 844 CSS px at device scale factor 1
+- Pixel dimensions: source 694 x 60; desktop implementation 680 x 42; mobile implementation 366 x 77
+- State: dark theme, HLL Server 2 online, 98/100 players, Foy Warfare Night, active round timer
+
+The source and final desktop component were inspected together in one focused comparison image. Exact pixel normalization was intentionally not applied because this is a redesign rather than a source clone; both crops preserve their native 1x density and the comparison evaluates hierarchy, footprint and visual language.
+
+### Findings and resolutions
+
+- P2 resolved: the first redesign used a 740 px desktop footprint and compressed the breadcrumb area at 1280 px. The final component retains the established 680 px footprint while keeping the segmented layout.
+- P2 resolved: the former gold pill gave every metric the same visual weight. The final component uses a neutral surface, fine dividers and a semantic connection-state edge; gold remains limited to data icons and actions.
+- P2 resolved: the former compact layout read as one large capsule. Mobile now uses a stable 2 x 2 information grid with server/map context on the flexible track and player/time values on the compact track.
+- No remaining P0, P1 or P2 issue was found. The 390 px page has no document-level horizontal overflow, no content truncation, and all four values remain readable.
+
+### Required fidelity surfaces
+
+- Fonts and typography: existing Montserrat hierarchy retained; labels are smaller, uppercase and letter-spaced while values remain bold and unbroken.
+- Spacing and layout rhythm: desktop uses four aligned segments; mobile uses two rows with matching internal padding and hairline separators. Radius is reduced from 12 px to 6 px.
+- Colors and tokens: existing theme tokens are used throughout. The broad gold tint was removed; semantic connection color is confined to the 3 px leading edge.
+- Image and icon fidelity: no raster assets are needed. Existing MUI server, player, map and timer icons are preserved without custom SVG or CSS-drawn replacements.
+- Copy and content: server/game, player count, map and remaining time remain unchanged and continue to use existing translations and live/stale fallbacks.
+
+### Interaction and technical verification
+
+- Desktop and mobile route loading, responsive reflow and the live countdown were exercised in the in-app browser.
+- The component has no direct controls, so no additional click path is required; its `role=status`, accessible label and connection-state attributes remain intact.
+- Browser diagnostics contain no runtime error. The only warning is the existing React Router v7 future-flag notice.
+- Production Vite build passed with 14,898 transformed modules. The existing lazy detail-chunk advisory remains unrelated to this component.
+
+### Comparison history
+
+1. Captured the original pill-shaped component at the supplied desktop state and the existing compact mobile state.
+2. Implemented a flat segmented server context bar and compared desktop and mobile renderings.
+3. Reduced the desktop width from 740 px to 680 px after the first comparison showed avoidable breadcrumb compression.
+4. Re-captured both viewports, verified no overflow or console error, and inspected the focused source/final comparison.
+
 final result: passed
