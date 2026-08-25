@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 
 export const DurationField = ({ control, errors, ...props }) => {
   const { t } = useTranslation();
-  const error = errors['duration'];
+  const error = errors['duration_hours'];
   const hasError = !!error;
 
   return (

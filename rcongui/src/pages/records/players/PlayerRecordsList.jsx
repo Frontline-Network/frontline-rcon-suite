@@ -13,6 +13,7 @@ import {
   TableRow,
   Tooltip,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
@@ -194,8 +195,163 @@ const PlayerRecordsListRow = memo(function PlayerRecordsListRow({
   );
 });
 
+const MobilePlayerRecordsListRow = memo(function MobilePlayerRecordsListRow({
+  player,
+  selected,
+  onSelect,
+}) {
+  const { t, i18n } = useTranslation();
+  const actionList = useMemo(
+    () =>
+      generatePlayerActions({
+        multiAction: false,
+        onlineAction: player.is_online,
+      }),
+    [player.is_online]
+  );
+  const name =
+    player?.account?.name ??
+    player.names?.[0]?.name ??
+    player?.soldier?.name ??
+    "???";
+  const avatar = player?.steaminfo?.profile?.avatar ?? name;
+  const level = player?.level ?? player?.soldier?.level;
+  const platform = player?.platform ?? player?.soldier?.platform;
+  const lastSeen = dayjs(player.last_seen_timestamp_ms)
+    .locale(i18n.language)
+    .fromNow();
+  const linkedCount = player?.identity?.linked_accounts?.length ?? 0;
+
+  return (
+    <Box
+      component="li"
+      sx={{
+        alignItems: "center",
+        bgcolor: selected ? "action.selected" : "transparent",
+        borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+        display: "grid",
+        gridTemplateColumns: "44px 36px minmax(0, 1fr) 44px",
+        minHeight: 72,
+        px: 0.5,
+        "&:last-child": { borderBottom: 0 },
+      }}
+    >
+      <Checkbox
+        size="small"
+        checked={selected}
+        onChange={() => onSelect(player)}
+        inputProps={{
+          "aria-label": t("records.players.selectPlayer", { name }),
+        }}
+        sx={{ minHeight: 44, minWidth: 44 }}
+      />
+      <OnlineStatusBadge
+        overlap="circular"
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        variant="dot"
+        isOnline={player.is_online}
+      >
+        <Avatar src={avatar} sx={{ width: 34, height: 34, fontSize: 14 }}>
+          {name[0]}
+        </Avatar>
+      </OnlineStatusBadge>
+      <Box
+        component={Link}
+        to={`/records/players/${player.player_id}`}
+        sx={(theme) => ({
+          color: "inherit",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          minHeight: 44,
+          minWidth: 0,
+          pl: 1,
+          textDecoration: "none",
+          "&:focus-visible": {
+            outline: `2px solid ${theme.palette.primary.main}`,
+            outlineOffset: 2,
+          },
+        })}
+      >
+        <Stack direction="row" spacing={0.75} alignItems="baseline">
+          <Typography
+            fontWeight={700}
+            noWrap
+            sx={{ color: "text.primary", minWidth: 0 }}
+          >
+            {name}
+          </Typography>
+          {linkedCount > 0 ? (
+            <Typography
+              variant="caption"
+              color="success.main"
+              sx={{ flex: "0 0 auto" }}
+            >
+              {t("records.players.linkedCount", { count: linkedCount })}
+            </Typography>
+          ) : null}
+        </Stack>
+        <Stack
+          direction="row"
+          spacing={0.75}
+          alignItems="center"
+          divider={<Box component="span" sx={{ color: "text.disabled" }}>·</Box>}
+          sx={{ minWidth: 0, mt: 0.25 }}
+        >
+          <Typography variant="caption" color="text.secondary" noWrap>
+            {t("views.table.level")} {level ?? "–"}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" noWrap>
+            {platform || t("common.unknown")}
+          </Typography>
+          <Typography
+            variant="caption"
+            color={player.is_online ? "success.main" : "text.secondary"}
+            noWrap
+            sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}
+          >
+            {lastSeen}
+          </Typography>
+        </Stack>
+      </Box>
+      <ProfileActions
+        player={player}
+        actions={actionList}
+        aria-label={t("records.players.openPlayerActions", { name })}
+        sx={{ width: 44, height: 44 }}
+      />
+    </Box>
+  );
+});
+
 export default function PlayerRecordsList({ players, selectedIds, onSelect }) {
   const { t } = useTranslation();
+  const compact = useMediaQuery((theme) => theme.breakpoints.down("md"));
+
+  if (compact) {
+    return (
+      <Box
+        component="ul"
+        aria-label={t("records.players.listLabel")}
+        sx={{
+          border: (theme) => `1px solid ${theme.palette.divider}`,
+          bgcolor: "background.paper",
+          listStyle: "none",
+          m: 0,
+          p: 0,
+        }}
+      >
+        {players.map((player) => (
+          <MobilePlayerRecordsListRow
+            key={player.player_id}
+            player={player}
+            selected={selectedIds.has(player.player_id)}
+            onSelect={onSelect}
+          />
+        ))}
+      </Box>
+    );
+  }
 
   return (
     <TableContainer

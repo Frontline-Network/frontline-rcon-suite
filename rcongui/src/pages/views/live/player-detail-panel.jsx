@@ -311,6 +311,7 @@ export default function PlayerDetailPanel({
   actions,
   primaryActions = DEFAULT_PRIMARY_ACTIONS,
   onOpenProfile,
+  onActionStart,
   renderActions,
 }) {
   const { t, i18n } = useTranslation();
@@ -390,6 +391,7 @@ export default function PlayerDetailPanel({
           action={action}
           icon={action === blacklistAction ? GavelIcon : undefined}
           label={compactActionLabel(action)}
+          onBeforeAction={onActionStart}
           recipients={player}
           variant="outlined"
           color={action === blacklistAction ? "warning" : "inherit"}

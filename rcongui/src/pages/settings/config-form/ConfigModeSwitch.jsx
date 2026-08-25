@@ -48,7 +48,7 @@ export default function ConfigModeSwitch({
           width: fullWidth ? "100%" : "fit-content",
           "& .MuiToggleButton-root": {
             minWidth: "auto",
-            minHeight: 31,
+            minHeight: 44,
             borderRadius: 0,
             px: 1.625,
             py: 0.45,

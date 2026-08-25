@@ -11,6 +11,8 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import { memo, useMemo, useState } from "react";
 import { DebouncedSearchInput } from "@/components/shared/DebouncedSearchInput";
@@ -38,6 +40,7 @@ import { getTeamkillRisk } from "@/utils/teamkill-risk.mjs";
 import PlayerDetailPanel from "./player-detail-panel";
 import PlayerTableLayout from "./player-table-layout";
 import { usePlayerSidebar } from "@/hooks/usePlayerSidebar";
+import MobilePlayerList from "./mobile-player-list";
 
 const PlayersTable = ({
   table,
@@ -49,6 +52,11 @@ const PlayersTable = ({
   onPresetChange,
 }) => {
   const { t } = useTranslation();
+  const theme = useTheme();
+  // The mobile command deck is capability-based rather than phone-only. A
+  // narrow tablet does not have enough room for the desktop operations table
+  // either, so it receives the same touch-native roster and action sheet.
+  const isCompactOperations = useMediaQuery(theme.breakpoints.down("md"));
   const { openWithId } = usePlayerSidebar();
   const [tableConfigDrawerOpen, setTableConfigDrawerOpen] = useState(false);
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
@@ -152,13 +160,13 @@ const PlayersTable = ({
       })}
     >
       <Stack
-        direction={{ xs: "column", sm: "row" }}
-        alignItems={{ xs: "stretch", sm: "center" }}
+        direction="row"
+        alignItems="center"
         justifyContent="space-between"
         gap={1}
         sx={{
           px: 1.25,
-          py: 1,
+          py: { xs: 0.75, md: 1 },
           borderBottom: "1px solid",
           borderColor: "divider",
         }}
@@ -182,7 +190,7 @@ const PlayersTable = ({
           onChange={(event) => onPresetChange(event.target.value)}
           size="small"
           aria-label={t("views.live.columnPreset")}
-          sx={{ minWidth: 150 }}
+          sx={{ display: { xs: "none", md: "inline-flex" }, minWidth: 150 }}
         >
           <MenuItem value="operations">
             {t("views.live.operationsPreset")}
@@ -196,7 +204,11 @@ const PlayersTable = ({
         direction={{ xs: "column", md: "row" }}
         alignItems={{ xs: "stretch", md: "center" }}
         gap={1}
-        sx={{ p: 1, borderBottom: "1px solid", borderColor: "divider" }}
+        sx={{
+          p: { xs: 0.75, md: 1 },
+          borderBottom: "1px solid",
+          borderColor: "divider",
+        }}
       >
         <Box
           sx={{ minWidth: { xs: "100%", md: 220 }, flex: { md: "1 1 280px" } }}
@@ -211,43 +223,64 @@ const PlayersTable = ({
             }
           />
         </Box>
-        <ToggleButtonGroup
-          value={quickFilter}
-          exclusive
-          onChange={handleQuickFilter}
-          size="small"
-          aria-label={t("views.live.quickFilters")}
+        <Box
           sx={{
-            flexWrap: "wrap",
-            gap: "1px",
             maxWidth: "100%",
-            "& .MuiToggleButtonGroup-grouped": {
-              border: "1px solid",
-              borderColor: "divider",
-              borderRadius: 0,
-              m: 0,
-            },
+            overflowX: { xs: "auto", md: "visible" },
+            overscrollBehaviorInline: "contain",
+            scrollbarWidth: "thin",
           }}
         >
-          <ToggleButton value="all">
-            {t("common.all")} {counts.all}
-          </ToggleButton>
-          <ToggleButton value="axis">
-            {t("views.team.axis")} {counts.axis}
-          </ToggleButton>
-          <ToggleButton value="allies">
-            {t("views.team.allies")} {counts.allies}
-          </ToggleButton>
-          <ToggleButton value="unassigned">
-            {t("views.live.lobby")} {counts.lobby}
-          </ToggleButton>
-          <ToggleButton value="risk">
-            {t("views.live.suspicious")} {counts.risk}
-          </ToggleButton>
-        </ToggleButtonGroup>
+          <ToggleButtonGroup
+            value={quickFilter}
+            exclusive
+            onChange={handleQuickFilter}
+            size="small"
+            aria-label={t("views.live.quickFilters")}
+            sx={{
+              display: "inline-flex",
+              flexWrap: { xs: "nowrap", md: "wrap" },
+              gap: "1px",
+              minWidth: { xs: "max-content", md: 0 },
+              "& .MuiToggleButtonGroup-grouped": {
+                border: "1px solid",
+                borderColor: "divider",
+                borderRadius: 0,
+                flex: "0 0 auto",
+                m: 0,
+                minHeight: 44,
+                whiteSpace: "nowrap",
+              },
+            }}
+          >
+            <ToggleButton value="all">
+              {t("common.all")} {counts.all}
+            </ToggleButton>
+            <ToggleButton value="axis">
+              {t("views.team.axis")} {counts.axis}
+            </ToggleButton>
+            <ToggleButton value="allies">
+              {t("views.team.allies")} {counts.allies}
+            </ToggleButton>
+            <ToggleButton value="unassigned">
+              {t("views.live.lobby")} {counts.lobby}
+            </ToggleButton>
+            <ToggleButton value="risk">
+              {t("views.live.suspicious")} {counts.risk}
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
       </Stack>
 
-      <TableToolbar sx={{ borderLeft: 0, borderRight: 0, px: 0.5 }}>
+      <TableToolbar
+        sx={{
+          borderLeft: 0,
+          borderRight: 0,
+          minHeight: { xs: 44, md: 48 },
+          px: 0.5,
+          py: { xs: 0, md: 0.5 },
+        }}
+      >
         <Button
           size="small"
           startIcon={<TuneOutlinedIcon />}
@@ -263,14 +296,17 @@ const PlayersTable = ({
             tableConfig.expandedView ? t("common.collapse") : t("common.expand")
           }
           onClick={() => setExpandedView(!tableConfig.expandedView)}
+          sx={{ display: { xs: "none", md: "inline-flex" } }}
         >
           {tableConfig.expandedView ? <UnfoldLessIcon /> : <UnfoldMoreIcon />}
         </IconButton>
-        <TableColumnSelection
-          table={table}
-          onColumnVisibilityChange={onColumnVisibilityChange}
-          getColumnLabel={(column) => columnLabels[column.id]}
-        />
+        <Box sx={{ display: { xs: "none", md: "contents" } }}>
+          <TableColumnSelection
+            table={table}
+            onColumnVisibilityChange={onColumnVisibilityChange}
+            getColumnLabel={(column) => columnLabels[column.id]}
+          />
+        </Box>
         <IconButton
           size="small"
           aria-label={t("common.settings")}
@@ -288,8 +324,15 @@ const PlayersTable = ({
         </Box>
       </Collapse>
 
-      <PlayerTableLayout data-testid="live-player-table-layout">
-        <Table
+      {isCompactOperations ? (
+        <MobilePlayerList
+          table={table}
+          isFetching={isFetching}
+          onOpenProfile={(player) => openWithId(player.player_id)}
+        />
+      ) : (
+        <PlayerTableLayout data-testid="live-player-table-layout">
+          <Table
           table={table}
           config={tableConfig}
           isFetching={isFetching}
@@ -364,8 +407,9 @@ const PlayersTable = ({
               />
             </Box>
           )}
-        />
-      </PlayerTableLayout>
+          />
+        </PlayerTableLayout>
+      )}
 
       {selectedPlayers.length > 0 ? (
         <Stack

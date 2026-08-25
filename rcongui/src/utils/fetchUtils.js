@@ -479,6 +479,19 @@ export const cmd = {
     }),
   GET_ONLINE_PLAYERS: (params) =>
     requestFactory({ method: "GET", cmd: "get_players", ...params }),
+  GET_MOBILE_INCIDENTS: (params) =>
+    requestFactory({
+      method: "GET",
+      cmd: "/api/mobile/v1/incidents",
+      ...params,
+    }),
+  UPDATE_MOBILE_INCIDENT: ({ incidentId, payload, ...params }) =>
+    requestFactory({
+      method: "PATCH",
+      cmd: `/api/mobile/v1/incidents/${incidentId}`,
+      payload,
+      ...params,
+    }),
   GET_PERMISSIONS: (params) =>
     requestFactory({
       method: "GET",

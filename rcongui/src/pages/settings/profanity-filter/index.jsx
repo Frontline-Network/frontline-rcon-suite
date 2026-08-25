@@ -16,6 +16,8 @@ import {
   Paper,
   Stack,
   TextField,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import SplitButton from "@/components/shared/SplitButton";
@@ -25,6 +27,8 @@ import { InputFileUpload } from "@/components/shared/InputFileUpload";
 import exportFile from "@/utils/exportFile";
 import { isFakeMode } from "@/mirage/demo-data";
 import { useTranslation } from "react-i18next";
+import PageHeader from "@/components/shared/PageHeader";
+import ConfirmButton from "@/components/shared/ConfirmButton";
 
 const INTENT = {
   SINGLE: 0,
@@ -51,6 +55,8 @@ const ProfanityFilter = () => {
   const [searched, setSearched] = useState("");
   const [newProfanity, setNewProfanity] = useState("");
   const submit = useSubmit();
+  const theme = useTheme();
+  const compact = useMediaQuery(theme.breakpoints.down("md"));
 
   const filteredProfanities = useMemo(
     () =>
@@ -81,27 +87,19 @@ const ProfanityFilter = () => {
     }
   };
 
-  const handleDeleteSingleProfanity = (index) => {
-    setProfanities((prev) =>
-      prev.slice(0, index).concat(prev.slice(index + 1))
-    );
-    setChecked((prev) => prev.filter((v) => v !== index));
+  const handleDeleteSingleProfanity = (word) => {
+    setProfanities((prev) => prev.filter((entry) => entry !== word));
+    setChecked((prev) => prev.filter((entry) => entry !== word));
   };
 
   const handleDeleteSelectedProfanities = () => {
-    setProfanities((prev) =>
-      prev.filter((_, index) => !checked.includes(index))
-    );
+    setProfanities((prev) => prev.filter((word) => !checked.includes(word)));
     setChecked([]);
   };
 
   const handleToggleSelectAll = (e) => {
     if (e.target.checked) {
-      setChecked(
-        Array(filteredProfanities.length)
-          .fill(null)
-          .map((_, index) => index)
-      );
+      setChecked(filteredProfanities);
     } else {
       setChecked([]);
     }
@@ -145,14 +143,21 @@ const ProfanityFilter = () => {
   return (
     <Box
       sx={{
-        maxWidth: (theme) => theme.breakpoints.values.md,
+        maxWidth: (theme) => theme.breakpoints.values.lg,
+        minWidth: 0,
+        pb: { xs: 10, md: 0 },
       }}
     >
+      <PageHeader
+        eyebrow={t("settings.profanity.eyebrow")}
+        title={t("settings.profanity.title")}
+        subtitle={t("settings.profanity.subtitle")}
+      />
       <Stack
         component={Paper}
-        direction={"row"}
+        direction={{ xs: "column", sm: "row" }}
         sx={{ p: 1, mb: 1 }}
-        justifyContent={"end"}
+        justifyContent="end"
         alignItems={"center"}
         gap={1}
       >
@@ -161,16 +166,35 @@ const ProfanityFilter = () => {
           color={"secondary"}
           onChange={handleFileUpload}
           accept={".txt"}
+          sx={{ minHeight: 44, width: { xs: "100%", sm: "auto" } }}
         />
         <Button
           onClick={handleFileDownload}
           variant="contained"
           color="secondary"
+          sx={{ minHeight: 44, width: { xs: "100%", sm: "auto" } }}
         >
           {t("settings.profanity.download")}
         </Button>
-        <Box>
-          <SplitButton
+        <Box sx={{ width: { xs: "100%", sm: "auto" } }}>
+          {compact ? (
+            <Stack direction="row" gap={1}>
+              <Button
+                variant="contained"
+                onClick={submitChanges(INTENT.SINGLE)}
+                sx={{ flex: 1, minHeight: 44 }}
+              >
+                {t("settings.profanity.apply")}
+              </Button>
+              <ConfirmButton
+                onConfirm={submitChanges(INTENT.ALL)}
+                title={t("settings.profanity.applyAllTitle")}
+                description={t("settings.profanity.applyAllDescription")}
+                buttonText={t("settings.profanity.allServers")}
+                buttonProps={{ variant: "outlined", sx: { minHeight: 44, whiteSpace: "nowrap" } }}
+              />
+            </Stack>
+          ) : <SplitButton
             options={[
               {
                 name: t("settings.profanity.apply"),
@@ -185,7 +209,7 @@ const ProfanityFilter = () => {
                 },
               },
             ]}
-          />
+          />}
         </Box>
       </Stack>
       <Stack
@@ -197,7 +221,7 @@ const ProfanityFilter = () => {
           padding: 1,
         }}
       >
-        <Stack direction={"row"} gap={1} sx={{ mb: 1, p: 0.5 }}>
+        <Stack direction={{ xs: "column", sm: "row" }} gap={1} sx={{ mb: 1, p: 0.5 }}>
           <TextField
             autoComplete={"off"}
             value={newProfanity}
@@ -207,13 +231,13 @@ const ProfanityFilter = () => {
             fullWidth
             label={t("settings.profanity.newEntry")}
           />
-          <Button onClick={handleAddProfanity} variant="contained">
+          <Button onClick={handleAddProfanity} variant="contained" sx={{ minHeight: 44 }}>
             {t("settings.profanity.add")}
           </Button>
         </Stack>
         <Stack
-          direction={"row"}
-          alignItems={"center"}
+          direction={{ xs: "column", sm: "row" }}
+          alignItems={{ xs: "stretch", sm: "center" }}
           justifyContent={"space-between"}
           gap={1}
           sx={{ mb: 1, p: 0.5 }}
@@ -237,26 +261,26 @@ const ProfanityFilter = () => {
               />
             }
           />
-          <Divider orientation="vertical" flexItem />
+          <Divider orientation={compact ? "horizontal" : "vertical"} flexItem />
           <SearchInput
             onChange={onSearchedChange}
             placeholder={t("settings.profanity.search")}
           />
-          <Divider orientation="vertical" flexItem />
+          <Divider orientation={compact ? "horizontal" : "vertical"} flexItem />
           <Button
             onClick={handleDeleteSelectedProfanities}
             variant="contained"
             color="warning"
             disabled={!checked.length}
-            sx={{ minWidth: "fit-content" }}
+            sx={{ minWidth: "fit-content", minHeight: 44 }}
           >
             {t("settings.profanity.deleteSelected")}
           </Button>
         </Stack>
         <Divider orientation="horizontal" />
         <FixedSizeList
-          height={600}
-          itemSize={40}
+          height={compact ? 460 : 600}
+          itemSize={compact ? 48 : 40}
           itemCount={filteredProfanities.length}
           itemData={filteredProfanities}
           overscanCount={5}
@@ -270,7 +294,9 @@ const ProfanityFilter = () => {
                 disablePadding
                 secondaryAction={
                   <IconButton
-                    onClick={() => handleDeleteSingleProfanity(index)}
+                    aria-label={`${t("common.delete")} ${filteredProfanities[index]}`}
+                    onClick={() => handleDeleteSingleProfanity(filteredProfanities[index])}
+                    sx={{ minWidth: 44, minHeight: 44 }}
                   >
                     <DeleteIcon />
                   </IconButton>
@@ -278,13 +304,13 @@ const ProfanityFilter = () => {
               >
                 <ListItemButton
                   role={undefined}
-                  onClick={handleToggle(index)}
+                  onClick={handleToggle(filteredProfanities[index])}
                   dense
                 >
                   <ListItemIcon>
                     <Checkbox
                       edge="start"
-                      checked={checked.includes(index)}
+                      checked={checked.includes(filteredProfanities[index])}
                       tabIndex={-1}
                       disableRipple
                       inputProps={{ "aria-labelledby": labelId }}

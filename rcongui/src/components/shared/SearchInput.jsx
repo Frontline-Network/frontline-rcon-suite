@@ -8,16 +8,25 @@ const SearchWrapper = styled(Box)({
   display: "flex",
   alignItems: "center",
   justifyContent: "start",
-  minWidth: 260,
+  minHeight: 44,
+  minWidth: 0,
+  width: "100%",
 });
 
 const StyledInput = styled(InputBase)(({theme}) => ({
+  flex: 1,
   marginLeft: theme.spacing(1),
-  "& .MuiButtonBase-root": {
-    display: "none",
+  minHeight: 44,
+  minWidth: 0,
+  "& .MuiInputBase-input": {
+    boxSizing: "border-box",
+    minHeight: 44,
+    paddingBlock: 0,
   },
-  "&:hover .MuiButtonBase-root": {
+  "& .MuiButtonBase-root": {
     display: "inline-flex",
+    minHeight: 44,
+    minWidth: 44,
   }
 }))
 

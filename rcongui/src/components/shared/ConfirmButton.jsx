@@ -5,6 +5,8 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -21,6 +23,8 @@ const ConfirmButton = ({
 }) => {
   const [open, setOpen] = useState(false);
   const { t } = useTranslation();
+  const theme = useTheme();
+  const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
 
   const handleConfirm = () => {
     onConfirm();
@@ -37,6 +41,7 @@ const ConfirmButton = ({
         {buttonText}
       </Button>
       <Dialog
+        fullScreen={fullScreen}
         open={open}
         onClose={() => setOpen(false)}
         aria-labelledby="confirm-dialog-title"
@@ -49,10 +54,10 @@ const ConfirmButton = ({
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpen(false)} color="warning">
+          <Button autoFocus onClick={() => setOpen(false)} color="warning">
             {cancelText ?? t("common.cancel")}
           </Button>
-          <Button onClick={handleConfirm} color="primary" autoFocus>
+          <Button onClick={handleConfirm} color="primary">
             {confirmText ?? t("common.confirm")}
           </Button>
         </DialogActions>

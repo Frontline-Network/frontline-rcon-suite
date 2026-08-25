@@ -108,16 +108,17 @@ export const loader = async ({ request }) => {
       });
 
   const bans = isFakeMode() ? [] : await cmd.GET_BANS();
+  const bannedPlayerIds = new Set(bans.map((ban) => ban.player_id));
 
   return {
     players: playersRecords.result.players.map((player) => ({
       ...player,
-      is_banned: bans.some((ban) => ban.player_id === player.player_id),
+      is_banned: bannedPlayerIds.has(player.player_id),
       identity: player.identity && {
         ...player.identity,
         linked_accounts: player.identity.linked_accounts.map((account) => ({
           ...account,
-          is_banned: bans.some((ban) => ban.player_id === account.player_id),
+          is_banned: bannedPlayerIds.has(account.player_id),
         })),
       },
     })),
@@ -153,14 +154,16 @@ export default function PlayersRecords() {
     "playerRecords.viewMode",
     "cards"
   );
-  const viewMode = isCompactViewport ? "cards" : storedViewMode;
+  const viewMode = isCompactViewport ? "list" : storedViewMode;
+  const onlinePlayersById = useMemo(
+    () => new Map(onlinePlayers.map((player) => [player.player_id, player])),
+    [onlinePlayers]
+  );
 
   const players = useMemo(() => {
     if (!server) return playersData;
     return playersData.map((player) => {
-      const thisOnlinePlayer = onlinePlayers.find(
-        (aPlayer) => aPlayer.player_id === player.player_id
-      );
+      const thisOnlinePlayer = onlinePlayersById.get(player.player_id);
 
       const profile = {
         ...player,
@@ -179,7 +182,7 @@ export default function PlayersRecords() {
 
       return profile;
     });
-  }, [playersData, server, onlinePlayers]);
+  }, [playersData, server, onlinePlayersById]);
 
   // Update cache with current page players
   useEffect(() => {
