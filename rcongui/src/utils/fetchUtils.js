@@ -498,6 +498,19 @@ export const cmd = {
       cmd: "get_own_user_permissions",
       ...params,
     }),
+  GET_OWN_APPEARANCE: (params) =>
+    requestFactory({
+      method: "GET",
+      cmd: "get_own_user_appearance",
+      ...params,
+    }),
+  SET_OWN_APPEARANCE: (payload, params = {}) =>
+    requestFactory({
+      method: "PUT",
+      cmd: "set_own_user_appearance",
+      payload,
+      ...params,
+    }),
   GET_PLAYER: (params) =>
     requestFactory({ method: "GET", cmd: "get_player_profile", ...params }),
   GET_PLAYER_BANS: (params) =>

@@ -245,6 +245,26 @@ export function makeServer({ environment = "development" } = {}) {
           });
         })
       );
+      let demoAppearance = {
+        version: 1,
+        mode: "dark",
+        preset: "frontline-gold",
+        customAccent: "#c59a4a",
+        colorVision: "standard",
+      };
+      this.get(
+        "/get_own_user_appearance",
+        trackProtectedRequest("/api/get_own_user_appearance", () =>
+          ok(demoAppearance)
+        )
+      );
+      this.put(
+        "/set_own_user_appearance",
+        trackProtectedRequest("/api/set_own_user_appearance", (_schema, request) => {
+          demoAppearance = JSON.parse(request.requestBody || "{}");
+          return ok(demoAppearance);
+        })
+      );
       this.get("/logout", () => ok(true));
 
       this.get(

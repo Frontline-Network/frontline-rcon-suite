@@ -9,7 +9,7 @@ import UnfoldMoreRoundedIcon from '@mui/icons-material/UnfoldMoreRounded';
 import {forwardRef} from "react";
 
 /* eslint-disable import/prefer-default-export */
-export const navigationCustomizations = ({ gray, brand }) => ({
+export const navigationCustomizations = ({ gray }) => ({
   MuiButton: {
     styleOverrides: {
       root: ({ theme }) => ({
@@ -21,11 +21,11 @@ export const navigationCustomizations = ({ gray, brand }) => ({
           minHeight: 44,
         },
       }),
-      containedPrimary: {
-        color: gray[900],
-        backgroundColor: brand[300],
-        '&:hover': { backgroundColor: brand[200] },
-      },
+      containedPrimary: ({ theme }) => ({
+        color: theme.palette.primary.contrastText,
+        backgroundColor: theme.palette.primary.main,
+        '&:hover': { backgroundColor: theme.palette.primary.dark },
+      }),
       outlined: ({ theme }) => ({
         borderColor: theme.palette.divider,
       }),
@@ -111,17 +111,17 @@ export const navigationCustomizations = ({ gray, brand }) => ({
       root: ({ theme }) => ({
         borderRadius: theme.shape.borderRadius,
         border: '1px solid',
-        borderColor: gray[200],
-        backgroundColor: gray[900],
-        boxShadow: `inset 0 1px 0 1px hsla(220, 0%, 100%, 0.6), inset 0 -1px 0 1px hsla(220, 35%, 90%, 0.5)`,
+        borderColor: theme.palette.divider,
+        backgroundColor: theme.palette.background.paper,
+        boxShadow: `inset 0 1px 0 1px ${alpha(theme.palette.common.white, 0.28)}`,
         '&:hover': {
-          borderColor: gray[300],
-          backgroundColor: gray[900],
+          borderColor: theme.palette.primary.main,
+          backgroundColor: theme.palette.background.paper,
           boxShadow: 'none',
         },
         [`&.${selectClasses.focused}`]: {
           outlineOffset: 0,
-          borderColor: gray[400],
+          borderColor: theme.palette.primary.main,
         },
         '&:before, &:after': {
           display: 'none',
@@ -184,7 +184,7 @@ export const navigationCustomizations = ({ gray, brand }) => ({
           width: 0,
         },
         '&:focus-visible': {
-          outline: `3px solid ${alpha(brand[500], 0.5)}`,
+          outline: `3px solid ${alpha(theme.palette.primary.main, 0.5)}`,
           outlineOffset: '4px',
           borderRadius: '2px',
         },
@@ -220,10 +220,7 @@ export const navigationCustomizations = ({ gray, brand }) => ({
         borderBottom: `1px solid ${gray[500]}`
       },
       '& .MuiTabs-indicator': ({ theme }) => ({
-        backgroundColor: brand[800],
-        ...theme.applyStyles('dark', {
-          backgroundColor: brand[200],
-        }),
+        backgroundColor: theme.palette.primary.main,
       }),
     },
   },
@@ -238,18 +235,18 @@ export const navigationCustomizations = ({ gray, brand }) => ({
         fontWeight: theme.typography.fontWeightRegular,
         marginRight: theme.spacing(1),
         '&:hover': {
-          color: brand[300],
+          color: theme.palette.primary.main,
         },
         '&.Mui-selected': {
           color: theme.palette.text.primary,
           fontWeight: theme.typography.fontWeightMedium,
         },
         '&.Mui-focusVisible': {
-          backgroundColor: brand[500],
+          backgroundColor: theme.palette.action.focus,
         },
         ...theme.applyStyles('dark', {
           ':hover': {
-            color: brand[300],
+            color: theme.palette.primary.light,
           },
           [`&.${tabClasses.selected}`]: {
             color: theme.palette.text.primary,

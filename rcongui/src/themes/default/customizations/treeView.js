@@ -1,7 +1,7 @@
 import { alpha } from '@mui/material/styles';
 
 /* eslint-disable import/prefer-default-export */
-export const treeViewCustomizations = ({ gray, brand }) => ({
+export const treeViewCustomizations = ({ gray }) => ({
   MuiTreeItem2: {
     styleOverrides: {
       root: ({ theme }) => ({
@@ -15,11 +15,11 @@ export const treeViewCustomizations = ({ gray, brand }) => ({
           borderColor: theme.palette.divider,
         },
         '&:focus-visible .focused': {
-          outline: `3px solid ${alpha(brand[500], 0.5)}`,
+          outline: `3px solid ${alpha(theme.palette.primary.main, 0.5)}`,
           outlineOffset: '2px',
           '&:hover': {
             backgroundColor: alpha(gray[300], 0.2),
-            outline: `3px solid ${alpha(brand[500], 0.5)}`,
+            outline: `3px solid ${alpha(theme.palette.primary.main, 0.5)}`,
             outlineOffset: '2px',
           },
         },
