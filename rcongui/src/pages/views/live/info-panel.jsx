@@ -7,6 +7,7 @@ import {
   VisibilityOutlined,
 } from "@mui/icons-material";
 import { Box, ButtonBase, Stack, Typography, alpha } from "@mui/material";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 const UNASSIGNED = "unassigned";
@@ -19,10 +20,10 @@ const AlertItem = ({ item, onFilter, isActive }) => {
   const interactive = Boolean(item.filter && onFilter);
   const content = (
     <Stack
-      direction="row"
-      alignItems="center"
+      alignItems="flex-start"
+      justifyContent="space-between"
       spacing={0.75}
-      sx={{ minWidth: 0 }}
+      sx={{ height: "100%", minWidth: 0, overflow: "hidden", width: "100%" }}
     >
       <Icon
         sx={{
@@ -31,18 +32,29 @@ const AlertItem = ({ item, onFilter, isActive }) => {
           fontSize: "1.05rem",
         }}
       />
-      <Box sx={{ minWidth: 0, textAlign: "left" }}>
+      <Box sx={{ minWidth: 0, textAlign: "left", width: "100%" }}>
         <Typography
           variant="caption"
           noWrap
-          sx={{ color: "text.secondary", display: "block" }}
+          sx={{ color: "text.secondary", display: "block", width: "100%" }}
         >
           {item.label}
         </Typography>
-        <Typography variant="subtitle2" noWrap>
+        <Typography
+          variant="h6"
+          noWrap
+          sx={{ fontVariantNumeric: "tabular-nums", lineHeight: 1.15, width: "100%" }}
+        >
           {item.value}
         </Typography>
       </Box>
+      <Typography
+        color={item.type === "warning" ? `${item.color}.light` : "text.secondary"}
+        variant="caption"
+        sx={{ mt: "auto" }}
+      >
+        {item.priority}
+      </Typography>
     </Stack>
   );
 
@@ -50,7 +62,7 @@ const AlertItem = ({ item, onFilter, isActive }) => {
     border: `1px solid ${alpha(theme.palette[item.color].main, 0.28)}`,
     borderLeft: `3px solid ${theme.palette[item.color].main}`,
     bgcolor: alpha(theme.palette[item.color].main, 0.045),
-    minHeight: 52,
+    minHeight: { xs: 124, md: 92 },
     minWidth: 0,
     px: 1.25,
     py: 0.75,
@@ -90,6 +102,7 @@ const AlertItem = ({ item, onFilter, isActive }) => {
 
 const InfoPanel = ({ gameData, playersData, onFilter, activeFilters = [] }) => {
   const { t } = useTranslation();
+  const scrollerRef = useRef(null);
   const content = [];
   const teamLabel = (team) => {
     if (team === "axis") return t("views.team.axis");
@@ -106,6 +119,7 @@ const InfoPanel = ({ gameData, playersData, onFilter, activeFilters = [] }) => {
       value: vipsCount,
       color: "warning",
       icon: StarOutline,
+      priority: t("views.live.priorityMedium"),
       filter: { columnId: "vip", value: true },
     });
   }
@@ -121,6 +135,7 @@ const InfoPanel = ({ gameData, playersData, onFilter, activeFilters = [] }) => {
       value: watchedCount,
       color: "primary",
       icon: VisibilityOutlined,
+      priority: t("views.live.priorityMedium"),
       filter: { columnId: "watchlist", value: true },
     });
   }
@@ -148,6 +163,7 @@ const InfoPanel = ({ gameData, playersData, onFilter, activeFilters = [] }) => {
         value: t("views.live.noCommander"),
         color: "error",
         icon: ErrorOutline,
+        priority: t("views.live.priorityHigh"),
         filter: { columnId: "team", value: team },
       });
     }
@@ -166,6 +182,7 @@ const InfoPanel = ({ gameData, playersData, onFilter, activeFilters = [] }) => {
           .join(", "),
         color: "warning",
         icon: ErrorOutline,
+        priority: t("views.live.priorityHigh"),
         filter: { columnId: "unit", value: state.no_sl_squads },
       });
     }
@@ -180,6 +197,7 @@ const InfoPanel = ({ gameData, playersData, onFilter, activeFilters = [] }) => {
     value: `${gameData?.allied_score ?? 0} : ${gameData?.axis_score ?? 0}`,
     color: "secondary",
     icon: SportsScoreOutlined,
+    priority: t("views.live.priorityInfo"),
   });
 
   content.push({
@@ -189,41 +207,90 @@ const InfoPanel = ({ gameData, playersData, onFilter, activeFilters = [] }) => {
     value: gameData?.next_map?.pretty_name ?? "–",
     color: "info",
     icon: MapOutlined,
+    priority: t("views.live.priorityInfo"),
   });
+
+  const contentKey = content.map((item) => item.key).join("|");
+  useEffect(() => {
+    const resetScroll = () => {
+      if (scrollerRef.current) scrollerRef.current.scrollLeft = 0;
+    };
+    resetScroll();
+    const frame = window.requestAnimationFrame(resetScroll);
+    const timer = window.setTimeout(resetScroll, 240);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+    };
+  }, [contentKey]);
 
   return (
     <Box
       component="section"
       aria-label={t("views.live.actionableStatus")}
-      sx={{
-        display: "grid",
-        gridTemplateColumns: {
-          xs: "repeat(1, minmax(0, 1fr))",
-          sm: "repeat(2, minmax(0, 1fr))",
-          lg: `repeat(${Math.min(content.length, 6)}, minmax(0, 1fr))`,
-        },
-        gap: 0.75,
-        mb: 1,
-      }}
+      sx={{ mb: 1 }}
     >
-      {content
-        .sort((a, b) => (a.type === b.type ? 0 : a.type === "warning" ? -1 : 1))
-        .map((item) => {
-          const isActive =
-            Boolean(item.filter) &&
-            activeFilters.length === 1 &&
-            activeFilters[0].id === item.filter.columnId &&
-            filterValuesMatch(activeFilters[0].value, item.filter.value);
+      <Typography
+        component="h2"
+        sx={{
+          color: "primary.light",
+          display: { xs: "block", md: "none" },
+          mb: 0.75,
+        }}
+        variant="overline"
+      >
+        {t("views.live.reviewNow", { defaultValue: "Jetzt prüfen" })}
+      </Typography>
+      <Box
+        ref={scrollerRef}
+        sx={{
+          display: "grid",
+          gridAutoColumns: {
+            xs: "minmax(148px, 48vw)",
+            sm: "minmax(164px, 32vw)",
+            md: "auto",
+          },
+          gridAutoFlow: { xs: "column", md: "row" },
+          gridTemplateColumns: {
+            xs: "none",
+            md: "repeat(3, minmax(0, 1fr))",
+            lg: `repeat(${Math.min(content.length, 6)}, minmax(0, 1fr))`,
+          },
+          gap: 0.75,
+          mx: { xs: -1.5, md: 0 },
+          overflowX: { xs: "auto", md: "visible" },
+          overscrollBehaviorInline: "contain",
+          px: { xs: 1.5, md: 0 },
+          pb: { xs: 0.5, md: 0 },
+          scrollPaddingInline: { xs: 12, md: 0 },
+          scrollSnapType: { xs: "inline proximity", md: "none" },
+          scrollbarWidth: "thin",
+          "& > *": {
+            scrollSnapAlign: { xs: "start", md: "none" },
+          },
+        }}
+      >
+        {content
+          .sort((a, b) =>
+            a.type === b.type ? 0 : a.type === "warning" ? -1 : 1
+          )
+          .map((item) => {
+            const isActive =
+              Boolean(item.filter) &&
+              activeFilters.length === 1 &&
+              activeFilters[0].id === item.filter.columnId &&
+              filterValuesMatch(activeFilters[0].value, item.filter.value);
 
-          return (
-            <AlertItem
-              key={item.key}
-              item={item}
-              onFilter={onFilter}
-              isActive={isActive}
-            />
-          );
-        })}
+            return (
+              <AlertItem
+                key={item.key}
+                item={item}
+                onFilter={onFilter}
+                isActive={isActive}
+              />
+            );
+          })}
+      </Box>
     </Box>
   );
 };

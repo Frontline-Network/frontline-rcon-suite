@@ -1,6 +1,6 @@
 import Table from "@/components/table/Table";
 import TableConfigDrawer from "@/components/table/TableConfigDrawer";
-import { Divider, IconButton } from "@mui/material";
+import { ButtonBase, Collapse, Divider, IconButton, Paper, Stack, useMediaQuery, useTheme } from "@mui/material";
 import { useState } from "react";
 import { DebouncedSearchInput } from "@/components/shared/DebouncedSearchInput";
 import SettingsIcon from "@mui/icons-material/Settings";
@@ -13,6 +13,7 @@ import { Box, Typography } from "@mui/material";
 import {downloadGame} from "@/features/download-game";
 import { useGameDetailsTableStore } from "@/stores/table-config";
 import { useTranslation } from "react-i18next";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 
 const renderSubComponent = ({ row }, t, playerNames) => {
   // Create a custom component that renders the player's stats
@@ -167,6 +168,9 @@ const PlayersTable = ({ table, selectedPlayers }) => {
   const [tableConfigDrawerOpen, setTableConfigDrawerOpen] = useState(false);
   const tableConfig = useGameDetailsTableStore();
   const setConfig = useGameDetailsTableStore(state => state.setConfig);
+  const theme = useTheme();
+  const compact = useMediaQuery(theme.breakpoints.down("md"));
+  const [expandedPlayerId, setExpandedPlayerId] = useState(null);
   const playerNames = new Map(
     table.options.data.map((player) => [player.player_id, player.player])
   );
@@ -177,8 +181,8 @@ const PlayersTable = ({ table, selectedPlayers }) => {
 
   return (
     <div>
-      <TableToolbar>
-        <ActionMenuButton
+      <TableToolbar sx={compact ? { flexWrap: "wrap", gap: 1 } : undefined}>
+        {!compact && <ActionMenuButton
           actions={generatePlayerActions({
             multiAction: true,
             onlineAction: false,
@@ -193,18 +197,18 @@ const PlayersTable = ({ table, selectedPlayers }) => {
             p: "1px 4px",
             height: "100%",
           }}
-        />
+        />}
         <DebouncedSearchInput
           placeholder={t("stats.liveSessions.searchPlayer")}
           initialValue={table.getColumn("name")?.getFilterValue() ?? ""}
           onChange={(value) => {
             table.getColumn("name")?.setFilterValue(value);
           }}
-          sx={{ maxWidth: 230 }}
+          sx={{ maxWidth: compact ? "none" : 230, flex: compact ? "1 1 100%" : undefined }}
         />
-        <TablePagination table={table} />
-        <Divider flexItem orientation="vertical" />
-        <IconButton
+        {!compact && <TablePagination table={table} />}
+        {!compact && <Divider flexItem orientation="vertical" />}
+        {!compact && <IconButton
           size="small"
           sx={{ p: 0.5, borderRadius: 0 }}
           aria-label={t("stats.gameDetails.download")}
@@ -217,21 +221,71 @@ const PlayersTable = ({ table, selectedPlayers }) => {
           ])}
         >
           <DownloadIcon sx={{ fontSize: 16 }} />
-        </IconButton>
-        <IconButton
+        </IconButton>}
+        {!compact && <IconButton
           size="small"
           sx={{ p: 0.5, borderRadius: 0 }}
           aria-label={t("common.settings")}
           onClick={handleTableConfigClick}
         >
           <SettingsIcon sx={{ fontSize: 16 }} />
-        </IconButton>
+        </IconButton>}
       </TableToolbar>
-      <Table
+      {compact ? (
+        <Stack component="section" aria-label={t("stats.liveGame.playerStatistics")} gap={0} sx={{ mt: 1 }}>
+          {table.getRowModel().rows.map((row) => {
+            const player = row.original;
+            const expanded = expandedPlayerId === player.player_id;
+            const recipient = { name: player.player, player_id: player.player_id };
+            return (
+              <Paper key={player.player_id} variant="outlined" sx={{ borderRadius: 0, borderBottomWidth: expanded ? 1 : 0, "&:last-child": { borderBottomWidth: 1 } }}>
+                <Stack direction="row" alignItems="center" sx={{ minHeight: 52, pr: 0.5 }}>
+                  <ButtonBase
+                    aria-expanded={expanded}
+                    aria-label={`${player.player} ${expanded ? t("common.close") : t("common.open")}`}
+                    onClick={() => setExpandedPlayerId(expanded ? null : player.player_id)}
+                    sx={{ display: "grid", gridTemplateColumns: "32px minmax(0, 1fr) 42px 42px 36px", alignItems: "center", flex: 1, minWidth: 0, minHeight: 52, textAlign: "left" }}
+                  >
+                    <ChevronRightIcon sx={{ transform: expanded ? "rotate(90deg)" : "none", transition: "transform 120ms" }} />
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography noWrap sx={{ fontWeight: 800 }}>{player.player}</Typography>
+                      <Typography variant="caption" color="text.secondary">{player.steaminfo?.country || t("common.unknown")}</Typography>
+                    </Box>
+                    <Box sx={{ textAlign: "center" }}>
+                      <Typography variant="caption" color="text.secondary" display="block">K</Typography>
+                      <Typography sx={{ fontWeight: 800 }}>{player.kills ?? 0}</Typography>
+                    </Box>
+                    <Box sx={{ textAlign: "center" }}>
+                      <Typography variant="caption" color="text.secondary" display="block">T</Typography>
+                      <Typography sx={{ fontWeight: 800 }}>{player.deaths ?? 0}</Typography>
+                    </Box>
+                    <Box sx={{ textAlign: "center" }}>
+                      <Typography variant="caption" color="text.secondary" display="block">TK</Typography>
+                      <Typography color={(player.teamkills ?? 0) > 0 ? "error.main" : "text.primary"} sx={{ fontWeight: 800 }}>{player.teamkills ?? 0}</Typography>
+                    </Box>
+                  </ButtonBase>
+                  <ActionMenuButton
+                    actions={generatePlayerActions({ onlineAction: false })}
+                    recipients={recipient}
+                    orientation="horizontal"
+                    disableRipple
+                    sx={{ minWidth: 44, minHeight: 44 }}
+                  />
+                </Stack>
+                <Collapse in={expanded} unmountOnExit>
+                  <Box sx={{ borderTop: "1px solid", borderColor: "divider", p: 1.25, bgcolor: "background.default" }}>
+                    {renderSubComponent({ row }, t, playerNames)}
+                  </Box>
+                </Collapse>
+              </Paper>
+            );
+          })}
+        </Stack>
+      ) : <Table
         table={table}
         config={tableConfig}
         renderSubComponent={(props) => renderSubComponent(props, t, playerNames)}
-      />
+      />}
       <TableConfigDrawer
         name={t("stats.gameDetails.title")}
         open={tableConfigDrawerOpen}

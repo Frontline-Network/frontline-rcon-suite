@@ -35,6 +35,9 @@ const StatusItem = ({
   icon,
   label,
   value,
+  area,
+  compact = false,
+  divider = false,
   grow = false,
   tone = "primary.main",
 }) => (
@@ -46,6 +49,18 @@ const StatusItem = ({
       alignItems: "center",
       minWidth: 0,
       flex: grow ? "1 1 150px" : "0 0 auto",
+      gridArea: area,
+      height: "100%",
+      px: { xs: 1, sm: 1.25 },
+      py: { xs: 0.75, sm: 0.8 },
+      borderLeft: divider ? "1px solid" : 0,
+      borderColor: "divider",
+      ...(compact && area === "server"
+        ? { borderBottom: "1px solid", borderBottomColor: "divider" }
+        : {}),
+      ...(compact && area === "players"
+        ? { borderBottom: "1px solid", borderBottomColor: "divider" }
+        : {}),
     }}
   >
     <Box
@@ -53,7 +68,7 @@ const StatusItem = ({
         display: "flex",
         color: tone,
         flexShrink: 0,
-        "& svg": { fontSize: { xs: 17, sm: 19 } },
+        "& svg": { fontSize: { xs: 16, sm: 18 } },
       }}
     >
       {icon}
@@ -64,9 +79,9 @@ const StatusItem = ({
         sx={{
           display: "block",
           color: "text.secondary",
-          fontSize: "0.62rem",
+          fontSize: { xs: "0.56rem", sm: "0.59rem" },
           lineHeight: 1,
-          letterSpacing: "0.04em",
+          letterSpacing: "0.055em",
           textTransform: "uppercase",
         }}
       >
@@ -76,9 +91,9 @@ const StatusItem = ({
         variant="body2"
         sx={{
           mt: 0.25,
-          fontSize: { xs: "0.76rem", sm: "0.82rem" },
+          fontSize: { xs: "0.75rem", sm: "0.8rem" },
           fontWeight: 700,
-          lineHeight: 1.1,
+          lineHeight: 1.15,
           overflow: "hidden",
           textOverflow: "ellipsis",
           whiteSpace: "nowrap",
@@ -169,24 +184,26 @@ const ServerStatus = ({ compact = false }) => {
       sx={(theme) => ({
         width: compact ? "100%" : "min(100%, 680px)",
         minWidth: 0,
-        px: { xs: 1.25, sm: 1.5 },
-        py: 0.75,
         border: "1px solid",
-        borderColor: alpha(theme.palette.primary.main, 0.28),
-        borderRadius: 1.5,
-        bgcolor: alpha(theme.palette.primary.main, 0.055),
-        boxShadow: `inset 3px 0 0 ${theme.palette.primary.main}`,
+        borderLeftWidth: 3,
+        borderColor: alpha(theme.palette.text.primary, 0.13),
+        borderLeftColor: identityTone,
+        borderRadius: 0.75,
+        bgcolor: alpha(theme.palette.background.paper, 0.82),
+        boxShadow: `0 8px 24px ${alpha(theme.palette.common.black, 0.14)}`,
+        overflow: "hidden",
       })}
     >
       <Box
         sx={{
           display: "grid",
+          gridTemplateAreas: compact
+            ? '"server players" "map time"'
+            : '"server players map time"',
           gridTemplateColumns: compact
-            ? "minmax(0, 1fr) minmax(82px, auto)"
-            : "minmax(150px, 1.4fr) auto minmax(110px, 1fr) auto",
+            ? "minmax(0, 1fr) minmax(84px, auto)"
+            : "minmax(170px, 1.25fr) auto minmax(150px, 1fr) auto",
           alignItems: "center",
-          columnGap: { xs: 1, sm: 1.5 },
-          rowGap: 1,
           minWidth: 0,
         }}
       >
@@ -196,6 +213,8 @@ const ServerStatus = ({ compact = false }) => {
               icon={<DnsRoundedIcon />}
               label={`${serverNumber} · ${gameLabel}`}
               value={serverLabel}
+              area="server"
+              compact={compact}
               grow
               tone={identityTone}
             />
@@ -203,11 +222,17 @@ const ServerStatus = ({ compact = false }) => {
               icon={<GroupsRoundedIcon />}
               label={t("matchStatus.players")}
               value={players}
+              area="players"
+              compact={compact}
+              divider
             />
             <StatusItem
               icon={<MapRoundedIcon />}
               label={t("matchStatus.map")}
               value={mapName}
+              area="map"
+              compact={compact}
+              divider={!compact}
               grow
             />
             <StatusItem
@@ -217,6 +242,9 @@ const ServerStatus = ({ compact = false }) => {
                 gameState ? formatRemainingTime(timeRemaining) : null,
                 connectionHealth.gameState
               )}
+              area="time"
+              compact={compact}
+              divider
             />
           </>
         ) : (

@@ -7,10 +7,14 @@ import {
   Autocomplete,
   Box,
   Button,
+  Chip,
+  Collapse,
   Divider,
   IconButton,
   Stack,
   TextField,
+  Typography,
+  useMediaQuery,
 } from "@mui/material";
 import InputLabel from "@mui/material/InputLabel";
 import MenuItem from "@mui/material/MenuItem";
@@ -41,12 +45,16 @@ import { TablePagination } from "@/components/table/TablePagination";
 import { DebouncedSearchInput } from "@/components/shared/DebouncedSearchInput";
 import downloadLogs from "./download";
 import DownloadIcon from "@mui/icons-material/Download";
+import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
+import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import { logActions } from "@/utils/lib";
 import timezonePlugin from "dayjs/plugin/timezone";
 import utcPlugin from "dayjs/plugin/utc";
 import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/shared/PageHeader";
 import { demoHistoricalLogs, isFakeMode } from "@/mirage/demo-data";
+import { ActionMenuButton } from "@/features/player-action/ActionMenu";
+import { generatePlayerActions } from "@/features/player-action/actions";
 
 dayjs.extend(timezonePlugin);
 dayjs.extend(utcPlugin);
@@ -109,6 +117,104 @@ const actionOptions = Object.keys(logActions).map((option) => ({
   name: option,
 }));
 
+const removeLogPlayerIds = (message = "") =>
+  message.replace(
+    /\((?:(?:Axis|Allies)\/)?(?:[0-9]{17}|[A-Z0-9]{16})\)/g,
+    ""
+  );
+
+const MobileGameLogList = ({ table }) => {
+  const { t } = useTranslation();
+  const actions = useMemo(
+    () => generatePlayerActions({ multiAction: false, onlineAction: true }),
+    []
+  );
+  const rows = table.getRowModel().rows;
+
+  if (rows.length === 0) {
+    return (
+      <Typography color="text.secondary" sx={{ py: 4, textAlign: "center" }}>
+        {t("common.noResults")}
+      </Typography>
+    );
+  }
+
+  return (
+    <Stack component="ol" aria-label={t("records.gameLogs.title")} sx={{ listStyle: "none", m: 0, p: 0 }}>
+      {rows.map((row) => {
+        const log = row.original;
+        const time = dayjs
+          .utc(log.event_time)
+          .tz(Intl.DateTimeFormat().resolvedOptions().timeZone)
+          .format(t("common.logDateTimeFormat"));
+        return (
+          <Box
+            component="li"
+            key={log.id ?? row.id}
+            sx={(theme) => ({
+              borderBottom: `1px solid ${theme.palette.divider}`,
+              px: 1.25,
+              py: 1.1,
+              "&:first-of-type": { borderTop: `1px solid ${theme.palette.divider}` },
+            })}
+          >
+            <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
+              <Typography color="text.secondary" variant="caption">{time}</Typography>
+              <Chip label={log.type || t("common.unknown")} size="small" variant="outlined" />
+            </Stack>
+            <Stack direction="row" alignItems="center" flexWrap="wrap" gap={0.75} sx={{ mt: 0.5 }}>
+              {log.player1_name && log.player1_id ? (
+                <ActionMenuButton
+                  actions={actions}
+                  recipients={{ player_id: log.player1_id, name: log.player1_name }}
+                  withProfile={Boolean(log.player1_id)}
+                  orientation="horizontal"
+                  renderButton={(props) => (
+                    <Button {...props} color="inherit" size="small" sx={{ minHeight: 44, px: 0.5 }}>
+                      {log.player1_name}
+                    </Button>
+                  )}
+                />
+              ) : log.player1_name ? (
+                <Typography variant="body2" sx={{ minHeight: 44, display: "flex", alignItems: "center" }}>
+                  {log.player1_name}
+                </Typography>
+              ) : null}
+              {log.player2_name ? (
+                <>
+                  <Typography aria-hidden color="text.secondary">→</Typography>
+                  {log.player2_id ? (
+                    <ActionMenuButton
+                      actions={actions}
+                      recipients={{ player_id: log.player2_id, name: log.player2_name }}
+                      withProfile
+                      orientation="horizontal"
+                      renderButton={(props) => (
+                        <Button {...props} color="inherit" size="small" sx={{ minHeight: 44, px: 0.5 }}>
+                          {log.player2_name}
+                        </Button>
+                      )}
+                    />
+                  ) : (
+                    <Typography variant="body2" sx={{ minHeight: 44, display: "flex", alignItems: "center" }}>
+                      {log.player2_name}
+                    </Typography>
+                  )}
+                </>
+              ) : null}
+            </Stack>
+            {log.content ? (
+              <Typography sx={{ overflowWrap: "anywhere" }} variant="body2">
+                {removeLogPlayerIds(log.content)}
+              </Typography>
+            ) : null}
+          </Box>
+        );
+      })}
+    </Stack>
+  );
+};
+
 export const loader = async ({ request }) => {
   const url = new URL(request.url);
   // Get params and set default values if not provided
@@ -158,6 +264,18 @@ const GameLogsPage = () => {
   const { t } = useTranslation();
   const { logs, fields } = useLoaderData();
   const submit = useSubmit();
+  const compact = useMediaQuery((theme) => theme.breakpoints.down("md"));
+  const hasActiveFilters = Boolean(
+    fields.player_name ||
+      fields.player_id ||
+      fields.action ||
+      fields.from ||
+      fields.till ||
+      fields.server_filter ||
+      fields.exact_player ||
+      fields.exact_action
+  );
+  const [filtersOpen, setFiltersOpen] = useState(hasActiveFilters);
   const logsColumns = useMemo(() => getLogsColumns(t), [t]);
 
   const table = useReactTable({
@@ -199,8 +317,33 @@ const GameLogsPage = () => {
         title={t("records.gameLogs.title")}
         subtitle={t("records.gameLogs.subtitle")}
       />
+      {compact ? (
+        <Button
+          aria-controls="game-log-filters"
+          aria-expanded={filtersOpen}
+          onClick={() => setFiltersOpen((value) => !value)}
+          startIcon={<TuneRoundedIcon />}
+          endIcon={
+            <KeyboardArrowDownRoundedIcon
+              sx={{ transform: filtersOpen ? "rotate(180deg)" : "none" }}
+            />
+          }
+          sx={{ justifyContent: "space-between", minHeight: 44 }}
+          variant="outlined"
+        >
+          {t("records.gameLogs.filters", { defaultValue: "Protokolle filtern" })}
+        </Button>
+      ) : null}
       <Stack direction={{ xs: "column", lg: "row" }} spacing={1}>
-      <GameLogsForm fields={fields} onSubmit={handleSubmit} />
+      {compact ? (
+        <Collapse in={filtersOpen}>
+          <Box id="game-log-filters">
+            <GameLogsForm compact fields={fields} onSubmit={handleSubmit} />
+          </Box>
+        </Collapse>
+      ) : (
+        <GameLogsForm fields={fields} onSubmit={handleSubmit} />
+      )}
       <Stack sx={{ flexGrow: 1 }}>
         <TableToolbar>
           <DebouncedSearchInput
@@ -229,14 +372,14 @@ const GameLogsPage = () => {
             <DownloadIcon />
           </IconButton>
         </TableToolbar>
-        <LiveLogsTable
-          table={table}
-          config={{
-            actions: [],
-            fontSize: "small",
-            density: "dense",
-          }}
-        />
+        {compact ? (
+          <MobileGameLogList table={table} />
+        ) : (
+          <LiveLogsTable
+            table={table}
+            config={{ actions: [], fontSize: "small", density: "dense" }}
+          />
+        )}
         <TableToolbar>
           <Box sx={{ flexGrow: 1 }} />
           <TablePagination table={table} />
@@ -247,7 +390,7 @@ const GameLogsPage = () => {
   );
 };
 
-const GameLogsForm = ({ fields, onSubmit }) => {
+const GameLogsForm = ({ compact = false, fields, onSubmit }) => {
   const { t } = useTranslation();
   const navigation = useNavigation();
   const server = useGlobalStore((state) => state.serverState);
@@ -330,7 +473,15 @@ const GameLogsForm = ({ fields, onSubmit }) => {
     >
       <Grid size={12}>
         <Form onSubmit={onSubmit}>
-          <Stack spacing={2} sx={{ p: 2 }}>
+          <Stack
+            spacing={compact ? 1.25 : 2}
+            sx={{
+              border: compact ? "1px solid" : 0,
+              borderColor: "divider",
+              bgcolor: compact ? "background.paper" : "transparent",
+              p: compact ? 1.25 : 2,
+            }}
+          >
             <TextField
               fullWidth
               label={t("records.gameLogs.playerId")}

@@ -9,6 +9,8 @@ import {
   Autocomplete,
   Box,
   Button,
+  Chip,
+  Collapse,
   FormControl,
   InputLabel,
   LinearProgress,
@@ -18,8 +20,11 @@ import {
   TextField,
   IconButton,
   Divider,
+  Typography,
+  useMediaQuery,
 } from "@mui/material";
 import { useMemo, useState } from "react";
+import dayjs from "dayjs";
 import { getAuditLogsColumns } from "./columns";
 import Table from "@/components/table/Table";
 import {
@@ -33,10 +38,88 @@ import { TableToolbar } from "@/components/table/TableToolbar";
 import NavPagination from "@/pages/stats/games/nav-pagination";
 import { TablePageSizeSelect } from "@/components/table/TablePageSizeSelect";
 import DownloadIcon from "@mui/icons-material/Download";
+import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
+import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import downloadLogs from "./download";
 import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/shared/PageHeader";
 import { demoAuditData, isFakeMode } from "@/mirage/demo-data";
+
+const readAuditArguments = (value) => {
+  try {
+    return JSON.parse(value ?? "{}");
+  } catch {
+    return {};
+  }
+};
+
+const MobileAuditLogList = ({ rows, onSelect }) => {
+  const { t } = useTranslation();
+
+  if (!rows.length) {
+    return (
+      <Typography color="text.secondary" sx={{ py: 4, textAlign: "center" }}>
+        {t("common.noResults")}
+      </Typography>
+    );
+  }
+
+  return (
+    <Stack component="ol" sx={{ listStyle: "none", m: 0, p: 0 }}>
+      {rows.map((row) => {
+        const auditLog = row.original;
+        const args = readAuditArguments(auditLog.command_arguments);
+        const subject = args.player_name ?? args.description ?? args.map_name;
+        return (
+          <Box
+            component="li"
+            key={auditLog.id ?? `${auditLog.creation_time}-${auditLog.command}`}
+            sx={(theme) => ({ borderBottom: `1px solid ${theme.palette.divider}` })}
+          >
+            <Button
+              color="inherit"
+              fullWidth
+              onClick={() => onSelect(auditLog)}
+              sx={{
+                alignItems: "stretch",
+                borderRadius: 0,
+                justifyContent: "flex-start",
+                minHeight: 72,
+                px: 1.25,
+                py: 1,
+                textAlign: "left",
+                textTransform: "none",
+              }}
+            >
+              <Stack width="100%" gap={0.35}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
+                  <Chip label={auditLog.command} size="small" variant="outlined" />
+                  <Typography color="text.secondary" variant="caption">
+                    {dayjs(auditLog.creation_time).format("lll")}
+                  </Typography>
+                </Stack>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="body2" fontWeight={700} noWrap>
+                      {auditLog.username || t("common.unknown")}
+                    </Typography>
+                    {subject ? (
+                      <Typography color="text.secondary" variant="caption" noWrap>
+                        {subject}
+                      </Typography>
+                    ) : null}
+                  </Box>
+                  <ChevronRightRoundedIcon color="action" aria-hidden />
+                </Stack>
+              </Stack>
+            </Button>
+          </Box>
+        );
+      })}
+    </Stack>
+  );
+};
 
 /**
  * @typedef {Object} AuditLogResponse
@@ -140,6 +223,7 @@ export const loader = async ({ request }) => {
 const AuditLogsPage = () => {
   const { t } = useTranslation();
   const { data, fields, autocompleteOptions } = useLoaderData();
+  const compact = useMediaQuery((theme) => theme.breakpoints.down("md"));
   const auditLogsColumns = useMemo(() => getAuditLogsColumns(t), [t]);
 
   const { audit_logs, total_pages, page, page_size } = data;
@@ -155,6 +239,10 @@ const AuditLogsPage = () => {
   });
 
   const [selectedAuditLog, setSelectedAuditLog] = useState(null);
+  const hasActiveFilters = Boolean(
+    fields.usernames.length || fields.commands.length || fields.parameters
+  );
+  const [filtersOpen, setFiltersOpen] = useState(hasActiveFilters);
 
   const table = useReactTable({
     data: audit_logs ?? [],
@@ -220,7 +308,25 @@ const AuditLogsPage = () => {
         title={t("records.auditLogs.title")}
         subtitle={t("records.auditLogs.subtitle")}
       />
-      <Form method="GET" onSubmit={handleSubmit}>
+      {compact ? (
+        <Button
+          aria-controls="audit-log-filters"
+          aria-expanded={filtersOpen}
+          onClick={() => setFiltersOpen((value) => !value)}
+          startIcon={<TuneRoundedIcon />}
+          endIcon={
+            <KeyboardArrowDownRoundedIcon
+              sx={{ transform: filtersOpen ? "rotate(180deg)" : "none" }}
+            />
+          }
+          sx={{ justifyContent: "space-between", minHeight: 44 }}
+          variant="outlined"
+        >
+          {t("records.auditLogs.filters")}
+        </Button>
+      ) : null}
+      <Collapse in={!compact || filtersOpen}>
+      <Form id="audit-log-filters" method="GET" onSubmit={handleSubmit}>
         <Stack spacing={2} direction={{ xs: "column", lg: "row" }}>
           <Autocomplete
             openText={t("common.openOptions")}
@@ -313,6 +419,7 @@ const AuditLogsPage = () => {
           </Button>
         </Stack>
       </Form>
+      </Collapse>
 
       <Stack component="section" id="audit-logs-section" spacing={1} direction={{ xs: "column", lg: "row" }}>
         <Stack direction="column" sx={{ width: "100%", order: { xs: 2, lg: 1 } }}>
@@ -344,22 +451,29 @@ const AuditLogsPage = () => {
               <DownloadIcon />
             </IconButton>
           </TableToolbar>
-          <Table
-            table={table}
-            columns={auditLogsColumns}
-            rowProps={(row) => ({
-              onClick: row.getToggleSelectedHandler(),
-              sx: {
-                cursor: "pointer",
-                bgcolor: row.getIsSelected() ? "action.selected" : "inherit",
-                "&:hover": {
-                  bgcolor: "action.hover",
+          {compact ? (
+            <MobileAuditLogList
+              rows={table.getRowModel().rows}
+              onSelect={setSelectedAuditLog}
+            />
+          ) : (
+            <Table
+              table={table}
+              columns={auditLogsColumns}
+              rowProps={(row) => ({
+                onClick: row.getToggleSelectedHandler(),
+                sx: {
+                  cursor: "pointer",
+                  bgcolor: row.getIsSelected() ? "action.selected" : "inherit",
+                  "&:hover": {
+                    bgcolor: "action.hover",
+                  },
                 },
-              },
-            })}
-          />
+              })}
+            />
+          )}
         </Stack>
-        <Box
+        {!compact || selectedAuditLog ? <Box
           sx={{
             order: { xs: 1, lg: 2 },
             maxWidth: 700,
@@ -371,7 +485,7 @@ const AuditLogsPage = () => {
             auditLog={selectedAuditLog}
             sx={{ position: "sticky", top: 0 }}
           />
-        </Box>
+        </Box> : null}
       </Stack>
     </Stack>
   );

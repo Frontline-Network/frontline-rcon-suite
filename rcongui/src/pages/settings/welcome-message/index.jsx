@@ -10,6 +10,8 @@ import {
   Skeleton,
   Stack,
   TextField,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import "@fontsource/montserrat";
 import SplitButton from "@/components/shared/SplitButton";
@@ -17,6 +19,8 @@ import AddCommentIcon from "@mui/icons-material/AddComment";
 import { TEMPLATE_CATEGORY } from "@/utils/lib";
 import { isFakeMode } from "@/mirage/demo-data";
 import { useTranslation } from "react-i18next";
+import PageHeader from "@/components/shared/PageHeader";
+import ConfirmButton from "@/components/shared/ConfirmButton";
 
 const INTENT = {
   APPLY_SINGLE: 0,
@@ -48,6 +52,8 @@ const WelcomeMessagePage = () => {
   const submit = useSubmit();
   const [message, setMessage] = useState(data.message);
   const [loading, setLoading] = useState(false);
+  const theme = useTheme();
+  const compact = useMediaQuery(theme.breakpoints.down("md"));
 
   useEffect(() => {
     setMessage(data.message);
@@ -79,56 +85,22 @@ const WelcomeMessagePage = () => {
   const applyDisabled = loading || !hasChanges;
 
   return (
-    <Box sx={{ maxWidth: (theme) => theme.breakpoints.values.md }}>
-      <Stack
-        component={Paper}
-        direction={"row"}
-        sx={{ p: 1, mb: 1 }}
-        justifyContent={"end"}
-        alignItems={"center"}
-        gap={1}
-      >
-        <Button
-          component={Link}
-          startIcon={<AddCommentIcon />}
-          variant="contained"
-          to={"/settings/templates/" + TEMPLATE_CATEGORY.WELCOME.toLowerCase()}
-        >
-          {t("settings.broadcast.createTemplate")}
-        </Button>
-        <SplitButton
-          disabled={applyDisabled}
-          options={[
-            {
-              name: loading ? t("common.loading") : t("settings.welcome.apply"),
-              buttonProps: {
-                disabled: applyDisabled,
-                onClick: handleApplyClick(INTENT.APPLY_SINGLE),
-              },
-            },
-            {
-              name: loading ? t("common.loading") : t("settings.welcome.applyAllServers"),
-              buttonProps: {
-                disabled: applyDisabled,
-                onClick: handleApplyClick(INTENT.APPLY_ALL),
-              },
-            },
-          ]}
-        />
-      </Stack>
-      <Box sx={{ mb: 2 }}>
-        <TextField
-          name="message"
-          value={message ?? ""}
-          onChange={handleOnChange}
-          placeholder={t("settings.templates.messageContent")}
-          multiline
-          minRows={16}
-          fullWidth
-          required
-        />
-      </Box>
-
+    <Box sx={{ maxWidth: (theme) => theme.breakpoints.values.lg, minWidth: 0, pb: { xs: 10, md: 0 } }}>
+      <PageHeader
+        eyebrow={t("settings.welcome.eyebrow")}
+        title={t("settings.welcome.title")}
+        subtitle={t("settings.welcome.subtitle")}
+        actions={!compact ? (
+          <Button
+            component={Link}
+            startIcon={<AddCommentIcon />}
+            variant="outlined"
+            to={"/settings/templates/" + TEMPLATE_CATEGORY.WELCOME.toLowerCase()}
+          >
+            {t("settings.broadcast.createTemplate")}
+          </Button>
+        ) : null}
+      />
       <Suspense fallback={<TemplateSkeleton />}>
         <Await
           resolve={data.templates}
@@ -167,6 +139,77 @@ const WelcomeMessagePage = () => {
           }}
         </Await>
       </Suspense>
+
+      {compact && (
+        <Button
+          component={Link}
+          startIcon={<AddCommentIcon />}
+          variant="outlined"
+          fullWidth
+          to={"/settings/templates/" + TEMPLATE_CATEGORY.WELCOME.toLowerCase()}
+          sx={{ mt: 1, minHeight: 44 }}
+        >
+          {t("settings.broadcast.createTemplate")}
+        </Button>
+      )}
+
+      <Paper variant="outlined" sx={{ mt: 1.5, p: { xs: 1.5, sm: 2 }, borderRadius: 0 }}>
+        <TextField
+          name="message"
+          value={message ?? ""}
+          onChange={handleOnChange}
+          placeholder={t("settings.templates.messageContent")}
+          multiline
+          minRows={compact ? 10 : 16}
+          fullWidth
+          required
+          helperText={t("settings.welcome.editorHint")}
+        />
+      </Paper>
+
+      {compact ? (
+        <Stack
+          component={Paper}
+          direction="row"
+          gap={1}
+          sx={{
+            position: "sticky",
+            bottom: "calc(64px + env(safe-area-inset-bottom))",
+            zIndex: theme.zIndex.appBar,
+            p: 1,
+            mt: 1.5,
+            border: "1px solid",
+            borderColor: "divider",
+          }}
+        >
+          <Button
+            variant="contained"
+            disabled={applyDisabled}
+            onClick={handleApplyClick(INTENT.APPLY_SINGLE)}
+            sx={{ flex: 1, minHeight: 44 }}
+          >
+            {loading ? t("common.loading") : t("settings.welcome.apply")}
+          </Button>
+          <ConfirmButton
+            disabled={applyDisabled}
+            onConfirm={handleApplyClick(INTENT.APPLY_ALL)}
+            title={t("settings.welcome.applyAllTitle")}
+            description={t("settings.welcome.applyAllDescription")}
+            buttonText={t("settings.welcome.allServers")}
+            buttonProps={{ variant: "outlined", sx: { minHeight: 44 } }}
+          />
+        </Stack>
+      ) : (
+        <Stack component={Paper} direction="row" justifyContent="flex-end" sx={{ p: 1, mt: 1.5 }}>
+          <SplitButton
+            disabled={applyDisabled}
+            options={[
+              { name: loading ? t("common.loading") : t("settings.welcome.apply"), buttonProps: { disabled: applyDisabled, onClick: handleApplyClick(INTENT.APPLY_SINGLE) } },
+              { name: loading ? t("common.loading") : t("settings.welcome.applyAllServers"), buttonProps: { disabled: applyDisabled, onClick: handleApplyClick(INTENT.APPLY_ALL) } },
+            ]}
+          />
+        </Stack>
+      )}
     </Box>
   );
 };

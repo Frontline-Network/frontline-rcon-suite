@@ -1,5 +1,7 @@
 import Padlock from "@/components/shared/Padlock";
 import SplitButton from "@/components/shared/SplitButton";
+import ConfirmButton from "@/components/shared/ConfirmButton";
+import PageHeader from "@/components/shared/PageHeader";
 import { cmd } from "@/utils/fetchUtils";
 import { TEMPLATE_CATEGORY } from "@/utils/lib";
 import {
@@ -11,6 +13,8 @@ import {
   Skeleton,
   TextField,
   Stack,
+  Typography,
+  useMediaQuery,
   useTheme,
 } from "@mui/material";
 import { lazy, Suspense, useEffect, useState } from "react";
@@ -115,6 +119,7 @@ const Autosettings = () => {
   const actionData = useActionData();
   const submit = useSubmit();
   const theme = useTheme();
+  const compact = useMediaQuery(theme.breakpoints.down("md"));
 
   const handleApplyClick = (intent) => () => {
     setSubmitting(true);
@@ -156,12 +161,60 @@ const Autosettings = () => {
     }
   }, [actionData]);
 
+  const templatePicker = (
+    <Suspense fallback={<TemplateSkeleton />}>
+      <Await
+        resolve={data.templates}
+        errorElement={
+          <AsyncClientError title={t("settings.autosettings.templates")} />
+        }
+      >
+        {(templates) => (
+          <Autocomplete
+            id="template-select"
+            fullWidth
+            options={templates}
+            onChange={handleTemplateChange}
+            autoHighlight
+            getOptionLabel={(option) => option.title}
+            renderOption={(props, option) => {
+              const { key, ...optionProps } = props;
+              return (
+                <Box key={key} component="li" {...optionProps}>
+                  #{option.id} {option.title}
+                </Box>
+              );
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label={t("settings.templates.select")}
+                slotProps={{
+                  htmlInput: {
+                    ...params.inputProps,
+                  },
+                }}
+              />
+            )}
+          />
+        )}
+      </Await>
+    </Suspense>
+  );
+
   return (
-    <Stack gap={2}>
+    <Stack gap={compact ? 1.25 : 2} sx={{ minWidth: 0, pb: { xs: 2, md: 0 } }}>
+      {compact ? (
+        <PageHeader
+          eyebrow={t("settings.autosettings.eyebrow")}
+          title={t("settings.autosettings.title")}
+          subtitle={t("settings.autosettings.subtitle")}
+        />
+      ) : null}
       <Stack
         component={Paper}
-        sx={{ p: 1, mb: 1 }}
-        direction={"row"}
+        sx={{ p: { xs: 1.25, md: 1 }, mb: { xs: 0, md: 1 } }}
+        direction={{ xs: "column", md: "row" }}
         justifyContent={"space-between"}
         gap={1}
       >
@@ -172,91 +225,121 @@ const Autosettings = () => {
           checked={isRunning(data.service)}
           handleChange={handleToggleService}
         />
-        <Stack direction={"row"} gap={1}>
+        <Stack direction={{ xs: "column", md: "row" }} gap={1}>
           <Button
-            variant="contained"
+            variant={compact ? "outlined" : "contained"}
             color="secondary"
             href="https://github.com/MarechJ/hll_rcon_tool/wiki/User-Guide-%E2%80%90-Main-interface-%E2%80%90-Settings-%E2%80%90-Autosettings"
             component={"a"}
+            sx={{ minHeight: 44 }}
           >
             {t("settings.autosettings.readDocs")}
           </Button>
-          <SplitButton
-            disabled={submitting}
-            options={[
-              {
-                name: submitting
-                  ? t("common.processing")
-                  : t("settings.autosettings.apply"),
-                buttonProps: {
-                  onClick: handleApplyClick(INTENT.APPLY_SINGLE),
-                  disabled: submitting,
+          {!compact ? (
+            <SplitButton
+              disabled={submitting}
+              options={[
+                {
+                  name: submitting
+                    ? t("common.processing")
+                    : t("settings.autosettings.apply"),
+                  buttonProps: {
+                    onClick: handleApplyClick(INTENT.APPLY_SINGLE),
+                    disabled: submitting,
+                  },
                 },
-              },
-              {
-                name: submitting
-                  ? t("common.processing")
-                  : t("settings.autosettings.applyAllServers"),
-                buttonProps: {
-                  onClick: handleApplyClick(INTENT.APPLY_ALL),
-                  disabled: submitting,
+                {
+                  name: submitting
+                    ? t("common.processing")
+                    : t("settings.autosettings.applyAllServers"),
+                  buttonProps: {
+                    onClick: handleApplyClick(INTENT.APPLY_ALL),
+                    disabled: submitting,
+                  },
                 },
-              },
-            ]}
-          />
+              ]}
+            />
+          ) : null}
         </Stack>
       </Stack>
       {error && <Alert severity="error">{error}</Alert>}
-      <Suspense>
-        <Editor
-          height="70vh"
-          defaultLanguage="json"
-          value={editorContent}
-          defaultValue=""
-          theme={theme.palette.mode === "dark" ? "vs-dark" : "vs-light"}
-          onChange={(value) => setEditorContent(value)}
-        />
-      </Suspense>
-      <Suspense fallback={<TemplateSkeleton />}>
-        <Await
-          resolve={data.templates}
-          errorElement={
-            <AsyncClientError title={t("settings.autosettings.templates")} />
-          }
-        >
-          {(templates) => {
-            return (
-              <Autocomplete
-                id="template-select"
-                fullWidth
-                options={templates}
-                onChange={handleTemplateChange}
-                autoHighlight
-                getOptionLabel={(option) => option.title}
-                renderOption={(props, option) => {
-                  const { key, ...optionProps } = props;
-                  return (
-                    <Box key={key} component="li" {...optionProps}>
-                      #{option.id} {option.title}
-                    </Box>
-                  );
-                }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label={t("settings.templates.select")}
-                    slotProps={{
-                      htmlInput: {
-                        ...params.inputProps,
-                      },
-                    }}
-                  />
-                )}
-              />
-            );
+      {compact ? templatePicker : null}
+      <Box component="section" aria-labelledby="autosettings-editor-title" sx={{ minWidth: 0 }}>
+        {compact ? (
+          <Stack spacing={0.25} sx={{ mb: 0.75 }}>
+            <Typography id="autosettings-editor-title" component="h2" variant="subtitle1">
+              {t("settings.autosettings.editorTitle")}
+            </Typography>
+            <Typography color="text.secondary" variant="caption">
+              {t("settings.autosettings.editorHint")}
+            </Typography>
+          </Stack>
+        ) : null}
+        <Box
+          sx={{
+            border: (themeValue) => `1px solid ${themeValue.palette.divider}`,
+            minWidth: 0,
+            overflow: "hidden",
+            width: "100%",
           }}
-        </Await>
-      </Suspense>
+        >
+          <Suspense>
+            <Editor
+              height={compact ? "clamp(320px, 50dvh, 520px)" : "70vh"}
+              defaultLanguage="json"
+              value={editorContent}
+              defaultValue=""
+              theme={theme.palette.mode === "dark" ? "vs-dark" : "vs-light"}
+              onChange={(value) => setEditorContent(value)}
+              options={{
+                minimap: { enabled: !compact },
+                wordWrap: compact ? "on" : "off",
+                lineNumbersMinChars: compact ? 2 : 5,
+                padding: { top: 8, bottom: 8 },
+              }}
+            />
+          </Suspense>
+        </Box>
+      </Box>
+      {!compact ? templatePicker : null}
+      {compact ? (
+        <Stack
+          component={Paper}
+          elevation={6}
+          spacing={1}
+          sx={{
+            bottom: "calc(64px + env(safe-area-inset-bottom, 0px))",
+            border: (themeValue) => `1px solid ${themeValue.palette.divider}`,
+            p: 1,
+            position: "sticky",
+            zIndex: (themeValue) => themeValue.zIndex.appBar - 1,
+          }}
+        >
+          <Button
+            variant="contained"
+            disabled={submitting}
+            onClick={handleApplyClick(INTENT.APPLY_SINGLE)}
+            sx={{ minHeight: 48 }}
+          >
+            {submitting
+              ? t("common.processing")
+              : t("settings.autosettings.apply")}
+          </Button>
+          <ConfirmButton
+            disabled={submitting}
+            onConfirm={handleApplyClick(INTENT.APPLY_ALL)}
+            title={t("settings.autosettings.applyAllTitle")}
+            description={t("settings.autosettings.applyAllDescription")}
+            buttonText={t("settings.autosettings.applyAllServers")}
+            buttonProps={{
+              color: "secondary",
+              variant: "outlined",
+              fullWidth: true,
+              sx: { minHeight: 44 },
+            }}
+          />
+        </Stack>
+      ) : null}
     </Stack>
   );
 };

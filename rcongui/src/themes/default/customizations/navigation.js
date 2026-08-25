@@ -17,6 +17,9 @@ export const navigationCustomizations = ({ gray, brand }) => ({
         minHeight: 38,
         boxShadow: 'none',
         '&:hover': { boxShadow: 'none' },
+        '@media (pointer: coarse)': {
+          minHeight: 44,
+        },
       }),
       containedPrimary: {
         color: gray[900],
@@ -33,6 +36,10 @@ export const navigationCustomizations = ({ gray, brand }) => ({
       root: ({ theme }) => ({
         borderRadius: theme.shape.borderRadius,
         color: theme.palette.text.secondary,
+        '@media (pointer: coarse)': {
+          minWidth: 44,
+          minHeight: 44,
+        },
         '&:hover': {
           color: theme.palette.primary.light,
           backgroundColor: theme.palette.action.hover,

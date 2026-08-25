@@ -15,9 +15,10 @@ import AutomodsCard from "@/components/cards/AutomodsCard";
 import FrontlineAppCard from "@/components/cards/FrontlineAppCard";
 import ResourceTelemetryCard from "@/components/cards/ResourceTelemetryCard";
 import BattleOverview from "@/components/dashboard/BattleOverview";
-import { Box, Divider, Stack, Typography } from "@mui/material";
+import { Box, Divider, Stack, Typography, useMediaQuery } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
+import { Navigate } from "react-router-dom";
 
 const SMALL_CARD_SIZE = {
   xs: 12,
@@ -248,4 +249,9 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard;
+const ResponsiveDashboard = () => {
+  const compact = useMediaQuery((theme) => theme.breakpoints.down("md"));
+  return compact ? <Navigate to="/views/live" replace /> : <Dashboard />;
+};
+
+export default ResponsiveDashboard;

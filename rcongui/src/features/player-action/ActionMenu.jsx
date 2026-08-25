@@ -281,6 +281,7 @@ export function ActionButton({
   sx,
   label,
   icon: Icon,
+  onBeforeAction,
   ...props
 }) {
   const { t } = useTranslation();
@@ -299,7 +300,10 @@ export function ActionButton({
           variant="outlined"
           startIcon={Icon ? <Icon /> : <action.icon />}
           disabled={!allowed}
-          onClick={() => openDialog(action, recipients, params)}
+          onClick={() => {
+            onBeforeAction?.();
+            openDialog(action, recipients, params);
+          }}
           sx={{ opacity: action.deprecated ? 0.5 : 1, ...sx }}
           {...props}
         >

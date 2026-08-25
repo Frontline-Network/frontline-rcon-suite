@@ -12,10 +12,14 @@ import ServerStatus from "../Header/server-status";
 import FrontlineBrand from "./FrontlineBrand";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
+import MobileBottomNavigation from "./MobileBottomNavigation";
 
 const Toolbar = styled(MuiToolbar)({
   width: "100%",
-  padding: "8px 12px",
+  paddingTop: "8px",
+  paddingBottom: "8px",
+  paddingLeft: "calc(12px + env(safe-area-inset-left))",
+  paddingRight: "calc(12px + env(safe-area-inset-right))",
   display: "flex",
   flexDirection: "column",
   alignItems: "start",
@@ -42,6 +46,7 @@ const AppNavbarBase = ({ toggleDrawer, open, isSmallScreen }) => {
         backgroundImage: "none",
         borderBottom: "1px solid",
         borderColor: "divider",
+        pt: "env(safe-area-inset-top)",
       }}
     >
       <Toolbar variant="regular">
@@ -93,6 +98,10 @@ export default function AppNavbar() {
       <SideMenuMobile
         open={isSmallScreen ? openDrawer : false}
         toggleDrawer={isSmallScreen ? toggleDrawer : () => {}}
+      />
+      <MobileBottomNavigation
+        moreOpen={openDrawer}
+        onOpenMore={() => setOpenDrawer(true)}
       />
     </>
   );

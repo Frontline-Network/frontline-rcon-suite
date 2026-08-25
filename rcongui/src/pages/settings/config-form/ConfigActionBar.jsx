@@ -54,7 +54,12 @@ export default function ConfigActionBar({
       component="footer"
       sx={{
         position: sticky ? "sticky" : "static",
-        bottom: sticky ? 0 : "auto",
+        bottom: sticky
+          ? {
+              xs: "calc(var(--mobile-bottom-nav-height, 0px) + env(safe-area-inset-bottom))",
+              sm: 0,
+            }
+          : "auto",
         zIndex: (theme) => theme.zIndex.appBar - 1,
         mt: 0,
         mx: { xs: -1, sm: 0 },
@@ -66,6 +71,10 @@ export default function ConfigActionBar({
         bgcolor: "background.paper",
         borderRadius: "0 0 8px 8px",
         boxShadow: sticky ? "0 -4px 12px rgba(0,0,0,0.06)" : 0,
+        "& .MuiButton-root": {
+          width: { xs: "100%", sm: "auto" },
+          minHeight: { xs: 44, sm: 36 },
+        },
       }}
     >
       <Stack

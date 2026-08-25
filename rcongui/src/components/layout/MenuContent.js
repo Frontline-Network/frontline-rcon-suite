@@ -12,14 +12,12 @@ import {
   Collapse,
   TextField,
   InputAdornment,
-  IconButton,
   Box,
   Tooltip,
 } from "@mui/material";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "@/stores/app-state";
 import SearchIcon from "@mui/icons-material/Search";
-import CloseIcon from "@mui/icons-material/Close";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/useAuth";
 import { canAccessNavLink } from "@/components/Header/nav-data";
@@ -88,6 +86,7 @@ const NavigationLink = ({ to, icon, text, onClick, locked, lockedReason }) => {
 };
 
 const Group = ({
+  id,
   groupName,
   icon,
   level = 1,
@@ -100,13 +99,19 @@ const Group = ({
 
   return (
     <ListItem key={groupName} disablePadding sx={{ display: "block" }}>
-      <ListItemButton onClick={onToggle} sx={{ minHeight: 44 }}>
+      <ListItemButton
+        aria-controls={`${id}-navigation-list`}
+        aria-expanded={isOpen}
+        onClick={onToggle}
+        sx={{ minHeight: 44 }}
+      >
         {icon && <ListItemIcon>{icon}</ListItemIcon>}
         <ListItemText primary={groupName} />
         {isOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
       </ListItemButton>
       <Collapse in={isOpen} timeout={"auto"} unmountOnExit>
         <List
+          id={`${id}-navigation-list`}
           dense
           sx={{ "& .MuiListItemButton-root": { pl: 2 * level } }}
           disablePadding
@@ -118,7 +123,7 @@ const Group = ({
   );
 };
 
-export default function MenuContent({ navigationTree, isMobile }) {
+export default function MenuContent({ navigationTree, isMobile, onNavigate }) {
   const { t } = useTranslation();
   const { permissions } = useAuth();
   const toggleDrawer = useAppStore((state) => state.toggleDrawer);
@@ -169,7 +174,7 @@ export default function MenuContent({ navigationTree, isMobile }) {
 
   const handleLinkClick = () => {
     if (isMobile) {
-      toggleDrawer();
+      (onNavigate ?? toggleDrawer)();
     }
   };
 
@@ -238,6 +243,7 @@ export default function MenuContent({ navigationTree, isMobile }) {
           size="small"
           fullWidth
           placeholder={t("navigation.search")}
+          inputProps={{ "aria-label": t("navigation.search") }}
           name="crcon-search"
           inputRef={searchInputRef}
           value={searchTerm}
@@ -250,7 +256,7 @@ export default function MenuContent({ navigationTree, isMobile }) {
                   <SearchIcon fontSize="small" />
                 </InputAdornment>
               ),
-              endAdornment: (
+              endAdornment: !isMobile ? (
                 <InputAdornment position="end">
                   <Box
                     aria-hidden
@@ -283,20 +289,10 @@ export default function MenuContent({ navigationTree, isMobile }) {
                     {keyHintLabel}
                   </Box>
                 </InputAdornment>
-              ),
+              ) : null,
             },
           }}
         />
-        {isMobile && (
-          <IconButton
-            size="small"
-            onClick={toggleDrawer}
-            aria-label={t("common.close")}
-            sx={{ minWidth: 44, minHeight: 44 }}
-          >
-            <CloseIcon sx={{ fontSize: 24 }} />
-          </IconButton>
-        )}
       </Stack>
       <List dense sx={{ overflowY: "auto", scrollbarWidth: "none" }}>
         {filteredTree
@@ -320,6 +316,7 @@ export default function MenuContent({ navigationTree, isMobile }) {
           .map((group) => (
             <Group
               key={group.id}
+              id={group.id}
               groupName={getLabel(group)}
               icon={group.icon}
               open={isGroupOpen(group.id)}

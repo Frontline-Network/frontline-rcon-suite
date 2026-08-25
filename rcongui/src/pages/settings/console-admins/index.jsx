@@ -262,7 +262,7 @@ const ConsoleAdminsPage = () => {
       />
       <Stack
         component={Paper}
-        direction={"row"}
+        direction={{ xs: "column", sm: "row" }}
         sx={{ p: 1, mb: 1 }}
         justifyContent={"end"}
         alignItems={"center"}
@@ -273,11 +273,13 @@ const ConsoleAdminsPage = () => {
           color={"secondary"}
           onChange={handleFileUpload}
           accept={".txt"}
+          sx={{ minHeight: 44, width: { xs: "100%", sm: "auto" } }}
         />
         <Button
           onClick={handleFileDownload}
           variant="contained"
           color="secondary"
+          sx={{ minHeight: 44, width: { xs: "100%", sm: "auto" } }}
         >
           {t("settings.consoleAdmins.download")}
         </Button>
@@ -285,6 +287,7 @@ const ConsoleAdminsPage = () => {
           onClick={submitChanges}
           disabled={!hasChanges}
           variant="contained"
+          sx={{ minHeight: 44, width: { xs: "100%", sm: "auto" } }}
         >
           {t("settings.consoleAdmins.apply")}
         </Button>
@@ -329,13 +332,14 @@ const ConsoleAdminsPage = () => {
             onClick={handleAddItem}
             disabled={!isValidAdminInput}
             variant="contained"
+            sx={{ minHeight: 44 }}
           >
             {t("settings.consoleAdmins.add")}
           </Button>
         </Stack>
         <Stack
-          direction={"row"}
-          alignItems={"center"}
+          direction={{ xs: "column", md: "row" }}
+          alignItems={{ xs: "stretch", md: "center" }}
           justifyContent={"space-between"}
           gap={1}
           sx={{ mb: 1, p: 0.5 }}
@@ -357,18 +361,26 @@ const ConsoleAdminsPage = () => {
               />
             }
           />
-          <Divider orientation="vertical" flexItem />
+          <Divider
+            orientation="vertical"
+            flexItem
+            sx={{ display: { xs: "none", md: "block" } }}
+          />
           <SearchInput
             onChange={onSearchedChange}
             placeholder={t("settings.consoleAdmins.search")}
           />
-          <Divider orientation="vertical" flexItem />
+          <Divider
+            orientation="vertical"
+            flexItem
+            sx={{ display: { xs: "none", md: "block" } }}
+          />
           <Button
             onClick={handleDeleteSelectedItems}
             variant="contained"
             color="warning"
             disabled={!checked.size}
-            sx={{ minWidth: "fit-content" }}
+            sx={{ minHeight: 44, minWidth: "fit-content" }}
           >
             {t("settings.consoleAdmins.deleteSelected")}
           </Button>
@@ -379,7 +391,7 @@ const ConsoleAdminsPage = () => {
           sx={{
             position: "relative",
             overflow: "auto",
-            maxHeight: 600,
+            maxHeight: { xs: "none", md: 600 },
             "& ul": { padding: 0 },
           }}
         >
@@ -393,11 +405,17 @@ const ConsoleAdminsPage = () => {
                   <Stack direction={"row"} gap={1}>
                     <IconButton
                       onClick={() => handleOpenProfile(admin.player_id)}
+                      aria-label={t("records.players.openPlayerActions", {
+                        name: admin.name,
+                      })}
+                      sx={{ minHeight: 44, minWidth: 44 }}
                     >
                       <AccountCircleIcon />
                     </IconButton>
                     <IconButton
                       onClick={() => handleDeleteSingleItem(admin.player_id)}
+                      aria-label={t("settings.consoleAdmins.deleteSelected")}
+                      sx={{ minHeight: 44, minWidth: 44 }}
                     >
                       <DeleteIcon />
                     </IconButton>
