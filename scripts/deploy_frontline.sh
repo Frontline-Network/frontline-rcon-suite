@@ -68,13 +68,14 @@ if ! git remote get-url "$remote_name" >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "Fetching $remote_name/$branch_name..."
-git fetch --prune "$remote_name" "$branch_name"
+echo "Fetching $remote_name/$branch_name and release tags..."
+git fetch --prune --tags "$remote_name" "$branch_name"
 
 current_sha="$(git rev-parse HEAD)"
 target_sha="$(git rev-parse FETCH_HEAD)"
 current_short="${current_sha:0:12}"
 target_short="${target_sha:0:12}"
+target_version="$(git describe --tags --always "$target_sha")"
 
 if ! git merge-base --is-ancestor "$current_sha" "$target_sha"; then
   echo "Refusing non-fast-forward deployment: $current_short -> $target_short" >&2
@@ -87,7 +88,7 @@ target_override="$(mktemp "${TMPDIR:-/tmp}/crcon-compose.XXXXXX.yaml")"
 trap 'rm -f "$target_override"' EXIT
 git show "$target_sha:compose.mobile-admin.yaml" > "$target_override"
 
-CRCON_IMAGE_TAG="$target_short" docker compose \
+CRCON_IMAGE_TAG="$target_short" CRCON_VERSION="$target_version" docker compose \
   --profile mobile \
   -f compose.yaml \
   -f "$target_override" \
@@ -143,7 +144,7 @@ for optional_worker in \
   fi
 done
 
-echo "Preflight passed: $current_short -> $target_short"
+echo "Preflight passed: $current_short -> $target_short ($target_version)"
 echo "Deployment services: ${deployment_services[*]}"
 if [[ "$mode" == "--check-only" ]]; then
   exit 0
@@ -196,7 +197,7 @@ fi
 git merge --ff-only "$target_sha"
 
 compose_target() {
-  CRCON_IMAGE_TAG="$target_short" docker compose \
+  CRCON_IMAGE_TAG="$target_short" CRCON_VERSION="$target_version" docker compose \
     --profile mobile \
     -f compose.yaml \
     -f compose.mobile-admin.yaml \
@@ -213,12 +214,28 @@ echo "Building immutable images for $target_short..."
 compose_target build --pull "${deployment_services[@]}"
 
 env_tmp="$(mktemp "$repo_root/.env.XXXXXX")"
-if grep -q '^CRCON_IMAGE_TAG=' .env; then
-  sed "s/^CRCON_IMAGE_TAG=.*/CRCON_IMAGE_TAG=$target_short/" .env > "$env_tmp"
-else
-  cp .env "$env_tmp"
-  printf '\nCRCON_IMAGE_TAG=%s\n' "$target_short" >> "$env_tmp"
-fi
+awk -v image_tag="$target_short" -v release_version="$target_version" '
+  BEGIN { image_written = 0; version_written = 0 }
+  /^CRCON_IMAGE_TAG=/ {
+    if (!image_written) {
+      print "CRCON_IMAGE_TAG=" image_tag
+      image_written = 1
+    }
+    next
+  }
+  /^CRCON_VERSION=/ {
+    if (!version_written) {
+      print "CRCON_VERSION=" release_version
+      version_written = 1
+    }
+    next
+  }
+  { print }
+  END {
+    if (!image_written) print "CRCON_IMAGE_TAG=" image_tag
+    if (!version_written) print "CRCON_VERSION=" release_version
+  }
+' .env > "$env_tmp"
 chmod --reference=.env "$env_tmp"
 mv "$env_tmp" .env
 
