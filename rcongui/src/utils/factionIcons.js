@@ -1,4 +1,13 @@
-const OFFICIAL_FACTIONS = new Set(["us", "ger", "rus", "gb", "can"]);
+const FACTION_ASSETS = {
+  us: "webp",
+  ger: "webp",
+  rus: "webp",
+  gb: "webp",
+  can: "webp",
+  dak: "svg",
+  cw: "svg",
+  nva: "svg",
+};
 
 const aliases = {
   allies: "us",
@@ -9,6 +18,10 @@ const aliases = {
   dak: "ger",
   german: "ger",
   germany: "ger",
+  northvietnam: "nva",
+  "north-vietnam": "nva",
+  pavn: "nva",
+  vietcong: "nva",
   soviet: "rus",
   soviets: "rus",
   ussr: "rus",
@@ -27,9 +40,10 @@ export const normalizeFaction = (faction) => {
 export const getFactionIconSrc = (faction, variant = "default") => {
   const key = normalizeFaction(faction);
   const suffix = variant === "default" ? "" : `_${variant}`;
+  const extension = FACTION_ASSETS[key];
 
-  if (OFFICIAL_FACTIONS.has(key)) {
-    return `/icons/teams/${key}${suffix}.webp`;
+  if (extension) {
+    return `/icons/teams/${key}${suffix}.${extension}`;
   }
   return `/icons/teams/unknown${suffix}.svg`;
 };

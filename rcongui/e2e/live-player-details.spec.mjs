@@ -4,6 +4,24 @@ import { openDemoPage, VIEWPORTS } from "./helpers.mjs";
 test.describe("live player density and details", () => {
   test.use({ viewport: VIEWPORTS.desktop });
 
+  test("places team and squad before the player name", async ({ page }) => {
+    await openDemoPage(page, "/views/live");
+
+    const headers = await page
+      .getByTestId("live-players-panel")
+      .locator("thead th")
+      .allTextContents();
+    const normalizedHeaders = headers.map((header) => header.trim());
+    const teamIndex = normalizedHeaders.indexOf("Team");
+    const squadIndex = normalizedHeaders.indexOf("Trupp");
+    const playerIndex = normalizedHeaders.indexOf("Name");
+
+    expect(teamIndex).toBeGreaterThanOrEqual(0);
+    expect(squadIndex).toBeGreaterThan(teamIndex);
+    expect(playerIndex).toBeGreaterThan(squadIndex);
+    expect(normalizedHeaders).not.toContain("Team / Trupp / Rolle");
+  });
+
   test("keeps every closed player on one line and opens one detail strip", async ({
     page,
   }) => {
@@ -65,11 +83,13 @@ test.describe("live player density and details", () => {
 
     const panel = page.getByTestId("live-players-panel");
     await panel
-      .getByRole("button", { name: /Details zu .* anzeigen/ })
+      .getByRole("button", { name: /Details zu .* (anzeigen|öffnen)/ })
       .first()
       .click();
 
-    const detailPanel = panel.getByTestId("live-player-detail-panel");
+    // Tablet width uses the mobile inspector sheet, which is rendered through
+    // a portal outside the players panel. Its content contract stays identical.
+    const detailPanel = page.getByTestId("live-player-detail-panel");
     await expect(detailPanel).toBeVisible();
 
     const overflow = await detailPanel.evaluate((element) => ({

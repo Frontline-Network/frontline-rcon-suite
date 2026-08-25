@@ -48,6 +48,13 @@ export const PlayerTableLayout = styled(Box, {
     borderCollapse: "separate",
     borderSpacing: 0,
     boxSizing: "border-box",
+    fontWeight: 300,
+  },
+
+  // Keep the dense operations roster visually calm and uniform. Explicit
+  // component variants used inside cells must not reintroduce bold text.
+  "& table th, & table td, & table button, & table [role='button'], & table .MuiTypography-root, & table span": {
+    fontWeight: "300 !important",
   },
 
   // Keep a stable header height without creating a second vertical scroll

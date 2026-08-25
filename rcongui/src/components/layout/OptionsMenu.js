@@ -8,10 +8,15 @@ import ListItemText from '@mui/material/ListItemText';
 import ListItemIcon, { listItemIconClasses } from '@mui/material/ListItemIcon';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import MoreVertRoundedIcon from '@mui/icons-material/MoreVertRounded';
+import PaletteOutlinedIcon from '@mui/icons-material/PaletteOutlined';
 import MenuButton from './MenuButton';
 import {useSubmit} from 'react-router-dom';
-import {Fragment, useState} from "react";
+import {Fragment, lazy, Suspense, useState} from "react";
 import { useTranslation } from "react-i18next";
+
+const AppearanceSettingsDialog = lazy(() =>
+  import("./AppearanceSettingsDialog")
+);
 
 const MenuItem = styled(MuiMenuItem)({
   margin: '2px 0',
@@ -20,6 +25,7 @@ const MenuItem = styled(MuiMenuItem)({
 export default function OptionsMenu() {
   const { t } = useTranslation();
   const [anchorEl, setAnchorEl] = useState(null);
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
   const submit = useSubmit();
   const open = Boolean(anchorEl);
   const handleClick = (event) => {
@@ -41,6 +47,7 @@ export default function OptionsMenu() {
     <Fragment>
       <MenuButton
         aria-label={t("common.actions")}
+        data-testid="user-options-menu"
         onClick={handleClick}
         sx={{ borderColor: 'transparent' }}
       >
@@ -66,6 +73,12 @@ export default function OptionsMenu() {
           },
         }}
       >
+        <MenuItem onClick={() => setAppearanceOpen(true)}>
+          <ListItemText>{t("appearance.menuLabel")}</ListItemText>
+          <ListItemIcon sx={{ ml: 'auto', minWidth: 0 }}>
+            <PaletteOutlinedIcon fontSize="small" />
+          </ListItemIcon>
+        </MenuItem>
         <MenuItem
           onClick={handleChangePassword}
           sx={{
@@ -92,6 +105,14 @@ export default function OptionsMenu() {
           </ListItemIcon>
         </MenuItem>
       </Menu>
+      {appearanceOpen ? (
+        <Suspense fallback={null}>
+          <AppearanceSettingsDialog
+            open
+            onClose={() => setAppearanceOpen(false)}
+          />
+        </Suspense>
+      ) : null}
     </Fragment>
   );
 }

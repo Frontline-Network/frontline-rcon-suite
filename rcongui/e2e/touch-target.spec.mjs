@@ -99,11 +99,10 @@ for (const [name, viewport] of [
     await openDemoPage(page, "/views/live");
 
     for (const [label, accessibleName] of [
-      [`${name} split-layout control`, "Geteilt"],
-      [`${name} player-layout control`, "Spieler"],
-      [`${name} log-layout control`, "Live-Protokoll"],
+      [`${name} operations tab`, "Einsatz"],
+      [`${name} event-log tab`, "Protokoll"],
     ]) {
-      const control = page.getByRole("button", {
+      const control = page.getByRole("tab", {
         name: accessibleName,
         exact: true,
       });

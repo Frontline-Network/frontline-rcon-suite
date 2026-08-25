@@ -4,6 +4,7 @@ import {
   Collapse,
   Divider,
   IconButton,
+  LinearProgress,
   List,
   ListItem,
   ListItemText,
@@ -293,7 +294,16 @@ function LogsTable({
         bgcolor: "background.paper",
         display: "flex",
         flexDirection: "column",
+        fontWeight: 300,
         minWidth: 0,
+        position: "relative",
+        // Keep the complete live protocol typographically calm and uniform.
+        // Several event renderers and MUI controls otherwise reintroduce
+        // medium or bold labels of their own.
+        "& .MuiTypography-root, & .MuiButton-root, & .MuiToggleButton-root, & .MuiInputBase-input, & .MuiFormLabel-root, & .MuiFormControlLabel-label, & .MuiListItemText-root, & button, & a, & span":
+          {
+            fontWeight: "300 !important",
+          },
         ...(viewportSticky
           ? {
               boxSizing: "border-box",
@@ -312,6 +322,16 @@ function LogsTable({
           : {}),
       })}
     >
+      {isFetching ? (
+        <LinearProgress
+          sx={{
+            position: "absolute",
+            inset: "0 0 auto",
+            zIndex: 9,
+            height: 2,
+          }}
+        />
+      ) : null}
       <Stack
         direction="row"
         alignItems="center"
@@ -481,8 +501,7 @@ function LogsTable({
       >
         <CompactLogsList
           table={table}
-          isFetching={isFetching}
-          isExpanded={isExpanded}
+          rows={table.getRowModel().rows}
           scrollable={viewportSticky}
         />
         <TableToolbar

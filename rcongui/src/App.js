@@ -40,7 +40,9 @@ const App = () => {
     driver: [localforage.INDEXEDDB, localforage.LOCALSTORAGE], // Preferred storage drivers in order
   });
 
-  const colorScheme = useAppStore((state) => state.colorScheme);
+  const appearance = useAppStore(
+    (state) => state.appearancePreview || state.appearance
+  );
 
   return (
     <StrictMode>
@@ -53,7 +55,7 @@ const App = () => {
               .localeText
           }
         >
-          <AppTheme selectedScheme={colorScheme}>
+          <AppTheme appearance={appearance}>
             <CssBaseline enableColorScheme />
             <RouterProvider router={adminRouter} />
             {import.meta.env.MODE !== "fake" ? (
