@@ -701,6 +701,7 @@ const de = {
       name: "Zur Sperrliste hinzufügen",
       compact: "Bannen",
       description: "Fügt den Spieler einer Sperrliste hinzu.",
+      confirm: "Zur Sperrliste hinzufügen",
     },
     addFlag: {
       name: "Markierung hinzufügen",
@@ -1260,7 +1261,7 @@ const de = {
       channelRolesHelp:
         "Wähle den gemeinsamen Report-Kanal und mindestens eine aktuelle Discord-Moderatorrolle aus.",
       actionSafety:
-        "Der erste Moderator, der eine Report-Aktion auswählt, übernimmt den Report. Permanent-Ban, Blacklist und Squad-Auflösung bleiben durch Grund, Vorschau und zweite Bestätigung geschützt.",
+        "Der erste Moderator, der eine Report-Aktion auswählt, übernimmt den Report. Permanent-Ban und Squad-Auflösung bleiben durch Grund, Vorschau und zweite Bestätigung geschützt; einzelne Sperrlisteneinträge werden direkt aus dem vollständig geprüften Formular ausgeführt.",
       testHelp:
         "Sende eine Testmeldung und prüfe Dienst, Discord-Zuordnung sowie den Callback oder zentralen Broker.",
       activateHelp:

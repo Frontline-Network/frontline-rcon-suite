@@ -96,6 +96,16 @@ export const ActionDialog = () => {
     submitRef.current?.click();
   };
 
+  const handleSuccess = (nextSuccess) => {
+    setSuccess(nextSuccess);
+    if (nextSuccess) {
+      // A completed request must never keep the destructive-action review
+      // warning visible. Success is a terminal dialog state.
+      setError(null);
+      setConfirmationStep(false);
+    }
+  };
+
   useEffect(() => {
     setConfirmationStep(false);
     setRecipientCount(recipients?.length ?? 0);
@@ -108,7 +118,7 @@ export const ActionDialog = () => {
   const actionHandlers = {
     submitRef,
     setError,
-    setSuccess,
+    setSuccess: handleSuccess,
     setLoading,
     closeDialog: handleClose,
   };
@@ -117,48 +127,55 @@ export const ActionDialog = () => {
 
   const content = (
     <>
-      {error ? <ClientError error={error} /> : null}
       {success ? (
-        <Alert severity="success" sx={{ mb: 1 }}>
+        <Alert
+          id="player-action-dialog-description"
+          severity="success"
+          sx={{ mb: 1 }}
+        >
           <AlertTitle>{t("common.success")}</AlertTitle>
           {t("actions.actionSucceeded")}
         </Alert>
-      ) : null}
-      {action.deprecated ? (
-        <Alert severity="warning" sx={{ mb: 1 }}>
-          <AlertTitle>{t("actions.deprecated")}</AlertTitle>
-          {t("actions.deprecatedNote")}
-        </Alert>
-      ) : null}
-      {confirmationStep ? (
-        <Alert severity={isCritical ? "error" : "warning"} sx={{ mb: 1.5 }}>
-          <AlertTitle>
-            {t("actions.secondConfirmationTitle", {
-              defaultValue: "Aktion nochmals prüfen",
-            })}
-          </AlertTitle>
-          {t("actions.secondConfirmationBody", {
-            count: recipientCount,
-            defaultValue:
-              "Diese Aktion wirkt unmittelbar. Prüfe Ziel und Angaben, bevor du sie endgültig ausführst.",
-          })}
-        </Alert>
-      ) : null}
-      <Typography
-        id="player-action-dialog-description"
-        variant="subtitle1"
-        sx={{ mb: 1 }}
-      >
-        {action.translationKey
-          ? t(`${action.translationKey}.description`)
-          : action.description}
-      </Typography>
-      <ActionForm
-        actionHandlers={actionHandlers}
-        locked={confirmationStep}
-        onRecipientCountChange={setRecipientCount}
-        state={state}
-      />
+      ) : (
+        <>
+          {error ? <ClientError error={error} /> : null}
+          {action.deprecated ? (
+            <Alert severity="warning" sx={{ mb: 1 }}>
+              <AlertTitle>{t("actions.deprecated")}</AlertTitle>
+              {t("actions.deprecatedNote")}
+            </Alert>
+          ) : null}
+          {confirmationStep ? (
+            <Alert severity={isCritical ? "error" : "warning"} sx={{ mb: 1.5 }}>
+              <AlertTitle>
+                {t("actions.secondConfirmationTitle", {
+                  defaultValue: "Aktion nochmals prüfen",
+                })}
+              </AlertTitle>
+              {t("actions.secondConfirmationBody", {
+                count: recipientCount,
+                defaultValue:
+                  "Diese Aktion wirkt unmittelbar. Prüfe Ziel und Angaben, bevor du sie endgültig ausführst.",
+              })}
+            </Alert>
+          ) : null}
+          <Typography
+            id="player-action-dialog-description"
+            variant="subtitle1"
+            sx={{ mb: 1 }}
+          >
+            {action.translationKey
+              ? t(`${action.translationKey}.description`)
+              : action.description}
+          </Typography>
+          <ActionForm
+            actionHandlers={actionHandlers}
+            locked={confirmationStep}
+            onRecipientCountChange={setRecipientCount}
+            state={state}
+          />
+        </>
+      )}
     </>
   );
 
@@ -173,48 +190,62 @@ export const ActionDialog = () => {
         flexWrap: "wrap",
         justifyContent: "flex-end",
         p: 1.25,
-        pb: compact
-          ? "calc(10px + env(safe-area-inset-bottom))"
-          : 1.25,
+        pb: compact ? "calc(10px + env(safe-area-inset-bottom))" : 1.25,
         position: compact ? "sticky" : "static",
         bottom: 0,
         zIndex: 1,
       }}
     >
-      <Button
-        ref={cancelRef}
-        variant="outlined"
-        color="secondary"
-        onClick={() => {
-          if (confirmationStep) {
-            setConfirmationStep(false);
-            return;
-          }
-          handleClose();
-        }}
-        sx={{ flex: { xs: "1 1 100%", sm: "0 0 auto" }, minHeight: 44 }}
-      >
-        {confirmationStep
-          ? t("common.back", { defaultValue: "Zurück" })
-          : t("common.cancel")}
-      </Button>
-      <Button
-        variant={confirmationStep ? "contained" : "outlined"}
-        color={isCritical ? "error" : "primary"}
-        disabled={loading || success || !recipients}
-        onClick={handleConfirm}
-        sx={{ flex: { xs: "1 1 100%", sm: "0 0 auto" }, minHeight: 44 }}
-      >
-        {loading
-          ? t("common.processing")
-          : confirmationStep
-            ? t("actions.executeFinally", {
-                defaultValue: "Endgültig ausführen",
-              })
-            : needsSecondConfirmation
+      {success ? (
+        <Button
+          ref={cancelRef}
+          variant="contained"
+          color="primary"
+          onClick={handleClose}
+          sx={{ flex: { xs: "1 1 100%", sm: "0 0 auto" }, minHeight: 44 }}
+        >
+          {t("common.close")}
+        </Button>
+      ) : (
+        <>
+          <Button
+            ref={cancelRef}
+            variant="outlined"
+            color="secondary"
+            onClick={() => {
+              if (confirmationStep) {
+                setConfirmationStep(false);
+                return;
+              }
+              handleClose();
+            }}
+            sx={{ flex: { xs: "1 1 100%", sm: "0 0 auto" }, minHeight: 44 }}
+          >
+            {confirmationStep
+              ? t("common.back", { defaultValue: "Zurück" })
+              : t("common.cancel")}
+          </Button>
+          <Button
+            variant={confirmationStep ? "contained" : "outlined"}
+            color={isCritical ? "error" : "primary"}
+            disabled={loading || !recipients}
+            onClick={handleConfirm}
+            sx={{ flex: { xs: "1 1 100%", sm: "0 0 auto" }, minHeight: 44 }}
+          >
+            {loading
+              ? t("common.processing")
+              : confirmationStep
+              ? t("actions.executeFinally", {
+                  defaultValue: "Endgültig ausführen",
+                })
+              : needsSecondConfirmation
               ? t("common.continue", { defaultValue: "Weiter" })
+              : action.submitLabelKey
+              ? t(action.submitLabelKey)
               : t("common.confirm")}
-      </Button>
+          </Button>
+        </>
+      )}
     </Stack>
   );
 
