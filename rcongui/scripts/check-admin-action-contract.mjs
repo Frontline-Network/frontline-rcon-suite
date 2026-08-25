@@ -83,13 +83,29 @@ for (const command of new Set(executionCommands)) {
 assert.equal(normalizeAdminActionGame("vietnam"), "hllv");
 assert.equal(normalizeAdminActionGame("unknown"), null);
 
-for (const command of ["perma_ban", "add_blacklist_record", "add_admin"]) {
+for (const command of ["perma_ban", "add_admin"]) {
   assert.equal(
     getAdminActionContract(command).confirmation,
     ADMIN_ACTION_CONFIRMATION.SECOND,
     `${command} must require a second confirmation`
   );
 }
+
+assert.equal(
+  getAdminActionContract("add_blacklist_record").confirmation,
+  ADMIN_ACTION_CONFIRMATION.REVIEW,
+  "A reversible single-player blacklist entry should execute from its reviewed form"
+);
+assert.equal(
+  requiresSecondConfirmation(getAdminActionContract("add_blacklist_record"), 1),
+  false,
+  "A single blacklist target must not require a redundant second confirmation"
+);
+assert.equal(
+  requiresSecondConfirmation(getAdminActionContract("add_blacklist_record"), 2),
+  true,
+  "Bulk blacklist actions retain the stronger confirmation path"
+);
 
 assert.equal(
   requiresSecondConfirmation(getAdminActionContract("kick"), 1),

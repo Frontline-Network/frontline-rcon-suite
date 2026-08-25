@@ -143,7 +143,6 @@ export const ADMIN_ACTION_CONTRACTS = Object.freeze({
     risk: ADMIN_ACTION_RISK.CRITICAL,
     reversibility: ADMIN_ACTION_REVERSIBILITY.REVERSIBLE,
     scope: ADMIN_ACTION_SCOPE.BLACKLIST,
-    confirmation: ADMIN_ACTION_CONFIRMATION.SECOND,
     reviewFields: ["blacklist", "reason", "expiration", "scope"],
   }),
   flag_player: contract({

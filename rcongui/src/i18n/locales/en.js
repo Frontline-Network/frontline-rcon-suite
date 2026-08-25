@@ -682,6 +682,7 @@ const en = {
       name: "Add to blacklist",
       compact: "Ban",
       description: "Adds the player to a blacklist.",
+      confirm: "Add to blacklist",
     },
     addFlag: { name: "Add flag", description: "Assigns a flag to the player." },
     removeFlags: {
@@ -1217,7 +1218,7 @@ const en = {
       channelRolesHelp:
         "Select the shared report channel and at least one current Discord moderator role.",
       actionSafety:
-        "The first moderator to select a report action claims the report. Permanent bans, blacklists, and squad disbands remain protected by a reason, preview, and second confirmation.",
+        "The first moderator to select a report action claims the report. Permanent bans and squad disbands remain protected by a reason, preview, and second confirmation; single blacklist entries execute directly from the fully reviewed form.",
       testHelp:
         "Send a test message and verify the service, Discord binding, and callback or central broker.",
       activateHelp:

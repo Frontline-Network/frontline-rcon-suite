@@ -213,6 +213,7 @@ export const permaBanAction = {
 export const blacklistAction = {
   safety: getAdminActionContract("add_blacklist_record"),
   translationKey: "actions.blacklist",
+  submitLabelKey: "actions.blacklist.confirm",
   name: "Add Blacklist",
   description: "Add player to a blacklist.",
   component: BlacklistPlayerFormFields,
