@@ -59,7 +59,7 @@ test.describe("connection state contract", () => {
 
     const status = page.getByTestId("global-match-status");
     await expect(status).toHaveAttribute("data-connection-state", "partial");
-    await expect(status.getByText("86/100", { exact: true })).toBeVisible();
+    await expect(status.getByText("98/100", { exact: true })).toBeVisible();
     await expect(
       status.getByText("Foy · Warfare · Nacht · Daten veraltet", {
         exact: true,

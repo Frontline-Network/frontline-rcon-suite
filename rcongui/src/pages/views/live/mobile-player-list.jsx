@@ -72,6 +72,7 @@ const PlayerStatus = ({ player }) => {
   if (items.length === 0) {
     return (
       <Typography
+        role="img"
         aria-label={t("views.live.noSpecialStatus")}
         color="text.disabled"
         variant="caption"
@@ -144,7 +145,13 @@ const PlayerActionSheet = ({ player, onClose, onOpenProfile }) => {
       })}
     >
       {player ? (
-        <Box sx={{ display: "flex", flexDirection: "column", maxHeight: "inherit" }}>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            maxHeight: "inherit",
+          }}
+        >
           <Stack
             direction="row"
             alignItems="center"
@@ -279,7 +286,11 @@ export default function MobilePlayerList({ table, isFetching, onOpenProfile }) {
             size="small"
             sx={{ minHeight: 44, minWidth: 44 }}
           />
-          <Typography color="text.secondary" sx={{ flexGrow: 1 }} variant="caption">
+          <Typography
+            color="text.secondary"
+            sx={{ flexGrow: 1 }}
+            variant="caption"
+          >
             {t("views.table.name")}
           </Typography>
           <Typography color="text.secondary" variant="caption">

@@ -175,9 +175,26 @@ const PlayerName = ({ id, name, team, teamLabel }) => {
           variant="body2"
           fontWeight={700}
           color={color}
-          aria-label={accessibleLabel}
         >
           {label}
+          {teamLabel ? (
+            <Box
+              component="span"
+              sx={{
+                border: 0,
+                clip: "rect(0 0 0 0)",
+                height: 1,
+                margin: -1,
+                overflow: "hidden",
+                p: 0,
+                position: "absolute",
+                whiteSpace: "nowrap",
+                width: 1,
+              }}
+            >
+              {` · ${teamLabel}`}
+            </Box>
+          ) : null}
         </Typography>
       </Tooltip>
     );
@@ -237,6 +254,7 @@ const CombatEvent = ({ event, weapon, teams, t }) => (
       <Tooltip title={weapon} arrow>
         <Box
           component="span"
+          role="img"
           tabIndex={0}
           aria-label={weapon}
           sx={{

@@ -134,6 +134,7 @@ const TeamkillRisk = ({ value, t, compact = false }) => {
       }
     >
       <Box
+        role="img"
         aria-label={description}
         sx={{
           alignItems: "center",
@@ -351,6 +352,7 @@ export const getColumns = (t, factionByTeam = {}) => [
             <Tooltip key={item.key} arrow title={item.label}>
               <Box
                 component="span"
+                role="img"
                 aria-label={item.label}
                 sx={{
                   alignItems: "center",

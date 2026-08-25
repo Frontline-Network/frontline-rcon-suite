@@ -255,7 +255,7 @@ const PlayersTable = ({
           value={preset}
           onChange={(event) => onPresetChange(event.target.value)}
           size="small"
-          aria-label={t("views.live.columnPreset")}
+          inputProps={{ "aria-label": t("views.live.columnPreset") }}
           sx={{ display: { xs: "none", md: "inline-flex" }, minWidth: 150 }}
         >
           <MenuItem value="operations">
