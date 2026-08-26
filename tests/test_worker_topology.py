@@ -18,6 +18,9 @@ class ComposeLoader(yaml.SafeLoader):
 ComposeLoader.add_constructor(
     "!reset", lambda loader, node: loader.construct_sequence(node)
 )
+ComposeLoader.add_constructor(
+    "!override", lambda loader, node: loader.construct_sequence(node)
+)
 
 
 def _load_compose(filename):
