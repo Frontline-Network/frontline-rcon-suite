@@ -1,15 +1,11 @@
 import {
   AssessmentOutlined,
   GroupsRounded,
-  MapRounded,
   TableChartOutlined,
-  TimerOutlined,
-  WifiRounded,
 } from "@mui/icons-material";
 import {
   Box,
   ButtonBase,
-  Stack,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
@@ -18,38 +14,7 @@ import {
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
 
-const Metric = ({ icon, label, value }) => (
-  <Stack
-    direction="row"
-    alignItems="center"
-    spacing={0.75}
-    sx={{ minWidth: 0, whiteSpace: "nowrap" }}
-  >
-    <Box sx={{ color: "primary.main", display: "grid", placeItems: "center" }}>
-      {icon}
-    </Box>
-    <Box sx={{ minWidth: 0 }}>
-      <Typography
-        variant="caption"
-        sx={{
-          color: "text.secondary",
-          display: { xs: "none", xl: "block" },
-          lineHeight: 1,
-        }}
-      >
-        {label}
-      </Typography>
-      <Typography variant="subtitle2" noWrap sx={{ lineHeight: 1.25 }}>
-        {value}
-      </Typography>
-    </Box>
-  </Stack>
-);
-
 export const LiveCommandBar = ({
-  gameData,
-  playerCount,
-  isFetching,
   layoutMode,
   onLayoutModeChange,
   splitDisabled,
@@ -57,8 +22,6 @@ export const LiveCommandBar = ({
   const { t } = useTranslation();
   const theme = useTheme();
   const isCompact = useMediaQuery(theme.breakpoints.down("md"));
-  const mapName = gameData?.current_map?.pretty_name ?? "–";
-  const timeRemaining = gameData?.raw_time_remaining ?? "--:--:--";
 
   return (
     <Box
@@ -70,73 +33,14 @@ export const LiveCommandBar = ({
         mb: 1,
       })}
     >
-      <Stack
-        direction={{ xs: "column", md: "row" }}
-        alignItems={{ xs: "stretch", md: "center" }}
-        justifyContent="space-between"
-        gap={1}
-        sx={{
-          display: { xs: "none", md: "flex" },
-          px: { xs: 1, md: 1.5 },
-          py: 1,
-        }}
-      >
-        <Typography variant="h6" sx={{ whiteSpace: "nowrap" }}>
-          {t("views.live.title")}
-        </Typography>
-
-        <Stack
-          direction="row"
-          alignItems="center"
-          spacing={{ xs: 1.25, lg: 2.25 }}
-          sx={{ minWidth: 0, overflowX: "auto", scrollbarWidth: "thin" }}
-        >
-          <Metric
-            icon={<GroupsRounded sx={{ fontSize: "1rem" }} />}
-            label={t("views.live.players")}
-            value={`${playerCount}/100`}
-          />
-          <Metric
-            icon={<MapRounded sx={{ fontSize: "1rem" }} />}
-            label={t("views.live.currentMap")}
-            value={mapName}
-          />
-          <Metric
-            icon={<TimerOutlined sx={{ fontSize: "1rem" }} />}
-            label={t("views.live.remainingTime")}
-            value={timeRemaining}
-          />
-          <Stack
-            direction="row"
-            alignItems="center"
-            spacing={0.5}
-            sx={{ whiteSpace: "nowrap" }}
-          >
-            <WifiRounded
-              sx={{
-                color: isFetching ? "warning.main" : "success.main",
-                fontSize: "1rem",
-              }}
-            />
-            <Typography
-              variant="caption"
-              sx={{ color: isFetching ? "warning.light" : "success.light" }}
-            >
-              {isFetching ? t("views.live.updating") : t("views.live.liveNow")}
-            </Typography>
-          </Stack>
-        </Stack>
-      </Stack>
-
       {isCompact ? (
         <Box
           role="tablist"
           aria-label={t("views.live.layout")}
-          sx={(theme) => ({
-            borderTop: `1px solid ${theme.palette.divider}`,
+          sx={{
             display: "grid",
             gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-          })}
+          }}
         >
           <ButtonBase
             role="tab"
@@ -193,7 +97,6 @@ export const LiveCommandBar = ({
           aria-label={t("views.live.layout")}
           size="small"
           sx={(theme) => ({
-            borderTop: `1px solid ${theme.palette.divider}`,
             display: "flex",
             px: 1,
             py: 0.75,
