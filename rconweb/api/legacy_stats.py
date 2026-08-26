@@ -12,7 +12,6 @@ import os
 
 from django.core.cache import cache
 from django.views.decorators.csrf import csrf_exempt
-from django_ratelimit.decorators import ratelimit
 
 from .auth import api_response
 from .decorators import require_http_methods
@@ -20,7 +19,6 @@ from .ratelimits import request_rate_limit_key
 
 logger = logging.getLogger("rconweb")
 
-LEGACY_STATS_RATE_LIMIT = "6/m"
 LEGACY_STATS_SAMPLE_SECONDS = max(
     60, int(os.getenv("HLL_LEGACY_STATS_SAMPLE_SECONDS", "3600"))
 )
@@ -89,12 +87,6 @@ def _deprecated_stats_response(request, endpoint: str):
 
 
 @csrf_exempt
-@ratelimit(
-    group="legacy-stats-endpoints",
-    key=request_rate_limit_key,
-    rate=LEGACY_STATS_RATE_LIMIT,
-    block=True,
-)
 @require_http_methods(["GET"])
 def get_player_list(request):
     """Retired: migrate clients to ``get_detailed_players``."""
@@ -103,12 +95,6 @@ def get_player_list(request):
 
 
 @csrf_exempt
-@ratelimit(
-    group="legacy-stats-endpoints",
-    key=request_rate_limit_key,
-    rate=LEGACY_STATS_RATE_LIMIT,
-    block=True,
-)
 @require_http_methods(["GET"])
 def get_scoreboard(request):
     """Retired: migrate clients to ``get_live_scoreboard``."""
