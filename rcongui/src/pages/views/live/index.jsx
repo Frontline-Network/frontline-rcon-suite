@@ -115,25 +115,10 @@ const getPresetVisibility = (preset, customVisibility) => {
   }, {});
 };
 
-export const loader = async () => {
-  if (import.meta.env.MODE === "fake") {
-    return {
-      initialLogsView: {
-        result: { actions: [], players: [], logs: [] },
-      },
-    };
-  }
-  const response = await cmd.GET_LIVE_LOGS({
-    payload: {
-      end: 250,
-      filter_action: [],
-      filter_player: [],
-      inclusive_filter: true,
-    },
-  });
-
-  return { initialLogsView: response };
-};
+// Keep route navigation immediate. React Query owns the single log request and
+// renders the existing loading state instead of blocking navigation and then
+// immediately repeating the request with the user's persisted filters.
+export const loader = () => ({ initialLogsView: undefined });
 
 const Live = () => {
   const { t } = useTranslation();
