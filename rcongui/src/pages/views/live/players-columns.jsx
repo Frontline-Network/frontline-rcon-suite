@@ -1,6 +1,7 @@
 import {
   Box,
   Checkbox,
+  IconButton,
   Stack,
   styled,
   Tooltip,
@@ -10,8 +11,6 @@ import { ErrorOutline, Star, Warning } from "@mui/icons-material";
 import { yellow } from "@mui/material/colors";
 import { alpha } from "@mui/material/styles";
 import dayjs from "dayjs";
-import { ActionMenuButton } from "@/features/player-action/ActionMenu";
-import { generatePlayerActions } from "@/features/player-action/actions";
 import { CountryFlag } from "@/components/shared/CountryFlag";
 import {
   getPlayerTier,
@@ -35,6 +34,7 @@ import {
 import { getTeamkillRisk } from "@/utils/teamkill-risk.mjs";
 import { getFactionIconSrc } from "@/utils/factionIcons";
 import { formatSquadLabel } from "./player-display-labels";
+import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 
 export const Square = styled(Box)(({ theme }) => ({
   display: "flex",
@@ -75,11 +75,6 @@ const Center = styled(Box)(() => ({
 
 const iconFontSize = "1em";
 const emojiFontSize = "0.85em";
-const onlinePlayerActions = generatePlayerActions({
-  multiAction: false,
-  onlineAction: true,
-});
-
 const getBanDetailText = (t, detail) => {
   if (detail.scope === "direct" && detail.type === "gameServer") {
     return t("views.table.activeBanDirect");
@@ -580,19 +575,34 @@ export const getColumns = (t, factionByTeam = {}) => [
     id: "actions",
     header: SortableHeader("ACT", t("common.actions")),
     accessorKey: "actions",
-    cell: ({ row }) => {
+    cell: ({ row, table }) => {
+      const isOpen =
+        table.options.meta?.activePlayerActionId === row.original.player_id;
       return (
-        <ActionMenuButton
-          actions={onlinePlayerActions}
-          recipients={row.original}
-          orientation="horizontal"
-          disableRipple={true}
-          sx={{
-            width: "1em",
-            height: "1em",
-            fontSize: "1em",
-          }}
-        />
+        <Tooltip title={t("actions.menu")}>
+          <IconButton
+            aria-controls={isOpen ? "live-player-row-actions-menu" : undefined}
+            aria-expanded={isOpen ? "true" : undefined}
+            aria-haspopup="true"
+            aria-label={t("actions.menu")}
+            data-player-name={row.original.name}
+            data-testid="live-player-row-actions-trigger"
+            disableRipple
+            onClick={(event) =>
+              table.options.meta?.openPlayerActionMenu?.(
+                event.currentTarget,
+                row.original
+              )
+            }
+            sx={{
+              width: "1em",
+              height: "1em",
+              fontSize: "1em",
+            }}
+          >
+            <MoreHorizIcon fontSize="inherit" />
+          </IconButton>
+        </Tooltip>
       );
     },
     meta: {
