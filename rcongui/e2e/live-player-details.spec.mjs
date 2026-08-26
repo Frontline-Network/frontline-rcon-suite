@@ -84,6 +84,12 @@ test.describe("live player density and details", () => {
     const triggers = panel.getByTestId("live-player-row-actions-trigger");
     await expect.poll(() => triggers.count()).toBeGreaterThan(1);
 
+    const firstPlayerName = await triggers.nth(0).getAttribute("data-player-name");
+    const secondPlayerName = await triggers.nth(1).getAttribute("data-player-name");
+    expect(firstPlayerName).toBeTruthy();
+    expect(secondPlayerName).toBeTruthy();
+    expect(secondPlayerName).not.toBe(firstPlayerName);
+
     await triggers.nth(0).click();
     const firstMenu = page.getByRole("menu");
     await expect(firstMenu).toBeVisible();
@@ -91,7 +97,9 @@ test.describe("live player density and details", () => {
 
     const firstDialog = page.getByRole("dialog", { name: "Nachricht senden" });
     await expect(firstDialog).toBeVisible();
-    await expect(firstDialog.getByText("FLN_Raven", { exact: true })).toBeVisible();
+    await expect(
+      firstDialog.getByText(firstPlayerName, { exact: true })
+    ).toBeVisible();
     await firstDialog.getByRole("button", { name: "Schließen" }).click();
     await expect(firstDialog).toHaveCount(0);
 
@@ -102,8 +110,12 @@ test.describe("live player density and details", () => {
       .click();
 
     const secondDialog = page.getByRole("dialog", { name: "Nachricht senden" });
-    await expect(secondDialog.getByText("FLN_Wolf", { exact: true })).toBeVisible();
-    await expect(secondDialog.getByText("FLN_Raven", { exact: true })).toHaveCount(0);
+    await expect(
+      secondDialog.getByText(secondPlayerName, { exact: true })
+    ).toBeVisible();
+    await expect(
+      secondDialog.getByText(firstPlayerName, { exact: true })
+    ).toHaveCount(0);
   });
 
   test("keeps the expanded inspector usable at tablet width", async ({

@@ -585,6 +585,7 @@ export const getColumns = (t, factionByTeam = {}) => [
             aria-expanded={isOpen ? "true" : undefined}
             aria-haspopup="true"
             aria-label={t("actions.menu")}
+            data-player-name={row.original.name}
             data-testid="live-player-row-actions-trigger"
             disableRipple
             onClick={(event) =>
