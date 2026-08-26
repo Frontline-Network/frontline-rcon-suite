@@ -48,6 +48,16 @@ def _measure(name: str, loader: Callable, player_ids: list[str]) -> dict:
     payload_bytes = len(
         json.dumps(profiles, default=str, separators=(",", ":")).encode("utf-8")
     )
+    field_payload_bytes = {
+        field: len(
+            json.dumps(
+                [profile.get(field) for profile in profiles],
+                default=str,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        )
+        for field in sorted({field for profile in profiles for field in profile})
+    }
     return {
         "name": name,
         "players": len(player_ids),
@@ -55,6 +65,7 @@ def _measure(name: str, loader: Callable, player_ids: list[str]) -> dict:
         "queries": query_count,
         "duration_ms": round(duration_ms, 1),
         "payload_bytes": payload_bytes,
+        "field_payload_bytes": field_payload_bytes,
     }
 
 
