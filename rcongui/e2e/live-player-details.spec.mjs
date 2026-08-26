@@ -75,6 +75,37 @@ test.describe("live player density and details", () => {
     await expect(panel.getByTestId("live-player-detail-panel")).toHaveCount(0);
   });
 
+  test("routes every row trigger through one shared action menu", async ({
+    page,
+  }) => {
+    await openDemoPage(page, "/views/live");
+
+    const panel = page.getByTestId("live-players-panel");
+    const triggers = panel.getByTestId("live-player-row-actions-trigger");
+    await expect(triggers).toHaveCount(6);
+
+    await triggers.nth(0).click();
+    const firstMenu = page.getByRole("menu");
+    await expect(firstMenu).toBeVisible();
+    await firstMenu.getByRole("menuitem", { name: "Nachricht senden" }).click();
+
+    const firstDialog = page.getByRole("dialog", { name: "Nachricht senden" });
+    await expect(firstDialog).toBeVisible();
+    await expect(firstDialog.getByText("FLN_Raven", { exact: true })).toBeVisible();
+    await firstDialog.getByRole("button", { name: "Schließen" }).click();
+    await expect(firstDialog).toHaveCount(0);
+
+    await triggers.nth(1).click();
+    const secondMenu = page.getByRole("menu");
+    await secondMenu
+      .getByRole("menuitem", { name: "Nachricht senden" })
+      .click();
+
+    const secondDialog = page.getByRole("dialog", { name: "Nachricht senden" });
+    await expect(secondDialog.getByText("FLN_Wolf", { exact: true })).toBeVisible();
+    await expect(secondDialog.getByText("FLN_Raven", { exact: true })).toHaveCount(0);
+  });
+
   test("keeps the expanded inspector usable at tablet width", async ({
     page,
   }) => {

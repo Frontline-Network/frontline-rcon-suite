@@ -14,6 +14,14 @@ const actionSource = await readFile(
   new URL("../src/features/player-action/actions.js", import.meta.url),
   "utf8"
 );
+const livePageSource = await readFile(
+  new URL("../src/pages/views/live/index.jsx", import.meta.url),
+  "utf8"
+);
+const livePlayerColumnsSource = await readFile(
+  new URL("../src/pages/views/live/players-columns.jsx", import.meta.url),
+  "utf8"
+);
 
 const matches = (pattern) =>
   [...actionSource.matchAll(pattern)].map((match) => match[1]);
@@ -127,6 +135,22 @@ assert.deepEqual(
   "Contracts must not drift away from the generic action catalogue"
 );
 
+assert.doesNotMatch(
+  livePlayerColumnsSource,
+  /ActionMenuButton/,
+  "Live player rows must not mount a complete action menu per player"
+);
+assert.match(
+  livePlayerColumnsSource,
+  /table\.options\.meta\?\.openPlayerActionMenu/,
+  "Live player row triggers must delegate to the shared action menu"
+);
+assert.equal(
+  [...livePageSource.matchAll(/<ActionMenu\b/g)].length,
+  1,
+  "The live desktop roster must mount exactly one shared row action menu"
+);
+
 console.log(
-  `Validated ${executionCommands.length} action definitions across ${referencedCommands.size} commands.`
+  `Validated ${executionCommands.length} action definitions across ${referencedCommands.size} commands and one shared live-player action menu.`
 );

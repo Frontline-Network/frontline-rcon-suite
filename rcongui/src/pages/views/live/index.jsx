@@ -1,4 +1,11 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { cmd } from "@/utils/fetchUtils";
 import { getColumns as getPlayersColumns } from "./players-columns";
 import { extractPlayers, extractTeamState } from "@/utils/extractPlayers";
@@ -32,10 +39,16 @@ import { useTranslation } from "react-i18next";
 import { getActiveBanStatus } from "./active-ban";
 import { useGlobalStore } from "@/stores/global-state";
 import { LiveCommandBar } from "./live-workspace";
+import { ActionMenu } from "@/features/player-action/ActionMenu";
+import { generatePlayerActions } from "@/features/player-action/actions";
 
 const interval = 15 * 1000;
 const UNASSIGNED = "unassigned";
 const SPLIT_MIN_CONTENT_WIDTH = 1120;
+const ONLINE_PLAYER_ACTIONS = generatePlayerActions({
+  multiAction: false,
+  onlineAction: true,
+});
 
 const PLAYER_COLUMN_IDS = [
   "select",
@@ -200,6 +213,16 @@ const Live = () => {
   // the player or log focus remains possible for the current page session.
   const [layoutMode, setLayoutMode] = useState("split");
   const [playerPreset, setPlayerPreset] = useState("operations");
+  const [playerActionMenu, setPlayerActionMenu] = useState({
+    anchorEl: null,
+    player: null,
+  });
+  const openPlayerActionMenu = useCallback((anchorEl, player) => {
+    setPlayerActionMenu({ anchorEl, player });
+  }, []);
+  const setPlayerActionMenuAnchor = useCallback((anchorEl) => {
+    setPlayerActionMenu((current) => ({ ...current, anchorEl }));
+  }, []);
 
   useLayoutEffect(() => {
     const workspace = workspaceRef.current;
@@ -351,6 +374,12 @@ const Live = () => {
       setPlayersTableConfig((prev) => ({ ...prev, columnVisibility: next }));
     },
     getRowId: (row) => row.player_id,
+    meta: {
+      openPlayerActionMenu,
+      activePlayerActionId: playerActionMenu.anchorEl
+        ? playerActionMenu.player?.player_id
+        : null,
+    },
     state: {
       sorting: playersSorting,
       rowSelection: playersRowSelection,
@@ -525,6 +554,16 @@ const Live = () => {
           </Box>
         ) : null}
       </Box>
+
+      {playerActionMenu.player ? (
+        <ActionMenu
+          actions={ONLINE_PLAYER_ACTIONS}
+          recipients={playerActionMenu.player}
+          anchorEl={playerActionMenu.anchorEl}
+          setAnchorEl={setPlayerActionMenuAnchor}
+          menuId="live-player-row-actions-menu"
+        />
+      ) : null}
     </Box>
   );
 };
