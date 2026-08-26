@@ -800,6 +800,25 @@ class PlayerProfileType(BasicPlayerProfileType):
     account: PlayerAccountType
 
 
+class LivePlayerProfileType(TypedDict):
+    """Bounded profile data embedded in live roster responses."""
+
+    id: int
+    player_id: str
+    steam_id: str | None
+    created: datetime.datetime
+    sessions_count: int
+    current_playtime_seconds: int
+    received_actions: list[PlayerActionType]
+    blacklists: list[BlacklistRecordWithBlacklistType]
+    is_blacklisted: bool
+    flags: list[PlayerFlagType]
+    watchlist: Optional[WatchListType]
+    is_watched: bool
+    steaminfo: Optional[SteamInfoType]
+    soldier: Optional[PlayerSoldierType]
+
+
 class PlayerProfileTypeEnriched(PlayerProfileType):
     bans: list[GameServerBanType]
     comments: list[PlayerCommentType]
@@ -808,7 +827,7 @@ class PlayerProfileTypeEnriched(PlayerProfileType):
 class GetDetailedPlayer(TypedDict):
     name: str
     player_id: str
-    profile: PlayerProfileType | None
+    profile: PlayerProfileType | LivePlayerProfileType | None
     is_vip: bool
     unit_id: Optional[int]
     unit_name: Optional[str]
@@ -846,7 +865,7 @@ class GetPlayersType(TypedDict):
     country: str | None
     steam_bans: Optional[SteamBansType]
     is_vip: bool
-    profile: PlayerProfileType | None
+    profile: PlayerProfileType | LivePlayerProfileType | None
 
 
 class StructuredLogLineType(TypedDict):
@@ -908,7 +927,6 @@ class GameStateType(TypedDict):
     max_vip_queue_count: int
     match_time: int
     server_name: str
-
 
 
 class VACGameBansConfigType(TypedDict):
