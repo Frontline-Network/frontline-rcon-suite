@@ -1,13 +1,12 @@
-# Add this override and activate the combined-workers profile to replace the
-# three standalone delivery processes with one shared Python/Django runtime:
-# docker compose --profile combined-workers -f compose.yaml \
-#   -f compose.mobile-admin.yaml -f compose.combined-workers.yaml up -d
+# Worker topology contract used by scripts/deploy_frontline.sh. Combined mode
+# activates only frontline_background_worker; split mode activates the three
+# standalone delivery services. Never activate both worker profiles together.
 services:
   mobile_push_worker:
-    profiles: ["split-background-workers"]
+    profiles: !override ["split-background-workers"]
 
   discord_report_worker:
-    profiles: ["split-background-workers"]
+    profiles: !override ["split-background-workers"]
 
   discord_moderation_worker:
-    profiles: ["split-background-workers"]
+    profiles: !override ["split-background-workers"]
