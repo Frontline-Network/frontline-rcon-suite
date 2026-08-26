@@ -411,6 +411,52 @@ cross-server queries, and the `unique_log_line(event_time, raw)` constraint is
 not changed. The migration therefore changes no gameplay data and no dedupe
 semantics.
 
+#### RCON1-4 rollout validation
+
+The migration was deployed to RCON1-4 in release `v0.4.13.16`. On 2026-08-26,
+the production index was valid and ready, occupied 554 MB and had already served
+6,514 scans. No index build was still running and PostgreSQL reported zero
+deadlocks.
+
+RCON2-4 immediately selected the composite index. Fetching the newest 1,000
+server rows took 0.7-0.9 ms. RCON1 exposed a data-distribution edge case: it owns
+17.64 million historical log rows but had no current-day rows, so PostgreSQL
+misestimated `server = ? ORDER BY event_time` and selected the global time
+index. That plan discarded 635,013 rows from other servers, touched 222,964
+buffers and took 327 ms.
+
+Release `v0.4.13.17` expresses server-scoped reads as the equivalent bounded
+range over `(server, event_time)` and orders by both index columns. The final
+production plan returned 1,000 complete RCON1 log rows in 2.04 ms from 336
+buffers, a 99.4% latency reduction and 99.85% fewer buffer accesses for the
+measured worst case. RCON2-4 continued to return the correct server-local rows.
+The composite index scan counter increased from 6,514 to 7,051 during rollout
+and validation.
+
+Operational checks after the `v0.4.13.17` rollout:
+
+- all RCON1-4 frontends reported `v0.4.13.17` and HTTP 200;
+- all RCON1-4 backends, supervisors, the combined background worker,
+  maintenance, PostgreSQL and Redis were healthy;
+- all required supervisor processes were `RUNNING`; optional disabled jobs
+  remained intentionally `EXITED` on the instances where they are not enabled;
+- application logs contained no new traceback, fatal or process-spawn errors;
+  two webhook 404 messages belonged to an already deleted external webhook and
+  were purged by the existing queue handling;
+- Redis added no `SCAN` or `KEYS` calls during the observation window, with zero
+  evictions and zero rejected connections;
+- three post-rollout samples kept application containers inside their configured
+  limits. Backend memory was 313-398 MiB of 1 GiB, supervisors 612-910 MiB of
+  2 GiB and the combined worker 168 MiB of 512 MiB. PostgreSQL's temporary
+  increase in Docker memory was file cache created by the deliberate worst-case
+  baseline scan (`anon` 74 MB, `file` 3.41 GB), not additional process heap.
+
+Rollback remains available through the verified database dump
+`postgres-20260826T232512Z-1a5de7f6813a-to-3100925db611.dump`, its SHA-256
+sidecar, deployment state `20260826T232512Z.env`, and the local backend and
+frontend images tagged `rollback-1a5de7f6813a`. The rollout did not target
+ente1, ente2, hll1 or any other installation.
+
 Do not enable `HLL_LOG_RETENTION_DAYS` until the affected raw game events have
 an approved archival path. `log_lines` is the source for round-stat generation,
 historical player logs, stat reprocessing, and the autobalancer history
