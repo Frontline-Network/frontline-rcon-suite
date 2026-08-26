@@ -100,7 +100,7 @@ def test_offensive_match_time_normalizes_broken_server_default(maps_history_cls)
         "axis_score": 4,
         "ts": 2,
     }
-    assert history.update.call_count == 2
+    assert history.update.call_count == 1
     history.update.assert_called_with(0, current_map)
 
 

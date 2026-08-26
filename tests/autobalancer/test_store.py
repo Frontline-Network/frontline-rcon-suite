@@ -41,6 +41,12 @@ class FakeRedis:
     def lrange(self, key, start, end):
         return self.lists.get(key, [])[start : end + 1]
 
+    def pipeline(self):
+        return self
+
+    def execute(self):
+        return []
+
     def eval(self, script, key_count, key, token, *args):
         if self.values.get(key) != token:
             return 0

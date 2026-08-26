@@ -652,8 +652,10 @@ def enqueue_transient_message(
     # overwriting anything that was there before so only the most recently queued
     # update is used
     key = f"{prefix}:{get_server_number()}:{transient_identifier}:{message.webhook_type}:{message.message_type}:{message.payload['webhook_id']}:{message_group_key}"
-    red.set(key, orjson.dumps(message.model_dump_json()), ex=ttl)
-    red.sadd(get_queue_registry_key(prefix=prefix), QUEUE_REGISTRY_SENTINEL, key)
+    pipe = red.pipeline()
+    pipe.set(key, orjson.dumps(message.model_dump_json()), ex=ttl)
+    pipe.sadd(get_queue_registry_key(prefix=prefix), QUEUE_REGISTRY_SENTINEL, key)
+    pipe.execute()
 
 
 def enqueue_message(
@@ -678,8 +680,12 @@ def enqueue_message(
     # without having to scan/decode every element in a list which might be thousands
     # of elements long
     queue_id = f"{prefix}:{get_server_number()}:{message.webhook_type}:{message.message_type}:{message.payload['webhook_id']}"
-    red.rpush(queue_id, orjson.dumps(message.model_dump_json()))
-    red.sadd(get_queue_registry_key(prefix=prefix), QUEUE_REGISTRY_SENTINEL, queue_id)
+    pipe = red.pipeline()
+    pipe.rpush(queue_id, orjson.dumps(message.model_dump_json()))
+    pipe.sadd(
+        get_queue_registry_key(prefix=prefix), QUEUE_REGISTRY_SENTINEL, queue_id
+    )
+    pipe.execute()
 
 
 def construct_webhook(
@@ -734,9 +740,11 @@ def move_to_dead_letter(
         source_queue_id=queue_id,
         reason=reason,
     )
-    red.lpush(DEAD_LETTER_QUEUE, entry.model_dump_json())  # type: ignore
-    red.ltrim(DEAD_LETTER_QUEUE, 0, WH_DEAD_LETTER_MAX_LENGTH - 1)  # type: ignore
-    red.expire(DEAD_LETTER_QUEUE, WH_DEAD_LETTER_TTL_SECS)  # type: ignore
+    pipe = red.pipeline()
+    pipe.lpush(DEAD_LETTER_QUEUE, entry.model_dump_json())
+    pipe.ltrim(DEAD_LETTER_QUEUE, 0, WH_DEAD_LETTER_MAX_LENGTH - 1)
+    pipe.expire(DEAD_LETTER_QUEUE, WH_DEAD_LETTER_TTL_SECS)
+    pipe.execute()
     logger.warning(
         "Moved webhook delivery to dead-letter queue: server=%s type=%s reason=%s",
         message.server_number,
@@ -1029,8 +1037,10 @@ async def dequeue_message(
                     message.payload["webhook_id"],
                 )
                 message.retry_attempts += 1
-                red.lpush(queue_id, orjson.dumps(message.model_dump_json()))  # type: ignore
-                red.ltrim(queue_id, 0, WH_MAX_QUEUE_LENGTH - 1)
+                pipe = red.pipeline()
+                pipe.lpush(queue_id, orjson.dumps(message.model_dump_json()))
+                pipe.ltrim(queue_id, 0, WH_MAX_QUEUE_LENGTH - 1)
+                pipe.execute()
             else:
                 move_to_dead_letter(
                     message=message,

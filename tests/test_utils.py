@@ -86,3 +86,18 @@ def test_fixed_len_list_empty_slice_does_not_read_redis_range():
 
     assert values[5:5] == []
     values.red.lrange.assert_not_called()
+
+
+def test_fixed_len_list_add_batches_push_and_trim():
+    values = FixedLenList.__new__(FixedLenList)
+    values.key = "values"
+    values.max_len = 3
+    values.serializer = str.encode
+    values.red = mock.Mock()
+    pipe = values.red.pipeline.return_value
+
+    values.add("four")
+
+    pipe.lpush.assert_called_once_with("values", b"four")
+    pipe.ltrim.assert_called_once_with("values", 0, 2)
+    pipe.execute.assert_called_once_with()

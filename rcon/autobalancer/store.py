@@ -86,9 +86,11 @@ class AutobalancerStore:
                 "block_reasons": status.get("block_reasons") or [],
             }
             history_key = self.key("status_history")
-            self.red.lpush(history_key, json.dumps(sample, default=str))
-            self.red.ltrim(history_key, 0, STATUS_HISTORY_MAX_SAMPLES - 1)
-            self.red.expire(history_key, STATUS_HISTORY_TTL_SECONDS)
+            pipe = self.red.pipeline()
+            pipe.lpush(history_key, json.dumps(sample, default=str))
+            pipe.ltrim(history_key, 0, STATUS_HISTORY_MAX_SAMPLES - 1)
+            pipe.expire(history_key, STATUS_HISTORY_TTL_SECONDS)
+            pipe.execute()
 
     def load_status(self) -> dict[str, Any]:
         raw = self.red.get(self.key("status"))

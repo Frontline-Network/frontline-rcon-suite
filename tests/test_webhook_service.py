@@ -139,19 +139,22 @@ def test_webhook_404_with_message_id_marks_edit_and_clears_related_queue_items()
 
 def test_enqueue_registers_persistent_queue():
     red = Mock()
+    pipe = red.pipeline.return_value
 
     enqueue_message(_message(), red=red)
 
-    red.rpush.assert_called_once()
-    red.sadd.assert_called_once_with(
+    pipe.rpush.assert_called_once()
+    pipe.sadd.assert_called_once_with(
         get_queue_registry_key(),
         "__initialized__",
         "whs:1:discord:audit:123",
     )
+    pipe.execute.assert_called_once_with()
 
 
 def test_enqueue_registers_transient_queue():
     red = Mock()
+    pipe = red.pipeline.return_value
 
     enqueue_transient_message(
         _message(WebhookMessageType.SCOREBOARD),
@@ -159,12 +162,13 @@ def test_enqueue_registers_transient_queue():
         red=red,
     )
 
-    red.set.assert_called_once()
-    red.sadd.assert_called_once_with(
+    pipe.set.assert_called_once()
+    pipe.sadd.assert_called_once_with(
         get_queue_registry_key(),
         "__initialized__",
         "whs:1:transient_identifier:discord:scoreboard:123:game",
     )
+    pipe.execute.assert_called_once_with()
 
 
 def test_webhook_queue_key_cache_reuses_discovery_within_refresh_interval():
@@ -285,6 +289,7 @@ def test_dead_letter_list_is_redacted_for_operator_views():
 
 def test_dead_letter_is_bounded_and_expires():
     red = Mock()
+    pipe = red.pipeline.return_value
 
     status = move_to_dead_letter(
         message=_message(),
@@ -294,9 +299,10 @@ def test_dead_letter_is_bounded_and_expires():
     )
 
     assert status["reason"] == "transport_error"
-    assert red.lpush.call_args.args[0] == DEAD_LETTER_QUEUE
-    red.ltrim.assert_called_once()
-    red.expire.assert_called_once()
+    assert pipe.lpush.call_args.args[0] == DEAD_LETTER_QUEUE
+    pipe.ltrim.assert_called_once()
+    pipe.expire.assert_called_once()
+    pipe.execute.assert_called_once_with()
 
 
 def test_dead_letter_retry_removes_entry_before_requeueing():
@@ -310,11 +316,13 @@ def test_dead_letter_retry_removes_entry_before_requeueing():
     raw_entry = entry.model_dump_json()
     red.lrange.return_value = [raw_entry]
     red.lrem.return_value = 1
+    pipe = red.pipeline.return_value
 
     assert retry_dead_letter_message("retry-me", red=red) is True
     red.lrem.assert_called_once_with(DEAD_LETTER_QUEUE, 1, raw_entry)
-    assert red.rpush.call_args.args[0] == "whs:1:discord:audit:123"
-    assert red.sadd.call_args.args[0] == get_queue_registry_key()
+    assert pipe.rpush.call_args.args[0] == "whs:1:discord:audit:123"
+    assert pipe.sadd.call_args.args[0] == get_queue_registry_key()
+    pipe.execute.assert_called_once_with()
 
 
 def test_expired_message_moves_to_dead_letter_without_contacting_discord(monkeypatch):
@@ -322,6 +330,7 @@ def test_expired_message_moves_to_dead_letter_without_contacting_discord(monkeyp
         update={"sent_at": datetime.now(tz=timezone.utc) - timedelta(hours=2)}
     )
     red = Mock()
+    pipe = red.pipeline.return_value
     # Persistent webhook queues keep the Pydantic JSON string as a Redis JSON
     # value, matching ``enqueue_message``.
     red.lpop.return_value = orjson.dumps(message.model_dump_json())
@@ -339,4 +348,5 @@ def test_expired_message_moves_to_dead_letter_without_contacting_discord(monkeyp
     )
 
     construct.assert_not_called()
-    assert red.lpush.call_args.args[0] == DEAD_LETTER_QUEUE
+    assert pipe.lpush.call_args.args[0] == DEAD_LETTER_QUEUE
+    pipe.execute.assert_called_once_with()
