@@ -779,7 +779,10 @@ class PlayersAction(Base):
 
 class LogLine(Base):
     __tablename__ = "log_lines"
-    __table_args__ = (UniqueConstraint("event_time", "raw", name="unique_log_line"),)
+    __table_args__ = (
+        UniqueConstraint("event_time", "raw", name="unique_log_line"),
+        Index("ix_log_lines_server_event_time", "server", "event_time"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     version: Mapped[int] = mapped_column(default=1)

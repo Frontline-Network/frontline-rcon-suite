@@ -10,7 +10,7 @@ def test_alembic_has_one_production_compatible_head():
     config = Config(str(ROOT / "alembic.ini"))
     config.set_main_option("script_location", str(ROOT / "alembic"))
 
-    assert ScriptDirectory.from_config(config).get_heads() == ["8d0f4a2c9b71"]
+    assert ScriptDirectory.from_config(config).get_heads() == ["c9e1f4a7b2d6"]
 
 
 def test_audit_time_index_is_created_concurrently():
@@ -22,6 +22,21 @@ def test_audit_time_index_is_created_concurrently():
     assert '"ix_audit_log_creation_time"' in migration
     assert "postgresql_concurrently=True" in migration
     assert "autocommit_block" in migration
+
+
+def test_log_server_time_index_is_created_concurrently():
+    migration = (
+        ROOT
+        / "alembic/versions/c9e1f4a7b2d6_index_log_lines_by_server_and_time.py"
+    ).read_text(encoding="utf-8")
+
+    assert 'down_revision = "8d0f4a2c9b71"' in migration
+    assert '"ix_log_lines_server_event_time"' in migration
+    assert '["server", "event_time"]' in migration
+    assert "postgresql_concurrently=True" in migration
+    assert "autocommit_block" in migration
+
+
 def test_django_mobile_and_autobalancer_branches_merge_before_frontline_permissions():
     mobile_migration = (
         ROOT / "rconweb/api/migrations/0024_mobile_admin_auth.py"
