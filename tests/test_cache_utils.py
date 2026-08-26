@@ -1,4 +1,5 @@
 import os
+import pickle
 from logging import getLogger
 from unittest import mock
 
@@ -146,6 +147,36 @@ def test_cold_lock_contention_does_not_sleep_before_fallback_execution():
         assert cached() == "fresh"
 
     function.assert_called_once_with()
+
+
+def test_method_cache_reuses_identical_arguments_and_isolates_variants():
+    values = {}
+    red = mock.Mock()
+    red.get.side_effect = lambda key: values.get(key)
+    red.set.return_value = True
+    red.setex.side_effect = lambda key, _ttl, value: values.__setitem__(key, value)
+    function = mock.Mock(
+        side_effect=lambda _instance, compact=False: {"compact": compact}
+    )
+    function.__name__ = "shared_snapshot"
+    function.__qualname__ = "Rcon.shared_snapshot"
+    cached = RedisCached(
+        pool=None,
+        red=red,
+        ttl_seconds=2,
+        function=function,
+        is_method=True,
+        cache_falsy=False,
+        serializer=pickle.dumps,
+        deserializer=pickle.loads,
+    )
+
+    with mock.patch.object(cached, "_release_lock"):
+        assert cached(object(), compact=True) == {"compact": True}
+        assert cached(object(), compact=True) == {"compact": True}
+        assert cached(object(), compact=False) == {"compact": False}
+
+    assert function.call_count == 2
 
 
 def test_mem_cache_used(monkeypatch):

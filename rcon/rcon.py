@@ -78,6 +78,11 @@ UNASSIGNED = "unassigned"
 TEMP_BAN = "temp"
 PERMA_BAN = "perma"
 
+# Keep this snapshot deliberately short-lived: it is shared by the web,
+# statistics and automation processes, but must still follow joins, leaves and
+# squad changes closely enough for live moderation.
+DETAILED_PLAYERS_CACHE_SECONDS = 2
+
 USER_CONFIG_NAME_PATTERN = re.compile(r"set_.*_config")
 
 # The base level of actions that will always show up in the Live view
@@ -342,6 +347,7 @@ class Rcon(ServerCtl):
             )
             return None
 
+    @ttl_cache(ttl=DETAILED_PLAYERS_CACHE_SECONDS, cache_falsy=False)
     def get_detailed_players(self, compact=False) -> GetDetailedPlayers:
         compact = strtobool(compact)
         try:
