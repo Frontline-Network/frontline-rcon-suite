@@ -6,9 +6,28 @@ from unittest import mock
 import orjson
 
 from rcon import game_logs, recent_actions
+from rcon.cache_utils import RedisCached
 from rcon.logs.recorder import LOG_HISTORY_PAGE_SIZE, LogRecorder
 from rcon.logs.stream import LogStream
+from rcon.rcon import DETAILED_PLAYERS_CACHE_SECONDS, Rcon
 from rcon.utils import LogsHistory, LogsHistorySnapshot
+
+
+def test_detailed_player_snapshot_uses_short_shared_cache():
+    cached = Rcon.get_detailed_players
+
+    assert DETAILED_PLAYERS_CACHE_SECONDS == 2
+    assert callable(getattr(cached, "cache_clear", None))
+    assert callable(getattr(cached, "clear_for", None))
+
+    # Production and CI use Redis, while isolated developer tests may use the
+    # compatible in-memory fallback.
+    redis_cache = getattr(cached, "cache", None)
+    if isinstance(redis_cache, RedisCached):
+        assert redis_cache.ttl_seconds == DETAILED_PLAYERS_CACHE_SECONDS
+        assert redis_cache.cache_falsy is False
+    else:
+        assert redis_cache.ttl == DETAILED_PLAYERS_CACHE_SECONDS
 
 
 def test_recent_logs_reads_only_requested_page(monkeypatch):
