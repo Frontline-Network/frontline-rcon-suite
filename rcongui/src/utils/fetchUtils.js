@@ -409,8 +409,13 @@ export const cmd = {
     }),
   GET_LIVE_SESSIONS: (params) =>
     requestFactory({ method: "GET", cmd: "get_live_scoreboard", ...params }),
-  GET_LIVE_TEAMS: (params) =>
-    requestFactory({ method: "GET", cmd: "get_team_view", ...params }),
+  GET_LIVE_TEAMS: ({ params = {}, ...options } = {}) =>
+    requestFactory({
+      method: "GET",
+      cmd: "get_team_view",
+      ...options,
+      params: { ...params, compact: "true" },
+    }),
   GET_CURRENT_MAP: (params) =>
     requestFactory({ method: "GET", cmd: "get_map", ...params }),
   GET_MAPS: (params) =>

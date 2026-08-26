@@ -20,15 +20,17 @@ from rcon.models import (
     PlayerFlag,
     PlayerID,
     PlayerName,
-    PlayerSoldier,
     PlayersAction,
     PlayerSession,
+    PlayerSoldier,
+    PlayerVIP,
     SteamInfo,
     WatchList,
     enter_session,
 )
 from rcon.steam_utils import is_steam_id_64
 from rcon.types import (
+    LivePlayerProfileType,
     PlayerActionState,
     PlayerActionType,
     PlayerCommentType,
@@ -92,7 +94,9 @@ def _active_player_blacklists(player: PlayerID) -> list[dict]:
     ]
 
 
-def get_player_identity_links(sess: Session, players: list[PlayerID]) -> dict[str, dict]:
+def get_player_identity_links(
+    sess: Session, players: list[PlayerID]
+) -> dict[str, dict]:
     """Resolve HLL and HLL:V records belonging to the same Steam account.
 
     HLL:V keeps its game-specific player ID because logs and admin commands need
@@ -103,9 +107,11 @@ def get_player_identity_links(sess: Session, players: list[PlayerID]) -> dict[st
         return {}
 
     canonical_ids = {
-        player.steam_id
-        if player.steam_id and is_steam_id_64(player.steam_id)
-        else player.player_id
+        (
+            player.steam_id
+            if player.steam_id and is_steam_id_64(player.steam_id)
+            else player.player_id
+        )
         for player in players
     }
     related = (
@@ -220,11 +226,226 @@ def _get_profiles(sess, player_ids, nb_sessions=0):
     )
 
 
+def _get_serializable_profiles(sess, player_ids):
+    """Load every relationship used by ``PlayerID.to_dict`` in batches."""
+    return (
+        sess.query(PlayerID)
+        .filter(PlayerID.player_id.in_(player_ids))
+        .options(
+            selectinload(PlayerID.names),
+            selectinload(PlayerID.sessions),
+            selectinload(PlayerID.received_actions),
+            selectinload(PlayerID.blacklists).selectinload(BlacklistRecord.blacklist),
+            selectinload(PlayerID.flags),
+            selectinload(PlayerID.watchlist),
+            selectinload(PlayerID.steaminfo),
+            selectinload(PlayerID.soldier),
+            selectinload(PlayerID.account),
+        )
+        .all()
+    )
+
+
+def _get_vips_by_player(sess, player_database_ids):
+    vips_by_player: dict[int, list[PlayerVIP]] = {}
+    if not player_database_ids:
+        return vips_by_player
+
+    for vip in (
+        sess.query(PlayerVIP)
+        .filter(PlayerVIP.player_id_id.in_(player_database_ids))
+        .all()
+    ):
+        vips_by_player.setdefault(vip.player_id_id, []).append(vip)
+    return vips_by_player
+
+
 def get_profiles(player_ids, nb_sessions=1):
     with enter_session() as sess:
-        players = _get_profiles(sess, player_ids, nb_sessions)
+        players = _get_serializable_profiles(sess, player_ids)
+        vips_by_player = _get_vips_by_player(sess, [player.id for player in players])
 
-        return [p.to_dict(limit_sessions=nb_sessions) for p in players]
+        return [
+            player.to_dict(
+                limit_sessions=nb_sessions,
+                preloaded_vips=vips_by_player.get(player.id, []),
+            )
+            for player in players
+        ]
+
+
+def _current_session_summary(sess, player_database_ids):
+    """Return session count and latest session without hydrating history rows."""
+    if not player_database_ids:
+        return {}
+
+    ranked_sessions = (
+        sess.query(
+            PlayerSession.player_id_id.label("player_id_id"),
+            PlayerSession.start.label("start"),
+            PlayerSession.end.label("end"),
+            PlayerSession.created.label("created"),
+            func.count(PlayerSession.id)
+            .over(partition_by=PlayerSession.player_id_id)
+            .label("sessions_count"),
+            func.row_number()
+            .over(
+                partition_by=PlayerSession.player_id_id,
+                order_by=(PlayerSession.created.desc(), PlayerSession.id.desc()),
+            )
+            .label("session_rank"),
+        )
+        .filter(PlayerSession.player_id_id.in_(player_database_ids))
+        .subquery()
+    )
+    rows = sess.query(ranked_sessions).filter(ranked_sessions.c.session_rank == 1).all()
+    return {row.player_id_id: row for row in rows}
+
+
+def _current_playtime_seconds(session_summary) -> int:
+    if session_summary is None or session_summary.end:
+        return 0
+    started_at = session_summary.start or session_summary.created
+    if started_at is None:
+        return 0
+    now = (
+        datetime.datetime.now(tz=started_at.tzinfo)
+        if started_at.tzinfo
+        else datetime.datetime.now()
+    )
+    return max(0, int((now - started_at).total_seconds()))
+
+
+def _watchlist_dict(player: PlayerID):
+    watch = player.watchlist
+    if watch is None:
+        return None
+    return {
+        "id": watch.id,
+        "modified": watch.modified,
+        "player_id": player.player_id,
+        "is_watched": watch.is_watched,
+        "reason": watch.reason,
+        "by": watch.by,
+        "count": watch.count,
+    }
+
+
+def _blacklist_record_dict(record: BlacklistRecord, player_id: str):
+    return {
+        "id": record.id,
+        "player_id": player_id,
+        "reason": record.reason,
+        "admin_name": record.admin_name,
+        "created_at": record.created_at,
+        "expires_at": record.expires_at,
+        "is_active": True,
+        "blacklist": record.blacklist.to_dict(with_records=False),
+    }
+
+
+def get_live_profiles(
+    player_ids, action_window_hours: int = 24
+) -> list[LivePlayerProfileType]:
+    """Return the bounded profile projection required by live roster screens.
+
+    History-heavy collections are deliberately excluded. Query count remains
+    constant as the online population grows.
+    """
+    if not player_ids:
+        return []
+
+    with enter_session() as sess:
+        players = (
+            sess.query(PlayerID)
+            .filter(PlayerID.player_id.in_(player_ids))
+            .options(
+                selectinload(PlayerID.flags),
+                selectinload(PlayerID.watchlist),
+                selectinload(PlayerID.soldier),
+            )
+            .all()
+        )
+        if not players:
+            return []
+
+        database_ids = [player.id for player in players]
+        session_summaries = _current_session_summary(sess, database_ids)
+
+        actions_by_player: dict[int, list[dict]] = {}
+        action_cutoff = datetime.datetime.utcnow() - datetime.timedelta(
+            hours=max(1, int(action_window_hours))
+        )
+        for player_database_id, action_time in (
+            sess.query(PlayersAction.player_id_id, PlayersAction.time)
+            .filter(
+                PlayersAction.player_id_id.in_(database_ids),
+                PlayersAction.time > action_cutoff,
+            )
+            .order_by(PlayersAction.player_id_id, PlayersAction.time.desc())
+            .all()
+        ):
+            actions_by_player.setdefault(player_database_id, []).append(
+                {"time": action_time}
+            )
+
+        blacklist_records_by_player: dict[int, list[dict]] = {}
+        blacklist_cutoff = datetime.datetime.now(tz=datetime.timezone.utc)
+        active_blacklist_records = (
+            sess.query(BlacklistRecord)
+            .filter(
+                BlacklistRecord.player_id_id.in_(database_ids),
+                or_(
+                    BlacklistRecord.expires_at.is_(None),
+                    BlacklistRecord.expires_at > blacklist_cutoff,
+                ),
+            )
+            .options(selectinload(BlacklistRecord.blacklist))
+            .all()
+        )
+        player_ids_by_database_id = {player.id: player.player_id for player in players}
+        for record in active_blacklist_records:
+            blacklist_records_by_player.setdefault(record.player_id_id, []).append(
+                _blacklist_record_dict(
+                    record, player_ids_by_database_id[record.player_id_id]
+                )
+            )
+
+        this_server = int(get_server_number())
+        profiles: list[LivePlayerProfileType] = []
+        for player in players:
+            summary = session_summaries.get(player.id)
+            blacklists = blacklist_records_by_player.get(player.id, [])
+            is_blacklisted = any(
+                record["blacklist"]["servers"] is None
+                or this_server in record["blacklist"]["servers"]
+                for record in blacklists
+            )
+            watchlist = _watchlist_dict(player)
+            profiles.append(
+                {
+                    "player_id": player.player_id,
+                    "sessions_count": summary.sessions_count if summary else 0,
+                    "current_playtime_seconds": _current_playtime_seconds(summary),
+                    "received_actions": actions_by_player.get(player.id, []),
+                    "blacklists": blacklists,
+                    "is_blacklisted": is_blacklisted,
+                    "flags": [flag.to_dict() for flag in (player.flags or [])],
+                    "watchlist": watchlist,
+                    "is_watched": bool(watchlist and watchlist["is_watched"]),
+                    "soldier": (
+                        {
+                            "level": player.soldier.level,
+                            "platform": player.soldier.platform,
+                            "clan_tag": player.soldier.clan_tag,
+                        }
+                        if player.soldier
+                        else None
+                    ),
+                }
+            )
+
+        return profiles
 
 
 def _get_set_player(
@@ -314,17 +535,26 @@ def get_players_by_appearance(
                 soldier_name = unaccent(PlayerName.name)
                 player_name = remove_accent(player_name)
             if not exact_name_match:
-                query = query.join(PlayerID.names).join(PlayerID.account).filter(
-                    or_(
-                        soldier_name.ilike("%{}%".format(player_name)),
-                        account_name.isnot(None) & account_name.ilike("%{}%".format(player_name))
+                query = (
+                    query.join(PlayerID.names)
+                    .join(PlayerID.account)
+                    .filter(
+                        or_(
+                            soldier_name.ilike("%{}%".format(player_name)),
+                            account_name.isnot(None)
+                            & account_name.ilike("%{}%".format(player_name)),
+                        )
                     )
                 )
             else:
-                query = query.join(PlayerID.names).join(PlayerID.account).filter(
-                    or_(
-                        soldier_name == player_name,
-                        account_name.isnot(None) & (account_name == player_name)
+                query = (
+                    query.join(PlayerID.names)
+                    .join(PlayerID.account)
+                    .filter(
+                        or_(
+                            soldier_name == player_name,
+                            account_name.isnot(None) & (account_name == player_name),
+                        )
                     )
                 )
 
@@ -353,8 +583,13 @@ def get_players_by_appearance(
             query = query.join(PlayerID.flags).filter(PlayerFlag.flag.in_(flags))
 
         if country:
-            query = query.join(PlayerID.steaminfo).join(PlayerID.account).filter(
-                SteamInfo.country == country.upper() or PlayerAccount.country == country.upper()
+            query = (
+                query.join(PlayerID.steaminfo)
+                .join(PlayerID.account)
+                .filter(
+                    SteamInfo.country == country.upper()
+                    or PlayerAccount.country == country.upper()
+                )
             )
 
         if last_seen_from:
@@ -481,7 +716,7 @@ def save_player(
     player_id: str,
     timestamp: float | None = None,
     *,
-    steam_id: str | None = None
+    steam_id: str | None = None,
 ) -> None:
     """Create a PlayerID record if non existent and save the player name alias"""
     with enter_session() as sess:
@@ -502,7 +737,7 @@ def save_player_action(
     reason: str = "",
     timestamp: float | None = None,
     *,
-    steam_id: str | None = None
+    steam_id: str | None = None,
 ):
     with enter_session() as sess:
         player = _get_set_player(
@@ -551,7 +786,7 @@ def save_start_player_session(
     player_id: str,
     timestamp: float,
     server_name: str | None = None,
-    server_number: int | None = None
+    server_number: int | None = None,
 ):
     config = RconServerSettingsUserConfig.load_from_db()
 
