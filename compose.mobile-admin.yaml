@@ -55,6 +55,36 @@ x-frontline-frontend: &frontline-frontend
     args:
       CRCON_VERSION: ${CRCON_VERSION:-development}
 
+# Fault-isolation envelopes for existing generated installations. These are
+# intentionally above the measured RCON1-4 warm working set: limits contain a
+# runaway instance; reservations document normal host-capacity planning.
+x-backend-deploy: &backend-deploy
+  resources:
+    limits:
+      cpus: '${BACKEND_CPU_LIMIT:-1.0}'
+      memory: ${BACKEND_MEMORY_LIMIT:-1024M}
+    reservations:
+      cpus: '0.10'
+      memory: 256M
+
+x-supervisor-deploy: &supervisor-deploy
+  resources:
+    limits:
+      cpus: '${SUPERVISOR_CPU_LIMIT:-1.5}'
+      memory: ${SUPERVISOR_MEMORY_LIMIT:-2048M}
+    reservations:
+      cpus: '0.20'
+      memory: 512M
+
+x-background-worker-deploy: &background-worker-deploy
+  resources:
+    limits:
+      cpus: '${BACKGROUND_WORKER_CPU_LIMIT:-0.50}'
+      memory: ${BACKGROUND_WORKER_MEMORY_LIMIT:-512M}
+    reservations:
+      cpus: '0.05'
+      memory: 128M
+
 services:
   maintenance:
     <<: *frontline-backend
@@ -74,6 +104,7 @@ services:
     # stay in lockstep with the mobile endpoints.
     <<: *frontline-backend
     command: mobile_push_worker
+    deploy: *background-worker-deploy
     environment: *mobile-environment
 
   discord_report_worker:
@@ -86,6 +117,7 @@ services:
       service: backend_1
     <<: *frontline-backend
     command: discord_event_worker
+    deploy: *background-worker-deploy
     # Extending backend_1 also inherits its private-network alias "backend".
     # Clear that alias or the frontend may send HTTP requests to this worker
     # instead of the actual Django backend after a worker recreation.
@@ -114,6 +146,7 @@ services:
       service: backend_1
     <<: *frontline-backend
     command: discord_moderation_worker
+    deploy: *background-worker-deploy
     networks:
       server1:
         aliases: !reset []
@@ -138,6 +171,7 @@ services:
     <<: *frontline-backend
     command: frontline_background_worker
     restart: unless-stopped
+    deploy: *background-worker-deploy
     healthcheck:
       test:
         [
@@ -164,34 +198,50 @@ services:
 
   backend_1:
     <<: *frontline-backend
+    restart: on-failure:5
+    deploy: *backend-deploy
     environment: *mobile-environment
 
   supervisor_1:
     <<: *frontline-backend
+    restart: on-failure:5
+    deploy: *supervisor-deploy
     environment: *mobile-environment
 
   backend_2:
     <<: *frontline-backend
+    restart: on-failure:5
+    deploy: *backend-deploy
     environment: *mobile-environment-server-2
 
   supervisor_2:
     <<: *frontline-backend
+    restart: on-failure:5
+    deploy: *supervisor-deploy
     environment: *mobile-environment-server-2
 
   backend_3:
     <<: *frontline-backend
+    restart: on-failure:5
+    deploy: *backend-deploy
     environment: *mobile-environment-server-3
 
   supervisor_3:
     <<: *frontline-backend
+    restart: on-failure:5
+    deploy: *supervisor-deploy
     environment: *mobile-environment-server-3
 
   backend_4:
     <<: *frontline-backend
+    restart: on-failure:5
+    deploy: *backend-deploy
     environment: *mobile-environment-server-4
 
   supervisor_4:
     <<: *frontline-backend
+    restart: on-failure:5
+    deploy: *supervisor-deploy
     environment: *mobile-environment-server-4
 
   frontend_1:
