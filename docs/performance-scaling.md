@@ -263,6 +263,13 @@ their rollout. All four public endpoints returned HTTP 200 in 33-37 ms. The
 mode remains opt-in until the long observation window is complete. Never enable
 it while the eight corresponding individual Supervisor programs are also running.
 
+Supervisor startup records whether an instance last used the split or shared
+topology. A real split-to-shared transition resets stale per-service controls
+to `RUNNING`, matching the autostart behaviour of a recreated split Supervisor.
+Subsequent shared-to-shared restarts retain intentional per-service stops. This
+prevents an old canary's Redis state from silently disabling a service when the
+shared runtime is enabled again later.
+
 Auto settings and broadcasts were added in a second, separately tested canary.
 RCON3 fell from 715.7 MiB to 496.8 MiB and RCON1 from 1.013 GiB to 801.3 MiB.
 The four supervisors together fell from roughly 3.26 GiB to 2.35 GiB, saving an

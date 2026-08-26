@@ -18,8 +18,11 @@ logger = logging.getLogger(__name__)
 RESTART_DELAY_SECONDS = 5.0
 MONITOR_INTERVAL_SECONDS = 1.0
 STATE_KEY = "frontline:supervisor_runtime:services"
+MODE_KEY = "frontline:supervisor_runtime:mode"
 RUNNING = "RUNNING"
 STOPPED = "STOPPED"
+SPLIT_MODE = "split"
+SHARED_MODE = "shared"
 
 
 def redis_text(value):
@@ -33,6 +36,37 @@ def decode_service_state(raw_state: dict) -> dict[str, str]:
         str(redis_text(key)): str(redis_text(value))
         for key, value in raw_state.items()
     }
+
+
+def mark_runtime_mode(mode: str, red=None) -> None:
+    """Persist the active supervisor topology for the next mode transition."""
+    if mode not in {SPLIT_MODE, SHARED_MODE}:
+        raise ValueError(f"Unsupported supervisor runtime mode: {mode}")
+    if red is None:
+        from rcon.cache_utils import get_redis_client
+
+        red = get_redis_client()
+    red.set(MODE_KEY, mode)
+
+
+def prepare_shared_state(red, service_names: Sequence[str]) -> bool:
+    """Reset stale controls only when entering shared mode from split mode.
+
+    A shared-runtime restart must retain intentional per-service stop requests.
+    Split Supervisor, however, starts its autostart programs afresh and marks
+    that topology in Redis.  On the next real split-to-shared transition, old
+    controls from an earlier canary must therefore not silently disable a
+    service.
+    """
+    previous_mode = redis_text(red.get(MODE_KEY))
+    transitioned = previous_mode != SHARED_MODE
+    if transitioned:
+        red.hset(
+            STATE_KEY,
+            mapping={f"{name}:desired": RUNNING for name in service_names},
+        )
+    mark_runtime_mode(SHARED_MODE, red=red)
+    return transitioned
 
 
 @dataclass(frozen=True)
@@ -144,6 +178,7 @@ def run(services: Sequence[ServiceSpec] = DEFAULT_SERVICES) -> None:
     stop_events: dict[str, threading.Event] = {}
     service_specs = {spec.name: spec for spec in services}
 
+    prepare_shared_state(red, service_specs)
     for name in service_specs:
         red.hsetnx(STATE_KEY, f"{name}:desired", RUNNING)
 

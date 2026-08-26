@@ -114,6 +114,14 @@ def run_combined_runtime():
     supervisor_runtime.run()
 
 
+@cli.command(name="supervisor_runtime_mode")
+@click.argument("mode", type=click.Choice(["split", "shared"]))
+def set_supervisor_runtime_mode(mode):
+    from rcon import supervisor_runtime
+
+    supervisor_runtime.mark_runtime_mode(mode)
+
+
 @cli.command(name="expiring_vips")
 def run_expiring_vips():
     from rcon.expiring_vips import service

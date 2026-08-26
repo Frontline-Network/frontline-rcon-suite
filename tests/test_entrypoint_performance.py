@@ -109,6 +109,15 @@ def test_combined_supervisor_runtime_is_explicit_opt_in():
     assert "supervisord -c /config/supervisord.conf" in entrypoint
 
 
+def test_split_supervisor_marks_mode_before_starting_services():
+    entrypoint = (REPO_ROOT / "entrypoint.sh").read_text(encoding="utf-8")
+
+    marker = "/code/manage.py supervisor_runtime_mode split"
+    split_start = "supervisord -c /config/supervisord_$SERVER_NUMBER.conf"
+    assert marker in entrypoint
+    assert entrypoint.index(marker) < entrypoint.index(split_start)
+
+
 def test_public_recent_logs_default_is_bounded_without_changing_internal_scan():
     api_commands = (REPO_ROOT / "rcon" / "api_commands.py").read_text(
         encoding="utf-8"
