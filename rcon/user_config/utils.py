@@ -1,5 +1,8 @@
 import logging
 import os
+import threading
+import time
+from copy import deepcopy
 from typing import Any, ClassVar, Iterable, Self, Type
 
 import pydantic
@@ -13,6 +16,10 @@ logger = logging.getLogger(__name__)
 
 USER_CONFIG_KEY_FORMAT = "{server}_{cls_name}"
 DISCORD_AUDIT_FORMAT = "changed values: `{differences}`"
+USER_CONFIG_CACHE_TTL_SECONDS = 2
+
+_USER_CONFIG_CACHE: dict[str, tuple[float, Any]] = {}
+_USER_CONFIG_CACHE_LOCK = threading.RLock()
 
 
 # Sourced without modification from https://stackoverflow.com/a/17246726
@@ -97,9 +104,9 @@ class BaseUserConfig(pydantic.BaseModel):
             logger.warning(f"HLL_DB_URL not set, returning a default instance")
             return cls()
 
-        # If the cache is unavailable, it will fall back to creating a default
-        # model instance, but will not persist it to the database and overwrite settings
-        conf = get_user_config(cls.KEY(), default=None)
+        # If the database returns no value, fall back to a default model instance,
+        # but do not persist it and risk overwriting legitimate settings.
+        conf = _get_cached_user_config(cls.KEY(), default=None)
         if conf is not None:
             try:
                 return cls.model_validate(conf)
@@ -159,6 +166,45 @@ def get_user_config(key: str, default=None) -> dict[str, Any] | Any | None:
         return res
 
 
+def _get_cached_user_config(key: str, default=None) -> dict[str, Any] | Any | None:
+    """Reuse hot-loop config reads briefly without delaying updates for long.
+
+    The cache is intentionally process-local. Configuration writes invalidate the
+    current process immediately, while independent supervisor processes observe a
+    change after at most ``USER_CONFIG_CACHE_TTL_SECONDS``. Values are copied on
+    both ingress and egress so callers cannot mutate the cached JSON document.
+    """
+
+    now = time.monotonic()
+    with _USER_CONFIG_CACHE_LOCK:
+        cached = _USER_CONFIG_CACHE.get(key)
+        if cached is not None:
+            expires_at, value = cached
+            if expires_at > now:
+                return deepcopy(value)
+            _USER_CONFIG_CACHE.pop(key, None)
+
+    value = get_user_config(key, default=default)
+    with _USER_CONFIG_CACHE_LOCK:
+        _USER_CONFIG_CACHE[key] = (
+            time.monotonic() + USER_CONFIG_CACHE_TTL_SECONDS,
+            deepcopy(value),
+        )
+    return value
+
+
+def _invalidate_user_config_cache(key: str) -> None:
+    with _USER_CONFIG_CACHE_LOCK:
+        _USER_CONFIG_CACHE.pop(key, None)
+
+
+def _clear_user_config_cache() -> None:
+    """Clear the process-local cache for tests and maintenance utilities."""
+
+    with _USER_CONFIG_CACHE_LOCK:
+        _USER_CONFIG_CACHE.clear()
+
+
 def _add_conf(sess, key, val):
     try:
         return sess.add(UserConfig(key=key, value=val))
@@ -176,6 +222,7 @@ def _remove_conf(sess, key):
         logger.info("Deleting %s", key)
         sess.delete(conf)
         sess.commit()
+        _invalidate_user_config_cache(key)
 
 
 def _set_default(sess: Session, key: str, val: dict[str, Any] | BaseUserConfig):
@@ -185,6 +232,7 @@ def _set_default(sess: Session, key: str, val: dict[str, Any] | BaseUserConfig):
     if _get_conf(sess, key) is None:
         logger.info("Seeding default values for %s", key)
         _add_conf(sess, key, val)
+        _invalidate_user_config_cache(key)
     return val
 
 
@@ -193,12 +241,16 @@ def set_user_config(key: str, object_: dict[str, Any] | BaseUserConfig):
         object_ = object_.model_dump()
 
     logger.debug("Setting user config for %s with %s", key, object_)
-    with enter_session() as sess:
-        conf = _get_conf(sess, key)
-        if conf is None:
-            _add_conf(sess, key, object_)
-        else:
-            conf.value = object_
+    _invalidate_user_config_cache(key)
+    try:
+        with enter_session() as sess:
+            conf = _get_conf(sess, key)
+            if conf is None:
+                _add_conf(sess, key, object_)
+            else:
+                conf.value = object_
+    finally:
+        _invalidate_user_config_cache(key)
 
 
 def validate_user_config(

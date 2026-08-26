@@ -17,7 +17,7 @@ from rcon.commands import HLLCommandFailedError
 from rcon.connection import HLLServerError
 from rcon.discord import send_to_discord_audit
 from rcon.hooks import inject_player_ids
-from rcon.logs.loop import on_kill, on_connected
+from rcon.logs.loop import on_connected, on_kill
 from rcon.rcon import Rcon, get_rcon
 from rcon.types import GetDetailedPlayer, StructuredLogLineType
 from rcon.user_config.auto_mod_level import AutoModLevelUserConfig
@@ -90,7 +90,10 @@ def _do_punitions(
             if method == ActionMethod.PUNISH:
                 if not aplayer.details.dry_run:
                     rcon.punish(
-                        player_name=aplayer.name, reason=aplayer.details.message, by=aplayer.details.author, player_id=aplayer.player_id
+                        player_name=aplayer.name,
+                        reason=aplayer.details.message,
+                        by=aplayer.details.author,
+                        player_id=aplayer.player_id,
                     )
                 audit(
                     discord_webhook_url=aplayer.details.discord_audit_url,
@@ -132,7 +135,11 @@ def _do_punitions(
                 )
 
 
-def do_punitions(rcon: Rcon, punitions_to_apply: PunitionsToApply):
+def do_punitions(
+    rcon: Rcon,
+    punitions_to_apply: PunitionsToApply,
+    mods: list | None = None,
+):
     if punitions_to_apply:
         logger.debug(
             "Automod will apply the following punitions %s",
@@ -141,17 +148,13 @@ def do_punitions(rcon: Rcon, punitions_to_apply: PunitionsToApply):
     else:
         logger.debug("Automod did not suggest any punitions")
 
-    _do_punitions(
-        rcon, ActionMethod.MESSAGE, punitions_to_apply.warning, enabled_moderators()
-    )
+    mods = enabled_moderators() if mods is None else mods
 
-    _do_punitions(
-        rcon, ActionMethod.PUNISH, punitions_to_apply.punish, enabled_moderators()
-    )
+    _do_punitions(rcon, ActionMethod.MESSAGE, punitions_to_apply.warning, mods)
 
-    _do_punitions(
-        rcon, ActionMethod.KICK, punitions_to_apply.kick, enabled_moderators()
-    )
+    _do_punitions(rcon, ActionMethod.PUNISH, punitions_to_apply.punish, mods)
+
+    _do_punitions(rcon, ActionMethod.KICK, punitions_to_apply.kick, mods)
 
 
 def enabled_moderators():
@@ -191,7 +194,7 @@ def punish_squads(rcon: Rcon, r: Redis):
 
     punitions_to_apply = get_punitions_to_apply(rcon, mods)
 
-    do_punitions(rcon, punitions_to_apply)
+    do_punitions(rcon, punitions_to_apply, mods)
     set_first_run_done(r)
 
 
@@ -228,10 +231,15 @@ def on_kill(rcon: Rcon, log: StructuredLogLineType):
         if callable(on_kill_hook):
             punitions_to_apply.merge(mod.on_kill(log))
 
-    do_punitions(rcon, punitions_to_apply)
+    do_punitions(rcon, punitions_to_apply, mods)
 
 
-pendingTimers = {}
+pendingTimers: dict[str, Timer] = {}
+
+
+def _remove_pending_timer(player_id: str, timer: Timer) -> None:
+    if pendingTimers.get(player_id) is timer:
+        pendingTimers.pop(player_id, None)
 
 
 @on_connected()
@@ -254,7 +262,9 @@ def on_connected(rcon: Rcon, _, name: str, player_id: str):
     try:
         detailed_player_info = rcon.get_detailed_player_info(player_id)
     except Exception as e:
-        logger.error(f"get_detailed_player_info threw an exception for {player_id}: {e}")
+        logger.error(
+            f"get_detailed_player_info threw an exception for {player_id}: {e}"
+        )
 
     punitions_to_apply: PunitionsToApply = PunitionsToApply()
     for mod in mods:
@@ -263,6 +273,8 @@ def on_connected(rcon: Rcon, _, name: str, player_id: str):
             punitions_to_apply.merge(
                 mod.on_connected(name, player_id, detailed_player_info)
             )
+
+    t: Timer | None = None
 
     def notify_player():
         try:
@@ -275,12 +287,16 @@ def on_connected(rcon: Rcon, _, name: str, player_id: str):
                 )
         except Exception as e:
             logger.error("Could not message player '%s' (%s) : %s", name, player_id, e)
+        finally:
+            if t is not None:
+                _remove_pending_timer(player_id, t)
 
     if len(punitions_to_apply.warning) == 0:
         return
 
     # The player might not yet have finished connecting in order to send messages.
     t = Timer(20, notify_player)
+    t.daemon = True
     pendingTimers[player_id] = t
     t.start()
 
