@@ -6,6 +6,7 @@ from dateutil import parser
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
+from rcon.log_queries import server_time_bounds, server_time_order
 from rcon.logs.loop import LogLoop
 from rcon.models import LogLine, PlayerID, enter_session
 from rcon.rcon import LOG_ACTIONS
@@ -259,14 +260,17 @@ def get_historical_logs_records(
     elif action and exact_action:
         q = q.filter(LogLine.type == action)
 
-    time_filter = []
-    if from_:
-        time_filter.append(LogLine.event_time >= from_)
+    if server_filter:
+        q = q.filter(*server_time_bounds(server_filter, from_, till))
+    else:
+        time_filter = []
+        if from_:
+            time_filter.append(LogLine.event_time >= from_)
 
-    if till:
-        time_filter.append(LogLine.event_time <= till)
+        if till:
+            time_filter.append(LogLine.event_time <= till)
 
-    q = q.filter(and_(*time_filter))
+        q = q.filter(and_(*time_filter))
 
     if player_id:
         # Handle not found
@@ -296,15 +300,18 @@ def get_historical_logs_records(
     if name_filters:
         q = q.filter(or_(*name_filters))
 
-    if server_filter:
-        q = q.filter(LogLine.server == server_filter)
-
     if time_sort:
-        q = q.order_by(
-            LogLine.event_time.desc()
-            if time_sort == "desc"
-            else LogLine.event_time.asc()
-        ).limit(limit)
+        descending = time_sort == "desc"
+        order = (
+            server_time_order(descending)
+            if server_filter
+            else (
+                LogLine.event_time.desc()
+                if descending
+                else LogLine.event_time.asc(),
+            )
+        )
+        q = q.order_by(*order).limit(limit)
 
     return q.all()
 
