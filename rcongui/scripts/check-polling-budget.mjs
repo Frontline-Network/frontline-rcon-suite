@@ -46,6 +46,16 @@ requireText(
   "Global state"
 );
 requireText(globalStateSource, "getGameStatePollingInterval", "Global state");
+requireText(globalStateSource, "shouldPollLiveRoster", "Global state");
+requireText(globalStateSource, "shouldPollModeratorPresence", "Global state");
+
+const liveViewSource = readSource("pages/views/live/index.jsx");
+requireText(
+  liveViewSource,
+  "React Query owns the single log request",
+  "Live view"
+);
+forbidText(liveViewSource, "const response = await cmd.GET_LIVE_LOGS", "Live route loader");
 
 for (const relativePath of [
   "pages/views/live/index.jsx",

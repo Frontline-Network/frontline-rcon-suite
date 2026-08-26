@@ -8,6 +8,8 @@ import {
 import {
   GAME_STATE_POLLING,
   getGameStatePollingInterval,
+  shouldPollLiveRoster,
+  shouldPollModeratorPresence,
 } from "../src/queries/polling-policy.js";
 import {
   HTTP_ERROR_TOAST_WINDOW_MS,
@@ -168,5 +170,31 @@ test.describe("game-state polling policy", () => {
     expect(getGameStatePollingInterval("/settings/general")).toBe(
       GAME_STATE_POLLING.defaultIntervalMs
     );
+  });
+
+  test("loads expensive roster and moderator presence only where visible", () => {
+    for (const route of [
+      "/",
+      "/views/live",
+      "/views/team/",
+      "/records/players",
+      "/records/players/7656119",
+      "/stats/live-sessions",
+    ]) {
+      expect(shouldPollLiveRoster(route)).toBe(true);
+    }
+
+    for (const route of [
+      "/settings/general",
+      "/settings/automods/no-leader",
+      "/records/game-logs",
+      "/apps/discord-report-bot",
+    ]) {
+      expect(shouldPollLiveRoster(route)).toBe(false);
+    }
+
+    expect(shouldPollModeratorPresence("/")).toBe(true);
+    expect(shouldPollModeratorPresence("/views/live")).toBe(false);
+    expect(shouldPollModeratorPresence("/settings/general")).toBe(false);
   });
 });
