@@ -18,6 +18,10 @@ ServiceSpec = _RUNTIME.ServiceSpec
 DEFAULT_SERVICES = _RUNTIME.DEFAULT_SERVICES
 _service_loop = _RUNTIME._service_loop
 decode_service_state = _RUNTIME.decode_service_state
+mark_runtime_mode = _RUNTIME.mark_runtime_mode
+prepare_shared_state = _RUNTIME.prepare_shared_state
+MODE_KEY = _RUNTIME.MODE_KEY
+STATE_KEY = _RUNTIME.STATE_KEY
 
 
 class SharedSupervisorRuntimeTests(unittest.TestCase):
@@ -41,6 +45,66 @@ class SharedSupervisorRuntimeTests(unittest.TestCase):
                 "routines:state": "RUNNING",
             },
         )
+
+    def test_split_to_shared_transition_resets_stale_stop_requests(self):
+        class FakeRedis:
+            def __init__(self):
+                self.values = {MODE_KEY: b"split"}
+                self.hashes = {STATE_KEY: {"auto_settings:desired": "STOPPED"}}
+
+            def get(self, key):
+                return self.values.get(key)
+
+            def set(self, key, value):
+                self.values[key] = value
+
+            def hset(self, key, mapping):
+                self.hashes.setdefault(key, {}).update(mapping)
+
+        red = FakeRedis()
+
+        self.assertTrue(
+            prepare_shared_state(red, ["auto_settings", "broadcasts"])
+        )
+        self.assertEqual(red.values[MODE_KEY], "shared")
+        self.assertEqual(
+            red.hashes[STATE_KEY]["auto_settings:desired"], "RUNNING"
+        )
+        self.assertEqual(red.hashes[STATE_KEY]["broadcasts:desired"], "RUNNING")
+
+    def test_shared_restart_preserves_intentional_stop_requests(self):
+        class FakeRedis:
+            def __init__(self):
+                self.values = {MODE_KEY: b"shared"}
+                self.hashes = {STATE_KEY: {"auto_settings:desired": "STOPPED"}}
+
+            def get(self, key):
+                return self.values.get(key)
+
+            def set(self, key, value):
+                self.values[key] = value
+
+            def hset(self, key, mapping):
+                self.hashes.setdefault(key, {}).update(mapping)
+
+        red = FakeRedis()
+
+        self.assertFalse(prepare_shared_state(red, ["auto_settings"]))
+        self.assertEqual(
+            red.hashes[STATE_KEY]["auto_settings:desired"], "STOPPED"
+        )
+
+    def test_split_runtime_marker_is_persisted(self):
+        class FakeRedis:
+            values = {}
+
+            def set(self, key, value):
+                self.values[key] = value
+
+        red = FakeRedis()
+        mark_runtime_mode("split", red=red)
+
+        self.assertEqual(red.values[MODE_KEY], "split")
 
     def test_shared_service_restarts_after_failure_and_clean_return(self):
         calls = 0
