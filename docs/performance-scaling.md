@@ -394,15 +394,35 @@ low-I/O maintenance window and verify free disk space first.
 
 The `runtime_data_retention` command is disabled unless a retention period is
 configured and is always a dry-run unless `--execute` is supplied. It samples
-only the maximum bounded work set and deletes in separately committed batches:
+only the maximum bounded work set and deletes in separately committed batches.
+
+Do not enable `HLL_LOG_RETENTION_DAYS` until the affected raw game events have
+an approved archival path. `log_lines` is the source for round-stat generation,
+historical player logs, stat reprocessing, and the autobalancer history
+fallback. Existing `PlayerStats` rows survive deletion, but the source data can
+no longer be reconstructed. Application, error, and container logs are outside
+this command's scope.
+
+Deployment-backup retention can be reviewed independently with the read-only
+storage planner:
+
+```bash
+python scripts/plan_storage_hygiene.py --keep-latest 8 --keep-weekly 8 --keep-monthly 6
+```
+
+The planner never changes or moves files. It protects every backup referenced
+by `.deploy-state/*.env`; its candidates are review output, not an instruction
+to delete them. Files and directories outside the managed `postgres-*.dump`
+set are reported separately with their complete size and are never selected as
+candidates.
 
 ```bash
 python rconweb/manage.py runtime_data_retention \
-  --log-days 180 --audit-days 365 --batch-size 1000 --max-batches 10
+  --audit-days 365 --batch-size 1000 --max-batches 10
 
 # Only after reviewing the dry-run and taking a backup:
 python rconweb/manage.py runtime_data_retention \
-  --log-days 180 --audit-days 365 --batch-size 1000 --max-batches 10 --execute
+  --audit-days 365 --batch-size 1000 --max-batches 10 --execute
 ```
 
 | Variable | Default | Purpose |
