@@ -102,7 +102,7 @@ services:
     command: webhook_service
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD-SHELL", "if [ -e /code/webhook-service-healthy ]; then echo 0; else echo 1; fi" ]
+      test: [ "CMD-SHELL", "test -e /code/webhook-service-healthy" ]
       start_period: 30s
       interval: 15s
       timeout: 30s
