@@ -94,7 +94,9 @@ def _active_player_blacklists(player: PlayerID) -> list[dict]:
     ]
 
 
-def get_player_identity_links(sess: Session, players: list[PlayerID]) -> dict[str, dict]:
+def get_player_identity_links(
+    sess: Session, players: list[PlayerID]
+) -> dict[str, dict]:
     """Resolve HLL and HLL:V records belonging to the same Steam account.
 
     HLL:V keeps its game-specific player ID because logs and admin commands need
@@ -105,9 +107,11 @@ def get_player_identity_links(sess: Session, players: list[PlayerID]) -> dict[st
         return {}
 
     canonical_ids = {
-        player.steam_id
-        if player.steam_id and is_steam_id_64(player.steam_id)
-        else player.player_id
+        (
+            player.steam_id
+            if player.steam_id and is_steam_id_64(player.steam_id)
+            else player.player_id
+        )
         for player in players
     }
     related = (
@@ -358,7 +362,6 @@ def get_live_profiles(
             .options(
                 selectinload(PlayerID.flags),
                 selectinload(PlayerID.watchlist),
-                selectinload(PlayerID.steaminfo),
                 selectinload(PlayerID.soldier),
             )
             .all()
@@ -373,8 +376,8 @@ def get_live_profiles(
         action_cutoff = datetime.datetime.utcnow() - datetime.timedelta(
             hours=max(1, int(action_window_hours))
         )
-        for action in (
-            sess.query(PlayersAction)
+        for player_database_id, action_time in (
+            sess.query(PlayersAction.player_id_id, PlayersAction.time)
             .filter(
                 PlayersAction.player_id_id.in_(database_ids),
                 PlayersAction.time > action_cutoff,
@@ -382,8 +385,8 @@ def get_live_profiles(
             .order_by(PlayersAction.player_id_id, PlayersAction.time.desc())
             .all()
         ):
-            actions_by_player.setdefault(action.player_id_id, []).append(
-                action.to_dict()
+            actions_by_player.setdefault(player_database_id, []).append(
+                {"time": action_time}
             )
 
         blacklist_records_by_player: dict[int, list[dict]] = {}
@@ -421,10 +424,7 @@ def get_live_profiles(
             watchlist = _watchlist_dict(player)
             profiles.append(
                 {
-                    "id": player.id,
                     "player_id": player.player_id,
-                    "steam_id": player.steam_id,
-                    "created": player.created,
                     "sessions_count": summary.sessions_count if summary else 0,
                     "current_playtime_seconds": _current_playtime_seconds(summary),
                     "received_actions": actions_by_player.get(player.id, []),
@@ -433,10 +433,15 @@ def get_live_profiles(
                     "flags": [flag.to_dict() for flag in (player.flags or [])],
                     "watchlist": watchlist,
                     "is_watched": bool(watchlist and watchlist["is_watched"]),
-                    "steaminfo": (
-                        player.steaminfo.to_dict() if player.steaminfo else None
+                    "soldier": (
+                        {
+                            "level": player.soldier.level,
+                            "platform": player.soldier.platform,
+                            "clan_tag": player.soldier.clan_tag,
+                        }
+                        if player.soldier
+                        else None
                     ),
-                    "soldier": (player.soldier.to_dict() if player.soldier else None),
                 }
             )
 
@@ -530,17 +535,26 @@ def get_players_by_appearance(
                 soldier_name = unaccent(PlayerName.name)
                 player_name = remove_accent(player_name)
             if not exact_name_match:
-                query = query.join(PlayerID.names).join(PlayerID.account).filter(
-                    or_(
-                        soldier_name.ilike("%{}%".format(player_name)),
-                        account_name.isnot(None) & account_name.ilike("%{}%".format(player_name))
+                query = (
+                    query.join(PlayerID.names)
+                    .join(PlayerID.account)
+                    .filter(
+                        or_(
+                            soldier_name.ilike("%{}%".format(player_name)),
+                            account_name.isnot(None)
+                            & account_name.ilike("%{}%".format(player_name)),
+                        )
                     )
                 )
             else:
-                query = query.join(PlayerID.names).join(PlayerID.account).filter(
-                    or_(
-                        soldier_name == player_name,
-                        account_name.isnot(None) & (account_name == player_name)
+                query = (
+                    query.join(PlayerID.names)
+                    .join(PlayerID.account)
+                    .filter(
+                        or_(
+                            soldier_name == player_name,
+                            account_name.isnot(None) & (account_name == player_name),
+                        )
                     )
                 )
 
@@ -569,8 +583,13 @@ def get_players_by_appearance(
             query = query.join(PlayerID.flags).filter(PlayerFlag.flag.in_(flags))
 
         if country:
-            query = query.join(PlayerID.steaminfo).join(PlayerID.account).filter(
-                SteamInfo.country == country.upper() or PlayerAccount.country == country.upper()
+            query = (
+                query.join(PlayerID.steaminfo)
+                .join(PlayerID.account)
+                .filter(
+                    SteamInfo.country == country.upper()
+                    or PlayerAccount.country == country.upper()
+                )
             )
 
         if last_seen_from:
@@ -697,7 +716,7 @@ def save_player(
     player_id: str,
     timestamp: float | None = None,
     *,
-    steam_id: str | None = None
+    steam_id: str | None = None,
 ) -> None:
     """Create a PlayerID record if non existent and save the player name alias"""
     with enter_session() as sess:
@@ -718,7 +737,7 @@ def save_player_action(
     reason: str = "",
     timestamp: float | None = None,
     *,
-    steam_id: str | None = None
+    steam_id: str | None = None,
 ):
     with enter_session() as sess:
         player = _get_set_player(
@@ -767,7 +786,7 @@ def save_start_player_session(
     player_id: str,
     timestamp: float,
     server_name: str | None = None,
-    server_number: int | None = None
+    server_number: int | None = None,
 ):
     config = RconServerSettingsUserConfig.load_from_db()
 

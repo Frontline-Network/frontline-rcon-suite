@@ -178,6 +178,7 @@ class GameEnum(enum.StrEnum):
     def from_int(cls, value: int) -> "GameEnum":
         return cls(GameIntEnum(value).name)
 
+
 class GameIntEnum(enum.IntEnum):
     HLL_WW2 = 1
     HLL_VIETNAM = 2
@@ -219,6 +220,7 @@ class ServerInfo:
             password=os.getenv("HLL_PASSWORD"),
             game=os.getenv("HLL_GAME"),
         )
+
 
 # Have to inherit from str to allow for JSON serialization w/ pydantic
 class Roles(str, enum.Enum):
@@ -425,7 +427,9 @@ class PlayerSessionType(TypedDict):
 class BasicPlayerProfileType(TypedDict):
     id: int
     player_id: str
-    steam_id: str | None  # Note: If player_id is the Steam ID, then steam_id might be None.
+    steam_id: (
+        str | None
+    )  # Note: If player_id is the Steam ID, then steam_id might be None.
     created: datetime.datetime
     names: list[PlayerNameType]
     steaminfo: Optional[SteamInfoType]
@@ -519,9 +523,11 @@ class DBLogLineType(TypedDict):
     server: str
     weapon: Optional[str]
 
+
 class Player(TypedDict):
     id: str
     name: str
+
 
 class PlayerTeamConfidence(enum.Enum):
     STRONG = "strong"
@@ -539,10 +545,11 @@ class PlayerTeamAssociation(TypedDict):
 
 
 class UnitHistoryEntry(TypedDict):
-    ts: int         # timestamp in seconds
-    team: int       # team int value
-    squad: int      # squad int value
-    role: int       # role int value
+    ts: int  # timestamp in seconds
+    team: int  # team int value
+    squad: int  # squad int value
+    role: int  # role int value
+
 
 class KillInfo(TypedDict):
     action: Literal["KILL", "DEATH"]
@@ -551,7 +558,9 @@ class KillInfo(TypedDict):
     ts: int
     weapon: str
 
+
 PlayerEncounters = list[KillInfo]
+
 
 class PlayerStatsType(TypedDict, total=False):
     id: int
@@ -620,10 +629,11 @@ class PlayerStat(TypedDict):
     deaths_and_redeploys: int
     units: Optional[list[UnitHistoryEntry]]
     p_unit: UnitHistoryEntry
-    p_coord: 'WorldPositionType'
+    p_coord: "WorldPositionType"
     has_spawned: bool
     names: list[str]
     status: Literal["offline", "online", "idle"]
+
 
 class CachedLiveGameStats(TypedDict):
     snapshot_timestamp: datetime.datetime
@@ -635,14 +645,17 @@ class GameLayout(TypedDict):
     requested: Sequence[str | int | None]
     set: list[str]
 
+
 class MapScore(TypedDict):
     ts: int
     allied_score: int
     axis_score: int
 
+
 class MapResult(TypedDict):
     axis: int
     allied: int
+
 
 class MapInfo(TypedDict):
     _schema_version: NotRequired[int]
@@ -800,23 +813,29 @@ class PlayerProfileType(BasicPlayerProfileType):
     account: PlayerAccountType
 
 
+class LivePlayerActionType(TypedDict):
+    time: datetime.datetime
+
+
+class LivePlayerSoldierType(TypedDict):
+    level: int
+    platform: Optional[str]
+    clan_tag: Optional[str]
+
+
 class LivePlayerProfileType(TypedDict):
     """Bounded profile data embedded in live roster responses."""
 
-    id: int
     player_id: str
-    steam_id: str | None
-    created: datetime.datetime
     sessions_count: int
     current_playtime_seconds: int
-    received_actions: list[PlayerActionType]
+    received_actions: list[LivePlayerActionType]
     blacklists: list[BlacklistRecordWithBlacklistType]
     is_blacklisted: bool
     flags: list[PlayerFlagType]
     watchlist: Optional[WatchListType]
     is_watched: bool
-    steaminfo: Optional[SteamInfoType]
-    soldier: Optional[PlayerSoldierType]
+    soldier: Optional[LivePlayerSoldierType]
 
 
 class PlayerProfileTypeEnriched(PlayerProfileType):
@@ -940,25 +959,30 @@ class VipId(TypedDict):
     player_id: str
     name: str
 
+
 class VoteMapVote(TypedDict):
     player_id: str
     player_name: str
     map_id: str
     vote_count: int
 
+
 class VoteMapVoter(TypedDict):
     player_id: str
     player_name: str
     count: int
+
 
 class VoteMapMapResult(TypedDict):
     map: "Layer"
     voters: list[VoteMapVoter]
     votes_count: int
 
+
 class VoteMapPlayerChoice(TypedDict):
     player_name: str
     player_id: str
+
 
 class VoteMapStatus(TypedDict):
     enabled: bool
@@ -968,14 +992,17 @@ class VoteMapStatus(TypedDict):
     last_reminder: Optional[datetime.datetime]
     player_choice: Optional[VoteMapPlayerChoice]
 
+
 class VoteMapHistoryResult(TypedDict):
     map_id: str
     votes_count: int
+
 
 class VoteMapHistory(TypedDict):
     ts: int
     map_id: str
     results: list[VoteMapHistoryResult]
+
 
 # Have to inherit from str to allow for JSON serialization w/ pydantic
 class AllLogTypes(str, enum.Enum):
@@ -1057,6 +1084,7 @@ class PublicInfoNameType(TypedDict):
     public_stats_port: int | None
     public_stats_port_https: int | None
 
+
 class ServerConfigType(TypedDict):
     build_number: str
     build_revision: str
@@ -1064,8 +1092,10 @@ class ServerConfigType(TypedDict):
     server_name: str
     supported_platforms: list[str]
 
+
 class PublicConfig(ServerConfigType):
     game: str
+
 
 class PublicInfoType(TypedDict):
     """TypedDict for rcon.views.get_public_info"""
@@ -1146,14 +1176,17 @@ class GetMapSequence(TypedDict):
     maps: list["Layer"]
     current_index: int
 
+
 class MapRotationResponse(TypedDict):
     maps: list[str]
     current_index: int
+
 
 class GetMapRotation(TypedDict):
     maps: list["Layer"]
     current_index: int
     next_index: int
+
 
 class ScoreDataType(TypedDict):
     cOMBAT: int
