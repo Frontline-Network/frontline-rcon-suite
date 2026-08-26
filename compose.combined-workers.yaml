@@ -3,10 +3,10 @@
 # standalone delivery services. Never activate both worker profiles together.
 services:
   mobile_push_worker:
-    profiles: ["split-background-workers"]
+    profiles: !reset ["split-background-workers"]
 
   discord_report_worker:
-    profiles: ["split-background-workers"]
+    profiles: !reset ["split-background-workers"]
 
   discord_moderation_worker:
-    profiles: ["split-background-workers"]
+    profiles: !reset ["split-background-workers"]
