@@ -396,6 +396,21 @@ The `runtime_data_retention` command is disabled unless a retention period is
 configured and is always a dry-run unless `--execute` is supplied. It samples
 only the maximum bounded work set and deletes in separately committed batches.
 
+### Server-scoped log history index
+
+Production `EXPLAIN (ANALYZE, BUFFERS)` measurements on 18.45 million
+`log_lines` rows showed that the event-time-only index had to discard 22,211
+rows from other servers to find one server's newest event. A one-day history
+query read 11,048 shared buffers and discarded 34,015 rows to return 16 rows.
+
+Migration `c9e1f4a7b2d6` adds the non-unique
+`ix_log_lines_server_event_time(server, event_time)` index. It is created and
+dropped concurrently so log ingestion remains writable while PostgreSQL builds
+or removes it. The existing event-time index stays available for intentionally
+cross-server queries, and the `unique_log_line(event_time, raw)` constraint is
+not changed. The migration therefore changes no gameplay data and no dedupe
+semantics.
+
 Do not enable `HLL_LOG_RETENTION_DAYS` until the affected raw game events have
 an approved archival path. `log_lines` is the source for round-stat generation,
 historical player logs, stat reprocessing, and the autobalancer history
