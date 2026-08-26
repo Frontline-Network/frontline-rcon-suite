@@ -396,13 +396,26 @@ The `runtime_data_retention` command is disabled unless a retention period is
 configured and is always a dry-run unless `--execute` is supplied. It samples
 only the maximum bounded work set and deletes in separately committed batches:
 
+For a low-cost capacity preview before that bounded probe, use the read-only
+planner. It uses only PostgreSQL catalog statistics and `EXPLAIN`, enforces a
+read-only transaction, and reports explicitly approximate values:
+
+```bash
+python scripts/plan_data_retention.py --log-days 90 --audit-days 365
+python scripts/plan_storage_hygiene.py --keep-latest 8 --keep-weekly 8 --keep-monthly 6
+```
+
+Neither planner changes rows or files. The storage planner also protects every
+backup referenced by `.deploy-state/*.env`. Its candidates are review output,
+not an instruction to delete them.
+
 ```bash
 python rconweb/manage.py runtime_data_retention \
-  --log-days 180 --audit-days 365 --batch-size 1000 --max-batches 10
+  --log-days 90 --audit-days 365 --batch-size 1000 --max-batches 10
 
 # Only after reviewing the dry-run and taking a backup:
 python rconweb/manage.py runtime_data_retention \
-  --log-days 180 --audit-days 365 --batch-size 1000 --max-batches 10 --execute
+  --log-days 90 --audit-days 365 --batch-size 1000 --max-batches 10 --execute
 ```
 
 | Variable | Default | Purpose |
