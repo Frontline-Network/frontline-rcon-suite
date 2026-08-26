@@ -47,6 +47,16 @@ requireText(
 );
 requireText(globalStateSource, "getGameStatePollingInterval", "Global state");
 requireText(globalStateSource, "shouldPollLiveRoster", "Global state");
+requireText(
+  globalStateSource,
+  "getGlobalLiveRosterPollingInterval",
+  "Global state"
+);
+requireText(
+  globalStateSource,
+  'queryIdentifier === "get_team_view"',
+  "Global state"
+);
 requireText(globalStateSource, "shouldPollModeratorPresence", "Global state");
 
 const liveViewSource = readSource("pages/views/live/index.jsx");
@@ -55,7 +65,11 @@ requireText(
   "React Query owns the single log request",
   "Live view"
 );
-forbidText(liveViewSource, "const response = await cmd.GET_LIVE_LOGS", "Live route loader");
+forbidText(
+  liveViewSource,
+  "const response = await cmd.GET_LIVE_LOGS",
+  "Live route loader"
+);
 
 for (const relativePath of [
   "pages/views/live/index.jsx",
@@ -114,5 +128,5 @@ if (systemUsageRegistrations !== 1) {
 }
 
 console.log(
-  "Polling budget contract passed: hidden tabs stop polling; one route-aware game-state stream and one shared system-usage stream serve all consumers."
+  "Polling budget contract passed: hidden tabs stop polling; one route-aware game-state stream, one live-roster interval per page and one shared system-usage stream serve all consumers."
 );

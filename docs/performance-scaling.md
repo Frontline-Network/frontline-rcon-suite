@@ -497,6 +497,45 @@ Normal batched deletes make space reusable inside PostgreSQL but do not shrink
 the data files. Disk reclamation (`VACUUM FULL`, `REINDEX`, or `pg_repack`) is a
 separate maintenance operation with its own capacity and rollback plan.
 
+## Live roster polling baseline
+
+The production frontend already requests `get_team_view?compact=true`. A
+read-only measurement on 2026-08-27 confirmed that the bounded live projection
+is materially smaller than the full player profile. RCON3 had nine online
+players during the usable sample; RCON1, RCON2 and RCON4 were empty.
+
+| RCON3 projection | SQL statements | Profile JSON | Profile gzip | Time |
+| --- | ---: | ---: | ---: | ---: |
+| Full profile | 11 | 19,393 B | 2,675 B | 19.75 ms |
+| Compact live profile | 7 | 3,585 B | 759 B | 8.01 ms |
+
+The complete team-view payload was 25,837 B (3,713 B gzip) in full mode and
+10,039 B (2,031 B gzip) in compact mode. The direct team-view timings were not
+compared because the full result was already cached while the compact result
+was cold. No player data was exported by the measurement.
+
+The remaining frontend issue was overlapping observers for the same React
+Query key. `GlobalState` registered a 30-second roster interval while the Live
+and Teams pages registered 10-second intervals and Live Sessions registered a
+15-second interval. Because route navigation starts the page timer at an
+arbitrary offset, the global timer can add two avoidable HTTP requests per
+minute and active browser. The modeled request budget is therefore:
+
+| Route | Before | After local change | Maximum reduction |
+| --- | ---: | ---: | ---: |
+| Live / Teams | up to 8/min | 6/min | 25% |
+| Live Sessions | up to 6/min | 4/min | 33% |
+
+The local change keeps `GlobalState` subscribed to the shared query so its
+online-player state still updates, but disables its own interval on pages that
+already own a faster roster observer. Dashboard and player-record routes keep
+the global 30-second interval because they have no page-owned roster poll.
+Contract tests cover trailing slashes, every page-owned route and the routes
+that must retain global polling. The polling-budget check, 13 focused API
+contract tests and the production frontend build passed. This change is not
+yet released or deployed; per the release policy it will be bundled with other
+validated low-risk optimizations before a requested RCON1-4 rollout.
+
 ## Canary measurement
 
 Capture at least five minutes before and after a restart, excluding image

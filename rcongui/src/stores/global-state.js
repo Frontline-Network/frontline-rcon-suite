@@ -20,6 +20,7 @@ import {
 import { useLocation } from "react-router-dom";
 import {
   getGameStatePollingInterval,
+  getGlobalLiveRosterPollingInterval,
   shouldPollLiveRoster,
   shouldPollModeratorPresence,
 } from "@/queries/polling-policy";
@@ -161,6 +162,10 @@ export const GlobalState = () => {
     location.pathname
   );
   const pollLiveRoster = shouldPollLiveRoster(location.pathname);
+  const globalLiveRosterPollingInterval = getGlobalLiveRosterPollingInterval(
+    location.pathname,
+    defaultRefetchInterval
+  );
   const pollModeratorPresence = shouldPollModeratorPresence(location.pathname);
   const crconQuery = useQuery({
     queryKey: [{ queryIdentifier: "get_connection_info" }],
@@ -195,13 +200,15 @@ export const GlobalState = () => {
         queryIdentifier === "get_team_view"
           ? pollLiveRoster
           : ["get_ingame_mods", "get_online_mods"].includes(queryIdentifier)
-            ? pollModeratorPresence
-            : true;
+          ? pollModeratorPresence
+          : true;
       return queryOptions({
         staleTime,
         refetchInterval:
           queryIdentifier === "get_gamestate"
             ? gameStateRefetchInterval
+            : queryIdentifier === "get_team_view"
+            ? globalLiveRosterPollingInterval
             : defaultRefetchInterval,
         ...query,
         enabled: canQueryGameServer && routeAllowsQuery,
@@ -235,12 +242,13 @@ export const GlobalState = () => {
       gameState: gameStateQuery?.data ?? null,
       servers: serversQuery?.data ?? [],
       onlineIngameMods: pollModeratorPresence
-        ? (ingameModsQuery?.data ?? [])
+        ? ingameModsQuery?.data ?? []
         : [],
-      onlineCrconMods: pollModeratorPresence ? (crconModsQuery?.data ?? []) : [],
-      onlinePlayers: canQueryGameServer && pollLiveRoster
-        ? useGlobalStore.getState().onlinePlayers
-        : [],
+      onlineCrconMods: pollModeratorPresence ? crconModsQuery?.data ?? [] : [],
+      onlinePlayers:
+        canQueryGameServer && pollLiveRoster
+          ? useGlobalStore.getState().onlinePlayers
+          : [],
       connectionHealth: {
         crcon: crconHealth,
         gameServer: gameServerHealth,
