@@ -412,7 +412,9 @@ python scripts/plan_storage_hygiene.py --keep-latest 8 --keep-weekly 8 --keep-mo
 
 The planner never changes or moves files. It protects every backup referenced
 by `.deploy-state/*.env`; its candidates are review output, not an instruction
-to delete them.
+to delete them. Files and directories outside the managed `postgres-*.dump`
+set are reported separately with their complete size and are never selected as
+candidates.
 
 ```bash
 python rconweb/manage.py runtime_data_retention \

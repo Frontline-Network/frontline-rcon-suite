@@ -83,6 +83,36 @@ def test_plan_reports_missing_checksum(tmp_path):
     assert Path(plan.entries[0].path) == missing
 
 
+def test_plan_reports_unmanaged_files_and_directories_without_selecting_them(tmp_path):
+    backup_dir = tmp_path / ".deploy-backups"
+    backup_dir.mkdir()
+    _backup(
+        backup_dir,
+        "managed",
+        datetime(2026, 8, 26, tzinfo=timezone.utc),
+    )
+    backup_dir.joinpath("legacy.patch").write_bytes(b"1234")
+    backup_dir.joinpath("postgres-orphan.dump.sha256").write_bytes(b"orphan")
+    source_backup = backup_dir / "source-backup"
+    source_backup.mkdir()
+    source_backup.joinpath("source.bin").write_bytes(b"1234567")
+
+    plan = build_retention_plan(
+        backup_dir,
+        tmp_path / ".deploy-state",
+        keep_latest=1,
+        keep_weekly=0,
+        keep_monthly=0,
+    )
+
+    assert plan.unmanaged_count == 3
+    assert plan.unmanaged_bytes == 4 + 6 + 7
+    assert {entry.kind for entry in plan.unmanaged_entries} == {"file", "directory"}
+    assert plan.candidate_count == 0
+    assert backup_dir.joinpath("legacy.patch").exists()
+    assert source_backup.joinpath("source.bin").exists()
+
+
 @pytest.mark.parametrize("argument", ["keep_latest", "keep_weekly", "keep_monthly"])
 def test_plan_rejects_negative_limits(tmp_path, argument):
     backup_dir = tmp_path / ".deploy-backups"
@@ -135,5 +165,6 @@ def test_cli_declares_read_only_and_outputs_candidates(tmp_path):
 
     assert "READ-ONLY STORAGE PLAN" in result.stdout
     assert "Candidates: 1 backups" in result.stdout
+    assert "Unmanaged (never candidates)" in result.stdout
     assert (backup_dir / "postgres-new.dump").exists()
     assert (backup_dir / "postgres-old.dump").exists()

@@ -36,6 +36,13 @@ class PlanEntry:
 
 
 @dataclass(frozen=True)
+class UnmanagedEntry:
+    path: str
+    size_bytes: int
+    kind: str
+
+
+@dataclass(frozen=True)
 class RetentionPlan:
     backup_dir: str
     total_count: int
@@ -45,7 +52,13 @@ class RetentionPlan:
     candidate_count: int
     candidate_bytes: int
     missing_checksum_count: int
+    checksum_count: int
+    checksum_bytes: int
+    unmanaged_count: int
+    unmanaged_bytes: int
+    observed_bytes: int
     entries: tuple[PlanEntry, ...]
+    unmanaged_entries: tuple[UnmanagedEntry, ...]
 
 
 def _utc_datetime(timestamp: float) -> datetime:
@@ -59,18 +72,84 @@ def load_backups(backup_dir: Path) -> list[Backup]:
 
     backups = []
     for path in resolved.glob("postgres-*.dump"):
-        if not path.is_file():
+        if path.is_symlink() or not path.is_file():
             continue
         stat = path.stat()
+        checksum_path = path.with_name(path.name + ".sha256")
         backups.append(
             Backup(
                 path=path.resolve(),
                 size_bytes=stat.st_size,
                 modified_at=_utc_datetime(stat.st_mtime),
-                has_checksum=path.with_name(path.name + ".sha256").is_file(),
+                has_checksum=(
+                    checksum_path.is_file() and not checksum_path.is_symlink()
+                ),
             )
         )
     return sorted(backups, key=lambda backup: backup.modified_at, reverse=True)
+
+
+def _entry_size(path: Path) -> int:
+    if path.is_symlink():
+        return path.lstat().st_size
+    if path.is_file():
+        return path.stat().st_size
+    if not path.is_dir():
+        return 0
+
+    total = 0
+    for root, directories, files in os.walk(path, followlinks=False):
+        root_path = Path(root)
+        directories[:] = [
+            name for name in directories if not (root_path / name).is_symlink()
+        ]
+        for name in files:
+            file_path = root_path / name
+            try:
+                total += (
+                    file_path.lstat().st_size
+                    if file_path.is_symlink()
+                    else file_path.stat().st_size
+                )
+            except FileNotFoundError:
+                # A concurrently completed deployment may move a temporary
+                # artifact between directory enumeration and stat().
+                continue
+    return total
+
+
+def load_unmanaged_entries(
+    backup_dir: Path, backups: Iterable[Backup]
+) -> tuple[tuple[UnmanagedEntry, ...], int, int]:
+    backup_root = backup_dir.resolve(strict=True)
+    managed_paths = {backup.path for backup in backups}
+    checksum_paths = {
+        backup.path.with_name(backup.path.name + ".sha256")
+        for backup in backups
+        if backup.has_checksum
+    }
+    checksum_bytes = sum(path.stat().st_size for path in checksum_paths)
+
+    unmanaged = []
+    for path in backup_root.iterdir():
+        resolved = path.resolve(strict=False)
+        if resolved in managed_paths or resolved in checksum_paths:
+            continue
+        kind = (
+            "symlink"
+            if path.is_symlink()
+            else "directory" if path.is_dir() else "file"
+        )
+        unmanaged.append(
+            UnmanagedEntry(
+                path=str(path.absolute()),
+                size_bytes=_entry_size(path),
+                kind=kind,
+            )
+        )
+
+    entries = tuple(sorted(unmanaged, key=lambda entry: entry.path))
+    return entries, len(checksum_paths), checksum_bytes
 
 
 def load_state_references(state_dir: Path, backup_dir: Path) -> set[Path]:
@@ -136,6 +215,9 @@ def build_retention_plan(
             raise ValueError(f"{label} must not be negative")
 
     backups = load_backups(backup_dir)
+    unmanaged_entries, checksum_count, checksum_bytes = load_unmanaged_entries(
+        backup_dir, backups
+    )
     references = load_state_references(state_dir, backup_dir)
     reasons: dict[Path, set[str]] = {backup.path: set() for backup in backups}
 
@@ -184,7 +266,17 @@ def build_retention_plan(
         candidate_count=len(candidate_entries),
         candidate_bytes=sum(entry.size_bytes for entry in candidate_entries),
         missing_checksum_count=sum(not entry.has_checksum for entry in entries),
+        checksum_count=checksum_count,
+        checksum_bytes=checksum_bytes,
+        unmanaged_count=len(unmanaged_entries),
+        unmanaged_bytes=sum(entry.size_bytes for entry in unmanaged_entries),
+        observed_bytes=(
+            sum(entry.size_bytes for entry in entries)
+            + checksum_bytes
+            + sum(entry.size_bytes for entry in unmanaged_entries)
+        ),
         entries=entries,
+        unmanaged_entries=unmanaged_entries,
     )
 
 
@@ -201,19 +293,29 @@ def _human_bytes(value: int) -> str:
 def _print_text(plan: RetentionPlan) -> None:
     print("READ-ONLY STORAGE PLAN — no files are changed")
     print(f"Backup directory: {plan.backup_dir}")
-    print(f"Total: {plan.total_count} backups / {_human_bytes(plan.total_bytes)}")
+    print(
+        f"Managed database dumps: {plan.total_count} / "
+        f"{_human_bytes(plan.total_bytes)}"
+    )
     print(f"Keep: {plan.keep_count} backups / {_human_bytes(plan.keep_bytes)}")
     print(
         f"Candidates: {plan.candidate_count} backups / "
         f"{_human_bytes(plan.candidate_bytes)}"
     )
     print(f"Missing checksum sidecars: {plan.missing_checksum_count}")
+    print(
+        f"Unmanaged (never candidates): {plan.unmanaged_count} entries / "
+        f"{_human_bytes(plan.unmanaged_bytes)}"
+    )
+    print(f"Observed storage: {_human_bytes(plan.observed_bytes)}")
     for entry in plan.entries:
         reasons = ",".join(entry.reasons) if entry.reasons else "not-selected"
         print(
             f"{entry.decision.upper()}|{entry.modified_at}|{entry.size_bytes}|"
             f"checksum={str(entry.has_checksum).lower()}|{reasons}|{entry.path}"
         )
+    for entry in plan.unmanaged_entries:
+        print(f"UNMANAGED|{entry.kind}|{entry.size_bytes}|{entry.path}")
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
