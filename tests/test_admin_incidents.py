@@ -3,7 +3,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -39,7 +39,51 @@ def incident_database(monkeypatch):
             session.close()
 
     monkeypatch.setattr(incidents, "enter_session", enter_test_session)
-    return enter_test_session
+    return engine
+
+
+def test_incident_lists_eager_load_subjects_in_constant_queries(incident_database):
+    for index in range(5):
+        incidents.create_incident(
+            server_number=1,
+            source="manual",
+            reason=f"report {index}",
+            actor="tester",
+            subjects=[
+                {
+                    "kind": "player",
+                    "state": "confirmed",
+                    "is_primary": True,
+                    "display_name": f"Player {index}",
+                    "player_id": f"player-{index}",
+                }
+            ],
+        )
+
+    query_count = 0
+
+    def count_query(*_args):
+        nonlocal query_count
+        query_count += 1
+
+    event.listen(incident_database, "before_cursor_execute", count_query)
+    try:
+        result = incidents.list_incidents(limit=100)
+    finally:
+        event.remove(incident_database, "before_cursor_execute", count_query)
+
+    assert len(result) == 5
+    assert query_count == 2
+
+    query_count = 0
+    event.listen(incident_database, "before_cursor_execute", count_query)
+    try:
+        changes, _cursor = incidents.list_incident_changes(0, limit=100)
+    finally:
+        event.remove(incident_database, "before_cursor_execute", count_query)
+
+    assert len(changes) == 5
+    assert query_count == 3
 
 
 def test_trigger_parser_links_only_a_unique_longest_player_name():

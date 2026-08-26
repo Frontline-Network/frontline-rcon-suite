@@ -322,8 +322,10 @@ class FixedLenList(Generic[T]):
 
     def add(self, obj: T) -> None:
         """Push to the left and trim to max_len."""
-        self.red.lpush(self.key, self.serializer(obj))
-        self.red.ltrim(self.key, 0, self.max_len - 1)
+        pipe = self.red.pipeline()
+        pipe.lpush(self.key, self.serializer(obj))
+        pipe.ltrim(self.key, 0, self.max_len - 1)
+        pipe.execute()
 
     def remove(self, obj: T) -> None:
         """Remove all occurrences of obj."""

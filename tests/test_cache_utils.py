@@ -24,7 +24,7 @@ class MockRedis:
 
 
 class MockRedisDeleteUnavailable(MockRedis):
-    def delete(self, _key):
+    def delete(self, *_keys):
         raise redis.exceptions.RedisError
 
 

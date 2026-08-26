@@ -7,6 +7,7 @@ from enum import Enum
 from typing import Any, Iterable, Mapping, Sequence
 
 from sqlalchemy import delete, func, select
+from sqlalchemy.orm import selectinload
 
 from rcon.incident_settings import (
     incident_context_fuzzy_threshold,
@@ -1044,7 +1045,7 @@ def list_incidents(
     limit: int = 100,
 ) -> list[dict]:
     limit = min(max(limit, 1), 250)
-    stmt = select(AdminIncident)
+    stmt = select(AdminIncident).options(selectinload(AdminIncident.subjects))
     if statuses:
         normalized = set(statuses)
         if not normalized.issubset(INCIDENT_STATUSES):
@@ -1094,7 +1095,9 @@ def list_incident_changes(
         incidents = {
             incident.id: incident
             for incident in sess.execute(
-                select(AdminIncident).where(AdminIncident.id.in_(incident_ids))
+                select(AdminIncident)
+                .options(selectinload(AdminIncident.subjects))
+                .where(AdminIncident.id.in_(incident_ids))
             )
             .scalars()
             .all()
