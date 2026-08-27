@@ -552,21 +552,27 @@ element are stored at page level. Multi-player selection toolbars remain
 separate because they represent a different action target and are mounted only
 once. Functional behavior is unchanged: Teams retains profile and edit menu
 entries, Live Sessions retains the existing online-player actions and
-completed-game statistics retain the historical-player action set.
+completed-game statistics retain the historical-player action set. Historical
+game logs and the player-profile log view now use the same pattern as well.
+Their first-player and second-player triggers preserve the previously different
+online/historical action sets instead of broadening the available commands.
 
 | Rendered roster | Complete row-action menus before | Complete row-action menus after | Reduction |
 | --- | ---: | ---: | ---: |
 | 1 player | 1 | 1 | 0% |
 | 50 players | 50 | 1 | 98% |
 | 100 players / one completed-game page | 100 | 1 | 99% |
+| 100 historical events / two player targets each | 200 | 1 | 99.5% |
 
 This is a component-mount reduction, not a claim that total page CPU or memory
 falls by the same percentage. A static contract rejects full per-row action
 menus on Live, Teams, Live Sessions and completed-game statistics. Five
-focused browser tests verified the shared menu from Teams and Live Sessions,
-plus completed-game rows on both desktop and mobile. The production frontend
-build also passed. This change is not yet released or deployed and will be
-included only in a later, explicitly approved bundle.
+focused browser tests originally verified Teams, Live Sessions and completed
+games. The expanded suite now contains eight browser tests and additionally
+verifies historical game logs on desktop and mobile plus the player-profile
+log view. The static action contract and production frontend build also passed.
+This change is not yet released or deployed and will be included only in a
+later, explicitly approved bundle.
 
 ## Canary measurement
 

@@ -53,6 +53,28 @@ const completedGameColumnsSource = await readFile(
   ),
   "utf8"
 );
+const gameLogsPageSource = await readFile(
+  new URL("../src/pages/records/game-logs/index.jsx", import.meta.url),
+  "utf8"
+);
+const gameLogsColumnsSource = await readFile(
+  new URL("../src/pages/records/game-logs/columns.jsx", import.meta.url),
+  "utf8"
+);
+const playerLogsPageSource = await readFile(
+  new URL(
+    "../src/pages/records/players/[playerId]/[detail]/logs.jsx",
+    import.meta.url
+  ),
+  "utf8"
+);
+const gameLogSharedMenuSource = await readFile(
+  new URL(
+    "../src/pages/records/game-logs/shared-player-action-menu.jsx",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 const matches = (pattern) =>
   [...actionSource.matchAll(pattern)].map((match) => match[1]);
@@ -240,6 +262,37 @@ assert.equal(
   "Completed games must mount exactly one shared row action menu"
 );
 
+assert.doesNotMatch(
+  gameLogsColumnsSource,
+  /ActionMenuButton/,
+  "Historical-log desktop rows must not mount a complete action menu per player"
+);
+assert.match(
+  gameLogsColumnsSource,
+  /table\.options\.meta\?\.openPlayerActionMenu/,
+  "Historical-log desktop triggers must delegate to the shared action menu"
+);
+assert.match(
+  gameLogsPageSource,
+  /table\.options\.meta\?\.openPlayerActionMenu/,
+  "Historical-log mobile triggers must delegate to the shared action menu"
+);
+assert.equal(
+  [...gameLogsPageSource.matchAll(/<GameLogPlayerActionMenu\b/g)].length,
+  1,
+  "Historical game logs must mount one shared player action menu"
+);
+assert.equal(
+  [...playerLogsPageSource.matchAll(/<GameLogPlayerActionMenu\b/g)].length,
+  1,
+  "Player-profile logs must mount one shared player action menu"
+);
+assert.equal(
+  [...gameLogSharedMenuSource.matchAll(/<ActionMenu\b/g)].length,
+  1,
+  "The historical-log controller must render exactly one complete action menu"
+);
+
 console.log(
-  `Validated ${executionCommands.length} action definitions across ${referencedCommands.size} commands and one shared row action menu on Live, Teams, Live Sessions and completed games.`
+  `Validated ${executionCommands.length} action definitions across ${referencedCommands.size} commands and shared row action menus on Live, Teams, Live Sessions, completed games and historical logs.`
 );

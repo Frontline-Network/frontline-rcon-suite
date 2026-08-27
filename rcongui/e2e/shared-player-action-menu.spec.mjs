@@ -59,6 +59,34 @@ test.describe("shared player action menus", () => {
       page.locator("#completed-game-player-actions-menu")
     ).toHaveCount(1);
   });
+
+  test("opens one shared menu from a historical game-log row", async ({
+    page,
+  }) => {
+    await openDemoPage(page, "/records/game-logs");
+
+    const actionTrigger = page.getByTestId("game-log-player-action-trigger");
+    await expect.poll(() => actionTrigger.count()).toBeGreaterThan(1);
+    await actionTrigger.first().click();
+
+    const menu = page.locator("#game-log-player-actions-menu:visible");
+    await expect(menu).toHaveCount(1);
+    await expect(menu.getByRole("menuitem").first()).toBeVisible();
+    await expect(page.locator("#game-log-player-actions-menu")).toHaveCount(1);
+  });
+
+  test("reuses the historical-log menu inside a player profile", async ({
+    page,
+  }) => {
+    await openDemoPage(page, "/records/players/76561198000000001/logs");
+
+    await page.getByTestId("game-log-player-action-trigger").first().click();
+
+    const menu = page.locator("#game-log-player-actions-menu:visible");
+    await expect(menu).toHaveCount(1);
+    await expect(menu.getByRole("menuitem").first()).toBeVisible();
+    await expect(page.locator("#game-log-player-actions-menu")).toHaveCount(1);
+  });
 });
 
 test.describe("shared player action menu on mobile", () => {
@@ -104,5 +132,20 @@ test.describe("shared player action menu on mobile", () => {
     await expect(
       page.locator("#completed-game-player-actions-menu")
     ).toHaveCount(1);
+  });
+
+  test("reuses the historical-log menu for mobile event cards", async ({
+    page,
+  }) => {
+    await openDemoPage(page, "/records/game-logs");
+
+    const actionTrigger = page.getByTestId("game-log-player-action-trigger");
+    await expect.poll(() => actionTrigger.count()).toBeGreaterThan(1);
+    await actionTrigger.first().click();
+
+    const menu = page.locator("#game-log-player-actions-menu:visible");
+    await expect(menu).toHaveCount(1);
+    await expect(menu.getByRole("menuitem").first()).toBeVisible();
+    await expect(page.locator("#game-log-player-actions-menu")).toHaveCount(1);
   });
 });

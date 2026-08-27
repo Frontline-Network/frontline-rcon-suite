@@ -1,7 +1,6 @@
-import { ActionMenuButton } from "@/features/player-action/ActionMenu";
 import dayjs from "dayjs";
 import { Action, SortableHeader, TextButton } from "@/components/table/styles";
-import { generatePlayerActions } from "@/features/player-action/actions";
+import { GAME_LOG_PLAYER_ACTION_MENU_ID } from "./shared-player-action-menu";
 
 const removePlayerIds = (message) => {
   // Combine both regex patterns into one
@@ -40,19 +39,31 @@ export const getLogsColumns = (t) => [
   {
     header: t("views.table.thisPlayer"),
     accessorKey: "player1_name",
-    cell: ({ row }) => {
+    cell: ({ row, table }) => {
+      const triggerKey = `${row.id}:player1`;
+      const actionMenuOpen =
+        table.options.meta?.activePlayerActionKey === triggerKey;
       return row.original.player1_name && row.original.player1_id ? (
-        <ActionMenuButton
-          actions={generatePlayerActions({
-            multiAction: false,
-            onlineAction: true,
-          })}
-          withProfile
-          recipients={{ player_id: row.original.player1_id, name: row.original.player1_name }}
-          renderButton={(props) => (
-            <TextButton {...props}>{row.original.player1_name}</TextButton>
-          )}
-        />
+        <TextButton
+          aria-controls={
+            actionMenuOpen ? GAME_LOG_PLAYER_ACTION_MENU_ID : undefined
+          }
+          aria-expanded={actionMenuOpen ? "true" : undefined}
+          aria-haspopup="true"
+          data-testid="game-log-player-action-trigger"
+          onClick={(event) =>
+            table.options.meta?.openPlayerActionMenu?.(
+              event.currentTarget,
+              {
+                player_id: row.original.player1_id,
+                name: row.original.player1_name,
+              },
+              { onlineAction: true, triggerKey }
+            )
+          }
+        >
+          {row.original.player1_name}
+        </TextButton>
       ) : row.original.player1_name ? <span>{row.original.player1_name}</span> : null;
     },
     filterFn: playerNameFilter,
@@ -76,18 +87,31 @@ export const getLogsColumns = (t) => [
     header: t("views.table.otherPlayer"),
     accessorKey: "player2_name",
     filterFn: playerNameFilter,
-    cell: ({ row }) => {
+    cell: ({ row, table }) => {
+      const triggerKey = `${row.id}:player2`;
+      const actionMenuOpen =
+        table.options.meta?.activePlayerActionKey === triggerKey;
       return row.original.player2_name && row.original.player2_id ? (
-        <ActionMenuButton
-          actions={generatePlayerActions({
-            multiAction: false,
-          })}
-          withProfile
-          recipients={{ player_id: row.original.player2_id, name: row.original.player2_name }}
-          renderButton={(props) => (
-            <TextButton {...props}>{row.original.player2_name}</TextButton>
-          )}
-        />
+        <TextButton
+          aria-controls={
+            actionMenuOpen ? GAME_LOG_PLAYER_ACTION_MENU_ID : undefined
+          }
+          aria-expanded={actionMenuOpen ? "true" : undefined}
+          aria-haspopup="true"
+          data-testid="game-log-player-action-trigger"
+          onClick={(event) =>
+            table.options.meta?.openPlayerActionMenu?.(
+              event.currentTarget,
+              {
+                player_id: row.original.player2_id,
+                name: row.original.player2_name,
+              },
+              { onlineAction: false, triggerKey }
+            )
+          }
+        >
+          {row.original.player2_name}
+        </TextButton>
       ) : row.original.player2_name ? <span>{row.original.player2_name}</span> : null;
     },
     meta: {

@@ -53,8 +53,11 @@ import utcPlugin from "dayjs/plugin/utc";
 import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/shared/PageHeader";
 import { demoHistoricalLogs, isFakeMode } from "@/mirage/demo-data";
-import { ActionMenuButton } from "@/features/player-action/ActionMenu";
-import { generatePlayerActions } from "@/features/player-action/actions";
+import {
+  GAME_LOG_PLAYER_ACTION_MENU_ID,
+  GameLogPlayerActionMenu,
+  useGameLogPlayerActionMenu,
+} from "./shared-player-action-menu";
 
 dayjs.extend(timezonePlugin);
 dayjs.extend(utcPlugin);
@@ -125,10 +128,6 @@ const removeLogPlayerIds = (message = "") =>
 
 const MobileGameLogList = ({ table }) => {
   const { t } = useTranslation();
-  const actions = useMemo(
-    () => generatePlayerActions({ multiAction: false, onlineAction: true }),
-    []
-  );
   const rows = table.getRowModel().rows;
 
   if (rows.length === 0) {
@@ -143,6 +142,8 @@ const MobileGameLogList = ({ table }) => {
     <Stack component="ol" aria-label={t("records.gameLogs.title")} sx={{ listStyle: "none", m: 0, p: 0 }}>
       {rows.map((row) => {
         const log = row.original;
+        const player1TriggerKey = `${row.id}:player1-mobile`;
+        const player2TriggerKey = `${row.id}:player2-mobile`;
         const time = dayjs
           .utc(log.event_time)
           .tz(Intl.DateTimeFormat().resolvedOptions().timeZone)
@@ -164,17 +165,37 @@ const MobileGameLogList = ({ table }) => {
             </Stack>
             <Stack direction="row" alignItems="center" flexWrap="wrap" gap={0.75} sx={{ mt: 0.5 }}>
               {log.player1_name && log.player1_id ? (
-                <ActionMenuButton
-                  actions={actions}
-                  recipients={{ player_id: log.player1_id, name: log.player1_name }}
-                  withProfile={Boolean(log.player1_id)}
-                  orientation="horizontal"
-                  renderButton={(props) => (
-                    <Button {...props} color="inherit" size="small" sx={{ minHeight: 44, px: 0.5 }}>
-                      {log.player1_name}
-                    </Button>
-                  )}
-                />
+                <Button
+                  aria-controls={
+                    table.options.meta?.activePlayerActionKey ===
+                    player1TriggerKey
+                      ? GAME_LOG_PLAYER_ACTION_MENU_ID
+                      : undefined
+                  }
+                  aria-expanded={
+                    table.options.meta?.activePlayerActionKey ===
+                    player1TriggerKey
+                      ? "true"
+                      : undefined
+                  }
+                  aria-haspopup="true"
+                  color="inherit"
+                  data-testid="game-log-player-action-trigger"
+                  onClick={(event) =>
+                    table.options.meta?.openPlayerActionMenu?.(
+                      event.currentTarget,
+                      { player_id: log.player1_id, name: log.player1_name },
+                      {
+                        onlineAction: true,
+                        triggerKey: player1TriggerKey,
+                      }
+                    )
+                  }
+                  size="small"
+                  sx={{ minHeight: 44, px: 0.5 }}
+                >
+                  {log.player1_name}
+                </Button>
               ) : log.player1_name ? (
                 <Typography variant="body2" sx={{ minHeight: 44, display: "flex", alignItems: "center" }}>
                   {log.player1_name}
@@ -184,17 +205,37 @@ const MobileGameLogList = ({ table }) => {
                 <>
                   <Typography aria-hidden color="text.secondary">→</Typography>
                   {log.player2_id ? (
-                    <ActionMenuButton
-                      actions={actions}
-                      recipients={{ player_id: log.player2_id, name: log.player2_name }}
-                      withProfile
-                      orientation="horizontal"
-                      renderButton={(props) => (
-                        <Button {...props} color="inherit" size="small" sx={{ minHeight: 44, px: 0.5 }}>
-                          {log.player2_name}
-                        </Button>
-                      )}
-                    />
+                    <Button
+                      aria-controls={
+                        table.options.meta?.activePlayerActionKey ===
+                        player2TriggerKey
+                          ? GAME_LOG_PLAYER_ACTION_MENU_ID
+                          : undefined
+                      }
+                      aria-expanded={
+                        table.options.meta?.activePlayerActionKey ===
+                        player2TriggerKey
+                          ? "true"
+                          : undefined
+                      }
+                      aria-haspopup="true"
+                      color="inherit"
+                      data-testid="game-log-player-action-trigger"
+                      onClick={(event) =>
+                        table.options.meta?.openPlayerActionMenu?.(
+                          event.currentTarget,
+                          { player_id: log.player2_id, name: log.player2_name },
+                          {
+                            onlineAction: true,
+                            triggerKey: player2TriggerKey,
+                          }
+                        )
+                      }
+                      size="small"
+                      sx={{ minHeight: 44, px: 0.5 }}
+                    >
+                      {log.player2_name}
+                    </Button>
                   ) : (
                     <Typography variant="body2" sx={{ minHeight: 44, display: "flex", alignItems: "center" }}>
                       {log.player2_name}
@@ -276,6 +317,7 @@ const GameLogsPage = () => {
       fields.exact_action
   );
   const [filtersOpen, setFiltersOpen] = useState(hasActiveFilters);
+  const playerActionMenu = useGameLogPlayerActionMenu();
   const logsColumns = useMemo(() => getLogsColumns(t), [t]);
 
   const table = useReactTable({
@@ -285,6 +327,7 @@ const GameLogsPage = () => {
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    meta: playerActionMenu.tableMeta,
     initialState: {
       pagination: {
         pageIndex: 0,
@@ -386,6 +429,7 @@ const GameLogsPage = () => {
         </TableToolbar>
       </Stack>
       </Stack>
+      <GameLogPlayerActionMenu controller={playerActionMenu} />
     </Stack>
   );
 };
