@@ -11,6 +11,15 @@ from rcon.automods.models import (
 from rcon.connection import HLLCommandError
 
 
+def test_automod_uses_compact_live_roster_snapshot():
+    rcon = Mock()
+    rcon.get_team_view.return_value = {"allies": {}, "axis": {}}
+
+    automod.get_punitions_to_apply(rcon, [])
+
+    rcon.get_team_view.assert_called_once_with(compact=True)
+
+
 def test_punish_rcon_error_is_logged_and_retried_without_stopping_automod():
     player = PunishPlayer(
         player_id="player-id",

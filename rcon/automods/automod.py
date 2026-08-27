@@ -31,7 +31,7 @@ first_run_done_key = "first_run_done"
 
 def get_punitions_to_apply(rcon, moderators) -> PunitionsToApply:
     logger.debug("Getting team info")
-    team_view = rcon.get_team_view()
+    team_view = rcon.get_team_view(compact=True)
     gamestate = rcon.get_gamestate()
     punitions_to_apply = PunitionsToApply()
 

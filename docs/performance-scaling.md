@@ -534,6 +534,24 @@ the compact path has constant query complexity instead of merely failing to
 observe an N+1 query with a small roster. The change is local, unreleased and
 will be included only in a later, explicitly approved bundle.
 
+The five-second Automod cycle still requested the full team view even though
+the four moderation rules consume only live team, squad, role, level, combat
+and profile-flag fields. All of those fields are present in the compact live
+projection. The local Automod change therefore requests `compact=True` and
+keeps the punishment calculation and RCON command path unchanged.
+
+| Automod live-profile SQL budget | Full projection before | Compact projection after | Reduction |
+| --- | ---: | ---: | ---: |
+| One five-second cycle | 11 | 5 | 54.5% |
+| One active instance per minute | 132 | 60 | 54.5% |
+| Four active instances per minute | 528 | 240 | 54.5% |
+
+These figures cover the profile-projection SQL statements, not the separate
+RCON calls or Redis moderation state. Seventy focused tests across all four
+Automod rule families passed with the compact snapshot, including an explicit
+contract that prevents the periodic loop from reverting to the full roster.
+This change is also local and unreleased.
+
 The remaining frontend issue was overlapping observers for the same React
 Query key. `GlobalState` registered a 30-second roster interval while the Live
 and Teams pages registered 10-second intervals and Live Sessions registered a
