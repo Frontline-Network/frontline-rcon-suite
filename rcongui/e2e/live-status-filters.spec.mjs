@@ -4,6 +4,30 @@ import { openDemoPage, VIEWPORTS } from "./helpers.mjs";
 test.describe("live status shortcuts", () => {
   test.use({ viewport: VIEWPORTS.desktop });
 
+  test("keeps the workspace controls without duplicating the global live status", async ({
+    page,
+  }) => {
+    await openDemoPage(page, "/views/live");
+
+    const commandBar = page.locator(
+      'section[aria-label="Live-Einsatzsteuerung"]'
+    );
+
+    await expect(commandBar).toBeVisible();
+    await expect(
+      commandBar.getByText("Live-Einsatz", { exact: true })
+    ).toHaveCount(0);
+    await expect(
+      commandBar.getByText("Aktuelle Karte", { exact: true })
+    ).toHaveCount(0);
+    await expect(commandBar.getByText("Restzeit", { exact: true })).toHaveCount(
+      0
+    );
+    await expect(
+      commandBar.getByRole("button", { name: "Geteilt" })
+    ).toBeVisible();
+  });
+
   test("toggles a commander warning off and restores every player", async ({
     page,
   }) => {
