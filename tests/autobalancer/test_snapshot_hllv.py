@@ -15,6 +15,9 @@ class Store:
 class HLLVRcon:
     game_profile = HLLV_PROFILE
 
+    def __init__(self):
+        self.compact_team_view_requested = False
+
     def get_gamestate(self):
         return {
             "current_map": {"id": "wdevc_warfare_day"},
@@ -25,7 +28,8 @@ class HLLVRcon:
             "time_remaining": timedelta(hours=1),
         }
 
-    def get_team_view(self):
+    def get_team_view(self, compact=False):
+        self.compact_team_view_requested = compact
         players = [
             {
                 "player_id": "hllv-squad-leader",
@@ -69,12 +73,14 @@ def test_hllv_snapshot_uses_game_roles_and_faction_labels(monkeypatch):
         lambda map_name, now: ("1000:wdevc_warfare_day", 900, True),
     )
 
+    rcon = HLLVRcon()
     snapshot = build_snapshot(
-        HLLVRcon(),
+        rcon,
         Store(),
         now=datetime(2026, 8, 16, tzinfo=timezone.utc),
     )
 
+    assert rcon.compact_team_view_requested is True
     assert snapshot.team_labels == {"allies": "US", "axis": "NVA"}
     assert snapshot.game == "hllv"
     assert snapshot.counts_match is True

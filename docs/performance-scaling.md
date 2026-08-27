@@ -552,6 +552,22 @@ Automod rule families passed with the compact snapshot, including an explicit
 contract that prevents the periodic loop from reverting to the full roster.
 This change is also local and unreleased.
 
+The same bounded projection is sufficient for two further periodic consumers:
+the Frontline Autobalancer snapshot and the Discord scoreboard VIP counter.
+The Autobalancer needs live team, squad, role, level, profile playtime and
+combat values; the scoreboard counter needs only `is_vip`. Neither consumer
+uses profile history, penalties, account data or the other unbounded relations
+from the full projection. Both now request `compact=True`, guarded by focused
+contract tests for HLL: Vietnam roles/factions and VIP counting.
+
+When the Autobalancer is active at its default five-second interval, its
+profile-projection SQL budget changes from 11 to 5 statements per cycle: 132
+to 60 statements per minute for one instance, or 528 to 240 for four active
+instances. Every scoreboard refresh receives the same 54.5% reduction in this
+part of its SQL work. Disabled Autobalancers do not build a roster snapshot, so
+the estimate deliberately excludes them. These changes remain local and will
+be released only as part of an explicitly approved bundle.
+
 The remaining frontend issue was overlapping observers for the same React
 Query key. `GlobalState` registered a 30-second roster interval while the Live
 and Teams pages registered 10-second intervals and Live Sessions registered a

@@ -14,6 +14,26 @@ class StopScoreboard(BaseException):
     pass
 
 
+def test_vip_count_uses_compact_live_roster():
+    rcon_api = mock.Mock()
+    rcon_api.get_team_view.return_value = {
+        "allies": {
+            "squads": {
+                "able": {"players": [{"is_vip": True}, {"is_vip": False}]}
+            },
+            "commander": {"is_vip": True},
+        },
+        "axis": {"squads": {}, "commander": None},
+    }
+
+    assert scoreboard.get_vip_count_by_team(rcon_api) == {
+        "allies": 2,
+        "axis": 0,
+        "none": 0,
+    }
+    rcon_api.get_team_view.assert_called_once_with(compact=True)
+
+
 @pytest.mark.parametrize(
     "config, expected_warning",
     [
