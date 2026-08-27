@@ -40,6 +40,25 @@ test.describe("shared player action menus", () => {
       page.locator("#live-sessions-player-actions-menu")
     ).toHaveCount(1);
   });
+
+  test("opens one shared menu from a completed-game player row", async ({
+    page,
+  }) => {
+    await openDemoPage(page, "/stats/games/fln-demo-1");
+
+    const actionTrigger = page.getByTestId(
+      "completed-game-player-action-trigger"
+    );
+    await expect.poll(() => actionTrigger.count()).toBeGreaterThan(1);
+    await actionTrigger.first().click();
+
+    const menu = page.locator("#completed-game-player-actions-menu:visible");
+    await expect(menu).toHaveCount(1);
+    await expect(menu.getByRole("menuitem").first()).toBeVisible();
+    await expect(
+      page.locator("#completed-game-player-actions-menu")
+    ).toHaveCount(1);
+  });
 });
 
 test.describe("shared player action menu on mobile", () => {
@@ -65,6 +84,25 @@ test.describe("shared player action menu on mobile", () => {
     await expect(menu.getByRole("menuitem").first()).toBeVisible();
     await expect(
       page.locator("#live-sessions-player-actions-menu")
+    ).toHaveCount(1);
+  });
+
+  test("reuses the completed-game menu for mobile player cards", async ({
+    page,
+  }) => {
+    await openDemoPage(page, "/stats/games/fln-demo-1");
+
+    const actionTrigger = page.getByTestId(
+      "completed-game-player-action-trigger"
+    );
+    await expect.poll(() => actionTrigger.count()).toBeGreaterThan(1);
+    await actionTrigger.first().click();
+
+    const menu = page.locator("#completed-game-player-actions-menu:visible");
+    await expect(menu).toHaveCount(1);
+    await expect(menu.getByRole("menuitem").first()).toBeVisible();
+    await expect(
+      page.locator("#completed-game-player-actions-menu")
     ).toHaveCount(1);
   });
 });

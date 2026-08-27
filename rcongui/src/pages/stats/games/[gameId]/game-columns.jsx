@@ -1,16 +1,10 @@
-import {
-  Box,
-  Checkbox,
-  IconButton,
-  styled,
-} from "@mui/material";
+import { Box, Checkbox, IconButton, styled } from "@mui/material";
 import dayjs from "dayjs";
-import { ActionMenuButton } from "@/features/player-action/ActionMenu";
-import { generatePlayerActions } from "@/features/player-action/actions";
 import { CountryFlag } from "@/components/shared/CountryFlag";
 import { SortableHeader } from "@/components/table/styles";
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import ArrowRightIcon from '@mui/icons-material/ArrowRight';
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
+import ArrowRightIcon from "@mui/icons-material/ArrowRight";
+import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 
 export const Square = styled(Box)(({ theme }) => ({
   display: "flex",
@@ -66,7 +60,8 @@ export const createGameColumns = (t) => [
     header: SortableHeader("🌎", t("records.players.country")),
     accessorKey: "steaminfo.country",
     cell: ({ row }) => {
-      return row.original.steaminfo?.country && row.original.steaminfo?.country !== "private" ? (
+      return row.original.steaminfo?.country &&
+        row.original.steaminfo?.country !== "private" ? (
         <CountryFlag country={row.original.steaminfo.country} />
       ) : null;
     },
@@ -78,18 +73,32 @@ export const createGameColumns = (t) => [
     id: "actions",
     header: <span title={t("common.actions")}>🛠️</span>,
     accessorKey: "actions",
-    cell: ({ row }) => {
+    cell: ({ row, table }) => {
+      const actionMenuOpen =
+        table.options.meta?.activePlayerActionId === row.original.player_id;
       return (
-        <ActionMenuButton
-          actions={generatePlayerActions()}
-          recipients={{ name: row.original.player, player_id: row.original.player_id }}
-          orientation="horizontal"
-          disableRipple={true}
+        <IconButton
+          aria-controls={
+            actionMenuOpen ? "completed-game-player-actions-menu" : undefined
+          }
+          aria-expanded={actionMenuOpen ? "true" : undefined}
+          aria-haspopup="true"
+          aria-label={t("actions.menu")}
+          data-testid="completed-game-player-action-trigger"
+          disableRipple
+          onClick={(event) =>
+            table.options.meta?.openPlayerActionMenu?.(event.currentTarget, {
+              name: row.original.player,
+              player_id: row.original.player_id,
+            })
+          }
           sx={{
-            width: 12,
-            height: 12,
+            width: 20,
+            height: 20,
           }}
-        />
+        >
+          <MoreHorizIcon sx={{ fontSize: 16 }} />
+        </IconButton>
       );
     },
     meta: {
@@ -98,7 +107,10 @@ export const createGameColumns = (t) => [
   },
   {
     id: "name",
-    header: SortableHeader(t("stats.gameDetails.csv.name"), t("stats.gameDetails.csv.name")),
+    header: SortableHeader(
+      t("stats.gameDetails.csv.name"),
+      t("stats.gameDetails.csv.name")
+    ),
     accessorKey: "player",
     cell: ({ row }) => {
       return (
@@ -110,12 +122,10 @@ export const createGameColumns = (t) => [
     meta: {
       variant: "fullname",
     },
-    children: [
-
-    ]
+    children: [],
   },
   {
-    id: 'expander',
+    id: "expander",
     header: () => null,
     cell: ({ row }) => {
       return row.getCanExpand() ? (
@@ -128,23 +138,32 @@ export const createGameColumns = (t) => [
           }}
           onClick={row.getToggleExpandedHandler()}
         >
-          {row.getIsExpanded() ? <ArrowDownwardIcon fontSize="small" /> : <ArrowRightIcon fontSize="small"  />}
+          {row.getIsExpanded() ? (
+            <ArrowDownwardIcon fontSize="small" />
+          ) : (
+            <ArrowRightIcon fontSize="small" />
+          )}
         </IconButton>
       ) : (
-        '🔵'
-      )
+        "🔵"
+      );
     },
   },
   {
     id: "kd",
-    header: SortableHeader("K/D", `${t("stats.gameDetails.metrics.kills")} / ${t("stats.gameDetails.deaths")}`),
+    header: SortableHeader(
+      "K/D",
+      `${t("stats.gameDetails.metrics.kills")} / ${t(
+        "stats.gameDetails.deaths"
+      )}`
+    ),
     accessorKey: "kill_death_ratio",
     cell: ({ row }) => {
       return <>{row.original.kill_death_ratio}</>;
     },
     meta: {
       variant: "short",
-    }
+    },
   },
   {
     id: "kpm",
@@ -155,29 +174,35 @@ export const createGameColumns = (t) => [
     },
     meta: {
       variant: "short",
-    }
+    },
   },
   {
     id: "kills",
-    header: SortableHeader(t("stats.gameDetails.metrics.kills"), t("stats.gameDetails.metrics.kills")),
+    header: SortableHeader(
+      t("stats.gameDetails.metrics.kills"),
+      t("stats.gameDetails.metrics.kills")
+    ),
     accessorKey: "kills",
     cell: ({ row }) => {
       return <>{row.original.kills}</>;
     },
     meta: {
       variant: "short",
-    }
+    },
   },
   {
     id: "deaths",
-    header: SortableHeader(t("stats.gameDetails.deaths"), t("stats.gameDetails.deaths")),
+    header: SortableHeader(
+      t("stats.gameDetails.deaths"),
+      t("stats.gameDetails.deaths")
+    ),
     accessorKey: "deaths",
     cell: ({ row }) => {
       return <>{row.original.deaths}</>;
     },
     meta: {
       variant: "short",
-    }
+    },
   },
   {
     id: "tk",
@@ -188,7 +213,7 @@ export const createGameColumns = (t) => [
     },
     meta: {
       variant: "short",
-    }
+    },
   },
   {
     id: "tk_streak",
@@ -199,7 +224,7 @@ export const createGameColumns = (t) => [
     },
     meta: {
       variant: "short",
-    }
+    },
   },
   {
     id: "td",
@@ -210,7 +235,7 @@ export const createGameColumns = (t) => [
     },
     meta: {
       variant: "short",
-    }
+    },
   },
   {
     id: "td_streak",
@@ -221,21 +246,27 @@ export const createGameColumns = (t) => [
     },
     meta: {
       variant: "short",
-    }
+    },
   },
   {
     id: "time",
-    header: SortableHeader(t("records.playerDetails.time"), t("stats.gameDetails.duration")),
+    header: SortableHeader(
+      t("records.playerDetails.time"),
+      t("stats.gameDetails.duration")
+    ),
     accessorFn: (row) => row.time_seconds ?? row.time ?? 0,
     aggregationFn: "mean",
     cell: ({ row }) => {
       const seconds = Number(
-        row.original.time_seconds ?? row.original.time ?? 0,
+        row.original.time_seconds ?? row.original.time ?? 0
       );
       return (
         <>
           {dayjs
-            .duration(Number.isFinite(seconds) && seconds >= 0 ? seconds : 0, "seconds")
+            .duration(
+              Number.isFinite(seconds) && seconds >= 0 ? seconds : 0,
+              "seconds"
+            )
             .format("H:mm")}
         </>
       );
@@ -251,5 +282,5 @@ export const createGameColumns = (t) => [
     cell: ({ row }) => {
       return <>{row.original.player_id}</>;
     },
-  }
+  },
 ];

@@ -38,6 +38,21 @@ const liveSessionsColumnsSource = await readFile(
   new URL("../src/pages/stats/live-sessions/columns.jsx", import.meta.url),
   "utf8"
 );
+const completedGamePageSource = await readFile(
+  new URL("../src/pages/stats/games/[gameId]/index.jsx", import.meta.url),
+  "utf8"
+);
+const completedGameTableSource = await readFile(
+  new URL("../src/pages/stats/games/[gameId]/game-table.jsx", import.meta.url),
+  "utf8"
+);
+const completedGameColumnsSource = await readFile(
+  new URL(
+    "../src/pages/stats/games/[gameId]/game-columns.jsx",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 const matches = (pattern) =>
   [...actionSource.matchAll(pattern)].map((match) => match[1]);
@@ -199,6 +214,32 @@ assert.equal(
   "Live Sessions must mount exactly one shared row action menu"
 );
 
+assert.doesNotMatch(
+  completedGameColumnsSource,
+  /ActionMenuButton/,
+  "Completed-game desktop rows must not mount a complete action menu per player"
+);
+assert.match(
+  completedGameColumnsSource,
+  /table\.options\.meta\?\.openPlayerActionMenu/,
+  "Completed-game desktop row triggers must delegate to the shared action menu"
+);
+assert.match(
+  completedGameTableSource,
+  /table\.options\.meta\?\.openPlayerActionMenu/,
+  "Completed-game mobile row triggers must delegate to the shared action menu"
+);
+assert.equal(
+  [...completedGameTableSource.matchAll(/<ActionMenuButton\b/g)].length,
+  1,
+  "Completed-game tables may retain only the single multi-player toolbar menu"
+);
+assert.equal(
+  [...completedGamePageSource.matchAll(/<ActionMenu\b/g)].length,
+  1,
+  "Completed games must mount exactly one shared row action menu"
+);
+
 console.log(
-  `Validated ${executionCommands.length} action definitions across ${referencedCommands.size} commands and one shared row action menu on Live, Teams and Live Sessions.`
+  `Validated ${executionCommands.length} action definitions across ${referencedCommands.size} commands and one shared row action menu on Live, Teams, Live Sessions and completed games.`
 );

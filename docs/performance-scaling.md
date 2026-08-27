@@ -551,21 +551,22 @@ exactly one shared row-action menu per page. The selected recipient and anchor
 element are stored at page level. Multi-player selection toolbars remain
 separate because they represent a different action target and are mounted only
 once. Functional behavior is unchanged: Teams retains profile and edit menu
-entries, while Live Sessions retains the existing online-player actions.
+entries, Live Sessions retains the existing online-player actions and
+completed-game statistics retain the historical-player action set.
 
 | Rendered roster | Complete row-action menus before | Complete row-action menus after | Reduction |
 | --- | ---: | ---: | ---: |
 | 1 player | 1 | 1 | 0% |
 | 50 players | 50 | 1 | 98% |
-| 100 players | 100 | 1 | 99% |
+| 100 players / one completed-game page | 100 | 1 | 99% |
 
 This is a component-mount reduction, not a claim that total page CPU or memory
 falls by the same percentage. A static contract rejects full per-row action
-menus on Live, Teams and Live Sessions. Three focused browser tests verified
-that the shared menu opens from a Teams row, a Live Sessions desktop row and a
-Live Sessions mobile card. The production frontend build also passed. This
-change is not yet released or deployed and will be included only in a later,
-explicitly approved bundle.
+menus on Live, Teams, Live Sessions and completed-game statistics. Five
+focused browser tests verified the shared menu from Teams and Live Sessions,
+plus completed-game rows on both desktop and mobile. The production frontend
+build also passed. This change is not yet released or deployed and will be
+included only in a later, explicitly approved bundle.
 
 ## Canary measurement
 
