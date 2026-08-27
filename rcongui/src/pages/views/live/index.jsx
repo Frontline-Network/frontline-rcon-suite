@@ -468,9 +468,6 @@ const Live = () => {
       })}
     >
       <LiveCommandBar
-        gameData={gameData}
-        playerCount={playersData.length}
-        isFetching={isTeamFetching || isLogsFetching}
         layoutMode={effectiveLayout}
         onLayoutModeChange={setLayoutMode}
         splitDisabled={!splitAvailable}
