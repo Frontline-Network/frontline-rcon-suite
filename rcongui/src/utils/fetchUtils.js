@@ -88,6 +88,7 @@ function getCookie(name) {
 const SAFE_HTTP_METHODS = new Set(["GET", "HEAD", "OPTIONS", "TRACE"]);
 const CSRF_RECOVERY_HEADER = "X-CRCON-CSRF-Recovery";
 const CSRF_TOKEN_HEADER = "X-CRCON-CSRF-Token";
+let serverConfirmedCsrfToken = null;
 
 function isUnsafeMethod(method) {
   return !SAFE_HTTP_METHODS.has(String(method || "GET").toUpperCase());
@@ -96,7 +97,11 @@ function isUnsafeMethod(method) {
 function requestHeadersWithCsrf(method, headers, tokenOverride) {
   const requestHeaders = new Headers(headers || {});
   if (isUnsafeMethod(method)) {
-    const csrfToken = tokenOverride || getCookie("csrftoken");
+    // Prefer a token that the server already accepted over document.cookie.
+    // Browsers may retain duplicate cookies with different paths, while
+    // document.cookie does not tell us which one will be sent to /api.
+    const csrfToken =
+      tokenOverride || serverConfirmedCsrfToken || getCookie("csrftoken");
     if (csrfToken) {
       requestHeaders.set("X-CSRFToken", decodeURIComponent(csrfToken));
     }
@@ -129,7 +134,10 @@ export async function fetchWithCsrf(input, options = {}) {
     response.headers.get(CSRF_RECOVERY_HEADER) === "1"
   ) {
     const recoveryToken = response.headers.get(CSRF_TOKEN_HEADER);
-    response = await send(recoveryToken);
+    if (recoveryToken) {
+      serverConfirmedCsrfToken = recoveryToken;
+      response = await send(recoveryToken);
+    }
   }
   return response;
 }
