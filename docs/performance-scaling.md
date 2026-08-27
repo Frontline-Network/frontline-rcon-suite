@@ -514,6 +514,26 @@ The complete team-view payload was 25,837 B (3,713 B gzip) in full mode and
 compared because the full result was already cached while the compact result
 was cold. No player data was exported by the measurement.
 
+The compact projection still loaded its two scalar relationships, watchlist
+and soldier profile, with separate `SELECT ... IN (...)` statements. They do
+not multiply parent rows, so the local change joins both into the bounded base
+player query while retaining a separate select-in query for the one-to-many
+flags collection. This removes two fixed SQL round trips without changing the
+response schema or loading any history-heavy collection.
+
+| Compact live-profile query count | Before | After local change | Reduction |
+| --- | ---: | ---: | ---: |
+| Measured RCON3 compact path / equivalent populated path | 7 | 5 | 28.6% |
+| ORM regression: one player | — | 5 | constant |
+| ORM regression: fifty players | — | 5 | constant |
+
+The regression test uses real SQLAlchemy relationships and verifies that the
+post-change count remains exactly five for both one and fifty players. It also
+checks that watchlist and soldier data are still serialized. This proves that
+the compact path has constant query complexity instead of merely failing to
+observe an N+1 query with a small roster. The change is local, unreleased and
+will be included only in a later, explicitly approved bundle.
+
 The remaining frontend issue was overlapping observers for the same React
 Query key. `GlobalState` registered a 30-second roster interval while the Live
 and Teams pages registered 10-second intervals and Live Sessions registered a

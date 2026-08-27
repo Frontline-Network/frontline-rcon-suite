@@ -1,7 +1,24 @@
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
-from rcon.models import PlayerAccount, PlayerID, PlayerSoldier, PlayerVIP, WatchList
+import pytest
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+from rcon.models import (
+    Blacklist,
+    BlacklistRecord,
+    PlayerAccount,
+    PlayerFlag,
+    PlayerID,
+    PlayersAction,
+    PlayerSession,
+    PlayerSoldier,
+    PlayerVIP,
+    WatchList,
+)
 from rcon.player_history import (
     _current_playtime_seconds,
     _watchlist_dict,
@@ -101,3 +118,99 @@ def test_empty_live_profile_request_does_not_open_a_database_session(monkeypatch
     monkeypatch.setattr("rcon.player_history.enter_session", fail_if_called)
 
     assert get_live_profiles([]) == []
+
+
+@pytest.fixture
+def live_profile_database(monkeypatch):
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    for model in (
+        PlayerID,
+        PlayerFlag,
+        WatchList,
+        PlayerSoldier,
+        PlayerSession,
+        PlayersAction,
+        Blacklist,
+        BlacklistRecord,
+    ):
+        model.__table__.create(engine)
+
+    sessions = sessionmaker(engine, expire_on_commit=False)
+
+    @contextmanager
+    def enter_test_session():
+        session = sessions()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    monkeypatch.setattr("rcon.player_history.enter_session", enter_test_session)
+    monkeypatch.setenv("SERVER_NUMBER", "1")
+    yield engine, sessions
+    engine.dispose()
+
+
+def test_live_profile_query_count_is_constant_and_joins_scalar_relationships(
+    live_profile_database,
+):
+    engine, sessions = live_profile_database
+    now = datetime.now(timezone.utc)
+    player_ids = [f"live-player-{index:03d}" for index in range(50)]
+
+    with sessions.begin() as session:
+        for index, player_id in enumerate(player_ids):
+            player = PlayerID(
+                player_id=player_id,
+                steam_id=None,
+                created=now.replace(tzinfo=None),
+            )
+            player.flags = [PlayerFlag(flag="seeded", comment=None, modified=now)]
+            player.watchlist = WatchList(
+                modified=now,
+                is_watched=index == 0,
+                reason="Observe" if index == 0 else "",
+                by="Test",
+                count=1 if index == 0 else 0,
+            )
+            player.soldier = PlayerSoldier(
+                eos_id=None,
+                name=f"Player {index}",
+                level=index,
+                platform="steam",
+                clan_tag=None,
+                updated=now,
+            )
+            session.add(player)
+
+    def load_with_query_count(requested_player_ids):
+        query_count = 0
+
+        def count_query(*_args):
+            nonlocal query_count
+            query_count += 1
+
+        event.listen(engine, "before_cursor_execute", count_query)
+        try:
+            profiles = get_live_profiles(requested_player_ids)
+        finally:
+            event.remove(engine, "before_cursor_execute", count_query)
+        return profiles, query_count
+
+    one_profile, one_player_queries = load_with_query_count(player_ids[:1])
+    all_profiles, full_roster_queries = load_with_query_count(player_ids)
+
+    assert one_player_queries == 5
+    assert full_roster_queries == one_player_queries
+    assert len(all_profiles) == 50
+    assert one_profile[0]["flags"][0]["flag"] == "seeded"
+    assert one_profile[0]["watchlist"]["reason"] == "Observe"
+    assert one_profile[0]["soldier"] == {
+        "level": 0,
+        "platform": "steam",
+        "clan_tag": None,
+    }

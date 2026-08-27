@@ -8,7 +8,7 @@ from functools import cmp_to_key
 from dateutil import parser
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, contains_eager, selectinload
+from sqlalchemy.orm import Session, contains_eager, joinedload, selectinload
 from sqlalchemy.sql.functions import ReturnTypeFromArgs
 
 from rcon.commands import HLLCommandFailedError
@@ -361,8 +361,8 @@ def get_live_profiles(
             .filter(PlayerID.player_id.in_(player_ids))
             .options(
                 selectinload(PlayerID.flags),
-                selectinload(PlayerID.watchlist),
-                selectinload(PlayerID.soldier),
+                joinedload(PlayerID.watchlist),
+                joinedload(PlayerID.soldier),
             )
             .all()
         )
