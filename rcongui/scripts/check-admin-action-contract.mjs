@@ -22,6 +22,22 @@ const livePlayerColumnsSource = await readFile(
   new URL("../src/pages/views/live/players-columns.jsx", import.meta.url),
   "utf8"
 );
+const teamPageSource = await readFile(
+  new URL("../src/pages/views/team/index.jsx", import.meta.url),
+  "utf8"
+);
+const teamSectionSource = await readFile(
+  new URL("../src/pages/views/team/team-section.jsx", import.meta.url),
+  "utf8"
+);
+const liveSessionsPageSource = await readFile(
+  new URL("../src/pages/stats/live-sessions/index.jsx", import.meta.url),
+  "utf8"
+);
+const liveSessionsColumnsSource = await readFile(
+  new URL("../src/pages/stats/live-sessions/columns.jsx", import.meta.url),
+  "utf8"
+);
 
 const matches = (pattern) =>
   [...actionSource.matchAll(pattern)].map((match) => match[1]);
@@ -151,6 +167,38 @@ assert.equal(
   "The live desktop roster must mount exactly one shared row action menu"
 );
 
+assert.doesNotMatch(
+  teamSectionSource,
+  /ActionMenuButton/,
+  "Team player rows must not mount a complete action menu per player"
+);
+assert.match(
+  teamSectionSource,
+  /onOpenPlayerActionMenu/,
+  "Team player row triggers must delegate to the shared action menu"
+);
+assert.equal(
+  [...teamPageSource.matchAll(/<ActionMenu\b/g)].length,
+  1,
+  "The team roster must mount exactly one shared row action menu"
+);
+
+assert.doesNotMatch(
+  liveSessionsColumnsSource,
+  /ActionMenuButton/,
+  "Live-session desktop rows must not mount a complete action menu per player"
+);
+assert.match(
+  liveSessionsColumnsSource,
+  /table\.options\.meta\?\.openPlayerActionMenu/,
+  "Live-session desktop row triggers must delegate to the shared action menu"
+);
+assert.equal(
+  [...liveSessionsPageSource.matchAll(/<ActionMenu\b/g)].length,
+  1,
+  "Live Sessions must mount exactly one shared row action menu"
+);
+
 console.log(
-  `Validated ${executionCommands.length} action definitions across ${referencedCommands.size} commands and one shared live-player action menu.`
+  `Validated ${executionCommands.length} action definitions across ${referencedCommands.size} commands and one shared row action menu on Live, Teams and Live Sessions.`
 );

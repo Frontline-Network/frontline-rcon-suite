@@ -1,20 +1,14 @@
-import {
-  Box,
-  Checkbox,
-  IconButton,
-  styled,
-} from "@mui/material";
+import { Box, Checkbox, IconButton, styled } from "@mui/material";
 import dayjs from "dayjs";
-import { ActionMenuButton } from "@/features/player-action/ActionMenu";
-import { generatePlayerActions } from "@/features/player-action/actions";
 import {
   getColoredFactionIconSrc,
   getPlayerTier,
   getTierColors,
 } from "@/utils/lib";
 import { SortableHeader } from "@/components/table/styles";
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import { useThemedImages } from "@/hooks/useThemedImages";
 
 export const Square = styled(Box)(({ theme }) => ({
@@ -94,7 +88,9 @@ export const createLiveSessionColumns = (t) => [
                 alt={row.original.faction}
                 title={row.original.faction}
               />
-            ) : <span>{"-"}</span>}
+            ) : (
+              <span>{"-"}</span>
+            )}
           </Square>
         </Center>
       );
@@ -113,9 +109,7 @@ export const createLiveSessionColumns = (t) => [
       return (
         <>
           <Center>
-            <Square>
-              {row.original.unit_name?.toUpperCase() ?? "-"}
-            </Square>
+            <Square>{row.original.unit_name?.toUpperCase() ?? "-"}</Square>
           </Center>
         </>
       );
@@ -170,31 +164,51 @@ export const createLiveSessionColumns = (t) => [
     id: "actions",
     header: <span title={t("common.actions")}>🛠️</span>,
     accessorKey: "actions",
-    cell: ({ row }) => {
-      if (row.getCanExpand()) return (
-        <IconButton
-          size="small"
-          sx={{ p: 0, width: 16, height: 16, fontSize: 12 }}
-          onClick={row.getToggleExpandedHandler()}
-        >
-          {row.getIsExpanded() ? <ExpandMoreIcon /> : <ChevronRightIcon />}
-        </IconButton>
-      );
+    cell: ({ row, table }) => {
+      if (row.getCanExpand())
+        return (
+          <IconButton
+            aria-expanded={row.getIsExpanded()}
+            aria-label={
+              row.getIsExpanded()
+                ? t("views.team.collapseSquadNamed", {
+                    name: row.original.unit_name,
+                  })
+                : t("views.team.expandSquadNamed", {
+                    name: row.original.unit_name,
+                  })
+            }
+            size="small"
+            sx={{ p: 0, width: 16, height: 16, fontSize: 12 }}
+            onClick={row.getToggleExpandedHandler()}
+          >
+            {row.getIsExpanded() ? <ExpandMoreIcon /> : <ChevronRightIcon />}
+          </IconButton>
+        );
 
+      const actionMenuOpen =
+        table.options.meta?.activePlayerActionId === row.original.player_id;
       return (
-        <ActionMenuButton
-          actions={generatePlayerActions({
-            multiAction: false,
-            onlineAction: true,
-          })}
-          recipients={row.original}
-          orientation="horizontal"
-          disableRipple={true}
-          sx={{
-            width: 12,
-            height: 12,
-          }}
-        />
+        <IconButton
+          aria-controls={
+            actionMenuOpen ? "live-sessions-player-actions-menu" : undefined
+          }
+          aria-expanded={actionMenuOpen ? "true" : undefined}
+          aria-haspopup="true"
+          aria-label={t("actions.menu")}
+          data-testid="live-sessions-player-action-trigger"
+          disableRipple
+          onClick={(event) =>
+            table.options.meta?.openPlayerActionMenu?.(
+              event.currentTarget,
+              row.original
+            )
+          }
+          size="small"
+          sx={{ width: 20, height: 20 }}
+        >
+          <MoreHorizIcon sx={{ fontSize: 16 }} />
+        </IconButton>
       );
     },
     meta: {
@@ -203,7 +217,10 @@ export const createLiveSessionColumns = (t) => [
   },
   {
     id: "name",
-    header: SortableHeader(t("stats.liveSessions.name"), t("stats.liveSessions.name")),
+    header: SortableHeader(
+      t("stats.liveSessions.name"),
+      t("stats.liveSessions.name")
+    ),
     accessorKey: "name",
     cell: ({ row }) => {
       return (
@@ -226,11 +243,7 @@ export const createLiveSessionColumns = (t) => [
     accessorKey: "kills",
     aggregationFn: "sum",
     cell: ({ row }) => {
-      return (
-        <>
-          {row.original.kills}
-        </>
-      );
+      return <>{row.original.kills}</>;
     },
     meta: {
       variant: "short",
@@ -242,11 +255,7 @@ export const createLiveSessionColumns = (t) => [
     accessorKey: "deaths",
     aggregationFn: "sum",
     cell: ({ row }) => {
-      return (
-        <>
-          {row.original.deaths}
-        </>
-      );
+      return <>{row.original.deaths}</>;
     },
     meta: {
       variant: "short",
@@ -258,11 +267,7 @@ export const createLiveSessionColumns = (t) => [
     accessorKey: "combat",
     aggregationFn: "sum",
     cell: ({ row }) => {
-      return (
-        <>
-          {row.original.combat}
-        </>
-      );
+      return <>{row.original.combat}</>;
     },
     meta: {
       variant: "short",
@@ -274,11 +279,7 @@ export const createLiveSessionColumns = (t) => [
     accessorKey: "offense",
     aggregationFn: "sum",
     cell: ({ row }) => {
-      return (
-        <>
-          {row.original.offense}
-        </>
-      );
+      return <>{row.original.offense}</>;
     },
     meta: {
       variant: "short",
@@ -290,11 +291,7 @@ export const createLiveSessionColumns = (t) => [
     accessorKey: "defense",
     aggregationFn: "sum",
     cell: ({ row }) => {
-      return (
-        <>
-          {row.original.defense}
-        </>
-      );
+      return <>{row.original.defense}</>;
     },
     meta: {
       variant: "short",
@@ -306,11 +303,7 @@ export const createLiveSessionColumns = (t) => [
     accessorKey: "support",
     aggregationFn: "sum",
     cell: ({ row }) => {
-      return (
-        <>
-          {row.original.support}
-        </>
-      );
+      return <>{row.original.support}</>;
     },
     meta: {
       variant: "short",
@@ -318,7 +311,10 @@ export const createLiveSessionColumns = (t) => [
   },
   {
     id: "time",
-    header: SortableHeader(t("records.playerDetails.time"), t("stats.liveSessions.currentPlaytime")),
+    header: SortableHeader(
+      t("records.playerDetails.time"),
+      t("stats.liveSessions.currentPlaytime")
+    ),
     accessorKey: "profile.current_playtime_seconds",
     aggregationFn: "mean",
     cell: ({ row }) => {

@@ -536,6 +536,37 @@ contract tests and the production frontend build passed. This change is not
 yet released or deployed; per the release policy it will be bundled with other
 validated low-risk optimizations before a requested RCON1-4 rollout.
 
+### Shared player-action menus
+
+The Live player table already used one page-level `ActionMenu`, but the Teams
+and Live Sessions views still mounted a complete `ActionMenuButton` for every
+rendered player. Each instance constructed its own MUI menu and subscribed to
+authorization, action-dialog, profile-sidebar, account-edit and soldier-edit
+hooks even while its menu was closed. With a full 100-player roster, opening
+all squads could therefore create up to 100 copies of that menu and hook tree
+on either page.
+
+The local change keeps one lightweight trigger per player and delegates it to
+exactly one shared row-action menu per page. The selected recipient and anchor
+element are stored at page level. Multi-player selection toolbars remain
+separate because they represent a different action target and are mounted only
+once. Functional behavior is unchanged: Teams retains profile and edit menu
+entries, while Live Sessions retains the existing online-player actions.
+
+| Rendered roster | Complete row-action menus before | Complete row-action menus after | Reduction |
+| --- | ---: | ---: | ---: |
+| 1 player | 1 | 1 | 0% |
+| 50 players | 50 | 1 | 98% |
+| 100 players | 100 | 1 | 99% |
+
+This is a component-mount reduction, not a claim that total page CPU or memory
+falls by the same percentage. A static contract rejects full per-row action
+menus on Live, Teams and Live Sessions. Three focused browser tests verified
+that the shared menu opens from a Teams row, a Live Sessions desktop row and a
+Live Sessions mobile card. The production frontend build also passed. This
+change is not yet released or deployed and will be included only in a later,
+explicitly approved bundle.
+
 ## Canary measurement
 
 Capture at least five minutes before and after a restart, excluding image
