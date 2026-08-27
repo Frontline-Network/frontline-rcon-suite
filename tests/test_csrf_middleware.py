@@ -190,3 +190,15 @@ class SessionCsrfProtectionMiddlewareTests(TestCase):
         self.assertIsNone(
             self.middleware.process_view(retry, historically_exempt_view, (), {})
         )
+
+
+class BrowserCookieSecuritySettingsTests(TestCase):
+    def test_authenticated_cookies_are_https_only(self):
+        self.assertTrue(settings.SESSION_COOKIE_SECURE)
+        self.assertTrue(settings.CSRF_COOKIE_SECURE)
+
+    def test_traefik_https_forwarding_is_recognized(self):
+        self.assertEqual(
+            settings.SECURE_PROXY_SSL_HEADER,
+            ("HTTP_X_FORWARDED_PROTO", "https"),
+        )

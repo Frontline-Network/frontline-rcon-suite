@@ -18,8 +18,6 @@ import UnfoldLessIcon from "@mui/icons-material/UnfoldLess";
 import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
 import { useTranslation } from "react-i18next";
 import { secondsToTime } from "@/utils/extractPlayers";
-import { ActionMenuButton } from "@/features/player-action/ActionMenu";
-import { generatePlayerActions } from "@/features/player-action/actions";
 import { TextButton } from "@/components/table/styles";
 import { useThemedImages } from "@/hooks/useThemedImages";
 import {
@@ -74,8 +72,14 @@ const getKd = (player) => {
     : Number(player?.kills || 0).toFixed(2);
 };
 
-const PlayerInfo = ({ player }) => {
+const PlayerInfo = ({
+  player,
+  activePlayerActionId,
+  onOpenPlayerActionMenu,
+}) => {
+  const { t } = useTranslation();
   const themedImg = useThemedImages();
+  const actionMenuOpen = activePlayerActionId === player.player_id;
 
   return (
     <Box className="player-info">
@@ -90,19 +94,19 @@ const PlayerInfo = ({ player }) => {
       ) : (
         <Box sx={{ width: 18, height: 18 }} />
       )}
-      <ActionMenuButton
-        actions={generatePlayerActions({
-          multiAction: false,
-          onlineAction: true,
-        })}
-        withProfile
-        recipients={player}
-        renderButton={(props) => (
-          <TextButton {...props} className="player-name">
-            {player.name}
-          </TextButton>
-        )}
-      />
+      <TextButton
+        aria-controls={
+          actionMenuOpen ? "team-player-row-actions-menu" : undefined
+        }
+        aria-expanded={actionMenuOpen ? "true" : undefined}
+        aria-haspopup="true"
+        aria-label={t("actions.menu")}
+        className="player-name"
+        data-testid="team-player-action-trigger"
+        onClick={(event) => onOpenPlayerActionMenu(event.currentTarget, player)}
+      >
+        {player.name}
+      </TextButton>
       {player.is_vip && (
         <Tooltip title="VIP">
           <StarIcon color="primary" sx={{ fontSize: 16, flex: "0 0 auto" }} />
@@ -117,6 +121,8 @@ const PlayerRowWrapper = ({
   selected,
   isCommander = false,
   onToggle,
+  activePlayerActionId,
+  onOpenPlayerActionMenu,
 }) => {
   const { t } = useTranslation();
   const Row = isCommander ? CommanderRow : PlayerRow;
@@ -131,7 +137,11 @@ const PlayerRowWrapper = ({
           "aria-label": t("views.team.selectPlayer", { name: player.name }),
         }}
       />
-      <PlayerInfo player={player} />
+      <PlayerInfo
+        player={player}
+        activePlayerActionId={activePlayerActionId}
+        onOpenPlayerActionMenu={onOpenPlayerActionMenu}
+      />
       <Typography className="leader-cell" variant="body2">
         {isCommander
           ? t("views.team.commander")
@@ -154,7 +164,14 @@ const PlayerRowWrapper = ({
   );
 };
 
-const SquadPlayers = ({ squad, expanded, selectedPlayers, onTogglePlayer }) => (
+const SquadPlayers = ({
+  squad,
+  expanded,
+  selectedPlayers,
+  onTogglePlayer,
+  activePlayerActionId,
+  onOpenPlayerActionMenu,
+}) => (
   <Collapse in={expanded} timeout="auto" unmountOnExit>
     {squad.players.map((player) => (
       <PlayerRowWrapper
@@ -162,6 +179,8 @@ const SquadPlayers = ({ squad, expanded, selectedPlayers, onTogglePlayer }) => (
         player={player}
         selected={selectedPlayers.has(player.player_id)}
         onToggle={onTogglePlayer}
+        activePlayerActionId={activePlayerActionId}
+        onOpenPlayerActionMenu={onOpenPlayerActionMenu}
       />
     ))}
   </Collapse>
@@ -174,6 +193,8 @@ const SquadRow = ({
   onTogglePlayer,
   onToggleSquad,
   onToggleExpand,
+  activePlayerActionId,
+  onOpenPlayerActionMenu,
 }) => {
   const { t } = useTranslation();
   const themedImg = useThemedImages();
@@ -266,6 +287,8 @@ const SquadRow = ({
         expanded={expanded}
         selectedPlayers={selectedPlayers}
         onTogglePlayer={onTogglePlayer}
+        activePlayerActionId={activePlayerActionId}
+        onOpenPlayerActionMenu={onOpenPlayerActionMenu}
       />
     </Box>
   );
@@ -307,6 +330,8 @@ export const TeamSection = ({
   onTeamCollapse,
   filterMode = "all",
   commanderAvailable,
+  activePlayerActionId,
+  onOpenPlayerActionMenu,
 }) => {
   const { t } = useTranslation();
   const isLobby = team.name === "lobby";
@@ -415,6 +440,8 @@ export const TeamSection = ({
           onTogglePlayer={onTogglePlayer}
           onToggleSquad={onToggleSquad}
           onToggleExpand={onToggleExpand}
+          activePlayerActionId={activePlayerActionId}
+          onOpenPlayerActionMenu={onOpenPlayerActionMenu}
         />
       </>
     );
@@ -509,6 +536,8 @@ export const TeamSection = ({
                 selected={selectedPlayers.has(commander.player_id)}
                 onToggle={onTogglePlayer}
                 isCommander
+                activePlayerActionId={activePlayerActionId}
+                onOpenPlayerActionMenu={onOpenPlayerActionMenu}
               />
             ) : !commanderAvailable ? (
               <MissingCommanderRow />
@@ -532,6 +561,8 @@ export const TeamSection = ({
                   onTogglePlayer={onTogglePlayer}
                   onToggleSquad={onToggleSquad}
                   onToggleExpand={onToggleExpand}
+                  activePlayerActionId={activePlayerActionId}
+                  onOpenPlayerActionMenu={onOpenPlayerActionMenu}
                 />
               ))}
             </Box>

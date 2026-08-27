@@ -22,6 +22,59 @@ const livePlayerColumnsSource = await readFile(
   new URL("../src/pages/views/live/players-columns.jsx", import.meta.url),
   "utf8"
 );
+const teamPageSource = await readFile(
+  new URL("../src/pages/views/team/index.jsx", import.meta.url),
+  "utf8"
+);
+const teamSectionSource = await readFile(
+  new URL("../src/pages/views/team/team-section.jsx", import.meta.url),
+  "utf8"
+);
+const liveSessionsPageSource = await readFile(
+  new URL("../src/pages/stats/live-sessions/index.jsx", import.meta.url),
+  "utf8"
+);
+const liveSessionsColumnsSource = await readFile(
+  new URL("../src/pages/stats/live-sessions/columns.jsx", import.meta.url),
+  "utf8"
+);
+const completedGamePageSource = await readFile(
+  new URL("../src/pages/stats/games/[gameId]/index.jsx", import.meta.url),
+  "utf8"
+);
+const completedGameTableSource = await readFile(
+  new URL("../src/pages/stats/games/[gameId]/game-table.jsx", import.meta.url),
+  "utf8"
+);
+const completedGameColumnsSource = await readFile(
+  new URL(
+    "../src/pages/stats/games/[gameId]/game-columns.jsx",
+    import.meta.url
+  ),
+  "utf8"
+);
+const gameLogsPageSource = await readFile(
+  new URL("../src/pages/records/game-logs/index.jsx", import.meta.url),
+  "utf8"
+);
+const gameLogsColumnsSource = await readFile(
+  new URL("../src/pages/records/game-logs/columns.jsx", import.meta.url),
+  "utf8"
+);
+const playerLogsPageSource = await readFile(
+  new URL(
+    "../src/pages/records/players/[playerId]/[detail]/logs.jsx",
+    import.meta.url
+  ),
+  "utf8"
+);
+const gameLogSharedMenuSource = await readFile(
+  new URL(
+    "../src/pages/records/game-logs/shared-player-action-menu.jsx",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 const matches = (pattern) =>
   [...actionSource.matchAll(pattern)].map((match) => match[1]);
@@ -151,6 +204,95 @@ assert.equal(
   "The live desktop roster must mount exactly one shared row action menu"
 );
 
+assert.doesNotMatch(
+  teamSectionSource,
+  /ActionMenuButton/,
+  "Team player rows must not mount a complete action menu per player"
+);
+assert.match(
+  teamSectionSource,
+  /onOpenPlayerActionMenu/,
+  "Team player row triggers must delegate to the shared action menu"
+);
+assert.equal(
+  [...teamPageSource.matchAll(/<ActionMenu\b/g)].length,
+  1,
+  "The team roster must mount exactly one shared row action menu"
+);
+
+assert.doesNotMatch(
+  liveSessionsColumnsSource,
+  /ActionMenuButton/,
+  "Live-session desktop rows must not mount a complete action menu per player"
+);
+assert.match(
+  liveSessionsColumnsSource,
+  /table\.options\.meta\?\.openPlayerActionMenu/,
+  "Live-session desktop row triggers must delegate to the shared action menu"
+);
+assert.equal(
+  [...liveSessionsPageSource.matchAll(/<ActionMenu\b/g)].length,
+  1,
+  "Live Sessions must mount exactly one shared row action menu"
+);
+
+assert.doesNotMatch(
+  completedGameColumnsSource,
+  /ActionMenuButton/,
+  "Completed-game desktop rows must not mount a complete action menu per player"
+);
+assert.match(
+  completedGameColumnsSource,
+  /table\.options\.meta\?\.openPlayerActionMenu/,
+  "Completed-game desktop row triggers must delegate to the shared action menu"
+);
+assert.match(
+  completedGameTableSource,
+  /table\.options\.meta\?\.openPlayerActionMenu/,
+  "Completed-game mobile row triggers must delegate to the shared action menu"
+);
+assert.equal(
+  [...completedGameTableSource.matchAll(/<ActionMenuButton\b/g)].length,
+  1,
+  "Completed-game tables may retain only the single multi-player toolbar menu"
+);
+assert.equal(
+  [...completedGamePageSource.matchAll(/<ActionMenu\b/g)].length,
+  1,
+  "Completed games must mount exactly one shared row action menu"
+);
+
+assert.doesNotMatch(
+  gameLogsColumnsSource,
+  /ActionMenuButton/,
+  "Historical-log desktop rows must not mount a complete action menu per player"
+);
+assert.match(
+  gameLogsColumnsSource,
+  /table\.options\.meta\?\.openPlayerActionMenu/,
+  "Historical-log desktop triggers must delegate to the shared action menu"
+);
+assert.match(
+  gameLogsPageSource,
+  /table\.options\.meta\?\.openPlayerActionMenu/,
+  "Historical-log mobile triggers must delegate to the shared action menu"
+);
+assert.equal(
+  [...gameLogsPageSource.matchAll(/<GameLogPlayerActionMenu\b/g)].length,
+  1,
+  "Historical game logs must mount one shared player action menu"
+);
+assert.equal(
+  [...playerLogsPageSource.matchAll(/<GameLogPlayerActionMenu\b/g)].length,
+  1,
+  "Player-profile logs must mount one shared player action menu"
+);
+assert.equal(
+  [...gameLogSharedMenuSource.matchAll(/<ActionMenu\b/g)].length,
+  1,
+  "The historical-log controller must render exactly one complete action menu"
+);
+
 console.log(
-  `Validated ${executionCommands.length} action definitions across ${referencedCommands.size} commands and one shared live-player action menu.`
+  `Validated ${executionCommands.length} action definitions across ${referencedCommands.size} commands and shared row action menus on Live, Teams, Live Sessions, completed games and historical logs.`
 );

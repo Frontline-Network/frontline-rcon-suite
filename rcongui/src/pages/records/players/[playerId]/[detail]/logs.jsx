@@ -39,6 +39,10 @@ import { cmd } from "@/utils/fetchUtils";
 import { useGlobalStore } from "@/stores/global-state";
 import { useTranslation } from "react-i18next";
 import { demoHistoricalLogs, isFakeMode } from "@/mirage/demo-data";
+import {
+  GameLogPlayerActionMenu,
+  useGameLogPlayerActionMenu,
+} from "@/pages/records/game-logs/shared-player-action-menu";
 
 const actionOptions = Object.keys(logActions).map((option) => ({
   label: logActions[option],
@@ -73,6 +77,7 @@ export default function PlayerLogs() {
   const server = useGlobalStore((state) => state.serverState);
   const otherServers = useGlobalStore((state) => state.servers);
   const [logs, setLogs] = useState(initialLogs);
+  const playerActionMenu = useGameLogPlayerActionMenu();
   const logsColumns = useMemo(() => getLogsColumns(t), [t]);
 
   useEffect(() => {
@@ -96,6 +101,7 @@ export default function PlayerLogs() {
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    meta: playerActionMenu.tableMeta,
     initialState: {
       pagination: {
         pageIndex: 0,
@@ -373,6 +379,7 @@ export default function PlayerLogs() {
           </TableToolbar>
         </DetailCard>
       </Stack>
+      <GameLogPlayerActionMenu controller={playerActionMenu} />
     </Stack>
   );
 }

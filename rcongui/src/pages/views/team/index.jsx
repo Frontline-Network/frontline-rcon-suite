@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -28,6 +28,7 @@ import { extractPlayers, extractTeamState } from "@/utils/extractPlayers";
 import { teamsLiveQueryOptions } from "@/queries/teams-live-query";
 import {
   ActionButton,
+  ActionMenu,
   ActionMenuButton,
 } from "@/features/player-action/ActionMenu";
 import {
@@ -62,6 +63,11 @@ const OVERFLOW_SELECTION_ACTIONS = generatePlayerActions({
 }).filter(
   (action) => action !== Actions.TempBan && action !== Actions.PermaBan
 );
+
+const SINGLE_PLAYER_ACTIONS = generatePlayerActions({
+  multiAction: false,
+  onlineAction: true,
+});
 
 const filterTeamRoster = (team, roleFilter, squadFilter) => {
   if (!team) return team;
@@ -112,6 +118,16 @@ const TeamViewPage = () => {
   const [roleFilter, setRoleFilter] = useState("all");
   const [squadFilter, setSquadFilter] = useState("all");
   const [activeTeam, setActiveTeam] = useState("allies");
+  const [playerActionMenu, setPlayerActionMenu] = useState({
+    anchorEl: null,
+    player: null,
+  });
+  const openPlayerActionMenu = useCallback((anchorEl, player) => {
+    setPlayerActionMenu({ anchorEl, player });
+  }, []);
+  const setPlayerActionMenuAnchor = useCallback((anchorEl) => {
+    setPlayerActionMenu((current) => ({ ...current, anchorEl }));
+  }, []);
 
   const summaryTeams = useMemo(
     () => ({
@@ -277,6 +293,10 @@ const TeamViewPage = () => {
         onTeamCollapse={() => setAllCollapsed(true, teamName)}
         filterMode={filterMode}
         commanderAvailable={Boolean(summary.commander)}
+        activePlayerActionId={
+          playerActionMenu.anchorEl ? playerActionMenu.player?.player_id : null
+        }
+        onOpenPlayerActionMenu={openPlayerActionMenu}
       />
     );
   };
@@ -470,6 +490,17 @@ const TeamViewPage = () => {
           </TeamContainer>
         </>
       )}
+
+      {playerActionMenu.player ? (
+        <ActionMenu
+          actions={SINGLE_PLAYER_ACTIONS}
+          recipients={playerActionMenu.player}
+          withProfile
+          anchorEl={playerActionMenu.anchorEl}
+          setAnchorEl={setPlayerActionMenuAnchor}
+          menuId="team-player-row-actions-menu"
+        />
+      ) : null}
 
       {selectedPlayers.size > 0 && (
         <Box

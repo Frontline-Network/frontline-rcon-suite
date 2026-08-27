@@ -10,7 +10,7 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { teamsLiveQuery } from "@/queries/teams-live-query";
 import {
   getExpandedRowModel,
@@ -24,7 +24,10 @@ import Table from "@/components/table/Table";
 import { isLeader, normalizePlayerProfile } from "@/utils/lib";
 import { extractPlayers } from "@/utils/extractPlayers";
 import { TableToolbar } from "@/components/table/TableToolbar";
-import { ActionMenuButton } from "@/features/player-action/ActionMenu";
+import {
+  ActionMenu,
+  ActionMenuButton,
+} from "@/features/player-action/ActionMenu";
 import { DebouncedSearchInput } from "@/components/shared/DebouncedSearchInput";
 import { generatePlayerActions } from "@/features/player-action/actions";
 import { useLiveSessionsTableStore } from "@/stores/table-config";
@@ -34,6 +37,7 @@ import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/shared/PageHeader";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import GroupsIcon from "@mui/icons-material/Groups";
+import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import { getColoredFactionIconSrc } from "@/utils/lib";
 import { NoRowsOverlay } from "@/components/NoRowsOverlay";
 
@@ -54,7 +58,17 @@ const LiveSessionsPage = () => {
 
   const tableConfig = useLiveSessionsTableStore();
   const [tableConfigDrawerOpen, setTableConfigDrawerOpen] = useState(false);
-  const setConfig = useLiveSessionsTableStore(state => state.setConfig);
+  const [playerActionMenu, setPlayerActionMenu] = useState({
+    anchorEl: null,
+    player: null,
+  });
+  const openPlayerActionMenu = useCallback((anchorEl, player) => {
+    setPlayerActionMenu({ anchorEl, player });
+  }, []);
+  const setPlayerActionMenuAnchor = useCallback((anchorEl) => {
+    setPlayerActionMenu((current) => ({ ...current, anchorEl }));
+  }, []);
+  const setConfig = useLiveSessionsTableStore((state) => state.setConfig);
 
   const playersData = useMemo(() => {
     if (!data) return [];
@@ -98,7 +112,10 @@ const LiveSessionsPage = () => {
 
         const unitLeader = unit.leader ?? {
           profile: normalizePlayerProfile({}),
-          name: unit.teamName === "neutral" ? t("stats.liveSessions.unassigned") : t("stats.liveSessions.noLeader"),
+          name:
+            unit.teamName === "neutral"
+              ? t("stats.liveSessions.unassigned")
+              : t("stats.liveSessions.noLeader"),
           unit_name: unit.unitName,
           team: unit.teamName,
           role: "",
@@ -125,6 +142,12 @@ const LiveSessionsPage = () => {
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSubRows: (row) => row.subrows,
+    meta: {
+      openPlayerActionMenu,
+      activePlayerActionId: playerActionMenu.anchorEl
+        ? playerActionMenu.player?.player_id
+        : null,
+    },
   });
 
   return (
@@ -155,9 +178,12 @@ const LiveSessionsPage = () => {
           <ActionMenuButton
             actions={multiPlayerActions}
             disabled={
-              !table.getIsSomePageRowsSelected() && !table.getIsAllRowsSelected()
+              !table.getIsSomePageRowsSelected() &&
+              !table.getIsAllRowsSelected()
             }
-            recipients={table.getSelectedRowModel().rows.map((row) => row.original)}
+            recipients={table
+              .getSelectedRowModel()
+              .rows.map((row) => row.original)}
             orientation="horizontal"
             disableRipple
             sx={{ minWidth: 44, minHeight: 44 }}
@@ -175,9 +201,12 @@ const LiveSessionsPage = () => {
           <ActionMenuButton
             actions={multiPlayerActions}
             disabled={
-              !table.getIsSomePageRowsSelected() && !table.getIsAllRowsSelected()
+              !table.getIsSomePageRowsSelected() &&
+              !table.getIsAllRowsSelected()
             }
-            recipients={table.getSelectedRowModel().rows.map((row) => row.original)}
+            recipients={table
+              .getSelectedRowModel()
+              .rows.map((row) => row.original)}
             orientation="horizontal"
             disableRipple
             sx={{ p: "1px 4px", height: "100%" }}
@@ -255,7 +284,9 @@ const LiveSessionsPage = () => {
                           }`
                         : undefined
                     }
-                    onClick={isUnit ? row.getToggleExpandedHandler() : undefined}
+                    onClick={
+                      isUnit ? row.getToggleExpandedHandler() : undefined
+                    }
                     sx={{
                       display: "grid",
                       gridTemplateColumns: "30px minmax(0, 1fr) 42px 42px 44px",
@@ -285,9 +316,7 @@ const LiveSessionsPage = () => {
                     )}
                     <Box sx={{ minWidth: 0 }}>
                       <Typography noWrap sx={{ fontWeight: 800 }}>
-                        {isUnit
-                          ? player.unit_name ?? player.name
-                          : player.name}
+                        {isUnit ? player.unit_name ?? player.name : player.name}
                       </Typography>
                       <Typography
                         variant="caption"
@@ -297,36 +326,73 @@ const LiveSessionsPage = () => {
                       >
                         {isUnit
                           ? `${memberCount} · ${player.name}`
-                          : `${player.unit_name ?? "–"} · ${player.role ?? "–"}`}
+                          : `${player.unit_name ?? "–"} · ${
+                              player.role ?? "–"
+                            }`}
                       </Typography>
                     </Box>
                     <Box sx={{ textAlign: "center" }}>
-                      <Typography variant="caption" color="text.secondary" display="block">
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        display="block"
+                      >
                         {t("stats.liveSessions.level")}
                       </Typography>
-                      <Typography sx={{ fontWeight: 800 }}>{player.level ?? 0}</Typography>
+                      <Typography sx={{ fontWeight: 800 }}>
+                        {player.level ?? 0}
+                      </Typography>
                     </Box>
                     <Box sx={{ textAlign: "center" }}>
-                      <Typography variant="caption" color="text.secondary" display="block">
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        display="block"
+                      >
                         K
                       </Typography>
-                      <Typography sx={{ fontWeight: 800 }}>{player.kills ?? 0}</Typography>
+                      <Typography sx={{ fontWeight: 800 }}>
+                        {player.kills ?? 0}
+                      </Typography>
                     </Box>
                     <Box sx={{ textAlign: "center" }}>
-                      <Typography variant="caption" color="text.secondary" display="block">
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        display="block"
+                      >
                         T
                       </Typography>
-                      <Typography sx={{ fontWeight: 800 }}>{player.deaths ?? 0}</Typography>
+                      <Typography sx={{ fontWeight: 800 }}>
+                        {player.deaths ?? 0}
+                      </Typography>
                     </Box>
                   </ButtonBase>
                   {!isUnit && (
-                    <ActionMenuButton
-                      actions={singlePlayerActions}
-                      recipients={player}
-                      orientation="horizontal"
+                    <IconButton
+                      aria-controls={
+                        playerActionMenu.anchorEl &&
+                        playerActionMenu.player?.player_id === player.player_id
+                          ? "live-sessions-player-actions-menu"
+                          : undefined
+                      }
+                      aria-expanded={
+                        playerActionMenu.anchorEl &&
+                        playerActionMenu.player?.player_id === player.player_id
+                          ? "true"
+                          : undefined
+                      }
+                      aria-haspopup="true"
+                      aria-label={t("actions.menu")}
+                      data-testid="live-sessions-player-action-trigger"
                       disableRipple
+                      onClick={(event) =>
+                        openPlayerActionMenu(event.currentTarget, player)
+                      }
                       sx={{ minWidth: 44, minHeight: 44 }}
-                    />
+                    >
+                      <MoreHorizIcon />
+                    </IconButton>
                   )}
                 </Stack>
                 {isUnit && (
@@ -366,6 +432,15 @@ const LiveSessionsPage = () => {
         }}
         config={tableConfig}
       />
+      {playerActionMenu.player ? (
+        <ActionMenu
+          actions={singlePlayerActions}
+          recipients={playerActionMenu.player}
+          anchorEl={playerActionMenu.anchorEl}
+          setAnchorEl={setPlayerActionMenuAnchor}
+          menuId="live-sessions-player-actions-menu"
+        />
+      ) : null}
     </Box>
   );
 };

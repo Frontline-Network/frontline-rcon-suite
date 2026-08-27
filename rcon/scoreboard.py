@@ -197,7 +197,7 @@ class TeamVIPCount(TypedDict):
 def get_vip_count_by_team(rcon_api: "RconAPI") -> TeamVIPCount:
     teams: TeamVIPCount = {"allies": 0, "axis": 0, "none": 0}
 
-    team_view = rcon_api.get_team_view()
+    team_view = rcon_api.get_team_view(compact=True)
     for team in teams:
         try:
             for squad_key in team_view[team]["squads"].keys():

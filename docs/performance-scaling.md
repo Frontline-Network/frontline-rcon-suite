@@ -497,6 +497,137 @@ Normal batched deletes make space reusable inside PostgreSQL but do not shrink
 the data files. Disk reclamation (`VACUUM FULL`, `REINDEX`, or `pg_repack`) is a
 separate maintenance operation with its own capacity and rollback plan.
 
+## Live roster polling baseline
+
+The production frontend already requests `get_team_view?compact=true`. A
+read-only measurement on 2026-08-27 confirmed that the bounded live projection
+is materially smaller than the full player profile. RCON3 had nine online
+players during the usable sample; RCON1, RCON2 and RCON4 were empty.
+
+| RCON3 projection | SQL statements | Profile JSON | Profile gzip | Time |
+| --- | ---: | ---: | ---: | ---: |
+| Full profile | 11 | 19,393 B | 2,675 B | 19.75 ms |
+| Compact live profile | 7 | 3,585 B | 759 B | 8.01 ms |
+
+The complete team-view payload was 25,837 B (3,713 B gzip) in full mode and
+10,039 B (2,031 B gzip) in compact mode. The direct team-view timings were not
+compared because the full result was already cached while the compact result
+was cold. No player data was exported by the measurement.
+
+The compact projection still loaded its two scalar relationships, watchlist
+and soldier profile, with separate `SELECT ... IN (...)` statements. They do
+not multiply parent rows, so the local change joins both into the bounded base
+player query while retaining a separate select-in query for the one-to-many
+flags collection. This removes two fixed SQL round trips without changing the
+response schema or loading any history-heavy collection.
+
+| Compact live-profile query count | Before | After local change | Reduction |
+| --- | ---: | ---: | ---: |
+| Measured RCON3 compact path / equivalent populated path | 7 | 5 | 28.6% |
+| ORM regression: one player | — | 5 | constant |
+| ORM regression: fifty players | — | 5 | constant |
+
+The regression test uses real SQLAlchemy relationships and verifies that the
+post-change count remains exactly five for both one and fifty players. It also
+checks that watchlist and soldier data are still serialized. This proves that
+the compact path has constant query complexity instead of merely failing to
+observe an N+1 query with a small roster. The change is local, unreleased and
+will be included only in a later, explicitly approved bundle.
+
+The five-second Automod cycle still requested the full team view even though
+the four moderation rules consume only live team, squad, role, level, combat
+and profile-flag fields. All of those fields are present in the compact live
+projection. The local Automod change therefore requests `compact=True` and
+keeps the punishment calculation and RCON command path unchanged.
+
+| Automod live-profile SQL budget | Full projection before | Compact projection after | Reduction |
+| --- | ---: | ---: | ---: |
+| One five-second cycle | 11 | 5 | 54.5% |
+| One active instance per minute | 132 | 60 | 54.5% |
+| Four active instances per minute | 528 | 240 | 54.5% |
+
+These figures cover the profile-projection SQL statements, not the separate
+RCON calls or Redis moderation state. Seventy focused tests across all four
+Automod rule families passed with the compact snapshot, including an explicit
+contract that prevents the periodic loop from reverting to the full roster.
+This change is also local and unreleased.
+
+The same bounded projection is sufficient for two further periodic consumers:
+the Frontline Autobalancer snapshot and the Discord scoreboard VIP counter.
+The Autobalancer needs live team, squad, role, level, profile playtime and
+combat values; the scoreboard counter needs only `is_vip`. Neither consumer
+uses profile history, penalties, account data or the other unbounded relations
+from the full projection. Both now request `compact=True`, guarded by focused
+contract tests for HLL: Vietnam roles/factions and VIP counting.
+
+When the Autobalancer is active at its default five-second interval, its
+profile-projection SQL budget changes from 11 to 5 statements per cycle: 132
+to 60 statements per minute for one instance, or 528 to 240 for four active
+instances. Every scoreboard refresh receives the same 54.5% reduction in this
+part of its SQL work. Disabled Autobalancers do not build a roster snapshot, so
+the estimate deliberately excludes them. These changes remain local and will
+be released only as part of an explicitly approved bundle.
+
+The remaining frontend issue was overlapping observers for the same React
+Query key. `GlobalState` registered a 30-second roster interval while the Live
+and Teams pages registered 10-second intervals and Live Sessions registered a
+15-second interval. Because route navigation starts the page timer at an
+arbitrary offset, the global timer can add two avoidable HTTP requests per
+minute and active browser. The modeled request budget is therefore:
+
+| Route | Before | After local change | Maximum reduction |
+| --- | ---: | ---: | ---: |
+| Live / Teams | up to 8/min | 6/min | 25% |
+| Live Sessions | up to 6/min | 4/min | 33% |
+
+The local change keeps `GlobalState` subscribed to the shared query so its
+online-player state still updates, but disables its own interval on pages that
+already own a faster roster observer. Dashboard and player-record routes keep
+the global 30-second interval because they have no page-owned roster poll.
+Contract tests cover trailing slashes, every page-owned route and the routes
+that must retain global polling. The polling-budget check, 13 focused API
+contract tests and the production frontend build passed. This change is not
+yet released or deployed; per the release policy it will be bundled with other
+validated low-risk optimizations before a requested RCON1-4 rollout.
+
+### Shared player-action menus
+
+The Live player table already used one page-level `ActionMenu`, but the Teams
+and Live Sessions views still mounted a complete `ActionMenuButton` for every
+rendered player. Each instance constructed its own MUI menu and subscribed to
+authorization, action-dialog, profile-sidebar, account-edit and soldier-edit
+hooks even while its menu was closed. With a full 100-player roster, opening
+all squads could therefore create up to 100 copies of that menu and hook tree
+on either page.
+
+The local change keeps one lightweight trigger per player and delegates it to
+exactly one shared row-action menu per page. The selected recipient and anchor
+element are stored at page level. Multi-player selection toolbars remain
+separate because they represent a different action target and are mounted only
+once. Functional behavior is unchanged: Teams retains profile and edit menu
+entries, Live Sessions retains the existing online-player actions and
+completed-game statistics retain the historical-player action set. Historical
+game logs and the player-profile log view now use the same pattern as well.
+Their first-player and second-player triggers preserve the previously different
+online/historical action sets instead of broadening the available commands.
+
+| Rendered roster | Complete row-action menus before | Complete row-action menus after | Reduction |
+| --- | ---: | ---: | ---: |
+| 1 player | 1 | 1 | 0% |
+| 50 players | 50 | 1 | 98% |
+| 100 players / one completed-game page | 100 | 1 | 99% |
+| 100 historical events / two player targets each | 200 | 1 | 99.5% |
+
+This is a component-mount reduction, not a claim that total page CPU or memory
+falls by the same percentage. A static contract rejects full per-row action
+menus on Live, Teams, Live Sessions and completed-game statistics. Five
+focused browser tests originally verified Teams, Live Sessions and completed
+games. The expanded suite now contains eight browser tests and additionally
+verifies historical game logs on desktop and mobile plus the player-profile
+log view. The static action contract and production frontend build also passed.
+This change is not yet released or deployed and will be included only in a
+later, explicitly approved bundle.
+
 ## Canary measurement
 
 Capture at least five minutes before and after a restart, excluding image

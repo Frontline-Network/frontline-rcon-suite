@@ -17,6 +17,16 @@ const LIVE_ROSTER_ROUTES = new Set([
   "/stats/live-sessions",
 ]);
 
+// These pages already own a faster roster observer. GlobalState must remain
+// subscribed so its shared online-player state stays current, but a second
+// interval on the same query can create an extra request whenever the timers
+// are slightly offset.
+const PAGE_OWNED_LIVE_ROSTER_ROUTES = new Set([
+  "/views/live",
+  "/views/team",
+  "/stats/live-sessions",
+]);
+
 export const shouldPollLiveRoster = (pathname = "") => {
   const normalized = normalizePathname(pathname);
   return (
@@ -25,6 +35,19 @@ export const shouldPollLiveRoster = (pathname = "") => {
     normalized === "/records/players"
   );
 };
+
+export const shouldUseGlobalLiveRosterPolling = (pathname = "") => {
+  const normalized = normalizePathname(pathname);
+  return (
+    shouldPollLiveRoster(normalized) &&
+    !PAGE_OWNED_LIVE_ROSTER_ROUTES.has(normalized)
+  );
+};
+
+export const getGlobalLiveRosterPollingInterval = (
+  pathname = "",
+  intervalMs = GAME_STATE_POLLING.defaultIntervalMs
+) => (shouldUseGlobalLiveRosterPolling(pathname) ? intervalMs : false);
 
 export const shouldPollModeratorPresence = (pathname = "") =>
   normalizePathname(pathname) === "/";

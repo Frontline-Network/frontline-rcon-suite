@@ -1295,7 +1295,7 @@ class RconAPI(Rcon):
         reset_to_default: bool = False,
         **kwargs,
     ) -> bool:
-        return self._validate_user_config(
+        result = self._validate_user_config(
             command_name=inspect.currentframe().f_code.co_name,  # type: ignore
             by=by,
             model=NameKickUserConfig,
@@ -1303,6 +1303,21 @@ class RconAPI(Rcon):
             dry_run=False,
             reset_to_default=reset_to_default,
         )
+        try:
+            # A CONNECTED-only hook cannot see players who were already online
+            # when the operator saved a new rule. Check the current roster once
+            # so the updated policy takes effect immediately without adding a
+            # permanent polling loop.
+            from rcon.auto_kick import scan_current_players
+
+            scan_current_players(self)
+        except Exception:
+            # The configuration has already been persisted. A transient RCON
+            # failure must not make the API claim the save itself failed.
+            logger.exception(
+                "Unable to scan current players after name-kick config update"
+            )
+        return result
 
     def validate_name_kick_config(
         self,

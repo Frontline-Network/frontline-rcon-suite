@@ -11,11 +11,18 @@ import {
   getPaginationRowModel,
 } from "@tanstack/react-table";
 import { createGameColumns } from "./game-columns";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import { Typography, Box, Paper } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 import { useTranslation } from "react-i18next";
+import { ActionMenu } from "@/features/player-action/ActionMenu";
+import { generatePlayerActions } from "@/features/player-action/actions";
+
+const HISTORICAL_PLAYER_ACTIONS = generatePlayerActions({
+  multiAction: false,
+  onlineAction: false,
+});
 
 export const StatCard = ({ playerStats, statsKey, limit = 10 }) => {
   const { t } = useTranslation();
@@ -31,26 +38,33 @@ export const StatCard = ({ playerStats, statsKey, limit = 10 }) => {
         {[...playerStats]
           .sort((a, b) => b[statsKey] - a[statsKey])
           .slice(0, limit)
-          .map((player, i) => player[statsKey] > 0 && (
-            <Box
-              key={player.player_id}
-              sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}
-            >
-              <Typography variant="body2">
-                {i === 0
-                  ? `🥇 ${player.player}`
-                  : i === 1
-                  ? `🥈 ${player.player}`
-                  : i === 2
-                  ? `🥉 ${player.player}`
-                  : (i + 1).toString() + '. ' + player.player}
-              </Typography>
-              <Box sx={{ flexGrow: 1, minWidth: 10 }} />
-              <Typography variant="body2" color="primary">
-                {player[statsKey]}
-              </Typography>
-            </Box>
-          ))}
+          .map(
+            (player, i) =>
+              player[statsKey] > 0 && (
+                <Box
+                  key={player.player_id}
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    mb: 1,
+                  }}
+                >
+                  <Typography variant="body2">
+                    {i === 0
+                      ? `🥇 ${player.player}`
+                      : i === 1
+                      ? `🥈 ${player.player}`
+                      : i === 2
+                      ? `🥉 ${player.player}`
+                      : (i + 1).toString() + ". " + player.player}
+                  </Typography>
+                  <Box sx={{ flexGrow: 1, minWidth: 10 }} />
+                  <Typography variant="body2" color="primary">
+                    {player[statsKey]}
+                  </Typography>
+                </Box>
+              )
+          )}
       </Paper>
     </Grid>
   );
@@ -89,7 +103,8 @@ export const CompletedGameDetails = ({ mapLayer, result, start, end, id }) => {
           {dayjs(start).format("L LT")}
         </Typography>
         <Typography variant="subtitle1" sx={{ mb: 1 }}>
-          {t("stats.gameDetails.duration")}: {dayjs.duration(dayjs(end) - dayjs(start)).format("HH:mm")}
+          {t("stats.gameDetails.duration")}:{" "}
+          {dayjs.duration(dayjs(end) - dayjs(start)).format("HH:mm")}
         </Typography>
         <Typography variant="subtitle2" color="text.secondary">
           {t("stats.gameDetails.gameId")}: {id}
@@ -101,6 +116,16 @@ export const CompletedGameDetails = ({ mapLayer, result, start, end, id }) => {
 
 export const GameTable = ({ playerStats, columns }) => {
   const [playersRowSelection, setPlayersRowSelection] = useState({});
+  const [playerActionMenu, setPlayerActionMenu] = useState({
+    anchorEl: null,
+    player: null,
+  });
+  const openPlayerActionMenu = useCallback((anchorEl, player) => {
+    setPlayerActionMenu({ anchorEl, player });
+  }, []);
+  const setPlayerActionMenuAnchor = useCallback((anchorEl) => {
+    setPlayerActionMenu((current) => ({ ...current, anchorEl }));
+  }, []);
   const [pagination, setPagination] = useState({
     pageIndex: 0,
     pageSize: 100,
@@ -118,6 +143,12 @@ export const GameTable = ({ playerStats, columns }) => {
     getPaginationRowModel: getPaginationRowModel(),
     onPaginationChange: setPagination,
     getRowId: (row) => row.player_id,
+    meta: {
+      openPlayerActionMenu,
+      activePlayerActionId: playerActionMenu.anchorEl
+        ? playerActionMenu.player?.player_id
+        : null,
+    },
     initialState: {
       sorting: [{ id: "time", desc: true }],
     },
@@ -142,14 +173,27 @@ export const GameTable = ({ playerStats, columns }) => {
       }));
   }, [playersRowSelection, table.getSelectedRowModel().rows]);
 
-  return <PlayersTable table={table} selectedPlayers={selectedPlayers} />;
+  return (
+    <>
+      <PlayersTable table={table} selectedPlayers={selectedPlayers} />
+      {playerActionMenu.player ? (
+        <ActionMenu
+          actions={HISTORICAL_PLAYER_ACTIONS}
+          recipients={playerActionMenu.player}
+          anchorEl={playerActionMenu.anchorEl}
+          setAnchorEl={setPlayerActionMenuAnchor}
+          menuId="completed-game-player-actions-menu"
+        />
+      ) : null}
+    </>
+  );
 };
 
 const CompletedGamePage = () => {
   const { t } = useTranslation();
   const columns = useMemo(() => createGameColumns(t), [t]);
   const { gameId } = useParams();
-  
+
   const { data, isLoading, error } = useQuery({
     ...gameQueryOptions.detail(gameId),
   });
@@ -159,18 +203,20 @@ const CompletedGamePage = () => {
   }
 
   if (error) {
-    return <div>{t("stats.gameDetails.loadError", { message: error.message })}</div>;
+    return (
+      <div>{t("stats.gameDetails.loadError", { message: error.message })}</div>
+    );
   }
 
   return (
     <div>
       <Box sx={{ p: 4 }}>
-        <CompletedGameDetails 
+        <CompletedGameDetails
           mapLayer={data.map}
-          result={data.result} 
-          start={data.start} 
-          end={data.end} 
-          id={data.id} 
+          result={data.result}
+          start={data.start}
+          end={data.end}
+          id={data.id}
         />
         <Grid container spacing={3} sx={{ mb: 4 }}>
           <StatCard playerStats={data.player_stats} statsKey="kills" />
