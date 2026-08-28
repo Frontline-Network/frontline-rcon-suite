@@ -59,6 +59,10 @@ import {
   GuidedConfigForm,
   NoLeaderSummaryPanel,
   SchemaConfigForm,
+  SeedingConfigForm,
+  SeedingOperationModeControl,
+  SeedingSummaryPanel,
+  SeedingWorkbenchLayout,
   validateProfiledConfig,
 } from "@/pages/settings/config-form";
 import { getConfigFormProfile } from "@/pages/settings/config-form/schema";
@@ -460,6 +464,10 @@ const ConfigPage = () => {
   );
   const hasGuidedProfile = Boolean(formProfile?.sections?.length);
   const usesGuidedRenderer = formProfile?.renderer === "guided";
+  const usesSeedingRenderer = formProfile?.renderer === "seeding";
+  const WorkbenchLayout = usesSeedingRenderer
+    ? SeedingWorkbenchLayout
+    : ConfigFormLayout;
   const changePermission = `can_change_${command}`;
   const canChange = Boolean(
     permissions?.is_superuser ||
@@ -674,11 +682,11 @@ const ConfigPage = () => {
         unmountOnExit={isAutobalancer}
       >
         <Form id="config-settings-form" method="post" onSubmit={handleSubmit}>
-          <ConfigFormLayout
+          <WorkbenchLayout
             eyebrow={pageEyebrow}
             title={pageTitle}
             description={pageDescription}
-            status={ruleStatus}
+            status={usesSeedingRenderer ? undefined : ruleStatus}
             statusColor={ruleStatusColor}
             sections={mode === "visual" ? sectionNavigation : []}
             activeSection={activeSection}
@@ -688,34 +696,49 @@ const ConfigPage = () => {
               "settings.configForms.workbench.mobileNavigation"
             )}
             headerActions={
-              <ConfigModeSwitch
-                value={mode}
-                onChange={updateMode}
-                ariaLabel={t("settings.configForms.workbench.tabsLabel")}
-                options={[
-                  {
-                    value: "visual",
-                    label: hasGuidedProfile
-                      ? t("settings.configForms.workbench.formTab")
-                      : isAutobalancer
-                      ? t("settings.config.basicMode")
-                      : t("settings.config.visual"),
-                  },
-                  {
-                    value: "code",
-                    label: hasGuidedProfile
-                      ? t("settings.configForms.workbench.jsonTab")
-                      : isAutobalancer
-                      ? t("settings.config.advancedJsonMode")
-                      : t("settings.config.code"),
-                  },
-                ]}
-              />
+              <Stack
+                direction={{ xs: "column", lg: "row" }}
+                spacing={1}
+                alignItems={{ xs: "stretch", lg: "center" }}
+              >
+                {usesSeedingRenderer && mode === "visual" && (
+                  <SeedingOperationModeControl
+                    data={jsonData}
+                    disabled={!canChange}
+                    onChange={handleSchemaSectionChange}
+                  />
+                )}
+                <ConfigModeSwitch
+                  value={mode}
+                  onChange={updateMode}
+                  ariaLabel={t("settings.configForms.workbench.tabsLabel")}
+                  options={[
+                    {
+                      value: "visual",
+                      label: hasGuidedProfile
+                        ? t("settings.configForms.workbench.formTab")
+                        : isAutobalancer
+                        ? t("settings.config.basicMode")
+                        : t("settings.config.visual"),
+                    },
+                    {
+                      value: "code",
+                      label: hasGuidedProfile
+                        ? t("settings.configForms.workbench.jsonTab")
+                        : isAutobalancer
+                        ? t("settings.config.advancedJsonMode")
+                        : t("settings.config.code"),
+                    },
+                  ]}
+                />
+              </Stack>
             }
             summary={
               mode === "visual" && hasGuidedProfile ? (
                 usesGuidedRenderer ? (
                   <NoLeaderSummaryPanel data={jsonData} />
+                ) : usesSeedingRenderer ? (
+                  <SeedingSummaryPanel data={jsonData} />
                 ) : (
                   <ConfigProfileSummaryPanel
                     profile={formProfile}
@@ -813,6 +836,15 @@ const ConfigPage = () => {
                     activeSection={activeSection}
                     disabled={!canChange}
                     onChange={handleGuidedChange}
+                  />
+                ) : usesSeedingRenderer ? (
+                  <SeedingConfigForm
+                    profile={formProfile}
+                    schema={schema}
+                    data={jsonData}
+                    activeSection={activeSection}
+                    disabled={!canChange}
+                    onChange={handleSchemaSectionChange}
                   />
                 ) : (
                   <SchemaConfigForm
@@ -915,7 +947,7 @@ const ConfigPage = () => {
                 </Box>
               </Stack>
             )}
-          </ConfigFormLayout>
+          </WorkbenchLayout>
         </Form>
       </Collapse>
     </Stack>

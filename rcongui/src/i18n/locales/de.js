@@ -272,20 +272,40 @@ const de = {
   mobileOperations: {
     eyebrow: "Serverbetrieb",
     title: "Betrieb",
-    subtitle: "Prüfe den Zustand deines Servers und öffne die häufigsten Betriebsaufgaben.",
+    subtitle:
+      "Prüfe den Zustand deines Servers und öffne die häufigsten Betriebsaufgaben.",
     cards: {
-      teams: { title: "Teams & Trupps", description: "Führungsprobleme, Trupps und Spieler verwalten." },
-      maps: { title: "Karten", description: "Aktuelle, nächste und sofortige Kartenwechsel steuern." },
-      balance: { title: "Autobalancer", description: "Balancezustand und letzte Eingriffe prüfen." },
-      automation: { title: "Automatisierung", description: "Regeln, Wirkungen und aktive Zeitpläne verwalten." },
-      services: { title: "Dienste", description: "CRCON, Gameserver und Hintergrunddienste prüfen." },
-      settings: { title: "Servereinstellungen", description: "Spielregeln und allgemeine Konfiguration öffnen." },
+      teams: {
+        title: "Teams & Trupps",
+        description: "Führungsprobleme, Trupps und Spieler verwalten.",
+      },
+      maps: {
+        title: "Karten",
+        description: "Aktuelle, nächste und sofortige Kartenwechsel steuern.",
+      },
+      balance: {
+        title: "Autobalancer",
+        description: "Balancezustand und letzte Eingriffe prüfen.",
+      },
+      automation: {
+        title: "Automatisierung",
+        description: "Regeln, Wirkungen und aktive Zeitpläne verwalten.",
+      },
+      services: {
+        title: "Dienste",
+        description: "CRCON, Gameserver und Hintergrunddienste prüfen.",
+      },
+      settings: {
+        title: "Servereinstellungen",
+        description: "Spielregeln und allgemeine Konfiguration öffnen.",
+      },
     },
   },
   incidents: {
     eyebrow: "Moderation",
     title: "Meldungen",
-    subtitle: "Admin-Reports serverübergreifend übernehmen, bearbeiten und abschließen.",
+    subtitle:
+      "Admin-Reports serverübergreifend übernehmen, bearbeiten und abschließen.",
     filters: "Meldungen filtern",
     tabs: {
       new: "Neu",
@@ -294,7 +314,12 @@ const de = {
       done: "Erledigt",
       dismissed: "Abgelehnt",
     },
-    status: { new: "Neu", claimed: "Übernommen", resolved: "Erledigt", dismissed: "Abgelehnt" },
+    status: {
+      new: "Neu",
+      claimed: "Übernommen",
+      resolved: "Erledigt",
+      dismissed: "Abgelehnt",
+    },
     server: "Server {{number}}",
     generalReport: "Allgemeine Meldung",
     unknownReporter: "Unbekannter Melder",
@@ -307,8 +332,10 @@ const de = {
     updated: "Zuletzt geändert",
     emptyTitle: "Hier ist alles erledigt",
     emptyDescription: "Für diesen Filter liegen derzeit keine Meldungen vor.",
-    loadFailed: "Die Meldungen konnten nicht geladen werden. Prüfe die Verbindung und versuche es erneut.",
-    updateFailed: "Die Meldung konnte nicht aktualisiert werden. Sie bleibt unverändert.",
+    loadFailed:
+      "Die Meldungen konnten nicht geladen werden. Prüfe die Verbindung und versuche es erneut.",
+    updateFailed:
+      "Die Meldung konnte nicht aktualisiert werden. Sie bleibt unverändert.",
     dismissConfirmationTitle: "Meldung wirklich ablehnen?",
     dismissConfirmationBody:
       "Die Ablehnung wird im Verlauf protokolliert. Der Vorgang kann danach nicht mehr als offen bearbeitet werden.",
@@ -2269,10 +2296,218 @@ const de = {
           "Steuere Mindest- und Höchstlevel sowie rollenabhängige Levelgrenzen. Spieler können stufenweise informiert, bestraft oder vom Server entfernt werden.",
       },
       seeding: {
-        eyebrow: "Automod-Regel",
+        eyebrow: "Automatisierung · Seeding",
         title: "Seeding-Regeln",
         intro:
           "Lege Regeln für die Aufbauphase des Servers fest und bestimme, wie Verstöße während des Seedings behandelt werden.",
+      },
+      seedingWorkbench: {
+        players: "Spieler",
+        seconds: "Sekunden",
+        level: "Level",
+        placeholders: "Einfügen:",
+        sections: {
+          operation: {
+            title: "Übersicht",
+            description:
+              "Lege fest, ob die Regeln ausgeschaltet, nur beobachtet oder aktiv durchgesetzt werden.",
+          },
+          rules: {
+            title: "Regeln",
+            description:
+              "Definiere die erlaubte Spielweise und die Spielerbereiche, in denen jede Regel gilt.",
+          },
+          exemptions: {
+            title: "Ausnahmen",
+            description:
+              "Schütze bestimmte Rollen, Markierungen oder neue Spieler vor automatischen Maßnahmen.",
+          },
+          actions: {
+            title: "Maßnahmen",
+            description:
+              "Baue die sichtbare Wirkungskette von der Ankündigung bis zum Kick auf.",
+          },
+          notifications: {
+            title: "Benachrichtigungen",
+            description:
+              "Sende erkannte Verstöße und ausgeführte Maßnahmen optional an Discord.",
+          },
+        },
+        operation: {
+          modeTitle: "Wie soll der Automod laufen?",
+          modeHelp:
+            "Der Testbetrieb nutzt dieselben Regeln, greift aber nicht in das Spiel ein.",
+          off: "Aus",
+          offHelp: "Keine Prüfung",
+          observe: "Beobachten",
+          observeHelp: "Nur protokollieren",
+          active: "Aktiv",
+          activeHelp: "Regeln durchsetzen",
+          note: "Spielerbereiche innerhalb der einzelnen Regeln bestimmen, wann diese gelten. Die globale Mindestzahl pausiert dagegen den gesamten Seeding-Automod.",
+        },
+        status: {
+          active: "Aktiv",
+          incomplete: "Nicht eingerichtet",
+          skipped: "Übersprungen",
+          unlimited: "Unbegrenzt",
+          times: "{{count}}×",
+        },
+        effectPreview: {
+          title: "So wirkt die Regel",
+          active:
+            "Die Regel greift zwischen {{min}} und {{max}} Spielern und prüft {{count}} konfigurierte Einträge.",
+          inactive:
+            "Diese Regel ist noch nicht vollständig eingerichtet und greift aktuell nicht ein.",
+          valid: "Die Regel ist einsatzbereit.",
+          missing: "Ergänze die Regel, bevor du sie aktiv einsetzt.",
+        },
+        rules: {
+          roles: {
+            title: "Rollen begrenzen",
+            description:
+              "Verhindert in der Aufbauphase Rollen, die kleine Gefechte zu stark beeinflussen.",
+          },
+          weapons: {
+            title: "Waffen begrenzen",
+            description:
+              "Bestraft den Einsatz ausgewählter Waffen unmittelbar, ohne bis zur Kick-Stufe zu eskalieren.",
+            empty:
+              "Noch keine Waffe gesperrt. Wähle eine Waffe aus dem Katalog oder gib einen noch unbekannten Spielnamen ein.",
+          },
+          cap: {
+            title: "Kampfbereich begrenzen",
+            description:
+              "Hält das Gefecht während des Seedings im vorgesehenen mittleren Kartenbereich.",
+            switchTitle: "Kampf um den mittleren Punkt erzwingen",
+            switchHelp:
+              "Spieler werden erkannt, wenn ihr Team mehr Sektoren als erlaubt angreift.",
+          },
+        },
+        fields: {
+          playerWindow: "Gültig für Spieleranzahl",
+          globalMinimum: "Gesamten Automod starten ab",
+          globalMinimumHelp:
+            "Unterhalb dieses Werts werden keine Regeln geprüft. 0 bedeutet: sofort prüfen.",
+          fromPlayers: "Gilt ab",
+          fromPlayersHelp: "Dieser Wert ist eingeschlossen.",
+          untilPlayers: "Gilt bis",
+          untilPlayersHelp:
+            "Bei Erreichen dieses Werts endet die Regel. 0 deaktiviert sie.",
+          blockedRoles: "Nicht erlaubte Rollen",
+          blockedRolesHelp:
+            "Wähle Rollen aus der gemeinsamen Liste für HLL und HLL: Vietnam.",
+          violationMessage: "Verstoßtext",
+          roleMessageHelp:
+            "Beschreibt den Rollenverstoß innerhalb der späteren Warn-, Bestrafungs- und Kick-Nachrichten.",
+          weaponMessageHelp:
+            "Beschreibt den Waffenverstoß in der direkten Bestrafungsnachricht.",
+          capMessageHelp:
+            "Beschreibt, warum der erlaubte Kampfbereich überschritten wurde.",
+          weaponId: "Interner Waffenname",
+          weaponLabel: "Lesbarer Name",
+          weaponPicker: "Waffe auswählen",
+          weaponPickerHelp:
+            "Durchsuche den Waffen-Katalog des aktiven Spiels. Unbekannte neue Spielnamen kannst du weiterhin frei eingeben und mit Enter übernehmen.",
+          noWeaponMatches: "Keine weitere passende Waffe gefunden",
+          addWeapon: "Waffe hinzufügen",
+          removeWeapon: "Waffe entfernen",
+          maxCaps: "Maximal gehaltene Sektoren",
+          maxCapsHelp:
+            "3 erlaubt den Kampf bis einschließlich des mittleren Punkts.",
+          directPunish: "Direkt bestrafen",
+          directPunishHelp:
+            "Überspringt bei einem Sektorverstoß die Warnstufe, damit der Automod rechtzeitig eingreift.",
+          flags: "Ausgenommene Spieler-Markierungen",
+          flagsHelp:
+            "Spieler mit mindestens einer dieser CRCON-Markierungen werden vollständig ausgenommen.",
+          immuneRoles: "Ausgenommene Rollen",
+          immuneRolesHelp:
+            "Spieler in diesen Rollen werden von allen Seeding-Maßnahmen ausgenommen.",
+          immuneLevel: "Spieler bis Level ausnehmen",
+          immuneLevelHelp:
+            "Spieler mit diesem oder einem niedrigeren Level sind geschützt. 0 deaktiviert die Ausnahme.",
+          announcementEnabled: "Seeding beim Beitritt erklären",
+          announcementEnabledHelp:
+            "Informiert beitretende Spieler über die aktuell geltenden Seeding-Regeln.",
+          announcementMessage: "Ankündigung beim Beitritt",
+          count: "Anzahl",
+          interval: "Abstand",
+          minSquad: "Truppgröße ab",
+          minServer: "Spielerzahl ab",
+          warningMessage: "Warnnachricht",
+          punishMessage: "Nachricht bei Bestrafung",
+          kickEnabled: "Nach den Bestrafungen kicken",
+          kickEnabledHelp:
+            "Entfernt Spieler als letzte Stufe, wenn der Verstoß trotz Warnungen und Bestrafungen fortbesteht.",
+          gracePeriod: "Letzte Frist",
+          kickMessage: "Kick-Nachricht",
+          webhook: "Discord-Audit-Webhook",
+          webhookHelp:
+            "Optional. Der Webhook erhält Protokolle der erkannten und ausgeführten Maßnahmen.",
+        },
+        weaponTypes: {
+          infantry: "Infanteriewaffe",
+          bazooka: "Panzerabwehrwaffe",
+          grenade: "Granate",
+          machine_gun: "Maschinengewehr",
+          sniper: "Scharfschützenwaffe",
+          mine: "Mine",
+          pak: "Panzerabwehrkanone",
+          satchel: "Sprengladung",
+          artillery: "Artillerie",
+          armor: "Fahrzeugwaffe",
+          commander: "Kommandantenfähigkeit",
+          self_propelled_artillery: "Selbstfahrlafette",
+          unknown: "Freie Eingabe",
+        },
+        count: {
+          skip: "Überspringen",
+          fixed: "Feste Anzahl",
+          unlimited: "Unbegrenzt",
+        },
+        actions: {
+          announcement: {
+            title: "Regeln ankündigen",
+            description: "Erklärt neuen Spielern die aktive Seeding-Phase.",
+          },
+          warning: {
+            title: "Warnen",
+            description:
+              "Gibt Spielern Zeit, ihr Verhalten vor der ersten Bestrafung zu ändern.",
+          },
+          punish: {
+            title: "Bestrafen",
+            description:
+              "Wendet die serverseitige Punish-Aktion an, wenn Warnungen nicht helfen.",
+          },
+          kick: {
+            title: "Kicken",
+            description:
+              "Entfernt Spieler erst nach Ablauf der vorherigen Eskalationsstufen.",
+          },
+        },
+        notifications: {
+          note: "Der Discord-Webhook ist nur für Audit-Meldungen gedacht. Spielernachrichten werden weiterhin direkt über den Gameserver gesendet.",
+        },
+        summary: {
+          title: "Übersicht",
+          activeRules: "{{count}} von 3 Regeln eingerichtet",
+          roles_one: "{{count}} Rolle gesperrt",
+          roles_other: "{{count}} Rollen gesperrt",
+          weapons_one: "{{count}} Waffe gesperrt",
+          weapons_other: "{{count}} Waffen gesperrt",
+          capActive: "Mittlerer Kampfbereich aktiv",
+          reaction: "Wirkungskette",
+          count: "{{count}}× · alle {{interval}} Sekunden",
+          unlimited: "Unbegrenzt · alle {{interval}} Sekunden",
+          kick: "nach {{seconds}} Sekunden",
+          activeNotice:
+            "Die Regeln greifen nach dem Speichern aktiv in das Spiel ein.",
+          testNotice:
+            "Testbetrieb: Verstöße werden erkannt, aber Spieler nicht beeinflusst.",
+          inactiveNotice:
+            "Der Automod ist ausgeschaltet. Die Konfiguration bleibt gespeichert.",
+        },
       },
       noSoloTank: {
         eyebrow: "Automod-Regel",
@@ -2408,14 +2643,16 @@ const de = {
     profanity: {
       eyebrow: "Spieler & Moderation",
       title: "Wortfilter",
-      subtitle: "Blockierte Begriffe pflegen, importieren und kontrolliert auf einen oder mehrere Server anwenden.",
+      subtitle:
+        "Blockierte Begriffe pflegen, importieren und kontrolliert auf einen oder mehrere Server anwenden.",
       upload: "Hochladen",
       download: "Herunterladen",
       apply: "Übernehmen",
       applyAllServers: "Auf alle Server anwenden",
       allServers: "Alle Server",
       applyAllTitle: "Wortfilter auf alle Server anwenden?",
-      applyAllDescription: "Die aktuelle Begriffsliste wird auf alle verbundenen Server dieser Installation übertragen.",
+      applyAllDescription:
+        "Die aktuelle Begriffsliste wird auf alle verbundenen Server dieser Installation übertragen.",
       newEntry: "Neuer Eintrag",
       add: "Hinzufügen",
       select: "Auswählen",
@@ -2425,7 +2662,8 @@ const de = {
     templates: {
       eyebrow: "Spieler & Moderation",
       title: "Nachrichtenvorlagen",
-      subtitle: "Wiederverwendbare Texte für Nachrichten, Maßnahmen und den Serverbetrieb verwalten.",
+      subtitle:
+        "Wiederverwendbare Texte für Nachrichten, Maßnahmen und den Serverbetrieb verwalten.",
       categories: "Kategorien",
       select: "Nachrichtenvorlage auswählen",
       message: "Nachricht",
@@ -2444,26 +2682,31 @@ const de = {
     autosettings: {
       eyebrow: "Serverbetrieb",
       title: "Automatische Einstellungen",
-      subtitle: "Regeln als Vorlage wählen, im erweiterten JSON-Modus prüfen und kontrolliert anwenden.",
+      subtitle:
+        "Regeln als Vorlage wählen, im erweiterten JSON-Modus prüfen und kontrolliert anwenden.",
       readDocs: "Dokumentation öffnen",
       apply: "Übernehmen",
       applyAllServers: "Auf alle Server anwenden",
       templates: "Vorlagen für automatische Einstellungen",
       editorTitle: "Erweiterte Konfiguration",
-      editorHint: "Änderungen werden erst durch Übernehmen auf den aktuell gewählten Server geschrieben.",
+      editorHint:
+        "Änderungen werden erst durch Übernehmen auf den aktuell gewählten Server geschrieben.",
       applyAllTitle: "Auf alle Server anwenden?",
-      applyAllDescription: "Die geöffnete Konfiguration wird auf alle verbundenen Server dieser Installation übertragen. Prüfe die Server- und Spielkompatibilität vor der Bestätigung.",
+      applyAllDescription:
+        "Die geöffnete Konfiguration wird auf alle verbundenen Server dieser Installation übertragen. Prüfe die Server- und Spielkompatibilität vor der Bestätigung.",
     },
     welcome: {
       eyebrow: "Karten & Spielbetrieb",
       title: "Willkommensnachricht",
-      subtitle: "Lege fest, welche Nachricht Spieler beim Betreten des Servers erhalten.",
+      subtitle:
+        "Lege fest, welche Nachricht Spieler beim Betreten des Servers erhalten.",
       apply: "Übernehmen",
       applyAllServers: "Auf alle Server anwenden",
       allServers: "Alle Server",
       editorHint: "Leer lassen, um die Willkommensnachricht zu deaktivieren.",
       applyAllTitle: "Willkommensnachricht auf alle Server anwenden?",
-      applyAllDescription: "Die aktuelle Nachricht wird auf alle verbundenen Server dieser Installation übertragen.",
+      applyAllDescription:
+        "Die aktuelle Nachricht wird auf alle verbundenen Server dieser Installation übertragen.",
       templates: "Willkommensvorlagen",
     },
     services: {
@@ -2751,7 +2994,8 @@ const de = {
     subtitle: "Passe die Oberfläche an deine Arbeitsweise und Wahrnehmung an.",
     presets: {
       title: "Farbkombination",
-      description: "Wähle ein geprüftes Preset oder lege darunter eine eigene Akzentfarbe fest.",
+      description:
+        "Wähle ein geprüftes Preset oder lege darunter eine eigene Akzentfarbe fest.",
       "frontline-gold": "Frontline Gold",
       "tactical-blue": "Tactical Blue",
       "signal-green": "Signal Green",
@@ -2766,7 +3010,8 @@ const de = {
     },
     custom: {
       title: "Eigene Akzentfarbe",
-      description: "Die Oberfläche passt Kontrast, Hover- und Fokusfarben automatisch an.",
+      description:
+        "Die Oberfläche passt Kontrast, Hover- und Fokusfarben automatisch an.",
       picker: "Akzentfarbe auswählen",
       hex: "Hex-Farbwert",
       invalid: "Gib eine Farbe im Format #C59A4A ein.",
@@ -2778,7 +3023,8 @@ const de = {
       deuteranopia: "Deuteranopie (Grünschwäche)",
       protanopia: "Protanopie (Rotschwäche)",
       tritanopia: "Tritanopie (Blauschwäche)",
-      description: "Statusfarben werden angepasst. Icons, Texte und Umrandungen bleiben zusätzlich erhalten.",
+      description:
+        "Statusfarben werden angepasst. Icons, Texte und Umrandungen bleiben zusätzlich erhalten.",
     },
     preview: {
       title: "Live-Vorschau",
@@ -2789,13 +3035,15 @@ const de = {
       warning: "Warnung",
       error: "Fehler",
     },
-    accessibilityHint: "Farben vermitteln niemals allein den Zustand. Die Oberfläche nutzt zusätzlich Symbole, Beschriftungen und sichtbare Fokusrahmen.",
+    accessibilityHint:
+      "Farben vermitteln niemals allein den Zustand. Die Oberfläche nutzt zusätzlich Symbole, Beschriftungen und sichtbare Fokusrahmen.",
     unsaved: "Nicht gespeicherte Änderungen",
     restoreSaved: "Gespeicherte Werte",
     restoreDefault: "Frontline-Standard",
     apply: "Änderungen übernehmen",
     saved: "Darstellung wurde für deinen Benutzer gespeichert.",
-    savedLocally: "Der Server war nicht erreichbar. Die Darstellung wurde vorübergehend in diesem Browser gespeichert.",
+    savedLocally:
+      "Der Server war nicht erreichbar. Die Darstellung wurde vorübergehend in diesem Browser gespeichert.",
   },
   matchStatus: {
     ariaLabel: "Aktueller Spielstatus",
