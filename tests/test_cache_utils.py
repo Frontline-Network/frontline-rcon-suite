@@ -3,9 +3,9 @@ import pickle
 from logging import getLogger
 from unittest import mock
 
+import pytest
 import redis
 import redis.exceptions
-import pytest
 
 from rcon import cache_utils
 from rcon.cache_utils import REDIS_SCAN_COUNT, RedisCached, invalidates_for, ttl_cache
@@ -276,3 +276,67 @@ def test_invalidates_for_clears_exact_key_before_and_after():
 
     assert cached_func.clear_for.call_count == 2
     cached_func.cache_clear.assert_not_called()
+
+
+def test_invalidates_uses_exact_key_for_parameterless_function():
+    def no_args():
+        return None
+
+    cached_func = mock.Mock()
+    cached_func.cache.function = no_args
+    cached_func.cache.is_method = False
+
+    with cache_utils.invalidates(cached_func):
+        cached_func.clear_for.assert_called_once_with()
+        cached_func.cache_clear.assert_not_called()
+
+    assert cached_func.clear_for.call_count == 2
+    cached_func.cache_clear.assert_not_called()
+
+
+def test_invalidates_uses_exact_key_for_parameterless_method():
+    def no_args_beyond_self(self):
+        return self
+
+    cached_func = mock.Mock()
+    cached_func.cache.function = no_args_beyond_self
+    cached_func.cache.is_method = True
+
+    with cache_utils.invalidates(cached_func):
+        cached_func.clear_for.assert_called_once_with()
+        cached_func.cache_clear.assert_not_called()
+
+    assert cached_func.clear_for.call_count == 2
+    cached_func.cache_clear.assert_not_called()
+
+
+def test_invalidates_scans_when_function_has_cache_key_variants():
+    def keyed(value):
+        return value
+
+    cached_func = mock.Mock()
+    cached_func.cache.function = keyed
+    cached_func.cache.is_method = False
+
+    with cache_utils.invalidates(cached_func):
+        cached_func.cache_clear.assert_called_once_with()
+        cached_func.clear_for.assert_not_called()
+
+    assert cached_func.cache_clear.call_count == 2
+    cached_func.clear_for.assert_not_called()
+
+
+def test_invalidates_scans_when_method_has_cache_key_variants():
+    def keyed_method(self, value):
+        return self, value
+
+    cached_func = mock.Mock()
+    cached_func.cache.function = keyed_method
+    cached_func.cache.is_method = True
+
+    with cache_utils.invalidates(cached_func):
+        cached_func.cache_clear.assert_called_once_with()
+        cached_func.clear_for.assert_not_called()
+
+    assert cached_func.cache_clear.call_count == 2
+    cached_func.clear_for.assert_not_called()
