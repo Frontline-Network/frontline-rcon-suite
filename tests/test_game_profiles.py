@@ -150,7 +150,7 @@ def test_get_game_profile(game, expected):
     ("controller_type", "game", "known_weapon"),
     [
         (HLLRconAPI, GameEnum.HLL_WW2, "155MM HOWITZER [M114]"),
-        (HLLVRconAPI, GameEnum.HLL_VIETNAM, None),
+        (HLLVRconAPI, GameEnum.HLL_VIETNAM, "M16A1"),
     ],
 )
 def test_available_weapon_catalog_uses_active_game_profile(
@@ -165,10 +165,25 @@ def test_available_weapon_catalog_uses_active_game_profile(
     assert result["game"] == game.value
     names = [weapon["name"] for weapon in result["weapons"]]
     assert names == sorted(names, key=str.casefold)
-    if known_weapon:
-        assert known_weapon in names
-    else:
-        assert names == []
+    assert known_weapon in names
+
+
+def test_hllv_profile_derives_combat_weapon_catalog_from_reference_data():
+    assert len(HLLV_PROFILE.weapons) >= 50
+    assert HLLV_PROFILE.weapons["M16A1"].value == "infantry"
+    assert HLLV_PROFILE.weapons["M40"].value == "sniper"
+    assert HLLV_PROFILE.weapons["MORTAR [MORTAR]"].value == "artillery"
+    assert HLLV_PROFILE.weapons["M48Patton"].value == "armor"
+
+    assert "Bandage" not in HLLV_PROFILE.weapons
+    assert "Medical Supplies" not in HLLV_PROFILE.weapons
+    assert "Binoculars" not in HLLV_PROFILE.weapons
+
+
+def test_hllv_weapon_catalog_uses_logical_crcon_sides():
+    assert HLLV_PROFILE.weapon_sides["M16A1"] is Team.ALLIES
+    assert HLLV_PROFILE.weapon_sides["RPD"] is Team.AXIS
+    assert "MORTAR" not in HLLV_PROFILE.weapon_sides
 
 
 def test_hllv_profile_does_not_read_hll_map_catalog():
@@ -648,9 +663,7 @@ def test_hllv_objective_rows_ignore_map_id_reference_parameter():
     )
 
     assert ctl.get_objective_rows() == [["0", "1", "2"]] * 5
-    ctl.exchange.assert_called_once_with(
-        "GetClientReferenceData", 2, "SetSectorLayout"
-    )
+    ctl.exchange.assert_called_once_with("GetClientReferenceData", 2, "SetSectorLayout")
 
 
 def test_hllv_objective_rows_fail_with_actionable_protocol_error():
@@ -746,7 +759,9 @@ def test_map_sequence_replacement_keeps_one_entry_until_the_replacement_is_ready
         (HLLVRcon, GameEnum.HLL_VIETNAM),
     ],
 )
-def test_map_sequence_replacement_rejects_empty_requests_before_mutation(ctl_type, game):
+def test_map_sequence_replacement_rejects_empty_requests_before_mutation(
+    ctl_type, game
+):
     ctl = ctl_type(ServerInfo(game=game))
 
     with pytest.raises(HLLCommandFailedError, match="Empty map sequence"):
