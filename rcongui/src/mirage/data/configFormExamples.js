@@ -72,11 +72,35 @@ const examples = {
   auto_mod_seeding_config: {
     data: {
       ...commonAutomodData,
-      immune_roles: ["commander"],
+      immune_roles: ["armycommander"],
       immune_player_level: 25,
-      disallowed_roles: ["armor", "artillery"],
-      disallowed_weapons: ["Artillery"],
-      enforce_cap_fight: true,
+      min_squad_players_for_punish: 0,
+      min_server_players_for_punish: 0,
+      min_squad_players_for_kick: 0,
+      min_server_players_for_kick: 0,
+      disallowed_roles: {
+        min_players: 1,
+        max_players: 40,
+        roles: {
+          tankcommander: "Panzerkommandant",
+          crewman: "Panzerbesatzung",
+        },
+        violation_message: "{role} ist während des Seedings nicht erlaubt.",
+      },
+      disallowed_weapons: {
+        min_players: 1,
+        max_players: 40,
+        weapons: { "155MM HOWITZER [M114]": "Artillerie" },
+        violation_message: "{weapon} ist während des Seedings nicht erlaubt.",
+      },
+      enforce_cap_fight: {
+        min_players: 1,
+        max_players: 50,
+        max_caps: 3,
+        skip_warning: true,
+        violation_message:
+          "Während des Seedings darf nur um den mittleren Punkt gekämpft werden.",
+      },
       announcement_enabled: true,
       announcement_message:
         "Bis 20 gegen 20 wird nur um den mittleren Punkt gekämpft.",
@@ -85,9 +109,41 @@ const examples = {
       ...commonAutomodProperties,
       immune_roles: strings("Ausgenommene Rollen"),
       immune_player_level: integer("Ausnahme bis Spielerlevel"),
-      disallowed_roles: strings("Während des Seedings gesperrte Rollen"),
-      disallowed_weapons: strings("Während des Seedings gesperrte Waffen"),
-      enforce_cap_fight: boolean("Kampf um den mittleren Punkt erzwingen"),
+      min_squad_players_for_punish: integer(
+        "Mindestgröße des Trupps für Bestrafungen"
+      ),
+      min_server_players_for_punish: integer(
+        "Mindestanzahl Spieler für Bestrafungen"
+      ),
+      min_squad_players_for_kick: integer("Mindestgröße des Trupps für Kicks"),
+      min_server_players_for_kick: integer("Mindestanzahl Spieler für Kicks"),
+      disallowed_roles: schema({
+        min_players: integer("Mindestanzahl Spieler"),
+        max_players: integer("Höchstanzahl Spieler"),
+        roles: {
+          type: "object",
+          title: "Gesperrte Rollen",
+          additionalProperties: { type: "string" },
+        },
+        violation_message: text("Hinweis bei Rollenverstoß"),
+      }),
+      disallowed_weapons: schema({
+        min_players: integer("Mindestanzahl Spieler"),
+        max_players: integer("Höchstanzahl Spieler"),
+        weapons: {
+          type: "object",
+          title: "Gesperrte Waffen",
+          additionalProperties: { type: "string" },
+        },
+        violation_message: text("Hinweis bei Waffenverstoß"),
+      }),
+      enforce_cap_fight: schema({
+        min_players: integer("Mindestanzahl Spieler"),
+        max_players: integer("Höchstanzahl Spieler"),
+        max_caps: integer("Maximal gehaltene Sektoren", 2),
+        skip_warning: boolean("Warnung überspringen"),
+        violation_message: text("Hinweis bei Sektorverstoß"),
+      }),
       announcement_enabled: boolean("Ankündigung aktivieren"),
       announcement_message: text("Seeding-Ankündigung"),
     }),

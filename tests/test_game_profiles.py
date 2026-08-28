@@ -146,6 +146,31 @@ def test_get_game_profile(game, expected):
     assert get_game_profile(game) is expected
 
 
+@pytest.mark.parametrize(
+    ("controller_type", "game", "known_weapon"),
+    [
+        (HLLRconAPI, GameEnum.HLL_WW2, "155MM HOWITZER [M114]"),
+        (HLLVRconAPI, GameEnum.HLL_VIETNAM, None),
+    ],
+)
+def test_available_weapon_catalog_uses_active_game_profile(
+    controller_type, game, known_weapon
+):
+    controller = controller_type.__new__(controller_type)
+    controller.config = SimpleNamespace(game=game)
+    controller.game_profile = get_game_profile(game)
+
+    result = controller.get_available_weapons()
+
+    assert result["game"] == game.value
+    names = [weapon["name"] for weapon in result["weapons"]]
+    assert names == sorted(names, key=str.casefold)
+    if known_weapon:
+        assert known_weapon in names
+    else:
+        assert names == []
+
+
 def test_hllv_profile_does_not_read_hll_map_catalog():
     hll_layer = HLL_PROFILE.parse_layer("carentan_warfare")
     hllv_layer = HLLV_PROFILE.parse_layer("carentan_warfare")

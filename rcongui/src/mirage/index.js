@@ -494,6 +494,33 @@ export function makeServer({ environment = "development" } = {}) {
         { name: "discord-bot", statename: "STOPPED", start: 1775100000, stop: 1775200000, now: 1775210400, info: "Discord-Benachrichtigungen" },
       ]));
       this.get("/get_maps", () => ok(mapLayers));
+      this.get("/get_available_weapons", () =>
+        ok({
+          game: "hll",
+          weapons: [
+            { name: "155MM HOWITZER [M114]", type: "artillery" },
+            { name: "150MM HOWITZER [sFH 18]", type: "artillery" },
+            {
+              name: "122MM HOWITZER [M1938 (M-30)]",
+              type: "artillery",
+            },
+            {
+              name: "QF 25-POUNDER [QF 25-Pounder]",
+              type: "artillery",
+            },
+            { name: "BOMBING RUN", type: "commander" },
+            { name: "PRECISION STRIKE", type: "commander" },
+            { name: "STRAFING RUN", type: "commander" },
+            { name: "M1 GARAND", type: "infantry" },
+            { name: "KARABINER 98K", type: "infantry" },
+            { name: "MP40", type: "infantry" },
+            { name: "MG42", type: "machine_gun" },
+            { name: "57MM CANNON [M1 57mm]", type: "pak" },
+            { name: "75MM CANNON [PAK 40]", type: "pak" },
+            { name: "SATCHEL", type: "satchel" },
+          ],
+        })
+      );
       this.get("/get_map", () => ok(currentLayer));
       this.get("/get_map_rotation", () => ok({ maps: mapLayers.slice(0, 3), current_index: 0, next_index: 1 }));
       this.get("/get_map_shuffle_enabled", () => ok(false));

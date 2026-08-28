@@ -162,6 +162,23 @@ class RconAPI(Rcon):
     def __init__(self, *args, pool_size: bool | None = None, **kwargs):
         super().__init__(*args, pool_size=pool_size, **kwargs)
 
+    def get_available_weapons(self) -> dict[str, Any]:
+        """Return the weapon identifiers known by the active game profile.
+
+        Settings forms use this catalogue for searchable suggestions.  The
+        server remains the source of truth so a new game build can extend the
+        catalogue without hard-coding a second copy in the frontend.
+        """
+        return {
+            "game": self.game_profile.game.value,
+            "weapons": [
+                {"name": name, "type": weapon_type.value}
+                for name, weapon_type in sorted(
+                    self.game_profile.weapons.items(), key=lambda item: item[0].casefold()
+                )
+            ],
+        }
+
     @staticmethod
     def _validate_user_config(
         command_name: str,

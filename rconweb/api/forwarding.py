@@ -3,12 +3,16 @@ from copy import deepcopy
 from typing import Any
 
 import requests
+from django.conf import settings
 from django.http import QueryDict
 
 from rcon.utils import ApiKey, get_server_number
 
 logger = logging.getLogger("rcon")
 FRONTEND_KEY_PREFIX = "frontend_"
+CSRF_RECOVERY_HEADER = "X-CRCON-CSRF-Recovery"
+CSRF_TOKEN_HEADER = "X-CRCON-CSRF-Token"
+CSRF_REQUEST_HEADER = "X-CSRFToken"
 
 
 def normalize_forward_server_numbers(value) -> tuple[int, ...] | None:
@@ -79,6 +83,59 @@ def _safe_forward_response(response) -> dict:
             remote_error = f"CRCON peer returned HTTP {response.status_code}"
         return _forward_failure(remote_error.strip()[:256])
     return payload
+
+
+def _post_with_csrf_recovery(
+    url: str,
+    *,
+    params: dict,
+    data: dict,
+    timeout: int,
+    cookies: dict,
+    headers: dict,
+):
+    """POST once, then recover one rejected session-CSRF request safely.
+
+    Browser-originated multi-server actions forward the authenticated Django
+    session to each peer. The peers therefore enforce CSRF just like they do
+    for the original browser request. Their CSRF failure response contains a
+    fresh token and cookie; retrying exactly once mirrors the browser recovery
+    flow without weakening CSRF protection or exempting mutating endpoints.
+    """
+
+    response = requests.post(
+        url,
+        params=params,
+        json=data,
+        timeout=timeout,
+        cookies=cookies,
+        headers=headers,
+    )
+    response_headers = getattr(response, "headers", {})
+    if (
+        response.status_code != 403
+        or response_headers.get(CSRF_RECOVERY_HEADER) != "1"
+    ):
+        return response
+
+    recovery_token = response_headers.get(CSRF_TOKEN_HEADER)
+    response_cookies = getattr(response, "cookies", {})
+    recovery_cookie = response_cookies.get(settings.CSRF_COOKIE_NAME)
+    if not recovery_token or not recovery_cookie:
+        return response
+
+    retry_headers = dict(headers)
+    retry_headers[CSRF_REQUEST_HEADER] = recovery_token
+    retry_cookies = dict(cookies)
+    retry_cookies[settings.CSRF_COOKIE_NAME] = recovery_cookie
+    return requests.post(
+        url,
+        params=params,
+        json=data,
+        timeout=timeout,
+        cookies=retry_cookies,
+        headers=retry_headers,
+    )
 
 
 def forwarding_unavailable_results(server_numbers=None) -> list[dict]:
@@ -172,10 +229,10 @@ def forward_command(
             url = f"http://{host}{path}"
 
             logger.info("Forwarding command: %s %s %s", url, params, data)
-            res = requests.post(
+            res = _post_with_csrf_recovery(
                 url,
                 params=params,
-                json=data,
+                data=data,
                 timeout=5,
                 cookies=cookies,
                 headers=headers,

@@ -20,6 +20,13 @@ const genericSection = (id, fields) => ({
   fields,
 });
 
+const seedingSection = (id, fields) => ({
+  id,
+  titleKey: `${ROOT}.seedingWorkbench.sections.${id}.title`,
+  descriptionKey: `${ROOT}.seedingWorkbench.sections.${id}.description`,
+  fields,
+});
+
 const field = (name, metadata = {}) => ({
   labelKey: `${ROOT}.noLeader.fields.${name}.label`,
   helpKey: `${ROOT}.noLeader.fields.${name}.help`,
@@ -240,52 +247,47 @@ const configFormProfiles = {
     ],
     ["rules", "warnings", "punishments", "kick"]
   ),
-  auto_mod_seeding_config: schemaProfile(
-    "seeding",
-    [
-      ["operation", ["enabled", "dry_run"]],
-      [
-        "exemptions",
-        [
-          "whitelist_flags",
-          "immune_roles",
-          "immune_player_level",
-          "dont_do_anything_below_this_number_of_players",
-        ],
-      ],
-      [
-        "rules",
-        ["disallowed_roles", "disallowed_weapons", "enforce_cap_fight"],
-      ],
-      ["announcements", ["announcement_enabled", "announcement_message"]],
-      [
-        "warnings",
-        ["number_of_warnings", "warning_interval_seconds", "warning_message"],
-      ],
-      [
-        "punishments",
-        [
-          "number_of_punishments",
-          "min_squad_players_for_punish",
-          "min_server_players_for_punish",
-          "punish_interval_seconds",
-          "punish_message",
-        ],
-      ],
-      [
-        "kick",
-        [
-          "kick_after_max_punish",
-          "min_squad_players_for_kick",
-          "min_server_players_for_kick",
-          "kick_grace_period_seconds",
-          "kick_message",
-        ],
-      ],
-      ["notifications", ["discord_webhook_url"]],
+  auto_mod_seeding_config: {
+    ...pageKeys("seeding"),
+    renderer: "seeding",
+    sections: [
+      seedingSection("operation", [
+        "enabled",
+        "dry_run",
+        "dont_do_anything_below_this_number_of_players",
+      ]),
+      seedingSection("rules", [
+        "disallowed_roles",
+        "disallowed_weapons",
+        "enforce_cap_fight",
+      ]),
+      seedingSection("exemptions", [
+        "whitelist_flags",
+        "immune_roles",
+        "immune_player_level",
+      ]),
+      seedingSection("actions", [
+        "announcement_enabled",
+        "announcement_message",
+        "number_of_warnings",
+        "warning_interval_seconds",
+        "warning_message",
+        "number_of_punishments",
+        "min_squad_players_for_punish",
+        "min_server_players_for_punish",
+        "punish_interval_seconds",
+        "punish_message",
+        "kick_after_max_punish",
+        "min_squad_players_for_kick",
+        "min_server_players_for_kick",
+        "kick_grace_period_seconds",
+        "kick_message",
+      ]),
+      seedingSection("notifications", ["discord_webhook_url"]),
     ],
-    ["rules", "warnings", "punishments", "kick"]
-  ),
+    fields: {},
+    summarySectionIds: ["rules", "actions"],
+  },
   auto_mod_solo_tank_config: schemaProfile(
     "noSoloTank",
     [

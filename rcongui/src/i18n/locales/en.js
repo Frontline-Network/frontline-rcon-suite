@@ -266,12 +266,30 @@ const en = {
     title: "Operations",
     subtitle: "Check server health and open the most common operating tasks.",
     cards: {
-      teams: { title: "Teams & squads", description: "Manage leadership issues, squads and players." },
-      maps: { title: "Maps", description: "Control current, next and immediate map changes." },
-      balance: { title: "Autobalancer", description: "Review balance health and recent interventions." },
-      automation: { title: "Automation", description: "Manage rules, effects and active schedules." },
-      services: { title: "Services", description: "Check CRCON, game server and background services." },
-      settings: { title: "Server settings", description: "Open gameplay rules and general configuration." },
+      teams: {
+        title: "Teams & squads",
+        description: "Manage leadership issues, squads and players.",
+      },
+      maps: {
+        title: "Maps",
+        description: "Control current, next and immediate map changes.",
+      },
+      balance: {
+        title: "Autobalancer",
+        description: "Review balance health and recent interventions.",
+      },
+      automation: {
+        title: "Automation",
+        description: "Manage rules, effects and active schedules.",
+      },
+      services: {
+        title: "Services",
+        description: "Check CRCON, game server and background services.",
+      },
+      settings: {
+        title: "Server settings",
+        description: "Open gameplay rules and general configuration.",
+      },
     },
   },
   incidents: {
@@ -286,7 +304,12 @@ const en = {
       done: "Resolved",
       dismissed: "Dismissed",
     },
-    status: { new: "New", claimed: "Claimed", resolved: "Resolved", dismissed: "Dismissed" },
+    status: {
+      new: "New",
+      claimed: "Claimed",
+      resolved: "Resolved",
+      dismissed: "Dismissed",
+    },
     server: "Server {{number}}",
     generalReport: "General report",
     unknownReporter: "Unknown reporter",
@@ -299,7 +322,8 @@ const en = {
     updated: "Last updated",
     emptyTitle: "All clear",
     emptyDescription: "There are no reports for this filter right now.",
-    loadFailed: "Reports could not be loaded. Check the connection and try again.",
+    loadFailed:
+      "Reports could not be loaded. Check the connection and try again.",
     updateFailed: "The report could not be updated. It remains unchanged.",
     dismissConfirmationTitle: "Dismiss this report?",
     dismissConfirmationBody:
@@ -2201,10 +2225,210 @@ const en = {
           "Control minimum and maximum levels as well as role-specific level thresholds. Players can be informed, punished, or removed in progressive stages.",
       },
       seeding: {
-        eyebrow: "Automod rule",
+        eyebrow: "Automation · Seeding",
         title: "Seeding rules",
         intro:
           "Set rules for the server build-up phase and choose how violations are handled while seeding.",
+      },
+      seedingWorkbench: {
+        players: "players",
+        seconds: "seconds",
+        level: "level",
+        placeholders: "Insert:",
+        sections: {
+          operation: {
+            title: "Overview",
+            description:
+              "Choose whether rules are off, observed, or actively enforced.",
+          },
+          rules: {
+            title: "Rules",
+            description:
+              "Define allowed play and the player windows for each rule.",
+          },
+          exemptions: {
+            title: "Exemptions",
+            description:
+              "Protect selected roles, flags, or new players from automatic actions.",
+          },
+          actions: {
+            title: "Actions",
+            description:
+              "Build the visible sequence from announcement to kick.",
+          },
+          notifications: {
+            title: "Notifications",
+            description:
+              "Optionally send detected violations and actions to Discord.",
+          },
+        },
+        operation: {
+          modeTitle: "How should the automod run?",
+          modeHelp:
+            "Test mode evaluates the same rules without affecting players.",
+          off: "Off",
+          offHelp: "No checks",
+          observe: "Observe",
+          observeHelp: "Log only",
+          active: "Active",
+          activeHelp: "Enforce rules",
+          note: "Rule-level player windows decide when each rule applies. The global minimum pauses the entire seeding automod.",
+        },
+        status: {
+          active: "Active",
+          incomplete: "Not configured",
+          skipped: "Skipped",
+          unlimited: "Unlimited",
+          times: "{{count}}×",
+        },
+        effectPreview: {
+          title: "How this rule works",
+          active:
+            "The rule applies between {{min}} and {{max}} players and checks {{count}} configured entries.",
+          inactive:
+            "This rule is not fully configured yet and currently does not take action.",
+          valid: "The rule is ready to use.",
+          missing: "Complete the rule before enabling enforcement.",
+        },
+        rules: {
+          roles: {
+            title: "Limit roles",
+            description:
+              "Blocks roles that have an outsized impact during server build-up.",
+          },
+          weapons: {
+            title: "Limit weapons",
+            description:
+              "Punishes selected weapon use directly without escalating to kick.",
+            empty:
+              "No weapon is blocked yet. Choose one from the catalogue or enter a game identifier that is not known yet.",
+          },
+          cap: {
+            title: "Limit the combat area",
+            description:
+              "Keeps fighting in the intended middle area while seeding.",
+            switchTitle: "Enforce fighting over the middle point",
+            switchHelp:
+              "Detects players when their team attacks beyond the allowed sectors.",
+          },
+        },
+        fields: {
+          playerWindow: "Applies to player count",
+          globalMinimum: "Start the entire automod at",
+          globalMinimumHelp:
+            "Below this value no rule is evaluated. 0 means immediately.",
+          fromPlayers: "Applies from",
+          fromPlayersHelp: "This value is inclusive.",
+          untilPlayers: "Applies until",
+          untilPlayersHelp: "The rule ends at this value. 0 disables it.",
+          blockedRoles: "Disallowed roles",
+          blockedRolesHelp:
+            "Choose from the shared HLL and HLL: Vietnam role list.",
+          violationMessage: "Violation text",
+          roleMessageHelp:
+            "Describes the role violation inside later warning, punish and kick messages.",
+          weaponMessageHelp:
+            "Describes the weapon violation in the direct punish message.",
+          capMessageHelp: "Explains why the allowed combat area was exceeded.",
+          weaponId: "Internal weapon name",
+          weaponLabel: "Readable name",
+          weaponPicker: "Choose a weapon",
+          weaponPickerHelp:
+            "Search the active game's weapon catalogue. You can still enter a new unknown game identifier and confirm it with Enter.",
+          noWeaponMatches: "No additional matching weapon found",
+          addWeapon: "Add weapon",
+          removeWeapon: "Remove weapon",
+          maxCaps: "Maximum sectors held",
+          maxCapsHelp: "3 allows fighting through the middle point.",
+          directPunish: "Punish directly",
+          directPunishHelp:
+            "Skips warnings for sector violations so the automod can react in time.",
+          flags: "Exempt player flags",
+          flagsHelp:
+            "Players with at least one of these CRCON flags are fully exempt.",
+          immuneRoles: "Exempt roles",
+          immuneRolesHelp:
+            "Players in these roles are exempt from all seeding actions.",
+          immuneLevel: "Exempt players up to level",
+          immuneLevelHelp:
+            "Players at or below this level are protected. 0 disables the exemption.",
+          announcementEnabled: "Explain seeding on join",
+          announcementEnabledHelp:
+            "Tells joining players which seeding rules currently apply.",
+          announcementMessage: "Join announcement",
+          count: "Count",
+          interval: "Interval",
+          minSquad: "Squad size from",
+          minServer: "Player count from",
+          warningMessage: "Warning message",
+          punishMessage: "Punish message",
+          kickEnabled: "Kick after punishments",
+          kickEnabledHelp:
+            "Removes players as the final stage when a violation persists after warnings and punishments.",
+          gracePeriod: "Final grace period",
+          kickMessage: "Kick message",
+          webhook: "Discord audit webhook",
+          webhookHelp:
+            "Optional. Receives logs for detected and executed actions.",
+        },
+        weaponTypes: {
+          infantry: "Infantry weapon",
+          bazooka: "Anti-tank weapon",
+          grenade: "Grenade",
+          machine_gun: "Machine gun",
+          sniper: "Sniper weapon",
+          mine: "Mine",
+          pak: "Anti-tank gun",
+          satchel: "Satchel charge",
+          artillery: "Artillery",
+          armor: "Vehicle weapon",
+          commander: "Commander ability",
+          self_propelled_artillery: "Self-propelled artillery",
+          unknown: "Custom entry",
+        },
+        count: { skip: "Skip", fixed: "Fixed count", unlimited: "Unlimited" },
+        actions: {
+          announcement: {
+            title: "Announce rules",
+            description: "Explains the active seeding phase to new players.",
+          },
+          warning: {
+            title: "Warn",
+            description:
+              "Gives players time to change before the first punishment.",
+          },
+          punish: {
+            title: "Punish",
+            description:
+              "Runs the server punish action when warnings do not help.",
+          },
+          kick: {
+            title: "Kick",
+            description:
+              "Removes players only after previous escalation stages complete.",
+          },
+        },
+        notifications: {
+          note: "The Discord webhook is only for audit messages. Player messages are still sent through the game server.",
+        },
+        summary: {
+          title: "Overview",
+          activeRules: "{{count}} of 3 rules configured",
+          roles_one: "{{count}} role blocked",
+          roles_other: "{{count}} roles blocked",
+          weapons_one: "{{count}} weapon blocked",
+          weapons_other: "{{count}} weapons blocked",
+          capActive: "Middle combat area active",
+          reaction: "Response chain",
+          count: "{{count}}× · every {{interval}} seconds",
+          unlimited: "Unlimited · every {{interval}} seconds",
+          kick: "after {{seconds}} seconds",
+          activeNotice: "After saving, these rules actively affect the game.",
+          testNotice:
+            "Test mode: violations are detected without affecting players.",
+          inactiveNotice:
+            "The automod is off. Its configuration remains saved.",
+        },
       },
       noSoloTank: {
         eyebrow: "Automod rule",
@@ -2340,14 +2564,16 @@ const en = {
     profanity: {
       eyebrow: "Players & moderation",
       title: "Profanity filter",
-      subtitle: "Maintain blocked terms, import lists, and apply changes to one or multiple servers in a controlled way.",
+      subtitle:
+        "Maintain blocked terms, import lists, and apply changes to one or multiple servers in a controlled way.",
       upload: "Upload",
       download: "Download",
       apply: "Apply",
       applyAllServers: "Apply all servers",
       allServers: "All servers",
       applyAllTitle: "Apply profanity filter to all servers?",
-      applyAllDescription: "The current term list will be sent to every connected server in this installation.",
+      applyAllDescription:
+        "The current term list will be sent to every connected server in this installation.",
       newEntry: "New profanity",
       add: "Add",
       select: "Select",
@@ -2357,7 +2583,8 @@ const en = {
     templates: {
       eyebrow: "Players & moderation",
       title: "Message templates",
-      subtitle: "Manage reusable text for messages, moderation actions, and server operations.",
+      subtitle:
+        "Manage reusable text for messages, moderation actions, and server operations.",
       categories: "Categories",
       select: "Select message template",
       message: "Message",
@@ -2376,15 +2603,18 @@ const en = {
     autosettings: {
       eyebrow: "Server operations",
       title: "Automatic settings",
-      subtitle: "Choose a template, review the advanced JSON configuration, and apply it in a controlled way.",
+      subtitle:
+        "Choose a template, review the advanced JSON configuration, and apply it in a controlled way.",
       readDocs: "Read documentation",
       apply: "Apply",
       applyAllServers: "Apply all servers",
       templates: "Automatic settings templates",
       editorTitle: "Advanced configuration",
-      editorHint: "Changes are only written to the selected server after you apply them.",
+      editorHint:
+        "Changes are only written to the selected server after you apply them.",
       applyAllTitle: "Apply to all servers?",
-      applyAllDescription: "The open configuration will be sent to every connected server in this installation. Check server and game compatibility before confirming.",
+      applyAllDescription:
+        "The open configuration will be sent to every connected server in this installation. Check server and game compatibility before confirming.",
     },
     welcome: {
       eyebrow: "Maps & server operations",
@@ -2395,7 +2625,8 @@ const en = {
       allServers: "All servers",
       editorHint: "Leave empty to disable the welcome message.",
       applyAllTitle: "Apply welcome message to all servers?",
-      applyAllDescription: "The current message will be sent to every connected server in this installation.",
+      applyAllDescription:
+        "The current message will be sent to every connected server in this installation.",
       templates: "Welcome templates",
     },
     services: {
@@ -2679,7 +2910,8 @@ const en = {
     subtitle: "Adapt the interface to your workflow and visual needs.",
     presets: {
       title: "Color combination",
-      description: "Choose a tested preset or define your own accent color below.",
+      description:
+        "Choose a tested preset or define your own accent color below.",
       "frontline-gold": "Frontline Gold",
       "tactical-blue": "Tactical Blue",
       "signal-green": "Signal Green",
@@ -2694,7 +2926,8 @@ const en = {
     },
     custom: {
       title: "Custom accent color",
-      description: "Contrast, hover and focus colors are adjusted automatically.",
+      description:
+        "Contrast, hover and focus colors are adjusted automatically.",
       picker: "Choose accent color",
       hex: "Hex color",
       invalid: "Enter a color in the format #C59A4A.",
@@ -2706,7 +2939,8 @@ const en = {
       deuteranopia: "Deuteranopia (green deficiency)",
       protanopia: "Protanopia (red deficiency)",
       tritanopia: "Tritanopia (blue deficiency)",
-      description: "Status colors are adapted while icons, labels and outlines remain available.",
+      description:
+        "Status colors are adapted while icons, labels and outlines remain available.",
     },
     preview: {
       title: "Live preview",
@@ -2717,13 +2951,15 @@ const en = {
       warning: "Warning",
       error: "Error",
     },
-    accessibilityHint: "Color never communicates state on its own. The interface also uses icons, labels and visible focus outlines.",
+    accessibilityHint:
+      "Color never communicates state on its own. The interface also uses icons, labels and visible focus outlines.",
     unsaved: "Unsaved changes",
     restoreSaved: "Saved values",
     restoreDefault: "Frontline default",
     apply: "Apply changes",
     saved: "Appearance was saved for your account.",
-    savedLocally: "The server was unavailable. Appearance was temporarily saved in this browser.",
+    savedLocally:
+      "The server was unavailable. Appearance was temporarily saved in this browser.",
   },
   matchStatus: {
     ariaLabel: "Current match status",
