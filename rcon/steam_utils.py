@@ -10,7 +10,7 @@ from typing import Any, Iterable, Sequence
 import steam.exceptions
 from sqlalchemy import or_, select
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, contains_eager, joinedload
 from sqlalchemy.sql.expression import func
 from steam.webapi import WebAPI
 
@@ -394,36 +394,42 @@ def update_missing_old_steam_info_single_player(
 def enrich_db_users(chunk_size=100, update_from_days_old=30):
     """Use the Steam API to update steam profiles/bans for missing or old records"""
     max_age = datetime.datetime.utcnow() - datetime.timedelta(days=update_from_days_old)
-    with enter_session() as sess:
-        # Missing JSONB records are surprisingly difficult to identify depending
-        # on how they've been persisted but JSONB.NULL should cover the different cases
-        # This query can also return many thousands of results, using stream_results and
-        # yield_per doesn't fetch all of the results at once, but pages through them
-        stmt = (
-            select(PlayerID)
-            .execution_options(stream_results=True, yield_per=chunk_size)
-            .outerjoin(SteamInfo)
-            .where(func.length(PlayerID.player_id) == 17)
-            .where(
-                or_(
-                    PlayerID.steaminfo == None,
-                    SteamInfo.updated <= max_age,
-                    SteamInfo.bans == JSONB.NULL,
-                    SteamInfo.profile == JSONB.NULL,
-                )
-            )
-        )
+    last_player_db_id = 0
+    page_number = 0
 
-        logger.info("Updating steam profiles/bans for missing/old users")
-        for idx, player_chunks in enumerate(sess.scalars(stmt).partitions()):
+    logger.info("Updating steam profiles/bans for missing/old users")
+    while True:
+        # A server-side streaming cursor keeps one transaction open for the
+        # entire enrichment job, including every Steam API wait. Keyset pages
+        # bound both memory and transaction lifetime to one chunk instead.
+        with enter_session() as sess:
+            stmt = (
+                select(PlayerID)
+                .options(contains_eager(PlayerID.steaminfo))
+                .outerjoin(SteamInfo)
+                .where(PlayerID.id > last_player_db_id)
+                .where(func.length(PlayerID.player_id) == 17)
+                .where(
+                    or_(
+                        PlayerID.steaminfo == None,
+                        SteamInfo.updated <= max_age,
+                        SteamInfo.bans == JSONB.NULL,
+                        SteamInfo.profile == JSONB.NULL,
+                    )
+                )
+                .order_by(PlayerID.id)
+                .limit(chunk_size)
+            )
+            players = list(sess.scalars(stmt))
+            if not players:
+                break
+
+            page_number += 1
+            last_player_db_id = players[-1].id
             try:
-                players = list(player_chunks)
-                if not players:
-                    logger.warning("Empty query results for page %s", idx)
-                    continue
                 logger.info(
                     "Updating page %s steam profile/bans, first steam ID of page: %s",
-                    idx + 1,
+                    page_number,
                     players[0],
                 )
                 num_profs, num_bans = update_db_player_info(sess, players=players)
@@ -436,14 +442,13 @@ def enrich_db_users(chunk_size=100, update_from_days_old=30):
             except Exception as e:
                 logger.error(
                     "Error while fetching Steam page %s (%s): %s",
-                    idx + 1,
+                    page_number,
                     type(e).__name__,
                     redact_steam_error(e),
                 )
 
-            # Shouldn't really need this with how many API calls we should be able to make
-            # but just to be on the safe side
-            time.sleep(1)
+        # Throttle only after the page transaction has committed and closed.
+        time.sleep(1)
 
 
 if __name__ == "__main__":
