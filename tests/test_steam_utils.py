@@ -1,5 +1,9 @@
+from contextlib import contextmanager
+from types import SimpleNamespace
+
 import pytest
 
+from rcon import steam_utils
 from rcon.steam_utils import (
     filter_steam_id,
     filter_steam_ids,
@@ -70,3 +74,67 @@ def test_redact_steam_error_hides_sensitive_query_parameters(parameter):
     assert secret not in redacted
     assert f"{parameter}=<redacted>" in redacted
     assert "steamids=76561198080212634" in redacted
+
+
+def test_enrich_db_users_closes_each_page_before_throttling(monkeypatch):
+    pages = [
+        [
+            SimpleNamespace(id=1, player_id="76561198000000001"),
+            SimpleNamespace(id=2, player_id="76561198000000002"),
+        ],
+        [SimpleNamespace(id=3, player_id="76561198000000003")],
+        [],
+    ]
+    events = []
+    statements = []
+
+    class FakeSession:
+        def __init__(self, players):
+            self.players = players
+
+        def scalars(self, statement):
+            statements.append(statement)
+            return iter(self.players)
+
+    sessions = [FakeSession(players) for players in pages]
+
+    @contextmanager
+    def fake_enter_session():
+        index = len([event for event in events if event[0] == "enter"])
+        events.append(("enter", index))
+        try:
+            yield sessions[index]
+        finally:
+            events.append(("exit", index))
+
+    def fake_update_db_player_info(session, players):
+        events.append(("update", tuple(player.id for player in players)))
+        return len(players), len(players)
+
+    monkeypatch.setattr(steam_utils, "enter_session", fake_enter_session)
+    monkeypatch.setattr(
+        steam_utils, "update_db_player_info", fake_update_db_player_info
+    )
+    monkeypatch.setattr(
+        steam_utils.time, "sleep", lambda seconds: events.append(("sleep", seconds))
+    )
+
+    steam_utils.enrich_db_users(chunk_size=2)
+
+    assert events == [
+        ("enter", 0),
+        ("update", (1, 2)),
+        ("exit", 0),
+        ("sleep", 1),
+        ("enter", 1),
+        ("update", (3,)),
+        ("exit", 1),
+        ("sleep", 1),
+        ("enter", 2),
+        ("exit", 2),
+    ]
+    assert [statement._limit_clause.value for statement in statements] == [2, 2, 2]
+    assert [
+        statement._where_criteria[0].right.value for statement in statements
+    ] == [0, 2, 3]
+    assert all("ORDER BY steam_id_64.id" in str(statement) for statement in statements)
