@@ -11,6 +11,8 @@ from rcon.types import AdminUserType
 logger = logging.getLogger(__name__)
 
 HEARTBEAT_KEY_PREFIX = "heartbeat_"
+HEARTBEAT_REGISTRY_KEY = "online_mod_heartbeat_registry"
+HEARTBEAT_REGISTRY_SENTINEL = "__initialized__"
 KNOWN_MODS_KEY = "mods"
 PLAYER_ID = "player_id"
 
@@ -33,11 +35,16 @@ def _heartbeat_key(uniqueid):
 
 def heartbeat(username, player_id, timeout=120):
     red = _red()
-    return red.setex(
-        _heartbeat_key(username),
-        timeout,
-        json.dumps(dict(username=username, player_id=player_id)),
-    )
+    heartbeat_key = _heartbeat_key(username)
+    with red.pipeline() as pipe:
+        pipe.setex(
+            heartbeat_key,
+            timeout,
+            json.dumps(dict(username=username, player_id=player_id)),
+        )
+        pipe.sadd(HEARTBEAT_REGISTRY_KEY, heartbeat_key)
+        result = pipe.execute()
+    return bool(result[0])
 
 
 # This exists only no to create a weird interdependancy / tight coupling with the API layer.
@@ -55,9 +62,43 @@ def set_registered_mods(moderators_name_steamids: List[tuple]):
 
 def online_mods() -> list[AdminUserType]:
     red = _red()
-    return [
-        json.loads(red.get(u)) for u in red.scan_iter(f"{HEARTBEAT_KEY_PREFIX}*", 1)
+    registered = {
+        value.decode() if isinstance(value, bytes) else str(value)
+        for value in red.smembers(HEARTBEAT_REGISTRY_KEY)
+    }
+
+    if HEARTBEAT_REGISTRY_SENTINEL not in registered:
+        # Existing deployments can have up to two minutes of live heartbeat
+        # keys that predate the registry. Import them once, then every producer
+        # maintains the bounded set directly and the read path never scans the
+        # shared Redis database again.
+        registered.update(
+            value.decode() if isinstance(value, bytes) else str(value)
+            for value in red.scan_iter(
+                match=f"{HEARTBEAT_KEY_PREFIX}*",
+                count=500,
+            )
+        )
+        red.sadd(
+            HEARTBEAT_REGISTRY_KEY,
+            HEARTBEAT_REGISTRY_SENTINEL,
+            *registered,
+        )
+
+    heartbeat_keys = sorted(registered - {HEARTBEAT_REGISTRY_SENTINEL})
+    if not heartbeat_keys:
+        return []
+
+    values = red.mget(heartbeat_keys)
+    expired_keys = [
+        heartbeat_key
+        for heartbeat_key, value in zip(heartbeat_keys, values)
+        if value is None
     ]
+    if expired_keys:
+        red.srem(HEARTBEAT_REGISTRY_KEY, *expired_keys)
+
+    return [json.loads(value) for value in values if value is not None]
 
 
 def ingame_mods(rcon=None) -> list[AdminUserType]:
