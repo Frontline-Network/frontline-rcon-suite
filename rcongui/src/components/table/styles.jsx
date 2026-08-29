@@ -113,27 +113,31 @@ export const StyledThead = styled("thead")(({ theme }) => ({
 }));
 
 export const StyledTh = styled("th", {
-  shouldForwardProp: (prop) => prop !== "variant" || prop !== "minWidth",
+  shouldForwardProp: (prop) =>
+    !["variant", "minWidth", "cellAlign"].includes(prop),
 })((styledProps) => {
   const variant = styledProps.variant;
+  const cellAlign = styledProps.cellAlign;
   return {
     width: getVariantWidth(variant),
     minWidth: getVariantMinWidth(variant),
-    textAlign: variant === "icon" ? "center" : "left",
+    textAlign: cellAlign || (variant === "icon" ? "center" : "left"),
     paddingLeft: variant === "icon" ? 0 : undefined,
     paddingRight: variant === "icon" ? 0 : undefined,
   };
 });
 
 export const StyledTd = styled("td", {
-  shouldForwardProp: (prop) => prop !== "variant" || prop !== "minWidth",
+  shouldForwardProp: (prop) =>
+    !["variant", "minWidth", "cellAlign"].includes(prop),
 })((styledProps) => {
   const variant = styledProps.variant;
+  const cellAlign = styledProps.cellAlign;
 
   return {
     width: getVariantWidth(variant),
     minWidth: getVariantMinWidth(variant),
-    textAlign: variant === "icon" ? "center" : "left",
+    textAlign: cellAlign || (variant === "icon" ? "center" : "left"),
   };
 });
 
@@ -178,25 +182,34 @@ export const HeaderButton = styled((props) => (
   <Button size="small" {...props} />
 ))(({ theme }) => ({
   width: "100%",
+  minWidth: 0,
+  paddingLeft: 0,
+  paddingRight: 0,
   borderRadius: 0,
   textAlign: "left",
   color: theme.palette.text.primary,
   fontSize: "1em",
   textDecoration: "none",
   textTransform: "none",
-  minWidth: "fit-content",
 }));
 
 export const SortableHeader =
   (text, title) =>
   ({ column }) => {
     const isIconColumn = column.columnDef?.meta?.variant === "icon";
+    const alignment = column.columnDef?.meta?.align;
+    const justifyContent =
+      alignment === "right"
+        ? "flex-end"
+        : alignment === "center" || isIconColumn
+          ? "center"
+          : "flex-start";
 
     return (
       <HeaderButton
         onClick={column.getToggleSortingHandler()}
         title={title || ""}
-        sx={{ justifyContent: isIconColumn ? "center" : "flex-start" }}
+        sx={{ justifyContent }}
       >
         {text}
         {column.getIsSorted() &&

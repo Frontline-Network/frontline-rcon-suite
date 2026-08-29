@@ -27,7 +27,13 @@ const Center = ({ children }) => (
 const Level = ({ value }) => {
   const tier = getPlayerTier(value);
   return (
-    <Box sx={{ color: (theme) => getTierColors(theme.palette.mode)[tier] }}>
+    <Box
+      sx={{
+        color: (theme) => getTierColors(theme.palette.mode)[tier],
+        fontVariantNumeric: "tabular-nums",
+        textAlign: "right",
+      }}
+    >
       {value ?? "–"}
     </Box>
   );
@@ -90,7 +96,11 @@ export const createLiveSessionColumns = (t) => [
         </Tooltip>
       </Center>
     ),
-    meta: { variant: "short", label: t("stats.liveSessions.faction") },
+    meta: {
+      variant: "short",
+      align: "center",
+      label: t("stats.liveSessions.faction"),
+    },
   },
   {
     id: "unit",
@@ -133,7 +143,11 @@ export const createLiveSessionColumns = (t) => [
         </Center>
       );
     },
-    meta: { variant: "short", label: t("stats.liveSessions.role") },
+    meta: {
+      variant: "short",
+      align: "center",
+      label: t("stats.liveSessions.role"),
+    },
   },
   {
     id: "name",
@@ -168,7 +182,11 @@ export const createLiveSessionColumns = (t) => [
       t("stats.liveSessions.level")
     ),
     cell: ({ row }) => <Level value={row.original.level} />,
-    meta: { variant: "short", label: t("stats.liveSessions.level") },
+    meta: {
+      variant: "short",
+      align: "right",
+      label: t("stats.liveSessions.level"),
+    },
   },
   {
     id: "kills",
@@ -179,7 +197,11 @@ export const createLiveSessionColumns = (t) => [
       t("stats.liveSessions.kills")
     ),
     cell: ({ row }) => <ScoreCell value={row.original.kills} />,
-    meta: { variant: "short", label: t("stats.liveSessions.kills") },
+    meta: {
+      variant: "short",
+      align: "right",
+      label: t("stats.liveSessions.kills"),
+    },
   },
   {
     id: "deaths",
@@ -190,7 +212,11 @@ export const createLiveSessionColumns = (t) => [
       t("stats.liveSessions.deaths")
     ),
     cell: ({ row }) => <ScoreCell value={row.original.deaths} />,
-    meta: { variant: "short", label: t("stats.liveSessions.deaths") },
+    meta: {
+      variant: "short",
+      align: "right",
+      label: t("stats.liveSessions.deaths"),
+    },
   },
   {
     id: "kdr",
@@ -202,7 +228,11 @@ export const createLiveSessionColumns = (t) => [
         {getPlayerKdr(row.original).toFixed(2)}
       </Box>
     ),
-    meta: { variant: "short", label: t("stats.liveSessions.kdr") },
+    meta: {
+      variant: "short",
+      align: "right",
+      label: t("stats.liveSessions.kdr"),
+    },
   },
   ...[
     ["combat", "combatScore"],
@@ -217,7 +247,11 @@ export const createLiveSessionColumns = (t) => [
       t(`stats.liveSessions.${label}`)
     ),
     cell: ({ row }) => <ScoreCell value={row.original[id]} />,
-    meta: { variant: "short", label: t(`stats.liveSessions.${label}`) },
+    meta: {
+      variant: "short",
+      align: "right",
+      label: t(`stats.liveSessions.${label}`),
+    },
   })),
   {
     id: "time",
@@ -228,17 +262,31 @@ export const createLiveSessionColumns = (t) => [
       t("stats.liveSessions.currentPlaytime")
     ),
     cell: ({ row }) => (
-      <Box sx={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+      <Box
+        sx={{
+          fontVariantNumeric: "tabular-nums",
+          textAlign: "right",
+          whiteSpace: "nowrap",
+        }}
+      >
         {formatSessionDuration(getPlayerSessionSeconds(row.original))}
       </Box>
     ),
-    meta: { variant: "short", label: t("stats.liveSessions.currentPlaytime") },
+    meta: {
+      variant: "short",
+      align: "right",
+      label: t("stats.liveSessions.currentPlaytime"),
+    },
   },
   {
     id: "actions",
     enableHiding: false,
     enableSorting: false,
-    header: <span title={t("common.actions")}>•••</span>,
+    header: (
+      <Box component="span" title={t("common.actions")} sx={{ display: "block", textAlign: "center" }}>
+        •••
+      </Box>
+    ),
     cell: ({ row }) => (
       <ActionMenuButton
         actions={generatePlayerActions({
@@ -262,6 +310,6 @@ export const createLiveSessionColumns = (t) => [
         )}
       />
     ),
-    meta: { variant: "icon" },
+    meta: { variant: "icon", align: "center" },
   },
 ];

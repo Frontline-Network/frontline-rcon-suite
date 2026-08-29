@@ -27,6 +27,7 @@ const Table = ({ table, config = {}, renderSubComponent, rowProps = () => ({}), 
                   <StyledTh
                     key={header.id}
                     variant={header.column.columnDef?.meta?.variant}
+                    cellAlign={header.column.columnDef?.meta?.align}
                   >
                     {header.isPlaceholder ? null : (
                       <div>
@@ -50,6 +51,7 @@ const Table = ({ table, config = {}, renderSubComponent, rowProps = () => ({}), 
                   <StyledTd
                     key={cell.id}
                     variant={cell.column.columnDef?.meta?.variant}
+                    cellAlign={cell.column.columnDef?.meta?.align}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </StyledTd>
