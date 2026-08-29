@@ -131,6 +131,71 @@ Keine verbleibenden P0-, P1- oder P2-Abweichungen innerhalb der Spielerakten-Neu
 
 final result: passed
 
+# Live-Sitzungen — Option 2 „Spieler-Explorer"
+
+## Vergleichsbasis
+
+- Source visual truth: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-ea92352b-7bbf-45b6-ba9d-74ecb5369791.png`
+- Implementation screenshot: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\live-sessions-implementation-1440x1024.png`
+- Kombinierter Vollvergleich: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\live-sessions-design-qa-comparison.png`
+- Fokusvergleich: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\live-sessions-design-qa-focus.png`
+- Responsive Evidence: `live-sessions-implementation-1000x900.png`, `live-sessions-implementation-390x844.png` und `live-sessions-drawer-390x844.png` im selben Evidence-Verzeichnis
+- Geprüfte Route: `/stats/live-sessions`
+- Viewport: Quelle und Implementierung jeweils 1440 × 1024 CSS px, DPR 1; keine Dichte-Normalisierung erforderlich
+- Pixelmaße: Quelle 1440 × 1024, Implementierung 1440 × 1024, Vollvergleich 2896 × 1024 mit 16-px-Trenner
+- Zustand: deutsche Fake-Testumgebung, Dark Theme, Server online, 6 realistische Live-Spieler; erste Spielerzeile ausgewählt. Die Referenz zeigt 86 Spieler, weshalb reine Zeilenanzahl und daraus entstehende Seitenhöhe nicht als Layoutabweichung bewertet wurden.
+
+## Findings
+
+Keine verbleibenden P0-, P1- oder P2-Abweichungen. Die Implementierung übernimmt die spielerzentrierte Einzeiler-Tabelle, die sichtbare Auswahlkante, die eckige FLN-Geometrie, die Schnellfilter, die kompakte Werkzeugleiste sowie den rechten Live-Inspector. Nicht verfügbare Felder der Bildvorlage wie Ping oder Kopfschüsse wurden bewusst nicht erfunden; der Inspector zeigt ausschließlich Werte des bestehenden Live-Endpunkts.
+
+## Pflichtflächen
+
+- Fonts und Typografie: Bahnschrift/Bahnschrift Condensed, kondensierte Versalien, tabellarische Zahlen und abgestufte Gewichte entsprechen der bestehenden Frontline-Designlinie. Tabellenköpfe verwenden lesbare Klartextbezeichnungen statt der früheren kryptischen Einzelbuchstaben.
+- Spacing und Layout: 1440 × 1024 besitzt eine dominante Spielerliste und einen 350-px-Sticky-Inspector. Goldene Auswahlkante, 1-px-Raster, eckige Buttons und die vertikale Rhythmik stimmen mit dem Ziel überein.
+- Farben und Tokens: Die Oberfläche verwendet ausschließlich bestehende Theme-Tokens. Gold bleibt Auswahl/Aktion vorbehalten; Alliierte, Achsenmächte, Erfolg und Warnung verwenden die vorhandenen semantischen Farben.
+- Image quality und Assets: vorhandene Fraktions- und Rollen-WebP-Assets werden scharf bei 18/26 px eingebunden; keine CSS-, Emoji- oder Inline-SVG-Ersatzgrafiken wurden erstellt.
+- Copy und Content: deutsche und englische Texte wurden vollständig ergänzt. Rollen werden im Inspector lokalisiert, Tabellenfelder und Aktionen sind eindeutig benannt.
+- Icons und Affordanzen: MUI-Aktionsicons, Fraktions- und Rollenicons sind konsistent ausgerichtet. Tooltips/ARIA-Beschriftungen stehen für Fraktion, Rolle, Spaltenwahl, Profil, Kopieren und Navigation zur Verfügung.
+- Responsive Verhalten: Bei 1000 px wechselt der Inspector in einen rechten Drawer. Bei 390 × 844 sind Werkzeugleiste und Schnellfilter horizontal bedienbar, die Tabelle bleibt in ihrem eigenen Scrollbereich und der Dokument-Overflow beträgt 0 px.
+- Accessibility: Spielerzeilen sind per Enter/Leertaste auswählbar; Checkboxes, Sortierung, Pagination, Drawer-Schließen und Aktionsbuttons sind semantisch beschriftet. Der Drawer besitzt eine sichtbare Schließen-Aktion.
+
+## Focused region evidence
+
+- Der Fokusvergleich enthält Werkzeugleiste, Filter, Tabelle, Auswahlzustand, Leistungsraster und Aktionen in einer gemeinsamen Bilddatei.
+- Teamfilter „Alliierte“ reduzierte die Tabelle korrekt auf 3 Spieler.
+- Suche nach `FLN_Wolf` reduzierte die Tabelle nach Ablauf des Debounce korrekt auf eine Zeile.
+- Mehrfachauswahl zeigte `1 ausgewählt`; die Spaltenauswahl öffnete lokalisierte Einträge; „Nachricht“ öffnete den bestehenden Action-Dialog.
+- Bei 1000 px öffnete ein Zeilenklick den Inspector-Drawer. Bei 390 px ließ sich derselbe Drawer öffnen und schließen.
+- Browserkonsole und `pageerror`: keine Fehler im finalen Lauf.
+
+## Comparison history
+
+1. [P2, HTML-Semantik] Der Spieler-ID-Bereich verschachtelte anfangs ein `div` in einem Typography-`p` und erzeugte eine React-Konsolenwarnung. Fix: der Context-Wert rendert als `div`. Post-fix: keine Konsolen- oder Seitenfehler.
+2. [P2, Typografie] „Kill/Death-Verhältnis“ brach im schmalen Metrikraster störend um. Fix: die sichtbare Metrik nutzt `K/D`, während Langtext in Tooltip/Tabellenkontext erhalten bleibt.
+3. [P2, Mobile] Schnellfilter und Zusammenfassung schrumpften bei 390 px ineinander. Fix: Mindestbreiten, `flex-shrink: 0` und lokale horizontale Scrollbereiche. Post-fix: keine Textkollision und 0 px Dokument-Overflow.
+4. [P2, Responsive Bedienung] Der schmale Inspector hatte keine explizite Schließen-Aktion. Fix: eckige Drawer-Kopfzeile mit beschriftetem Schließen-Button; Öffnen und Schließen automatisiert geprüft.
+
+## Open Questions
+
+- Keine blockierenden Fragen. Die Referenz visualisiert zusätzliche Daten wie Ping, Kopfschüsse und erweiterten Truppkontext. Diese Werte liefert der bestehende Live-Endpunkt nicht zuverlässig; sie wurden deshalb zugunsten ehrlicher Kampf-/Offensive-/Defensive-/Supportwerte weggelassen.
+
+## Implementation Checklist
+
+- [x] Flache, stabile Spielerzeilen mit persistenten Player-IDs
+- [x] Team-, Lobby- und führungslose Schnellfilter
+- [x] Suche, Sortierung, Pagination und lokalisierte Spaltenwahl
+- [x] Einzel- und Mehrfachaktionen mit bestehenden Berechtigungen/Dialogen
+- [x] Sticky Desktop-Inspector und responsiver Drawer
+- [x] Produktionsbuild, Browserinteraktionen und Konsolenprüfung
+- [x] Voll- und Fokusvergleich gegen das ausgewählte Mockup
+
+## Follow-up Polish
+
+- [P3] Die Fake-Testumgebung enthält derzeit sechs statt 86 Spieler. Mit einem vollen Server füllt die paginierte 16-Zeilen-Tabelle den im Zielbild sichtbaren Bereich; dies ist ein Datenzustand und keine verbleibende Layoutabweichung.
+
+final result: passed
+
 # Audit-Protokolle — Option 1 „Audit-Journal“
 
 ## Vergleichsbasis

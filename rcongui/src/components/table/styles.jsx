@@ -100,7 +100,7 @@ export const StyledTable = styled("table", {
     "& th": {
       ...getDensityPadding(density, theme),
       verticalAlign: "middle",
-      height: "3rem",  
+      height: "3rem",
     },
     "& tbody tr": {
       verticalAlign: "top",
@@ -139,6 +139,19 @@ export const StyledTd = styled("td", {
 
 export const StyledTr = styled("tr")(({ theme }) => ({
   borderBottom: `1px solid ${theme.palette.divider}`,
+  "&[data-interactive='true']": {
+    cursor: "pointer",
+  },
+  "&[data-interactive='true']:hover": {
+    backgroundColor: theme.palette.action.hover,
+  },
+  "&[data-inspected='true']": {
+    backgroundColor: theme.palette.action.selected,
+    boxShadow: `inset 2px 0 0 ${theme.palette.primary.main}`,
+  },
+  "&[data-inspected='true']:hover": {
+    backgroundColor: theme.palette.action.selected,
+  },
 }));
 
 export const Action = styled("div", {

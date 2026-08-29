@@ -13,7 +13,11 @@ import {
 import ViewColumnIcon from "@mui/icons-material/ViewColumn";
 import { useTranslation } from "react-i18next";
 
-const TableColumnSelection = ({ table, onColumnVisibilityChange }) => {
+const TableColumnSelection = ({
+  table,
+  onColumnVisibilityChange,
+  renderButton,
+}) => {
   const { t } = useTranslation();
   const columns = table.getAllColumns().filter((col) => col.getCanHide());
 
@@ -21,18 +25,22 @@ const TableColumnSelection = ({ table, onColumnVisibilityChange }) => {
     <PopoverMenu
       id="column-picker"
       description={t("selection.columnsDescription")}
-      renderButton={(props) => (
-        <IconButton
-          {...props}
-          aria-label={t("selection.columns")}
-          size="small"
-          sx={{ borderRadius: 0 }}
-        >
-          <Tooltip title={t("selection.columns")}>
-            <ViewColumnIcon sx={{ fontSize: 16 }} />
-          </Tooltip>
-        </IconButton>
-      )}
+      renderButton={(props) =>
+        renderButton ? (
+          renderButton(props)
+        ) : (
+          <IconButton
+            {...props}
+            aria-label={t("selection.columns")}
+            size="small"
+            sx={{ borderRadius: 0 }}
+          >
+            <Tooltip title={t("selection.columns")}>
+              <ViewColumnIcon sx={{ fontSize: 16 }} />
+            </Tooltip>
+          </IconButton>
+        )
+      }
       sx={{ width: "200px" }}
     >
       <List
@@ -53,7 +61,11 @@ const TableColumnSelection = ({ table, onColumnVisibilityChange }) => {
             disableGutters
             sx={{ "& .MuiButtonBase-root": { opacity: 1 } }}
           >
-            <ListItemButton onClick={() => onColumnVisibilityChange(column.id, !column.getIsVisible())}>
+            <ListItemButton
+              onClick={() =>
+                onColumnVisibilityChange(column.id, !column.getIsVisible())
+              }
+            >
               <ListItemIcon>
                 <Checkbox
                   edge="start"
@@ -82,7 +94,7 @@ const TableColumnSelection = ({ table, onColumnVisibilityChange }) => {
                   }}
                 >
                   <ListItemText id={`picker-${column.id}`}>
-                    {column.id}
+                    {column.columnDef.meta?.label ?? column.id}
                   </ListItemText>
                 </Box>
               </Box>
