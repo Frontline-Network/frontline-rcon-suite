@@ -229,7 +229,7 @@ export const createLiveSessionColumns = (t) => [
       </Box>
     ),
     meta: {
-      variant: "short",
+      variant: "ratio",
       align: "right",
       label: t("stats.liveSessions.kdr"),
     },

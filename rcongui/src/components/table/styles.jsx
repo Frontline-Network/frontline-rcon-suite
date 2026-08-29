@@ -9,6 +9,8 @@ export function getVariantWidth(variant) {
       return "1.25em";
     case "short":
       return "4em";
+    case "ratio":
+      return "5.5em";
     case "time":
       return "16ch";
     case "name":
@@ -30,6 +32,8 @@ export function getVariantMinWidth(variant) {
       return "1.25em";
     case "short":
       return "4em";
+    case "ratio":
+      return "5.5em";
     case "time":
       return "16ch";
     case "name":
@@ -198,12 +202,34 @@ export const SortableHeader =
   ({ column }) => {
     const isIconColumn = column.columnDef?.meta?.variant === "icon";
     const alignment = column.columnDef?.meta?.align;
+    const sortDirection = column.getIsSorted();
     const justifyContent =
       alignment === "right"
         ? "flex-end"
         : alignment === "center" || isIconColumn
           ? "center"
           : "flex-start";
+    const sortIcon = sortDirection ? (
+      sortDirection === "asc" ? (
+        <ArrowUpwardIcon
+          sx={{
+            fontSize: "1em",
+            width: "1em",
+            height: "1em",
+            ...(alignment === "right" ? { mr: 0.5 } : { ml: 0.5 }),
+          }}
+        />
+      ) : (
+        <ArrowDownwardIcon
+          sx={{
+            fontSize: "1em",
+            width: "1em",
+            height: "1em",
+            ...(alignment === "right" ? { mr: 0.5 } : { ml: 0.5 }),
+          }}
+        />
+      )
+    ) : null;
 
     return (
       <HeaderButton
@@ -211,27 +237,9 @@ export const SortableHeader =
         title={title || ""}
         sx={{ justifyContent }}
       >
+        {alignment === "right" && sortIcon}
         {text}
-        {column.getIsSorted() &&
-          (column.getIsSorted() === "asc" ? (
-            <ArrowUpwardIcon
-              sx={{
-                fontSize: "1em",
-                width: "1em",
-                height: "1em",
-                ml: 0.5,
-              }}
-            />
-          ) : (
-            <ArrowDownwardIcon
-              sx={{
-                fontSize: "1em",
-                width: "1em",
-                height: "1em",
-                ml: 0.5,
-              }}
-            />
-          ))}
+        {alignment !== "right" && sortIcon}
       </HeaderButton>
     );
   };
