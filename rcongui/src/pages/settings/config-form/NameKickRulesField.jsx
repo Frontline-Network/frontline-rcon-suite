@@ -142,7 +142,7 @@ export default function NameKickRulesField({
                   bgcolor: active
                     ? "rgba(214, 170, 77, 0.08)"
                     : "background.default",
-                  borderRadius: 1,
+                  borderRadius: 0,
                 }}
               >
                 <Stack
@@ -332,7 +332,7 @@ export default function NameKickRulesField({
           border: "1px solid",
           borderColor: "divider",
           bgcolor: "background.default",
-          borderRadius: 1,
+          borderRadius: 0,
         }}
       >
         <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>

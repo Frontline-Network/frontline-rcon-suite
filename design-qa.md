@@ -127,6 +127,71 @@ Rohkonfiguration bleibt im erweiterten JSON-Modus erreichbar.
 - Bei einer einzelnen Zusatzspalte bleibt die Tabelle ohne Überbreite; die obere Scrollleiste wird dann automatisch ausgeblendet.
 - Produktions-Build und Browser-Laufzeittest erfolgreich.
 
+## Seeder-VIP-Belohnung — Option 3
+
+- Referenz: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-5a0cb3d4-fbdb-4e4a-88ae-ad6f8caa41a1.png`
+- Implementierung: `/settings/others/seed-vip` im lokalen Demo-Modus
+- Vergleichszustand: Deutsch, Formularmodus, Aktiv, Abschnitt „Voraussetzungen“, gespeicherte Ausgangswerte
+- Gemeinsamer Vergleich: `C:\Users\chris\AppData\Local\Temp\seed-vip-option3-comparison-final.png`
+- Vergleichsgröße: Referenz und Umsetzung jeweils 1487 × 1058 Pixel
+
+### Sichtbarer Vergleich
+
+- Die ausgewählte Option 3 wurde in die bestehende Frontline-Arbeitsfläche übertragen, ohne Navigation, Typografie, Farbwelt oder eckige Komponenten neu zu erfinden.
+- Ziel, Qualifikation und Belohnung bilden oberhalb des Formulars eine kompakte, sofort verständliche Wirkungskette.
+- Das Ergebnis-Briefing löst die aktuelle Konfiguration in einen verständlichen Satz und vier operative Schritte auf.
+- Team-Zielwerte, Mindestspielzeit, Anwesenheitsbedingung und Fortschrittsmeldungen sind als vier flache Entscheidungszeilen aufgebaut.
+- Wirksame Werte stehen im Hauptfluss. Legacy-Minimalwerte, Rückfallpuffer und Darstellungsoptionen befinden sich in klar bezeichneten erweiterten Bereichen.
+- Die Speicherleiste bleibt bei der Referenzgröße vollständig sichtbar; die zuvor doppelte Abschnittsüberschrift und die redundante Gültigkeitsmeldung wurden entfernt.
+
+### Fachliche und funktionale Prüfung
+
+- Die Zusammenfassung verwendet die tatsächlich wirksamen Felder `max_allies` und `max_axis`; die gespeicherten, aber aktuell nicht ausgewerteten `min_*`-Felder werden nicht als wirksame Zielspanne dargestellt.
+- Gekoppelte Teamwerte geprüft: eine Änderung bei den Alliierten aktualisiert bei aktiver Kopplung beide Seiten und die Wirkungsvorschau sofort.
+- Qualifikations-Presets und Anwesenheitsmodus aktualisieren Formular, Zusammenfassung und Dirty-State korrekt.
+- Belohnungsdauer und kumulative beziehungsweise neu berechnete VIP-Laufzeit werden mit einer Ergebnisvorschau erklärt.
+- Spielertexte bleiben einzeln aufklappbar; vorhandene Platzhalter sind direkt einsetzbar.
+- Webhook-Liste wird editierbar dargestellt; leere und vorhandene Zustände sind abgedeckt.
+- JSON-Modus bleibt als vollständiger technischer Fallback erhalten. Das nicht wirksame Kompatibilitätsfeld `forward` wird im vereinfachten Hauptfluss nicht als funktionierende Steuerung ausgegeben.
+
+### Responsive und technische Prüfung
+
+- 1487 × 1058: vollständige Entscheidungsoberfläche und Speicherleiste ohne Überdeckung geprüft.
+- 390 × 844: kein horizontaler Seitenüberlauf (`scrollWidth = innerWidth = 390`); Navigation und Zusammenfassung brechen kontrolliert um.
+- Produktionsnaher Vite-Build im Fake-Modus: bestanden.
+- Browserkonsole: keine neuen Fehler; ausschließlich die bestehende React-Router-v7-Future-Flag-Warnung.
+- Keine offenen P0-, P1- oder P2-Designabweichungen im neuen Seeder-VIP-Formular.
+
+final result: passed
+
+# Design-QA: Seeder-VIP Option 3 — Feinschliff
+
+## Vergleichsgrundlage
+
+- Zielbild: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-5a0cb3d4-fbdb-4e4a-88ae-ad6f8caa41a1.png`
+- Browser-gerenderte Umsetzung: `C:\Users\chris\AppData\Local\Temp\seed-vip-polish-final-desktop.png`
+- Gemeinsamer Vergleich: `C:\Users\chris\AppData\Local\Temp\seed-vip-polish-final-compare.png`
+- Lokale Route: `http://127.0.0.1:3001/settings/others/seed-vip`
+
+## Feinschliff
+
+- Alle fünf Bereichsreiter besitzen nun kurze, vollständig lesbare Untertitel; die Desktop-Navigation zeigt keine abgeschnittenen Satzfragmente mehr.
+- Gleiche Teamziele werden als „25 je Team“ zusammengefasst. Bei abweichenden Zielen nennt die Oberfläche beide Seiten eindeutig.
+- Der Ablauftext verwendet natürliche deutsche und englische Formulierungen statt „25 bzw. 25“.
+- VIP-Dauer, Ablauftext und Ergebnisvorschau verwenden korrekte Einzahl und Mehrzahl für einen bzw. mehrere Tage.
+- Die Zusammenfassung beschreibt die Verlängerungslogik konkret als „verlängert Laufzeit“ bzw. „beginnt ab Abschluss“.
+- Die bestehende eckige Frontline-Designlinie, Seitenstruktur und Feldlogik blieben unverändert.
+
+## Interaktionen und technische Prüfung
+
+- Gekoppelte und getrennte Teamziele, Zusammenfassung und Ablauftext: bestanden.
+- Belohnung auf einen Tag ändern, Einzahl prüfen und auf sieben Tage zurücksetzen: bestanden.
+- Nach dem Rücksetzen entspricht der Formularzustand wieder vollständig den gespeicherten Werten.
+- Desktop bei 1487 × 1058: kein horizontaler Überlauf; `mainScrollWidth` entspricht `mainClientWidth`.
+- Mobil bei 390 × 844: Dokument- und Body-Breite bleiben 390 Pixel; alle Formularbereiche und Bedienelemente sind im DOM erreichbar.
+- Produktionsbuild mit Vite (`--mode fake`): bestanden.
+- Direkter Side-by-Side-Vergleich zeigt keine offenen P0-, P1- oder P2-Abweichungen im bearbeiteten Feinschliff.
+
 final result: passed
 
 # Live-Ansicht: natürliche Spielerliste und festes Live-Protokoll

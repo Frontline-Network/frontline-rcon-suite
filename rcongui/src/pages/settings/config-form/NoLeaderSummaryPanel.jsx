@@ -1,55 +1,75 @@
-import {
-  Alert,
-  AlertTitle,
-  Box,
-  Divider,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Box, Stack, Typography } from "@mui/material";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import GavelOutlinedIcon from "@mui/icons-material/GavelOutlined";
+import Groups2OutlinedIcon from "@mui/icons-material/Groups2Outlined";
+import PlayArrowOutlinedIcon from "@mui/icons-material/PlayArrowOutlined";
+import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import { useTranslation } from "react-i18next";
 
-const formatStage = (count, interval, t) => {
-  if (Number(count) === 0)
-    return t("settings.configForms.workbench.flow.disabled");
+const formatStage = (count, interval, t, root) => {
+  if (Number(count) === 0) return t(`${root}.summary.skipped`);
   if (Number(count) === -1) {
-    return t("settings.configForms.workbench.flow.unlimited", { interval });
+    return t(`${root}.summary.unlimited`, { interval: interval ?? 0 });
   }
-  return t("settings.configForms.workbench.flow.count", { count, interval });
+  return t(`${root}.summary.count`, {
+    count: count ?? 0,
+    interval: interval ?? 0,
+  });
 };
 
-function FlowRow({ number, title, value }) {
+function OverviewSegment({ icon, eyebrow, children, detail, border = true }) {
   return (
     <Box
+      component="section"
       sx={{
-        display: "grid",
-        gridTemplateColumns: "25px 85px minmax(0, 1fr)",
-        gap: 0.625,
-        alignItems: "center",
+        minWidth: 0,
+        px: { xs: 1.75, sm: 2.25, lg: 2.75 },
+        py: { xs: 1.75, md: 2.1 },
+        borderRight: { xs: 0, md: border ? "1px solid" : 0 },
+        borderBottom: { xs: border ? "1px solid" : 0, md: 0 },
+        borderColor: "divider",
       }}
     >
-      <Box
-        aria-hidden="true"
+      <Stack direction="row" spacing={1.5} alignItems="flex-start">
+        <Box
+          aria-hidden="true"
+          sx={{ color: "primary.main", display: "flex", mt: 0.15 }}
+        >
+          {icon}
+        </Box>
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: "block", mb: 0.35, letterSpacing: "0.05em" }}
+          >
+            {eyebrow}
+          </Typography>
+          {children}
+          {detail}
+        </Box>
+      </Stack>
+    </Box>
+  );
+}
+
+function ReactionStage({ label, value, active = true }) {
+  return (
+    <Box component="li" sx={{ minWidth: 0, flex: "1 1 0", listStyle: "none" }}>
+      <Typography
+        variant="body2"
         sx={{
-          display: "grid",
-          placeItems: "center",
-          width: 25,
-          height: 25,
-          border: "1px solid",
-          borderColor: "primary.main",
-          borderRadius: "50%",
-          color: "primary.main",
-          fontSize: 12,
-          fontWeight: 900,
+          color: active ? "text.primary" : "text.disabled",
+          fontWeight: 750,
         }}
       >
-        {number}
-      </Box>
-      <Typography sx={{ fontSize: 11.5 }} fontWeight={850}>
-        {title}
+        {label}
       </Typography>
       <Typography
-        color="text.secondary"
-        sx={{ fontSize: 10.5, whiteSpace: "nowrap" }}
+        variant="caption"
+        color={active ? "text.secondary" : "text.disabled"}
+        sx={{ display: "block", mt: 0.2 }}
       >
         {value}
       </Typography>
@@ -57,90 +77,176 @@ function FlowRow({ number, title, value }) {
   );
 }
 
-const getReachability = (data) => {
-  if (!data?.kick_after_max_punish) return "disabled";
-  if (Number(data?.number_of_warnings) === -1) return "warningsUnlimited";
-  if (Number(data?.number_of_punishments) === -1) return "punishmentsUnlimited";
-  if (Number(data?.number_of_punishments) <= 0) return "punishmentsSkipped";
-  return "reachable";
-};
-
-export default function NoLeaderSummaryPanel({ data }) {
+export default function NoLeaderSummaryPanel({
+  data = {},
+  translationRoot = "settings.configForms.noLeader",
+}) {
   const { t } = useTranslation();
-  const reachability = getReachability(data);
-  const kickReachable = reachability === "reachable";
-  const kickConfigured = Boolean(data?.kick_after_max_punish);
+  const root = `${translationRoot}.workbench`;
+  const minimum = Math.max(
+    0,
+    Number(data.dont_do_anything_below_this_number_of_players) || 0
+  );
+  const checks = Math.max(0, Number(data.number_of_notes) || 0);
+  const warningActive = Number(data.number_of_warnings) !== 0;
+  const punishActive = Number(data.number_of_punishments) !== 0;
+  const kickActive = Boolean(data.kick_after_max_punish);
+  const kickReachable =
+    kickActive &&
+    Number(data.number_of_warnings) !== -1 &&
+    Number(data.number_of_punishments) > 0;
+  const exceptionCount =
+    (data.immune_roles?.length || 0) +
+    (data.whitelist_flags?.length || 0) +
+    (Number(data.immune_player_level) > 0 ? 1 : 0);
+  const operationNotice = data.enabled
+    ? data.dry_run
+      ? t(`${root}.summary.testNotice`)
+      : t(`${root}.summary.activeNotice`)
+    : t(`${root}.summary.inactiveNotice`);
 
   return (
     <Box
       component="aside"
-      aria-label={t("settings.configForms.workbench.flow.title")}
+      aria-label={t(`${root}.summary.title`)}
+      sx={{
+        bgcolor: "background.paper",
+        border: "1px solid",
+        borderColor: "divider",
+        borderRadius: 0,
+        overflow: "hidden",
+      }}
     >
-      <Typography
-        component="h2"
-        variant="h6"
-        fontWeight={900}
-        sx={{ textTransform: "uppercase" }}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", md: "0.82fr 1fr 1.55fr" },
+        }}
       >
-        {t("settings.configForms.workbench.flow.title")}
-      </Typography>
-      <Typography
-        variant="overline"
-        color="text.primary"
-        sx={{ display: "block", mt: 0, mb: 1.5 }}
-      >
-        {t("settings.configForms.workbench.flow.sequence")}
-      </Typography>
-      <Stack spacing={2}>
-        <FlowRow
-          number={1}
-          title={t("settings.configForms.workbench.flow.warn")}
-          value={formatStage(
-            data?.number_of_warnings,
-            data?.warning_interval_seconds,
-            t
-          )}
-        />
-        <FlowRow
-          number={2}
-          title={t("settings.configForms.workbench.flow.punish")}
-          value={
-            Number(data?.number_of_punishments) === 0
-              ? t("settings.configForms.workbench.flow.disabled")
-              : t("settings.configForms.workbench.flow.punishAction")
+        <OverviewSegment
+          icon={<PlayArrowOutlinedIcon fontSize="small" />}
+          eyebrow={t(`${root}.summary.startCondition`)}
+          detail={
+            <Typography
+              variant="caption"
+              color={
+                data.enabled && !data.dry_run
+                  ? "success.main"
+                  : "text.secondary"
+              }
+              sx={{ display: "block", mt: 0.65, maxWidth: 300 }}
+            >
+              {operationNotice}
+            </Typography>
           }
-        />
-        <FlowRow
-          number={3}
-          title={t("settings.configForms.workbench.flow.kick")}
-          value={
-            kickConfigured
-              ? t("settings.configForms.workbench.flow.kickAfterSeconds", {
-                  seconds: data?.kick_grace_period_seconds,
-                })
-              : t("settings.configForms.workbench.flow.disabled")
+        >
+          <Typography variant="h5" component="p" sx={{ lineHeight: 1.15 }}>
+            {minimum === 0
+              ? t(`${root}.summary.immediate`)
+              : t(`${root}.summary.fromPlayers`, { count: minimum })}
+          </Typography>
+        </OverviewSegment>
+
+        <OverviewSegment
+          icon={<SearchOutlinedIcon fontSize="small" />}
+          eyebrow={t(`${root}.summary.detection`)}
+          detail={
+            <Stack spacing={0.45} sx={{ mt: 0.65 }}>
+              <Stack direction="row" spacing={0.65} alignItems="center">
+                <CheckCircleOutlineIcon
+                  sx={{ fontSize: 15, color: "primary.main" }}
+                />
+                <Typography variant="caption" color="text.secondary">
+                  {t(`${root}.summary.checks`, {
+                    count: checks,
+                    interval: data.notes_interval_seconds ?? 0,
+                  })}
+                </Typography>
+              </Stack>
+              <Stack direction="row" spacing={0.65} alignItems="center">
+                <Groups2OutlinedIcon
+                  sx={{ fontSize: 15, color: "primary.main" }}
+                />
+                <Typography variant="caption" color="text.secondary">
+                  {t(`${root}.summary.exceptions`, { count: exceptionCount })}
+                </Typography>
+              </Stack>
+            </Stack>
           }
-        />
-      </Stack>
-      <Divider sx={{ my: 1.5 }} />
-      <Typography variant="overline" color="text.primary">
-        {t("settings.configForms.workbench.flow.reachability")}
-      </Typography>
-      <Alert
-        severity={
-          kickReachable ? "success" : kickConfigured ? "warning" : "info"
-        }
-        sx={{ mt: 0.25, borderRadius: 0.75, alignItems: "flex-start" }}
-      >
-        <AlertTitle sx={{ mb: 0.5, fontWeight: 850 }}>
-          {t(
-            `settings.configForms.workbench.flow.reachabilityStates.${reachability}.title`
-          )}
-        </AlertTitle>
-        {t(
-          `settings.configForms.workbench.flow.reachabilityStates.${reachability}.description`
-        )}
-      </Alert>
+        >
+          <Typography variant="subtitle1" component="p">
+            {checks === 0
+              ? t(`${root}.summary.noConfirmation`)
+              : t(`${root}.summary.confirmedViolation`)}
+          </Typography>
+        </OverviewSegment>
+
+        <OverviewSegment
+          icon={<GavelOutlinedIcon fontSize="small" />}
+          eyebrow={t(`${root}.summary.reaction`)}
+          border={false}
+        >
+          <Stack
+            component="ol"
+            direction={{ xs: "column", sm: "row" }}
+            spacing={{ xs: 0.8, sm: 1 }}
+            alignItems={{ xs: "stretch", sm: "center" }}
+            sx={{ p: 0, m: 0 }}
+          >
+            <ReactionStage
+              label={t(`${root}.summary.warn`)}
+              value={formatStage(
+                data.number_of_warnings,
+                data.warning_interval_seconds,
+                t,
+                root
+              )}
+              active={warningActive}
+            />
+            <ChevronRightIcon
+              aria-hidden="true"
+              sx={{
+                color: "primary.main",
+                fontSize: 18,
+                flex: "0 0 auto",
+                transform: { xs: "rotate(90deg)", sm: "none" },
+              }}
+            />
+            <ReactionStage
+              label={t(`${root}.summary.punish`)}
+              value={formatStage(
+                data.number_of_punishments,
+                data.punish_interval_seconds,
+                t,
+                root
+              )}
+              active={punishActive}
+            />
+            <ChevronRightIcon
+              aria-hidden="true"
+              sx={{
+                color: "primary.main",
+                fontSize: 18,
+                flex: "0 0 auto",
+                transform: { xs: "rotate(90deg)", sm: "none" },
+              }}
+            />
+            <ReactionStage
+              label={t(`${root}.summary.kick`)}
+              value={
+                kickReachable
+                  ? t(`${root}.summary.kickAfter`, {
+                      seconds: data.kick_grace_period_seconds ?? 0,
+                    })
+                  : kickActive
+                  ? t(`${root}.summary.unreachable`)
+                  : t(`${root}.summary.skipped`)
+              }
+              active={kickReachable}
+            />
+          </Stack>
+        </OverviewSegment>
+      </Box>
     </Box>
   );
 }

@@ -94,9 +94,21 @@ class SeedingRulesAutomod:
         """
         p: PunitionsToApply = PunitionsToApply()
 
-        disallowed_roles = set(self.config.disallowed_roles.roles.values())
-        disallowed_weapons = set(self.config.disallowed_weapons.weapons.values())
-        enforce_cap_fight_maxplayers = self.config.enforce_cap_fight.max_players
+        disallowed_roles = (
+            set(self.config.disallowed_roles.roles.values())
+            if self.config.disallowed_roles.enabled
+            else set()
+        )
+        disallowed_weapons = (
+            set(self.config.disallowed_weapons.weapons.values())
+            if self.config.disallowed_weapons.enabled
+            else set()
+        )
+        enforce_cap_fight_maxplayers = (
+            self.config.enforce_cap_fight.max_players
+            if self.config.enforce_cap_fight.enabled
+            else 0
+        )
 
         if self.config.announcement_enabled and (
             len(disallowed_roles) != 0
@@ -268,6 +280,9 @@ class SeedingRulesAutomod:
         self.red.delete(disabled_rule_key(rule))
 
     def _is_seeding_rule_disabled(self, rule: str) -> bool:
+        if not getattr(self.config, rule).enabled:
+            return True
+
         k = disabled_rule_key(rule)
         if not self.red.exists(k):
             return False

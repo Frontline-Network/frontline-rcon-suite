@@ -57,8 +57,11 @@ import {
   ConfigProfileSummaryPanel,
   ConfigValidationSummary,
   GuidedConfigForm,
+  NameKickSummaryPanel,
+  NoLeaderOperationModeControl,
   NoLeaderSummaryPanel,
   SchemaConfigForm,
+  SeedVipConfigForm,
   SeedingConfigForm,
   SeedingOperationModeControl,
   SeedingSummaryPanel,
@@ -465,9 +468,17 @@ const ConfigPage = () => {
   const hasGuidedProfile = Boolean(formProfile?.sections?.length);
   const usesGuidedRenderer = formProfile?.renderer === "guided";
   const usesSeedingRenderer = formProfile?.renderer === "seeding";
-  const WorkbenchLayout = usesSeedingRenderer
-    ? SeedingWorkbenchLayout
-    : ConfigFormLayout;
+  const usesSeedVipRenderer = formProfile?.renderer === "seedVip";
+  const usesNameKickRenderer = formProfile?.renderer === "nameKick";
+  const usesSchemaWorkbench = formProfile?.layout === "workbench";
+  const WorkbenchLayout =
+    usesSeedingRenderer ||
+    usesSeedVipRenderer ||
+    usesGuidedRenderer ||
+    usesNameKickRenderer ||
+    usesSchemaWorkbench
+      ? SeedingWorkbenchLayout
+      : ConfigFormLayout;
   const changePermission = `can_change_${command}`;
   const canChange = Boolean(
     permissions?.is_superuser ||
@@ -686,7 +697,15 @@ const ConfigPage = () => {
             eyebrow={pageEyebrow}
             title={pageTitle}
             description={pageDescription}
-            status={usesSeedingRenderer ? undefined : ruleStatus}
+            status={
+              usesSeedingRenderer ||
+              usesSeedVipRenderer ||
+              usesGuidedRenderer ||
+              usesNameKickRenderer ||
+              (usesSchemaWorkbench && hasEnabledSetting)
+                ? undefined
+                : ruleStatus
+            }
             statusColor={ruleStatusColor}
             sections={mode === "visual" ? sectionNavigation : []}
             activeSection={activeSection}
@@ -708,6 +727,27 @@ const ConfigPage = () => {
                     onChange={handleSchemaSectionChange}
                   />
                 )}
+                {usesGuidedRenderer && mode === "visual" && (
+                  <NoLeaderOperationModeControl
+                    data={jsonData}
+                    disabled={!canChange}
+                    onChange={handleSchemaSectionChange}
+                    translationRoot={formProfile.translationRoot}
+                  />
+                )}
+                {usesSchemaWorkbench &&
+                  formProfile.operationMode &&
+                  mode === "visual" && (
+                    <NoLeaderOperationModeControl
+                      data={jsonData}
+                      disabled={!canChange}
+                      onChange={handleSchemaSectionChange}
+                      translationRoot="settings.configForms"
+                      supportsDryRun={
+                        formProfile.operationMode === "threeState"
+                      }
+                    />
+                  )}
                 <ConfigModeSwitch
                   value={mode}
                   onChange={updateMode}
@@ -735,8 +775,13 @@ const ConfigPage = () => {
             }
             summary={
               mode === "visual" && hasGuidedProfile ? (
-                usesGuidedRenderer ? (
-                  <NoLeaderSummaryPanel data={jsonData} />
+                usesNameKickRenderer ? (
+                  <NameKickSummaryPanel data={jsonData} />
+                ) : usesGuidedRenderer ? (
+                  <NoLeaderSummaryPanel
+                    data={jsonData}
+                    translationRoot={formProfile.translationRoot}
+                  />
                 ) : usesSeedingRenderer ? (
                   <SeedingSummaryPanel data={jsonData} />
                 ) : (
@@ -841,6 +886,13 @@ const ConfigPage = () => {
                   <SeedingConfigForm
                     profile={formProfile}
                     schema={schema}
+                    data={jsonData}
+                    activeSection={activeSection}
+                    disabled={!canChange}
+                    onChange={handleSchemaSectionChange}
+                  />
+                ) : usesSeedVipRenderer ? (
+                  <SeedVipConfigForm
                     data={jsonData}
                     activeSection={activeSection}
                     disabled={!canChange}

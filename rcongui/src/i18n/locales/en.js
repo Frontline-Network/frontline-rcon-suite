@@ -1847,6 +1847,22 @@ const en = {
         noDelay: "No additional delay",
         anySquadSize: "Any squad size",
       },
+      playerFlagPicker: {
+        noticeTitle: "Select existing player flags",
+        noticeBody:
+          "The catalogue is loaded directly from the player profiles in this CRCON instance. Players with at least one selected flag are exempt from the respective rule.",
+        label: "Exempt player flags",
+        placeholder: "Search for a flag or enter a new one",
+        help: "Select existing flags. You can still type a custom flag and press Enter to add it.",
+        loading: "Loading flags …",
+        noOptions: "No other existing flag found",
+        loadFailed:
+          "The flag catalogue could not be loaded. Custom values can still be entered.",
+        playerCount_one: "{{count}} player profile",
+        playerCount_other: "{{count}} player profiles",
+        catalogueCount_one: "{{count}} existing flag found",
+        catalogueCount_other: "{{count}} existing flags found",
+      },
       roles: {
         armycommander: "Commander",
         officer: "Squad leader",
@@ -1878,6 +1894,12 @@ const en = {
         defaultEyebrow: "Server configuration",
         defaultIntro:
           "Configure this area with the guided form, or switch to the advanced JSON view for special cases.",
+        mode: {
+          title: "Operating mode",
+          off: "Off",
+          observe: "Observe",
+          active: "Active",
+        },
         tabsLabel: "Editing mode",
         formTab: "Form",
         jsonTab: "JSON (advanced)",
@@ -1984,6 +2006,21 @@ const en = {
           count: "{{count}}× · every {{interval}} seconds",
           kick: "Kick after {{seconds}} seconds",
           intervalMinutes: "Check every {{count}} minutes",
+          notificationsActive: "Discord notification enabled",
+          notificationsInactive: "No Discord notification",
+          noDuration: "No duration configured",
+          duration: {
+            minutes_one: "{{count}} minute",
+            minutes_other: "{{count}} minutes",
+            hours_one: "{{count}} hour",
+            hours_other: "{{count}} hours",
+            days_one: "{{count}} day",
+            days_other: "{{count}} days",
+            weeks_one: "{{count}} week",
+            weeks_other: "{{count}} weeks",
+            years_one: "{{count}} year",
+            years_other: "{{count}} years",
+          },
           configured: "{{configured}} of {{total}} values configured",
           activeNotice:
             "The settings shown will be used for this server after saving.",
@@ -2096,14 +2133,77 @@ const en = {
           description:
             "Exemptions are checked before every action. Dry runs follow the same flow but never affect the game.",
         },
+        workbench: {
+          mode: {
+            title: "How should the rule run?",
+            off: "Off",
+            observe: "Observe",
+            active: "Active",
+          },
+          operation: {
+            help: "The global minimum pauses the entire automod. Detection, warnings, and actions only begin once enough players are connected.",
+          },
+          detection: {
+            skipped:
+              "The first warning follows without an additional confirmation stage",
+            result_one:
+              "{{checks}} internal check confirms the violation after about {{seconds}} seconds",
+            result_other:
+              "{{checks}} internal checks confirm the violation after about {{seconds}} seconds",
+            help: "These checks remain invisible to the player and prevent premature actions during short role changes.",
+          },
+          actions: {
+            inactive: "Skipped",
+            unlimited: "Unlimited",
+            configured: "Configured",
+            unreachable: "Unreachable",
+          },
+          notifications: {
+            help: "The webhook receives audit messages for detected violations and applied actions. It is not required for the rule to operate.",
+          },
+          summary: {
+            title: "Rule overview",
+            startCondition: "Start the entire automod from",
+            immediate: "Check immediately",
+            fromPlayers: "{{count}} players",
+            activeNotice:
+              "The rule will actively affect the game after saving.",
+            testNotice: "Log only – no messages or game actions.",
+            inactiveNotice: "The rule is off; all settings are retained.",
+            detection: "Detection",
+            confirmedViolation: "Violation is confirmed",
+            noConfirmation: "No confirmation stage",
+            checks_one: "{{count}} check · every {{interval}} seconds",
+            checks_other: "{{count}} checks · every {{interval}} seconds",
+            exceptions_one: "{{count}} configured exemption",
+            exceptions_other: "{{count}} configured exemptions",
+            reaction: "Action sequence",
+            warn: "Warn",
+            punish: "Punish",
+            kick: "Kick",
+            count: "{{count}}× · every {{interval}} seconds",
+            unlimited: "Unlimited · every {{interval}} seconds",
+            skipped: "Skipped",
+            unreachable: "Unreachable with this sequence",
+            kickAfter: "after a {{seconds}} second grace period",
+          },
+        },
         sections: {
           operation: {
-            title: "Basics",
-            description: "Core settings",
+            title: "Overview",
+            description: "Operating mode and global start condition",
+          },
+          detection: {
+            title: "Detection",
+            description: "Confirm violations reliably",
           },
           exemptions: {
             title: "Exceptions",
             description: "Who is exempt",
+          },
+          actions: {
+            title: "Actions",
+            description: "Build warnings, punishment, and kick",
           },
           observation: {
             title: "Confirm",
@@ -2219,10 +2319,167 @@ const en = {
         },
       },
       level: {
-        eyebrow: "Automod rule",
+        eyebrow: "Automation · Player level",
         title: "Level rules",
         intro:
           "Control minimum and maximum levels as well as role-specific level thresholds. Players can be informed, punished, or removed in progressive stages.",
+        sections: {
+          operation: {
+            title: "Start condition",
+            description: "Server population required before checks begin",
+          },
+          rules: {
+            title: "Level limits",
+            description: "General and role-specific requirements",
+          },
+          exemptions: {
+            title: "Exceptions",
+            description: "Protected flags and level-bug handling",
+          },
+          announcements: {
+            title: "Announcements",
+            description: "Notices before enforcement begins",
+          },
+          warnings: {
+            title: "Warnings",
+            description: "Count, interval, and message",
+          },
+          punishments: {
+            title: "Punishments",
+            description: "Consequences after unsuccessful warnings",
+          },
+          kick: {
+            title: "Kick",
+            description: "Final escalation stage and reason",
+          },
+          notifications: {
+            title: "Audit",
+            description: "Optional Discord notification",
+          },
+          advanced: {
+            title: "Additional settings",
+            description: "Additional fields supplied by the server",
+          },
+        },
+        fields: {
+          dont_do_anything_below_this_number_of_players: {
+            label: "Only check from this player count",
+            help: "Below this number, the level rule remains fully inactive. Set 0 to check at any population.",
+          },
+          min_level: {
+            label: "Server minimum level",
+            help: "Players below this level do not meet the general access requirement.",
+          },
+          max_level: {
+            label: "Server maximum level",
+            help: "Set 0 to disable the general upper limit.",
+          },
+          level_thresholds: {
+            label: "Level limits by role",
+            help: "Define a separate minimum level and population requirement for selected roles.",
+          },
+          label: {
+            label: "Display name",
+            help: "Readable name for this role.",
+          },
+          min_players: {
+            label: "Applies from player count",
+            help: "The role-specific limit is enforced from this server population.",
+          },
+          min_level_message: {
+            label: "Message below minimum level",
+            help: "Message fragment for players below the general minimum level.",
+          },
+          max_level_message: {
+            label: "Message above maximum level",
+            help: "Message fragment for players above the general maximum level.",
+          },
+          violation_message: {
+            label: "Role violation message",
+            help: "Describes the violated role-specific level requirement.",
+          },
+          force_kick_message: {
+            label: "Server-level kick message",
+            help: "Shown when a player is immediately kicked by the general level limit.",
+          },
+          whitelist_flags: {
+            label: "Exempt player flags",
+            help: "Players with at least one of these flags are not checked.",
+          },
+          levelbug_enabled: {
+            label: "Protect players affected by the level-1 bug",
+            help: "Exempts level-1 players when the known HLL level bug is suspected.",
+          },
+          announcement_enabled: {
+            label: "Announce level rules",
+            help: "Tells connecting players about the active level requirements.",
+          },
+          only_announce_impacted_players: {
+            label: "Only notify affected players",
+            help: "Sends the announcement only to players currently violating a limit.",
+          },
+          announcement_message: {
+            label: "Announcement",
+            help: "Message explaining the active level requirements.",
+          },
+          number_of_warnings: {
+            label: "Warnings before punishment",
+            help: "-1 warns indefinitely; 0 skips this stage.",
+          },
+          warning_interval_seconds: {
+            label: "Interval between warnings",
+            help: "Time between two warning messages.",
+          },
+          warning_message: {
+            label: "Warning message",
+            help: "Message sent to players violating a level requirement.",
+          },
+          number_of_punishments: {
+            label: "Number of punishments",
+            help: "-1 punishes indefinitely; 0 skips this stage.",
+          },
+          min_squad_players_for_punish: {
+            label: "Minimum squad size",
+            help: "Punish only when the squad has at least this many players.",
+          },
+          min_server_players_for_punish: {
+            label: "Minimum server population for punishment",
+            help: "No punishment is applied below this value.",
+          },
+          punish_interval_seconds: {
+            label: "Interval between punishments",
+            help: "Time between two punishments.",
+          },
+          punish_message: {
+            label: "Punishment message",
+            help: "Message the player receives with a punishment.",
+          },
+          kick_after_max_punish: {
+            label: "Kick after punishments",
+            help: "Enables the final escalation stage.",
+          },
+          min_squad_players_for_kick: {
+            label: "Minimum squad size for kick",
+            help: "Kick only when the squad has at least this many players.",
+          },
+          min_server_players_for_kick: {
+            label: "Minimum server population for kick",
+            help: "No kick is applied below this value.",
+          },
+          kick_grace_period_seconds: {
+            label: "Final grace period before kick",
+            help: "Time after the final punishment in which the violation can be resolved.",
+          },
+          kick_message: {
+            label: "Kick message",
+            help: "Reason shown when the player is removed.",
+          },
+          discord_webhook_url: {
+            label: "Discord audit webhook",
+            help: "Optional. Records detected violations and applied actions.",
+          },
+        },
+        summary: { levelRange: "Levels {{min}} to {{max}}" },
       },
       seeding: {
         eyebrow: "Automation · Seeding",
@@ -2276,6 +2533,7 @@ const en = {
         },
         status: {
           active: "Active",
+          inactive: "Inactive",
           incomplete: "Not configured",
           skipped: "Skipped",
           unlimited: "Unlimited",
@@ -2287,10 +2545,14 @@ const en = {
             "The rule applies between {{min}} and {{max}} players and checks {{count}} configured entries.",
           inactive:
             "This rule is not fully configured yet and currently does not take action.",
+          disabled: "This rule is disabled. Its settings remain saved.",
           valid: "The rule is ready to use.",
           missing: "Complete the rule before enabling enforcement.",
+          disabledNotice:
+            "Use the switch in the overview to enable this rule again.",
         },
         rules: {
+          toggle: "Enable or disable {{title}}",
           roles: {
             title: "Limit roles",
             description:
@@ -2413,7 +2675,7 @@ const en = {
         },
         summary: {
           title: "Overview",
-          activeRules: "{{count}} of 3 rules configured",
+          activeRules: "{{count}} of 3 rules active",
           roles_one: "{{count}} role blocked",
           roles_other: "{{count}} roles blocked",
           weapons_one: "{{count}} weapon blocked",
@@ -2431,28 +2693,423 @@ const en = {
         },
       },
       noSoloTank: {
-        eyebrow: "Automod rule",
+        eyebrow: "Automation · Vehicles",
         title: "Prevent solo tanks",
         intro:
-          "Choose how CRCON responds to one-person armor squads in Hell Let Loose and HLL: Vietnam.",
+          "Reliably detect one-person armor squads and define a clear response chain for Hell Let Loose and HLL: Vietnam.",
+        summary: {
+          title: "Solo tank rule flow",
+          description:
+            "The confirmation phase avoids premature actions. Exemptions are checked again before every visible action.",
+        },
+        workbench: {
+          mode: {
+            title: "How should the rule run?",
+            off: "Off",
+            observe: "Observe",
+            active: "Active",
+          },
+          operation: {
+            help: "The global minimum pauses the entire rule. Solo tanks are only detected once enough players are connected.",
+          },
+          detection: {
+            skipped:
+              "The first warning follows without an additional confirmation stage",
+            result_one:
+              "{{checks}} internal check confirms the solo tank after about {{seconds}} seconds",
+            result_other:
+              "{{checks}} internal checks confirm the solo tank after about {{seconds}} seconds",
+            help: "Invisible checks give a second crew member time to join and prevent actions during brief squad changes.",
+          },
+          actions: {
+            inactive: "Skipped",
+            unlimited: "Unlimited",
+            configured: "Configured",
+            unreachable: "Unreachable",
+          },
+          notifications: {
+            help: "The webhook receives audit messages for detected solo tanks and applied actions. It is not required for the rule to operate.",
+          },
+          summary: {
+            title: "Rule overview",
+            startCondition: "Check solo tanks from",
+            immediate: "Check immediately",
+            fromPlayers: "{{count}} players",
+            activeNotice:
+              "The rule will actively affect the game after saving.",
+            testNotice: "Log only – no messages or game actions.",
+            inactiveNotice: "The rule is off; all settings are retained.",
+            detection: "Confirmation",
+            confirmedViolation: "Solo occupancy is confirmed",
+            noConfirmation: "No confirmation stage",
+            checks_one: "{{count}} check · every {{interval}} seconds",
+            checks_other: "{{count}} checks · every {{interval}} seconds",
+            exceptions_one: "{{count}} configured exemption",
+            exceptions_other: "{{count}} configured exemptions",
+            reaction: "Action sequence",
+            warn: "Warn",
+            punish: "Punish",
+            kick: "Kick",
+            count: "{{count}}× · every {{interval}} seconds",
+            unlimited: "Unlimited · every {{interval}} seconds",
+            skipped: "Skipped",
+            unreachable: "Unreachable with this sequence",
+            kickAfter: "after a {{seconds}} second grace period",
+          },
+        },
+        sections: {
+          operation: {
+            title: "Overview",
+            description: "Operating mode and global start condition",
+          },
+          detection: {
+            title: "Detect solo tanks",
+            description: "Confirm one-person occupancy reliably",
+          },
+          exemptions: {
+            title: "Exceptions",
+            description: "Protected players and flags",
+          },
+          actions: {
+            title: "Actions",
+            description: "Build warnings, punishment, and kick",
+          },
+          warnings: {
+            title: "Warn",
+            description: "Ask the player to take on another crew member",
+          },
+          punishments: {
+            title: "Punish",
+            description: "Apply the server-side punish action",
+          },
+          kick: {
+            title: "Kick",
+            description: "Remove repeat solo tankers as the final stage",
+          },
+          notifications: {
+            title: "Messages",
+            description: "Optional audit notifications",
+          },
+        },
+        fields: {
+          enabled: {
+            label: "Enable solo tank automod",
+            help: "Monitors armor squads with one member and runs the configured stages.",
+          },
+          dry_run: {
+            label: "Log only (dry run)",
+            help: "Detects solo tanks but sends no messages and applies neither punishments nor kicks.",
+          },
+          discord_webhook_url: {
+            label: "Discord audit webhook",
+            help: "Optional Discord webhook for detected violations and applied actions.",
+            placeholder: "https://discord.com/api/webhooks/…",
+          },
+          whitelist_flags: {
+            label: "Exempt player flags",
+            help: "Players with at least one of these CRCON flags are exempt from every stage.",
+          },
+          immune_player_level: {
+            label: "Exempt players up to level",
+            help: "Players at or below this level are protected. Set 0 to disable this exemption.",
+          },
+          dont_do_anything_below_this_number_of_players: {
+            label: "Minimum server population",
+            help: "The rule pauses below this total player count. Set 0 for no minimum.",
+          },
+          number_of_notes: {
+            label: "Invisible confirmations",
+            help: "Number of internal checks before the first warning. Set 0 to skip this stage.",
+          },
+          notes_interval_seconds: {
+            label: "Time between confirmations",
+            help: "Wait time between two checks of the same armor squad.",
+          },
+          number_of_warnings: {
+            label: "Number of warnings",
+            help: "Set 0 to skip warnings. Set -1 to warn indefinitely and never advance to punishment.",
+          },
+          warning_interval_seconds: {
+            label: "Time between warnings",
+            help: "Wait time before the same player is warned again.",
+          },
+          warning_message: {
+            label: "Warning message",
+            help: "Asks the player to take on a second crew member.",
+          },
+          number_of_punishments: {
+            label: "Number of punishments",
+            help: "Set 0 to skip punishment and make kick unreachable. Set -1 to punish indefinitely.",
+          },
+          min_server_players_for_punish: {
+            label: "Minimum server population for punishments",
+            help: "Punishments start only at this total player count. Set 0 for no minimum.",
+          },
+          punish_interval_seconds: {
+            label: "Time between punishments",
+            help: "Wait time before the same player is punished again.",
+          },
+          punish_message: {
+            label: "Punishment message",
+            help: "Message the player receives with the punish action.",
+          },
+          kick_after_max_punish: {
+            label: "Kick after punishments",
+            help: "Enables kick as the final stage. At least one punishment must have been applied successfully first.",
+          },
+          min_server_players_for_kick: {
+            label: "Minimum server population for kicks",
+            help: "Kicks apply only at this total player count. Set 0 for no minimum.",
+          },
+          kick_grace_period_seconds: {
+            label: "Final grace period before kick",
+            help: "Time after the final punishment in which a second crew member can join.",
+          },
+          kick_message: {
+            label: "Kick message",
+            help: "Reason shown to the player when they are kicked.",
+          },
+        },
       },
       vacBans: {
         eyebrow: "Security & bans",
         title: "Check VAC and game bans",
         intro:
           "Choose which ban history is checked on connect and how CRCON handles affected players.",
+        sections: {
+          rules: {
+            title: "Check criteria",
+            description: "History period and ban threshold",
+          },
+          actions: {
+            title: "Ban action",
+            description: "Blocklist, reason, and expiry behavior",
+          },
+          exemptions: {
+            title: "Exceptions",
+            description: "Protected player flags",
+          },
+          advanced: {
+            title: "Additional settings",
+            description: "Additional fields supplied by the server",
+          },
+        },
+        fields: {
+          vac_history_days: {
+            label: "VAC bans within the last days",
+            help: "Set 0 to disable checking the age of the latest VAC ban.",
+          },
+          game_ban_threshhold: {
+            label: "Allowed game-ban count",
+            help: "The configured ban action is triggered from this threshold.",
+          },
+          blacklist_id: {
+            label: "Target blocklist",
+            help: "ID of the blocklist that receives a matching player.",
+          },
+          ban_on_vac_history_reason: {
+            label: "Ban reason",
+            help: "Reason stored with the blocklist entry. {DAYS_SINCE_LAST_BAN} is available.",
+          },
+          auto_expire: {
+            label: "Expire the ban automatically",
+            help: "Aligns the ban end with the configured history limit instead of banning permanently.",
+          },
+          whitelist_flags: {
+            label: "Exempt player flags",
+            help: "Players with at least one of these flags are not banned.",
+          },
+        },
+        summary: {
+          history: "{{days}} days of history · from {{count}} game bans",
+          action: "Blocklist {{id}} · {{expiry}}",
+          expiring: "with expiry",
+          permanent: "permanent",
+          flags_one: "{{count}} protected flag",
+          flags_other: "{{count}} protected flags",
+        },
       },
       tkBans: {
         eyebrow: "Security & bans",
         title: "Teamkill ban on connect",
         intro:
           "Detect early teamkills after connect, define exceptions, and configure the resulting ban.",
+        sections: {
+          detection: {
+            title: "Detection",
+            description: "Time window and tolerance after connect",
+          },
+          exemptions: {
+            title: "Exceptions",
+            description: "Weapons, VIPs, flags, and established players",
+          },
+          actions: {
+            title: "Ban action",
+            description: "Blocklist, duration, and player message",
+          },
+          notifications: {
+            title: "Audit",
+            description: "Optional Discord notification",
+          },
+          advanced: {
+            title: "Additional settings",
+            description: "Additional fields supplied by the server",
+          },
+        },
+        fields: {
+          max_time_after_connect_minutes: {
+            label: "Time window after connect",
+            help: "Only teamkills within these first minutes are evaluated.",
+          },
+          ignore_tk_after_n_kills: {
+            label: "Stop checking after enemy kills",
+            help: "Ends detection once the player has made this many regular kills.",
+          },
+          ignore_tk_after_n_deaths: {
+            label: "Stop checking after deaths",
+            help: "Ends detection once the player has died this many times.",
+          },
+          teamkill_tolerance_count: {
+            label: "Tolerated teamkills",
+            help: "This many early teamkills remain without an automatic ban.",
+          },
+          excluded_weapons: {
+            label: "Excluded weapons",
+            help: "Teamkills with these internal weapon names do not trigger a ban.",
+          },
+          whitelist_players: {
+            label: "Exempt players",
+            help: "Combines flags, VIP status, and previous sessions.",
+          },
+          has_flag: {
+            label: "Player flags",
+            help: "At least one matching flag exempts the player.",
+          },
+          is_vip: {
+            label: "Exempt VIPs",
+            help: "Active VIP players are not automatically banned.",
+          },
+          has_at_least_n_sessions: {
+            label: "Exempt from this session count",
+            help: "Protects established players with at least this many previous sessions.",
+          },
+          message: {
+            label: "Message shown to the player",
+            help: "Shown to the player together with the automatic ban.",
+          },
+          author_name: {
+            label: "Displayed author",
+            help: "Name of the automated moderator stored with the blocklist entry.",
+          },
+          blacklist_id: {
+            label: "Target blocklist",
+            help: "ID of the blocklist that receives the player.",
+          },
+          ban_duration: {
+            label: "Ban duration",
+            help: "The units are added to form one total ban duration.",
+          },
+          minutes: { label: "Minutes", help: "Additional minutes." },
+          hours: { label: "Hours", help: "Additional hours." },
+          days: { label: "Days", help: "Additional days." },
+          weeks: { label: "Weeks", help: "Additional weeks." },
+          years: { label: "Years", help: "Additional years." },
+          discord_webhook_url: {
+            label: "Discord audit webhook",
+            help: "Optional. Reports automatically created teamkill bans.",
+          },
+          discord_webhook_message: {
+            label: "Discord message",
+            help: "Audit message sent after a ban is applied.",
+          },
+        },
+        summary: {
+          detection: "{{minutes}} minutes · {{count}} TK tolerated",
+          action: "Blocklist {{id}} · {{duration}}",
+          exemptions: "{{weapons}} weapons · {{flags}} flags",
+        },
       },
       nameKicks: {
         eyebrow: "Players & moderation",
         title: "Name filter",
         intro:
           "Check player names against your rules, protect exempt players, and set a clear kick reason.",
+        sections: {
+          rules: {
+            title: "Filter rules",
+            description: "Presets, custom regex, and test run",
+          },
+          exemptions: {
+            title: "Exceptions",
+            description: "Protected player flags",
+          },
+          actions: {
+            title: "Kick action",
+            description: "Clear explanation for affected players",
+          },
+          notifications: {
+            title: "Audit",
+            description: "Optional Discord notification",
+          },
+        },
+        fields: {
+          regular_expressions: {
+            label: "Name rules",
+            help: "Every matching rule immediately removes a newly connected player from the server.",
+          },
+          whitelist_flags: {
+            label: "Exempt player flags",
+            help: "Players with at least one of these CRCON flags are not removed by the name filter.",
+          },
+          kick_reason: {
+            label: "Kick reason shown to the player",
+            help: "A short and clear reason shown when the player is removed.",
+          },
+          discord_webhook_url: {
+            label: "Discord audit webhook",
+            help: "Optional. Sends matches and applied kicks to the configured Discord webhook.",
+          },
+        },
+        flagPicker: {
+          noticeTitle: "Select existing flags directly",
+          noticeBody:
+            "The catalogue is loaded from player profiles in this CRCON instance. A player with at least one selected flag bypasses the name filter.",
+          label: "Exempt flags",
+          placeholder: "Search for a flag or enter a new one",
+          help: "Select existing flags. You can still type a custom flag and press Enter to add it.",
+          loading: "Loading flags…",
+          noOptions: "No additional existing flag found",
+          loadFailed:
+            "The flag catalogue could not be loaded. You can still enter custom values.",
+          playerCount_one: "used by {{count}} player",
+          playerCount_other: "used by {{count}} players",
+          catalogueCount_one: "{{count}} existing flag found",
+          catalogueCount_other: "{{count}} existing flags found",
+        },
+        workbench: {
+          summary: {
+            title: "Name filter overview",
+            filter: "Filter rules",
+            rules_one: "{{count}} rule active",
+            rules_other: "{{count}} rules active",
+            noRules: "No rule active",
+            filterActive: "New player names are checked on connect.",
+            filterInactive: "Without a rule, no players are removed by name.",
+            effect: "Effect on match",
+            kickOnMatch: "Remove from server immediately",
+            reasonMissing: "Add a clear kick reason.",
+            exemptions: "Exceptions",
+            flags_one: "{{count}} flag",
+            flags_other: "{{count}} flags",
+            noFlags: "No flags",
+            exemptionsHelp: "Matching flags bypass the filter.",
+            audit: "Discord audit",
+            webhookActive: "Webhook connected",
+            webhookInactive: "Not configured",
+            webhookActiveHelp: "Matches and kicks are recorded.",
+            webhookInactiveHelp: "The filter still works without a webhook.",
+          },
+        },
         rulesEditor: {
           noticeTitle: "Every match results in a kick",
           noticeBody:
@@ -2513,12 +3170,297 @@ const en = {
         title: "Seeder VIP reward",
         intro:
           "Choose when seeding counts as successful and which VIP reward eligible players receive.",
+        sections: {
+          operation: {
+            title: "Process",
+            description: "Language and polling intervals",
+          },
+          requirements: {
+            title: "Requirements",
+            description: "Targets & qualification",
+          },
+          reward: {
+            title: "VIP reward",
+            description: "Duration & extension",
+          },
+          messages: {
+            title: "Player messages",
+            description: "Progress & completion",
+          },
+          notifications: {
+            title: "Webhooks",
+            description: "External notifications",
+          },
+          advanced: {
+            title: "Additional settings",
+            description: "Additional fields supplied by the server",
+          },
+        },
+        fields: {
+          language: {
+            label: "Language",
+            help: "Locale used for automatically formatted dates and durations, for example en_US.",
+          },
+          poll_time_seeding: {
+            label: "Polling interval while seeding",
+            help: "Seconds between checks while the server is building population.",
+          },
+          poll_time_seeded: {
+            label: "Polling interval after seeding",
+            help: "Seconds between checks after the server is considered seeded.",
+          },
+          requirements: {
+            label: "Seeding requirements",
+            help: "Defines when seeding is active and who qualifies for a reward.",
+          },
+          buffer: {
+            label: "Transition buffer",
+            help: "Additional time between reaching the target population and completing seeding.",
+          },
+          min_allies: {
+            label: "Minimum Allies",
+            help: "Minimum players required on the Allied side.",
+          },
+          min_axis: {
+            label: "Minimum Axis",
+            help: "Minimum players required on the Axis side.",
+          },
+          max_allies: {
+            label: "Maximum Allies",
+            help: "Upper seeding population on the Allied side.",
+          },
+          max_axis: {
+            label: "Maximum Axis",
+            help: "Upper seeding population on the Axis side.",
+          },
+          online_when_seeded: {
+            label: "Player must be online at completion",
+            help: "Rewards only players still connected when seeding succeeds.",
+          },
+          minimum_play_time: {
+            label: "Minimum play time",
+            help: "Time a player must have been present during the seeding phase.",
+          },
+          seconds: { label: "Seconds", help: "Additional seconds." },
+          minutes: { label: "Minutes", help: "Additional minutes." },
+          hours: { label: "Hours", help: "Additional hours." },
+          days: { label: "Days", help: "Additional days." },
+          weeks: { label: "Weeks", help: "Additional weeks." },
+          player_announce_thresholds: {
+            label: "Player-count announcement thresholds",
+            help: "The current seeding progress is announced at these total player counts.",
+          },
+          reward: {
+            label: "VIP reward",
+            help: "Controls duration and behavior when VIP already exists.",
+          },
+          forward: {
+            label: "Calculate duration from today",
+            help: "Calculates the new duration from now instead of the existing expiry date.",
+          },
+          player_name_format_not_current_vip: {
+            label: "Name for a new VIP entry",
+            help: "Name template for players who do not currently have an active VIP entry.",
+          },
+          cumulative: {
+            label: "Add rewards together",
+            help: "Multiple successful seeding rewards extend the existing duration.",
+          },
+          timeframe: {
+            label: "VIP duration",
+            help: "The units are added to form one reward duration.",
+          },
+          nice_time_delta: {
+            label: "Format duration for people",
+            help: "Shows the reward duration in a natural format in player messages.",
+          },
+          nice_expiration_date: {
+            label: "Format expiry date for people",
+            help: "Shows the new VIP expiry in a readable format in player messages.",
+          },
+          player_messages: {
+            label: "Messages to players",
+            help: "Text for progress, completion, and the personal VIP reward.",
+          },
+          seeding_in_progress_message: {
+            label: "Seeding in progress",
+            help: "Message sent when an announcement threshold is reached.",
+          },
+          seeding_complete_message: {
+            label: "Seeding completed",
+            help: "Message sent when the server is considered seeded.",
+          },
+          player_count_message: {
+            label: "Player count",
+            help: "Representation of the current team populations.",
+          },
+          reward_player_message: {
+            label: "Reward message",
+            help: "Personal message sent to a player receiving the VIP reward.",
+          },
+          reward_player_message_no_vip: {
+            label: "Message without reward",
+            help: "Message sent to players who did not meet the requirements.",
+          },
+          hooks: {
+            label: "Notification webhooks",
+            help: "Optional destinations receiving seeding updates.",
+          },
+          url: {
+            label: "Webhook URL",
+            help: "Destination address for the notification.",
+          },
+        },
+        summary: {
+          targetLabel: "Target",
+          targetEqual: "{{count}} per team",
+          target: "Allies {{allies}} · Axis {{axis}}",
+          qualificationLabel: "Qualification",
+          qualification: "{{minutes}} min minimum play time",
+          requirements: "{{allies}} Allies · {{axis}} Axis · {{minutes}} min",
+          reward: "{{duration}} · {{mode}}",
+          cumulative: "extends current VIP",
+          replace: "starts at completion",
+          messages_one: "{{count}} message configured",
+          messages_other: "{{count}} messages configured",
+        },
+        workbench: {
+          custom: "Custom value",
+          advanced: "Advanced settings",
+          brief: {
+            title: "How your seeder reward works",
+            sentenceEqual_one:
+              "Once both teams reach {{target}} players each, active players qualify for {{days}} day of VIP after {{minutes}} minutes.",
+            sentenceEqual_other:
+              "Once both teams reach {{target}} players each, active players qualify for {{days}} days of VIP after {{minutes}} minutes.",
+            sentenceSplit_one:
+              "Once Allies reach {{allies}} and Axis reaches {{axis}} players, active players qualify for {{days}} day of VIP after {{minutes}} minutes.",
+            sentenceSplit_other:
+              "Once Allies reach {{allies}} and Axis reaches {{axis}} players, active players qualify for {{days}} days of VIP after {{minutes}} minutes.",
+            teamTargetEqual: "{{count}} players per team",
+            teamTarget: "{{allies}} / {{axis}} target population",
+            playTime: "Play for {{minutes}} min",
+            online: "Online at completion",
+            accumulated: "Qualified during seeding",
+            reward_one: "+{{days}} day VIP",
+            reward_other: "+{{days}} days VIP",
+          },
+          operation: {
+            language: "Message language",
+            languageHelp:
+              "Controls the language and date/time formatting of automated messages.",
+            german: "German",
+            english: "English",
+            during: "Check while seeding",
+            duringHelp:
+              "How often requirements are checked while the server is building population.",
+            after: "Check after successful seeding",
+            afterHelp:
+              "How often the service checks after the server is considered seeded.",
+            zeroWarning:
+              "0 seconds creates a tight loop. Choose a sensible polling interval.",
+          },
+          requirements: {
+            players_one: "{{count}} player",
+            players_other: "{{count}} players",
+            noAnnouncements: "No announcement thresholds set.",
+            ownValue: "Player count",
+            addThreshold: "Add announcement threshold",
+            targetTitle: "Target population per team",
+            targetHelp: "Each team must reach at least this many players.",
+            allies: "Allies",
+            axis: "Axis",
+            couple: "Link values",
+            playTime: "Qualification time",
+            playTimeHelp:
+              "How long a player must contribute while the server is building.",
+            playTimeControlHelp:
+              "Choose a preset or use the slider for the exact duration.",
+            eligibility: "Who receives the reward?",
+            eligibilityHelp:
+              "Choose whether players must still be present at completion.",
+            onlineAtEnd: "Online at completion",
+            duringSeeding: "Qualified during seeding",
+            announcements: "Announce progress",
+            announcementsHelp:
+              "The current status is posted at these total player counts.",
+            buffer: "Post-seeding fallback buffer",
+            bufferHelp:
+              "Delay before a seeded server returns to seeding mode after the player count drops.",
+            legacyHelp:
+              "These legacy values are stored but not evaluated by the current Seeder VIP service. Change them only for backward compatibility.",
+            legacyAllies: "Legacy minimum Allies",
+            legacyAxis: "Legacy minimum Axis",
+            valid:
+              "The effective requirements are complete and clearly configured.",
+          },
+          reward: {
+            duration: "Reward per successful seeding",
+            days_one: "{{count}} day VIP",
+            days_other: "{{count}} days VIP",
+            dayUnit: "days",
+            existingVip: "Existing VIP duration",
+            extend: "Extend the existing duration",
+            recalculate: "Recalculate from completion",
+            previewCumulative_one:
+              "The {{days}} day is added to the existing VIP duration.",
+            previewCumulative_other:
+              "The {{days}} days are added to the existing VIP duration.",
+            previewReplace_one:
+              "Eligible players receive {{days}} day of VIP from completion. A longer existing remainder is preserved.",
+            previewReplace_other:
+              "Eligible players receive {{days}} days of VIP from completion. A longer existing remainder is preserved.",
+            advanced: "Presentation and compatibility",
+            entryName: "Name of a new VIP entry",
+            entryPreview: "Preview: {{name}}",
+            niceDuration: "Use readable duration text",
+            niceExpiry: "Use a readable expiry date",
+            forwardCompatibility:
+              "The existing compatibility field “forward” is not evaluated by the current service and remains unchanged. It is still available in JSON mode.",
+          },
+          messages: {
+            empty: "No text configured",
+            placeholders: "Available placeholders",
+          },
+          webhooks: {
+            emptyTitle: "No webhooks configured",
+            emptyHelp:
+              "Optionally send seeding progress and completion to external destinations.",
+            url: "Webhook {{number}}",
+            delete: "Remove webhook {{number}}",
+            add: "Add webhook",
+          },
+        },
       },
       expiredVip: {
         eyebrow: "VIP management",
         title: "Clean up expired VIPs",
         intro:
           "Choose how often CRCON checks expired VIP entries and optionally sends a notification.",
+        sections: {
+          schedule: {
+            title: "Check interval",
+            description: "Schedule for automatic cleanup",
+          },
+          notifications: {
+            title: "Audit",
+            description: "Optional Discord notification",
+          },
+          advanced: {
+            title: "Additional settings",
+            description: "Additional fields supplied by the server",
+          },
+        },
+        fields: {
+          interval_minutes: {
+            label: "Check every number of minutes",
+            help: "CRCON checks for and removes expired VIP entries at this interval.",
+          },
+          discord_webhook_url: {
+            label: "Discord audit webhook",
+            help: "Optional. Reports VIP entries removed automatically.",
+          },
+        },
       },
     },
     config: {
