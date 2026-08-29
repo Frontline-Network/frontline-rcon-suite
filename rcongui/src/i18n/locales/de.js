@@ -1952,16 +1952,13 @@ const de = {
       workbench: {
         defaultEyebrow: "Serverkonfiguration",
         defaultIntro:
-          "Konfiguriere diesen Bereich über das geführte Formular oder wechsle für Spezialfälle zur erweiterten JSON-Ansicht.",
+          "Konfiguriere diesen Bereich sicher über das geführte Formular.",
         mode: {
           title: "Betriebsmodus",
           off: "Aus",
           observe: "Beobachten",
           active: "Aktiv",
         },
-        tabsLabel: "Bearbeitungsmodus",
-        formTab: "Formular",
-        jsonTab: "JSON (erweitert)",
         navigation: "Konfigurationsbereiche",
         mobileNavigation: "Bereich auswählen",
         sectionEyebrow: "Abschnitt {{current}} von {{total}}",
@@ -1984,6 +1981,20 @@ const de = {
         validationTitle: "Einige Angaben müssen geprüft werden",
         validationDescription:
           "Behebe die markierten Punkte, bevor du speicherst.",
+        compatibilityTitle: "Konfiguration kann nicht sicher bearbeitet werden",
+        compatibilityDescription:
+          "Die gespeicherten Daten weichen strukturell von dieser CRCON-Version ab. Sie wurden nicht verändert. Führe zuerst die passende Konfigurationsmigration aus.",
+        compatibilityIssue:
+          "{{path}}: erwartet {{expected}}, vorhanden {{actual}}",
+        types: {
+          array: "Liste",
+          object: "Objekt",
+          string: "Text",
+          integer: "Ganzzahl",
+          number: "Zahl",
+          boolean: "Ja/Nein-Wert",
+          null: "Leerwert",
+        },
         navigateToError: "Öffnen",
         choices: {
           skip: "Überspringen",
@@ -3500,7 +3511,7 @@ const de = {
             niceDuration: "Laufzeit lesbar formulieren",
             niceExpiry: "Ablaufdatum lesbar formulieren",
             forwardCompatibility:
-              "Das vorhandene Kompatibilitätsfeld „forward“ wird vom aktuellen Dienst nicht ausgewertet und bleibt deshalb unverändert. Es ist weiterhin im JSON-Modus sichtbar.",
+              "Das vorhandene Kompatibilitätsfeld „forward“ wird vom aktuellen Dienst nicht ausgewertet und beim Speichern unverändert übernommen.",
           },
           messages: {
             empty: "Noch kein Text hinterlegt",
@@ -3559,7 +3570,6 @@ const de = {
       closeAutobalancerSettings: "Einstellungen schließen",
       openAutobalancerSettings: "Einstellungen öffnen · Modus {{mode}}",
       basicMode: "Einfache Ansicht",
-      advancedJsonMode: "Erweitert (JSON)",
       reload: "Neu laden",
       saveSettings: "Einstellungen speichern",
       explanation: "Erklärung",
@@ -4666,10 +4676,7 @@ const deMasterFallback = {
       },
       "workbench": {
         "defaultEyebrow": "Serverkonfiguration",
-        "defaultIntro": "Konfiguriere diesen Bereich über das geführte Formular oder wechsle für Spezialfälle zur erweiterten JSON-Ansicht.",
-        "tabsLabel": "Bearbeitungsmodus",
-        "formTab": "Formular",
-        "jsonTab": "JSON (erweitert)",
+        "defaultIntro": "Konfiguriere diesen Bereich sicher über das geführte Formular.",
         "navigation": "Konfigurationsbereiche",
         "mobileNavigation": "Bereich auswählen",
         "sectionEyebrow": "Abschnitt {{current}} von {{total}}",
@@ -4688,6 +4695,18 @@ const deMasterFallback = {
         "readOnlyDescription": "Dir fehlt die Berechtigung {{permission}}. Du kannst die Regel prüfen, aber nicht verändern.",
         "validationTitle": "Einige Angaben müssen geprüft werden",
         "validationDescription": "Behebe die markierten Punkte, bevor du speicherst.",
+        "compatibilityTitle": "Konfiguration kann nicht sicher bearbeitet werden",
+        "compatibilityDescription": "Die gespeicherten Daten weichen strukturell von dieser CRCON-Version ab. Sie wurden nicht verändert. Führe zuerst die passende Konfigurationsmigration aus.",
+        "compatibilityIssue": "{{path}}: erwartet {{expected}}, vorhanden {{actual}}",
+        "types": {
+          "array": "Liste",
+          "object": "Objekt",
+          "string": "Text",
+          "integer": "Ganzzahl",
+          "number": "Zahl",
+          "boolean": "Ja/Nein-Wert",
+          "null": "Leerwert"
+        },
         "navigateToError": "Öffnen",
         "choices": {
           "skip": "Überspringen",

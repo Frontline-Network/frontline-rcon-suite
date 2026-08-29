@@ -7,14 +7,7 @@ import {
   useRevalidator,
   useSubmit,
 } from "react-router-dom";
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { execute, get, handleHttpError } from "@/utils/fetchUtils";
 import {
   Box,
@@ -26,7 +19,6 @@ import {
   Alert,
   Stack,
   Typography,
-  useTheme,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import SettingsIcon from "@mui/icons-material/Settings";
@@ -34,7 +26,6 @@ import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
-import { a11yDark, a11yLight, CopyBlock } from "react-code-blocks";
 import { toast } from "react-toastify";
 import { JsonForms } from "@jsonforms/react";
 import {
@@ -54,7 +45,6 @@ import { useAuth } from "@/hooks/useAuth";
 import {
   ConfigActionBar,
   ConfigFormLayout,
-  ConfigModeSwitch,
   ConfigProfileSummaryPanel,
   ConfigValidationSummary,
   GuidedConfigForm,
@@ -69,6 +59,10 @@ import {
   SeedingWorkbenchLayout,
   validateProfiledConfig,
 } from "@/pages/settings/config-form";
+import {
+  inspectConfigCompatibility,
+  mergeConfigWithSchema,
+} from "@/pages/settings/config-form/configCompatibility.mjs";
 import { getConfigFormProfile } from "@/pages/settings/config-form/schema";
 import IntegrationsHub from "@/pages/settings/integrations/IntegrationsHub";
 import IntegrationConfigEditor from "@/pages/settings/integrations/IntegrationConfigEditor";
@@ -77,7 +71,6 @@ import {
   getIntegrationBySlug,
 } from "@/pages/settings/integrations/registry";
 
-const Editor = lazy(() => import("@monaco-editor/react"));
 // Fake-preview saves stay process-local so repeated form interactions are
 // deterministic without changing the production request path.
 const fakeConfigOverrides = new Map();
@@ -88,6 +81,28 @@ const systemDiagnosticsCommands = new Set([
   "steam_config",
   "log_stream_config",
   "watch_killrate_config",
+]);
+
+const guidedRendererSections = new Set([
+  "operation",
+  "detection",
+  "exemptions",
+  "actions",
+  "notifications",
+]);
+const seedingRendererSections = new Set([
+  "operation",
+  "rules",
+  "exemptions",
+  "actions",
+  "notifications",
+]);
+const seedVipRendererSections = new Set([
+  "operation",
+  "requirements",
+  "reward",
+  "messages",
+  "notifications",
 ]);
 
 const diagnosticColor = {
@@ -206,6 +221,39 @@ const ChatWebhookDiagnostics = ({ canChange }) => {
         </Stack>
       </CardContent>
     </Card>
+  );
+};
+
+const ConfigCompatibilityAlert = ({ issues }) => {
+  const { t } = useTranslation();
+  if (!issues.length) return null;
+
+  return (
+    <Alert severity="warning" data-testid="config-compatibility-warning">
+      <Typography variant="body2" fontWeight={800}>
+        {t("settings.configForms.workbench.compatibilityTitle")}
+      </Typography>
+      <Typography variant="body2" sx={{ mb: 1 }}>
+        {t("settings.configForms.workbench.compatibilityDescription")}
+      </Typography>
+      <Stack component="ul" spacing={0.35} sx={{ m: 0, pl: 2.5 }}>
+        {issues.map((issue) => (
+          <Typography component="li" variant="caption" key={issue.path}>
+            {t("settings.configForms.workbench.compatibilityIssue", {
+              path: issue.path,
+              expected: t(
+                `settings.configForms.workbench.types.${issue.expectedType}`,
+                { defaultValue: issue.expectedType }
+              ),
+              actual: t(
+                `settings.configForms.workbench.types.${issue.actualType}`,
+                { defaultValue: issue.actualType }
+              ),
+            })}
+          </Typography>
+        ))}
+      </Stack>
+    </Alert>
   );
 };
 
@@ -468,7 +516,6 @@ const normalizeValidationErrors = (errors, profile, t) => {
 const ConfigPage = () => {
   const { t } = useTranslation();
   const {
-    note,
     command,
     name,
     nameKey,
@@ -481,7 +528,6 @@ const ConfigPage = () => {
   const [validationErrors, setValidationErrors] = useState(null);
   const [jsonData, setJsonData] = useState(data);
   const [editorContent, setEditorContent] = useState("");
-  const [mode, setMode] = useState("visual");
   const [activeSection, setActiveSection] = useState("operation");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const revalidator = useRevalidator();
@@ -489,7 +535,6 @@ const ConfigPage = () => {
   const submit = useSubmit();
   const navigation = useNavigation();
   const { permissions } = useAuth();
-  const theme = useTheme();
   const isAutobalancer = command === "autobalancer_config";
   const isChatWebhookConfig = command === "chat_discord_webhooks_config";
   const isSystemDiagnostics = systemDiagnosticsCommands.has(command);
@@ -523,6 +568,11 @@ const ConfigPage = () => {
     () => JSON.stringify(data, null, 2),
     [data]
   );
+  const compatibilityIssues = useMemo(
+    () => inspectConfigCompatibility(data, schema),
+    [data, schema]
+  );
+  const hasCompatibilityIssues = compatibilityIssues.length > 0;
   const isDirty = editorContent !== savedEditorContent;
   const isSubmitting = navigation.state === "submitting";
   const clientValidationErrors = useMemo(
@@ -536,24 +586,9 @@ const ConfigPage = () => {
     () => normalizeValidationErrors(validationErrors, formProfile, t),
     [formProfile, t, validationErrors]
   );
-  const codeValidationErrors = useMemo(() => {
-    if (mode !== "code") return [];
-    try {
-      JSON.parse(editorContent);
-      return [];
-    } catch (error) {
-      return [
-        {
-          id: "invalid-json",
-          message: t("settings.config.invalidJson", { error: error.message }),
-        },
-      ];
-    }
-  }, [editorContent, mode, t]);
   const allValidationErrors = [
     ...clientValidationErrors,
     ...normalizedServerErrors,
-    ...codeValidationErrors,
   ];
   const hasBlockingErrors = allValidationErrors.length > 0;
 
@@ -590,7 +625,13 @@ const ConfigPage = () => {
   }, [command, formProfile]);
 
   const handleSubmit = (e) => {
-    if (!canChange || isSubmitting || !isDirty || hasBlockingErrors) {
+    if (
+      !canChange ||
+      isSubmitting ||
+      !isDirty ||
+      hasBlockingErrors ||
+      hasCompatibilityIssues
+    ) {
       e.preventDefault();
       return;
     }
@@ -608,34 +649,22 @@ const ConfigPage = () => {
   };
 
   const handleGuidedChange = (fieldName, value) => {
-    const nextData = { ...jsonData, [fieldName]: value };
+    const nextData = mergeConfigWithSchema(
+      jsonData,
+      { [fieldName]: value },
+      schema
+    );
     setJsonData(nextData);
     setEditorContent(JSON.stringify(nextData, null, 2));
     setValidationErrors(null);
   };
 
   const handleSchemaSectionChange = (sectionData) => {
-    const nextData = { ...jsonData, ...sectionData };
+    const nextData = mergeConfigWithSchema(jsonData, sectionData, schema);
     setJsonData(nextData);
     setEditorContent(JSON.stringify(nextData, null, 2));
     setValidationErrors(null);
   };
-
-  function updateMode(mode) {
-    if (mode === "visual") {
-      try {
-        setJsonData(JSON.parse(editorContent));
-      } catch (e) {
-        setValidationErrors({
-          _root: t("settings.config.invalidJson", { error: e.message }),
-        });
-        return;
-      }
-    } else if (jsonData) {
-      setEditorContent(JSON.stringify(jsonData, null, 2));
-    }
-    setMode(mode);
-  }
 
   const handleOpenAutobalancerSettings = () => {
     setSettingsOpen(true);
@@ -691,10 +720,6 @@ const ConfigPage = () => {
         <Stack spacing={1.5}>
           <Box
             sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", md: "minmax(0, 1fr) auto" },
-              gap: 1.5,
-              alignItems: "center",
               border: "1px solid",
               borderColor: "divider",
               px: { xs: 1.5, md: 2 },
@@ -724,21 +749,6 @@ const ConfigPage = () => {
                 </Typography>
               </Stack>
             </Box>
-            <ConfigModeSwitch
-              value={mode}
-              onChange={updateMode}
-              ariaLabel={t("settings.configForms.workbench.tabsLabel")}
-              options={[
-                {
-                  value: "visual",
-                  label: t("settings.configForms.workbench.formTab"),
-                },
-                {
-                  value: "code",
-                  label: t("settings.configForms.workbench.jsonTab"),
-                },
-              ]}
-            />
           </Box>
 
           {!canChange && (
@@ -754,17 +764,18 @@ const ConfigPage = () => {
             </Alert>
           )}
 
+          <ConfigCompatibilityAlert issues={compatibilityIssues} />
+
           <ConfigValidationSummary
             errors={allValidationErrors}
             title={t("settings.configForms.workbench.validationTitle")}
             description={t(
               "settings.configForms.workbench.validationDescription"
             )}
-            onNavigate={() => setMode("visual")}
             navigateLabel={t("settings.configForms.workbench.navigateToError")}
           />
 
-          {mode === "visual" ? (
+          {!hasCompatibilityIssues && (
             <IntegrationConfigEditor
               command={command}
               data={jsonData}
@@ -772,39 +783,9 @@ const ConfigPage = () => {
               schema={schema}
               onChange={(nextData) => handleSchemaSectionChange(nextData)}
             />
-          ) : (
-            <Box
-              data-testid="config-json-editor"
-              sx={{
-                overflow: "hidden",
-                border: "1px solid",
-                borderColor: "divider",
-                minHeight: 420,
-              }}
-            >
-              <Suspense>
-                <Editor
-                  height="58vh"
-                  defaultLanguage="json"
-                  value={editorContent}
-                  defaultValue=""
-                  options={{
-                    readOnly: !canChange,
-                    minimap: { enabled: false },
-                    wordWrap: "on",
-                    automaticLayout: true,
-                  }}
-                  theme={theme.palette.mode === "dark" ? "vs-dark" : "vs-light"}
-                  onChange={(value) => {
-                    setEditorContent(value || "");
-                    setValidationErrors(null);
-                  }}
-                />
-              </Suspense>
-            </Box>
           )}
 
-          {isChatWebhookConfig && mode === "visual" && (
+          {isChatWebhookConfig && (
             <ChatWebhookDiagnostics canChange={canChange} />
           )}
 
@@ -848,7 +829,11 @@ const ConfigPage = () => {
               startIcon: <SaveOutlinedIcon />,
               sx: { width: 200, height: 40 },
               disabled:
-                !canChange || !isDirty || hasBlockingErrors || isSubmitting,
+                !canChange ||
+                !isDirty ||
+                hasBlockingErrors ||
+                hasCompatibilityIssues ||
+                isSubmitting,
             }}
           />
         </Stack>
@@ -936,7 +921,7 @@ const ConfigPage = () => {
                 : ruleStatus
             }
             statusColor={ruleStatusColor}
-            sections={mode === "visual" ? sectionNavigation : []}
+            sections={sectionNavigation}
             activeSection={activeSection}
             onSectionChange={setActiveSection}
             navigationLabel={t("settings.configForms.workbench.navigation")}
@@ -949,61 +934,34 @@ const ConfigPage = () => {
                 spacing={1}
                 alignItems={{ xs: "stretch", lg: "center" }}
               >
-                {usesSeedingRenderer && mode === "visual" && (
+                {usesSeedingRenderer && (
                   <SeedingOperationModeControl
                     data={jsonData}
-                    disabled={!canChange}
+                    disabled={!canChange || hasCompatibilityIssues}
                     onChange={handleSchemaSectionChange}
                   />
                 )}
-                {usesGuidedRenderer && mode === "visual" && (
+                {usesGuidedRenderer && (
                   <NoLeaderOperationModeControl
                     data={jsonData}
-                    disabled={!canChange}
+                    disabled={!canChange || hasCompatibilityIssues}
                     onChange={handleSchemaSectionChange}
                     translationRoot={formProfile.translationRoot}
                   />
                 )}
-                {usesSchemaWorkbench &&
-                  formProfile.operationMode &&
-                  mode === "visual" && (
-                    <NoLeaderOperationModeControl
-                      data={jsonData}
-                      disabled={!canChange}
-                      onChange={handleSchemaSectionChange}
-                      translationRoot="settings.configForms"
-                      supportsDryRun={
-                        formProfile.operationMode === "threeState"
-                      }
-                    />
-                  )}
-                <ConfigModeSwitch
-                  value={mode}
-                  onChange={updateMode}
-                  ariaLabel={t("settings.configForms.workbench.tabsLabel")}
-                  options={[
-                    {
-                      value: "visual",
-                      label: hasGuidedProfile
-                        ? t("settings.configForms.workbench.formTab")
-                        : isAutobalancer
-                        ? t("settings.config.basicMode")
-                        : t("settings.config.visual"),
-                    },
-                    {
-                      value: "code",
-                      label: hasGuidedProfile
-                        ? t("settings.configForms.workbench.jsonTab")
-                        : isAutobalancer
-                        ? t("settings.config.advancedJsonMode")
-                        : t("settings.config.code"),
-                    },
-                  ]}
-                />
+                {usesSchemaWorkbench && formProfile.operationMode && (
+                  <NoLeaderOperationModeControl
+                    data={jsonData}
+                    disabled={!canChange || hasCompatibilityIssues}
+                    onChange={handleSchemaSectionChange}
+                    translationRoot="settings.configForms"
+                    supportsDryRun={formProfile.operationMode === "threeState"}
+                  />
+                )}
               </Stack>
             }
             summary={
-              mode === "visual" && hasGuidedProfile ? (
+              hasGuidedProfile && !hasCompatibilityIssues ? (
                 usesNameKickRenderer ? (
                   <NameKickSummaryPanel data={jsonData} />
                 ) : usesGuidedRenderer ? (
@@ -1066,7 +1024,11 @@ const ConfigPage = () => {
                   startIcon: <SaveOutlinedIcon />,
                   sx: { width: 200, height: 40 },
                   disabled:
-                    !canChange || !isDirty || hasBlockingErrors || isSubmitting,
+                    !canChange ||
+                    !isDirty ||
+                    hasBlockingErrors ||
+                    hasCompatibilityIssues ||
+                    isSubmitting,
                 }}
               />
             }
@@ -1084,6 +1046,8 @@ const ConfigPage = () => {
               </Alert>
             )}
 
+            <ConfigCompatibilityAlert issues={compatibilityIssues} />
+
             <ConfigValidationSummary
               errors={allValidationErrors}
               title={t("settings.configForms.workbench.validationTitle")}
@@ -1091,7 +1055,6 @@ const ConfigPage = () => {
                 "settings.configForms.workbench.validationDescription"
               )}
               onNavigate={(sectionId) => {
-                setMode("visual");
                 setActiveSection(sectionId);
               }}
               navigateLabel={t(
@@ -1099,11 +1062,14 @@ const ConfigPage = () => {
               )}
             />
 
-            {isAutobalancer && <AutobalancerHelp config={jsonData} />}
+            {isAutobalancer && !hasCompatibilityIssues && (
+              <AutobalancerHelp config={jsonData} />
+            )}
 
-            {mode === "visual" ? (
-              hasGuidedProfile ? (
-                usesGuidedRenderer ? (
+            {!hasCompatibilityIssues &&
+              (hasGuidedProfile ? (
+                usesGuidedRenderer &&
+                guidedRendererSections.has(activeSection) ? (
                   <GuidedConfigForm
                     profile={formProfile}
                     schema={schema}
@@ -1112,7 +1078,8 @@ const ConfigPage = () => {
                     disabled={!canChange}
                     onChange={handleGuidedChange}
                   />
-                ) : usesSeedingRenderer ? (
+                ) : usesSeedingRenderer &&
+                  seedingRendererSections.has(activeSection) ? (
                   <SeedingConfigForm
                     profile={formProfile}
                     schema={schema}
@@ -1121,7 +1088,8 @@ const ConfigPage = () => {
                     disabled={!canChange}
                     onChange={handleSchemaSectionChange}
                   />
-                ) : usesSeedVipRenderer ? (
+                ) : usesSeedVipRenderer &&
+                  seedVipRendererSections.has(activeSection) ? (
                   <SeedVipConfigForm
                     data={jsonData}
                     activeSection={activeSection}
@@ -1152,8 +1120,13 @@ const ConfigPage = () => {
                     data={jsonData}
                     readonly={!canChange}
                     onChange={({ data: nextData }) => {
-                      setEditorContent(JSON.stringify(nextData, null, 2));
-                      setJsonData(nextData);
+                      const mergedData = mergeConfigWithSchema(
+                        jsonData,
+                        nextData,
+                        schema
+                      );
+                      setEditorContent(JSON.stringify(mergedData, null, 2));
+                      setJsonData(mergedData);
                       setValidationErrors(null);
                     }}
                     sx={{ "& .jfa-label": { fontSize: "14px" } }}
@@ -1163,72 +1136,7 @@ const ConfigPage = () => {
                     cells={materialCells}
                   />
                 </Box>
-              )
-            ) : (
-              <Stack spacing={3}>
-                <Box
-                  data-testid="config-json-editor"
-                  sx={{
-                    overflow: "hidden",
-                    border: "1px solid",
-                    borderColor: "divider",
-                    minHeight: 480,
-                  }}
-                >
-                  <Suspense>
-                    <Editor
-                      height="70vh"
-                      defaultLanguage="json"
-                      value={editorContent}
-                      defaultValue=""
-                      options={{
-                        readOnly: !canChange,
-                        minimap: { enabled: false },
-                        wordWrap: "on",
-                        automaticLayout: true,
-                      }}
-                      theme={
-                        theme.palette.mode === "dark" ? "vs-dark" : "vs-light"
-                      }
-                      onChange={(value) => {
-                        setEditorContent(value || "");
-                        setValidationErrors(null);
-                      }}
-                    />
-                  </Suspense>
-                </Box>
-
-                <Box>
-                  <Typography variant="h5" sx={{ mb: 1.25 }}>
-                    {isAutobalancer
-                      ? t("settings.config.explanation")
-                      : t("settings.config.documentation")}
-                  </Typography>
-                  <CopyBlock
-                    wrapLongLines
-                    text={note}
-                    language="json"
-                    wrapLines
-                    theme={theme.palette.mode === "dark" ? a11yDark : a11yLight}
-                  />
-                </Box>
-
-                <Box>
-                  <Typography variant="h5" sx={{ mb: 1.25 }}>
-                    {isAutobalancer
-                      ? t("settings.config.technicalSchema")
-                      : t("settings.config.modelSchema")}
-                  </Typography>
-                  <CopyBlock
-                    wrapLongLines
-                    text={JSON.stringify(schema, null, 2)}
-                    language="json"
-                    wrapLines
-                    theme={theme.palette.mode === "dark" ? a11yDark : a11yLight}
-                  />
-                </Box>
-              </Stack>
-            )}
+              ))}
           </WorkbenchLayout>
         </Form>
       </Collapse>

@@ -1932,17 +1932,13 @@ const en = {
       },
       workbench: {
         defaultEyebrow: "Server configuration",
-        defaultIntro:
-          "Configure this area with the guided form, or switch to the advanced JSON view for special cases.",
+        defaultIntro: "Configure this area safely with the guided form.",
         mode: {
           title: "Operating mode",
           off: "Off",
           observe: "Observe",
           active: "Active",
         },
-        tabsLabel: "Editing mode",
-        formTab: "Form",
-        jsonTab: "JSON (advanced)",
         navigation: "Configuration sections",
         mobileNavigation: "Choose section",
         sectionEyebrow: "Section {{current}} of {{total}}",
@@ -1962,6 +1958,20 @@ const en = {
           "You are missing the {{permission}} permission. You can review this rule but cannot change it.",
         validationTitle: "Some entries need attention",
         validationDescription: "Resolve the listed items before saving.",
+        compatibilityTitle: "This configuration cannot be edited safely",
+        compatibilityDescription:
+          "The saved data differs structurally from this CRCON version. It has not been changed. Apply the matching configuration migration first.",
+        compatibilityIssue:
+          "{{path}}: expected {{expected}}, found {{actual}}",
+        types: {
+          array: "list",
+          object: "object",
+          string: "text",
+          integer: "integer",
+          number: "number",
+          boolean: "yes/no value",
+          null: "empty value",
+        },
         navigateToError: "Open",
         choices: {
           skip: "Skip",
@@ -3456,7 +3466,7 @@ const en = {
             niceDuration: "Use readable duration text",
             niceExpiry: "Use a readable expiry date",
             forwardCompatibility:
-              "The existing compatibility field “forward” is not evaluated by the current service and remains unchanged. It is still available in JSON mode.",
+              "The existing compatibility field “forward” is not evaluated by the current service and is preserved unchanged when saving.",
           },
           messages: {
             empty: "No text configured",
@@ -3515,7 +3525,6 @@ const en = {
       closeAutobalancerSettings: "Close settings",
       openAutobalancerSettings: "Open settings · Mode {{mode}}",
       basicMode: "Basic view",
-      advancedJsonMode: "Advanced (JSON)",
       reload: "Reload",
       saveSettings: "Save settings",
       explanation: "Explanation",
@@ -4621,10 +4630,7 @@ const enMasterFallback = {
       },
       "workbench": {
         "defaultEyebrow": "Server configuration",
-        "defaultIntro": "Configure this area with the guided form, or switch to the advanced JSON view for special cases.",
-        "tabsLabel": "Editing mode",
-        "formTab": "Form",
-        "jsonTab": "JSON (advanced)",
+        "defaultIntro": "Configure this area safely with the guided form.",
         "navigation": "Configuration sections",
         "mobileNavigation": "Choose section",
         "sectionEyebrow": "Section {{current}} of {{total}}",
@@ -4643,6 +4649,18 @@ const enMasterFallback = {
         "readOnlyDescription": "You are missing the {{permission}} permission. You can review this rule but cannot change it.",
         "validationTitle": "Some entries need attention",
         "validationDescription": "Resolve the listed items before saving.",
+        "compatibilityTitle": "This configuration cannot be edited safely",
+        "compatibilityDescription": "The saved data differs structurally from this CRCON version. It has not been changed. Apply the matching configuration migration first.",
+        "compatibilityIssue": "{{path}}: expected {{expected}}, found {{actual}}",
+        "types": {
+          "array": "list",
+          "object": "object",
+          "string": "text",
+          "integer": "integer",
+          "number": "number",
+          "boolean": "yes/no value",
+          "null": "empty value"
+        },
         "navigateToError": "Open",
         "choices": {
           "skip": "Skip",

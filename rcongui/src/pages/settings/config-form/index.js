@@ -3,7 +3,6 @@ export { default as ConfigFormLayout } from "./ConfigFormLayout";
 export { default as SeedingWorkbenchLayout } from "./SeedingWorkbenchLayout";
 export { default as ConfigFormShell } from "./ConfigFormShell";
 export { default as ConfigFormSection } from "./ConfigFormSection";
-export { default as ConfigModeSwitch } from "./ConfigModeSwitch";
 export { default as ConfigSectionNav } from "./ConfigSectionNav";
 export { default as ConfigSectionNavigation } from "./ConfigSectionNavigation";
 export { default as ConfigSummaryPanel } from "./ConfigSummaryPanel";
