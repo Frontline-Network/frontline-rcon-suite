@@ -11,12 +11,15 @@ export { default as ConfigProfileSummaryPanel } from "./ConfigProfileSummaryPane
 export { default as ConfigValidationSummary } from "./ConfigValidationSummary";
 export {
   default as GuidedConfigForm,
+  NoLeaderOperationModeControl,
   validateProfiledConfig,
 } from "./GuidedConfigForm";
 export { default as NoLeaderSummaryPanel } from "./NoLeaderSummaryPanel";
+export { default as NameKickSummaryPanel } from "./NameKickSummaryPanel";
 export { default as SchemaConfigForm } from "./SchemaConfigForm";
 export {
   default as SeedingConfigForm,
   SeedingOperationModeControl,
 } from "./SeedingConfigForm";
 export { default as SeedingSummaryPanel } from "./SeedingSummaryPanel";
+export { default as SeedVipConfigForm } from "./SeedVipConfigForm";

@@ -549,6 +549,16 @@ export function makeServer({ environment = "development" } = {}) {
           ],
         })
       );
+      this.get("/get_available_player_flags", () =>
+        ok({
+          flags: [
+            { flag: "admin", player_count: 18 },
+            { flag: "trusted", player_count: 9 },
+            { flag: "name-filter-exempt", player_count: 4 },
+            { flag: "⭐", player_count: 2 },
+          ],
+        })
+      );
       this.get("/get_map", () => ok(currentLayer));
       this.get("/get_map_rotation", () => ok({ maps: mapLayers.slice(0, 3), current_index: 0, next_index: 1 }));
       this.get("/get_map_shuffle_enabled", () => ok(false));

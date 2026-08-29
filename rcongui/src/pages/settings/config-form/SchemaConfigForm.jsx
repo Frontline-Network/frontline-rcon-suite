@@ -20,6 +20,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { schemaFormCustomRenderers } from "@/pages/settings/[configs]/renderer/renderer";
 import ConfigFormSection from "./ConfigFormSection";
+import NameKickFlagsField from "./NameKickFlagsField";
 import NameKickRulesField from "./NameKickRulesField";
 
 const sectionIcons = {
@@ -54,15 +55,15 @@ const sectionSchema = (schema, fields) => {
   };
 };
 
-const localizeProperty = (name, propertySchema, t, i18n) => {
+const localizeProperty = (name, propertySchema, t, i18n, translationRoot) => {
   const labelKeys = [
-    `settings.configForms.noLeader.fields.${name}.label`,
+    translationRoot && `${translationRoot}.fields.${name}.label`,
     `settings.others.fields.${name}.title`,
-  ];
+  ].filter(Boolean);
   const helpKeys = [
-    `settings.configForms.noLeader.fields.${name}.help`,
+    translationRoot && `${translationRoot}.fields.${name}.help`,
     `settings.others.fields.${name}.description`,
-  ];
+  ].filter(Boolean);
   const labelKey = labelKeys.find((key) => i18n.exists(key));
   const helpKey = helpKeys.find((key) => i18n.exists(key));
   const properties = propertySchema?.properties
@@ -70,7 +71,7 @@ const localizeProperty = (name, propertySchema, t, i18n) => {
         Object.entries(propertySchema.properties).map(
           ([childName, childSchema]) => [
             childName,
-            localizeProperty(childName, childSchema, t, i18n),
+            localizeProperty(childName, childSchema, t, i18n, translationRoot),
           ]
         )
       )
@@ -84,13 +85,13 @@ const localizeProperty = (name, propertySchema, t, i18n) => {
   };
 };
 
-const localizeSchema = (activeSchema, t, i18n) => ({
+const localizeSchema = (activeSchema, t, i18n, translationRoot) => ({
   ...activeSchema,
   properties: Object.fromEntries(
     Object.entries(activeSchema?.properties || {}).map(
       ([name, propertySchema]) => [
         name,
-        localizeProperty(name, propertySchema, t, i18n),
+        localizeProperty(name, propertySchema, t, i18n, translationRoot),
       ]
     )
   ),
@@ -118,8 +119,8 @@ export default function SchemaConfigForm({
     [data, section]
   );
   const localizedActiveSchema = useMemo(
-    () => localizeSchema(activeSchema, t, i18n),
-    [activeSchema, i18n, t]
+    () => localizeSchema(activeSchema, t, i18n, profile.translationRoot),
+    [activeSchema, i18n, profile.translationRoot, t]
   );
 
   if (!section) return null;
@@ -127,6 +128,9 @@ export default function SchemaConfigForm({
   const isNameKickRules =
     profile?.titleKey === "settings.configForms.nameKicks.title" &&
     section.id === "rules";
+  const isNameKickExemptions =
+    profile?.titleKey === "settings.configForms.nameKicks.title" &&
+    section.id === "exemptions";
 
   return (
     <Box data-testid="config-schema-form">
@@ -152,12 +156,43 @@ export default function SchemaConfigForm({
               onChange?.({ regular_expressions: regularExpressions })
             }
           />
+        ) : isNameKickExemptions ? (
+          <NameKickFlagsField
+            value={activeData.whitelist_flags}
+            disabled={disabled}
+            onChange={(whitelistFlags) =>
+              onChange?.({ whitelist_flags: whitelistFlags })
+            }
+          />
         ) : (
           <Box
             sx={{
+              border: "1px solid",
+              borderColor: "divider",
+              bgcolor: "background.default",
+              px: { xs: 1.25, sm: 1.75 },
+              py: { xs: 1, sm: 1.5 },
               "& .MuiFormControl-root": { mt: 0.5 },
               "& .MuiGrid-container": { rowGap: 0.5 },
-              "& .MuiInputBase-root": { bgcolor: "background.default" },
+              "& .MuiInputBase-root": {
+                bgcolor: "background.paper",
+                borderRadius: 0,
+              },
+              "& .MuiButton-root, & .MuiChip-root, & .MuiAlert-root": {
+                borderRadius: 0,
+              },
+              "& .MuiCard-root": {
+                borderRadius: 0,
+                boxShadow: "none",
+                bgcolor: "background.paper",
+                border: "1px solid",
+                borderColor: "divider",
+              },
+              "& .MuiCardContent-root": {
+                px: { xs: 1.25, sm: 1.75 },
+                py: { xs: 1, sm: 1.5 },
+                "&:last-child": { pb: { xs: 1, sm: 1.5 } },
+              },
               "& .MuiFormHelperText-root": { lineHeight: 1.45 },
             }}
           >

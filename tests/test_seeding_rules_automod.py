@@ -395,6 +395,58 @@ def test_does_nothing_when_enough_players(team_view):
     assert PunitionsToApply() == mod.on_kill(kill_event_log)
 
 
+def test_individual_rule_switches_disable_enforcement_without_losing_settings(
+    team_view,
+):
+    player_count = get_team_count(team_view, "allies") + get_team_count(
+        team_view, "axis"
+    )
+    config = AutoModSeedingUserConfig(
+        enabled=True,
+        disallowed_roles=DisallowedRoles(
+            enabled=False,
+            roles={Roles.tank_commander: "Tanks", Roles.crewman: "Tanks"},
+            min_players=0,
+            max_players=player_count + 1,
+        ),
+        disallowed_weapons=DisallowedWeapons(
+            enabled=False,
+            weapons={"MP40": "MP40"},
+            min_players=0,
+            max_players=player_count + 1,
+        ),
+        enforce_cap_fight=EnforceCapFight(
+            enabled=False,
+            min_players=0,
+            max_players=player_count + 1,
+            max_caps=game_state["allied_score"],
+        ),
+    )
+    mod = mod_with_config(config)
+    squad = team_view["allies"]["squads"]["able"]
+
+    assert config.disallowed_roles.roles
+    assert config.disallowed_weapons.weapons == {"MP40": "MP40"}
+    assert config.enforce_cap_fight.max_caps == game_state["allied_score"]
+
+    assert PunitionsToApply() == mod.punitions_to_apply(
+        team_view, "able", "allies", squad, game_state
+    )
+    squad["players"][0]["offense"] += 1
+    assert PunitionsToApply() == mod.punitions_to_apply(
+        team_view, "able", "allies", squad, game_state
+    )
+    assert PunitionsToApply() == mod.on_kill(kill_event_log)
+
+
+def test_individual_seeding_rules_are_enabled_by_default():
+    config = AutoModSeedingUserConfig()
+
+    assert config.disallowed_roles.enabled is True
+    assert config.disallowed_weapons.enabled is True
+    assert config.enforce_cap_fight.enabled is True
+
+
 def test_does_nothing_when_not_enough_players(team_view):
     mod = mod_with_config(
         AutoModSeedingUserConfig(

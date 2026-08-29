@@ -13,10 +13,28 @@ const noLeaderSection = (id, fields) => ({
   fields,
 });
 
-const genericSection = (id, fields) => ({
+const noSoloTankSection = (id, fields) => ({
   id,
-  titleKey: `${ROOT}.workbench.sectionTitles.${id}`,
-  descriptionKey: `${ROOT}.workbench.sectionDescriptions.${id}`,
+  titleKey: `${ROOT}.noSoloTank.sections.${id}.title`,
+  descriptionKey: `${ROOT}.noSoloTank.sections.${id}.description`,
+  fields,
+});
+
+const nameKickSection = (id, fields) => ({
+  id,
+  titleKey: `${ROOT}.nameKicks.sections.${id}.title`,
+  descriptionKey: `${ROOT}.nameKicks.sections.${id}.description`,
+  fields,
+});
+
+const genericSection = (page, id, fields) => ({
+  id,
+  titleKey: page
+    ? `${ROOT}.${page}.sections.${id}.title`
+    : `${ROOT}.workbench.sectionTitles.${id}`,
+  descriptionKey: page
+    ? `${ROOT}.${page}.sections.${id}.description`
+    : `${ROOT}.workbench.sectionDescriptions.${id}`,
   fields,
 });
 
@@ -33,10 +51,25 @@ const field = (name, metadata = {}) => ({
   ...metadata,
 });
 
-const schemaProfile = (page, sections, summarySectionIds) => ({
+const soloTankField = (name, metadata = {}) => ({
+  labelKey: `${ROOT}.noSoloTank.fields.${name}.label`,
+  helpKey: `${ROOT}.noSoloTank.fields.${name}.help`,
+  ...metadata,
+});
+
+const schemaProfile = (
+  page,
+  sections,
+  summarySectionIds,
+  { operationMode = null } = {}
+) => ({
   ...pageKeys(page),
+  page,
   renderer: "schema",
-  sections: sections.map(([id, fields]) => genericSection(id, fields)),
+  layout: "workbench",
+  translationRoot: `${ROOT}.${page}`,
+  operationMode,
+  sections: sections.map(([id, fields]) => genericSection(page, id, fields)),
   fields: {},
   summarySectionIds,
 });
@@ -44,35 +77,32 @@ const schemaProfile = (page, sections, summarySectionIds) => ({
 const noLeaderProfile = {
   ...pageKeys("noLeader"),
   renderer: "guided",
+  translationRoot: `${ROOT}.noLeader`,
   summary: {
     titleKey: `${ROOT}.noLeader.summary.title`,
     descriptionKey: `${ROOT}.noLeader.summary.description`,
   },
   sections: [
-    noLeaderSection("operation", ["enabled", "dry_run"]),
+    noLeaderSection("operation", [
+      "enabled",
+      "dry_run",
+      "dont_do_anything_below_this_number_of_players",
+    ]),
+    noLeaderSection("detection", ["number_of_notes", "notes_interval_seconds"]),
     noLeaderSection("exemptions", [
       "whitelist_flags",
       "immune_roles",
       "immune_player_level",
-      "dont_do_anything_below_this_number_of_players",
     ]),
-    noLeaderSection("observation", [
-      "number_of_notes",
-      "notes_interval_seconds",
-    ]),
-    noLeaderSection("warnings", [
+    noLeaderSection("actions", [
       "number_of_warnings",
       "warning_interval_seconds",
       "warning_message",
-    ]),
-    noLeaderSection("punishments", [
       "number_of_punishments",
       "min_squad_players_for_punish",
       "min_server_players_for_punish",
       "punish_interval_seconds",
       "punish_message",
-    ]),
-    noLeaderSection("kick", [
       "kick_after_max_punish",
       "min_squad_players_for_kick",
       "min_server_players_for_kick",
@@ -185,20 +215,158 @@ const noLeaderProfile = {
   },
 };
 
+const noSoloTankProfile = {
+  ...pageKeys("noSoloTank"),
+  renderer: "guided",
+  translationRoot: `${ROOT}.noSoloTank`,
+  summary: {
+    titleKey: `${ROOT}.noSoloTank.summary.title`,
+    descriptionKey: `${ROOT}.noSoloTank.summary.description`,
+  },
+  sections: [
+    noSoloTankSection("operation", [
+      "enabled",
+      "dry_run",
+      "dont_do_anything_below_this_number_of_players",
+    ]),
+    noSoloTankSection("detection", [
+      "number_of_notes",
+      "notes_interval_seconds",
+    ]),
+    noSoloTankSection("exemptions", ["whitelist_flags", "immune_player_level"]),
+    noSoloTankSection("actions", [
+      "number_of_warnings",
+      "warning_interval_seconds",
+      "warning_message",
+      "number_of_punishments",
+      "min_server_players_for_punish",
+      "punish_interval_seconds",
+      "punish_message",
+      "kick_after_max_punish",
+      "min_server_players_for_kick",
+      "kick_grace_period_seconds",
+      "kick_message",
+    ]),
+    noSoloTankSection("notifications", ["discord_webhook_url"]),
+  ],
+  fields: {
+    enabled: soloTankField("enabled", { kind: "toggle" }),
+    dry_run: soloTankField("dry_run", { kind: "toggle" }),
+    discord_webhook_url: soloTankField("discord_webhook_url", {
+      kind: "url",
+      placeholderKey: `${ROOT}.noSoloTank.fields.discord_webhook_url.placeholder`,
+    }),
+    whitelist_flags: soloTankField("whitelist_flags", { kind: "tags" }),
+    immune_player_level: soloTankField("immune_player_level", {
+      kind: "number",
+      unitKey: `${ROOT}.units.level`,
+      specialValues: { 0: "disabled" },
+    }),
+    dont_do_anything_below_this_number_of_players: soloTankField(
+      "dont_do_anything_below_this_number_of_players",
+      {
+        kind: "number",
+        unitKey: `${ROOT}.units.players`,
+        specialValues: { 0: "noMinimum" },
+      }
+    ),
+    number_of_notes: soloTankField("number_of_notes", {
+      kind: "number",
+      unitKey: `${ROOT}.units.checks`,
+      specialValues: { 0: "skip" },
+    }),
+    notes_interval_seconds: soloTankField("notes_interval_seconds", {
+      kind: "number",
+      unitKey: `${ROOT}.units.seconds`,
+    }),
+    number_of_warnings: soloTankField("number_of_warnings", {
+      kind: "number",
+      unitKey: `${ROOT}.units.messages`,
+      specialValues: { 0: "skip", "-1": "unlimited" },
+    }),
+    warning_interval_seconds: soloTankField("warning_interval_seconds", {
+      kind: "number",
+      unitKey: `${ROOT}.units.seconds`,
+      specialValues: { 0: "noDelay" },
+    }),
+    warning_message: soloTankField("warning_message", {
+      kind: "textarea",
+      placeholders: [
+        "{player_name}",
+        "{squad_name}",
+        "{max_warnings}",
+        "{received_warnings}",
+        "{next_check_seconds}",
+      ],
+    }),
+    number_of_punishments: soloTankField("number_of_punishments", {
+      kind: "number",
+      unitKey: `${ROOT}.units.actions`,
+      specialValues: { 0: "skip", "-1": "unlimited" },
+    }),
+    min_server_players_for_punish: soloTankField(
+      "min_server_players_for_punish",
+      {
+        kind: "number",
+        unitKey: `${ROOT}.units.players`,
+        specialValues: { 0: "noMinimum" },
+      }
+    ),
+    punish_interval_seconds: soloTankField("punish_interval_seconds", {
+      kind: "number",
+      unitKey: `${ROOT}.units.seconds`,
+      specialValues: { 0: "noDelay" },
+    }),
+    punish_message: soloTankField("punish_message", {
+      kind: "textarea",
+      placeholders: [
+        "{player_name}",
+        "{squad_name}",
+        "{max_punishes}",
+        "{received_punishes}",
+        "{next_check_seconds}",
+      ],
+    }),
+    kick_after_max_punish: soloTankField("kick_after_max_punish", {
+      kind: "toggle",
+    }),
+    min_server_players_for_kick: soloTankField("min_server_players_for_kick", {
+      kind: "number",
+      unitKey: `${ROOT}.units.players`,
+      specialValues: { 0: "noMinimum" },
+    }),
+    kick_grace_period_seconds: soloTankField("kick_grace_period_seconds", {
+      kind: "number",
+      unitKey: `${ROOT}.units.seconds`,
+      specialValues: { 0: "noDelay" },
+    }),
+    kick_message: soloTankField("kick_message", {
+      kind: "textarea",
+      placeholders: ["{player_name}", "{squad_name}", "{kick_grace_period}"],
+    }),
+  },
+};
+
+const nameKickProfile = {
+  ...pageKeys("nameKicks"),
+  renderer: "nameKick",
+  translationRoot: `${ROOT}.nameKicks`,
+  sections: [
+    nameKickSection("rules", ["regular_expressions"]),
+    nameKickSection("exemptions", ["whitelist_flags"]),
+    nameKickSection("actions", ["kick_reason"]),
+    nameKickSection("notifications", ["discord_webhook_url"]),
+  ],
+  fields: {},
+  summarySectionIds: ["rules", "actions", "exemptions", "notifications"],
+};
+
 const configFormProfiles = {
   auto_mod_no_leader_config: noLeaderProfile,
   auto_mod_level_config: schemaProfile(
     "level",
     [
-      ["operation", ["enabled", "dry_run"]],
-      [
-        "exemptions",
-        [
-          "whitelist_flags",
-          "dont_do_anything_below_this_number_of_players",
-          "levelbug_enabled",
-        ],
-      ],
+      ["operation", ["dont_do_anything_below_this_number_of_players"]],
       [
         "rules",
         [
@@ -211,6 +379,7 @@ const configFormProfiles = {
           "force_kick_message",
         ],
       ],
+      ["exemptions", ["whitelist_flags", "levelbug_enabled"]],
       [
         "announcements",
         [
@@ -245,7 +414,8 @@ const configFormProfiles = {
       ],
       ["notifications", ["discord_webhook_url"]],
     ],
-    ["rules", "warnings", "punishments", "kick"]
+    ["rules", "warnings", "punishments", "kick"],
+    { operationMode: "threeState" }
   ),
   auto_mod_seeding_config: {
     ...pageKeys("seeding"),
@@ -288,45 +458,7 @@ const configFormProfiles = {
     fields: {},
     summarySectionIds: ["rules", "actions"],
   },
-  auto_mod_solo_tank_config: schemaProfile(
-    "noSoloTank",
-    [
-      ["operation", ["enabled", "dry_run"]],
-      [
-        "exemptions",
-        [
-          "whitelist_flags",
-          "immune_player_level",
-          "dont_do_anything_below_this_number_of_players",
-        ],
-      ],
-      ["observation", ["number_of_notes", "notes_interval_seconds"]],
-      [
-        "warnings",
-        ["number_of_warnings", "warning_interval_seconds", "warning_message"],
-      ],
-      [
-        "punishments",
-        [
-          "number_of_punishments",
-          "min_server_players_for_punish",
-          "punish_interval_seconds",
-          "punish_message",
-        ],
-      ],
-      [
-        "kick",
-        [
-          "kick_after_max_punish",
-          "min_server_players_for_kick",
-          "kick_grace_period_seconds",
-          "kick_message",
-        ],
-      ],
-      ["notifications", ["discord_webhook_url"]],
-    ],
-    ["observation", "warnings", "punishments", "kick"]
-  ),
+  auto_mod_solo_tank_config: noSoloTankProfile,
   vac_game_bans_config: schemaProfile(
     "vacBans",
     [
@@ -339,7 +471,6 @@ const configFormProfiles = {
   tk_ban_on_connect_config: schemaProfile(
     "tkBans",
     [
-      ["operation", ["enabled"]],
       [
         "detection",
         [
@@ -353,46 +484,33 @@ const configFormProfiles = {
       ["actions", ["message", "author_name", "blacklist_id", "ban_duration"]],
       ["notifications", ["discord_webhook_url", "discord_webhook_message"]],
     ],
-    ["detection", "actions", "exemptions", "notifications"]
+    ["detection", "actions", "exemptions", "notifications"],
+    { operationMode: "toggle" }
   ),
-  name_kick_config: schemaProfile(
-    "nameKicks",
-    [
-      ["rules", ["regular_expressions"]],
-      ["exemptions", ["whitelist_flags"]],
-      ["actions", ["kick_reason"]],
-      ["notifications", ["discord_webhook_url"]],
-    ],
-    ["rules", "actions", "exemptions", "notifications"]
-  ),
-  seed_vip_config: schemaProfile(
-    "seedVip",
-    [
+  name_kick_config: nameKickProfile,
+  seed_vip_config: {
+    ...schemaProfile(
+      "seedVip",
       [
-        "operation",
-        [
-          "enabled",
-          "dry_run",
-          "language",
-          "poll_time_seeding",
-          "poll_time_seeded",
-        ],
+        ["operation", ["language", "poll_time_seeding", "poll_time_seeded"]],
+        ["requirements", ["requirements", "player_announce_thresholds"]],
+        ["reward", ["reward", "nice_time_delta", "nice_expiration_date"]],
+        ["messages", ["player_messages"]],
+        ["notifications", ["hooks"]],
       ],
-      ["requirements", ["requirements", "player_announce_thresholds"]],
-      ["reward", ["reward", "nice_time_delta", "nice_expiration_date"]],
-      ["messages", ["player_messages"]],
-      ["notifications", ["hooks"]],
-    ],
-    ["requirements", "reward", "messages", "notifications"]
-  ),
+      ["requirements", "reward", "messages", "notifications"],
+      { operationMode: "threeState" }
+    ),
+    renderer: "seedVip",
+  },
   expired_vip_config: schemaProfile(
     "expiredVip",
     [
-      ["operation", ["enabled"]],
       ["schedule", ["interval_minutes"]],
       ["notifications", ["discord_webhook_url"]],
     ],
-    ["operation", "schedule", "notifications"]
+    ["schedule", "notifications"],
+    { operationMode: "toggle" }
   ),
 };
 
@@ -440,7 +558,7 @@ const buildGenericProfile = (schema) => {
   });
   const sections = sectionOrder
     .filter((id) => groups.get(id).length)
-    .map((id) => genericSection(id, groups.get(id)));
+    .map((id) => genericSection(null, id, groups.get(id)));
   return {
     renderer: "schema",
     sections,
@@ -463,8 +581,18 @@ const finalizeProfile = (profile, schema) => {
       entry.fields.forEach((name) => known.add(name));
       return entry;
     });
-  const remaining = [...available].filter((name) => !known.has(name));
-  if (remaining.length) sections.push(genericSection("advanced", remaining));
+  const shellFields = new Set(
+    profile.operationMode === "threeState"
+      ? ["enabled", "dry_run"]
+      : profile.operationMode === "toggle"
+      ? ["enabled"]
+      : []
+  );
+  const remaining = [...available].filter(
+    (name) => !known.has(name) && !shellFields.has(name)
+  );
+  if (remaining.length)
+    sections.push(genericSection(profile.page || null, "advanced", remaining));
   return { ...profile, sections };
 };
 

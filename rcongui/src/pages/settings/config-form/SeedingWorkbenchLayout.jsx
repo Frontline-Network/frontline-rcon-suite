@@ -1,18 +1,32 @@
 import { Box, ButtonBase, Chip, Stack, Typography } from "@mui/material";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import CampaignOutlinedIcon from "@mui/icons-material/CampaignOutlined";
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
+import ExitToAppOutlinedIcon from "@mui/icons-material/ExitToAppOutlined";
 import GavelOutlinedIcon from "@mui/icons-material/GavelOutlined";
 import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
+import RedeemOutlinedIcon from "@mui/icons-material/RedeemOutlined";
 import RuleOutlinedIcon from "@mui/icons-material/RuleOutlined";
+import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 
 const sectionIcons = {
   operation: DashboardOutlinedIcon,
+  requirements: CheckCircleOutlineIcon,
+  detection: VisibilityOutlinedIcon,
   rules: RuleOutlinedIcon,
   exemptions: ShieldOutlinedIcon,
+  announcements: CampaignOutlinedIcon,
+  warnings: CampaignOutlinedIcon,
+  punishments: GavelOutlinedIcon,
+  kick: ExitToAppOutlinedIcon,
   actions: GavelOutlinedIcon,
+  reward: RedeemOutlinedIcon,
+  messages: CampaignOutlinedIcon,
+  schedule: ScheduleOutlinedIcon,
   notifications: NotificationsNoneOutlinedIcon,
 };
 

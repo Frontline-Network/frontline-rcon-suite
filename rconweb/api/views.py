@@ -502,6 +502,10 @@ ENDPOINT_PERMISSIONS: dict[Callable, list[str] | set[str] | str] = {
     rcon_api.get_auto_mod_no_leader_config: "api.can_view_auto_mod_no_leader_config",
     rcon_api.get_auto_mod_seeding_config: "api.can_view_auto_mod_seeding_config",
     rcon_api.get_available_weapons: "api.can_view_auto_mod_seeding_config",
+    # The catalogue contains only distinct flag labels and aggregate counts.
+    # Every authenticated CRCON user may use it in the settings forms; no
+    # player identities or comments are exposed.
+    rcon_api.get_available_player_flags: set(),
     rcon_api.get_auto_mod_solo_tank_config: "api.can_view_auto_mod_solo_tank_config",
     rcon_api.get_autobalance_enabled: "api.can_view_autobalance_enabled",
     rcon_api.get_autobalance_threshold: "api.can_view_autobalance_threshold",
@@ -778,6 +782,7 @@ RCON_ENDPOINT_HTTP_METHODS: dict[Callable, list[str]] = {
     rcon_api.get_auto_mod_no_leader_config: ["GET"],
     rcon_api.get_auto_mod_seeding_config: ["GET"],
     rcon_api.get_available_weapons: ["GET"],
+    rcon_api.get_available_player_flags: ["GET"],
     rcon_api.get_auto_mod_solo_tank_config: ["GET"],
     rcon_api.get_autobalance_enabled: ["GET"],
     rcon_api.get_autobalance_threshold: ["GET"],

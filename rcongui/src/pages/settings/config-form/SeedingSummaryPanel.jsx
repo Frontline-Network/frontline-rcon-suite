@@ -20,6 +20,7 @@ const mapSize = (value, child) => {
 const ruleActive = (value, child) => {
   if (typeof value === "boolean") return value;
   if (!value || typeof value !== "object") return false;
+  if (value.enabled === false) return false;
   if (child && mapSize(value, child) === 0) return false;
   return Number(value.max_players) > 0;
 };

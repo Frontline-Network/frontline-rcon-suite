@@ -1,4 +1,4 @@
-from typing import Optional, TypedDict
+from typing import NotRequired, Optional, TypedDict
 
 from pydantic import BaseModel, Field, HttpUrl, field_serializer, field_validator
 
@@ -26,6 +26,7 @@ ENFORCE_CAP_FIGHT_VIOLATION_MESSAGE = "Attacking 4th cap while seeding is not al
 
 
 class DisallowedRolesType(TypedDict):
+    enabled: NotRequired[bool]
     min_players: int
     max_players: int
     roles: dict[Roles, str]
@@ -33,6 +34,7 @@ class DisallowedRolesType(TypedDict):
 
 
 class DisallowedWeaponsType(TypedDict):
+    enabled: NotRequired[bool]
     min_players: int
     max_players: int
     weapons: dict[str, str]
@@ -40,6 +42,7 @@ class DisallowedWeaponsType(TypedDict):
 
 
 class EnforceCapFightType(TypedDict):
+    enabled: NotRequired[bool]
     min_players: int
     max_players: int
     max_caps: int
@@ -82,6 +85,7 @@ class AutoModSeedingType(TypedDict):
 
 
 class DisallowedRoles(BaseModel):
+    enabled: bool = Field(default=True, title="Enabled", description="Whether this individual seeding rule is enabled")
     min_players: int = Field(ge=0, le=100, default=0, title="Minimum Players", description="The minimum players on the server to enforce this rule")
     max_players: int = Field(ge=0, le=100, default=100, title="Maximum Players", description="The maximum players on the server to enforce this rule")
     roles: dict[Roles, str] = Field(default_factory=dict, title="Disallowed Roles", description="The list of roles that are not allowed while server is seeding")
@@ -89,6 +93,7 @@ class DisallowedRoles(BaseModel):
 
 
 class DisallowedWeapons(BaseModel):
+    enabled: bool = Field(default=True, title="Enabled", description="Whether this individual seeding rule is enabled")
     min_players: int = Field(ge=0, le=100, default=0, title="Minimum Players", description="The minimum players on the server to enforce this rule")
     max_players: int = Field(ge=0, le=100, default=100, title="Maximum Players", description="The maximum players on the server to enforce this rule")
     weapons: dict[str, str] = Field(default_factory=dict, title="Disallowed Weapons", description="The list of weapons that are not allowed while server is seeding")
@@ -96,6 +101,7 @@ class DisallowedWeapons(BaseModel):
 
 
 class EnforceCapFight(BaseModel):
+    enabled: bool = Field(default=True, title="Enabled", description="Whether this individual seeding rule is enabled")
     min_players: int = Field(ge=0, le=100, default=0, title="Minimum Players", description="The minimum players on the server to enforce this rule")
     max_players: int = Field(ge=0, le=100, default=100, title="Maximum Players", description="The maximum players on the server to enforce this rule")
     max_caps: int = Field(ge=2, le=4, default=3, title="Maximum capped Points", description="The maximum number of cap points that can be capped by one team. Starting to cap another point will violate this rule")
@@ -161,6 +167,7 @@ class AutoModSeedingUserConfig(BaseUserConfig):
         )
 
         disallowed_roles = DisallowedRoles(
+            enabled=values.get("disallowed_roles").get("enabled", True),
             min_players=values.get("disallowed_roles").get("min_players"),
             max_players=values.get("disallowed_roles").get("max_players"),
             roles=values.get("disallowed_roles").get("roles"),
@@ -168,6 +175,7 @@ class AutoModSeedingUserConfig(BaseUserConfig):
         )
 
         disallowed_weapons = DisallowedWeapons(
+            enabled=values.get("disallowed_weapons").get("enabled", True),
             min_players=values.get("disallowed_weapons").get("min_players"),
             max_players=values.get("disallowed_weapons").get("max_players"),
             weapons=values.get("disallowed_weapons").get("weapons"),
@@ -175,6 +183,7 @@ class AutoModSeedingUserConfig(BaseUserConfig):
         )
 
         enforce_cap_fight = EnforceCapFight(
+            enabled=values.get("enforce_cap_fight").get("enabled", True),
             min_players=values.get("enforce_cap_fight").get("min_players"),
             max_players=values.get("enforce_cap_fight").get("max_players"),
             max_caps=values.get("enforce_cap_fight").get("max_caps"),

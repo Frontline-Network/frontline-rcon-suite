@@ -179,6 +179,10 @@ class RconAPI(Rcon):
             ],
         }
 
+    def get_available_player_flags(self) -> dict[str, Any]:
+        """Return player markings already used by this CRCON instance."""
+        return {"flags": player_history.get_available_player_flags()}
+
     @staticmethod
     def _validate_user_config(
         command_name: str,
