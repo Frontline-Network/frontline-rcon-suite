@@ -446,7 +446,14 @@ export default function LiveSessionsPage() {
           minWidth: 0,
         }}
       >
-        <Box sx={{ minWidth: 0 }}>
+        <Box
+          sx={{
+            minWidth: 0,
+            "& table th, & table td": {
+              px: { xs: 0.5, sm: 0.875 },
+            },
+          }}
+        >
           <Table
             table={table}
             config={tableConfig}
