@@ -71,6 +71,7 @@ import {
 } from "@/pages/settings/config-form";
 import { getConfigFormProfile } from "@/pages/settings/config-form/schema";
 import IntegrationsHub from "@/pages/settings/integrations/IntegrationsHub";
+import IntegrationConfigEditor from "@/pages/settings/integrations/IntegrationConfigEditor";
 import {
   getIntegrationByCommand,
   getIntegrationBySlug,
@@ -684,6 +685,187 @@ const ConfigPage = () => {
     })
   );
 
+  if (isIntegrationHub) {
+    const integrationForm = (
+      <Form id="config-settings-form" method="post" onSubmit={handleSubmit}>
+        <Stack spacing={1.5}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "minmax(0, 1fr) auto" },
+              gap: 1.5,
+              alignItems: "center",
+              border: "1px solid",
+              borderColor: "divider",
+              px: { xs: 1.5, md: 2 },
+              py: 1.25,
+              bgcolor: "background.paper",
+            }}
+          >
+            <Box>
+              <Typography
+                variant="overline"
+                color="primary.main"
+                sx={{ display: "block", letterSpacing: "0.08em" }}
+              >
+                {t("settings.integrations.form.moduleConfiguration")}
+              </Typography>
+              <Stack
+                direction="row"
+                spacing={1}
+                alignItems="baseline"
+                flexWrap="wrap"
+              >
+                <Typography component="h2" variant="h6">
+                  {displayName}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {ruleStatus}
+                </Typography>
+              </Stack>
+            </Box>
+            <ConfigModeSwitch
+              value={mode}
+              onChange={updateMode}
+              ariaLabel={t("settings.configForms.workbench.tabsLabel")}
+              options={[
+                {
+                  value: "visual",
+                  label: t("settings.configForms.workbench.formTab"),
+                },
+                {
+                  value: "code",
+                  label: t("settings.configForms.workbench.jsonTab"),
+                },
+              ]}
+            />
+          </Box>
+
+          {!canChange && (
+            <Alert severity="warning">
+              <Typography variant="body2" fontWeight={800}>
+                {t("settings.configForms.workbench.readOnly")}
+              </Typography>
+              <Typography variant="body2">
+                {t("settings.configForms.workbench.readOnlyDescription", {
+                  permission: changePermission,
+                })}
+              </Typography>
+            </Alert>
+          )}
+
+          <ConfigValidationSummary
+            errors={allValidationErrors}
+            title={t("settings.configForms.workbench.validationTitle")}
+            description={t(
+              "settings.configForms.workbench.validationDescription"
+            )}
+            onNavigate={() => setMode("visual")}
+            navigateLabel={t("settings.configForms.workbench.navigateToError")}
+          />
+
+          {mode === "visual" ? (
+            <IntegrationConfigEditor
+              command={command}
+              data={jsonData}
+              disabled={!canChange}
+              schema={schema}
+              onChange={(nextData) => handleSchemaSectionChange(nextData)}
+            />
+          ) : (
+            <Box
+              data-testid="config-json-editor"
+              sx={{
+                overflow: "hidden",
+                border: "1px solid",
+                borderColor: "divider",
+                minHeight: 420,
+              }}
+            >
+              <Suspense>
+                <Editor
+                  height="58vh"
+                  defaultLanguage="json"
+                  value={editorContent}
+                  defaultValue=""
+                  options={{
+                    readOnly: !canChange,
+                    minimap: { enabled: false },
+                    wordWrap: "on",
+                    automaticLayout: true,
+                  }}
+                  theme={theme.palette.mode === "dark" ? "vs-dark" : "vs-light"}
+                  onChange={(value) => {
+                    setEditorContent(value || "");
+                    setValidationErrors(null);
+                  }}
+                />
+              </Suspense>
+            </Box>
+          )}
+
+          {isChatWebhookConfig && mode === "visual" && (
+            <ChatWebhookDiagnostics canChange={canChange} />
+          )}
+
+          <ConfigActionBar
+            sticky={false}
+            dirty={isDirty}
+            dirtyLabel={t("settings.configForms.workbench.dirty")}
+            stateLabel={
+              isDirty ? undefined : t("settings.configForms.workbench.saved")
+            }
+            stateDescription={
+              isDirty
+                ? undefined
+                : t("settings.configForms.workbench.savedDescription")
+            }
+            stateIcon={
+              isDirty ? (
+                <WarningAmberOutlinedIcon color="warning" />
+              ) : (
+                <CheckCircleOutlineIcon color="success" />
+              )
+            }
+            secondaryActions={[
+              {
+                id: "reset",
+                label: t("settings.configForms.workbench.reset"),
+                startIcon: <RestartAltIcon />,
+                variant: "text",
+                onClick: handleDiscard,
+                disabled: !isDirty || isSubmitting,
+                testId: "config-reset-button",
+              },
+            ]}
+            primaryAction={{
+              id: "save",
+              type: "submit",
+              form: "config-settings-form",
+              label: t("settings.configForms.workbench.save"),
+              loadingLabel: t("settings.configForms.workbench.saving"),
+              loading: isSubmitting,
+              startIcon: <SaveOutlinedIcon />,
+              sx: { width: 200, height: 40 },
+              disabled:
+                !canChange || !isDirty || hasBlockingErrors || isSubmitting,
+            }}
+          />
+        </Stack>
+      </Form>
+    );
+
+    return (
+      <IntegrationsHub
+        activeCommand={command}
+        activeData={jsonData}
+        isDirty={isDirty}
+      >
+        {integrationForm}
+      </IntegrationsHub>
+    );
+  }
+
   const content = (
     <Stack
       direction="column"
@@ -1052,18 +1234,6 @@ const ConfigPage = () => {
       </Collapse>
     </Stack>
   );
-
-  if (isIntegrationHub) {
-    return (
-      <IntegrationsHub
-        activeCommand={command}
-        activeData={jsonData}
-        isDirty={isDirty}
-      >
-        {content}
-      </IntegrationsHub>
-    );
-  }
 
   return isSystemDiagnostics ? (
     <SystemDiagnosticsLayout>{content}</SystemDiagnosticsLayout>

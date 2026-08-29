@@ -160,6 +160,34 @@ Rohkonfiguration bleibt im erweiterten JSON-Modus erreichbar.
 
 final result: passed
 
+---
+
+# Design QA — Compact integration forms
+
+## Evidence
+
+- Source visual truth: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-0311286f-9538-4c20-bd89-ed18a87c047c.png`
+- Final implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\integration-kills-compact.png`
+- Side-by-side comparison: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\integration-qa-comparison.png`
+- Browser states reviewed: Kills & Teamkills, RCON-Chatbefehle, Discord-Scoreboard and the legacy `/settings/webhooks/kills` direct route.
+
+## Comparison result
+
+The inline module area now uses a purpose-built, schema-driven integration editor. The former settings workbench — including its step rail, large empty canvas and unrelated form chrome — is no longer mounted inside the integrations ledger.
+
+- Layout: compact square sections sit directly beneath the selected ledger row and use the full available width.
+- Hierarchy: module header, Formular/JSON switch, numbered groups, inputs and save state follow the selected reference direction without copying the legacy form shell.
+- Field coverage: nested arrays, primitive lists, enums, booleans, arbitrary JSON objects and masked webhook URLs remain editable from the real schemas.
+- Compatibility: permissions, validation, save/reset, dirty navigation guard, JSON expert mode and legacy direct URLs remain intact.
+- Complex modules: RCON commands render list and JSON-object fields without raw schema names; Scoreboard renders its larger configuration as grouped square sections.
+- Interaction: enable/disable, add/remove and reset behavior passed in the browser. The legacy Kills URL resolves to the compact editor.
+
+## QA result
+
+No actionable P0, P1 or P2 visual or functional discrepancy remains. A dedicated 390 px browser capture is still a P3 follow-up because this in-app browser session did not expose viewport resizing; the editor itself uses one-column `xs` breakpoints and contains no fixed-width content.
+
+final result: passed
+
 # Design-QA: Spiele — Einsatzjournal (Option 2)
 
 ## Vergleichsgrundlage
@@ -453,11 +481,11 @@ passed
 
 ## Comparison result
 
-The implementation follows the selected full-width ledger direction and the established Frontline design line. Eleven previously separate settings pages are represented as two dense groups: eight Discord webhooks and three related communication or hosting modules. Rows remain square, compact and separated by one-pixel dividers; the active row expands its existing production form inline.
+The implementation follows the selected full-width ledger direction and the established Frontline design line. Eleven previously separate settings pages are represented as two dense groups: eight Discord webhooks and three related communication or hosting modules. Rows remain square, compact and separated by one-pixel dividers; the active row expands a dedicated compact schema editor inline.
 
 - Layout and hierarchy: the header, search/filter rail, four-column ledger, group labels, module rows and inline editor match the reference composition.
 - Product-safe deviation: the mockup's unverified connection-state filters and status values were replaced by factual category filters and configuration states. This avoids simulating health data and avoids loading all eleven configurations on entry.
-- Form fidelity: the selected mockup used a conceptual short Kills form. The implementation deliberately embeds the existing schema-driven production form, preserving all fields, validation, Formular/JSON modes, save/reset behavior and permissions.
+- Form fidelity: the selected mockup used a conceptual short Kills form. The corrected implementation now mounts a dedicated compact schema editor rather than the legacy settings workbench, while preserving validation, Formular/JSON modes, save/reset behavior and permissions.
 - Visual language: existing Frontline typography, gold active state, dark green-black surfaces, MUI icons and square borders are preserved. No rounded card treatment, shadows, gradients, emoji or placeholder artwork were introduced.
 - Responsive behavior: at 390 px the ledger reflows to a compact module/purpose/status stack, the category filters remain horizontally reachable and the expanded form uses the full available width. `documentElement.scrollWidth` and `body.scrollWidth` both remained 390 px.
 

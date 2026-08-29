@@ -59,6 +59,281 @@ const commonAutomodProperties = {
 };
 
 const examples = {
+  audit_discord_webhooks_config: {
+    data: {
+      hooks: [{ url: "https://discord.com/api/webhooks/123456/demo-token" }],
+    },
+    schema: schema({
+      hooks: {
+        type: "array",
+        title: "Discord-Webhooks",
+        items: schema({ url: text("Webhook-URL", "uri") }),
+      },
+    }),
+  },
+  admin_pings_discord_webhooks_config: {
+    data: {
+      trigger_words: ["!admin", "admin bitte"],
+      hooks: [
+        {
+          url: "https://discord.com/api/webhooks/123456/demo-token",
+          user_mentions: ["<@123456789>"],
+          role_mentions: ["<@&987654321>"],
+        },
+      ],
+    },
+    schema: schema({
+      trigger_words: strings("Auslösewörter"),
+      hooks: {
+        type: "array",
+        title: "Discord-Webhooks",
+        items: schema({
+          url: text("Webhook-URL", "uri"),
+          user_mentions: strings("Benutzer erwähnen"),
+          role_mentions: strings("Rollen erwähnen"),
+        }),
+      },
+    }),
+  },
+  watchlist_discord_webhooks_config: {
+    data: {
+      hooks: [
+        {
+          url: "https://discord.com/api/webhooks/123456/demo-token",
+          user_mentions: [],
+          role_mentions: ["<@&987654321>"],
+        },
+      ],
+    },
+    schema: schema({
+      hooks: {
+        type: "array",
+        title: "Discord-Webhooks",
+        items: schema({
+          url: text("Webhook-URL", "uri"),
+          user_mentions: strings("Benutzer erwähnen"),
+          role_mentions: strings("Rollen erwähnen"),
+        }),
+      },
+    }),
+  },
+  camera_discord_webhooks_config: {
+    data: {
+      hooks: [
+        {
+          url: "https://discord.com/api/webhooks/123456/demo-token",
+          user_mentions: [],
+          role_mentions: ["<@&987654321>"],
+        },
+      ],
+    },
+    schema: schema({
+      hooks: {
+        type: "array",
+        title: "Discord-Webhooks",
+        items: schema({
+          url: text("Webhook-URL", "uri"),
+          user_mentions: strings("Benutzer erwähnen"),
+          role_mentions: strings("Rollen erwähnen"),
+        }),
+      },
+    }),
+  },
+  chat_discord_webhooks_config: {
+    data: {
+      allow_mentions: false,
+      hooks: [{ url: "https://discord.com/api/webhooks/123456/demo-token" }],
+    },
+    schema: schema({
+      hooks: {
+        type: "array",
+        title: "Discord-Webhooks",
+        items: schema({ url: text("Webhook-URL", "uri") }),
+      },
+      allow_mentions: boolean("Erwähnungen aus dem Chat erlauben"),
+    }),
+  },
+  kills_discord_webhooks_config: {
+    data: {
+      send_kills: true,
+      send_team_kills: true,
+      hooks: [{ url: "https://discord.com/api/webhooks/123456/demo-token" }],
+    },
+    schema: schema({
+      hooks: {
+        type: "array",
+        title: "Discord-Webhooks",
+        items: schema({ url: text("Webhook-URL", "uri") }),
+      },
+      send_kills: boolean("Kills senden"),
+      send_team_kills: boolean("Teamkills senden"),
+    }),
+  },
+  log_line_webhook_config: {
+    data: {
+      webhooks: [
+        {
+          log_types: ["CHAT", "KILL", "TEAM KILL"],
+          webhook: {
+            url: "https://discord.com/api/webhooks/123456/demo-token",
+            user_mentions: [],
+            role_mentions: ["<@&987654321>"],
+          },
+        },
+      ],
+    },
+    schema: schema({
+      webhooks: {
+        type: "array",
+        title: "Log-Webhooks",
+        items: schema({
+          log_types: {
+            type: "array",
+            title: "Ereignistypen",
+            items: {
+              type: "string",
+              enum: ["CHAT", "KILL", "TEAM KILL", "CONNECTED", "DISCONNECTED"],
+            },
+          },
+          webhook: schema({
+            url: text("Webhook-URL", "uri"),
+            user_mentions: strings("Benutzer erwähnen"),
+            role_mentions: strings("Rollen erwähnen"),
+          }),
+        }),
+      },
+    }),
+  },
+  scoreboard_config: {
+    data: {
+      public_scoreboard_url: "https://stats.example/frontline",
+      hooks: [{ url: "https://discord.com/api/webhooks/123456/demo-token" }],
+      header_gamestate_enabled: true,
+      map_rotation_enabled: true,
+      player_stats_enabled: true,
+      footer_last_refreshed_text: "Zuletzt aktualisiert",
+      header_gamestate_include_server_name: true,
+      header_gamestate_time_between_refreshes: 5,
+      quick_connect_url: "steam://connect/127.0.0.1:7777",
+      battlemetrics_url: "https://www.battlemetrics.com/servers/hll/123456",
+      show_map_image: true,
+      map_rotation_include_server_name: true,
+      map_rotation_time_between_refreshes: 30,
+      current_map_format: "🟩 {1}. **{0}**",
+      next_map_format: "🟨 {1}. {0}",
+      other_map_format: "⬛ {1}. {0}",
+      show_map_legend: true,
+      map_rotation_title_text: "Kartenrotation",
+      player_stats_include_server_name: true,
+      player_stats_title_text: "Spielerstatistiken",
+      player_stats_time_between_refreshes: 5,
+      player_stats_num_to_display: 5,
+    },
+    schema: schema({
+      public_scoreboard_url: text("Öffentliche Scoreboard-URL", "uri"),
+      hooks: {
+        type: "array",
+        title: "Discord-Webhooks",
+        items: schema({ url: text("Webhook-URL", "uri") }),
+      },
+      header_gamestate_enabled: boolean("Kopfbereich aktiv"),
+      map_rotation_enabled: boolean("Kartenrotation aktiv"),
+      player_stats_enabled: boolean("Spielerstatistiken aktiv"),
+      footer_last_refreshed_text: text("Fußzeile"),
+      header_gamestate_include_server_name: boolean("Servername anzeigen"),
+      header_gamestate_time_between_refreshes: integer("Aktualisierung"),
+      quick_connect_url: text("Direktverbindungs-URL", "uri"),
+      battlemetrics_url: text("BattleMetrics-URL", "uri"),
+      show_map_image: boolean("Kartenbild anzeigen"),
+      map_rotation_include_server_name: boolean("Servername anzeigen"),
+      map_rotation_time_between_refreshes: integer("Aktualisierung"),
+      current_map_format: text("Aktuelle Karte"),
+      next_map_format: text("Nächste Karte"),
+      other_map_format: text("Weitere Karten"),
+      show_map_legend: boolean("Kartenlegende anzeigen"),
+      map_rotation_title_text: text("Titel"),
+      player_stats_include_server_name: boolean("Servername anzeigen"),
+      player_stats_title_text: text("Titel"),
+      player_stats_time_between_refreshes: integer("Aktualisierung"),
+      player_stats_num_to_display: integer("Spieler je Statistik", 1),
+    }),
+  },
+  chat_commands_config: {
+    data: {
+      enabled: true,
+      describe_words: ["!help", "@help"],
+      command_words: [
+        {
+          words: ["!rules"],
+          description: "Zeigt die wichtigsten Serverregeln.",
+          message: "Bitte beachte unsere Serverregeln unter fln.gg/rules.",
+        },
+      ],
+    },
+    schema: schema({
+      enabled: boolean("Aktiviert"),
+      describe_words: strings("Hilfe-Befehle"),
+      command_words: {
+        type: "array",
+        title: "Konfigurierte Befehle",
+        items: schema({
+          words: strings("Befehlswörter"),
+          description: text("Beschreibung"),
+          message: text("Antwortnachricht"),
+        }),
+      },
+    }),
+  },
+  rcon_chat_commands_config: {
+    data: {
+      enabled: true,
+      describe_words: ["!help"],
+      command_words: [
+        {
+          words: ["!redeploy"],
+          enabled: true,
+          description: "Löst einen schnelleren Redeploy aus.",
+          commands: {
+            punish: {
+              player_name: "{player_name}",
+              reason: "Redeploy per Chatbefehl",
+            },
+          },
+          conditions: { player_count: { min: 0, max: 49 } },
+        },
+      ],
+    },
+    schema: schema({
+      enabled: boolean("Aktiviert"),
+      describe_words: strings("Hilfe-Befehle"),
+      command_words: {
+        type: "array",
+        title: "RCON-Chatbefehle",
+        items: schema({
+          words: strings("Befehlswörter"),
+          enabled: boolean("Befehl aktiv"),
+          description: text("Beschreibung"),
+          commands: {
+            type: "object",
+            title: "RCON-Befehle",
+            additionalProperties: true,
+          },
+          conditions: {
+            type: "object",
+            title: "Bedingungen",
+            additionalProperties: true,
+          },
+        }),
+      },
+    }),
+  },
+  server_name_change_config: {
+    data: { ip: "127.0.0.1", port: 10011 },
+    schema: schema({
+      ip: text("Server-IP"),
+      port: integer("Query-Port", 1),
+    }),
+  },
   auto_mod_level_config: {
     data: {
       ...commonAutomodData,
