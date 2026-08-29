@@ -20,8 +20,9 @@ import { Form, useLoaderData } from "react-router-dom";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
-import PageHeader from "@/components/shared/PageHeader";
 import { demoServices, isFakeMode } from "@/mirage/demo-data";
+import SystemDiagnosticsLayout from "../system-diagnostics/SystemDiagnosticsLayout";
+import { ControlSectionHeader } from "../general-group/ControlPageLayout";
 
 dayjs.extend(relativeTime);
 dayjs.extend(localizedFormat);
@@ -82,18 +83,27 @@ const stateColor = {
 const isRunning = (service) => service.statename === "RUNNING";
 
 const Services = () => {
-  const { services, deadLetters: initialDeadLetters, diagnosticsPreview, operationalHealth: initialOperationalHealth } = useLoaderData();
+  const {
+    services,
+    deadLetters: initialDeadLetters,
+    diagnosticsPreview,
+    operationalHealth: initialOperationalHealth,
+  } = useLoaderData();
   const { t } = useTranslation();
   const [deadLetters, setDeadLetters] = useState(initialDeadLetters);
   const [retryingId, setRetryingId] = useState(null);
-  const [operationalHealth, setOperationalHealth] = useState(initialOperationalHealth);
+  const [operationalHealth, setOperationalHealth] = useState(
+    initialOperationalHealth
+  );
   const [healthWindow, setHealthWindow] = useState(15);
 
   const refreshOperationalHealth = async (windowMinutes) => {
     setHealthWindow(windowMinutes);
     try {
       setOperationalHealth(
-        await cmd.GET_OPERATIONAL_HEALTH({ params: { window_minutes: windowMinutes } })
+        await cmd.GET_OPERATIONAL_HEALTH({
+          params: { window_minutes: windowMinutes },
+        })
       );
     } catch (error) {
       toast.error(error?.message || t("settings.services.health.failed"));
@@ -113,181 +123,238 @@ const Services = () => {
         toast.error(t("settings.services.webhooks.retryMissing"));
       }
     } catch (error) {
-      toast.error(error?.message || t("settings.services.webhooks.retryFailed"));
+      toast.error(
+        error?.message || t("settings.services.webhooks.retryFailed")
+      );
     } finally {
       setRetryingId(null);
     }
   };
 
   return (
-    <Stack sx={{ maxWidth: (theme) => theme.breakpoints.values.md }}>
-      <PageHeader
-        eyebrow={t("settings.services.eyebrow")}
+    <SystemDiagnosticsLayout>
+      <ControlSectionHeader
         title={t("settings.services.title")}
-        subtitle={t("settings.services.subtitle")}
+        description={t("settings.services.subtitle")}
       />
-      <Alert
-        sx={{ mb: 2 }}
-        severity="info"
-        action={
-          <Button href="/api/logs" component={"a"}>
-            {t("settings.services.searchLogs")}
-          </Button>
-        }
+      <Stack
+        spacing={1.25}
+        sx={{
+          p: { xs: 1, md: 1.5 },
+          "& .MuiAccordion-root": {
+            border: "1px solid",
+            borderColor: "divider",
+            boxShadow: "none",
+            "&::before": { display: "none" },
+          },
+        }}
       >
-        {t("settings.services.hint")}
-      </Alert>
-      {operationalHealth && (
-        <Alert severity={operationalHealth.overall_state === "healthy" ? "success" : operationalHealth.overall_state === "critical" ? "error" : "warning"} sx={{ mb: 2 }}>
-          <AlertTitle>{t("settings.services.health.title")}</AlertTitle>
-          <Stack direction={{ xs: "column", sm: "row" }} gap={1} alignItems={{ sm: "center" }} flexWrap="wrap">
-            {[5, 15, 60].map((minutes) => (
-              <Button key={minutes} size="small" variant={healthWindow === minutes ? "contained" : "outlined"} onClick={() => refreshOperationalHealth(minutes)}>
-                {t("settings.services.health.window", { minutes })}
-              </Button>
-            ))}
-            {Object.entries(operationalHealth.components).map(([name, component]) => (
-              <Chip key={name} size="small" color={component.state === "healthy" ? "success" : component.state === "offline" ? "error" : "warning"} label={t(`settings.services.health.components.${name}`, { defaultValue: name }) + ": " + component.state} />
-            ))}
-          </Stack>
-          <Typography variant="body2" sx={{ mt: 1 }}>
-            {t("settings.services.health.lastCheck", { time: new Date(operationalHealth.generated_at).toLocaleString() })}
-          </Typography>
-        </Alert>
-      )}
-      {diagnosticsPreview && (
         <Alert
           severity="info"
-          sx={{ mb: 2 }}
           action={
-            <Button href="/api/download_support_diagnostics" component="a">
-              {t("settings.services.diagnostics.download")}
+            <Button href="/api/logs" component={"a"}>
+              {t("settings.services.searchLogs")}
             </Button>
           }
         >
-          <AlertTitle>{t("settings.services.diagnostics.title")}</AlertTitle>
-          <Typography variant="body2">
-            {t("settings.services.diagnostics.scope", {
-              bytes: diagnosticsPreview.estimated_bytes,
-              services: diagnosticsPreview.service_count,
-              history: diagnosticsPreview.history_samples,
-            })}
-          </Typography>
-          <Typography variant="body2" sx={{ mt: 0.5 }}>
-            {t("settings.services.diagnostics.omitted")}
-          </Typography>
+          {t("settings.services.hint")}
         </Alert>
-      )}
-      {deadLetters.length > 0 && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          <AlertTitle>{t("settings.services.webhooks.title")}</AlertTitle>
-          <Stack gap={1}>
-            <Typography variant="body2">
-              {t("settings.services.webhooks.hint", {
-                count: deadLetters.length,
+        {operationalHealth && (
+          <Alert
+            severity={
+              operationalHealth.overall_state === "healthy"
+                ? "success"
+                : operationalHealth.overall_state === "critical"
+                ? "error"
+                : "warning"
+            }
+            sx={{ mb: 2 }}
+          >
+            <AlertTitle>{t("settings.services.health.title")}</AlertTitle>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              gap={1}
+              alignItems={{ sm: "center" }}
+              flexWrap="wrap"
+            >
+              {[5, 15, 60].map((minutes) => (
+                <Button
+                  key={minutes}
+                  size="small"
+                  variant={healthWindow === minutes ? "contained" : "outlined"}
+                  onClick={() => refreshOperationalHealth(minutes)}
+                >
+                  {t("settings.services.health.window", { minutes })}
+                </Button>
+              ))}
+              {Object.entries(operationalHealth.components).map(
+                ([name, component]) => (
+                  <Chip
+                    key={name}
+                    size="small"
+                    color={
+                      component.state === "healthy"
+                        ? "success"
+                        : component.state === "offline"
+                        ? "error"
+                        : "warning"
+                    }
+                    label={
+                      t(`settings.services.health.components.${name}`, {
+                        defaultValue: name,
+                      }) +
+                      ": " +
+                      component.state
+                    }
+                  />
+                )
+              )}
+            </Stack>
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              {t("settings.services.health.lastCheck", {
+                time: new Date(operationalHealth.generated_at).toLocaleString(),
               })}
             </Typography>
-            {deadLetters.map((entry) => (
-              <Stack
-                key={entry.id}
-                direction={{ xs: "column", sm: "row" }}
-                alignItems={{ sm: "center" }}
-                justifyContent="space-between"
-                gap={1}
-              >
-                <Typography variant="body2">
-                  {entry.server_number} · {entry.message_type} · {entry.reason} ·{" "}
-                  {dayjs(entry.failed_at).format("LLL")}
-                </Typography>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  disabled={retryingId === entry.id}
-                  onClick={() => retryDeadLetter(entry.id)}
-                >
-                  {t("settings.services.webhooks.retry")}
-                </Button>
-              </Stack>
-            ))}
-          </Stack>
-        </Alert>
-      )}
-      {services.map((service) => {
-        return (
-          <Accordion key={service.name}>
-            <AccordionSummary
-              expandIcon={<ExpandMoreIcon />}
-              aria-controls={`${service.name}-content`}
-              id={`${service.name}-header`}
-            >
-              <Stack direction={"row"} gap={1} sx={{ minWidth: 300 }}>
-                <Chip
-                  sx={{ flexBasis: 80 }}
-                  color={stateColor[service.statename]}
-                  label={service.statename}
-                />
-                <Typography>{service.title}</Typography>
-              </Stack>
-            </AccordionSummary>
-
-            <AccordionDetails>
-              <Stack component={"section"} gap={4}>
-                {service.spawnerr && (
-                  <Alert severity="error">
-                    <AlertTitle>{t("settings.services.error")}</AlertTitle>
-                    {service.spawnerr}
-                  </Alert>
-                )}
+          </Alert>
+        )}
+        {diagnosticsPreview && (
+          <Alert
+            severity="info"
+            sx={{ mb: 2 }}
+            action={
+              <Button href="/api/download_support_diagnostics" component="a">
+                {t("settings.services.diagnostics.download")}
+              </Button>
+            }
+          >
+            <AlertTitle>{t("settings.services.diagnostics.title")}</AlertTitle>
+            <Typography variant="body2">
+              {t("settings.services.diagnostics.scope", {
+                bytes: diagnosticsPreview.estimated_bytes,
+                services: diagnosticsPreview.service_count,
+                history: diagnosticsPreview.history_samples,
+              })}
+            </Typography>
+            <Typography variant="body2" sx={{ mt: 0.5 }}>
+              {t("settings.services.diagnostics.omitted")}
+            </Typography>
+          </Alert>
+        )}
+        {deadLetters.length > 0 && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <AlertTitle>{t("settings.services.webhooks.title")}</AlertTitle>
+            <Stack gap={1}>
+              <Typography variant="body2">
+                {t("settings.services.webhooks.hint", {
+                  count: deadLetters.length,
+                })}
+              </Typography>
+              {deadLetters.map((entry) => (
                 <Stack
-                  direction={"row"}
-                  alignItems={"center"}
-                  flexWrap={true}
+                  key={entry.id}
+                  direction={{ xs: "column", sm: "row" }}
+                  alignItems={{ sm: "center" }}
+                  justifyContent="space-between"
                   gap={1}
                 >
-                  <Typography variant="caption">
-                    {`${isRunning(service) ? t("settings.services.started") : t("settings.services.stopped")} ${
-                      service.uptime
-                    }`}
+                  <Typography variant="body2">
+                    {entry.server_number} · {entry.message_type} ·{" "}
+                    {entry.reason} · {dayjs(entry.failed_at).format("LLL")}
                   </Typography>
-                  <Divider orientation="vertical" flexItem />
-                  <Typography variant="caption">
-                    {t("settings.services.stoppedAt")} {service.stop}
-                  </Typography>
-                  <Divider orientation="vertical" flexItem />
-                  <Typography variant="caption">
-                    {t("settings.services.startedAt")} {service.start}
-                  </Typography>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    disabled={retryingId === entry.id}
+                    onClick={() => retryDeadLetter(entry.id)}
+                  >
+                    {t("settings.services.webhooks.retry")}
+                  </Button>
                 </Stack>
-              </Stack>
-              <Divider sx={{ my: 0.5 }} orientation="horizontal" flexItem />
-              <Typography>
-                {service.info || t("settings.services.missingDescription")}
-              </Typography>
-            </AccordionDetails>
+              ))}
+            </Stack>
+          </Alert>
+        )}
+        {services.map((service) => {
+          return (
+            <Accordion key={service.name}>
+              <AccordionSummary
+                expandIcon={<ExpandMoreIcon />}
+                aria-controls={`${service.name}-content`}
+                id={`${service.name}-header`}
+              >
+                <Stack direction={"row"} gap={1} sx={{ minWidth: 300 }}>
+                  <Chip
+                    sx={{ flexBasis: 80 }}
+                    color={stateColor[service.statename]}
+                    label={service.statename}
+                  />
+                  <Typography>{service.title}</Typography>
+                </Stack>
+              </AccordionSummary>
 
-            <AccordionActions>
-              <Form method="POST">
-                <input
-                  name={"service_name"}
-                  value={service.name}
-                  hidden
-                  readOnly
-                />
-                <Button
-                  type="submit"
-                  variant="contained"
-                  color={isRunning(service) ? "secondary" : "primary"}
-                  name={"action"}
-                  value={isRunning(service) ? "stop" : "start"}
-                >
-                  {isRunning(service) ? t("settings.services.stop") : t("settings.services.start")}
-                </Button>
-              </Form>
-            </AccordionActions>
-          </Accordion>
-        );
-      })}
-    </Stack>
+              <AccordionDetails>
+                <Stack component={"section"} gap={4}>
+                  {service.spawnerr && (
+                    <Alert severity="error">
+                      <AlertTitle>{t("settings.services.error")}</AlertTitle>
+                      {service.spawnerr}
+                    </Alert>
+                  )}
+                  <Stack
+                    direction={"row"}
+                    alignItems={"center"}
+                    flexWrap={true}
+                    gap={1}
+                  >
+                    <Typography variant="caption">
+                      {`${
+                        isRunning(service)
+                          ? t("settings.services.started")
+                          : t("settings.services.stopped")
+                      } ${service.uptime}`}
+                    </Typography>
+                    <Divider orientation="vertical" flexItem />
+                    <Typography variant="caption">
+                      {t("settings.services.stoppedAt")} {service.stop}
+                    </Typography>
+                    <Divider orientation="vertical" flexItem />
+                    <Typography variant="caption">
+                      {t("settings.services.startedAt")} {service.start}
+                    </Typography>
+                  </Stack>
+                </Stack>
+                <Divider sx={{ my: 0.5 }} orientation="horizontal" flexItem />
+                <Typography>
+                  {service.info || t("settings.services.missingDescription")}
+                </Typography>
+              </AccordionDetails>
+
+              <AccordionActions>
+                <Form method="POST">
+                  <input
+                    name={"service_name"}
+                    value={service.name}
+                    hidden
+                    readOnly
+                  />
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    color={isRunning(service) ? "secondary" : "primary"}
+                    name={"action"}
+                    value={isRunning(service) ? "stop" : "start"}
+                  >
+                    {isRunning(service)
+                      ? t("settings.services.stop")
+                      : t("settings.services.start")}
+                  </Button>
+                </Form>
+              </AccordionActions>
+            </Accordion>
+          );
+        })}
+      </Stack>
+    </SystemDiagnosticsLayout>
   );
 };
 

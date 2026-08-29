@@ -534,14 +534,7 @@ const taskGroupDefinitions = [
     id: "system-diagnostics",
     translationKey: "navigation.groups.systemDiagnostics",
     icon: <MiscellaneousServicesIcon />,
-    routes: [
-      "/settings/services",
-      "/settings/others/game-server",
-      "/settings/others/crcon",
-      "/settings/others/steam",
-      "/settings/others/log-stream",
-      "/settings/others/watch-kill-rate",
-    ],
+    routes: ["/settings/services"],
   },
 ];
 

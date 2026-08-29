@@ -130,3 +130,79 @@ passed
 Keine verbleibenden P0-, P1- oder P2-Abweichungen innerhalb der Spielerakten-Neuanordnung.
 
 final result: passed
+
+# Audit-Protokolle — Option 1 „Audit-Journal“
+
+## Vergleichsbasis
+
+- Designziel: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-708a76a0-09a5-46a1-bf2a-2d0acc4bbcb7.png`
+- Implementierung: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\audit-logs-journal-final-1536.png`
+- Vollansicht-Vergleich: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\audit-logs-comparison-full.png`
+- Fokusvergleich: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\audit-logs-comparison-focus.png`
+- Mobile Evidence: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\audit-logs-journal-mobile.png`
+- Geprüfte Route: `/records/audit-logs`
+- Viewports: 1536 × 1024, 1024 × 768 und 390 × 844 CSS px, DPR 1
+- Zustand: deutsche Fake-Testumgebung, 36 realistisch gemischte Audit-Einträge, zwei Tage, erfolgreiche, fehlgeschlagene und ungeklärte Aktionen
+
+## Geprüfte Flächen und Interaktionen
+
+- Die alte generische Tabelle wurde durch ein dichtes chronologisches Audit-Journal mit Datumstrennern, Klartextaktionen, technischem Befehl, Ziel, Akteur und Status ersetzt.
+- Die Auswahl arbeitet mit einer stabilen Audit-ID statt dem Seitenindex und wird nach Filter- oder Seitenwechsel zuverlässig neu aufgelöst.
+- Der Desktop-Inspector bleibt beim Scrollen erreichbar und zeigt lokale/UTC-Zeit, Ziel, Spieler-ID, Server, Audit-ID, übermittelte Werte, Ergebnis und maskierte technische Rohdaten.
+- Auf Tablet und Mobile öffnet dieselbe Detailansicht als rechter beziehungsweise vollbreiter Drawer; ohne Auswahl bleibt die Chronik vollständig sichtbar.
+- Suchparameter, Benutzer, Befehl, Sortierung und Seitengröße verwenden die tatsächlich unterstützten API-Parameter. Bereich und Ergebnis filtern ehrlich innerhalb der geladenen Seite; nicht unterstützte Zeitraum-/Serverfilter wurden nicht vorgetäuscht.
+- Export ist bewusst mit „Diese Seite exportieren“ beschriftet und entspricht dem tatsächlichen Exportumfang.
+- Unicode-Suche mit `Гук` findet `Гук в Шльопках`; Zurücksetzen stellt die vollständigen 36 Einträge wieder her.
+- Pagination mit 25 Einträgen zeigt auf Seite 2 korrekt `26–36 von 36 · 11 sichtbar`; der Inspector zeigt einen Eintrag der neuen Seite.
+- Mobile Kontrolle bei 390 × 844: `scrollWidth` entspricht `clientWidth` (390 px), kein horizontaler Overflow.
+- Nach sauberem Reload: keine Browserfehler; Produktions-Webbuild mit Vite erfolgreich.
+
+## Comparison history
+
+1. [P1, Statuslogik] JSON-Ergebnisse mit `{"failed": false}` wurden durch eine Text-Fallbackprüfung zunächst fälschlich als Fehler markiert. Fix: Textprüfung wird nur noch bei nicht parsebaren Ergebnissen verwendet; erfolgreiche, fehlgeschlagene, teilweise und ungeklärte Zustände sind semantisch getrennt.
+2. [P1, Datenschutz] Potenziell sensible Werte in Passwort-, Token-, Session-, Credential-, API-Key-, Cookie-, Authorization- und Webhook-Feldern werden rekursiv maskiert, bevor sie im Inspector oder Rohdatenbereich erscheinen.
+3. [P2, Responsiveness] Der Desktop-Inspector hätte auf schmalen Inhaltsbreiten die Chronik eingeengt. Fix: Ab 1439 px und kleiner wird er als Drawer geöffnet; die Journalliste behält die volle Breite.
+4. [P2, API-Ehrlichkeit] Das Visual enthielt Zeitraum- und Serverfilter, die der bestehende Audit-Endpunkt nicht unterstützt. Diese wurden bewusst nicht als funktionslose Attrappen übernommen; stattdessen bleiben nur belastbare Serverfilter und klar als seitenlokal erkennbare Bereichs-/Statusfilter sichtbar.
+5. Finale visuelle Prüfung: Quellbild und Implementierung wurden bei identischer Desktop-Größe als Vollansicht und als Fokusbereich kombiniert. Das eckige FLN-Raster, die Dichte, Chronologie, Auswahlmarkierung und rechte Detailhierarchie stimmen überein. Keine verbleibenden P0-, P1- oder P2-Abweichungen.
+
+final result: passed
+
+# Spielprotokolle — Option 2 „Runden-Timeline“
+
+## Vergleichsbasis
+
+- Designziel: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-c28f46fd-f9d9-41b0-899f-93977a82bf6c.png`
+- Implementierung: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\game-logs-timeline-final.png`
+- Vollansicht-Vergleich: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\game-logs-timeline-comparison-small.png`
+- Fokusvergleich: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\game-logs-timeline-comparison-focus.png`
+- Mobile Evidence: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\game-logs-timeline-mobile.png`
+- Geprüfte Route: `/records/game-logs`
+- Viewports: 1536 × 1024 und 390 × 844 CSS px, DPR 1
+- Zustand: deutsche Fake-Testumgebung, 36 historische Ereignisse, Foy · Warfare · Nacht, Teamkill-Ereignis ausgewählt
+
+## Geprüfte Flächen und Interaktionen
+
+- Der frühere permanente linke Filterblock wurde durch eine kompakte, vollbreite Filterleiste ersetzt.
+- Spielername/ID, Zeitraum, Server, Ereigniskategorien und erweiterte Filter arbeiten zusammen und schreiben den Zustand in die URL.
+- Kategorien zeigen belastbare Trefferzahlen; aktive Filter erscheinen als löschbare Chips.
+- Die Ereignisliste ist als dichte chronologische Timeline mit semantischen Icons, Farben und Klartextbezeichnungen umgesetzt.
+- Ein ausgewähltes Ereignis erhält eine eindeutige Goldmarkierung und zeigt Zeit, Akteur, Ziel, Waffe, Server, IDs, Nachricht sowie Rohprotokoll.
+- Kopieren und Spielerprofil sind direkt aus dem Ereigniskontext erreichbar.
+- Die Rundenübersicht zeigt Karte, Modus, Start/Ende, Dauer, Ereignisse nach Typ und aktivste Spieler.
+- Mobile Kontrolle bei 390 × 844: Filter stapeln sauber, Kategorien bleiben horizontal bedienbar und `scrollWidth` entspricht `innerWidth`.
+- Nach sauberem Reload bei 1536 × 1024: keine neue Browser-/Seitenfehlermeldung und keine Fehleransicht.
+- Produktions-Webbuild mit Vite: erfolgreich.
+
+## Comparison history
+
+1. [P1, Stabilität] Die kombinierte Spielersuche rief in den Demodaten `.toLowerCase()` auf einem leeren Wert auf. Fix: Suchwerte werden vor dem Vergleich sicher zu Strings normalisiert. Post-fix: `FLN_Wolf` liefert zehn Ereignisse ohne Laufzeitfehler.
+2. [P2, Informationskonsistenz] Die rechte Rundenübersicht übernahm zunächst die gerade gefilterte Kategorie und verfälschte damit die Gesamtsicht. Fix: Timeline und Trefferliste verwenden gefilterte Daten, die Rundenübersicht bewusst den vollständigen geladenen Rundendatensatz.
+3. [P2, Copy] Der Rundentitel wiederholte den Modus („Warfare“). Fix: Titelstruktur auf `Runde · {{map}}` reduziert.
+4. [P2, Filterzustand] Der Standard suggerierte „Letzte Runde“, obwohl ohne Filter der vollständige Zeitraum geladen wurde. Fix: ehrlicher Standard `Gesamter Zeitraum`; „Letzte Runde“ bleibt als bewusst wählbares Preset erhalten.
+5. Finale visuelle Prüfung: Quellbild und Implementierung wurden bei identischer Desktop-Größe als Vollansicht und als dichter Fokusbereich kombiniert und gemeinsam beurteilt. Keine verbleibenden P0-, P1- oder P2-Abweichungen.
+
+## Follow-up Polish
+
+- [P3] Durch den bestehenden globalen Seitenkopf beginnt die Ereignisdetailkarte bei 1024 px Höhe etwas später als im isolierten Konzept. Sie bleibt im rechten Sticky-Kontext erreichbar und benötigt keine Funktionsänderung.
+
+final result: passed

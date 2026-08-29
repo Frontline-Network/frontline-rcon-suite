@@ -28,6 +28,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { cmd, mobileRequest } from "@/utils/fetchUtils";
 import { toast } from "react-toastify";
 import { useTranslation } from "react-i18next";
+import { ControlPageLayout } from "../ControlPageLayout";
 
 function CrconAppSettings({
   showFrontline = true,
@@ -42,6 +43,7 @@ function CrconAppSettings({
   const [devices, setDevices] = useState([]);
   const [bootstrap, setBootstrap] = useState(null);
   const [mobileError, setMobileError] = useState("");
+  const [activeSection, setActiveSection] = useState("pairing");
 
   const loadDevices = useCallback(async () => {
     try {
@@ -64,7 +66,9 @@ function CrconAppSettings({
   }, [loadDevices, showFrontline]);
 
   useEffect(() => {
-    const code = new URLSearchParams(window.location.search).get("desktop_code");
+    const code = new URLSearchParams(window.location.search).get(
+      "desktop_code"
+    );
     if (code) {
       setDesktopCode(code.toUpperCase());
     }
@@ -172,308 +176,407 @@ function CrconAppSettings({
     reconnectMutation.mutate();
   };
 
-  const frontlineCardSx = frontlinePresentation
-    ? (theme) => ({
-        border: "1px solid",
-        borderColor: "primary.main",
-        background: `linear-gradient(125deg, ${theme.palette.background.paper} 0%, ${theme.palette.action.hover} 100%)`,
-      })
-    : undefined;
-  const frontlineSectionSx = frontlinePresentation
-    ? {
-        p: { xs: 1.5, md: 2 },
-        border: "1px solid",
-        borderColor: "divider",
-        borderRadius: 2,
-        bgcolor: "background.paper",
-      }
-    : undefined;
+  const frontlineCardSx = (theme) => ({
+    border: "1px solid",
+    borderColor: frontlinePresentation ? "primary.main" : "divider",
+    borderRadius: 0,
+    boxShadow: "none",
+    background: frontlinePresentation
+      ? `linear-gradient(125deg, ${theme.palette.background.paper} 0%, ${theme.palette.action.hover} 100%)`
+      : theme.palette.background.paper,
+  });
+  const frontlineSectionSx = {
+    p: { xs: 1.5, md: 2 },
+    border: "1px solid",
+    borderColor: "divider",
+    borderRadius: 0,
+    bgcolor: "background.default",
+  };
+  const sections = [
+    { key: "pairing", label: "Geräte koppeln" },
+    { key: "devices", label: "Meine Geräte" },
+    { key: "utilities", label: "CRCON-Werkzeuge" },
+  ];
+  const selectSection = (key) => {
+    setActiveSection(key);
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById(`crcon-${key}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
 
   return (
-    <Grid container spacing={3}>
-      {showFrontline && <Grid size={12}>
-        <Card elevation={frontlinePresentation ? 0 : 2} sx={frontlineCardSx}>
-          <CardHeader
-            avatar={<QrCodeIcon color="primary" />}
-            title={t("settings.mobile.title")}
-            subheader={t("settings.mobile.subtitle")}
-            sx={frontlinePresentation ? { pb: 2 } : undefined}
-          />
-          <Divider flexItem />
-          <CardContent sx={frontlinePresentation ? { p: { xs: 2, md: 3 } } : undefined}>
-            <Stack spacing={2}>
-              {mobileError && <Alert severity="info">{mobileError}</Alert>}
-              <Alert severity={frontlinePresentation ? "info" : "warning"} variant={frontlinePresentation ? "outlined" : "standard"}>
-                {t("settings.mobile.pairingWarning")}
-              </Alert>
-              {!pairing || ["consumed", "denied"].includes(pairing.state) ? (
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={frontlineSectionSx}>
-                  <TextField
-                    label={t("settings.mobile.confirmPassword")}
-                    type="password"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    autoComplete="current-password"
-                    fullWidth
-                  />
-                  <Button
-                    variant="contained"
-                    startIcon={<QrCodeIcon />}
-                    disabled={!password || createPairingMutation.isPending}
-                    onClick={() => createPairingMutation.mutate()}
+    <ControlPageLayout
+      sections={sections.filter(
+        (section) => showUtilities || section.key !== "utilities"
+      )}
+      active={activeSection}
+      onChange={selectSection}
+    >
+      <Grid
+        container
+        spacing={1.5}
+        sx={{
+          p: 1.5,
+          "& .MuiButton-root, & .MuiCard-root, & .MuiOutlinedInput-root, & .MuiChip-root":
+            {
+              borderRadius: 0,
+            },
+        }}
+      >
+        {showFrontline && (
+          <Grid id="crcon-pairing" size={12} sx={{ scrollMarginTop: 96 }}>
+            <Card elevation={0} sx={frontlineCardSx}>
+              <CardHeader
+                avatar={<QrCodeIcon color="primary" />}
+                title={t("settings.mobile.title")}
+                subheader={t("settings.mobile.subtitle")}
+                sx={frontlinePresentation ? { pb: 2 } : undefined}
+              />
+              <Divider flexItem />
+              <CardContent
+                sx={frontlinePresentation ? { p: { xs: 2, md: 3 } } : undefined}
+              >
+                <Stack spacing={2}>
+                  {mobileError && <Alert severity="info">{mobileError}</Alert>}
+                  <Alert
+                    severity={frontlinePresentation ? "info" : "warning"}
+                    variant={frontlinePresentation ? "outlined" : "standard"}
                   >
-                    {t("settings.mobile.createQr")}
-                  </Button>
-                </Stack>
-              ) : (
-                <Stack
-                  direction={{ xs: "column", md: "row" }}
-                  spacing={3}
-                  alignItems="center"
-                  sx={frontlineSectionSx}
-                >
-                  {pairing.qr_payload && pairing.state === "pending" && (
-                    <Box sx={{ bgcolor: "white", p: 2, borderRadius: 1 }}>
-                      <QRCodeSVG
-                        value={pairing.qr_payload}
-                        size={224}
-                        level="Q"
+                    {t("settings.mobile.pairingWarning")}
+                  </Alert>
+                  {!pairing ||
+                  ["consumed", "denied"].includes(pairing.state) ? (
+                    <Stack
+                      direction={{ xs: "column", sm: "row" }}
+                      spacing={2}
+                      sx={frontlineSectionSx}
+                    >
+                      <TextField
+                        label={t("settings.mobile.confirmPassword")}
+                        type="password"
+                        value={password}
+                        onChange={(event) => setPassword(event.target.value)}
+                        autoComplete="current-password"
+                        fullWidth
                       />
-                    </Box>
+                      <Button
+                        variant="contained"
+                        startIcon={<QrCodeIcon />}
+                        disabled={!password || createPairingMutation.isPending}
+                        onClick={() => createPairingMutation.mutate()}
+                      >
+                        {t("settings.mobile.createQr")}
+                      </Button>
+                    </Stack>
+                  ) : (
+                    <Stack
+                      direction={{ xs: "column", md: "row" }}
+                      spacing={3}
+                      alignItems="center"
+                      sx={frontlineSectionSx}
+                    >
+                      {pairing.qr_payload && pairing.state === "pending" && (
+                        <Box sx={{ bgcolor: "white", p: 2, borderRadius: 1 }}>
+                          <QRCodeSVG
+                            value={pairing.qr_payload}
+                            size={224}
+                            level="Q"
+                          />
+                        </Box>
+                      )}
+                      <Stack spacing={1} sx={{ minWidth: 280 }}>
+                        <Chip
+                          label={`${t("settings.mobile.statusLabel")}: ${t(
+                            `settings.mobile.status.${pairing.state}`,
+                            { defaultValue: pairing.state }
+                          )}`}
+                          color="primary"
+                          variant="outlined"
+                        />
+                        {pairing.state === "pending" && (
+                          <Typography color="text.secondary">
+                            {t("settings.mobile.scanCode")}
+                          </Typography>
+                        )}
+                        {pairing.state === "scanned" && (
+                          <>
+                            <Typography variant="h3" sx={{ letterSpacing: 6 }}>
+                              {pairing.verification_code}
+                            </Typography>
+                            <Typography>
+                              {pairing.device_name} · {pairing.platform}
+                            </Typography>
+                            <Stack direction="row" spacing={1}>
+                              <Button
+                                variant="contained"
+                                onClick={() =>
+                                  approvePairingMutation.mutate(true)
+                                }
+                              >
+                                {t("settings.mobile.approve")}
+                              </Button>
+                              <Button
+                                color="error"
+                                onClick={() =>
+                                  approvePairingMutation.mutate(false)
+                                }
+                              >
+                                {t("settings.mobile.deny")}
+                              </Button>
+                            </Stack>
+                          </>
+                        )}
+                        {pairing.state === "approved" && (
+                          <Typography>
+                            {t("settings.mobile.approved")}
+                          </Typography>
+                        )}
+                      </Stack>
+                    </Stack>
                   )}
-                  <Stack spacing={1} sx={{ minWidth: 280 }}>
-                    <Chip
-                      label={`${t("settings.mobile.statusLabel")}: ${t(`settings.mobile.status.${pairing.state}`, { defaultValue: pairing.state })}`}
-                      color="primary"
-                      variant="outlined"
-                    />
-                    {pairing.state === "pending" && (
-                      <Typography color="text.secondary">
-                        {t("settings.mobile.scanCode")}
+
+                  <Divider />
+                  <Stack
+                    id="crcon-devices"
+                    spacing={2}
+                    sx={{ ...frontlineSectionSx, scrollMarginTop: 96 }}
+                  >
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <DesktopIcon color="primary" />
+                      <Typography variant="h6">
+                        {t("settings.desktopMobile.title")}
                       </Typography>
-                    )}
-                    {pairing.state === "scanned" && (
+                    </Stack>
+                    <Typography variant="body2" color="text.secondary">
+                      {t("settings.desktopMobile.hint")}
+                    </Typography>
+                    <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                      <TextField
+                        label={t("settings.desktopMobile.code")}
+                        value={desktopCode}
+                        onChange={(event) =>
+                          setDesktopCode(event.target.value.toUpperCase())
+                        }
+                        placeholder="FLN-7KQ9-PM2X"
+                        inputProps={{
+                          autoCapitalize: "characters",
+                          spellCheck: false,
+                        }}
+                        fullWidth
+                      />
+                      <TextField
+                        label={t("settings.mobile.confirmPassword")}
+                        type="password"
+                        value={desktopPassword}
+                        onChange={(event) =>
+                          setDesktopPassword(event.target.value)
+                        }
+                        autoComplete="current-password"
+                        fullWidth
+                      />
+                      <Button
+                        variant="contained"
+                        startIcon={<DesktopIcon />}
+                        disabled={
+                          !desktopCode.trim() ||
+                          !desktopPassword ||
+                          approveDesktopMutation.isPending
+                        }
+                        onClick={() => approveDesktopMutation.mutate()}
+                      >
+                        {t("settings.desktopMobile.approve")}
+                      </Button>
+                    </Stack>
+                  </Stack>
+
+                  <Divider />
+                  <Stack spacing={2} sx={frontlineSectionSx}>
+                    {bootstrap?.user?.permissions?.includes(
+                      "api.can_manage_all_mobile_devices"
+                    ) && (
                       <>
-                        <Typography variant="h3" sx={{ letterSpacing: 6 }}>
-                          {pairing.verification_code}
+                        <Typography variant="h6">
+                          {t("settings.mobile.installationConfiguration")}
                         </Typography>
-                        <Typography>
-                          {pairing.device_name} · {pairing.platform}
-                        </Typography>
-                        <Stack direction="row" spacing={1}>
-                          <Button
-                            variant="contained"
-                            onClick={() => approvePairingMutation.mutate(true)}
-                          >
-                            {t("settings.mobile.approve")}
-                          </Button>
-                          <Button
-                            color="error"
-                            onClick={() => approvePairingMutation.mutate(false)}
-                          >
-                            {t("settings.mobile.deny")}
-                          </Button>
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          useFlexGap
+                          flexWrap="wrap"
+                        >
+                          <Chip
+                            label={`${t("settings.mobile.url")}: ${
+                              bootstrap.mobile_configuration.public_base_url
+                            }`}
+                          />
+                          <Chip
+                            label={`${t(
+                              "settings.mobile.triggers"
+                            )}: ${bootstrap.mobile_configuration.incident_triggers.join(
+                              ", "
+                            )}`}
+                          />
+                          <Chip
+                            label={`${t("settings.mobile.retention")}: ${
+                              bootstrap.mobile_configuration
+                                .incident_retention_days
+                            } ${t("settings.mobile.days")}`}
+                          />
+                          <Chip
+                            color={
+                              bootstrap.mobile_configuration
+                                .push_relay_configured
+                                ? "success"
+                                : "default"
+                            }
+                            label={
+                              bootstrap.mobile_configuration
+                                .push_relay_configured
+                                ? t("settings.mobile.pushConfigured")
+                                : t("settings.mobile.pushDisabled")
+                            }
+                          />
                         </Stack>
+                        <Typography variant="body2" color="text.secondary">
+                          {t("settings.mobile.configurationHint")}
+                        </Typography>
                       </>
                     )}
-                    {pairing.state === "approved" && (
-                      <Typography>
-                        {t("settings.mobile.approved")}
+                    <Typography variant="h6">
+                      {t("settings.mobile.myDevices")}
+                    </Typography>
+                    {devices.length === 0 ? (
+                      <Typography color="text.secondary">
+                        {t("settings.mobile.noDevices")}
                       </Typography>
+                    ) : (
+                      <List disablePadding>
+                        {devices.map((device) => (
+                          <ListItem
+                            key={device.id}
+                            divider
+                            secondaryAction={
+                              !device.revoked_at && (
+                                <Button
+                                  color="error"
+                                  onClick={() => revokeDevice(device.id)}
+                                >
+                                  {t("settings.mobile.revoke")}
+                                </Button>
+                              )
+                            }
+                          >
+                            <PhoneIcon
+                              sx={{ mr: 2 }}
+                              color={device.revoked_at ? "disabled" : "action"}
+                            />
+                            <ListItemText
+                              primary={`${device.name} · ${device.username}`}
+                              secondary={`${device.platform} · ${
+                                device.last_seen_at
+                                  ? `${t(
+                                      "settings.mobile.lastSeen"
+                                    )} ${new Date(
+                                      device.last_seen_at
+                                    ).toLocaleString()}`
+                                  : t("settings.mobile.neverUsed")
+                              }${
+                                device.revoked_at
+                                  ? ` · ${t("settings.mobile.revoked")}`
+                                  : ""
+                              }`}
+                            />
+                          </ListItem>
+                        ))}
+                      </List>
                     )}
                   </Stack>
                 </Stack>
-              )}
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
 
-              <Divider />
-              <Stack spacing={2} sx={frontlineSectionSx}>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <DesktopIcon color="primary" />
-                  <Typography variant="h6">
-                    {t("settings.desktopMobile.title")}
+        {/* Flush Cache Card */}
+        {showUtilities && (
+          <Grid
+            id="crcon-utilities"
+            size={{ xs: 12, md: 6 }}
+            sx={{ scrollMarginTop: 96 }}
+          >
+            <Card
+              elevation={0}
+              sx={{ border: "1px solid", borderColor: "divider" }}
+            >
+              <CardHeader
+                avatar={<CacheIcon color="primary" />}
+                title={t("settings.mobile.cacheTitle")}
+                subheader={t("settings.mobile.cacheSubtitle")}
+              />
+              <Divider flexItem sx={{ mt: 1, mb: 2 }} />
+              <CardContent>
+                <Stack spacing={2}>
+                  <Typography variant="body2" color="text.secondary">
+                    {t("settings.mobile.cacheDescription")}
                   </Typography>
-                </Stack>
-                <Typography variant="body2" color="text.secondary">
-                  {t("settings.desktopMobile.hint")}
-                </Typography>
-                <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                  <TextField
-                    label={t("settings.desktopMobile.code")}
-                    value={desktopCode}
-                    onChange={(event) =>
-                      setDesktopCode(event.target.value.toUpperCase())
-                    }
-                    placeholder="FLN-7KQ9-PM2X"
-                    inputProps={{ autoCapitalize: "characters", spellCheck: false }}
-                    fullWidth
-                  />
-                  <TextField
-                    label={t("settings.mobile.confirmPassword")}
-                    type="password"
-                    value={desktopPassword}
-                    onChange={(event) => setDesktopPassword(event.target.value)}
-                    autoComplete="current-password"
-                    fullWidth
-                  />
+                  <Alert severity="warning">
+                    {t("settings.mobile.cacheWarning")}
+                  </Alert>
                   <Button
                     variant="contained"
-                    startIcon={<DesktopIcon />}
-                    disabled={
-                      !desktopCode.trim() ||
-                      !desktopPassword ||
-                      approveDesktopMutation.isPending
-                    }
-                    onClick={() => approveDesktopMutation.mutate()}
+                    color="warning"
+                    onClick={handleFlushCache}
+                    disabled={flushCacheMutation.isPending}
+                    startIcon={<CacheIcon />}
                   >
-                    {t("settings.desktopMobile.approve")}
+                    {flushCacheMutation.isPending
+                      ? t("settings.mobile.flushing")
+                      : t("settings.mobile.flushCache")}
                   </Button>
                 </Stack>
-              </Stack>
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
 
-              <Divider />
-              <Stack spacing={2} sx={frontlineSectionSx}>
-              {bootstrap?.user?.permissions?.includes(
-                "api.can_manage_all_mobile_devices"
-              ) && (
-                <>
-                  <Typography variant="h6">
-                    {t("settings.mobile.installationConfiguration")}
-                  </Typography>
-                  <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                    <Chip
-                      label={`${t("settings.mobile.url")}: ${bootstrap.mobile_configuration.public_base_url}`}
-                    />
-                    <Chip
-                      label={`${t("settings.mobile.triggers")}: ${bootstrap.mobile_configuration.incident_triggers.join(
-                        ", "
-                      )}`}
-                    />
-                    <Chip
-                      label={`${t("settings.mobile.retention")}: ${bootstrap.mobile_configuration.incident_retention_days} ${t("settings.mobile.days")}`}
-                    />
-                    <Chip
-                      color={
-                        bootstrap.mobile_configuration.push_relay_configured
-                          ? "success"
-                          : "default"
-                      }
-                      label={
-                        bootstrap.mobile_configuration.push_relay_configured
-                          ? t("settings.mobile.pushConfigured")
-                          : t("settings.mobile.pushDisabled")
-                      }
-                    />
-                  </Stack>
+        {/* Reconnect Gameserver Card */}
+        {showUtilities && (
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Card
+              elevation={0}
+              sx={{ border: "1px solid", borderColor: "divider" }}
+            >
+              <CardHeader
+                avatar={<LinkIcon color="primary" />}
+                title={t("settings.mobile.connectionTitle")}
+                subheader={t("settings.mobile.connectionSubtitle")}
+              />
+              <Divider flexItem sx={{ mt: 1, mb: 2 }} />
+              <CardContent>
+                <Stack spacing={2}>
                   <Typography variant="body2" color="text.secondary">
-                    {t("settings.mobile.configurationHint")}
+                    {t("settings.mobile.connectionDescription")}
                   </Typography>
-                </>
-              )}
-              <Typography variant="h6">{t("settings.mobile.myDevices")}</Typography>
-              {devices.length === 0 ? (
-                <Typography color="text.secondary">
-                  {t("settings.mobile.noDevices")}
-                </Typography>
-              ) : (
-                <List disablePadding>
-                  {devices.map((device) => (
-                    <ListItem
-                      key={device.id}
-                      divider
-                      secondaryAction={
-                        !device.revoked_at && (
-                          <Button
-                            color="error"
-                            onClick={() => revokeDevice(device.id)}
-                          >
-                            {t("settings.mobile.revoke")}
-                          </Button>
-                        )
-                      }
-                    >
-                      <PhoneIcon
-                        sx={{ mr: 2 }}
-                        color={device.revoked_at ? "disabled" : "action"}
-                      />
-                      <ListItemText
-                        primary={`${device.name} · ${device.username}`}
-                        secondary={`${device.platform} · ${
-                          device.last_seen_at
-                            ? `${t("settings.mobile.lastSeen")} ${new Date(
-                                device.last_seen_at
-                              ).toLocaleString()}`
-                            : t("settings.mobile.neverUsed")
-                        }${device.revoked_at ? ` · ${t("settings.mobile.revoked")}` : ""}`}
-                      />
-                    </ListItem>
-                  ))}
-                </List>
-              )}
-              </Stack>
-            </Stack>
-          </CardContent>
-        </Card>
-      </Grid>}
-
-      {/* Flush Cache Card */}
-      {showUtilities && <Grid size={{ xs: 12, md: 6 }}>
-        <Card elevation={2}>
-          <CardHeader
-            avatar={<CacheIcon color="primary" />}
-            title={t("settings.mobile.cacheTitle")}
-            subheader={t("settings.mobile.cacheSubtitle")}
-          />
-          <Divider flexItem sx={{ mt: 1, mb: 2 }} />
-          <CardContent>
-            <Stack spacing={2}>
-              <Typography variant="body2" color="text.secondary">
-                {t("settings.mobile.cacheDescription")}
-              </Typography>
-              <Alert severity="warning">
-                {t("settings.mobile.cacheWarning")}
-              </Alert>
-              <Button
-                variant="contained"
-                color="warning"
-                onClick={handleFlushCache}
-                disabled={flushCacheMutation.isPending}
-                startIcon={<CacheIcon />}
-              >
-                {flushCacheMutation.isPending ? t("settings.mobile.flushing") : t("settings.mobile.flushCache")}
-              </Button>
-            </Stack>
-          </CardContent>
-        </Card>
-      </Grid>}
-
-      {/* Reconnect Gameserver Card */}
-      {showUtilities && <Grid size={{ xs: 12, md: 6 }}>
-        <Card elevation={2}>
-          <CardHeader
-            avatar={<LinkIcon color="primary" />}
-            title={t("settings.mobile.connectionTitle")}
-            subheader={t("settings.mobile.connectionSubtitle")}
-          />
-          <Divider flexItem sx={{ mt: 1, mb: 2 }} />
-          <CardContent>
-            <Stack spacing={2}>
-              <Typography variant="body2" color="text.secondary">
-                {t("settings.mobile.connectionDescription")}
-              </Typography>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={handleReconnect}
-                disabled={reconnectMutation.isPending}
-                startIcon={<LinkIcon />}
-              >
-                {reconnectMutation.isPending ? t("settings.mobile.reconnecting") : t("settings.mobile.reconnect")}
-              </Button>
-            </Stack>
-          </CardContent>
-        </Card>
-      </Grid>}
-    </Grid>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={handleReconnect}
+                    disabled={reconnectMutation.isPending}
+                    startIcon={<LinkIcon />}
+                  >
+                    {reconnectMutation.isPending
+                      ? t("settings.mobile.reconnecting")
+                      : t("settings.mobile.reconnect")}
+                  </Button>
+                </Stack>
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
+      </Grid>
+    </ControlPageLayout>
   );
 }
 

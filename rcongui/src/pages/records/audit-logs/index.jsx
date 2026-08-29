@@ -1,78 +1,28 @@
-import { cmd } from "@/utils/fetchUtils";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Form,
-  useLoaderData,
-  useNavigation,
-  useSubmit,
-} from "react-router-dom";
-import {
-  Autocomplete,
   Box,
   Button,
-  FormControl,
-  InputLabel,
+  Drawer,
   LinearProgress,
-  MenuItem,
-  Select,
   Stack,
-  TextField,
-  IconButton,
-  Divider,
+  Typography,
+  useMediaQuery,
 } from "@mui/material";
-import { useMemo, useState } from "react";
-import { getAuditLogsColumns } from "./columns";
-import Table from "@/components/table/Table";
-import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  getFilteredRowModel,
-} from "@tanstack/react-table";
-import { AuditLogCard } from "@/components/shared/card/AuditLogCard";
-import { TableToolbar } from "@/components/table/TableToolbar";
-import NavPagination from "@/pages/stats/games/nav-pagination";
-import { TablePageSizeSelect } from "@/components/table/TablePageSizeSelect";
 import DownloadIcon from "@mui/icons-material/Download";
-import downloadLogs from "./download";
+import { useLoaderData, useNavigation, useSubmit } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import dayjs from "dayjs";
+import { cmd } from "@/utils/fetchUtils";
 import PageHeader from "@/components/shared/PageHeader";
+import NavPagination from "@/pages/stats/games/nav-pagination";
+import { useGlobalStore } from "@/stores/global-state";
 import { demoAuditData, isFakeMode } from "@/mirage/demo-data";
+import downloadLogs from "./download";
+import AuditLogsFilters from "./AuditLogsFilters";
+import AuditLogsJournal from "./AuditLogsJournal";
+import AuditLogInspector from "./AuditLogInspector";
+import { getAuditCategoryCounts, getAuditEntryView } from "./audit-utils";
 
-/**
- * @typedef {Object} AuditLogResponse
- * @property {AuditLog[]} audit_logs
- * @property {number} page
- * @property {number} page_size
- * @property {number} total_pages
- * @property {number} total_entries
- */
-
-/**
- * @typedef {Object} AuditLogParams
- * @property {string} usernames
- * @property {string} commands
- * @property {string} parameters
- * @property {string} time_sort
- * @property {number} page
- * @property {number} page_size
- */
-
-/**
- * @typedef {Object} AuditLoaderData
- * @property {AuditLog[]} auditLogs
- * @property {number} total_pages
- * @property {number} page
- * @property {AuditLogParams} fields
- */
-
-/**
- * Helper function to get all values from a URL parameter
- *
- * If the parameter is provided without a value, it will be converted to an array with one empty string
- *
- * @param {string[]} value
- * @returns {string[]}
- */
 const getAll = (value) => {
   if (Array.isArray(value) && value.length === 1 && value[0] === "") {
     return [];
@@ -80,301 +30,290 @@ const getAll = (value) => {
   return value;
 };
 
-/**
- * Loader for the audit logs page.
- *
- * Note: `usernames` and `commands` parameters can be included multiple times
- * which will be converted to an array of strings
- *
- * eg. `?usernames=John&usernames=Jane` will be converted to `["John", "Jane"]`
- *
- * @param {Request} request
- * @returns {Promise<AuditLoaderData>}
- */
-export const loader = async ({ request }) => {
-  const url = new URL(request.url);
+const filterDemoAuditLogs = (logs, fields) => {
+  const parameters = String(fields.parameters || "").toLowerCase();
+  const filtered = logs
+    .filter(
+      (entry) =>
+        !fields.usernames.length || fields.usernames.includes(entry.username)
+    )
+    .filter(
+      (entry) =>
+        !fields.commands.length || fields.commands.includes(entry.command)
+    )
+    .filter((entry) =>
+      !parameters
+        ? true
+        : `${entry.command_arguments || ""} ${entry.command_result || ""}`
+            .toLowerCase()
+            .includes(parameters)
+    )
+    .sort((a, b) => {
+      const delta =
+        dayjs(a.creation_time).valueOf() - dayjs(b.creation_time).valueOf();
+      return fields.time_sort === "asc" ? delta : -delta;
+    });
 
-  // Get all values from URL parameters and set defaults
-  const usernames = getAll(url.searchParams.getAll("usernames"));
-  const commands = getAll(url.searchParams.getAll("commands"));
-  const parameters = url.searchParams.get("parameters") ?? "";
-  const time_sort = url.searchParams.get("time_sort") ?? "desc";
-  const page = url.searchParams.get("page") ?? 1;
-  const page_size = url.searchParams.get("page_size") ?? 10;
-
-  const fields = {
-    usernames,
-    commands,
-    parameters,
-    time_sort,
-    page,
-    page_size,
-  };
-
-  const params = new URLSearchParams();
-
-  // Cannot use simple Object as some keys can be duplicated for multiple values
-  // eg. `usernames` can have multiple values
-  Object.entries(fields).forEach(([key, value]) => {
-    if (Array.isArray(value)) {
-      value.forEach((v) => {
-        if (v) params.append(key, v);
-      });
-    } else if (value !== "" && value !== null) {
-      params.append(key, value);
-    }
-  });
-
-  const auditLogsResult = isFakeMode() ? demoAuditData : await cmd.GET_AUDIT_LOGS({ params });
-  const autocompleteOptions = isFakeMode()
-    ? { usernames: ["Frontline Admin", "Leitstelle"], commands: ["message_player", "set_map"] }
-    : await cmd.GET_AUDIT_LOGS_AUTOCOMPLETE();
+  const page = Number(fields.page) || 1;
+  const pageSize = Number(fields.page_size) || 50;
+  const start = (page - 1) * pageSize;
 
   return {
-    data: auditLogsResult,
-    fields,
-    autocompleteOptions,
+    audit_logs: filtered.slice(start, start + pageSize),
+    total_pages: Math.ceil(filtered.length / pageSize),
+    total_entries: filtered.length,
+    page,
+    page_size: pageSize,
   };
 };
 
-const AuditLogsPage = () => {
+export const loader = async ({ request }) => {
+  const url = new URL(request.url);
+  const fields = {
+    usernames: getAll(url.searchParams.getAll("usernames")),
+    commands: getAll(url.searchParams.getAll("commands")),
+    parameters: url.searchParams.get("parameters") ?? "",
+    time_sort: url.searchParams.get("time_sort") ?? "desc",
+    page: Number(url.searchParams.get("page") ?? 1),
+    page_size: Number(url.searchParams.get("page_size") ?? 50),
+  };
+
+  const params = new URLSearchParams();
+  Object.entries(fields).forEach(([key, value]) => {
+    if (Array.isArray(value)) {
+      value.filter(Boolean).forEach((item) => params.append(key, item));
+    } else if (value !== "" && value !== null) {
+      params.append(key, String(value));
+    }
+  });
+
+  const data = isFakeMode()
+    ? filterDemoAuditLogs(demoAuditData.audit_logs, fields)
+    : await cmd.GET_AUDIT_LOGS({ params });
+  const autocompleteOptions = isFakeMode()
+    ? {
+        usernames: [
+          ...new Set(demoAuditData.audit_logs.map((item) => item.username)),
+        ],
+        commands: [
+          ...new Set(demoAuditData.audit_logs.map((item) => item.command)),
+        ],
+      }
+    : await cmd.GET_AUDIT_LOGS_AUTOCOMPLETE();
+
+  return { data, fields, autocompleteOptions };
+};
+
+export default function AuditLogsPage() {
   const { t } = useTranslation();
   const { data, fields, autocompleteOptions } = useLoaderData();
-  const auditLogsColumns = useMemo(() => getAuditLogsColumns(t), [t]);
-
-  const { audit_logs, total_pages, page, page_size } = data;
-
   const submit = useSubmit();
   const navigation = useNavigation();
+  const compactInspector = useMediaQuery("(max-width: 1439px)");
+  const server = useGlobalStore((state) => state.serverState);
+  const [category, setCategory] = useState("all");
+  const [status, setStatus] = useState("all");
+  const [selectedKey, setSelectedKey] = useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const [formFields, setFormFields] = useState({
-    usernames: fields.usernames,
-    commands: fields.commands,
-    parameters: fields.parameters,
-    time_sort: fields.time_sort,
-  });
+  const {
+    audit_logs = [],
+    total_pages = 0,
+    total_entries = 0,
+    page = 1,
+    page_size = 50,
+  } = data || {};
 
-  const [selectedAuditLog, setSelectedAuditLog] = useState(null);
+  const entries = useMemo(
+    () => audit_logs.map((entry) => getAuditEntryView(entry, t)),
+    [audit_logs, t]
+  );
+  const counts = useMemo(() => getAuditCategoryCounts(entries), [entries]);
+  const visibleEntries = useMemo(
+    () =>
+      entries.filter(
+        (entry) =>
+          (category === "all" || entry.category === category) &&
+          (status === "all" || entry.status === status)
+      ),
+    [category, entries, status]
+  );
+  const selectedEntry =
+    visibleEntries.find((entry) => entry.key === selectedKey) || null;
 
-  const table = useReactTable({
-    data: audit_logs ?? [],
-    columns: auditLogsColumns,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    enableRowSelection: true,
-    enableMultiRowSelection: false,
-    onRowSelectionChange: (updater) => {
-      // TODO:
-      // This may cause a bug when paginating???
-      const newSelection =
-        typeof updater === "function" ? updater({}) : updater;
-      const selectedId = Object.keys(newSelection)[0];
-      const selectedLog = audit_logs[selectedId];
-      setSelectedAuditLog(selectedLog);
-    },
-  });
-
-  const handleInputChange = (e) => {
-    const { name, value, checked } = e.target;
-    setFormFields((prev) => ({
-      ...prev,
-      [name]: e.target.type === "checkbox" ? checked : value,
-    }));
-  };
-
-  const getParams = (otherParams = {}) => {
-    const params = new URLSearchParams();
-    Object.entries({ ...formFields, ...otherParams }).forEach(
-      ([key, value]) => {
-        if (Array.isArray(value)) {
-          value.forEach((v) => params.append(key, v));
-        } else {
-          params.append(key, value);
-        }
-      }
+  useEffect(() => {
+    const selectionStillVisible = visibleEntries.some(
+      (entry) => entry.key === selectedKey
     );
-    return params;
-  };
+    if (selectionStillVisible) return;
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    submit(getParams(), { method: "GET" });
-  };
+    setDrawerOpen(false);
+    setSelectedKey(compactInspector ? null : visibleEntries[0]?.key || null);
+  }, [compactInspector, selectedKey, visibleEntries]);
 
-  const handlePageSizeChange = (pageSize) => {
-    submit(getParams({ page_size: pageSize }), {
-      method: "GET",
-      replace: true,
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    formData.set("page", "1");
+    [...formData.entries()].forEach(([key, value]) => {
+      if (value === "") formData.delete(key);
     });
+    submit(formData, { method: "GET", replace: true });
   };
 
-  const handleDownload = () => {
-    downloadLogs(audit_logs);
+  const handleReset = () => {
+    setCategory("all");
+    setStatus("all");
+    submit(
+      { time_sort: "desc", page_size: 50, page: 1 },
+      { method: "GET", replace: true }
+    );
   };
+
+  const handleSelect = (entry) => {
+    setSelectedKey(entry.key);
+    if (compactInspector) setDrawerOpen(true);
+  };
+
+  const serverLabel =
+    server?.short_name ||
+    server?.name ||
+    (server?.server_number
+      ? t("records.auditLogs.serverNumber", { number: server.server_number })
+      : null);
+  const pageStart = total_entries
+    ? (Number(page) - 1) * Number(page_size) + 1
+    : 0;
+  const pageEnd = Math.min(Number(page) * Number(page_size), total_entries);
 
   return (
-    <Stack direction={{ xs: "column" }} spacing={1} sx={{ mt: 2 }}>
+    <Stack spacing={1} sx={{ mt: 0.5, width: "100%", minWidth: 0, pb: 2 }}>
       <PageHeader
         eyebrow={t("records.auditLogs.eyebrow")}
         title={t("records.auditLogs.title")}
         subtitle={t("records.auditLogs.subtitle")}
-      />
-      <Form method="GET" onSubmit={handleSubmit}>
-        <Stack spacing={2} direction={{ xs: "column", lg: "row" }}>
-          <Autocomplete
-            openText={t("common.openOptions")}
-            closeText={t("common.closeOptions")}
-            clearText={t("common.clearSelection")}
-            noOptionsText={t("common.noResults")}
-            multiple
-            sx={{ width: { xs: "100%", lg: "25%" } }}
-            clearOnEscape
-            limitTags={2}
-            id="usernames-autocomplete"
-            options={autocompleteOptions.usernames}
-            value={formFields.usernames}
-            filterSelectedOptions
-            onChange={(e, val) => {
-              setFormFields((prev) => ({
-                ...prev,
-                usernames: val,
-              }));
-            }}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                variant="outlined"
-                label={t("records.auditLogs.user")}
-                fullWidth
-              />
-            )}
-          />
-          <Autocomplete
-            openText={t("common.openOptions")}
-            closeText={t("common.closeOptions")}
-            clearText={t("common.clearSelection")}
-            noOptionsText={t("common.noResults")}
-            multiple
-            sx={{ width: { xs: "100%", lg: "25%" } }}
-            clearOnEscape
-            limitTags={2}
-            id="commands-autocomplete"
-            options={autocompleteOptions.commands}
-            value={formFields.commands}
-            filterSelectedOptions
-            onChange={(e, val) => {
-              setFormFields((prev) => ({
-                ...prev,
-                commands: val,
-              }));
-            }}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                variant="outlined"
-                name="commands"
-                label={t("records.auditLogs.action")}
-                fullWidth
-              />
-            )}
-          />
-          <TextField
-            name="parameters"
-            sx={{ width: { xs: "100%", lg: "25%" } }}
-            value={formFields.parameters}
-            onChange={handleInputChange}
-            label={t("records.auditLogs.parameters")}
-          />
-          <FormControl sx={{ width: { xs: "100%", lg: "15%" } }}>
-            <InputLabel id="time-sort-label">{t("records.auditLogs.sort")}</InputLabel>
-            <Select
-              labelId="time-sort-label"
-              name="time_sort"
-              value={formFields.time_sort}
-              onChange={handleInputChange}
-              label={t("records.auditLogs.sort")}
-              fullWidth
+        actions={
+          <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ whiteSpace: "nowrap" }}
             >
-              <MenuItem value="desc">{t("records.auditLogs.newest")}</MenuItem>
-              <MenuItem value="asc">{t("records.auditLogs.oldest")}</MenuItem>
-            </Select>
-          </FormControl>
+              {t("records.auditLogs.totalEntries", { count: total_entries })}
+            </Typography>
+            <Button
+              variant="outlined"
+              startIcon={<DownloadIcon />}
+              onClick={() => downloadLogs(audit_logs)}
+              disabled={!audit_logs.length}
+              sx={{ borderRadius: 0, whiteSpace: "nowrap" }}
+            >
+              {t("records.auditLogs.exportPage")}
+            </Button>
+          </Stack>
+        }
+      />
 
-          <Button
-            type="submit"
-            variant="contained"
-            color="primary"
-            sx={{ width: { xs: "100%", lg: "10%" } }}
-            disabled={navigation.state === "loading"}
-            onClick={handleSubmit}
+      <AuditLogsFilters
+        fields={fields}
+        autocompleteOptions={autocompleteOptions}
+        category={category}
+        status={status}
+        counts={counts}
+        onCategoryChange={setCategory}
+        onStatusChange={setStatus}
+        onSubmit={handleSubmit}
+        onReset={handleReset}
+      />
+
+      {navigation.state === "loading" && <LinearProgress />}
+
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: compactInspector
+            ? "minmax(0, 1fr)"
+            : "minmax(0, 1fr) 408px",
+          gap: 1.25,
+          alignItems: "start",
+          minWidth: 0,
+        }}
+      >
+        <Box sx={{ minWidth: 0 }}>
+          <AuditLogsJournal
+            entries={visibleEntries}
+            selectedKey={selectedKey}
+            onSelect={handleSelect}
+          />
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            alignItems={{ xs: "stretch", sm: "center" }}
+            gap={1}
+            sx={{
+              minHeight: 48,
+              px: 1.25,
+              py: 0.75,
+              border: "1px solid",
+              borderTop: 0,
+              borderColor: "divider",
+              bgcolor: "background.paper",
+            }}
           >
-            {t("common.search")}
-          </Button>
-        </Stack>
-      </Form>
-
-      <Stack component="section" id="audit-logs-section" spacing={1} direction={{ xs: "column", lg: "row" }}>
-        <Stack direction="column" sx={{ width: "100%", order: { xs: 2, lg: 1 } }}>
-          <TableToolbar>
-            <TablePageSizeSelect
-              pageSize={page_size}
-              setPageSize={handlePageSizeChange}
-            />
+            <Typography variant="caption" color="text.secondary">
+              {t("records.auditLogs.loadedRange", {
+                start: pageStart,
+                end: pageEnd,
+                total: total_entries,
+                visible: visibleEntries.length,
+              })}
+            </Typography>
             <Box sx={{ flexGrow: 1 }} />
             <NavPagination
-              page={page}
-              maxPages={total_pages}
+              page={Number(page)}
+              maxPages={Number(total_pages)}
               disabled={navigation.state === "loading"}
             />
-            <Divider flexItem orientation="vertical" />
-            <IconButton
-              size="small"
-              variant="contained"
-              color="primary"
-              sx={{
-                "&.MuiIconButton-root": {
-                  borderRadius: 0,
-                },
-              }}
-              onClick={handleDownload}
-              aria-label={t("records.auditLogs.download")}
-              title={t("records.auditLogs.download")}
-            >
-              <DownloadIcon />
-            </IconButton>
-          </TableToolbar>
-          <Table
-            table={table}
-            columns={auditLogsColumns}
-            rowProps={(row) => ({
-              onClick: row.getToggleSelectedHandler(),
-              sx: {
-                cursor: "pointer",
-                bgcolor: row.getIsSelected() ? "action.selected" : "inherit",
-                "&:hover": {
-                  bgcolor: "action.hover",
-                },
-              },
-            })}
-          />
-        </Stack>
-        <Box
-          sx={{
-            order: { xs: 1, lg: 2 },
-            maxWidth: 700,
-            width: (theme) =>
-              theme.breakpoints.down("lg") ? "100%" : "auto",
-          }}
-        >
-          <AuditLogCard
-            auditLog={selectedAuditLog}
-            sx={{ position: "sticky", top: 0 }}
-          />
+          </Stack>
         </Box>
-      </Stack>
+
+        {!compactInspector && (
+          <Box
+            sx={{
+              position: "sticky",
+              top: 60,
+              maxHeight: "calc(100vh - 76px)",
+              overflowY: "auto",
+              minWidth: 0,
+            }}
+          >
+            <AuditLogInspector
+              entry={selectedEntry}
+              serverLabel={serverLabel}
+              defaultRawOpen
+            />
+          </Box>
+        )}
+      </Box>
+
+      <Drawer
+        anchor="right"
+        open={compactInspector && drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        PaperProps={{
+          sx: {
+            width: { xs: "100%", sm: 440 },
+            maxWidth: "100vw",
+            bgcolor: "background.default",
+            p: { xs: 1, sm: 1.5 },
+          },
+        }}
+      >
+        <AuditLogInspector
+          entry={selectedEntry}
+          serverLabel={serverLabel}
+          onClose={() => setDrawerOpen(false)}
+        />
+      </Drawer>
     </Stack>
   );
-};
-
-export default AuditLogsPage;
+}

@@ -1,117 +1,71 @@
-import { cmd } from "@/utils/fetchUtils";
-import Grid from "@mui/material/Grid2";
-import { DesktopDateTimePicker } from "@mui/x-date-pickers/DesktopDateTimePicker";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import {
-  Autocomplete,
-  Box,
-  Button,
-  Divider,
-  IconButton,
-  Stack,
-  TextField,
-} from "@mui/material";
-import InputLabel from "@mui/material/InputLabel";
-import MenuItem from "@mui/material/MenuItem";
-import FormControl from "@mui/material/FormControl";
-import Select from "@mui/material/Select";
-import FormControlLabel from "@mui/material/FormControlLabel";
-import Switch from "@mui/material/Switch";
 import { useMemo, useState } from "react";
-import {
-  Form,
-  useLoaderData,
-  useNavigation,
-  useSubmit,
-} from "react-router-dom";
-import { getLogsColumns } from "./columns";
-import {
-  getCoreRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  getFilteredRowModel,
-  useReactTable,
-} from "@tanstack/react-table";
-import LiveLogsTable from "@/components/live-logs/LiveLogsTable";
-import { useGlobalStore } from "@/stores/global-state";
-import dayjs from "dayjs";
-import { TableToolbar } from "@/components/table/TableToolbar";
-import { TablePagination } from "@/components/table/TablePagination";
-import { DebouncedSearchInput } from "@/components/shared/DebouncedSearchInput";
-import downloadLogs from "./download";
+import { Box, Button, Stack, Typography } from "@mui/material";
 import DownloadIcon from "@mui/icons-material/Download";
-import { logActions } from "@/utils/lib";
+import { useLoaderData, useSubmit } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import dayjs from "dayjs";
 import timezonePlugin from "dayjs/plugin/timezone";
 import utcPlugin from "dayjs/plugin/utc";
-import { useTranslation } from "react-i18next";
+import { cmd } from "@/utils/fetchUtils";
 import PageHeader from "@/components/shared/PageHeader";
 import { demoHistoricalLogs, isFakeMode } from "@/mirage/demo-data";
+import downloadLogs from "./download";
+import GameLogsFilters from "./GameLogsFilters";
+import GameLogsTimeline from "./GameLogsTimeline";
+import { filterLogsByCategory } from "./event-utils";
 
 dayjs.extend(timezonePlugin);
 dayjs.extend(utcPlugin);
 
-/*
-IT'S POST REQUEST !!!
+const filterDemoLogs = (logs, fields) => {
+  const nameQuery = fields.player_name.toLowerCase();
+  const actionQuery = fields.action.toUpperCase();
+  const playerMatches = (value) =>
+    fields.exact_player
+      ? String(value || "").toLowerCase() === nameQuery
+      : String(value || "")
+          .toLowerCase()
+          .includes(nameQuery);
+  const actionMatches = (value) =>
+    fields.exact_action
+      ? String(value || "").toUpperCase() === actionQuery
+      : String(value || "")
+          .toUpperCase()
+          .includes(actionQuery);
 
-There is not server side pagination !!!
-
-game log example {
-    "content": "[VLK] Dorfieee (76561198178339671)",
-    "creation_time": "2025-02-10T18:30:37.535809",
-    "event_time": "2025-02-10T18:28:15", 
-    "id": 503822,
-    "player1_id": "76561198178339671",
-    "player1_name": "[VLK] Dorfieee",
-    "player2_id": null,
-    "player2_name": null,
-    "raw": "[46 ms (1739212095)] DISCONNECTED [VLK] Dorfieee (76561198178339671)",
-    "server": "1",
-    "type": "DISCONNECTED",
-    "version": 1,
-    "weapon": null
-}
-
-live log example {
-    "action": "DISCONNECTED",
-    "event_time": "2025-02-10T21:02:26",
-    "line_without_time": "DISCONNECTED Snuffff (b9b23e7f120d1a00d482fba507a81cc8)",
-    "message": "Snuffff (b9b23e7f120d1a00d482fba507a81cc8)",
-    "player_id_1": "b9b23e7f120d1a00d482fba507a81cc8",
-    "player_id_2": null,
-    "player_name_1": "Snuffff", 
-    "player_name_2": null,
-    "raw": "[1.89 sec (1739221346)] DISCONNECTED Snuffff (b9b23e7f120d1a00d482fba507a81cc8)",
-    "relative_time_ms": -2221.716,
-    "sub_content": null,
-    "timestamp_ms": 1739221346000,
-    "version": 1,
-    "weapon": null
-}
-
-params {
-  player_name
-  action
-  player_id
-  from
-  till
-  limit
-  time_sort
-  exact_player
-  exact_action
-  server_filter
-}
-
-*/
-
-const actionOptions = Object.keys(logActions).map((option) => ({
-  label: logActions[option],
-  name: option,
-}));
+  return logs
+    .filter((log) =>
+      !nameQuery
+        ? true
+        : playerMatches(log.player1_name) || playerMatches(log.player2_name)
+    )
+    .filter((log) =>
+      !fields.player_id
+        ? true
+        : [log.player1_id, log.player2_id].includes(fields.player_id)
+    )
+    .filter((log) => (!actionQuery ? true : actionMatches(log.type)))
+    .filter((log) =>
+      !fields.server_filter
+        ? true
+        : String(log.server) === String(fields.server_filter)
+    )
+    .filter((log) =>
+      !fields.from ? true : dayjs(log.event_time).isAfter(fields.from)
+    )
+    .filter((log) =>
+      !fields.till ? true : dayjs(log.event_time).isBefore(fields.till)
+    )
+    .sort((a, b) => {
+      const delta =
+        dayjs(a.event_time).valueOf() - dayjs(b.event_time).valueOf();
+      return fields.time_sort === "asc" ? delta : -delta;
+    })
+    .slice(0, fields.limit);
+};
 
 export const loader = async ({ request }) => {
   const url = new URL(request.url);
-  // Get params and set default values if not provided
   const player_name = url.searchParams.get("player_name") ?? "";
   const player_id = url.searchParams.get("player_id") ?? "";
   const action = url.searchParams.get("action") ?? "";
@@ -125,8 +79,8 @@ export const loader = async ({ request }) => {
     ? Number(url.searchParams.get("limit"))
     : 500;
   const time_sort = url.searchParams.get("time_sort") ?? "desc";
-  const exact_player = url.searchParams.get("exact_player") ?? false;
-  const exact_action = url.searchParams.get("exact_action") ?? false;
+  const exact_player = url.searchParams.get("exact_player") === "true";
+  const exact_action = url.searchParams.get("exact_action") === "true";
   const server_filter = url.searchParams.get("server_filter") ?? "";
 
   const fields = {
@@ -143,355 +97,95 @@ export const loader = async ({ request }) => {
   };
 
   const response = isFakeMode()
-    ? { result: demoHistoricalLogs }
+    ? { result: filterDemoLogs(demoHistoricalLogs, fields) }
     : await cmd.GET_HISTORICAL_LOGS({ payload: fields });
 
-  const logs = response.result;
-
-  return {
-    logs,
-    fields,
-  };
+  return { logs: response.result || [], fields };
 };
+
+const isPlayerId = (value) => /^(?:\d{17}|[A-Z0-9]{16})$/i.test(value);
 
 const GameLogsPage = () => {
   const { t } = useTranslation();
   const { logs, fields } = useLoaderData();
   const submit = useSubmit();
-  const logsColumns = useMemo(() => getLogsColumns(t), [t]);
+  const [category, setCategory] = useState("all");
+  const filteredLogs = useMemo(
+    () => filterLogsByCategory(logs || [], category),
+    [logs, category]
+  );
 
-  const table = useReactTable({
-    data: logs ?? [],
-    columns: logsColumns,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    initialState: {
-      pagination: {
-        pageIndex: 0,
-        pageSize: 100,
-      },
-    },
-  });
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const playerQuery = String(formData.get("player_query") || "").trim();
+    formData.delete("player_query");
+    formData.set("player_name", isPlayerId(playerQuery) ? "" : playerQuery);
+    formData.set("player_id", isPlayerId(playerQuery) ? playerQuery : "");
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const formData = new FormData(e.target);
-    if (formData.get("server_filter") === "0") {
+    if (
+      !formData.get("server_filter") ||
+      formData.get("server_filter") === "0"
+    ) {
       formData.set("server_filter", "");
     }
-    const fields = Object.fromEntries(formData);
-    submit(fields, {
-      method: "GET",
-      replace: true,
+
+    [...formData.entries()].forEach(([key, value]) => {
+      if (value === "") formData.delete(key);
     });
+
+    submit(Object.fromEntries(formData), { method: "GET", replace: true });
   };
 
-  const handleDownload = () => {
-    downloadLogs(logs);
+  const handleReset = () => {
+    submit({ limit: 500, time_sort: "desc" }, { method: "GET", replace: true });
   };
 
   return (
-    <Stack spacing={1} sx={{ mt: 2 }}>
+    <Stack spacing={1} sx={{ mt: 0.5, width: "100%", minWidth: 0, pb: 2 }}>
       <PageHeader
         eyebrow={t("records.gameLogs.eyebrow")}
         title={t("records.gameLogs.title")}
-        subtitle={t("records.gameLogs.subtitle")}
-      />
-      <Stack direction={{ xs: "column", lg: "row" }} spacing={1}>
-      <GameLogsForm fields={fields} onSubmit={handleSubmit} />
-      <Stack sx={{ flexGrow: 1 }}>
-        <TableToolbar>
-          <DebouncedSearchInput
-            placeholder={t("records.gameLogs.searchLogs")}
-            onChange={(value) => {
-              table.getColumn("content")?.setFilterValue(value);
-            }}
-            sx={{ maxWidth: (theme) => theme.breakpoints.values.sm }}
-          />
-          <Box sx={{ flexGrow: 1 }} />
-          <TablePagination table={table} />
-          <Divider flexItem orientation="vertical" />
-          <IconButton
-            size="small"
-            variant="contained"
-            color="primary"
-            sx={{
-              "&.MuiIconButton-root": {
-                borderRadius: 0,
-              },
-            }}
-            onClick={handleDownload}
-            aria-label={t("records.gameLogs.download")}
-            title={t("records.gameLogs.download")}
-          >
-            <DownloadIcon />
-          </IconButton>
-        </TableToolbar>
-        <LiveLogsTable
-          table={table}
-          config={{
-            actions: [],
-            fontSize: "small",
-            density: "dense",
-          }}
-        />
-        <TableToolbar>
-          <Box sx={{ flexGrow: 1 }} />
-          <TablePagination table={table} />
-        </TableToolbar>
-      </Stack>
-      </Stack>
-    </Stack>
-  );
-};
-
-const GameLogsForm = ({ fields, onSubmit }) => {
-  const { t } = useTranslation();
-  const navigation = useNavigation();
-  const server = useGlobalStore((state) => state.serverState);
-  const otherServers = useGlobalStore((state) => state.servers);
-  const [formFields, setFormFields] = useState({
-    player_name: fields.player_name || "",
-    player_id: fields.player_id || "",
-    action: fields.action || "",
-    limit: fields.limit || 100,
-    time_sort: fields.time_sort || "desc",
-    exact_player: fields.exact_player || false,
-    exact_action: fields.exact_action || false,
-    server_filter: fields.server_filter || "",
-    from: fields.from ? dayjs(fields.from) : null,
-    till: fields.till ? dayjs(fields.till) : null,
-  });
-
-  const [actionInputValue, setActionInputValue] = useState("");
-
-  const serverOptions = useMemo(() => {
-    if (!server || !otherServers) return [];
-
-    const options = [server, ...otherServers].map((server) => ({
-      label: server.name,
-      value: server.server_number,
-    }));
-
-    return options;
-  }, [server, otherServers]);
-
-  const handleInputChange = (e) => {
-    const { name, value, checked } = e.target;
-
-    let newValue = value;
-
-    if (e.target.type === "checkbox") {
-      newValue = checked;
-    }
-
-    setFormFields((prev) => ({
-      ...prev,
-      [name]: newValue,
-    }));
-  };
-
-  const handleDateChange = (name) => (value) => {
-    setFormFields((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleActionChange = (event, newValue) => {
-    setFormFields((prev) => ({
-      ...prev,
-      action: newValue?.name || "",
-    }));
-  };
-
-  const handleClear = () => {
-    setActionInputValue("");
-    setFormFields({
-      player_name: "",
-      player_id: "",
-      action: "",
-      limit: 100,
-      time_sort: "desc",
-      exact_player: false,
-      exact_action: false,
-      server_filter: "",
-      from: null,
-      till: null,
-    });
-  };
-
-  return (
-    <Grid
-      container
-      sx={{ width: "100%", maxWidth: { lg: "400px" }, flexGrow: 1 }}
-    >
-      <Grid size={12}>
-        <Form onSubmit={onSubmit}>
-          <Stack spacing={2} sx={{ p: 2 }}>
-            <TextField
-              fullWidth
-              label={t("records.gameLogs.playerId")}
-              name="player_id"
-              value={formFields.player_id}
-              onChange={handleInputChange}
-            />
-            <Stack direction="row" alignItems="center" spacing={1}>
-              <TextField
-                fullWidth
-                label={t("records.gameLogs.name")}
-                name="player_name"
-                value={formFields.player_name}
-                onChange={handleInputChange}
-              />
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={formFields.exact_player}
-                    name="exact_player"
-                    onChange={handleInputChange}
-                    color="primary"
-                  />
-                }
-                label={t("records.gameLogs.exact")}
-                labelPlacement="end"
-              />
-            </Stack>
-
-            <Stack direction="row" alignItems="center" spacing={1}>
-              <Autocomplete
-                openText={t("common.openOptions")}
-                closeText={t("common.closeOptions")}
-                clearText={t("common.clearSelection")}
-                noOptionsText={t("common.noResults")}
-                aria-labelledby="action_label"
-                fullWidth
-                freeSolo
-                options={actionOptions}
-                getOptionLabel={(option) => option.name}
-                renderOption={(props, option) => {
-                  const { key, ...optionProps } = props;
-                  return (
-                    <Box key={option.name} component="li" {...optionProps}>
-                      {logActions[option.name]} {option.name}
-                    </Box>
-                  )
-                }}
-                value={actionOptions.find((o) => o.name === formFields.action) || null}
-                onChange={handleActionChange}
-                inputValue={actionInputValue}
-                onInputChange={(event, newValue) => {
-                  setActionInputValue(newValue);
-                }}
-                renderInput={(params) => (
-                  <TextField name="action" {...params} label={t("records.gameLogs.action")} />
-                )}
-              />
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={formFields.exact_action}
-                    name="exact_action"
-                    onChange={handleInputChange}
-                    color="primary"
-                  />
-                }
-                label={t("records.gameLogs.exact")}
-                labelPlacement="end"
-              />
-            </Stack>
-
-            <FormControl fullWidth>
-              <InputLabel id="server_filter_label">{t("records.gameLogs.server")}</InputLabel>
-              <Select
-                labelId="server_filter_label"
-                name="server_filter"
-                value={formFields.server_filter}
-                onChange={handleInputChange}
-                label={t("records.gameLogs.server")}
-              >
-                <MenuItem value={0}>{t("records.gameLogs.allServers")}</MenuItem>
-                {serverOptions.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <TextField
-              fullWidth
-                label={t("records.gameLogs.limit")}
-              name="limit"
-              type="number"
-              value={formFields.limit}
-              onChange={handleInputChange}
-            />
-
-            <LocalizationProvider dateAdapter={AdapterDayjs}>
-              <DesktopDateTimePicker
-                localeText={{ openDatePickerDialogue: () => t("common.chooseDate") }}
-                value={formFields?.from}
-                label={t("records.gameLogs.from")}
-                name="from"
-                onChange={handleDateChange("from")}
-                format="YYYY/MM/DD HH:mm"
-                ampm={false}
-                slotProps={{ textField: { fullWidth: true } }}
-              />
-            </LocalizationProvider>
-
-            <LocalizationProvider dateAdapter={AdapterDayjs}>
-              <DesktopDateTimePicker
-                localeText={{ openDatePickerDialogue: () => t("common.chooseDate") }}
-                label={t("records.gameLogs.until")}
-                name="till"
-                onChange={handleDateChange("till")}
-                format="YYYY/MM/DD HH:mm"
-                ampm={false}
-                value={formFields?.till}
-                slotProps={{ textField: { fullWidth: true } }}
-              />
-            </LocalizationProvider>
-
-            <FormControl fullWidth>
-              <InputLabel id="time_sort_label">{t("records.gameLogs.sort")}</InputLabel>
-              <Select
-                labelId="time_sort_label"
-                name="time_sort"
-                value={formFields.time_sort}
-                onChange={handleInputChange}
-              >
-                <MenuItem value={"desc"}>{t("records.gameLogs.newest")}</MenuItem>
-                <MenuItem value={"asc"}>{t("records.gameLogs.oldest")}</MenuItem>
-              </Select>
-            </FormControl>
-
+        subtitle={t("records.gameLogs.timeline.subtitle")}
+        actions={
+          <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ whiteSpace: "nowrap" }}
+            >
+              {t("records.gameLogs.timeline.loaded", { count: logs.length })}
+            </Typography>
             <Button
-              onClick={handleClear}
               variant="outlined"
-              color="error"
-              size="large"
+              startIcon={<DownloadIcon />}
+              onClick={() => downloadLogs(logs)}
+              sx={{ borderRadius: 0, whiteSpace: "nowrap" }}
             >
-              {t("records.gameLogs.clear")}
-            </Button>
-
-            <Button
-              fullWidth
-              variant="contained"
-              color="primary"
-              size="large"
-              type="submit"
-              disabled={navigation.state === "loading"}
-            >
-              {t("common.search")}
+              {t("records.gameLogs.timeline.export")}
             </Button>
           </Stack>
-        </Form>
-      </Grid>
-    </Grid>
+        }
+      />
+
+      <GameLogsFilters
+        fields={fields}
+        logs={logs}
+        category={category}
+        onCategoryChange={setCategory}
+        onSubmit={handleSubmit}
+        onReset={handleReset}
+      />
+
+      <Box sx={{ minWidth: 0 }}>
+        <GameLogsTimeline
+          logs={filteredLogs}
+          allLogs={logs}
+          category={category}
+          onCategoryChange={setCategory}
+        />
+      </Box>
+    </Stack>
   );
 };
 

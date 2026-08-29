@@ -1,126 +1,208 @@
-import React from "react";
-import {
-  Alert,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  Divider,
-  Grid2 as Grid,
-  Stack,
-  Typography,
-} from "@mui/material";
-import SaveIcon from "@mui/icons-material/Save";
-import VideoCamIcon from "@mui/icons-material/Videocam";
+import React, { useState } from "react";
+import { Alert, Button, ButtonGroup, Stack, Typography } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { useLoaderData } from "react-router-dom";
-import { cmd } from "@/utils/fetchUtils";
 import { toast } from "react-toastify";
-import { ToggleInput } from "../components";
 import { useTranslation } from "react-i18next";
+import { cmd } from "@/utils/fetchUtils";
+import {
+  ControlActionBar,
+  ControlPageLayout,
+  ControlRow,
+  ControlSectionHeader,
+  RowStatus,
+} from "../ControlPageLayout";
 
 const ADMIN_CAM_KEY = {
   broadcast: "broadcast",
   welcome: "welcome",
 };
 
+function ToggleButtons({ value, onChange, disabled, label }) {
+  return (
+    <ButtonGroup
+      size="small"
+      disabled={disabled}
+      aria-label={label}
+      sx={{ "& .MuiButton-root": { minWidth: 104, borderRadius: 0 } }}
+    >
+      <Button
+        variant={!value ? "contained" : "outlined"}
+        color={!value ? "inherit" : "primary"}
+        onClick={() => onChange(false)}
+      >
+        Inaktiv
+      </Button>
+      <Button
+        variant={value ? "contained" : "outlined"}
+        onClick={() => onChange(true)}
+      >
+        Aktiv
+      </Button>
+    </ButtonGroup>
+  );
+}
+
 function AdminCamSettings() {
   const { t } = useTranslation();
   const loaderData = useLoaderData();
   const queryClient = useQueryClient();
+  const [active, setActive] = useState("notifications");
+  const [error, setError] = useState("");
 
   const { data: cameraConfig } = useQuery({
     queryKey: [{ queryIdentifier: "get_camera_notification_config" }],
-    queryFn: () => cmd.GET_CAMERA_NOTIFICATION_CONFIG({ throwRouteError: false }),
+    queryFn: () =>
+      cmd.GET_CAMERA_NOTIFICATION_CONFIG({ throwRouteError: false }),
     initialData: loaderData.cameraConfig,
   });
-
-  const { mutate, isPending } = useMutation({
+  const mutation = useMutation({
     mutationFn: (values) =>
-      cmd.SET_CAMERA_NOTIFICATION_CONFIG({ payload: values, throwRouteError: false }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: [{ queryIdentifier: "get_camera_notification_config" }],
-      });
-      toast.success(t("settings.adminCam.updated"));
-    },
-    onError: (error) => {
-      toast.error(t("settings.adminCam.updateFailed", { message: error.message }));
-    },
+      cmd.SET_CAMERA_NOTIFICATION_CONFIG({
+        payload: values,
+        throwRouteError: false,
+      }),
   });
 
   const form = useForm({
     defaultValues: {
-      [ADMIN_CAM_KEY.broadcast]: cameraConfig?.[ADMIN_CAM_KEY.broadcast] || false,
-      [ADMIN_CAM_KEY.welcome]: cameraConfig?.[ADMIN_CAM_KEY.welcome] || false,
+      [ADMIN_CAM_KEY.broadcast]: Boolean(
+        cameraConfig?.[ADMIN_CAM_KEY.broadcast]
+      ),
+      [ADMIN_CAM_KEY.welcome]: Boolean(cameraConfig?.[ADMIN_CAM_KEY.welcome]),
     },
   });
 
   React.useEffect(() => {
     if (cameraConfig) {
       form.reset({
-        [ADMIN_CAM_KEY.broadcast]: cameraConfig[ADMIN_CAM_KEY.broadcast],
-        [ADMIN_CAM_KEY.welcome]: cameraConfig[ADMIN_CAM_KEY.welcome],
+        [ADMIN_CAM_KEY.broadcast]: Boolean(
+          cameraConfig[ADMIN_CAM_KEY.broadcast]
+        ),
+        [ADMIN_CAM_KEY.welcome]: Boolean(cameraConfig[ADMIN_CAM_KEY.welcome]),
       });
     }
   }, [cameraConfig, form]);
 
-  const onSubmit = form.handleSubmit((values) => mutate(values));
+  const setValue = (key, value) => {
+    form.setValue(key, value, { shouldDirty: true });
+    setError("");
+  };
+
+  const save = async () => {
+    try {
+      const values = form.getValues();
+      await mutation.mutateAsync(values);
+      form.reset(values);
+      queryClient.invalidateQueries({
+        queryKey: [{ queryIdentifier: "get_camera_notification_config" }],
+      });
+      toast.success(t("settings.adminCam.updated"));
+    } catch (nextError) {
+      setError(nextError.message);
+      toast.error(
+        t("settings.adminCam.updateFailed", { message: nextError.message })
+      );
+    }
+  };
+
+  const sections = [
+    { key: "notifications", label: "Benachrichtigungen" },
+    { key: "behavior", label: "Wirkung & Hinweise" },
+  ];
 
   return (
-    <Grid container spacing={3}>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <Card elevation={2}>
-          <CardHeader
-            avatar={<VideoCamIcon color="primary" />}
-            title={t("settings.adminCam.title")}
-            subheader={t("settings.adminCam.subtitle")}
-            action={
-              <Button
-                type="submit"
-                form="admin-cam-form"
-                variant="contained"
-                size="small"
-                startIcon={<SaveIcon />}
-                disabled={form.formState.isSubmitting || isPending}
-              >
-                {isPending ? t("common.processing") : t("common.save")}
-              </Button>
-            }
-          />
-          <Divider flexItem sx={{ mt: 1, mb: 2 }} />
-          <CardContent>
-            <Box component="form" id="admin-cam-form" onSubmit={onSubmit}>
-              <Stack gap={2}>
-                <Typography variant="body1" color="text.secondary">
-                  {t("settings.adminCam.description")}
-                </Typography>
-
-                <ToggleInput
-                  keyName={ADMIN_CAM_KEY.broadcast}
-                  title={t("settings.adminCam.broadcast")}
+    <>
+      <ControlPageLayout
+        sections={sections}
+        active={active}
+        onChange={setActive}
+      >
+        {active === "notifications" ? (
+          <>
+            <ControlSectionHeader
+              title={t("settings.adminCam.title")}
+              description={t("settings.adminCam.description")}
+            />
+            <ControlRow
+              title={t("settings.adminCam.broadcast")}
+              description="Sendet beim Betreten der Admin-Kamera eine Servermeldung."
+              value={
+                <ToggleButtons
+                  label={t("settings.adminCam.broadcast")}
                   value={form.watch(ADMIN_CAM_KEY.broadcast)}
-                  onChange={(checked) =>
-                    form.setValue(ADMIN_CAM_KEY.broadcast, checked)
-                  }
+                  onChange={(value) => setValue(ADMIN_CAM_KEY.broadcast, value)}
+                  disabled={mutation.isPending}
                 />
-
-                <ToggleInput
-                  keyName={ADMIN_CAM_KEY.welcome}
-                  title={t("settings.adminCam.welcome")}
+              }
+              meta={
+                form.watch(ADMIN_CAM_KEY.broadcast)
+                  ? "Meldung aktiv"
+                  : "Keine Meldung"
+              }
+              status={
+                <RowStatus dirty={form.formState.isDirty} error={error} />
+              }
+            />
+            <ControlRow
+              title={t("settings.adminCam.welcome")}
+              description="Zeigt Administratoren beim Einstieg einen persönlichen Hinweis."
+              value={
+                <ToggleButtons
+                  label={t("settings.adminCam.welcome")}
                   value={form.watch(ADMIN_CAM_KEY.welcome)}
-                  onChange={(checked) =>
-                    form.setValue(ADMIN_CAM_KEY.welcome, checked)
-                  }
+                  onChange={(value) => setValue(ADMIN_CAM_KEY.welcome, value)}
+                  disabled={mutation.isPending}
                 />
-              </Stack>
-            </Box>
-          </CardContent>
-        </Card>
-      </Grid>
-    </Grid>
+              }
+              meta={
+                form.watch(ADMIN_CAM_KEY.welcome)
+                  ? "Hinweis aktiv"
+                  : "Kein Hinweis"
+              }
+              status={
+                <RowStatus dirty={form.formState.isDirty} error={error} />
+              }
+            />
+          </>
+        ) : (
+          <>
+            <ControlSectionHeader
+              title="Wirkung & Hinweise"
+              description="Was die beiden Optionen für Administratoren und Spieler bewirken."
+            />
+            <Stack spacing={1.25} sx={{ p: 2 }}>
+              <Alert severity="info" sx={{ borderRadius: 0 }}>
+                Die Einstellungen betreffen nur den Eintritt in die
+                Admin-Kamera. Andere Moderationsmeldungen bleiben unverändert.
+              </Alert>
+              <Typography variant="body2" color="text.secondary">
+                Servermeldung und persönlicher Hinweis können unabhängig
+                voneinander aktiviert werden. Änderungen gelten nach dem
+                Speichern für den nächsten Eintritt in die Kamera.
+              </Typography>
+            </Stack>
+          </>
+        )}
+      </ControlPageLayout>
+      <ControlActionBar
+        dirtyCount={form.formState.isDirty ? 1 : 0}
+        onReset={() => {
+          form.reset({
+            [ADMIN_CAM_KEY.broadcast]: Boolean(
+              cameraConfig?.[ADMIN_CAM_KEY.broadcast]
+            ),
+            [ADMIN_CAM_KEY.welcome]: Boolean(
+              cameraConfig?.[ADMIN_CAM_KEY.welcome]
+            ),
+          });
+          setError("");
+        }}
+        onSave={save}
+        saving={mutation.isPending}
+      />
+    </>
   );
 }
 

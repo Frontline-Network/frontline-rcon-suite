@@ -38,8 +38,17 @@ import { useTranslation } from "react-i18next";
 import i18n from "@/i18n";
 import AutobalancerHelp from "@/pages/settings/[configs]/autobalancer-help";
 import AutobalancerShadowOverview from "@/pages/settings/[configs]/autobalancer-shadow-overview";
+import SystemDiagnosticsLayout from "../system-diagnostics/SystemDiagnosticsLayout";
 
 const Editor = lazy(() => import("@monaco-editor/react"));
+
+const systemDiagnosticsCommands = new Set([
+  "rcon_connection_settings_config",
+  "rcon_server_settings_config",
+  "steam_config",
+  "log_stream_config",
+  "watch_killrate_config",
+]);
 
 const diagnosticColor = {
   valid: "success",
@@ -115,7 +124,9 @@ const ChatWebhookDiagnostics = () => {
                   size="small"
                   color={diagnosticColor[diagnostic.status] || "default"}
                   label={t(
-                    `settings.config.webhookDiagnostics.status_${diagnostic.status || "unverified"}`
+                    `settings.config.webhookDiagnostics.status_${
+                      diagnostic.status || "unverified"
+                    }`
                   )}
                 />
                 {diagnostic.last_error && (
@@ -130,14 +141,24 @@ const ChatWebhookDiagnostics = () => {
             <Button
               variant="outlined"
               disabled={loading}
-              onClick={() => run("diagnose_chat_webhooks", "settings.config.webhookDiagnostics.checked")}
+              onClick={() =>
+                run(
+                  "diagnose_chat_webhooks",
+                  "settings.config.webhookDiagnostics.checked"
+                )
+              }
             >
               {t("settings.config.webhookDiagnostics.check")}
             </Button>
             <Button
               variant="contained"
               disabled={loading || diagnostics.length === 0}
-              onClick={() => run("test_chat_webhooks", "settings.config.webhookDiagnostics.testSent")}
+              onClick={() =>
+                run(
+                  "test_chat_webhooks",
+                  "settings.config.webhookDiagnostics.testSent"
+                )
+              }
             >
               {t("settings.config.webhookDiagnostics.test")}
             </Button>
@@ -305,6 +326,7 @@ const ConfigPage = () => {
   const theme = useTheme();
   const isAutobalancer = command === "autobalancer_config";
   const isChatWebhookConfig = command === "chat_discord_webhooks_config";
+  const isSystemDiagnostics = systemDiagnosticsCommands.has(command);
 
   useEffect(() => {
     setEditorContent(JSON.stringify(data, null, 2));
@@ -360,8 +382,26 @@ const ConfigPage = () => {
     });
   };
 
-  return (
-    <Stack direction={"column"} spacing={4}>
+  const content = (
+    <Stack
+      direction={"column"}
+      spacing={isSystemDiagnostics ? 2 : 4}
+      sx={
+        isSystemDiagnostics
+          ? {
+              p: { xs: 1.5, md: 2 },
+              "& .MuiButton-root, & .MuiButtonGroup-root, & .MuiPaper-root, & .MuiOutlinedInput-root":
+                { borderRadius: 0 },
+              "& form": {
+                p: { xs: 1.25, md: 2 },
+                border: "1px solid",
+                borderColor: "divider",
+                bgcolor: "background.default",
+              },
+            }
+          : undefined
+      }
+    >
       {isAutobalancer && (
         <AutobalancerShadowOverview
           config={jsonData}
@@ -418,6 +458,8 @@ const ConfigPage = () => {
                   onClick={() => updateMode("code")}
                 >
                   {isAutobalancer
+                    ? t("settings.config.advancedJsonMode")
+                    : isSystemDiagnostics
                     ? t("settings.config.advancedJsonMode")
                     : t("settings.config.code")}
                 </Button>
@@ -477,12 +519,12 @@ const ConfigPage = () => {
               )}
               <Stack direction={"row"} spacing={1}>
                 <Button variant={"outlined"} onClick={handleRefresh}>
-                  {isAutobalancer
+                  {isAutobalancer || isSystemDiagnostics
                     ? t("settings.config.reload")
                     : t("common.refresh")}
                 </Button>
                 <Button variant={"contained"} type="submit">
-                  {isAutobalancer
+                  {isAutobalancer || isSystemDiagnostics
                     ? t("settings.config.saveSettings")
                     : t("settings.config.submit")}
                 </Button>
@@ -522,6 +564,12 @@ const ConfigPage = () => {
         </Stack>
       </Collapse>
     </Stack>
+  );
+
+  return isSystemDiagnostics ? (
+    <SystemDiagnosticsLayout>{content}</SystemDiagnosticsLayout>
+  ) : (
+    content
   );
 };
 

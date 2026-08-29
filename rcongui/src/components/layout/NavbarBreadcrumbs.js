@@ -37,6 +37,14 @@ const StyledPopper = styled(Popper)(({ theme }) => ({
 const translatedLabel = (item, t) =>
   item?.translationKey ? t(item.translationKey) : item?.name || "";
 
+const systemDiagnosticsAliases = {
+  "/settings/others/game-server": "navigation.links.gameServer",
+  "/settings/others/crcon": "navigation.links.crcon",
+  "/settings/others/steam": "navigation.links.steam",
+  "/settings/others/log-stream": "navigation.links.logStream",
+  "/settings/others/watch-kill-rate": "navigation.links.watchKillRate",
+};
+
 function GroupBreadcrumb({ menu, permissions }) {
   const { t } = useTranslation();
   const [anchorEl, setAnchorEl] = useState(null);
@@ -133,15 +141,24 @@ export default function NavbarBreadcrumbs({ mobileCompact = false }) {
         path: link.to.startsWith("/") ? link.to : `/${link.to}`,
       }))
     );
-    return (
-      links
-        .filter(
-          ({ path }) =>
-            location.pathname === path ||
-            location.pathname.startsWith(`${path}/`)
-        )
-        .sort((a, b) => b.path.length - a.path.length)[0] || {}
-    );
+    const currentLink = links
+      .filter(
+        ({ path }) =>
+          location.pathname === path || location.pathname.startsWith(`${path}/`)
+      )
+      .sort((a, b) => b.path.length - a.path.length)[0];
+    if (currentLink) return currentLink;
+
+    const aliasTranslationKey = systemDiagnosticsAliases[location.pathname];
+    if (!aliasTranslationKey) return {};
+
+    return {
+      menu: navMenus.find((menu) => menu.id === "system-diagnostics"),
+      link: {
+        to: location.pathname,
+        translationKey: aliasTranslationKey,
+      },
+    };
   }, [location.pathname]);
 
   const currentLabel = current.link
