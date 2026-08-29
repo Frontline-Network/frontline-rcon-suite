@@ -160,6 +160,59 @@ Rohkonfiguration bleibt im erweiterten JSON-Modus erreichbar.
 
 final result: passed
 
+# Design-QA: Spiele — Einsatzjournal (Option 2)
+
+## Vergleichsgrundlage
+
+- Source Visual Truth: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\games-journal-selected.png`
+- Browser-gerenderte Umsetzung: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\games-journal-implementation.jpg`
+- Gemeinsamer Full-View-Vergleich: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\games-journal-comparison.png`
+- Gemeinsamer Fokusvergleich: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\games-journal-comparison-focus.png`
+- Mobile Umsetzung: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\games-journal-mobile-final.jpg`
+- Route: `http://127.0.0.1:3003/stats/games`
+- Vergleichsviewport: Referenz auf 1440 × 1024 normalisiert; Implementierung bei 1440 × 1024 CSS-Pixeln.
+- Zustand: Deutsch, dunkles Frontline-Theme, vier lokale Beispieldatensätze, erste Serverseite, keine aktiven Filter.
+
+## Visueller Abgleich
+
+- Die gewählte chronologische Journalstruktur ist vollständig umgesetzt: Kommandoleiste, Modusreiter, Tagesgruppen, Einsatzzeit, Kartenbild, Karte/Modus/Umgebung, klar beschrifteter Spielstand, Dauer, technische ID und Zeilen-Navigation.
+- Die bestehende Frontline-Navigation, Statusleiste, eckige 1-Pixel-Flächen und Typografie bleiben unverändert. Die neue Seite wirkt deshalb wie ein Bestandteil des Produkts und nicht wie ein fremdes Dashboard.
+- Desktop-Zeilen folgen derselben ruhigen horizontalen Leserichtung wie die Referenz. Bei geringer Datendichte bleibt die Oberfläche bewusst kompakt, statt leeren Beispielinhalt zu erfinden.
+- Die Implementierung nutzt reale Kartenassets; fehlt ein Bild, erscheint ein neutrales Kartensymbol innerhalb derselben festen Thumbnail-Fläche.
+- Der Footer zeigt Bereich, serverseitige Seitennavigation und Seitengröße ohne die doppelte Seitenzahl aus dem Konzeptbild.
+
+## Responsive Prüfung
+
+- 1440 × 1024: vollständige Journalansicht ohne horizontalen Überlauf.
+- 1024 × 768: Filter und Zeilen brechen kontrolliert um; `scrollWidth = clientWidth = 1024`.
+- 390 × 844: kein horizontaler Seitenüberlauf; `scrollWidth = clientWidth = 390`.
+- Mobil werden technische ID und Fraktionslabels ausgeblendet, der Spielstand bleibt sichtbar, Dauer wechselt in die Kartenmetazeile und jede Spielzeile bleibt als vollständiges Touch-Ziel erreichbar.
+- Die zunächst zu hohe mobile Suchzeile wurde korrigiert, indem ihre Desktop-Flexbasis auf schmalen Ansichten deaktiviert wurde. Anschließend wurde der dekorative Timeline-Punkt mobil entfernt, um Karte, Metadaten und Spielstand sauber voneinander zu trennen.
+
+## Interaktionen und Datenverhalten
+
+- Suche nach Karte oder Spiel-ID filtert die aktuell geladene Serverseite; der Platzhalter benennt diese Reichweite ausdrücklich.
+- Zeitraum, Umgebung und Modus lassen sich kombinieren; „Filter zurücksetzen“ stellt den Ausgangszustand wieder her.
+- Modusreiter zeigen die Trefferzahl des aktuellen Filterkontexts.
+- Jede Zeile ist als vollständiger Link bedienbar; Navigation zu `/stats/games/fln-demo-1` wurde im Browser bestätigt.
+- Serverpagination und Seitengröße bleiben in den URL-Parametern erhalten; der Loader fordert exakt die gewählte Seite und Größe an.
+- Lade-, Aktualisierungs-, Leer-, Teilfehler- und Fehlerzustände sind sichtbar und zugänglich abgedeckt.
+- Browserkonsole: keine Fehler.
+- Produktionsnaher Vite-Build im Fake-Modus: bestanden.
+
+## Vergleichshistorie
+
+1. P2 — Die mobile Suchleiste beanspruchte wegen ihrer Desktop-Flexbasis rund 320 Pixel Höhe.
+   - Fix: auf schmalen Ansichten `flex: 0 0 auto`, Desktopbasis erst ab `lg`.
+   - Post-Fix: Suchfeld, Auswahlfelder, Zurücksetzen und Modusreiter erscheinen kompakt oberhalb der ersten Tagesgruppe.
+2. P2 — Der mobile Timeline-Punkt reduzierte die verfügbare Textbreite und drängte Metadaten an den Spielstand.
+   - Fix: Punkt unter `sm` ausgeblendet und Mobile-Grid auf fünf Spalten reduziert.
+   - Post-Fix: Kartenname, Modus, Umgebung, Dauer und Spielstand bleiben ohne Überdeckung lesbar.
+
+Keine offenen P0-, P1- oder P2-Abweichungen in der umgesetzten Spieleübersicht.
+
+final result: passed
+
 # Design-QA: Seeder-VIP Option 3 — Feinschliff
 
 ## Vergleichsgrundlage

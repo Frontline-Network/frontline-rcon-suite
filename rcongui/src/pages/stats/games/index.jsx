@@ -1,54 +1,71 @@
-import { useReactTable } from "@tanstack/react-table";
 import { GameListTable } from "./game-list-table";
-import { createGameListColumns } from "./game-list-columns";
 import { cmd } from "@/utils/fetchUtils";
 import { useLoaderData, useSearchParams } from "react-router-dom";
-import {
-  getCoreRowModel,
-  getSortedRowModel,
-  getFilteredRowModel,
-} from "@tanstack/react-table";
 import { gameQueryOptions } from "@/queries/game-query";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { useMemo } from "react";
+import { useEffect } from "react";
 import PageHeader from "@/components/shared/PageHeader";
 import { demoGames, isFakeMode } from "@/mirage/demo-data";
 
-export const loader = async () => {
-  if (isFakeMode()) return { maps: demoGames, total: demoGames.length };
-  return await cmd.GET_COMPLETED_GAMES();
+const parsePositiveInteger = (value, fallback) => {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+export const loader = async ({ request }) => {
+  const url = new URL(request.url);
+  const page = parsePositiveInteger(url.searchParams.get("page"), 1);
+  const pageSize = Math.min(
+    parsePositiveInteger(url.searchParams.get("page_size"), 50),
+    100
+  );
+
+  if (isFakeMode()) {
+    const start = (page - 1) * pageSize;
+    return {
+      maps: demoGames.slice(start, start + pageSize),
+      page,
+      page_size: pageSize,
+      total: demoGames.length,
+    };
+  }
+
+  return await cmd.GET_COMPLETED_GAMES({
+    params: { page, limit: pageSize },
+  });
 };
 
 export const GamesList = () => {
   const { t } = useTranslation();
-  const columns = useMemo(() => createGameListColumns(t), [t]);
   const data = useLoaderData();
 
-  const [searchParams] = useSearchParams();
-  const page = Number(searchParams.get("page") ?? 1);
-  const pageSize = Number(searchParams.get("page_size") ?? 50);
-  const maxPages = Math.ceil(data.total / pageSize);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const page = parsePositiveInteger(searchParams.get("page"), 1);
+  const pageSize = Math.min(
+    parsePositiveInteger(searchParams.get("page_size"), 50),
+    100
+  );
 
-  const { data: games, isLoading } = useQuery({
+  const gamesQuery = useQuery({
     ...gameQueryOptions.list(page, pageSize),
     initialData: data,
+    placeholderData: (previousData) => previousData,
   });
 
-  const table = useReactTable({
-    columns: columns,
-    data: games?.maps ?? [],
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    filterFns: {
-      mapFilter: (row, id, filterValue) => {
-        return row.original.map.pretty_name
-          .toLowerCase()
-          .includes(filterValue.toLowerCase());
-      },
-    },
-  });
+  const games = gamesQuery.data ?? data;
+  const total = Number(games?.total ?? 0);
+  const currentPage = parsePositiveInteger(games?.page, page);
+  const currentPageSize = parsePositiveInteger(games?.page_size, pageSize);
+  const maxPages = Math.max(1, Math.ceil(total / currentPageSize));
+
+  useEffect(() => {
+    if (total > 0 && page > maxPages) {
+      const next = new URLSearchParams(searchParams);
+      next.set("page", String(maxPages));
+      setSearchParams(next, { replace: true });
+    }
+  }, [maxPages, page, searchParams, setSearchParams, total]);
 
   return (
     <div>
@@ -57,7 +74,18 @@ export const GamesList = () => {
         title={t("stats.games.title")}
         subtitle={t("stats.games.subtitle")}
       />
-      <GameListTable table={table} page={page} maxPages={maxPages} />
+      <GameListTable
+        games={games?.maps ?? []}
+        total={total}
+        page={currentPage}
+        pageSize={currentPageSize}
+        maxPages={maxPages}
+        isLoading={gamesQuery.isLoading}
+        isFetching={gamesQuery.isFetching}
+        isError={gamesQuery.isError}
+        error={gamesQuery.error}
+        onRetry={gamesQuery.refetch}
+      />
     </div>
   );
 };
