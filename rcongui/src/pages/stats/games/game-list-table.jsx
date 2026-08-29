@@ -5,7 +5,6 @@ import {
   Button,
   ButtonBase,
   FormControl,
-  InputLabel,
   LinearProgress,
   MenuItem,
   Select,
@@ -267,13 +266,16 @@ export function GameListTable({
               "& .MuiOutlinedInput-root": { borderRadius: 0, height: 46 },
             }}
           >
-            <InputLabel id="games-period-label">
-              {t("stats.games.period")}
-            </InputLabel>
             <Select
-              labelId="games-period-label"
               value={period}
-              label={t("stats.games.period")}
+              inputProps={{ "aria-label": t("stats.games.period") }}
+              renderValue={(value) =>
+                `${t("stats.games.period")}: ${
+                  value === "all"
+                    ? t("stats.games.allGames")
+                    : t("stats.games.lastDays", { count: Number(value) })
+                }`
+              }
               onChange={(event) => setPeriod(event.target.value)}
             >
               <MenuItem value="all">{t("stats.games.allGames")}</MenuItem>
@@ -292,13 +294,16 @@ export function GameListTable({
               "& .MuiOutlinedInput-root": { borderRadius: 0, height: 46 },
             }}
           >
-            <InputLabel id="games-environment-label">
-              {t("stats.games.environment")}
-            </InputLabel>
             <Select
-              labelId="games-environment-label"
               value={environment}
-              label={t("stats.games.environment")}
+              inputProps={{ "aria-label": t("stats.games.environment") }}
+              renderValue={(value) =>
+                `${t("stats.games.environment")}: ${
+                  value === "all"
+                    ? t("stats.games.allEnvironments")
+                    : getMapEnvironmentLabel(t, value)
+                }`
+              }
               onChange={(event) => setEnvironment(event.target.value)}
             >
               <MenuItem value="all">
