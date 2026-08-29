@@ -354,7 +354,7 @@ const rawNavMenus = [
         icon: <BrowseGalleryIcon />,
       },
       {
-        name: "Live Game",
+        name: "Live Statistics",
         to: "/stats/live-game",
         icon: <SportsEsportsIcon />,
       },
@@ -440,7 +440,7 @@ const taskGroupDefinitions = [
     id: "live-operations",
     translationKey: "navigation.groups.liveOperations",
     icon: <BoltIcon />,
-    routes: ["/views/live", "/views/team"],
+    routes: ["/views/live", "/views/team", "/stats/live-game"],
   },
   {
     id: "players-moderation",
@@ -526,7 +526,6 @@ const taskGroupDefinitions = [
       "/records/game-logs",
       "/records/audit-logs",
       "/stats/live-sessions",
-      "/stats/live-game",
       "/stats/games",
     ],
   },

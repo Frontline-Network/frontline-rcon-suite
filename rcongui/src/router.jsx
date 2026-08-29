@@ -17,6 +17,11 @@ const CampaignsCrumb = () => {
   return <span>{t("navigation.links.broadcastMessage")}</span>;
 };
 
+const LiveGameCrumb = () => {
+  const { t } = useTranslation();
+  return <Link to={"/stats/live-game"}>{t("navigation.links.liveGame")}</Link>;
+};
+
 const lazyPage =
   (
     componentImport,
@@ -462,7 +467,7 @@ const router = createBrowserRouter([
           {
             path: "live-game",
             handle: {
-              crumb: () => <Link to={"/stats/live-game"}>Live Game</Link>,
+              crumb: () => <LiveGameCrumb />,
             },
             lazy: lazyPage(() => import("./pages/stats/live-game")),
             errorElement: <RouteError />,
