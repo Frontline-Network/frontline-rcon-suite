@@ -3,8 +3,8 @@ import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
-import MilitaryTechIcon from '@mui/icons-material/MilitaryTech';
-import AssignmentIndIcon from '@mui/icons-material/AssignmentInd';
+import MilitaryTechIcon from "@mui/icons-material/MilitaryTech";
+import AssignmentIndIcon from "@mui/icons-material/AssignmentInd";
 import {
   Badge,
   Box,
@@ -13,12 +13,13 @@ import {
   Typography,
   Card,
   Tooltip,
+  Button,
 } from "@mui/material";
 import { useAuth } from "@/hooks/useAuth";
 import { useActionDialog } from "@/hooks/useActionDialog";
 import { usePlayerSidebar } from "@/hooks/usePlayerSidebar";
 import PersonIcon from "@mui/icons-material/Person";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { useEditAccountModal } from "@/hooks/useEditAccountModal";
 import { useEditSoldierModal } from "@/hooks/useEditSoldierModal";
 import { useTranslation } from "react-i18next";
@@ -33,14 +34,17 @@ export function ActionMenu({
   anchorEl,
   setAnchorEl,
   withProfile = false,
+  menuId,
 }) {
   const { t } = useTranslation();
   const { permissions: user } = useAuth();
   const { openDialog } = useActionDialog();
   const { openWithId } = usePlayerSidebar();
   const open = Boolean(anchorEl);
-  const { openModal: openAccountModal, modal: accountModal } = useEditAccountModal(recipients.player_id, recipients.account)
-  const { openModal: openSoldierModal, modal: soldierModal } = useEditSoldierModal(recipients.player_id, recipients.soldier)
+  const { openModal: openAccountModal, modal: accountModal } =
+    useEditAccountModal(recipients.player_id, recipients.account);
+  const { openModal: openSoldierModal, modal: soldierModal } =
+    useEditSoldierModal(recipients.player_id, recipients.soldier);
   const handleClose = () => {
     setAnchorEl(null);
   };
@@ -62,7 +66,7 @@ export function ActionMenu({
 
   return (
     <Menu
-      id="long-menu"
+      id={menuId}
       anchorEl={anchorEl}
       open={open}
       onClose={handleClose}
@@ -104,13 +108,17 @@ export function ActionMenu({
             variant="inherit"
             sx={{ textDecoration: action.deprecated ? "line-through" : "" }}
           >
-            {action.translationKey ? t(`${action.translationKey}.name`) : action.name}
+            {action.translationKey
+              ? t(`${action.translationKey}.name`)
+              : action.name}
           </Typography>
         </MenuItem>
       ))}
       {filteredActionList.length === 0 && (
         <MenuItem disabled>
-          {actions.length > 0 ? t("actions.missingPermission") : t("actions.none")}
+          {actions.length > 0
+            ? t("actions.missingPermission")
+            : t("actions.none")}
         </MenuItem>
       )}
       {accountModal}
@@ -149,8 +157,11 @@ export function ActionMenuButton({
   ...props
 }) {
   const { t } = useTranslation();
+  const generatedId = useId();
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
+  const buttonId = `player-action-button-${generatedId}`;
+  const menuId = `player-action-menu-${generatedId}`;
 
   const handleClick = (event) => {
     setAnchorEl(event.currentTarget);
@@ -158,8 +169,8 @@ export function ActionMenuButton({
 
   const buttonProps = {
     "aria-label": t("actions.menu"),
-    id: "default-action-menu-button",
-    "aria-controls": open ? "default-action-menu-button" : undefined,
+    id: buttonId,
+    "aria-controls": open ? menuId : undefined,
     "aria-expanded": open ? "true" : undefined,
     "aria-haspopup": "true",
     onClick: handleClick,
@@ -185,6 +196,7 @@ export function ActionMenuButton({
         withProfile={withProfile}
         anchorEl={anchorEl}
         setAnchorEl={setAnchorEl}
+        menuId={menuId}
       />
     </Box>
   );
@@ -209,7 +221,11 @@ export function ActionBar({ actions, recipients = [] }) {
       }}
     >
       {actions.map((action) => (
-        <ActionIconButton key={action.name} action={action} recipients={recipients} />
+        <ActionIconButton
+          key={action.name}
+          action={action}
+          recipients={recipients}
+        />
       ))}
     </Card>
   );
@@ -227,7 +243,9 @@ export function ActionIconButton({
   const { t } = useTranslation();
   const { permissions: user } = useAuth();
   const { openDialog } = useActionDialog();
-  const actionLabel = label || (action.translationKey ? t(`${action.translationKey}.name`) : action.name);
+  const actionLabel =
+    label ||
+    (action.translationKey ? t(`${action.translationKey}.name`) : action.name);
   const allowed = hasPermission(user)(action);
 
   const handleActionClick = (action) => () => {
@@ -235,7 +253,10 @@ export function ActionIconButton({
   };
 
   return (
-    <Tooltip title={allowed ? actionLabel : t("actions.missingPermission")} key={action.name}>
+    <Tooltip
+      title={allowed ? actionLabel : t("actions.missingPermission")}
+      key={action.name}
+    >
       <span>
         <IconButton
           key={action.name}
@@ -248,6 +269,46 @@ export function ActionIconButton({
         >
           {icon ? icon : <action.icon sx={sx} />}
         </IconButton>
+      </span>
+    </Tooltip>
+  );
+}
+
+export function ActionButton({
+  action,
+  recipients,
+  params,
+  sx,
+  label,
+  icon: Icon,
+  onBeforeAction,
+  ...props
+}) {
+  const { t } = useTranslation();
+  const { permissions: user } = useAuth();
+  const { openDialog } = useActionDialog();
+  const allowed = hasPermission(user)(action);
+  const actionLabel =
+    label ||
+    (action.translationKey ? t(`${action.translationKey}.name`) : action.name);
+
+  return (
+    <Tooltip title={allowed ? actionLabel : t("actions.missingPermission")}>
+      <span>
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={Icon ? <Icon /> : <action.icon />}
+          disabled={!allowed}
+          onClick={() => {
+            onBeforeAction?.();
+            openDialog(action, recipients, params);
+          }}
+          sx={{ opacity: action.deprecated ? 0.5 : 1, ...sx }}
+          {...props}
+        >
+          {actionLabel}
+        </Button>
       </span>
     </Tooltip>
   );

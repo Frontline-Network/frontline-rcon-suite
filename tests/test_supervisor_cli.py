@@ -21,6 +21,7 @@ SUPERVISOR_COMMANDS = {
     "log_stream",
     "routines",
     "seed_vip",
+    "supervisor_runtime_mode",
     "watch_killrate",
 }
 

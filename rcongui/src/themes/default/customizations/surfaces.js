@@ -1,7 +1,5 @@
-import { alpha } from '@mui/material/styles';
-
 /* eslint-disable import/prefer-default-export */
-export const surfacesCustomizations = ({ gray, brand }) => ({
+export const surfacesCustomizations = () => ({
   MuiAccordion: {
     defaultProps: {
       elevation: 0,
@@ -36,11 +34,8 @@ export const surfacesCustomizations = ({ gray, brand }) => ({
       root: ({ theme }) => ({
         border: 'none',
         borderRadius: 8,
-        '&:hover': { backgroundColor: gray[50] },
+        '&:hover': { backgroundColor: theme.palette.action.hover },
         '&:focus-visible': { backgroundColor: 'transparent' },
-        ...theme.applyStyles('dark', {
-          '&:hover': { backgroundColor: gray[800] },
-        }),
       }),
     },
   },
@@ -61,13 +56,10 @@ export const surfacesCustomizations = ({ gray, brand }) => ({
           padding: 14,
           gap: 14,
           transition: 'all 100ms ease',
-          backgroundColor: alpha(gray[900], 0.9),
+          backgroundColor: theme.palette.background.paper,
           borderRadius: theme.shape.borderRadius,
-          border: `1px solid ${alpha(brand[300], 0.2)}`,
+          border: `1px solid ${theme.palette.divider}`,
           boxShadow: 'none',
-          ...theme.applyStyles('dark', {
-            backgroundColor: alpha(gray[900], 0.9),
-          }),
           variants: [
             {
               props: {
@@ -76,10 +68,7 @@ export const surfacesCustomizations = ({ gray, brand }) => ({
               style: {
                 border: `1px solid ${theme.palette.divider}`,
                 boxShadow: 'none',
-                background: alpha(gray[900], 0.78),
-                ...theme.applyStyles('dark', {
-                  background: alpha(gray[900], 0.78),
-                }),
+                background: theme.palette.background.paper,
               },
             },
           ],

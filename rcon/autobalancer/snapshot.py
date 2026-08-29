@@ -47,7 +47,7 @@ def build_snapshot(
 ) -> BalanceSnapshot:
     now = now or datetime.now(timezone.utc)
     game_state = rcon.get_gamestate()
-    team_view = rcon.get_team_view()
+    team_view = rcon.get_team_view(compact=True)
     game = rcon.game_profile.game
     leader_roles = get_squad_leader_roles(game)
     map_name = _map_name(game_state)

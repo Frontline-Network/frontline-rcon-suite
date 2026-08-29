@@ -3,7 +3,8 @@ import Drawer, { drawerClasses } from "@mui/material/Drawer";
 import Stack from "@mui/material/Stack";
 import MenuContent from "./MenuContent";
 import SelectContent from "./SelectContent";
-import { Box, List } from "@mui/material";
+import { Box, IconButton, List } from "@mui/material";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import { navMenus } from "../Header/nav-data";
 import ConnectionStatus from "./sidebar/ConnectionStatus";
 import AboutDialog from "./sidebar/About";
@@ -22,6 +23,7 @@ const MobileDrawer = ({ open, toggleDrawer, children }) => {
       open={open}
       onClose={toggleDrawer}
       PaperProps={{
+        id: "mobile-primary-navigation",
         component: "nav",
         "aria-label": t("navigation.primary"),
       }}
@@ -32,10 +34,29 @@ const MobileDrawer = ({ open, toggleDrawer, children }) => {
           backgroundColor: "background.paper",
           minWidth: 240,
           width: { xs: "100%", sm: "auto" },
+          pt: "env(safe-area-inset-top)",
+          pb: "env(safe-area-inset-bottom)",
+          pl: "env(safe-area-inset-left)",
+          pr: "env(safe-area-inset-right)",
         },
       }}
     >
-      <Stack sx={{ height: "100%" }}>{children}</Stack>
+      <Stack sx={{ height: "100%" }}>
+        <IconButton
+          aria-label={t("common.close")}
+          onClick={toggleDrawer}
+          sx={{
+            alignSelf: "flex-end",
+            display: { xs: "inline-flex", sm: "none" },
+            minHeight: 44,
+            minWidth: 44,
+            mr: 0.5,
+          }}
+        >
+          <CloseRoundedIcon />
+        </IconButton>
+        {children}
+      </Stack>
     </Drawer>
   );
 };
@@ -50,7 +71,11 @@ function AdminSideMenuMobile({ open, toggleDrawer }) {
         <SystemUsage />
       </List>
       <Divider />
-      <MenuContent navigationTree={navMenus} isMobile={true} />
+      <MenuContent
+        navigationTree={navMenus}
+        isMobile={true}
+        onNavigate={toggleDrawer}
+      />
       <List dense sx={{ color: theme => theme.palette.text.secondary }}>
         <AboutDialog />
       </List>

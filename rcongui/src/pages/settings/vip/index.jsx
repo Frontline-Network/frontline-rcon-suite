@@ -410,7 +410,12 @@ const VipPageContent = () => {
       setFormFields((prev) => ({ ...prev, description, player_id }));
     } else {
       setVipIndefinitely(false);
-      setFormFields({ description, player_id, expiration: dayjs(expiration) });
+      setFormFields((prev) => ({
+        ...prev,
+        description,
+        player_id,
+        expiration: dayjs(expiration),
+      }));
     }
   };
 
@@ -418,6 +423,7 @@ const VipPageContent = () => {
     logger("addVip", formFields.player_id);
     addVip({
       ...formFields,
+      forward,
       expiration: vipIndefinitely ? null : formFields.expiration,
     });
     handleClear();
@@ -428,6 +434,7 @@ const VipPageContent = () => {
       description: "",
       player_id: "",
       expiration: dayjs().add(5, "minutes"),
+      forward,
     });
     setSearchPlayer({ name: "", player_id: "" });
     setVipIndefinitely(false);

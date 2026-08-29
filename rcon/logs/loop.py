@@ -335,7 +335,6 @@ class LogLoop:
 
         if not map_has_ended:
             self.record_cap_flips(current_map, curr_map_time_elapsed, gs)
-            maps_history.update(self.ACTIVE_MAP_INDEX, current_map)
 
         dp = self.get_detailed_players()
         logger.info(

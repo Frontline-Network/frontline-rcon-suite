@@ -100,6 +100,18 @@ const router = createBrowserRouter([
         errorElement: <RouteError />,
       },
       {
+        path: "incidents",
+        handle: { crumb: () => <span>Meldungen</span> },
+        lazy: lazyPage(() => import("./pages/incidents")),
+        errorElement: <RouteError />,
+      },
+      {
+        path: "mobile/operations",
+        handle: { crumb: () => <span>Betrieb</span> },
+        lazy: lazyPage(() => import("./pages/mobile/operations")),
+        errorElement: <RouteError />,
+      },
+      {
         path: "views",
         errorElement: <RouteError />,
         handle: { crumb: () => <ViewsCrumb /> },

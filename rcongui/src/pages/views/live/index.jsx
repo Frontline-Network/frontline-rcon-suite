@@ -1,76 +1,250 @@
-import { useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { cmd } from "@/utils/fetchUtils";
 import { getColumns as getPlayersColumns } from "./players-columns";
-import { Header } from "@/components/game/Header";
 import { extractPlayers, extractTeamState } from "@/utils/extractPlayers";
 import { useLoaderData } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import PlayersTable from "./players-table";
 import LogsTable from "./logs-table";
 import { getLogsColumns } from "./logs-columns";
-import { useLogsSearchStore, usePlayersTableStore, useLogsTableStore } from "@/stores/table-config";
+import {
+  useLogsSearchStore,
+  usePlayersTableStore,
+  useLogsTableStore,
+} from "@/stores/table-config";
 import { teamsLiveQueryOptions } from "@/queries/teams-live-query";
 import { normalizePlayerProfile } from "@/utils/lib";
 import {
   getCoreRowModel,
+  getExpandedRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import Grid from "@mui/material/Grid2";
 import InfoPanel from "./info-panel";
-import { Box, Stack, ToggleButton, ToggleButtonGroup, Tooltip } from '@mui/material';
-import TableChartIcon from '@mui/icons-material/TableChart';
-import ScoreboardIcon from '@mui/icons-material/Scoreboard';
-import AssessmentIcon from '@mui/icons-material/Assessment';
-import { DebouncedSearchInput } from "@/components/shared/DebouncedSearchInput";
+import { Box, IconButton, Stack, Tooltip, Typography } from "@mui/material";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import DisbandSquadDialog from "@/features/player-action/DisbandSquad";
 import MessageAllDialog from "@/features/player-action/MessageAll";
 import { useTranslation } from "react-i18next";
-import PageHeader from "@/components/shared/PageHeader";
 import { getActiveBanStatus } from "./active-ban";
 import { useGlobalStore } from "@/stores/global-state";
+import { LiveCommandBar } from "./live-workspace";
+import { ActionMenu } from "@/features/player-action/ActionMenu";
+import { generatePlayerActions } from "@/features/player-action/actions";
 
-const interval = 15 * 1000; // 15 seconds
-const UNASSIGNED = "unassigned"
+const interval = 15 * 1000;
+const UNASSIGNED = "unassigned";
+const SPLIT_MIN_CONTENT_WIDTH = 1120;
+const ONLINE_PLAYER_ACTIONS = generatePlayerActions({
+  multiAction: false,
+  onlineAction: true,
+});
 
-export const loader = async () => {
-  if (import.meta.env.MODE === "fake") {
-    return {
-      initialLogsView: {
-        result: { actions: [], players: [], logs: [] },
-      },
-    };
-  }
-  const response = await cmd.GET_LIVE_LOGS({
-    payload: {
-      end: 250,
-      filter_action: [],
-      filter_player: [],
-      inclusive_filter: true,
-    },
-  });
+const PLAYER_COLUMN_IDS = [
+  "select",
+  "details",
+  "team",
+  "unit",
+  "player_summary",
+  "performance_summary",
+  "status_summary",
+  "role",
+  "level",
+  "kills",
+  "deaths",
+  "kpm",
+  "team_kills",
+  "combat",
+  "offense",
+  "defense",
+  "support",
+  "vehicle_kills",
+  "vehicles_destroyed",
+  "actions",
+  "platform",
+  "clan-tag",
+  "name",
+  "player_id",
+  "active_ban",
+  "warnings",
+  "watchlist",
+  "country",
+  "vip",
+  "flags",
+  "visits",
+  "time",
+];
 
-  return { initialLogsView: response };
+const OPERATIONS_COLUMNS = new Set([
+  "select",
+  "details",
+  "team",
+  "unit",
+  "player_summary",
+  "kills",
+  "deaths",
+  "team_kills",
+  "status_summary",
+  "time",
+  "actions",
+]);
+
+const COMPOSITE_COLUMNS = new Set([
+  "performance_summary",
+  "status_summary",
+]);
+
+const getPresetVisibility = (preset, customVisibility) => {
+  if (preset === "custom") return customVisibility;
+  return PLAYER_COLUMN_IDS.reduce((visibility, id) => {
+    if (preset === "operations") visibility[id] = OPERATIONS_COLUMNS.has(id);
+    if (preset === "all")
+      visibility[id] =
+        id !== "player_id" && id !== "name" && !COMPOSITE_COLUMNS.has(id);
+    return visibility;
+  }, {});
 };
+
+// Keep route navigation immediate. React Query owns the single log request and
+// renders the existing loading state instead of blocking navigation and then
+// immediately repeating the request with the user's persisted filters.
+export const loader = () => ({ initialLogsView: undefined });
 
 const Live = () => {
   const { t } = useTranslation();
-  // ---------------- VIEW STATE -----------------
   const { initialLogsView } = useLoaderData();
-  const playersColumns = useMemo(() => getPlayersColumns(t), [t]);
-  const logsColumns = useMemo(() => getLogsColumns(t), [t]);
-  const [globalFilter, setGlobalFilter] = useState([]);
+  const gameState = useGlobalStore((state) => state.gameState);
+  const factionByTeam = useMemo(
+    () => ({
+      allies: gameState?.current_map?.map?.allies?.name ?? "allies",
+      axis: gameState?.current_map?.map?.axis?.name ?? "axis",
+      unassigned: "unknown",
+    }),
+    [
+      gameState?.current_map?.map?.allies?.name,
+      gameState?.current_map?.map?.axis?.name,
+    ]
+  );
+  const playersColumns = useMemo(() => {
+    const baseColumns = getPlayersColumns(t, factionByTeam);
+    const detailsColumn = {
+      id: "details",
+      header: null,
+      cell: ({ row, table }) => {
+        const isExpanded = row.getIsExpanded();
+        const label = isExpanded
+          ? t("views.live.hidePlayerDetails", {
+              defaultValue: `Details zu ${row.original.name} schließen`,
+              name: row.original.name,
+            })
+          : t("views.live.showPlayerDetails", {
+              defaultValue: `Details zu ${row.original.name} anzeigen`,
+              name: row.original.name,
+            });
 
-  // ---------------- PLAYERS DATA -----------------
+        return (
+          <Tooltip arrow title={label}>
+            <IconButton
+              aria-controls={`live-player-details-${row.id}`}
+              aria-expanded={isExpanded}
+              aria-label={label}
+              onClick={() =>
+                table.setExpanded(isExpanded ? {} : { [row.id]: true })
+              }
+              size="small"
+              sx={{ p: 0.25 }}
+            >
+              {isExpanded ? (
+                <KeyboardArrowDownIcon fontSize="small" />
+              ) : (
+                <KeyboardArrowRightIcon fontSize="small" />
+              )}
+            </IconButton>
+          </Tooltip>
+        );
+      },
+      meta: {
+        variant: "icon",
+        sticky: "left",
+        stickyOffset: "2.25rem",
+      },
+    };
+
+    const leadingColumnIds = ["select", "team", "unit", "player_summary"];
+    const columnsById = new Map(
+      baseColumns.map((column) => [column.id, column])
+    );
+    const orderedColumns = [
+      ...leadingColumnIds.map((id) => columnsById.get(id)).filter(Boolean),
+      ...baseColumns.filter((column) => !leadingColumnIds.includes(column.id)),
+    ];
+
+    return [orderedColumns[0], detailsColumn, ...orderedColumns.slice(1)];
+  }, [factionByTeam, t]);
+  const logsColumns = useMemo(() => getLogsColumns(t), [t]);
+  const workspaceRef = useRef(null);
+  const [contentWidth, setContentWidth] = useState(null);
+  // Every visit starts in the operator-focused split workspace. Switching to
+  // the player or log focus remains possible for the current page session.
+  const [layoutMode, setLayoutMode] = useState("split");
+  const [playerPreset, setPlayerPreset] = useState("operations");
+  const [playerActionMenu, setPlayerActionMenu] = useState({
+    anchorEl: null,
+    player: null,
+  });
+  const openPlayerActionMenu = useCallback((anchorEl, player) => {
+    setPlayerActionMenu({ anchorEl, player });
+  }, []);
+  const setPlayerActionMenuAnchor = useCallback((anchorEl) => {
+    setPlayerActionMenu((current) => ({ ...current, anchorEl }));
+  }, []);
+
+  useLayoutEffect(() => {
+    const workspace = workspaceRef.current;
+    if (!workspace) return undefined;
+
+    const updateContentWidth = (width) => {
+      const nextWidth = Math.round(width);
+      if (nextWidth <= 0) return;
+      setContentWidth((previousWidth) =>
+        previousWidth === nextWidth ? previousWidth : nextWidth
+      );
+    };
+
+    updateContentWidth(workspace.getBoundingClientRect().width);
+
+    if (typeof ResizeObserver === "undefined") {
+      const handleWindowResize = () =>
+        updateContentWidth(workspace.getBoundingClientRect().width);
+      window.addEventListener("resize", handleWindowResize);
+      return () => window.removeEventListener("resize", handleWindowResize);
+    }
+
+    const resizeObserver = new ResizeObserver(([entry]) => {
+      updateContentWidth(entry.contentRect.width);
+    });
+    resizeObserver.observe(workspace);
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  const splitAvailable =
+    contentWidth !== null && contentWidth >= SPLIT_MIN_CONTENT_WIDTH;
+
   const { data: teamData, isFetching: isTeamFetching } = useQuery({
     ...teamsLiveQueryOptions,
     staleTime: 5 * 1000,
     refetchInterval: 10 * 1000,
   });
-
-  // const teamData = teamViewResponse.result;
 
   const playersData = useMemo(() => {
     if (!teamData) return [];
@@ -86,9 +260,7 @@ const Live = () => {
     });
   }, [teamData]);
 
-  // ---------------- LOGS DATA -----------------
   const logsSearchParams = useLogsSearchStore();
-  const setSearchParams = useLogsSearchStore(state => state.setSearchParams);
 
   const { data: logsView, isFetching: isLogsFetching } = useQuery({
     queryKey: [
@@ -105,18 +277,19 @@ const Live = () => {
       cmd.GET_LIVE_LOGS({
         payload: {
           end: logsSearchParams.limit,
-          filter_action: logsSearchParams.enabled ? logsSearchParams.actions : [],
-          filter_player: logsSearchParams.enabled ? logsSearchParams.players : [],
+          filter_action: logsSearchParams.enabled
+            ? logsSearchParams.actions
+            : [],
+          filter_player: logsSearchParams.enabled
+            ? logsSearchParams.players
+            : [],
           inclusive_filter: logsSearchParams.inclusive_filter,
         },
       }),
     select: (response) => response.result,
     initialData: initialLogsView,
-    refetchInterval: interval, // Polling interval for updates
+    refetchInterval: interval,
   });
-
-  // ---------------- GAME HEADER DATA -----------------
-  const gameState = useGlobalStore((state) => state.gameState);
 
   const gameData = useMemo(() => {
     if (gameState && teamData) {
@@ -139,27 +312,30 @@ const Live = () => {
     return null;
   }, [gameState, teamData]);
 
-  // ---------------- PLAYERS TABLE STATE -----------------
   const [playersSorting, setPlayersSorting] = useState([
-    {
-      id: "time",
-      desc: true,
-    },
+    { id: "time", desc: true },
   ]);
-
   const [playersRowSelection, setPlayersRowSelection] = useState({});
+  const [playersExpanded, setPlayersExpanded] = useState({});
   const [playersColumnFilters, setPlayersColumnFilters] = useState([]);
   const playersTableConfig = usePlayersTableStore();
-  const setPlayersTableConfig = usePlayersTableStore(state => state.setConfig);
-
-  const playersColumnVisibility = playersTableConfig.columnVisibility;
+  const setPlayersTableConfig = usePlayersTableStore(
+    (state) => state.setConfig
+  );
+  const playersColumnVisibility = useMemo(
+    () =>
+      getPresetVisibility(playerPreset, playersTableConfig.columnVisibility),
+    [playerPreset, playersTableConfig.columnVisibility]
+  );
 
   const handlePlayersColumnVisibilityChange = (columnId, isVisible) => {
-    setPlayersTableConfig((prev) => {
-      const columnVisibility = { ...prev.columnVisibility };
-      columnVisibility[columnId] === false ? delete columnVisibility[columnId] : columnVisibility[columnId] = isVisible;
-      return { ...prev, columnVisibility }
-    });
+    const columnVisibility = {
+      ...playersColumnVisibility,
+      [columnId]: isVisible,
+    };
+
+    setPlayerPreset("custom");
+    setPlayersTableConfig((prev) => ({ ...prev, columnVisibility }));
   };
 
   const playersTable = useReactTable({
@@ -169,212 +345,207 @@ const Live = () => {
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getCoreRowModel: getCoreRowModel(),
+    getExpandedRowModel: getExpandedRowModel(),
+    getRowCanExpand: () => true,
+    onExpandedChange: setPlayersExpanded,
     onRowSelectionChange: setPlayersRowSelection,
     onColumnFiltersChange: setPlayersColumnFilters,
-    onColumnVisibilityChange: handlePlayersColumnVisibilityChange,
-    onGlobalFilterChange: setGlobalFilter,
+    onColumnVisibilityChange: (updater) => {
+      const next =
+        typeof updater === "function"
+          ? updater(playersColumnVisibility)
+          : updater;
+      setPlayerPreset("custom");
+      setPlayersTableConfig((prev) => ({ ...prev, columnVisibility: next }));
+    },
     getRowId: (row) => row.player_id,
+    meta: {
+      openPlayerActionMenu,
+      activePlayerActionId: playerActionMenu.anchorEl
+        ? playerActionMenu.player?.player_id
+        : null,
+    },
     state: {
       sorting: playersSorting,
       rowSelection: playersRowSelection,
+      expanded: playersExpanded,
       columnFilters: playersColumnFilters,
       columnVisibility: playersColumnVisibility,
-      globalFilter,
     },
   });
 
-  // ---------------- LOGS TABLE STATE -----------------
+  useEffect(() => {
+    const onlineIds = new Set(playersData.map((player) => player.player_id));
+    setPlayersExpanded((current) => {
+      const [expandedId] = Object.keys(current).filter((id) => current[id]);
+      if (!expandedId || onlineIds.has(expandedId)) return current;
+      return {};
+    });
+  }, [playersData]);
+
   const [logsFiltering, setLogsFiltering] = useState([]);
   const logsTableConfig = useLogsTableStore();
-  const setLogsTableConfig = useLogsTableStore(state => state.setConfig);
-  const setPagination = useLogsTableStore(state => state.setPagination);
-
+  const setLogsTableConfig = useLogsTableStore((state) => state.setConfig);
+  const setPagination = useLogsTableStore((state) => state.setPagination);
   const logsColumnVisibility = logsTableConfig.columnVisibility;
 
-  const handleLogsColumnVisibilityChange = (columnId, isVisible) => {
-    setLogsTableConfig((prev) => {
-      const columnVisibility = { ...prev.columnVisibility };
-      columnVisibility[columnId] === false ? delete columnVisibility[columnId] : columnVisibility[columnId] = isVisible;
-      return { ...prev, columnVisibility }
-    });
-  };
-
-  const handleLogsPaginationChange = (updater) => {
-    setPagination(updater(logsTableConfig.pagination));
-  };
-
   const logsTable = useReactTable({
-    data: logsView.logs,
+    data: logsView?.logs ?? [],
     columns: logsColumns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     onColumnFiltersChange: setLogsFiltering,
-    onColumnVisibilityChange: handleLogsColumnVisibilityChange,
-    onPaginationChange: handleLogsPaginationChange,
-    onGlobalFilterChange: setGlobalFilter,
+    onColumnVisibilityChange: (updater) => {
+      const next =
+        typeof updater === "function" ? updater(logsColumnVisibility) : updater;
+      setLogsTableConfig((prev) => ({ ...prev, columnVisibility: next }));
+    },
+    onPaginationChange: (updater) => {
+      const next =
+        typeof updater === "function"
+          ? updater(logsTableConfig.pagination)
+          : updater;
+      setPagination(next);
+    },
     autoResetPageIndex: false,
     state: {
       columnFilters: logsFiltering,
       columnVisibility: logsColumnVisibility,
       pagination: logsTableConfig.pagination,
-      globalFilter,
     },
   });
 
-  const selectedPlayers = useMemo(() => {
-    return Object.keys(playersRowSelection)
-      .map((key) => {
-        return (
-          playersTable.getSelectedRowModel().rows.find((row) => row.id === key)
-            ?.original ?? null
-        );
-      })
-      .filter(Boolean);
-  }, [playersRowSelection, playersTable.getSelectedRowModel().rows]);
+  const selectedPlayers = useMemo(
+    () => playersTable.getSelectedRowModel().rows.map((row) => row.original),
+    [playersRowSelection, playersTable]
+  );
 
-  // Add visibility state
-  const [visibleElements, setVisibleElements] = useState(['players', 'logs', 'header']);
+  const effectiveLayout =
+    !splitAvailable && layoutMode === "split" ? "players" : layoutMode;
+  const showPlayers = effectiveLayout !== "logs";
+  const showLogs = effectiveLayout !== "players";
 
-  const handleVisibility = (event, newVisibility) => {
-    console.log(newVisibility);
-    setVisibleElements(newVisibility);
+  const handleToggleLogsExpanded = () => {
+    setLayoutMode((currentMode) => {
+      if (currentMode !== "logs") return "logs";
+      return splitAvailable ? "split" : "players";
+    });
   };
 
-  const handleSearch = (value) => {
-    setGlobalFilter([value]);
+  const handleStatusFilter = ({ columnId, value }) => {
+    setLayoutMode("players");
+
+    const currentFilters = playersTable.getState().columnFilters;
+    const isAlreadyActive =
+      currentFilters.length === 1 &&
+      currentFilters[0].id === columnId &&
+      JSON.stringify(currentFilters[0].value) === JSON.stringify(value);
+
+    playersTable.resetColumnFilters();
+    if (!isAlreadyActive) {
+      playersTable.getColumn(columnId)?.setFilterValue(value);
+    }
   };
 
   return (
     <Box
+      ref={workspaceRef}
       data-testid="live-operations"
       sx={(theme) => ({
+        minWidth: 0,
+        "& .MuiButton-root, & .MuiIconButton-root, & .MuiToggleButton-root": {
+          minHeight: 36,
+        },
         [theme.breakpoints.down("lg")]: {
           "& .MuiButton-root, & .MuiIconButton-root, & .MuiToggleButton-root": {
             minWidth: 44,
             minHeight: 44,
           },
-          "& .MuiInputBase-root": {
-            minHeight: 44,
-          },
+          "& .MuiInputBase-root": { minHeight: 44 },
         },
       })}
     >
-      <PageHeader
-        eyebrow={t("views.live.eyebrow")}
-        title={t("views.live.title")}
-        subtitle={t("views.live.subtitle")}
+      <LiveCommandBar
+        layoutMode={effectiveLayout}
+        onLayoutModeChange={setLayoutMode}
+        splitDisabled={!splitAvailable}
       />
-      <Grid container spacing={1}>
 
-        <Grid size={12} sx={{ bgcolor: 'background.paper' }}>
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            justifyContent="space-between"
-            alignItems={{ xs: "stretch", sm: "center" }}
-            spacing={1}
-          >
-            <Box sx={{ minWidth: 0, flexGrow: 1 }}>
-              <DebouncedSearchInput
-                placeholder={t("views.live.globalSearch")}
-                onChange={handleSearch}
-              />
-            </Box>
-            <ToggleButtonGroup
-              value={visibleElements}
-              onChange={handleVisibility}
-              aria-label={t("common.show")}
-              multiple
-              size="small"
-              sx={{
-                alignSelf: { xs: "flex-end", sm: "auto" },
-                flexShrink: 0,
-                '& .MuiToggleButton-root': {
-                  border: 'none',
-                  p: 0.5,
-                  color: 'text.secondary',
-                  '&.Mui-selected': {
-                    bgcolor: 'transparent',
-                    color: 'text.primary',
-                  }
-                }
-              }}
-            >
-              <Tooltip title={visibleElements.includes('players') ? t("views.live.hidePlayers") : t("views.live.showPlayers")}>
-                <ToggleButton
-                  value="players"
-                  aria-label={visibleElements.includes('players') ? t("views.live.hidePlayers") : t("views.live.showPlayers")}
-                >
-                  <TableChartIcon sx={{ fontSize: { xs: '1rem', lg: '1.25rem' } }} />
-                </ToggleButton>
-              </Tooltip>
-              <Tooltip title={visibleElements.includes('logs') ? t("views.live.hideLogs") : t("views.live.showLogs")}>
-                <ToggleButton
-                  value="logs"
-                  aria-label={visibleElements.includes('logs') ? t("views.live.hideLogs") : t("views.live.showLogs")}
-                >
-                  <AssessmentIcon sx={{ fontSize: { xs: '1rem', lg: '1.25rem' } }} />
-                </ToggleButton>
-              </Tooltip>
-              <Tooltip title={visibleElements.includes('header') ? t("views.live.hideHeader") : t("views.live.showHeader")}>
-                <ToggleButton
-                  value="header"
-                  aria-label={visibleElements.includes('header') ? t("views.live.hideHeader") : t("views.live.showHeader")}
-                >
-                  <ScoreboardIcon sx={{ fontSize: { xs: '1rem', lg: '1.25rem' } }} />
-                </ToggleButton>
-              </Tooltip>
-            </ToggleButtonGroup>
-          </Stack>
-          <InfoPanel gameData={gameData} playersData={playersData} />
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <MessageAllDialog />
-            <DisbandSquadDialog />
-          </Stack>
-        </Grid>
+      <InfoPanel
+        gameData={gameData}
+        playersData={playersData}
+        onFilter={handleStatusFilter}
+        activeFilters={playersColumnFilters}
+      />
 
-        {visibleElements.includes('header') && (
-          <Grid size={12}>
-            <Header data={gameData} />
-          </Grid>
-        )}
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        spacing={1}
+        sx={{ mb: 1 }}
+      >
+        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+          {t("views.live.serverActions")}
+        </Typography>
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <MessageAllDialog />
+          <DisbandSquadDialog />
+        </Stack>
+      </Stack>
 
-        {visibleElements.includes('players') && (
-          <Grid
-            size={{
-              xs: 12,
-              lg: !visibleElements.includes('logs') ? "grow" : "auto",
-            }}
-          >
-            <PlayersTable
-              table={playersTable}
-              teamData={teamData}
-              selectedPlayers={selectedPlayers}
-              onColumnVisibilityChange={handlePlayersColumnVisibilityChange}
-              isFetching={isTeamFetching}
-            />
-          </Grid>
-        )}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns:
+            showPlayers && showLogs
+              ? "minmax(0, 72fr) minmax(360px, 28fr)"
+              : "minmax(0, 1fr)",
+          gap: 1,
+          alignItems: "start",
+          minWidth: 0,
+        }}
+      >
+        {showPlayers ? (
+          <PlayersTable
+            table={playersTable}
+            teamData={teamData}
+            selectedPlayers={selectedPlayers}
+            onColumnVisibilityChange={handlePlayersColumnVisibilityChange}
+            isFetching={isTeamFetching}
+            preset={playerPreset}
+            onPresetChange={setPlayerPreset}
+          />
+        ) : null}
 
-        {visibleElements.includes('logs') && (
-          <Grid
-            size={{
-              xs: 12,
-              lg: "grow",
-            }}
+        {showLogs ? (
+          <Box
+            data-testid="live-logs-rail"
+            sx={{ alignSelf: "stretch", minWidth: 0 }}
           >
             <LogsTable
               table={logsTable}
               logsViewData={logsView}
-              searchParams={logsSearchParams}
-              setSearchParams={setSearchParams}
-              onColumnVisibilityChange={handleLogsColumnVisibilityChange}
               isFetching={isLogsFetching}
+              isExpanded={effectiveLayout === "logs"}
+              onToggleExpanded={handleToggleLogsExpanded}
+              viewportSticky={effectiveLayout === "split"}
             />
-          </Grid>
-        )}
-      </Grid>
+          </Box>
+        ) : null}
+      </Box>
+
+      {playerActionMenu.player ? (
+        <ActionMenu
+          actions={ONLINE_PLAYER_ACTIONS}
+          recipients={playerActionMenu.player}
+          anchorEl={playerActionMenu.anchorEl}
+          setAnchorEl={setPlayerActionMenuAnchor}
+          menuId="live-player-row-actions-menu"
+        />
+      ) : null}
     </Box>
   );
 };

@@ -156,10 +156,20 @@ export const PlayerSidebarProvider = ({ children }) => {
       is_online: isOnline,
     });
 
-    let aPlayer = getOnlinePlayer(playerId);
+    const onlinePlayer = getOnlinePlayer(playerId);
+    let aPlayer = onlinePlayer;
 
     if (aPlayer) {
-      aPlayer = getPlayerWithOnlineStatus(aPlayer, true);
+      // Live roster responses intentionally carry a compact profile. Once the
+      // dedicated profile request resolves, use that complete record in the
+      // drawer while retaining current game fields from the online player.
+      aPlayer = getPlayerWithOnlineStatus(
+        {
+          ...onlinePlayer,
+          profile: profile ?? onlinePlayer.profile,
+        },
+        true
+      );
     } else if (profile) {
       aPlayer = getPlayerWithOnlineStatus({ profile }, false);
     } else {

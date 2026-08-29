@@ -3,10 +3,18 @@ import {
   json,
   useActionData,
   useLoaderData,
+  useNavigation,
   useRevalidator,
   useSubmit,
 } from "react-router-dom";
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { execute, get, handleHttpError } from "@/utils/fetchUtils";
 import {
   Box,
@@ -15,22 +23,25 @@ import {
   CardContent,
   Chip,
   Collapse,
+  Alert,
   Stack,
   Typography,
   useTheme,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import SettingsIcon from "@mui/icons-material/Settings";
+import RestartAltIcon from "@mui/icons-material/RestartAlt";
+import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 import { a11yDark, a11yLight, CopyBlock } from "react-code-blocks";
 import { toast } from "react-toastify";
-import { red } from "@mui/material/colors";
 import { JsonForms } from "@jsonforms/react";
 import {
   materialCells,
   materialRenderers,
 } from "@jsonforms/material-renderers";
 import { Generate } from "@jsonforms/core";
-import ButtonGroup from "@mui/material/ButtonGroup";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { customRenderers } from "@/pages/settings/[configs]/renderer/renderer";
 import { isFakeMode } from "@/mirage/demo-data";
@@ -39,8 +50,28 @@ import i18n from "@/i18n";
 import AutobalancerHelp from "@/pages/settings/[configs]/autobalancer-help";
 import AutobalancerShadowOverview from "@/pages/settings/[configs]/autobalancer-shadow-overview";
 import SystemDiagnosticsLayout from "../system-diagnostics/SystemDiagnosticsLayout";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  ConfigActionBar,
+  ConfigFormLayout,
+  ConfigModeSwitch,
+  ConfigProfileSummaryPanel,
+  ConfigValidationSummary,
+  GuidedConfigForm,
+  NoLeaderSummaryPanel,
+  SchemaConfigForm,
+  SeedingConfigForm,
+  SeedingOperationModeControl,
+  SeedingSummaryPanel,
+  SeedingWorkbenchLayout,
+  validateProfiledConfig,
+} from "@/pages/settings/config-form";
+import { getConfigFormProfile } from "@/pages/settings/config-form/schema";
 
 const Editor = lazy(() => import("@monaco-editor/react"));
+// Fake-preview saves stay process-local so repeated form interactions are
+// deterministic without changing the production request path.
+const fakeConfigOverrides = new Map();
 
 const systemDiagnosticsCommands = new Set([
   "rcon_connection_settings_config",
@@ -222,6 +253,29 @@ export const loader = async ({ params }) => {
         ...details,
       };
     }
+    if (details.command === "auto_mod_no_leader_config") {
+      const { noLeaderConfig, noLeaderSchema } = await import(
+        "@/mirage/data/noLeaderConfig"
+      );
+      return {
+        note: note.default,
+        data: fakeConfigOverrides.get(details.command) || noLeaderConfig,
+        schema: noLeaderSchema,
+        ...details,
+      };
+    }
+    const { getConfigFormExample } = await import(
+      "@/mirage/data/configFormExamples"
+    );
+    const example = getConfigFormExample(details.command);
+    if (example) {
+      return {
+        note: note.default,
+        data: fakeConfigOverrides.get(details.command) || example.data,
+        schema: example.schema,
+        ...details,
+      };
+    }
     return {
       note: note.default,
       data: {
@@ -276,7 +330,23 @@ export const action = async ({ request }) => {
   if (!(name && config))
     return { ok: false, error: i18n.t("errors.missingParameters") };
 
-  config = JSON.parse(config);
+  try {
+    config = JSON.parse(config);
+  } catch (parseError) {
+    return {
+      ok: false,
+      error: {
+        _root: i18n.t("settings.config.invalidJson", {
+          error: parseError.message,
+        }),
+      },
+    };
+  }
+
+  if (isFakeMode()) {
+    fakeConfigOverrides.set(name, config);
+    return { ok: true };
+  }
 
   try {
     response = await execute(`validate_${name}`, {
@@ -306,9 +376,77 @@ export const action = async ({ request }) => {
     return { ok: false, error };
   }
 
-  response = await execute(`set_${name}`, config);
+  try {
+    response = await execute(`set_${name}`, config);
+  } catch (error) {
+    handleHttpError(error);
+  }
+
+  const rawSaved = await response.text();
+  let saved = { result: true };
+  if (rawSaved) {
+    try {
+      saved = JSON.parse(rawSaved);
+    } catch (parseError) {
+      throw json(
+        {
+          message: i18n.t("errors.configSaveFailed"),
+          error: parseError.message,
+        },
+        { status: 502 }
+      );
+    }
+  }
+
+  if (!response.ok || !saved || saved.failed) {
+    throw json(
+      {
+        message: i18n.t("errors.configSaveFailed"),
+        error: saved?.error,
+        command: saved?.command,
+      },
+      { status: 400 }
+    );
+  }
 
   return { ok: true };
+};
+
+const normalizeValidationErrors = (errors, profile, t) => {
+  if (!errors) return [];
+  if (Array.isArray(errors)) {
+    return errors.flatMap((error, index) =>
+      typeof error === "string"
+        ? [{ id: `server-${index}`, message: error }]
+        : [error]
+    );
+  }
+  if (typeof errors === "string") {
+    return [{ id: "server-root", message: errors }];
+  }
+
+  const sectionByField = new Map(
+    (profile?.sections || []).flatMap((section) =>
+      section.fields.map((fieldName) => [fieldName, section.id])
+    )
+  );
+
+  return Object.entries(errors).flatMap(([fieldName, message]) => {
+    const messages = Array.isArray(message) ? message : [message];
+    const metadata = profile?.fields?.[fieldName];
+    return messages.map((entry, index) => ({
+      id: `${fieldName}-${index}`,
+      label:
+        fieldName === "_root"
+          ? undefined
+          : metadata?.labelKey
+          ? t(metadata.labelKey)
+          : fieldName,
+      message:
+        typeof entry === "string" ? entry : JSON.stringify(entry, null, 2),
+      sectionId: sectionByField.get(fieldName),
+    }));
+  });
 };
 
 const ConfigPage = () => {
@@ -319,19 +457,76 @@ const ConfigPage = () => {
   const [jsonData, setJsonData] = useState(data);
   const [editorContent, setEditorContent] = useState("");
   const [mode, setMode] = useState("visual");
+  const [activeSection, setActiveSection] = useState("operation");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const revalidator = useRevalidator();
   const actionData = useActionData();
   const submit = useSubmit();
+  const navigation = useNavigation();
+  const { permissions } = useAuth();
   const theme = useTheme();
   const isAutobalancer = command === "autobalancer_config";
   const isChatWebhookConfig = command === "chat_discord_webhooks_config";
   const isSystemDiagnostics = systemDiagnosticsCommands.has(command);
+  const formProfile = useMemo(
+    () => getConfigFormProfile(command, schema),
+    [command, schema]
+  );
+  const hasGuidedProfile = Boolean(formProfile?.sections?.length);
+  const usesGuidedRenderer = formProfile?.renderer === "guided";
+  const usesSeedingRenderer = formProfile?.renderer === "seeding";
+  const WorkbenchLayout = usesSeedingRenderer
+    ? SeedingWorkbenchLayout
+    : ConfigFormLayout;
+  const changePermission = `can_change_${command}`;
+  const canChange = Boolean(
+    permissions?.is_superuser ||
+      permissions?.permissions?.some(
+        (item) => item.permission === changePermission
+      )
+  );
+  const savedEditorContent = useMemo(
+    () => JSON.stringify(data, null, 2),
+    [data]
+  );
+  const isDirty = editorContent !== savedEditorContent;
+  const isSubmitting = navigation.state === "submitting";
+  const clientValidationErrors = useMemo(
+    () =>
+      hasGuidedProfile
+        ? validateProfiledConfig(schema, jsonData, formProfile, t)
+        : [],
+    [formProfile, hasGuidedProfile, jsonData, schema, t]
+  );
+  const normalizedServerErrors = useMemo(
+    () => normalizeValidationErrors(validationErrors, formProfile, t),
+    [formProfile, t, validationErrors]
+  );
+  const codeValidationErrors = useMemo(() => {
+    if (mode !== "code") return [];
+    try {
+      JSON.parse(editorContent);
+      return [];
+    } catch (error) {
+      return [
+        {
+          id: "invalid-json",
+          message: t("settings.config.invalidJson", { error: error.message }),
+        },
+      ];
+    }
+  }, [editorContent, mode, t]);
+  const allValidationErrors = [
+    ...clientValidationErrors,
+    ...normalizedServerErrors,
+    ...codeValidationErrors,
+  ];
+  const hasBlockingErrors = allValidationErrors.length > 0;
 
   useEffect(() => {
-    setEditorContent(JSON.stringify(data, null, 2));
+    setEditorContent(savedEditorContent);
     setJsonData(data);
-  }, [data]);
+  }, [data, savedEditorContent]);
 
   useEffect(() => {
     if (actionData && actionData.ok === false) {
@@ -340,14 +535,31 @@ const ConfigPage = () => {
     } else if (actionData && actionData.ok) {
       setValidationErrors(null);
       toast.success(t("settings.config.saved", { name: displayName }));
+      revalidator.revalidate();
     }
-  }, [actionData, displayName, t]);
+  }, [actionData, displayName, revalidator, t]);
+
+  useEffect(() => {
+    const warnBeforeUnload = (event) => {
+      if (!isDirty) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [isDirty]);
 
   useEffect(() => {
     setValidationErrors(null);
-  }, [command]);
+    setActiveSection(formProfile?.sections?.[0]?.id || "operation");
+  }, [command, formProfile]);
 
   const handleSubmit = (e) => {
+    if (!canChange || isSubmitting || !isDirty || hasBlockingErrors) {
+      e.preventDefault();
+      return;
+    }
     const formData = new FormData();
     formData.append("config", editorContent);
     formData.append("name", command);
@@ -355,8 +567,23 @@ const ConfigPage = () => {
     e.preventDefault();
   };
 
-  const handleRefresh = () => {
-    revalidator.revalidate();
+  const handleDiscard = () => {
+    setEditorContent(savedEditorContent);
+    setJsonData(data);
+    setValidationErrors(null);
+  };
+
+  const handleGuidedChange = (fieldName, value) => {
+    const nextData = { ...jsonData, [fieldName]: value };
+    setJsonData(nextData);
+    setEditorContent(JSON.stringify(nextData, null, 2));
+    setValidationErrors(null);
+  };
+
+  const handleSchemaSectionChange = (sectionData) => {
+    const nextData = { ...jsonData, ...sectionData };
+    setJsonData(nextData);
+    setEditorContent(JSON.stringify(nextData, null, 2));
     setValidationErrors(null);
   };
 
@@ -365,7 +592,10 @@ const ConfigPage = () => {
       try {
         setJsonData(JSON.parse(editorContent));
       } catch (e) {
-        setValidationErrors(t("settings.config.invalidJson", { error: e }));
+        setValidationErrors({
+          _root: t("settings.config.invalidJson", { error: e.message }),
+        });
+        return;
       }
     } else if (jsonData) {
       setEditorContent(JSON.stringify(jsonData, null, 2));
@@ -382,21 +612,55 @@ const ConfigPage = () => {
     });
   };
 
+  const pageEyebrow = formProfile?.eyebrowKey
+    ? t(formProfile.eyebrowKey)
+    : t("settings.configForms.workbench.defaultEyebrow");
+  const pageTitle = formProfile?.titleKey
+    ? t(formProfile.titleKey)
+    : displayName;
+  const pageDescription = formProfile?.introKey
+    ? t(formProfile.introKey)
+    : t("settings.configForms.workbench.defaultIntro");
+  const hasEnabledSetting = Boolean(schema?.properties?.enabled);
+  const ruleStatus = hasEnabledSetting
+    ? jsonData?.enabled
+      ? jsonData?.dry_run
+        ? t("settings.configForms.workbench.statusTest")
+        : t("settings.configForms.workbench.statusActive")
+      : t("settings.configForms.workbench.statusInactive")
+    : t("settings.configForms.workbench.statusConfigured");
+  const ruleStatusColor =
+    hasEnabledSetting && jsonData?.enabled ? "success" : "default";
+  const activeSectionIndex = (formProfile?.sections || []).findIndex(
+    (section) => section.id === activeSection
+  );
+  const sectionNavigation = (formProfile?.sections || []).map(
+    (section, index) => ({
+      id: section.id,
+      label: t(section.titleKey),
+      description: t(section.descriptionKey),
+      status: allValidationErrors.some(
+        (error) => error.sectionId === section.id
+      )
+        ? "error"
+        : index < activeSectionIndex
+        ? "complete"
+        : index === activeSectionIndex
+        ? "current"
+        : "upcoming",
+    })
+  );
+
   const content = (
     <Stack
-      direction={"column"}
+      direction="column"
       spacing={isSystemDiagnostics ? 2 : 4}
       sx={
         isSystemDiagnostics
           ? {
               p: { xs: 1.5, md: 2 },
-              "& .MuiButton-root, & .MuiButtonGroup-root, & .MuiPaper-root, & .MuiOutlinedInput-root":
-                { borderRadius: 0 },
-              "& form": {
-                p: { xs: 1.25, md: 2 },
-                border: "1px solid",
-                borderColor: "divider",
-                bgcolor: "background.default",
+              "& .MuiButton-root, & .MuiButtonGroup-root, & .MuiPaper-root, & .MuiOutlinedInput-root": {
+                borderRadius: 0,
               },
             }
           : undefined
@@ -440,128 +704,274 @@ const ConfigPage = () => {
         timeout="auto"
         unmountOnExit={isAutobalancer}
       >
-        <Stack spacing={4}>
-          <Form method="post" onSubmit={handleSubmit}>
-            <Stack direction={"row"} justifyContent={"space-between"}>
-              <Typography variant="h3">{displayName}</Typography>
-              <ButtonGroup variant="outlined">
-                <Button
-                  variant={mode === "visual" ? "contained" : "outlined"}
-                  onClick={() => updateMode("visual")}
-                >
-                  {isAutobalancer
-                    ? t("settings.config.basicMode")
-                    : t("settings.config.visual")}
-                </Button>
-                <Button
-                  variant={mode === "code" ? "contained" : "outlined"}
-                  onClick={() => updateMode("code")}
-                >
-                  {isAutobalancer
-                    ? t("settings.config.advancedJsonMode")
-                    : isSystemDiagnostics
-                    ? t("settings.config.advancedJsonMode")
-                    : t("settings.config.code")}
-                </Button>
-              </ButtonGroup>
-            </Stack>
-            <Stack spacing={2} direction={"column"}>
-              {validationErrors && (
-                <Box sx={{ mb: 2 }}>
-                  <CopyBlock
-                    wrapLongLines
-                    text={JSON.stringify(validationErrors, null, 2)}
-                    language="json"
-                    theme={theme.palette.mode === "dark" ? a11yDark : a11yLight}
-                    customStyle={{ border: `2px solid ${red["600"]}` }}
+        <Form id="config-settings-form" method="post" onSubmit={handleSubmit}>
+          <WorkbenchLayout
+            eyebrow={pageEyebrow}
+            title={pageTitle}
+            description={pageDescription}
+            status={usesSeedingRenderer ? undefined : ruleStatus}
+            statusColor={ruleStatusColor}
+            sections={mode === "visual" ? sectionNavigation : []}
+            activeSection={activeSection}
+            onSectionChange={setActiveSection}
+            navigationLabel={t("settings.configForms.workbench.navigation")}
+            mobileNavigationLabel={t(
+              "settings.configForms.workbench.mobileNavigation"
+            )}
+            headerActions={
+              <Stack
+                direction={{ xs: "column", lg: "row" }}
+                spacing={1}
+                alignItems={{ xs: "stretch", lg: "center" }}
+              >
+                {usesSeedingRenderer && mode === "visual" && (
+                  <SeedingOperationModeControl
+                    data={jsonData}
+                    disabled={!canChange}
+                    onChange={handleSchemaSectionChange}
                   />
-                </Box>
+                )}
+                <ConfigModeSwitch
+                  value={mode}
+                  onChange={updateMode}
+                  ariaLabel={t("settings.configForms.workbench.tabsLabel")}
+                  options={[
+                    {
+                      value: "visual",
+                      label: hasGuidedProfile
+                        ? t("settings.configForms.workbench.formTab")
+                        : isAutobalancer
+                        ? t("settings.config.basicMode")
+                        : t("settings.config.visual"),
+                    },
+                    {
+                      value: "code",
+                      label: hasGuidedProfile
+                        ? t("settings.configForms.workbench.jsonTab")
+                        : isAutobalancer
+                        ? t("settings.config.advancedJsonMode")
+                        : t("settings.config.code"),
+                    },
+                  ]}
+                />
+              </Stack>
+            }
+            summary={
+              mode === "visual" && hasGuidedProfile ? (
+                usesGuidedRenderer ? (
+                  <NoLeaderSummaryPanel data={jsonData} />
+                ) : usesSeedingRenderer ? (
+                  <SeedingSummaryPanel data={jsonData} />
+                ) : (
+                  <ConfigProfileSummaryPanel
+                    profile={formProfile}
+                    data={jsonData}
+                  />
+                )
+              ) : null
+            }
+            actionBar={
+              <ConfigActionBar
+                dirty={isDirty}
+                dirtyLabel={t("settings.configForms.workbench.dirty")}
+                stateLabel={
+                  isDirty
+                    ? undefined
+                    : t("settings.configForms.workbench.saved")
+                }
+                stateDescription={
+                  isDirty
+                    ? undefined
+                    : t("settings.configForms.workbench.savedDescription")
+                }
+                stateIcon={
+                  isDirty ? (
+                    <WarningAmberOutlinedIcon color="warning" />
+                  ) : (
+                    <CheckCircleOutlineIcon color="success" />
+                  )
+                }
+                secondaryActions={[
+                  {
+                    id: "reset",
+                    label: t("settings.configForms.workbench.reset"),
+                    startIcon: <RestartAltIcon />,
+                    variant: "text",
+                    onClick: handleDiscard,
+                    disabled: !isDirty || isSubmitting,
+                    testId: "config-reset-button",
+                  },
+                ]}
+                primaryAction={{
+                  id: "save",
+                  type: "submit",
+                  form: "config-settings-form",
+                  label: isAutobalancer
+                    ? t("settings.config.saveSettings")
+                    : t("settings.configForms.workbench.save"),
+                  loadingLabel: t("settings.configForms.workbench.saving"),
+                  loading: isSubmitting,
+                  startIcon: <SaveOutlinedIcon />,
+                  sx: { width: 200, height: 40 },
+                  disabled:
+                    !canChange || !isDirty || hasBlockingErrors || isSubmitting,
+                }}
+              />
+            }
+          >
+            {!canChange && (
+              <Alert severity="warning">
+                <Typography variant="body2" fontWeight={800}>
+                  {t("settings.configForms.workbench.readOnly")}
+                </Typography>
+                <Typography variant="body2">
+                  {t("settings.configForms.workbench.readOnlyDescription", {
+                    permission: changePermission,
+                  })}
+                </Typography>
+              </Alert>
+            )}
+
+            <ConfigValidationSummary
+              errors={allValidationErrors}
+              title={t("settings.configForms.workbench.validationTitle")}
+              description={t(
+                "settings.configForms.workbench.validationDescription"
               )}
-              {isAutobalancer && <AutobalancerHelp config={jsonData} />}
-              {mode === "visual" ? (
+              onNavigate={(sectionId) => {
+                setMode("visual");
+                setActiveSection(sectionId);
+              }}
+              navigateLabel={t(
+                "settings.configForms.workbench.navigateToError"
+              )}
+            />
+
+            {isAutobalancer && <AutobalancerHelp config={jsonData} />}
+
+            {mode === "visual" ? (
+              hasGuidedProfile ? (
+                usesGuidedRenderer ? (
+                  <GuidedConfigForm
+                    profile={formProfile}
+                    schema={schema}
+                    data={jsonData}
+                    activeSection={activeSection}
+                    disabled={!canChange}
+                    onChange={handleGuidedChange}
+                  />
+                ) : usesSeedingRenderer ? (
+                  <SeedingConfigForm
+                    profile={formProfile}
+                    schema={schema}
+                    data={jsonData}
+                    activeSection={activeSection}
+                    disabled={!canChange}
+                    onChange={handleSchemaSectionChange}
+                  />
+                ) : (
+                  <SchemaConfigForm
+                    profile={formProfile}
+                    schema={schema}
+                    data={jsonData}
+                    activeSection={activeSection}
+                    disabled={!canChange}
+                    onChange={handleSchemaSectionChange}
+                  />
+                )
+              ) : (
                 <Box
                   sx={{
-                    "& .MuiFormControl-root": {
-                      marginTop: "14px",
-                    },
+                    p: { xs: 1.25, sm: 2 },
+                    border: "1px solid",
+                    borderColor: "divider",
+                    bgcolor: "background.paper",
+                    "& .MuiFormControl-root": { mt: 1.75 },
                   }}
                 >
                   <JsonForms
                     data={jsonData}
-                    onChange={({ data }) => {
-                      setEditorContent(JSON.stringify(data, null, 2));
-                      setJsonData(data);
+                    readonly={!canChange}
+                    onChange={({ data: nextData }) => {
+                      setEditorContent(JSON.stringify(nextData, null, 2));
+                      setJsonData(nextData);
+                      setValidationErrors(null);
                     }}
-                    sx={{
-                      "& .jfa-label": {
-                        fontSize: "14px",
-                      },
-                    }}
+                    sx={{ "& .jfa-label": { fontSize: "14px" } }}
                     schema={schema}
                     uischema={Generate.uiSchema(schema)}
                     renderers={[...customRenderers, ...materialRenderers]}
                     cells={materialCells}
                   />
                 </Box>
-              ) : (
-                <Suspense>
-                  <Editor
-                    height="70vh"
-                    defaultLanguage="json"
-                    value={editorContent}
-                    defaultValue=""
-                    theme={
-                      theme.palette.mode === "dark" ? "vs-dark" : "vs-light"
-                    }
-                    onChange={(value) => setEditorContent(value)}
+              )
+            ) : (
+              <Stack spacing={3}>
+                <Box
+                  data-testid="config-json-editor"
+                  sx={{
+                    overflow: "hidden",
+                    border: "1px solid",
+                    borderColor: "divider",
+                    minHeight: 480,
+                  }}
+                >
+                  <Suspense>
+                    <Editor
+                      height="70vh"
+                      defaultLanguage="json"
+                      value={editorContent}
+                      defaultValue=""
+                      options={{
+                        readOnly: !canChange,
+                        minimap: { enabled: false },
+                        wordWrap: "on",
+                        automaticLayout: true,
+                      }}
+                      theme={
+                        theme.palette.mode === "dark" ? "vs-dark" : "vs-light"
+                      }
+                      onChange={(value) => {
+                        setEditorContent(value || "");
+                        setValidationErrors(null);
+                      }}
+                    />
+                  </Suspense>
+                </Box>
+
+                <Box>
+                  <Typography variant="h5" sx={{ mb: 1.25 }}>
+                    {isAutobalancer
+                      ? t("settings.config.explanation")
+                      : t("settings.config.documentation")}
+                  </Typography>
+                  <CopyBlock
+                    wrapLongLines
+                    text={note}
+                    language="json"
+                    wrapLines
+                    theme={theme.palette.mode === "dark" ? a11yDark : a11yLight}
                   />
-                </Suspense>
-              )}
-              <Stack direction={"row"} spacing={1}>
-                <Button variant={"outlined"} onClick={handleRefresh}>
-                  {isAutobalancer || isSystemDiagnostics
-                    ? t("settings.config.reload")
-                    : t("common.refresh")}
-                </Button>
-                <Button variant={"contained"} type="submit">
-                  {isAutobalancer || isSystemDiagnostics
-                    ? t("settings.config.saveSettings")
-                    : t("settings.config.submit")}
-                </Button>
+                </Box>
+
+                <Box>
+                  <Typography variant="h5" sx={{ mb: 1.25 }}>
+                    {isAutobalancer
+                      ? t("settings.config.technicalSchema")
+                      : t("settings.config.modelSchema")}
+                  </Typography>
+                  <CopyBlock
+                    wrapLongLines
+                    text={JSON.stringify(schema, null, 2)}
+                    language="json"
+                    wrapLines
+                    theme={theme.palette.mode === "dark" ? a11yDark : a11yLight}
+                  />
+                </Box>
               </Stack>
-            </Stack>
-          </Form>
-          {mode === "code" ? (
-            <>
-              <Typography variant="h4">
-                {isAutobalancer
-                  ? t("settings.config.explanation")
-                  : t("settings.config.documentation")}
-              </Typography>
-              <CopyBlock
-                wrapLongLines
-                text={note}
-                language="json"
-                wrapLines
-                theme={theme.palette.mode === "dark" ? a11yDark : a11yLight}
-              />
-              <Typography variant="h4">
-                {isAutobalancer
-                  ? t("settings.config.technicalSchema")
-                  : t("settings.config.modelSchema")}
-              </Typography>
-              <CopyBlock
-                wrapLongLines
-                text={JSON.stringify(schema, null, 2)}
-                language="json"
-                wrapLines
-                theme={theme.palette.mode === "dark" ? a11yDark : a11yLight}
-              />
-            </>
-          ) : (
-            <></>
-          )}
-        </Stack>
+            )}
+          </WorkbenchLayout>
+        </Form>
       </Collapse>
     </Stack>
   );

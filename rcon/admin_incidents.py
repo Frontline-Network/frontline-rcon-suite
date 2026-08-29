@@ -1,21 +1,23 @@
 import hashlib
 import re
 import unicodedata
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from difflib import SequenceMatcher
+from enum import Enum
 from typing import Any, Iterable, Mapping, Sequence
 
 from sqlalchemy import delete, func, select
+from sqlalchemy.orm import selectinload
 
+from rcon.incident_settings import (
+    incident_context_fuzzy_threshold,
+    incident_context_mode,
+)
 from rcon.models import (
     AdminIncident,
     AdminIncidentEvent,
     AdminIncidentSubject,
     enter_session,
-)
-from rcon.incident_settings import (
-    incident_context_fuzzy_threshold,
-    incident_context_mode,
 )
 from rcon.types import GameEnum
 from rcon.utils import get_server_number, get_squad_leader_roles
@@ -29,9 +31,9 @@ PARSER_VERSION = "2.1.0"
 DEFAULT_FUZZY_THRESHOLD = 0.74
 RECENT_PLAYER_LOOKBACK_SECONDS = 5 * 60
 RECENT_PLAYER_LOG_LIMIT = 2_500
-SQUAD_LEADER_ROLES = get_squad_leader_roles(
-    GameEnum.HLL_WW2
-) | get_squad_leader_roles(GameEnum.HLL_VIETNAM)
+SQUAD_LEADER_ROLES = get_squad_leader_roles(GameEnum.HLL_WW2) | get_squad_leader_roles(
+    GameEnum.HLL_VIETNAM
+)
 COMMANDER_ROLES = {"armycommander", "commander"}
 COMMANDER_ALIASES = ("commander", "kommandant", "kommandeur")
 
@@ -56,6 +58,26 @@ class InvalidIncidentTransition(ValueError):
 
 def _utcnow() -> datetime:
     return datetime.now(tz=timezone.utc)
+
+
+def _json_safe_action_result(value: Any) -> Any:
+    """Normalize game-action results before persisting them in JSON columns.
+
+    Several CRCON actions return database-shaped dictionaries containing
+    ``datetime`` values.  The action itself has already completed at that
+    point, so allowing JSON serialization to fail would incorrectly report a
+    successful moderation action as rejected and invite unsafe retries.
+    """
+
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, Enum):
+        return _json_safe_action_result(value.value)
+    if isinstance(value, Mapping):
+        return {str(key): _json_safe_action_result(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return [_json_safe_action_result(item) for item in value]
+    return value
 
 
 def _normalize_message(value: str) -> str:
@@ -138,9 +160,7 @@ def _name_is_mentioned(normalized_message: str, name: str) -> bool:
     normalized_name = _normalize_message(name)
     return bool(
         len(normalized_name) >= 3
-        and re.search(
-            rf"(?<!\w){re.escape(normalized_name)}(?!\w)", normalized_message
-        )
+        and re.search(rf"(?<!\w){re.escape(normalized_name)}(?!\w)", normalized_message)
     )
 
 
@@ -302,9 +322,7 @@ def recent_report_players(
             candidate = candidates.setdefault(
                 player_id,
                 {
-                    **_cached_stat_snapshot(
-                        stats_by_id.get(player_id), player_context
-                    ),
+                    **_cached_stat_snapshot(stats_by_id.get(player_id), player_context),
                     "player_id": player_id,
                     "name": name,
                     "online": False,
@@ -356,9 +374,7 @@ def _is_squad_leader(player: dict) -> bool:
 
 def _is_commander(player: dict) -> bool:
     role = re.sub(r"[^a-z0-9]", "", str(player.get("role") or "").casefold())
-    unit_type = re.sub(
-        r"[^a-z0-9]", "", str(player.get("unit_type") or "").casefold()
-    )
+    unit_type = re.sub(r"[^a-z0-9]", "", str(player.get("unit_type") or "").casefold())
     return role in COMMANDER_ROLES or unit_type == "commander"
 
 
@@ -444,10 +460,14 @@ def _resolve_subjects(
                 else "suggested"
             )
             method = (
-                "recent_teamkill"
-                if exact and direct_evidence
-                else ("recent_name" if exact and recent else "name_contained")
-            ) if exact else ""
+                (
+                    "recent_teamkill"
+                    if exact and direct_evidence
+                    else ("recent_name" if exact and recent else "name_contained")
+                )
+                if exact
+                else ""
+            )
             confidence = 1.0 if exact else 0.0
             matched_text = exact.group(0) if exact else ""
             if not exact:
@@ -1025,7 +1045,7 @@ def list_incidents(
     limit: int = 100,
 ) -> list[dict]:
     limit = min(max(limit, 1), 250)
-    stmt = select(AdminIncident)
+    stmt = select(AdminIncident).options(selectinload(AdminIncident.subjects))
     if statuses:
         normalized = set(statuses)
         if not normalized.issubset(INCIDENT_STATUSES):
@@ -1075,7 +1095,9 @@ def list_incident_changes(
         incidents = {
             incident.id: incident
             for incident in sess.execute(
-                select(AdminIncident).where(AdminIncident.id.in_(incident_ids))
+                select(AdminIncident)
+                .options(selectinload(AdminIncident.subjects))
+                .where(AdminIncident.id.in_(incident_ids))
             )
             .scalars()
             .all()
@@ -1546,7 +1568,7 @@ def complete_incident_action(
             {
                 **reservation.payload,
                 "idempotency_key": idempotency_key,
-                "result": result,
+                "result": _json_safe_action_result(result),
                 "error": error,
             },
         )

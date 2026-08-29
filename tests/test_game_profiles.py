@@ -4,23 +4,23 @@ from unittest.mock import Mock, call
 
 import pytest
 
-from rcon.commands import HLLCommandFailedError, HLLServerCtl, HLLVServerCtl
-from rcon.connection import HLLBrokenConnectionError, HLLCommandError
 from rcon.api_commands import (
     HLLRconAPI,
     HLLVRconAPI,
     RconAPI,
     create_rcon_api,
 )
+from rcon.commands import HLLCommandFailedError, HLLServerCtl, HLLVServerCtl
+from rcon.connection import HLLBrokenConnectionError, HLLCommandError
 from rcon.game import get_game_profile
 from rcon.game.hll.profile import HLL_PROFILE
 from rcon.game.hllv import legacy_layers
-from rcon.game.hllv.profile import HLLV_PROFILE
 from rcon.game.hllv.legacy_layers import (
     HLLV_LEGACY_CATALOG_VERSION,
     report_unknown_hllv_layer,
 )
-from rcon.maps import GameMode, Team, UNKNOWN_MAP_NAME
+from rcon.game.hllv.profile import HLLV_PROFILE
+from rcon.maps import UNKNOWN_MAP_NAME, GameMode, Team
 from rcon.rcon import HLLRcon, HLLVRcon, Rcon, create_rcon
 from rcon.types import GameEnum, ServerInfo
 
@@ -54,6 +54,26 @@ def _session(map_id: str, game_mode: str = "Warfare") -> dict:
 
 def test_server_info_defaults_game_even_without_port():
     assert ServerInfo().game is GameEnum.HLL_WW2
+
+
+@pytest.mark.parametrize(
+    ("controller_type", "leader_role"),
+    [
+        (HLLRcon, "officer"),
+        (HLLRcon, "artilleryobserver"),
+        (HLLVRcon, "squadleader"),
+        (HLLVRcon, "mortarobserver"),
+        (HLLVRcon, "helicopterlogisticsofficer"),
+    ],
+)
+def test_no_leader_automod_detects_game_specific_squad_leaders(
+    controller_type, leader_role
+):
+    controller = controller_type.__new__(controller_type)
+    controller.config = SimpleNamespace(game=controller_type.game_test_command(None))
+
+    assert controller._has_leader({"players": [{"role": leader_role}]}) is True
+    assert controller._has_leader({"players": [{"role": "rifleman"}]}) is False
 
 
 @pytest.mark.parametrize(
@@ -124,6 +144,46 @@ def test_get_slots_replaces_implausible_hll_count_with_connected_player_count(
 )
 def test_get_game_profile(game, expected):
     assert get_game_profile(game) is expected
+
+
+@pytest.mark.parametrize(
+    ("controller_type", "game", "known_weapon"),
+    [
+        (HLLRconAPI, GameEnum.HLL_WW2, "155MM HOWITZER [M114]"),
+        (HLLVRconAPI, GameEnum.HLL_VIETNAM, "M16A1"),
+    ],
+)
+def test_available_weapon_catalog_uses_active_game_profile(
+    controller_type, game, known_weapon
+):
+    controller = controller_type.__new__(controller_type)
+    controller.config = SimpleNamespace(game=game)
+    controller.game_profile = get_game_profile(game)
+
+    result = controller.get_available_weapons()
+
+    assert result["game"] == game.value
+    names = [weapon["name"] for weapon in result["weapons"]]
+    assert names == sorted(names, key=str.casefold)
+    assert known_weapon in names
+
+
+def test_hllv_profile_derives_combat_weapon_catalog_from_reference_data():
+    assert len(HLLV_PROFILE.weapons) >= 50
+    assert HLLV_PROFILE.weapons["M16A1"].value == "infantry"
+    assert HLLV_PROFILE.weapons["M40"].value == "sniper"
+    assert HLLV_PROFILE.weapons["MORTAR [MORTAR]"].value == "artillery"
+    assert HLLV_PROFILE.weapons["M48Patton"].value == "armor"
+
+    assert "Bandage" not in HLLV_PROFILE.weapons
+    assert "Medical Supplies" not in HLLV_PROFILE.weapons
+    assert "Binoculars" not in HLLV_PROFILE.weapons
+
+
+def test_hllv_weapon_catalog_uses_logical_crcon_sides():
+    assert HLLV_PROFILE.weapon_sides["M16A1"] is Team.ALLIES
+    assert HLLV_PROFILE.weapon_sides["RPD"] is Team.AXIS
+    assert "MORTAR" not in HLLV_PROFILE.weapon_sides
 
 
 def test_hllv_profile_does_not_read_hll_map_catalog():
@@ -603,9 +663,7 @@ def test_hllv_objective_rows_ignore_map_id_reference_parameter():
     )
 
     assert ctl.get_objective_rows() == [["0", "1", "2"]] * 5
-    ctl.exchange.assert_called_once_with(
-        "GetClientReferenceData", 2, "SetSectorLayout"
-    )
+    ctl.exchange.assert_called_once_with("GetClientReferenceData", 2, "SetSectorLayout")
 
 
 def test_hllv_objective_rows_fail_with_actionable_protocol_error():
@@ -701,7 +759,9 @@ def test_map_sequence_replacement_keeps_one_entry_until_the_replacement_is_ready
         (HLLVRcon, GameEnum.HLL_VIETNAM),
     ],
 )
-def test_map_sequence_replacement_rejects_empty_requests_before_mutation(ctl_type, game):
+def test_map_sequence_replacement_rejects_empty_requests_before_mutation(
+    ctl_type, game
+):
     ctl = ctl_type(ServerInfo(game=game))
 
     with pytest.raises(HLLCommandFailedError, match="Empty map sequence"):

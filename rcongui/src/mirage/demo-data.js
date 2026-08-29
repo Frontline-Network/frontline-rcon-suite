@@ -51,7 +51,29 @@ export const demoMapLayers = [
   },
 ];
 
-const demoNames = ["FLN_Raven", "FLN_Wolf", "FLN_Valkyrie", "FLN_Hawkeye", "FLN_Falcon", "FLN_Bravo"];
+const baseDemoNames = [
+  "FLN_Raven",
+  "FLN_Wolf",
+  "FLN_Valkyrie",
+  "FLN_Hawkeye",
+  "FLN_Falcon",
+  "FLN_Bravo",
+];
+const simulatedAlliesNames = Array.from(
+  { length: 46 },
+  (_, index) => `Demo_Allies_${String(index + 1).padStart(2, "0")}`,
+);
+const simulatedAxisNames = Array.from(
+  { length: 46 },
+  (_, index) => `Demo_Axis_${String(index + 1).padStart(2, "0")}`,
+);
+const demoNames = [
+  ...baseDemoNames,
+  ...simulatedAlliesNames,
+  ...simulatedAxisNames,
+];
+const demoPlayerId = (index) =>
+  `76561198${String(index + 1).padStart(9, "0")}`;
 
 export const demoPlayerRecords = demoNames.map((name, index) => ({
   id: index + 1,
@@ -70,7 +92,7 @@ export const demoPlayerRecords = demoNames.map((name, index) => ({
   last_seen_timestamp_ms: now - index * 1800000,
   created: new Date(now - (index + 20) * 86400000).toISOString(),
   total_playtime_seconds: 28800 + index * 3600,
-  current_playtime_seconds: index < 3 ? 3600 : 0,
+  current_playtime_seconds: 300 + (index % 18) * 240,
   penalty_count: { PUNISH: index, KICK: index % 2, TEMPBAN: 0, PERMABAN: 0 },
   flags:
     index === 2
@@ -136,8 +158,11 @@ const demoChatMessages = ["Bereit für den Einsatz.", "Rechte Flanke sichern.", 
 
 export const demoHistoricalLogs = Array.from({ length: 36 }, (_, index) => {
   const type = demoLogTypes[index % demoLogTypes.length];
-  const playerIndex = index % demoNames.length;
-  const targetIndex = (index + 2) % demoNames.length;
+  // Historical demo activity intentionally cycles through the named players.
+  // Otherwise the first player only receives the system-only match-start row
+  // and their profile appears to have no logs at all.
+  const playerIndex = index % baseDemoNames.length;
+  const targetIndex = (index + 2) % baseDemoNames.length;
   const player1Name = demoNames[playerIndex];
   const player2Name = ["KILL", "TEAM KILL", "ADMIN KICKED"].includes(type) ? demoNames[targetIndex] : null;
   const weapon = ["KILL", "TEAM KILL"].includes(type) ? demoWeapons[index % demoWeapons.length] : null;
@@ -151,9 +176,9 @@ export const demoHistoricalLogs = Array.from({ length: 36 }, (_, index) => {
     event_time: eventTime,
     creation_time: eventTime,
     content,
-    player1_id: type === "MATCH START" ? null : `7656119800000000${playerIndex + 1}`,
+    player1_id: type === "MATCH START" ? null : demoPlayerId(playerIndex),
     player1_name: type === "MATCH START" ? "SYSTEM" : player1Name,
-    player2_id: player2Name ? `7656119800000000${targetIndex + 1}` : null,
+    player2_id: player2Name ? demoPlayerId(targetIndex) : null,
     player2_name: player2Name,
     server: "2",
     weapon,
@@ -393,12 +418,13 @@ const livePlayer = (record, index, team, unitName, role = "rifleman") => ({
   loadout: "standard issue",
   team,
   role,
-  kills: 14 - index,
-  deaths: 3 + index,
-  combat: 320 - index * 12,
-  offense: 180 - index * 8,
-  defense: 140 - index * 5,
-  support: 220 - index * 7,
+  kills: Math.max(0, 14 - (index % 15)),
+  deaths: 3 + (index % 12),
+  team_kills: index % 11 === 0 ? 3 : index % 7 === 0 ? 1 : 0,
+  combat: 160 + (index % 18) * 12,
+  offense: 90 + (index % 16) * 8,
+  defense: 80 + (index % 14) * 7,
+  support: 100 + (index % 20) * 6,
   level: record.soldier.level,
 });
 
@@ -454,8 +480,8 @@ export const demoGameState = {
   time_remaining: 3427,
   allied_score: 3,
   axis_score: 2,
-  num_allied_players: 43,
-  num_axis_players: 43,
+  num_allied_players: 49,
+  num_axis_players: 49,
 };
 
 export const demoServerConnection = {
@@ -463,7 +489,7 @@ export const demoServerConnection = {
   short_name: "Frontline #2",
   server_number: 2,
   game: "hll",
-  current_players: 86,
+  current_players: 98,
   max_players: 100,
   port: 4174,
 };

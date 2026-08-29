@@ -40,7 +40,7 @@ Focused region comparison was not necessary because the original-resolution impl
 - Page reload and 15-second refetch were tested without row-count collapse.
 - Production build completed successfully.
 
-## Comparison history
+## Interaktionen und technische Prüfung
 
 ### Iteration 1 — blocked
 

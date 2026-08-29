@@ -1,4 +1,5 @@
 import functools
+import inspect
 import logging
 import os
 import pickle
@@ -438,11 +439,26 @@ def ttl_cache(
 
 @contextmanager
 def invalidates(*cached_funcs):
+    def clear_cached_func(cached_func) -> None:
+        cache = getattr(cached_func, "cache", None)
+        function = getattr(cache, "function", None)
+        is_method = bool(getattr(cache, "is_method", False))
+
+        if function is not None:
+            parameters = list(inspect.signature(function).parameters.values())
+            if is_method and parameters:
+                parameters = parameters[1:]
+            if not parameters:
+                cached_func.clear_for()
+                return
+
+        cached_func.cache_clear()
+
     for f in cached_funcs:
-        f.cache_clear()
+        clear_cached_func(f)
     yield None
     for f in cached_funcs:
-        f.cache_clear()
+        clear_cached_func(f)
 
 
 @contextmanager

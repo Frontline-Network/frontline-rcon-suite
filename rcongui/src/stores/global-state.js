@@ -18,7 +18,12 @@ import {
   EMPTY_CONNECTION_HEALTH,
 } from "@/utils/connectionHealth";
 import { useLocation } from "react-router-dom";
-import { getGameStatePollingInterval } from "@/queries/polling-policy";
+import {
+  getGameStatePollingInterval,
+  getGlobalLiveRosterPollingInterval,
+  shouldPollLiveRoster,
+  shouldPollModeratorPresence,
+} from "@/queries/polling-policy";
 
 // Create the Zustand store
 export const useGlobalStore = create((set) => ({
@@ -156,6 +161,12 @@ export const GlobalState = () => {
   const gameStateRefetchInterval = getGameStatePollingInterval(
     location.pathname
   );
+  const pollLiveRoster = shouldPollLiveRoster(location.pathname);
+  const globalLiveRosterPollingInterval = getGlobalLiveRosterPollingInterval(
+    location.pathname,
+    defaultRefetchInterval
+  );
+  const pollModeratorPresence = shouldPollModeratorPresence(location.pathname);
   const crconQuery = useQuery({
     queryKey: [{ queryIdentifier: "get_connection_info" }],
     queryFn: async () => {
@@ -185,14 +196,22 @@ export const GlobalState = () => {
   const queryResults = useQueries({
     queries: globalQueries.map((query) => {
       const queryIdentifier = query.queryKey?.[0]?.queryIdentifier;
+      const routeAllowsQuery =
+        queryIdentifier === "get_team_view"
+          ? pollLiveRoster
+          : ["get_ingame_mods", "get_online_mods"].includes(queryIdentifier)
+          ? pollModeratorPresence
+          : true;
       return queryOptions({
         staleTime,
         refetchInterval:
           queryIdentifier === "get_gamestate"
             ? gameStateRefetchInterval
+            : queryIdentifier === "get_team_view"
+            ? globalLiveRosterPollingInterval
             : defaultRefetchInterval,
-        enabled: canQueryGameServer,
         ...query,
+        enabled: canQueryGameServer && routeAllowsQuery,
       });
     }),
   });
@@ -222,11 +241,14 @@ export const GlobalState = () => {
       status: statusQuery?.data ?? null,
       gameState: gameStateQuery?.data ?? null,
       servers: serversQuery?.data ?? [],
-      onlineIngameMods: ingameModsQuery?.data ?? [],
-      onlineCrconMods: crconModsQuery?.data ?? [],
-      onlinePlayers: canQueryGameServer
-        ? useGlobalStore.getState().onlinePlayers
+      onlineIngameMods: pollModeratorPresence
+        ? ingameModsQuery?.data ?? []
         : [],
+      onlineCrconMods: pollModeratorPresence ? crconModsQuery?.data ?? [] : [],
+      onlinePlayers:
+        canQueryGameServer && pollLiveRoster
+          ? useGlobalStore.getState().onlinePlayers
+          : [],
       connectionHealth: {
         crcon: crconHealth,
         gameServer: gameServerHealth,
@@ -257,6 +279,8 @@ export const GlobalState = () => {
     serversQuery?.data,
     ingameModsQuery?.data,
     crconModsQuery?.data,
+    pollLiveRoster,
+    pollModeratorPresence,
   ]);
 
   return null;

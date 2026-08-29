@@ -1,7 +1,5 @@
 import { Box, Checkbox, IconButton, Tooltip } from "@mui/material";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
-import { ActionMenuButton } from "@/features/player-action/ActionMenu";
-import { generatePlayerActions } from "@/features/player-action/actions";
 import {
   getColoredFactionIconSrc,
   getPlayerTier,
@@ -287,28 +285,22 @@ export const createLiveSessionColumns = (t) => [
         •••
       </Box>
     ),
-    cell: ({ row }) => (
-      <ActionMenuButton
-        actions={generatePlayerActions({
-          multiAction: false,
-          onlineAction: true,
-        })}
-        recipients={row.original}
-        withProfile
-        renderButton={(props) => (
-          <IconButton
-            {...props}
-            size="small"
-            onClick={(event) => {
-              event.stopPropagation();
-              props.onClick(event);
-            }}
-            sx={{ borderRadius: 0, p: 0.25 }}
-          >
-            <MoreHorizIcon sx={{ fontSize: 18 }} />
-          </IconButton>
-        )}
-      />
+    cell: ({ row, table }) => (
+      <IconButton
+        aria-label={t("actions.menu")}
+        data-testid="live-sessions-player-action-trigger"
+        size="small"
+        onClick={(event) => {
+          event.stopPropagation();
+          table.options.meta?.openPlayerActionMenu(
+            event.currentTarget,
+            row.original
+          );
+        }}
+        sx={{ borderRadius: 0, p: 0.25 }}
+      >
+        <MoreHorizIcon sx={{ fontSize: 18 }} />
+      </IconButton>
     ),
     meta: { variant: "icon", align: "center" },
   },

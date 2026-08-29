@@ -1,8 +1,8 @@
-import { Button, Stack } from "@mui/material";
+import { Box, Button, Stack } from "@mui/material";
 import { useForm } from "react-hook-form";
 import { BadgeList } from "./BadgeList";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import PlayerSearchField from "@/components/form/custom/PlayerSearchField";
 import { executeQueued } from "./executionQueue.mjs";
@@ -21,9 +21,7 @@ const initRecipients = (recipients) =>
     } else {
       recipient.name = recipient?.name ?? recipient?.names[0]?.name;
     }
-    let removedClanName = recipient.name.replace(/^\[([^\]]*)\]/, "").trim(); // remove `[clantags]`
-    let shortedName = removedClanName.substring(0, 8);
-    let label = removedClanName.length > 6 ? shortedName + "..." : shortedName;
+    const label = recipient.name;
     return {
       recipient: recipient,
       status: recipient?.status ?? ACTION_STATUS.default,
@@ -31,7 +29,12 @@ const initRecipients = (recipients) =>
     };
   });
 
-export const ActionForm = ({ state: actionState, actionHandlers }) => {
+export const ActionForm = ({
+  state: actionState,
+  actionHandlers,
+  locked = false,
+  onRecipientCountChange,
+}) => {
   const { t } = useTranslation();
   const {
     handleSubmit,
@@ -46,12 +49,11 @@ export const ActionForm = ({ state: actionState, actionHandlers }) => {
     },
   });
   const { recipients, action, params } = actionState;
-  const { submitRef, closeDialog, setLoading, setError, setSuccess } =
+  const { submitRef, setLoading, setError, setSuccess } =
     actionHandlers;
   const [recipientStates, setRecipientStates] = useState(
     initRecipients(recipients)
   );
-  const closeDialogTimeoutRef = useRef(null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -59,8 +61,8 @@ export const ActionForm = ({ state: actionState, actionHandlers }) => {
   }, [recipients]);
 
   useEffect(() => {
-    return () => clearTimeout(closeDialogTimeoutRef.current);
-  }, []);
+    onRecipientCountChange?.(recipientStates.length);
+  }, [onRecipientCountChange, recipientStates.length]);
 
   const onSubmit = useCallback(
     async (data) => {
@@ -150,12 +152,12 @@ export const ActionForm = ({ state: actionState, actionHandlers }) => {
 
       if (allSuccess) {
         setSuccess(true);
-        setTimeout(closeDialog, 1800);
+        setLoading(false);
       } else {
         setLoading(false);
       }
     },
-    [recipientStates]
+    [action, params, queryClient, recipientStates, setError, setLoading, setSuccess]
   );
 
   const handleDeleteRecipient = (player) => {
@@ -180,15 +182,27 @@ export const ActionForm = ({ state: actionState, actionHandlers }) => {
 
   return (
     <Stack spacing={1}>
-      <BadgeList
-        recipients={recipientStates}
-        onDelete={handleDeleteRecipient}
-      />
-      {recipients.length === 0 && (
-        <PlayerSearchField onSelect={handleAddRecipient} />
-      )}
+      <Box
+        component="fieldset"
+        disabled={locked}
+        sx={{ border: 0, m: 0, minWidth: 0, p: 0 }}
+      >
+        <BadgeList
+          recipients={recipientStates}
+          onDelete={handleDeleteRecipient}
+        />
+        {recipients.length === 0 && (
+          <PlayerSearchField onSelect={handleAddRecipient} />
+        )}
+      </Box>
       <form onSubmit={handleSubmit(onSubmit)}>
-        <ActionFields errors={errors} {...formProps} {...actionState} />
+        <Box
+          component="fieldset"
+          disabled={locked}
+          sx={{ border: 0, m: 0, minWidth: 0, p: 0 }}
+        >
+          <ActionFields errors={errors} {...formProps} {...actionState} />
+        </Box>
         <Button
           ref={submitRef}
           type="submit"

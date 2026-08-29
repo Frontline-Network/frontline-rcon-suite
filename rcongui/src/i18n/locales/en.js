@@ -2404,4 +2404,977 @@ Object.assign(en.maps.votemapSettings, {
   dominationOptionsHelp: "Number of Domination maps to offer.",
 });
 
-export default en;
+const mergeMissingTranslations = (preferred, fallback) => {
+  if (
+    !preferred ||
+    typeof preferred !== "object" ||
+    Array.isArray(preferred) ||
+    !fallback ||
+    typeof fallback !== "object" ||
+    Array.isArray(fallback)
+  ) {
+    return preferred ?? fallback;
+  }
+
+  const merged = { ...fallback };
+  for (const [key, value] of Object.entries(preferred)) {
+    merged[key] =
+      value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      fallback[key] &&
+      typeof fallback[key] === "object" &&
+      !Array.isArray(fallback[key])
+        ? mergeMissingTranslations(value, fallback[key])
+        : value;
+  }
+  return merged;
+};
+
+const enMasterFallback = {
+  "mobileNav": {
+    "ariaLabel": "Mobile primary navigation",
+    "operations": "Operations",
+    "incidents": "Reports",
+    "players": "Players",
+    "server-operations": "Server",
+    "more": "More"
+  },
+  "mobileOperations": {
+    "eyebrow": "Server operations",
+    "title": "Operations",
+    "subtitle": "Check server health and open the most common operating tasks.",
+    "cards": {
+      "teams": {
+        "title": "Teams & squads",
+        "description": "Manage leadership issues, squads and players."
+      },
+      "maps": {
+        "title": "Maps",
+        "description": "Control current, next and immediate map changes."
+      },
+      "balance": {
+        "title": "Autobalancer",
+        "description": "Review balance health and recent interventions."
+      },
+      "automation": {
+        "title": "Automation",
+        "description": "Manage rules, effects and active schedules."
+      },
+      "services": {
+        "title": "Services",
+        "description": "Check CRCON, game server and background services."
+      },
+      "settings": {
+        "title": "Server settings",
+        "description": "Open gameplay rules and general configuration."
+      }
+    }
+  },
+  "incidents": {
+    "eyebrow": "Moderation",
+    "title": "Reports",
+    "subtitle": "Claim, process and resolve admin reports across servers.",
+    "filters": "Filter reports",
+    "tabs": {
+      "new": "New",
+      "claimed": "Claimed",
+      "open": "Open",
+      "done": "Resolved",
+      "dismissed": "Dismissed"
+    },
+    "status": {
+      "new": "New",
+      "claimed": "Claimed",
+      "resolved": "Resolved",
+      "dismissed": "Dismissed"
+    },
+    "server": "Server {{number}}",
+    "generalReport": "General report",
+    "unknownReporter": "Unknown reporter",
+    "assignedTo": "assigned to {{name}}",
+    "reason": "Report reason",
+    "noReason": "No reason supplied.",
+    "reporter": "Reporter",
+    "assignee": "Assignee",
+    "unassigned": "Not claimed yet",
+    "updated": "Last updated",
+    "emptyTitle": "All clear",
+    "emptyDescription": "There are no reports for this filter right now.",
+    "loadFailed": "Reports could not be loaded. Check the connection and try again.",
+    "updateFailed": "The report could not be updated. It remains unchanged.",
+    "dismissConfirmationTitle": "Dismiss this report?",
+    "dismissConfirmationBody": "The dismissal is recorded in the timeline. The report can no longer be handled as open afterwards.",
+    "actions": {
+      "claim": "Claim",
+      "dismiss": "Dismiss",
+      "resolve": "Resolve",
+      "confirmDismiss": "Confirm dismissal"
+    }
+  },
+  "views": {
+    "live": {
+      "reviewNow": "Review now",
+      "mobileOperationsTab": "Operations",
+      "mobileLogTab": "Log",
+      "loadMorePlayers": "Load more players",
+      "mobileCombatColumn": "K / D",
+      "priorityHigh": "High",
+      "priorityMedium": "Medium",
+      "priorityInfo": "Info",
+      "score": "Score",
+      "commandBar": "Live operations control",
+      "currentMap": "Current map",
+      "remainingTime": "Time remaining",
+      "updating": "Updating",
+      "liveNow": "Live",
+      "layout": "Workspace view",
+      "splitView": "Split",
+      "assignment": "Team / squad / role",
+      "performance": "Combat / risk",
+      "status": "Status",
+      "warned": "Warned",
+      "actionableStatus": "Actionable status and battle state",
+      "online": "online",
+      "columnPreset": "Column preset",
+      "operationsPreset": "Operations",
+      "customPreset": "Custom view",
+      "allColumnsPreset": "All columns",
+      "horizontalTableScroll": "Scroll table columns horizontally",
+      "quickFilters": "Player quick filters",
+      "suspicious": "Suspicious",
+      "selectionFilters": "Selection filters",
+      "playersSelected_one": "{{count}} player selected",
+      "playersSelected_other": "{{count}} players selected",
+      "clearSelection": "Clear selection",
+      "selectionActions": "Open actions",
+      "moreActions": "More",
+      "events": "events",
+      "eventStream": "Live event stream",
+      "eventFilters": "Filter events",
+      "admin": "Admin",
+      "chat": "Chat",
+      "teamkills": "Teamkills",
+      "kills": "Kills",
+      "match": "Match",
+      "searchLogs": "Search logs...",
+      "advancedFilters": "Advanced filters",
+      "maximizeLogs": "Maximize live log",
+      "restoreSplitView": "Restore split view",
+      "copyLog": "Copy original log message",
+      "logCopied": "Original log message copied",
+      "splitUnavailable": "Split view needs more available width.",
+      "serverActions": "Server actions",
+      "mobileRoster": "Mobile player list",
+      "noSpecialStatus": "No special status",
+      "expandPlayer": "Open details for {{name}}",
+      "collapsePlayer": "Close details for {{name}}",
+      "openPlayerProfile": "Open profile for {{name}}"
+    },
+    "team": {
+      "lobby": "Lobby",
+      "commander": "Commander",
+      "commanderPositionOpen": "Position unfilled",
+      "statusFilter": "Status",
+      "roleFilter": "Role",
+      "squadFilter": "Squad",
+      "allRoles": "All roles",
+      "allSquads": "All squads",
+      "squadOrPlayer": "Squad / player",
+      "leaderOrRole": "Squad lead / role",
+      "statusOrKd": "Status / K/D",
+      "selectionActions": "Actions for selected players",
+      "selectionHint": "Choose an action for this selection",
+      "moreActions": "More",
+      "selectionActionLabels": {
+        "message": "Message",
+        "kick": "Kick",
+        "ban": "Temp/Perma ban",
+        "switchTeam": "Team",
+        "removeFromSquad": "Squad kick"
+      },
+      "selectPlayer": "Select {{name}}",
+      "selectSquad": "Select squad {{name}}",
+      "selectTeam": "Select team {{name}}",
+      "expandSquad": "Expand squad",
+      "collapseSquad": "Collapse squad",
+      "expandSquadNamed": "Expand squad {{name}}",
+      "collapseSquadNamed": "Collapse squad {{name}}",
+      "expandTeam": "Expand all squads on this team",
+      "collapseTeam": "Collapse all squads on this team",
+      "expandTeamNamed": "Expand all {{name}} squads",
+      "collapseTeamNamed": "Collapse all {{name}} squads",
+      "squadsCount_one": "{{count}} squad",
+      "squadsCount_other": "{{count}} squads",
+      "problemsCount_one": "{{count}} problem",
+      "problemsCount_other": "{{count}} problems",
+      "noMatches": "No matching players or squads found.",
+      "issueCommander_one": "{{count}} team without commander",
+      "issueCommander_other": "{{count}} teams without commander",
+      "issueCommanderDetail": "Unfilled command positions",
+      "issueLeaders_one": "{{count}} squad without leader",
+      "issueLeaders_other": "{{count}} squads without leader",
+      "issueLeadersDetail": "Squads requiring attention",
+      "issueUnassigned_one": "{{count}} player without squad",
+      "issueUnassigned_other": "{{count}} players without squad",
+      "issueUnassignedDetail": "Lobby and unassigned players",
+      "filters": {
+        "all": "Show all",
+        "issues": "Issues only",
+        "noLeader": "No squad leader",
+        "unassigned": "Unassigned"
+      },
+      "squadTypes": {
+        "infantry": "Infantry",
+        "armor": "Armor",
+        "armour": "Armor",
+        "recon": "Recon",
+        "artillery": "Artillery",
+        "mortar": "Mortar",
+        "helicopter": "Helicopter",
+        "other": "Other units"
+      }
+    },
+    "table": {
+      "selection": "Player selection",
+      "faction": "Faction",
+      "teamKillsShort": "TKs",
+      "teamKillRiskLabel": "TK risk",
+      "combatShort": "Combat",
+      "offenseShort": "Offense",
+      "defenseShort": "Defense",
+      "supportShort": "Support",
+      "nameOnly": "Name (single column)",
+      "playerSummary": "Player (name and level)",
+      "playerId": "Player ID",
+      "warnings": "Warnings",
+      "vip": "VIP"
+    }
+  },
+  "actions": {
+    "viewProfileCompact": "Profile",
+    "secondConfirmationTitle": "Review action again",
+    "secondConfirmationBody": "This action takes effect immediately. Check the target and details before final execution.",
+    "executeFinally": "Execute finally",
+    "sendMessage": {
+      "compact": "Message"
+    },
+    "punish": {
+      "compact": "Punish"
+    },
+    "kick": {
+      "compact": "Kick"
+    },
+    "blacklist": {
+      "compact": "Ban",
+      "confirm": "Add to blacklist"
+    }
+  },
+  "records": {
+    "auditLogs": {
+      "filters": "Filter audit logs"
+    }
+  },
+  "settings": {
+    "configForms": {
+      "units": {
+        "seconds": "seconds",
+        "players": "players",
+        "squadPlayers": "squad members",
+        "level": "level",
+        "checks": "checks",
+        "messages": "messages",
+        "actions": "actions"
+      },
+      "specialValues": {
+        "disabled": "Disabled",
+        "noMinimum": "No minimum",
+        "skip": "Skip this stage",
+        "unlimited": "Unlimited; do not advance to the next stage",
+        "noDelay": "No additional delay",
+        "anySquadSize": "Any squad size"
+      },
+      "roles": {
+        "armycommander": "Commander",
+        "officer": "Squad leader",
+        "rifleman": "Rifleman",
+        "assault": "Assault",
+        "automaticrifleman": "Automatic rifleman",
+        "medic": "Medic",
+        "support": "Support",
+        "heavymachinegunner": "Machine gunner",
+        "antitank": "Anti-tank",
+        "engineer": "Engineer",
+        "tankcommander": "Tank commander",
+        "crewman": "Crewman",
+        "spotter": "Spotter",
+        "sniper": "Sniper",
+        "artilleryobserver": "Artillery observer",
+        "operator": "Operator",
+        "gunner": "Gunner",
+        "squadleader": "Squad leader",
+        "specialist": "Specialist",
+        "grenadier": "Grenadier",
+        "mortarsupport": "Mortar support",
+        "mortarobserver": "Mortar squad leader",
+        "mortargunner": "Mortar gunner",
+        "helicopterpilot": "Helicopter pilot",
+        "helicopterlogisticsofficer": "Helicopter logistics officer"
+      },
+      "workbench": {
+        "defaultEyebrow": "Server configuration",
+        "defaultIntro": "Configure this area with the guided form, or switch to the advanced JSON view for special cases.",
+        "tabsLabel": "Editing mode",
+        "formTab": "Form",
+        "jsonTab": "JSON (advanced)",
+        "navigation": "Configuration sections",
+        "mobileNavigation": "Choose section",
+        "sectionEyebrow": "Section {{current}} of {{total}}",
+        "statusActive": "Active",
+        "statusInactive": "Disabled",
+        "statusTest": "Test mode",
+        "statusConfigured": "Configured",
+        "save": "Save changes",
+        "saving": "Saving …",
+        "reset": "Restore saved values",
+        "dirty": "Unsaved changes",
+        "dirtyDescription": "Review the summary and save to apply the new rule.",
+        "saved": "All changes saved",
+        "savedDescription": "The values shown match the saved configuration.",
+        "readOnly": "Read-only access",
+        "readOnlyDescription": "You are missing the {{permission}} permission. You can review this rule but cannot change it.",
+        "validationTitle": "Some entries need attention",
+        "validationDescription": "Resolve the listed items before saving.",
+        "navigateToError": "Open",
+        "choices": {
+          "skip": "Skip",
+          "count": "Count",
+          "unlimited": "Unlimited"
+        },
+        "choiceHelp": {
+          "skip": "Send no warnings",
+          "count": "A fixed number of warnings",
+          "unlimited": "Warn continuously"
+        },
+        "warningMode": "Warning mode",
+        "warningModeHelp": "Choose how and when players are warned before punishment.",
+        "warningsBeforePunish": "Warnings before punishment",
+        "warningsBeforePunishHelp": "Number of warnings sent before punishment.",
+        "warningIntervalHelp": "Time between two warnings.",
+        "availablePlaceholders": "Available placeholders",
+        "messagePreview": "Player preview",
+        "messagePreviewEmpty": "No message entered yet.",
+        "warningPreviewMeta": "Warning {{current}} of {{total}} · Next check in {{seconds}} seconds",
+        "sectionTitles": {
+          "operation": "Basics",
+          "scope": "Scope",
+          "requirements": "Requirements",
+          "detection": "Detection",
+          "rules": "Rules",
+          "exemptions": "Exceptions",
+          "schedule": "Schedule",
+          "announcements": "Announcements",
+          "observation": "Confirm",
+          "warnings": "Warnings",
+          "punishments": "Punishments",
+          "kick": "Kick",
+          "actions": "Actions",
+          "reward": "Reward",
+          "messages": "Messages",
+          "notifications": "Notifications",
+          "advanced": "Additional settings"
+        },
+        "sectionDescriptions": {
+          "operation": "Enable the rule and decide whether it should start in dry-run mode.",
+          "scope": "Choose when this feature applies and which players or game situations it covers.",
+          "requirements": "Define the conditions that must be met before this feature intervenes.",
+          "detection": "Choose which events are detected and when they count as a violation.",
+          "rules": "Set the rules, thresholds, and checks used by this configuration.",
+          "exemptions": "Define which players, roles, and flags are exempt from this rule.",
+          "schedule": "Set the check intervals and timing for this service.",
+          "announcements": "Configure the notices players receive on connect or while the rule is active.",
+          "observation": "Choose how often a violation is confirmed internally before a visible warning follows.",
+          "warnings": "Choose how and when players are warned before punishment. Warnings remind players to assign a squad leader.",
+          "punishments": "Set the consequences when warnings have no effect.",
+          "kick": "Configure the final escalation stage and grace period before a kick.",
+          "actions": "Choose the action, its duration, and the reason shown to affected players.",
+          "reward": "Set the amount, duration, and delivery of the reward.",
+          "messages": "Edit the messages players or administrators receive during this workflow.",
+          "notifications": "Optionally provide a Discord webhook for audit messages.",
+          "advanced": "Additional settings that do not belong to one of the main workflow stages."
+        },
+        "profileSummary": {
+          "title": "Summary",
+          "sequence": "Action sequence",
+          "active": "Active – actions are performed",
+          "inactive": "Disabled",
+          "test": "Test mode – log only",
+          "disabled": "Skipped or disabled",
+          "unlimited": "Unlimited · every {{interval}} seconds",
+          "count": "{{count}}× · every {{interval}} seconds",
+          "kick": "Kick after {{seconds}} seconds",
+          "intervalMinutes": "Check every {{count}} minutes",
+          "configured": "{{configured}} of {{total}} values configured",
+          "activeNotice": "The settings shown will be used for this server after saving.",
+          "inactiveNotice": "This feature is disabled. All other values remain saved."
+        },
+        "placeholders": {
+          "player_name": "Player name",
+          "squad_name": "Squad name",
+          "max_warnings": "Maximum warnings",
+          "received_warnings": "Previous warnings",
+          "next_check_seconds": "Next check",
+          "max_punishes": "Maximum punishments",
+          "received_punishes": "Punishments received",
+          "kick_grace_period": "Kick grace period"
+        },
+        "flow": {
+          "title": "Summary",
+          "sequence": "Action sequence",
+          "warn": "Warn",
+          "punish": "Punish",
+          "kick": "Kick",
+          "count": "{{count}}× · every {{interval}} seconds",
+          "unlimited": "Unlimited · every {{interval}} seconds",
+          "afterSeconds": "after {{seconds}} seconds",
+          "punishAction": "Remove squad-leader rights",
+          "kickAfterSeconds": "Kick after {{seconds}} seconds",
+          "disabled": "Disabled",
+          "reachability": "Reachability",
+          "reachable": "All active stages are reachable in this order.",
+          "unreachable": "A later stage cannot be reached with the current values.",
+          "reachabilityStates": {
+            "reachable": {
+              "title": "Kick is reachable",
+              "description": "Warnings and punishments finish before the kick stage begins."
+            },
+            "disabled": {
+              "title": "Kick is disabled",
+              "description": "Enable the kick stage to remove players after punishments."
+            },
+            "warningsUnlimited": {
+              "title": "Kick cannot be reached",
+              "description": "Unlimited warnings never advance to punishment. Choose a fixed warning count."
+            },
+            "punishmentsUnlimited": {
+              "title": "Kick cannot be reached",
+              "description": "Unlimited punishments never advance to the kick stage. Choose a fixed punishment count."
+            },
+            "punishmentsSkipped": {
+              "title": "Kick cannot be reached",
+              "description": "At least one punishment must run before a kick can happen."
+            }
+          }
+        },
+        "ruleDisabledNotice": "The rule is disabled. Your other values are retained and will be used again after enabling it.",
+        "summary": {
+          "status": "Rule status",
+          "sequence": "Effective sequence",
+          "minimumPlayers": "Start condition",
+          "exemptions": "Exceptions",
+          "active": "Automod performs game actions",
+          "inactive": "Automod is disabled",
+          "test": "Log only – no game actions",
+          "minimumPlayersValue": "From {{count}} players",
+          "noMinimumPlayers": "Independent of player count",
+          "exemptionsValue": "{{roles}} roles · {{flags}} flags · up to level {{level}}",
+          "noExemptions": "No additional exceptions",
+          "observation": "{{count}} checks",
+          "observationSkipped": "Checks skipped",
+          "warnings": "{{count}} warnings",
+          "warningsUnlimited": "Warn indefinitely",
+          "warningsSkipped": "Warnings skipped",
+          "punishments": "{{count}} punishments",
+          "punishmentsUnlimited": "Punish indefinitely",
+          "punishmentsSkipped": "Punishments skipped",
+          "kick": "then kick",
+          "noKick": "no kick",
+          "unreachableKick": "Kick is unreachable: configure at least one finite punishment before the kick stage."
+        },
+        "validation": {
+          "required": "This field is required.",
+          "integer": "Enter a whole number.",
+          "minimum": "The minimum allowed value is {{value}}.",
+          "maximum": "The maximum allowed value is {{value}}.",
+          "url": "Enter a valid HTTP or HTTPS address.",
+          "enum": "At least one value is not supported by this server.",
+          "duplicate": "Duplicate values are not allowed.",
+          "emptyRegex": "Empty regular expressions are not allowed because they would match every player name.",
+          "placeholder": "Unknown placeholders: {{values}}. Use one of the provided placeholders."
+        }
+      },
+      "noLeader": {
+        "eyebrow": "Automation",
+        "title": "Squads without a leader",
+        "intro": "This rule works for Hell Let Loose and Hell Let Loose: Vietnam.",
+        "summary": {
+          "title": "Rule flow",
+          "description": "Exemptions are checked before every action. Dry runs follow the same flow but never affect the game."
+        },
+        "sections": {
+          "operation": {
+            "title": "Basics",
+            "description": "Core settings"
+          },
+          "exemptions": {
+            "title": "Exceptions",
+            "description": "Who is exempt"
+          },
+          "observation": {
+            "title": "Confirm",
+            "description": "Conditions and thresholds"
+          },
+          "warnings": {
+            "title": "Warn",
+            "description": "Configure warnings"
+          },
+          "punishments": {
+            "title": "Punish",
+            "description": "Set consequences"
+          },
+          "kick": {
+            "title": "Kick",
+            "description": "Kick rules"
+          },
+          "notifications": {
+            "title": "Messages",
+            "description": "Notifications"
+          }
+        },
+        "fields": {
+          "enabled": {
+            "label": "Enable automod",
+            "help": "Monitors squads without a leader and runs the stages configured below."
+          },
+          "dry_run": {
+            "label": "Log only (dry run)",
+            "help": "Evaluates the full rule but sends no messages and applies neither punishments nor kicks."
+          },
+          "discord_webhook_url": {
+            "label": "Discord audit webhook",
+            "help": "Optional Discord webhook for actions that were applied or detected during a dry run.",
+            "placeholder": "https://discord.com/api/webhooks/…"
+          },
+          "whitelist_flags": {
+            "label": "Exempt player flags",
+            "help": "Players with at least one of these CRCON flags are exempt from every stage."
+          },
+          "immune_roles": {
+            "label": "Exempt roles",
+            "help": "Players in these game roles will not be observed, warned, punished, or kicked."
+          },
+          "immune_player_level": {
+            "label": "Exempt players up to level",
+            "help": "Players at or below this level are protected. Set 0 to disable this exemption."
+          },
+          "dont_do_anything_below_this_number_of_players": {
+            "label": "Minimum server population",
+            "help": "The rule pauses below this total player count. Set 0 for no minimum."
+          },
+          "number_of_notes": {
+            "label": "Invisible checks",
+            "help": "Number of internal checks before the first warning. Players do not see this stage. Set 0 to skip it."
+          },
+          "notes_interval_seconds": {
+            "label": "Time between checks",
+            "help": "Wait time between two invisible checks of the same player."
+          },
+          "number_of_warnings": {
+            "label": "Number of warnings",
+            "help": "Set 0 to skip warnings. Set -1 to warn indefinitely and never advance to punishment."
+          },
+          "warning_interval_seconds": {
+            "label": "Time between warnings",
+            "help": "Wait time before the same player is warned again."
+          },
+          "warning_message": {
+            "label": "Warning message",
+            "help": "Message players receive with every warning."
+          },
+          "number_of_punishments": {
+            "label": "Number of punishments",
+            "help": "Set 0 to skip punishments, but a kick cannot happen without a prior punishment. Set -1 to punish indefinitely and never advance to kick."
+          },
+          "min_squad_players_for_punish": {
+            "label": "Minimum squad size for punishments",
+            "help": "Punishments start only when the affected squad has at least this many members. Set 0 for any squad size."
+          },
+          "min_server_players_for_punish": {
+            "label": "Minimum server population for punishments",
+            "help": "Punishments start only at this total player count. Set 0 for no minimum."
+          },
+          "punish_interval_seconds": {
+            "label": "Time between punishments",
+            "help": "Wait time before the same player is punished again."
+          },
+          "punish_message": {
+            "label": "Punishment message",
+            "help": "Message the player receives with the punish action."
+          },
+          "kick_after_max_punish": {
+            "label": "Kick after punishments",
+            "help": "Enables kick as the final stage. At least one punishment must have been applied successfully first."
+          },
+          "min_squad_players_for_kick": {
+            "label": "Minimum squad size for kicks",
+            "help": "Kicks apply only when the affected squad has at least this many members. Set 0 for any squad size."
+          },
+          "min_server_players_for_kick": {
+            "label": "Minimum server population for kicks",
+            "help": "Kicks apply only at this total player count. Set 0 for no minimum."
+          },
+          "kick_grace_period_seconds": {
+            "label": "Final grace period before kick",
+            "help": "Time after the last punishment in which the squad can still choose a leader."
+          },
+          "kick_message": {
+            "label": "Kick message",
+            "help": "Reason shown to the player when they are kicked."
+          }
+        }
+      },
+      "level": {
+        "eyebrow": "Automod rule",
+        "title": "Level rules",
+        "intro": "Control minimum and maximum levels as well as role-specific level thresholds. Players can be informed, punished, or removed in progressive stages."
+      },
+      "seeding": {
+        "eyebrow": "Automation · Seeding",
+        "title": "Seeding rules",
+        "intro": "Set rules for the server build-up phase and choose how violations are handled while seeding."
+      },
+      "seedingWorkbench": {
+        "players": "players",
+        "seconds": "seconds",
+        "level": "level",
+        "placeholders": "Insert:",
+        "sections": {
+          "operation": {
+            "title": "Overview",
+            "description": "Choose whether rules are off, observed, or actively enforced."
+          },
+          "rules": {
+            "title": "Rules",
+            "description": "Define allowed play and the player windows for each rule."
+          },
+          "exemptions": {
+            "title": "Exemptions",
+            "description": "Protect selected roles, flags, or new players from automatic actions."
+          },
+          "actions": {
+            "title": "Actions",
+            "description": "Build the visible sequence from announcement to kick."
+          },
+          "notifications": {
+            "title": "Notifications",
+            "description": "Optionally send detected violations and actions to Discord."
+          }
+        },
+        "operation": {
+          "modeTitle": "How should the automod run?",
+          "modeHelp": "Test mode evaluates the same rules without affecting players.",
+          "off": "Off",
+          "offHelp": "No checks",
+          "observe": "Observe",
+          "observeHelp": "Log only",
+          "active": "Active",
+          "activeHelp": "Enforce rules",
+          "note": "Rule-level player windows decide when each rule applies. The global minimum pauses the entire seeding automod."
+        },
+        "status": {
+          "active": "Active",
+          "incomplete": "Not configured",
+          "skipped": "Skipped",
+          "unlimited": "Unlimited",
+          "times": "{{count}}×"
+        },
+        "effectPreview": {
+          "title": "How this rule works",
+          "active": "The rule applies between {{min}} and {{max}} players and checks {{count}} configured entries.",
+          "inactive": "This rule is not fully configured yet and currently does not take action.",
+          "valid": "The rule is ready to use.",
+          "missing": "Complete the rule before enabling enforcement."
+        },
+        "rules": {
+          "roles": {
+            "title": "Limit roles",
+            "description": "Blocks roles that have an outsized impact during server build-up."
+          },
+          "weapons": {
+            "title": "Limit weapons",
+            "description": "Punishes selected weapon use directly without escalating to kick.",
+            "empty": "No weapon is blocked yet. Choose one from the catalogue or enter a game identifier that is not known yet."
+          },
+          "cap": {
+            "title": "Limit the combat area",
+            "description": "Keeps fighting in the intended middle area while seeding.",
+            "switchTitle": "Enforce fighting over the middle point",
+            "switchHelp": "Detects players when their team attacks beyond the allowed sectors."
+          }
+        },
+        "fields": {
+          "playerWindow": "Applies to player count",
+          "globalMinimum": "Start the entire automod at",
+          "globalMinimumHelp": "Below this value no rule is evaluated. 0 means immediately.",
+          "fromPlayers": "Applies from",
+          "fromPlayersHelp": "This value is inclusive.",
+          "untilPlayers": "Applies until",
+          "untilPlayersHelp": "The rule ends at this value. 0 disables it.",
+          "blockedRoles": "Disallowed roles",
+          "blockedRolesHelp": "Choose from the shared HLL and HLL: Vietnam role list.",
+          "violationMessage": "Violation text",
+          "roleMessageHelp": "Describes the role violation inside later warning, punish and kick messages.",
+          "weaponMessageHelp": "Describes the weapon violation in the direct punish message.",
+          "capMessageHelp": "Explains why the allowed combat area was exceeded.",
+          "weaponId": "Internal weapon name",
+          "weaponLabel": "Readable name",
+          "weaponPicker": "Choose a weapon",
+          "weaponPickerHelp": "Search the active game's weapon catalogue. You can still enter a new unknown game identifier and confirm it with Enter.",
+          "noWeaponMatches": "No additional matching weapon found",
+          "addWeapon": "Add weapon",
+          "removeWeapon": "Remove weapon",
+          "maxCaps": "Maximum sectors held",
+          "maxCapsHelp": "3 allows fighting through the middle point.",
+          "directPunish": "Punish directly",
+          "directPunishHelp": "Skips warnings for sector violations so the automod can react in time.",
+          "flags": "Exempt player flags",
+          "flagsHelp": "Players with at least one of these CRCON flags are fully exempt.",
+          "immuneRoles": "Exempt roles",
+          "immuneRolesHelp": "Players in these roles are exempt from all seeding actions.",
+          "immuneLevel": "Exempt players up to level",
+          "immuneLevelHelp": "Players at or below this level are protected. 0 disables the exemption.",
+          "announcementEnabled": "Explain seeding on join",
+          "announcementEnabledHelp": "Tells joining players which seeding rules currently apply.",
+          "announcementMessage": "Join announcement",
+          "count": "Count",
+          "interval": "Interval",
+          "minSquad": "Squad size from",
+          "minServer": "Player count from",
+          "warningMessage": "Warning message",
+          "punishMessage": "Punish message",
+          "kickEnabled": "Kick after punishments",
+          "kickEnabledHelp": "Removes players as the final stage when a violation persists after warnings and punishments.",
+          "gracePeriod": "Final grace period",
+          "kickMessage": "Kick message",
+          "webhook": "Discord audit webhook",
+          "webhookHelp": "Optional. Receives logs for detected and executed actions."
+        },
+        "weaponTypes": {
+          "infantry": "Infantry weapon",
+          "bazooka": "Anti-tank weapon",
+          "grenade": "Grenade",
+          "machine_gun": "Machine gun",
+          "sniper": "Sniper weapon",
+          "mine": "Mine",
+          "pak": "Anti-tank gun",
+          "satchel": "Satchel charge",
+          "artillery": "Artillery",
+          "armor": "Vehicle weapon",
+          "commander": "Commander ability",
+          "self_propelled_artillery": "Self-propelled artillery",
+          "unknown": "Custom entry"
+        },
+        "count": {
+          "skip": "Skip",
+          "fixed": "Fixed count",
+          "unlimited": "Unlimited"
+        },
+        "actions": {
+          "announcement": {
+            "title": "Announce rules",
+            "description": "Explains the active seeding phase to new players."
+          },
+          "warning": {
+            "title": "Warn",
+            "description": "Gives players time to change before the first punishment."
+          },
+          "punish": {
+            "title": "Punish",
+            "description": "Runs the server punish action when warnings do not help."
+          },
+          "kick": {
+            "title": "Kick",
+            "description": "Removes players only after previous escalation stages complete."
+          }
+        },
+        "notifications": {
+          "note": "The Discord webhook is only for audit messages. Player messages are still sent through the game server."
+        },
+        "summary": {
+          "title": "Overview",
+          "activeRules": "{{count}} of 3 rules configured",
+          "roles_one": "{{count}} role blocked",
+          "roles_other": "{{count}} roles blocked",
+          "weapons_one": "{{count}} weapon blocked",
+          "weapons_other": "{{count}} weapons blocked",
+          "capActive": "Middle combat area active",
+          "reaction": "Response chain",
+          "count": "{{count}}× · every {{interval}} seconds",
+          "unlimited": "Unlimited · every {{interval}} seconds",
+          "kick": "after {{seconds}} seconds",
+          "activeNotice": "After saving, these rules actively affect the game.",
+          "testNotice": "Test mode: violations are detected without affecting players.",
+          "inactiveNotice": "The automod is off. Its configuration remains saved."
+        }
+      },
+      "noSoloTank": {
+        "eyebrow": "Automod rule",
+        "title": "Prevent solo tanks",
+        "intro": "Choose how CRCON responds to one-person armor squads in Hell Let Loose and HLL: Vietnam."
+      },
+      "vacBans": {
+        "eyebrow": "Security & bans",
+        "title": "Check VAC and game bans",
+        "intro": "Choose which ban history is checked on connect and how CRCON handles affected players."
+      },
+      "tkBans": {
+        "eyebrow": "Security & bans",
+        "title": "Teamkill ban on connect",
+        "intro": "Detect early teamkills after connect, define exceptions, and configure the resulting ban."
+      },
+      "nameKicks": {
+        "eyebrow": "Players & moderation",
+        "title": "Name filter",
+        "intro": "Check player names against your rules, protect exempt players, and set a clear kick reason.",
+        "rulesEditor": {
+          "noticeTitle": "Every match results in a kick",
+          "noticeBody": "The name filter is a blocklist: as soon as a rule matches a newly connected player's name, CRCON removes that player. Templates are stored correctly by the form, so you do not need to escape JSON characters.",
+          "templatesTitle": "Choose a protection goal",
+          "templatesHelp": "Enable only the templates that match your server rules. The strict character list can catch international names and emoji.",
+          "presets": {
+            "unreadable": {
+              "title": "No readable characters",
+              "description": "Removes names made entirely of symbols or non-Latin characters. Letters, digits, German umlauts, and clan tags remain allowed."
+            },
+            "blank": {
+              "title": "Blank name",
+              "description": "Matches empty names and names containing whitespace only."
+            },
+            "strictCharacters": {
+              "title": "Strict character list",
+              "description": "Allows only Latin letters, digits, spaces, and a small set of common punctuation and clan characters."
+            }
+          },
+          "active": "Active",
+          "useTemplate": "Use template",
+          "removeTemplate": "Remove template",
+          "configuredTitle": "Active rules",
+          "configuredHelp": "Templates and custom rules are evaluated together from top to bottom.",
+          "ruleCount_one": "{{count}} rule",
+          "ruleCount_other": "{{count}} rules",
+          "noRules": "No name rule is active. Newly connected players will not be removed based on their name.",
+          "ruleLabel": "RegEx {{number}}",
+          "emptyRule": "An empty RegEx would match every player name. Delete the rule or enter an expression.",
+          "deleteRule": "Delete rule",
+          "customLabel": "Custom Python RegEx",
+          "customPlaceholder": "e.g. (?i)^admin",
+          "addCustom": "Add custom rule",
+          "testTitle": "Test a player name first",
+          "testHelp": "The preview mirrors Python behavior for common expressions. The rule is only stored and activated after you save the changes.",
+          "testLabel": "Test player name",
+          "testPlaceholder": "Enter a player name",
+          "testKick": "“{{name}}” would be removed.",
+          "testAllow": "“{{name}}” would pass the name filter.",
+          "testMatched": "Matched by rule {{number}}.",
+          "testUnsupported_one": "One Python-specific rule could not be evaluated in the browser preview.",
+          "testUnsupported_other": "{{count}} Python-specific rules could not be evaluated in the browser preview."
+        }
+      },
+      "seedVip": {
+        "eyebrow": "Seeding & rewards",
+        "title": "Seeder VIP reward",
+        "intro": "Choose when seeding counts as successful and which VIP reward eligible players receive."
+      },
+      "expiredVip": {
+        "eyebrow": "VIP management",
+        "title": "Clean up expired VIPs",
+        "intro": "Choose how often CRCON checks expired VIP entries and optionally sends a notification."
+      }
+    },
+    "profanity": {
+      "eyebrow": "Players & moderation",
+      "title": "Profanity filter",
+      "subtitle": "Maintain blocked terms, import lists, and apply changes to one or multiple servers in a controlled way.",
+      "allServers": "All servers",
+      "applyAllTitle": "Apply profanity filter to all servers?",
+      "applyAllDescription": "The current term list will be sent to every connected server in this installation."
+    },
+    "templates": {
+      "eyebrow": "Players & moderation",
+      "title": "Message templates",
+      "subtitle": "Manage reusable text for messages, moderation actions, and server operations."
+    },
+    "autosettings": {
+      "eyebrow": "Server operations",
+      "title": "Automatic settings",
+      "subtitle": "Choose a template, review the advanced JSON configuration, and apply it in a controlled way.",
+      "editorTitle": "Advanced configuration",
+      "editorHint": "Changes are only written to the selected server after you apply them.",
+      "applyAllTitle": "Apply to all servers?",
+      "applyAllDescription": "The open configuration will be sent to every connected server in this installation. Check server and game compatibility before confirming."
+    },
+    "welcome": {
+      "eyebrow": "Maps & server operations",
+      "title": "Welcome message",
+      "subtitle": "Define the message players receive when they join the server.",
+      "allServers": "All servers",
+      "editorHint": "Leave empty to disable the welcome message.",
+      "applyAllTitle": "Apply welcome message to all servers?",
+      "applyAllDescription": "The current message will be sent to every connected server in this installation."
+    }
+  },
+  "appearance": {
+    "menuLabel": "Appearance & colors",
+    "title": "Appearance & colors",
+    "subtitle": "Adapt the interface to your workflow and visual needs.",
+    "presets": {
+      "title": "Color combination",
+      "description": "Choose a tested preset or define your own accent color below.",
+      "frontline-gold": "Frontline Gold",
+      "tactical-blue": "Tactical Blue",
+      "signal-green": "Signal Green",
+      "command-red": "Command Red",
+      "neutral": "Neutral"
+    },
+    "mode": {
+      "title": "Display mode",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "custom": {
+      "title": "Custom accent color",
+      "description": "Contrast, hover and focus colors are adjusted automatically.",
+      "picker": "Choose accent color",
+      "hex": "Hex color",
+      "invalid": "Enter a color in the format #C59A4A.",
+      "contrastHint": "Insufficient contrast is corrected automatically."
+    },
+    "colorVision": {
+      "title": "Color vision mode",
+      "standard": "Standard",
+      "deuteranopia": "Deuteranopia (green deficiency)",
+      "protanopia": "Protanopia (red deficiency)",
+      "tritanopia": "Tritanopia (blue deficiency)",
+      "description": "Status colors are adapted while icons, labels and outlines remain available."
+    },
+    "preview": {
+      "title": "Live preview",
+      "primary": "Primary action",
+      "selected": "Selected",
+      "info": "Information",
+      "success": "Success",
+      "warning": "Warning",
+      "error": "Error"
+    },
+    "accessibilityHint": "Color never communicates state on its own. The interface also uses icons, labels and visible focus outlines.",
+    "unsaved": "Unsaved changes",
+    "restoreSaved": "Saved values",
+    "restoreDefault": "Frontline default",
+    "apply": "Apply changes",
+    "saved": "Appearance was saved for your account.",
+    "savedLocally": "The server was unavailable. Appearance was temporarily saved in this browser."
+  }
+};
+
+export default mergeMissingTranslations(en, enMasterFallback);

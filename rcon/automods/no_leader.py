@@ -1,6 +1,4 @@
-"""
-Enforces the "Every squad must have an officer" rule
-"""
+"""Enforce the "Every squad must have a squad leader" rule."""
 
 import logging
 import pickle
@@ -23,7 +21,7 @@ from rcon.automods.models import (
     WatchStatus,
 )
 from rcon.automods.num_or_inf import num_or_inf
-from rcon.types import GameStateType
+from rcon.types import GameStateType, normalize_role
 from rcon.user_config.auto_mod_no_leader import AutoModNoLeaderUserConfig
 
 LEADER_WATCH_RESET_SECS = 120
@@ -51,6 +49,20 @@ class NoLeaderAutomod:
         Global on/off switch
         """
         return self.config.enabled
+
+    def _has_immune_role(self, role: str | None) -> bool:
+        """Compare live HLL/HLLV role names with the shared CRCON catalog.
+
+        HLL: Vietnam reports the infantry squad leader as ``squadleader``
+        while HLL reports the same responsibility as ``officer``.  Unknown
+        roles are deliberately treated as non-immune so a new game role can
+        never abort the whole automod cycle.
+        """
+        normalized_role = normalize_role(role)
+        return (
+            normalized_role is not None
+            and normalized_role in self.config.immune_roles
+        )
 
     @contextmanager
     def watch_state(self, team: str, squad_name: str):
@@ -294,7 +306,7 @@ class NoLeaderAutomod:
         # immune_player_level
         if (
             aplayer.lvl <= self.config.immune_player_level
-            or aplayer.role in self.config.immune_roles
+            or self._has_immune_role(aplayer.role)
         ):
             self.logger.debug("%s is immune to notes", aplayer.short_repr())
             return PunishStepState.IMMUNED
@@ -352,7 +364,7 @@ class NoLeaderAutomod:
         # immune_player_level
         if (
             aplayer.lvl <= self.config.immune_player_level
-            or aplayer.role in self.config.immune_roles
+            or self._has_immune_role(aplayer.role)
         ):
             self.logger.debug("%s is immune to warnings", aplayer.short_repr())
             return PunishStepState.IMMUNED
@@ -418,7 +430,7 @@ class NoLeaderAutomod:
         # immune_player_level
         if (
             aplayer.lvl <= self.config.immune_player_level
-            or aplayer.role in self.config.immune_roles
+            or self._has_immune_role(aplayer.role)
         ):
             self.logger.debug("%s is immune to punishment", aplayer.short_repr())
             return PunishStepState.IMMUNED
@@ -493,7 +505,7 @@ class NoLeaderAutomod:
         # immune_player_level
         if (
             aplayer.lvl <= self.config.immune_player_level
-            or aplayer.role in self.config.immune_roles
+            or self._has_immune_role(aplayer.role)
         ):
             self.logger.debug("%s is immune to kick", aplayer.short_repr())
             return PunishStepState.IMMUNED

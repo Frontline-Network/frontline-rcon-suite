@@ -4,8 +4,12 @@ import { openDemoPage, VIEWPORTS } from "./helpers.mjs";
 const expectMinimumTouchTarget = async (locator, label) => {
   const box = await locator.boundingBox();
   expect(box, `${label} has no visible bounding box`).not.toBeNull();
-  expect(box.width, `${label} is narrower than 44px`).toBeGreaterThanOrEqual(44);
-  expect(box.height, `${label} is shorter than 44px`).toBeGreaterThanOrEqual(44);
+  expect(box.width, `${label} is narrower than 44px`).toBeGreaterThanOrEqual(
+    44
+  );
+  expect(box.height, `${label} is shorter than 44px`).toBeGreaterThanOrEqual(
+    44
+  );
 };
 
 const expectInsideViewport = async (locator, viewport, label) => {
@@ -28,10 +32,14 @@ test("the mobile app shell stays within a 320px viewport and keeps navigation av
   await openDemoPage(page, "/");
 
   await expect(page.getByTestId("global-match-status").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "Navigation öffnen" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Navigation öffnen" })
+  ).toBeVisible();
   await expect
     .poll(() =>
-      page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth
+      )
     )
     .toBe(true);
 
@@ -45,12 +53,16 @@ test("the mobile app shell stays within a 320px viewport and keeps navigation av
   ).toBeVisible();
   await expect
     .poll(() =>
-      page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth
+      )
     )
     .toBe(true);
 });
 
-test("important mobile navigation controls meet the 44px target size", async ({ page }) => {
+test("important mobile navigation controls meet the 44px target size", async ({
+  page,
+}) => {
   await page.setViewportSize(VIEWPORTS.mobile);
   await openDemoPage(page, "/");
 
@@ -60,15 +72,15 @@ test("important mobile navigation controls meet the 44px target size", async ({ 
 
   await expectMinimumTouchTarget(
     page.getByRole("combobox", { name: "Server auswählen" }),
-    "server selector",
+    "server selector"
   );
   await expectMinimumTouchTarget(
     page.getByRole("link", { name: "Übersicht" }),
-    "overview link",
+    "overview link"
   );
   await expectMinimumTouchTarget(
     page.getByRole("button", { name: "Schließen" }),
-    "drawer close button",
+    "drawer close button"
   );
   await expectMinimumTouchTarget(
     page.getByRole("button", { name: "Sprache" }),
@@ -87,11 +99,13 @@ for (const [name, viewport] of [
     await openDemoPage(page, "/views/live");
 
     for (const [label, accessibleName] of [
-      [`${name} player visibility control`, "Spieler ausblenden"],
-      [`${name} log visibility control`, "Protokoll ausblenden"],
-      [`${name} battle-state visibility control`, "Gefechtslage ausblenden"],
+      [`${name} operations tab`, "Einsatz"],
+      [`${name} event-log tab`, "Protokoll"],
     ]) {
-      const control = page.getByRole("button", { name: accessibleName });
+      const control = page.getByRole("tab", {
+        name: accessibleName,
+        exact: true,
+      });
       await expectMinimumTouchTarget(control, label);
       await expectInsideViewport(control, viewport, label);
     }

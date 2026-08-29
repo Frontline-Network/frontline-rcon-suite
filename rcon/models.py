@@ -42,7 +42,6 @@ from sqlalchemy.schema import UniqueConstraint
 from rcon.maps import Team
 from rcon.types import (
     AuditLogType,
-    GameIntEnum,
     BlacklistRecordType,
     BlacklistRecordWithBlacklistType,
     BlacklistRecordWithPlayerType,
@@ -50,6 +49,7 @@ from rcon.types import (
     BlacklistType,
     BlacklistWithRecordsType,
     DBLogLineType,
+    GameIntEnum,
     GameLayout,
     GetDetailedPlayer,
     MapResult,
@@ -73,12 +73,12 @@ from rcon.types import (
     PlayerTeamAssociation,
     PlayerTeamConfidence,
     PlayerVIPType,
-    UnitHistoryEntry,
     ServerCountType,
     SteamBansType,
     SteamInfoType,
     SteamPlayerSummaryType,
     StructuredLogLineWithMetaData,
+    UnitHistoryEntry,
     WatchListType,
 )
 from rcon.utils import (
@@ -260,7 +260,12 @@ class PlayerID(Base):
             return int((datetime.now() - start).total_seconds())
         return 0
 
-    def to_dict(self, limit_sessions=5) -> PlayerProfileType:
+    def to_dict(
+        self,
+        limit_sessions=5,
+        *,
+        preloaded_vips: list["PlayerVIP"] | None = None,
+    ) -> PlayerProfileType:
         this_server = int(get_server_number())
         blacklists = [record.to_dict() for record in self.blacklists]
         is_blacklisted = any(
@@ -272,7 +277,11 @@ class PlayerID(Base):
                 or any(server == this_server for server in b["blacklist"]["servers"])
             ]
         )
-        vips = [v.to_dict() for v in self.vips]
+        # ``vips`` is dynamic and cannot be eager-loaded. Bulk callers may
+        # provide the rows fetched in one query; single-profile callers keep
+        # the existing lazy behaviour.
+        vip_rows = self.vips if preloaded_vips is None else preloaded_vips
+        vips = [v.to_dict() for v in vip_rows]
         is_vip = any(vip["server_number"] == this_server for vip in vips)
         return {
             "id": self.id,
@@ -770,7 +779,10 @@ class PlayersAction(Base):
 
 class LogLine(Base):
     __tablename__ = "log_lines"
-    __table_args__ = (UniqueConstraint("event_time", "raw", name="unique_log_line"),)
+    __table_args__ = (
+        UniqueConstraint("event_time", "raw", name="unique_log_line"),
+        Index("ix_log_lines_server_event_time", "server", "event_time"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     version: Mapped[int] = mapped_column(default=1)

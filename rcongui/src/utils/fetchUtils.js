@@ -88,6 +88,7 @@ function getCookie(name) {
 const SAFE_HTTP_METHODS = new Set(["GET", "HEAD", "OPTIONS", "TRACE"]);
 const CSRF_RECOVERY_HEADER = "X-CRCON-CSRF-Recovery";
 const CSRF_TOKEN_HEADER = "X-CRCON-CSRF-Token";
+let serverConfirmedCsrfToken = null;
 
 function isUnsafeMethod(method) {
   return !SAFE_HTTP_METHODS.has(String(method || "GET").toUpperCase());
@@ -96,7 +97,11 @@ function isUnsafeMethod(method) {
 function requestHeadersWithCsrf(method, headers, tokenOverride) {
   const requestHeaders = new Headers(headers || {});
   if (isUnsafeMethod(method)) {
-    const csrfToken = tokenOverride || getCookie("csrftoken");
+    // Prefer a token that the server already accepted over document.cookie.
+    // Browsers may retain duplicate cookies with different paths, while
+    // document.cookie does not tell us which one will be sent to /api.
+    const csrfToken =
+      tokenOverride || serverConfirmedCsrfToken || getCookie("csrftoken");
     if (csrfToken) {
       requestHeaders.set("X-CSRFToken", decodeURIComponent(csrfToken));
     }
@@ -129,7 +134,10 @@ export async function fetchWithCsrf(input, options = {}) {
     response.headers.get(CSRF_RECOVERY_HEADER) === "1"
   ) {
     const recoveryToken = response.headers.get(CSRF_TOKEN_HEADER);
-    response = await send(recoveryToken);
+    if (recoveryToken) {
+      serverConfirmedCsrfToken = recoveryToken;
+      response = await send(recoveryToken);
+    }
   }
   return response;
 }
@@ -409,8 +417,13 @@ export const cmd = {
     }),
   GET_LIVE_SESSIONS: (params) =>
     requestFactory({ method: "GET", cmd: "get_live_scoreboard", ...params }),
-  GET_LIVE_TEAMS: (params) =>
-    requestFactory({ method: "GET", cmd: "get_team_view", ...params }),
+  GET_LIVE_TEAMS: ({ params = {}, ...options } = {}) =>
+    requestFactory({
+      method: "GET",
+      cmd: "get_team_view",
+      ...options,
+      params: { ...params, compact: "true" },
+    }),
   GET_CURRENT_MAP: (params) =>
     requestFactory({ method: "GET", cmd: "get_map", ...params }),
   GET_MAPS: (params) =>
@@ -479,10 +492,36 @@ export const cmd = {
     }),
   GET_ONLINE_PLAYERS: (params) =>
     requestFactory({ method: "GET", cmd: "get_players", ...params }),
+  GET_MOBILE_INCIDENTS: (params) =>
+    requestFactory({
+      method: "GET",
+      cmd: "/api/mobile/v1/incidents",
+      ...params,
+    }),
+  UPDATE_MOBILE_INCIDENT: ({ incidentId, payload, ...params }) =>
+    requestFactory({
+      method: "PATCH",
+      cmd: `/api/mobile/v1/incidents/${incidentId}`,
+      payload,
+      ...params,
+    }),
   GET_PERMISSIONS: (params) =>
     requestFactory({
       method: "GET",
       cmd: "get_own_user_permissions",
+      ...params,
+    }),
+  GET_OWN_APPEARANCE: (params) =>
+    requestFactory({
+      method: "GET",
+      cmd: "get_own_user_appearance",
+      ...params,
+    }),
+  SET_OWN_APPEARANCE: (payload, params = {}) =>
+    requestFactory({
+      method: "PUT",
+      cmd: "set_own_user_appearance",
+      payload,
       ...params,
     }),
   GET_PLAYER: (params) =>

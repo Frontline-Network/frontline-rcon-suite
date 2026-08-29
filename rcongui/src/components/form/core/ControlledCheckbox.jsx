@@ -22,9 +22,9 @@ export function ControlledCheckbox({
         <FormControlLabel
           control={
             <Checkbox
-              onChange={field.onChange} // send value to hook form
+              checked={Boolean(field.value)}
+              onChange={(_event, checked) => field.onChange(checked)}
               onBlur={field.onBlur} // notify when input is touched/blur
-              value={field.value} // input value
               name={field.name} // send down the input name
               inputRef={field.ref} // send input ref, so we can focus on input when error appear
               disabled={field.disabled}

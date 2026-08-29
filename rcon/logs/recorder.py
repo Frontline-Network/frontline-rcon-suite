@@ -5,12 +5,12 @@ import threading
 import time
 from typing import Callable, Iterable
 
-from sqlalchemy import desc
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from rcon.game.registry import GAME_ID
+from rcon.log_queries import server_time_bounds, server_time_order
 from rcon.logs.loop import LogLoop
 from rcon.models import LogLine, PlayerID, enter_session
 from rcon.player_history import _get_set_player
@@ -33,8 +33,8 @@ class LogRecorder:
         to_store: list[StructuredLogLineWithMetaData] = []
         last_log = (
             sess.query(LogLine)
-            .filter(LogLine.server == self.server_id)
-            .order_by(desc(LogLine.event_time))
+            .filter(*server_time_bounds(self.server_id))
+            .order_by(*server_time_order(descending=True))
             .limit(1)
             .one_or_none()
         )

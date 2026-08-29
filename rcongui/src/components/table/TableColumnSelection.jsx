@@ -1,25 +1,27 @@
-import { PopoverMenu } from "@/components/shared/PopoverMenu";
 import {
-  Tooltip,
+  Box,
+  Checkbox,
+  IconButton,
   List,
   ListItem,
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Checkbox,
-  Box,
-  IconButton,
+  Tooltip,
 } from "@mui/material";
 import ViewColumnIcon from "@mui/icons-material/ViewColumn";
 import { useTranslation } from "react-i18next";
+
+import { PopoverMenu } from "@/components/shared/PopoverMenu";
 
 const TableColumnSelection = ({
   table,
   onColumnVisibilityChange,
   renderButton,
+  getColumnLabel,
 }) => {
   const { t } = useTranslation();
-  const columns = table.getAllColumns().filter((col) => col.getCanHide());
+  const columns = table.getAllColumns().filter((column) => column.getCanHide());
 
   return (
     <PopoverMenu
@@ -54,53 +56,54 @@ const TableColumnSelection = ({
           "& ul": { padding: 0 },
         }}
       >
-        {columns.map((column) => (
-          <ListItem
-            key={column.id}
-            dense
-            disableGutters
-            sx={{ "& .MuiButtonBase-root": { opacity: 1 } }}
-          >
-            <ListItemButton
-              onClick={() =>
-                onColumnVisibilityChange(column.id, !column.getIsVisible())
-              }
+        {columns.map((column) => {
+          const label =
+            getColumnLabel?.(column) ??
+            column.columnDef.meta?.label ??
+            (typeof column.columnDef.header === "string"
+              ? column.columnDef.header
+              : column.id);
+
+          return (
+            <ListItem
+              key={column.id}
+              dense
+              disableGutters
+              sx={{ "& .MuiButtonBase-root": { opacity: 1 } }}
             >
-              <ListItemIcon>
-                <Checkbox
-                  edge="start"
-                  checked={column.getIsVisible()}
-                  disabled={!column.getCanHide()}
-                  tabIndex={-1}
-                  disableRipple
-                  inputProps={{ "aria-labelledby": `picker-${column.id}` }}
-                />
-              </ListItemIcon>
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  overflow: "hidden",
-                  px: 0,
-                  py: 0.25,
-                  gap: 1,
-                }}
+              <ListItemButton
+                onClick={() =>
+                  onColumnVisibilityChange(column.id, !column.getIsVisible())
+                }
               >
                 <Box
                   sx={{
+                    display: "flex",
+                    alignItems: "center",
                     overflow: "hidden",
-                    whiteSpace: "nowrap",
-                    textOverflow: "ellipsis",
+                    px: 0,
+                    py: 0.25,
+                    gap: 1,
                   }}
                 >
-                  <ListItemText id={`picker-${column.id}`}>
-                    {column.columnDef.meta?.label ?? column.id}
-                  </ListItemText>
+                  <ListItemIcon>
+                    <Checkbox
+                      edge="start"
+                      checked={column.getIsVisible()}
+                      disabled={!column.getCanHide()}
+                      tabIndex={-1}
+                      disableRipple
+                      inputProps={{
+                        "aria-labelledby": `picker-${column.id}`,
+                      }}
+                    />
+                  </ListItemIcon>
+                  <ListItemText id={`picker-${column.id}`} primary={label} />
                 </Box>
-              </Box>
-            </ListItemButton>
-          </ListItem>
-        ))}
+              </ListItemButton>
+            </ListItem>
+          );
+        })}
       </List>
     </PopoverMenu>
   );

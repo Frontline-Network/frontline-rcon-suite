@@ -66,7 +66,14 @@ export default function Root() {
       >
         {t("common.skipToContent")}
       </Box>
-      <Box sx={{ display: "flex" }}>
+      <Box
+        sx={{
+          "--app-header-height": { xs: "128px", sm: "128px", lg: "0px" },
+          "--mobile-bottom-nav-height": "64px",
+          display: "flex",
+          minHeight: "100dvh",
+        }}
+      >
         <SideMenu />
         <AppNavbar />
         {/* Main content */}
@@ -78,17 +85,24 @@ export default function Root() {
             flexGrow: 1,
             backgroundColor: theme.palette.background.default,
             overflow: "auto",
-            height: "100vh",
+            height: "100dvh",
+            scrollPaddingTop: "var(--app-header-height)",
           })}
         >
           <Stack
             sx={{
               alignItems: "center",
               mx: 0,
-              pb: 4,
+              pb: {
+                xs: "calc(var(--mobile-bottom-nav-height) + env(safe-area-inset-bottom) + 16px)",
+                md: 4,
+              },
               // The compact navbar has two rows (navigation + live server state).
               // Keep the first page heading below the fixed bar at every mobile width.
-              mt: { xs: 16, lg: 0 },
+              pt: {
+                xs: "calc(var(--app-header-height) + env(safe-area-inset-top))",
+                lg: 0,
+              },
               minHeight: "100%",
             }}
           >

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ast
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
@@ -31,6 +31,8 @@ class FakeResponse:
     status_code: int
     payload: object = None
     invalid_json: bool = False
+    headers: dict[str, str] = field(default_factory=dict)
+    cookies: dict[str, str] = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
@@ -176,6 +178,51 @@ def test_forward_command_retries_method_not_allowed_as_get(monkeypatch):
     assert len(post_calls) == 1
     assert len(get_calls) == 1
     assert get_calls[0][1]["params"] == {"forwarded": True}
+    assert results[0]["status_code"] == 200
+    assert results[0]["response"]["failed"] is False
+
+
+def test_forward_command_recovers_session_csrf_rejection_once(monkeypatch):
+    configure_targets(
+        monkeypatch,
+        {"frontend_1": "key-1", "frontend_2": "key-2"},
+    )
+    calls = []
+    responses = iter(
+        [
+            FakeResponse(
+                403,
+                {"failed": True, "error": "CSRF cookie not set"},
+                headers={
+                    "X-CRCON-CSRF-Recovery": "1",
+                    "X-CRCON-CSRF-Token": "fresh-token",
+                },
+                cookies={"csrftoken": "fresh-cookie"},
+            ),
+            FakeResponse(200, {"failed": False, "result": "ok"}),
+        ]
+    )
+
+    def post(url, **kwargs):
+        calls.append((url, kwargs))
+        return next(responses)
+
+    monkeypatch.setattr(forwarding.requests, "post", post)
+
+    results = forwarding.forward_command(
+        path="/api/add_vip",
+        sessionid="browser-session",
+        auth_header=None,
+        json={"forward": True, "player_id": "player"},
+    )
+
+    assert len(calls) == 2
+    assert calls[0][1]["cookies"] == {"sessionid": "browser-session"}
+    assert calls[1][1]["cookies"] == {
+        "sessionid": "browser-session",
+        "csrftoken": "fresh-cookie",
+    }
+    assert calls[1][1]["headers"]["X-CSRFToken"] == "fresh-token"
     assert results[0]["status_code"] == 200
     assert results[0]["response"]["failed"] is False
 

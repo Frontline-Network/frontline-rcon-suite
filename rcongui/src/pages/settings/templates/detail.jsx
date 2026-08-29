@@ -13,6 +13,8 @@ import {
   Stack,
   styled,
   TextField,
+  Typography,
+  useMediaQuery,
 } from "@mui/material";
 import { cmd } from "@/utils/fetchUtils";
 import SearchIcon from "@mui/icons-material/Search";
@@ -151,7 +153,7 @@ const StyledTextField = styled(TextField)((theme) => ({
   },
 }));
 
-function EditorActions({ editor, actions }) {
+function EditorActions({ editor, actions, compact = false }) {
   const { t } = useTranslation();
   const canBeSaved = editor.title.trim() && editor.content.trim();
 
@@ -161,8 +163,22 @@ function EditorActions({ editor, actions }) {
       sx={(theme) => ({
         display: "flex",
         flexWrap: "wrap",
+        gap: theme.spacing(0.75),
         padding: theme.spacing(1),
         borderRadius: 0,
+        ...(compact && {
+          position: "sticky",
+          bottom: "calc(64px + env(safe-area-inset-bottom))",
+          zIndex: theme.zIndex.appBar,
+          mt: 1,
+          border: "1px solid",
+          borderColor: theme.palette.divider,
+          boxShadow: theme.shadows[8],
+        }),
+        "& .MuiButton-root": {
+          minHeight: 44,
+          ...(compact && { flex: "1 1 132px" }),
+        },
       })}
     >
       <Box sx={{ flexGrow: 1 }} />
@@ -236,7 +252,7 @@ function EditorActions({ editor, actions }) {
   );
 }
 
-function EditorFields({ editor, category, setEditor }) {
+function EditorFields({ editor, category, setEditor, compact = false }) {
   const { t } = useTranslation();
   const theme = useTheme();
 
@@ -285,7 +301,7 @@ function EditorFields({ editor, category, setEditor }) {
         <Suspense fallback={<Skeleton variant="rectangular" height="70vh" />}>
           <StyledTextField
             multiline
-            minRows={16}
+            minRows={compact ? 9 : 16}
             fullWidth
             name="content"
             value={editor.content}
@@ -295,7 +311,7 @@ function EditorFields({ editor, category, setEditor }) {
           />
           <Box sx={{ display: editor.mode === MODE.READ ? "none" : "block" }}>
             <Editor
-              height="70vh"
+              height={compact ? "52vh" : "70vh"}
               defaultLanguage="json"
               value={editor.content}
               defaultValue=""
@@ -311,7 +327,7 @@ function EditorFields({ editor, category, setEditor }) {
           onChange={handleOnInputChange}
           placeholder={t("settings.templates.messageContent")}
           multiline
-          minRows={16}
+          minRows={compact ? 9 : 16}
           fullWidth
           required
           disabled={editor.mode === MODE.READ}
@@ -321,26 +337,44 @@ function EditorFields({ editor, category, setEditor }) {
   );
 }
 
-function MessageList({ messages, onMessageClick, selected }) {
+function MessageList({ messages, onMessageClick, selected, compact = false }) {
   const { t } = useTranslation();
   return (
     <Paper
       sx={{
         borderRadius: 0,
-        minHeight: "300px",
-        maxHeight: "calc(100vh - 256px)",
-        overflowY: "auto",
+        minHeight: compact ? 0 : "300px",
+        maxHeight: compact ? "none" : "calc(100vh - 256px)",
+        overflowY: compact ? "visible" : "auto",
+        overflowX: compact ? "auto" : "hidden",
         scrollbarWidth: "thin",
         scrollbarGutter: "auto",
       }}
     >
-      <List>
+      <List
+        sx={compact ? {
+          display: "flex",
+          gap: 1,
+          p: 1,
+          width: "max-content",
+        } : undefined}
+      >
         {messages.length ? (
           messages.map((message, index) => (
-            <ListItem key={message.id} disablePadding>
+            <ListItem
+              key={message.id}
+              disablePadding
+              sx={compact ? { width: 244, flex: "0 0 244px" } : undefined}
+            >
               <ListItemButton
                 onClick={() => onMessageClick(index)}
                 selected={selected !== undefined && message.id === selected}
+                sx={compact ? {
+                  minHeight: 68,
+                  border: "1px solid",
+                  borderColor: message.id === selected ? "primary.main" : "divider",
+                  alignItems: "flex-start",
+                } : undefined}
               >
                 <ListItemText
                   sx={{
@@ -380,6 +414,8 @@ const MessagesDetailPage = () => {
   const action = useActionData();
   const [editor, setEditor] = useState(initialState);
   const [searchValue, setSearchValue] = useState("");
+  const theme = useTheme();
+  const compact = useMediaQuery(theme.breakpoints.down("md"));
 
   useEffect(() => {
     if (!action) return;
@@ -408,8 +444,9 @@ const MessagesDetailPage = () => {
   }, [action, messages]);
 
   useEffect(() => {
-    setEditor(initialState);
-  }, [category]);
+    const firstMessage = messages[0];
+    setEditor(firstMessage ? { mode: MODE.READ, ...firstMessage } : initialState);
+  }, [category, messages]);
 
   const handleMessageClick = (index) => {
     const message = messages[index];
@@ -455,8 +492,8 @@ const MessagesDetailPage = () => {
   });
 
   return (
-    <Stack direction={["column", "row"]}>
-      <Stack direction={"column"} sx={{ minWidth: 300, width: 300 }}>
+    <Stack direction={compact ? "column" : "row"} gap={compact ? 1.5 : 0} sx={{ minWidth: 0 }}>
+      <Stack direction="column" sx={{ minWidth: compact ? 0 : 300, width: compact ? "100%" : 300 }}>
         <Paper
           sx={(theme) => ({
             padding: theme.spacing(0.5),
@@ -464,6 +501,8 @@ const MessagesDetailPage = () => {
             flexDirection: "column",
             alignItems: "center",
             borderRadius: 0,
+            border: "1px solid",
+            borderColor: theme.palette.divider,
           })}
         >
           <SearchWrapper>
@@ -471,7 +510,7 @@ const MessagesDetailPage = () => {
               <SearchIcon />
             </Box>
             <InputBase
-              sx={{ ml: 1 }}
+              sx={{ ml: 1, flex: 1, minWidth: 0 }}
               placeholder={t("settings.templates.search")}
               inputProps={{ "aria-label": t("settings.templates.search") }}
               onChange={handleSearchChange}
@@ -482,23 +521,32 @@ const MessagesDetailPage = () => {
           selected={editor.id}
           messages={filteredMessages}
           onMessageClick={handleMessageClick}
+          compact={compact}
         />
       </Stack>
-      <Box component={Form} method="POST" sx={{ flexGrow: 1, width: "100%" }}>
-        <EditorActions
+      <Box component={Form} method="POST" sx={{ flexGrow: 1, width: "100%", minWidth: 0 }}>
+        {!compact && <EditorActions
           editor={editor}
-          actions={{
-            create: handleCreate,
-            update: handleUpdate,
-            cancelCreate: handleCancelCreate,
-            cancelEdit: handleCancelUpdate,
-          }}
-        />
+          actions={{ create: handleCreate, update: handleUpdate, cancelCreate: handleCancelCreate, cancelEdit: handleCancelUpdate }}
+        />}
+        <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 0 }}>
+          <Typography variant="overline" color="primary.main" sx={{ fontWeight: 800 }}>
+            {editor.mode === MODE.CREATE
+              ? t("settings.templates.createNew")
+              : editor.title || t("settings.templates.select")}
+          </Typography>
         <EditorFields
           editor={editor}
           setEditor={setEditor}
           category={category}
+          compact={compact}
         />
+        </Paper>
+        {compact && <EditorActions
+          editor={editor}
+          compact
+          actions={{ create: handleCreate, update: handleUpdate, cancelCreate: handleCancelCreate, cancelEdit: handleCancelUpdate }}
+        />}
       </Box>
     </Stack>
   );

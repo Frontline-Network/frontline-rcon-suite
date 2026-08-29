@@ -15,6 +15,18 @@ export function getVariantWidth(variant) {
       return "16ch";
     case "name":
       return "20ch";
+    case "playerName":
+      return "16ch";
+    case "teamCompact":
+      return "4rem";
+    case "squadCompact":
+      return "6.5rem";
+    case "assignmentSummary":
+      return "18ch";
+    case "performanceSummary":
+      return "15ch";
+    case "statusSummary":
+      return "10ch";
     case "fullname":
       return "30ch";
     case "action":
@@ -38,6 +50,18 @@ export function getVariantMinWidth(variant) {
       return "16ch";
     case "name":
       return "20ch";
+    case "playerName":
+      return "16ch";
+    case "teamCompact":
+      return "4rem";
+    case "squadCompact":
+      return "6.5rem";
+    case "assignmentSummary":
+      return "18ch";
+    case "performanceSummary":
+      return "15ch";
+    case "statusSummary":
+      return "10ch";
     case "fullname":
       return "30ch";
     case "action":
@@ -46,6 +70,17 @@ export function getVariantMinWidth(variant) {
       return "50ch";
     default:
       return "auto";
+  }
+}
+
+export function getVariantMaxWidth(variant) {
+  switch (variant) {
+    case "teamCompact":
+      return "4rem";
+    case "squadCompact":
+      return "6.5rem";
+    default:
+      return undefined;
   }
 }
 
@@ -118,30 +153,62 @@ export const StyledThead = styled("thead")(({ theme }) => ({
 
 export const StyledTh = styled("th", {
   shouldForwardProp: (prop) =>
-    !["variant", "minWidth", "cellAlign"].includes(prop),
+    ![
+      "variant",
+      "minWidth",
+      "cellAlign",
+      "sticky",
+      "stickyOffset",
+    ].includes(prop),
 })((styledProps) => {
   const variant = styledProps.variant;
   const cellAlign = styledProps.cellAlign;
+  const sticky = styledProps.sticky;
   return {
     width: getVariantWidth(variant),
     minWidth: getVariantMinWidth(variant),
+    maxWidth: getVariantMaxWidth(variant),
     textAlign: cellAlign || (variant === "icon" ? "center" : "left"),
     paddingLeft: variant === "icon" ? 0 : undefined,
     paddingRight: variant === "icon" ? 0 : undefined,
+    ...(sticky
+      ? {
+          position: "sticky",
+          [sticky]: styledProps.stickyOffset ?? 0,
+          zIndex: 4,
+          backgroundColor: styledProps.theme.palette.background.paper,
+        }
+      : {}),
   };
 });
 
 export const StyledTd = styled("td", {
   shouldForwardProp: (prop) =>
-    !["variant", "minWidth", "cellAlign"].includes(prop),
+    ![
+      "variant",
+      "minWidth",
+      "cellAlign",
+      "sticky",
+      "stickyOffset",
+    ].includes(prop),
 })((styledProps) => {
   const variant = styledProps.variant;
   const cellAlign = styledProps.cellAlign;
+  const sticky = styledProps.sticky;
 
   return {
     width: getVariantWidth(variant),
     minWidth: getVariantMinWidth(variant),
+    maxWidth: getVariantMaxWidth(variant),
     textAlign: cellAlign || (variant === "icon" ? "center" : "left"),
+    ...(sticky
+      ? {
+          position: "sticky",
+          [sticky]: styledProps.stickyOffset ?? 0,
+          zIndex: 2,
+          backgroundColor: styledProps.theme.palette.background.default,
+        }
+      : {}),
   };
 });
 

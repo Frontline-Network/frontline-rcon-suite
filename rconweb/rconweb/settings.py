@@ -182,10 +182,17 @@ CORS_ORIGIN_ALLOW_ALL = False
 # The browser never needs to inspect the authenticated Django session.  The
 # CSRF cookie remains readable so the frontend can send it as a request header.
 SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
 CSRF_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_DOMAIN = os.getenv("SESSION_COOKIE_DOMAIN") or None
 CSRF_COOKIE_DOMAIN = os.getenv("CSRF_COOKIE_DOMAIN") or None
+
+# Traefik terminates TLS before forwarding requests to Django. Trust only its
+# standard scheme header so Django still treats those requests as HTTPS when
+# validating origins and constructing security-sensitive responses.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # Cross-origin browser clients must be listed explicitly above. Same-origin
 # requests do not need a CSRF trusted-origin exception.
@@ -196,7 +203,6 @@ if DEBUG:
     # Chrome requires these to be set or it won't allow cookies to save between
     # cross origin requests, by default in debug the backend runs on localhost:8000
     #  and the frontend on localhost:3000 which are considered different domains
-    SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SAMESITE = "None"
     SESSION_COOKIE_SAMESITE = "None"
 

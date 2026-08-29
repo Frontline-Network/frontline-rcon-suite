@@ -946,9 +946,7 @@ class MobileContextTests(TestCase):
 
     @patch("api.mobile_incidents.time.sleep")
     @patch("api.mobile_incidents.confirmed_action_subject")
-    def test_hllv_kick_retries_one_transient_rejection(
-        self, confirmed_subject, sleep
-    ):
+    def test_hllv_kick_retries_one_transient_rejection(self, confirmed_subject, sleep):
         from api.mobile_incidents import _execute_action
         from rcon.types import GameEnum
 
@@ -1138,6 +1136,41 @@ class MobileContextTests(TestCase):
                     "context-admin",
                     {"target_id": "biene-id", "target_name": "Biene"},
                 )
+
+    @patch("api.mobile_incidents.confirmed_action_subject")
+    def test_blacklist_defaults_to_builtin_list_zero(self, confirmed_subject):
+        from api.mobile_incidents import _execute_action
+
+        confirmed_subject.return_value = {
+            "display_name": "Biene",
+            "player_id": "biene-id",
+        }
+        add_blacklist_record = MagicMock(return_value={"id": 9})
+        fake_views = SimpleNamespace(
+            rcon_api=SimpleNamespace(add_blacklist_record=add_blacklist_record)
+        )
+
+        with patch.dict(sys.modules, {"api.views": fake_views}):
+            self.assertEqual(
+                _execute_action(
+                    "blacklist",
+                    {
+                        "player_id": "biene-id",
+                        "reason": "Reason",
+                        "confirmed": True,
+                    },
+                    "context-admin",
+                    {"target_id": "biene-id", "target_name": "Biene"},
+                ),
+                {"id": 9},
+            )
+
+        add_blacklist_record.assert_called_once_with(
+            player_id="biene-id",
+            blacklist_id=0,
+            reason="Reason",
+            admin_name="context-admin",
+        )
 
     def test_rejected_squad_disband_is_not_treated_as_success(self):
         from api.mobile_incidents import _execute_action

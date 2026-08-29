@@ -1,6 +1,7 @@
 import {
   Box,
   Checkbox,
+  IconButton,
   Stack,
   styled,
   Tooltip,
@@ -8,9 +9,8 @@ import {
 } from "@mui/material";
 import { ErrorOutline, Star, Warning } from "@mui/icons-material";
 import { yellow } from "@mui/material/colors";
+import { alpha } from "@mui/material/styles";
 import dayjs from "dayjs";
-import { ActionMenuButton } from "@/features/player-action/ActionMenu";
-import { generatePlayerActions } from "@/features/player-action/actions";
 import { CountryFlag } from "@/components/shared/CountryFlag";
 import {
   getPlayerTier,
@@ -18,7 +18,6 @@ import {
   hasRecentWarnings,
   isSteamPlayer,
   getTierColors,
-  getColoredFactionIconSrc,
 } from "@/utils/lib";
 import { SortableHeader, TextButton } from "@/components/table/styles";
 import RemoveRedEyeIcon from "@mui/icons-material/RemoveRedEye";
@@ -27,8 +26,15 @@ import CopyableText from "@/components/shared/CopyableText";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Emoji from "@/components/shared/Emoji";
 import { useThemedImages } from "@/hooks/useThemedImages";
-import { getPlatformIcon, getPlatformLabel, PLATFORMS } from "@/constants/platforms";
+import {
+  getPlatformIcon,
+  getPlatformLabel,
+  PLATFORMS,
+} from "@/constants/platforms";
 import { getTeamkillRisk } from "@/utils/teamkill-risk.mjs";
+import { getFactionIconSrc } from "@/utils/factionIcons";
+import { formatSquadLabel } from "./player-display-labels";
+import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 
 export const Square = styled(Box)(({ theme }) => ({
   display: "flex",
@@ -69,7 +75,6 @@ const Center = styled(Box)(() => ({
 
 const iconFontSize = "1em";
 const emojiFontSize = "0.85em";
-
 const getBanDetailText = (t, detail) => {
   if (detail.scope === "direct" && detail.type === "gameServer") {
     return t("views.table.activeBanDirect");
@@ -94,7 +99,7 @@ const getBanDetailText = (t, detail) => {
   });
 };
 
-const TeamkillRisk = ({ value, t }) => {
+const TeamkillRisk = ({ value, t, compact = false }) => {
   const risk = getTeamkillRisk(value);
   const levelLabel = t(`views.table.teamKillRisk.${risk.level}`);
   const description = t("views.table.teamKillRisk.description", {
@@ -105,8 +110,8 @@ const TeamkillRisk = ({ value, t }) => {
     risk.level === "high"
       ? "error.main"
       : risk.level === "caution"
-        ? "warning.main"
-        : "success.main";
+      ? "warning.main"
+      : "success.main";
   const Icon = risk.level === "high" ? ErrorOutline : Warning;
 
   return (
@@ -124,6 +129,7 @@ const TeamkillRisk = ({ value, t }) => {
       }
     >
       <Box
+        role="img"
         aria-label={description}
         sx={{
           alignItems: "center",
@@ -139,14 +145,14 @@ const TeamkillRisk = ({ value, t }) => {
           <Icon aria-hidden="true" sx={{ fontSize: "1em" }} />
         ) : null}
         <Typography component="span" variant="caption" fontWeight="inherit">
-          {`${risk.count} ${levelLabel}`}
+          {compact ? `TK ${risk.count}` : `${risk.count} ${levelLabel}`}
         </Typography>
       </Box>
     </Tooltip>
   );
 };
 
-export const getColumns = (t) => [
+export const getColumns = (t, factionByTeam = {}) => [
   {
     id: "select",
     header: ({ table }) => (
@@ -182,55 +188,244 @@ export const getColumns = (t) => [
     ),
     meta: {
       variant: "icon",
+      sticky: "left",
+      stickyOffset: 0,
     },
+  },
+  {
+    id: "player_summary",
+    header: SortableHeader(t("views.table.name"), t("views.table.name")),
+    accessorFn: (row) => row.name,
+    cell: ({ row }) => {
+      const { openWithId } = usePlayerSidebar();
+      return (
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={0.75}
+          sx={{
+            minWidth: "12ch",
+            maxWidth: "100%",
+            overflow: "hidden",
+            textAlign: "left",
+            whiteSpace: "nowrap",
+          }}
+        >
+          <Tooltip arrow placement="top-start" title={row.original.name}>
+            <Box
+              component="span"
+              sx={{ display: "inline-flex", minWidth: 0, overflow: "hidden" }}
+            >
+              <TextButton
+                onClick={() => openWithId(row.original.player_id)}
+                sx={{ minWidth: 0, maxWidth: "100%", overflow: "hidden" }}
+              >
+                <Typography
+                  component="span"
+                  noWrap
+                  variant="body2"
+                  sx={{
+                    color: (theme) => alpha(theme.palette.text.primary, 0.82),
+                    display: "block",
+                    fontWeight: 300,
+                    maxWidth: "100%",
+                  }}
+                >
+                  {row.original.name}
+                </Typography>
+              </TextButton>
+            </Box>
+          </Tooltip>
+          <LevelColored
+            component="span"
+            level={row.original.level}
+            sx={{
+              flex: "0 0 auto",
+              fontSize: "0.72rem",
+              fontWeight: 700,
+              lineHeight: 1,
+            }}
+          >
+            Lv {row.original.level ?? "–"}
+          </LevelColored>
+        </Stack>
+      );
+    },
+    meta: {
+      variant: "playerName",
+      sticky: "left",
+      stickyOffset: "4.5rem",
+    },
+  },
+  {
+    id: "performance_summary",
+    header: SortableHeader(
+      t("views.live.performance"),
+      t("views.live.performance")
+    ),
+    accessorFn: (row) => row.kills,
+    cell: ({ row }) => (
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={0.75}
+        sx={{ minWidth: "10ch", whiteSpace: "nowrap" }}
+      >
+        <Tooltip
+          arrow
+          title={`${t("views.table.kills")}: ${row.original.kills ?? 0} · ${t(
+            "views.table.deaths"
+          )}: ${row.original.deaths ?? 0}`}
+        >
+          <Typography
+            component="span"
+            variant="caption"
+            sx={{ color: "text.primary", whiteSpace: "nowrap" }}
+          >
+            K {row.original.kills ?? 0} · D {row.original.deaths ?? 0}
+          </Typography>
+        </Tooltip>
+        <TeamkillRisk value={row.original} t={t} compact />
+      </Stack>
+    ),
+    meta: { variant: "performanceSummary" },
+  },
+  {
+    id: "status_summary",
+    header: t("views.live.status"),
+    accessorFn: (row) =>
+      [
+        row.is_vip,
+        row.profile?.watchlist?.is_watched,
+        hasRecentWarnings(row.profile?.received_actions ?? []),
+        row.activeBanStatus?.isActive,
+      ].filter(Boolean).length,
+    cell: ({ row }) => {
+      const items = [];
+      if (row.original.is_vip) {
+        items.push({
+          key: "vip",
+          icon: <Star sx={{ fontSize: "0.95rem" }} />,
+          label: "VIP",
+          color: "warning.light",
+        });
+      }
+      if (row.original.profile?.watchlist?.is_watched) {
+        items.push({
+          key: "watch",
+          icon: <RemoveRedEyeIcon sx={{ fontSize: "0.95rem" }} />,
+          label: t("views.live.watched"),
+          color: "primary.light",
+        });
+      }
+      if (hasRecentWarnings(row.original.profile?.received_actions ?? [])) {
+        items.push({
+          key: "warning",
+          icon: <Warning sx={{ fontSize: "0.95rem" }} />,
+          label: t("views.live.warned"),
+          color: "warning.light",
+        });
+      }
+      if (row.original.activeBanStatus?.isActive) {
+        items.push({
+          key: "ban",
+          icon: <ErrorOutline sx={{ fontSize: "0.95rem" }} />,
+          label: t("views.table.activeBan"),
+          color: "error.light",
+        });
+      }
+      if (items.length === 0) {
+        return (
+          <Typography variant="caption" sx={{ color: "text.disabled" }}>
+            –
+          </Typography>
+        );
+      }
+      return (
+        <Stack direction="row" flexWrap="wrap" gap={0.75}>
+          {items.map((item) => (
+            <Tooltip key={item.key} arrow title={item.label}>
+              <Box
+                component="span"
+                role="img"
+                aria-label={item.label}
+                sx={{
+                  alignItems: "center",
+                  color: item.color,
+                  display: "inline-flex",
+                  minHeight: 24,
+                }}
+              >
+                {item.icon}
+              </Box>
+            </Tooltip>
+          ))}
+        </Stack>
+      );
+    },
+    meta: { variant: "statusSummary" },
   },
   {
     accessorKey: "team",
     id: "team",
-    header: SortableHeader("T", t("views.table.team")),
+    header: SortableHeader(t("views.table.team"), t("views.table.team")),
     cell: ({ row }) => {
-      const themedImg = useThemedImages()
+      const team = row.original.team;
+      const teamLabel = t(`views.team.${team}`, {
+        defaultValue: team ?? "–",
+      });
+      const faction = factionByTeam[team] ?? team ?? "unknown";
       return (
-        <Center>
-          <Square>
-            {row.original.faction ? (
-              <img
-                src={getColoredFactionIconSrc(row.original.faction)}
-                width={16}
-                height={16}
-                alt={row.original.faction}
-                title={row.original.faction}
-              />
-            ) : (
-              "-"
-            )}
-          </Square>
-        </Center>
+        <Tooltip arrow placement="top" title={teamLabel}>
+          <Box
+            component="img"
+            src={getFactionIconSrc(faction, "colored")}
+            alt={teamLabel}
+            sx={{
+              display: "block",
+              height: 20,
+              mx: "auto",
+              objectFit: "contain",
+              width: 20,
+            }}
+            onError={(event) => {
+              event.currentTarget.src = getFactionIconSrc("unknown", "colored");
+            }}
+          />
+        </Tooltip>
       );
     },
     meta: {
-      variant: "icon",
+      variant: "teamCompact",
     },
   },
   {
     id: "unit",
-    header: SortableHeader("U", t("views.table.unit")),
+    header: SortableHeader(t("views.table.unit"), t("views.table.unit")),
     accessorKey: "unit_name",
+    filterFn: (row, _columnId, value) => {
+      if (!value || (Array.isArray(value) && value.length === 0)) return true;
+      const values = Array.isArray(value) ? value : [value];
+      return values.includes(row.original.unit_name);
+    },
     // Group by unit name and team
     // getGroupingValue: (row) => `${row.original.unit_name ?? "-"}-${row.original.team}`,
     cell: ({ row }) => {
+      const unitLabel = formatSquadLabel(row.original.unit_name);
       return (
-        <Center>
-          <Square>
-            {row.original.unit_name !== "unassigned"
-              ? row.original.unit_name?.charAt(0)?.toUpperCase()
-              : "-"}
-          </Square>
-        </Center>
+        <Tooltip arrow placement="top" title={unitLabel}>
+          <Typography
+            noWrap
+            variant="caption"
+            sx={{ color: "text.primary", fontWeight: 600 }}
+          >
+            {unitLabel}
+          </Typography>
+        </Tooltip>
       );
     },
     meta: {
-      variant: "icon",
+      variant: "squadCompact",
     },
   },
   {
@@ -275,10 +470,24 @@ export const getColumns = (t) => [
   },
   {
     id: "kills",
-    header: SortableHeader("K", t("views.table.kills")),
+    header: SortableHeader(t("views.table.kills"), t("views.table.kills")),
     accessorKey: "kills",
     cell: ({ row }) => {
       return <>{row.original.kills}</>;
+    },
+    meta: {
+      variant: "short",
+    },
+  },
+  {
+    id: "deaths",
+    header: SortableHeader(t("views.table.deaths"), t("views.table.deaths")),
+    accessorKey: "deaths",
+    cell: ({ row }) => {
+      return <>{row.original.deaths}</>;
+    },
+    meta: {
+      variant: "short",
     },
   },
   {
@@ -287,7 +496,7 @@ export const getColumns = (t) => [
     accessorFn: (row) => {
       const kills = Number(row.kills) || 0;
       const playtime = Number(
-        row.map_playtime_seconds ?? row.profile?.current_playtime_seconds ?? 0,
+        row.map_playtime_seconds ?? row.profile?.current_playtime_seconds ?? 0
       );
       if (!Number.isFinite(playtime) || playtime <= 0 || kills <= 0) return 0;
       return (kills / playtime) * 60;
@@ -298,8 +507,15 @@ export const getColumns = (t) => [
   },
   {
     id: "team_kills",
-    header: SortableHeader("TK", t("views.table.teamKills")),
+    header: SortableHeader(
+      t("views.table.teamKillRiskLabel"),
+      t("views.table.teamKillRiskLabel")
+    ),
     accessorFn: (row) => getTeamkillRisk(row).count,
+    filterFn: (row, _columnId, value) => {
+      if (value !== "risk") return true;
+      return getTeamkillRisk(row.original).count > 0;
+    },
     cell: (props) => {
       return <TeamkillRisk value={props.getValue()} t={t} />;
     },
@@ -359,26 +575,40 @@ export const getColumns = (t) => [
     id: "actions",
     header: SortableHeader("ACT", t("common.actions")),
     accessorKey: "actions",
-    cell: ({ row }) => {
+    cell: ({ row, table }) => {
+      const isOpen =
+        table.options.meta?.activePlayerActionId === row.original.player_id;
       return (
-        <ActionMenuButton
-          actions={generatePlayerActions({
-            multiAction: false,
-            onlineAction: true,
-          })}
-          recipients={row.original}
-          orientation="horizontal"
-          disableRipple={true}
-          sx={{
-            width: "1em",
-            height: "1em",
-            fontSize: "1em",
-          }}
-        />
+        <Tooltip title={t("actions.menu")}>
+          <IconButton
+            aria-controls={isOpen ? "live-player-row-actions-menu" : undefined}
+            aria-expanded={isOpen ? "true" : undefined}
+            aria-haspopup="true"
+            aria-label={t("actions.menu")}
+            data-player-name={row.original.name}
+            data-testid="live-player-row-actions-trigger"
+            disableRipple
+            onClick={(event) =>
+              table.options.meta?.openPlayerActionMenu?.(
+                event.currentTarget,
+                row.original
+              )
+            }
+            sx={{
+              width: "1em",
+              height: "1em",
+              fontSize: "1em",
+            }}
+          >
+            <MoreHorizIcon fontSize="inherit" />
+          </IconButton>
+        </Tooltip>
       );
     },
     meta: {
       variant: "icon",
+      sticky: "right",
+      stickyOffset: 0,
     },
   },
   {
@@ -386,7 +616,8 @@ export const getColumns = (t) => [
     header: SortableHeader("OS", t("views.table.platform")),
     accessorFn: (row) =>
       getPlatformLabel(
-        row.platform || (isSteamPlayer(row) ? PLATFORMS.STEAM : PLATFORMS.XBOX_LIVE),
+        row.platform ||
+          (isSteamPlayer(row) ? PLATFORMS.STEAM : PLATFORMS.XBOX_LIVE)
       ),
     cell: ({ row }) => {
       const platform = row.original.platform;
@@ -519,6 +750,8 @@ export const getColumns = (t) => [
     id: "watchlist",
     header: SortableHeader("W", t("views.table.watchlist")),
     accessorKey: "profile.watchlist",
+    filterFn: (row, _columnId, value) =>
+      !value || Boolean(row.original.profile?.watchlist?.is_watched),
     cell: ({ row }) => {
       return row.original.profile?.watchlist &&
         row.original.profile?.watchlist?.is_watched ? (
@@ -540,6 +773,7 @@ export const getColumns = (t) => [
     id: "vip",
     header: SortableHeader("VIP"),
     accessorKey: "is_vip",
+    filterFn: (row, _columnId, value) => !value || Boolean(row.original.is_vip),
     cell: ({ row }) => {
       return row.original.is_vip ? (
         <Star
@@ -589,7 +823,10 @@ export const getColumns = (t) => [
   },
   {
     id: "time",
-    header: SortableHeader(t("views.table.timeShort"), t("views.table.currentPlaytime")),
+    header: SortableHeader(
+      t("views.table.timeShort"),
+      t("views.table.currentPlaytime")
+    ),
     accessorKey: "profile.current_playtime_seconds",
     aggregationFn: "mean",
     cell: ({ row }) => {

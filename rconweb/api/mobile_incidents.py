@@ -25,8 +25,8 @@ from rcon.admin_incidents import (
 from rcon.commands import HLLCommandFailedError
 from rcon.connection import (
     HLLCommandError,
-    HLLCommandFailedError as HLLConnectionCommandFailedError,
 )
+from rcon.connection import HLLCommandFailedError as HLLConnectionCommandFailedError
 from rcon.types import GameEnum
 from rcon.utils import get_server_number
 
@@ -107,11 +107,7 @@ def _player_is_offline(rcon_api, player_id: str) -> bool:
 
 def _player_has_ban(rcon_api, player_id: str, *, permanent: bool) -> bool:
     try:
-        bans = (
-            rcon_api.get_perma_bans()
-            if permanent
-            else rcon_api.get_temp_bans()
-        )
+        bans = rcon_api.get_perma_bans() if permanent else rcon_api.get_temp_bans()
         return _contains_player_id(bans, player_id)
     except Exception:
         return False
@@ -634,7 +630,7 @@ def _execute_action(action: str, data: dict, user_name: str, incident: dict):
                 by=user_name,
                 save_message=True,
                 player_name=player_name or None,
-            )
+            ),
         )
     if action in {"punish", "kick", "temp_ban", "perma_ban"}:
         reason = str(data.get("reason") or "").strip()
@@ -691,17 +687,13 @@ def _execute_action(action: str, data: dict, user_name: str, incident: dict):
                 by=user_name,
                 player_name=player_name or None,
             ),
-            verify=lambda: _player_has_ban(
-                views.rcon_api, player_id, permanent=False
-            ),
+            verify=lambda: _player_has_ban(views.rcon_api, player_id, permanent=False),
         )
     if action == "blacklist":
         reason = str(data.get("reason") or "").strip()
         blacklist_id = int(data.get("blacklist_id", 0))
-        if not reason or blacklist_id < 1 or data.get("confirmed") is not True:
-            raise ValueError(
-                "Blacklist requires a reason, blacklist_id and explicit confirmation"
-            )
+        if not reason or blacklist_id < 0 or data.get("confirmed") is not True:
+            raise ValueError("Blacklist requires a reason and explicit confirmation")
         return _run_game_action(
             action,
             views.rcon_api,
@@ -710,7 +702,7 @@ def _execute_action(action: str, data: dict, user_name: str, incident: dict):
                 blacklist_id=blacklist_id,
                 reason=reason,
                 admin_name=user_name,
-            )
+            ),
         )
     if action == "comment":
         comment = str(data.get("comment") or "").strip()

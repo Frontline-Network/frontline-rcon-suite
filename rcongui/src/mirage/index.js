@@ -31,6 +31,63 @@ export function makeServer({ environment = "development" } = {}) {
   const protectedRequestLog = [];
   let demoDiscordLastTest = null;
   let demoDiscordEnabled = true;
+  let demoIncidents = [
+    {
+      id: "demo-report-1",
+      server_number: 2,
+      source: "chat",
+      status: "new",
+      reporter_id: "76561198000000001",
+      reporter_name: "FLN_Raven",
+      target_id: "76561198000000004",
+      target_name: "FLN_Hawkeye",
+      reason: "Absichtlicher Teamkill am mittleren Punkt.",
+      raw_message: "!admin hawkeye absichtlicher tk",
+      assigned_to: null,
+      revision: 1,
+      created_at: new Date(Date.now() - 4 * 60000).toISOString(),
+      updated_at: new Date(Date.now() - 4 * 60000).toISOString(),
+      subjects: [],
+      primary_subject: null,
+    },
+    {
+      id: "demo-report-2",
+      server_number: 3,
+      source: "chat",
+      status: "claimed",
+      reporter_id: "76561198000000002",
+      reporter_name: "FLN_Wolf",
+      target_id: null,
+      target_name: null,
+      reason: "Squad Able spricht nicht und reagiert nicht auf den Commander.",
+      raw_message: "!admin squad able redet nicht",
+      assigned_to: "Frontline Admin",
+      revision: 2,
+      created_at: new Date(Date.now() - 12 * 60000).toISOString(),
+      updated_at: new Date(Date.now() - 2 * 60000).toISOString(),
+      subjects: [{ id: "subject-able", kind: "squad", name: "Able", confirmed: true }],
+      primary_subject: { id: "subject-able", kind: "squad", name: "Able", confirmed: true },
+    },
+    {
+      id: "demo-report-3",
+      server_number: 4,
+      source: "chat",
+      status: "resolved",
+      reporter_id: "76561198000000003",
+      reporter_name: "FLN_Valkyrie",
+      target_id: "76561198000000005",
+      target_name: "FLN_Falcon",
+      reason: "Beleidigungen im Teamchat.",
+      raw_message: "!admin falcon beleidigt",
+      assigned_to: "Leitstelle",
+      revision: 4,
+      created_at: new Date(Date.now() - 45 * 60000).toISOString(),
+      updated_at: new Date(Date.now() - 22 * 60000).toISOString(),
+      resolved_at: new Date(Date.now() - 22 * 60000).toISOString(),
+      subjects: [],
+      primary_subject: null,
+    },
+  ];
   const trackProtectedRequest = (path, handler) => (...args) => {
     protectedRequestLog.push(path);
     if (isDemoSessionExpired()) {
@@ -216,6 +273,26 @@ export function makeServer({ environment = "development" } = {}) {
           });
         })
       );
+      let demoAppearance = {
+        version: 1,
+        mode: "dark",
+        preset: "frontline-gold",
+        customAccent: "#c59a4a",
+        colorVision: "standard",
+      };
+      this.get(
+        "/get_own_user_appearance",
+        trackProtectedRequest("/api/get_own_user_appearance", () =>
+          ok(demoAppearance)
+        )
+      );
+      this.put(
+        "/set_own_user_appearance",
+        trackProtectedRequest("/api/set_own_user_appearance", (_schema, request) => {
+          demoAppearance = JSON.parse(request.requestBody || "{}");
+          return ok(demoAppearance);
+        })
+      );
       this.get("/logout", () => ok(true));
 
       this.get(
@@ -246,8 +323,8 @@ export function makeServer({ environment = "development" } = {}) {
             time_remaining: 3427,
             allied_score: 3,
             axis_score: 2,
-            num_allied_players: 43,
-            num_axis_players: 43,
+            num_allied_players: 49,
+            num_axis_players: 49,
           })
         )
       );
@@ -445,6 +522,33 @@ export function makeServer({ environment = "development" } = {}) {
         { name: "discord-bot", statename: "STOPPED", start: 1775100000, stop: 1775200000, now: 1775210400, info: "Discord-Benachrichtigungen" },
       ]));
       this.get("/get_maps", () => ok(mapLayers));
+      this.get("/get_available_weapons", () =>
+        ok({
+          game: "hll",
+          weapons: [
+            { name: "155MM HOWITZER [M114]", type: "artillery" },
+            { name: "150MM HOWITZER [sFH 18]", type: "artillery" },
+            {
+              name: "122MM HOWITZER [M1938 (M-30)]",
+              type: "artillery",
+            },
+            {
+              name: "QF 25-POUNDER [QF 25-Pounder]",
+              type: "artillery",
+            },
+            { name: "BOMBING RUN", type: "commander" },
+            { name: "PRECISION STRIKE", type: "commander" },
+            { name: "STRAFING RUN", type: "commander" },
+            { name: "M1 GARAND", type: "infantry" },
+            { name: "KARABINER 98K", type: "infantry" },
+            { name: "MP40", type: "infantry" },
+            { name: "MG42", type: "machine_gun" },
+            { name: "57MM CANNON [M1 57mm]", type: "pak" },
+            { name: "75MM CANNON [PAK 40]", type: "pak" },
+            { name: "SATCHEL", type: "satchel" },
+          ],
+        })
+      );
       this.get("/get_map", () => ok(currentLayer));
       this.get("/get_map_rotation", () => ok({ maps: mapLayers.slice(0, 3), current_index: 0, next_index: 1 }));
       this.get("/get_map_shuffle_enabled", () => ok(false));
@@ -632,6 +736,55 @@ export function makeServer({ environment = "development" } = {}) {
           };
         }
         return ok(decision);
+      });
+
+      this.get("/api/mobile/v1/incidents", () => ok(demoIncidents));
+      this.patch("/api/mobile/v1/incidents/:incidentId", (schema, request) => {
+        const payload = request.requestBody
+          ? JSON.parse(request.requestBody)
+          : {};
+        const index = demoIncidents.findIndex(
+          (incident) => incident.id === request.params.incidentId
+        );
+        if (index < 0) {
+          return new Response(
+            404,
+            { "Content-Type": "application/json" },
+            { error: "Incident not found" }
+          );
+        }
+        const current = demoIncidents[index];
+        if (Number(payload.revision) !== Number(current.revision)) {
+          return new Response(
+            409,
+            { "Content-Type": "application/json" },
+            { error: "Incident revision conflict" }
+          );
+        }
+        const nextStatus =
+          payload.operation === "claim"
+            ? "claimed"
+            : payload.operation === "resolved"
+            ? "resolved"
+            : payload.operation === "dismissed"
+            ? "dismissed"
+            : current.status;
+        const updated = {
+          ...current,
+          status: nextStatus,
+          assigned_to:
+            payload.operation === "claim"
+              ? "Frontline Admin"
+              : current.assigned_to,
+          revision: current.revision + 1,
+          updated_at: new Date().toISOString(),
+          resolved_at:
+            nextStatus === "resolved" ? new Date().toISOString() : current.resolved_at,
+        };
+        demoIncidents = demoIncidents.map((incident, incidentIndex) =>
+          incidentIndex === index ? updated : incident
+        );
+        return { failed: false, result: updated };
       });
       
       this.get(

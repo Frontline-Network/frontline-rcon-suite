@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Box,
@@ -35,7 +35,10 @@ import TableColumnSelection from "@/components/table/TableColumnSelection";
 import TableConfigDrawer from "@/components/table/TableConfigDrawer";
 import { DebouncedSearchInput } from "@/components/shared/DebouncedSearchInput";
 import PageHeader from "@/components/shared/PageHeader";
-import { ActionMenuButton } from "@/features/player-action/ActionMenu";
+import {
+  ActionMenu,
+  ActionMenuButton,
+} from "@/features/player-action/ActionMenu";
 import { generatePlayerActions } from "@/features/player-action/actions";
 import { useLiveSessionsTableStore } from "@/stores/table-config";
 import { createLiveSessionColumns } from "./columns";
@@ -121,7 +124,25 @@ export default function LiveSessionsPage() {
   const { data, isLoading, isFetching, error, dataUpdatedAt } = teamsLiveQuery({
     refetchInterval: 15 * 1000,
   });
+  const [playerActionMenu, setPlayerActionMenu] = useState({
+    anchorEl: null,
+    player: null,
+  });
+  const openPlayerActionMenu = useCallback((anchorEl, player) => {
+    setPlayerActionMenu({ anchorEl, player });
+  }, []);
+  const setPlayerActionMenuAnchor = useCallback((anchorEl) => {
+    setPlayerActionMenu((current) => ({ ...current, anchorEl }));
+  }, []);
   const columns = useMemo(() => createLiveSessionColumns(t), [t]);
+  const singlePlayerActions = useMemo(
+    () =>
+      generatePlayerActions({
+        multiAction: false,
+        onlineAction: true,
+      }),
+    []
+  );
   const tableConfig = useLiveSessionsTableStore();
   const setConfig = useLiveSessionsTableStore((state) => state.setConfig);
   const setColumnVisibility = useLiveSessionsTableStore(
@@ -182,6 +203,12 @@ export default function LiveSessionsPage() {
     onGlobalFilterChange: setGlobalFilter,
     onSortingChange: setSorting,
     initialState: { pagination: { pageSize: 16 } },
+    meta: {
+      openPlayerActionMenu,
+      activePlayerActionId: playerActionMenu.anchorEl
+        ? playerActionMenu.player?.player_id
+        : null,
+    },
   });
 
   const filteredRows = table.getFilteredRowModel().rows;
@@ -614,6 +641,16 @@ export default function LiveSessionsPage() {
         }}
         config={tableConfig}
       />
+      {playerActionMenu.player ? (
+        <ActionMenu
+          actions={singlePlayerActions}
+          recipients={playerActionMenu.player}
+          anchorEl={playerActionMenu.anchorEl}
+          setAnchorEl={setPlayerActionMenuAnchor}
+          menuId="live-sessions-player-actions-menu"
+          withProfile
+        />
+      ) : null}
     </Stack>
   );
 }

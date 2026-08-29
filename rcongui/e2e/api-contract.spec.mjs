@@ -8,6 +8,10 @@ import {
 import {
   GAME_STATE_POLLING,
   getGameStatePollingInterval,
+  getGlobalLiveRosterPollingInterval,
+  shouldPollLiveRoster,
+  shouldPollModeratorPresence,
+  shouldUseGlobalLiveRosterPolling,
 } from "../src/queries/polling-policy.js";
 import {
   HTTP_ERROR_TOAST_WINDOW_MS,
@@ -168,5 +172,53 @@ test.describe("game-state polling policy", () => {
     expect(getGameStatePollingInterval("/settings/general")).toBe(
       GAME_STATE_POLLING.defaultIntervalMs
     );
+  });
+
+  test("loads expensive roster and moderator presence only where visible", () => {
+    for (const route of [
+      "/",
+      "/views/live",
+      "/views/team/",
+      "/records/players",
+      "/records/players/7656119",
+      "/stats/live-sessions",
+    ]) {
+      expect(shouldPollLiveRoster(route)).toBe(true);
+    }
+
+    for (const route of [
+      "/settings/general",
+      "/settings/automods/no-leader",
+      "/records/game-logs",
+      "/apps/discord-report-bot",
+    ]) {
+      expect(shouldPollLiveRoster(route)).toBe(false);
+    }
+
+    expect(shouldPollModeratorPresence("/")).toBe(true);
+    expect(shouldPollModeratorPresence("/views/live")).toBe(false);
+    expect(shouldPollModeratorPresence("/settings/general")).toBe(false);
+  });
+
+  test("lets live roster pages own the only polling interval", () => {
+    for (const route of [
+      "/views/live",
+      "/views/team/",
+      "/stats/live-sessions",
+    ]) {
+      expect(shouldPollLiveRoster(route)).toBe(true);
+      expect(shouldUseGlobalLiveRosterPolling(route)).toBe(false);
+      expect(getGlobalLiveRosterPollingInterval(route)).toBe(false);
+    }
+
+    for (const route of ["/", "/records/players", "/records/players/7656119"]) {
+      expect(shouldUseGlobalLiveRosterPolling(route)).toBe(true);
+      expect(getGlobalLiveRosterPollingInterval(route)).toBe(
+        GAME_STATE_POLLING.defaultIntervalMs
+      );
+    }
+
+    expect(shouldUseGlobalLiveRosterPolling("/settings/general")).toBe(false);
+    expect(getGlobalLiveRosterPollingInterval("/settings/general")).toBe(false);
   });
 });

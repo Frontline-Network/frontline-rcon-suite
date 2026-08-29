@@ -219,53 +219,75 @@ export const logActions = {
 };
 
 export function getGameDuration(start, end) {
-  const totalSeconds = dayjs(end).diff(dayjs(start), 'seconds');
+  const totalSeconds = dayjs(end).diff(dayjs(start), "seconds");
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
 
   // Format the result as hh:mm:ss
-  const formattedTime = `${String(hours).padStart(2, '0')}:${String(
+  const formattedTime = `${String(hours).padStart(2, "0")}:${String(
     minutes
-  ).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  ).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 
   return formattedTime;
 }
 
 export function isLeader(role) {
-  return ["officer", "tankcommander", "spotter", "armycommander"].includes(role);
+  return [
+    "armycommander",
+    "officer",
+    "artilleryobserver",
+    "squadleader",
+    "tankcommander",
+    "spotter",
+    "mortarobserver",
+    "helicopterlogisticsofficer",
+  ].includes(role);
 }
 
 export function isSteamPlayer(player) {
-  const { player_id: id } = player
-  return id.length === 17 && !Number.isNaN(Number(id))
+  const { player_id: id } = player;
+  return id.length === 17 && !Number.isNaN(Number(id));
 }
 
 export function getSteamProfileUrl(id) {
-  return `https://steamcommunity.com/profiles/${id}`
+  return `https://steamcommunity.com/profiles/${id}`;
 }
 
 export function getXboxProfileUrl(playerName) {
-  return `https://xboxgamertag.com/search/${playerName}`
+  return `https://xboxgamertag.com/search/${playerName}`;
 }
 
 export function removeLogPlayerIds(message) {
-  const regex = /\((?:(?:Axis|Allies)\/)?(?:[0-9]{17}|[a-z0-9]{32})\)/g;
+  const regex = /\((?:(?:axis|allies)\/)?(?:[0-9]{17}|[a-z0-9]{32})\)/gi;
   return message.replace(regex, "");
-};
+}
 
 export function getLogTeam(log) {
-  let searched = log.message;
-  if (log.action.startsWith("CHAT")) {
-    searched = log.action;
-  }
-  const regex = /(?<team>Allies|Axis)/;
-  const match = searched.match(regex);
-  return match?.groups?.team;
+  const explicitTeam = [
+    log?.team,
+    log?.player_team,
+    log?.player_team_1,
+    log?.team_name,
+  ].find((value) => /^(allies|axis)$/i.test(String(value ?? "").trim()));
+  const searched = [
+    explicitTeam,
+    log?.action,
+    log?.message,
+    log?.line_without_time,
+    log?.raw,
+    log?.sub_content,
+  ].join(" ");
+  const match = searched.match(/\b(allies|axis)\b/i)?.[1]?.toLowerCase();
+
+  return match === "axis" ? "Axis" : match === "allies" ? "Allies" : undefined;
 }
 
 export function getTeamColor(team) {
-  return (theme) => theme.palette.text[team === "Axis" ? "red" : team === "Allies" ? "blue" : "inherit"];
+  return (theme) =>
+    theme.palette.text[
+      team === "Axis" ? "red" : team === "Allies" ? "blue" : "inherit"
+    ];
 }
 
 // Returns tier colors based on theme mode ("light" or "dark")
@@ -284,4 +306,5 @@ export function useTierColors() {
   return getTierColors(theme.palette.mode);
 }
 
-export const getColoredFactionIconSrc = (faction) => getFactionIcon(faction, "colored");
+export const getColoredFactionIconSrc = (faction) =>
+  getFactionIcon(faction, "colored");

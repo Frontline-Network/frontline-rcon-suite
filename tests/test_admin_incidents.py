@@ -1,8 +1,9 @@
 import os
 from contextlib import contextmanager
+from datetime import datetime, timezone
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -38,7 +39,51 @@ def incident_database(monkeypatch):
             session.close()
 
     monkeypatch.setattr(incidents, "enter_session", enter_test_session)
-    return enter_test_session
+    return engine
+
+
+def test_incident_lists_eager_load_subjects_in_constant_queries(incident_database):
+    for index in range(5):
+        incidents.create_incident(
+            server_number=1,
+            source="manual",
+            reason=f"report {index}",
+            actor="tester",
+            subjects=[
+                {
+                    "kind": "player",
+                    "state": "confirmed",
+                    "is_primary": True,
+                    "display_name": f"Player {index}",
+                    "player_id": f"player-{index}",
+                }
+            ],
+        )
+
+    query_count = 0
+
+    def count_query(*_args):
+        nonlocal query_count
+        query_count += 1
+
+    event.listen(incident_database, "before_cursor_execute", count_query)
+    try:
+        result = incidents.list_incidents(limit=100)
+    finally:
+        event.remove(incident_database, "before_cursor_execute", count_query)
+
+    assert len(result) == 5
+    assert query_count == 2
+
+    query_count = 0
+    event.listen(incident_database, "before_cursor_execute", count_query)
+    try:
+        changes, _cursor = incidents.list_incident_changes(0, limit=100)
+    finally:
+        event.remove(incident_database, "before_cursor_execute", count_query)
+
+    assert len(changes) == 5
+    assert query_count == 3
 
 
 def test_trigger_parser_links_only_a_unique_longest_player_name():
@@ -180,9 +225,7 @@ def test_recent_teamkill_recovers_disconnected_target_with_cached_stats():
     assert target["recent_teamkill"]["seconds_before_report"] == 20
 
 
-def test_chat_ingestion_links_recent_offline_teamkiller(
-    incident_database, monkeypatch
-):
+def test_chat_ingestion_links_recent_offline_teamkiller(incident_database, monkeypatch):
     monkeypatch.setenv("INCIDENT_CONTEXT_MODE", "enabled")
     monkeypatch.setattr(incidents, "get_server_number", lambda: 1)
     incident, created = incidents.create_incident_from_chat(
@@ -774,6 +817,34 @@ def test_action_idempotency_key_is_reserved_once(incident_database):
     assert next_cursor > cursor
     assert retry_created is False
     assert outcome["event_type"] == "action"
+
+
+def test_action_result_datetimes_are_json_safe(incident_database):
+    incident, _ = incidents.create_incident(
+        server_number=1,
+        source="manual",
+        reason="blacklist action test",
+        actor="alice",
+    )
+    incidents.reserve_incident_action(
+        incident["id"],
+        actor="alice",
+        action="blacklist",
+        arguments={"reason": "Cheating", "blacklist_id": 0},
+        idempotency_key="blacklist-action-json-safe",
+    )
+    created_at = datetime(2026, 8, 23, 19, 50, tzinfo=timezone.utc)
+
+    completed = incidents.complete_incident_action(
+        "blacklist-action-json-safe",
+        result={"id": 42, "created_at": created_at},
+    )
+
+    assert completed["events"][-1]["event_type"] == "action"
+    assert completed["events"][-1]["payload"]["result"] == {
+        "id": 42,
+        "created_at": created_at.isoformat(),
+    }
 
 
 def test_action_reservation_claims_incident_and_confirms_selected_suggestion(

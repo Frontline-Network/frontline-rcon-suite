@@ -1,81 +1,117 @@
 import { useMemo } from "react";
-import { getPlayerTier, useTierColors } from "@/utils/lib";
-import StarIcon from "@mui/icons-material/Star";
 import {
-  TeamBox,
-  ScrollContainer,
-  ContentWrapper,
-  HeaderRow,
-  TeamHeaderRow,
-  CommanderRow,
-  PlayerRow,
-  SquadHeader,
-} from "./styled";
-import { Box, Typography, IconButton, Checkbox, Tooltip } from "@mui/material";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+  Box,
+  Checkbox,
+  Chip,
+  Collapse,
+  IconButton,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import PersonOffIcon from "@mui/icons-material/PersonOff";
-import Collapse from "@mui/material/Collapse";
-import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import PersonOffOutlinedIcon from "@mui/icons-material/PersonOffOutlined";
+import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
+import StarIcon from "@mui/icons-material/Star";
 import UnfoldLessIcon from "@mui/icons-material/UnfoldLess";
+import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
+import { useTranslation } from "react-i18next";
 import { secondsToTime } from "@/utils/extractPlayers";
-import { ActionMenuButton } from "@/features/player-action/ActionMenu";
-import { generatePlayerActions } from "@/features/player-action/actions";
 import { TextButton } from "@/components/table/styles";
 import { useThemedImages } from "@/hooks/useThemedImages";
-import { useTranslation } from "react-i18next";
+import {
+  CommanderRow,
+  ContentWrapper,
+  HeaderRow,
+  PlayerRow,
+  ScrollContainer,
+  SquadGroupHeader,
+  SquadHeader,
+  TeamBox,
+  TeamHeaderRow,
+} from "./styled";
 
 export const UNASSIGNED = "unassigned";
 
-const PlayerStats = ({ player }) => (
-  <>
-    <Box className="stat">{player?.kills || 0}</Box>
-    <Box className="stat">{player?.deaths || 0}</Box>
-    <Box className="stat">{player?.combat || 0}</Box>
-    <Box className="stat">{player?.offense || 0}</Box>
-    <Box className="stat">{player?.defense || 0}</Box>
-    <Box className="stat">{player?.support || 0}</Box>
-    <Box className="stat">
-      {secondsToTime(
-        player?.time ?? player?.profile?.current_playtime_seconds ?? 0
-      )}
-    </Box>
-  </>
-);
+const LEADER_ROLES = new Set([
+  "officer",
+  "squadleader",
+  "tankcommander",
+  "spotter",
+  "artilleryobserver",
+  "mortarobserver",
+  "helicopterlogisticsofficer",
+]);
 
-const PlayerInfo = ({ player }) => {
+const SQUAD_LIMITS = {
+  infantry: 6,
+  armor: 3,
+  armour: 3,
+  recon: 2,
+  artillery: 3,
+  mortar: 3,
+  helicopter: 6,
+};
+
+const normalizeType = (value) => String(value || "infantry").toLowerCase();
+
+const getLeader = (squad) =>
+  squad.players.find((player) =>
+    LEADER_ROLES.has(
+      String(player.role || "")
+        .replaceAll(" ", "")
+        .toLowerCase()
+    )
+  );
+
+const getKd = (player) => {
+  const deaths = Number(player?.deaths || 0);
+  return deaths
+    ? (Number(player?.kills || 0) / deaths).toFixed(2)
+    : Number(player?.kills || 0).toFixed(2);
+};
+
+const PlayerInfo = ({
+  player,
+  activePlayerActionId,
+  onOpenPlayerActionMenu,
+}) => {
+  const { t } = useTranslation();
   const themedImg = useThemedImages();
+  const actionMenuOpen = activePlayerActionId === player.player_id;
+
   return (
     <Box className="player-info">
       {player.role ? (
-        <img
+        <Box
+          component="img"
           src={themedImg.getRoleIconSrc(player.role)}
-          alt={player.role}
-          width={16}
-          height={16}
-          title={player.role}
+          alt=""
+          aria-hidden
+          sx={{ width: 18, height: 18, flex: "0 0 auto" }}
         />
       ) : (
-        <Typography sx={{ width: 16, height: 16, textAlign: "center" }}>
-          {"-"}
-        </Typography>
+        <Box sx={{ width: 18, height: 18 }} />
       )}
-      <span onClick={(e) => e.stopPropagation()}>
-        <ActionMenuButton
-          actions={generatePlayerActions({
-            multiAction: false,
-            onlineAction: true,
-          })}
-          withProfile
-          recipients={player}
-          renderButton={(props) => (
-            <TextButton {...props} className="player-name">
-              {player.name}
-            </TextButton>
-          )}
-        />
-      </span>
-      {player.is_vip && <StarIcon sx={{ fontSize: 16 }} />}
+      <TextButton
+        aria-controls={
+          actionMenuOpen ? "team-player-row-actions-menu" : undefined
+        }
+        aria-expanded={actionMenuOpen ? "true" : undefined}
+        aria-haspopup="true"
+        aria-label={t("actions.menu")}
+        className="player-name"
+        data-testid="team-player-action-trigger"
+        onClick={(event) => onOpenPlayerActionMenu(event.currentTarget, player)}
+      >
+        {player.name}
+      </TextButton>
+      {player.is_vip && (
+        <Tooltip title="VIP">
+          <StarIcon color="primary" sx={{ fontSize: 16, flex: "0 0 auto" }} />
+        </Tooltip>
+      )}
     </Box>
   );
 };
@@ -83,173 +119,202 @@ const PlayerInfo = ({ player }) => {
 const PlayerRowWrapper = ({
   player,
   selected,
-  isCommander,
+  isCommander = false,
   onToggle,
-  displayStats = true,
-}) => (
-  <PlayerRow
-    selected={selected}
-    onClick={(e) => onToggle(player, e)}
-    level={player.level}
-    isCommander={isCommander}
-    timeOnly={!displayStats}
-  >
-    <Box className="level">{player.level}</Box>
-    <PlayerInfo player={player} />
-    {displayStats && <PlayerStats player={player} />}
-    {!displayStats && (
-      <Box className="stat">
+  activePlayerActionId,
+  onOpenPlayerActionMenu,
+}) => {
+  const { t } = useTranslation();
+  const Row = isCommander ? CommanderRow : PlayerRow;
+
+  return (
+    <Row selected={selected} level={player.level} isCommander={isCommander}>
+      <Checkbox
+        size="small"
+        checked={selected}
+        onChange={(event) => onToggle(player, event)}
+        inputProps={{
+          "aria-label": t("views.team.selectPlayer", { name: player.name }),
+        }}
+      />
+      <PlayerInfo
+        player={player}
+        activePlayerActionId={activePlayerActionId}
+        onOpenPlayerActionMenu={onOpenPlayerActionMenu}
+      />
+      <Typography className="leader-cell" variant="body2">
+        {isCommander
+          ? t("views.team.commander")
+          : player.role
+          ? t(`settings.configForms.roles.${player.role}`, {
+              defaultValue: player.role,
+            })
+          : t("common.unknown")}
+      </Typography>
+      <Typography className="level-cell" variant="body2">
+        {player.level ?? "–"}
+      </Typography>
+      <Typography className="problem-cell" variant="caption">
+        {getKd(player)} ·{" "}
         {secondsToTime(
           player?.time ?? player?.profile?.current_playtime_seconds ?? 0
         )}
-      </Box>
-    )}
-  </PlayerRow>
-);
+      </Typography>
+    </Row>
+  );
+};
 
 const SquadPlayers = ({
   squad,
-  collapsed,
+  expanded,
   selectedPlayers,
   onTogglePlayer,
-  displayStats = true,
+  activePlayerActionId,
+  onOpenPlayerActionMenu,
 }) => (
-  <Collapse in={collapsed}>
+  <Collapse in={expanded} timeout="auto" unmountOnExit>
     {squad.players.map((player) => (
       <PlayerRowWrapper
         key={player.player_id}
         player={player}
         selected={selectedPlayers.has(player.player_id)}
         onToggle={onTogglePlayer}
-        displayStats={displayStats}
+        activePlayerActionId={activePlayerActionId}
+        onOpenPlayerActionMenu={onOpenPlayerActionMenu}
       />
     ))}
   </Collapse>
 );
 
-const SquadStats = ({ squad }) => (
-  <Box className="squad-stats">
-    <Box className="stat">{squad.kills}</Box>
-    <Box className="stat">{squad.deaths}</Box>
-    <Box className="stat">{squad.combat}</Box>
-    <Box className="stat">{squad.offense}</Box>
-    <Box className="stat">{squad.defense}</Box>
-    <Box className="stat">{squad.support}</Box>
-    <Box className="stat">∅ {secondsToTime(squad.time)}</Box>
-  </Box>
-);
-
-const UnassignedStats = ({ players }) => (
-  <Box className="squad-stats">
-    <Box className="stat">{players.reduce((sum, p) => sum + p.kills, 0)}</Box>
-    <Box className="stat">{players.reduce((sum, p) => sum + p.deaths, 0)}</Box>
-    <Box className="stat">{players.reduce((sum, p) => sum + p.combat, 0)}</Box>
-    <Box className="stat">{players.reduce((sum, p) => sum + p.offense, 0)}</Box>
-    <Box className="stat">{players.reduce((sum, p) => sum + p.defense, 0)}</Box>
-    <Box className="stat">{players.reduce((sum, p) => sum + p.support, 0)}</Box>
-    <Box className="stat">0:00</Box>
-  </Box>
-);
-
-const StatHeader = ({ label, shortLabel, iconSrc }) => (
-  <Tooltip title={label} placement="top" arrow>
-    <Box component="span" className="metric-header" aria-label={label}>
-      {iconSrc ? (
-        <Box component="img" src={iconSrc} alt="" aria-hidden sx={{ width: 16, height: 16 }} />
-      ) : shortLabel}
-    </Box>
-  </Tooltip>
-);
-
-const SquadGroupHeader = ({ type }) => (
-  <Typography
-    variant="subtitle2"
-    sx={{
-      px: 1,
-      py: 0.5,
-      backgroundColor: (theme) => theme.palette.background.default,
-      color: (theme) => theme.palette.text.secondary,
-      borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
-      textTransform: "uppercase",
-      display: "flex",
-      alignItems: "center",
-      gap: 1,
-    }}
-  >
-    {type}
-  </Typography>
-);
-
-const SquadNameInfo = ({ squad, showIcon = true }) => {
-  const themedImg = useThemedImages();
+const SquadRow = ({
+  squad,
+  expanded,
+  selectedPlayers,
+  onTogglePlayer,
+  onToggleSquad,
+  onToggleExpand,
+  activePlayerActionId,
+  onOpenPlayerActionMenu,
+}) => {
   const { t } = useTranslation();
+  const themedImg = useThemedImages();
+  const type = normalizeType(squad.type);
+  const leader = getLeader(squad);
+  const allSelected =
+    squad.players.length > 0 &&
+    squad.players.every((player) => selectedPlayers.has(player.player_id));
+  const partlySelected =
+    squad.players.some((player) => selectedPlayers.has(player.player_id)) &&
+    !allSelected;
+  const hasProblem = !squad.has_leader || !leader;
+  const capacity = SQUAD_LIMITS[type];
+
   return (
-    <Box className="squad-name-container">
-      {showIcon && squad.type && (
-        <img
-          src={themedImg.getRoleIconSrc(squad.type)}
-          alt={squad.type}
-          width={16}
-          height={16}
-          title={squad.type}
+    <Box>
+      <SquadHeader selected={allSelected} hasProblem={hasProblem}>
+        <Checkbox
+          size="small"
+          checked={allSelected}
+          indeterminate={partlySelected}
+          onChange={() => onToggleSquad(squad.players, allSelected)}
+          inputProps={{
+            "aria-label": t("views.team.selectSquad", { name: squad.name }),
+          }}
         />
-      )}
-      <Typography
-        variant="subtitle2"
-        sx={{
-          textTransform: "uppercase",
-          fontWeight: "bold",
-          minWidth: 0,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
-      >
-        {squad.name} ({squad.players.length})
-      </Typography>
-      {!squad.has_leader && (
-        <img
-          src="/icons/ping.webp"
-          alt={t("views.team.noLeader")}
-          title={t("views.team.noLeader")}
-          width={16}
-          height={16}
-          style={{ opacity: 0.7 }}
-        />
-      )}
+        <Box className="squad-main">
+          <Tooltip
+            disableInteractive
+            title={
+              expanded
+                ? t("views.team.collapseSquad")
+                : t("views.team.expandSquad")
+            }
+          >
+            <IconButton
+              size="small"
+              onClick={() => onToggleExpand(squad.name)}
+              aria-label={
+                expanded
+                  ? t("views.team.collapseSquadNamed", { name: squad.name })
+                  : t("views.team.expandSquadNamed", { name: squad.name })
+              }
+              aria-expanded={expanded}
+              sx={{ minWidth: 44, minHeight: 44 }}
+            >
+              {expanded ? <ExpandMoreIcon /> : <ChevronRightIcon />}
+            </IconButton>
+          </Tooltip>
+          <Box
+            component="img"
+            src={themedImg.getRoleIconSrc(type)}
+            alt=""
+            aria-hidden
+            sx={{ width: 18, height: 18, flex: "0 0 auto" }}
+          />
+          <Typography className="squad-name" variant="body2">
+            {squad.name}
+          </Typography>
+          <Chip
+            size="small"
+            variant="outlined"
+            label={`${squad.players.length}${capacity ? `/${capacity}` : ""}`}
+            color={
+              capacity && squad.players.length >= capacity
+                ? "success"
+                : "default"
+            }
+            sx={{ height: 22, flex: "0 0 auto" }}
+          />
+        </Box>
+        <Typography className="leader-cell" variant="body2">
+          {leader?.name ?? t("views.team.noLeader")}
+        </Typography>
+        <Typography className="level-cell" variant="body2">
+          Ø {squad.level ?? 0}
+        </Typography>
+        <Box className="problem-cell">
+          {hasProblem ? (
+            <>
+              <ReportProblemOutlinedIcon fontSize="small" aria-hidden />
+              <span>1</span>
+            </>
+          ) : (
+            <CheckCircleOutlineIcon fontSize="small" aria-hidden />
+          )}
+        </Box>
+      </SquadHeader>
+      <SquadPlayers
+        squad={squad}
+        expanded={expanded}
+        selectedPlayers={selectedPlayers}
+        onTogglePlayer={onTogglePlayer}
+        activePlayerActionId={activePlayerActionId}
+        onOpenPlayerActionMenu={onOpenPlayerActionMenu}
+      />
     </Box>
   );
 };
 
-const SquadHeaderContent = ({ squad, collapsedSquads, onToggleExpand }) => {
-  const tierColors = useTierColors();
+const MissingCommanderRow = () => {
+  const { t } = useTranslation();
   return (
-    <Box className="squad-info">
-      <IconButton
-        size="small"
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleExpand(squad.name);
-        }}
-      >
-        {!collapsedSquads[squad.name] ? (
-          <ExpandMoreIcon />
-        ) : (
-          <ChevronRightIcon />
-        )}
-      </IconButton>
-      <SquadNameInfo squad={squad} />
-      <Typography variant="caption" sx={{ ml: "auto" }}>
-        ∅{" "}
-        <Box
-          component="span"
-          sx={{
-            color: tierColors[getPlayerTier(squad.level)],
-          }}
-        >
-          {squad.level}
-        </Box>
+    <CommanderRow isCommander>
+      <Box />
+      <Box className="player-info" sx={{ color: "warning.main" }}>
+        <PersonOffOutlinedIcon fontSize="small" aria-hidden />
+        <Typography variant="body2" fontWeight={700}>
+          {t("views.team.noCommander")}
+        </Typography>
+      </Box>
+      <Typography className="leader-cell" variant="body2">
+        {t("views.team.commanderPositionOpen")}
       </Typography>
-    </Box>
+      <Typography className="level-cell">–</Typography>
+      <Box className="problem-cell" sx={{ color: "warning.main" }}>
+        <ReportProblemOutlinedIcon fontSize="small" aria-hidden />
+        <span>1</span>
+      </Box>
+    </CommanderRow>
   );
 };
 
@@ -260,317 +325,259 @@ export const TeamSection = ({
   onTogglePlayer,
   onToggleSquad,
   onToggleAll,
-  collapsedSquads,
+  collapsedSquads = {},
   onToggleExpand,
   onTeamExpand,
   onTeamCollapse,
+  filterMode = "all",
+  commanderAvailable,
+  activePlayerActionId,
+  onOpenPlayerActionMenu,
 }) => {
   const { t } = useTranslation();
-  const themedImg = useThemedImages();
   const isLobby = team.name === "lobby";
 
-  const { commander, squadGroups, unassignedPlayers, allPlayers } =
-    useMemo(() => {
-      // Filter out command squad and sort remaining squads
-      const squads = team.squads
-        .filter((s) => s.name !== "command" && s.name !== UNASSIGNED)
-        .sort((a, b) => a.name.localeCompare(b.name));
+  const {
+    commander,
+    squadGroups,
+    unassignedPlayers,
+    visiblePlayers,
+    issueCount,
+  } = useMemo(() => {
+    const allSquads = (team.squads ?? [])
+      .filter((squad) => squad.name !== "command" && squad.name !== UNASSIGNED)
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const unassigned =
+      team.squads?.find((squad) => squad.name === UNASSIGNED)?.players ?? [];
+    const problemSquads = allSquads.filter((squad) => !squad.has_leader);
+    const visibleSquads =
+      filterMode === "issues" || filterMode === "noLeader"
+        ? problemSquads
+        : filterMode === "unassigned"
+        ? []
+        : allSquads;
 
-      // Group squads by type
-      const grouped = squads.reduce((acc, squad) => {
-        const type = squad.type || "infantry";
-        if (!acc[type]) {
-          acc[type] = [];
-        }
-        acc[type].push(squad);
-        return acc;
-      }, {});
+    const grouped = visibleSquads.reduce((result, squad) => {
+      const type = normalizeType(squad.type);
+      result[type] ??= [];
+      result[type].push(squad);
+      return result;
+    }, {});
+    const preferredOrder = [
+      "infantry",
+      "armor",
+      "armour",
+      "recon",
+      "artillery",
+      "mortar",
+      "helicopter",
+    ];
+    const typeOrder = [
+      ...preferredOrder.filter((type) => grouped[type]?.length),
+      ...Object.keys(grouped).filter((type) => !preferredOrder.includes(type)),
+    ];
+    const showUnassigned =
+      filterMode === "all" ||
+      filterMode === "issues" ||
+      filterMode === "unassigned";
+    const showCommander = filterMode === "all" || filterMode === "issues";
+    const groups = typeOrder.map((type) => ({ type, squads: grouped[type] }));
+    const players = [
+      ...(showCommander && team.commander ? [team.commander] : []),
+      ...groups.flatMap(({ squads }) =>
+        squads.flatMap((squad) => squad.players)
+      ),
+      ...(showUnassigned ? unassigned : []),
+    ];
 
-      // Define the order of squad types
-      const typeOrder = ["infantry", "armor", "recon", "artillery"];
-      const squadGroups = typeOrder.reduce((acc, type) => {
-        if (grouped[type]?.length > 0) {
-          acc.push({
-            type,
-            squads: grouped[type],
-          });
-        }
-        return acc;
-      }, []);
+    return {
+      commander: showCommander ? team.commander : null,
+      squadGroups: groups,
+      unassignedPlayers: showUnassigned ? unassigned : [],
+      visiblePlayers: players,
+      issueCount:
+        problemSquads.length +
+        unassigned.length +
+        (!isLobby && !commanderAvailable ? 1 : 0),
+    };
+  }, [commanderAvailable, filterMode, isLobby, team]);
 
-      const unassignedSquad = team.squads.find((s) => s.name === UNASSIGNED);
+  const allSelected =
+    visiblePlayers.length > 0 &&
+    visiblePlayers.every((player) => selectedPlayers.has(player.player_id));
+  const partlySelected =
+    visiblePlayers.some((player) => selectedPlayers.has(player.player_id)) &&
+    !allSelected;
+  const visibleSquadNames = [
+    ...squadGroups.flatMap(({ squads }) => squads.map((squad) => squad.name)),
+    ...(unassignedPlayers.length ? [UNASSIGNED] : []),
+  ];
+  const anySquadCollapsed = visibleSquadNames.some(
+    (squadName) => collapsedSquads[squadName] ?? true
+  );
+  const renderedSquadCount = squadGroups.reduce(
+    (sum, group) => sum + group.squads.length,
+    0
+  );
 
-      // Create a list of all players for selection
-      const allPlayers = [];
-      if (team.commander) {
-        allPlayers.push(team.commander);
-      }
-      squadGroups.forEach(({ squads }) => {
-        squads.forEach((squad) => {
-          allPlayers.push(...squad.players);
-        });
-      });
-      allPlayers.push(...(unassignedSquad?.players || []));
-
-      return {
-        commander: team.commander,
-        squadGroups,
-        unassignedPlayers: unassignedSquad?.players || [],
-        allPlayers,
-      };
-    }, [team]);
-
-  const getUnassignedSquad = (players) => {
-    if (players.length === 0) {
-      return null;
-    }
+  const renderUnassigned = () => {
+    if (!unassignedPlayers.length) return null;
+    const squad = {
+      name: UNASSIGNED,
+      type: "infantry",
+      has_leader: isLobby,
+      level: 0,
+      players: unassignedPlayers,
+    };
     return (
-      <Box>
-        <SquadHeader
-          selected={players.every((p) => selectedPlayers.has(p.player_id))}
-          onClick={(_) =>
-            onToggleSquad(
-              players,
-              players.every((p) => selectedPlayers.has(p.player_id))
-            )
-          }
-        >
-          <Box className="squad-info">
-            <IconButton
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleExpand(UNASSIGNED);
-              }}
-            >
-              {!collapsedSquads[UNASSIGNED] ? (
-                <ExpandMoreIcon />
-              ) : (
-                <ChevronRightIcon />
-              )}
-            </IconButton>
-            <Box className="squad-name-container">
-              <Typography
-                variant="subtitle2"
-                sx={{
-                  textTransform: "uppercase",
-                  fontWeight: "bold",
-                  minWidth: 0,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {isLobby ? t("views.live.lobby") : t("views.team.noPlatoon")} ({players.length})
-              </Typography>
-            </Box>
-          </Box>
-          <UnassignedStats players={players} />
-        </SquadHeader>
-        <SquadPlayers
-          squad={{ players }}
-          collapsed={!collapsedSquads[UNASSIGNED]}
+      <>
+        <SquadGroupHeader>
+          {isLobby ? t("views.live.lobby") : t("views.team.noPlatoon")}
+        </SquadGroupHeader>
+        <SquadRow
+          squad={squad}
+          expanded={!(collapsedSquads[UNASSIGNED] ?? true)}
           selectedPlayers={selectedPlayers}
           onTogglePlayer={onTogglePlayer}
+          onToggleSquad={onToggleSquad}
+          onToggleExpand={onToggleExpand}
+          activePlayerActionId={activePlayerActionId}
+          onOpenPlayerActionMenu={onOpenPlayerActionMenu}
         />
-      </Box>
+      </>
     );
   };
-
-  const getLobbyPlayers = (players) => {
-    if (players.length === 0) {
-      return null;
-    }
-    return (
-      <SquadPlayers
-        squad={{ players }}
-        collapsed={!collapsedSquads[UNASSIGNED]}
-        selectedPlayers={selectedPlayers}
-        onTogglePlayer={onTogglePlayer}
-        displayStats={false}
-      />
-    );
-  };
-
-  const anySquadCollapsed = Object.values(collapsedSquads).some(Boolean);
 
   return (
-    <TeamBox>
-      <Box
-        sx={{
-          backgroundColor: (theme) => theme.palette.background.paper,
-          display: "flex",
-          alignItems: "center",
-          gap: 1,
-          p: 1,
-        }}
-      >
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <Checkbox
-            size="small"
-            checked={
-              allPlayers.length > 0 &&
-              allPlayers.every((p) => selectedPlayers.has(p.player_id))
-            }
-            indeterminate={
-              allPlayers.some((p) => selectedPlayers.has(p.player_id)) &&
-              !allPlayers.every((p) => selectedPlayers.has(p.player_id))
-            }
-            onChange={(e) => onToggleAll(allPlayers, e.target.checked)}
-            sx={{
-              color: (theme) => theme.palette.text.secondary,
-              "&.Mui-checked, &.MuiCheckbox-indeterminate": {
-                color: (theme) => theme.palette.primary.main,
-              },
-            }}
-          />
+    <TeamBox teamName={team.name} data-testid={`team-panel-${team.name}`}>
+      <TeamHeaderRow>
+        <Checkbox
+          size="small"
+          checked={allSelected}
+          indeterminate={partlySelected}
+          onChange={(event) =>
+            onToggleAll(visiblePlayers, event.target.checked)
+          }
+          inputProps={{
+            "aria-label": t("views.team.selectTeam", { name: title }),
+          }}
+        />
+        <Box className="team-title">
           <Typography
-            variant="body2"
+            variant="h6"
+            component="h2"
             sx={{
-              color: "text.secondary",
-              minWidth: 100,
+              fontWeight: 800,
+              color:
+                team.name === "allies"
+                  ? "info.light"
+                  : team.name === "axis"
+                  ? "error.light"
+                  : "text.primary",
             }}
           >
-            {!allPlayers.some((p) => selectedPlayers.has(p.player_id))
-              ? t("common.selectAll")
-              : allPlayers.every((p) => selectedPlayers.has(p.player_id))
-              ? t("views.team.allSelected")
-              : t("views.team.selected", { count: allPlayers.filter((p) => selectedPlayers.has(p.player_id)).length })}
+            {title}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {t("views.team.totalPlayers", { count: team.count })}
           </Typography>
         </Box>
-        <Typography
-          variant="h6"
-          sx={{
-            textTransform: "uppercase",
-            fontWeight: "bold",
-            flex: 1,
-            textAlign: "center",
-          }}
-        >
-          {isLobby ? `Lobby (${team.count})` : title}
-        </Typography>
-        <Box sx={{ display: "flex", gap: 1 }}>
-          {anySquadCollapsed ? (
-            <IconButton size="small" onClick={onTeamExpand}>
-              <UnfoldMoreIcon />
+        <Box className="team-summary">
+          <Typography variant="caption" className="optional-summary">
+            {t("views.team.squadsCount", { count: renderedSquadCount })}
+          </Typography>
+          <Typography variant="caption" className="optional-summary">
+            Ø {team.avg_level ?? 0}
+          </Typography>
+          <Chip
+            size="small"
+            color={issueCount ? "warning" : "success"}
+            variant="outlined"
+            label={t("views.team.problemsCount", { count: issueCount })}
+          />
+          <Tooltip
+            disableInteractive
+            title={
+              anySquadCollapsed
+                ? t("views.team.expandTeam")
+                : t("views.team.collapseTeam")
+            }
+          >
+            <IconButton
+              onClick={anySquadCollapsed ? onTeamExpand : onTeamCollapse}
+              aria-label={
+                anySquadCollapsed
+                  ? t("views.team.expandTeamNamed", { name: title })
+                  : t("views.team.collapseTeamNamed", { name: title })
+              }
+              sx={{ minWidth: 44, minHeight: 44 }}
+            >
+              {anySquadCollapsed ? <UnfoldMoreIcon /> : <UnfoldLessIcon />}
             </IconButton>
-          ) : (
-            <IconButton size="small" onClick={onTeamCollapse}>
-              <UnfoldLessIcon />
-            </IconButton>
-          )}
+          </Tooltip>
         </Box>
-      </Box>
+      </TeamHeaderRow>
+
       <ScrollContainer>
         <ContentWrapper>
-          {!isLobby ? (
-            <>
-              <HeaderRow>
-                <Box>LVL</Box>
-                <Box>{t("views.table.name")}</Box>
-                <StatHeader
-                  label={t("views.table.kills")}
-                  iconSrc={themedImg.getMetricIconSrc("kills")}
-                />
-                <StatHeader
-                  label={t("views.table.deaths")}
-                  iconSrc={themedImg.getMetricIconSrc("deaths")}
-                />
-                <StatHeader
-                  label={t("views.table.combat")}
-                  iconSrc={themedImg.getMetricIconSrc("combat")}
-                />
-                <StatHeader
-                  label={t("views.table.offense")}
-                  iconSrc={themedImg.getMetricIconSrc("offense")}
-                />
-                <StatHeader
-                  label={t("views.table.defense")}
-                  iconSrc={themedImg.getMetricIconSrc("defense")}
-                />
-                <StatHeader
-                  label={t("views.table.support")}
-                  iconSrc={themedImg.getMetricIconSrc("support")}
-                />
-                <StatHeader
-                  label={t("views.table.time")}
-                  shortLabel={t("views.team.statsShort.time")}
-                />
-              </HeaderRow>
-              <TeamHeaderRow>
-                <Box>∅ {team.avg_level}</Box>
-                <Box style={{ textAlign: "center" }}>
-                  {t("views.team.totalPlayers", { count: team.count })}
-                </Box>
-                <Box className="stat">{team?.kills || 0}</Box>
-                <Box className="stat">{team?.deaths || 0}</Box>
-                <Box className="stat">{team?.combat || 0}</Box>
-                <Box className="stat">{team?.offense || 0}</Box>
-                <Box className="stat">{team?.defense || 0}</Box>
-                <Box className="stat">{team?.support || 0}</Box>
-                <Box className="stat">∅ {secondsToTime(team?.time ?? 0)}</Box>
-              </TeamHeaderRow>
+          <HeaderRow aria-hidden>
+            <Box />
+            <Box>
+              {isLobby ? t("views.table.name") : t("views.team.squadOrPlayer")}
+            </Box>
+            <Box className="leader-cell">{t("views.team.leaderOrRole")}</Box>
+            <Box className="level-cell">{t("views.table.level")}</Box>
+            <Box>{t("views.team.statusOrKd")}</Box>
+          </HeaderRow>
 
-              {commander ? (
-                <PlayerRowWrapper
-                  player={commander}
-                  selected={selectedPlayers.has(commander.player_id)}
-                  onToggle={onTogglePlayer}
-                  isCommander={true}
+          {!isLobby &&
+            (filterMode === "all" || filterMode === "issues") &&
+            (commander ? (
+              <PlayerRowWrapper
+                player={commander}
+                selected={selectedPlayers.has(commander.player_id)}
+                onToggle={onTogglePlayer}
+                isCommander
+                activePlayerActionId={activePlayerActionId}
+                onOpenPlayerActionMenu={onOpenPlayerActionMenu}
+              />
+            ) : !commanderAvailable ? (
+              <MissingCommanderRow />
+            ) : null)}
+
+          {renderUnassigned()}
+
+          {squadGroups.map(({ type, squads }) => (
+            <Box key={type}>
+              <SquadGroupHeader>
+                {t(`views.team.squadTypes.${type}`, {
+                  defaultValue: t("views.team.squadTypes.other"),
+                })}
+              </SquadGroupHeader>
+              {squads.map((squad) => (
+                <SquadRow
+                  key={squad.name}
+                  squad={squad}
+                  expanded={!(collapsedSquads[squad.name] ?? true)}
+                  selectedPlayers={selectedPlayers}
+                  onTogglePlayer={onTogglePlayer}
+                  onToggleSquad={onToggleSquad}
+                  onToggleExpand={onToggleExpand}
+                  activePlayerActionId={activePlayerActionId}
+                  onOpenPlayerActionMenu={onOpenPlayerActionMenu}
                 />
-              ) : team.name !== "lobby" ? (
-                <CommanderRow>
-                  <Box className="level">-</Box>
-                  <Box className="player-info">
-                    <Box className="no-commander">
-                      <PersonOffIcon sx={{ fontSize: 16 }} />
-                      <Typography>{t("views.team.noCommander")}</Typography>
-                    </Box>
-                  </Box>
-                  <PlayerStats player={{}} />
-                </CommanderRow>
-              ) : null}
-
-              {getUnassignedSquad(unassignedPlayers)}
-
-              {squadGroups.map(({ type, squads }) => (
-                <Box key={type}>
-                  <SquadGroupHeader type={type} />
-                  {squads.map((squad) => (
-                    <Box key={squad.name}>
-                      <SquadHeader
-                        selected={squad.players.every((p) =>
-                          selectedPlayers.has(p.player_id)
-                        )}
-                        onClick={(_) =>
-                          onToggleSquad(
-                            squad.players,
-                            squad.players.every((p) =>
-                              selectedPlayers.has(p.player_id)
-                            )
-                          )
-                        }
-                      >
-                        <SquadHeaderContent
-                          squad={squad}
-                          collapsedSquads={collapsedSquads}
-                          onToggleExpand={onToggleExpand}
-                        />
-                        <SquadStats squad={squad} />
-                      </SquadHeader>
-                      <SquadPlayers
-                        squad={squad}
-                        collapsed={!collapsedSquads[squad.name]}
-                        selectedPlayers={selectedPlayers}
-                        onTogglePlayer={onTogglePlayer}
-                      />
-                    </Box>
-                  ))}
-                </Box>
               ))}
-            </>
-          ) : (
-            getLobbyPlayers(unassignedPlayers)
-          )}
+            </Box>
+          ))}
+
+          {!visiblePlayers.length &&
+            !(!commanderAvailable && filterMode === "issues") && (
+              <Box sx={{ p: 3, textAlign: "center", color: "text.secondary" }}>
+                <Typography variant="body2">
+                  {t("views.team.noMatches")}
+                </Typography>
+              </Box>
+            )}
         </ContentWrapper>
       </ScrollContainer>
     </TeamBox>

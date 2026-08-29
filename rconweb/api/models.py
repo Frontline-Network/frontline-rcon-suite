@@ -7,6 +7,16 @@ from django.db import models
 from rconweb.settings import SECRET_KEY
 
 
+def default_user_appearance():
+    return {
+        "version": 1,
+        "mode": "dark",
+        "preset": "frontline-gold",
+        "customAccent": "#c59a4a",
+        "colorVision": "standard",
+    }
+
+
 class DjangoAPIKey(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     api_key = models.CharField(unique=True)
@@ -38,6 +48,19 @@ class SteamPlayer(models.Model):
         max_length=100, verbose_name="Player ID", blank=True, default=""
     )
     default_permissions = ()
+
+
+class UserAppearancePreference(models.Model):
+    """Versioned, account-bound visual preferences for the CRCON web UI."""
+
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="appearance_preference"
+    )
+    preferences = models.JSONField(default=default_user_appearance)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        default_permissions = ()
 
 
 class MobileDevice(models.Model):

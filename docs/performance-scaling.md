@@ -263,6 +263,13 @@ their rollout. All four public endpoints returned HTTP 200 in 33-37 ms. The
 mode remains opt-in until the long observation window is complete. Never enable
 it while the eight corresponding individual Supervisor programs are also running.
 
+Supervisor startup records whether an instance last used the split or shared
+topology. A real split-to-shared transition resets stale per-service controls
+to `RUNNING`, matching the autostart behaviour of a recreated split Supervisor.
+Subsequent shared-to-shared restarts retain intentional per-service stops. This
+prevents an old canary's Redis state from silently disabling a service when the
+shared runtime is enabled again later.
+
 Auto settings and broadcasts were added in a second, separately tested canary.
 RCON3 fell from 715.7 MiB to 496.8 MiB and RCON1 from 1.013 GiB to 801.3 MiB.
 The four supervisors together fell from roughly 3.26 GiB to 2.35 GiB, saving an
@@ -387,15 +394,96 @@ low-I/O maintenance window and verify free disk space first.
 
 The `runtime_data_retention` command is disabled unless a retention period is
 configured and is always a dry-run unless `--execute` is supplied. It samples
-only the maximum bounded work set and deletes in separately committed batches:
+only the maximum bounded work set and deletes in separately committed batches.
+
+### Server-scoped log history index
+
+Production `EXPLAIN (ANALYZE, BUFFERS)` measurements on 18.45 million
+`log_lines` rows showed that the event-time-only index had to discard 22,211
+rows from other servers to find one server's newest event. A one-day history
+query read 11,048 shared buffers and discarded 34,015 rows to return 16 rows.
+
+Migration `c9e1f4a7b2d6` adds the non-unique
+`ix_log_lines_server_event_time(server, event_time)` index. It is created and
+dropped concurrently so log ingestion remains writable while PostgreSQL builds
+or removes it. The existing event-time index stays available for intentionally
+cross-server queries, and the `unique_log_line(event_time, raw)` constraint is
+not changed. The migration therefore changes no gameplay data and no dedupe
+semantics.
+
+#### RCON1-4 rollout validation
+
+The migration was deployed to RCON1-4 in release `v0.4.13.16`. On 2026-08-26,
+the production index was valid and ready, occupied 554 MB and had already served
+6,514 scans. No index build was still running and PostgreSQL reported zero
+deadlocks.
+
+RCON2-4 immediately selected the composite index. Fetching the newest 1,000
+server rows took 0.7-0.9 ms. RCON1 exposed a data-distribution edge case: it owns
+17.64 million historical log rows but had no current-day rows, so PostgreSQL
+misestimated `server = ? ORDER BY event_time` and selected the global time
+index. That plan discarded 635,013 rows from other servers, touched 222,964
+buffers and took 327 ms.
+
+Release `v0.4.13.17` expresses server-scoped reads as the equivalent bounded
+range over `(server, event_time)` and orders by both index columns. The final
+production plan returned 1,000 complete RCON1 log rows in 2.04 ms from 336
+buffers, a 99.4% latency reduction and 99.85% fewer buffer accesses for the
+measured worst case. RCON2-4 continued to return the correct server-local rows.
+The composite index scan counter increased from 6,514 to 7,051 during rollout
+and validation.
+
+Operational checks after the `v0.4.13.17` rollout:
+
+- all RCON1-4 frontends reported `v0.4.13.17` and HTTP 200;
+- all RCON1-4 backends, supervisors, the combined background worker,
+  maintenance, PostgreSQL and Redis were healthy;
+- all required supervisor processes were `RUNNING`; optional disabled jobs
+  remained intentionally `EXITED` on the instances where they are not enabled;
+- application logs contained no new traceback, fatal or process-spawn errors;
+  two webhook 404 messages belonged to an already deleted external webhook and
+  were purged by the existing queue handling;
+- Redis added no `SCAN` or `KEYS` calls during the observation window, with zero
+  evictions and zero rejected connections;
+- three post-rollout samples kept application containers inside their configured
+  limits. Backend memory was 313-398 MiB of 1 GiB, supervisors 612-910 MiB of
+  2 GiB and the combined worker 168 MiB of 512 MiB. PostgreSQL's temporary
+  increase in Docker memory was file cache created by the deliberate worst-case
+  baseline scan (`anon` 74 MB, `file` 3.41 GB), not additional process heap.
+
+Rollback remains available through the verified database dump
+`postgres-20260826T232512Z-1a5de7f6813a-to-3100925db611.dump`, its SHA-256
+sidecar, deployment state `20260826T232512Z.env`, and the local backend and
+frontend images tagged `rollback-1a5de7f6813a`. The rollout did not target
+ente1, ente2, hll1 or any other installation.
+
+Do not enable `HLL_LOG_RETENTION_DAYS` until the affected raw game events have
+an approved archival path. `log_lines` is the source for round-stat generation,
+historical player logs, stat reprocessing, and the autobalancer history
+fallback. Existing `PlayerStats` rows survive deletion, but the source data can
+no longer be reconstructed. Application, error, and container logs are outside
+this command's scope.
+
+Deployment-backup retention can be reviewed independently with the read-only
+storage planner:
+
+```bash
+python scripts/plan_storage_hygiene.py --keep-latest 8 --keep-weekly 8 --keep-monthly 6
+```
+
+The planner never changes or moves files. It protects every backup referenced
+by `.deploy-state/*.env`; its candidates are review output, not an instruction
+to delete them. Files and directories outside the managed `postgres-*.dump`
+set are reported separately with their complete size and are never selected as
+candidates.
 
 ```bash
 python rconweb/manage.py runtime_data_retention \
-  --log-days 180 --audit-days 365 --batch-size 1000 --max-batches 10
+  --audit-days 365 --batch-size 1000 --max-batches 10
 
 # Only after reviewing the dry-run and taking a backup:
 python rconweb/manage.py runtime_data_retention \
-  --log-days 180 --audit-days 365 --batch-size 1000 --max-batches 10 --execute
+  --audit-days 365 --batch-size 1000 --max-batches 10 --execute
 ```
 
 | Variable | Default | Purpose |
@@ -408,6 +496,208 @@ python rconweb/manage.py runtime_data_retention \
 Normal batched deletes make space reusable inside PostgreSQL but do not shrink
 the data files. Disk reclamation (`VACUUM FULL`, `REINDEX`, or `pg_repack`) is a
 separate maintenance operation with its own capacity and rollback plan.
+
+## Live roster polling baseline
+
+The production frontend already requests `get_team_view?compact=true`. A
+read-only measurement on 2026-08-27 confirmed that the bounded live projection
+is materially smaller than the full player profile. RCON3 had nine online
+players during the usable sample; RCON1, RCON2 and RCON4 were empty.
+
+| RCON3 projection | SQL statements | Profile JSON | Profile gzip | Time |
+| --- | ---: | ---: | ---: | ---: |
+| Full profile | 11 | 19,393 B | 2,675 B | 19.75 ms |
+| Compact live profile | 7 | 3,585 B | 759 B | 8.01 ms |
+
+The complete team-view payload was 25,837 B (3,713 B gzip) in full mode and
+10,039 B (2,031 B gzip) in compact mode. The direct team-view timings were not
+compared because the full result was already cached while the compact result
+was cold. No player data was exported by the measurement.
+
+The compact projection still loaded its two scalar relationships, watchlist
+and soldier profile, with separate `SELECT ... IN (...)` statements. They do
+not multiply parent rows, so the local change joins both into the bounded base
+player query while retaining a separate select-in query for the one-to-many
+flags collection. This removes two fixed SQL round trips without changing the
+response schema or loading any history-heavy collection.
+
+| Compact live-profile query count | Before | After local change | Reduction |
+| --- | ---: | ---: | ---: |
+| Measured RCON3 compact path / equivalent populated path | 7 | 5 | 28.6% |
+| ORM regression: one player | — | 5 | constant |
+| ORM regression: fifty players | — | 5 | constant |
+
+The regression test uses real SQLAlchemy relationships and verifies that the
+post-change count remains exactly five for both one and fifty players. It also
+checks that watchlist and soldier data are still serialized. This proves that
+the compact path has constant query complexity instead of merely failing to
+observe an N+1 query with a small roster. The change shipped to RCON1-4 in
+`v0.4.13.18` as part of PR #219.
+
+The five-second Automod cycle still requested the full team view even though
+the four moderation rules consume only live team, squad, role, level, combat
+and profile-flag fields. All of those fields are present in the compact live
+projection. The local Automod change therefore requests `compact=True` and
+keeps the punishment calculation and RCON command path unchanged.
+
+| Automod live-profile SQL budget | Full projection before | Compact projection after | Reduction |
+| --- | ---: | ---: | ---: |
+| One five-second cycle | 11 | 5 | 54.5% |
+| One active instance per minute | 132 | 60 | 54.5% |
+| Four active instances per minute | 528 | 240 | 54.5% |
+
+These figures cover the profile-projection SQL statements, not the separate
+RCON calls or Redis moderation state. Seventy focused tests across all four
+Automod rule families passed with the compact snapshot, including an explicit
+contract that prevents the periodic loop from reverting to the full roster.
+This change also shipped in `v0.4.13.18`.
+
+The same bounded projection is sufficient for two further periodic consumers:
+the Frontline Autobalancer snapshot and the Discord scoreboard VIP counter.
+The Autobalancer needs live team, squad, role, level, profile playtime and
+combat values; the scoreboard counter needs only `is_vip`. Neither consumer
+uses profile history, penalties, account data or the other unbounded relations
+from the full projection. Both now request `compact=True`, guarded by focused
+contract tests for HLL: Vietnam roles/factions and VIP counting.
+
+When the Autobalancer is active at its default five-second interval, its
+profile-projection SQL budget changes from 11 to 5 statements per cycle: 132
+to 60 statements per minute for one instance, or 528 to 240 for four active
+instances. Every scoreboard refresh receives the same 54.5% reduction in this
+part of its SQL work. Disabled Autobalancers do not build a roster snapshot, so
+the estimate deliberately excludes them. These changes shipped in
+`v0.4.13.18`.
+
+The remaining frontend issue was overlapping observers for the same React
+Query key. `GlobalState` registered a 30-second roster interval while the Live
+and Teams pages registered 10-second intervals and Live Sessions registered a
+15-second interval. Because route navigation starts the page timer at an
+arbitrary offset, the global timer can add two avoidable HTTP requests per
+minute and active browser. The modeled request budget is therefore:
+
+| Route | Before | After local change | Maximum reduction |
+| --- | ---: | ---: | ---: |
+| Live / Teams | up to 8/min | 6/min | 25% |
+| Live Sessions | up to 6/min | 4/min | 33% |
+
+The local change keeps `GlobalState` subscribed to the shared query so its
+online-player state still updates, but disables its own interval on pages that
+already own a faster roster observer. Dashboard and player-record routes keep
+the global 30-second interval because they have no page-owned roster poll.
+Contract tests cover trailing slashes, every page-owned route and the routes
+that must retain global polling. The polling-budget check, 13 focused API
+contract tests and the production frontend build passed. This change shipped
+in the `v0.4.13.18` RCON1-4 bundle.
+
+### Shared player-action menus
+
+The Live player table already used one page-level `ActionMenu`, but the Teams
+and Live Sessions views still mounted a complete `ActionMenuButton` for every
+rendered player. Each instance constructed its own MUI menu and subscribed to
+authorization, action-dialog, profile-sidebar, account-edit and soldier-edit
+hooks even while its menu was closed. With a full 100-player roster, opening
+all squads could therefore create up to 100 copies of that menu and hook tree
+on either page.
+
+The local change keeps one lightweight trigger per player and delegates it to
+exactly one shared row-action menu per page. The selected recipient and anchor
+element are stored at page level. Multi-player selection toolbars remain
+separate because they represent a different action target and are mounted only
+once. Functional behavior is unchanged: Teams retains profile and edit menu
+entries, Live Sessions retains the existing online-player actions and
+completed-game statistics retain the historical-player action set. Historical
+game logs and the player-profile log view now use the same pattern as well.
+Their first-player and second-player triggers preserve the previously different
+online/historical action sets instead of broadening the available commands.
+
+| Rendered roster | Complete row-action menus before | Complete row-action menus after | Reduction |
+| --- | ---: | ---: | ---: |
+| 1 player | 1 | 1 | 0% |
+| 50 players | 50 | 1 | 98% |
+| 100 players / one completed-game page | 100 | 1 | 99% |
+| 100 historical events / two player targets each | 200 | 1 | 99.5% |
+
+This is a component-mount reduction, not a claim that total page CPU or memory
+falls by the same percentage. A static contract rejects full per-row action
+menus on Live, Teams, Live Sessions and completed-game statistics. Five
+focused browser tests originally verified Teams, Live Sessions and completed
+games. The expanded suite now contains eight browser tests and additionally
+verifies historical game logs on desktop and mobile plus the player-profile
+log view. The static action contract and production frontend build also passed.
+This change shipped in the `v0.4.13.18` RCON1-4 bundle.
+
+## Redis registries, exact invalidation and bounded enrichment
+
+Three production findings were closed on RCON1-4 on 2026-08-28. No rollout in
+this sequence targeted ente1, ente2, hll1 or another installation.
+
+### Heartbeat registry (`v0.4.13.20`, PR #221)
+
+Recurring moderator heartbeat discovery previously scanned the Redis database.
+Heartbeats now register their exact keys in a Redis set, use `MGET` for the
+known members, and prune expired members. A one-time legacy import is guarded
+by a sentinel. Production databases 1-4 each reported the registry and sentinel
+after deployment, and Redis monitoring showed no recurring heartbeat-pattern
+`SCAN` after initialization.
+
+### Exact parameterless cache invalidation (`v0.4.13.21`, PR #222)
+
+The RCON3 gameserver reconnect window exposed a separate invalidation storm:
+417 `SCAN` commands in 50 seconds for parameterless caches such as gamestate,
+map, rotation and VIP IDs. Parameterless cached functions and methods now
+delete their one fresh/stale key pair directly. Functions with cache-key
+arguments retain the prefix-scan fallback.
+
+A controlled production check invalidated four representative caches before
+and after the context boundary. Redis `cmdstat_scan` stayed exactly at
+1,901,903, a delta of zero. Eight exact key deletions were exercised by that
+check. Eighty-three focused cache, heartbeat, message-variable and performance
+tests passed locally. GitHub Actions did not start because of the repository
+account's billing/spending limit; this was recorded on PR #222 and the local
+gate was used for the admin merge.
+
+### Bounded Steam enrichment transactions (`v0.4.13.22`, PR #223)
+
+After the cache rollout, PostgreSQL exposed one `enrich_db_users` connection
+per RCON instance that had remained `idle in transaction` for about seven
+minutes. The old server-side cursor held one transaction open across every
+Steam API request and throttle interval. Enrichment now uses ordered keyset
+pages of at most 100 players, populates `SteamInfo` from the existing join, and
+commits/closes each page before sleeping.
+
+A read-only production probe traversed three real pages without calling Steam
+or writing player data. A longer probe was observed during its throttle phase
+as `idle` with no `xact_start`; after it ended, PostgreSQL reported zero
+`idle in transaction` sessions. One hundred and two focused backend, worker,
+cache and paging tests passed locally. PR #223 had the same GitHub account-level
+CI refusal and used the documented local gate.
+
+### Final RCON1-4 validation and rollback
+
+- `rcon.fln.gg`, `rcon2.fln.gg`, `rcon3.fln.gg` and `rcon4.fln.gg` returned
+  HTTP 200 on `v0.4.13.22`;
+- every deployment healthcheck and migration check passed at
+  `c9e1f4a7b2d6 (head)`;
+- all application containers reported zero restarts and `OOMKilled=false`;
+- Redis reported zero evictions and zero rejected connections; its observed
+  memory was 544 MiB with a 1.03 fragmentation ratio;
+- application memory in the final point sample was 313-495 MiB per backend,
+  610-910 MiB per supervisor and 171 MiB for the combined worker. The sample is
+  workload-dependent and is not presented as a causal before/after estimate;
+- RCON3's gameserver was intentionally being shut down for an announced server
+  update. Its `log_stream` exit and transient RCON reconnects were therefore
+  classified as an external condition. The RCON3 web/API containers, Automod,
+  combined runtime and remaining workers stayed available.
+
+Each production step has a separate PostgreSQL dump, SHA-256 sidecar, rollback
+image set and deployment-state file. The primary rollback dumps are:
+
+- `postgres-20260828T093549Z-9cfdd3cf3faa-to-02e055205e29.dump`
+  for `v0.4.13.20`;
+- `postgres-20260828T095617Z-02e055205e29-to-0c77ef13cd94.dump`
+  for `v0.4.13.21`;
+- `postgres-20260828T101720Z-0c77ef13cd94-to-10b0843d888c.dump`
+  for `v0.4.13.22`.
 
 ## Canary measurement
 

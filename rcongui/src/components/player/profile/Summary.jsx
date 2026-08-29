@@ -1,20 +1,15 @@
-import {
-    Box,
-    Typography,
-    Divider,
-    Stack,
-  } from "@mui/material";
-  import dayjs from "dayjs";
-  import VisibilityIcon from "@mui/icons-material/Visibility";
-  import { Chip } from "@mui/material";
-  import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
-  import WorkspacePremiumIcon from "@mui/icons-material/WorkspacePremium";
-  import PersonIcon from "@mui/icons-material/Person";
-  import EmergencyIcon from "@mui/icons-material/Emergency";
-  import FlagIcon from "@mui/icons-material/Flag";
-  import FlagList from "./FlagList";
-  import WatchlistList from "./WatchlistList";
-  import VipList from "./VipList";
+import { Box, Typography, Divider, Stack } from "@mui/material";
+import dayjs from "dayjs";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import { Chip } from "@mui/material";
+import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
+import WorkspacePremiumIcon from "@mui/icons-material/WorkspacePremium";
+import PersonIcon from "@mui/icons-material/Person";
+import EmergencyIcon from "@mui/icons-material/Emergency";
+import FlagIcon from "@mui/icons-material/Flag";
+import FlagList from "./FlagList";
+import WatchlistList from "./WatchlistList";
+import VipList from "./VipList";
 import CopyableText from "@/components/shared/CopyableText";
 import { useTranslation } from "react-i18next";
 
@@ -54,11 +49,20 @@ const PlayerProfileSummary = ({
           <CalendarTodayIcon /> {t("playerDrawer.summary.activity")}
         </Typography>
         <Stack spacing={0.5}>
-          <Typography>{t("playerDrawer.summary.firstSeen")}: {dayjs(firstSeen).format("LLL")}</Typography>
-          <Typography>{t("playerDrawer.summary.lastSeen")}: {dayjs(lastSeen).format("LLL")}</Typography>
-          <Typography>{t("playerDrawer.summary.visits")}: {sessionCount}</Typography>
           <Typography>
-            {t("playerDrawer.summary.playtime")}: {Math.floor(totalPlaytime / 3600)} {t("playerDrawer.summary.hours")}
+            {t("playerDrawer.summary.firstSeen")}:{" "}
+            {dayjs(firstSeen).format("LLL")}
+          </Typography>
+          <Typography>
+            {t("playerDrawer.summary.lastSeen")}:{" "}
+            {dayjs(lastSeen).format("LLL")}
+          </Typography>
+          <Typography>
+            {t("playerDrawer.summary.visits")}: {sessionCount}
+          </Typography>
+          <Typography>
+            {t("playerDrawer.summary.playtime")}:{" "}
+            {Math.floor(totalPlaytime / 3600)} {t("playerDrawer.summary.hours")}
           </Typography>
         </Stack>
       </Box>
@@ -97,9 +101,9 @@ const PlayerProfileSummary = ({
           <PersonIcon /> {t("playerDrawer.summary.aliases")}
         </Typography>
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-          {names?.map((nameObj) => (
+          {names?.map((nameObj, index) => (
             <Chip
-              key={nameObj.id}
+              key={nameObj.id ?? `${nameObj.name}-${index}`}
               label={nameObj.name}
               variant="outlined"
               size="small"
@@ -107,7 +111,7 @@ const PlayerProfileSummary = ({
           ))}
         </Box>
       </Box>
-      
+
       <Divider />
 
       <Box component="section">
@@ -118,7 +122,10 @@ const PlayerProfileSummary = ({
           <EmergencyIcon /> EOS ID
         </Typography>
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-          <CopyableText label={eosId ?? t("playerDrawer.summary.unset")} text={eosId} />
+          <CopyableText
+            label={eosId ?? t("playerDrawer.summary.unset")}
+            text={eosId}
+          />
         </Box>
       </Box>
     </Stack>
