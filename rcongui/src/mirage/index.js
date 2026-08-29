@@ -157,6 +157,34 @@ export function makeServer({ environment = "development" } = {}) {
       steaminfo: { country: index % 2 ? "AT" : "DE" },
     };
   });
+  const liveScorePlayers = () => Array.from({ length: 36 }, (_, index) => {
+    const base = scorePlayers()[index % demoPlayerNames.length];
+    const team = index % 2 ? "axis" : "allies";
+    const kills = Math.max(0, 34 - index);
+    const deaths = 3 + (index % 11);
+    return {
+      ...base,
+      player_id: `${base.player_id.slice(0, -2)}${String(index + 1).padStart(2, "0")}`,
+      player: index < demoPlayerNames.length ? base.player : `${base.player}_${index + 1}`,
+      team,
+      faction: team === "allies" ? "us" : "ger",
+      status: index % 7 === 0 ? "offline" : index % 5 === 0 ? "idle" : "online",
+      kills,
+      deaths,
+      teamkills: index % 9 === 0 ? 2 : index % 5 === 0 ? 1 : 0,
+      kills_streak: Math.max(1, 10 - (index % 8)),
+      kill_death_ratio: Number((kills / Math.max(1, deaths)).toFixed(2)),
+      kills_per_minute: Number((kills / (58 + (index % 30))).toFixed(2)),
+      time_seconds: Math.max(420, 4080 - index * 88),
+      combat: 610 - index * 9,
+      offense: 340 - index * 4,
+      defense: 300 - index * 3,
+      support: 460 - index * 5,
+      weapons: { "M1 GARAND": Math.max(1, kills - 4), "MK2 GRENADE": index % 5 },
+      most_killed: { [scorePlayers()[(index + 1) % demoPlayerNames.length].player_id]: 4 + (index % 5) },
+      death_by: { [scorePlayers()[(index + 2) % demoPlayerNames.length].player_id]: 2 + (index % 4) },
+    };
+  });
   const autoMod = (enabled, webhook = false) => ({
     enabled,
     discord_webhook_url: webhook ? "https://discord.example/frontline" : "",
@@ -446,11 +474,18 @@ export function makeServer({ environment = "development" } = {}) {
         const game = completedGames.find((item) => item.id === request.queryParams.map_id) || completedGames[0];
         return ok({ ...game, player_stats: scorePlayers() });
       });
-      this.get("/get_live_game_stats", () => ok({ stats: scorePlayers() }));
+      this.get("/get_live_game_stats", () => ok({
+        stats: liveScorePlayers(),
+        snapshot_timestamp: Math.floor(Date.now() / 1000),
+        refresh_interval_sec: 15,
+      }));
       this.get("/get_public_info", () => ok({
         time_remaining: 3427,
         score: { allied: 3, axis: 2 },
-        current_map: currentLayer,
+        current_map: { map: currentLayer, start: Math.floor(Date.now() / 1000) - 3600 },
+        next_map: { map: mapLayers[1], start: null },
+        player_count: 86,
+        max_player_count: 100,
         player_count_by_team: { allied: 43, axis: 43 },
       }));
 
