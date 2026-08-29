@@ -392,3 +392,48 @@ Post-fix evidence: `live-game-option2-qa.png` and `live-game-option2-comparison.
 - P3: a later backend enhancement could add reliable current squad/role data, but those values should not be inferred in this UI.
 
 final result: passed
+
+---
+
+# Design QA — Completed game command dossier
+
+## Evidence
+
+- Source: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-44b9f318-ef8b-495e-9f98-d8a5adf6363a.png`
+- Implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\game-detail\16-option1-final-desktop.png`
+- Full comparison: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\game-detail\14-design-qa-full.png`
+- Focused content comparison: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\game-detail\15-design-qa-focus.png`
+- Mobile top: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\game-detail\09-option1-mobile-top.png`
+- Mobile table after correction: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\game-detail\12-option1-mobile-table-fixed.png`
+- Mobile expanded player: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\game-detail\13-option1-mobile-expanded.png`
+- Desktop viewport: 1487 × 1058 px, completed game `fln-demo-1`, no open menus or expanded rows.
+- Mobile viewport: 390 × 844 px, completed game `fln-demo-1`, default and expanded-player states.
+
+## Comparison result
+
+The implementation preserves the selected Command Dossier direction: an angular three-part match banner, a continuous 3 × 2 performance matrix, and a full-width analysis table. The implementation uses the existing Frontline navigation, tokens, typography, map asset, icon family, and production-ready controls rather than reproducing decorative placeholders from the mockup.
+
+- Layout and spacing: section order, visual hierarchy, square borders, dense ledger rhythm, and column alignment match the target. The implementation keeps the game table slightly denser so the existing role, squad, country, selection, expansion, and action capabilities remain available.
+- Typography and color: Frontline display/body hierarchy, muted copy, gold headers and values, and faction colors match the target intent. No generic rounded cards, shadows, gradients, emoji, or custom SVG substitutes were introduced.
+- Imagery and icons: the real map asset and the existing MUI icon set are used. The image keeps a stable crop at desktop and becomes a full-width banner on mobile.
+- Responsiveness: the desktop dossier becomes a stacked scorecard, swipeable performance categories, compact player rows, and expandable player statistics at 390 px. Controls remain reachable above the persistent mobile navigation.
+- Accessibility and behavior: semantic regions/headings, labelled search and filters, keyboard-accessible buttons, table selection, row expansion, column selection, CSV export, and player actions remain in place. Browser logs contain no runtime errors.
+
+## QA iterations
+
+1. Initial desktop comparison: matched the selected composition and exposed no P0/P1 desktop issues.
+2. Initial mobile pass: found a P2 overlap where long team/squad/role metadata entered the K/T/TK columns.
+3. Correction: reduced fixed statistic-column widths and explicitly clipped the metadata column with an ellipsis.
+4. Final mobile and desktop pass: no overlap, clipping, broken hierarchy, inaccessible core control, or runtime error remains.
+
+## Verification
+
+- Production build: passed (`vite build`).
+- Desktop browser QA: passed.
+- Mobile browser QA: passed.
+- Search filtering: passed.
+- Desktop and mobile row expansion: passed.
+- Column chooser: passed.
+- Console errors: none.
+
+passed

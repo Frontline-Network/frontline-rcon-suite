@@ -578,6 +578,7 @@ export function makeServer({ environment = "development" } = {}) {
 
       const completedGames = [0, 1, 2, 3].map((index) => ({
         id: `fln-demo-${index + 1}`,
+        server_number: 2,
         map: mapLayers[index % mapLayers.length],
         result: { allied: index % 2 ? 2 : 3, axis: index % 2 ? 3 : 2 },
         start: new Date(Date.now() - (index + 1) * 7200000).toISOString(),

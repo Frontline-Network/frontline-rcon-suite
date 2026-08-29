@@ -1,172 +1,239 @@
-import Table from "@/components/table/Table";
-import TableConfigDrawer from "@/components/table/TableConfigDrawer";
+import { useMemo, useState } from "react";
 import {
+  Box,
+  Button,
   ButtonBase,
   Collapse,
-  Divider,
+  FormControl,
   IconButton,
+  MenuItem,
   Paper,
+  Select,
   Stack,
+  Typography,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import { useState } from "react";
-import { DebouncedSearchInput } from "@/components/shared/DebouncedSearchInput";
-import SettingsIcon from "@mui/icons-material/Settings";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import DownloadIcon from "@mui/icons-material/Download";
-import { ActionMenuButton } from "@/features/player-action/ActionMenu";
-import { generatePlayerActions } from "@/features/player-action/actions";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
+import SettingsIcon from "@mui/icons-material/Settings";
+import ViewColumnIcon from "@mui/icons-material/ViewColumn";
+import { useTranslation } from "react-i18next";
+
+import { DebouncedSearchInput } from "@/components/shared/DebouncedSearchInput";
+import Table from "@/components/table/Table";
+import TableColumnSelection from "@/components/table/TableColumnSelection";
+import TableConfigDrawer from "@/components/table/TableConfigDrawer";
 import { TablePagination } from "@/components/table/TablePagination";
 import { TableToolbar } from "@/components/table/TableToolbar";
-import { Box, Typography } from "@mui/material";
+import { ActionMenuButton } from "@/features/player-action/ActionMenu";
+import { generatePlayerActions } from "@/features/player-action/actions";
 import { downloadGame } from "@/features/download-game";
 import { useGameDetailsTableStore } from "@/stores/table-config";
-import { useTranslation } from "react-i18next";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
+import {
+  formatRoleLabel,
+  formatSquadLabel,
+} from "@/pages/views/live/player-display-labels";
+
+import {
+  getHistoricalRole,
+  getHistoricalSquad,
+  normalizeHistoricalTeam,
+} from "./game-detail-utils";
+
+const LEDGER_BORDER = "rgba(214, 184, 112, 0.2)";
+
+const teamLabel = (t, side) => {
+  if (side === "allies") return t("views.team.allies");
+  if (side === "axis") return t("views.team.axis");
+  if (side === "mixed") return t("stats.gameDetails.mixedTeam");
+  return t("stats.gameDetails.unknownTeam");
+};
+
+const teamColor = (side) => {
+  if (side === "allies") return "info.light";
+  if (side === "axis") return "error.light";
+  if (side === "mixed") return "warning.light";
+  return "text.secondary";
+};
+
+const csvHeaders = (t) => [
+  t("stats.gameDetails.csv.playerId"),
+  t("stats.gameDetails.csv.name"),
+  t("stats.gameDetails.metrics.kills"),
+  t("stats.gameDetails.deaths"),
+  "K/D",
+  t("stats.gameDetails.csv.maxKillStreak"),
+  t("stats.gameDetails.csv.killsPerMinute"),
+  t("stats.gameDetails.csv.deathsPerMinute"),
+  t("stats.gameDetails.csv.maxDeathStreak"),
+  t("stats.gameDetails.csv.maxTeamKillStreak"),
+  t("stats.gameDetails.csv.deathByTeamKill"),
+  t("stats.gameDetails.csv.deathByTeamKillStreak"),
+  t("stats.gameDetails.csv.longestLife"),
+  t("stats.gameDetails.csv.shortestLife"),
+  t("stats.gameDetails.csv.nemesis"),
+  t("stats.gameDetails.csv.victim"),
+  t("stats.gameDetails.csv.combat"),
+  t("stats.gameDetails.csv.support"),
+  t("stats.gameDetails.csv.defense"),
+  t("stats.gameDetails.csv.offense"),
+  t("stats.gameDetails.csv.weapons"),
+  t("stats.gameDetails.csv.deathByWeapons"),
+];
+
+const StatSection = ({ title, stats }) => (
+  <Box sx={{ minWidth: 0 }}>
+    <Typography
+      variant="overline"
+      color="primary.main"
+      sx={{ display: "block", mb: 0.75 }}
+    >
+      {title}
+    </Typography>
+    <Stack>
+      {stats.map(({ label, value }) => (
+        <Box
+          key={label}
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 2,
+            py: 0.45,
+            borderBottom: "1px solid",
+            borderColor: LEDGER_BORDER,
+          }}
+        >
+          <Typography variant="body2" color="text.secondary">
+            {label}
+          </Typography>
+          <Typography
+            variant="body2"
+            sx={{ fontVariantNumeric: "tabular-nums" }}
+          >
+            {value ?? "–"}
+          </Typography>
+        </Box>
+      ))}
+    </Stack>
+  </Box>
+);
+
+const DetailList = ({ title, values }) => (
+  <Box sx={{ minWidth: 0 }}>
+    <Typography
+      variant="overline"
+      color="primary.main"
+      sx={{ display: "block", mb: 0.75 }}
+    >
+      {title}
+    </Typography>
+    {values.length ? (
+      <Stack>
+        {values.map(({ id, label, value }) => (
+          <Box
+            key={id}
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1fr) auto",
+              gap: 1,
+              py: 0.45,
+              borderBottom: "1px solid",
+              borderColor: LEDGER_BORDER,
+            }}
+          >
+            <Typography variant="body2" color="text.secondary" noWrap>
+              {label}
+            </Typography>
+            <Typography variant="body2">{value}</Typography>
+          </Box>
+        ))}
+      </Stack>
+    ) : (
+      <Typography variant="body2" color="text.disabled">
+        –
+      </Typography>
+    )}
+  </Box>
+);
 
 const renderSubComponent = ({ row }, t, playerNames) => {
-  // Create a custom component that renders the player's stats
+  const player = row.original;
+  const ratio = Number(player.kill_death_ratio);
+  const kpm = Number(player.kills_per_minute);
   const statCategories = {
     combat: [
-      {
-        label: t("stats.gameDetails.metrics.kills"),
-        value: row.original.kills,
-      },
-      { label: t("stats.gameDetails.deaths"), value: row.original.deaths },
+      { label: t("stats.gameDetails.metrics.kills"), value: player.kills },
+      { label: t("stats.gameDetails.deaths"), value: player.deaths },
       {
         label: "K/D",
-        value: (row.original.kills / Math.max(row.original.deaths, 1)).toFixed(
-          2
-        ),
+        value: Number.isFinite(ratio) ? ratio.toFixed(2) : "–",
       },
       {
         label: t("stats.gameDetails.killsPerMinute"),
-        value: row.original.kills_per_minute?.toFixed(2),
+        value: Number.isFinite(kpm) ? kpm.toFixed(2) : "–",
       },
     ],
     teamwork: [
-      {
-        label: t("stats.gameDetails.teamKills"),
-        value: row.original.teamkills,
-      },
+      { label: t("stats.gameDetails.teamKills"), value: player.teamkills },
       {
         label: t("stats.gameDetails.teamKillStreak"),
-        value: row.original.teamkills_streak,
+        value: player.teamkills_streak,
       },
       {
         label: t("stats.gameDetails.deathsByTeamKill"),
-        value: row.original.deaths_by_tk,
+        value: player.deaths_by_tk,
       },
       {
         label: t("stats.gameDetails.teamDeathStreak"),
-        value: row.original.deaths_by_tk_streak,
+        value: player.deaths_by_tk_streak,
       },
     ],
-    offense: [
+    objective: [
       {
-        label: t("stats.gameDetails.offensiveKills"),
-        value: row.original.offensive_kills,
+        label: t("stats.gameDetails.metrics.offense"),
+        value: player.offense,
       },
       {
-        label: t("stats.gameDetails.defensiveKills"),
-        value: row.original.defensive_kills,
+        label: t("stats.gameDetails.metrics.defense"),
+        value: player.defense,
+      },
+      {
+        label: t("stats.gameDetails.metrics.combat"),
+        value: player.combat,
+      },
+      {
+        label: t("stats.gameDetails.metrics.support"),
+        value: player.support,
       },
     ],
   };
 
-  const StatSection = ({ title, stats }) => (
-    <Box>
-      <Typography variant="subtitle2" sx={{ mb: 1 }}>
-        {title}
-      </Typography>
-      {stats.map(({ label, value }) => (
-        <Box
-          key={label}
-          sx={{ display: "flex", justifyContent: "space-between", py: 0.5 }}
-        >
-          <Typography variant="body2">{label}:</Typography>
-          <Typography variant="body2" sx={{ ml: 2 }}>
-            {value}
-          </Typography>
-        </Box>
-      ))}
-    </Box>
-  );
-
-  const players = Object.entries(row.original.most_killed || {}).map(
-    ([playerId, kills]) => (
-      <Box
-        key={playerId}
-        sx={{ display: "flex", justifyContent: "space-between", py: 0.5 }}
-      >
-        <Typography variant="body2">
-          {playerNames.get(playerId) || playerId}:
-        </Typography>
-        <Typography variant="body2" sx={{ ml: 2 }}>
-          {kills}
-        </Typography>
-      </Box>
-    )
-  );
-
-  const weapons = Object.entries(row.original.weapons || {}).map(
-    ([weapon, kills]) => (
-      <Box
-        key={weapon}
-        sx={{ display: "flex", justifyContent: "space-between", py: 0.5 }}
-      >
-        <Typography variant="body2">{weapon}:</Typography>
-        <Typography variant="body2" sx={{ ml: 2 }}>
-          {kills}
-        </Typography>
-      </Box>
-    )
-  );
-
-  const deathsByWeapon = Object.entries(
-    row.original.death_by_weapons || {}
-  ).map(([weapon, deaths]) => (
-    <Box
-      key={weapon}
-      sx={{ display: "flex", justifyContent: "space-between", py: 0.5 }}
-    >
-      <Typography variant="body2">{weapon}:</Typography>
-      <Typography variant="body2" sx={{ ml: 2 }}>
-        {deaths}
-      </Typography>
-    </Box>
-  ));
-
-  const deathsByPlayer = Object.entries(row.original.death_by || {}).map(
-    ([playerId, deaths]) => (
-      <Box
-        key={playerId}
-        sx={{ display: "flex", justifyContent: "space-between", py: 0.5 }}
-      >
-        <Typography variant="body2">
-          {playerNames.get(playerId) || playerId}:
-        </Typography>
-        <Typography variant="body2" sx={{ ml: 2 }}>
-          {deaths}
-        </Typography>
-      </Box>
-    )
-  );
+  const keyedValues = (record, resolveLabel) =>
+    Object.entries(record || {}).map(([id, value]) => ({
+      id,
+      label: resolveLabel(id),
+      value,
+    }));
 
   return (
     <Box
+      id={row.id + "-details"}
       sx={{
-        p: 2,
-        maxWidth: { xs: (theme) => theme.breakpoints.values.sm, lg: "100%" },
+        p: { xs: 1.5, md: 2 },
+        bgcolor: "rgba(255,255,255,0.015)",
+        borderLeft: "2px solid",
+        borderColor: "primary.main",
       }}
     >
       <Box
         sx={{
           display: "grid",
           gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" },
-          gap: { xs: 2, md: 4 },
-          mb: 4,
+          gap: { xs: 2, md: 3 },
+          mb: 2.5,
         }}
       >
         <StatSection
@@ -179,47 +246,48 @@ const renderSubComponent = ({ row }, t, playerNames) => {
         />
         <StatSection
           title={t("stats.gameDetails.objectiveStats")}
-          stats={statCategories.offense}
+          stats={statCategories.objective}
         />
       </Box>
-
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: { xs: "1fr", md: "repeat(4, 1fr)" },
-          gap: { xs: 2, md: 4 },
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "repeat(2, minmax(0, 1fr))",
+            lg: "repeat(4, minmax(0, 1fr))",
+          },
+          gap: { xs: 2, md: 3 },
         }}
       >
-        <Box>
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>
-            {t("stats.gameDetails.killsByPlayer")}
-          </Typography>
-          {players}
-        </Box>
-        <Box>
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>
-            {t("stats.gameDetails.killsByWeapon")}
-          </Typography>
-          {weapons}
-        </Box>
-        <Box>
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>
-            {t("stats.gameDetails.deathsByWeapon")}
-          </Typography>
-          {deathsByWeapon}
-        </Box>
-        <Box>
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>
-            {t("stats.gameDetails.deathsByPlayer")}
-          </Typography>
-          {deathsByPlayer}
-        </Box>
+        <DetailList
+          title={t("stats.gameDetails.killsByPlayer")}
+          values={keyedValues(
+            player.most_killed,
+            (id) => playerNames.get(id) || id
+          )}
+        />
+        <DetailList
+          title={t("stats.gameDetails.killsByWeapon")}
+          values={keyedValues(player.weapons, (id) => id)}
+        />
+        <DetailList
+          title={t("stats.gameDetails.deathsByWeapon")}
+          values={keyedValues(player.death_by_weapons, (id) => id)}
+        />
+        <DetailList
+          title={t("stats.gameDetails.deathsByPlayer")}
+          values={keyedValues(
+            player.death_by,
+            (id) => playerNames.get(id) || id
+          )}
+        />
       </Box>
     </Box>
   );
 };
 
-const PlayersTable = ({ table, selectedPlayers }) => {
+const PlayersTable = ({ table, selectedPlayers, onColumnVisibilityChange }) => {
   const { t } = useTranslation();
   const [tableConfigDrawerOpen, setTableConfigDrawerOpen] = useState(false);
   const tableConfig = useGameDetailsTableStore();
@@ -227,243 +295,338 @@ const PlayersTable = ({ table, selectedPlayers }) => {
   const theme = useTheme();
   const compact = useMediaQuery(theme.breakpoints.down("md"));
   const [expandedPlayerId, setExpandedPlayerId] = useState(null);
-  const playerNames = new Map(
-    table.options.data.map((player) => [player.player_id, player.player])
+  const playerNames = useMemo(
+    () =>
+      new Map(
+        table.options.data.map((player) => [player.player_id, player.player])
+      ),
+    [table.options.data]
   );
+  const roleOptions = useMemo(
+    () =>
+      [
+        ...new Set(table.options.data.map(getHistoricalRole).filter(Boolean)),
+      ].sort((a, b) => a.localeCompare(b)),
+    [table.options.data]
+  );
+  const teamFilter = table.getColumn("team")?.getFilterValue() ?? "all";
+  const roleFilter = table.getColumn("role")?.getFilterValue() ?? "all";
+  const rows = table.getRowModel().rows;
 
-  const handleTableConfigClick = () => {
-    setTableConfigDrawerOpen((prev) => !prev);
+  const updateFilter = (columnId, value) => {
+    table
+      .getColumn(columnId)
+      ?.setFilterValue(value === "all" ? undefined : value);
+    table.setPageIndex(0);
+    table.resetRowSelection();
   };
 
   return (
-    <div>
-      <TableToolbar sx={compact ? { flexWrap: "wrap", gap: 1 } : undefined}>
-        {!compact && (
-          <ActionMenuButton
-            actions={generatePlayerActions({
-              multiAction: true,
-              onlineAction: false,
-            })}
-            disabled={
-              !table.getIsSomePageRowsSelected() &&
-              !table.getIsAllRowsSelected()
-            }
-            recipients={selectedPlayers}
-            orientation="horizontal"
-            disableRipple={true}
-            sx={{
-              p: "1px 4px",
-              height: "100%",
-            }}
-          />
-        )}
+    <Box
+      component="section"
+      aria-labelledby="completed-game-players-heading"
+      sx={{
+        border: "1px solid",
+        borderColor: LEDGER_BORDER,
+        bgcolor: "rgba(8, 12, 9, 0.78)",
+        overflow: "hidden",
+      }}
+    >
+      <Typography
+        component="h2"
+        id="completed-game-players-heading"
+        variant="overline"
+        color="primary.main"
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          minHeight: 36,
+          px: 1.5,
+          fontWeight: 900,
+          letterSpacing: "0.11em",
+          borderBottom: "1px solid",
+          borderColor: LEDGER_BORDER,
+        }}
+      >
+        {t("stats.gameDetails.playerAnalysis")}
+      </Typography>
+      <TableToolbar
+        sx={{
+          border: 0,
+          borderBottom: "1px solid",
+          borderColor: LEDGER_BORDER,
+          flexWrap: "wrap",
+          minHeight: 48,
+        }}
+      >
         <DebouncedSearchInput
           placeholder={t("stats.liveSessions.searchPlayer")}
           initialValue={table.getColumn("name")?.getFilterValue() ?? ""}
           onChange={(value) => {
             table.getColumn("name")?.setFilterValue(value);
+            table.setPageIndex(0);
           }}
           sx={{
-            maxWidth: compact ? "none" : 230,
-            flex: compact ? "1 1 100%" : undefined,
+            flex: { xs: "1 1 100%", md: "1 1 280px" },
+            maxWidth: { md: 360 },
+            "& .MuiOutlinedInput-root": { borderRadius: 0, height: 48 },
+            "& fieldset": { borderTop: 0, borderBottom: 0, borderLeft: 0 },
           }}
         />
-        {!compact && <TablePagination table={table} />}
-        {!compact && <Divider flexItem orientation="vertical" />}
-        {!compact && (
-          <IconButton
-            size="small"
-            sx={{ p: 0.5, borderRadius: 0 }}
-            aria-label={t("stats.gameDetails.download")}
-            onClick={() =>
-              downloadGame(table.options.data, [
-                t("stats.gameDetails.csv.playerId"),
-                t("stats.gameDetails.csv.name"),
-                t("stats.gameDetails.metrics.kills"),
-                t("stats.gameDetails.deaths"),
-                "K/D",
-                t("stats.gameDetails.csv.maxKillStreak"),
-                t("stats.gameDetails.csv.killsPerMinute"),
-                t("stats.gameDetails.csv.deathsPerMinute"),
-                t("stats.gameDetails.csv.maxDeathStreak"),
-                t("stats.gameDetails.csv.maxTeamKillStreak"),
-                t("stats.gameDetails.csv.deathByTeamKill"),
-                t("stats.gameDetails.csv.deathByTeamKillStreak"),
-                t("stats.gameDetails.csv.longestLife"),
-                t("stats.gameDetails.csv.shortestLife"),
-                t("stats.gameDetails.csv.nemesis"),
-                t("stats.gameDetails.csv.victim"),
-                t("stats.gameDetails.csv.combat"),
-                t("stats.gameDetails.csv.support"),
-                t("stats.gameDetails.csv.defense"),
-                t("stats.gameDetails.csv.offense"),
-                t("stats.gameDetails.csv.weapons"),
-                t("stats.gameDetails.csv.deathByWeapons"),
-              ])
-            }
-          >
-            <DownloadIcon sx={{ fontSize: 16 }} />
-          </IconButton>
-        )}
-        {!compact && (
-          <IconButton
-            size="small"
-            sx={{ p: 0.5, borderRadius: 0 }}
-            aria-label={t("common.settings")}
-            onClick={handleTableConfigClick}
-          >
-            <SettingsIcon sx={{ fontSize: 16 }} />
-          </IconButton>
-        )}
-      </TableToolbar>
-      {compact ? (
-        <Stack
-          component="section"
-          aria-label={t("stats.liveGame.playerStatistics")}
-          gap={0}
-          sx={{ mt: 1 }}
+        <FormControl
+          size="small"
+          sx={{
+            flex: { xs: "1 1 50%", sm: "0 0 170px" },
+            "& .MuiOutlinedInput-root": { borderRadius: 0, height: 48 },
+          }}
         >
-          {table.getRowModel().rows.map((row) => {
-            const player = row.original;
-            const expanded = expandedPlayerId === player.player_id;
-            return (
-              <Paper
-                key={player.player_id}
-                variant="outlined"
-                sx={{
-                  borderRadius: 0,
-                  borderBottomWidth: expanded ? 1 : 0,
-                  "&:last-child": { borderBottomWidth: 1 },
-                }}
+          <Select
+            value={teamFilter}
+            onChange={(event) => updateFilter("team", event.target.value)}
+            inputProps={{ "aria-label": t("stats.gameDetails.teamFilter") }}
+          >
+            <MenuItem value="all">{t("stats.gameDetails.allTeams")}</MenuItem>
+            <MenuItem value="allies">{t("views.team.allies")}</MenuItem>
+            <MenuItem value="axis">{t("views.team.axis")}</MenuItem>
+            <MenuItem value="review">
+              {t("stats.gameDetails.teamReview")}
+            </MenuItem>
+          </Select>
+        </FormControl>
+        {table.getColumn("role") ? (
+          <FormControl
+            size="small"
+            sx={{
+              flex: { xs: "1 1 50%", sm: "0 0 170px" },
+              "& .MuiOutlinedInput-root": { borderRadius: 0, height: 48 },
+            }}
+          >
+            <Select
+              value={roleFilter}
+              onChange={(event) => updateFilter("role", event.target.value)}
+              inputProps={{ "aria-label": t("stats.gameDetails.roleFilter") }}
+            >
+              <MenuItem value="all">{t("stats.gameDetails.allRoles")}</MenuItem>
+              {roleOptions.map((role) => (
+                <MenuItem key={role} value={role}>
+                  {formatRoleLabel(t, role)}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        ) : null}
+        <Box sx={{ flex: { md: 1 } }} />
+        {selectedPlayers.length ? (
+          <ActionMenuButton
+            actions={generatePlayerActions({
+              multiAction: true,
+              onlineAction: false,
+            })}
+            recipients={selectedPlayers}
+            renderButton={(props) => (
+              <Button
+                {...props}
+                startIcon={<GroupsOutlinedIcon />}
+                sx={{ minHeight: 48, borderRadius: 0, px: 1.5 }}
               >
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  sx={{ minHeight: 52, pr: 0.5 }}
+                {t("stats.gameDetails.selectedPlayers", {
+                  count: selectedPlayers.length,
+                })}
+              </Button>
+            )}
+          />
+        ) : null}
+        <Button
+          startIcon={<DownloadIcon />}
+          onClick={() => downloadGame(table.options.data, csvHeaders(t))}
+          sx={{ minHeight: 48, borderRadius: 0, px: 1.5 }}
+        >
+          {t("stats.gameDetails.csvExport")}
+        </Button>
+        <TableColumnSelection
+          table={table}
+          onColumnVisibilityChange={onColumnVisibilityChange}
+          renderButton={(props) => (
+            <Button
+              {...props}
+              startIcon={<ViewColumnIcon />}
+              sx={{ minHeight: 48, borderRadius: 0, px: 1.5 }}
+            >
+              {t("stats.gameDetails.columns")}
+            </Button>
+          )}
+        />
+        <IconButton
+          aria-label={t("stats.gameDetails.tableSettings")}
+          onClick={() => setTableConfigDrawerOpen(true)}
+          sx={{ width: 48, height: 48, borderRadius: 0 }}
+        >
+          <SettingsIcon fontSize="small" />
+        </IconButton>
+      </TableToolbar>
+
+      {compact ? (
+        rows.length ? (
+          <Stack
+            component="div"
+            aria-label={t("stats.liveGame.playerStatistics")}
+            gap={0}
+          >
+            {rows.map((row) => {
+              const player = row.original;
+              const expanded = expandedPlayerId === player.player_id;
+              const side = normalizeHistoricalTeam(player.team);
+              const role = getHistoricalRole(player);
+              const squad = getHistoricalSquad(player);
+              return (
+                <Paper
+                  key={player.player_id}
+                  variant="outlined"
+                  sx={{
+                    borderRadius: 0,
+                    borderWidth: 0,
+                    borderBottom: "1px solid",
+                    borderColor: LEDGER_BORDER,
+                    bgcolor: "transparent",
+                  }}
                 >
-                  <ButtonBase
-                    aria-expanded={expanded}
-                    aria-label={`${player.player} ${
-                      expanded ? t("common.close") : t("common.open")
-                    }`}
-                    onClick={() =>
-                      setExpandedPlayerId(expanded ? null : player.player_id)
-                    }
-                    sx={{
-                      display: "grid",
-                      gridTemplateColumns: "32px minmax(0, 1fr) 42px 42px 36px",
-                      alignItems: "center",
-                      flex: 1,
-                      minWidth: 0,
-                      minHeight: 52,
-                      textAlign: "left",
-                    }}
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    sx={{ minHeight: 58, pr: 0.5 }}
                   >
-                    <ChevronRightIcon
+                    <ButtonBase
+                      aria-expanded={expanded}
+                      aria-controls={
+                        expanded ? row.id + "-mobile-details" : undefined
+                      }
+                      aria-label={
+                        player.player +
+                        " " +
+                        (expanded ? t("common.close") : t("common.open"))
+                      }
+                      onClick={() =>
+                        setExpandedPlayerId(expanded ? null : player.player_id)
+                      }
                       sx={{
-                        transform: expanded ? "rotate(90deg)" : "none",
-                        transition: "transform 120ms",
+                        display: "grid",
+                        gridTemplateColumns:
+                          "28px minmax(0, 1fr) repeat(3, 34px)",
+                        alignItems: "center",
+                        flex: 1,
+                        minWidth: 0,
+                        minHeight: 58,
+                        textAlign: "left",
                       }}
-                    />
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography noWrap sx={{ fontWeight: 800 }}>
-                        {player.player}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {player.steaminfo?.country || t("common.unknown")}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ textAlign: "center" }}>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        display="block"
+                    >
+                      <ChevronRightIcon
+                        sx={{
+                          transform: expanded ? "rotate(90deg)" : "none",
+                          transition: "transform 120ms",
+                        }}
+                      />
+                      <Box
+                        sx={{
+                          minWidth: 0,
+                          maxWidth: "100%",
+                          overflow: "hidden",
+                        }}
                       >
-                        K
-                      </Typography>
-                      <Typography sx={{ fontWeight: 800 }}>
-                        {player.kills ?? 0}
-                      </Typography>
+                        <Typography
+                          variant="body2"
+                          noWrap
+                          sx={{ display: "block" }}
+                        >
+                          {player.player}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          color={teamColor(side)}
+                          noWrap
+                          sx={{ display: "block", maxWidth: "100%" }}
+                        >
+                          {[
+                            teamLabel(t, side),
+                            squad ? formatSquadLabel(squad) : null,
+                            role ? formatRoleLabel(t, role) : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </Typography>
+                      </Box>
+                      {[
+                        ["K", player.kills ?? 0],
+                        ["T", player.deaths ?? 0],
+                        ["TK", player.teamkills ?? 0],
+                      ].map(([label, value]) => (
+                        <Box key={label} sx={{ textAlign: "center" }}>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            display="block"
+                          >
+                            {label}
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            color={
+                              label === "TK" && Number(value) > 0
+                                ? "error.main"
+                                : "text.primary"
+                            }
+                          >
+                            {value}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </ButtonBase>
+                    <IconButton
+                      aria-controls={
+                        table.options.meta?.activePlayerActionId ===
+                        player.player_id
+                          ? "completed-game-player-actions-menu"
+                          : undefined
+                      }
+                      aria-expanded={
+                        table.options.meta?.activePlayerActionId ===
+                        player.player_id
+                          ? "true"
+                          : undefined
+                      }
+                      aria-haspopup="true"
+                      aria-label={t("stats.gameDetails.playerActions", {
+                        player: player.player,
+                      })}
+                      data-testid="completed-game-player-action-trigger"
+                      disableRipple
+                      onClick={(event) =>
+                        table.options.meta?.openPlayerActionMenu?.(
+                          event.currentTarget,
+                          {
+                            name: player.player,
+                            player_id: player.player_id,
+                          }
+                        )
+                      }
+                      sx={{ minWidth: 44, minHeight: 44, borderRadius: 0 }}
+                    >
+                      <MoreHorizIcon />
+                    </IconButton>
+                  </Stack>
+                  <Collapse in={expanded} unmountOnExit>
+                    <Box id={row.id + "-mobile-details"}>
+                      {renderSubComponent({ row }, t, playerNames)}
                     </Box>
-                    <Box sx={{ textAlign: "center" }}>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        display="block"
-                      >
-                        T
-                      </Typography>
-                      <Typography sx={{ fontWeight: 800 }}>
-                        {player.deaths ?? 0}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ textAlign: "center" }}>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        display="block"
-                      >
-                        TK
-                      </Typography>
-                      <Typography
-                        color={
-                          (player.teamkills ?? 0) > 0
-                            ? "error.main"
-                            : "text.primary"
-                        }
-                        sx={{ fontWeight: 800 }}
-                      >
-                        {player.teamkills ?? 0}
-                      </Typography>
-                    </Box>
-                  </ButtonBase>
-                  <IconButton
-                    aria-controls={
-                      table.options.meta?.activePlayerActionId ===
-                      player.player_id
-                        ? "completed-game-player-actions-menu"
-                        : undefined
-                    }
-                    aria-expanded={
-                      table.options.meta?.activePlayerActionId ===
-                      player.player_id
-                        ? "true"
-                        : undefined
-                    }
-                    aria-haspopup="true"
-                    aria-label={t("actions.menu")}
-                    data-testid="completed-game-player-action-trigger"
-                    disableRipple
-                    onClick={(event) =>
-                      table.options.meta?.openPlayerActionMenu?.(
-                        event.currentTarget,
-                        {
-                          name: player.player,
-                          player_id: player.player_id,
-                        }
-                      )
-                    }
-                    sx={{ minWidth: 44, minHeight: 44 }}
-                  >
-                    <MoreHorizIcon />
-                  </IconButton>
-                </Stack>
-                <Collapse in={expanded} unmountOnExit>
-                  <Box
-                    sx={{
-                      borderTop: "1px solid",
-                      borderColor: "divider",
-                      p: 1.25,
-                      bgcolor: "background.default",
-                    }}
-                  >
-                    {renderSubComponent({ row }, t, playerNames)}
-                  </Box>
-                </Collapse>
-              </Paper>
-            );
-          })}
-        </Stack>
+                  </Collapse>
+                </Paper>
+              );
+            })}
+          </Stack>
+        ) : (
+          <Typography color="text.secondary" sx={{ p: 3, textAlign: "center" }}>
+            {t("stats.gameDetails.noPlayersFound")}
+          </Typography>
+        )
       ) : (
         <Table
           table={table}
@@ -471,10 +634,36 @@ const PlayersTable = ({ table, selectedPlayers }) => {
           renderSubComponent={(props) =>
             renderSubComponent(props, t, playerNames)
           }
+          showTopScrollbar
+          topScrollbarLabel={t("stats.gameDetails.scrollColumns")}
         />
       )}
+
+      <Stack
+        component="footer"
+        direction={{ xs: "column", sm: "row" }}
+        alignItems={{ xs: "stretch", sm: "center" }}
+        justifyContent="space-between"
+        gap={1}
+        sx={{
+          minHeight: 48,
+          px: 1.5,
+          py: 0.5,
+          borderTop: "1px solid",
+          borderColor: LEDGER_BORDER,
+        }}
+      >
+        <Typography variant="caption" color="text.secondary">
+          {t("stats.gameDetails.playersShown", {
+            shown: table.getFilteredRowModel().rows.length,
+            total: table.options.data.length,
+          })}
+        </Typography>
+        <TablePagination table={table} />
+      </Stack>
+
       <TableConfigDrawer
-        name={t("stats.gameDetails.title")}
+        name={t("stats.gameDetails.playerAnalysis")}
         open={tableConfigDrawerOpen}
         onClose={(config) => {
           setTableConfigDrawerOpen(false);
@@ -482,7 +671,7 @@ const PlayersTable = ({ table, selectedPlayers }) => {
         }}
         config={tableConfig}
       />
-    </div>
+    </Box>
   );
 };
 
