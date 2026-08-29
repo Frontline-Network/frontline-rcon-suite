@@ -724,6 +724,66 @@ export const demoBlacklists = [
 
 export const demoBlacklistRecords = [
   {
+    id: 106,
+    blacklist: demoBlacklists[1],
+    player: {
+      player_id: "76561198000000026",
+      names: [{ name: "Wotan" }, { name: "Odin32" }],
+      steaminfo: null,
+    },
+    reason: "Mehrfaches Teamkilling und absichtliches Stören des Events",
+    formatted_reason: "Mehrfaches Teamkilling und absichtliches Stören des Events",
+    created_at: new Date(Date.now() - 35 * 60_000).toISOString(),
+    expires_at: null,
+    is_active: true,
+    admin_name: "Frontline Admin",
+  },
+  {
+    id: 105,
+    blacklist: demoBlacklists[0],
+    player: {
+      player_id: "76561198000000025",
+      names: [{ name: "Shadow" }],
+      steaminfo: null,
+    },
+    reason: "Beleidigungen im Textchat",
+    formatted_reason: "Beleidigungen im Textchat",
+    created_at: new Date(Date.now() - 2 * 60 * 60_000).toISOString(),
+    expires_at: new Date(Date.now() + 4 * 86400000).toISOString(),
+    is_active: true,
+    admin_name: "Frontline Admin",
+  },
+  {
+    id: 104,
+    blacklist: demoBlacklists[1],
+    player: {
+      player_id: "76561198000000024",
+      names: [{ name: "DerJoker254" }],
+      steaminfo: null,
+    },
+    reason: "Event-Ausschluss wegen wiederholter Regelverstöße",
+    formatted_reason: "Event-Ausschluss wegen wiederholter Regelverstöße",
+    created_at: new Date(Date.now() - 4 * 60 * 60_000).toISOString(),
+    expires_at: new Date(Date.now() + 4 * 86400000).toISOString(),
+    is_active: true,
+    admin_name: "Leitstelle",
+  },
+  {
+    id: 103,
+    blacklist: demoBlacklists[0],
+    player: {
+      player_id: "76561198000000023",
+      names: [{ name: "TommyGun" }],
+      steaminfo: null,
+    },
+    reason: "Rassistische Äußerungen im Chat",
+    formatted_reason: "Rassistische Äußerungen im Chat",
+    created_at: new Date(Date.now() - 86400000 * 18).toISOString(),
+    expires_at: new Date(Date.now() - 86400000 * 2).toISOString(),
+    is_active: false,
+    admin_name: "Frontline Admin",
+  },
+  {
     id: 101,
     blacklist: demoBlacklists[0],
     player: {

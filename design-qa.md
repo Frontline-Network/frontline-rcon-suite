@@ -162,6 +162,48 @@ final result: passed
 
 ---
 
+# Sperrlisten / Moderations-Journal – Design QA
+
+## Prüfgrundlage
+
+- Referenz: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-a2889daa-9885-4371-85b1-30b2964d3a7f.png`
+- Implementierung: `.tmp/product-design/blacklists/implementation-option-3.png`
+- Direkter Vergleich: `.tmp/product-design/blacklists/option-3-comparison.png`
+- Referenz- und Prüfviewport: 1705 × 923 px
+- Zusätzliche Responsive-Prüfung: 1280 × 720 px und 390 × 844 px
+- Zustand: Filterleiste sichtbar, sechs realistische Demo-Einträge in drei Zeitgruppen, erster Eintrag als Fallakte geöffnet
+
+## Vergleichsergebnis
+
+Die Implementierung übernimmt die ausgewählte Richtung als dichtes Moderations-Journal: feste Filterleiste, chronologische Gruppen, kompakte Eintragszeilen, eckige Bedienelemente, goldene Zustandsakzente und eine inline aufklappbare Fallakte. Die vorhandene Frontline-Navigation, Typografie, Farbtokens und Komponenten bleiben erhalten. Abweichende Beispieldaten und leicht kompaktere Abstände sind beabsichtigt und passen zur bestehenden Anwendung.
+
+## Interaction und Kompatibilität
+
+- Statusfilter Aktiv / Alle / Abgelaufen inklusive Suche und Zurücksetzen: passed
+- Auf- und Zuklappen einer Fallakte: passed
+- Öffnen und Schließen des Bearbeiten-Dialogs: passed
+- Pagination und Seitengröße: passed
+- Horizontale Überbreite bei 1705 px, 1280 px und 390 px: keine
+- Deutsche relative und absolute Datumsdarstellung: passed
+- Browserkonsole: keine Anwendungsfehler; nur bestehender React-Router-v7-Zukunftshinweis
+
+## QA history
+
+1. P2 — Die sechs Metadatenspalten wurden bereits bei mittlerer Breite aktiviert und erzeugten Überbreite.
+   - Fix: breite Zeilendarstellung erst am XL-Breakpoint; darunter bleibt die kompakte Ein-Zeilen-Darstellung erhalten.
+2. P2 — Relative Zeitangaben erschienen trotz deutscher Oberfläche auf Englisch.
+   - Fix: relative und absolute Datumswerte werden über `Intl` konsistent lokalisiert.
+3. P2 — Der Bearbeiten-Dialog erzeugte im Demo-Modus einen unbehandelten Vorlagenfehler und eine React-Warnung für einen `null`-Inputwert.
+   - Fix: lokaler Vorlagen-Fallback und gültiger leerer Hidden-Inputwert.
+4. P2 — Zwei Demodatensätze reichten nicht aus, um alle Journalgruppen und Filterzustände zu prüfen.
+   - Fix: aktive, befristete und abgelaufene Fälle für Heute, letzte sieben Tage und ältere Einträge ergänzt.
+
+Keine P0-, P1- oder P2-Abweichung bleibt offen.
+
+final result: passed
+
+---
+
 # Design QA — Compact integration forms
 
 ## Evidence

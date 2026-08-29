@@ -189,6 +189,7 @@ def search_blacklist_records(
     reason: str = None,
     blacklist_id: int = None,
     exclude_expired: bool = False,
+    expired_only: bool = False,
     page_size: int = 50,
     page: int = 1,
 ) -> tuple[list[BlacklistRecord], int]:
@@ -213,7 +214,14 @@ def search_blacklist_records(
         )
     if blacklist_id is not None:
         filters.append(BlacklistRecord.blacklist_id == blacklist_id)
-    if exclude_expired:
+    if expired_only:
+        filters.extend(
+            [
+                BlacklistRecord.expires_at.is_not(None),
+                BlacklistRecord.expires_at <= func.now(),
+            ]
+        )
+    elif exclude_expired:
         filters.append(
             or_(
                 BlacklistRecord.expires_at.is_(None),
