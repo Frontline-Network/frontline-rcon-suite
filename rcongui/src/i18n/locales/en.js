@@ -1111,6 +1111,88 @@ const en = {
     },
   },
   settings: {
+    integrations: {
+      eyebrow: "Server configuration",
+      title: "Discord & communication",
+      description:
+        "Discord webhooks publish server events to configured Discord destinations. The remaining modules control in-game commands or hosting.",
+      searchPlaceholder: "Search modules …",
+      searchLabel: "Search communication modules",
+      refresh: "Refresh",
+      lastUpdated: "Last updated: {{value}}",
+      unsavedConfirmation:
+        "This module has unsaved changes. Switch to another module anyway?",
+      groups: {
+        discord: "Discord webhooks · {{count}}",
+        communication: "Other communication · {{count}}",
+      },
+      filters: {
+        all: "All",
+        discord: "Discord",
+        commands: "Commands",
+        hosting: "Hosting",
+      },
+      columns: {
+        module: "Module",
+        purpose: "Purpose",
+        configuration: "Configuration",
+        action: "Action",
+      },
+      status: {
+        active: "Active",
+        configured: "Configured",
+        inactive: "Inactive",
+        available: "Open",
+      },
+      emptyTitle: "No modules found",
+      emptyDescription: "Adjust the search or filters to show more modules.",
+      modules: {
+        audit: {
+          name: "Audit",
+          purpose: "Send test-mode and configuration changes to Discord.",
+        },
+        adminPing: {
+          name: "Admin call",
+          purpose: "Send on-demand admin notifications to Discord.",
+        },
+        watchlist: {
+          name: "Watchlist",
+          purpose: "Send watchlist updates to Discord.",
+        },
+        camera: {
+          name: "Admin camera",
+          purpose: "Send admin-camera events to Discord.",
+        },
+        chat: {
+          name: "Chat mirror",
+          purpose: "Mirror player chat to selected Discord channels.",
+        },
+        kills: {
+          name: "Kills & team kills",
+          purpose: "Send kills and team kills to Discord.",
+        },
+        logLine: {
+          name: "Log events",
+          purpose: "Send selected server logs to Discord.",
+        },
+        scoreboard: {
+          name: "Discord scoreboard",
+          purpose: "Send score and scoreboard updates to Discord.",
+        },
+        chatCommands: {
+          name: "Player chat commands",
+          purpose: "Configure in-game chat commands for players.",
+        },
+        rconCommands: {
+          name: "RCON chat commands",
+          purpose: "Configure advanced RCON commands through chat.",
+        },
+        gtxServer: {
+          name: "GTX server name",
+          purpose: "Synchronize the GTX server name and player count.",
+        },
+      },
+    },
     discordReports: {
       title: "Discord Report Bot",
       subtitle: "Player reports follow the CRCON template; AI is limited to automatic chat and name reviews.",
@@ -1838,7 +1920,7 @@ const en = {
           messages:
             "Edit the messages players or administrators receive during this workflow.",
           notifications:
-            "Optionally provide a Discord webhook for audit messages.",
+            "Configure the Discord destinations and notifications for this module.",
           advanced:
             "Additional settings that do not belong to one of the main workflow stages.",
         },
@@ -3799,6 +3881,7 @@ const en = {
       templates: "Templates",
       profanityFilter: "Profanity filter",
       autosettings: "Automatic settings",
+      discordCommunication: "Discord & communication",
       audit: "Audit",
       adminPing: "Admin ping",
       watchlist: "Watchlist",

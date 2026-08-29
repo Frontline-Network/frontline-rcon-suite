@@ -70,6 +70,11 @@ import {
   validateProfiledConfig,
 } from "@/pages/settings/config-form";
 import { getConfigFormProfile } from "@/pages/settings/config-form/schema";
+import IntegrationsHub from "@/pages/settings/integrations/IntegrationsHub";
+import {
+  getIntegrationByCommand,
+  getIntegrationBySlug,
+} from "@/pages/settings/integrations/registry";
 
 const Editor = lazy(() => import("@monaco-editor/react"));
 // Fake-preview saves stay process-local so repeated form interactions are
@@ -91,7 +96,7 @@ const diagnosticColor = {
   unverified: "default",
 };
 
-const ChatWebhookDiagnostics = () => {
+const ChatWebhookDiagnostics = ({ canChange }) => {
   const { t } = useTranslation();
   const [diagnostics, setDiagnostics] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -174,7 +179,7 @@ const ChatWebhookDiagnostics = () => {
           <Stack direction="row" spacing={1} flexWrap="wrap">
             <Button
               variant="outlined"
-              disabled={loading}
+              disabled={loading || !canChange}
               onClick={() =>
                 run(
                   "diagnose_chat_webhooks",
@@ -186,7 +191,7 @@ const ChatWebhookDiagnostics = () => {
             </Button>
             <Button
               variant="contained"
-              disabled={loading || diagnostics.length === 0}
+              disabled={loading || !canChange || diagnostics.length === 0}
               onClick={() =>
                 run(
                   "test_chat_webhooks",
@@ -204,22 +209,29 @@ const ChatWebhookDiagnostics = () => {
 };
 
 export const loader = async ({ params }) => {
-  const { category, type } = params;
+  let { category, type } = params;
   let note, data, details, configTypes, schema;
 
-  // Dynamically load JSON based on route parameters
   try {
-    const configMappingModule = await import("../_data/mappings");
+    if (params.section !== undefined || (!params.category && !params.type)) {
+      details = getIntegrationBySlug(params.section || "audit");
+      if (!details) throw new Error();
+      category = details.category;
+      type = details.type;
+    } else {
+      const configMappingModule = await import("../_data/mappings");
 
-    if (!configMappingModule[category]) throw new Error();
+      if (!configMappingModule[category]) throw new Error();
 
-    configTypes = configMappingModule[category];
+      configTypes = configMappingModule[category];
+      details = configTypes.find(
+        (configType) => type === configType.path.split("/").slice(-1)[0]
+      );
 
-    details = configTypes.find(
-      (configType) => type === configType.path.split("/").slice(-1)[0]
-    );
-
-    if (!details) throw new Error();
+      if (!details) throw new Error();
+      const integration = getIntegrationByCommand(details.command);
+      if (integration) details = { ...details, ...integration };
+    }
   } catch (error) {
     throw json(
       {
@@ -454,7 +466,16 @@ const normalizeValidationErrors = (errors, profile, t) => {
 
 const ConfigPage = () => {
   const { t } = useTranslation();
-  const { note, command, name, nameKey, data, schema } = useLoaderData();
+  const {
+    note,
+    command,
+    name,
+    nameKey,
+    data,
+    schema,
+    slug: integrationSlug,
+    changePermission: explicitChangePermission,
+  } = useLoaderData();
   const displayName = nameKey ? t(nameKey) : name;
   const [validationErrors, setValidationErrors] = useState(null);
   const [jsonData, setJsonData] = useState(data);
@@ -471,6 +492,7 @@ const ConfigPage = () => {
   const isAutobalancer = command === "autobalancer_config";
   const isChatWebhookConfig = command === "chat_discord_webhooks_config";
   const isSystemDiagnostics = systemDiagnosticsCommands.has(command);
+  const isIntegrationHub = Boolean(integrationSlug);
   const formProfile = useMemo(
     () => getConfigFormProfile(command, schema),
     [command, schema]
@@ -489,7 +511,7 @@ const ConfigPage = () => {
     usesSchemaWorkbench
       ? SeedingWorkbenchLayout
       : ConfigFormLayout;
-  const changePermission = `can_change_${command}`;
+  const changePermission = explicitChangePermission || `can_change_${command}`;
   const canChange = Boolean(
     permissions?.is_superuser ||
       permissions?.permissions?.some(
@@ -670,9 +692,10 @@ const ConfigPage = () => {
         isSystemDiagnostics
           ? {
               p: { xs: 1.5, md: 2 },
-              "& .MuiButton-root, & .MuiButtonGroup-root, & .MuiPaper-root, & .MuiOutlinedInput-root": {
-                borderRadius: 0,
-              },
+              "& .MuiButton-root, & .MuiButtonGroup-root, & .MuiPaper-root, & .MuiOutlinedInput-root":
+                {
+                  borderRadius: 0,
+                },
             }
           : undefined
       }
@@ -683,7 +706,7 @@ const ConfigPage = () => {
           onOpenSettings={handleOpenAutobalancerSettings}
         />
       )}
-      {isChatWebhookConfig && <ChatWebhookDiagnostics />}
+      {isChatWebhookConfig && <ChatWebhookDiagnostics canChange={canChange} />}
       {isAutobalancer && (
         <Button
           id="autobalancer-settings"
@@ -717,6 +740,7 @@ const ConfigPage = () => {
       >
         <Form id="config-settings-form" method="post" onSubmit={handleSubmit}>
           <WorkbenchLayout
+            embedded={isIntegrationHub}
             eyebrow={pageEyebrow}
             title={pageTitle}
             description={pageDescription}
@@ -817,6 +841,7 @@ const ConfigPage = () => {
             }
             actionBar={
               <ConfigActionBar
+                sticky={!isIntegrationHub}
                 dirty={isDirty}
                 dirtyLabel={t("settings.configForms.workbench.dirty")}
                 stateLabel={
@@ -1027,6 +1052,18 @@ const ConfigPage = () => {
       </Collapse>
     </Stack>
   );
+
+  if (isIntegrationHub) {
+    return (
+      <IntegrationsHub
+        activeCommand={command}
+        activeData={jsonData}
+        isDirty={isDirty}
+      >
+        {content}
+      </IntegrationsHub>
+    );
+  }
 
   return isSystemDiagnostics ? (
     <SystemDiagnosticsLayout>{content}</SystemDiagnosticsLayout>

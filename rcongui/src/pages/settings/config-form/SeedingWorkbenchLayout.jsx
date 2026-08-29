@@ -170,6 +170,7 @@ export default function SeedingWorkbenchLayout({
   actionBar,
   testId = "config-page-shell",
   sx,
+  embedded = false,
 }) {
   const hasNavigation = sections.length > 0;
   const hasSummary = Boolean(summary);
@@ -179,7 +180,7 @@ export default function SeedingWorkbenchLayout({
       data-testid={testId}
       sx={{
         width: "100%",
-        maxWidth: 1460,
+        maxWidth: embedded ? "none" : 1460,
         mx: "auto",
         "& .MuiButton-root, & .MuiToggleButton-root, & .MuiOutlinedInput-root, & .MuiOutlinedInput-notchedOutline, & .MuiAlert-root, & .MuiChip-root":
           {
@@ -198,10 +199,10 @@ export default function SeedingWorkbenchLayout({
           },
           gap: { xs: 1.5, md: 3 },
           alignItems: "end",
-          mb: 1.5,
+          mb: embedded ? 1 : 1.5,
         }}
       >
-        <Box sx={{ minWidth: 0 }}>
+        <Box sx={{ minWidth: 0, display: embedded ? "none" : "block" }}>
           {eyebrow && (
             <Typography
               variant="overline"
@@ -249,6 +250,7 @@ export default function SeedingWorkbenchLayout({
         {headerActions && (
           <Box
             sx={{
+              gridColumn: embedded ? "1 / -1" : undefined,
               justifySelf: { xs: "stretch", md: "end" },
               minWidth: { md: 300 },
               "& [data-testid='config-mode-toggle']": {
@@ -270,6 +272,7 @@ export default function SeedingWorkbenchLayout({
       <Box
         sx={{
           border: "1px solid",
+          borderTopColor: embedded ? "divider" : undefined,
           borderColor: "divider",
           borderRadius: 0,
           bgcolor: "background.paper",

@@ -526,7 +526,7 @@ ENDPOINT_PERMISSIONS: dict[Callable, list[str] | set[str] | str] = {
     rcon_api.get_idle_autokick_time: "api.can_view_idle_autokick_time",
     rcon_api.get_ingame_mods: "api.can_view_ingame_admins",
     rcon_api.get_kills_discord_webhooks_config: "api.can_view_kills_discord_webhooks_config",
-    rcon_api.get_log_line_webhook_config: "api.get_log_line_webhook_config",
+    rcon_api.get_log_line_webhook_config: "api.can_view_log_line_discord_webhook_config",
     rcon_api.get_logs: "api.can_view_game_logs",
     rcon_api.get_map_rotation: "api.can_view_map_rotation",
     rcon_api.get_map_shuffle_enabled: "api.can_view_map_shuffle_enabled",
@@ -561,7 +561,7 @@ ENDPOINT_PERMISSIONS: dict[Callable, list[str] | set[str] | str] = {
     rcon_api.get_round_time_remaining: "api.can_view_round_time_remaining",
     rcon_api.get_scoreboard_config: "api.can_view_scorebot_config",
     rcon_api.get_scorebot_config: "api.can_view_scorebot_config",
-    rcon_api.get_server_name_change_config: "api.get_server_name_change_config",
+    rcon_api.get_server_name_change_config: "api.can_view_server_name_change_config",
     rcon_api.get_server_settings: {
         "api.can_view_team_switch_cooldown",
         "api.can_view_autobalance_threshold",

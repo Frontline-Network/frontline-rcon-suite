@@ -18,6 +18,7 @@ export default function ConfigFormLayout({
   actionBar,
   testId = "config-page-shell",
   sx,
+  embedded = false,
 }) {
   const hasNavigation = sections.length > 0;
   const hasSummary = Boolean(summary);
@@ -26,13 +27,13 @@ export default function ConfigFormLayout({
       data-testid={testId}
       sx={{
         width: "100%",
-        maxWidth: hasNavigation ? 1304 : undefined,
-        mx: hasNavigation ? { xs: 0, xl: 1.5 } : undefined,
+        maxWidth: embedded ? "none" : hasNavigation ? 1304 : undefined,
+        mx: embedded ? 0 : hasNavigation ? { xs: 0, xl: 1.5 } : undefined,
         ...sx,
       }}
     >
       <Stack spacing={1.5} sx={{ mb: 1 }}>
-        <Box>
+        <Box sx={{ display: embedded ? "none" : "block" }}>
           {eyebrow && (
             <Typography
               variant="overline"

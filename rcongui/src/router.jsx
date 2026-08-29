@@ -467,6 +467,18 @@ const router = createBrowserRouter([
         ],
       },
       {
+        path: "/settings/integrations",
+        handle: { crumb: () => <span>Discord &amp; Kommunikation</span> },
+        lazy: lazyPage(() => import("./pages/settings/integrations")),
+        errorElement: <RouteError />,
+      },
+      {
+        path: "/settings/integrations/:section",
+        handle: { crumb: () => <span>Discord &amp; Kommunikation</span> },
+        lazy: lazyPage(() => import("./pages/settings/[configs]/detail")),
+        errorElement: <RouteError />,
+      },
+      {
         path: "/settings/:category/:type",
         lazy: lazyPage(() => import("./pages/settings/[configs]/detail")),
         errorElement: <RouteError />,

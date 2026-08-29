@@ -437,3 +437,50 @@ The implementation preserves the selected Command Dossier direction: an angular 
 - Console errors: none.
 
 passed
+
+---
+
+# Design QA — Discord & Kommunikation
+
+## Evidence
+
+- Source visual truth: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-0311286f-9538-4c20-bd89-ed18a87c047c.png`
+- Desktop implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\integrations-hub\implementation-desktop.png`
+- Mobile implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\integrations-hub\implementation-mobile.png`
+- Normalized side-by-side comparison: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\integrations-hub\comparison-full.png`
+- Desktop viewport and capture: 1487 × 1058 px, Kills & Teamkills selected and expanded.
+- Mobile viewport and capture: 390 × 844 px, search term `kills`, Kills & Teamkills selected and expanded.
+
+## Comparison result
+
+The implementation follows the selected full-width ledger direction and the established Frontline design line. Eleven previously separate settings pages are represented as two dense groups: eight Discord webhooks and three related communication or hosting modules. Rows remain square, compact and separated by one-pixel dividers; the active row expands its existing production form inline.
+
+- Layout and hierarchy: the header, search/filter rail, four-column ledger, group labels, module rows and inline editor match the reference composition.
+- Product-safe deviation: the mockup's unverified connection-state filters and status values were replaced by factual category filters and configuration states. This avoids simulating health data and avoids loading all eleven configurations on entry.
+- Form fidelity: the selected mockup used a conceptual short Kills form. The implementation deliberately embeds the existing schema-driven production form, preserving all fields, validation, Formular/JSON modes, save/reset behavior and permissions.
+- Visual language: existing Frontline typography, gold active state, dark green-black surfaces, MUI icons and square borders are preserved. No rounded card treatment, shadows, gradients, emoji or placeholder artwork were introduced.
+- Responsive behavior: at 390 px the ledger reflows to a compact module/purpose/status stack, the category filters remain horizontally reachable and the expanded form uses the full available width. `documentElement.scrollWidth` and `body.scrollWidth` both remained 390 px.
+
+## Interaction and compatibility checks
+
+- Hub landing route `/settings/integrations`: passed without forcing the Audit permission or loading an arbitrary module.
+- New detail route `/settings/integrations/kills`: passed; selected row and inline form remain synchronized with the URL.
+- Search: passed with `kamera` and `kills`.
+- Category filters: passed for Discord and Hosting.
+- Legacy direct links: passed for `/settings/webhooks/chat` and `/settings/others/rcon-chat-commands`; both retain their URL and open the corresponding row.
+- Permissions: each module retains its exact view/change permissions; change controls are disabled when only view access is present.
+- Secrets: webhook values remain inside the existing masked schema controls and are not summarized in the ledger.
+- Browser console: no runtime errors; only the existing React Router v7 future-flag warnings were present.
+- Unsaved-change guard: present for module switches and navigation. The native confirmation dialog could not be completed by the browser automation runtime, but this is not a visual blocker and the guard path is explicit in the implementation.
+
+## QA history
+
+1. P2 — formatting the complete locale files created a noisy multi-thousand-line diff.
+   - Fix: reverted only the mechanical formatting and reapplied the integration copy as focused additions.
+   - Post-fix evidence: locale diffs are limited to the new hub copy, generic module notification copy and navigation label.
+2. P2 — the first ledger implementation suppressed row dividers through a `first-of-type` selector that matched each row wrapper.
+   - Fix: row separators now use the module index and render consistently between players/modules while preserving the active expanded block.
+   - Post-fix evidence: the final desktop comparison shows continuous, calm one-pixel row separation across both groups.
+3. Final normalized comparison: no actionable P0, P1 or P2 visual discrepancy remains.
+
+final result: passed

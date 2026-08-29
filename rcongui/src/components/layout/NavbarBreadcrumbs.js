@@ -37,12 +37,24 @@ const StyledPopper = styled(Popper)(({ theme }) => ({
 const translatedLabel = (item, t) =>
   item?.translationKey ? t(item.translationKey) : item?.name || "";
 
-const systemDiagnosticsAliases = {
+const routeAliases = {
   "/settings/others/game-server": "navigation.links.gameServer",
   "/settings/others/crcon": "navigation.links.crcon",
   "/settings/others/steam": "navigation.links.steam",
   "/settings/others/log-stream": "navigation.links.logStream",
   "/settings/others/watch-kill-rate": "navigation.links.watchKillRate",
+  "/settings/webhooks/audit": "navigation.links.discordCommunication",
+  "/settings/webhooks/admin-ping": "navigation.links.discordCommunication",
+  "/settings/webhooks/watchlist": "navigation.links.discordCommunication",
+  "/settings/webhooks/camera": "navigation.links.discordCommunication",
+  "/settings/webhooks/chat": "navigation.links.discordCommunication",
+  "/settings/webhooks/kills": "navigation.links.discordCommunication",
+  "/settings/webhooks/log-line": "navigation.links.discordCommunication",
+  "/settings/others/scoreboard": "navigation.links.discordCommunication",
+  "/settings/others/chat-commands": "navigation.links.discordCommunication",
+  "/settings/others/rcon-chat-commands":
+    "navigation.links.discordCommunication",
+  "/settings/others/gtx-server": "navigation.links.discordCommunication",
 };
 
 function GroupBreadcrumb({ menu, permissions }) {
@@ -149,11 +161,15 @@ export default function NavbarBreadcrumbs({ mobileCompact = false }) {
       .sort((a, b) => b.path.length - a.path.length)[0];
     if (currentLink) return currentLink;
 
-    const aliasTranslationKey = systemDiagnosticsAliases[location.pathname];
+    const aliasTranslationKey = routeAliases[location.pathname];
     if (!aliasTranslationKey) return {};
 
     return {
-      menu: navMenus.find((menu) => menu.id === "system-diagnostics"),
+      menu: navMenus.find((menu) =>
+        aliasTranslationKey === "navigation.links.discordCommunication"
+          ? menu.id === "integrations"
+          : menu.id === "system-diagnostics"
+      ),
       link: {
         to: location.pathname,
         translationKey: aliasTranslationKey,
