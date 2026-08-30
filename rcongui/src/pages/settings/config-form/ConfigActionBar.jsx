@@ -48,15 +48,20 @@ export default function ConfigActionBar({
   dirty = false,
   dirtyLabel,
   sticky = true,
+  mobileSticky = sticky,
 }) {
   return (
     <Box
       component="footer"
       sx={{
-        position: sticky ? "sticky" : "static",
+        position: sticky
+          ? { xs: mobileSticky ? "sticky" : "static", md: "sticky" }
+          : "static",
         bottom: sticky
           ? {
-              xs: "calc(var(--mobile-bottom-nav-height, 0px) + env(safe-area-inset-bottom))",
+              xs: mobileSticky
+                ? "calc(var(--mobile-bottom-nav-height, 0px) + env(safe-area-inset-bottom))"
+                : "auto",
               md: 0,
             }
           : "auto",
@@ -70,7 +75,12 @@ export default function ConfigActionBar({
         borderColor: "divider",
         bgcolor: "background.paper",
         borderRadius: 0,
-        boxShadow: sticky ? "0 -4px 12px rgba(0,0,0,0.06)" : 0,
+        boxShadow: sticky
+          ? {
+              xs: mobileSticky ? "0 -4px 12px rgba(0,0,0,0.06)" : 0,
+              md: "0 -4px 12px rgba(0,0,0,0.06)",
+            }
+          : 0,
         "& .MuiButton-root": {
           width: { xs: "100%", md: "auto" },
           minHeight: { xs: 44, md: 36 },

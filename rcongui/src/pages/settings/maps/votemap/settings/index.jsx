@@ -8,34 +8,44 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import cloneDeep from "lodash/cloneDeep";
 import isEqual from "lodash/isEqual";
-import transform from "lodash/transform";
 import { toast } from "react-toastify";
 import { VotemapChangeNotification } from "./VotemapChangeNotification";
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Box,
   Button,
+  Card,
+  CardContent,
   CircularProgress,
   Dialog,
   DialogContent,
   DialogTitle,
   Divider,
   FormControl,
+  FormControlLabel,
   IconButton,
   InputLabel,
   MenuItem,
   Select,
   Stack,
+  Switch,
   TextField,
   Typography,
   useTheme,
 } from "@mui/material";
 import {
+  advancedRuleConfigs,
   defaultMapOptions,
+  findPadlockConfig,
+  gameModeOptionConfigs,
   messageFieldConfigs,
-  padlockConfigs,
-  textFieldConfigs,
+  primaryRuleGroups,
+  recentMapsConfig,
+  reminderFrequencyConfig,
+  vipVoteCountConfig,
 } from "./configs-data";
-import Padlock from "@/components/shared/Padlock";
 import SaveIcon from "@mui/icons-material/Save";
 import ReplayIcon from "@mui/icons-material/Replay";
 import { useTranslation } from "react-i18next";
@@ -46,11 +56,334 @@ import Emoji from "@/components/shared/Emoji";
 import AddCircleIcon from "@mui/icons-material/AddCircle";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
+import AddIcon from "@mui/icons-material/Add";
+import BallotOutlinedIcon from "@mui/icons-material/BallotOutlined";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import MapOutlinedIcon from "@mui/icons-material/MapOutlined";
+import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
+import RemoveIcon from "@mui/icons-material/Remove";
+import StarBorderOutlinedIcon from "@mui/icons-material/StarBorderOutlined";
 import ConfigActionBar from "@/pages/settings/config-form/ConfigActionBar";
-import ConfigFormSection from "@/pages/settings/config-form/ConfigFormSection";
 import StableNumberField from "@/pages/settings/config-form/StableNumberField";
 import { useAuth } from "@/hooks/useAuth";
 import { isFakeMode } from "@/mirage/demo-data";
+
+const workbenchCardSx = {
+  height: "100%",
+  borderRadius: 0,
+  borderColor: "divider",
+  bgcolor: "background.paper",
+  boxShadow: "none",
+};
+
+function SectionHeading({ number, title, description, summary }) {
+  return (
+    <Stack
+      direction={{ xs: "column", sm: "row" }}
+      justifyContent="space-between"
+      alignItems={{ xs: "flex-start", sm: "center" }}
+      gap={1}
+    >
+      <Stack direction="row" spacing={1.25} alignItems="flex-start">
+        <Box
+          aria-hidden="true"
+          sx={{
+            display: "grid",
+            placeItems: "center",
+            width: 24,
+            height: 24,
+            flex: "0 0 auto",
+            border: "1px solid",
+            borderColor: "primary.main",
+            color: "primary.main",
+            fontSize: 13,
+            fontWeight: 850,
+          }}
+        >
+          {number}
+        </Box>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography
+            component="h3"
+            variant="subtitle1"
+            color="primary.main"
+            fontWeight={850}
+            sx={{ textTransform: "uppercase", letterSpacing: 0.35 }}
+          >
+            {title}
+          </Typography>
+          {description && (
+            <Typography variant="caption" color="text.secondary">
+              {description}
+            </Typography>
+          )}
+        </Box>
+      </Stack>
+      {summary && (
+        <Typography variant="caption" color="text.secondary" sx={{ pl: 4.5 }}>
+          {summary}
+        </Typography>
+      )}
+    </Stack>
+  );
+}
+
+function SummaryMetric({ icon, label, value }) {
+  return (
+    <Stack
+      direction="row"
+      alignItems="center"
+      spacing={1.25}
+      sx={{ minWidth: 0, px: { xs: 1.25, sm: 2 }, py: 1.25 }}
+    >
+      <Box
+        sx={{ display: "grid", placeItems: "center", color: "text.secondary" }}
+      >
+        {icon}
+      </Box>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography
+          variant="overline"
+          color="text.secondary"
+          sx={{ display: "block", lineHeight: 1.15 }}
+        >
+          {label}
+        </Typography>
+        <Typography variant="body2" fontWeight={850} noWrap>
+          {value}
+        </Typography>
+      </Box>
+    </Stack>
+  );
+}
+
+function RuleToggle({ label, checked, onChange, disabled = false }) {
+  return (
+    <FormControlLabel
+      label={label}
+      labelPlacement="start"
+      disabled={disabled}
+      control={
+        <Switch
+          size="small"
+          checked={Boolean(checked)}
+          onChange={(event) => onChange(event.target.checked)}
+        />
+      }
+      sx={{
+        width: "100%",
+        minHeight: 27,
+        m: 0,
+        gap: 2,
+        justifyContent: "space-between",
+        "& .MuiFormControlLabel-label": {
+          flex: "1 1 auto",
+          fontSize: "0.75rem",
+          lineHeight: 1.35,
+        },
+      }}
+    />
+  );
+}
+
+function NumberStepper({
+  label,
+  value,
+  inputProps,
+  helperText,
+  invalidHelperText,
+  onValidityChange,
+  onChange,
+  compact = false,
+}) {
+  const [invalid, setInvalid] = useState(false);
+  const min =
+    inputProps?.min === undefined ? undefined : Number(inputProps.min);
+  const max =
+    inputProps?.max === undefined ? undefined : Number(inputProps.max);
+  const numericValue = Number(value);
+  const canDecrease =
+    Number.isFinite(numericValue) && (min === undefined || numericValue > min);
+  const canIncrease =
+    Number.isFinite(numericValue) && (max === undefined || numericValue < max);
+  const stepValue = (direction) => {
+    const base = Number.isFinite(numericValue) ? numericValue : min ?? 0;
+    const next = base + direction;
+    onChange(Math.max(min ?? next, Math.min(max ?? next, next)));
+  };
+
+  return (
+    <Box sx={{ minWidth: 0 }}>
+      {!compact && (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: "block", mb: 0.5 }}
+        >
+          {label}
+        </Typography>
+      )}
+      <Stack direction="row" alignItems="stretch" spacing={0}>
+        <IconButton
+          aria-label={`${label}: weniger`}
+          onClick={() => stepValue(-1)}
+          disabled={!canDecrease}
+          size="small"
+          sx={{
+            width: 36,
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 0,
+          }}
+        >
+          <RemoveIcon fontSize="small" />
+        </IconButton>
+        <StableNumberField
+          variant="outlined"
+          value={value}
+          requiredValue
+          invalidHelperText={invalidHelperText}
+          onValidityChange={(valid) => {
+            setInvalid(!valid);
+            onValidityChange?.(valid);
+          }}
+          onChange={onChange}
+          slotProps={{
+            htmlInput: { ...inputProps, "aria-label": label },
+          }}
+          sx={{
+            width: compact ? 72 : 84,
+            mx: "-1px",
+            "& .MuiOutlinedInput-root": { height: 36, borderRadius: 0 },
+            "& input": {
+              textAlign: "center",
+              px: 0.75,
+              py: 0.75,
+              fontWeight: 800,
+            },
+            "& .MuiFormHelperText-root": { display: "none" },
+          }}
+        />
+        <IconButton
+          aria-label={`${label}: mehr`}
+          onClick={() => stepValue(1)}
+          disabled={!canIncrease}
+          size="small"
+          sx={{
+            width: 36,
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 0,
+          }}
+        >
+          <AddIcon fontSize="small" />
+        </IconButton>
+      </Stack>
+      {invalid ? (
+        <Typography
+          role="alert"
+          variant="caption"
+          color="error.main"
+          sx={{ display: "block", mt: 0.5 }}
+        >
+          {invalidHelperText}
+        </Typography>
+      ) : (
+        !compact &&
+        helperText && (
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: "block", mt: 0.5 }}
+          >
+            {helperText}
+          </Typography>
+        )
+      )}
+    </Box>
+  );
+}
+
+function WorkbenchAccordion({ number, title, summary, testId, children }) {
+  return (
+    <Accordion
+      data-testid={testId}
+      disableGutters
+      elevation={0}
+      sx={{
+        border: "1px solid",
+        borderColor: "divider",
+        borderRadius: "0 !important",
+        bgcolor: "background.paper",
+        "&::before": { display: "none" },
+        "& + &": { mt: 1 },
+      }}
+    >
+      <AccordionSummary
+        expandIcon={<ExpandMoreIcon />}
+        sx={{
+          minHeight: 52,
+          px: { xs: 1.5, sm: 2 },
+          "& .MuiAccordionSummary-content": { my: 1 },
+        }}
+      >
+        <Box sx={{ width: "100%", pr: 1 }}>
+          <SectionHeading number={number} title={title} summary={summary} />
+        </Box>
+      </AccordionSummary>
+      <AccordionDetails sx={{ px: { xs: 1.5, sm: 2 }, pt: 0, pb: 2 }}>
+        <Divider sx={{ mb: 2 }} />
+        {children}
+      </AccordionDetails>
+    </Accordion>
+  );
+}
+
+function FlagChooserGroup({ title, help, items, addLabel, onEdit, onAdd }) {
+  return (
+    <Box>
+      <Typography variant="subtitle2" fontWeight={850}>
+        {title}
+      </Typography>
+      <Typography variant="caption" color="text.secondary">
+        {help}
+      </Typography>
+      <Stack
+        direction="row"
+        flexWrap="wrap"
+        gap={1}
+        alignItems="center"
+        sx={{ mt: 1 }}
+      >
+        {items.map((item, index) => (
+          <Button
+            key={`${item}-${index}`}
+            variant="outlined"
+            aria-label={`${title}: ${item || "?"}`}
+            onClick={() => onEdit(index)}
+            sx={{ minWidth: 44, minHeight: 40, borderRadius: 0, fontSize: 22 }}
+          >
+            <Emoji emoji={item ?? "❓"} />
+          </Button>
+        ))}
+        <IconButton
+          aria-label={addLabel}
+          sx={{
+            width: 40,
+            height: 40,
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 0,
+          }}
+          onClick={onAdd}
+        >
+          <AddCircleIcon />
+        </IconButton>
+      </Stack>
+    </Box>
+  );
+}
 
 function VotemapSettingsPage() {
   const { t } = useTranslation();
@@ -80,16 +413,17 @@ function VotemapSettingsPage() {
     mutationFn: fakeMode
       ? async (nextConfig) => ({ arguments: nextConfig })
       : mapsManagerMutationOptions.setVotemapConfig.mutationFn,
-    onSuccess: (response) => {
+    onSuccess: (response, submittedConfig) => {
       // Update this reference so the user does not get change
       // notification about his own changes
-      prevConfig.current = cloneDeep(workingConfig);
-      if (fakeMode) {
-        queryClient.setQueryData(
-          mapsManagerQueryKeys.voteMapConfig,
-          response.arguments
-        );
-      } else {
+      prevConfig.current = cloneDeep(submittedConfig);
+      editBaseline.current = cloneDeep(submittedConfig);
+      setWorkingConfig(cloneDeep(submittedConfig));
+      queryClient.setQueryData(
+        mapsManagerQueryKeys.voteMapConfig,
+        fakeMode ? response.arguments : submittedConfig
+      );
+      if (!fakeMode) {
         queryClient.invalidateQueries({
           queryKey: mapsManagerQueryKeys.voteMapConfig,
         });
@@ -110,6 +444,7 @@ function VotemapSettingsPage() {
   });
 
   const prevConfig = useRef(config);
+  const editBaseline = useRef(config);
   const [workingConfig, setWorkingConfig] = useState(config);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [emojiPickerIndex, setEmojiPickerIndex] = useState(null);
@@ -118,9 +453,12 @@ function VotemapSettingsPage() {
     () => new Set()
   );
   const isConfigDirty = useMemo(
-    () => !isEqual(workingConfig, config),
-    [workingConfig, config]
+    () => !isEqual(workingConfig, editBaseline.current),
+    [workingConfig]
   );
+  const instructionTextIsValid = String(
+    workingConfig.instruction_text ?? ""
+  ).includes("{map_selection}");
 
   const getLabel = (configItem) =>
     t(
@@ -135,14 +473,13 @@ function VotemapSettingsPage() {
   // Compare incoming config changes
   const handleIncomingConfigChange = () => {
     // check how the configs differ (deep comparison)
-    const diff = transform(
-      prevConfig.current,
-      (result, value, key) => {
-        if (!isEqual(value, config[key])) {
-          result.push(key);
-        }
-      },
-      []
+    const diff = [
+      ...new Set([
+        ...Object.keys(prevConfig.current ?? {}),
+        ...Object.keys(config ?? {}),
+      ]),
+    ].filter(
+      (key) => !isEqual(prevConfig.current?.[key], config?.[key])
     );
 
     // no changes do nothing
@@ -156,6 +493,10 @@ function VotemapSettingsPage() {
     // the same time. Saving this full config must never overwrite an
     // enable/disable action performed from the live tab.
     if (diff.includes("enabled")) {
+      editBaseline.current = {
+        ...editBaseline.current,
+        enabled: config.enabled,
+      };
       setWorkingConfig((prev) => ({ ...prev, enabled: config.enabled }));
     }
 
@@ -172,9 +513,17 @@ function VotemapSettingsPage() {
         onAccept: () => {
           setWorkingConfig((prev) => {
             const combined = { ...prev };
+            const nextBaseline = { ...editBaseline.current };
             actionableDiff.forEach((key) => {
-              combined[key] = cloneDeep(config[key]);
+              if (Object.prototype.hasOwnProperty.call(config, key)) {
+                combined[key] = cloneDeep(config[key]);
+                nextBaseline[key] = cloneDeep(config[key]);
+              } else {
+                delete combined[key];
+                delete nextBaseline[key];
+              }
             });
+            editBaseline.current = nextBaseline;
             return combined;
           });
         },
@@ -186,11 +535,35 @@ function VotemapSettingsPage() {
 
   const handleConfigReset = () => {
     setInvalidNumberFields(new Set());
-    setWorkingConfig(cloneDeep(prevConfig.current));
+    editBaseline.current = cloneDeep(config);
+    setWorkingConfig(cloneDeep(config));
   };
 
   const handleConfigSave = () => {
-    changeConfig(workingConfig);
+    // Start from the freshest server object and overlay only fields that the
+    // operator changed relative to the accepted baseline. This preserves
+    // future backend fields even if they change while this form is open.
+    const baseline = editBaseline.current ?? {};
+    const changedKeys = [
+      ...new Set([
+        ...Object.keys(baseline),
+        ...Object.keys(workingConfig ?? {}),
+      ]),
+    ].filter(
+      (key) =>
+        key !== "enabled" &&
+        !isEqual(baseline[key], workingConfig?.[key])
+    );
+    const submittedConfig = cloneDeep(config ?? {});
+    changedKeys.forEach((key) => {
+      if (Object.prototype.hasOwnProperty.call(workingConfig, key)) {
+        submittedConfig[key] = cloneDeep(workingConfig[key]);
+      } else {
+        delete submittedConfig[key];
+      }
+    });
+    submittedConfig.enabled = config?.enabled ?? workingConfig.enabled;
+    changeConfig(submittedConfig);
   };
 
   const handleNumberValidity = (field) => (valid) => {
@@ -384,72 +757,221 @@ function VotemapSettingsPage() {
     handleCloseEmojiPicker();
   };
 
+  const totalMapOptions = gameModeOptionConfigs.reduce(
+    (sum, configItem) => sum + (Number(workingConfig[configItem.name]) || 0),
+    0
+  );
+  const hasMapOptions = totalMapOptions > 0;
+  const configuredMessageCount = messageFieldConfigs.filter((configItem) =>
+    String(workingConfig[configItem.name] ?? "").trim()
+  ).length;
+  const permissionSummary = workingConfig.allow_vip_only
+    ? t("maps.votemapWorkbench.vipOnly")
+    : (workingConfig.allow_flag_only || []).length > 0
+    ? t("maps.votemapWorkbench.markerRestricted", {
+        count: workingConfig.allow_flag_only.length,
+      })
+    : t("maps.votemapWorkbench.allPlayers");
+  const reminderSummary =
+    Number(workingConfig.reminder_frequency_minutes) === 0
+      ? t("maps.votemapWorkbench.disabled")
+      : t("maps.votemapWorkbench.everyMinutes", {
+          count: workingConfig.reminder_frequency_minutes,
+        });
+  const selectedDefaultMethod = defaultMapOptions.find(
+    (option) => option.name === workingConfig.default_method
+  );
+  const defaultMethodSummary = selectedDefaultMethod
+    ? t(`maps.votemapSettings.${selectedDefaultMethod.labelKey}`)
+    : t("common.unknown");
+
+  const renderRuleToggle = (configItem, { disabled = false } = {}) => (
+    <RuleToggle
+      key={configItem.name}
+      label={getLabel(configItem)}
+      checked={workingConfig[configItem.name]}
+      disabled={disabled}
+      onChange={handleWorkingChanges(configItem.name)}
+    />
+  );
+
   useEffect(handleIncomingConfigChange, [config, workingConfig]);
 
   return (
     <>
-      <Box sx={{ p: { xs: 1.5, md: 2.5 }, pb: 0 }}>
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="overline" color="primary.main">
-            {t("maps.votemapWorkbench.settingsEyebrow")}
+      <Box
+        sx={{
+          width: { xs: "calc(100vw - 12px)", md: "100%" },
+          maxWidth: { xs: "calc(100vw - 12px)", md: "100%" },
+          boxSizing: "border-box",
+          minWidth: 0,
+          overflowX: "hidden",
+          p: { xs: 1.5, md: 2.5 },
+          pb: 1.5,
+        }}
+      >
+        <Box
+          component="section"
+          aria-labelledby="votemap-effect-summary-title"
+          sx={{
+            mb: 1.25,
+            border: "1px solid",
+            borderColor: "divider",
+            bgcolor: "background.paper",
+          }}
+        >
+          <Typography
+            id="votemap-effect-summary-title"
+            variant="overline"
+            color="primary.main"
+            sx={{ display: "block", px: 2, pt: 1.25 }}
+          >
+            {t("maps.votemapWorkbench.effectSummary")}
           </Typography>
-          <Typography component="h2" variant="h5" fontWeight={850}>
-            {t("maps.votemapWorkbench.settingsTitle")}
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.35 }}>
-            {t("maps.votemapWorkbench.settingsDescription")}
-          </Typography>
+          <Box
+            data-testid="votemap-effect-summary"
+            sx={{
+              display: "grid",
+              width: "100%",
+              minWidth: 0,
+              gridTemplateColumns: {
+                xs: "minmax(0, 1fr)",
+                sm: "repeat(2, minmax(0, 1fr))",
+                lg: "repeat(4, minmax(0, 1fr))",
+              },
+              "& > *": {
+                borderRight: { xs: 0, sm: "1px solid" },
+                borderBottom: { xs: "1px solid", sm: 0 },
+                borderColor: "divider",
+              },
+              "& > *:nth-of-type(2n)": {
+                borderRight: { sm: 0, lg: "1px solid" },
+              },
+              "& > *:nth-of-type(n+3)": {
+                borderTop: { sm: "1px solid", lg: 0 },
+                borderColor: "divider",
+              },
+              "& > *:last-of-type": { borderRight: 0, borderBottom: 0 },
+            }}
+          >
+            <SummaryMetric
+              icon={<BallotOutlinedIcon />}
+              label={t("maps.votemapWorkbench.optionMix")}
+              value={t("maps.votemapWorkbench.mapsTotal", {
+                count: totalMapOptions,
+              })}
+            />
+            <SummaryMetric
+              icon={<NotificationsNoneOutlinedIcon />}
+              label={t("maps.votemapWorkbench.reminders")}
+              value={reminderSummary}
+            />
+            <SummaryMetric
+              icon={<GroupsOutlinedIcon />}
+              label={t("maps.votemapWorkbench.eligibility")}
+              value={permissionSummary}
+            />
+            <SummaryMetric
+              icon={<StarBorderOutlinedIcon />}
+              label={t("maps.votemapWorkbench.vip")}
+              value={t("maps.votemapWorkbench.voteWeight", {
+                count: workingConfig.vip_vote_count,
+              })}
+            />
+          </Box>
         </Box>
 
         <Box
           sx={{
             display: "grid",
             gridTemplateColumns: {
-              xs: "1fr",
-              lg: "minmax(0, 0.9fr) minmax(0, 1.1fr)",
+              xs: "minmax(0, 1fr)",
+              lg: "minmax(360px, 0.82fr) minmax(480px, 1.18fr)",
             },
-            gap: 2,
-            alignItems: "start",
+            gap: 1.25,
+            alignItems: "stretch",
           }}
         >
-          <ConfigFormSection
-            id="votemap-messages"
-            eyebrow={t("maps.votemapWorkbench.messagesEyebrow")}
-            title={t("maps.messages")}
-            description={t("maps.votemapWorkbench.messagesDescription")}
+          <Card
+            data-testid="votemap-mode-matrix"
+            component="section"
+            aria-labelledby="votemap-modes-heading"
+            variant="outlined"
+          sx={workbenchCardSx}
           >
-            <Stack spacing={1.5}>
-              {messageFieldConfigs.map((configItem) => (
-                <TextField
-                  key={configItem.name}
-                  fullWidth
-                  variant="filled"
-                  multiline
-                  rows={configItem.rows}
-                  label={getLabel(configItem)}
-                  helperText={getHelperText(configItem)}
-                  value={workingConfig[configItem.name] ?? ""}
-                  onChange={handleWorkingChanges(configItem.name)}
-                />
-              ))}
-            </Stack>
-          </ConfigFormSection>
-
-          <ConfigFormSection
-            id="votemap-rules"
-            eyebrow={t("maps.votemapWorkbench.rulesEyebrow")}
-            title={t("maps.configuration")}
-            description={t("maps.votemapWorkbench.rulesDescription")}
-          >
-            <Stack spacing={1.25}>
-              <FormControl>
+            <CardContent
+              sx={{
+                p: 1.5,
+                "&:last-child": { pb: 1.5 },
+              }}
+            >
+              <SectionHeading
+                number="1"
+                title={t("maps.votemapWorkbench.modeSectionTitle")}
+                description={t("maps.votemapWorkbench.modeSectionDescription")}
+              />
+              <Divider sx={{ my: 1.25 }} />
+              <Stack spacing={0} divider={<Divider flexItem />}>
+                {gameModeOptionConfigs.map((configItem) => (
+                  <Stack
+                    key={configItem.name}
+                    data-testid={`votemap-mode-row-${configItem.name}`}
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="center"
+                    gap={2}
+                    sx={{ minHeight: 45, py: 0.35 }}
+                  >
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      alignItems="center"
+                      sx={{ minWidth: 0 }}
+                    >
+                      <MapOutlinedIcon
+                        fontSize="small"
+                        sx={{ color: "text.secondary", flex: "0 0 auto" }}
+                      />
+                      <Typography variant="body2" fontWeight={750}>
+                        {getLabel(configItem)}
+                      </Typography>
+                    </Stack>
+                    <NumberStepper
+                      compact
+                      label={getLabel(configItem)}
+                      value={workingConfig[configItem.name]}
+                      inputProps={configItem.inputProps}
+                      invalidHelperText={t(
+                        "maps.votemapWorkbench.invalidNumber"
+                      )}
+                      onValidityChange={handleNumberValidity(configItem.name)}
+                      onChange={(value) => {
+                        if (value !== undefined)
+                          handleWorkingChanges(configItem.name)(value);
+                      }}
+                    />
+                  </Stack>
+                ))}
+              </Stack>
+              {!hasMapOptions && (
+                <Typography
+                  role="alert"
+                  variant="caption"
+                  color="error.main"
+                  sx={{ display: "block", mt: 1 }}
+                >
+                  {t("maps.votemapWorkbench.requireMapOption")}
+                </Typography>
+              )}
+              <Divider sx={{ my: 1.25 }} />
+              <FormControl fullWidth size="small">
                 <InputLabel id="default_method">
-                  {t("maps.votemapSettings.defaultMapMethod")}
+                  {t("maps.votemapWorkbench.fallbackSelection")}
                 </InputLabel>
                 <Select
                   value={workingConfig.default_method ?? ""}
                   onChange={handleWorkingChanges("default_method")}
-                  label={t("maps.votemapSettings.defaultMapMethod")}
+                  label={t("maps.votemapWorkbench.fallbackSelection")}
                   labelId="default_method"
                 >
                   {defaultMapOptions.map((option) => (
@@ -459,288 +981,416 @@ function VotemapSettingsPage() {
                   ))}
                 </Select>
               </FormControl>
+            </CardContent>
+          </Card>
 
-              <Divider flexItem orientation={"horizontal"} />
-
-              {padlockConfigs.map((configItem) => (
-                <Padlock
-                  key={configItem.name}
-                  label={getLabel(configItem)}
-                  checked={workingConfig[configItem.name] ?? false}
-                  handleChange={handleWorkingChanges(configItem.name)}
-                />
-              ))}
-
-              <Divider flexItem orientation={"horizontal"} />
-
-              {textFieldConfigs.map((configItem) => (
-                <StableNumberField
-                  key={configItem.name}
-                  variant="filled"
-                  fullWidth
-                  slotProps={{
-                    htmlInput: configItem.inputProps,
-                  }}
-                  label={getLabel(configItem)}
-                  helperText={getHelperText(configItem)}
-                  value={workingConfig[configItem.name]}
-                  requiredValue
-                  invalidHelperText={t("maps.votemapWorkbench.invalidNumber")}
-                  onValidityChange={handleNumberValidity(configItem.name)}
-                  onChange={(value) => {
-                    if (value !== undefined) {
-                      handleWorkingChanges(configItem.name)(value);
-                    }
-                  }}
-                />
-              ))}
-
-              <Divider flexItem orientation={"horizontal"} />
-
-              {/* Vote Flags Section */}
-              <Typography variant="subtitle1">
-                {t("maps.votemapAdvanced.voteCountFlags")}
-              </Typography>
-              <Typography variant="caption">
-                {t("maps.votemapAdvanced.voteCountFlagsHelp")}
-              </Typography>
-              <Stack
-                direction="row"
-                gap={1}
-                flexWrap={"wrap"}
-                alignItems={"center"}
-              >
-                {(workingConfig.vote_flags || []).map((item, idx) => (
-                  <Stack
-                    key={idx}
-                    direction="row"
-                    gap={0.25}
-                    alignItems="center"
+          <Card
+            component="section"
+            aria-labelledby="votemap-rules-heading"
+            variant="outlined"
+            sx={workbenchCardSx}
+          >
+            <CardContent
+              sx={{
+                p: 1.5,
+                "&:last-child": { pb: 1.5 },
+              }}
+            >
+              <SectionHeading
+                number="2"
+                title={t("maps.votemapWorkbench.selectionRulesTitle")}
+                description={t(
+                  "maps.votemapWorkbench.selectionRulesDescription"
+                )}
+              />
+              <Divider sx={{ my: 1.25 }} />
+              {primaryRuleGroups.map((group, groupIndex) => (
+                <Box key={group.id} sx={{ mt: groupIndex ? 0.75 : 0 }}>
+                  <Typography
+                    variant="overline"
+                    color="primary.main"
+                    sx={{ display: "block", mb: 0.25 }}
                   >
-                    <Button
-                      variant="outlined"
-                      aria-label={`${t(
-                        "maps.votemapAdvanced.voteCountFlags"
-                      )}: ${item.flag || "?"}`}
-                      onClick={() =>
-                        handleOpenEmojiPicker(idx, "update_vote_flag")
-                      }
-                      sx={{ minWidth: 48, minHeight: 44, fontSize: 24 }}
-                    >
-                      <Emoji emoji={item.flag || "❓"} />
-                    </Button>
-                    <StableNumberField
-                      label={t("maps.votemapAdvanced.voteCount")}
-                      slotProps={{ htmlInput: { min: 1, max: 100 } }}
-                      value={item.vote_count}
-                      requiredValue
+                    {t(`maps.votemapWorkbench.ruleGroups.${group.id}`)}
+                  </Typography>
+                  <Stack spacing={0.1}>
+                    {group.configNames.map((name) =>
+                      renderRuleToggle(findPadlockConfig(name))
+                    )}
+                  </Stack>
+                  <Divider sx={{ mt: 0.75 }} />
+                </Box>
+              ))}
+              <Box sx={{ mt: 0.75 }}>
+                <Typography
+                  variant="overline"
+                  color="primary.main"
+                  sx={{ display: "block", mb: 0.5 }}
+                >
+                  {t("maps.votemapWorkbench.ruleGroups.reminders")}
+                </Typography>
+                <Stack spacing={0.25}>
+                  {renderRuleToggle(findPadlockConfig("allow_opt_out"))}
+                  <Stack
+                    direction={{ xs: "column", sm: "row" }}
+                    justifyContent="space-between"
+                    alignItems={{ xs: "flex-start", sm: "center" }}
+                    gap={1}
+                    sx={{ minHeight: 32 }}
+                  >
+                    <Typography variant="body2">
+                      {getLabel(reminderFrequencyConfig)}
+                    </Typography>
+                    <NumberStepper
+                      compact
+                      label={getLabel(reminderFrequencyConfig)}
+                      value={workingConfig[reminderFrequencyConfig.name]}
+                      inputProps={reminderFrequencyConfig.inputProps}
                       invalidHelperText={t(
                         "maps.votemapWorkbench.invalidNumber"
                       )}
                       onValidityChange={handleNumberValidity(
-                        `vote_flags.${idx}`
+                        reminderFrequencyConfig.name
                       )}
-                      onChange={(value) =>
-                        handleVoteFlagChange(idx, "vote_count", value)
-                      }
-                      sx={{ width: 112 }}
+                      onChange={(value) => {
+                        if (value !== undefined)
+                          handleWorkingChanges(reminderFrequencyConfig.name)(
+                            value
+                          );
+                      }}
                     />
                   </Stack>
-                ))}
-                <IconButton
-                  variant="outlined"
-                  aria-label={t("maps.votemapWorkbench.addVoteWeightFlag")}
-                  sx={{ width: 44, height: 44 }}
-                  onClick={() =>
-                    handleOpenEmojiPicker(
-                      (workingConfig.vote_flags || []).length,
-                      "add_vote_flag"
-                    )
-                  }
-                >
-                  <AddCircleIcon />
-                </IconButton>
-              </Stack>
-
-              <Divider flexItem orientation={"horizontal"} />
-
-              {/* Vote Whitelist Flags Section */}
-              <Typography variant="subtitle1">
-                {t("maps.votemapAdvanced.voteWhitelistFlags")}
-              </Typography>
-              <Typography variant="caption">
-                {t("maps.votemapAdvanced.voteWhitelistFlagsHelp")}
-              </Typography>
-              <Stack
-                direction="row"
-                flexWrap={"wrap"}
-                gap={1}
-                alignItems="center"
+                  {renderRuleToggle(findPadlockConfig("remind_on_match_start"))}
+                  {renderRuleToggle(findPadlockConfig("remind_on_match_end"))}
+                </Stack>
+              </Box>
+              <Divider sx={{ my: 0.75 }} />
+              <Typography
+                variant="overline"
+                color="primary.main"
+                sx={{ display: "block", mb: 0.25 }}
               >
-                {(workingConfig.allow_flag_only || []).map((item, idx) => (
-                  <Button
-                    key={idx}
-                    variant="outlined"
-                    aria-label={`${t(
-                      "maps.votemapAdvanced.voteWhitelistFlags"
-                    )}: ${item || "?"}`}
-                    onClick={() =>
-                      handleOpenEmojiPicker(idx, "update_allow_flag_only")
-                    }
-                    sx={{ minWidth: 48, minHeight: 44, fontSize: 24 }}
-                  >
-                    <Emoji emoji={item ?? "❓"} />
-                  </Button>
-                ))}
-                <IconButton
-                  variant="outlined"
-                  aria-label={t("maps.votemapWorkbench.addAllowedFlag")}
-                  sx={{ width: 44, height: 44 }}
-                  onClick={() =>
-                    handleOpenEmojiPicker(
-                      (workingConfig.allow_flag_only || []).length,
-                      "add_allow_flag_only"
-                    )
-                  }
-                >
-                  <AddCircleIcon />
-                </IconButton>
-              </Stack>
-
-              {/* Vote Ban Flags Section */}
-              <Typography variant="subtitle1">
-                {t("maps.votemapAdvanced.voteBanFlags")}
+                {t("maps.votemapWorkbench.ruleGroups.vipAccess")}
               </Typography>
-              <Typography variant="caption">
-                {t("maps.votemapAdvanced.voteBanFlagsHelp")}
-              </Typography>
-              <Stack
-                direction="row"
-                flexWrap={"wrap"}
-                gap={1}
-                alignItems="center"
-              >
-                {(workingConfig.vote_ban_flags || []).map((item, idx) => (
-                  <Button
-                    key={idx}
-                    variant="outlined"
-                    aria-label={`${t("maps.votemapAdvanced.voteBanFlags")}: ${
-                      item || "?"
-                    }`}
-                    onClick={() =>
-                      handleOpenEmojiPicker(idx, "update_vote_ban_flag")
-                    }
-                    sx={{ minWidth: 48, minHeight: 44, fontSize: 24 }}
-                  >
-                    <Emoji emoji={item ?? "❓"} />
-                  </Button>
-                ))}
-                <IconButton
-                  variant="outlined"
-                  aria-label={t("maps.votemapWorkbench.addBlockedFlag")}
-                  sx={{ width: 44, height: 44 }}
-                  onClick={() =>
-                    handleOpenEmojiPicker(
-                      (workingConfig.vote_ban_flags || []).length,
-                      "add_vote_ban_flag"
-                    )
-                  }
-                >
-                  <AddCircleIcon />
-                </IconButton>
-              </Stack>
-
-              <Divider flexItem orientation={"horizontal"} />
-
-              {/* Player Choice Flags Section */}
-              <Typography variant="subtitle1">
-                {t("maps.votemapAdvanced.playerChoiceWhitelistFlags")}
-              </Typography>
-              <Typography variant="caption">
-                {t("maps.votemapAdvanced.playerChoiceWhitelistFlagsHelp")}
-              </Typography>
-              <Stack
-                direction="row"
-                flexWrap={"wrap"}
-                gap={1}
-                alignItems="center"
-              >
-                {(workingConfig.player_choice_flags || []).map((item, idx) => (
-                  <Button
-                    key={idx}
-                    variant="outlined"
-                    aria-label={`${t(
-                      "maps.votemapAdvanced.playerChoiceWhitelistFlags"
-                    )}: ${item || "?"}`}
-                    onClick={() =>
-                      handleOpenEmojiPicker(idx, "update_player_choice_flag")
-                    }
-                    sx={{ minWidth: 48, minHeight: 44, fontSize: 24 }}
-                  >
-                    <Emoji emoji={item ?? "❓"} />
-                  </Button>
-                ))}
-                <IconButton
-                  variant="outlined"
-                  aria-label={t("maps.votemapWorkbench.addPlayerChoiceFlag")}
-                  sx={{ width: 44, height: 44 }}
-                  onClick={() =>
-                    handleOpenEmojiPicker(
-                      (workingConfig.player_choice_flags || []).length,
-                      "add_player_choice_flag"
-                    )
-                  }
-                >
-                  <AddCircleIcon />
-                </IconButton>
-              </Stack>
-              <Dialog
-                open={emojiPickerOpen}
-                onClose={handleCloseEmojiPicker}
-                aria-labelledby="votemap-emoji-picker-title"
-                maxWidth="xs"
-                fullWidth
-              >
-                <DialogTitle id="votemap-emoji-picker-title">
-                  {t("maps.votemapWorkbench.chooseMarker")}
-                </DialogTitle>
-                <DialogContent dividers sx={{ p: 0, overflow: "hidden" }}>
-                  <Suspense
-                    fallback={
-                      <Typography sx={{ p: 3 }}>
-                        {t("maps.votemapAdvanced.loadingEmojiPicker")}
-                      </Typography>
-                    }
-                  >
-                    <EmojiPicker
-                      set="twitter"
-                      theme={theme.palette.mode}
-                      data={emojiData}
-                      onEmojiSelect={handleEmojiSelected}
-                    />
-                    {!emojiPickerMode?.startsWith("add_") && (
-                      <Button
-                        onClick={() => {
-                          handleRemoveFlag(emojiPickerIndex);
-                          handleCloseEmojiPicker();
-                        }}
-                        variant="contained"
-                        color="error"
-                        fullWidth
-                        sx={{ minHeight: 44 }}
-                      >
-                        {t("settings.general.remove")}
-                      </Button>
-                    )}
-                  </Suspense>
-                </DialogContent>
-              </Dialog>
-            </Stack>
-          </ConfigFormSection>
+              {renderRuleToggle(findPadlockConfig("allow_vip_only"))}
+            </CardContent>
+          </Card>
         </Box>
+
+        <Box sx={{ mt: 1.25 }}>
+          <WorkbenchAccordion
+            number="3"
+            testId="votemap-accordion-messages"
+            title={t("maps.messages")}
+            summary={t("maps.votemapWorkbench.messagesConfigured", {
+              count: configuredMessageCount,
+            })}
+          >
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  lg: "repeat(2, minmax(0, 1fr))",
+                },
+                gap: 1.5,
+              }}
+            >
+              {messageFieldConfigs.map((configItem) => (
+                <TextField
+                  key={configItem.name}
+                  fullWidth
+                  variant="filled"
+                  multiline
+                  minRows={configItem.name === "no_vote_text" ? 2 : 4}
+                  maxRows={8}
+                  label={getLabel(configItem)}
+                  helperText={getHelperText(configItem)}
+                  error={
+                    configItem.name === "instruction_text" &&
+                    !instructionTextIsValid
+                  }
+                  FormHelperTextProps={{
+                    component: "div",
+                  }}
+                  value={workingConfig[configItem.name] ?? ""}
+                  onChange={handleWorkingChanges(configItem.name)}
+                  sx={{
+                    gridColumn:
+                      configItem.name === "instruction_text"
+                        ? { lg: "1 / -1" }
+                        : undefined,
+                    "& .MuiFilledInput-root": { borderRadius: 0 },
+                  }}
+                />
+              ))}
+              {!instructionTextIsValid && (
+                <Typography
+                  role="alert"
+                  variant="caption"
+                  color="error.main"
+                  sx={{ gridColumn: { lg: "1 / -1" } }}
+                >
+                  {t("maps.votemapWorkbench.requireMapSelectionPlaceholder")}
+                </Typography>
+              )}
+            </Box>
+          </WorkbenchAccordion>
+
+          <WorkbenchAccordion
+            number="4"
+            testId="votemap-accordion-permissions"
+            title={t("maps.votemapWorkbench.markersAndPermissions")}
+            summary={t("maps.votemapWorkbench.permissionsSummary", {
+              access: permissionSummary,
+              count: workingConfig.vip_vote_count,
+            })}
+          >
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  lg: "repeat(2, minmax(0, 1fr))",
+                },
+                gap: 2,
+              }}
+            >
+              <Box>
+                <Typography
+                  variant="subtitle2"
+                  fontWeight={850}
+                  sx={{ mb: 0.5 }}
+                >
+                  {t("maps.votemapWorkbench.vipWeightTitle")}
+                </Typography>
+                <NumberStepper
+                  label={getLabel(vipVoteCountConfig)}
+                  value={workingConfig[vipVoteCountConfig.name]}
+                  inputProps={vipVoteCountConfig.inputProps}
+                  helperText={getHelperText(vipVoteCountConfig)}
+                  invalidHelperText={t("maps.votemapWorkbench.invalidNumber")}
+                  onValidityChange={handleNumberValidity(
+                    vipVoteCountConfig.name
+                  )}
+                  onChange={(value) => {
+                    if (value !== undefined)
+                      handleWorkingChanges(vipVoteCountConfig.name)(value);
+                  }}
+                />
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" fontWeight={850}>
+                  {t("maps.votemapAdvanced.voteCountFlags")}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {t("maps.votemapAdvanced.voteCountFlagsHelp")}
+                </Typography>
+                <Stack
+                  direction="row"
+                  gap={1}
+                  flexWrap="wrap"
+                  alignItems="flex-start"
+                  sx={{ mt: 1 }}
+                >
+                  {(workingConfig.vote_flags || []).map((item, idx) => (
+                    <Stack
+                      key={`${item.flag}-${idx}`}
+                      direction="row"
+                      spacing={0.5}
+                      alignItems="flex-start"
+                    >
+                      <Button
+                        variant="outlined"
+                        aria-label={`${t(
+                          "maps.votemapAdvanced.voteCountFlags"
+                        )}: ${item.flag || "?"}`}
+                        onClick={() =>
+                          handleOpenEmojiPicker(idx, "update_vote_flag")
+                        }
+                        sx={{
+                          minWidth: 44,
+                          minHeight: 40,
+                          borderRadius: 0,
+                          fontSize: 22,
+                        }}
+                      >
+                        <Emoji emoji={item.flag || "❓"} />
+                      </Button>
+                      <StableNumberField
+                        label={t("maps.votemapAdvanced.voteCount")}
+                        slotProps={{ htmlInput: { min: 1, max: 100 } }}
+                        value={item.vote_count}
+                        requiredValue
+                        invalidHelperText={t(
+                          "maps.votemapWorkbench.invalidNumber"
+                        )}
+                        onValidityChange={handleNumberValidity(
+                          `vote_flags.${idx}`
+                        )}
+                        onChange={(value) =>
+                          handleVoteFlagChange(idx, "vote_count", value)
+                        }
+                        sx={{
+                          width: 112,
+                          "& .MuiOutlinedInput-root": { borderRadius: 0 },
+                        }}
+                      />
+                    </Stack>
+                  ))}
+                  <IconButton
+                    aria-label={t("maps.votemapWorkbench.addVoteWeightFlag")}
+                    sx={{
+                      width: 40,
+                      height: 40,
+                      border: "1px solid",
+                      borderColor: "divider",
+                      borderRadius: 0,
+                    }}
+                    onClick={() =>
+                      handleOpenEmojiPicker(
+                        (workingConfig.vote_flags || []).length,
+                        "add_vote_flag"
+                      )
+                    }
+                  >
+                    <AddCircleIcon />
+                  </IconButton>
+                </Stack>
+              </Box>
+              <FlagChooserGroup
+                title={t("maps.votemapAdvanced.voteWhitelistFlags")}
+                help={t("maps.votemapAdvanced.voteWhitelistFlagsHelp")}
+                items={workingConfig.allow_flag_only || []}
+                addLabel={t("maps.votemapWorkbench.addAllowedFlag")}
+                onEdit={(index) =>
+                  handleOpenEmojiPicker(index, "update_allow_flag_only")
+                }
+                onAdd={() =>
+                  handleOpenEmojiPicker(
+                    (workingConfig.allow_flag_only || []).length,
+                    "add_allow_flag_only"
+                  )
+                }
+              />
+              <FlagChooserGroup
+                title={t("maps.votemapAdvanced.voteBanFlags")}
+                help={t("maps.votemapAdvanced.voteBanFlagsHelp")}
+                items={workingConfig.vote_ban_flags || []}
+                addLabel={t("maps.votemapWorkbench.addBlockedFlag")}
+                onEdit={(index) =>
+                  handleOpenEmojiPicker(index, "update_vote_ban_flag")
+                }
+                onAdd={() =>
+                  handleOpenEmojiPicker(
+                    (workingConfig.vote_ban_flags || []).length,
+                    "add_vote_ban_flag"
+                  )
+                }
+              />
+              <FlagChooserGroup
+                title={t("maps.votemapAdvanced.playerChoiceWhitelistFlags")}
+                help={t("maps.votemapAdvanced.playerChoiceWhitelistFlagsHelp")}
+                items={workingConfig.player_choice_flags || []}
+                addLabel={t("maps.votemapWorkbench.addPlayerChoiceFlag")}
+                onEdit={(index) =>
+                  handleOpenEmojiPicker(index, "update_player_choice_flag")
+                }
+                onAdd={() =>
+                  handleOpenEmojiPicker(
+                    (workingConfig.player_choice_flags || []).length,
+                    "add_player_choice_flag"
+                  )
+                }
+              />
+            </Box>
+          </WorkbenchAccordion>
+
+          <WorkbenchAccordion
+            number="5"
+            testId="votemap-accordion-advanced"
+            title={t("maps.votemapWorkbench.advancedSelectionRules")}
+            summary={t("maps.votemapWorkbench.advancedSummary", {
+              method: defaultMethodSummary,
+              count: workingConfig.number_last_played_to_exclude,
+            })}
+          >
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  lg: "minmax(260px, 0.75fr) minmax(0, 1.25fr)",
+                },
+                gap: 2,
+              }}
+            >
+              <NumberStepper
+                label={getLabel(recentMapsConfig)}
+                value={workingConfig[recentMapsConfig.name]}
+                inputProps={recentMapsConfig.inputProps}
+                helperText={getHelperText(recentMapsConfig)}
+                invalidHelperText={t("maps.votemapWorkbench.invalidNumber")}
+                onValidityChange={handleNumberValidity(recentMapsConfig.name)}
+                onChange={(value) => {
+                  if (value !== undefined)
+                    handleWorkingChanges(recentMapsConfig.name)(value);
+                }}
+              />
+              <Stack spacing={0.25}>
+                {advancedRuleConfigs.map((configItem) =>
+                  renderRuleToggle(configItem)
+                )}
+              </Stack>
+            </Box>
+          </WorkbenchAccordion>
+        </Box>
+
+        <Dialog
+          open={emojiPickerOpen}
+          onClose={handleCloseEmojiPicker}
+          aria-labelledby="votemap-emoji-picker-title"
+          maxWidth="xs"
+          fullWidth
+        >
+          <DialogTitle id="votemap-emoji-picker-title">
+            {t("maps.votemapWorkbench.chooseMarker")}
+          </DialogTitle>
+          <DialogContent dividers sx={{ p: 0, overflow: "hidden" }}>
+            <Suspense
+              fallback={
+                <Typography sx={{ p: 3 }}>
+                  {t("maps.votemapAdvanced.loadingEmojiPicker")}
+                </Typography>
+              }
+            >
+              <EmojiPicker
+                set="twitter"
+                theme={theme.palette.mode}
+                data={emojiData}
+                onEmojiSelect={handleEmojiSelected}
+              />
+              {!emojiPickerMode?.startsWith("add_") && (
+                <Button
+                  onClick={() => {
+                    handleRemoveFlag(emojiPickerIndex);
+                    handleCloseEmojiPicker();
+                  }}
+                  variant="contained"
+                  color="error"
+                  fullWidth
+                  sx={{ minHeight: 44, borderRadius: 0 }}
+                >
+                  {t("settings.general.remove")}
+                </Button>
+              )}
+            </Suspense>
+          </DialogContent>
+        </Dialog>
       </Box>
 
       <ConfigActionBar
+        mobileSticky={false}
         dirty={isConfigDirty}
         dirtyLabel={t("maps.votemapWorkbench.unsavedChanges")}
         stateIcon={
@@ -777,6 +1427,8 @@ function VotemapSettingsPage() {
             !isConfigDirty ||
             isConfigSaving ||
             invalidNumberFields.size > 0 ||
+            !hasMapOptions ||
+            !instructionTextIsValid ||
             !canChangeConfig,
           loading: isConfigSaving,
           onClick: handleConfigSave,

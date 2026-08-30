@@ -143,3 +143,56 @@ export const defaultMapOptions = [
     labelKey: "randomAll",
   },
 ];
+
+const pickConfig = (configs, name) =>
+  configs.find((config) => config.name === name);
+
+export const gameModeOptionConfigs = [
+  pickConfig(textFieldConfigs, "num_warfare_options"),
+  pickConfig(textFieldConfigs, "num_offensive_options"),
+  pickConfig(textFieldConfigs, "num_conquest_options"),
+  pickConfig(textFieldConfigs, "num_domination_options"),
+  pickConfig(textFieldConfigs, "num_skirmish_control_options"),
+];
+
+export const reminderFrequencyConfig = pickConfig(
+  textFieldConfigs,
+  "reminder_frequency_minutes"
+);
+
+export const recentMapsConfig = pickConfig(
+  textFieldConfigs,
+  "number_last_played_to_exclude"
+);
+
+export const vipVoteCountConfig = pickConfig(
+  textFieldConfigs,
+  "vip_vote_count"
+);
+
+export const primaryRuleGroups = [
+  {
+    id: "repetitions",
+    configNames: [
+      "consider_offensive_same_map",
+      "consider_skirmishes_as_same_map",
+      "consider_environment_as_same_map",
+    ],
+  },
+  {
+    id: "consecutive",
+    configNames: [
+      "allow_consecutive_offensives",
+      "allow_consecutive_offensives_opposite_sides",
+      "allow_consecutive_skirmishes",
+    ],
+  },
+];
+
+export const advancedRuleConfigs = [
+  "allow_multiple_maps_with_same_environment",
+  "allow_default_to_offensive",
+  "allow_default_to_skirmish",
+].map((name) => pickConfig(padlockConfigs, name));
+
+export const findPadlockConfig = (name) => pickConfig(padlockConfigs, name);
