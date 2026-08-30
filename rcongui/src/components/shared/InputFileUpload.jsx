@@ -1,33 +1,43 @@
-import { styled } from '@mui/material/styles';
-import Button from '@mui/material/Button';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import { styled } from "@mui/material/styles";
+import Button from "@mui/material/Button";
+import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 
-const VisuallyHiddenInput = styled('input')({
-  clip: 'rect(0 0 0 0)',
-  clipPath: 'inset(50%)',
+const VisuallyHiddenInput = styled("input")({
+  clip: "rect(0 0 0 0)",
+  clipPath: "inset(50%)",
   height: 1,
-  overflow: 'hidden',
-  position: 'absolute',
+  overflow: "hidden",
+  position: "absolute",
   bottom: 0,
   left: 0,
-  whiteSpace: 'nowrap',
+  whiteSpace: "nowrap",
   width: 1,
 });
 
-export function InputFileUpload({ text, icon, color, variant, ...props }) {
+export function InputFileUpload({
+  text,
+  icon,
+  color,
+  variant,
+  accept,
+  onChange,
+  inputProps,
+  ...buttonProps
+}) {
   return (
     <Button
       component="label"
-      role={undefined}
       variant={variant ?? "contained"}
       color={color ?? "primary"}
-      tabIndex={-1}
       startIcon={icon ?? <CloudUploadIcon />}
-      {...props}
+      {...buttonProps}
     >
       {text ?? "Upload file"}
       <VisuallyHiddenInput
         type="file"
+        accept={accept}
+        onChange={onChange}
+        {...inputProps}
       />
     </Button>
   );

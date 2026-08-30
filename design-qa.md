@@ -45,6 +45,51 @@ Keine offenen P0-, P1- oder P2-Abweichungen.
 Ein zusätzlicher Ausschnitt war nicht notwendig. Der kombinierte 2990 × 1058-px-Vergleich zeigt Source und Umsetzung vollständig nebeneinander; die relevanten Hauptbereiche, Zusammenfassung, Matrix und Aktionsleiste sind gleichzeitig beurteilbar.
 
 final result: passed
+
+---
+
+# Design QA: Konsolen-Admins, Option 1 „Berechtigungsregister“
+
+## Prüfgrundlage
+
+- Gewählte visuelle Richtung: Option 1 „Berechtigungsregister“.
+- Source visual truth: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-a5416038-aef0-4b7d-bee3-e0bda743fa61.png`
+- Implementierte Route: `http://127.0.0.1:3005/settings/console-admins`
+- Implementierung: `.codex/design-qa/console-admins-option-1/implementation.png`
+- Gesamtvergleich: `.codex/design-qa/console-admins-option-1/comparison-full.png`
+- Fokusvergleich: `.codex/design-qa/console-admins-option-1/comparison-focus.png`
+- Mobile Evidenz: `.codex/design-qa/console-admins-option-1/mobile.png`
+- Source und Desktop-Implementierung: jeweils 1487 × 1058 px, dunkles Frontline-Theme, deutsche Sprache und derselbe vorgemerkte Änderungszustand.
+
+## Ergebnis
+
+- Die Seite folgt der gewählten Register-Struktur: kompakter Seitenkopf mit Rollenübersicht, feste Erfassungsspalte, vollbreite Admin-Tabelle und gemeinsame Aktionsleiste.
+- Die eckige Frontline-Designlinie, dunkle grün-schwarze Flächen, goldene Akzente, feine Trenner und die bestehende Typografie wurden konsequent beibehalten.
+- Hinzufügen, Rollenwechsel und Entfernen sind als getrennte, farblich codierte Änderungszustände sichtbar. Keine dieser Änderungen wird vor dem abschließenden Speichern an den Server übertragen.
+- Mehrfachauswahl, Namens- und Steam64-Suche, Rollenfilter sowie Import und Export sind im Tabellenkopf zusammengeführt.
+- Der vom Nutzer gemeldete Höhenversatz wurde behoben: Die Mehrfachaktion lautet kompakt „3 entfernen“, bleibt einzeilig und ist nun exakt auf „Import / Export“ ausgerichtet.
+- Mobil wird die Erfassung eingeklappt, die Tabelle wechselt in lesbare Einzelkarten und die Aktionsleiste bleibt nur bei tatsächlich ungespeicherten Änderungen klebend.
+
+## Vergleichsverlauf
+
+1. Der erste Vergleich zeigte als P1, dass das Suchfeld in der mobilen Spaltenanordnung wegen seiner Desktop-Flexbasis unnötig viel Höhe belegte. Die Flexbasis wird nun breakpointabhängig gesetzt.
+2. Die mobile Prüfung zeigte als P1, dass die immer klebende Aktionsleiste Karten verdecken konnte. Im sauberen Zustand ist sie mobil statisch; bei Änderungen bleibt sie erreichbar.
+3. Die Rollenreihenfolge wurde an die gewählte Richtung angepasst: Senior, Junior, Spectator. Der sichere Standard für neue Einträge bleibt bewusst Spectator.
+4. Markierte Tabellenzeilen verwenden jetzt dezente, statusbezogene Flächen statt einer starken einheitlichen Auswahlfarbe.
+5. Der abschließende Fokusvergleich zeigte keine offenen P0-, P1- oder P2-Abweichungen.
+
+## Funktions- und Qualitätsprüfung
+
+- Neuer Admin mit Name, Steam64-ID und Rolle vorgemerkt; Status „Neu“ und Änderungszähler geprüft.
+- Bestehende Rolle Senior → Junior geändert; Inline-Auswahl und Status „Rolle geändert“ geprüft.
+- Bestehenden Admin zum Entfernen vorgemerkt und Rückgängig-Aktion sichtbar geprüft.
+- Namenssuche, Zurücksetzen der Suche sowie Einzel- und Mehrfachauswahl geprüft.
+- Speicherbestätigung bei vorgemerkter Entfernung geöffnet und ohne Servermutation abgebrochen.
+- Datei-Upload-Komponente korrigiert: `accept` und `onChange` liegen jetzt auf dem echten Dateifeld; der Upload-Button bleibt per Tastatur erreichbar.
+- Produktionsbuild und Prettier-Prüfung bestanden; nur die bereits bestehende Chunk-Größenwarnung.
+- Browserkonsole: keine Laufzeitfehler; ausschließlich die bereits bestehende React-Router-Future-Flag-Warnung.
+
+final result: passed
 ---
 
 # Design QA: Spielerakten-Karten, Richtung 1
