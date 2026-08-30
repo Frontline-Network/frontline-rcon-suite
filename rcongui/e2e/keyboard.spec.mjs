@@ -8,7 +8,9 @@ test.describe("keyboard navigation", () => {
     await openDemoPage(page, "/");
 
     await page.keyboard.press("Tab");
-    const skipLink = page.getByRole("link", { name: "Zum Hauptinhalt springen" });
+    const skipLink = page.getByRole("link", {
+      name: "Zum Hauptinhalt springen",
+    });
     await expect(skipLink).toBeFocused();
     await page.keyboard.press("Enter");
 
@@ -19,7 +21,9 @@ test.describe("keyboard navigation", () => {
     await openDemoPage(page, "/");
 
     await page.keyboard.press("Control+K");
-    await expect(page.getByPlaceholder("Navigation durchsuchen …")).toBeFocused();
+    await expect(
+      page.getByPlaceholder("Navigation durchsuchen …")
+    ).toBeFocused();
   });
 });
 
@@ -30,10 +34,12 @@ test.describe("mobile navigation", () => {
     await openDemoPage(page, "/");
 
     await page.getByRole("button", { name: "Navigation öffnen" }).click();
-    const navigation = page.getByRole("navigation", { name: "Hauptnavigation" });
+    const navigation = page.getByRole("navigation", {
+      name: "Hauptnavigation",
+    });
     await expect(navigation).toBeVisible();
     await expect(
-      navigation.getByPlaceholder("Navigation durchsuchen …"),
+      navigation.getByPlaceholder("Navigation durchsuchen …")
     ).toBeVisible();
   });
 
@@ -48,7 +54,7 @@ test.describe("mobile navigation", () => {
       name: "Hauptnavigation",
     });
     const mapsGroup = navigation.getByRole("button", {
-      name: "Karten & Spielbetrieb",
+      name: "Spielbetrieb",
     });
     await mapsGroup.focus();
     await page.keyboard.press("Enter");

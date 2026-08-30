@@ -40,7 +40,7 @@ const AppNavbarBase = ({ toggleDrawer, open, isSmallScreen }) => {
     <AppBar
       position="fixed"
       sx={{
-        display: { xs: "auto", lg: "none" },
+        display: { xs: "auto", md: "none" },
         boxShadow: 0,
         bgcolor: "background.paper",
         backgroundImage: "none",
@@ -58,7 +58,10 @@ const AppNavbarBase = ({ toggleDrawer, open, isSmallScreen }) => {
             width: "100%",
           }}
         >
-          <MenuButton aria-label={t("navigation.openMenu")} onClick={toggleDrawer}>
+          <MenuButton
+            aria-label={t("navigation.openMenu")}
+            onClick={toggleDrawer}
+          >
             <MenuRoundedIcon />
           </MenuButton>
           <FrontlineBrand compact />
@@ -86,7 +89,7 @@ export default function AppNavbar() {
   const [openDrawer, setOpenDrawer] = useState(false);
   const toggleDrawer = () => setOpenDrawer((current) => !current);
   const theme = useTheme();
-  const isSmallScreen = useMediaQuery(theme.breakpoints.down("lg"));
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down("md"));
 
   return (
     <>

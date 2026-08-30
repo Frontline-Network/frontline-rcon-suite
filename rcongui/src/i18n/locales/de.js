@@ -4634,6 +4634,17 @@ const de = {
     openMenu: "Navigation öffnen",
     toggleMenu: "Navigation ein- oder ausblenden",
     search: "Navigation durchsuchen …",
+    noResults: "Keine passenden Seiten gefunden.",
+    workspaces: {
+      home: "Übersicht",
+      live: "Live",
+      moderation: "Moderation",
+      gameOperations: "Spielbetrieb",
+      automation: "Automatisierung",
+      analytics: "Analyse",
+      integrations: "Integrationen",
+      system: "System",
+    },
     navigateTo: "Navigieren zu",
     permissionMissing: "Diese Seite ist sichtbar, aber dir fehlt die erforderliche Berechtigung.",
     groups: {

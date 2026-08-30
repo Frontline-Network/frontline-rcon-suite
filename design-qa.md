@@ -118,3 +118,63 @@ final result: passed
 3. Endkontrolle: keine offenen P0-, P1- oder P2-Abweichungen; keine Funktionsregression im geprüften Karten- und Auswahlfluss.
 
 final result: passed
+
+---
+
+# Design QA: Frontline Command Rail, Option 1
+
+## Prüfgrundlage
+
+- Designziel: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-c4dbe56a-f770-44a3-a78a-302baa69a3dc.png`
+- Browser-Umsetzung: `.tmp/navigation-design-qa/command-rail-implementation-1440.png`
+- Direkter Vergleich: `.tmp/navigation-design-qa/command-rail-comparison.png`
+- Referenzgröße: 1487 × 1058 px
+- Browser-Viewport: 1440 × 1024 px
+- Geprüfter Zustand: dunkles Frontline-Theme, `/settings/console-admins`, Arbeitsbereich „Moderation“ geöffnet
+
+## Vergleich und Iterationen
+
+1. Der erste Browser-Abgleich zeigte ein doppeltes Logo, ein zu schmales 228-px-Kontextpanel und dadurch unnötige Umbrüche bei langen Bereichsnamen und im Suchfeld.
+2. Das Kontextpanel wurde auf 276 px verbreitert, die Marke im Panel auf die Textvariante reduziert und die Arbeitsbereiche auf klare Kurzbezeichnungen umgestellt.
+3. Der finale Vergleich zeigt dieselbe Hierarchie wie das Designziel: dauerhaftes Icon-Rail, kontextabhängiges Navigationspanel, sichtbarer Serverkontext, globale Suche und ein klar markierter aktiver Eintrag.
+
+## Fidelity-Prüfung
+
+- **Layout und Abstände:** Rail und Kontextpanel bilden eine eigenständige Navigationszone. Die eckigen Flächen, feinen Trennlinien und kompakten Abstände entsprechen der bestehenden Frontline-Designlinie. Das produktive Konsolen-Admin-Formular bleibt breiter und informationsreicher als das vereinfachte Mockup, ohne die Navigationshierarchie zu beeinträchtigen.
+- **Typografie:** Bestehende Frontline-Schriften, Versalien, Gewichtungen und Laufweiten werden weiterverwendet. Arbeitsbereich, Seitentitel und Navigationseinträge besitzen eine klare Abstufung; im finalen 276-px-Panel entstehen keine problematischen Umbrüche.
+- **Farben:** Grün-dunkle Flächen, warmer Frontline-Akzent, cyanfarbene Funktionshinweise und semantische Statusfarben werden aus den vorhandenen Tokens übernommen. Der aktive Bereich bleibt deutlich, ohne den Seiteninhalt zu überstrahlen.
+- **Formen und Oberflächen:** Keine generischen runden Karten wurden eingeführt. Rail, Panel, Suchfeld, Serverwähler und Navigationseinträge folgen der eckigen Produktoberfläche.
+- **Icons:** Ausschließlich vorhandene MUI-Icons aus derselben Stilfamilie; Größen, Ausrichtung, aktive und inaktive Zustände wurden im Browser geprüft.
+- **Bilder und Assets:** Das vorhandene Frontline-Logo wird wiederverwendet. Es wurden keine Platzhalter, CSS-Zeichnungen oder nachgebauten SVG-Assets ergänzt.
+- **Copy:** Kurze, verständliche Arbeitsbereichsnamen in Deutsch und Englisch. Die Suche besitzt einen verständlichen Leerzustand.
+
+## Verhalten und Responsivität
+
+- Desktop ab 1280 px: Rail und Kontextpanel bleiben stabil sichtbar; das Panel kann reduziert werden, das Rail bleibt erreichbar.
+- Tablet 900–1279 px: Das Kontextpanel öffnet als Overlay. `Escape` schließt es und setzt den Fokus auf den auslösenden Arbeitsbereich zurück.
+- Mobile unter 900 px: Die bestehende mobile Kopfzeile, der Vollbild-Drawer und die Bottom-Navigation bleiben aktiv; das Desktop-Rail ist ausgeblendet.
+- `Ctrl+K` öffnet das Kontextpanel aus dem reduzierten Zustand und fokussiert die globale Navigationssuche.
+- Die Suche filtert berechtigte und sichtbare Ziele über alle Arbeitsbereiche. Gesperrte Ziele bleiben erkennbar und semantisch deaktiviert.
+- Geprüft bei 1440 × 1024, 1024 × 900 und 390 × 844: kein horizontaler Dokument-Overflow, keine überlappenden Navigationselemente.
+
+## Accessibility
+
+- Semantische Buttons und Links mit zugänglichen Namen, `aria-expanded`, `aria-controls` und sichtbaren Fokuszuständen.
+- Tastaturzugriff für Rail, Suche und Navigationsziele; Fokus-Rückgabe nach `Escape` geprüft.
+- Praktische Touch-Ziele in der mobilen Navigation bleiben erhalten.
+- Status wird nicht allein über Farbe vermittelt; Text und Icons ergänzen die semantischen Zustände.
+
+## Technische Verifikation
+
+- Workspace-Zuordnung und Pfadnormalisierung: 4/4 Node-Tests bestanden.
+- Vite-Produktionsbuild erfolgreich; nur die bereits bekannte Chunk-Größenwarnung bleibt bestehen.
+- Browserprüfung ohne sichtbares Runtime-Fehler-Overlay.
+
+## Verbleibende Abweichungen
+
+- **P3:** Das Designziel nutzt eine vereinfachte Beispieltabelle. Die Umsetzung behält bewusst das produktive Konsolen-Admin-Formular und seine höhere Informationsdichte bei.
+- **P3:** Die Serverbezeichnung wird im kompakten Panel bei sehr langen Namen visuell gekürzt; der Serverwähler selbst bleibt vollständig bedienbar.
+
+Keine offenen P0-, P1- oder P2-Befunde.
+
+final result: passed

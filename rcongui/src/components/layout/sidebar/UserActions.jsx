@@ -1,12 +1,12 @@
 import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { Avatar, Box, Stack, Typography } from "@mui/material";
+import { Avatar, Box, Stack, Tooltip, Typography } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { useAppStore } from "@/stores/app-state";
 import { cmd } from "@/utils/fetchUtils";
 import OptionsMenu from "../OptionsMenu";
 
-export const UserActions = () => {
+export const UserActions = ({ compact = false }) => {
   const { permissions } = useAuth();
   const userKey = permissions?.user_name;
   const selectAppearanceUser = useAppStore(
@@ -33,28 +33,37 @@ export const UserActions = () => {
 
   return (
     <Stack
-      direction="row"
+      direction={compact ? "column" : "row"}
+      data-testid={compact ? "command-rail-user-actions" : undefined}
       sx={{
-        p: 2,
-        gap: 1,
+        width: compact ? 64 : "auto",
+        p: compact ? 0.5 : 2,
+        gap: compact ? 0.25 : 1,
         alignItems: "center",
         borderTop: "1px solid",
         borderColor: "divider",
       }}
     >
-      <Avatar
-        sizes="small"
-        alt={permissions?.user_name?.toUpperCase() ?? "?"}
-        sx={{ width: 36, height: 36 }}
-      />
-      <Box sx={{ mr: "auto" }}>
-        <Typography
-          variant="body2"
-          sx={{ fontWeight: 500, lineHeight: "16px" }}
-        >
-          {permissions?.user_name ?? "?????"}
-        </Typography>
-      </Box>
+      <Tooltip
+        title={permissions?.user_name ?? "?????"}
+        placement={compact ? "right" : "top"}
+      >
+        <Avatar
+          sizes="small"
+          alt={permissions?.user_name?.toUpperCase() ?? "?"}
+          sx={{ width: compact ? 34 : 36, height: compact ? 34 : 36 }}
+        />
+      </Tooltip>
+      {!compact && (
+        <Box sx={{ mr: "auto" }}>
+          <Typography
+            variant="body2"
+            sx={{ fontWeight: 500, lineHeight: "16px" }}
+          >
+            {permissions?.user_name ?? "?????"}
+          </Typography>
+        </Box>
+      )}
       <OptionsMenu />
     </Stack>
   );

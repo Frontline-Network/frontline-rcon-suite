@@ -115,10 +115,9 @@ test.describe("permission-aware navigation", () => {
   }) => {
     await openDemoPage(page, "/", { query: { demo_role: "viewer" } });
 
-    const navigation = page.getByRole("navigation", {
-      name: "Hauptnavigation",
-    });
-    await navigation.getByRole("button", { name: "Live-Betrieb" }).click();
+    const rail = page.getByTestId("desktop-command-rail");
+    const navigation = page.getByTestId("desktop-navigation-panel");
+    await rail.getByRole("button", { name: "Live" }).click();
 
     const liveView = navigation.getByRole("button", { name: "Live-Ansicht" });
     await expect(liveView).toHaveAttribute("aria-disabled", "true");
@@ -139,10 +138,9 @@ test.describe("permission-aware navigation", () => {
   }) => {
     await openDemoPage(page, "/");
 
-    const navigation = page.getByRole("navigation", {
-      name: "Hauptnavigation",
-    });
-    await navigation.getByRole("button", { name: "Live-Betrieb" }).click();
+    const rail = page.getByTestId("desktop-command-rail");
+    const navigation = page.getByTestId("desktop-navigation-panel");
+    await rail.getByRole("button", { name: "Live" }).click();
     await expect(
       navigation.getByRole("link", { name: "Live-Ansicht" })
     ).toHaveAttribute("href", "/views/live");
@@ -151,17 +149,14 @@ test.describe("permission-aware navigation", () => {
   test("shows map changes under maps and game operations", async ({ page }) => {
     await openDemoPage(page, "/");
 
-    const navigation = page.getByRole("navigation", {
-      name: "Hauptnavigation",
-    });
-    await navigation.getByRole("button", { name: "Live-Betrieb" }).click();
+    const rail = page.getByTestId("desktop-command-rail");
+    const navigation = page.getByTestId("desktop-navigation-panel");
+    await rail.getByRole("button", { name: "Live" }).click();
     await expect(
       navigation.getByRole("link", { name: "Karte wechseln" })
     ).toHaveCount(0);
 
-    await navigation
-      .getByRole("button", { name: "Karten & Spielbetrieb" })
-      .click();
+    await rail.getByRole("button", { name: "Spielbetrieb" }).click();
     await expect(
       navigation.getByRole("link", { name: "Karte wechseln" })
     ).toHaveAttribute("href", "/settings/maps/change");
@@ -170,10 +165,9 @@ test.describe("permission-aware navigation", () => {
   test("selects only the current app entry", async ({ page }) => {
     await openDemoPage(page, "/apps/discord-report-bot");
 
-    const navigation = page.getByRole("navigation", {
-      name: "Hauptnavigation",
-    });
-    await navigation.getByRole("button", { name: "Apps einrichten" }).click();
+    const rail = page.getByTestId("desktop-command-rail");
+    const navigation = page.getByTestId("desktop-navigation-panel");
+    await rail.getByRole("button", { name: "Integrationen" }).click();
 
     const frontlineApp = navigation.getByRole("link", {
       name: "Frontline App",
@@ -202,7 +196,7 @@ test.describe("task-oriented mobile navigation", () => {
       name: "Hauptnavigation",
     });
     const playersGroup = navigation.getByRole("button", {
-      name: "Spieler & Moderation",
+      name: "Moderation",
     });
     await expect(playersGroup).toBeVisible();
     await expect(playersGroup).toHaveCSS("min-height", "44px");
@@ -211,9 +205,7 @@ test.describe("task-oriented mobile navigation", () => {
       navigation.getByRole("link", { name: "Spieler" })
     ).toBeVisible();
 
-    await navigation
-      .getByRole("button", { name: "Karten & Spielbetrieb" })
-      .click();
+    await navigation.getByRole("button", { name: "Spielbetrieb" }).click();
     await expect(
       navigation.getByRole("link", { name: "Karte wechseln" })
     ).toBeVisible();

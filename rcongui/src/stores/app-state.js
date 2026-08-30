@@ -1,12 +1,9 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import siteConfig from "@/config/siteConfig";
-import {
-  DEFAULT_APPEARANCE,
-  normalizeAppearance,
-} from "@/themes/appearance";
+import { DEFAULT_APPEARANCE, normalizeAppearance } from "@/themes/appearance";
 
-const prefix = siteConfig.appName + '.';
+const prefix = siteConfig.appName + ".";
 const withPrefix = (key) => prefix + key;
 
 export const useAppStore = create(
@@ -66,8 +63,10 @@ export const useAppStore = create(
         set({ appearancePreview: value ? normalizeAppearance(value) : null }),
       clearAppearancePreview: () => set({ appearancePreview: null }),
       widthMode: "xl",
-      toggleWidthMode: () => set({ widthMode: get().widthMode === "xl" ? false : "xl" }),
+      toggleWidthMode: () =>
+        set({ widthMode: get().widthMode === "xl" ? false : "xl" }),
       openDrawer: true,
+      setDrawerOpen: (open) => set({ openDrawer: Boolean(open) }),
       toggleDrawer: () => set({ openDrawer: !get().openDrawer }),
       // Persist which navigation groups are expanded.
       groupOpenState: {},

@@ -49,7 +49,7 @@ test("the mobile app shell stays within a 320px viewport and keeps navigation av
   });
   await expect(navigation).toBeVisible();
   await expect(
-    navigation.getByRole("button", { name: "Spieler & Moderation" })
+    navigation.getByRole("button", { name: "Moderation" })
   ).toBeVisible();
   await expect
     .poll(() =>

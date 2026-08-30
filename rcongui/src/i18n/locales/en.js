@@ -4588,6 +4588,17 @@ const en = {
     openMenu: "Open navigation",
     toggleMenu: "Toggle navigation",
     search: "Search navigation...",
+    noResults: "No matching pages found.",
+    workspaces: {
+      home: "Overview",
+      live: "Live",
+      moderation: "Moderation",
+      gameOperations: "Game operations",
+      automation: "Automation",
+      analytics: "Analytics",
+      integrations: "Integrations",
+      system: "System",
+    },
     navigateTo: "Navigate to",
     permissionMissing: "This page is visible, but you do not have the required permission.",
     groups: {
