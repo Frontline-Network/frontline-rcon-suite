@@ -17,13 +17,23 @@ test.describe("keyboard navigation", () => {
     await expect(page.locator("#main-content")).toBeFocused();
   });
 
-  test("Ctrl+K focuses the navigation search", async ({ page }) => {
+  test("server switcher opens and restores focus with Escape", async ({
+    page,
+  }) => {
     await openDemoPage(page, "/");
 
-    await page.keyboard.press("Control+K");
-    await expect(
-      page.getByPlaceholder("Navigation durchsuchen …")
-    ).toBeFocused();
+    const serverSwitcher = page.getByTestId("server-rail-switcher");
+    await serverSwitcher.focus();
+    await page.keyboard.press("Enter");
+    const serverMenu = page.getByRole("menu", { name: "Server wechseln" });
+    await expect(serverMenu).toBeVisible();
+    await expect(serverMenu.getByRole("menuitem").first()).toHaveCSS(
+      "border-radius",
+      "0px"
+    );
+
+    await page.keyboard.press("Escape");
+    await expect(serverSwitcher).toBeFocused();
   });
 });
 

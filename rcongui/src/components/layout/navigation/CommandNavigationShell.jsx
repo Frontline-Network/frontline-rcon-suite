@@ -1,22 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Box,
-  List,
-  Popover,
-  Stack,
-  Typography,
-  useMediaQuery,
-} from "@mui/material";
+import { Box, List, Popover, Typography, useMediaQuery } from "@mui/material";
 import MonitorHeartOutlinedIcon from "@mui/icons-material/MonitorHeartOutlined";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/useAuth";
 import { useAppStore } from "@/stores/app-state";
 import { useGlobalStore } from "@/stores/global-state";
+import { getGameLabel, normalizeGame } from "@/utils/game-context";
 import { CONNECTION_STATE } from "@/utils/connectionHealth";
-import SelectContent from "../SelectContent";
-import FrontlineBrand from "../FrontlineBrand";
-import AboutDialog from "../sidebar/About";
 import ConnectionStatus from "../sidebar/ConnectionStatus";
 import SystemUsage from "../sidebar/SystemUsage";
 import { UserActions } from "../sidebar/UserActions";
@@ -24,11 +15,11 @@ import CommandRail, { COMMAND_RAIL_WIDTH } from "./CommandRail";
 import ContextNavigationPanel, {
   CONTEXT_NAVIGATION_PANEL_WIDTH,
 } from "./ContextNavigationPanel";
+import ServerRailSwitcher from "./ServerRailSwitcher";
 import { buildCommandRailWorkspaces } from "./command-rail-navigation";
 import { doesNavigationRouteMatch } from "./command-rail-workspaces.mjs";
 
 const PERSISTENT_NAVIGATION_MEDIA = "(min-width: 1280px)";
-const DESKTOP_NAVIGATION_MEDIA = "(min-width: 900px)";
 const PANEL_ID = "desktop-navigation-panel";
 
 const workspaceCodes = {
@@ -40,6 +31,24 @@ const workspaceCodes = {
   analytics: "ANA",
   integrations: "INT",
   system: "SYS",
+};
+
+const workspaceTitleTranslationKeys = {
+  live: "navigation.groups.liveOperations",
+  moderation: "navigation.groups.playersModeration",
+  "game-operations": "navigation.groups.mapsGameOperations",
+  automation: "navigation.groups.automation",
+  analytics: "navigation.groups.logsAnalytics",
+  integrations: "navigation.workspaces.integrations",
+  system: "navigation.workspaces.system",
+};
+
+const compactSectionTranslationKeys = {
+  live: "navigation.contextSections.operations",
+  moderation: "navigation.contextSections.management",
+  "game-operations": "navigation.contextSections.gameOperations",
+  automation: "navigation.contextSections.rules",
+  analytics: "navigation.contextSections.analysis",
 };
 
 const connectionStateColors = {
@@ -61,61 +70,6 @@ const getCurrentLinkId = (pathname, workspaces) =>
     .filter((link) => doesNavigationRouteMatch(pathname, link.to))
     .sort((left, right) => right.to.length - left.to.length)[0]?.to ?? null;
 
-function StatusSquare({ color }) {
-  return (
-    <Box
-      aria-hidden
-      component="span"
-      sx={{
-        width: 7,
-        height: 7,
-        flexShrink: 0,
-        bgcolor: color,
-        border: "1px solid",
-        borderColor: "background.default",
-      }}
-    />
-  );
-}
-
-function ServerDock({ connectionHealth, t }) {
-  const gameServerState =
-    connectionHealth?.gameServer?.state ?? CONNECTION_STATE.UNKNOWN;
-  const crconState = connectionHealth?.crcon?.state ?? CONNECTION_STATE.UNKNOWN;
-
-  return (
-    <Stack spacing={0.75}>
-      <Typography
-        variant="caption"
-        sx={{ color: "primary.light", textTransform: "uppercase" }}
-      >
-        {t("sidebar.server")}
-      </Typography>
-      <SelectContent />
-      <Stack
-        direction="row"
-        divider={
-          <Box
-            aria-hidden
-            sx={{ width: "1px", alignSelf: "stretch", bgcolor: "divider" }}
-          />
-        }
-        spacing={1}
-        sx={{ color: "text.secondary" }}
-      >
-        <Stack direction="row" alignItems="center" spacing={0.75}>
-          <StatusSquare color={connectionStateColors[gameServerState]} />
-          <Typography variant="caption">{t("sidebar.gameServer")}</Typography>
-        </Stack>
-        <Stack direction="row" alignItems="center" spacing={0.75}>
-          <StatusSquare color={connectionStateColors[crconState]} />
-          <Typography variant="caption">CRCON</Typography>
-        </Stack>
-      </Stack>
-    </Stack>
-  );
-}
-
 export default function CommandNavigationShell() {
   const { t } = useTranslation();
   const { permissions } = useAuth();
@@ -124,11 +78,10 @@ export default function CommandNavigationShell() {
   const openPanel = useAppStore((state) => state.openDrawer);
   const setPanelOpen = useAppStore((state) => state.setDrawerOpen);
   const connectionHealth = useGlobalStore((state) => state.connectionHealth);
+  const serverState = useGlobalStore((state) => state.serverState);
   const persistent = useMediaQuery(PERSISTENT_NAVIGATION_MEDIA);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(null);
-  const [searchValue, setSearchValue] = useState("");
   const [healthAnchor, setHealthAnchor] = useState(null);
-  const searchInputRef = useRef(null);
   const lastWorkspaceTriggerRef = useRef(null);
 
   const workspaces = useMemo(
@@ -150,10 +103,7 @@ export default function CommandNavigationShell() {
     if (!routeWorkspaceId) return;
 
     setSelectedWorkspaceId(routeWorkspaceId);
-    if (routeWorkspaceDirectRoute) {
-      setPanelOpen(false);
-      setSearchValue("");
-    }
+    if (routeWorkspaceDirectRoute) setPanelOpen(false);
   }, [routeWorkspaceDirectRoute, routeWorkspaceId, setPanelOpen]);
 
   const effectiveWorkspaceId = selectedWorkspaceId || routeWorkspaceId;
@@ -161,35 +111,6 @@ export default function CommandNavigationShell() {
     workspaces.find((workspace) => workspace.id === effectiveWorkspaceId) ??
     workspaces[0] ??
     null;
-
-  const keyHintLabel = useMemo(() => {
-    if (typeof navigator === "undefined") return "Ctrl+K";
-    const platform = navigator.userAgentData?.platform || navigator.platform;
-    return /mac|iphone|ipad|ipod/i.test(platform) ? "⌘K" : "Ctrl+K";
-  }, []);
-
-  const focusSearch = () => {
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => searchInputRef.current?.focus());
-    });
-  };
-
-  useEffect(() => {
-    const handleShortcut = (event) => {
-      if (!window.matchMedia(DESKTOP_NAVIGATION_MEDIA).matches) return;
-      const key = String(event.key || "").toLowerCase();
-      const isApple = keyHintLabel === "⌘K";
-      if (key !== "k" || (isApple ? !event.metaKey : !event.ctrlKey)) return;
-
-      event.preventDefault();
-      setPanelOpen(true);
-      focusSearch();
-    };
-
-    window.addEventListener("keydown", handleShortcut, { capture: true });
-    return () =>
-      window.removeEventListener("keydown", handleShortcut, { capture: true });
-  }, [keyHintLabel, setPanelOpen]);
 
   const railWorkspaces = workspaces.map((workspace) => ({
     id: workspace.id,
@@ -203,30 +124,25 @@ export default function CommandNavigationShell() {
       : openPanel && workspace.id === effectiveWorkspaceId,
   }));
 
-  const mapWorkspaceItems = (workspace) =>
-    workspace.links.map((link) => ({
+  const selectedWorkspaceSections = selectedWorkspace?.sections ?? [];
+  const sections = selectedWorkspaceSections.map((section) => ({
+    id: section.id,
+    label:
+      selectedWorkspaceSections.length === 1 &&
+      compactSectionTranslationKeys[selectedWorkspace.id]
+        ? t(compactSectionTranslationKeys[selectedWorkspace.id])
+        : section.labelTranslationKey
+        ? t(section.labelTranslationKey)
+        : undefined,
+    items: section.links.map((link) => ({
       id: link.to,
       href: link.to,
       label: getTranslatedLinkLabel(link, t),
       icon: link.icon,
       locked: link.locked,
       lockedReason: link.locked ? t("navigation.permissionMissing") : undefined,
-    }));
-
-  const sections = searchValue.trim()
-    ? workspaces.map((workspace) => ({
-        id: workspace.id,
-        label: t(workspace.labelTranslationKey),
-        items: mapWorkspaceItems(workspace),
-      }))
-    : selectedWorkspace
-    ? [
-        {
-          id: selectedWorkspace.id,
-          items: mapWorkspaceItems(selectedWorkspace),
-        },
-      ]
-    : [];
+    })),
+  }));
 
   const currentLinkId = getCurrentLinkId(location.pathname, workspaces);
 
@@ -237,22 +153,18 @@ export default function CommandNavigationShell() {
     if (workspace?.directRoute) {
       navigate(workspace.directRoute);
       setSelectedWorkspaceId(workspaceId);
-      setSearchValue("");
       setPanelOpen(false);
       return;
     }
 
     const isSameWorkspace = workspaceId === effectiveWorkspaceId;
-
     setSelectedWorkspaceId(workspaceId);
-    setSearchValue("");
     setPanelOpen(isSameWorkspace && openPanel ? false : true);
   };
 
   const handleItemSelect = (_itemId, item) => {
     if (!item?.href || item.locked) return;
     navigate(item.href);
-    setSearchValue("");
     if (!persistent) setPanelOpen(false);
   };
 
@@ -269,6 +181,13 @@ export default function CommandNavigationShell() {
   const gameServerState =
     connectionHealth?.gameServer?.state ?? CONNECTION_STATE.UNKNOWN;
   const crconState = connectionHealth?.crcon?.state ?? CONNECTION_STATE.UNKNOWN;
+  const gameLabel = getGameLabel(normalizeGame(serverState?.game));
+  const serverContext = [
+    t("sidebar.serverNumber", { number: serverState?.server_number ?? "–" }),
+    gameLabel,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <Box
@@ -301,6 +220,7 @@ export default function CommandNavigationShell() {
         activeWorkspaceId={effectiveWorkspaceId}
         currentWorkspaceId={routeWorkspaceId}
         onWorkspaceChange={handleWorkspaceChange}
+        topSlot={<ServerRailSwitcher />}
         utilityItems={[
           {
             id: "health",
@@ -348,30 +268,35 @@ export default function CommandNavigationShell() {
           <ContextNavigationPanel
             id={PANEL_ID}
             presentation={persistent ? "persistent" : "overlay"}
-            workspaceLabel={t(selectedWorkspace.labelTranslationKey)}
+            workspaceLabel={t(
+              workspaceTitleTranslationKeys[selectedWorkspace.id] ||
+                selectedWorkspace.labelTranslationKey
+            )}
             workspaceCode={workspaceCodes[selectedWorkspace.id]}
+            workspaceDescription={serverContext}
             sections={sections}
             activeItemId={currentLinkId}
             onItemSelect={handleItemSelect}
             ariaLabel={t("navigation.primary")}
-            searchValue={searchValue}
-            onSearchChange={setSearchValue}
-            searchPlaceholder={t("navigation.search")}
             emptyMessage={t("navigation.noResults")}
-            searchHint={keyHintLabel}
-            searchInputRef={searchInputRef}
+            statusItems={[
+              {
+                id: "system",
+                label: `${t("navigation.panelStatus.system")} ${t(
+                  `connectionStates.${crconState}`
+                )}`,
+                color: connectionStateColors[crconState],
+              },
+              {
+                id: "data",
+                label: `${t("navigation.panelStatus.data")} ${t(
+                  `connectionStates.${gameServerState}`
+                )}`,
+              },
+            ]}
             onKeyDown={(event) => {
               if (event.key === "Escape" && !persistent) closeOverlayPanel();
             }}
-            topSlot={<FrontlineBrand textOnly />}
-            headerSlot={
-              <ServerDock connectionHealth={connectionHealth} t={t} />
-            }
-            footerSlot={
-              <List dense disablePadding sx={{ color: "text.secondary" }}>
-                <AboutDialog />
-              </List>
-            }
           />
         </Box>
       )}

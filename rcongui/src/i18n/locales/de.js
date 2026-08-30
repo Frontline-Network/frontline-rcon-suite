@@ -4645,6 +4645,17 @@ const de = {
       integrations: "Integrationen",
       system: "System",
     },
+    contextSections: {
+      operations: "Betrieb",
+      management: "Verwaltung",
+      gameOperations: "Spielbetrieb",
+      rules: "Regeln",
+      analysis: "Auswertung",
+    },
+    panelStatus: {
+      system: "System",
+      data: "Daten",
+    },
     navigateTo: "Navigieren zu",
     permissionMissing: "Diese Seite ist sichtbar, aber dir fehlt die erforderliche Berechtigung.",
     groups: {
@@ -4755,6 +4766,8 @@ const de = {
       disabled: "Diese CRCON-Verbindung ist deaktiviert.",
     },
     selectServer: "Server auswählen",
+    switchServer: "Server wechseln",
+    currentServer: "Aktuell",
     serverNumber: "Server {{number}}",
     changePassword: "Passwort ändern",
     logout: "Abmelden",

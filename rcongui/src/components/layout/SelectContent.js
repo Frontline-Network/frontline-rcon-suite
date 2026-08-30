@@ -10,25 +10,12 @@ import DevicesRoundedIcon from "@mui/icons-material/DevicesRounded";
 import { useGlobalStore } from "@/stores/global-state";
 import { useTranslation } from "react-i18next";
 import { getGameLabel, normalizeGame } from "@/utils/game-context";
+import {
+  buildServerOptions,
+  getServerHref,
+} from "./navigation/server-switching.mjs";
 
-export function getServerHref(selectedServer, currentHref = window.location.href) {
-  const currentUrl = new URL(currentHref);
-  let targetUrl;
-
-  if (selectedServer.link) {
-    targetUrl = new URL(selectedServer.link);
-  } else {
-    const regex = /:(\d+)/gm;
-    targetUrl = new URL(
-      currentUrl.href.replace(regex, `:${selectedServer.port}`)
-    );
-  }
-
-  targetUrl.pathname = currentUrl.pathname;
-  targetUrl.search = currentUrl.search;
-  targetUrl.hash = currentUrl.hash;
-  return targetUrl.href;
-}
+export { getServerHref } from "./navigation/server-switching.mjs";
 
 const Avatar = styled(MuiAvatar)(({ theme }) => ({
   width: 28,
@@ -64,7 +51,9 @@ export default function SelectContent() {
     switchToServer(selectedServer);
   };
 
-  const servers = thisServer ? [thisServer, ...otherServers] : null;
+  const servers = thisServer
+    ? buildServerOptions(thisServer, otherServers)
+    : null;
 
   return (
     <Select
@@ -125,9 +114,9 @@ export default function SelectContent() {
                   whiteSpace: "nowrap",
                 }}
                 primary={server.name ?? "<server_name>"}
-                secondary={
-                  t("sidebar.serverNumber", { number: server.server_number })
-                }
+                secondary={t("sidebar.serverNumber", {
+                  number: server.server_number,
+                })}
               />
               {gameLabel ? (
                 <Chip

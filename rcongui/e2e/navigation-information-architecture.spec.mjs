@@ -162,6 +162,34 @@ test.describe("permission-aware navigation", () => {
     ).toHaveAttribute("href", "/views/live");
   });
 
+  test("renders the compact mission index without legacy search or server card", async ({
+    page,
+  }) => {
+    await openDemoPage(page, "/");
+
+    const rail = page.getByTestId("desktop-command-rail");
+    await expect(page.getByTestId("desktop-navigation-panel")).toHaveCount(0);
+    await rail.getByRole("button", { name: "Live" }).click();
+    const navigation = page.getByTestId("desktop-navigation-panel");
+
+    await expect(
+      navigation.getByRole("heading", { name: "Live-Betrieb" })
+    ).toBeVisible();
+    await expect(
+      navigation.getByText("Betrieb", { exact: true })
+    ).toBeVisible();
+    await expect(navigation.getByText(/Server 2 · HLL/)).toBeVisible();
+    await expect(
+      navigation.getByRole("link", { name: "Live-Ansicht" })
+    ).toHaveCSS("border-radius", "0px");
+    await expect(
+      navigation.getByPlaceholder("Navigation durchsuchen …")
+    ).toHaveCount(0);
+    await expect(
+      navigation.getByRole("combobox", { name: "Server auswählen" })
+    ).toHaveCount(0);
+  });
+
   test("shows map changes under maps and game operations", async ({ page }) => {
     await openDemoPage(page, "/");
 

@@ -12,6 +12,34 @@ const getWorkspaceLinks = (definition, navigationGroups) =>
     (groupId) => navigationGroups.get(groupId)?.links ?? []
   );
 
+const getWorkspaceSections = (
+  definition,
+  navigationGroups,
+  permissions,
+  includeLocked
+) =>
+  definition.groupIds
+    .map((groupId) => {
+      const group = navigationGroups.get(groupId);
+      const links = (group?.links ?? [])
+        .map((link) => {
+          const isAccessible = canAccessNavLink(link, permissions);
+          return {
+            ...link,
+            isAccessible,
+            locked: !isAccessible,
+          };
+        })
+        .filter((link) => includeLocked || link.isAccessible);
+
+      return {
+        id: groupId,
+        labelTranslationKey: group?.translationKey,
+        links,
+      };
+    })
+    .filter((section) => section.links.length > 0);
+
 const getWorkspaceIcon = (definition, navigationGroups) => {
   const iconSource = navigationGroups.get(definition.iconSourceGroupId);
   return iconSource?.icon ?? iconSource?.links?.[0]?.icon ?? null;
@@ -59,22 +87,20 @@ export const buildCommandRailWorkspaces = ({
 
   return commandRailWorkspaceDefinitions
     .map((definition) => {
-      const links = getWorkspaceLinks(definition, navigationGroups)
-        .map((link) => {
-          const isAccessible = canAccessNavLink(link, permissions);
-          return {
-            ...link,
-            isAccessible,
-            locked: !isAccessible,
-          };
-        })
-        .filter((link) => includeLocked || link.isAccessible);
+      const sections = getWorkspaceSections(
+        definition,
+        navigationGroups,
+        permissions,
+        includeLocked
+      );
+      const links = sections.flatMap((section) => section.links);
 
       return {
         id: definition.id,
         labelTranslationKey: definition.labelTranslationKey,
         icon: getWorkspaceIcon(definition, navigationGroups),
         links,
+        sections,
         directRoute: definition.directRoute ?? null,
         defaultRoute: links[0]?.to ?? null,
         isActive: definition.id === activeWorkspaceId,

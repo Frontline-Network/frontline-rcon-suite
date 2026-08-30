@@ -121,6 +121,47 @@ final result: passed
 
 ---
 
+# Design QA: Desktop-Navigation – Präzisionsindex mit Theme-Verlauf
+
+## Prüfgrundlage
+
+- Gewählte visuelle Richtung: verfeinerte Option 1 „Präzisionsindex“.
+- Source visual truth: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-84d33f44-fabe-4685-87f9-264aa3be6c94.png`.
+- Farb- und Oberflächenreferenz: der bestehende themeabhängige Verlauf der produktiven Navigation.
+- Implementierte Route und Zustand: `http://127.0.0.1:3005/`, Arbeitsbereich „Live“ geöffnet, Serverauswahl geschlossen.
+- Finale Browseraufnahme: `.tmp/nav-audit/07-final-square-navigation.png`.
+- Gemeinsamer Gesamtvergleich: `.tmp/nav-audit/08-design-qa-final-comparison.png`.
+- Fokusvergleich der Navigation: `.tmp/nav-audit/08-design-qa-final-navigation-crop.png`.
+- Source und Umsetzung wurden bei 1586 × 992 px und Geräteskalierung 1 verglichen.
+
+## Ergebnis
+
+- Das dauerhafte 64-px-Kommando-Rail und der kompakte 244-px-Präzisionsindex ersetzen die frühere breite Navigationsleiste.
+- Die Navigationssuche, die doppelte Serverkarte, die zusätzliche Markenwiederholung und der Versionsblock wurden aus dem Desktop-Kontextpanel entfernt.
+- Der Serverwechsel sitzt als dauerhaft erreichbares `S2`-Kommando direkt unter dem Logo. Die Auswahl erhält echte Links, Servernummer, Spielkennung und einen textlich ergänzten Status.
+- Der vom Nutzer gewünschte bestehende Theme-Verlauf bleibt auf Rail und Kontextpanel erhalten und reagiert weiterhin auf das gewählte Farbschema.
+- Navigationseinträge, aktive Zustände, Server-Schalter, Server-Menüeinträge, Popover und Tooltips verwenden konsequent 0 px Radius. Computed-Style-Prüfung: Kontextnavigation `0px`, Rail `0px`, Server-Schalter `0px`, Server-Menü `0px`.
+- Der Bereichstitel, die Abschnittsüberschriften, feinen Trenner und die kompakte Statuszeile folgen der eckigen Frontline-Designlinie.
+
+## Verhalten und Accessibility
+
+- Arbeitsbereiche lassen sich weiterhin über das Rail öffnen und schließen; Ziele bleiben semantische Links.
+- Der Serverwechsler öffnet per Tastatur, schließt mit `Escape` und gibt den Fokus an den Auslöser zurück.
+- Status wird zusätzlich zu Farbe durch zugängliche Namen und Textlabels vermittelt.
+- Bei 1024 px bleibt die Navigation ohne horizontalen Dokument-Overflow (`scrollWidth === viewportWidth`) als Overlay bedienbar.
+- Die mobile Navigation bleibt unverändert und verwendet weiterhin den bestehenden mobilen Drawer.
+
+## Technische Verifikation
+
+- Produktionsbuild erfolgreich; nur die bereits bekannte Warnung für große Chunks bleibt bestehen.
+- Pfad-, Query- und Hash-Erhalt beim Serverwechsel sowie Sortierung/Deduplizierung der Serveroptionen wurden geprüft.
+- Browserinteraktionen für Arbeitsbereich, Servermenü und `Escape` ohne sichtbares Fehler-Overlay geprüft.
+- Keine offenen P0-, P1- oder P2-Befunde.
+
+final result: passed
+
+---
+
 # Design QA: Frontline Command Rail, Option 1
 
 ## Prüfgrundlage

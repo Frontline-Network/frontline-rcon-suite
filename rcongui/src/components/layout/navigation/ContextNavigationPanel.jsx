@@ -1,27 +1,21 @@
-import { createElement, isValidElement, useState } from "react";
+import { createElement, isValidElement } from "react";
 import {
   Box,
-  InputAdornment,
   List,
   ListItem,
   ListItemButton,
   ListItemIcon,
   ListItemText,
   Stack,
-  TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
-import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import { alpha } from "@mui/material/styles";
 import { NavLink } from "react-router-dom";
-import {
-  getContextNavigationSurface,
-  getNavigationControlSurface,
-} from "./navigation-surfaces";
+import { getContextNavigationSurface } from "./navigation-surfaces";
 
-export const CONTEXT_NAVIGATION_PANEL_WIDTH = 276;
+export const CONTEXT_NAVIGATION_PANEL_WIDTH = 244;
 
 const renderIcon = (icon) => {
   if (!icon) return null;
@@ -53,21 +47,23 @@ function ContextNavigationItem({ item, active, onSelect }) {
       }}
       sx={(theme) => ({
         position: "relative",
-        minHeight: 42,
-        px: 1.5,
-        py: 0.75,
-        borderRadius: 0,
-        borderLeft: "3px solid",
+        minHeight: 46,
+        px: 1.25,
+        py: 0.5,
+        borderRadius: "0 !important",
+        borderLeft: "2px solid",
         borderLeftColor: active ? "primary.main" : "transparent",
+        borderBottom: "1px solid",
+        borderBottomColor: "divider",
         color: active ? "primary.light" : "text.secondary",
         bgcolor: active
-          ? alpha(theme.palette.primary.main, 0.13)
+          ? alpha(theme.palette.primary.main, 0.11)
           : "transparent",
         cursor: locked ? "not-allowed" : "pointer",
         "&:hover": {
           color: active ? "primary.light" : "text.primary",
           bgcolor: active
-            ? alpha(theme.palette.primary.main, 0.17)
+            ? alpha(theme.palette.primary.main, 0.15)
             : "action.hover",
         },
         "&:focus-visible": {
@@ -78,7 +74,13 @@ function ContextNavigationItem({ item, active, onSelect }) {
       })}
     >
       {item.icon && (
-        <ListItemIcon sx={{ minWidth: 32, color: "inherit" }}>
+        <ListItemIcon
+          sx={{
+            minWidth: 38,
+            color: "inherit",
+            "& svg": { width: 18, height: 18 },
+          }}
+        >
           {renderIcon(item.icon)}
         </ListItemIcon>
       )}
@@ -87,7 +89,7 @@ function ContextNavigationItem({ item, active, onSelect }) {
         secondary={item.description}
         primaryTypographyProps={{
           fontSize: 13,
-          fontWeight: active ? 700 : 500,
+          fontWeight: active ? 700 : 400,
           lineHeight: 1.25,
         }}
         secondaryTypographyProps={{
@@ -123,7 +125,12 @@ function ContextNavigationItem({ item, active, onSelect }) {
   return (
     <ListItem disablePadding>
       {locked ? (
-        <Tooltip title={item.lockedReason || ""} placement="right" arrow>
+        <Tooltip
+          title={item.lockedReason || ""}
+          placement="right"
+          arrow
+          slotProps={{ tooltip: { sx: { borderRadius: 0 } } }}
+        >
           {button}
         </Tooltip>
       ) : (
@@ -133,11 +140,6 @@ function ContextNavigationItem({ item, active, onSelect }) {
   );
 }
 
-/**
- * Route-agnostic second navigation level for the active workspace. Sections
- * and item ids are supplied by the caller so permissions and routing remain
- * outside this visual component.
- */
 export default function ContextNavigationPanel({
   workspaceLabel,
   workspaceCode,
@@ -147,37 +149,15 @@ export default function ContextNavigationPanel({
   onItemSelect,
   ariaLabel,
   width = CONTEXT_NAVIGATION_PANEL_WIDTH,
-  searchValue,
-  defaultSearchValue = "",
-  onSearchChange,
-  searchPlaceholder = "Navigation durchsuchen …",
   emptyMessage = "No matching pages found.",
-  searchHint,
-  searchInputRef,
-  showSearch = true,
-  topSlot,
-  headerSlot,
-  footerSlot,
+  statusItems = [],
   id = "desktop-navigation-panel",
   presentation = "persistent",
   onKeyDown,
 }) {
-  const [internalSearchValue, setInternalSearchValue] =
-    useState(defaultSearchValue);
-  const resolvedSearchValue = searchValue ?? internalSearchValue;
-  const normalizedQuery = resolvedSearchValue.trim().toLocaleLowerCase();
-  const visibleSections = sections
-    .map((section) => ({
-      ...section,
-      items: normalizedQuery
-        ? section.items.filter((item) =>
-            `${item.label} ${item.description || ""}`
-              .toLocaleLowerCase()
-              .includes(normalizedQuery)
-          )
-        : section.items,
-    }))
-    .filter((section) => section.items.length > 0);
+  const visibleSections = sections.filter(
+    (section) => section.items.length > 0
+  );
 
   return (
     <Box
@@ -196,116 +176,58 @@ export default function ContextNavigationPanel({
       })}
     >
       <Stack sx={{ height: "100%", minHeight: 0 }}>
-        {topSlot && (
-          <Box
-            sx={{
-              flexShrink: 0,
-              borderBottom: "1px solid",
-              borderColor: "divider",
-            }}
-          >
-            {topSlot}
-          </Box>
-        )}
         <Box
           sx={{
-            px: 2,
-            pt: 2,
-            pb: 1.5,
+            px: 1.75,
+            pt: 1.75,
+            pb: 1.35,
             borderBottom: "1px solid",
             borderColor: "divider",
           }}
         >
-          <Stack direction="row" alignItems="baseline" spacing={1}>
-            {workspaceCode && (
-              <Typography
-                variant="caption"
-                sx={{ color: "primary.main", letterSpacing: "0.16em" }}
-              >
-                {workspaceCode}
-              </Typography>
-            )}
+          {workspaceCode && (
             <Typography
-              component="h2"
+              variant="caption"
               sx={{
-                minWidth: 0,
-                color: "text.primary",
-                fontFamily:
-                  '"Bahnschrift Condensed", "Arial Narrow", Bahnschrift, sans-serif',
-                fontSize: 18,
-                fontWeight: 800,
-                lineHeight: 1.1,
-                letterSpacing: "0.06em",
-                textTransform: "uppercase",
+                display: "block",
+                mb: 0.4,
+                color: "primary.main",
+                letterSpacing: "0.16em",
               }}
             >
-              {workspaceLabel}
+              {workspaceCode}
             </Typography>
-          </Stack>
+          )}
+          <Typography
+            component="h2"
+            sx={{
+              minWidth: 0,
+              color: "text.primary",
+              fontFamily:
+                '"Bahnschrift Condensed", "Arial Narrow", Bahnschrift, sans-serif',
+              fontSize: 19,
+              fontWeight: 800,
+              lineHeight: 1.05,
+              letterSpacing: "0.045em",
+              textTransform: "uppercase",
+            }}
+          >
+            {workspaceLabel}
+          </Typography>
           {workspaceDescription && (
             <Typography
               variant="caption"
-              sx={{ display: "block", mt: 0.75, color: "text.secondary" }}
+              sx={{
+                display: "block",
+                mt: 0.75,
+                color: "text.secondary",
+                letterSpacing: "0.04em",
+              }}
             >
               {workspaceDescription}
             </Typography>
           )}
-          {headerSlot && <Box sx={{ mt: 1.25 }}>{headerSlot}</Box>}
         </Box>
-
-        {showSearch && (
-          <Box sx={{ px: 1.25, pt: 1.25 }}>
-            <TextField
-              value={resolvedSearchValue}
-              onChange={(event) => {
-                if (searchValue === undefined) {
-                  setInternalSearchValue(event.target.value);
-                }
-                onSearchChange?.(event.target.value);
-              }}
-              placeholder={searchPlaceholder}
-              inputProps={{ "aria-label": searchPlaceholder }}
-              inputRef={searchInputRef}
-              size="small"
-              fullWidth
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchRoundedIcon sx={{ fontSize: 18 }} />
-                    </InputAdornment>
-                  ),
-                  endAdornment: searchHint ? (
-                    <InputAdornment position="end">
-                      <Typography
-                        component="kbd"
-                        variant="caption"
-                        sx={{
-                          px: 0.6,
-                          py: 0.25,
-                          border: "1px solid",
-                          borderColor: "divider",
-                          color: "text.secondary",
-                          fontFamily: "monospace",
-                          lineHeight: 1,
-                        }}
-                      >
-                        {searchHint}
-                      </Typography>
-                    </InputAdornment>
-                  ) : null,
-                },
-              }}
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  minHeight: 40,
-                  borderRadius: 0,
-                  bgcolor: getNavigationControlSurface,
-                },
-              }}
-            />
-          </Box>
-        )}
 
         <Box
           component="nav"
@@ -314,29 +236,33 @@ export default function ContextNavigationPanel({
             flex: 1,
             minHeight: 0,
             overflowY: "auto",
-            px: 1,
-            py: 1.25,
+            px: 1.25,
+            py: 1.5,
             scrollbarColor: "rgba(197, 154, 74, 0.3) transparent",
             scrollbarWidth: "thin",
           }}
         >
           {visibleSections.map((section, sectionIndex) => (
-            <Box key={section.id} sx={{ mt: sectionIndex === 0 ? 0 : 2 }}>
+            <Box key={section.id} sx={{ mt: sectionIndex === 0 ? 0 : 2.25 }}>
               {section.label && (
                 <Typography
                   variant="caption"
                   sx={{
                     display: "block",
-                    px: 1.5,
-                    pb: 0.65,
+                    px: 0.75,
+                    pb: 0.7,
                     color: "primary.light",
+                    letterSpacing: "0.12em",
                     textTransform: "uppercase",
                   }}
                 >
                   {section.label}
                 </Typography>
               )}
-              <List disablePadding>
+              <List
+                disablePadding
+                sx={{ borderTop: "1px solid", borderColor: "divider" }}
+              >
                 {section.items.map((item) => (
                   <ContextNavigationItem
                     key={item.id}
@@ -359,16 +285,59 @@ export default function ContextNavigationPanel({
           )}
         </Box>
 
-        {footerSlot && (
+        {statusItems.length > 0 && (
           <Box
             sx={{
               flexShrink: 0,
-              p: 1.25,
+              px: 1.75,
+              py: 1.1,
               borderTop: "1px solid",
               borderColor: "divider",
             }}
           >
-            {footerSlot}
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={0.75}
+              divider={
+                <Typography
+                  aria-hidden
+                  variant="caption"
+                  sx={{ color: "text.disabled" }}
+                >
+                  ·
+                </Typography>
+              }
+            >
+              {statusItems.map((item) => (
+                <Stack
+                  key={item.id}
+                  direction="row"
+                  alignItems="center"
+                  spacing={0.5}
+                >
+                  {item.color && (
+                    <Box
+                      aria-hidden
+                      component="span"
+                      sx={{ width: 6, height: 6, bgcolor: item.color }}
+                    />
+                  )}
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: "text.secondary",
+                      fontSize: 9,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {item.label}
+                  </Typography>
+                </Stack>
+              ))}
+            </Stack>
           </Box>
         )}
       </Stack>

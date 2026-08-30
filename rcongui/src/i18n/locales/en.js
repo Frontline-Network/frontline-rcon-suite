@@ -4599,6 +4599,17 @@ const en = {
       integrations: "Integrations",
       system: "System",
     },
+    contextSections: {
+      operations: "Operations",
+      management: "Management",
+      gameOperations: "Game operations",
+      rules: "Rules",
+      analysis: "Analysis",
+    },
+    panelStatus: {
+      system: "System",
+      data: "Data",
+    },
     navigateTo: "Navigate to",
     permissionMissing: "This page is visible, but you do not have the required permission.",
     groups: {
@@ -4709,6 +4720,8 @@ const en = {
       disabled: "This CRCON connection is disabled.",
     },
     selectServer: "Select server",
+    switchServer: "Switch server",
+    currentServer: "Current",
     serverNumber: "Server {{number}}",
     changePassword: "Change password",
     logout: "Log out",

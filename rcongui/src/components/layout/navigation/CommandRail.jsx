@@ -33,7 +33,7 @@ function RailAction({ item, active, current, onActivate }) {
         width: 48,
         height: 44,
         minWidth: 44,
-        borderRadius: 0,
+        borderRadius: "0 !important",
         border: "1px solid transparent",
         color: active ? "primary.light" : "text.secondary",
         bgcolor: active ? "action.selected" : "transparent",
@@ -93,7 +93,13 @@ function RailAction({ item, active, current, onActivate }) {
   );
 
   return (
-    <Tooltip title={item.label} placement="right" arrow enterDelay={450}>
+    <Tooltip
+      title={item.label}
+      placement="right"
+      arrow
+      enterDelay={450}
+      slotProps={{ tooltip: { sx: { borderRadius: 0 } } }}
+    >
       <span>{button}</span>
     </Tooltip>
   );
@@ -131,7 +137,12 @@ export default function CommandRail({
       })}
     >
       <Stack sx={{ height: "100%", alignItems: "center" }}>
-        <Tooltip title={brandLabel} placement="right" arrow>
+        <Tooltip
+          title={brandLabel}
+          placement="right"
+          arrow
+          slotProps={{ tooltip: { sx: { borderRadius: 0 } } }}
+        >
           <Box
             sx={{
               width: "100%",
@@ -194,6 +205,7 @@ export default function CommandRail({
                   title={status.label}
                   placement="right"
                   arrow
+                  slotProps={{ tooltip: { sx: { borderRadius: 0 } } }}
                 >
                   <Box
                     component="span"
