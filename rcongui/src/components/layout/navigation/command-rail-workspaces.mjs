@@ -18,6 +18,7 @@ export const commandRailWorkspaceDefinitions = Object.freeze(
       labelTranslationKey: "navigation.workspaces.home",
       groupIds: ["root"],
       iconSourceGroupId: "root",
+      directRoute: "/",
     },
     {
       id: "live",

@@ -16,6 +16,13 @@ const navigationSource = readFileSync(
 );
 
 test.describe("command rail workspace contract", () => {
+  test("marks the overview workspace as a direct destination", () => {
+    expect(commandRailWorkspaceDefinitions[0]).toMatchObject({
+      id: "home",
+      directRoute: "/",
+    });
+  });
+
   test("groups every existing navigation group exactly once", () => {
     const taskGroupsSource = navigationSource.slice(
       navigationSource.indexOf("const taskGroupDefinitions"),

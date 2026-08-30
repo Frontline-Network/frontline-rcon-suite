@@ -141,14 +141,20 @@ export default function CommandNavigationShell() {
     [location.pathname, permissions]
   );
 
-  const routeWorkspaceId =
-    workspaces.find((workspace) => workspace.isActive)?.id ??
-    workspaces[0]?.id ??
-    null;
+  const routeWorkspace =
+    workspaces.find((workspace) => workspace.isActive) ?? workspaces[0] ?? null;
+  const routeWorkspaceId = routeWorkspace?.id ?? null;
+  const routeWorkspaceDirectRoute = routeWorkspace?.directRoute ?? null;
 
   useEffect(() => {
-    if (routeWorkspaceId) setSelectedWorkspaceId(routeWorkspaceId);
-  }, [routeWorkspaceId]);
+    if (!routeWorkspaceId) return;
+
+    setSelectedWorkspaceId(routeWorkspaceId);
+    if (routeWorkspaceDirectRoute) {
+      setPanelOpen(false);
+      setSearchValue("");
+    }
+  }, [routeWorkspaceDirectRoute, routeWorkspaceId, setPanelOpen]);
 
   const effectiveWorkspaceId = selectedWorkspaceId || routeWorkspaceId;
   const selectedWorkspace =
@@ -191,8 +197,10 @@ export default function CommandNavigationShell() {
     label: t(workspace.labelTranslationKey),
     ariaLabel: t(workspace.labelTranslationKey),
     icon: workspace.icon,
-    ariaControls: PANEL_ID,
-    expanded: openPanel && workspace.id === effectiveWorkspaceId,
+    ariaControls: workspace.directRoute ? undefined : PANEL_ID,
+    expanded: workspace.directRoute
+      ? undefined
+      : openPanel && workspace.id === effectiveWorkspaceId,
   }));
 
   const mapWorkspaceItems = (workspace) =>
@@ -224,6 +232,16 @@ export default function CommandNavigationShell() {
 
   const handleWorkspaceChange = (workspaceId, event) => {
     lastWorkspaceTriggerRef.current = event?.currentTarget ?? null;
+    const workspace = workspaces.find((entry) => entry.id === workspaceId);
+
+    if (workspace?.directRoute) {
+      navigate(workspace.directRoute);
+      setSelectedWorkspaceId(workspaceId);
+      setSearchValue("");
+      setPanelOpen(false);
+      return;
+    }
+
     const isSameWorkspace = workspaceId === effectiveWorkspaceId;
 
     setSelectedWorkspaceId(workspaceId);

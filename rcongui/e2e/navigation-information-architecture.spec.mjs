@@ -110,6 +110,22 @@ test.describe("task-oriented navigation contract", () => {
 test.describe("permission-aware navigation", () => {
   test.use({ viewport: VIEWPORTS.desktop });
 
+  test("opens the overview directly without a secondary navigation panel", async ({
+    page,
+  }) => {
+    await openDemoPage(page, "/views/live");
+
+    const overview = page
+      .getByTestId("desktop-command-rail")
+      .getByRole("button", { name: "Übersicht" });
+    await overview.click();
+
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByTestId("desktop-navigation-panel")).toHaveCount(0);
+    await expect(overview).toHaveAttribute("aria-current", "page");
+    await expect(overview).not.toHaveAttribute("aria-controls");
+  });
+
   test("keeps a protected destination discoverable and explains why a viewer cannot open it", async ({
     page,
   }) => {
@@ -186,6 +202,23 @@ test.describe("permission-aware navigation", () => {
 test.describe("task-oriented mobile navigation", () => {
   test.use({ viewport: VIEWPORTS.mobile });
 
+  test("omits the desktop-only overview from mobile navigation", async ({
+    page,
+  }) => {
+    await openDemoPage(page, "/views/live");
+    await page.getByRole("button", { name: "Navigation öffnen" }).click();
+
+    const navigation = page.getByRole("navigation", {
+      name: "Hauptnavigation",
+    });
+    await expect(
+      navigation.getByRole("button", { name: "Übersicht", exact: true })
+    ).toHaveCount(0);
+    await expect(
+      navigation.getByRole("link", { name: "Übersicht", exact: true })
+    ).toHaveCount(0);
+  });
+
   test("keeps the task groups usable in the full-width drawer", async ({
     page,
   }) => {
@@ -206,8 +239,11 @@ test.describe("task-oriented mobile navigation", () => {
     ).toBeVisible();
 
     await navigation.getByRole("button", { name: "Spielbetrieb" }).click();
-    await expect(
-      navigation.getByRole("link", { name: "Karte wechseln" })
-    ).toBeVisible();
+    const changeMap = navigation.getByRole("link", {
+      name: "Karte wechseln",
+    });
+    await expect(changeMap).toBeVisible();
+    await changeMap.click();
+    await expect(page).toHaveURL(/\/settings\/maps\/change$/);
   });
 });

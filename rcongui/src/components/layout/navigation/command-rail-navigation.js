@@ -75,6 +75,7 @@ export const buildCommandRailWorkspaces = ({
         labelTranslationKey: definition.labelTranslationKey,
         icon: getWorkspaceIcon(definition, navigationGroups),
         links,
+        directRoute: definition.directRoute ?? null,
         defaultRoute: links[0]?.to ?? null,
         isActive: definition.id === activeWorkspaceId,
       };

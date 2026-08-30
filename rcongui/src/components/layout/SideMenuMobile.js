@@ -70,13 +70,15 @@ function AdminSideMenuMobile({ open, toggleDrawer }) {
     pathname: location.pathname,
     permissions,
     includeLocked: true,
-  }).map((workspace) => ({
-    id: workspace.id,
-    name: workspace.id,
-    translationKey: workspace.labelTranslationKey,
-    icon: workspace.icon,
-    links: workspace.links,
-  }));
+  })
+    .filter((workspace) => !workspace.directRoute)
+    .map((workspace) => ({
+      id: workspace.id,
+      name: workspace.id,
+      translationKey: workspace.labelTranslationKey,
+      icon: workspace.icon,
+      links: workspace.links,
+    }));
 
   return (
     <MobileDrawer open={open} toggleDrawer={toggleDrawer}>
