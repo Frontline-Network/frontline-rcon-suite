@@ -61,6 +61,7 @@ const AppNavbarBase = ({ toggleDrawer, open, isSmallScreen }) => {
           <MenuButton
             aria-label={t("navigation.openMenu")}
             onClick={toggleDrawer}
+            sx={{ borderRadius: "0 !important" }}
           >
             <MenuRoundedIcon />
           </MenuButton>

@@ -230,48 +230,49 @@ test.describe("permission-aware navigation", () => {
 test.describe("task-oriented mobile navigation", () => {
   test.use({ viewport: VIEWPORTS.mobile });
 
-  test("omits the desktop-only overview from mobile navigation", async ({
-    page,
-  }) => {
+  test("uses the same compact workspace index on mobile", async ({ page }) => {
     await openDemoPage(page, "/views/live");
     await page.getByRole("button", { name: "Navigation öffnen" }).click();
 
-    const navigation = page.getByRole("navigation", {
-      name: "Hauptnavigation",
-    });
+    const navigation = page.getByTestId("mobile-command-navigation");
+    await expect(navigation).toBeVisible();
+    await expect(navigation.getByTestId("server-rail-switcher")).toBeVisible();
     await expect(
-      navigation.getByRole("button", { name: "Übersicht", exact: true })
+      navigation.getByPlaceholder("Navigation durchsuchen …")
     ).toHaveCount(0);
     await expect(
-      navigation.getByRole("link", { name: "Übersicht", exact: true })
-    ).toHaveCount(0);
+      navigation.getByRole("heading", { name: "Live-Betrieb" })
+    ).toBeVisible();
+    await expect(
+      navigation.getByRole("link", { name: "Live-Ansicht" })
+    ).toHaveCSS("border-radius", "0px");
   });
 
-  test("keeps the task groups usable in the full-width drawer", async ({
+  test("switches workspaces and closes after mobile navigation", async ({
     page,
   }) => {
     await openDemoPage(page, "/");
     await page.getByRole("button", { name: "Navigation öffnen" }).click();
 
-    const navigation = page.getByRole("navigation", {
-      name: "Hauptnavigation",
-    });
-    const playersGroup = navigation.getByRole("button", {
+    const navigation = page.getByTestId("mobile-command-navigation");
+    const moderation = navigation.getByRole("button", {
       name: "Moderation",
+      exact: true,
     });
-    await expect(playersGroup).toBeVisible();
-    await expect(playersGroup).toHaveCSS("min-height", "44px");
-    await playersGroup.click();
+    await moderation.click();
     await expect(
       navigation.getByRole("link", { name: "Spieler" })
     ).toBeVisible();
 
-    await navigation.getByRole("button", { name: "Spielbetrieb" }).click();
+    await navigation
+      .getByRole("button", { name: "Spielbetrieb", exact: true })
+      .click();
     const changeMap = navigation.getByRole("link", {
       name: "Karte wechseln",
     });
     await expect(changeMap).toBeVisible();
     await changeMap.click();
     await expect(page).toHaveURL(/\/settings\/maps\/change$/);
+    await expect(page.getByTestId("mobile-command-navigation")).toHaveCount(0);
   });
 });

@@ -14,7 +14,10 @@ const languages = [
   { code: "en", key: "language.en" },
 ];
 
-export default function LanguageSelector({ touchSafe = false }) {
+export default function LanguageSelector({
+  touchSafe = false,
+  square = false,
+}) {
   const { i18n, t } = useTranslation();
   const [anchorEl, setAnchorEl] = useState(null);
   const language = i18n.resolvedLanguage || "de";
@@ -32,7 +35,10 @@ export default function LanguageSelector({ touchSafe = false }) {
           size="small"
           aria-label={t("language.label")}
           onClick={(event) => setAnchorEl(event.currentTarget)}
-          sx={touchSafe ? { minWidth: 45, minHeight: 45 } : undefined}
+          sx={{
+            ...(touchSafe ? { minWidth: 45, minHeight: 45 } : {}),
+            ...(square ? { borderRadius: "0 !important" } : {}),
+          }}
         >
           <TranslateRoundedIcon />
         </IconButton>

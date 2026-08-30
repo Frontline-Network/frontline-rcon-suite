@@ -154,6 +154,8 @@ export default function ContextNavigationPanel({
   id = "desktop-navigation-panel",
   presentation = "persistent",
   onKeyDown,
+  headerAction,
+  height = "100dvh",
 }) {
   const visibleSections = sections.filter(
     (section) => section.items.length > 0
@@ -169,7 +171,7 @@ export default function ContextNavigationPanel({
       sx={(theme) => ({
         width,
         minWidth: width,
-        height: "100dvh",
+        height,
         ...getContextNavigationSurface(theme),
         borderRight: "1px solid",
         borderColor: "divider",
@@ -178,7 +180,9 @@ export default function ContextNavigationPanel({
       <Stack sx={{ height: "100%", minHeight: 0 }}>
         <Box
           sx={{
+            position: "relative",
             px: 1.75,
+            pr: headerAction ? 7 : 1.75,
             pt: 1.75,
             pb: 1.35,
             borderBottom: "1px solid",
@@ -226,6 +230,11 @@ export default function ContextNavigationPanel({
             >
               {workspaceDescription}
             </Typography>
+          )}
+          {headerAction && (
+            <Box sx={{ position: "absolute", top: 8, right: 8 }}>
+              {headerAction}
+            </Box>
           )}
         </Box>
 

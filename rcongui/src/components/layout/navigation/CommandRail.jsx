@@ -122,6 +122,7 @@ export default function CommandRail({
   ariaLabel = "Arbeitsbereiche",
   topSlot,
   bottomSlot,
+  height = "100dvh",
 }) {
   return (
     <Box
@@ -130,7 +131,7 @@ export default function CommandRail({
       sx={(theme) => ({
         width: COMMAND_RAIL_WIDTH,
         minWidth: COMMAND_RAIL_WIDTH,
-        height: "100dvh",
+        height,
         ...getCommandRailSurface(theme),
         borderRight: "1px solid",
         borderColor: "divider",

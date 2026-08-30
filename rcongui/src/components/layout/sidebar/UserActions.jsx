@@ -59,6 +59,7 @@ export const UserActions = ({ compact = false }) => {
           <Tooltip
             title={`${userLabel} · ${t("common.actions")}`}
             placement={compact ? "right" : "top"}
+            slotProps={{ tooltip: { sx: { borderRadius: 0 } } }}
           >
             <IconButton
               {...triggerProps}

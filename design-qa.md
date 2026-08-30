@@ -149,13 +149,50 @@ final result: passed
 - Der Serverwechsler öffnet per Tastatur, schließt mit `Escape` und gibt den Fokus an den Auslöser zurück.
 - Status wird zusätzlich zu Farbe durch zugängliche Namen und Textlabels vermittelt.
 - Bei 1024 px bleibt die Navigation ohne horizontalen Dokument-Overflow (`scrollWidth === viewportWidth`) als Overlay bedienbar.
-- Die mobile Navigation bleibt unverändert und verwendet weiterhin den bestehenden mobilen Drawer.
+- Die mobile Navigation wurde im nachfolgenden QA-Schritt auf dieselbe Rail-/Präzisionsindex-Logik umgestellt.
 
 ## Technische Verifikation
 
 - Produktionsbuild erfolgreich; nur die bereits bekannte Warnung für große Chunks bleibt bestehen.
 - Pfad-, Query- und Hash-Erhalt beim Serverwechsel sowie Sortierung/Deduplizierung der Serveroptionen wurden geprüft.
 - Browserinteraktionen für Arbeitsbereich, Servermenü und `Escape` ohne sichtbares Fehler-Overlay geprüft.
+- Keine offenen P0-, P1- oder P2-Befunde.
+
+final result: passed
+
+---
+
+# Design QA: Mobile Navigation – Präzisionsindex
+
+## Prüfgrundlage
+
+- Responsive Designziel: die gewählte Desktop-Richtung „Präzisionsindex“, übertragen auf einen vollflächigen mobilen Drawer.
+- Ausgangszustand: `.tmp/nav-mobile-audit/02-current-mobile-drawer.png`.
+- Finale Browseraufnahme bei 390 × 844 px: `.tmp/nav-mobile-audit/03-new-mobile-navigation.png`.
+- Gemeinsamer Vorher-/Nachher-Vergleich: `.tmp/nav-mobile-audit/04-mobile-before-after.png`.
+- Zusätzlich geprüft: 320 × 700 px, Arbeitsbereich „Spielbetrieb“ und geöffnete Serverauswahl.
+
+## Ergebnis
+
+- Die alte mobile Akkordeon-Navigation wurde durch dasselbe 64-px-Kommando-Rail und einen kontextabhängigen Präzisionsindex wie am Desktop ersetzt.
+- Navigationssuche, breite Serverkarte, CPU-/RAM-/SSD-Block und Versionszeile entfallen aus dem mobilen Hauptfluss.
+- Der Serverwechsel sitzt als eckiges `S2`-Kommando direkt unter dem Logo; das Servermenü bleibt selbst bei 320 px innerhalb des Viewports.
+- Arbeitsbereiche wechseln ohne Seitenreload. Ein Navigationsziel schließt den Drawer nach dem Routenwechsel automatisch.
+- Sprache und Benutzeraktionen bleiben im unteren Rail erreichbar. Alle Navigations-, Server-, Sprach- und Schließen-Schaltflächen folgen der eckigen 0-px-Radius-Designlinie.
+- Der vorhandene themeabhängige Verlauf bleibt auf Rail und Kontextpanel erhalten.
+
+## Responsivität und Accessibility
+
+- 390 × 844 px: Rail 64 px, Kontextpanel 326 px, kein horizontaler Dokument-Overflow.
+- 320 × 700 px: Rail 64 px, Kontextpanel 256 px, Servermenü 248 px breit und vollständig sichtbar.
+- Zugängliche Namen für Arbeitsbereiche, Serverauswahl, Sprache, Benutzeraktionen und Schließen sind vorhanden.
+- Touch-Ziele sind mindestens 44 px hoch beziehungsweise breit; aktive Navigation wird zusätzlich durch Linie, Fläche und `aria-current` vermittelt.
+- Die Kerninteraktion Moderation → Spieler sowie Spielbetrieb → Karte wechseln wurde im lokalen In-App-Browser geprüft.
+
+## Technische Verifikation
+
+- Vite-Produktionsbuild erfolgreich; nur die bereits bekannte Chunk-Größenwarnung bleibt bestehen.
+- `git diff --check` ohne Fehler.
 - Keine offenen P0-, P1- oder P2-Befunde.
 
 final result: passed

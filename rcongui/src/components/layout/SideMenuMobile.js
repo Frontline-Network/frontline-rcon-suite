@@ -1,23 +1,9 @@
-import Divider from "@mui/material/Divider";
 import Drawer, { drawerClasses } from "@mui/material/Drawer";
-import Stack from "@mui/material/Stack";
-import MenuContent from "./MenuContent";
-import SelectContent from "./SelectContent";
-import { Box, IconButton, List } from "@mui/material";
-import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
-import ConnectionStatus from "./sidebar/ConnectionStatus";
-import AboutDialog from "./sidebar/About";
-import { UserActions } from "./sidebar/UserActions";
-import SystemUsage from "./sidebar/SystemUsage";
-import FrontlineBrand from "./FrontlineBrand";
-import LanguageSelector from "./LanguageSelector";
 import { useTranslation } from "react-i18next";
-import { useLocation } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
-import { buildCommandRailWorkspaces } from "./navigation/command-rail-navigation";
 import { getContextNavigationSurface } from "./navigation/navigation-surfaces";
+import MobileCommandNavigation from "./navigation/MobileCommandNavigation";
 
-const MobileDrawer = ({ open, toggleDrawer, children }) => {
+const MobileDrawer = ({ open, toggleDrawer }) => {
   const { t } = useTranslation();
 
   return (
@@ -27,15 +13,17 @@ const MobileDrawer = ({ open, toggleDrawer, children }) => {
       onClose={toggleDrawer}
       PaperProps={{
         id: "mobile-primary-navigation",
-        component: "nav",
+        component: "aside",
         "aria-label": t("navigation.primary"),
       }}
       sx={(theme) => ({
         zIndex: theme.zIndex.drawer + 1,
         [`& .${drawerClasses.paper}`]: {
           ...getContextNavigationSurface(theme),
-          minWidth: 240,
-          width: { xs: "100%", sm: "auto" },
+          width: "100vw",
+          maxWidth: "100vw",
+          overflow: "hidden",
+          borderRadius: "0 !important",
           pt: "env(safe-area-inset-top)",
           pb: "env(safe-area-inset-bottom)",
           pl: "env(safe-area-inset-left)",
@@ -43,73 +31,13 @@ const MobileDrawer = ({ open, toggleDrawer, children }) => {
         },
       })}
     >
-      <Stack sx={{ height: "100%" }}>
-        <IconButton
-          aria-label={t("common.close")}
-          onClick={toggleDrawer}
-          sx={{
-            alignSelf: "flex-end",
-            display: { xs: "inline-flex", sm: "none" },
-            minHeight: 44,
-            minWidth: 44,
-            mr: 0.5,
-          }}
-        >
-          <CloseRoundedIcon />
-        </IconButton>
-        {children}
-      </Stack>
+      <MobileCommandNavigation open={open} onClose={toggleDrawer} />
     </Drawer>
   );
 };
 
 function AdminSideMenuMobile({ open, toggleDrawer }) {
-  const { permissions } = useAuth();
-  const location = useLocation();
-  const mobileNavigationTree = buildCommandRailWorkspaces({
-    pathname: location.pathname,
-    permissions,
-    includeLocked: true,
-  })
-    .filter((workspace) => !workspace.directRoute)
-    .map((workspace) => ({
-      id: workspace.id,
-      name: workspace.id,
-      translationKey: workspace.labelTranslationKey,
-      icon: workspace.icon,
-      links: workspace.links,
-    }));
-
-  return (
-    <MobileDrawer open={open} toggleDrawer={toggleDrawer}>
-      <FrontlineBrand />
-      <Box sx={{ px: 1.5, pb: 1 }}>
-        <SelectContent />
-      </Box>
-      <Divider />
-      <MenuContent
-        navigationTree={mobileNavigationTree}
-        isMobile={true}
-        onNavigate={toggleDrawer}
-      />
-      <Divider />
-      <List
-        dense
-        sx={{ color: (theme) => theme.palette.text.secondary, px: 1.25 }}
-      >
-        <ConnectionStatus />
-        <SystemUsage />
-      </List>
-      <List dense sx={{ color: (theme) => theme.palette.text.secondary }}>
-        <AboutDialog />
-      </List>
-      <Stack direction="row" sx={{ gap: 1, px: 1.5, py: 0.5 }}>
-        <LanguageSelector touchSafe />
-      </Stack>
-      <Divider />
-      <UserActions />
-    </MobileDrawer>
-  );
+  return <MobileDrawer open={open} toggleDrawer={toggleDrawer} />;
 }
 
 export default AdminSideMenuMobile;

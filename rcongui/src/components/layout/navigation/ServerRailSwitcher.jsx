@@ -140,8 +140,9 @@ export default function ServerRailSwitcher() {
         slotProps={{
           paper: {
             sx: {
-              width: 310,
-              ml: 1,
+              width: { xs: "calc(100vw - 72px)", sm: 310 },
+              maxWidth: 310,
+              ml: { xs: 0, sm: 1 },
               borderRadius: "0 !important",
               border: "1px solid",
               borderColor: "divider",
