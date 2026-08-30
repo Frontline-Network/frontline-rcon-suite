@@ -3562,6 +3562,304 @@ const en = {
           },
         },
       },
+      rconConnection: {
+        eyebrow: "System & diagnostics",
+        title: "Game-server connection",
+        intro:
+          "Manage the RCON connection pool and optional performance diagnostics through a focused form.",
+        sections: {
+          connections: {
+            title: "Connection pool",
+            description: "Set the number of parallel RCON connections",
+          },
+          telemetry: {
+            title: "Performance diagnostics",
+            description: "Measurement and interval for RCON calls",
+          },
+          advanced: {
+            title: "Additional settings",
+            description: "Additional fields supplied by the server",
+          },
+        },
+        fields: {
+          thread_pool_size: {
+            label: "Parallel RCON connections",
+            help: "Controls how many RCON requests may be processed at once. Higher values also increase game-server load.",
+          },
+          performance_statistics_enabled: {
+            label: "Collect RCON performance statistics",
+            help: "Records RCON call timings for targeted troubleshooting. This diagnostic can stay disabled during normal operation.",
+          },
+          performance_statistics_interval_seconds: {
+            label: "Measurement interval in seconds",
+            help: "Sets the time window used to aggregate performance measurements.",
+          },
+        },
+      },
+      crconRuntime: {
+        eyebrow: "System & diagnostics",
+        title: "CRCON settings",
+        intro:
+          "Manage instance identity, access, refresh rates, and platform-specific rules in one place.",
+        sections: {
+          identity: {
+            title: "Identity & links",
+            description: "Name and public destinations for this instance",
+          },
+          access: {
+            title: "Access & distribution",
+            description: "API access and cross-instance unbans",
+          },
+          refresh: {
+            title: "Refresh rates",
+            description: "Intervals for live and current-game data",
+          },
+          windowsStore: {
+            title: "Windows Store players",
+            description: "Detection and response for Windows Store IDs",
+          },
+          messages: {
+            title: "Message framing",
+            description: "Shared header and footer for player messages",
+          },
+          advanced: {
+            title: "Additional settings",
+            description: "Additional fields supplied by the server",
+          },
+        },
+        fields: {
+          short_name: {
+            label: "Instance short name",
+            help: "A compact name used to identify this CRCON instance in overviews and notifications.",
+          },
+          server_url: {
+            label: "Public CRCON address",
+            help: "The complete URL administrators use to reach this instance.",
+          },
+          discord_invite_url: {
+            label: "Discord invitation link",
+            help: "Optional invitation link that may be shown to players and administrators.",
+          },
+          lock_stats_api: {
+            label: "Protect the statistics API",
+            help: "Restricts statistics endpoints to signed-in users with the required permission.",
+          },
+          broadcast_unbans: {
+            label: "Send unbans to connected instances",
+            help: "Distributes revoked bans to CRCON instances configured to receive them.",
+          },
+          live_stats_refresh_seconds: {
+            label: "Refresh live statistics",
+            help: "Interval in seconds for the general live-statistics refresh.",
+          },
+          live_stats_refresh_current_game_seconds: {
+            label: "Refresh current game",
+            help: "Interval in seconds for current-game statistics. Very low values increase server load.",
+          },
+          windows_store_players: {
+            label: "Windows Store player rule",
+            help: "Configures detection, action, and messages for players using a Windows Store ID.",
+          },
+          message_enhancements: {
+            label: "Message framing",
+            help: "Optionally adds a shared header and footer to supported player messages.",
+          },
+          enabled: {
+            label: "Enable",
+            help: "Turns this part of the configuration on or off.",
+          },
+          action: {
+            label: "Action",
+            help: "Action taken when a Windows Store player is detected.",
+          },
+          player_message: {
+            label: "Player message",
+            help: "Message sent to the affected player.",
+          },
+          audit_message: {
+            label: "Audit message",
+            help: "Text written to the administrative event log.",
+          },
+          audit_message_author: {
+            label: "Audit message author",
+            help: "Name shown as the author of the audit message.",
+          },
+          temp_ban_length_hours: {
+            label: "Temporary ban length in hours",
+            help: "Duration used when a temporary ban is selected as the action.",
+          },
+          message_header: {
+            label: "Message header",
+            help: "Optional text prepended to supported player messages.",
+          },
+          message_footer: {
+            label: "Message footer",
+            help: "Optional text appended to supported player messages.",
+          },
+        },
+      },
+      steamApi: {
+        eyebrow: "System & diagnostics",
+        title: "Steam API",
+        intro:
+          "Store the Steam Web API key used for player profiles and VAC or game-ban checks.",
+        sections: {
+          credentials: {
+            title: "Credentials",
+            description: "Connect the Steam Web API securely to CRCON",
+          },
+          advanced: {
+            title: "Additional settings",
+            description: "Additional fields supplied by the server",
+          },
+        },
+        fields: {
+          api_key: {
+            label: "Steam Web API key",
+            help: "Required for Steam profile data and VAC or game-ban queries. Do not share it publicly.",
+          },
+        },
+      },
+      logStream: {
+        eyebrow: "System & diagnostics",
+        title: "Log stream",
+        intro:
+          "Configure the temporary game-event buffer used by live views and integrations. Error and system logs are unaffected.",
+        sections: {
+          capacity: {
+            title: "Buffer & startup",
+            description: "Capacity and history loaded when the stream starts",
+          },
+          refresh: {
+            title: "Refresh",
+            description: "Polling interval and time overlap",
+          },
+          advanced: {
+            title: "Additional settings",
+            description: "Additional fields supplied by the server",
+          },
+        },
+        fields: {
+          stream_size: {
+            label: "Maximum buffered events",
+            help: "Limits how many game events are retained by the live stream.",
+          },
+          startup_since_mins: {
+            label: "Startup lookback in minutes",
+            help: "Loads events from this previous period when the stream starts.",
+          },
+          refresh_frequency_sec: {
+            label: "Polling interval in seconds",
+            help: "Time between refreshes. Shorter intervals react faster but create more load.",
+          },
+          refresh_since_mins: {
+            label: "Overlap per poll in minutes",
+            help: "Re-reads this period on each refresh so delayed events are not missed.",
+          },
+        },
+      },
+      watchKillrate: {
+        eyebrow: "System & diagnostics",
+        title: "Monitor kill rate",
+        intro:
+          "Detect unusual kill rates with separate thresholds for infantry, armor, artillery, and machine guns.",
+        sections: {
+          timing: {
+            title: "Timing",
+            description: "Start delay, checks, and report cooldown",
+          },
+          thresholds: {
+            title: "Thresholds",
+            description: "Minimum kills and kill rates by play style",
+          },
+          exceptions: {
+            title: "Exceptions",
+            description: "Exclude repeats, flags, and player roles",
+          },
+          notifications: {
+            title: "Notifications",
+            description: "Configure the author and Discord destinations",
+          },
+          advanced: {
+            title: "Additional settings",
+            description: "Additional fields supplied by the server",
+          },
+        },
+        fields: {
+          match_start_cooldown_secs: {
+            label: "Delay after match start in seconds",
+            help: "Waits this long before kill-rate checks begin.",
+          },
+          watch_interval_secs: {
+            label: "Check interval in seconds",
+            help: "Time between automatic checks.",
+          },
+          report_cooldown_mins: {
+            label: "Report cooldown in minutes",
+            help: "Minimum time between two reports about the same suspicious activity.",
+          },
+          min_kills: {
+            label: "Minimum kills",
+            help: "A player's kill rate is evaluated only after reaching this number of kills.",
+          },
+          killrate_threshold: {
+            label: "Infantry kill-rate threshold",
+            help: "General threshold for players not assigned to a special category.",
+          },
+          killrate_threshold_armor: {
+            label: "Armor kill-rate threshold",
+            help: "Separate threshold for tank crews.",
+          },
+          killrate_threshold_artillery: {
+            label: "Artillery kill-rate threshold",
+            help: "Separate threshold for artillery players.",
+          },
+          killrate_threshold_mg: {
+            label: "Machine-gun kill-rate threshold",
+            help: "Separate threshold for machine gunners.",
+          },
+          only_report_once_per_match: {
+            label: "Report only once per match",
+            help: "Prevents repeated reports about the same player during one match.",
+          },
+          whitelist_flags: {
+            label: "Excluded player flags",
+            help: "Players with at least one of these flags are not reported.",
+          },
+          ignore_armor: {
+            label: "Ignore tank crews",
+            help: "Excludes players identified as tank crew from checks entirely.",
+          },
+          ignore_artillery: {
+            label: "Ignore artillery players",
+            help: "Excludes players identified as artillery from checks entirely.",
+          },
+          ignore_mg: {
+            label: "Ignore machine gunners",
+            help: "Excludes machine gunners from checks entirely.",
+          },
+          author: {
+            label: "Author name",
+            help: "Name shown in the Discord notification.",
+          },
+          webhooks: {
+            label: "Discord webhooks",
+            help: "Destinations and optional user or role mentions for kill-rate reports.",
+          },
+          url: {
+            label: "Webhook URL",
+            help: "Discord webhook that receives the report.",
+          },
+          user_mentions: {
+            label: "Mention users",
+            help: "Discord user IDs mentioned in a report.",
+          },
+          role_mentions: {
+            label: "Mention roles",
+            help: "Discord role IDs mentioned in a report.",
+          },
+        },
+      },
       expiredVip: {
         eyebrow: "VIP management",
         title: "Clean up expired VIPs",

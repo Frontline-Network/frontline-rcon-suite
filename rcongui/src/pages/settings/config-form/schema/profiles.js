@@ -362,6 +362,87 @@ const nameKickProfile = {
 };
 
 const configFormProfiles = {
+  rcon_connection_settings_config: schemaProfile(
+    "rconConnection",
+    [
+      ["connections", ["thread_pool_size"]],
+      [
+        "telemetry",
+        [
+          "performance_statistics_enabled",
+          "performance_statistics_interval_seconds",
+        ],
+      ],
+    ],
+    ["connections", "telemetry"]
+  ),
+  rcon_server_settings_config: schemaProfile(
+    "crconRuntime",
+    [
+      ["identity", ["short_name", "server_url", "discord_invite_url"]],
+      ["access", ["lock_stats_api", "broadcast_unbans"]],
+      [
+        "refresh",
+        [
+          "live_stats_refresh_seconds",
+          "live_stats_refresh_current_game_seconds",
+        ],
+      ],
+      ["windowsStore", ["windows_store_players"]],
+      ["messages", ["message_enhancements"]],
+    ],
+    ["identity", "access", "refresh", "windowsStore"]
+  ),
+  steam_config: schemaProfile(
+    "steamApi",
+    [["credentials", ["api_key"]]],
+    ["credentials"]
+  ),
+  log_stream_config: schemaProfile(
+    "logStream",
+    [
+      ["capacity", ["stream_size", "startup_since_mins"]],
+      ["refresh", ["refresh_frequency_sec", "refresh_since_mins"]],
+    ],
+    ["capacity", "refresh"],
+    { operationMode: "toggle" }
+  ),
+  watch_killrate_config: schemaProfile(
+    "watchKillrate",
+    [
+      [
+        "timing",
+        [
+          "match_start_cooldown_secs",
+          "watch_interval_secs",
+          "report_cooldown_mins",
+        ],
+      ],
+      [
+        "thresholds",
+        [
+          "min_kills",
+          "killrate_threshold",
+          "killrate_threshold_armor",
+          "killrate_threshold_artillery",
+          "killrate_threshold_mg",
+        ],
+      ],
+      [
+        "exceptions",
+        [
+          "only_report_once_per_match",
+          "whitelist_flags",
+          "ignore_armor",
+          "ignore_artillery",
+          "ignore_mg",
+        ],
+      ],
+      ["notifications", ["author", "webhooks"]],
+    ],
+    ["timing", "thresholds", "exceptions", "notifications"],
+    { operationMode: "toggle" }
+  ),
   auto_mod_no_leader_config: noLeaderProfile,
   auto_mod_level_config: schemaProfile(
     "level",

@@ -12,6 +12,14 @@ import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
+import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
+import DnsOutlinedIcon from "@mui/icons-material/DnsOutlined";
+import KeyOutlinedIcon from "@mui/icons-material/KeyOutlined";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import QueryStatsOutlinedIcon from "@mui/icons-material/QueryStatsOutlined";
+import SpeedOutlinedIcon from "@mui/icons-material/SpeedOutlined";
+import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
+import SyncOutlinedIcon from "@mui/icons-material/SyncOutlined";
 
 const sectionIcons = {
   operation: DashboardOutlinedIcon,
@@ -28,6 +36,17 @@ const sectionIcons = {
   messages: CampaignOutlinedIcon,
   schedule: ScheduleOutlinedIcon,
   notifications: NotificationsNoneOutlinedIcon,
+  connections: DnsOutlinedIcon,
+  telemetry: QueryStatsOutlinedIcon,
+  identity: BadgeOutlinedIcon,
+  access: LockOutlinedIcon,
+  refresh: SyncOutlinedIcon,
+  windowsStore: RuleOutlinedIcon,
+  credentials: KeyOutlinedIcon,
+  capacity: StorageOutlinedIcon,
+  timing: ScheduleOutlinedIcon,
+  thresholds: SpeedOutlinedIcon,
+  exceptions: ShieldOutlinedIcon,
 };
 
 const getSectionLabel = (section) =>
