@@ -1,9 +1,9 @@
 import { generatePlayerActions } from "@/features/player-action/actions";
 import {
+  Box,
   Card,
   CardContent,
   Stack,
-  Divider,
   Typography,
   Checkbox,
 } from "@mui/material";
@@ -15,6 +15,82 @@ import ProfileActions from "@/components/player/profile/Actions";
 import { useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import LinkedAccounts from "@/components/player/profile/LinkedAccounts";
+
+const ActivityMetric = ({ label, value, title }) => (
+  <Box
+    sx={{
+      minWidth: 0,
+      px: 1,
+      py: 0.875,
+      "&:not(:last-of-type)": {
+        borderRight: (theme) => `1px solid ${theme.palette.divider}`,
+      },
+    }}
+  >
+    <Typography
+      variant="caption"
+      color="text.secondary"
+      sx={{
+        display: "block",
+        mb: 0.25,
+        fontSize: "0.65rem",
+        letterSpacing: "0.06em",
+        lineHeight: 1.25,
+        textTransform: "uppercase",
+      }}
+    >
+      {label}
+    </Typography>
+    <Typography
+      variant="body2"
+      color="text.primary"
+      title={title ?? value}
+      sx={{
+        display: "-webkit-box",
+        minHeight: "2.4em",
+        overflow: "hidden",
+        fontSize: "0.75rem",
+        fontWeight: 500,
+        lineHeight: 1.2,
+        WebkitBoxOrient: "vertical",
+        WebkitLineClamp: 2,
+      }}
+    >
+      {value}
+    </Typography>
+  </Box>
+);
+
+const PenaltyMetric = ({ label, value, severe = false }) => (
+  <Box
+    sx={{
+      minWidth: 0,
+      px: 0.875,
+      py: 0.75,
+      "&:not(:last-of-type)": {
+        borderRight: (theme) => `1px solid ${theme.palette.divider}`,
+      },
+    }}
+  >
+    <Typography
+      variant="caption"
+      color="text.secondary"
+      noWrap
+      sx={{ display: "block", fontSize: "0.625rem", lineHeight: 1.2 }}
+    >
+      {label}
+    </Typography>
+    <Typography
+      variant="body2"
+      color={
+        value > 0 ? (severe ? "error.main" : "warning.main") : "text.disabled"
+      }
+      sx={{ mt: 0.25, fontWeight: 600, lineHeight: 1.2 }}
+    >
+      {value}
+    </Typography>
+  </Box>
+);
 
 export default function PlayerCard({
   player: playerProfile,
@@ -78,12 +154,41 @@ export default function PlayerCard({
   return (
     <Card
       sx={{
+        position: "relative",
         minWidth: 0,
         height: "100%",
-        borderColor: (theme) => (selected ? theme.palette.primary.main : ""),
+        overflow: "hidden",
+        borderColor: (theme) =>
+          selected ? theme.palette.primary.main : theme.palette.divider,
+        bgcolor: "background.paper",
+        boxShadow: "none",
+        transition: (theme) =>
+          theme.transitions.create(["border-color", "background-color"], {
+            duration: theme.transitions.duration.shortest,
+          }),
+        "&::before": {
+          content: '""',
+          position: "absolute",
+          inset: "0 auto 0 0",
+          width: 3,
+          bgcolor: selected ? "primary.main" : "transparent",
+        },
+        "&:hover": {
+          borderColor: (theme) => theme.palette.primary.dark,
+          bgcolor: "action.hover",
+        },
       }}
     >
-      <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
+      <CardContent
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 1,
+          height: "100%",
+          p: 1.5,
+          "&:last-child": { pb: 1.5 },
+        }}
+      >
         <PlayerProfileHeader
           player={playerProfile}
           isOnline={playerProfile.is_online}
@@ -96,85 +201,80 @@ export default function PlayerCard({
           clanTag={clanTag}
         />
         <LinkedAccounts identity={playerProfile.identity} compact />
-        <ActionList playerProfile={playerProfile} />
-        <FlagList player={playerProfile} />
+
         <Stack
           direction="row"
-          alignItems={"center"}
-          justifyContent={"space-between"}
-          spacing={2}
-          sx={{ p: 1 }}
+          alignItems="center"
+          justifyContent="space-between"
+          flexWrap="wrap"
+          gap={0.5}
+          sx={{
+            minHeight: 36,
+            mx: -1.5,
+            px: 1.5,
+            py: 0.375,
+            borderTop: (theme) => `1px solid ${theme.palette.divider}`,
+            borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+            bgcolor: "action.hover",
+          }}
         >
-          <div>
-            <Typography variant="body2" color="text.secondary">
-              {t("records.players.created")}
-            </Typography>
-            <Typography
-              variant="caption"
-              fontWeight={500}
-              color="text.secondary"
-            >
-              {firstSeen}
-            </Typography>
-          </div>
-          <div>
-            <Typography variant="body2" color="text.secondary">
-              {t("records.players.totalPlaytime")}
-            </Typography>
-            <Typography
-              variant="caption"
-              fontWeight={500}
-              color="text.secondary"
-            >
-              {totalPlaytime} {t("records.players.hours")}
-            </Typography>
-          </div>
-          <div>
-            <Typography variant="body2" color="text.secondary">
-              {t("records.players.lastSeen")}
-            </Typography>
-            <Typography
-              variant="caption"
-              fontWeight={500}
-              color="text.secondary"
-            >
-              {lastSeen}
-            </Typography>
-          </div>
+          <ActionList playerProfile={playerProfile} />
+          <FlagList player={playerProfile} />
         </Stack>
-        <Divider sx={{ my: 0 }} />
-        <Stack
-          direction="row"
-          alignItems={"center"}
-          justifyContent={"space-between"}
-          spacing={2}
-          sx={{ p: 1 }}
+
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            border: (theme) => `1px solid ${theme.palette.divider}`,
+          }}
         >
-          <Typography variant="caption" color="text.secondary">
-            {t("actions.types.PUNISH")}:{" "}
-            <Typography variant="caption" color="text.primary">
-              {penalties?.PUNISH ?? 0}
-            </Typography>
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {t("actions.types.KICK")}:{" "}
-            <Typography variant="caption" color="text.primary">
-              {penalties?.KICK ?? 0}
-            </Typography>
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {t("actions.types.TEMPBAN")}:{" "}
-            <Typography variant="caption" color="text.primary">
-              {penalties?.TEMPBAN ?? 0}
-            </Typography>
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {t("actions.types.PERMABAN")}:{" "}
-            <Typography variant="caption" color="text.primary">
-              {penalties?.PERMABAN ?? 0}
-            </Typography>
-          </Typography>
-        </Stack>
+          <ActivityMetric
+            label={t("records.players.created")}
+            value={firstSeen}
+          />
+          <ActivityMetric
+            label={t("records.players.totalPlaytime")}
+            value={`${totalPlaytime} ${t("records.players.hours")}`}
+          />
+          <ActivityMetric
+            label={t("records.players.lastSeen")}
+            value={lastSeen}
+          />
+        </Box>
+
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+            mt: "auto",
+            border: (theme) => `1px solid ${theme.palette.divider}`,
+            bgcolor: "background.default",
+            "& > :nth-of-type(-n + 2)": {
+              borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+            },
+            "& > :nth-of-type(2)": { borderRight: 0 },
+          }}
+        >
+          <PenaltyMetric
+            label={t("actions.types.PUNISH")}
+            value={penalties?.PUNISH ?? 0}
+          />
+          <PenaltyMetric
+            label={t("actions.types.KICK")}
+            value={penalties?.KICK ?? 0}
+          />
+          <PenaltyMetric
+            label={t("actions.types.TEMPBAN")}
+            value={penalties?.TEMPBAN ?? 0}
+            severe
+          />
+          <PenaltyMetric
+            label={t("actions.types.PERMABAN")}
+            value={penalties?.PERMABAN ?? 0}
+            severe
+          />
+        </Box>
       </CardContent>
     </Card>
   );
