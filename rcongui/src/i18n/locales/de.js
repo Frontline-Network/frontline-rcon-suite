@@ -3607,6 +3607,304 @@ const de = {
           },
         },
       },
+      rconConnection: {
+        eyebrow: "System & Diagnose",
+        title: "Gameserver-Verbindung",
+        intro:
+          "Steuere den RCON-Verbindungspool und die optionale Leistungsdiagnose über ein übersichtliches Formular.",
+        sections: {
+          connections: {
+            title: "Verbindungspool",
+            description: "Parallele RCON-Verbindungen festlegen",
+          },
+          telemetry: {
+            title: "Leistungsdiagnose",
+            description: "Messung und Intervall für RCON-Aufrufe",
+          },
+          advanced: {
+            title: "Weitere Einstellungen",
+            description: "Zusätzliche vom Server bereitgestellte Felder",
+          },
+        },
+        fields: {
+          thread_pool_size: {
+            label: "Parallele RCON-Verbindungen",
+            help: "Bestimmt, wie viele RCON-Anfragen gleichzeitig verarbeitet werden können. Höhere Werte erhöhen auch die Last auf dem Gameserver.",
+          },
+          performance_statistics_enabled: {
+            label: "RCON-Leistungsstatistiken erfassen",
+            help: "Erfasst Laufzeiten der RCON-Aufrufe für die gezielte Fehlersuche. Im Normalbetrieb kann diese Diagnose deaktiviert bleiben.",
+          },
+          performance_statistics_interval_seconds: {
+            label: "Messintervall in Sekunden",
+            help: "Legt fest, in welchem Zeitfenster die Leistungswerte zusammengefasst werden.",
+          },
+        },
+      },
+      crconRuntime: {
+        eyebrow: "System & Diagnose",
+        title: "CRCON-Einstellungen",
+        intro:
+          "Verwalte Instanzidentität, Zugriff, Aktualisierungsraten und plattformspezifische Regeln an einem Ort.",
+        sections: {
+          identity: {
+            title: "Identität & Links",
+            description: "Name und öffentliche Ziele dieser Instanz",
+          },
+          access: {
+            title: "Zugriff & Weitergabe",
+            description: "API-Zugriff und instanzübergreifende Entsperrungen",
+          },
+          refresh: {
+            title: "Aktualisierungsraten",
+            description: "Intervalle für Live- und Spieldaten",
+          },
+          windowsStore: {
+            title: "Windows-Store-Spieler",
+            description: "Erkennung und Reaktion für Windows-Store-IDs",
+          },
+          messages: {
+            title: "Nachrichtenrahmen",
+            description: "Einheitlicher Kopf- und Fußtext für Spielermeldungen",
+          },
+          advanced: {
+            title: "Weitere Einstellungen",
+            description: "Zusätzliche vom Server bereitgestellte Felder",
+          },
+        },
+        fields: {
+          short_name: {
+            label: "Kurzname der Instanz",
+            help: "Kompakter Name, der diese CRCON-Instanz in Übersichten und Benachrichtigungen kennzeichnet.",
+          },
+          server_url: {
+            label: "Öffentliche CRCON-Adresse",
+            help: "Vollständige URL, unter der Administratoren diese Instanz erreichen.",
+          },
+          discord_invite_url: {
+            label: "Discord-Einladungslink",
+            help: "Optionaler Einladungslink, der Spielern und Administratoren angezeigt werden kann.",
+          },
+          lock_stats_api: {
+            label: "Statistik-API schützen",
+            help: "Beschränkt den Zugriff auf Statistik-Endpunkte auf angemeldete Benutzer mit passender Berechtigung.",
+          },
+          broadcast_unbans: {
+            label: "Entsperrungen an verbundene Instanzen senden",
+            help: "Gibt aufgehobene Sperren an die dafür eingerichteten CRCON-Instanzen weiter.",
+          },
+          live_stats_refresh_seconds: {
+            label: "Live-Statistiken aktualisieren",
+            help: "Intervall in Sekunden für die allgemeine Aktualisierung der Live-Statistiken.",
+          },
+          live_stats_refresh_current_game_seconds: {
+            label: "Aktuelles Spiel aktualisieren",
+            help: "Intervall in Sekunden für die Statistik des laufenden Spiels. Sehr kleine Werte erhöhen die Serverlast.",
+          },
+          windows_store_players: {
+            label: "Regel für Windows-Store-Spieler",
+            help: "Legt Erkennung, Maßnahme und Meldungen für Spieler mit Windows-Store-ID fest.",
+          },
+          message_enhancements: {
+            label: "Nachrichtenrahmen",
+            help: "Ergänzt ausgehende Spielermeldungen optional um einen einheitlichen Kopf- und Fußtext.",
+          },
+          enabled: {
+            label: "Aktivieren",
+            help: "Schaltet diesen Teil der Konfiguration ein oder aus.",
+          },
+          action: {
+            label: "Maßnahme",
+            help: "Aktion, die bei einem erkannten Windows-Store-Spieler ausgeführt wird.",
+          },
+          player_message: {
+            label: "Nachricht an den Spieler",
+            help: "Text, den der betroffene Spieler erhält.",
+          },
+          audit_message: {
+            label: "Audit-Nachricht",
+            help: "Text für das administrative Ereignisprotokoll.",
+          },
+          audit_message_author: {
+            label: "Absender der Audit-Nachricht",
+            help: "Name, unter dem die Audit-Nachricht erscheint.",
+          },
+          temp_ban_length_hours: {
+            label: "Temporäre Sperrdauer in Stunden",
+            help: "Dauer einer temporären Sperre, wenn diese Maßnahme ausgewählt ist.",
+          },
+          message_header: {
+            label: "Nachrichtenkopf",
+            help: "Optionaler Text, der vor unterstützte Spielermeldungen gesetzt wird.",
+          },
+          message_footer: {
+            label: "Nachrichtenfuß",
+            help: "Optionaler Text, der an unterstützte Spielermeldungen angehängt wird.",
+          },
+        },
+      },
+      steamApi: {
+        eyebrow: "System & Diagnose",
+        title: "Steam-API",
+        intro:
+          "Hinterlege den Steam-Web-API-Schlüssel für Spielerprofile, VAC- und Spielsperren-Prüfungen.",
+        sections: {
+          credentials: {
+            title: "Zugangsdaten",
+            description: "Steam-Web-API sicher mit CRCON verbinden",
+          },
+          advanced: {
+            title: "Weitere Einstellungen",
+            description: "Zusätzliche vom Server bereitgestellte Felder",
+          },
+        },
+        fields: {
+          api_key: {
+            label: "Steam-Web-API-Schlüssel",
+            help: "Der Schlüssel wird für Steam-Profildaten sowie VAC- und Spielsperren-Abfragen benötigt. Teile ihn nicht öffentlich.",
+          },
+        },
+      },
+      logStream: {
+        eyebrow: "System & Diagnose",
+        title: "Log-Stream",
+        intro:
+          "Konfiguriere den flüchtigen Spielprotokoll-Puffer für Live-Ansichten und Integrationen. Fehler- und Systemlogs bleiben davon unberührt.",
+        sections: {
+          capacity: {
+            title: "Puffer & Start",
+            description: "Umfang und Rückblick beim Start des Streams",
+          },
+          refresh: {
+            title: "Aktualisierung",
+            description: "Abrufintervall und zeitliche Überlappung",
+          },
+          advanced: {
+            title: "Weitere Einstellungen",
+            description: "Zusätzliche vom Server bereitgestellte Felder",
+          },
+        },
+        fields: {
+          stream_size: {
+            label: "Maximale Ereignisse im Puffer",
+            help: "Begrenzt die Zahl der im Live-Stream vorgehaltenen Spielereignisse.",
+          },
+          startup_since_mins: {
+            label: "Rückblick beim Start in Minuten",
+            help: "Lädt beim Start Ereignisse aus diesem zurückliegenden Zeitraum in den Stream.",
+          },
+          refresh_frequency_sec: {
+            label: "Abrufintervall in Sekunden",
+            help: "Zeit zwischen zwei Aktualisierungen. Kürzere Intervalle reagieren schneller, erzeugen aber mehr Last.",
+          },
+          refresh_since_mins: {
+            label: "Überlappung pro Abruf in Minuten",
+            help: "Liest bei jeder Aktualisierung diesen Zeitraum erneut, damit verspätete Ereignisse nicht verloren gehen.",
+          },
+        },
+      },
+      watchKillrate: {
+        eyebrow: "System & Diagnose",
+        title: "Killrate überwachen",
+        intro:
+          "Erkenne auffällige Killraten mit getrennten Grenzwerten für Infanterie, Panzer, Artillerie und Maschinengewehre.",
+        sections: {
+          timing: {
+            title: "Zeitsteuerung",
+            description: "Startverzögerung, Prüfung und Meldepause",
+          },
+          thresholds: {
+            title: "Schwellenwerte",
+            description: "Mindestkills und Killraten nach Spielweise",
+          },
+          exceptions: {
+            title: "Ausnahmen",
+            description: "Wiederholungen, Markierungen und Rollen ausnehmen",
+          },
+          notifications: {
+            title: "Benachrichtigungen",
+            description: "Absender und Discord-Ziele festlegen",
+          },
+          advanced: {
+            title: "Weitere Einstellungen",
+            description: "Zusätzliche vom Server bereitgestellte Felder",
+          },
+        },
+        fields: {
+          match_start_cooldown_secs: {
+            label: "Wartezeit nach Rundenstart in Sekunden",
+            help: "Beginnt erst nach dieser Zeit mit der Killrate-Prüfung.",
+          },
+          watch_interval_secs: {
+            label: "Prüfintervall in Sekunden",
+            help: "Abstand zwischen zwei automatischen Prüfungen.",
+          },
+          report_cooldown_mins: {
+            label: "Meldepause in Minuten",
+            help: "Mindestabstand zwischen zwei Meldungen zum selben auffälligen Verlauf.",
+          },
+          min_kills: {
+            label: "Mindestanzahl Kills",
+            help: "Eine Killrate wird erst nach dieser Zahl an Kills bewertet.",
+          },
+          killrate_threshold: {
+            label: "Killrate-Grenzwert Infanterie",
+            help: "Allgemeiner Grenzwert für Spieler, die keiner besonderen Kategorie zugeordnet sind.",
+          },
+          killrate_threshold_armor: {
+            label: "Killrate-Grenzwert Panzer",
+            help: "Eigener Grenzwert für Panzerbesatzungen.",
+          },
+          killrate_threshold_artillery: {
+            label: "Killrate-Grenzwert Artillerie",
+            help: "Eigener Grenzwert für Artilleriespieler.",
+          },
+          killrate_threshold_mg: {
+            label: "Killrate-Grenzwert Maschinengewehr",
+            help: "Eigener Grenzwert für Maschinengewehrschützen.",
+          },
+          only_report_once_per_match: {
+            label: "Pro Runde nur einmal melden",
+            help: "Verhindert wiederholte Meldungen zum selben Spieler innerhalb einer Runde.",
+          },
+          whitelist_flags: {
+            label: "Ausgenommene Spieler-Markierungen",
+            help: "Spieler mit mindestens einer dieser Markierungen werden nicht gemeldet.",
+          },
+          ignore_armor: {
+            label: "Panzerbesatzungen ignorieren",
+            help: "Schließt als Panzerbesatzung erkannte Spieler vollständig von der Prüfung aus.",
+          },
+          ignore_artillery: {
+            label: "Artilleriespieler ignorieren",
+            help: "Schließt als Artilleriespieler erkannte Spieler vollständig von der Prüfung aus.",
+          },
+          ignore_mg: {
+            label: "Maschinengewehrschützen ignorieren",
+            help: "Schließt Maschinengewehrschützen vollständig von der Prüfung aus.",
+          },
+          author: {
+            label: "Absendername",
+            help: "Name, der in der Discord-Benachrichtigung angezeigt wird.",
+          },
+          webhooks: {
+            label: "Discord-Webhooks",
+            help: "Ziele und optionale Benutzer- oder Rollen-Erwähnungen für Killrate-Meldungen.",
+          },
+          url: {
+            label: "Webhook-URL",
+            help: "Discord-Webhook, an den die Meldung gesendet wird.",
+          },
+          user_mentions: {
+            label: "Benutzer erwähnen",
+            help: "Discord-Benutzer-IDs, die bei einer Meldung erwähnt werden.",
+          },
+          role_mentions: {
+            label: "Rollen erwähnen",
+            help: "Discord-Rollen-IDs, die bei einer Meldung erwähnt werden.",
+          },
+        },
+      },
       expiredVip: {
         eyebrow: "VIP-Verwaltung",
         title: "Abgelaufene VIPs bereinigen",

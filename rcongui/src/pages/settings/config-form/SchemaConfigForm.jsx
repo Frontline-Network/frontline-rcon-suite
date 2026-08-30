@@ -11,6 +11,14 @@ import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNone
 import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
 import RedeemOutlinedIcon from "@mui/icons-material/RedeemOutlined";
 import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
+import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
+import DnsOutlinedIcon from "@mui/icons-material/DnsOutlined";
+import KeyOutlinedIcon from "@mui/icons-material/KeyOutlined";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import QueryStatsOutlinedIcon from "@mui/icons-material/QueryStatsOutlined";
+import SpeedOutlinedIcon from "@mui/icons-material/SpeedOutlined";
+import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
+import SyncOutlinedIcon from "@mui/icons-material/SyncOutlined";
 import { JsonForms } from "@jsonforms/react";
 import { Generate } from "@jsonforms/core";
 import {
@@ -39,6 +47,17 @@ const sectionIcons = {
   reward: <RedeemOutlinedIcon fontSize="small" />,
   messages: <CampaignOutlinedIcon fontSize="small" />,
   notifications: <NotificationsNoneOutlinedIcon fontSize="small" />,
+  connections: <DnsOutlinedIcon fontSize="small" />,
+  telemetry: <QueryStatsOutlinedIcon fontSize="small" />,
+  identity: <BadgeOutlinedIcon fontSize="small" />,
+  access: <LockOutlinedIcon fontSize="small" />,
+  refresh: <SyncOutlinedIcon fontSize="small" />,
+  windowsStore: <RuleOutlinedIcon fontSize="small" />,
+  credentials: <KeyOutlinedIcon fontSize="small" />,
+  capacity: <StorageOutlinedIcon fontSize="small" />,
+  timing: <ScheduleOutlinedIcon fontSize="small" />,
+  thresholds: <SpeedOutlinedIcon fontSize="small" />,
+  exceptions: <ShieldOutlinedIcon fontSize="small" />,
   advanced: <TuneOutlinedIcon fontSize="small" />,
 };
 

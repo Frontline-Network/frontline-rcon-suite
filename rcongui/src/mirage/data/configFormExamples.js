@@ -1,5 +1,6 @@
 const boolean = (title) => ({ type: "boolean", title });
 const integer = (title, minimum = 0) => ({ type: "integer", title, minimum });
+const number = (title, minimum = 0) => ({ type: "number", title, minimum });
 const text = (title, format) => ({
   type: "string",
   title,
@@ -59,6 +60,165 @@ const commonAutomodProperties = {
 };
 
 const examples = {
+  rcon_connection_settings_config: {
+    data: {
+      thread_pool_size: 20,
+      performance_statistics_enabled: false,
+      performance_statistics_interval_seconds: 30,
+    },
+    schema: schema({
+      thread_pool_size: {
+        ...integer("Parallele RCON-Verbindungen", 1),
+        maximum: 100,
+      },
+      performance_statistics_enabled: boolean(
+        "RCON-Leistungsstatistiken erfassen"
+      ),
+      performance_statistics_interval_seconds: integer(
+        "Messintervall in Sekunden",
+        1
+      ),
+    }),
+  },
+  rcon_server_settings_config: {
+    data: {
+      short_name: "Frontline #2",
+      server_url: "https://rcon2.example.org",
+      discord_invite_url: "https://discord.gg/frontline",
+      lock_stats_api: true,
+      broadcast_unbans: true,
+      live_stats_refresh_seconds: 15,
+      live_stats_refresh_current_game_seconds: 5,
+      windows_store_players: {
+        enabled: false,
+        action: null,
+        player_message:
+          "Windows-Store-Spieler sind auf diesem Server nicht erlaubt.",
+        audit_message:
+          "Windows-Store-Spieler {name} ({player_id}), Maßnahme: {action}",
+        audit_message_author: "CRCON",
+        temp_ban_length_hours: 1,
+      },
+      message_enhancements: {
+        enabled: true,
+        message_header: "[Frontline]",
+        message_footer: "Mehr Informationen: fln.gg",
+      },
+    },
+    schema: schema({
+      short_name: text("Kurzname der Instanz"),
+      server_url: text("Öffentliche CRCON-Adresse", "uri"),
+      discord_invite_url: text("Discord-Einladungslink", "uri"),
+      lock_stats_api: boolean("Statistik-API schützen"),
+      broadcast_unbans: boolean("Entsperrungen an verbundene Instanzen senden"),
+      live_stats_refresh_seconds: integer("Live-Statistiken aktualisieren", 1),
+      live_stats_refresh_current_game_seconds: integer(
+        "Aktuelles Spiel aktualisieren",
+        1
+      ),
+      windows_store_players: schema({
+        enabled: boolean("Aktivieren"),
+        action: {
+          title: "Maßnahme",
+          anyOf: [
+            {
+              type: "string",
+              enum: ["KICK", "TEMP_BAN", "PERMA_BAN"],
+            },
+            { type: "null" },
+          ],
+        },
+        player_message: text("Nachricht an den Spieler"),
+        audit_message: text("Audit-Nachricht"),
+        audit_message_author: text("Absender der Audit-Nachricht"),
+        temp_ban_length_hours: integer("Temporäre Sperrdauer in Stunden", 1),
+      }),
+      message_enhancements: schema({
+        enabled: boolean("Aktivieren"),
+        message_header: text("Nachrichtenkopf"),
+        message_footer: text("Nachrichtenfuß"),
+      }),
+    }),
+  },
+  steam_config: {
+    data: { api_key: "demo-steam-web-api-key" },
+    schema: schema({
+      api_key: text("Steam-Web-API-Schlüssel"),
+    }),
+  },
+  log_stream_config: {
+    data: {
+      enabled: true,
+      stream_size: 1000,
+      startup_since_mins: 2,
+      refresh_frequency_sec: 1,
+      refresh_since_mins: 2,
+    },
+    schema: schema({
+      enabled: boolean("Aktiviert"),
+      stream_size: {
+        ...integer("Maximale Ereignisse im Puffer", 1),
+        maximum: 100000,
+      },
+      startup_since_mins: integer("Rückblick beim Start in Minuten"),
+      refresh_frequency_sec: integer("Abrufintervall in Sekunden", 1),
+      refresh_since_mins: integer("Überlappung pro Abruf in Minuten"),
+    }),
+  },
+  watch_killrate_config: {
+    data: {
+      enabled: true,
+      match_start_cooldown_secs: 180,
+      watch_interval_secs: 60,
+      report_cooldown_mins: 15,
+      min_kills: 25,
+      killrate_threshold: 1.25,
+      killrate_threshold_armor: 2,
+      killrate_threshold_artillery: 3,
+      killrate_threshold_mg: 1.5,
+      only_report_once_per_match: true,
+      whitelist_flags: ["admin", "trusted"],
+      ignore_armor: true,
+      ignore_artillery: true,
+      ignore_mg: true,
+      author: "CRCON Watch KillRate",
+      webhooks: [
+        {
+          url: "https://discord.com/api/webhooks/123456/demo-token",
+          user_mentions: [],
+          role_mentions: ["<@&987654321>"],
+        },
+      ],
+    },
+    schema: schema({
+      enabled: boolean("Aktiviert"),
+      match_start_cooldown_secs: integer(
+        "Wartezeit nach Rundenstart in Sekunden"
+      ),
+      watch_interval_secs: integer("Prüfintervall in Sekunden", 2),
+      report_cooldown_mins: integer("Meldepause in Minuten", 1),
+      min_kills: integer("Mindestanzahl Kills"),
+      killrate_threshold: number("Killrate-Grenzwert Infanterie"),
+      killrate_threshold_armor: number("Killrate-Grenzwert Panzer"),
+      killrate_threshold_artillery: number("Killrate-Grenzwert Artillerie"),
+      killrate_threshold_mg: number("Killrate-Grenzwert Maschinengewehr"),
+      only_report_once_per_match: boolean("Pro Runde nur einmal melden"),
+      whitelist_flags: strings("Ausgenommene Spieler-Markierungen"),
+      ignore_armor: boolean("Panzerbesatzungen ignorieren"),
+      ignore_artillery: boolean("Artilleriespieler ignorieren"),
+      ignore_mg: boolean("Maschinengewehrschützen ignorieren"),
+      author: text("Absendername"),
+      webhooks: {
+        type: "array",
+        title: "Discord-Webhooks",
+        items: schema({
+          url: text("Webhook-URL", "uri"),
+          user_mentions: strings("Benutzer erwähnen"),
+          role_mentions: strings("Rollen erwähnen"),
+        }),
+      },
+    }),
+  },
   audit_discord_webhooks_config: {
     data: {
       hooks: [{ url: "https://discord.com/api/webhooks/123456/demo-token" }],
