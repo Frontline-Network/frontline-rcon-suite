@@ -3,8 +3,7 @@ const de = {
   playerIdentity: {
     linkedAccounts: "Automatisch verknüpft mit",
     restrictedTitle: "Sicherheitswarnung: verknüpftes Konto gesperrt",
-    restrictedDescription:
-      "Das verknüpfte {{game}} „{{name}}“ besitzt eine aktive Sperre. Es wurde keine automatische Maßnahme ausgeführt.",
+    restrictedDescription: "Das verknüpfte {{game}} „{{name}}“ besitzt eine aktive Sperre. Es wurde keine automatische Maßnahme ausgeführt.",
     games: { hll: "HLL-Konto", hll_vietnam: "HLL:V-Konto" },
   },
   common: {
@@ -47,6 +46,7 @@ const de = {
     optionMenu: "Aktionsmenü mit Auswahl",
     selectOption: "Option auswählen",
     search: "Suchen",
+    reset: "Zurücksetzen",
     refresh: "Aktualisieren",
     expand: "Erweitern",
     collapse: "Einklappen",
@@ -102,24 +102,19 @@ const de = {
     rank: "Nach Rang auswählen",
     rankDescription: "Alle Spieler mit diesem Rang auswählen.",
     visits: "Nach Besuchen auswählen",
-    visitsDescription:
-      "Alle Spieler mit höchstens dieser Anzahl von Besuchen auswählen.",
+    visitsDescription: "Alle Spieler mit höchstens dieser Anzahl von Besuchen auswählen.",
     maxVisits: "Maximale Spielerbesuche",
     logAction: "Protokolle nach Aktion filtern",
-    logActionDescription:
-      "Aktionen auswählen, nach denen die Protokolle gefiltert werden.",
+    logActionDescription: "Aktionen auswählen, nach denen die Protokolle gefiltert werden.",
     logPlayer: "Protokolle nach Spieler filtern",
-    logPlayerDescription:
-      "Spieler auswählen, nach denen die Protokolle gefiltert werden.",
+    logPlayerDescription: "Spieler auswählen, nach denen die Protokolle gefiltert werden.",
     logTeam: "Protokolle nach Team filtern",
     logTeamDescription: "Protokolle auf ein oder mehrere Teams begrenzen.",
     columns: "Spalten auswählen",
     columnsDescription: "Anzuzeigende Tabellenspalten auswählen.",
-    logActionQueryDescription:
-      "Aktionen auswählen, die für die Protokollabfrage verwendet werden.",
+    logActionQueryDescription: "Aktionen auswählen, die für die Protokollabfrage verwendet werden.",
     logHighlight: "Protokollaktionen hervorheben",
-    logHighlightDescription:
-      "Aktionen auswählen, deren Protokolle hervorgehoben werden.",
+    logHighlightDescription: "Aktionen auswählen, deren Protokolle hervorgehoben werden.",
     logHighlightOn: "Hervorhebung aktiv",
     logHighlightOff: "Hervorhebung inaktiv",
     searchActions: "Aktionen suchen",
@@ -139,21 +134,18 @@ const de = {
     title: "Das hat nicht funktioniert",
     unexpected: "Ein unerwarteter Fehler ist aufgetreten.",
     configUnknown: "Diese Konfiguration ist nicht bekannt.",
-    configDocumentationUnavailable:
-      "Die Dokumentation für diese Konfiguration ist nicht verfügbar.",
+    configDocumentationUnavailable: "Die Dokumentation für diese Konfiguration ist nicht verfügbar.",
     configLoadFailed: "Die Konfigurationsdaten konnten nicht geladen werden.",
     configSchemaFailed: "Das Konfigurationsschema konnte nicht geladen werden.",
     missingParameters: "Erforderliche Parameter fehlen.",
     configValidationFailed: "Der Server konnte die Konfiguration nicht prüfen.",
-    persistent:
-      "Wenn der Fehler bestehen bleibt, kontaktiere bitte den Support.",
+    persistent: "Wenn der Fehler bestehen bleibt, kontaktiere bitte den Support.",
     report: "Fehler melden",
     back: "Zurück",
     tryAgain: "Erneut versuchen",
     unknown: "Unbekannter Fehler",
     command: "Befehl",
-    requestFailed:
-      "Die Anfrage konnte nicht verarbeitet werden. Prüfe die Verbindung und versuche es erneut.",
+    requestFailed: "Die Anfrage konnte nicht verarbeitet werden. Prüfe die Verbindung und versuche es erneut.",
     sectionUnavailable: "Dieser Bereich kann derzeit nicht angezeigt werden.",
     commentSaveFailed: "Der Kommentar konnte nicht gespeichert werden.",
   },
@@ -210,8 +202,7 @@ const de = {
   },
   playerEditor: {
     addInformation: "Daten ergänzen",
-    disabledField:
-      "Dieses Feld enthält bereits einen Wert und kann nicht geändert werden.",
+    disabledField: "Dieses Feld enthält bereits einen Wert und kann nicht geändert werden.",
     updating: "Wird gespeichert …",
     validation: {
       name: "Der Name darf nur Buchstaben, Zahlen, Leerzeichen, Bindestriche und Unterstriche enthalten.",
@@ -219,18 +210,15 @@ const de = {
       levelMin: "Das Level muss mindestens 1 sein.",
       levelMax: "Das Level darf 500 nicht überschreiten.",
       platform: "Wähle eine gültige Plattform aus.",
-      clanTag:
-        "Der Clan-Tag darf nur Buchstaben, Zahlen, Leerzeichen, Bindestriche, Unterstriche und Klammern enthalten.",
+      clanTag: "Der Clan-Tag darf nur Buchstaben, Zahlen, Leerzeichen, Bindestriche, Unterstriche und Klammern enthalten.",
       clanTagLength: "Der Clan-Tag darf höchstens vier Zeichen enthalten.",
       discordId: "Die Discord-ID muss eine gültige Zahl sein.",
       country: "Das Land muss ein gültiger ISO-Code mit zwei Buchstaben sein.",
-      language:
-        "Die Sprache muss ein gültiger ISO-Code mit zwei Buchstaben sein.",
+      language: "Die Sprache muss ein gültiger ISO-Code mit zwei Buchstaben sein.",
     },
     soldier: {
       title: "Soldatendaten ergänzen",
-      description:
-        "Ergänze fehlende Soldatendaten. Bereits vorhandene Werte sind geschützt und können nicht geändert werden.",
+      description: "Ergänze fehlende Soldatendaten. Bereits vorhandene Werte sind geschützt und können nicht geändert werden.",
       success: "Soldatendaten wurden erfolgreich gespeichert.",
       failed: "Soldatendaten konnten nicht gespeichert werden.",
       name: "Spielername",
@@ -246,8 +234,7 @@ const de = {
     },
     account: {
       title: "Kontodaten bearbeiten",
-      description:
-        "Bearbeite die Kontodaten des Spielers. Alle Felder können geändert werden.",
+      description: "Bearbeite die Kontodaten des Spielers. Alle Felder können geändert werden.",
       success: "Kontodaten wurden erfolgreich gespeichert.",
       failed: "Kontodaten konnten nicht gespeichert werden.",
       name: "Kontoname",
@@ -261,110 +248,15 @@ const de = {
       languageHelp: "Bevorzugte Sprache des Spielers auswählen.",
     },
   },
-  mobileNav: {
-    ariaLabel: "Mobile Hauptnavigation",
-    operations: "Einsatz",
-    incidents: "Meldungen",
-    players: "Spieler",
-    "server-operations": "Betrieb",
-    more: "Mehr",
-  },
-  mobileOperations: {
-    eyebrow: "Serverbetrieb",
-    title: "Betrieb",
-    subtitle:
-      "Prüfe den Zustand deines Servers und öffne die häufigsten Betriebsaufgaben.",
-    cards: {
-      teams: {
-        title: "Teams & Trupps",
-        description: "Führungsprobleme, Trupps und Spieler verwalten.",
-      },
-      maps: {
-        title: "Karten",
-        description: "Aktuelle, nächste und sofortige Kartenwechsel steuern.",
-      },
-      balance: {
-        title: "Autobalancer",
-        description: "Balancezustand und letzte Eingriffe prüfen.",
-      },
-      automation: {
-        title: "Automatisierung",
-        description: "Regeln, Wirkungen und aktive Zeitpläne verwalten.",
-      },
-      services: {
-        title: "Dienste",
-        description: "CRCON, Gameserver und Hintergrunddienste prüfen.",
-      },
-      settings: {
-        title: "Servereinstellungen",
-        description: "Spielregeln und allgemeine Konfiguration öffnen.",
-      },
-    },
-  },
-  incidents: {
-    eyebrow: "Moderation",
-    title: "Meldungen",
-    subtitle:
-      "Admin-Reports serverübergreifend übernehmen, bearbeiten und abschließen.",
-    filters: "Meldungen filtern",
-    tabs: {
-      new: "Neu",
-      claimed: "Übernommen",
-      open: "Offen",
-      done: "Erledigt",
-      dismissed: "Abgelehnt",
-    },
-    status: {
-      new: "Neu",
-      claimed: "Übernommen",
-      resolved: "Erledigt",
-      dismissed: "Abgelehnt",
-    },
-    server: "Server {{number}}",
-    generalReport: "Allgemeine Meldung",
-    unknownReporter: "Unbekannter Melder",
-    assignedTo: "bei {{name}}",
-    reason: "Grund der Meldung",
-    noReason: "Kein Grund angegeben.",
-    reporter: "Melder",
-    assignee: "Bearbeitung",
-    unassigned: "Noch nicht übernommen",
-    updated: "Zuletzt geändert",
-    emptyTitle: "Hier ist alles erledigt",
-    emptyDescription: "Für diesen Filter liegen derzeit keine Meldungen vor.",
-    loadFailed:
-      "Die Meldungen konnten nicht geladen werden. Prüfe die Verbindung und versuche es erneut.",
-    updateFailed:
-      "Die Meldung konnte nicht aktualisiert werden. Sie bleibt unverändert.",
-    dismissConfirmationTitle: "Meldung wirklich ablehnen?",
-    dismissConfirmationBody:
-      "Die Ablehnung wird im Verlauf protokolliert. Der Vorgang kann danach nicht mehr als offen bearbeitet werden.",
-    actions: {
-      claim: "Übernehmen",
-      dismiss: "Ablehnen",
-      resolve: "Abschließen",
-      confirmDismiss: "Ablehnung bestätigen",
-    },
-  },
   views: {
     live: {
       title: "Live-Einsatz",
-      reviewNow: "Jetzt prüfen",
-      mobileOperationsTab: "Einsatz",
-      mobileLogTab: "Protokoll",
-      loadMorePlayers: "Weitere Spieler laden",
-      mobileCombatColumn: "K / D",
-      priorityHigh: "Hoch",
-      priorityMedium: "Mittel",
-      priorityInfo: "Info",
       eyebrow: "Serverbetrieb",
-      subtitle:
-        "Spieler, Gefechtslage und Serverereignisse in Echtzeit überwachen.",
+      subtitle: "Spieler, Gefechtslage und Serverereignisse in Echtzeit überwachen.",
       globalSearch: "Spieler und Protokolle durchsuchen …",
       players: "Spieler",
       logs: "Live-Protokoll",
       scoreboard: "Gefechtslage",
-      score: "Spielstand",
       showPlayers: "Spieler anzeigen",
       hidePlayers: "Spieler ausblenden",
       showLogs: "Protokoll anzeigen",
@@ -387,53 +279,6 @@ const de = {
       filterActions: "Aktionen filtern",
       noActionFilters: "Keine Aktionsfilter ausgewählt",
       logQueryLimit: "Abruflimit für Protokolle",
-      commandBar: "Live-Einsatzsteuerung",
-      currentMap: "Aktuelle Karte",
-      remainingTime: "Restzeit",
-      updating: "Wird aktualisiert",
-      liveNow: "Live",
-      layout: "Arbeitsansicht",
-      splitView: "Geteilt",
-      assignment: "Team / Trupp / Rolle",
-      performance: "Kampf / Risiko",
-      status: "Status",
-      warned: "Verwarnt",
-      actionableStatus: "Handlungsbedarf und Gefechtsstatus",
-      online: "online",
-      columnPreset: "Spaltenprofil",
-      operationsPreset: "Einsatz",
-      customPreset: "Eigene Ansicht",
-      allColumnsPreset: "Alle Spalten",
-      horizontalTableScroll: "Tabellenspalten horizontal verschieben",
-      quickFilters: "Spieler-Schnellfilter",
-      suspicious: "Auffällig",
-      selectionFilters: "Auswahlfilter",
-      playersSelected_one: "{{count}} Spieler ausgewählt",
-      playersSelected_other: "{{count}} Spieler ausgewählt",
-      clearSelection: "Auswahl löschen",
-      selectionActions: "Aktionen öffnen",
-      moreActions: "Mehr",
-      events: "Ereignisse",
-      eventStream: "Live-Ereignisstrom",
-      eventFilters: "Ereignisse filtern",
-      admin: "Admin",
-      chat: "Chat",
-      teamkills: "Teamkills",
-      kills: "Kills",
-      match: "Runde",
-      searchLogs: "Protokoll durchsuchen …",
-      advancedFilters: "Erweiterte Filter",
-      maximizeLogs: "Live-Protokoll maximieren",
-      restoreSplitView: "Geteilte Ansicht wiederherstellen",
-      copyLog: "Originalmeldung kopieren",
-      logCopied: "Originalmeldung kopiert",
-      splitUnavailable: "Die geteilte Ansicht benötigt mehr verfügbare Breite.",
-      serverActions: "Serveraktionen",
-      mobileRoster: "Mobile Spielerliste",
-      noSpecialStatus: "Kein besonderer Status",
-      expandPlayer: "Details zu {{name}} öffnen",
-      collapsePlayer: "Details zu {{name}} schließen",
-      openPlayerProfile: "Profil von {{name}} öffnen",
     },
     team: {
       title: "Teamübersicht",
@@ -453,71 +298,9 @@ const de = {
       battleOverview: "Aktuelle Gefechtslage",
       allies: "Alliierte",
       axis: "Achsenmächte",
-      lobby: "Lobby",
       players: "Spieler",
       liveScore: "Aktueller Spielstand",
       attackers: "Angreifer",
-      commander: "Commander",
-      commanderPositionOpen: "Position unbesetzt",
-      statusFilter: "Status",
-      roleFilter: "Rolle",
-      squadFilter: "Trupp",
-      allRoles: "Alle Rollen",
-      allSquads: "Alle Trupps",
-      squadOrPlayer: "Trupp / Spieler",
-      leaderOrRole: "Truppführer / Rolle",
-      statusOrKd: "Status / K/D",
-      selectionActions: "Aktionen für ausgewählte Spieler",
-      selectionHint: "Aktion für diese Auswahl festlegen",
-      moreActions: "Weitere",
-      selectionActionLabels: {
-        message: "Nachricht",
-        kick: "Kick",
-        ban: "Temp/Perma-Bann",
-        switchTeam: "Team",
-        removeFromSquad: "Trupp-Kick",
-      },
-      selectPlayer: "{{name}} auswählen",
-      selectSquad: "Trupp {{name}} auswählen",
-      selectTeam: "Team {{name}} auswählen",
-      expandSquad: "Trupp öffnen",
-      collapseSquad: "Trupp schließen",
-      expandSquadNamed: "Trupp {{name}} öffnen",
-      collapseSquadNamed: "Trupp {{name}} schließen",
-      expandTeam: "Alle Trupps dieses Teams öffnen",
-      collapseTeam: "Alle Trupps dieses Teams schließen",
-      expandTeamNamed: "Alle Trupps von {{name}} öffnen",
-      collapseTeamNamed: "Alle Trupps von {{name}} schließen",
-      squadsCount_one: "{{count}} Trupp",
-      squadsCount_other: "{{count}} Trupps",
-      problemsCount_one: "{{count}} Problem",
-      problemsCount_other: "{{count}} Probleme",
-      noMatches: "Keine passenden Spieler oder Trupps gefunden.",
-      issueCommander_one: "{{count}} Team ohne Commander",
-      issueCommander_other: "{{count}} Teams ohne Commander",
-      issueCommanderDetail: "Unbesetzte Führungspositionen",
-      issueLeaders_one: "{{count}} Trupp ohne Truppführer",
-      issueLeaders_other: "{{count}} Trupps ohne Truppführer",
-      issueLeadersDetail: "Trupps mit Handlungsbedarf",
-      issueUnassigned_one: "{{count}} Spieler ohne Trupp",
-      issueUnassigned_other: "{{count}} Spieler ohne Trupp",
-      issueUnassignedDetail: "Lobby und nicht zugeordnete Spieler",
-      filters: {
-        all: "Alle anzeigen",
-        issues: "Nur Auffälligkeiten",
-        noLeader: "Ohne Truppführer",
-        unassigned: "Ohne Trupp",
-      },
-      squadTypes: {
-        infantry: "Infanterie",
-        armor: "Panzer",
-        armour: "Panzer",
-        recon: "Aufklärung",
-        artillery: "Artillerie",
-        mortar: "Mörser",
-        helicopter: "Hubschrauber",
-        other: "Weitere Einheiten",
-      },
       gameModes: {
         warfare: "Kriegsführung",
         offensive: "Offensive",
@@ -539,9 +322,7 @@ const de = {
       },
     },
     table: {
-      selection: "Spielerauswahl",
       team: "Team",
-      faction: "Fraktion",
       unit: "Trupp",
       role: "Rolle",
       level: "Level",
@@ -549,15 +330,12 @@ const de = {
       deaths: "Tode",
       killsPerMinute: "Kills pro Minute",
       teamKills: "Teamkills",
-      teamKillsShort: "TKs",
-      teamKillRiskLabel: "TK-Risiko",
       teamKillRisk: {
         none: "OK",
         caution: "PRÜFEN",
         high: "HOCH",
         description: "{{count}} Teamkills · Risiko: {{level}}",
-        thresholds:
-          "Hinweis: ab 1 Teamkill prüfen, ab 3 Teamkills hohes Risiko.",
+        thresholds: "Hinweis: ab 1 Teamkill prüfen, ab 3 Teamkills hohes Risiko.",
       },
       vehicleKills: "Fahrzeug-Kills",
       vehiclesDestroyed: "Zerstörte Fahrzeuge",
@@ -565,26 +343,15 @@ const de = {
       offense: "Offensive Effektivität",
       defense: "Defensive Effektivität",
       support: "Unterstützungseffektivität",
-      combatShort: "Kampf",
-      offenseShort: "Offensive",
-      defenseShort: "Defensive",
-      supportShort: "Support",
       platform: "Plattform",
       clanTag: "Clan-Tag",
       name: "Name",
-      nameOnly: "Name (Einzelspalte)",
-      playerSummary: "Spieler (Name und Level)",
-      playerId: "Spieler-ID",
-      warnings: "Warnungen",
-      vip: "VIP",
       recentAction: "Kürzlich eine Maßnahme erhalten",
       activeBan: "Noch bestehender Bann",
       activeBanDirect: "Aktiver Bann auf diesem Spielkonto",
       activeBlacklistDirect: "Aktiver Eintrag in {{list}}",
-      activeBanLinked:
-        "Aktiver Bann auf dem verknüpften {{game}}-Konto {{name}}",
-      activeBlacklistLinked:
-        "Aktiver Eintrag in {{list}} auf dem verknüpften {{game}}-Konto {{name}}",
+      activeBanLinked: "Aktiver Bann auf dem verknüpften {{game}}-Konto {{name}}",
+      activeBlacklistLinked: "Aktiver Eintrag in {{list}} auf dem verknüpften {{game}}-Konto {{name}}",
       activeBanNoAutomaticAction: "Nur Hinweis – keine automatische Maßnahme.",
       watchlist: "Auf der Beobachtungsliste",
       country: "Land",
@@ -614,52 +381,38 @@ const de = {
       MESSAGE: "Nachricht",
     },
     none: "Keine Aktionen verfügbar",
-    missingPermission:
-      "Dir fehlt die erforderliche Berechtigung für diese Aktionen.",
+    missingPermission: "Dir fehlt die erforderliche Berechtigung für diese Aktionen.",
     noRecipients: "Keine Empfänger ausgewählt",
     noFlags: "Dieser Spieler hat keine Markierungen.",
     viewProfile: "Profil ansehen",
-    viewProfileCompact: "Profil",
     editSoldier: "Soldatenprofil bearbeiten",
     editAccount: "Konto bearbeiten",
     deprecated: "Veraltete Aktion",
-    deprecatedNote:
-      "Für eine verlässlichere Sperrverwaltung empfehlen wir Sperrlisten.",
+    deprecatedNote: "Für eine verlässlichere Sperrverwaltung empfehlen wir Sperrlisten.",
     messageAll: "Nachricht an alle Spieler",
-    messageAllDescription:
-      "Diese Nachricht wird an alle Spieler auf dem Server gesendet.",
+    messageAllDescription: "Diese Nachricht wird an alle Spieler auf dem Server gesendet.",
     messageSent: "Nachricht wurde an alle Spieler gesendet.",
     actionSucceeded: "Die Aktion wurde erfolgreich ausgeführt.",
-    secondConfirmationTitle: "Aktion nochmals prüfen",
-    secondConfirmationBody:
-      "Diese Aktion wirkt unmittelbar. Prüfe Ziel und Angaben, bevor du sie endgültig ausführst.",
-    executeFinally: "Endgültig ausführen",
     sending: "Wird gesendet …",
     disbandSquad: "Trupp auflösen",
     context: {
       title: "Ausführungskontext",
       noLiveData: "Keine bestätigten Live-Daten",
-      lastUpdated:
-        "Gameserver-Daten zuletzt erfolgreich aktualisiert: {{time}}",
-      connectionBlocked:
-        "Die Aktion ist gesperrt, bis CRCON und Gameserver wieder aktuelle Online-Daten liefern.",
+      lastUpdated: "Gameserver-Daten zuletzt erfolgreich aktualisiert: {{time}}",
+      connectionBlocked: "Die Aktion ist gesperrt, bis CRCON und Gameserver wieder aktuelle Online-Daten liefern.",
     },
     disband: {
       title: "Trupps sicher auflösen",
-      effect:
-        "Alle betroffenen Spieler werden mit einer Verzögerung von etwa 10 Sekunden neu eingesetzt. Anschließend steht der Truppplatz wieder zur Verfügung.",
+      effect: "Alle betroffenen Spieler werden mit einer Verzögerung von etwa 10 Sekunden neu eingesetzt. Anschließend steht der Truppplatz wieder zur Verfügung.",
       permissionMissing: "Dir fehlt die Berechtigung „Trupp auflösen“.",
-      auditPermissionMissing:
-        "Dir fehlt die Berechtigung zum Anzeigen des Audit-Protokolls.",
+      auditPermissionMissing: "Dir fehlt die Berechtigung zum Anzeigen des Audit-Protokolls.",
       commandFailed: "Der Gameserver hat die Truppauflösung nicht bestätigt.",
       noSquads: "Keine auflösbaren Trupps verfügbar.",
       review: "Auswirkung prüfen",
-      reviewWarning:
-        "Prüfe die {{count}} ausgewählten Trupps. Erst der nächste Schritt führt die Aktion aus.",
+      reviewWarning: "Prüfe die {{count}} ausgewählten Trupps. Erst der nächste Schritt führt die Aktion aus.",
       targets: "Betroffene Trupps",
       targetDetails: "{{count}} Spieler · Truppführer: {{leader}}",
-      irreversible:
-        "Die laufende Ausführung kann nicht zurückgenommen werden. Spieler verlieren ihren aktuellen Trupp und werden neu eingesetzt.",
+      irreversible: "Die laufende Ausführung kann nicht zurückgenommen werden. Spieler verlieren ihren aktuellen Trupp und werden neu eingesetzt.",
       execute: "Ausgewählte Trupps jetzt auflösen ({{count}})",
       results: "Ergebnisse pro Trupp",
       resultSummary: "{{success}} erfolgreich · {{failed}} fehlgeschlagen",
@@ -673,13 +426,11 @@ const de = {
     },
     sendMessage: {
       name: "Nachricht senden",
-      compact: "Nachricht",
       description: "Zeigt die Nachricht oben rechts im Spiel an.",
     },
     addWatch: {
       name: "Beobachten",
-      description:
-        "Sendet beim Beitritt eine Discord-Nachricht über den konfigurierten Webhook.",
+      description: "Sendet beim Beitritt eine Discord-Nachricht über den konfigurierten Webhook.",
     },
     removeWatch: {
       name: "Beobachtung entfernen",
@@ -699,17 +450,14 @@ const de = {
     },
     switchOnDeath: {
       name: "Teamwechsel beim Tod",
-      description:
-        "Verschiebt den Spieler nach seinem nächsten Tod in das andere Team.",
+      description: "Verschiebt den Spieler nach seinem nächsten Tod in das andere Team.",
     },
     punish: {
       name: "Spieler bestrafen",
-      compact: "Bestrafen",
       description: "Tötet den Spieler im Spiel, sofern er lebt.",
     },
     kick: {
       name: "Spieler kicken",
-      compact: "Kicken",
       description: "Entfernt den Spieler vom Server.",
     },
     tempBan: {
@@ -726,9 +474,7 @@ const de = {
     },
     blacklist: {
       name: "Zur Sperrliste hinzufügen",
-      compact: "Bannen",
       description: "Fügt den Spieler einer Sperrliste hinzu.",
-      confirm: "Zur Sperrliste hinzufügen",
     },
     addFlag: {
       name: "Markierung hinzufügen",
@@ -748,8 +494,7 @@ const de = {
     },
     removeFromSquad: {
       name: "Aus Trupp entfernen",
-      description:
-        "Versetzt den Spieler neu und entfernt ihn aus seinem aktuellen Trupp.",
+      description: "Versetzt den Spieler neu und entfernt ihn aus seinem aktuellen Trupp.",
     },
   },
   fields: {
@@ -777,8 +522,7 @@ const de = {
     emoji: "Emoji",
     note: "Notiz",
     noteHelp: "Notiz zu dieser Markierung.",
-    blacklistReasonHelp:
-      "Nachricht für den Spieler. Verfügbare Variablen: {player_id}, {player_name}, {banned_at}, {banned_until}, {expires_at}, {duration}, {expires}, {ban_id}, {blacklist_name}",
+    blacklistReasonHelp: "Nachricht für den Spieler. Verfügbare Variablen: {player_id}, {player_name}, {banned_at}, {banned_until}, {expires_at}, {duration}, {expires}, {ban_id}, {blacklist_name}",
     vipPreview: "Beschreibung (Vorschau)",
     vipPreviewHelp: "Der VIP wird als <PRÄFIX><SPIELERNAME><SUFFIX> angezeigt.",
     prefix: "Präfix",
@@ -789,8 +533,7 @@ const de = {
     vipQueueHelp: "Hilft, die Warteschlange zu überspringen!",
     neverExpires: "Läuft nie ab",
     adminGroups: "Admin-Gruppen",
-    watchReasonHelp:
-      "Dieser Grund wird bei der Verbindung in der Discord-Nachricht angezeigt.",
+    watchReasonHelp: "Dieser Grund wird bei der Verbindung in der Discord-Nachricht angezeigt.",
   },
   records: {
     players: {
@@ -860,15 +603,13 @@ const de = {
       searchComments: "Kommentare suchen",
       author: "Autor",
       soldier: "Soldat",
-      soldierDescription:
-        "Dauerhafte Spielinformationen; werden bei jeder Verbindung aktualisiert.",
+      soldierDescription: "Dauerhafte Spielinformationen; werden bei jeder Verbindung aktualisiert.",
       name: "Name",
       clanTag: "Clan-Tag",
       level: "Level",
       platform: "Plattform",
       account: "Konto",
-      accountDescription:
-        "CRCON-Kontodaten, die mit diesem Spieler verknüpft sind.",
+      accountDescription: "CRCON-Kontodaten, die mit diesem Spieler verknüpft sind.",
       country: "Land",
       language: "Sprache",
       membership: "Mitgliedschaft",
@@ -876,8 +617,7 @@ const de = {
     vips: {
       title: "VIP-Verwaltung",
       eyebrow: "Spielerakten",
-      subtitle:
-        "VIP-Zugänge suchen, zeitlich steuern und serverübergreifend verwalten.",
+      subtitle: "VIP-Zugänge suchen, zeitlich steuern und serverübergreifend verwalten.",
       applyChangesTo: "Änderungen anwenden auf",
       thisServer: "Diesen Server",
       allServers: "Alle Server",
@@ -903,8 +643,7 @@ const de = {
       editSelected: "Auswahl bearbeiten",
       removeSelected: "Auswahl entfernen",
       removeSelectedTitle: "Ausgewählte VIPs entfernen?",
-      removeSelectedDescription:
-        "Möchtest du {{count}} ausgewählte VIP-Einträge wirklich entfernen?",
+      removeSelectedDescription: "Möchtest du {{count}} ausgewählte VIP-Einträge wirklich entfernen?",
       search: "VIP suchen …",
       selection: "{{selected}} von {{total}} ausgewählt",
       all: "Alle",
@@ -921,25 +660,74 @@ const de = {
       recordsFound: "{{count}} VIP-Einträge gefunden.",
       uploadProcessing: "VIP-Einträge werden verarbeitet … Bitte warten.",
       uploadFinished: "VIP-Einträge wurden hochgeladen.",
-      uploadWarning:
-        "Diese Aktion überschreibt alle VIP-Einträge des aktuellen Servers. Lade vorher möglichst eine Sicherung herunter.",
+      uploadWarning: "Diese Aktion überschreibt alle VIP-Einträge des aktuellen Servers. Lade vorher möglichst eine Sicherung herunter.",
       uploadFile: "Datei hochladen",
       uploadFromFile: "VIPs aus Datei hochladen",
       clear: "Leeren",
+      uploadError: "Die VIP-Datei konnte nicht verarbeitet werden.",
+      vipRecord: "VIP-Einsatzakte",
+      scopeHint: "Diese Änderung gilt für: {{scope}}.",
+      saving: "Wird gespeichert …",
+      maintenance: "Datenpflege",
+      importExport: "Import / Export",
+      downloadDescription: "VIP-Liste des aktuellen Servers als Textdatei sichern.",
+      uploadDescription: "Vorhandene VIP-Liste des aktuellen Servers durch eine Datei ersetzen.",
+      selectVisible: "Sichtbare VIP-Einträge auswählen",
+      selectPlayer: "VIP-Eintrag von {{name}} auswählen",
+      player: "Spieler",
+      editPlayer: "VIP-Eintrag von {{name}} bearbeiten",
+      removePlayer: "VIP-Eintrag von {{name}} entfernen",
+      collapseDetails: "VIP-Akte von {{name}} schließen",
+      expandDetails: "VIP-Akte von {{name}} öffnen",
+      collapse: "Details schließen",
+      expand: "Details öffnen",
+      expirationExact: "Ablauf (exakt)",
+      profile: "Profil",
+      register: "VIP-Einsatzregister",
+      resultCount: "{{shown}} von {{total}} VIPs",
+      selectedCount: "{{count}} ausgewählt",
+      clearSelection: "Auswahl aufheben",
+      partialFailure: "Die Änderung konnte nicht auf allen gewählten Servern abgeschlossen werden.",
+      removeSuccess: "Der VIP-Eintrag wurde entfernt.",
+      removeError: "Der VIP-Eintrag konnte nicht entfernt werden.",
+      saveSuccess: "Der VIP-Eintrag wurde gespeichert.",
+      saveError: "Der VIP-Eintrag konnte nicht gespeichert werden.",
+      filters: "VIPs filtern",
+      expiringSoon: "Läuft ≤ 7 Tage ab",
+      allDurations: "Alle Laufzeiten",
+      withinDays: "Innerhalb von {{count}} Tagen",
+      thisServerShort: "Dieser Server",
+      allServersShort: "Alle Server",
+      listSource: "Listenquelle",
+      currentServerOnly: "Aktueller Server",
+      updatedAt: "Aktualisiert um {{time}}",
+      total: "Gesamt",
+      hideFilters: "Filter schließen",
+      showFilters: "Filter anzeigen",
+      removeTitle: "VIP-Eintrag entfernen?",
+      removeDescription: "Soll der VIP-Zugang von {{name}} wirklich entfernt werden?",
     },
     blacklists: {
       title: "Sperrlisten",
       eyebrow: "Moderation",
-      subtitle:
-        "Serverübergreifende Ausschlüsse durchsuchen, bearbeiten und nachvollziehen.",
+      subtitle: "Serverübergreifende Ausschlüsse durchsuchen, bearbeiten und nachvollziehen.",
       manageTitle: "Sperrlisten verwalten",
-      manageSubtitle:
-        "Listen, Serverzuordnung und Synchronisationsverhalten konfigurieren.",
+      manageSubtitle: "Listen, Serverzuordnung und Synchronisationsverhalten konfigurieren.",
       createRecord: "Neuen Sperreintrag anlegen",
+      createRecordShort: "Sperreintrag",
       manageLists: "Listen verwalten",
       searchPlayerId: "Nach Spieler-ID suchen",
       searchNameReason: "Nach Name oder Grund suchen",
+      searchNameReasonShort: "Name oder Grund",
+      filters: "Filter",
       list: "Sperrliste",
+      allLists: "Alle Sperrlisten",
+      status: "Status",
+      statusOptions: {
+        active: "Aktiv",
+        all: "Alle",
+        expired: "Abgelaufen",
+      },
       showExpired: "Abgelaufene anzeigen",
       editRecord: "Sperreintrag bearbeiten",
       expireRecord: "Sperreintrag auslaufen lassen",
@@ -957,14 +745,38 @@ const de = {
       expiresIn: "Läuft in {{duration}} ab",
       expiredAgo: "Vor {{duration}} abgelaufen",
       neverExpires: "Läuft nie ab",
+      activePermanent: "Aktiv · permanent",
+      activeUntil: "Aktiv · {{duration}}",
+      expiredSince: "Abgelaufen · {{duration}}",
+      recordsCount: "{{count}} Einträge",
+      range: "{{start}}–{{end}} von {{total}}",
+      groups: {
+        today: "Heute",
+        recent: "Letzte 7 Tage",
+        older: "Älter",
+      },
+      serverNumber: "Server {{number}}",
+      openPlayerProfile: "Spielerprofil öffnen",
+      openSteamProfile: "Steam-Profil öffnen",
+      aliases: "Aliasnamen",
+      createdBy: "Erstellt von",
+      fullReason: "Grund (vollständig)",
+      affectedServers: "Betroffene Server",
+      createdAt: "Erstellt am",
+      synchronization: "Synchronisation",
+      expirationDate: "Ablaufdatum",
+      entryId: "Eintrag-ID",
+      endBan: "Sperre beenden",
+      noRecords: "Keine Sperreinträge für diese Filter gefunden.",
+      confirmExpireTitle: "Sperre beenden?",
+      confirmExpireDescription: "Die Sperre für {{name}} wird sofort beendet. Der Eintrag bleibt zur Nachvollziehbarkeit erhalten.",
+      confirmDeleteTitle: "Sperreintrag endgültig löschen?",
+      confirmDeleteDescription: "Der Sperreintrag für {{name}} wird dauerhaft gelöscht und kann nicht wiederhergestellt werden.",
       blacklistPlayer: "Spieler sperren",
-      dialogDescription:
-        "Mit einem Sperreintrag entziehst du einem Spieler den Zugang zu einem oder mehreren Servern.",
+      dialogDescription: "Mit einem Sperreintrag entziehst du einem Spieler den Zugang zu einem oder mehreren Servern.",
       warningNoServers: "Diese Sperrliste betrifft aktuell keinen Server.",
-      warningUnknownServer:
-        "Der aktuelle Server konnte nicht ermittelt werden. Betroffene Server: [{{servers}}]",
-      warningOtherServers:
-        "Diese Sperrliste betrifft diesen Server nicht. Betroffene Server: [{{servers}}]",
+      warningUnknownServer: "Der aktuelle Server konnte nicht ermittelt werden. Betroffene Server: [{{servers}}]",
+      warningOtherServers: "Diese Sperrliste betrifft diesen Server nicht. Betroffene Server: [{{servers}}]",
       expirationHelp: "Zeitpunkt, zu dem der Sperreintrag abläuft.",
       indefiniteNotice: "Die ausgewählten Spieler werden dauerhaft gesperrt.",
       reason: "Grund",
@@ -972,8 +784,7 @@ const de = {
       savedMessages: "Gespeicherte Nachrichten",
       backToRecords: "Zurück zu den Einträgen",
       deleteListTitle: "Sperrliste „{{name}}“ löschen?",
-      deleteListDescription:
-        "Möchtest du die Sperrliste und alle zugehörigen Einträge dauerhaft löschen?",
+      deleteListDescription: "Möchtest du die Sperrliste und alle zugehörigen Einträge dauerhaft löschen?",
       listName: "Listenname",
       servers: "Server",
       allServers: "Alle",
@@ -982,8 +793,7 @@ const de = {
       editList: "Sperrliste bearbeiten",
       createList: "Neue Liste anlegen",
       createListTitle: "Sperrliste anlegen",
-      listDescription:
-        "Sperrlisten bündeln Ausschlüsse und ermöglichen eine flexible, serverübergreifende Verwaltung.",
+      listDescription: "Sperrlisten bündeln Ausschlüsse und ermöglichen eine flexible, serverübergreifende Verwaltung.",
       enableAllServers: "Auf allen Servern aktivieren",
       syncMethods: {
         kick_only: "Nur kicken",
@@ -991,19 +801,15 @@ const de = {
         ban_immediately: "Sofort sperren",
       },
       syncDescriptions: {
-        kick_only:
-          "Spieler werden bei jedem Beitritt gekickt und sehen den Grund.",
-        ban_on_connect:
-          "Spieler sehen den Sperrgrund einmal und werden anschließend gesperrt.",
-        ban_immediately:
-          "Spieler sehen den Grund nur, wenn sie beim Eintrag online sind.",
+        kick_only: "Spieler werden bei jedem Beitritt gekickt und sehen den Grund.",
+        ban_on_connect: "Spieler sehen den Sperrgrund einmal und werden anschließend gesperrt.",
+        ban_immediately: "Spieler sehen den Grund nur, wenn sie beim Eintrag online sind.",
       },
     },
     gameLogs: {
       title: "Spielprotokolle",
       eyebrow: "Protokolle",
-      subtitle:
-        "Historische Spielereignisse durchsuchen, filtern und exportieren.",
+      subtitle: "Historische Spielereignisse durchsuchen, filtern und exportieren.",
       searchLogs: "Protokolle durchsuchen …",
       playerId: "Spieler-ID",
       name: "Name",
@@ -1019,12 +825,94 @@ const de = {
       oldest: "Älteste zuerst",
       clear: "Zurücksetzen",
       download: "Protokolle herunterladen",
+      timeline: {
+        subtitle: "Chronologische Ereignisse einer Runde filtern, durchsuchen und im Zusammenhang prüfen.",
+        loaded: "{{count}} Ereignisse geladen",
+        export: "Exportieren",
+        playerSearch: "Spielername oder ID",
+        timeRange: "Zeitraum",
+        lastRound: "Letzte Runde",
+        lastHour: "Letzte Stunde",
+        lastSixHours: "Letzte 6 Stunden",
+        lastDay: "Letzte 24 Stunden",
+        allTime: "Gesamter Zeitraum",
+        customRange: "Benutzerdefiniert",
+        filter: "Filtern",
+        filtering: "Wird gefiltert …",
+        advanced: "Erweitert",
+        eventCategories: "Ereigniskategorien",
+        clearAll: "Alle Filter löschen",
+        exactAction: "Aktion exakt abgleichen",
+        exactPlayer: "Spieler exakt abgleichen",
+        maxLoaded: "Maximal zu ladende Ereignisse",
+        roundHeading: "Runde · {{map}}",
+        eventsInSelection: "{{count}} Ereignisse in dieser Auswahl",
+        roundOverview: "Runde im Blick",
+        map: "Karte",
+        gameMode: "Spielmodus",
+        roundStart: "Rundenstart",
+        roundEnd: "Rundenende",
+        duration: "Dauer",
+        eventsByType: "Ereignisse nach Typ",
+        activity: "Aktivität · Top 5 Spieler",
+        total: "Gesamt",
+        selectedEvent: "Ausgewähltes Ereignis",
+        selectEvent: "Wähle ein Ereignis aus, um alle verfügbaren Details zu prüfen.",
+        timestamp: "Zeitstempel",
+        attacker: "Akteur",
+        target: "Ziel",
+        weapon: "Waffe",
+        message: "Nachricht",
+        rawLog: "Roh-Log",
+        copy: "Kopieren",
+        copied: "Kopiert",
+        copyId: "Spieler-ID kopieren",
+        profile: "Profil",
+        noEvents: "Keine Ereignisse in dieser Auswahl",
+        adjustFilters: "Passe den Zeitraum oder die Ereigniskategorie an.",
+        showAll: "Alle Ereignisse anzeigen",
+        noPlayerActivity: "Keine Spieleraktivität vorhanden.",
+        unknownMap: "Unbekannte Karte",
+        system: "System",
+        playerJoined: "{{player}} ist dem Server beigetreten",
+        playerLeft: "{{player}} hat den Server verlassen",
+        loadedCount: "{{shown}} von {{total}} geladen",
+        perPage: "Pro Seite",
+        categories: {
+          all: "Alle",
+          admin: "Admin",
+          chat: "Chat",
+          kills: "Kills",
+          teamkills: "Teamkills",
+          connections: "Verbindungen",
+          round: "Runde",
+        },
+        presets: {
+          last_round: "Letzte Runde",
+          "1h": "Letzte Stunde",
+          "6h": "Letzte 6 Stunden",
+          "24h": "Letzte 24 Stunden",
+          all: "Gesamter Zeitraum",
+          custom: "Benutzerdefiniert",
+        },
+        eventLabels: {
+          admin: "Admin",
+          chat: "Chat",
+          teamChat: "Chat · Team",
+          unitChat: "Chat · Trupp",
+          kill: "Kill",
+          teamkill: "Teamkill",
+          connected: "Verbunden",
+          disconnected: "Getrennt",
+          round: "Runde",
+          other: "Ereignis",
+        },
+      },
     },
     auditLogs: {
       title: "Audit-Protokolle",
       eyebrow: "Sicherheit",
-      subtitle:
-        "Administrative Änderungen und ausgeführte Befehle nachvollziehen.",
+      subtitle: "Administrative Änderungen, Moderation und Systembefehle lückenlos nachvollziehen.",
       user: "Nach Benutzer suchen",
       action: "Nach Aktion suchen",
       parameters: "Nach Parametern suchen",
@@ -1042,21 +930,111 @@ const de = {
       arguments: "Argumente",
       result: "Ergebnis",
       selectRow: "Wähle einen Audit-Eintrag aus, um Details anzuzeigen.",
-      filters: "Audit-Protokolle filtern",
+      userFilter: "Benutzer",
+      commandFilter: "Befehl",
+      searchPlaceholder: "Ziel, Spieler-ID oder Parameter suchen …",
+      category: "Bereich",
+      categoryPage: "Bereich · diese Seite",
+      status: "Status",
+      statusPage: "Status · diese Seite",
+      filter: "Filtern",
+      filtering: "Filtere …",
+      advanced: "Erweitert",
+      clearAll: "Alle Filter löschen",
+      pageSize: "Einträge pro Seite",
+      exportPage: "Diese Seite exportieren",
+      totalEntries_one: "{{count}} Eintrag",
+      totalEntries_other: "{{count}} Einträge",
+      entryCount_one: "{{count}} Eintrag",
+      entryCount_other: "{{count}} Einträge",
+      loadedRange: "{{start}}–{{end}} von {{total}} · {{visible}} sichtbar",
+      target: "Ziel",
+      server: "Server",
+      serverUnknown: "Aktueller Server",
+      serverNumber: "Server {{number}}",
+      auditId: "Audit-ID",
+      openProfile: "Spielerprofil öffnen",
+      submittedValues: "Übermittelte Werte",
+      rawData: "Technische Rohdaten",
+      copyRaw: "Rohdaten kopieren",
+      noArguments: "Für diese Aktion wurden keine Parameter gespeichert.",
+      resultUnknown: "Für diese Aktion liegt kein eindeutiger Ergebnisstatus vor.",
+      unknownAction: "Unbekannter Befehl",
+      unknownUser: "Unbekannter Benutzer",
+      playerTarget: "Spieler",
+      serverWide: "Serverweit",
+      unknownDate: "Datum unbekannt",
+      today: "Heute",
+      yesterday: "Gestern",
+      emptyTitle: "Keine Audit-Einträge gefunden",
+      emptyDescription: "Passe die Filter an oder lösche sie, um weitere Einträge zu sehen.",
+      categories: {
+        all: "Alle Bereiche",
+        moderation: "Moderation",
+        maps: "Karten",
+        access: "Zugriff & Rollen",
+        settings: "Konfiguration",
+        system: "System",
+      },
+      statuses: {
+        all: "Alle Status",
+        success: "Erfolgreich",
+        failed: "Fehlgeschlagen",
+        partial: "Teilweise",
+        unknown: "Ungeklärt",
+      },
+      resultMessages: {
+        success: "Die Aktion wurde erfolgreich ausgeführt.",
+        failed: "Die Aktion ist fehlgeschlagen.",
+        partial: "Die Aktion wurde nur teilweise ausgeführt.",
+      },
+      actions: {
+        messagePlayer: "Nachricht an Spieler gesendet",
+        punishPlayer: "Spieler bestraft",
+        kickPlayer: "Spieler gekickt",
+        tempBanPlayer: "Spieler temporär gesperrt",
+        permaBanPlayer: "Spieler dauerhaft gesperrt",
+        disbandSquad: "Trupp aufgelöst",
+        switchPlayer: "Spieler ins andere Team verschoben",
+        changeMap: "Karte gewechselt",
+        setNextMap: "Nächste Karte festgelegt",
+        changeRotation: "Kartenrotation geändert",
+        addVip: "VIP hinzugefügt",
+        removeVip: "VIP entfernt",
+        addAdmin: "Adminrolle hinzugefügt",
+        removeAdmin: "Adminrolle entfernt",
+        changeAutobalance: "Autobalancer geändert",
+        changeWelcome: "Willkommensnachricht geändert",
+        clearCache: "Cache geleert",
+        restartService: "Dienst neu gestartet",
+        toggleService: "Dienststatus geändert",
+        administrativeAction: "Administrative Aktion",
+      },
+      argumentLabels: {
+        playerName: "Spielername",
+        playerId: "Spieler-ID",
+        message: "Nachricht",
+        reason: "Grund",
+        duration: "Dauer",
+        map: "Karte",
+        squad: "Trupp",
+        team: "Team",
+        service: "Dienst",
+        server: "Server",
+      },
+      boolean: { yes: "Ja", no: "Nein" },
     },
   },
   maps: {
     title: "Kartenverwaltung",
     eyebrow: "Spielsteuerung",
-    subtitle:
-      "Kartenwechsel, Rotation, Sektoren und Kartenabstimmung verwalten.",
+    subtitle: "Kartenwechsel, Rotation, Sektoren und Kartenabstimmung verwalten.",
     current: "Aktuelle Karte",
     next: "Nächste Karte",
     restart: "Aktuelle Karte neu starten",
     setCurrent: "Aktuelle Karte festlegen: {{map}}",
     server: "Server: {{server}}",
-    timerNotice:
-      "Dadurch wird ein 60-Sekunden-Timer gestartet und die aktive Karte überschrieben.",
+    timerNotice: "Dadurch wird ein 60-Sekunden-Timer gestartet und die aktive Karte überschrieben.",
     changed: "Karte wurde zu {{map}} gewechselt.",
     builder: "Editor",
     settings: "Einstellungen",
@@ -1077,8 +1055,7 @@ const de = {
     whitelist: "Auswahlliste",
     status: "Status",
     objectives: "Sektoren",
-    objectivesIntro:
-      "Wähle Sektoren direkt auf der Karte aus. Nach der Bestätigung wird die aktuelle Karte sofort neu gestartet; ausgelassene Reihen werden zufällig gewählt.",
+    objectivesIntro: "Wähle Sektoren direkt auf der Karte aus. Nach der Bestätigung wird die aktuelle Karte sofort neu gestartet; ausgelassene Reihen werden zufällig gewählt.",
     clear: "Leeren",
     selectByName: "Nach Namen auswählen",
     objectiveNumber: "Sektor {{number}}",
@@ -1087,8 +1064,7 @@ const de = {
     adjacent: "Sektoren müssen benachbart sein",
     notStraight: "Sektoren dürfen nicht in einer geraden Linie liegen",
     changeObjectives: "Sektoren ändern",
-    objectiveRestart:
-      "Die Karte wird sofort mit den unten aufgeführten Sektoren neu gestartet.",
+    objectiveRestart: "Die Karte wird sofort mit den unten aufgeführten Sektoren neu gestartet.",
     mapChanged: "Die Karte wurde gewechselt!",
     messages: "Nachrichten",
     configuration: "Konfiguration",
@@ -1106,35 +1082,26 @@ const de = {
     noMaps: "Keine Karten gefunden",
     adjustFilters: "Passe Suche oder Filter an.",
     unsupportedMode: "Nicht unterstützter Spielmodus",
-    objectivesSkirmish:
-      "Sektoren können im Geplänkel-Modus nicht geändert werden.",
+    objectivesSkirmish: "Sektoren können im Geplänkel-Modus nicht geändert werden.",
     rotationShuffle: "Kartenrotation mischen",
-    rotationShuffleDescription:
-      "Mischt die Kartenrotation bei jedem Durchlauf zufällig.",
+    rotationShuffleDescription: "Mischt die Kartenrotation bei jedem Durchlauf zufällig.",
     rotationShuffleUpdated: "Kartenrotation wird nun {{state}} gemischt.",
     votemapConfigChanged: "Die Konfiguration wurde geändert",
-    votemapWhitelistSaved:
-      "Auswahlliste der Kartenabstimmung wurde gespeichert.",
-    votemapWhitelistReset:
-      "Auswahlliste der Kartenabstimmung wurde zurückgesetzt.",
-    votemapWhitelistOutdated:
-      "Einige Karten der Auswahlliste wurden gelöscht oder umbenannt: {{maps}}. Setze die Auswahlliste zurück oder passe die automatischen Einstellungen an.",
-    resetVotemapWhitelist:
-      "Auswahlliste auf alle verfügbaren Karten zurücksetzen",
+    votemapWhitelistSaved: "Auswahlliste der Kartenabstimmung wurde gespeichert.",
+    votemapWhitelistReset: "Auswahlliste der Kartenabstimmung wurde zurückgesetzt.",
+    votemapWhitelistOutdated: "Einige Karten der Auswahlliste wurden gelöscht oder umbenannt: {{maps}}. Setze die Auswahlliste zurück oder passe die automatischen Einstellungen an.",
+    resetVotemapWhitelist: "Auswahlliste auf alle verfügbaren Karten zurücksetzen",
     ignoreChanges: "Ignorieren",
     resetChanges: "Änderungen zurücksetzen",
-    copySelectedMapIds:
-      "Liste der ausgewählten Karten-IDs in die Zwischenablage kopieren.",
+    copySelectedMapIds: "Liste der ausgewählten Karten-IDs in die Zwischenablage kopieren.",
     copyMapIdsHint: "Nützlich für automatische Einstellungen.",
     mobileView: "Ansicht",
     mapList: "Kartenliste",
     mapSelection: "Kartenauswahl",
     noMoreMaps: "Es sind keine weiteren Karten zum Hinzufügen verfügbar.",
-    objectiveGridCell:
-      "Sektorposition Reihe {{row}}, Spalte {{column}}: {{state}}",
+    objectiveGridCell: "Sektorposition Reihe {{row}}, Spalte {{column}}: {{state}}",
     objectiveSelected: "ausgewählt",
-    objectivesUnavailable:
-      "Dieser Gameserver stellt keine Sektor-Layout-Steuerung über RCON bereit.",
+    objectivesUnavailable: "Dieser Gameserver stellt keine Sektor-Layout-Steuerung über RCON bereit.",
     objectiveAvailable: "verfügbar",
     objectiveUnavailable: "nicht verfügbar",
     changeMap: "Karte wechseln",
@@ -1148,13 +1115,10 @@ const de = {
     disableVotemap: "Kartenabstimmung deaktivieren",
     votemapUpdated: "Kartenabstimmung wurde {{state}}.",
     votemapReset: "Kartenabstimmung wurde zurückgesetzt.",
-    disableVotemapDescription:
-      "Kartenabstimmung deaktivieren und Karten über die Rotation bestimmen.",
-    enableVotemapDescription:
-      "Kartenabstimmung aktivieren und Karten anhand der Stimmen oder weiterer Bedingungen bestimmen.",
+    disableVotemapDescription: "Kartenabstimmung deaktivieren und Karten über die Rotation bestimmen.",
+    enableVotemapDescription: "Kartenabstimmung aktivieren und Karten anhand der Stimmen oder weiterer Bedingungen bestimmen.",
     resetVotemap: "Zurücksetzen",
-    resetVotemapDescription:
-      "Aktuelle Stimmen zurücksetzen und einen neuen Kartenpool erzeugen.",
+    resetVotemapDescription: "Aktuelle Stimmen zurücksetzen und einen neuen Kartenpool erzeugen.",
     votemapSettings: {
       updated: "Die Konfiguration der Kartenabstimmung wurde gespeichert.",
       reset: "Zurücksetzen",
@@ -1162,14 +1126,11 @@ const de = {
       instructionText: "Erinnerungstext zur Kartenabstimmung",
       instructionTextHelp: "Füge {map_selection} in den Text ein.",
       thankYouText: "Bestätigung nach der Abstimmung",
-      thankYouTextHelp:
-        "Antwort nach einer Stimmabgabe. {player_name} und {map_name} sind verfügbar. Leer lassen, um keine Bestätigung zu senden.",
+      thankYouTextHelp: "Antwort nach einer Stimmabgabe. {player_name} und {map_name} sind verfügbar. Leer lassen, um keine Bestätigung zu senden.",
       helpText: "Hilfetext",
-      helpTextHelp:
-        "Dieser Text erscheint bei einem ungültigen !votemap-Befehl oder bei !votemap help.",
+      helpTextHelp: "Dieser Text erscheint bei einem ungültigen !votemap-Befehl oder bei !votemap help.",
       reminderFrequency: "Erinnerungsintervall in Minuten",
-      reminderFrequencyHelp:
-        "Erinnert nicht abstimmende Spieler per Direktnachricht. 0 deaktiviert Erinnerungen.",
+      reminderFrequencyHelp: "Erinnert nicht abstimmende Spieler per Direktnachricht. 0 deaktiviert Erinnerungen.",
       warfareOptions: "Warfare-Karten",
       warfareOptionsHelp: "Anzahl der angebotenen Warfare-Karten.",
       offensiveOptions: "Offensive-Karten",
@@ -1177,58 +1138,41 @@ const de = {
       skirmishOptions: "Control-Skirmish-Karten",
       skirmishOptionsHelp: "Anzahl der angebotenen Control-Skirmish-Karten.",
       recentMapsExcluded: "Ausgeschlossene zuletzt gespielte Karten",
-      recentMapsExcludedHelp:
-        "Die letzten N Karten werden ausgeschlossen; die aktuelle Karte immer.",
-      allowOptOut:
-        "Spielern erlauben, Erinnerungen mit !votemap never abzubestellen",
-      considerOffensiveSameMap:
-        "Offensive-Karten beim Ausschließen als dieselbe Karte behandeln",
-      considerSkirmishesSameMap:
-        "Skirmish-Karten beim Ausschließen als dieselbe Karte behandeln",
-      allowConsecutiveOffensives:
-        "Aufeinanderfolgende Offensive-Karten erlauben",
-      allowConsecutiveOffensivesOppositeSides:
-        "Aufeinanderfolgende Offensive-Karten mit zweimaliger Verteidigung desselben Teams erlauben",
-      allowConsecutiveSkirmishes:
-        "Aufeinanderfolgende Skirmish-Karten erlauben",
+      recentMapsExcludedHelp: "Die letzten N Karten werden ausgeschlossen; die aktuelle Karte immer.",
+      allowOptOut: "Spielern erlauben, Erinnerungen mit !votemap never abzubestellen",
+      considerOffensiveSameMap: "Offensive-Karten beim Ausschließen als dieselbe Karte behandeln",
+      considerSkirmishesSameMap: "Skirmish-Karten beim Ausschließen als dieselbe Karte behandeln",
+      allowConsecutiveOffensives: "Aufeinanderfolgende Offensive-Karten erlauben",
+      allowConsecutiveOffensivesOppositeSides: "Aufeinanderfolgende Offensive-Karten mit zweimaliger Verteidigung desselben Teams erlauben",
+      allowConsecutiveSkirmishes: "Aufeinanderfolgende Skirmish-Karten erlauben",
       allowDefaultToOffensive: "Offensive als Standardkarte erlauben",
       allowDefaultToSkirmish: "Skirmish als Standardkarte erlauben",
-      leastPlayedSuggestions:
-        "Am seltensten gespielte Karte aus den Vorschlägen",
+      leastPlayedSuggestions: "Am seltensten gespielte Karte aus den Vorschlägen",
       leastPlayedAll: "Am seltensten gespielte Karte aus allen Karten",
       randomSuggestions: "Zufällige Karte aus den Vorschlägen",
       randomAll: "Zufällige Karte aus allen Karten",
     },
     votemapAdvanced: {
-      considerEnvironmentSameMap:
-        "Kartenvarianten mit unterschiedlicher Umgebung beim Ausschließen als dieselbe Karte behandeln",
-      allowMultipleMapsSameEnvironment:
-        "Mehrere Kartenvarianten derselben Umgebung in einer Abstimmung erlauben",
+      considerEnvironmentSameMap: "Kartenvarianten mit unterschiedlicher Umgebung beim Ausschließen als dieselbe Karte behandeln",
+      allowMultipleMapsSameEnvironment: "Mehrere Kartenvarianten derselben Umgebung in einer Abstimmung erlauben",
       remindOnMatchStart: "Abstimmungserinnerung beim Start der Runde senden",
       remindOnMatchEnd: "Abstimmungserinnerung am Ende der Runde senden",
       allowVipOnly: "Nur VIP-Spielern die Abstimmung erlauben",
       playerChoiceHelpText: "Hilfetext zur Spielerwahl",
-      playerChoiceHelpTextHelp:
-        "Wird angezeigt, wenn der Befehl zur Spielerwahl falsch verwendet wird.",
+      playerChoiceHelpTextHelp: "Wird angezeigt, wenn der Befehl zur Spielerwahl falsch verwendet wird.",
       noVoteText: "Text ohne Abstimmungsergebnis",
-      noVoteTextHelp:
-        "Wird angezeigt, wenn kein gültiges Abstimmungsergebnis vorliegt.",
+      noVoteTextHelp: "Wird angezeigt, wenn kein gültiges Abstimmungsergebnis vorliegt.",
       vipVoteCount: "Stimmengewicht für VIPs",
-      vipVoteCountHelp:
-        "Anzahl der Stimmen, die eine VIP-Stimme zählt (1–100).",
+      vipVoteCountHelp: "Anzahl der Stimmen, die eine VIP-Stimme zählt (1–100).",
       voteCountFlags: "Stimmengewicht nach Kennzeichnung",
-      voteCountFlagsHelp:
-        "Stimmen von Spielern mit einer dieser Kennzeichnungen zählen mehrfach. Treffen mehrere zu, gilt der höchste Wert (0–100).",
+      voteCountFlagsHelp: "Stimmen von Spielern mit einer dieser Kennzeichnungen zählen mehrfach. Treffen mehrere zu, gilt der höchste Wert (0–100).",
       voteCount: "Stimmengewicht",
       voteWhitelistFlags: "Erlaubte Kennzeichnungen für Abstimmungen",
-      voteWhitelistFlagsHelp:
-        "Nur Spieler mit einer dieser Kennzeichnungen dürfen abstimmen. Bei leerer Liste dürfen alle abstimmen.",
+      voteWhitelistFlagsHelp: "Nur Spieler mit einer dieser Kennzeichnungen dürfen abstimmen. Bei leerer Liste dürfen alle abstimmen.",
       voteBanFlags: "Gesperrte Kennzeichnungen für Abstimmungen",
-      voteBanFlagsHelp:
-        "Spieler mit einer dieser Kennzeichnungen dürfen nicht über Karten abstimmen.",
+      voteBanFlagsHelp: "Spieler mit einer dieser Kennzeichnungen dürfen nicht über Karten abstimmen.",
       playerChoiceWhitelistFlags: "Erlaubte Kennzeichnungen für Spielerwahl",
-      playerChoiceWhitelistFlagsHelp:
-        "Nur Spieler mit einer dieser Kennzeichnungen dürfen !vm add verwenden. Bei leerer Liste dürfen es alle verwenden.",
+      playerChoiceWhitelistFlagsHelp: "Nur Spieler mit einer dieser Kennzeichnungen dürfen !vm add verwenden. Bei leerer Liste dürfen es alle verwenden.",
       loadingEmojiPicker: "Emoji-Auswahl wird geladen …",
     },
     votemapStatus: {
@@ -1238,19 +1182,16 @@ const de = {
       playerChoice: "Spielerwahl von {{player}}",
       history: "Abstimmungsverlauf",
       resultRecorded: "Ergebnis vom {{date}} mit {{map}} auf dem Server.",
-      emptyHistoryResult:
-        "Es gab keine Kartenauswahl oder die Kartenabstimmung war deaktiviert.",
+      emptyHistoryResult: "Es gab keine Kartenauswahl oder die Kartenabstimmung war deaktiviert.",
       noHistory: "Es wurden noch keine Abstimmungsergebnisse aufgezeichnet.",
       paused: "(pausiert)",
       lastReminder: "Letzte Abstimmungserinnerung",
       remind: "Erinnern",
-      remindHelp:
-        "Allen Spielern im Spiel eine Erinnerung zur Abstimmung senden.",
+      remindHelp: "Allen Spielern im Spiel eine Erinnerung zur Abstimmung senden.",
       add: "Karte hinzufügen",
       addHelp: "Die ausgewählte Karte zur aktuellen Abstimmung hinzufügen.",
       setWinner: "Gewinner festlegen",
-      setWinnerHelp:
-        "Die nächste Karte bestimmen, indem sie als Abstimmungsgewinner festgelegt wird.",
+      setWinnerHelp: "Die nächste Karte bestimmen, indem sie als Abstimmungsgewinner festgelegt wird.",
       selectMap: "Karte auswählen",
       reminderSent: "Die Erinnerung zur Kartenabstimmung wurde gesendet.",
       mapRemoved: "{{map}} wurde aus der aktuellen Auswahl entfernt.",
@@ -1259,10 +1200,203 @@ const de = {
     },
   },
   settings: {
+    integrations: {
+      eyebrow: "Serverkonfiguration",
+      title: "Discord & Kommunikation",
+      description:
+        "Discord-Webhooks veröffentlichen Serverereignisse an konfigurierte Discord-Ziele. Die übrigen Module steuern Ingame-Befehle oder Hosting.",
+      searchPlaceholder: "Module suchen …",
+      searchLabel: "Kommunikationsmodule durchsuchen",
+      refresh: "Aktualisieren",
+      lastUpdated: "Zuletzt aktualisiert: {{value}}",
+      unsavedConfirmation:
+        "In diesem Modul gibt es ungespeicherte Änderungen. Wirklich zu einem anderen Modul wechseln?",
+      groups: {
+        discord: "Discord-Webhooks · {{count}}",
+        communication: "Weitere Kommunikation · {{count}}",
+      },
+      filters: {
+        all: "Alle",
+        discord: "Discord",
+        commands: "Befehle",
+        hosting: "Hosting",
+      },
+      columns: {
+        module: "Modul",
+        purpose: "Zweck",
+        configuration: "Konfiguration",
+        action: "Aktion",
+      },
+      status: {
+        active: "Aktiv",
+        configured: "Konfiguriert",
+        inactive: "Inaktiv",
+        available: "Öffnen",
+      },
+      emptyTitle: "Keine Module gefunden",
+      emptyDescription:
+        "Passe Suche oder Filter an, um weitere Module anzuzeigen.",
+      form: {
+        moduleConfiguration: "Modulkonfiguration",
+        enabled: "Aktiv",
+        disabled: "Inaktiv",
+        entryCount_one: "{{count}} Eintrag",
+        entryCount_other: "{{count}} Einträge",
+        noEntries: "Noch kein Eintrag konfiguriert.",
+        addEntry: "Eintrag hinzufügen",
+        removeEntry: "Eintrag {{number}} entfernen",
+        secretHelp: "Der sensible Zugriffsschlüssel wird maskiert dargestellt.",
+        showSecret: "Zugriffsschlüssel anzeigen",
+        hideSecret: "Zugriffsschlüssel ausblenden",
+        sections: {
+          operation: {
+            title: "Betrieb",
+            description: "Modul aktivieren oder pausieren.",
+          },
+          destinations: {
+            title: "Discord-Ziele",
+            description: "Webhook-Ziele und öffentliche Verweise verwalten.",
+          },
+          events: {
+            title: "Ereignisse",
+            description: "Festlegen, welche Ereignisse übertragen werden.",
+          },
+          mentions: {
+            title: "Erwähnungen & Auslöser",
+            description: "Rollen, Benutzer und Auslösewörter festlegen.",
+          },
+          commands: {
+            title: "Befehle",
+            description: "Chatbefehle, Hilfeaufrufe und Wirkungen verwalten.",
+          },
+          connection: {
+            title: "Verbindung",
+            description: "GTX-Endpunkt für die Namenssynchronisierung festlegen.",
+          },
+          scoreboardHeader: {
+            title: "Spielstand & Kopfbereich",
+            description: "Grunddaten und Spielstandsanzeige konfigurieren.",
+          },
+          mapRotation: {
+            title: "Kartenrotation",
+            description: "Darstellung und Aktualisierung der Rotation festlegen.",
+          },
+          playerStats: {
+            title: "Spielerstatistiken",
+            description: "Ranglisten, Werte und Aktualisierung konfigurieren.",
+          },
+          appearance: {
+            title: "Darstellung",
+            description: "Texte und sichtbare Ausgabe anpassen.",
+          },
+          advanced: {
+            title: "Weitere Einstellungen",
+            description: "Zusätzliche Parameter dieses Moduls verwalten.",
+          },
+        },
+        fields: {
+          listItem: "Wert",
+          enabled: "Modulstatus",
+          hooks: "Discord-Webhooks",
+          webhooks: "Log-Webhooks",
+          webhook: "Discord-Ziel",
+          url: "Webhook-URL",
+          user_mentions: "Benutzer erwähnen",
+          role_mentions: "Rollen erwähnen",
+          trigger_words: "Auslösewörter",
+          allow_mentions: "Erwähnungen aus dem Chat erlauben",
+          send_kills: "Kills senden",
+          send_team_kills: "Teamkills senden",
+          log_types: "Ereignistypen",
+          command_words: "Konfigurierte Befehle",
+          describe_words: "Hilfe-Befehle",
+          words: "Befehlswörter",
+          description: "Beschreibung",
+          message: "Antwortnachricht",
+          commands: "Ausgeführte RCON-Befehle",
+          conditions: "Bedingungen",
+          ip: "Server-IP",
+          port: "Query-Port",
+          public_scoreboard_url: "Öffentliche Scoreboard-URL",
+          footer_last_refreshed_text: "Fußzeile: letzte Aktualisierung",
+          header_gamestate_enabled: "Kopfbereich aktiv",
+          map_rotation_enabled: "Kartenrotation aktiv",
+          player_stats_enabled: "Spielerstatistiken aktiv",
+          header_gamestate_include_server_name: "Servername anzeigen",
+          header_gamestate_time_between_refreshes: "Aktualisierung in Sekunden",
+          quick_connect_url: "Direktverbindungs-URL",
+          battlemetrics_url: "BattleMetrics-URL",
+          show_map_image: "Kartenbild anzeigen",
+          objective_score_format_generic: "Allgemeines Spielstandsformat",
+          objective_score_format_ger_v_us: "Format Deutschland gegen USA",
+          objective_score_format_ger_v_sov: "Format Deutschland gegen UdSSR",
+          objective_score_format_ger_v_uk: "Format Deutschland gegen UK",
+          header_gamestate_embeds: "Felder im Kopfbereich",
+          map_rotation_include_server_name: "Servername in Rotation anzeigen",
+          map_rotation_time_between_refreshes: "Rotationsintervall in Sekunden",
+          current_map_format: "Format aktuelle Karte",
+          next_map_format: "Format nächste Karte",
+          other_map_format: "Format weitere Karten",
+          show_map_legend: "Kartenlegende anzeigen",
+          map_rotation_title_text: "Titel der Kartenrotation",
+          map_legend: "Kartenlegende",
+          player_stats_include_server_name: "Servername in Statistiken anzeigen",
+          player_stats_title_text: "Titel der Spielerstatistiken",
+          player_stats_time_between_refreshes: "Statistikintervall in Sekunden",
+          player_stats_num_to_display: "Spieler je Statistik",
+          player_stat_embeds: "Felder der Spielerstatistik",
+        },
+      },
+      modules: {
+        audit: {
+          name: "Audit",
+          purpose: "Testbetrieb und Änderungsprotokoll an Discord senden.",
+        },
+        adminPing: {
+          name: "Admin-Ruf",
+          purpose: "Admin-Benachrichtigungen bei Bedarf an Discord senden.",
+        },
+        watchlist: {
+          name: "Beobachtungsliste",
+          purpose: "Updates der Beobachtungsliste an Discord senden.",
+        },
+        camera: {
+          name: "Admin-Kamera",
+          purpose: "Ereignisse der Admin-Kamera an Discord senden.",
+        },
+        chat: {
+          name: "Chat-Spiegelung",
+          purpose: "Spieler-Chat in ausgewählte Discord-Kanäle spiegeln.",
+        },
+        kills: {
+          name: "Kills & Teamkills",
+          purpose: "Kills und Teamkills an Discord senden.",
+        },
+        logLine: {
+          name: "Log-Ereignisse",
+          purpose: "Ausgewählte Server-Protokolle an Discord senden.",
+        },
+        scoreboard: {
+          name: "Discord-Scoreboard",
+          purpose: "Spielstand und Scoreboard-Updates an Discord senden.",
+        },
+        chatCommands: {
+          name: "Spieler-Chatbefehle",
+          purpose: "Ingame-Chatbefehle für Spieler konfigurieren.",
+        },
+        rconCommands: {
+          name: "RCON-Chatbefehle",
+          purpose: "Erweiterte RCON-Befehle über den Chat konfigurieren.",
+        },
+        gtxServer: {
+          name: "GTX-Servername",
+          purpose: "GTX-Servername und Spielerzahl synchronisieren.",
+        },
+      },
+    },
     discordReports: {
       title: "Discord Report Bot",
-      subtitle:
-        "Spieler-Reports nach CRCON-Vorlage; KI nur für automatische Chat- und Namensprüfungen.",
+      subtitle: "Spieler-Reports nach CRCON-Vorlage; KI nur für automatische Chat- und Namensprüfungen.",
       statusConnected: "Verbunden",
       statusDisconnected: "Nicht verbunden",
       statusActive: "Aktiv",
@@ -1280,31 +1414,22 @@ const de = {
       back: "Zurück",
       next: "Weiter",
       connecting: "Verbindung wird hergestellt …",
-      appInstalled:
-        "Die Discord-App ist mit dieser CRCON-Installation verbunden.",
-      installPrivacy:
-        "CRCON öffnet die offizielle Discord-Installation. Du musst weder Bot-Token noch Server-ID eingeben.",
+      appInstalled: "Die Discord-App ist mit dieser CRCON-Installation verbunden.",
+      installPrivacy: "CRCON öffnet die offizielle Discord-Installation. Du musst weder Bot-Token noch Server-ID eingeben.",
       guildNotDetected: "Noch kein Discord-Server erkannt",
-      channelRolesHelp:
-        "Wähle den gemeinsamen Report-Kanal und mindestens eine aktuelle Discord-Moderatorrolle aus.",
-      actionSafety:
-        "Der erste Moderator, der eine Report-Aktion auswählt, übernimmt den Report. Permanent-Ban und Squad-Auflösung bleiben durch Grund, Vorschau und zweite Bestätigung geschützt; einzelne Sperrlisteneinträge werden direkt aus dem vollständig geprüften Formular ausgeführt.",
-      testHelp:
-        "Sende eine Testmeldung und prüfe Dienst, Discord-Zuordnung sowie den Callback oder zentralen Broker.",
-      activateHelp:
-        "Prüfe die wirksame Konfiguration und aktiviere den Bot erst, wenn Kanal, Rollen und Test stimmen.",
-      activateWithoutTest:
-        "Es gibt noch keinen erfolgreichen Test. Die Integration kann gespeichert werden, sollte aber vor dem Live-Betrieb getestet werden.",
+      channelRolesHelp: "Wähle den gemeinsamen Report-Kanal und mindestens eine aktuelle Discord-Moderatorrolle aus.",
+      actionSafety: "Der erste Moderator, der eine Report-Aktion auswählt, übernimmt den Report. Permanent-Ban, Blacklist und Squad-Auflösung bleiben durch Grund, Vorschau und zweite Bestätigung geschützt.",
+      testHelp: "Sende eine Testmeldung und prüfe Dienst, Discord-Zuordnung sowie den Callback oder zentralen Broker.",
+      activateHelp: "Prüfe die wirksame Konfiguration und aktiviere den Bot erst, wenn Kanal, Rollen und Test stimmen.",
+      activateWithoutTest: "Es gibt noch keinen erfolgreichen Test. Die Integration kann gespeichert werden, sollte aber vor dem Live-Betrieb getestet werden.",
       saveAndActivate: "Speichern & aktivieren",
       savePaused: "Pausiert speichern",
-      actionFailed:
-        "Die Aktion konnte nicht abgeschlossen werden. Die bestehende Konfiguration wurde nicht stillschweigend geändert.",
+      actionFailed: "Die Aktion konnte nicht abgeschlossen werden. Die bestehende Konfiguration wurde nicht stillschweigend geändert.",
       technicalDetails: "Technische Details",
       runDiagnostics: "Diagnose ausführen",
       diagnosticsComplete: "Discord-Diagnose abgeschlossen.",
       repair: "Verbindung neu prüfen",
-      repairComplete:
-        "Discord-Zuordnung und Betriebsstatus wurden neu geladen.",
+      repairComplete: "Discord-Zuordnung und Betriebsstatus wurden neu geladen.",
       serviceStatus: "Frontline-Dienst",
       bindingStatus: "Discord-Zuordnung",
       callbackStatus: "Callback / Broker",
@@ -1315,8 +1440,7 @@ const de = {
       brokerMode: "Zentraler Broker",
       directMode: "Direkter CRCON-Callback",
       serverFallback: "CRCON-Server",
-      serverContextUnavailable:
-        "Server- und Spielkontext derzeit nicht verfügbar",
+      serverContextUnavailable: "Server- und Spielkontext derzeit nicht verfügbar",
       state_active: "Aktiv",
       state_healthy: "Fehlerfrei",
       state_online: "Online",
@@ -1332,8 +1456,7 @@ const de = {
       state_idle: "Bereit",
       state_paused: "Pausiert",
       state_not_connected: "Nicht verbunden",
-      installHint:
-        "Installiere zuerst die Frontline Discord-App. Der Discord-Server wird automatisch erkannt; anschließend wählst du Kanal und Moderatorrollen aus. Ein eigener Bot-Token ist nicht nötig.",
+      installHint: "Installiere zuerst die Frontline Discord-App. Der Discord-Server wird automatisch erkannt; anschließend wählst du Kanal und Moderatorrollen aus. Ein eigener Bot-Token ist nicht nötig.",
       install: "Discord-App installieren",
       detectServer: "Discord-Server erkennen",
       roles: "Moderatorrollen",
@@ -1348,24 +1471,19 @@ const de = {
       reportChannel: "Report-Kanal",
       guildId: "Discord-Server-ID",
       channelId: "Report-Kanal-ID",
-      guildIdHelp:
-        "In Discord den Entwicklermodus aktivieren, den Server rechtsklicken und seine ID kopieren.",
-      guildDetectedHelp:
-        "Wird sicher aus dem Server ermittelt, auf dem die Discord-App installiert ist, und kann hier nicht geändert werden.",
-      channelIdHelp:
-        "Den gewünschten Discord-Kanal rechtsklicken und seine ID kopieren.",
+      guildIdHelp: "In Discord den Entwicklermodus aktivieren, den Server rechtsklicken und seine ID kopieren.",
+      guildDetectedHelp: "Wird sicher aus dem Server ermittelt, auf dem die Discord-App installiert ist, und kann hier nicht geändert werden.",
+      channelIdHelp: "Den gewünschten Discord-Kanal rechtsklicken und seine ID kopieren.",
       rolesHelp: "Wähle mindestens eine Rolle für Discord-Aktionen aus.",
       changeConnection: "Verbindung ändern",
-      changeConnectionHint:
-        "Die bestehende Verbindung bleibt aktiv, bis du die neue Zuordnung speicherst.",
+      changeConnectionHint: "Die bestehende Verbindung bleibt aktiv, bis du die neue Zuordnung speicherst.",
       saveConnection: "Zuordnung speichern",
       cancel: "Abbrechen",
       chat_enabled: "KI für Chat",
       names_enabled: "KI für Namen",
       shadow_mode: "Shadow-Modus",
       quality_opt_in: "Anonymisierte Qualitätsbeispiele (Opt-in)",
-      externalBilling:
-        "KI-Aufrufe laufen ausschließlich über deinen eigenen API-Key oder deinen ChatGPT/Codex-Login. Frontline stellt kein KI-Kontingent bereit.",
+      externalBilling: "KI-Aufrufe laufen ausschließlich über deinen eigenen API-Key oder deinen ChatGPT/Codex-Login. Frontline stellt kein KI-Kontingent bereit.",
       customTerms: "Eigene Begriffe",
       exceptions: "Ausnahmen",
       regexes: "Reguläre Ausdrücke",
@@ -1373,51 +1491,39 @@ const de = {
       template_claimed: "Meldestatus: Übernahme",
       template_resolved: "Meldestatus: Abschluss",
       template_dismissed: "Meldestatus: Ablehnung",
-      aiSafety:
-        "KI-Ergebnisse sind ausschließlich Vorschläge. Jede Spielaktion benötigt einen aktuell berechtigten Moderator; destruktive Aktionen zusätzlich Grund, Vorschau und zweite Bestätigung.",
+      aiSafety: "KI-Ergebnisse sind ausschließlich Vorschläge. Jede Spielaktion benötigt einen aktuell berechtigten Moderator; destruktive Aktionen zusätzlich Grund, Vorschau und zweite Bestätigung.",
       save: "Speichern",
       saved: "Discord- und KI-Konfiguration gespeichert.",
       test: "Testmeldung",
       testSent: "Testmeldung gesendet.",
       disconnect: "Verbindung trennen",
       sectionConnection: "Discord-Verbindung",
-      sectionConnectionHelp:
-        "Server und Report-Kanal werden über die installierte Discord-App sicher erkannt.",
+      sectionConnectionHelp: "Server und Report-Kanal werden über die installierte Discord-App sicher erkannt.",
       sectionPermissions: "Moderation & Berechtigungen",
-      sectionPermissionsHelp:
-        "Lege fest, welche Discord-Rollen den Bot bedienen und welche Aktionen angeboten werden.",
+      sectionPermissionsHelp: "Lege fest, welche Discord-Rollen den Bot bedienen und welche Aktionen angeboten werden.",
       sectionAi: "KI-Prüfungen",
-      sectionAiHelp:
-        "Automatische Prüfungen betreffen Chat und Spielernamen; normale Spielerreports benötigen keine KI.",
+      sectionAiHelp: "Automatische Prüfungen betreffen Chat und Spielernamen; normale Spielerreports benötigen keine KI.",
       aiProvider: "KI-Anbieter",
       provider_api_key: "Eigener OpenAI-API-Key",
-      provider_api_key_help:
-        "Der Schlüssel wird verschlüsselt in CRCON gespeichert. Die API-Kosten laufen über dein OpenAI-Projekt.",
+      provider_api_key_help: "Der Schlüssel wird verschlüsselt in CRCON gespeichert. Die API-Kosten laufen über dein OpenAI-Projekt.",
       provider_codex: "ChatGPT/Codex-Abonnement",
-      provider_codex_help:
-        "Melde dein ChatGPT-Konto per Gerätecode an und nutze ein Modell, das dein Codex-Abonnement freigibt.",
+      provider_codex_help: "Melde dein ChatGPT-Konto per Gerätecode an und nutze ein Modell, das dein Codex-Abonnement freigibt.",
       apiKey: "OpenAI-API-Key",
-      apiKeyHelp:
-        "Der Schlüssel wird beim Speichern verschlüsselt und später nicht mehr angezeigt.",
-      apiKeyStored:
-        "Ein verschlüsselter Schlüssel ist gespeichert. Leer lassen, um ihn beizubehalten.",
+      apiKeyHelp: "Der Schlüssel wird beim Speichern verschlüsselt und später nicht mehr angezeigt.",
+      apiKeyStored: "Ein verschlüsselter Schlüssel ist gespeichert. Leer lassen, um ihn beizubehalten.",
       codexLogin: "Mit ChatGPT anmelden",
       codexLogout: "Abmelden",
       codexConnected: "Angemeldet als {{email}} ({{plan}}).",
       codexDisconnected: "Noch kein ChatGPT-/Codex-Konto verbunden.",
       codexUnavailable: "Die Codex-Runtime ist derzeit nicht verfügbar.",
-      codexPending:
-        "Anmeldung läuft. Gib auf der geöffneten Seite den Code {{code}} ein.",
+      codexPending: "Anmeldung läuft. Gib auf der geöffneten Seite den Code {{code}} ein.",
       codexOpenLogin: "Anmeldeseite öffnen – Code {{code}}",
       ai_model: "Modell für Chat-Prüfungen",
-      ai_modelHelp:
-        "Wird nur für verdächtige Chatkandidaten nach dem lokalen Vorfilter verwendet.",
+      ai_modelHelp: "Wird nur für verdächtige Chatkandidaten nach dem lokalen Vorfilter verwendet.",
       player_name_model: "Modell für Namensprüfungen",
-      player_name_modelHelp:
-        "Wird nur bei neuen oder tatsächlich geänderten Spielernamen aufgerufen.",
+      player_name_modelHelp: "Wird nur bei neuen oder tatsächlich geänderten Spielernamen aufgerufen.",
       sectionTemplates: "Statusmeldungen an den Melder",
-      sectionTemplatesHelp:
-        "Diese CRCON-Vorlagen werden bei den jeweiligen Bearbeitungsschritten ausschließlich an den Spieler gesendet, der den Admin-Report erstellt hat.",
+      sectionTemplatesHelp: "Diese CRCON-Vorlagen werden bei den jeweiligen Bearbeitungsschritten ausschließlich an den Spieler gesendet, der den Admin-Report erstellt hat.",
       allowedActions: "Erlaubte Discord-Aktionen",
       action_message: "Nachricht",
       action_punish: "Bestrafen",
@@ -1436,28 +1542,23 @@ const de = {
         },
         command_words: {
           title: "Befehle",
-          description:
-            "Befehle, die Spielern auf dem Server zur Verfügung stehen.",
+          description: "Befehle, die Spielern auf dem Server zur Verfügung stehen.",
         },
         describe_words: {
           title: "Hilfe-Befehle",
-          description:
-            "Diese Befehle zeigen Spielern die verfügbaren Befehle an.",
+          description: "Diese Befehle zeigen Spielern die verfügbaren Befehle an.",
         },
         words: {
           title: "Auslöser",
-          description:
-            "Wörter, die diesen Befehl auslösen. Sie müssen mit ! oder @ beginnen.",
+          description: "Wörter, die diesen Befehl auslösen. Sie müssen mit ! oder @ beginnen.",
         },
         description: {
           title: "Beschreibung",
-          description:
-            "Optionale Beschreibung, die Spielern über einen Hilfe-Befehl angezeigt wird.",
+          description: "Optionale Beschreibung, die Spielern über einen Hilfe-Befehl angezeigt wird.",
         },
         message: {
           title: "Nachricht",
-          description:
-            "Nachricht, die beim Auslösen des Befehls im Spiel an den Spieler gesendet wird.",
+          description: "Nachricht, die beim Auslösen des Befehls im Spiel an den Spieler gesendet wird.",
         },
         commands: {
           title: "RCON-Befehle",
@@ -1620,14 +1721,12 @@ const de = {
       serverName: "Servername",
       adminCam: "Admin-Kamera",
       crcon: "CRCON-App",
-      notice:
-        "Die angezeigten Werte können von den aktuellen Servereinstellungen abweichen, da der HLL-Server diese Daten seit U18 nicht bereitstellt. Änderungen können weiterhin gespeichert werden.",
+      notice: "Die angezeigten Werte können von den aktuellen Servereinstellungen abweichen, da der HLL-Server diese Daten seit U18 nicht bereitstellt. Änderungen können weiterhin gespeichert werden.",
     },
     game: {
       dynamicWeather: "Dynamisches Wetter",
       dynamicWeatherToggle: "Dynamisches Wetter steuern",
-      dynamicWeatherDescription:
-        "Dynamisches Wetter für eine bestimmte Karte aktivieren oder deaktivieren.",
+      dynamicWeatherDescription: "Dynamisches Wetter für eine bestimmte Karte aktivieren oder deaktivieren.",
       matchTimers: "Rundenzeiten",
       matchTimer: "{{mode}}-Rundenzeit",
       offensiveTimerDescription: "Dauer jeder Kontrollpunktphase.",
@@ -1635,39 +1734,31 @@ const de = {
       warmupTimers: "Aufwärmzeiten",
       warmupTimer: "{{mode}}-Aufwärmzeit",
       warmupTimerDescription: "Dauer der Aufwärmphase.",
-      timerExample:
-        "Beispiel: Rundenzeit = 93 Minuten, Aufwärmzeit = 3 Minuten → Gesamtdauer der Runde = 93 Minuten.",
-      changeNote:
-        "Hinweis: Die Änderungen werden beim nächsten Kartenwechsel angewendet.",
-      removeTimerNote:
-        "Hinweis: Beim Entfernen wird wieder der Standardwert verwendet; die Kennzeichnung im HLL-Serverbrowser entfällt.",
+      timerExample: "Beispiel: Rundenzeit = 93 Minuten, Aufwärmzeit = 3 Minuten → Gesamtdauer der Runde = 93 Minuten.",
+      changeNote: "Hinweis: Die Änderungen werden beim nächsten Kartenwechsel angewendet.",
+      removeTimerNote: "Hinweis: Beim Entfernen wird wieder der Standardwert verwendet; die Kennzeichnung im HLL-Serverbrowser entfällt.",
     },
     adminCam: {
       title: "Admin-Kamera-Benachrichtigungen",
-      subtitle:
-        "Festlegen, wie Spieler beim Betreten des Kameramodus informiert werden.",
-      description:
-        "Diese Funktion benachrichtigt Spieler, wenn ein Admin den Kameramodus betritt. Du kannst eine Servernachricht senden oder die Willkommensnachricht ändern. Von der Willkommensnachricht wird abgeraten: Der Kamerahinweis und der Standardtext erscheinen nacheinander und verdecken den linken Bildschirmbereich zweimal.",
+      subtitle: "Festlegen, wie Spieler beim Betreten des Kameramodus informiert werden.",
+      description: "Diese Funktion benachrichtigt Spieler, wenn ein Admin den Kameramodus betritt. Du kannst eine Servernachricht senden oder die Willkommensnachricht ändern. Von der Willkommensnachricht wird abgeraten: Der Kamerahinweis und der Standardtext erscheinen nacheinander und verdecken den linken Bildschirmbereich zweimal.",
       broadcast: "Per Servernachricht informieren",
       welcome: "Per Willkommensnachricht informieren",
       updated: "Admin-Kamera-Benachrichtigungen wurden gespeichert.",
-      updateFailed:
-        "Admin-Kamera-Benachrichtigungen konnten nicht gespeichert werden: {{message}}",
+      updateFailed: "Admin-Kamera-Benachrichtigungen konnten nicht gespeichert werden: {{message}}",
     },
     general: {
       updated: "„{{name}}“ wurde gespeichert.",
       updateFailed: "„{{name}}“ konnte nicht gespeichert werden: {{message}}",
       remove: "Entfernen",
       timerRemoved: "Timer für {{gameMode}} wurde entfernt.",
-      timerRemoveFailed:
-        "Timer für {{gameMode}} konnte nicht entfernt werden: {{message}}",
+      timerRemoveFailed: "Timer für {{gameMode}} konnte nicht entfernt werden: {{message}}",
       votes: "Stimmen",
       minimumPlayers: "Minimale Spieler",
       noThresholds: "Keine Schwellenwerte festgelegt.",
       addThreshold: "Schwellenwert hinzufügen",
       autoVotekickToggle: "Automatisches Votekick-System",
-      autoVotekickConditions:
-        "Bedingungen für das automatische Votekick-System",
+      autoVotekickConditions: "Bedingungen für das automatische Votekick-System",
       minimumIngameModerators: "Minimale Moderatoren im Spiel",
       minimumOnlineModerators: "Minimale online CRCON-Moderatoren",
       cards: {
@@ -1709,16 +1800,13 @@ const de = {
         },
         autoVotekick: {
           title: "Automatisches Votekick-System",
-          subtitle:
-            "Votekick anhand verfügbarer Moderatoren automatisch steuern",
+          subtitle: "Votekick anhand verfügbarer Moderatoren automatisch steuern",
         },
       },
       help: {
         default: "0 zum Deaktivieren",
-        autobalance_threshold:
-          "0 bedeutet, dass die Teams exakt gleich groß sein müssen.",
-        autobalance_enabled:
-          "Der Autobalancer verschiebt Spieler automatisch, um die Teams auszugleichen.",
+        autobalance_threshold: "0 bedeutet, dass die Teams exakt gleich groß sein müssen.",
+        autobalance_enabled: "Der Autobalancer verschiebt Spieler automatisch, um die Teams auszugleichen.",
         queue_length: "Empfohlener Wert: 6",
         vip_slots_num: "Empfohlener Wert: 1–2",
         match_warfare_timer: "Standardwert: 90 Minuten",
@@ -1726,20 +1814,17 @@ const de = {
         match_skirmish_timer: "Standardwert: 30 Minuten",
         warmup_warfare_timer: "Standardwert: 3 Minuten",
         warmup_skirmish_timer: "Standardwert: 3 Minuten",
-        votekick_thresholds:
-          "Lege die nötigen Stimmen für einen Kick abhängig von der Teamgröße fest. Das erste Feld ist die Mindestanzahl Spieler, das zweite die benötigten Stimmen. Sinnvolle Werte sind [0, 1], [10, 5], [25, 12], [50, 20].",
+        votekick_thresholds: "Lege die nötigen Stimmen für einen Kick abhängig von der Teamgröße fest. Das erste Feld ist die Mindestanzahl Spieler, das zweite die benötigten Stimmen. Sinnvolle Werte sind [0, 1], [10, 5], [25, 12], [50, 20].",
       },
     },
     serverName: {
       title: "Servername",
       subtitle: "Aktueller Anzeigename des Spielservers",
-      intro:
-        "Wenn dein Spielserver bei GTX oder einem kompatiblen Anbieter mit SFTP-Zugang gehostet wird, kannst du den Servernamen ohne Neustart des HLL-Servers ändern.",
+      intro: "Wenn dein Spielserver bei GTX oder einem kompatiblen Anbieter mit SFTP-Zugang gehostet wird, kannst du den Servernamen ohne Neustart des HLL-Servers ändern.",
       requirements: "Voraussetzungen:",
       configureCredentials: "SFTP-Zugangsdaten in der .env-Datei konfigurieren",
       provideHost: "SFTP-IP-Adresse und Port des Spielservers unten eintragen",
-      changeNote:
-        "Hinweis: Der neue Name erscheint erst nach einem Kartenwechsel.",
+      changeNote: "Hinweis: Der neue Name erscheint erst nach einem Kartenwechsel.",
       placeholder: "Servernamen eingeben",
       helper: "Dieser Name wird im Serverbrowser angezeigt.",
       sftpTitle: "SFTP-Konfiguration",
@@ -1754,8 +1839,7 @@ const de = {
     mobile: {
       title: "Frontline App",
       subtitle: "Eigenes CRCON-Konto sicher mit der Frontline App koppeln.",
-      pairingWarning:
-        "Bestätige das Gerät nur, wenn sein sechsstelliger Code mit dieser Seite übereinstimmt. Der QR-Code läuft nach zwei Minuten ab und kann nur einmal verwendet werden.",
+      pairingWarning: "Bestätige das Gerät nur, wenn sein sechsstelliger Code mit dieser Seite übereinstimmt. Der QR-Code läuft nach zwei Minuten ab und kann nur einmal verwendet werden.",
       confirmPassword: "CRCON-Passwort bestätigen",
       createQr: "QR-Code erstellen",
       statusLabel: "Status",
@@ -1777,8 +1861,7 @@ const de = {
       days: "Tage",
       pushConfigured: "Push eingerichtet",
       pushDisabled: "Push deaktiviert",
-      configurationHint:
-        "Diese sicherheitsrelevanten Bereitstellungswerte werden über die CRCON-Umgebungsdatei geändert.",
+      configurationHint: "Diese sicherheitsrelevanten Bereitstellungswerte werden über die CRCON-Umgebungsdatei geändert.",
       allDevices: "Alle Frontline-Geräte",
       myDevices: "Meine Frontline-Geräte",
       noDevices: "Keine Frontline-Geräte gekoppelt.",
@@ -1789,23 +1872,19 @@ const de = {
       deviceRevoked: "Frontline-Gerät wurde entzogen.",
       cacheTitle: "Cache-Verwaltung",
       cacheSubtitle: "Anwendungs-Cache leeren",
-      cacheDescription:
-        "Dadurch wird der interne Cache verschiedener CRCON-Komponenten geleert. Verwende diese Funktion nur bei Bedarf, da Daten neu berechnet und geladen werden müssen.",
-      cacheWarning:
-        "Nur verwenden, wenn du dazu von CRCON-Betreuenden angewiesen wurdest oder die Auswirkungen kennst.",
+      cacheDescription: "Dadurch wird der interne Cache verschiedener CRCON-Komponenten geleert. Verwende diese Funktion nur bei Bedarf, da Daten neu berechnet und geladen werden müssen.",
+      cacheWarning: "Nur verwenden, wenn du dazu von CRCON-Betreuenden angewiesen wurdest oder die Auswirkungen kennst.",
       flushing: "Wird geleert …",
       flushCache: "Cache leeren",
       cacheFlushed: "Cache wurde geleert.",
       cacheFlushFailed: "Cache konnte nicht geleert werden",
       connectionTitle: "Spielserververbindung",
       connectionSubtitle: "Verbindung zum Spielserver neu aufbauen",
-      connectionDescription:
-        "Stellt die Verbindung zum Spielserver erneut her. Nutze dies bei einer instabilen Verbindung.",
+      connectionDescription: "Stellt die Verbindung zum Spielserver erneut her. Nutze dies bei einer instabilen Verbindung.",
       reconnecting: "Verbindung wird aufgebaut …",
       reconnect: "Neu verbinden",
       reconnected: "Verbindung zum Spielserver wurde wiederhergestellt.",
-      reconnectFailed:
-        "Verbindung zum Spielserver konnte nicht wiederhergestellt werden",
+      reconnectFailed: "Verbindung zum Spielserver konnte nicht wiederhergestellt werden",
     },
     desktopMobile: {
       title: "Frontline für Windows verbinden",
@@ -1825,8 +1904,7 @@ const de = {
     campaigns: {
       eyebrow: "Kommunikation",
       title: "Kampagnen",
-      subtitle:
-        "Plane wiederkehrende Ingame-Hinweise für VIP-Zugang, Community, Events und andere wichtige Angebote.",
+      subtitle: "Plane wiederkehrende Ingame-Hinweise für VIP-Zugang, Community, Events und andere wichtige Angebote.",
       moduleActive: "Kampagnenmodul aktiv",
       modulePaused: "Kampagnenmodul pausiert",
       randomOrder: "Reihenfolge mischen",
@@ -1840,10 +1918,8 @@ const de = {
       duplicate: "Kampagne duplizieren",
       copyName: "{{name}} – Kopie",
       message: "Ingame-Nachricht",
-      messageHelp:
-        "Die Nachricht wird als große Servereinblendung an alle verbundenen Spieler gesendet.",
-      playerMessageHelp:
-        "Die Nachricht wird einzeln über message_player an berechtigte Spieler gesendet. Verfügbar sind unter anderem {player_name}, {vip_status} und {vip_expiration}.",
+      messageHelp: "Die Nachricht wird als große Servereinblendung an alle verbundenen Spieler gesendet.",
+      playerMessageHelp: "Die Nachricht wird einzeln über message_player an berechtigte Spieler gesendet. Verfügbar sind unter anderem {player_name}, {vip_status} und {vip_expiration}.",
       deliveryMode: "Auslieferungskanal",
       deliveryBroadcast: "Server-Broadcast",
       deliveryPlayerMessage: "Direkte Spielernachricht",
@@ -1861,8 +1937,7 @@ const de = {
       testNow: "Jetzt testweise senden",
       testing: "Wird gesendet …",
       testSent: "Die Kampagne wurde testweise als Servernachricht gesendet.",
-      playerTestSent:
-        "Die Direktkampagne wurde an den ausgewählten Spieler gesendet.",
+      playerTestSent: "Die Direktkampagne wurde an den ausgewählten Spieler gesendet.",
       testFailed: "Der Testversand ist fehlgeschlagen: {{message}}",
       selectTestPlayer: "Testspieler auswählen",
       onlinePlayer: "Online-Spieler",
@@ -1885,8 +1960,7 @@ const de = {
         expired: "verfallen",
       },
       saved: "Die Kampagnen wurden gespeichert.",
-      invalidRange:
-        "Prüfe die Nachricht und den Spielerbereich. Die Mindestzahl darf nicht über der Höchstzahl liegen.",
+      invalidRange: "Prüfe die Nachricht und den Spielerbereich. Die Mindestzahl darf nicht über der Höchstzahl liegen.",
       importTemplate: "Nachrichtenvorlage als Kampagne übernehmen",
       emptyTitle: "Noch keine Kampagnen",
       emptyText:
@@ -1911,6 +1985,22 @@ const de = {
         unlimited: "Unbegrenzt; nicht zur nächsten Phase wechseln",
         noDelay: "Ohne zusätzliche Wartezeit",
         anySquadSize: "Für jede Truppgröße",
+      },
+      playerFlagPicker: {
+        noticeTitle: "Vorhandene Spieler-Markierungen auswählen",
+        noticeBody:
+          "Der Katalog wird direkt aus den Spielerprofilen dieser CRCON-Instanz geladen. Spieler mit mindestens einer ausgewählten Markierung werden von der jeweiligen Regel ausgenommen.",
+        label: "Ausgenommene Spieler-Markierungen",
+        placeholder: "Markierung suchen oder neu eingeben",
+        help: "Wähle vorhandene Markierungen aus. Eine eigene Markierung kannst du weiterhin eintippen und mit Enter übernehmen.",
+        loading: "Markierungen werden geladen …",
+        noOptions: "Keine weitere vorhandene Markierung gefunden",
+        loadFailed:
+          "Der Markierungskatalog konnte nicht geladen werden. Eigene Werte können weiterhin eingegeben werden.",
+        playerCount_one: "{{count}} Spielerprofil",
+        playerCount_other: "{{count}} Spielerprofile",
+        catalogueCount_one: "{{count}} vorhandene Markierung gefunden",
+        catalogueCount_other: "{{count}} vorhandene Markierungen gefunden",
       },
       roles: {
         armycommander: "Kommandant",
@@ -1942,10 +2032,13 @@ const de = {
       workbench: {
         defaultEyebrow: "Serverkonfiguration",
         defaultIntro:
-          "Konfiguriere diesen Bereich über das geführte Formular oder wechsle für Spezialfälle zur erweiterten JSON-Ansicht.",
-        tabsLabel: "Bearbeitungsmodus",
-        formTab: "Formular",
-        jsonTab: "JSON (erweitert)",
+          "Konfiguriere diesen Bereich sicher über das geführte Formular.",
+        mode: {
+          title: "Betriebsmodus",
+          off: "Aus",
+          observe: "Beobachten",
+          active: "Aktiv",
+        },
         navigation: "Konfigurationsbereiche",
         mobileNavigation: "Bereich auswählen",
         sectionEyebrow: "Abschnitt {{current}} von {{total}}",
@@ -1968,6 +2061,20 @@ const de = {
         validationTitle: "Einige Angaben müssen geprüft werden",
         validationDescription:
           "Behebe die markierten Punkte, bevor du speicherst.",
+        compatibilityTitle: "Konfiguration kann nicht sicher bearbeitet werden",
+        compatibilityDescription:
+          "Die gespeicherten Daten weichen strukturell von dieser CRCON-Version ab. Sie wurden nicht verändert. Führe zuerst die passende Konfigurationsmigration aus.",
+        compatibilityIssue:
+          "{{path}}: erwartet {{expected}}, vorhanden {{actual}}",
+        types: {
+          array: "Liste",
+          object: "Objekt",
+          string: "Text",
+          integer: "Ganzzahl",
+          number: "Zahl",
+          boolean: "Ja/Nein-Wert",
+          null: "Leerwert",
+        },
         navigateToError: "Öffnen",
         choices: {
           skip: "Überspringen",
@@ -2039,7 +2146,7 @@ const de = {
           messages:
             "Bearbeite die Texte, die Spieler oder Administratoren in diesem Ablauf erhalten.",
           notifications:
-            "Hinterlege optional einen Discord-Webhook für Audit-Meldungen.",
+            "Hinterlege die Discord-Ziele und Benachrichtigungen für dieses Modul.",
           advanced:
             "Weitere Einstellungen dieses Bereichs, die keiner Hauptphase zugeordnet sind.",
         },
@@ -2054,6 +2161,21 @@ const de = {
           count: "{{count}}× · alle {{interval}} Sekunden",
           kick: "Kick nach {{seconds}} Sekunden",
           intervalMinutes: "Prüfung alle {{count}} Minuten",
+          notificationsActive: "Discord-Benachrichtigung aktiv",
+          notificationsInactive: "Ohne Discord-Benachrichtigung",
+          noDuration: "Keine Dauer festgelegt",
+          duration: {
+            minutes_one: "{{count}} Minute",
+            minutes_other: "{{count}} Minuten",
+            hours_one: "{{count}} Stunde",
+            hours_other: "{{count}} Stunden",
+            days_one: "{{count}} Tag",
+            days_other: "{{count}} Tage",
+            weeks_one: "{{count}} Woche",
+            weeks_other: "{{count}} Wochen",
+            years_one: "{{count}} Jahr",
+            years_other: "{{count}} Jahre",
+          },
           configured: "{{configured}} von {{total}} Angaben gesetzt",
           activeNotice:
             "Die gezeigten Einstellungen werden nach dem Speichern für diesen Server verwendet.",
@@ -2167,14 +2289,79 @@ const de = {
           description:
             "Ausnahmen werden vor jeder Maßnahme geprüft. Testläufe protokollieren denselben Ablauf, greifen aber nicht in das Spiel ein.",
         },
+        workbench: {
+          mode: {
+            title: "Wie soll die Regel arbeiten?",
+            off: "Aus",
+            observe: "Beobachten",
+            active: "Aktiv",
+          },
+          operation: {
+            help: "Die globale Mindestzahl pausiert den gesamten Automod. Erkennung, Warnungen und Maßnahmen beginnen erst, wenn genügend Spieler verbunden sind.",
+          },
+          detection: {
+            skipped:
+              "Die erste Warnung folgt ohne zusätzliche Bestätigungsphase",
+            result_one:
+              "{{checks}} interne Prüfung bestätigt den Verstoß nach etwa {{seconds}} Sekunden",
+            result_other:
+              "{{checks}} interne Prüfungen bestätigen den Verstoß nach etwa {{seconds}} Sekunden",
+            help: "Diese Prüfungen bleiben für den Spieler unsichtbar und verhindern vorschnelle Maßnahmen bei kurzen Rollenwechseln.",
+          },
+          actions: {
+            inactive: "Übersprungen",
+            unlimited: "Unbegrenzt",
+            configured: "Konfiguriert",
+            unreachable: "Nicht erreichbar",
+          },
+          notifications: {
+            help: "Der Webhook erhält Audit-Meldungen zu erkannten Verstößen und ausgeführten Maßnahmen. Er ist für die Regelfunktion nicht erforderlich.",
+          },
+          summary: {
+            title: "Regelübersicht",
+            startCondition: "Gesamten Automod starten ab",
+            immediate: "Sofort prüfen",
+            fromPlayers: "{{count}} Spieler",
+            activeNotice:
+              "Die Regel greift nach dem Speichern aktiv in das Spiel ein.",
+            testNotice:
+              "Nur protokollieren – keine Nachrichten oder Spielaktionen.",
+            inactiveNotice:
+              "Die Regel ist ausgeschaltet; Einstellungen bleiben erhalten.",
+            detection: "Erkennung",
+            confirmedViolation: "Verstoß wird bestätigt",
+            noConfirmation: "Ohne Bestätigungsphase",
+            checks_one: "{{count}} Prüfung · alle {{interval}} Sekunden",
+            checks_other: "{{count}} Prüfungen · alle {{interval}} Sekunden",
+            exceptions_one: "{{count}} konfigurierte Ausnahme",
+            exceptions_other: "{{count}} konfigurierte Ausnahmen",
+            reaction: "Wirkungskette",
+            warn: "Warnen",
+            punish: "Bestrafen",
+            kick: "Kicken",
+            count: "{{count}}× · alle {{interval}} Sekunden",
+            unlimited: "Unbegrenzt · alle {{interval}} Sekunden",
+            skipped: "Übersprungen",
+            unreachable: "Mit diesem Ablauf nicht erreichbar",
+            kickAfter: "nach {{seconds}} Sekunden Frist",
+          },
+        },
         sections: {
           operation: {
-            title: "Grundlagen",
-            description: "Basis-Einstellungen",
+            title: "Übersicht",
+            description: "Betriebsart und globale Startbedingung",
+          },
+          detection: {
+            title: "Erkennung",
+            description: "Verstöße sicher bestätigen",
           },
           exemptions: {
             title: "Ausnahmen",
             description: "Wer ist ausgenommen",
+          },
+          actions: {
+            title: "Maßnahmen",
+            description: "Warnung, Bestrafung und Kick aufbauen",
           },
           observation: {
             title: "Bestätigen",
@@ -2290,10 +2477,167 @@ const de = {
         },
       },
       level: {
-        eyebrow: "Automod-Regel",
+        eyebrow: "Automatisierung · Spielerlevel",
         title: "Level-Regeln",
         intro:
           "Steuere Mindest- und Höchstlevel sowie rollenabhängige Levelgrenzen. Spieler können stufenweise informiert, bestraft oder vom Server entfernt werden.",
+        sections: {
+          operation: {
+            title: "Startbedingung",
+            description: "Ab welcher Serverauslastung die Prüfung beginnt",
+          },
+          rules: {
+            title: "Levelgrenzen",
+            description: "Allgemeine und rollenabhängige Anforderungen",
+          },
+          exemptions: {
+            title: "Ausnahmen",
+            description: "Geschützte Markierungen und Level-Fehler",
+          },
+          announcements: {
+            title: "Ankündigungen",
+            description: "Hinweise vor der eigentlichen Maßnahme",
+          },
+          warnings: {
+            title: "Warnungen",
+            description: "Anzahl, Abstand und Nachricht",
+          },
+          punishments: {
+            title: "Bestrafungen",
+            description: "Konsequenzen nach erfolglosen Warnungen",
+          },
+          kick: {
+            title: "Kick",
+            description: "Letzte Eskalationsstufe und Begründung",
+          },
+          notifications: {
+            title: "Audit",
+            description: "Optionale Discord-Benachrichtigung",
+          },
+          advanced: {
+            title: "Weitere Einstellungen",
+            description: "Zusätzliche vom Server bereitgestellte Felder",
+          },
+        },
+        fields: {
+          dont_do_anything_below_this_number_of_players: {
+            label: "Erst ab dieser Spielerzahl prüfen",
+            help: "Unterhalb dieses Werts bleibt die Level-Regel vollständig inaktiv. 0 prüft unabhängig von der Spielerzahl.",
+          },
+          min_level: {
+            label: "Mindestlevel des Servers",
+            help: "Spieler unter diesem Level erfüllen die allgemeine Zugangsvoraussetzung nicht.",
+          },
+          max_level: {
+            label: "Höchstlevel des Servers",
+            help: "0 deaktiviert die allgemeine Obergrenze.",
+          },
+          level_thresholds: {
+            label: "Levelgrenzen je Rolle",
+            help: "Definiere für einzelne Rollen eigene Mindestlevel und die dafür nötige Spielerzahl.",
+          },
+          label: {
+            label: "Anzeigename",
+            help: "Lesbare Bezeichnung der Rolle.",
+          },
+          min_players: {
+            label: "Gilt ab Spielerzahl",
+            help: "Ab dieser Serverauslastung wird die rollenbezogene Grenze angewendet.",
+          },
+          min_level_message: {
+            label: "Nachricht bei zu niedrigem Level",
+            help: "Textbaustein für Spieler unter dem allgemeinen Mindestlevel.",
+          },
+          max_level_message: {
+            label: "Nachricht bei zu hohem Level",
+            help: "Textbaustein für Spieler über dem allgemeinen Höchstlevel.",
+          },
+          violation_message: {
+            label: "Nachricht bei Rollenverstoß",
+            help: "Beschreibt die verletzte rollenbezogene Levelanforderung.",
+          },
+          force_kick_message: {
+            label: "Kick-Nachricht für Serverlevel",
+            help: "Wird bei einem unmittelbaren Kick wegen der allgemeinen Levelgrenze angezeigt.",
+          },
+          whitelist_flags: {
+            label: "Ausgenommene Spieler-Markierungen",
+            help: "Spieler mit mindestens einer dieser Markierungen werden nicht geprüft.",
+          },
+          levelbug_enabled: {
+            label: "Spieler mit Level-1-Fehler schützen",
+            help: "Nimmt Level-1-Spieler aus, wenn der bekannte HLL-Level-Fehler vermutet wird.",
+          },
+          announcement_enabled: {
+            label: "Level-Regeln ankündigen",
+            help: "Informiert Spieler beim Verbinden über die aktiven Levelanforderungen.",
+          },
+          only_announce_impacted_players: {
+            label: "Nur betroffene Spieler informieren",
+            help: "Sendet die Ankündigung ausschließlich an Spieler, die eine Grenze verletzt haben.",
+          },
+          announcement_message: {
+            label: "Ankündigung",
+            help: "Nachricht über die aktiven Levelanforderungen.",
+          },
+          number_of_warnings: {
+            label: "Warnungen vor der Bestrafung",
+            help: "-1 warnt unbegrenzt, 0 überspringt diese Stufe.",
+          },
+          warning_interval_seconds: {
+            label: "Abstand zwischen Warnungen",
+            help: "Wartezeit zwischen zwei Warnnachrichten.",
+          },
+          warning_message: {
+            label: "Warnnachricht",
+            help: "Nachricht für Spieler, die eine Levelanforderung verletzen.",
+          },
+          number_of_punishments: {
+            label: "Anzahl Bestrafungen",
+            help: "-1 bestraft unbegrenzt, 0 überspringt diese Stufe.",
+          },
+          min_squad_players_for_punish: {
+            label: "Mindestgröße des Trupps",
+            help: "Bestrafen erst, wenn der Trupp mindestens so viele Spieler hat.",
+          },
+          min_server_players_for_punish: {
+            label: "Mindestanzahl Spieler für Bestrafungen",
+            help: "Unterhalb dieses Werts wird nicht bestraft.",
+          },
+          punish_interval_seconds: {
+            label: "Abstand zwischen Bestrafungen",
+            help: "Wartezeit zwischen zwei Bestrafungen.",
+          },
+          punish_message: {
+            label: "Bestrafungsnachricht",
+            help: "Nachricht, die der Spieler bei der Bestrafung erhält.",
+          },
+          kick_after_max_punish: {
+            label: "Nach den Bestrafungen kicken",
+            help: "Aktiviert die letzte Eskalationsstufe.",
+          },
+          min_squad_players_for_kick: {
+            label: "Mindestgröße des Trupps für Kick",
+            help: "Kick erst, wenn der Trupp mindestens so viele Spieler hat.",
+          },
+          min_server_players_for_kick: {
+            label: "Mindestanzahl Spieler für Kick",
+            help: "Unterhalb dieses Werts wird nicht gekickt.",
+          },
+          kick_grace_period_seconds: {
+            label: "Letzte Frist vor dem Kick",
+            help: "Zeit nach der letzten Bestrafung, in der der Verstoß behoben werden kann.",
+          },
+          kick_message: {
+            label: "Kick-Nachricht",
+            help: "Begründung, die der Spieler beim Entfernen erhält.",
+          },
+          discord_webhook_url: {
+            label: "Discord-Audit-Webhook",
+            help: "Optional. Protokolliert erkannte Verstöße und ausgeführte Maßnahmen.",
+          },
+        },
+        summary: { levelRange: "Level {{min}} bis {{max}}" },
       },
       seeding: {
         eyebrow: "Automatisierung · Seeding",
@@ -2347,6 +2691,7 @@ const de = {
         },
         status: {
           active: "Aktiv",
+          inactive: "Inaktiv",
           incomplete: "Nicht eingerichtet",
           skipped: "Übersprungen",
           unlimited: "Unbegrenzt",
@@ -2358,10 +2703,15 @@ const de = {
             "Die Regel greift zwischen {{min}} und {{max}} Spielern und prüft {{count}} konfigurierte Einträge.",
           inactive:
             "Diese Regel ist noch nicht vollständig eingerichtet und greift aktuell nicht ein.",
+          disabled:
+            "Diese Regel ist deaktiviert. Ihre Einstellungen bleiben gespeichert.",
           valid: "Die Regel ist einsatzbereit.",
           missing: "Ergänze die Regel, bevor du sie aktiv einsetzt.",
+          disabledNotice:
+            "Aktiviere die Regel über den Schalter in der Übersicht, wenn sie wieder eingreifen soll.",
         },
         rules: {
+          toggle: "{{title}} aktivieren oder deaktivieren",
           roles: {
             title: "Rollen begrenzen",
             description:
@@ -2491,7 +2841,7 @@ const de = {
         },
         summary: {
           title: "Übersicht",
-          activeRules: "{{count}} von 3 Regeln eingerichtet",
+          activeRules: "{{count}} von 3 Regeln aktiv",
           roles_one: "{{count}} Rolle gesperrt",
           roles_other: "{{count}} Rollen gesperrt",
           weapons_one: "{{count}} Waffe gesperrt",
@@ -2510,28 +2860,429 @@ const de = {
         },
       },
       noSoloTank: {
-        eyebrow: "Automod-Regel",
+        eyebrow: "Automatisierung · Fahrzeuge",
         title: "Solo-Panzer verhindern",
         intro:
-          "Lege fest, wie CRCON auf allein besetzte Panzertrupps in Hell Let Loose und HLL: Vietnam reagiert.",
+          "Erkenne allein besetzte Panzertrupps zuverlässig und lege eine nachvollziehbare Reaktionskette für Hell Let Loose und HLL: Vietnam fest.",
+        summary: {
+          title: "Ablauf der Solo-Panzer-Regel",
+          description:
+            "Die Bestätigungsphase verhindert vorschnelle Maßnahmen. Ausnahmen werden vor jeder sichtbaren Aktion erneut geprüft.",
+        },
+        workbench: {
+          mode: {
+            title: "Wie soll die Regel arbeiten?",
+            off: "Aus",
+            observe: "Beobachten",
+            active: "Aktiv",
+          },
+          operation: {
+            help: "Die globale Mindestzahl pausiert die gesamte Regel. Solo-Panzer werden erst erkannt, wenn genügend Spieler mit dem Server verbunden sind.",
+          },
+          detection: {
+            skipped:
+              "Die erste Warnung folgt ohne zusätzliche Bestätigungsphase",
+            result_one:
+              "{{checks}} interne Prüfung bestätigt die Alleinbesetzung nach etwa {{seconds}} Sekunden",
+            result_other:
+              "{{checks}} interne Prüfungen bestätigen die Alleinbesetzung nach etwa {{seconds}} Sekunden",
+            help: "Die unsichtbaren Prüfungen geben einem zweiten Besatzungsmitglied Zeit beizutreten und verhindern Maßnahmen bei kurzen Truppwechseln.",
+          },
+          actions: {
+            inactive: "Übersprungen",
+            unlimited: "Unbegrenzt",
+            configured: "Konfiguriert",
+            unreachable: "Nicht erreichbar",
+          },
+          notifications: {
+            help: "Der Webhook erhält Audit-Meldungen zu erkannten Solo-Panzern und ausgeführten Maßnahmen. Für die Regelfunktion ist er nicht erforderlich.",
+          },
+          summary: {
+            title: "Regelübersicht",
+            startCondition: "Solo-Panzer prüfen ab",
+            immediate: "Sofort prüfen",
+            fromPlayers: "{{count}} Spieler",
+            activeNotice:
+              "Die Regel greift nach dem Speichern aktiv in das Spiel ein.",
+            testNotice:
+              "Nur protokollieren – keine Nachrichten oder Spielaktionen.",
+            inactiveNotice:
+              "Die Regel ist ausgeschaltet; Einstellungen bleiben erhalten.",
+            detection: "Bestätigung",
+            confirmedViolation: "Alleinbesetzung wird bestätigt",
+            noConfirmation: "Ohne Bestätigungsphase",
+            checks_one: "{{count}} Prüfung · alle {{interval}} Sekunden",
+            checks_other: "{{count}} Prüfungen · alle {{interval}} Sekunden",
+            exceptions_one: "{{count}} konfigurierte Ausnahme",
+            exceptions_other: "{{count}} konfigurierte Ausnahmen",
+            reaction: "Wirkungskette",
+            warn: "Warnen",
+            punish: "Bestrafen",
+            kick: "Kicken",
+            count: "{{count}}× · alle {{interval}} Sekunden",
+            unlimited: "Unbegrenzt · alle {{interval}} Sekunden",
+            skipped: "Übersprungen",
+            unreachable: "Mit diesem Ablauf nicht erreichbar",
+            kickAfter: "nach {{seconds}} Sekunden Frist",
+          },
+        },
+        sections: {
+          operation: {
+            title: "Übersicht",
+            description: "Betriebsart und globale Startbedingung",
+          },
+          detection: {
+            title: "Solo-Panzer erkennen",
+            description: "Alleinbesetzung sicher bestätigen",
+          },
+          exemptions: {
+            title: "Ausnahmen",
+            description: "Geschützte Spieler und Markierungen",
+          },
+          actions: {
+            title: "Maßnahmen",
+            description: "Warnung, Bestrafung und Kick aufbauen",
+          },
+          warnings: {
+            title: "Warnen",
+            description:
+              "Fordert den Spieler auf, ein Besatzungsmitglied aufzunehmen",
+          },
+          punishments: {
+            title: "Bestrafen",
+            description: "Setzt die serverseitige Punish-Aktion ein",
+          },
+          kick: {
+            title: "Kick",
+            description:
+              "Entfernt wiederholt allein fahrende Spieler als letzte Stufe",
+          },
+          notifications: {
+            title: "Nachrichten",
+            description: "Optionale Audit-Benachrichtigungen",
+          },
+        },
+        fields: {
+          enabled: {
+            label: "Solo-Panzer-Automod aktivieren",
+            help: "Überwacht Panzertrupps mit nur einem Mitglied und führt die festgelegten Stufen aus.",
+          },
+          dry_run: {
+            label: "Nur protokollieren (Testlauf)",
+            help: "Erkennt Solo-Panzer vollständig, sendet aber keine Nachrichten und führt weder Bestrafungen noch Kicks aus.",
+          },
+          discord_webhook_url: {
+            label: "Discord-Audit-Webhook",
+            help: "Optionaler Discord-Webhook für erkannte Verstöße und ausgeführte Maßnahmen.",
+            placeholder: "https://discord.com/api/webhooks/…",
+          },
+          whitelist_flags: {
+            label: "Ausgenommene Spieler-Markierungen",
+            help: "Spieler mit mindestens einer dieser CRCON-Markierungen werden von allen Stufen ausgenommen.",
+          },
+          immune_player_level: {
+            label: "Spieler bis Level ausnehmen",
+            help: "Spieler mit diesem oder einem niedrigeren Level sind geschützt. 0 deaktiviert diese Ausnahme.",
+          },
+          dont_do_anything_below_this_number_of_players: {
+            label: "Mindestanzahl Spieler auf dem Server",
+            help: "Unterhalb dieser Gesamtspielerzahl pausiert die Regel. 0 bedeutet: keine Mindestanzahl.",
+          },
+          number_of_notes: {
+            label: "Unsichtbare Bestätigungen",
+            help: "Anzahl interner Prüfungen vor der ersten Warnung. 0 überspringt diese Phase.",
+          },
+          notes_interval_seconds: {
+            label: "Abstand zwischen Bestätigungen",
+            help: "Wartezeit zwischen zwei Prüfungen desselben Panzertrupps.",
+          },
+          number_of_warnings: {
+            label: "Anzahl Warnungen",
+            help: "0 überspringt Warnungen. -1 warnt unbegrenzt und wechselt nicht zur Bestrafung.",
+          },
+          warning_interval_seconds: {
+            label: "Abstand zwischen Warnungen",
+            help: "Wartezeit, bevor derselbe Spieler erneut gewarnt wird.",
+          },
+          warning_message: {
+            label: "Warnnachricht",
+            help: "Fordert den Spieler auf, ein zweites Besatzungsmitglied aufzunehmen.",
+          },
+          number_of_punishments: {
+            label: "Anzahl Bestrafungen",
+            help: "0 überspringt Bestrafungen und macht den Kick unerreichbar. -1 bestraft unbegrenzt.",
+          },
+          min_server_players_for_punish: {
+            label: "Mindestanzahl Spieler für Bestrafungen",
+            help: "Bestrafungen beginnen erst ab dieser Gesamtspielerzahl. 0 setzt keine Mindestanzahl.",
+          },
+          punish_interval_seconds: {
+            label: "Abstand zwischen Bestrafungen",
+            help: "Wartezeit, bevor derselbe Spieler erneut bestraft wird.",
+          },
+          punish_message: {
+            label: "Nachricht bei Bestrafung",
+            help: "Nachricht, die der Spieler zusammen mit der Punish-Aktion erhält.",
+          },
+          kick_after_max_punish: {
+            label: "Nach den Bestrafungen kicken",
+            help: "Aktiviert den Kick als letzte Stufe. Zuvor muss mindestens eine Bestrafung erfolgreich ausgeführt worden sein.",
+          },
+          min_server_players_for_kick: {
+            label: "Mindestanzahl Spieler für Kicks",
+            help: "Kicks werden erst ab dieser Gesamtspielerzahl ausgeführt. 0 setzt keine Mindestanzahl.",
+          },
+          kick_grace_period_seconds: {
+            label: "Letzte Frist vor dem Kick",
+            help: "Zeit nach der letzten Bestrafung, in der ein zweites Besatzungsmitglied beitreten kann.",
+          },
+          kick_message: {
+            label: "Kick-Nachricht",
+            help: "Begründung, die der Spieler beim Kick erhält.",
+          },
+        },
       },
       vacBans: {
         eyebrow: "Sicherheit & Sperren",
         title: "VAC- und Spielsperren prüfen",
         intro:
           "Lege fest, welche Sperrhistorie beim Beitritt geprüft wird und wie CRCON betroffene Spieler behandelt.",
+        sections: {
+          rules: {
+            title: "Prüfkriterien",
+            description: "Zeitraum und Schwellenwert der Sperrhistorie",
+          },
+          actions: {
+            title: "Sperrmaßnahme",
+            description: "Sperrliste, Grund und Ablaufverhalten",
+          },
+          exemptions: {
+            title: "Ausnahmen",
+            description: "Geschützte Spieler-Markierungen",
+          },
+          advanced: {
+            title: "Weitere Einstellungen",
+            description: "Zusätzliche vom Server bereitgestellte Felder",
+          },
+        },
+        fields: {
+          vac_history_days: {
+            label: "VAC-Sperren der letzten Tage",
+            help: "0 deaktiviert die Prüfung nach dem Alter der letzten VAC-Sperre.",
+          },
+          game_ban_threshhold: {
+            label: "Anzahl erlaubter Spielsperren",
+            help: "Ab diesem Schwellenwert wird die konfigurierte Sperrmaßnahme ausgelöst.",
+          },
+          blacklist_id: {
+            label: "Ziel-Sperrliste",
+            help: "ID der Sperrliste, der ein Treffer hinzugefügt wird.",
+          },
+          ban_on_vac_history_reason: {
+            label: "Sperrgrund",
+            help: "Begründung für den Sperrlisteneintrag. {DAYS_SINCE_LAST_BAN} kann verwendet werden.",
+          },
+          auto_expire: {
+            label: "Sperre automatisch ablaufen lassen",
+            help: "Passt das Ende an die konfigurierte Historiengrenze an, statt dauerhaft zu sperren.",
+          },
+          whitelist_flags: {
+            label: "Ausgenommene Spieler-Markierungen",
+            help: "Spieler mit mindestens einer dieser Markierungen werden nicht gesperrt.",
+          },
+        },
+        summary: {
+          history: "{{days}} Tage Historie · ab {{count}} Spielsperren",
+          action: "Sperrliste {{id}} · {{expiry}}",
+          expiring: "mit Ablauf",
+          permanent: "dauerhaft",
+          flags_one: "{{count}} Markierung geschützt",
+          flags_other: "{{count}} Markierungen geschützt",
+        },
       },
       tkBans: {
         eyebrow: "Sicherheit & Sperren",
         title: "Teamkill-Sperre beim Beitritt",
         intro:
           "Erkenne frühe Teamkills nach dem Beitritt, definiere Ausnahmen und konfiguriere die daraus entstehende Sperre.",
+        sections: {
+          detection: {
+            title: "Erkennung",
+            description: "Zeitfenster und Toleranz nach dem Beitritt",
+          },
+          exemptions: {
+            title: "Ausnahmen",
+            description: "Waffen, VIPs, Markierungen und erfahrene Spieler",
+          },
+          actions: {
+            title: "Sperrmaßnahme",
+            description: "Sperrliste, Dauer und Spielernachricht",
+          },
+          notifications: {
+            title: "Audit",
+            description: "Optionale Discord-Benachrichtigung",
+          },
+          advanced: {
+            title: "Weitere Einstellungen",
+            description: "Zusätzliche vom Server bereitgestellte Felder",
+          },
+        },
+        fields: {
+          max_time_after_connect_minutes: {
+            label: "Zeitfenster nach dem Beitritt",
+            help: "Nur Teamkills innerhalb dieser ersten Minuten werden bewertet.",
+          },
+          ignore_tk_after_n_kills: {
+            label: "Nach eigenen Kills nicht mehr prüfen",
+            help: "Beendet die Prüfung, sobald der Spieler so viele Gegner getötet hat.",
+          },
+          ignore_tk_after_n_deaths: {
+            label: "Nach eigenen Toden nicht mehr prüfen",
+            help: "Beendet die Prüfung, sobald der Spieler so oft gestorben ist.",
+          },
+          teamkill_tolerance_count: {
+            label: "Tolerierte Teamkills",
+            help: "So viele frühe Teamkills bleiben ohne automatische Sperre.",
+          },
+          excluded_weapons: {
+            label: "Ausgenommene Waffen",
+            help: "Teamkills mit diesen internen Waffennamen lösen keine Sperre aus.",
+          },
+          whitelist_players: {
+            label: "Ausgenommene Spieler",
+            help: "Kombiniert Markierungen, VIP-Status und bisherige Sitzungen.",
+          },
+          has_flag: {
+            label: "Spieler-Markierungen",
+            help: "Mindestens eine passende Markierung nimmt den Spieler aus.",
+          },
+          is_vip: {
+            label: "VIPs ausnehmen",
+            help: "Aktive VIP-Spieler werden nicht automatisch gesperrt.",
+          },
+          has_at_least_n_sessions: {
+            label: "Ab dieser Sitzungszahl ausnehmen",
+            help: "Schützt bekannte Spieler mit mindestens so vielen bisherigen Sitzungen.",
+          },
+          message: {
+            label: "Nachricht für den Spieler",
+            help: "Wird dem Spieler zusammen mit der automatischen Sperre angezeigt.",
+          },
+          author_name: {
+            label: "Angezeigter Autor",
+            help: "Name des automatischen Moderators im Sperrlisteneintrag.",
+          },
+          blacklist_id: {
+            label: "Ziel-Sperrliste",
+            help: "ID der Sperrliste, der der Spieler hinzugefügt wird.",
+          },
+          ban_duration: {
+            label: "Sperrdauer",
+            help: "Die Einheiten werden zu einer gemeinsamen Sperrdauer addiert.",
+          },
+          minutes: { label: "Minuten", help: "Zusätzliche Minuten." },
+          hours: { label: "Stunden", help: "Zusätzliche Stunden." },
+          days: { label: "Tage", help: "Zusätzliche Tage." },
+          weeks: { label: "Wochen", help: "Zusätzliche Wochen." },
+          years: { label: "Jahre", help: "Zusätzliche Jahre." },
+          discord_webhook_url: {
+            label: "Discord-Audit-Webhook",
+            help: "Optional. Meldet automatisch erstellte Teamkill-Sperren.",
+          },
+          discord_webhook_message: {
+            label: "Discord-Nachricht",
+            help: "Text der Audit-Nachricht für eine ausgeführte Sperre.",
+          },
+        },
+        summary: {
+          detection: "{{minutes}} Minuten · {{count}} TK toleriert",
+          action: "Sperrliste {{id}} · {{duration}}",
+          exemptions: "{{weapons}} Waffen · {{flags}} Markierungen",
+        },
       },
       nameKicks: {
         eyebrow: "Spieler & Moderation",
         title: "Namensfilter",
         intro:
           "Prüfe Spielernamen anhand deiner Regeln, schütze ausgenommene Spieler und lege einen verständlichen Kick-Grund fest.",
+        sections: {
+          rules: {
+            title: "Filterregeln",
+            description: "Vorlagen, eigene RegEx und Testlauf",
+          },
+          exemptions: {
+            title: "Ausnahmen",
+            description: "Geschützte Spieler-Markierungen",
+          },
+          actions: {
+            title: "Kick-Aktion",
+            description: "Verständliche Begründung für betroffene Spieler",
+          },
+          notifications: {
+            title: "Audit",
+            description: "Optionale Discord-Benachrichtigung",
+          },
+        },
+        fields: {
+          regular_expressions: {
+            label: "Namensregeln",
+            help: "Jede passende Regel entfernt einen neu verbundenen Spieler unmittelbar vom Server.",
+          },
+          whitelist_flags: {
+            label: "Ausgenommene Spieler-Markierungen",
+            help: "Spieler mit mindestens einer dieser CRCON-Markierungen werden vom Namensfilter nicht entfernt.",
+          },
+          kick_reason: {
+            label: "Kick-Grund für den Spieler",
+            help: "Kurze, verständliche Begründung, die dem Spieler beim Entfernen angezeigt wird.",
+          },
+          discord_webhook_url: {
+            label: "Discord-Audit-Webhook",
+            help: "Optional. Sendet Treffer und ausgeführte Kicks an den angegebenen Discord-Webhook.",
+          },
+        },
+        flagPicker: {
+          noticeTitle: "Vorhandene Markierungen direkt auswählen",
+          noticeBody:
+            "Der Katalog wird aus den Spielerprofilen dieser CRCON-Instanz geladen. Hat ein Spieler mindestens eine ausgewählte Markierung, wird er vom Namensfilter ausgenommen.",
+          label: "Ausgenommene Markierungen",
+          placeholder: "Markierung suchen oder neu eingeben",
+          help: "Wähle vorhandene Markierungen aus. Eine eigene Markierung kannst du weiterhin eintippen und mit Enter übernehmen.",
+          loading: "Markierungen werden geladen …",
+          noOptions: "Keine weitere vorhandene Markierung gefunden",
+          loadFailed:
+            "Der Markierungskatalog konnte nicht geladen werden. Eigene Werte können weiterhin eingegeben werden.",
+          playerCount_one: "bei {{count}} Spieler",
+          playerCount_other: "bei {{count}} Spielern",
+          catalogueCount_one: "{{count}} vorhandene Markierung gefunden",
+          catalogueCount_other: "{{count}} vorhandene Markierungen gefunden",
+        },
+        workbench: {
+          summary: {
+            title: "Namensfilter-Übersicht",
+            filter: "Filterregeln",
+            rules_one: "{{count}} Regel aktiv",
+            rules_other: "{{count}} Regeln aktiv",
+            noRules: "Keine Regel aktiv",
+            filterActive: "Neue Spielernamen werden beim Verbinden geprüft.",
+            filterInactive:
+              "Ohne Regel werden keine Spieler nach Namen entfernt.",
+            effect: "Wirkung bei Treffer",
+            kickOnMatch: "Sofort vom Server entfernen",
+            reasonMissing: "Ergänze noch einen verständlichen Kick-Grund.",
+            exemptions: "Ausnahmen",
+            flags_one: "{{count}} Markierung",
+            flags_other: "{{count}} Markierungen",
+            noFlags: "Keine Markierungen",
+            exemptionsHelp: "Passende Markierungen überspringen den Filter.",
+            audit: "Discord-Audit",
+            webhookActive: "Webhook verbunden",
+            webhookInactive: "Nicht eingerichtet",
+            webhookActiveHelp: "Treffer und Kicks werden protokolliert.",
+            webhookInactiveHelp:
+              "Die Regelfunktion arbeitet auch ohne Webhook.",
+          },
+        },
         rulesEditor: {
           noticeTitle: "Jeder Treffer führt zu einem Kick",
           noticeBody:
@@ -2592,12 +3343,299 @@ const de = {
         title: "Seeder-VIP-Belohnung",
         intro:
           "Lege fest, wann Seeding als erfolgreich gilt und welche VIP-Belohnung berechtigte Spieler erhalten.",
+        sections: {
+          operation: {
+            title: "Ablauf",
+            description: "Sprache und Prüfintervalle",
+          },
+          requirements: {
+            title: "Voraussetzungen",
+            description: "Zielstärke & Qualifikation",
+          },
+          reward: {
+            title: "VIP-Belohnung",
+            description: "Dauer & Verlängerung",
+          },
+          messages: {
+            title: "Spielernachrichten",
+            description: "Fortschritt & Abschluss",
+          },
+          notifications: {
+            title: "Webhooks",
+            description: "Externe Benachrichtigungen",
+          },
+          advanced: {
+            title: "Weitere Einstellungen",
+            description: "Zusätzliche vom Server bereitgestellte Felder",
+          },
+        },
+        fields: {
+          language: {
+            label: "Sprache",
+            help: "Locale für automatisch formatierte Zeit- und Datumsangaben, zum Beispiel de_DE.",
+          },
+          poll_time_seeding: {
+            label: "Prüfintervall während des Seedings",
+            help: "Sekunden zwischen zwei Prüfungen, solange der Server aufgebaut wird.",
+          },
+          poll_time_seeded: {
+            label: "Prüfintervall nach dem Seeding",
+            help: "Sekunden zwischen zwei Prüfungen, nachdem der Server als geseedet gilt.",
+          },
+          requirements: {
+            label: "Seeding-Voraussetzungen",
+            help: "Definiert, wann die Aufbauphase läuft und wer die Belohnung erhält.",
+          },
+          buffer: {
+            label: "Übergangspuffer",
+            help: "Zusätzliche Zeit zwischen erreichter Spielerzahl und abgeschlossenem Seeding.",
+          },
+          min_allies: {
+            label: "Mindestens Alliierte",
+            help: "Mindestens benötigte Spieler auf alliierter Seite.",
+          },
+          min_axis: {
+            label: "Mindestens Achsenmächte",
+            help: "Mindestens benötigte Spieler auf Achsenseite.",
+          },
+          max_allies: {
+            label: "Höchstens Alliierte",
+            help: "Obergrenze der Aufbauphase auf alliierter Seite.",
+          },
+          max_axis: {
+            label: "Höchstens Achsenmächte",
+            help: "Obergrenze der Aufbauphase auf Achsenseite.",
+          },
+          online_when_seeded: {
+            label: "Spieler muss beim Abschluss online sein",
+            help: "Belohnt nur Spieler, die beim erfolgreichen Seeding noch verbunden sind.",
+          },
+          minimum_play_time: {
+            label: "Mindestspielzeit",
+            help: "So lange muss ein Spieler während der Aufbauphase anwesend gewesen sein.",
+          },
+          seconds: { label: "Sekunden", help: "Zusätzliche Sekunden." },
+          minutes: { label: "Minuten", help: "Zusätzliche Minuten." },
+          hours: { label: "Stunden", help: "Zusätzliche Stunden." },
+          days: { label: "Tage", help: "Zusätzliche Tage." },
+          weeks: { label: "Wochen", help: "Zusätzliche Wochen." },
+          player_announce_thresholds: {
+            label: "Spielerzahlen für Ankündigungen",
+            help: "Bei diesen Gesamtspielerzahlen wird der aktuelle Seeding-Fortschritt angekündigt.",
+          },
+          reward: {
+            label: "VIP-Belohnung",
+            help: "Steuert Laufzeit und Verhalten bei bereits vorhandenem VIP.",
+          },
+          forward: {
+            label: "Laufzeit ab heute berechnen",
+            help: "Berechnet die neue Laufzeit vom aktuellen Zeitpunkt statt vom vorhandenen Ablaufdatum.",
+          },
+          player_name_format_not_current_vip: {
+            label: "Name für neuen VIP-Eintrag",
+            help: "Namensvorlage für Spieler, die bisher keinen aktiven VIP-Eintrag besitzen.",
+          },
+          cumulative: {
+            label: "Belohnungen addieren",
+            help: "Mehrere erfolgreiche Seeding-Belohnungen verlängern die vorhandene Laufzeit.",
+          },
+          timeframe: {
+            label: "VIP-Laufzeit",
+            help: "Die Einheiten werden zu einer gemeinsamen Belohnungsdauer addiert.",
+          },
+          nice_time_delta: {
+            label: "Laufzeit lesbar formatieren",
+            help: "Stellt die Belohnungsdauer in Spielernachrichten natürlich lesbar dar.",
+          },
+          nice_expiration_date: {
+            label: "Ablaufdatum lesbar formatieren",
+            help: "Stellt das neue VIP-Ablaufdatum in Spielernachrichten verständlich dar.",
+          },
+          player_messages: {
+            label: "Nachrichten an Spieler",
+            help: "Texte für Fortschritt, Abschluss und die individuelle VIP-Belohnung.",
+          },
+          seeding_in_progress_message: {
+            label: "Seeding läuft",
+            help: "Nachricht, wenn eine Ankündigungsschwelle erreicht wird.",
+          },
+          seeding_complete_message: {
+            label: "Seeding abgeschlossen",
+            help: "Nachricht, sobald der Server als geseedet gilt.",
+          },
+          player_count_message: {
+            label: "Spielerzahl",
+            help: "Darstellung der aktuellen Teamstärken.",
+          },
+          reward_player_message: {
+            label: "Belohnungsnachricht",
+            help: "Persönliche Nachricht an einen Spieler mit erhaltener VIP-Belohnung.",
+          },
+          reward_player_message_no_vip: {
+            label: "Nachricht ohne Belohnung",
+            help: "Nachricht an Spieler, die die Bedingungen nicht erfüllt haben.",
+          },
+          hooks: {
+            label: "Benachrichtigungs-Webhooks",
+            help: "Optionale Ziele, die über den Seeding-Fortschritt informiert werden.",
+          },
+          url: {
+            label: "Webhook-URL",
+            help: "Zieladresse für die Benachrichtigung.",
+          },
+        },
+        summary: {
+          targetLabel: "Ziel",
+          targetEqual: "{{count}} je Team",
+          target: "Alliierte {{allies}} · Achse {{axis}}",
+          qualificationLabel: "Qualifikation",
+          qualification: "{{minutes}} Min. Mindestspielzeit",
+          requirements:
+            "{{allies}} Alliierte · {{axis}} Achse · {{minutes}} Min.",
+          reward: "{{duration}} · {{mode}}",
+          cumulative: "verlängert Laufzeit",
+          replace: "beginnt ab Abschluss",
+          messages_one: "{{count}} Nachricht konfiguriert",
+          messages_other: "{{count}} Nachrichten konfiguriert",
+        },
+        workbench: {
+          custom: "Eigener Wert",
+          advanced: "Erweiterte Einstellungen",
+          brief: {
+            title: "So läuft deine Seeder-Belohnung",
+            sentenceEqual_one:
+              "Sobald beide Teams je {{target}} Spieler erreichen, qualifizieren sich aktive Spieler nach {{minutes}} Minuten für {{days}} Tag VIP.",
+            sentenceEqual_other:
+              "Sobald beide Teams je {{target}} Spieler erreichen, qualifizieren sich aktive Spieler nach {{minutes}} Minuten für {{days}} Tage VIP.",
+            sentenceSplit_one:
+              "Sobald die Alliierten {{allies}} und die Achsenmächte {{axis}} Spieler erreichen, qualifizieren sich aktive Spieler nach {{minutes}} Minuten für {{days}} Tag VIP.",
+            sentenceSplit_other:
+              "Sobald die Alliierten {{allies}} und die Achsenmächte {{axis}} Spieler erreichen, qualifizieren sich aktive Spieler nach {{minutes}} Minuten für {{days}} Tage VIP.",
+            teamTargetEqual: "{{count}} Spieler je Team",
+            teamTarget: "{{allies}} / {{axis}} als Zielstärke",
+            playTime: "{{minutes}} Min. mitspielen",
+            online: "Beim Abschluss online",
+            accumulated: "Während des Seedings qualifiziert",
+            reward_one: "+{{days}} Tag VIP",
+            reward_other: "+{{days}} Tage VIP",
+          },
+          operation: {
+            language: "Sprache der Meldungen",
+            languageHelp:
+              "Steuert Sprache sowie Datums- und Zeitformat der automatischen Texte.",
+            german: "Deutsch",
+            english: "Englisch",
+            during: "Prüfung während des Seedings",
+            duringHelp:
+              "Wie oft die Voraussetzungen geprüft werden, solange der Server aufgebaut wird.",
+            after: "Prüfung nach erfolgreichem Seeding",
+            afterHelp:
+              "Wie oft geprüft wird, nachdem der Server als geseedet gilt.",
+            zeroWarning:
+              "0 Sekunden erzeugt eine Dauerschleife. Wähle ein sinnvolles Prüfintervall.",
+          },
+          requirements: {
+            players_one: "{{count}} Spieler",
+            players_other: "{{count}} Spieler",
+            noAnnouncements: "Keine Ankündigungsschwellen festgelegt.",
+            ownValue: "Spielerzahl",
+            addThreshold: "Ankündigungsschwelle hinzufügen",
+            targetTitle: "Zielstärke pro Team",
+            targetHelp:
+              "Mindestens diese Spielerzahl muss das jeweilige Team erreichen.",
+            allies: "Alliierte",
+            axis: "Achsenmächte",
+            couple: "Werte koppeln",
+            playTime: "Qualifikationszeit",
+            playTimeHelp:
+              "So lange muss ein Spieler beim Aufbau mitgewirkt haben.",
+            playTimeControlHelp:
+              "Voreinstellung wählen oder die genaue Dauer mit dem Regler festlegen.",
+            eligibility: "Wer erhält die Belohnung?",
+            eligibilityHelp:
+              "Bestimmt, ob Anwesenheit beim Abschluss erforderlich ist.",
+            onlineAtEnd: "Beim Abschluss online",
+            duringSeeding: "Während des Seedings qualifiziert",
+            announcements: "Fortschritt ankündigen",
+            announcementsHelp:
+              "Bei diesen Gesamtspielerzahlen wird der aktuelle Stand gemeldet.",
+            buffer: "Rückfallpuffer nach dem Seeding",
+            bufferHelp:
+              "Wartezeit, bevor ein bereits geseedeter Server nach sinkender Spielerzahl wieder in den Seeding-Modus fällt.",
+            legacyHelp:
+              "Diese beiden Legacy-Werte werden gespeichert, vom aktuellen Seeder-VIP-Dienst aber nicht ausgewertet. Ändere sie nur für Abwärtskompatibilität.",
+            legacyAllies: "Legacy-Minimum Alliierte",
+            legacyAxis: "Legacy-Minimum Achsenmächte",
+            valid:
+              "Die wirksamen Voraussetzungen sind vollständig und verständlich konfiguriert.",
+          },
+          reward: {
+            duration: "Belohnung pro erfolgreichem Seeding",
+            days_one: "{{count}} Tag VIP",
+            days_other: "{{count}} Tage VIP",
+            dayUnit: "Tage",
+            existingVip: "Vorhandene VIP-Laufzeit",
+            extend: "Bestehende Laufzeit verlängern",
+            recalculate: "Ab Abschluss neu berechnen",
+            previewCumulative_one:
+              "Der {{days}} Tag wird zur vorhandenen VIP-Laufzeit addiert.",
+            previewCumulative_other:
+              "Die {{days}} Tage werden zur vorhandenen VIP-Laufzeit addiert.",
+            previewReplace_one:
+              "Berechtigte Spieler erhalten {{days}} Tag VIP ab Abschluss. Eine längere bestehende Restzeit bleibt erhalten.",
+            previewReplace_other:
+              "Berechtigte Spieler erhalten {{days}} Tage VIP ab Abschluss. Eine längere bestehende Restzeit bleibt erhalten.",
+            advanced: "Darstellung und Kompatibilität",
+            entryName: "Name des neuen VIP-Eintrags",
+            entryPreview: "Vorschau: {{name}}",
+            niceDuration: "Laufzeit lesbar formulieren",
+            niceExpiry: "Ablaufdatum lesbar formulieren",
+            forwardCompatibility:
+              "Das vorhandene Kompatibilitätsfeld „forward“ wird vom aktuellen Dienst nicht ausgewertet und beim Speichern unverändert übernommen.",
+          },
+          messages: {
+            empty: "Noch kein Text hinterlegt",
+            placeholders: "Verfügbare Platzhalter",
+          },
+          webhooks: {
+            emptyTitle: "Keine Webhooks eingerichtet",
+            emptyHelp:
+              "Optional kannst du Seeding-Fortschritt und Abschluss an externe Ziele senden.",
+            url: "Webhook {{number}}",
+            delete: "Webhook {{number}} entfernen",
+            add: "Webhook hinzufügen",
+          },
+        },
       },
       expiredVip: {
         eyebrow: "VIP-Verwaltung",
         title: "Abgelaufene VIPs bereinigen",
         intro:
           "Bestimme, wie oft CRCON abgelaufene VIP-Einträge prüft und optional darüber informiert.",
+        sections: {
+          schedule: {
+            title: "Prüfintervall",
+            description: "Rhythmus der automatischen Bereinigung",
+          },
+          notifications: {
+            title: "Audit",
+            description: "Optionale Discord-Benachrichtigung",
+          },
+          advanced: {
+            title: "Weitere Einstellungen",
+            description: "Zusätzliche vom Server bereitgestellte Felder",
+          },
+        },
+        fields: {
+          interval_minutes: {
+            label: "Alle wie viele Minuten prüfen",
+            help: "CRCON sucht in diesem Abstand nach abgelaufenen VIP-Einträgen und entfernt sie.",
+          },
+          discord_webhook_url: {
+            label: "Discord-Audit-Webhook",
+            help: "Optional. Informiert über automatisch entfernte VIP-Einträge.",
+          },
+        },
       },
     },
     config: {
@@ -2612,13 +3650,11 @@ const de = {
       closeAutobalancerSettings: "Einstellungen schließen",
       openAutobalancerSettings: "Einstellungen öffnen · Modus {{mode}}",
       basicMode: "Einfache Ansicht",
-      advancedJsonMode: "Erweitert (JSON)",
       reload: "Neu laden",
       saveSettings: "Einstellungen speichern",
       explanation: "Erklärung",
       technicalSchema: "Technisches Schema",
-      objectUnsupported:
-        "Die Eigenschaft „{{name}}“ wird im Formular noch nicht unterstützt. Bitte im Code-Editor bearbeiten.",
+      objectUnsupported: "Die Eigenschaft „{{name}}“ wird im Formular noch nicht unterstützt. Bitte im Code-Editor bearbeiten.",
       label: "Bezeichnung",
       minPlayers: "Minimale Spieler",
       minLevel: "Mindestlevel",
@@ -2641,18 +3677,10 @@ const de = {
       },
     },
     profanity: {
-      eyebrow: "Spieler & Moderation",
-      title: "Wortfilter",
-      subtitle:
-        "Blockierte Begriffe pflegen, importieren und kontrolliert auf einen oder mehrere Server anwenden.",
       upload: "Hochladen",
       download: "Herunterladen",
       apply: "Übernehmen",
       applyAllServers: "Auf alle Server anwenden",
-      allServers: "Alle Server",
-      applyAllTitle: "Wortfilter auf alle Server anwenden?",
-      applyAllDescription:
-        "Die aktuelle Begriffsliste wird auf alle verbundenen Server dieser Installation übertragen.",
       newEntry: "Neuer Eintrag",
       add: "Hinzufügen",
       select: "Auswählen",
@@ -2660,10 +3688,6 @@ const de = {
       deleteSelected: "Auswahl löschen",
     },
     templates: {
-      eyebrow: "Spieler & Moderation",
-      title: "Nachrichtenvorlagen",
-      subtitle:
-        "Wiederverwendbare Texte für Nachrichten, Maßnahmen und den Serverbetrieb verwalten.",
       categories: "Kategorien",
       select: "Nachrichtenvorlage auswählen",
       message: "Nachricht",
@@ -2680,33 +3704,14 @@ const de = {
       search: "Nachricht suchen",
     },
     autosettings: {
-      eyebrow: "Serverbetrieb",
-      title: "Automatische Einstellungen",
-      subtitle:
-        "Regeln als Vorlage wählen, im erweiterten JSON-Modus prüfen und kontrolliert anwenden.",
       readDocs: "Dokumentation öffnen",
       apply: "Übernehmen",
       applyAllServers: "Auf alle Server anwenden",
       templates: "Vorlagen für automatische Einstellungen",
-      editorTitle: "Erweiterte Konfiguration",
-      editorHint:
-        "Änderungen werden erst durch Übernehmen auf den aktuell gewählten Server geschrieben.",
-      applyAllTitle: "Auf alle Server anwenden?",
-      applyAllDescription:
-        "Die geöffnete Konfiguration wird auf alle verbundenen Server dieser Installation übertragen. Prüfe die Server- und Spielkompatibilität vor der Bestätigung.",
     },
     welcome: {
-      eyebrow: "Karten & Spielbetrieb",
-      title: "Willkommensnachricht",
-      subtitle:
-        "Lege fest, welche Nachricht Spieler beim Betreten des Servers erhalten.",
       apply: "Übernehmen",
       applyAllServers: "Auf alle Server anwenden",
-      allServers: "Alle Server",
-      editorHint: "Leer lassen, um die Willkommensnachricht zu deaktivieren.",
-      applyAllTitle: "Willkommensnachricht auf alle Server anwenden?",
-      applyAllDescription:
-        "Die aktuelle Nachricht wird auf alle verbundenen Server dieser Installation übertragen.",
       templates: "Willkommensvorlagen",
     },
     services: {
@@ -2738,10 +3743,8 @@ const de = {
       },
       diagnostics: {
         title: "Support-Diagnosepaket",
-        scope:
-          "Enthält Versions-, Gesundheits- und aggregierte Ressourcenwerte ({{services}} Dienste, {{history}} Messpunkte, ca. {{bytes}} Bytes).",
-        omitted:
-          "Keine Rohlogs, Spieler- oder Chatdaten, IP-Adressen, URLs, Zugangsdaten oder Tokens.",
+        scope: "Enthält Versions-, Gesundheits- und aggregierte Ressourcenwerte ({{services}} Dienste, {{history}} Messpunkte, ca. {{bytes}} Bytes).",
+        omitted: "Keine Rohlogs, Spieler- oder Chatdaten, IP-Adressen, URLs, Zugangsdaten oder Tokens.",
         download: "Diagnosepaket herunterladen",
       },
       webhooks: {
@@ -2749,17 +3752,14 @@ const de = {
         hint: "{{count}} Zustellung benötigt Aufmerksamkeit. Behebe zuerst die Webhook-Konfiguration und wiederhole sie dann gezielt.",
         retry: "Zustellung wiederholen",
         retrySuccess: "Die Webhook-Zustellung wurde erneut eingereiht.",
-        retryMissing:
-          "Diese fehlgeschlagene Zustellung ist nicht mehr verfügbar.",
-        retryFailed:
-          "Die Webhook-Zustellung konnte nicht erneut eingereiht werden.",
+        retryMissing: "Diese fehlgeschlagene Zustellung ist nicht mehr verfügbar.",
+        retryFailed: "Die Webhook-Zustellung konnte nicht erneut eingereiht werden.",
       },
     },
     consoleAdmins: {
       title: "Konsolen-Admins",
       eyebrow: "Berechtigungen",
-      subtitle:
-        "Administrative Konsolenrollen hinzufügen, prüfen und entfernen.",
+      subtitle: "Administrative Konsolenrollen hinzufügen, prüfen und entfernen.",
       upload: "Hochladen",
       download: "Herunterladen",
       apply: "Übernehmen",
@@ -2780,41 +3780,255 @@ const de = {
       unassigned: "Nicht zugewiesen",
       tableSettings: "Live-Sitzungen",
       team: "Team",
+      faction: "Fraktion",
+      factionShort: "F",
       unit: "Trupp",
       role: "Rolle",
+      roleShort: "R",
       level: "Level",
+      levelShort: "LVL",
       name: "Name",
       kills: "Kills",
+      killsShort: "K",
       deaths: "Tode",
+      deathsShort: "T",
+      kdr: "Kill/Death-Verhältnis",
+      kdrShort: "K/D",
       combatScore: "Kampfpunkte",
       offenseScore: "Angriffspunkte",
       defenseScore: "Verteidigungspunkte",
       supportScore: "Unterstützungspunkte",
       currentPlaytime: "Aktuelle Spielzeit",
+      timeShort: "Zeit",
+      unknown: "Unbekannt",
+      updatedAt: "Aktualisiert {{time}}",
+      connectionError: "Live-Daten nicht erreichbar",
+      loadError: "Die Live-Sitzungen konnten nicht geladen werden.",
+      sorting: "Sortierung",
+      sortKdr: "K/D absteigend",
+      sortKills: "Kills absteigend",
+      sortTime: "Sitzungszeit absteigend",
+      sortName: "Name aufsteigend",
+      columns: "Spalten",
+      selected: "{{count}} ausgewählt",
+      noneSelected: "Keine Auswahl",
+      range: "{{from}}–{{to}} von {{total}} Spielern",
+      selectPlayerHint:
+        "Wähle einen Spieler aus, um die Live-Sitzung zu prüfen.",
+      livePlayer: "Aktive Spielsitzung",
+      sessionTime: "Sitzungszeit",
+      sessionDetails: "Sitzungsdetails",
+      currentPerformance: "Leistung in dieser Sitzung",
+      combatShort: "Kampf",
+      offenseShort: "Offensive",
+      defenseShort: "Defensive",
+      supportShort: "Support",
+      actionsTitle: "Aktionen",
+      playerId: "Spieler-ID",
+      copyPlayerId: "Spieler-ID kopieren",
+      filters: {
+        all: "Alle",
+        allies: "Alliierte",
+        axis: "Achsenmächte",
+        unassigned: "Lobby",
+        leaderless: "Ohne Führung",
+      },
+      summary: {
+        allies: "Alliierte",
+        axis: "Achsenmächte",
+      },
+      teams: {
+        allies: "Alliierte",
+        axis: "Achsenmächte",
+        unassigned: "Lobby",
+      },
+      actions: {
+        message: "Nachricht",
+        punish: "Bestrafen",
+        kick: "Kicken",
+        ban: "Bannen",
+        profile: "Profil",
+      },
+      roles: {
+        armycommander: "Kommandant",
+        officer: "Truppführer",
+        rifleman: "Gewehrschütze",
+        automaticrifleman: "Automatikschütze",
+        assault: "Sturmtrupp",
+        medic: "Sanitäter",
+        support: "Versorgung",
+        engineer: "Pionier",
+        antitank: "Panzerabwehr",
+        heavymachinegunner: "MG-Schütze",
+        tankcommander: "Panzerkommandant",
+        crewman: "Panzerbesatzung",
+        spotter: "Aufklärer",
+        sniper: "Scharfschütze",
+        artilleryobserver: "Artilleriebeobachter",
+        operator: "Bediener",
+        gunner: "Geschützschütze",
+        helicopterpilot: "Hubschrauberpilot",
+        helicopterlogisticsofficer: "Logistikoffizier",
+        mortarsupport: "Mörserversorgung",
+        mortarobserver: "Mörserbeobachter",
+        mortargunner: "Mörserschütze",
+        unknown: "Unbekannt",
+      },
     },
     liveGame: {
-      title: "Live-Spiel",
-      eyebrow: "Statistiken",
-      subtitle: "Aktuellen Spielstand und Spielerleistung verfolgen.",
+      title: "Live-Statistik",
+      eyebrow: "Live-Betrieb",
+      subtitle: "Teams, Spielstand und Leistung seit Rundenstart direkt vergleichen.",
       playerStatistics: "Spielerstatistik",
+      liveUpdated: "Live · aktuell",
+      connectionError: "Verbindung unterbrochen",
+      staleAge: "Daten veraltet · vor {{seconds}} Sek.",
+      currentMap: "Aktuelle Karte",
+      nextMap: "Nächste Karte",
+      mode: "Modus",
+      score: "Spielstand",
+      remaining: "Restzeit",
+      searchPlayer: "Spieler durchsuchen …",
+      filter: "Spieler filtern",
+      filterAll: "Alle Spieler",
+      filterOnline: "Nur aktive",
+      filterRisk: "Auffällig",
+      sorting: "Spieler sortieren",
+      sortKdr: "K/D absteigend",
+      sortKills: "Kills absteigend",
+      sortTeamkills: "Teamkills absteigend",
+      sortTime: "Spielzeit absteigend",
+      sortName: "Name aufsteigend",
+      toggleSortDirection: "Sortierreihenfolge umkehren",
+      exportCsv: "Export (CSV)",
+      pageSize: "Zeilen pro Team",
+      showCount: "{{count}} anzeigen",
+      range: "{{from}}–{{to}} von {{total}}",
+      noneSelected: "Keine Auswahl",
+      selected: "{{count}} ausgewählt",
+      player: "Spieler",
+      playerCount: "{{count}} Spieler",
+      selectTeam: "Alle Spieler von {{team}} auswählen",
+      selectPlayer: "{{player}} auswählen",
+      killsShort: "Kills",
+      kdr: "Kill-/Death-Verhältnis",
+      kpmShort: "K/Min.",
+      timeShort: "Zeit",
+      supportShort: "Support",
+      teamkillWarning: "Spieler mit Teamkills",
+      noPlayers: "Keine passenden Spieler in diesem Team.",
+      comparison: "Teamvergleich",
+      balance: "Kill-Balance",
+      even: "Ausgeglichen",
+      selectPlayerHint: "Wähle einen Spieler aus, um Leistungsdetails und Profilaktionen zu sehen.",
+      playerDetails: "Spielerdetails",
+      performance: "Leistung seit Rundenstart",
+      mostKilled: "Häufigste Opfer",
+      nemesis: "Nemesis",
+      weapons: "Waffen",
+      noDetailData: "Keine Daten",
+      level: "Level",
+      country: "Land",
+      playerId: "Spieler-ID",
+      copyPlayerId: "Spieler-ID kopieren",
+      profile: "Profil",
+      actions: "Aktionen",
+      statusOnline: "Online",
+      statusIdle: "Inaktiv",
+      statusOffline: "Getrennt",
+      statusUnknown: "Status unbekannt",
+      unknownTeam: "Team unbekannt",
+      unknownPlayers: "{{count}} Spieler konnten keinem Team sicher zugeordnet werden.",
+      dataScope: "Daten seit Rundenstart · einschließlich bereits getrennter Spieler",
+      loadError: "Live-Spiel und Spielstand konnten nicht geladen werden.",
+      partialError: "Ein Teil der Live-Daten konnte nicht aktualisiert werden. Der letzte Stand bleibt sichtbar.",
+      retry: "Erneut versuchen",
     },
     games: {
       title: "Spiele",
       eyebrow: "Historie",
-      subtitle:
-        "Abgeschlossene Spiele, Ergebnisse und Kartenleistung auswerten.",
+      subtitle: "Abgeschlossene Spiele nach Tag und Einsatzzeit durchsuchen.",
       search: "Spiele durchsuchen …",
+      searchPage: "Karte oder Spiel-ID auf dieser Seite suchen …",
       listSettings: "Spieleliste",
+      archive: "Chronologisches Spielearchiv",
       map: "Karte",
       result: "Ergebnis",
       start: "Start",
       duration: "Dauer",
+      period: "Zeitraum",
+      environment: "Umgebung",
+      allGames: "Alle Spiele",
+      allEnvironments: "Alle Umgebungen",
+      lastDays: "Letzte {{count}} Tage",
+      resetFilters: "Filter zurücksetzen",
+      modeFilter: "Nach Spielmodus filtern",
+      today: "Heute",
+      yesterday: "Gestern",
+      unknownDate: "Datum unbekannt",
+      unknownMap: "Unbekannte Karte",
+      entries_one: "{{count}} Spiel",
+      entries_other: "{{count}} Spiele",
+      pageMatches_one: "{{count}} Treffer auf dieser Seite",
+      pageMatches_other: "{{count}} Treffer auf dieser Seite",
+      allies: "Alliierte",
+      axis: "Achsenmächte",
+      scoreLabel: "Alliierte {{allied}} zu {{axis}} Achsenmächte",
+      openGameLabel: "{{map}}, {{mode}}, {{environment}}, {{date}}, Ergebnis {{allied}} zu {{axis}}, Dauer {{duration}} öffnen",
+      noGames: "Noch keine abgeschlossenen Spiele vorhanden.",
+      noMatchesOnPage: "Keine Spiele entsprechen den Filtern auf dieser Seite.",
+      loadError: "Die Spiele konnten nicht geladen werden.",
+      partialError: "Die Aktualisierung ist fehlgeschlagen. Der letzte Stand bleibt sichtbar.",
+      retry: "Erneut versuchen",
+      updating: "Spiele werden aktualisiert",
+      range: "{{from}}–{{to}} von {{total}} Spielen",
+      pageSize: "Spiele pro Seite",
+      show: "{{count}} anzeigen",
+      pagination: "Seitennavigation des Spielearchivs",
+      pageIndicator: "Seite {{page}} von {{maxPages}}",
+      goToPage: "Seite {{page}} öffnen",
     },
     gameDetails: {
       title: "Spieldetails",
+      completedGame: "Abgeschlossenes Spiel",
+      backToArchive: "Zurück zum Spielearchiv",
+      bestPerformances: "Bestleistungen",
+      playerAnalysis: "Spieleranalyse",
+      metricFilter: "Bestleistung auswählen",
+      noMetricData: "Keine Werte für diese Kategorie vorhanden.",
       score: "Punktestand",
+      date: "Datum",
+      start: "Beginn",
+      end: "Ende",
       duration: "Dauer",
+      server: "Server",
+      serverNumber: "Server {{number}}",
       gameId: "Spiel-ID",
+      team: "Team",
+      role: "Rolle",
+      squad: "Trupp",
+      allTeams: "Alle Teams",
+      mixedTeam: "Gemischt",
+      unknownTeam: "Unbekannt",
+      teamReview: "Gemischt / Unbekannt",
+      allRoles: "Alle Rollen",
+      teamFilter: "Nach Team filtern",
+      roleFilter: "Nach Rolle filtern",
+      csvExport: "CSV-Export",
+      columns: "Spalten",
+      tableSettings: "Tabellendarstellung",
+      selectedPlayers: "{{count}} ausgewählt",
+      selectAllPlayers: "Alle Spieler auswählen",
+      selectPlayer: "{{player}} auswählen",
+      selection: "Auswahl",
+      togglePlayerDetails: "Details für {{player}} ein- oder ausklappen",
+      playerActions: "Aktionen für {{player}}",
+      killDeathRatio: "Kill-/Tode-Verhältnis",
+      teamKillStreakShort: "TK-Serie",
+      teamDeathStreakShort: "TT-Serie",
+      noPlayersFound: "Keine Spieler entsprechen den Filtern.",
+      scrollColumns: "Tabellenspalten horizontal scrollen",
+      playersShown: "{{shown}} von {{total}} Spielern",
       loadError: "Spieldetails konnten nicht geladen werden: {{message}}",
       topStat: "Beste {{stat}}",
       deaths: "Tode",
@@ -2870,8 +4084,7 @@ const de = {
     toggleMenu: "Navigation ein- oder ausblenden",
     search: "Navigation durchsuchen …",
     navigateTo: "Navigieren zu",
-    permissionMissing:
-      "Diese Seite ist sichtbar, aber dir fehlt die erforderliche Berechtigung.",
+    permissionMissing: "Diese Seite ist sichtbar, aber dir fehlt die erforderliche Berechtigung.",
     groups: {
       appsSetup: "Apps einrichten",
       views: "Ansichten",
@@ -2914,6 +4127,7 @@ const de = {
       templates: "Vorlagen",
       profanityFilter: "Wortfilter",
       autosettings: "Automatische Einstellungen",
+      discordCommunication: "Discord & Kommunikation",
       audit: "Audit",
       adminPing: "Admin-Benachrichtigung",
       watchlist: "Beobachtungsliste",
@@ -2941,7 +4155,7 @@ const de = {
       logStream: "Log-Stream",
       watchKillRate: "Killrate überwachen",
       liveSessions: "Live-Sitzungen",
-      liveGame: "Live-Spiel",
+      liveGame: "Live-Statistik",
       games: "Spiele",
     },
   },
@@ -2957,20 +4171,16 @@ const de = {
     hllConnected: "Gameserver verbunden",
     gameServerConnected: "Gameserver verbunden",
     gameServerOffline: "CRCON ist verbunden, aber der Gameserver ist offline.",
-    gameServerUnknown:
-      "Die Gameserver-Verbindung ist unbekannt, weil CRCON offline ist.",
+    gameServerUnknown: "Die Gameserver-Verbindung ist unbekannt, weil CRCON offline ist.",
     crconOffline: "Die Verbindung zu CRCON wurde nicht hergestellt.",
     gameServer: "Gameserver",
     gameServerState: {
       loading: "Die Gameserver-Verbindung wird geprüft.",
       online: "Der Gameserver antwortet mit aktuellen Daten.",
       offline: "CRCON erreicht den Gameserver derzeit nicht.",
-      partial:
-        "Ein Teil der Gameserver-Daten ist aktuell, andere Daten sind nicht verfügbar oder veraltet.",
-      stale:
-        "Der Gameserver hat zuletzt geantwortet, die aktuellen Daten konnten aber nicht erneuert werden.",
-      unknown:
-        "Der Gameserver-Status ist unbekannt, weil CRCON keine belastbaren Daten liefert.",
+      partial: "Ein Teil der Gameserver-Daten ist aktuell, andere Daten sind nicht verfügbar oder veraltet.",
+      stale: "Der Gameserver hat zuletzt geantwortet, die aktuellen Daten konnten aber nicht erneuert werden.",
+      unknown: "Der Gameserver-Status ist unbekannt, weil CRCON keine belastbaren Daten liefert.",
       disabled: "Diese Gameserver-Verbindung ist deaktiviert.",
     },
     crconState: {
@@ -2978,8 +4188,7 @@ const de = {
       online: "CRCON ist erreichbar.",
       offline: "CRCON ist derzeit nicht erreichbar.",
       partial: "CRCON ist nur teilweise verfügbar.",
-      stale:
-        "CRCON hat zuletzt geantwortet, die Verbindung konnte aber nicht erneut bestätigt werden.",
+      stale: "CRCON hat zuletzt geantwortet, die Verbindung konnte aber nicht erneut bestätigt werden.",
       unknown: "Der CRCON-Status ist unbekannt.",
       disabled: "Diese CRCON-Verbindung ist deaktiviert.",
     },
@@ -2987,63 +4196,6 @@ const de = {
     serverNumber: "Server {{number}}",
     changePassword: "Passwort ändern",
     logout: "Abmelden",
-  },
-  appearance: {
-    menuLabel: "Darstellung & Farben",
-    title: "Darstellung & Farben",
-    subtitle: "Passe die Oberfläche an deine Arbeitsweise und Wahrnehmung an.",
-    presets: {
-      title: "Farbkombination",
-      description:
-        "Wähle ein geprüftes Preset oder lege darunter eine eigene Akzentfarbe fest.",
-      "frontline-gold": "Frontline Gold",
-      "tactical-blue": "Tactical Blue",
-      "signal-green": "Signal Green",
-      "command-red": "Command Red",
-      neutral: "Neutral",
-    },
-    mode: {
-      title: "Darstellungsmodus",
-      light: "Hell",
-      dark: "Dunkel",
-      system: "System",
-    },
-    custom: {
-      title: "Eigene Akzentfarbe",
-      description:
-        "Die Oberfläche passt Kontrast, Hover- und Fokusfarben automatisch an.",
-      picker: "Akzentfarbe auswählen",
-      hex: "Hex-Farbwert",
-      invalid: "Gib eine Farbe im Format #C59A4A ein.",
-      contrastHint: "Zu schwache Kontraste werden automatisch korrigiert.",
-    },
-    colorVision: {
-      title: "Farbenblindmodus",
-      standard: "Standard",
-      deuteranopia: "Deuteranopie (Grünschwäche)",
-      protanopia: "Protanopie (Rotschwäche)",
-      tritanopia: "Tritanopie (Blauschwäche)",
-      description:
-        "Statusfarben werden angepasst. Icons, Texte und Umrandungen bleiben zusätzlich erhalten.",
-    },
-    preview: {
-      title: "Live-Vorschau",
-      primary: "Primäraktion",
-      selected: "Ausgewählt",
-      info: "Information",
-      success: "Erfolg",
-      warning: "Warnung",
-      error: "Fehler",
-    },
-    accessibilityHint:
-      "Farben vermitteln niemals allein den Zustand. Die Oberfläche nutzt zusätzlich Symbole, Beschriftungen und sichtbare Fokusrahmen.",
-    unsaved: "Nicht gespeicherte Änderungen",
-    restoreSaved: "Gespeicherte Werte",
-    restoreDefault: "Frontline-Standard",
-    apply: "Änderungen übernehmen",
-    saved: "Darstellung wurde für deinen Benutzer gespeichert.",
-    savedLocally:
-      "Der Server war nicht erreichbar. Die Darstellung wurde vorübergehend in diesem Browser gespeichert.",
   },
   matchStatus: {
     ariaLabel: "Aktueller Spielstatus",
@@ -3078,12 +4230,9 @@ const de = {
       messages: {
         warning: "Eine Ressource überschreitet die Warnschwelle.",
         critical: "Eine Ressource überschreitet die kritische Schwelle.",
-        partial:
-          "Ein Teil der Ressourcenmessung ist nicht verfügbar. Prüfe die Dienste- und Containerkonfiguration.",
-        stale:
-          "Die aktuelle Messung konnte nicht erneuert werden. Die letzte erfolgreiche Messung bleibt sichtbar.",
-        unavailable:
-          "CRCON liefert derzeit keine belastbaren Ressourcenwerte. Prüfe die Dienste- und Containerkonfiguration.",
+        partial: "Ein Teil der Ressourcenmessung ist nicht verfügbar. Prüfe die Dienste- und Containerkonfiguration.",
+        stale: "Die aktuelle Messung konnte nicht erneuert werden. Die letzte erfolgreiche Messung bleibt sichtbar.",
+        unavailable: "CRCON liefert derzeit keine belastbaren Ressourcenwerte. Prüfe die Dienste- und Containerkonfiguration.",
       },
       metrics: { cpu: "CPU", ram: "RAM", disk: "SSD" },
       usedTotal: "{{used}} / {{total}} {{unit}} verwendet",
@@ -3097,19 +4246,16 @@ const de = {
         unavailable: "nicht verfügbar",
       },
       units: { cores: "Kerne" },
-      warningDetail:
-        "{{metric}} liegt bei {{percent}} % und überschreitet die Schwelle von {{threshold}} %.",
+      warningDetail: "{{metric}} liegt bei {{percent}} % und überschreitet die Schwelle von {{threshold}} %.",
       openServices: "Dienste prüfen",
       history: "Verlauf",
       range: "{{minutes}} Min. · Messung alle {{interval}} Sek.",
-      historyUnavailable:
-        "Für einen Verlauf sind noch nicht genügend Messpunkte vorhanden.",
+      historyUnavailable: "Für einen Verlauf sind noch nicht genügend Messpunkte vorhanden.",
       sampledAt: "Gemessen: {{time}}",
       refreshing: "wird aktualisiert",
       thresholds: "Warnung ab 80 % · kritisch ab 90 %",
       historySummary: "Ressourcenverlauf. {{summary}}",
-      historySummaryMetric:
-        "{{metric}} zwischen {{minimum}} und {{maximum}} Prozent.",
+      historySummaryMetric: "{{metric}} zwischen {{minimum}} und {{maximum}} Prozent.",
     },
     situation: "Gefechtslage",
     players: "Spieler",
@@ -3164,13 +4310,11 @@ const de = {
     axis: "Achsenmächte",
     basedOnGames: "Basierend auf {{count}} gültigen Spielen seit {{date}}",
     invalidGamesExcluded: "{{count}} ungültige Spiele ausgeschlossen",
-    validGameRules:
-      "Ein gültiges Spiel dauert 10 bis 200 Minuten, enthält vollständige Ergebnisse und endet – außer im Skirmish – mit insgesamt fünf Punkten.",
+    validGameRules: "Ein gültiges Spiel dauert 10 bis 200 Minuten, enthält vollständige Ergebnisse und endet – außer im Skirmish – mit insgesamt fünf Punkten.",
     frontlineApp: {
       eyebrow: "Apps einrichten",
       title: "Frontline App",
-      description:
-        "Kopple dein Konto sicher mit der mobilen oder Windows-Leitstelle.",
+      description: "Kopple dein Konto sicher mit der mobilen oder Windows-Leitstelle.",
       action: "Frontline App einrichten",
       hint: "QR-Code und Geräteverwaltung direkt in CRCON",
     },
@@ -3178,66 +4322,54 @@ const de = {
   apps: {
     eyebrow: "Übersicht",
     title: "Apps einrichten",
-    subtitle:
-      "Verbinde CRCON mit den Frontline-Apps für mobile Administration und Discord-Reports.",
+    subtitle: "Verbinde CRCON mit den Frontline-Apps für mobile Administration und Discord-Reports.",
     frontline: {
       title: "Frontline App",
       description: "Die mobile Leitstelle für schnelle, sichere Admin-Arbeit.",
       security: "Kontogebundene Rechte",
       qr: "Sichere QR-Kopplung",
       devices: "Android & Web",
-      detail:
-        "Die App übernimmt ausschließlich deine bestehenden CRCON-Rechte. Jedes Gerät wird einzeln gekoppelt und kann hier jederzeit entzogen werden.",
+      detail: "Die App übernimmt ausschließlich deine bestehenden CRCON-Rechte. Jedes Gerät wird einzeln gekoppelt und kann hier jederzeit entzogen werden.",
       setup: "Gerät koppeln",
       open: "Frontline Web-App öffnen",
       openWindows: "Frontline für Windows öffnen",
-      windowsHint:
-        "Für diese Plattform steht die Frontline-Windows-App bereit. Dort erfolgt die Kopplung über einen kurzen Gerätecode.",
+      windowsHint: "Für diese Plattform steht die Frontline-Windows-App bereit. Dort erfolgt die Kopplung über einen kurzen Gerätecode.",
     },
     discord: {
       eyebrow: "Apps einrichten",
       title: "Discord Report Bot",
       description: "Reports direkt in Discord empfangen und sicher bearbeiten.",
-      detail:
-        "Wähle Discord-Server, Report-Kanal und Moderatorrollen direkt in CRCON. Spielaktionen bleiben an die aktuellen CRCON-Berechtigungen gebunden.",
+      detail: "Wähle Discord-Server, Report-Kanal und Moderatorrollen direkt in CRCON. Spielaktionen bleiben an die aktuellen CRCON-Berechtigungen gebunden.",
       setup: "Discord Report Bot einrichten",
       reports: "Live-Spielerreports",
       permissions: "Rollenbasierte Aktionen",
       ai: "Optionale KI-Prüfungen",
-      pageSubtitle:
-        "Installiere und verwalte den zentralen Frontline-Bot, lege Moderatorrollen fest und konfiguriere Reports, Aktionen und KI-Prüfungen an einem Ort.",
+      pageSubtitle: "Installiere und verwalte den zentralen Frontline-Bot, lege Moderatorrollen fest und konfiguriere Reports, Aktionen und KI-Prüfungen an einem Ort.",
     },
     how: {
       title: "In drei Schritten",
       one: "Frontline auf dem Smartphone oder im Browser unter webapp.fln.gg öffnen.",
       two: "Hier „Gerät koppeln“ wählen und nach Passwortbestätigung den QR-Code scannen.",
-      three:
-        "Den sechsstelligen Vergleichscode prüfen und die Verbindung bestätigen.",
+      three: "Den sechsstelligen Vergleichscode prüfen und die Verbindung bestätigen.",
     },
   },
   settingEffect: {
     serverValue: "Zuletzt gelesener Serverwert",
     draftValue: "Wert im Formular",
     recommendedValue: "FLN-Empfehlung",
-    unsaved:
-      "Der Wert im Formular wurde noch nicht an den Gameserver gesendet.",
-    commandSent:
-      "„{{name}}“ wurde an den Gameserver gesendet. Der wirksame Wert kann nicht automatisch bestätigt werden.",
-    pendingServerApply:
-      "„{{name}}“ wurde gesendet, der Gameserver meldet noch einen abweichenden Wert. CRCON prüft ihn nach dem nächsten Kartenwechsel oder Serverneustart erneut.",
-    unverified:
-      "Das aktuelle Spielprotokoll bestätigt den tatsächlich wirksamen Wert nicht zuverlässig. Ein erfolgreicher Speichervorgang bestätigt deshalb nur, dass CRCON den Befehl gesendet hat.",
+    unsaved: "Der Wert im Formular wurde noch nicht an den Gameserver gesendet.",
+    commandSent: "„{{name}}“ wurde an den Gameserver gesendet. Der wirksame Wert kann nicht automatisch bestätigt werden.",
+    pendingServerApply: "„{{name}}“ wurde gesendet, der Gameserver meldet noch einen abweichenden Wert. CRCON prüft ihn nach dem nächsten Kartenwechsel oder Serverneustart erneut.",
+    unverified: "Das aktuelle Spielprotokoll bestätigt den tatsächlich wirksamen Wert nicht zuverlässig. Ein erfolgreicher Speichervorgang bestätigt deshalb nur, dass CRCON den Befehl gesendet hat.",
     games: "Im RCON-Protokoll: HLL und HLL Vietnam",
     appliesImmediately: "Befehl wirkt ohne CRCON-Neustart",
     lastRead: "Gelesen: {{time}}",
     notAvailable: "nicht verfügbar",
     notDocumented: "Nicht dokumentiert",
-    permissionMissing:
-      "Dir fehlt die Berechtigung zum Ändern dieser Einstellung.",
+    permissionMissing: "Dir fehlt die Berechtigung zum Ändern dieser Einstellung.",
     useRecommended: "Empfehlung einsetzen",
     discardDraft: "Ungesendete Änderung verwerfen",
-    auditUnavailable:
-      "Letzter Administrator und Rücksetzung sind in dieser Serverantwort nicht enthalten. Änderungen bleiben im Audit-Protokoll nachvollziehbar.",
+    auditUnavailable: "Letzter Administrator und Rücksetzung sind in dieser Serverantwort nicht enthalten. Änderungen bleiben im Audit-Protokoll nachvollziehbar.",
     units: {
       minutes: "{{value}} Min.",
       milliseconds: "{{value}} ms",
@@ -3245,14 +4377,10 @@ const de = {
       slots: "{{value}} Plätze",
     },
     conflicts: {
-      autoSettings:
-        "Abhängigkeit: Auto Settings kann diesen Wert bei der nächsten passenden Regel erneut überschreiben.",
-      vipAutomation:
-        "Abhängigkeit: Auto Settings oder Real VIP kann die reservierten Plätze erneut anpassen.",
-      autobalancer:
-        "Abhängigkeit: Auto Settings und der Frontline-Autobalancer können mit der nativen Spieleinstellung zusammenwirken.",
-      autoVotekick:
-        "Abhängigkeit: Das automatische Votekick-System kann diese Einstellung abhängig von verfügbaren Moderatoren ändern.",
+      autoSettings: "Abhängigkeit: Auto Settings kann diesen Wert bei der nächsten passenden Regel erneut überschreiben.",
+      vipAutomation: "Abhängigkeit: Auto Settings oder Real VIP kann die reservierten Plätze erneut anpassen.",
+      autobalancer: "Abhängigkeit: Auto Settings und der Frontline-Autobalancer können mit der nativen Spieleinstellung zusammenwirken.",
+      autoVotekick: "Abhängigkeit: Das automatische Votekick-System kann diese Einstellung abhängig von verfügbaren Moderatoren ändern.",
     },
   },
   serverSettings: {
@@ -3267,8 +4395,7 @@ const de = {
     playersUnit: "Spieler",
     slotsUnit: "Plätze",
     loading: "Servereinstellungen werden geladen …",
-    unavailable:
-      "Die Servereinstellungen sind derzeit nicht verfügbar. Es werden keine Ersatzwerte angezeigt.",
+    unavailable: "Die Servereinstellungen sind derzeit nicht verfügbar. Es werden keine Ersatzwerte angezeigt.",
     lastRead: "Zuletzt erfolgreich gelesen: {{time}}",
   },
   login: {
@@ -3285,8 +4412,7 @@ const de = {
     invalid: "Die Anmeldedaten sind ungültig. Bitte erneut versuchen.",
     sessionExpired: "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.",
     unavailable: "Die CRCON-Serveranwendung antwortet nicht.",
-    unknownError:
-      "Ein unbekannter Fehler ist aufgetreten. Bitte das Netzwerkprotokoll prüfen und den Support kontaktieren.",
+    unknownError: "Ein unbekannter Fehler ist aufgetreten. Bitte das Netzwerkprotokoll prüfen und den Support kontaktieren.",
   },
   auth: { preparing: "Frontline CRCON wird vorbereitet" },
   about: {
@@ -3294,8 +4420,7 @@ const de = {
     documentation: "Dokumentation",
     help: "Hilfe benötigt?",
     issue: "Problem gefunden? Pull Request erstellen",
-    description:
-      "Erweitertes RCON-Werkzeug für Hell Let Loose mit Serververwaltung, Moderation und Automatisierung.",
+    description: "Erweitertes RCON-Werkzeug für Hell Let Loose mit Serververwaltung, Moderation und Automatisierung.",
     apiVersion: "API-Version",
     upToDate: "Du verwendest die aktuelle Version.",
     updateAvailable: "Eine neuere Version ist verfügbar.",
@@ -3312,4 +4437,986 @@ Object.assign(de.maps.votemapSettings, {
   dominationOptionsHelp: "Anzahl der angebotenen Domination-Karten.",
 });
 
-export default de;
+const mergeMissingTranslations = (preferred, fallback) => {
+  if (
+    !preferred ||
+    typeof preferred !== "object" ||
+    Array.isArray(preferred) ||
+    !fallback ||
+    typeof fallback !== "object" ||
+    Array.isArray(fallback)
+  ) {
+    return preferred ?? fallback;
+  }
+
+  const merged = { ...fallback };
+  for (const [key, value] of Object.entries(preferred)) {
+    merged[key] =
+      value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      fallback[key] &&
+      typeof fallback[key] === "object" &&
+      !Array.isArray(fallback[key])
+        ? mergeMissingTranslations(value, fallback[key])
+        : value;
+  }
+  return merged;
+};
+
+const deMasterFallback = {
+  "mobileNav": {
+    "ariaLabel": "Mobile Hauptnavigation",
+    "operations": "Einsatz",
+    "incidents": "Meldungen",
+    "players": "Spieler",
+    "server-operations": "Betrieb",
+    "more": "Mehr"
+  },
+  "mobileOperations": {
+    "eyebrow": "Serverbetrieb",
+    "title": "Betrieb",
+    "subtitle": "Prüfe den Zustand deines Servers und öffne die häufigsten Betriebsaufgaben.",
+    "cards": {
+      "teams": {
+        "title": "Teams & Trupps",
+        "description": "Führungsprobleme, Trupps und Spieler verwalten."
+      },
+      "maps": {
+        "title": "Karten",
+        "description": "Aktuelle, nächste und sofortige Kartenwechsel steuern."
+      },
+      "balance": {
+        "title": "Autobalancer",
+        "description": "Balancezustand und letzte Eingriffe prüfen."
+      },
+      "automation": {
+        "title": "Automatisierung",
+        "description": "Regeln, Wirkungen und aktive Zeitpläne verwalten."
+      },
+      "services": {
+        "title": "Dienste",
+        "description": "CRCON, Gameserver und Hintergrunddienste prüfen."
+      },
+      "settings": {
+        "title": "Servereinstellungen",
+        "description": "Spielregeln und allgemeine Konfiguration öffnen."
+      }
+    }
+  },
+  "incidents": {
+    "eyebrow": "Moderation",
+    "title": "Meldungen",
+    "subtitle": "Admin-Reports serverübergreifend übernehmen, bearbeiten und abschließen.",
+    "filters": "Meldungen filtern",
+    "tabs": {
+      "new": "Neu",
+      "claimed": "Übernommen",
+      "open": "Offen",
+      "done": "Erledigt",
+      "dismissed": "Abgelehnt"
+    },
+    "status": {
+      "new": "Neu",
+      "claimed": "Übernommen",
+      "resolved": "Erledigt",
+      "dismissed": "Abgelehnt"
+    },
+    "server": "Server {{number}}",
+    "generalReport": "Allgemeine Meldung",
+    "unknownReporter": "Unbekannter Melder",
+    "assignedTo": "bei {{name}}",
+    "reason": "Grund der Meldung",
+    "noReason": "Kein Grund angegeben.",
+    "reporter": "Melder",
+    "assignee": "Bearbeitung",
+    "unassigned": "Noch nicht übernommen",
+    "updated": "Zuletzt geändert",
+    "emptyTitle": "Hier ist alles erledigt",
+    "emptyDescription": "Für diesen Filter liegen derzeit keine Meldungen vor.",
+    "loadFailed": "Die Meldungen konnten nicht geladen werden. Prüfe die Verbindung und versuche es erneut.",
+    "updateFailed": "Die Meldung konnte nicht aktualisiert werden. Sie bleibt unverändert.",
+    "dismissConfirmationTitle": "Meldung wirklich ablehnen?",
+    "dismissConfirmationBody": "Die Ablehnung wird im Verlauf protokolliert. Der Vorgang kann danach nicht mehr als offen bearbeitet werden.",
+    "actions": {
+      "claim": "Übernehmen",
+      "dismiss": "Ablehnen",
+      "resolve": "Abschließen",
+      "confirmDismiss": "Ablehnung bestätigen"
+    }
+  },
+  "views": {
+    "live": {
+      "reviewNow": "Jetzt prüfen",
+      "mobileOperationsTab": "Einsatz",
+      "mobileLogTab": "Protokoll",
+      "loadMorePlayers": "Weitere Spieler laden",
+      "mobileCombatColumn": "K / D",
+      "priorityHigh": "Hoch",
+      "priorityMedium": "Mittel",
+      "priorityInfo": "Info",
+      "score": "Spielstand",
+      "commandBar": "Live-Einsatzsteuerung",
+      "currentMap": "Aktuelle Karte",
+      "remainingTime": "Restzeit",
+      "updating": "Wird aktualisiert",
+      "liveNow": "Live",
+      "layout": "Arbeitsansicht",
+      "splitView": "Geteilt",
+      "assignment": "Team / Trupp / Rolle",
+      "performance": "Kampf / Risiko",
+      "status": "Status",
+      "warned": "Verwarnt",
+      "actionableStatus": "Handlungsbedarf und Gefechtsstatus",
+      "online": "online",
+      "columnPreset": "Spaltenprofil",
+      "operationsPreset": "Einsatz",
+      "customPreset": "Eigene Ansicht",
+      "allColumnsPreset": "Alle Spalten",
+      "horizontalTableScroll": "Tabellenspalten horizontal verschieben",
+      "quickFilters": "Spieler-Schnellfilter",
+      "suspicious": "Auffällig",
+      "selectionFilters": "Auswahlfilter",
+      "playersSelected_one": "{{count}} Spieler ausgewählt",
+      "playersSelected_other": "{{count}} Spieler ausgewählt",
+      "clearSelection": "Auswahl löschen",
+      "selectionActions": "Aktionen öffnen",
+      "moreActions": "Mehr",
+      "events": "Ereignisse",
+      "eventStream": "Live-Ereignisstrom",
+      "eventFilters": "Ereignisse filtern",
+      "admin": "Admin",
+      "chat": "Chat",
+      "teamkills": "Teamkills",
+      "kills": "Kills",
+      "match": "Runde",
+      "searchLogs": "Protokoll durchsuchen …",
+      "advancedFilters": "Erweiterte Filter",
+      "maximizeLogs": "Live-Protokoll maximieren",
+      "restoreSplitView": "Geteilte Ansicht wiederherstellen",
+      "copyLog": "Originalmeldung kopieren",
+      "logCopied": "Originalmeldung kopiert",
+      "splitUnavailable": "Die geteilte Ansicht benötigt mehr verfügbare Breite.",
+      "serverActions": "Serveraktionen",
+      "mobileRoster": "Mobile Spielerliste",
+      "noSpecialStatus": "Kein besonderer Status",
+      "expandPlayer": "Details zu {{name}} öffnen",
+      "collapsePlayer": "Details zu {{name}} schließen",
+      "openPlayerProfile": "Profil von {{name}} öffnen"
+    },
+    "team": {
+      "lobby": "Lobby",
+      "commander": "Commander",
+      "commanderPositionOpen": "Position unbesetzt",
+      "statusFilter": "Status",
+      "roleFilter": "Rolle",
+      "squadFilter": "Trupp",
+      "allRoles": "Alle Rollen",
+      "allSquads": "Alle Trupps",
+      "squadOrPlayer": "Trupp / Spieler",
+      "leaderOrRole": "Truppführer / Rolle",
+      "statusOrKd": "Status / K/D",
+      "selectionActions": "Aktionen für ausgewählte Spieler",
+      "selectionHint": "Aktion für diese Auswahl festlegen",
+      "moreActions": "Weitere",
+      "selectionActionLabels": {
+        "message": "Nachricht",
+        "kick": "Kick",
+        "ban": "Temp/Perma-Bann",
+        "switchTeam": "Team",
+        "removeFromSquad": "Trupp-Kick"
+      },
+      "selectPlayer": "{{name}} auswählen",
+      "selectSquad": "Trupp {{name}} auswählen",
+      "selectTeam": "Team {{name}} auswählen",
+      "expandSquad": "Trupp öffnen",
+      "collapseSquad": "Trupp schließen",
+      "expandSquadNamed": "Trupp {{name}} öffnen",
+      "collapseSquadNamed": "Trupp {{name}} schließen",
+      "expandTeam": "Alle Trupps dieses Teams öffnen",
+      "collapseTeam": "Alle Trupps dieses Teams schließen",
+      "expandTeamNamed": "Alle Trupps von {{name}} öffnen",
+      "collapseTeamNamed": "Alle Trupps von {{name}} schließen",
+      "squadsCount_one": "{{count}} Trupp",
+      "squadsCount_other": "{{count}} Trupps",
+      "problemsCount_one": "{{count}} Problem",
+      "problemsCount_other": "{{count}} Probleme",
+      "noMatches": "Keine passenden Spieler oder Trupps gefunden.",
+      "issueCommander_one": "{{count}} Team ohne Commander",
+      "issueCommander_other": "{{count}} Teams ohne Commander",
+      "issueCommanderDetail": "Unbesetzte Führungspositionen",
+      "issueLeaders_one": "{{count}} Trupp ohne Truppführer",
+      "issueLeaders_other": "{{count}} Trupps ohne Truppführer",
+      "issueLeadersDetail": "Trupps mit Handlungsbedarf",
+      "issueUnassigned_one": "{{count}} Spieler ohne Trupp",
+      "issueUnassigned_other": "{{count}} Spieler ohne Trupp",
+      "issueUnassignedDetail": "Lobby und nicht zugeordnete Spieler",
+      "filters": {
+        "all": "Alle anzeigen",
+        "issues": "Nur Auffälligkeiten",
+        "noLeader": "Ohne Truppführer",
+        "unassigned": "Ohne Trupp"
+      },
+      "squadTypes": {
+        "infantry": "Infanterie",
+        "armor": "Panzer",
+        "armour": "Panzer",
+        "recon": "Aufklärung",
+        "artillery": "Artillerie",
+        "mortar": "Mörser",
+        "helicopter": "Hubschrauber",
+        "other": "Weitere Einheiten"
+      }
+    },
+    "table": {
+      "selection": "Spielerauswahl",
+      "faction": "Fraktion",
+      "teamKillsShort": "TKs",
+      "teamKillRiskLabel": "TK-Risiko",
+      "combatShort": "Kampf",
+      "offenseShort": "Offensive",
+      "defenseShort": "Defensive",
+      "supportShort": "Support",
+      "nameOnly": "Name (Einzelspalte)",
+      "playerSummary": "Spieler (Name und Level)",
+      "playerId": "Spieler-ID",
+      "warnings": "Warnungen",
+      "vip": "VIP"
+    }
+  },
+  "actions": {
+    "viewProfileCompact": "Profil",
+    "secondConfirmationTitle": "Aktion nochmals prüfen",
+    "secondConfirmationBody": "Diese Aktion wirkt unmittelbar. Prüfe Ziel und Angaben, bevor du sie endgültig ausführst.",
+    "executeFinally": "Endgültig ausführen",
+    "sendMessage": {
+      "compact": "Nachricht"
+    },
+    "punish": {
+      "compact": "Bestrafen"
+    },
+    "kick": {
+      "compact": "Kicken"
+    },
+    "blacklist": {
+      "compact": "Bannen",
+      "confirm": "Zur Sperrliste hinzufügen"
+    }
+  },
+  "records": {
+    "auditLogs": {
+      "filters": "Audit-Protokolle filtern"
+    }
+  },
+  "settings": {
+    "configForms": {
+      "units": {
+        "seconds": "Sekunden",
+        "players": "Spieler",
+        "squadPlayers": "Truppmitglieder",
+        "level": "Level",
+        "checks": "Prüfungen",
+        "messages": "Nachrichten",
+        "actions": "Aktionen"
+      },
+      "specialValues": {
+        "disabled": "Deaktiviert",
+        "noMinimum": "Keine Mindestanzahl",
+        "skip": "Phase überspringen",
+        "unlimited": "Unbegrenzt; nicht zur nächsten Phase wechseln",
+        "noDelay": "Ohne zusätzliche Wartezeit",
+        "anySquadSize": "Für jede Truppgröße"
+      },
+      "roles": {
+        "armycommander": "Kommandant",
+        "officer": "Truppführer",
+        "rifleman": "Schütze",
+        "assault": "Sturmtruppe",
+        "automaticrifleman": "Automatikschütze",
+        "medic": "Sanitäter",
+        "support": "Versorgung",
+        "heavymachinegunner": "Maschinengewehrschütze",
+        "antitank": "Panzerabwehr",
+        "engineer": "Pionier",
+        "tankcommander": "Panzerkommandant",
+        "crewman": "Panzerbesatzung",
+        "spotter": "Aufklärer",
+        "sniper": "Scharfschütze",
+        "artilleryobserver": "Artilleriebeobachter",
+        "operator": "Operator",
+        "gunner": "Richtschütze",
+        "squadleader": "Truppführer",
+        "specialist": "Spezialist",
+        "grenadier": "Grenadier",
+        "mortarsupport": "Mörser-Versorgung",
+        "mortarobserver": "Mörsertruppführer",
+        "mortargunner": "Mörserschütze",
+        "helicopterpilot": "Hubschrauberpilot",
+        "helicopterlogisticsofficer": "Hubschrauber-Logistikoffizier"
+      },
+      "workbench": {
+        "defaultEyebrow": "Serverkonfiguration",
+        "defaultIntro": "Konfiguriere diesen Bereich sicher über das geführte Formular.",
+        "navigation": "Konfigurationsbereiche",
+        "mobileNavigation": "Bereich auswählen",
+        "sectionEyebrow": "Abschnitt {{current}} von {{total}}",
+        "statusActive": "Aktiv",
+        "statusInactive": "Deaktiviert",
+        "statusTest": "Testbetrieb",
+        "statusConfigured": "Konfiguriert",
+        "save": "Änderungen speichern",
+        "saving": "Wird gespeichert …",
+        "reset": "Gespeicherte Werte wiederherstellen",
+        "dirty": "Ungespeicherte Änderungen",
+        "dirtyDescription": "Prüfe die Zusammenfassung und speichere, damit die neue Regel wirksam wird.",
+        "saved": "Alle Änderungen gespeichert",
+        "savedDescription": "Die angezeigten Werte entsprechen der gespeicherten Konfiguration.",
+        "readOnly": "Nur Lesezugriff",
+        "readOnlyDescription": "Dir fehlt die Berechtigung {{permission}}. Du kannst die Regel prüfen, aber nicht verändern.",
+        "validationTitle": "Einige Angaben müssen geprüft werden",
+        "validationDescription": "Behebe die markierten Punkte, bevor du speicherst.",
+        "compatibilityTitle": "Konfiguration kann nicht sicher bearbeitet werden",
+        "compatibilityDescription": "Die gespeicherten Daten weichen strukturell von dieser CRCON-Version ab. Sie wurden nicht verändert. Führe zuerst die passende Konfigurationsmigration aus.",
+        "compatibilityIssue": "{{path}}: erwartet {{expected}}, vorhanden {{actual}}",
+        "types": {
+          "array": "Liste",
+          "object": "Objekt",
+          "string": "Text",
+          "integer": "Ganzzahl",
+          "number": "Zahl",
+          "boolean": "Ja/Nein-Wert",
+          "null": "Leerwert"
+        },
+        "navigateToError": "Öffnen",
+        "choices": {
+          "skip": "Überspringen",
+          "count": "Anzahl",
+          "unlimited": "Unbegrenzt"
+        },
+        "choiceHelp": {
+          "skip": "Keine Warnungen senden",
+          "count": "Feste Anzahl von Warnungen",
+          "unlimited": "Kontinuierlich warnen"
+        },
+        "warningMode": "Warnmodus",
+        "warningModeHelp": "Lege fest, wie und wann Spieler vor einer Bestrafung gewarnt werden.",
+        "warningsBeforePunish": "Warnungen vor der Bestrafung",
+        "warningsBeforePunishHelp": "Anzahl der Warnungen, bevor bestraft wird.",
+        "warningIntervalHelp": "Zeit zwischen zwei Warnungen.",
+        "availablePlaceholders": "Verfügbare Platzhalter",
+        "messagePreview": "Vorschau für den Spieler",
+        "messagePreviewEmpty": "Noch keine Nachricht eingetragen.",
+        "warningPreviewMeta": "Warnung {{current}} von {{total}} · Nächste Prüfung in {{seconds}} Sekunden",
+        "sectionTitles": {
+          "operation": "Grundlagen",
+          "scope": "Geltungsbereich",
+          "requirements": "Voraussetzungen",
+          "detection": "Erkennung",
+          "rules": "Regeln",
+          "exemptions": "Ausnahmen",
+          "schedule": "Zeitplan",
+          "announcements": "Ankündigungen",
+          "observation": "Bestätigen",
+          "warnings": "Warnungen",
+          "punishments": "Bestrafungen",
+          "kick": "Kick",
+          "actions": "Maßnahmen",
+          "reward": "Belohnung",
+          "messages": "Nachrichten",
+          "notifications": "Benachrichtigungen",
+          "advanced": "Weitere Einstellungen"
+        },
+        "sectionDescriptions": {
+          "operation": "Aktiviere die Regel und entscheide, ob sie zunächst im Testbetrieb laufen soll.",
+          "scope": "Lege fest, wann und für welche Spieler oder Spielsituationen die Funktion gilt.",
+          "requirements": "Definiere die Bedingungen, die erfüllt sein müssen, bevor die Funktion eingreift.",
+          "detection": "Bestimme, welche Ereignisse erkannt werden und ab wann daraus ein Verstoß entsteht.",
+          "rules": "Lege die fachlichen Regeln, Grenzwerte und Prüfungen für diesen Bereich fest.",
+          "exemptions": "Lege fest, welche Spieler, Rollen und Markierungen von der Regel ausgenommen sind.",
+          "schedule": "Lege Prüfintervalle und zeitliche Abläufe für diesen Dienst fest.",
+          "announcements": "Konfiguriere Hinweise, die Spieler beim Betreten oder während der Regel erhalten.",
+          "observation": "Bestimme, wie oft ein Verstoß intern bestätigt wird, bevor eine sichtbare Warnung folgt.",
+          "warnings": "Lege fest, wie und wann Spieler vor einer Bestrafung gewarnt werden. Warnungen erinnern Spieler daran, einen Truppführer zu benennen.",
+          "punishments": "Lege die Konsequenzen fest, falls Warnungen ohne Wirkung bleiben.",
+          "kick": "Konfiguriere die letzte Eskalationsstufe und die Frist vor dem Kick.",
+          "actions": "Bestimme die Maßnahme, ihre Dauer und die Begründung für betroffene Spieler.",
+          "reward": "Lege Umfang, Dauer und Weitergabe der Belohnung fest.",
+          "messages": "Bearbeite die Texte, die Spieler oder Administratoren in diesem Ablauf erhalten.",
+          "notifications": "Hinterlege optional einen Discord-Webhook für Audit-Meldungen.",
+          "advanced": "Weitere Einstellungen dieses Bereichs, die keiner Hauptphase zugeordnet sind."
+        },
+        "profileSummary": {
+          "title": "Zusammenfassung",
+          "sequence": "Wirkungskette",
+          "active": "Aktiv – Maßnahmen werden ausgeführt",
+          "inactive": "Deaktiviert",
+          "test": "Testbetrieb – nur protokollieren",
+          "disabled": "Übersprungen oder deaktiviert",
+          "unlimited": "Unbegrenzt · alle {{interval}} Sekunden",
+          "count": "{{count}}× · alle {{interval}} Sekunden",
+          "kick": "Kick nach {{seconds}} Sekunden",
+          "intervalMinutes": "Prüfung alle {{count}} Minuten",
+          "configured": "{{configured}} von {{total}} Angaben gesetzt",
+          "activeNotice": "Die gezeigten Einstellungen werden nach dem Speichern für diesen Server verwendet.",
+          "inactiveNotice": "Die Funktion ist deaktiviert. Die übrigen Werte bleiben gespeichert."
+        },
+        "placeholders": {
+          "player_name": "Spielername",
+          "squad_name": "Truppname",
+          "max_warnings": "Max. Warnungen",
+          "received_warnings": "Bisherige Warnungen",
+          "next_check_seconds": "Nächste Prüfung",
+          "max_punishes": "Max. Bestrafungen",
+          "received_punishes": "Erhaltene Bestrafungen",
+          "kick_grace_period": "Kick-Frist"
+        },
+        "flow": {
+          "title": "Zusammenfassung",
+          "sequence": "Wirkungskette",
+          "warn": "Warnen",
+          "punish": "Bestrafen",
+          "kick": "Kick",
+          "count": "{{count}}× · alle {{interval}} Sekunden",
+          "unlimited": "Unbegrenzt · alle {{interval}} Sekunden",
+          "afterSeconds": "nach {{seconds}} Sekunden",
+          "punishAction": "Kick Truppführerrechte",
+          "kickAfterSeconds": "Kick nach {{seconds}} Sekunden",
+          "disabled": "Deaktiviert",
+          "reachability": "Erreichbarkeit",
+          "reachable": "Alle aktiven Stufen sind in dieser Reihenfolge erreichbar.",
+          "unreachable": "Eine spätere Stufe ist mit den aktuellen Werten nicht erreichbar.",
+          "reachabilityStates": {
+            "reachable": {
+              "title": "Kick ist erreichbar",
+              "description": "Warnungen und Bestrafungen laufen vollständig ab, bevor die Kick-Stufe beginnt."
+            },
+            "disabled": {
+              "title": "Kick ist deaktiviert",
+              "description": "Aktiviere die Kick-Stufe, wenn Spieler nach den Bestrafungen entfernt werden sollen."
+            },
+            "warningsUnlimited": {
+              "title": "Kick kann nicht erreicht werden",
+              "description": "Unbegrenzte Warnungen wechseln nie zur Bestrafung. Wähle eine feste Anzahl von Warnungen."
+            },
+            "punishmentsUnlimited": {
+              "title": "Kick kann nicht erreicht werden",
+              "description": "Unbegrenzte Bestrafungen wechseln nie zur Kick-Stufe. Wähle eine feste Anzahl von Bestrafungen."
+            },
+            "punishmentsSkipped": {
+              "title": "Kick kann nicht erreicht werden",
+              "description": "Für einen Kick muss mindestens eine Bestrafung ausgeführt werden."
+            }
+          }
+        },
+        "ruleDisabledNotice": "Die Regel ist deaktiviert. Deine übrigen Einstellungen bleiben erhalten und werden nach dem Aktivieren wieder verwendet.",
+        "summary": {
+          "status": "Regelstatus",
+          "sequence": "Wirksamer Ablauf",
+          "minimumPlayers": "Startbedingung",
+          "exemptions": "Ausnahmen",
+          "active": "Automod greift aktiv ein",
+          "inactive": "Automod ist deaktiviert",
+          "test": "Nur protokollieren – keine Spielaktionen",
+          "minimumPlayersValue": "Ab {{count}} Spielern",
+          "noMinimumPlayers": "Unabhängig von der Spielerzahl",
+          "exemptionsValue": "{{roles}} Rollen · {{flags}} Markierungen · bis Level {{level}}",
+          "noExemptions": "Keine zusätzlichen Ausnahmen",
+          "observation": "{{count}} Prüfungen",
+          "observationSkipped": "Prüfung übersprungen",
+          "warnings": "{{count}} Warnungen",
+          "warningsUnlimited": "Unbegrenzt warnen",
+          "warningsSkipped": "Warnungen übersprungen",
+          "punishments": "{{count}} Bestrafungen",
+          "punishmentsUnlimited": "Unbegrenzt bestrafen",
+          "punishmentsSkipped": "Bestrafungen übersprungen",
+          "kick": "danach Kick",
+          "noKick": "kein Kick",
+          "unreachableKick": "Der Kick ist nicht erreichbar: Aktiviere mindestens eine endliche Bestrafung vor der Kick-Stufe."
+        },
+        "validation": {
+          "required": "Dieses Feld ist erforderlich.",
+          "integer": "Bitte gib eine ganze Zahl ein.",
+          "minimum": "Der kleinste erlaubte Wert ist {{value}}.",
+          "maximum": "Der größte erlaubte Wert ist {{value}}.",
+          "url": "Bitte gib eine gültige HTTP- oder HTTPS-Adresse ein.",
+          "enum": "Mindestens ein Wert wird von diesem Server nicht unterstützt.",
+          "duplicate": "Doppelte Werte sind nicht erlaubt.",
+          "emptyRegex": "Leere reguläre Ausdrücke sind nicht erlaubt, weil sie jeden Spielernamen treffen würden.",
+          "placeholder": "Unbekannte Platzhalter: {{values}}. Verwende einen der angebotenen Platzhalter."
+        }
+      },
+      "noLeader": {
+        "eyebrow": "Automatisierung",
+        "title": "Trupps ohne Truppführer",
+        "intro": "Diese Regel funktioniert für Hell Let Loose und Hell Let Loose: Vietnam.",
+        "summary": {
+          "title": "Ablauf der Regel",
+          "description": "Ausnahmen werden vor jeder Maßnahme geprüft. Testläufe protokollieren denselben Ablauf, greifen aber nicht in das Spiel ein."
+        },
+        "sections": {
+          "operation": {
+            "title": "Grundlagen",
+            "description": "Basis-Einstellungen"
+          },
+          "exemptions": {
+            "title": "Ausnahmen",
+            "description": "Wer ist ausgenommen"
+          },
+          "observation": {
+            "title": "Bestätigen",
+            "description": "Bedingungen und Schwellwerte"
+          },
+          "warnings": {
+            "title": "Warnen",
+            "description": "Warnungen konfigurieren"
+          },
+          "punishments": {
+            "title": "Bestrafen",
+            "description": "Konsequenzen festlegen"
+          },
+          "kick": {
+            "title": "Kick",
+            "description": "Kick-Regeln"
+          },
+          "notifications": {
+            "title": "Nachrichten",
+            "description": "Benachrichtigungen"
+          }
+        },
+        "fields": {
+          "enabled": {
+            "label": "Automod aktivieren",
+            "help": "Überwacht Trupps ohne Truppführer und führt die unten festgelegten Stufen aus."
+          },
+          "dry_run": {
+            "label": "Nur protokollieren (Testlauf)",
+            "help": "Prüft die Regel vollständig, sendet aber keine Nachrichten und führt weder Bestrafungen noch Kicks aus."
+          },
+          "discord_webhook_url": {
+            "label": "Discord-Audit-Webhook",
+            "help": "Optionaler Discord-Webhook für Protokolle der durchgeführten oder im Testlauf erkannten Maßnahmen.",
+            "placeholder": "https://discord.com/api/webhooks/…"
+          },
+          "whitelist_flags": {
+            "label": "Ausgenommene Spieler-Markierungen",
+            "help": "Spieler mit mindestens einer dieser CRCON-Markierungen werden von allen Stufen ausgenommen."
+          },
+          "immune_roles": {
+            "label": "Ausgenommene Rollen",
+            "help": "Spieler in diesen Spielrollen werden nicht geprüft, gewarnt, bestraft oder gekickt."
+          },
+          "immune_player_level": {
+            "label": "Spieler bis Level ausnehmen",
+            "help": "Spieler mit diesem oder einem niedrigeren Level sind geschützt. Der Wert 0 deaktiviert diese Ausnahme."
+          },
+          "dont_do_anything_below_this_number_of_players": {
+            "label": "Mindestanzahl Spieler auf dem Server",
+            "help": "Unterhalb dieser Gesamtspielerzahl pausiert die Regel. 0 bedeutet: keine Mindestanzahl."
+          },
+          "number_of_notes": {
+            "label": "Unsichtbare Prüfungen",
+            "help": "Anzahl interner Prüfungen vor der ersten Warnung. Spieler sehen diese Phase nicht. 0 überspringt sie."
+          },
+          "notes_interval_seconds": {
+            "label": "Abstand zwischen Prüfungen",
+            "help": "Wartezeit zwischen zwei unsichtbaren Prüfungen desselben Spielers."
+          },
+          "number_of_warnings": {
+            "label": "Anzahl Warnungen",
+            "help": "0 überspringt Warnungen. -1 warnt unbegrenzt und wechselt dadurch nicht zur Bestrafung."
+          },
+          "warning_interval_seconds": {
+            "label": "Abstand zwischen Warnungen",
+            "help": "Wartezeit, bevor derselbe Spieler erneut gewarnt wird."
+          },
+          "warning_message": {
+            "label": "Warnnachricht",
+            "help": "Nachricht, die Spieler bei jeder Warnung erhalten."
+          },
+          "number_of_punishments": {
+            "label": "Anzahl Bestrafungen",
+            "help": "0 überspringt Bestrafungen, ermöglicht aber keinen Kick ohne vorherige Bestrafung. -1 bestraft unbegrenzt und wechselt nicht zum Kick."
+          },
+          "min_squad_players_for_punish": {
+            "label": "Mindestgröße des Trupps für Bestrafungen",
+            "help": "Bestrafungen beginnen erst, wenn der betroffene Trupp mindestens so viele Mitglieder hat. 0 gilt für jede Truppgröße."
+          },
+          "min_server_players_for_punish": {
+            "label": "Mindestanzahl Spieler für Bestrafungen",
+            "help": "Bestrafungen beginnen erst ab dieser Gesamtspielerzahl. 0 setzt keine Mindestanzahl."
+          },
+          "punish_interval_seconds": {
+            "label": "Abstand zwischen Bestrafungen",
+            "help": "Wartezeit, bevor derselbe Spieler erneut bestraft wird."
+          },
+          "punish_message": {
+            "label": "Nachricht bei Bestrafung",
+            "help": "Nachricht, die der Spieler zusammen mit der Punish-Aktion erhält."
+          },
+          "kick_after_max_punish": {
+            "label": "Nach den Bestrafungen kicken",
+            "help": "Aktiviert den Kick als letzte Stufe. Dafür muss zuvor mindestens eine Bestrafung erfolgreich ausgeführt worden sein."
+          },
+          "min_squad_players_for_kick": {
+            "label": "Mindestgröße des Trupps für Kicks",
+            "help": "Kicks werden erst ausgeführt, wenn der betroffene Trupp mindestens so viele Mitglieder hat. 0 gilt für jede Truppgröße."
+          },
+          "min_server_players_for_kick": {
+            "label": "Mindestanzahl Spieler für Kicks",
+            "help": "Kicks werden erst ab dieser Gesamtspielerzahl ausgeführt. 0 setzt keine Mindestanzahl."
+          },
+          "kick_grace_period_seconds": {
+            "label": "Letzte Frist vor dem Kick",
+            "help": "Zeit nach der letzten Bestrafung, in der der Trupp noch einen Truppführer bestimmen kann."
+          },
+          "kick_message": {
+            "label": "Kick-Nachricht",
+            "help": "Begründung, die der Spieler beim Kick erhält."
+          }
+        }
+      },
+      "level": {
+        "eyebrow": "Automod-Regel",
+        "title": "Level-Regeln",
+        "intro": "Steuere Mindest- und Höchstlevel sowie rollenabhängige Levelgrenzen. Spieler können stufenweise informiert, bestraft oder vom Server entfernt werden."
+      },
+      "seeding": {
+        "eyebrow": "Automatisierung · Seeding",
+        "title": "Seeding-Regeln",
+        "intro": "Lege Regeln für die Aufbauphase des Servers fest und bestimme, wie Verstöße während des Seedings behandelt werden."
+      },
+      "seedingWorkbench": {
+        "players": "Spieler",
+        "seconds": "Sekunden",
+        "level": "Level",
+        "placeholders": "Einfügen:",
+        "sections": {
+          "operation": {
+            "title": "Übersicht",
+            "description": "Lege fest, ob die Regeln ausgeschaltet, nur beobachtet oder aktiv durchgesetzt werden."
+          },
+          "rules": {
+            "title": "Regeln",
+            "description": "Definiere die erlaubte Spielweise und die Spielerbereiche, in denen jede Regel gilt."
+          },
+          "exemptions": {
+            "title": "Ausnahmen",
+            "description": "Schütze bestimmte Rollen, Markierungen oder neue Spieler vor automatischen Maßnahmen."
+          },
+          "actions": {
+            "title": "Maßnahmen",
+            "description": "Baue die sichtbare Wirkungskette von der Ankündigung bis zum Kick auf."
+          },
+          "notifications": {
+            "title": "Benachrichtigungen",
+            "description": "Sende erkannte Verstöße und ausgeführte Maßnahmen optional an Discord."
+          }
+        },
+        "operation": {
+          "modeTitle": "Wie soll der Automod laufen?",
+          "modeHelp": "Der Testbetrieb nutzt dieselben Regeln, greift aber nicht in das Spiel ein.",
+          "off": "Aus",
+          "offHelp": "Keine Prüfung",
+          "observe": "Beobachten",
+          "observeHelp": "Nur protokollieren",
+          "active": "Aktiv",
+          "activeHelp": "Regeln durchsetzen",
+          "note": "Spielerbereiche innerhalb der einzelnen Regeln bestimmen, wann diese gelten. Die globale Mindestzahl pausiert dagegen den gesamten Seeding-Automod."
+        },
+        "status": {
+          "active": "Aktiv",
+          "incomplete": "Nicht eingerichtet",
+          "skipped": "Übersprungen",
+          "unlimited": "Unbegrenzt",
+          "times": "{{count}}×"
+        },
+        "effectPreview": {
+          "title": "So wirkt die Regel",
+          "active": "Die Regel greift zwischen {{min}} und {{max}} Spielern und prüft {{count}} konfigurierte Einträge.",
+          "inactive": "Diese Regel ist noch nicht vollständig eingerichtet und greift aktuell nicht ein.",
+          "valid": "Die Regel ist einsatzbereit.",
+          "missing": "Ergänze die Regel, bevor du sie aktiv einsetzt."
+        },
+        "rules": {
+          "roles": {
+            "title": "Rollen begrenzen",
+            "description": "Verhindert in der Aufbauphase Rollen, die kleine Gefechte zu stark beeinflussen."
+          },
+          "weapons": {
+            "title": "Waffen begrenzen",
+            "description": "Bestraft den Einsatz ausgewählter Waffen unmittelbar, ohne bis zur Kick-Stufe zu eskalieren.",
+            "empty": "Noch keine Waffe gesperrt. Wähle eine Waffe aus dem Katalog oder gib einen noch unbekannten Spielnamen ein."
+          },
+          "cap": {
+            "title": "Kampfbereich begrenzen",
+            "description": "Hält das Gefecht während des Seedings im vorgesehenen mittleren Kartenbereich.",
+            "switchTitle": "Kampf um den mittleren Punkt erzwingen",
+            "switchHelp": "Spieler werden erkannt, wenn ihr Team mehr Sektoren als erlaubt angreift."
+          }
+        },
+        "fields": {
+          "playerWindow": "Gültig für Spieleranzahl",
+          "globalMinimum": "Gesamten Automod starten ab",
+          "globalMinimumHelp": "Unterhalb dieses Werts werden keine Regeln geprüft. 0 bedeutet: sofort prüfen.",
+          "fromPlayers": "Gilt ab",
+          "fromPlayersHelp": "Dieser Wert ist eingeschlossen.",
+          "untilPlayers": "Gilt bis",
+          "untilPlayersHelp": "Bei Erreichen dieses Werts endet die Regel. 0 deaktiviert sie.",
+          "blockedRoles": "Nicht erlaubte Rollen",
+          "blockedRolesHelp": "Wähle Rollen aus der gemeinsamen Liste für HLL und HLL: Vietnam.",
+          "violationMessage": "Verstoßtext",
+          "roleMessageHelp": "Beschreibt den Rollenverstoß innerhalb der späteren Warn-, Bestrafungs- und Kick-Nachrichten.",
+          "weaponMessageHelp": "Beschreibt den Waffenverstoß in der direkten Bestrafungsnachricht.",
+          "capMessageHelp": "Beschreibt, warum der erlaubte Kampfbereich überschritten wurde.",
+          "weaponId": "Interner Waffenname",
+          "weaponLabel": "Lesbarer Name",
+          "weaponPicker": "Waffe auswählen",
+          "weaponPickerHelp": "Durchsuche den Waffen-Katalog des aktiven Spiels. Unbekannte neue Spielnamen kannst du weiterhin frei eingeben und mit Enter übernehmen.",
+          "noWeaponMatches": "Keine weitere passende Waffe gefunden",
+          "addWeapon": "Waffe hinzufügen",
+          "removeWeapon": "Waffe entfernen",
+          "maxCaps": "Maximal gehaltene Sektoren",
+          "maxCapsHelp": "3 erlaubt den Kampf bis einschließlich des mittleren Punkts.",
+          "directPunish": "Direkt bestrafen",
+          "directPunishHelp": "Überspringt bei einem Sektorverstoß die Warnstufe, damit der Automod rechtzeitig eingreift.",
+          "flags": "Ausgenommene Spieler-Markierungen",
+          "flagsHelp": "Spieler mit mindestens einer dieser CRCON-Markierungen werden vollständig ausgenommen.",
+          "immuneRoles": "Ausgenommene Rollen",
+          "immuneRolesHelp": "Spieler in diesen Rollen werden von allen Seeding-Maßnahmen ausgenommen.",
+          "immuneLevel": "Spieler bis Level ausnehmen",
+          "immuneLevelHelp": "Spieler mit diesem oder einem niedrigeren Level sind geschützt. 0 deaktiviert die Ausnahme.",
+          "announcementEnabled": "Seeding beim Beitritt erklären",
+          "announcementEnabledHelp": "Informiert beitretende Spieler über die aktuell geltenden Seeding-Regeln.",
+          "announcementMessage": "Ankündigung beim Beitritt",
+          "count": "Anzahl",
+          "interval": "Abstand",
+          "minSquad": "Truppgröße ab",
+          "minServer": "Spielerzahl ab",
+          "warningMessage": "Warnnachricht",
+          "punishMessage": "Nachricht bei Bestrafung",
+          "kickEnabled": "Nach den Bestrafungen kicken",
+          "kickEnabledHelp": "Entfernt Spieler als letzte Stufe, wenn der Verstoß trotz Warnungen und Bestrafungen fortbesteht.",
+          "gracePeriod": "Letzte Frist",
+          "kickMessage": "Kick-Nachricht",
+          "webhook": "Discord-Audit-Webhook",
+          "webhookHelp": "Optional. Der Webhook erhält Protokolle der erkannten und ausgeführten Maßnahmen."
+        },
+        "weaponTypes": {
+          "infantry": "Infanteriewaffe",
+          "bazooka": "Panzerabwehrwaffe",
+          "grenade": "Granate",
+          "machine_gun": "Maschinengewehr",
+          "sniper": "Scharfschützenwaffe",
+          "mine": "Mine",
+          "pak": "Panzerabwehrkanone",
+          "satchel": "Sprengladung",
+          "artillery": "Artillerie",
+          "armor": "Fahrzeugwaffe",
+          "commander": "Kommandantenfähigkeit",
+          "self_propelled_artillery": "Selbstfahrlafette",
+          "unknown": "Freie Eingabe"
+        },
+        "count": {
+          "skip": "Überspringen",
+          "fixed": "Feste Anzahl",
+          "unlimited": "Unbegrenzt"
+        },
+        "actions": {
+          "announcement": {
+            "title": "Regeln ankündigen",
+            "description": "Erklärt neuen Spielern die aktive Seeding-Phase."
+          },
+          "warning": {
+            "title": "Warnen",
+            "description": "Gibt Spielern Zeit, ihr Verhalten vor der ersten Bestrafung zu ändern."
+          },
+          "punish": {
+            "title": "Bestrafen",
+            "description": "Wendet die serverseitige Punish-Aktion an, wenn Warnungen nicht helfen."
+          },
+          "kick": {
+            "title": "Kicken",
+            "description": "Entfernt Spieler erst nach Ablauf der vorherigen Eskalationsstufen."
+          }
+        },
+        "notifications": {
+          "note": "Der Discord-Webhook ist nur für Audit-Meldungen gedacht. Spielernachrichten werden weiterhin direkt über den Gameserver gesendet."
+        },
+        "summary": {
+          "title": "Übersicht",
+          "activeRules": "{{count}} von 3 Regeln eingerichtet",
+          "roles_one": "{{count}} Rolle gesperrt",
+          "roles_other": "{{count}} Rollen gesperrt",
+          "weapons_one": "{{count}} Waffe gesperrt",
+          "weapons_other": "{{count}} Waffen gesperrt",
+          "capActive": "Mittlerer Kampfbereich aktiv",
+          "reaction": "Wirkungskette",
+          "count": "{{count}}× · alle {{interval}} Sekunden",
+          "unlimited": "Unbegrenzt · alle {{interval}} Sekunden",
+          "kick": "nach {{seconds}} Sekunden",
+          "activeNotice": "Die Regeln greifen nach dem Speichern aktiv in das Spiel ein.",
+          "testNotice": "Testbetrieb: Verstöße werden erkannt, aber Spieler nicht beeinflusst.",
+          "inactiveNotice": "Der Automod ist ausgeschaltet. Die Konfiguration bleibt gespeichert."
+        }
+      },
+      "noSoloTank": {
+        "eyebrow": "Automod-Regel",
+        "title": "Solo-Panzer verhindern",
+        "intro": "Lege fest, wie CRCON auf allein besetzte Panzertrupps in Hell Let Loose und HLL: Vietnam reagiert."
+      },
+      "vacBans": {
+        "eyebrow": "Sicherheit & Sperren",
+        "title": "VAC- und Spielsperren prüfen",
+        "intro": "Lege fest, welche Sperrhistorie beim Beitritt geprüft wird und wie CRCON betroffene Spieler behandelt."
+      },
+      "tkBans": {
+        "eyebrow": "Sicherheit & Sperren",
+        "title": "Teamkill-Sperre beim Beitritt",
+        "intro": "Erkenne frühe Teamkills nach dem Beitritt, definiere Ausnahmen und konfiguriere die daraus entstehende Sperre."
+      },
+      "nameKicks": {
+        "eyebrow": "Spieler & Moderation",
+        "title": "Namensfilter",
+        "intro": "Prüfe Spielernamen anhand deiner Regeln, schütze ausgenommene Spieler und lege einen verständlichen Kick-Grund fest.",
+        "rulesEditor": {
+          "noticeTitle": "Jeder Treffer führt zu einem Kick",
+          "noticeBody": "Der Namensfilter ist eine Sperrliste: Sobald eine Regel auf einen neu verbundenen Spielernamen passt, entfernt CRCON den Spieler. Vorlagen werden im Formular automatisch korrekt gespeichert – du musst keine JSON-Zeichen maskieren.",
+          "templatesTitle": "Schutzziel auswählen",
+          "templatesHelp": "Aktiviere nur die Vorlagen, die zu deinen Serverregeln passen. Die strenge Zeichenliste kann internationale Namen und Emojis erfassen.",
+          "presets": {
+            "unreadable": {
+              "title": "Keine lesbaren Zeichen",
+              "description": "Entfernt Namen, die vollständig aus Symbolen oder nicht-lateinischen Zeichen bestehen. Buchstaben, Ziffern, Umlaute und Clan-Tags bleiben erlaubt."
+            },
+            "blank": {
+              "title": "Leerer Name",
+              "description": "Erfasst leere Namen und Namen, die ausschließlich aus Leerzeichen bestehen."
+            },
+            "strictCharacters": {
+              "title": "Strenge Zeichenliste",
+              "description": "Erlaubt ausschließlich lateinische Buchstaben, Ziffern, Leerzeichen sowie wenige übliche Satz- und Clan-Zeichen."
+            }
+          },
+          "active": "Aktiv",
+          "useTemplate": "Vorlage verwenden",
+          "removeTemplate": "Vorlage entfernen",
+          "configuredTitle": "Aktive Regeln",
+          "configuredHelp": "Vorlagen und eigene Regeln werden gemeinsam von oben nach unten geprüft.",
+          "ruleCount_one": "{{count}} Regel",
+          "ruleCount_other": "{{count}} Regeln",
+          "noRules": "Derzeit ist keine Namensregel aktiv. Neu verbundene Spieler werden nicht anhand ihres Namens entfernt.",
+          "ruleLabel": "RegEx {{number}}",
+          "emptyRule": "Eine leere RegEx würde jeden Spielernamen treffen. Lösche die Regel oder trage einen Ausdruck ein.",
+          "deleteRule": "Regel löschen",
+          "customLabel": "Eigene Python-RegEx",
+          "customPlaceholder": "z. B. (?i)^admin",
+          "addCustom": "Eigene Regel hinzufügen",
+          "testTitle": "Spielername vorab prüfen",
+          "testHelp": "Die Vorschau bildet das Python-Verhalten für übliche RegEx ab. Gespeichert und wirksam wird die Regel erst mit „Änderungen speichern“.",
+          "testLabel": "Test-Spielername",
+          "testPlaceholder": "Spielername eingeben",
+          "testKick": "„{{name}}“ würde entfernt.",
+          "testAllow": "„{{name}}“ würde den Namensfilter passieren.",
+          "testMatched": "Treffer durch Regel {{number}}.",
+          "testUnsupported_one": "Eine Python-spezifische Regel konnte in der Browser-Vorschau nicht geprüft werden.",
+          "testUnsupported_other": "{{count}} Python-spezifische Regeln konnten in der Browser-Vorschau nicht geprüft werden."
+        }
+      },
+      "seedVip": {
+        "eyebrow": "Seeding & Belohnungen",
+        "title": "Seeder-VIP-Belohnung",
+        "intro": "Lege fest, wann Seeding als erfolgreich gilt und welche VIP-Belohnung berechtigte Spieler erhalten."
+      },
+      "expiredVip": {
+        "eyebrow": "VIP-Verwaltung",
+        "title": "Abgelaufene VIPs bereinigen",
+        "intro": "Bestimme, wie oft CRCON abgelaufene VIP-Einträge prüft und optional darüber informiert."
+      }
+    },
+    "profanity": {
+      "eyebrow": "Spieler & Moderation",
+      "title": "Wortfilter",
+      "subtitle": "Blockierte Begriffe pflegen, importieren und kontrolliert auf einen oder mehrere Server anwenden.",
+      "allServers": "Alle Server",
+      "applyAllTitle": "Wortfilter auf alle Server anwenden?",
+      "applyAllDescription": "Die aktuelle Begriffsliste wird auf alle verbundenen Server dieser Installation übertragen."
+    },
+    "templates": {
+      "eyebrow": "Spieler & Moderation",
+      "title": "Nachrichtenvorlagen",
+      "subtitle": "Wiederverwendbare Texte für Nachrichten, Maßnahmen und den Serverbetrieb verwalten."
+    },
+    "autosettings": {
+      "eyebrow": "Serverbetrieb",
+      "title": "Automatische Einstellungen",
+      "subtitle": "Regeln als Vorlage wählen, im erweiterten JSON-Modus prüfen und kontrolliert anwenden.",
+      "editorTitle": "Erweiterte Konfiguration",
+      "editorHint": "Änderungen werden erst durch Übernehmen auf den aktuell gewählten Server geschrieben.",
+      "applyAllTitle": "Auf alle Server anwenden?",
+      "applyAllDescription": "Die geöffnete Konfiguration wird auf alle verbundenen Server dieser Installation übertragen. Prüfe die Server- und Spielkompatibilität vor der Bestätigung."
+    },
+    "welcome": {
+      "eyebrow": "Karten & Spielbetrieb",
+      "title": "Willkommensnachricht",
+      "subtitle": "Lege fest, welche Nachricht Spieler beim Betreten des Servers erhalten.",
+      "allServers": "Alle Server",
+      "editorHint": "Leer lassen, um die Willkommensnachricht zu deaktivieren.",
+      "applyAllTitle": "Willkommensnachricht auf alle Server anwenden?",
+      "applyAllDescription": "Die aktuelle Nachricht wird auf alle verbundenen Server dieser Installation übertragen."
+    }
+  },
+  "appearance": {
+    "menuLabel": "Darstellung & Farben",
+    "title": "Darstellung & Farben",
+    "subtitle": "Passe die Oberfläche an deine Arbeitsweise und Wahrnehmung an.",
+    "presets": {
+      "title": "Farbkombination",
+      "description": "Wähle ein geprüftes Preset oder lege darunter eine eigene Akzentfarbe fest.",
+      "frontline-gold": "Frontline Gold",
+      "tactical-blue": "Tactical Blue",
+      "signal-green": "Signal Green",
+      "command-red": "Command Red",
+      "neutral": "Neutral"
+    },
+    "mode": {
+      "title": "Darstellungsmodus",
+      "light": "Hell",
+      "dark": "Dunkel",
+      "system": "System"
+    },
+    "custom": {
+      "title": "Eigene Akzentfarbe",
+      "description": "Die Oberfläche passt Kontrast, Hover- und Fokusfarben automatisch an.",
+      "picker": "Akzentfarbe auswählen",
+      "hex": "Hex-Farbwert",
+      "invalid": "Gib eine Farbe im Format #C59A4A ein.",
+      "contrastHint": "Zu schwache Kontraste werden automatisch korrigiert."
+    },
+    "colorVision": {
+      "title": "Farbenblindmodus",
+      "standard": "Standard",
+      "deuteranopia": "Deuteranopie (Grünschwäche)",
+      "protanopia": "Protanopie (Rotschwäche)",
+      "tritanopia": "Tritanopie (Blauschwäche)",
+      "description": "Statusfarben werden angepasst. Icons, Texte und Umrandungen bleiben zusätzlich erhalten."
+    },
+    "preview": {
+      "title": "Live-Vorschau",
+      "primary": "Primäraktion",
+      "selected": "Ausgewählt",
+      "info": "Information",
+      "success": "Erfolg",
+      "warning": "Warnung",
+      "error": "Fehler"
+    },
+    "accessibilityHint": "Farben vermitteln niemals allein den Zustand. Die Oberfläche nutzt zusätzlich Symbole, Beschriftungen und sichtbare Fokusrahmen.",
+    "unsaved": "Nicht gespeicherte Änderungen",
+    "restoreSaved": "Gespeicherte Werte",
+    "restoreDefault": "Frontline-Standard",
+    "apply": "Änderungen übernehmen",
+    "saved": "Darstellung wurde für deinen Benutzer gespeichert.",
+    "savedLocally": "Der Server war nicht erreichbar. Die Darstellung wurde vorübergehend in diesem Browser gespeichert."
+  }
+};
+
+export default mergeMissingTranslations(de, deMasterFallback);

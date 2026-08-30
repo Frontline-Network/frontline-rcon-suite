@@ -12,21 +12,18 @@ test.describe("effective server-settings context", () => {
     page,
   }) => {
     const main = await openDemoPage(page, "/settings/general");
+    const matrix = main.getByTestId("general-settings-operations-matrix");
 
-    await expect(main.getByTestId("admin-action-context")).toContainText(
-      "Frontline #2"
-    );
-    await expect(main.getByTestId("admin-action-context")).toContainText("HLL");
+    await expect(matrix).toContainText("Frontline #2 · Server 2");
+    await expect(matrix).toContainText("CRCON · Online");
+    await expect(matrix).toContainText("Gameserver · Online");
+    await expect(matrix).toContainText("Werte nicht verifiziert");
 
-    const vip = main.getByTestId("setting-effect-vip_slots_num");
-    await expect(vip).toContainText("Zuletzt gelesener Serverwert");
+    await matrix.getByRole("button", { name: "Zugang & Plätze" }).click();
+    const vip = matrix.getByTestId("general-setting-vip_slots_num");
     await expect(vip).toContainText("2 Plätze");
-    await expect(vip).toContainText("FLN-Empfehlung");
-    await expect(vip).toContainText("Im RCON-Protokoll: HLL und HLL Vietnam");
-    await expect(main).toContainText(
-      "Das aktuelle Spielprotokoll bestätigt den tatsächlich wirksamen Wert nicht zuverlässig"
-    );
-    await expect(vip).toContainText("Real VIP");
+    await expect(vip).toContainText("1–2 Plätze");
+    await expect(vip).toContainText("Gespeichert");
   });
 
   test("uses the same compatibility context for an HLL Vietnam installation", async ({
@@ -36,12 +33,14 @@ test.describe("effective server-settings context", () => {
       query: { demo_game: "hll_vietnam" },
     });
 
-    await expect(main.getByTestId("admin-action-context")).toContainText(
+    await expect(page.getByTestId("global-match-status").first()).toContainText(
       "HLL: Vietnam"
     );
+    const matrix = main.getByTestId("general-settings-operations-matrix");
+    await matrix.getByRole("button", { name: "Teamausgleich" }).click();
     await expect(
-      main.getByTestId("setting-effect-autobalance_threshold")
-    ).toContainText("Im RCON-Protokoll: HLL und HLL Vietnam");
+      matrix.getByTestId("general-setting-autobalance_threshold")
+    ).toBeVisible();
   });
 
   test("explains missing change permissions instead of enabling save", async ({
@@ -51,32 +50,28 @@ test.describe("effective server-settings context", () => {
       query: { demo_role: "viewer" },
     });
 
-    const save = main.getByRole("button", { name: "Speichern" }).first();
+    const matrix = main.getByTestId("general-settings-operations-matrix");
+    const save = matrix.getByRole("button", {
+      name: "Änderungen speichern",
+    });
     await expect(save).toBeDisabled();
-    await save.hover({ force: true });
-    await expect(
-      page.getByText(
-        "Dir fehlt die Berechtigung zum Ändern dieser Einstellung."
-      )
-    ).toBeVisible();
+    await expect(matrix.getByRole("spinbutton").first()).toBeDisabled();
   });
 
   test("marks unsent drafts and can restore the recommendation", async ({
     page,
   }) => {
     const main = await openDemoPage(page, "/settings/general");
-    const vipCard = main
-      .getByRole("group")
-      .filter({ has: page.getByText("VIP-Plätze", { exact: true }) });
+    const matrix = main.getByTestId("general-settings-operations-matrix");
+    await matrix.getByRole("button", { name: "Zugang & Plätze" }).click();
+    const vipCard = matrix.getByTestId("general-setting-vip_slots_num");
     const input = vipCard.getByRole("spinbutton");
 
     await input.fill("5");
     await input.blur();
-    await expect(vipCard).toContainText(
-      "Der Wert im Formular wurde noch nicht an den Gameserver gesendet."
-    );
+    await expect(vipCard).toContainText("Geändert");
 
-    await vipCard.getByRole("button", { name: "Empfehlung einsetzen" }).click();
+    await vipCard.getByRole("button", { name: "1–2 Plätze" }).click();
     await expect(input).toHaveValue("2");
   });
 
@@ -103,8 +98,11 @@ test.describe("effective settings on mobile", () => {
 
   test("keeps the setting context usable at 390 px", async ({ page }) => {
     const main = await openDemoPage(page, "/settings/general");
+    const matrix = main.getByTestId("general-settings-operations-matrix");
+    await matrix.getByRole("combobox", { name: "Einstellung" }).click();
+    await page.getByRole("option", { name: "Zugang & Plätze" }).click();
     await expect(
-      main.getByTestId("setting-effect-vip_slots_num")
+      matrix.getByTestId("general-setting-vip_slots_num")
     ).toBeVisible();
     await expectNoHorizontalPageOverflow(page);
   });

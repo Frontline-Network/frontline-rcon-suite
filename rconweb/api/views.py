@@ -502,6 +502,10 @@ ENDPOINT_PERMISSIONS: dict[Callable, list[str] | set[str] | str] = {
     rcon_api.get_auto_mod_no_leader_config: "api.can_view_auto_mod_no_leader_config",
     rcon_api.get_auto_mod_seeding_config: "api.can_view_auto_mod_seeding_config",
     rcon_api.get_available_weapons: "api.can_view_auto_mod_seeding_config",
+    # The catalogue contains only distinct flag labels and aggregate counts.
+    # Every authenticated CRCON user may use it in the settings forms; no
+    # player identities or comments are exposed.
+    rcon_api.get_available_player_flags: set(),
     rcon_api.get_auto_mod_solo_tank_config: "api.can_view_auto_mod_solo_tank_config",
     rcon_api.get_autobalance_enabled: "api.can_view_autobalance_enabled",
     rcon_api.get_autobalance_threshold: "api.can_view_autobalance_threshold",
@@ -522,7 +526,7 @@ ENDPOINT_PERMISSIONS: dict[Callable, list[str] | set[str] | str] = {
     rcon_api.get_idle_autokick_time: "api.can_view_idle_autokick_time",
     rcon_api.get_ingame_mods: "api.can_view_ingame_admins",
     rcon_api.get_kills_discord_webhooks_config: "api.can_view_kills_discord_webhooks_config",
-    rcon_api.get_log_line_webhook_config: "api.get_log_line_webhook_config",
+    rcon_api.get_log_line_webhook_config: "api.can_view_log_line_discord_webhook_config",
     rcon_api.get_logs: "api.can_view_game_logs",
     rcon_api.get_map_rotation: "api.can_view_map_rotation",
     rcon_api.get_map_shuffle_enabled: "api.can_view_map_shuffle_enabled",
@@ -557,7 +561,7 @@ ENDPOINT_PERMISSIONS: dict[Callable, list[str] | set[str] | str] = {
     rcon_api.get_round_time_remaining: "api.can_view_round_time_remaining",
     rcon_api.get_scoreboard_config: "api.can_view_scorebot_config",
     rcon_api.get_scorebot_config: "api.can_view_scorebot_config",
-    rcon_api.get_server_name_change_config: "api.get_server_name_change_config",
+    rcon_api.get_server_name_change_config: "api.can_view_server_name_change_config",
     rcon_api.get_server_settings: {
         "api.can_view_team_switch_cooldown",
         "api.can_view_autobalance_threshold",
@@ -778,6 +782,7 @@ RCON_ENDPOINT_HTTP_METHODS: dict[Callable, list[str]] = {
     rcon_api.get_auto_mod_no_leader_config: ["GET"],
     rcon_api.get_auto_mod_seeding_config: ["GET"],
     rcon_api.get_available_weapons: ["GET"],
+    rcon_api.get_available_player_flags: ["GET"],
     rcon_api.get_auto_mod_solo_tank_config: ["GET"],
     rcon_api.get_autobalance_enabled: ["GET"],
     rcon_api.get_autobalance_threshold: ["GET"],

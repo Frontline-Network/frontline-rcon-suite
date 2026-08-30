@@ -1,6 +1,9 @@
 import { Fragment, memo, useLayoutEffect, useRef, useState } from "react";
 import { flexRender } from "@tanstack/react-table";
+import { Box, LinearProgress } from "@mui/material";
+
 import { NoRowsOverlay } from "@/components/NoRowsOverlay";
+import LoadingOverlay from "./LoadingOverlay";
 import {
   StyledTable,
   StyledTd,
@@ -8,8 +11,6 @@ import {
   StyledThead,
   StyledTr,
 } from "./styles";
-import { Box, LinearProgress } from "@mui/material";
-import LoadingOverlay from "./LoadingOverlay";
 
 const EMPTY_ROW_PROPS = () => ({});
 
@@ -32,6 +33,7 @@ const MemoizedTableBody = memo(
                 <StyledTd
                   key={cell.id}
                   variant={cell.column.columnDef?.meta?.variant}
+                  cellAlign={cell.column.columnDef?.meta?.align}
                   sticky={cell.column.columnDef?.meta?.sticky}
                   stickyOffset={cell.column.columnDef?.meta?.stickyOffset}
                 >
@@ -170,25 +172,22 @@ const Table = ({
           <StyledThead>
             {table.getHeaderGroups().map((headerGroup) => (
               <StyledTr key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  return (
-                    <StyledTh
-                      key={header.id}
-                      variant={header.column.columnDef?.meta?.variant}
-                      sticky={header.column.columnDef?.meta?.sticky}
-                      stickyOffset={header.column.columnDef?.meta?.stickyOffset}
-                    >
-                      {header.isPlaceholder ? null : (
-                        <div>
-                          {flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                        </div>
-                      )}
-                    </StyledTh>
-                  );
-                })}
+                {headerGroup.headers.map((header) => (
+                  <StyledTh
+                    key={header.id}
+                    variant={header.column.columnDef?.meta?.variant}
+                    cellAlign={header.column.columnDef?.meta?.align}
+                    sticky={header.column.columnDef?.meta?.sticky}
+                    stickyOffset={header.column.columnDef?.meta?.stickyOffset}
+                  >
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
+                  </StyledTh>
+                ))}
               </StyledTr>
             ))}
           </StyledThead>

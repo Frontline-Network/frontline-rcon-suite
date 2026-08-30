@@ -1,42 +1,48 @@
-import { PopoverMenu } from "@/components/shared/PopoverMenu";
 import {
-  Tooltip,
+  Box,
+  Checkbox,
+  IconButton,
   List,
   ListItem,
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Checkbox,
-  Box,
-  IconButton,
+  Tooltip,
 } from "@mui/material";
 import ViewColumnIcon from "@mui/icons-material/ViewColumn";
 import { useTranslation } from "react-i18next";
 
+import { PopoverMenu } from "@/components/shared/PopoverMenu";
+
 const TableColumnSelection = ({
   table,
   onColumnVisibilityChange,
+  renderButton,
   getColumnLabel,
 }) => {
   const { t } = useTranslation();
-  const columns = table.getAllColumns().filter((col) => col.getCanHide());
+  const columns = table.getAllColumns().filter((column) => column.getCanHide());
 
   return (
     <PopoverMenu
       id="column-picker"
       description={t("selection.columnsDescription")}
-      renderButton={(props) => (
-        <IconButton
-          {...props}
-          aria-label={t("selection.columns")}
-          size="small"
-          sx={{ borderRadius: 0 }}
-        >
-          <Tooltip title={t("selection.columns")}>
-            <ViewColumnIcon sx={{ fontSize: 16 }} />
-          </Tooltip>
-        </IconButton>
-      )}
+      renderButton={(props) =>
+        renderButton ? (
+          renderButton(props)
+        ) : (
+          <IconButton
+            {...props}
+            aria-label={t("selection.columns")}
+            size="small"
+            sx={{ borderRadius: 0 }}
+          >
+            <Tooltip title={t("selection.columns")}>
+              <ViewColumnIcon sx={{ fontSize: 16 }} />
+            </Tooltip>
+          </IconButton>
+        )
+      }
       sx={{ width: "200px" }}
     >
       <List
@@ -53,6 +59,7 @@ const TableColumnSelection = ({
         {columns.map((column) => {
           const label =
             getColumnLabel?.(column) ??
+            column.columnDef.meta?.label ??
             (typeof column.columnDef.header === "string"
               ? column.columnDef.header
               : column.id);
@@ -66,22 +73,9 @@ const TableColumnSelection = ({
             >
               <ListItemButton
                 onClick={() =>
-                  onColumnVisibilityChange(
-                    column.id,
-                    !column.getIsVisible()
-                  )
+                  onColumnVisibilityChange(column.id, !column.getIsVisible())
                 }
               >
-                <ListItemIcon>
-                  <Checkbox
-                    edge="start"
-                    checked={column.getIsVisible()}
-                    disabled={!column.getCanHide()}
-                    tabIndex={-1}
-                    disableRipple
-                    inputProps={{ "aria-labelledby": `picker-${column.id}` }}
-                  />
-                </ListItemIcon>
                 <Box
                   sx={{
                     display: "flex",
@@ -92,17 +86,19 @@ const TableColumnSelection = ({
                     gap: 1,
                   }}
                 >
-                  <Box
-                    sx={{
-                      overflow: "hidden",
-                      whiteSpace: "nowrap",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    <ListItemText id={`picker-${column.id}`}>
-                      {label}
-                    </ListItemText>
-                  </Box>
+                  <ListItemIcon>
+                    <Checkbox
+                      edge="start"
+                      checked={column.getIsVisible()}
+                      disabled={!column.getCanHide()}
+                      tabIndex={-1}
+                      disableRipple
+                      inputProps={{
+                        "aria-labelledby": `picker-${column.id}`,
+                      }}
+                    />
+                  </ListItemIcon>
+                  <ListItemText id={`picker-${column.id}`} primary={label} />
                 </Box>
               </ListItemButton>
             </ListItem>

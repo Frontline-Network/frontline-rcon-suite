@@ -1,9 +1,9 @@
-import { useMemo } from "react";
 import {
   Alert,
   Autocomplete,
   Box,
   Chip,
+  Divider,
   FormControlLabel,
   IconButton,
   InputAdornment,
@@ -17,25 +17,64 @@ import {
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
-import CampaignOutlinedIcon from "@mui/icons-material/CampaignOutlined";
 import GavelOutlinedIcon from "@mui/icons-material/GavelOutlined";
-import ExitToAppOutlinedIcon from "@mui/icons-material/ExitToAppOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
+import RuleOutlinedIcon from "@mui/icons-material/RuleOutlined";
 import AddIcon from "@mui/icons-material/Add";
 import RemoveIcon from "@mui/icons-material/Remove";
 import { useTranslation } from "react-i18next";
 import { getAllRoles } from "@/constants/roles";
-import ConfigFormSection from "./ConfigFormSection";
+import PlayerFlagPicker from "./PlayerFlagPicker";
 import StableNumberField from "./StableNumberField";
 
 const sectionIcons = {
   operation: <PowerSettingsNewIcon fontSize="small" />,
   exemptions: <ShieldOutlinedIcon fontSize="small" />,
-  observation: <VisibilityOutlinedIcon fontSize="small" />,
-  warnings: <CampaignOutlinedIcon fontSize="small" />,
-  punishments: <GavelOutlinedIcon fontSize="small" />,
-  kick: <ExitToAppOutlinedIcon fontSize="small" />,
+  detection: <VisibilityOutlinedIcon fontSize="small" />,
+  actions: <GavelOutlinedIcon fontSize="small" />,
+  notifications: <NotificationsNoneOutlinedIcon fontSize="small" />,
 };
+
+const cardSx = {
+  border: "1px solid",
+  borderColor: "divider",
+  bgcolor: "background.default",
+  borderRadius: 0,
+};
+
+function SectionHeader({ section, translationRoot }) {
+  const { t } = useTranslation();
+  return (
+    <Stack direction="row" spacing={1.25} alignItems="flex-start">
+      <Box
+        sx={{
+          display: "grid",
+          placeItems: "center",
+          width: 38,
+          height: 38,
+          flex: "0 0 auto",
+          color: "primary.main",
+          bgcolor: "action.selected",
+          border: "1px solid",
+          borderColor: "divider",
+          borderRadius: 0,
+        }}
+      >
+        {sectionIcons[section] || <RuleOutlinedIcon fontSize="small" />}
+      </Box>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography component="h2" variant="h6" fontWeight={850}>
+          {t(`${translationRoot}.sections.${section}.title`)}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+          {t(`${translationRoot}.sections.${section}.description`)}
+        </Typography>
+      </Box>
+    </Stack>
+  );
+}
 
 const normalizeType = (property = {}) => {
   if (Array.isArray(property.type)) {
@@ -451,7 +490,7 @@ function MessageField({ name, value, metadata, disabled, onChange, data }) {
       </Box>
       <TextField
         name={name}
-        aria-label={t(metadata.labelKey)}
+        inputProps={{ "aria-label": t(metadata.labelKey) }}
         value={displayValue}
         disabled={disabled}
         onChange={(event) => onChange(toStoredValue(event.target.value))}
@@ -495,7 +534,7 @@ function MessageField({ name, value, metadata, disabled, onChange, data }) {
           />
         ))}
       </Stack>
-      <Box sx={{ pt: 4.625 }}>
+      <Box sx={{ pt: 1 }}>
         <Typography
           variant="overline"
           color="text.primary"
@@ -513,7 +552,7 @@ function MessageField({ name, value, metadata, disabled, onChange, data }) {
             border: "1px solid",
             borderColor: "divider",
             bgcolor: "action.hover",
-            borderRadius: 0.75,
+            borderRadius: 0,
           }}
         >
           <Typography
@@ -750,7 +789,7 @@ function WarningFields({ profile, schema, data, disabled, onChange }) {
           }}
           aria-label={t(countMetadata.labelKey)}
           sx={{
-            borderRadius: 0.75,
+            borderRadius: 0,
             overflow: "hidden",
             "& .MuiToggleButton-root": {
               borderRadius: 0,
@@ -761,7 +800,7 @@ function WarningFields({ profile, schema, data, disabled, onChange }) {
               bgcolor: "rgba(214, 170, 77, 0.08) !important",
               color: "primary.main !important",
               borderColor: "primary.main !important",
-              borderRadius: "6px !important",
+              borderRadius: "0 !important",
             },
           }}
         >
@@ -852,6 +891,467 @@ function WarningFields({ profile, schema, data, disabled, onChange }) {
   );
 }
 
+export function NoLeaderOperationModeControl({
+  data,
+  disabled = false,
+  onChange,
+  translationRoot = "settings.configForms.noLeader",
+  supportsDryRun = true,
+}) {
+  const { t } = useTranslation();
+  const mode = !data.enabled
+    ? "off"
+    : supportsDryRun && data.dry_run
+    ? "observe"
+    : "active";
+
+  return (
+    <ToggleButtonGroup
+      value={mode}
+      exclusive
+      disabled={disabled}
+      onChange={(_, nextMode) => {
+        if (!nextMode) return;
+        onChange?.(
+          supportsDryRun
+            ? {
+                enabled: nextMode !== "off",
+                dry_run: nextMode === "observe",
+              }
+            : { enabled: nextMode === "active" }
+        );
+      }}
+      aria-label={t(`${translationRoot}.workbench.mode.title`)}
+      size="small"
+      sx={{
+        "& .MuiToggleButton-root": {
+          minHeight: 44,
+          minWidth: { xs: 0, sm: 112 },
+          px: { xs: 1.25, sm: 2 },
+          borderRadius: 0,
+          textTransform: "none",
+          fontWeight: 800,
+        },
+        "& .MuiToggleButton-root.Mui-selected": {
+          bgcolor: mode === "active" ? "success.dark" : "action.selected",
+          color: mode === "active" ? "success.contrastText" : "text.primary",
+        },
+      }}
+    >
+      <ToggleButton value="off">
+        {t(`${translationRoot}.workbench.mode.off`)}
+      </ToggleButton>
+      {supportsDryRun && (
+        <ToggleButton value="observe">
+          {t(`${translationRoot}.workbench.mode.observe`)}
+        </ToggleButton>
+      )}
+      <ToggleButton value="active">
+        {t(`${translationRoot}.workbench.mode.active`)}
+      </ToggleButton>
+    </ToggleButtonGroup>
+  );
+}
+
+function StageCard({ number, title, description, status, disabled, children }) {
+  return (
+    <Box
+      sx={{
+        ...cardSx,
+        p: { xs: 1.5, md: 2 },
+        opacity: disabled ? 0.58 : 1,
+        transition: "opacity 140ms ease",
+      }}
+    >
+      <Stack direction="row" spacing={1.25} alignItems="flex-start">
+        <Box
+          aria-hidden="true"
+          sx={{
+            display: "grid",
+            placeItems: "center",
+            width: 30,
+            height: 30,
+            flex: "0 0 auto",
+            border: "1px solid",
+            borderColor: disabled ? "divider" : "primary.main",
+            color: disabled ? "text.disabled" : "primary.main",
+            fontWeight: 900,
+          }}
+        >
+          {number}
+        </Box>
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            useFlexGap
+            flexWrap="wrap"
+          >
+            <Typography variant="subtitle1" fontWeight={850}>
+              {title}
+            </Typography>
+            <Chip label={status} size="small" variant="outlined" />
+          </Stack>
+          <Typography variant="caption" color="text.secondary">
+            {description}
+          </Typography>
+        </Box>
+      </Stack>
+      <Divider sx={{ my: 1.75 }} />
+      {children}
+    </Box>
+  );
+}
+
+function FieldRenderer({ name, profile, schema, data, disabled, onChange }) {
+  const metadata = profile.fields[name];
+  if (!metadata) return null;
+  return (
+    <FieldControl
+      name={name}
+      value={data[name]}
+      metadata={metadata}
+      property={schema.properties?.[name] || {}}
+      disabled={disabled}
+      onChange={(value) => onChange(name, value)}
+      data={data}
+    />
+  );
+}
+
+function OperationSection({
+  profile,
+  schema,
+  data,
+  disabled,
+  onChange,
+  translationRoot,
+}) {
+  const { t } = useTranslation();
+  return (
+    <Stack spacing={2}>
+      <Box sx={{ ...cardSx, p: { xs: 1.5, md: 2 } }}>
+        <Box sx={{ maxWidth: 620 }}>
+          <FieldRenderer
+            name="dont_do_anything_below_this_number_of_players"
+            profile={profile}
+            schema={schema}
+            data={data}
+            disabled={disabled}
+            onChange={onChange}
+          />
+        </Box>
+      </Box>
+      <Alert severity="info" icon={<InfoOutlinedIcon />}>
+        {t(`${translationRoot}.workbench.operation.help`)}
+      </Alert>
+    </Stack>
+  );
+}
+
+function DetectionSection({
+  profile,
+  schema,
+  data,
+  disabled,
+  onChange,
+  translationRoot,
+}) {
+  const { t } = useTranslation();
+  const checks = Math.max(0, Number(data.number_of_notes) || 0);
+  const interval = Math.max(0, Number(data.notes_interval_seconds) || 0);
+  return (
+    <Stack spacing={2}>
+      <Box sx={{ ...cardSx, p: { xs: 1.5, md: 2 } }}>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
+            gap: 2,
+          }}
+        >
+          {["number_of_notes", "notes_interval_seconds"].map((name) => (
+            <FieldRenderer
+              key={name}
+              name={name}
+              profile={profile}
+              schema={schema}
+              data={data}
+              disabled={disabled}
+              onChange={onChange}
+            />
+          ))}
+        </Box>
+      </Box>
+      <Box
+        sx={{
+          ...cardSx,
+          display: "grid",
+          gridTemplateColumns: "auto minmax(0, 1fr)",
+          gap: 1.25,
+          alignItems: "center",
+          p: 1.5,
+        }}
+      >
+        <CheckCircleOutlineIcon color="primary" />
+        <Box>
+          <Typography variant="body2" fontWeight={800}>
+            {checks === 0
+              ? t(`${translationRoot}.workbench.detection.skipped`)
+              : t(`${translationRoot}.workbench.detection.result`, {
+                  count: checks,
+                  checks,
+                  seconds: checks * interval,
+                })}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {t(`${translationRoot}.workbench.detection.help`)}
+          </Typography>
+        </Box>
+      </Box>
+    </Stack>
+  );
+}
+
+function ExemptionsSection({ profile, schema, data, disabled, onChange }) {
+  const hasRoleExemptions = Boolean(profile.fields.immune_roles);
+  const hasFlagExemptions = Boolean(profile.fields.whitelist_flags);
+  const hasLevelExemption = Boolean(profile.fields.immune_player_level);
+  return (
+    <Stack spacing={2}>
+      {hasRoleExemptions && (
+        <Box sx={{ ...cardSx, p: { xs: 1.5, md: 2 } }}>
+          <FieldRenderer
+            name="immune_roles"
+            profile={profile}
+            schema={schema}
+            data={data}
+            disabled={disabled}
+            onChange={onChange}
+          />
+        </Box>
+      )}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", md: "1.35fr 0.65fr" },
+          gap: 2,
+        }}
+      >
+        {hasFlagExemptions && (
+          <Box sx={{ ...cardSx, p: { xs: 1.5, md: 2 } }}>
+            <PlayerFlagPicker
+              value={data.whitelist_flags || []}
+              disabled={disabled}
+              onChange={(value) => onChange("whitelist_flags", value)}
+            />
+          </Box>
+        )}
+        {hasLevelExemption && (
+          <Box sx={{ ...cardSx, p: { xs: 1.5, md: 2 } }}>
+            <FieldRenderer
+              name="immune_player_level"
+              profile={profile}
+              schema={schema}
+              data={data}
+              disabled={disabled}
+              onChange={onChange}
+            />
+          </Box>
+        )}
+      </Box>
+    </Stack>
+  );
+}
+
+function ActionsSection({
+  profile,
+  schema,
+  data,
+  disabled,
+  onChange,
+  translationRoot,
+}) {
+  const { t } = useTranslation();
+  const warningsDisabled = Number(data.number_of_warnings) === 0;
+  const punishmentsDisabled = Number(data.number_of_punishments) === 0;
+  const kickDisabled = !data.kick_after_max_punish;
+  const kickUnreachable =
+    !kickDisabled &&
+    (Number(data.number_of_warnings) === -1 ||
+      Number(data.number_of_punishments) === -1 ||
+      Number(data.number_of_punishments) <= 0);
+  const status = (isDisabled, count) =>
+    isDisabled
+      ? t(`${translationRoot}.workbench.actions.inactive`)
+      : Number(count) === -1
+      ? t(`${translationRoot}.workbench.actions.unlimited`)
+      : t(`${translationRoot}.workbench.actions.configured`);
+
+  return (
+    <Stack spacing={1.5}>
+      <StageCard
+        number={1}
+        title={t(`${translationRoot}.sections.warnings.title`)}
+        description={t(`${translationRoot}.sections.warnings.description`)}
+        status={status(warningsDisabled, data.number_of_warnings)}
+        disabled={warningsDisabled}
+      >
+        <WarningFields
+          profile={profile}
+          schema={schema}
+          data={data}
+          disabled={disabled}
+          onChange={onChange}
+        />
+      </StageCard>
+
+      <StageCard
+        number={2}
+        title={t(`${translationRoot}.sections.punishments.title`)}
+        description={t(`${translationRoot}.sections.punishments.description`)}
+        status={status(punishmentsDisabled, data.number_of_punishments)}
+        disabled={punishmentsDisabled}
+      >
+        <Stack spacing={2}>
+          <FieldRenderer
+            name="number_of_punishments"
+            profile={profile}
+            schema={schema}
+            data={data}
+            disabled={disabled}
+            onChange={onChange}
+          />
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+                md: "repeat(3, minmax(0, 1fr))",
+              },
+              gap: 2,
+            }}
+          >
+            {[
+              "min_squad_players_for_punish",
+              "min_server_players_for_punish",
+              "punish_interval_seconds",
+            ]
+              .filter((name) => profile.fields[name])
+              .map((name) => (
+                <FieldRenderer
+                  key={name}
+                  name={name}
+                  profile={profile}
+                  schema={schema}
+                  data={data}
+                  disabled={disabled}
+                  onChange={onChange}
+                />
+              ))}
+          </Box>
+          <FieldRenderer
+            name="punish_message"
+            profile={profile}
+            schema={schema}
+            data={data}
+            disabled={disabled}
+            onChange={onChange}
+          />
+        </Stack>
+      </StageCard>
+
+      <StageCard
+        number={3}
+        title={t(`${translationRoot}.sections.kick.title`)}
+        description={t(`${translationRoot}.sections.kick.description`)}
+        status={
+          kickUnreachable
+            ? t(`${translationRoot}.workbench.actions.unreachable`)
+            : status(kickDisabled)
+        }
+        disabled={kickDisabled}
+      >
+        <Stack spacing={2}>
+          <FieldRenderer
+            name="kick_after_max_punish"
+            profile={profile}
+            schema={schema}
+            data={data}
+            disabled={disabled}
+            onChange={onChange}
+          />
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+                md: "repeat(3, minmax(0, 1fr))",
+              },
+              gap: 2,
+            }}
+          >
+            {[
+              "min_squad_players_for_kick",
+              "min_server_players_for_kick",
+              "kick_grace_period_seconds",
+            ]
+              .filter((name) => profile.fields[name])
+              .map((name) => (
+                <FieldRenderer
+                  key={name}
+                  name={name}
+                  profile={profile}
+                  schema={schema}
+                  data={data}
+                  disabled={disabled || kickDisabled}
+                  onChange={onChange}
+                />
+              ))}
+          </Box>
+          <FieldRenderer
+            name="kick_message"
+            profile={profile}
+            schema={schema}
+            data={data}
+            disabled={disabled || kickDisabled}
+            onChange={onChange}
+          />
+        </Stack>
+      </StageCard>
+    </Stack>
+  );
+}
+
+function NotificationsSection({
+  profile,
+  schema,
+  data,
+  disabled,
+  onChange,
+  translationRoot,
+}) {
+  const { t } = useTranslation();
+  return (
+    <Stack spacing={2}>
+      <Box sx={{ ...cardSx, p: { xs: 1.5, md: 2 } }}>
+        <FieldRenderer
+          name="discord_webhook_url"
+          profile={profile}
+          schema={schema}
+          data={data}
+          disabled={disabled}
+          onChange={onChange}
+        />
+      </Box>
+      <Alert severity="info" icon={<InfoOutlinedIcon />}>
+        {t(`${translationRoot}.workbench.notifications.help`)}
+      </Alert>
+    </Stack>
+  );
+}
+
 export default function GuidedConfigForm({
   profile,
   schema,
@@ -861,29 +1361,8 @@ export default function GuidedConfigForm({
   onChange,
 }) {
   const { t } = useTranslation();
-
-  const fieldToSection = useMemo(
-    () =>
-      new Map(
-        profile.sections.flatMap((section) =>
-          section.fields.map((fieldName) => [fieldName, section.id])
-        )
-      ),
-    [profile]
-  );
-
-  const isFieldDisabled = (fieldName) => {
-    if (disabled) return true;
-    if (fieldName === "dry_run" && !data.enabled) return true;
-    if (
-      fieldToSection.get(fieldName) === "kick" &&
-      fieldName !== "kick_after_max_punish" &&
-      !data.kick_after_max_punish
-    ) {
-      return true;
-    }
-    return false;
-  };
+  const translationRoot =
+    profile.translationRoot || "settings.configForms.noLeader";
 
   return (
     <Stack spacing={2} data-testid="config-guided-form">
@@ -892,53 +1371,63 @@ export default function GuidedConfigForm({
           {t("settings.configForms.workbench.ruleDisabledNotice")}
         </Alert>
       )}
-      {profile.sections.map((section) => (
-        <Box
-          key={section.id}
-          sx={{ display: section.id === activeSection ? "block" : "none" }}
-        >
-          <ConfigFormSection
-            id={`config-form-${section.id}`}
-            testId={`config-section-${section.id}`}
-            icon={sectionIcons[section.id]}
-            title={t(section.titleKey)}
-            description={t(section.descriptionKey)}
+      <Box data-section={activeSection}>
+        <SectionHeader
+          section={activeSection}
+          translationRoot={translationRoot}
+        />
+        <Divider sx={{ my: 2 }} />
+        {activeSection === "operation" && (
+          <OperationSection
+            profile={profile}
+            schema={schema}
+            data={data}
             disabled={disabled}
-            plain
-          >
-            {section.id === "warnings" ? (
-              <WarningFields
-                profile={profile}
-                schema={schema}
-                data={data}
-                disabled={disabled}
-                onChange={onChange}
-              />
-            ) : (
-              <Stack spacing={2.25}>
-                {section.fields.map((fieldName) => {
-                  const metadata = profile.fields[fieldName];
-                  const property = schema.properties?.[fieldName] || {};
-                  if (!metadata) return null;
-
-                  return (
-                    <FieldControl
-                      key={fieldName}
-                      name={fieldName}
-                      value={data[fieldName]}
-                      metadata={metadata}
-                      property={property}
-                      disabled={isFieldDisabled(fieldName)}
-                      onChange={(value) => onChange(fieldName, value)}
-                      data={data}
-                    />
-                  );
-                })}
-              </Stack>
-            )}
-          </ConfigFormSection>
-        </Box>
-      ))}
+            onChange={onChange}
+            translationRoot={translationRoot}
+          />
+        )}
+        {activeSection === "detection" && (
+          <DetectionSection
+            profile={profile}
+            schema={schema}
+            data={data}
+            disabled={disabled}
+            onChange={onChange}
+            translationRoot={translationRoot}
+          />
+        )}
+        {activeSection === "exemptions" && (
+          <ExemptionsSection
+            profile={profile}
+            schema={schema}
+            data={data}
+            disabled={disabled}
+            onChange={onChange}
+            translationRoot={translationRoot}
+          />
+        )}
+        {activeSection === "actions" && (
+          <ActionsSection
+            profile={profile}
+            schema={schema}
+            data={data}
+            disabled={disabled}
+            onChange={onChange}
+            translationRoot={translationRoot}
+          />
+        )}
+        {activeSection === "notifications" && (
+          <NotificationsSection
+            profile={profile}
+            schema={schema}
+            data={data}
+            disabled={disabled}
+            onChange={onChange}
+            translationRoot={translationRoot}
+          />
+        )}
+      </Box>
     </Stack>
   );
 }

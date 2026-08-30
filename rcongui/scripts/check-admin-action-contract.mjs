@@ -61,6 +61,10 @@ const gameLogsColumnsSource = await readFile(
   new URL("../src/pages/records/game-logs/columns.jsx", import.meta.url),
   "utf8"
 );
+const gameLogsTimelineSource = await readFile(
+  new URL("../src/pages/records/game-logs/GameLogsTimeline.jsx", import.meta.url),
+  "utf8"
+);
 const playerLogsPageSource = await readFile(
   new URL(
     "../src/pages/records/players/[playerId]/[detail]/logs.jsx",
@@ -262,26 +266,34 @@ assert.equal(
   "Completed games must mount exactly one shared row action menu"
 );
 
-assert.doesNotMatch(
-  gameLogsColumnsSource,
-  /ActionMenuButton/,
-  "Historical-log desktop rows must not mount a complete action menu per player"
-);
-assert.match(
-  gameLogsColumnsSource,
-  /table\.options\.meta\?\.openPlayerActionMenu/,
-  "Historical-log desktop triggers must delegate to the shared action menu"
-);
-assert.match(
-  gameLogsPageSource,
-  /table\.options\.meta\?\.openPlayerActionMenu/,
-  "Historical-log mobile triggers must delegate to the shared action menu"
-);
-assert.equal(
-  [...gameLogsPageSource.matchAll(/<GameLogPlayerActionMenu\b/g)].length,
-  1,
-  "Historical game logs must mount one shared player action menu"
-);
+if (/<GameLogsTimeline\b/.test(gameLogsPageSource)) {
+  assert.doesNotMatch(
+    gameLogsTimelineSource,
+    /ActionMenuButton|<ActionMenu\b|<GameLogPlayerActionMenu\b/,
+    "The redesigned historical timeline must not mount player action menus per event"
+  );
+} else {
+  assert.doesNotMatch(
+    gameLogsColumnsSource,
+    /ActionMenuButton/,
+    "Historical-log desktop rows must not mount a complete action menu per player"
+  );
+  assert.match(
+    gameLogsColumnsSource,
+    /table\.options\.meta\?\.openPlayerActionMenu/,
+    "Historical-log desktop triggers must delegate to the shared action menu"
+  );
+  assert.match(
+    gameLogsPageSource,
+    /table\.options\.meta\?\.openPlayerActionMenu/,
+    "Historical-log mobile triggers must delegate to the shared action menu"
+  );
+  assert.equal(
+    [...gameLogsPageSource.matchAll(/<GameLogPlayerActionMenu\b/g)].length,
+    1,
+    "Historical game logs must mount one shared player action menu"
+  );
+}
 assert.equal(
   [...playerLogsPageSource.matchAll(/<GameLogPlayerActionMenu\b/g)].length,
   1,

@@ -280,6 +280,30 @@ def _incident_log_entry(event: dict, incident: dict, language: str) -> str | Non
         or bool(payload.get("error"))
         or payload.get("result") is False
     )
+    action_result = payload.get("result")
+    punish_message_fallback = (
+        action == "punish"
+        and isinstance(action_result, dict)
+        and action_result.get("outcome")
+        == "punish_not_confirmed_message_sent"
+        and action_result.get("message_sent") is True
+        and action_result.get("punished") is False
+    )
+
+    if punish_message_fallback:
+        if language == "de":
+            description = (
+                f"⚠️ {actor} konnte die Bestrafung von {target} nicht bestätigen. "
+                f"Der Spieler war möglicherweise bereits tot. Der Grund wurde als "
+                f"Nachricht gesendet: {reason}"
+            )
+        else:
+            description = (
+                f"⚠️ {actor} could not confirm the punishment for {target}; the "
+                f"player may already have been dead. The reason was sent as a "
+                f"message instead: {reason}"
+            )
+        return _truncate(f"{timestamp}{description}", 700)
 
     if language == "de":
         descriptions = {

@@ -904,6 +904,44 @@ def test_failed_action_is_honestly_recorded_without_internal_error_details():
     assert "secret backend details" not in logbook["value"]
 
 
+def test_punish_message_fallback_is_not_logged_as_successful_punishment():
+    event = _event()
+    event["incident"].update(
+        {
+            "discord_language": "de",
+            "target_name": "Grummelnuss",
+            "events": [
+                {
+                    "actor": "discord:789:[FLN] Biene",
+                    "event_type": "action",
+                    "created_at": "2026-08-22T12:59:12+00:00",
+                    "payload": {
+                        "action": "punish",
+                        "arguments": {"reason": "Teamkill"},
+                        "result": {
+                            "outcome": "punish_not_confirmed_message_sent",
+                            "punished": False,
+                            "message_sent": True,
+                            "possible_reason": "player_not_alive",
+                        },
+                        "error": None,
+                    },
+                }
+            ],
+        }
+    )
+
+    payload = render_message(IncidentEventEnvelope.model_validate(event), None)
+    logbook = next(
+        field for field in payload["embeds"][0]["fields"] if field["name"] == "Logbuch"
+    )
+    assert "Bestrafung von Grummelnuss nicht bestätigen" in logbook["value"]
+    assert "bereits tot" in logbook["value"]
+    assert "Grund wurde als Nachricht gesendet" in logbook["value"]
+    assert "bestrafte Grummelnuss" not in logbook["value"]
+    assert "❌ Fehlgeschlagen" not in logbook["value"]
+
+
 @pytest.mark.parametrize(
     ("event_type", "payload", "expected"),
     [
@@ -1927,6 +1965,55 @@ def test_non_destructive_action_executes_immediately_without_confirmation_button
     assert post.call_args_list[1].kwargs["json"]["interaction_id"] == (
         "1538274085513994251"
     )
+    with SessionLocal() as session:
+        assert session.query(PreparedActionRelay).count() == 0
+
+
+def test_punish_message_fallback_explains_dead_player_and_keeps_report_open():
+    _seed()
+    prepare = httpx.Response(
+        200,
+        request=httpx.Request("POST", "https://crcon.example/prepare"),
+        json={
+            "result": {
+                "preparation_id": "33333333-3333-3333-3333-333333333333",
+                "confirmation_token": "confirmation-test",
+                "preview": "punish on Target: Test moderation action",
+                "requires_second_confirmation": False,
+            }
+        },
+    )
+    execute = httpx.Response(
+        200,
+        request=httpx.Request("POST", "https://crcon.example/execute"),
+        json={
+            "result": {
+                "action_result": {
+                    "outcome": "punish_not_confirmed_message_sent",
+                    "punished": False,
+                    "message_sent": True,
+                    "possible_reason": "player_not_alive",
+                }
+            }
+        },
+    )
+    with (
+        patch("discord_service.app.main._verify_discord_signature"),
+        patch(
+            "discord_service.app.main.httpx.post", side_effect=[prepare, execute]
+        ) as post,
+    ):
+        response = TestClient(app).post(
+            "/v1/discord/interactions", json=_modal_interaction("punish")
+        )
+
+    assert response.status_code == 200
+    content = response.json()["data"]["content"]
+    assert "möglicherweise bereits tot" in content
+    assert "stattdessen als Nachricht gesendet" in content
+    assert "Report bleibt offen" in content
+    assert "components" not in response.json()["data"]
+    assert post.call_count == 2
     with SessionLocal() as session:
         assert session.query(PreparedActionRelay).count() == 0
 

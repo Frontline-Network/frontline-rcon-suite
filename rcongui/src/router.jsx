@@ -17,6 +17,11 @@ const CampaignsCrumb = () => {
   return <span>{t("navigation.links.broadcastMessage")}</span>;
 };
 
+const LiveGameCrumb = () => {
+  const { t } = useTranslation();
+  return <Link to={"/stats/live-game"}>{t("navigation.links.liveGame")}</Link>;
+};
+
 const lazyPage =
   (
     componentImport,
@@ -462,6 +467,18 @@ const router = createBrowserRouter([
         ],
       },
       {
+        path: "/settings/integrations",
+        handle: { crumb: () => <span>Discord &amp; Kommunikation</span> },
+        lazy: lazyPage(() => import("./pages/settings/integrations")),
+        errorElement: <RouteError />,
+      },
+      {
+        path: "/settings/integrations/:section",
+        handle: { crumb: () => <span>Discord &amp; Kommunikation</span> },
+        lazy: lazyPage(() => import("./pages/settings/[configs]/detail")),
+        errorElement: <RouteError />,
+      },
+      {
         path: "/settings/:category/:type",
         lazy: lazyPage(() => import("./pages/settings/[configs]/detail")),
         errorElement: <RouteError />,
@@ -474,7 +491,7 @@ const router = createBrowserRouter([
           {
             path: "live-game",
             handle: {
-              crumb: () => <Link to={"/stats/live-game"}>Live Game</Link>,
+              crumb: () => <LiveGameCrumb />,
             },
             lazy: lazyPage(() => import("./pages/stats/live-game")),
             errorElement: <RouteError />,

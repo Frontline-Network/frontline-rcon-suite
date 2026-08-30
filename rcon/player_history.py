@@ -54,6 +54,30 @@ def player_has_flag(player_dict, flag) -> bool:
     return flag in {flag["flag"] for flag in flags}
 
 
+def get_available_player_flags() -> list[dict[str, str | int]]:
+    """Return the distinct player flags that already exist in the database.
+
+    Configuration forms use this catalogue for suggestions.  The flag itself
+    remains free-form, so older installations and custom administrative
+    workflows keep working even when a value is not in the catalogue yet.
+    """
+    with enter_session() as sess:
+        rows = (
+            sess.query(PlayerFlag.flag, func.count(PlayerFlag.id))
+            .filter(func.length(func.trim(PlayerFlag.flag)) > 0)
+            .group_by(PlayerFlag.flag)
+            .all()
+        )
+
+    return [
+        {"flag": flag, "player_count": int(player_count)}
+        for flag, player_count in sorted(
+            rows,
+            key=lambda row: (-int(row[1]), str(row[0]).casefold()),
+        )
+    ]
+
+
 def get_player(sess: Session, player_id: str) -> PlayerID | None:
     return sess.query(PlayerID).filter(PlayerID.player_id == player_id).one_or_none()
 

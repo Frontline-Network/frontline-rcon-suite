@@ -223,6 +223,7 @@ const SquadRow = ({
         />
         <Box className="squad-main">
           <Tooltip
+            disableInteractive
             title={
               expanded
                 ? t("views.team.collapseSquad")
@@ -495,6 +496,7 @@ export const TeamSection = ({
             label={t("views.team.problemsCount", { count: issueCount })}
           />
           <Tooltip
+            disableInteractive
             title={
               anySquadCollapsed
                 ? t("views.team.expandTeam")

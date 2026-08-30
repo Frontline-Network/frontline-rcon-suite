@@ -71,6 +71,7 @@ HLLV_RETRYABLE_ACTIONS = {
     "disband_squad",
 }
 HLLV_ACTION_RETRY_DELAY_SECONDS = 0.75
+PUNISH_MESSAGE_FALLBACK_OUTCOME = "punish_not_confirmed_message_sent"
 
 
 class GameServerActionRejected(ValueError):
@@ -165,6 +166,82 @@ def _run_game_action(action: str, rcon_api, operation, *, verify=None):
     raise GameServerActionRejected(
         "The game server rejected the action; the incident remains open"
     )
+
+
+def _punish_with_message_fallback(
+    rcon_api,
+    *,
+    player_id: str,
+    player_name: str | None,
+    reason: str,
+    user_name: str,
+):
+    """Warn a player when the game cannot confirm an immediate punishment.
+
+    HLL and HLL Vietnam can reject ``PunishPlayer`` with an internal error when
+    the selected player is already dead. The RCON protocol does not expose a
+    reliable alive/dead flag, so the error cannot be distinguished from every
+    other transient server-side rejection. In that narrow situation we keep
+    the moderation intent visible by sending the reason as a direct message.
+
+    The structured result is deliberately not reported as a successful
+    punishment. Discord uses it to show the fallback and keeps the incident
+    open for an administrator to review.
+    """
+
+    try:
+        return _run_game_action(
+            "punish",
+            rcon_api,
+            lambda: rcon_api.punish(
+                player_id,
+                reason=reason,
+                by=user_name,
+                player_name=player_name,
+            ),
+        )
+    except (
+        HLLCommandError,
+        HLLCommandFailedError,
+        HLLConnectionCommandFailedError,
+        GameServerActionRejected,
+    ) as punish_error:
+        # Authentication and other client-side protocol errors are not
+        # evidence that the target was already dead. Surface those unchanged
+        # instead of disguising a configuration problem as a useful fallback.
+        if isinstance(punish_error, HLLCommandError) and punish_error.status_code < 500:
+            raise
+        fallback_message = f"Punish-Hinweis / Punishment notice: {reason}"
+        try:
+            _run_game_action(
+                "message",
+                rcon_api,
+                lambda: rcon_api.message_player(
+                    player_id,
+                    message=fallback_message,
+                    by=user_name,
+                    save_message=True,
+                    player_name=player_name,
+                ),
+            )
+        except Exception as fallback_error:
+            logger.warning(
+                "PunishPlayer was rejected and its player-message fallback "
+                "also failed (%s)",
+                fallback_error.__class__.__name__,
+            )
+            raise punish_error from fallback_error
+
+        logger.info(
+            "PunishPlayer was not confirmed; sent the moderation reason to "
+            "the player as a fallback"
+        )
+        return {
+            "outcome": PUNISH_MESSAGE_FALLBACK_OUTCOME,
+            "punished": False,
+            "message_sent": True,
+            "possible_reason": "player_not_alive",
+        }
 
 
 def _parse_csv(value: str | None) -> list[str]:
@@ -560,15 +637,12 @@ def _execute_action(action: str, data: dict, user_name: str, incident: dict):
         if not reason:
             raise ValueError("A reason is required")
         if action == "punish":
-            return _run_game_action(
-                action,
+            return _punish_with_message_fallback(
                 views.rcon_api,
-                lambda: views.rcon_api.punish(
-                    player_id,
-                    reason=reason,
-                    by=user_name,
-                    player_name=player_name or None,
-                ),
+                player_id=player_id,
+                reason=reason,
+                user_name=user_name,
+                player_name=player_name or None,
             )
         if action == "kick":
             if data.get("confirmed") is not True:

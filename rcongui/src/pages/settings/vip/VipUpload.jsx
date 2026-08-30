@@ -1,7 +1,13 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { cmd, fetchWithCsrf } from "@/utils/fetchUtils";
-import { Alert, Button, Stack, CircularProgress, Typography } from "@mui/material";
+import { cmd } from "@/utils/fetchUtils";
+import {
+  Alert,
+  Button,
+  Stack,
+  CircularProgress,
+  Typography,
+} from "@mui/material";
 import { CloudUpload } from "@mui/icons-material";
 import { InputFileUpload } from "@/components/shared/InputFileUpload";
 import { vipQueryKeys } from "@/queries/vip-query";
@@ -22,22 +28,23 @@ const VipUpload = () => {
       const formData = new FormData();
       formData.append("File", file);
 
-      queryClient.invalidateQueries({ queryKey: [{ queryIdentifier: "vip_upload_status" }] });
+      queryClient.invalidateQueries({
+        queryKey: [{ queryIdentifier: "vip_upload_status" }],
+      });
 
-      const response = await fetchWithCsrf(
-        `${process.env.REACT_APP_API_URL}upload_vips`,
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
-      return response;
+      return cmd.UPLOAD_VIP_FILE({ payload: formData, headers: {} });
     },
     onSuccess: (data) => {
-      setUploadId(!data.failed);
+      if (data?.failed || data?.result?.failed) {
+        setUploadId(null);
+        setStatus("error");
+        return;
+      }
+      setUploadId(true);
     },
     onError: () => {
       setUploadId(null);
+      setStatus("error");
     },
   });
 
@@ -111,19 +118,23 @@ const VipUpload = () => {
     );
   }
 
+  if (status === "error") {
+    return (
+      <Stack spacing={2}>
+        <Alert severity="error">{t("records.vips.uploadError")}</Alert>
+        <Button variant="outlined" onClick={reset}>
+          {t("common.retry")}
+        </Button>
+      </Stack>
+    );
+  }
+
   if (showWarning) {
     return (
       <Stack spacing={2}>
-        <Alert severity="warning">
-          {t("records.vips.uploadWarning")}
-        </Alert>
+        <Alert severity="warning">{t("records.vips.uploadWarning")}</Alert>
         <Stack direction="row" spacing={1}>
-          <Button
-            fullWidth
-            variant="outlined"
-            color="error"
-            onClick={reset}
-          >
+          <Button fullWidth variant="outlined" color="error" onClick={reset}>
             {t("common.cancel")}
           </Button>
           <InputFileUpload

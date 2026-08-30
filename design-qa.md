@@ -1,48 +1,44 @@
-+# Design QA — Konfigurationsformulare und Live-Einsatz
+# Design QA — Live-Spiel / Option 2
 
-## Vergleichsbasis Konfigurationsformulare
+## Evidence
 
-- Referenz: finale Nutzervorlage (`codex-clipboard-79491ed8-28e5-4c2b-b580-7dfa4d38f2fb.png`)
-- Referenzgröße: 1683 × 935 Pixel
-- Implementierung: `/settings/automods/no-leader` im lokalen Demo-Modus
-- Prüfzustand: Deutsch, Formularmodus, Abschnitt „Warnen“, Testbetrieb, ungespeicherte Änderung
-- Implementierungsaufnahme: `no-leader-warning-final-qa-v3.png`
-- Gemeinsamer Vergleich: `no-leader-reference-vs-implementation-final-v2.png`
+- Source visual truth: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-1da4afa6-0f8a-48d1-a98d-1440a8f4302d.png`
+- Browser-rendered implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\live-game-option2-qa.png`
+- Normalized implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\live-game-option2-qa-normalized.png`
+- Same-input comparison: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\live-game-option2-comparison.png`
+- Source pixels: 1487 × 1058 at 1×.
+- Implementation pixels: 2353 × 1272 at 1×; CSS browser viewport 2353 × 1272.
+- Normalization: the implementation was downsampled proportionally to 1487 × 804 and placed on the same 1487 × 1058 dark canvas as the source. No crop or aspect distortion was applied.
+- State: German dark Frontline theme, 36 simulated players, K/D descending, one selected player, player inspector visible, 17 rows per team.
 
-## Visueller Vergleich Konfigurationsformulare
+## Full-view comparison
 
-Referenz und Implementierung wurden bei identischer Viewportgröße in einer gemeinsamen Side-by-Side-Grafik verglichen. Die Implementierung übernimmt die wesentlichen sichtbaren Merkmale der gewählten Richtung:
+The normalized same-input comparison was reviewed for composition, hierarchy and density. The implementation preserves the selected option's command-board structure: flat match strip, shared command toolbar, mirrored allied/axis tables, central comparison rail and right-side player inspector. Main edges align, both team surfaces are symmetrical, selection is gold, faction meaning uses icon plus label, and the page avoids rounded nested cards.
 
-- kompakter Seitentitel mit Status direkt am Titel;
-- Formular/JSON-Umschaltung unterhalb des Kopfs;
-- zusammenhängende Drei-Spalten-Arbeitsfläche ohne getrennte Karten;
-- sieben nummerierte Konfigurationsschritte mit aktiver Stufe;
-- Warnmodus mit den Optionen Überspringen, Anzahl und Unbegrenzt;
-- numerische Schrittsteuerungen für Anzahl und Intervall;
-- verständliche Platzhalter und eine aufgelöste Spielnachrichten-Vorschau;
-- Wirkungskette und Erreichbarkeitsprüfung in der Zusammenfassung;
-- direkt angeschlossene, sticky Speicherleiste mit eindeutigem Entwurfsstatus.
+The source is a 1487 px concept while the available in-app browser viewport is materially wider. The implementation intentionally uses the additional width instead of stretching type or rows; after proportional normalization, the major-region proportions and visual hierarchy remain equivalent. Responsive behavior is defined at 1440, 900 and mobile breakpoints; the current in-app browser did not expose a viewport override for a second pixel capture.
 
-Die bestehenden globalen Navigations- und Matchstatus-Komponenten bleiben unverändert und folgen weiterhin dem aktuellen CRCON-Layout.
+Focused region comparison was not necessary because the original-resolution implementation capture keeps the table headers, dense rows, center metrics and inspector typography legible. Those four regions were still reviewed separately at original resolution.
 
-Die Vorlage zeigt im rechten Bereich exemplarisch „Kick kann nicht erreicht werden“. Die Implementierung berechnet diesen Status dagegen aus den tatsächlich gewählten Warn-, Bestrafungs- und Kick-Zeiten. Im geprüften Zustand ist „Kick ist erreichbar“ daher die fachlich korrekte, bewusst beibehaltene Ausgabe.
+## Required fidelity surfaces
 
-## Responsive und funktionale Prüfung Konfigurationsformulare
+- Fonts and typography: passed. Existing Frontline display/body type is preserved; labels are uppercase with restrained tracking; player names remain lighter than headers; all metrics use tabular numerals.
+- Spacing and layout rhythm: passed. Flat 1 px surfaces, 8–10 px major gaps, dense 34 px desktop rows, matched team widths, and an inspector aligned to the table block.
+- Colors and tokens: passed. Existing theme tokens drive background, dividers and text; cyan/allied, muted red/axis, gold/selection and semantic warning/success tones match the reference intent.
+- Image and icon fidelity: passed. Existing faction image assets and MUI icons are used. No custom SVG, CSS drawing, placeholder image or emoji was introduced in the redesigned page.
+- Copy and content: passed with intentional product constraints. Squad and role are not shown because the live-game endpoint does not provide reliable values. Profile-safe actions are retained for disconnected historical match participants.
 
-- 1683 × 935: Drei-Spalten-Layout und sticky Aktionsleiste geprüft.
-- 768 × 900: Formular und Zusammenfassung umbrechen ohne abgeschnittene Inhalte.
-- 390 × 844: mobile Abschnittsnavigation, Formularelemente und Aktionsbereich geprüft.
-- 1440 Pixel und 390 Pixel: kein horizontaler Seitenüberlauf.
-- Formular → JSON → Formular: Entwurf und rohe Backend-Platzhalter bleiben erhalten.
-- Deutsche Anzeigenamen wie `{Spielername}` und `{Truppname}` werden bidirektional auf die unveränderten Backend-Platzhalter abgebildet.
-- Abschnittsnavigation: Vorschau und Zusammenfassung reagieren auf Warnmodus, Anzahl und Intervall.
-- Änderung → Zurücksetzen: Dirty-State wird gesetzt und anschließend korrekt entfernt.
-- Speichern im lokalen Demo-Modus: Werte bleiben nach einem erneuten Laden erhalten.
-- Ungültiges JSON: Editor meldet den Fehler, ohne den letzten gültigen Entwurf zu verlieren.
-- HLL und HLL: Vietnam: beide Spielprofile durch den gleichen Formular- und Validierungsfluss geprüft.
-- Zielgerichtete E2E-Suite: 12 von 12 Tests erfolgreich.
-- Produktions-Build: erfolgreich.
-- `git diff --check`: erfolgreich.
+## Interaction verification
+
+- Search filters both teams together and preserves symmetric sorting.
+- All / active / flagged filters work.
+- Row selection updates the player inspector.
+- Checkbox selection enables the shared selection action.
+- Both team pagers work independently; page-size selection is available.
+- Sort field and direction are interactive.
+- CSV export remains connected to the full filtered live-game dataset.
+- Query refresh retains the 36-player demo dataset and next-map data.
+- Page reload and 15-second refetch were tested without row-count collapse.
+- Production build completed successfully.
 
 ## Ergebnis Konfigurationsformulare
 
@@ -126,6 +122,194 @@ Rohkonfiguration bleibt im erweiterten JSON-Modus erreichbar.
 - Mit 27 eingeblendeten Spalten wurde eine Überbreite von 672 Pixeln erzeugt. Die synchronisierte obere Scrollleiste erscheint automatisch, entspricht mit 1741 Pixeln exakt der Tabellenbreite und lässt Name sowie Aktionen sticky erreichbar.
 - Bei einer einzelnen Zusatzspalte bleibt die Tabelle ohne Überbreite; die obere Scrollleiste wird dann automatisch ausgeblendet.
 - Produktions-Build und Browser-Laufzeittest erfolgreich.
+
+## Seeder-VIP-Belohnung — Option 3
+
+- Referenz: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-5a0cb3d4-fbdb-4e4a-88ae-ad6f8caa41a1.png`
+- Implementierung: `/settings/others/seed-vip` im lokalen Demo-Modus
+- Vergleichszustand: Deutsch, Formularmodus, Aktiv, Abschnitt „Voraussetzungen“, gespeicherte Ausgangswerte
+- Gemeinsamer Vergleich: `C:\Users\chris\AppData\Local\Temp\seed-vip-option3-comparison-final.png`
+- Vergleichsgröße: Referenz und Umsetzung jeweils 1487 × 1058 Pixel
+
+### Sichtbarer Vergleich
+
+- Die ausgewählte Option 3 wurde in die bestehende Frontline-Arbeitsfläche übertragen, ohne Navigation, Typografie, Farbwelt oder eckige Komponenten neu zu erfinden.
+- Ziel, Qualifikation und Belohnung bilden oberhalb des Formulars eine kompakte, sofort verständliche Wirkungskette.
+- Das Ergebnis-Briefing löst die aktuelle Konfiguration in einen verständlichen Satz und vier operative Schritte auf.
+- Team-Zielwerte, Mindestspielzeit, Anwesenheitsbedingung und Fortschrittsmeldungen sind als vier flache Entscheidungszeilen aufgebaut.
+- Wirksame Werte stehen im Hauptfluss. Legacy-Minimalwerte, Rückfallpuffer und Darstellungsoptionen befinden sich in klar bezeichneten erweiterten Bereichen.
+- Die Speicherleiste bleibt bei der Referenzgröße vollständig sichtbar; die zuvor doppelte Abschnittsüberschrift und die redundante Gültigkeitsmeldung wurden entfernt.
+
+### Fachliche und funktionale Prüfung
+
+- Die Zusammenfassung verwendet die tatsächlich wirksamen Felder `max_allies` und `max_axis`; die gespeicherten, aber aktuell nicht ausgewerteten `min_*`-Felder werden nicht als wirksame Zielspanne dargestellt.
+- Gekoppelte Teamwerte geprüft: eine Änderung bei den Alliierten aktualisiert bei aktiver Kopplung beide Seiten und die Wirkungsvorschau sofort.
+- Qualifikations-Presets und Anwesenheitsmodus aktualisieren Formular, Zusammenfassung und Dirty-State korrekt.
+- Belohnungsdauer und kumulative beziehungsweise neu berechnete VIP-Laufzeit werden mit einer Ergebnisvorschau erklärt.
+- Spielertexte bleiben einzeln aufklappbar; vorhandene Platzhalter sind direkt einsetzbar.
+- Webhook-Liste wird editierbar dargestellt; leere und vorhandene Zustände sind abgedeckt.
+- JSON-Modus bleibt als vollständiger technischer Fallback erhalten. Das nicht wirksame Kompatibilitätsfeld `forward` wird im vereinfachten Hauptfluss nicht als funktionierende Steuerung ausgegeben.
+
+### Responsive und technische Prüfung
+
+- 1487 × 1058: vollständige Entscheidungsoberfläche und Speicherleiste ohne Überdeckung geprüft.
+- 390 × 844: kein horizontaler Seitenüberlauf (`scrollWidth = innerWidth = 390`); Navigation und Zusammenfassung brechen kontrolliert um.
+- Produktionsnaher Vite-Build im Fake-Modus: bestanden.
+- Browserkonsole: keine neuen Fehler; ausschließlich die bestehende React-Router-v7-Future-Flag-Warnung.
+- Keine offenen P0-, P1- oder P2-Designabweichungen im neuen Seeder-VIP-Formular.
+
+final result: passed
+
+---
+
+# Sperrlisten / Moderations-Journal – Design QA
+
+## Prüfgrundlage
+
+- Referenz: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-a2889daa-9885-4371-85b1-30b2964d3a7f.png`
+- Implementierung: `.tmp/product-design/blacklists/implementation-option-3.png`
+- Direkter Vergleich: `.tmp/product-design/blacklists/option-3-comparison.png`
+- Referenz- und Prüfviewport: 1705 × 923 px
+- Zusätzliche Responsive-Prüfung: 1280 × 720 px und 390 × 844 px
+- Zustand: Filterleiste sichtbar, sechs realistische Demo-Einträge in drei Zeitgruppen, erster Eintrag als Fallakte geöffnet
+
+## Vergleichsergebnis
+
+Die Implementierung übernimmt die ausgewählte Richtung als dichtes Moderations-Journal: feste Filterleiste, chronologische Gruppen, kompakte Eintragszeilen, eckige Bedienelemente, goldene Zustandsakzente und eine inline aufklappbare Fallakte. Die vorhandene Frontline-Navigation, Typografie, Farbtokens und Komponenten bleiben erhalten. Abweichende Beispieldaten und leicht kompaktere Abstände sind beabsichtigt und passen zur bestehenden Anwendung.
+
+## Interaction und Kompatibilität
+
+- Statusfilter Aktiv / Alle / Abgelaufen inklusive Suche und Zurücksetzen: passed
+- Auf- und Zuklappen einer Fallakte: passed
+- Öffnen und Schließen des Bearbeiten-Dialogs: passed
+- Pagination und Seitengröße: passed
+- Horizontale Überbreite bei 1705 px, 1280 px und 390 px: keine
+- Deutsche relative und absolute Datumsdarstellung: passed
+- Browserkonsole: keine Anwendungsfehler; nur bestehender React-Router-v7-Zukunftshinweis
+
+## QA history
+
+1. P2 — Die sechs Metadatenspalten wurden bereits bei mittlerer Breite aktiviert und erzeugten Überbreite.
+   - Fix: breite Zeilendarstellung erst am XL-Breakpoint; darunter bleibt die kompakte Ein-Zeilen-Darstellung erhalten.
+2. P2 — Relative Zeitangaben erschienen trotz deutscher Oberfläche auf Englisch.
+   - Fix: relative und absolute Datumswerte werden über `Intl` konsistent lokalisiert.
+3. P2 — Der Bearbeiten-Dialog erzeugte im Demo-Modus einen unbehandelten Vorlagenfehler und eine React-Warnung für einen `null`-Inputwert.
+   - Fix: lokaler Vorlagen-Fallback und gültiger leerer Hidden-Inputwert.
+4. P2 — Zwei Demodatensätze reichten nicht aus, um alle Journalgruppen und Filterzustände zu prüfen.
+   - Fix: aktive, befristete und abgelaufene Fälle für Heute, letzte sieben Tage und ältere Einträge ergänzt.
+
+Keine P0-, P1- oder P2-Abweichung bleibt offen.
+
+final result: passed
+
+---
+
+# Design QA — Compact integration forms
+
+## Evidence
+
+- Source visual truth: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-0311286f-9538-4c20-bd89-ed18a87c047c.png`
+- Final implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\integration-kills-compact.png`
+- Side-by-side comparison: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\integration-qa-comparison.png`
+- Browser states reviewed: Kills & Teamkills, RCON-Chatbefehle, Discord-Scoreboard and the legacy `/settings/webhooks/kills` direct route.
+
+## Comparison result
+
+The inline module area now uses a purpose-built, schema-driven integration editor. The former settings workbench — including its step rail, large empty canvas and unrelated form chrome — is no longer mounted inside the integrations ledger.
+
+- Layout: compact square sections sit directly beneath the selected ledger row and use the full available width.
+- Hierarchy: module header, Formular/JSON switch, numbered groups, inputs and save state follow the selected reference direction without copying the legacy form shell.
+- Field coverage: nested arrays, primitive lists, enums, booleans, arbitrary JSON objects and masked webhook URLs remain editable from the real schemas.
+- Compatibility: permissions, validation, save/reset, dirty navigation guard, JSON expert mode and legacy direct URLs remain intact.
+- Complex modules: RCON commands render list and JSON-object fields without raw schema names; Scoreboard renders its larger configuration as grouped square sections.
+- Interaction: enable/disable, add/remove and reset behavior passed in the browser. The legacy Kills URL resolves to the compact editor.
+
+## QA result
+
+No actionable P0, P1 or P2 visual or functional discrepancy remains. A dedicated 390 px browser capture is still a P3 follow-up because this in-app browser session did not expose viewport resizing; the editor itself uses one-column `xs` breakpoints and contains no fixed-width content.
+
+final result: passed
+
+# Design-QA: Spiele — Einsatzjournal (Option 2)
+
+## Vergleichsgrundlage
+
+- Source Visual Truth: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\games-journal-selected.png`
+- Browser-gerenderte Umsetzung: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\games-journal-implementation.jpg`
+- Gemeinsamer Full-View-Vergleich: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\games-journal-comparison.png`
+- Gemeinsamer Fokusvergleich: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\games-journal-comparison-focus.png`
+- Mobile Umsetzung: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\games-journal-mobile-final.jpg`
+- Route: `http://127.0.0.1:3003/stats/games`
+- Vergleichsviewport: Referenz auf 1440 × 1024 normalisiert; Implementierung bei 1440 × 1024 CSS-Pixeln.
+- Zustand: Deutsch, dunkles Frontline-Theme, vier lokale Beispieldatensätze, erste Serverseite, keine aktiven Filter.
+
+## Visueller Abgleich
+
+- Die gewählte chronologische Journalstruktur ist vollständig umgesetzt: Kommandoleiste, Modusreiter, Tagesgruppen, Einsatzzeit, Kartenbild, Karte/Modus/Umgebung, klar beschrifteter Spielstand, Dauer, technische ID und Zeilen-Navigation.
+- Die bestehende Frontline-Navigation, Statusleiste, eckige 1-Pixel-Flächen und Typografie bleiben unverändert. Die neue Seite wirkt deshalb wie ein Bestandteil des Produkts und nicht wie ein fremdes Dashboard.
+- Desktop-Zeilen folgen derselben ruhigen horizontalen Leserichtung wie die Referenz. Bei geringer Datendichte bleibt die Oberfläche bewusst kompakt, statt leeren Beispielinhalt zu erfinden.
+- Die Implementierung nutzt reale Kartenassets; fehlt ein Bild, erscheint ein neutrales Kartensymbol innerhalb derselben festen Thumbnail-Fläche.
+- Der Footer zeigt Bereich, serverseitige Seitennavigation und Seitengröße ohne die doppelte Seitenzahl aus dem Konzeptbild.
+
+## Responsive Prüfung
+
+- 1440 × 1024: vollständige Journalansicht ohne horizontalen Überlauf.
+- 1024 × 768: Filter und Zeilen brechen kontrolliert um; `scrollWidth = clientWidth = 1024`.
+- 390 × 844: kein horizontaler Seitenüberlauf; `scrollWidth = clientWidth = 390`.
+- Mobil werden technische ID und Fraktionslabels ausgeblendet, der Spielstand bleibt sichtbar, Dauer wechselt in die Kartenmetazeile und jede Spielzeile bleibt als vollständiges Touch-Ziel erreichbar.
+- Die zunächst zu hohe mobile Suchzeile wurde korrigiert, indem ihre Desktop-Flexbasis auf schmalen Ansichten deaktiviert wurde. Anschließend wurde der dekorative Timeline-Punkt mobil entfernt, um Karte, Metadaten und Spielstand sauber voneinander zu trennen.
+
+## Interaktionen und Datenverhalten
+
+- Suche nach Karte oder Spiel-ID filtert die aktuell geladene Serverseite; der Platzhalter benennt diese Reichweite ausdrücklich.
+- Zeitraum, Umgebung und Modus lassen sich kombinieren; „Filter zurücksetzen“ stellt den Ausgangszustand wieder her.
+- Modusreiter zeigen die Trefferzahl des aktuellen Filterkontexts.
+- Jede Zeile ist als vollständiger Link bedienbar; Navigation zu `/stats/games/fln-demo-1` wurde im Browser bestätigt.
+- Serverpagination und Seitengröße bleiben in den URL-Parametern erhalten; der Loader fordert exakt die gewählte Seite und Größe an.
+- Lade-, Aktualisierungs-, Leer-, Teilfehler- und Fehlerzustände sind sichtbar und zugänglich abgedeckt.
+- Browserkonsole: keine Fehler.
+- Produktionsnaher Vite-Build im Fake-Modus: bestanden.
+
+## Vergleichshistorie
+
+1. P2 — Die mobile Suchleiste beanspruchte wegen ihrer Desktop-Flexbasis rund 320 Pixel Höhe.
+   - Fix: auf schmalen Ansichten `flex: 0 0 auto`, Desktopbasis erst ab `lg`.
+   - Post-Fix: Suchfeld, Auswahlfelder, Zurücksetzen und Modusreiter erscheinen kompakt oberhalb der ersten Tagesgruppe.
+2. P2 — Der mobile Timeline-Punkt reduzierte die verfügbare Textbreite und drängte Metadaten an den Spielstand.
+   - Fix: Punkt unter `sm` ausgeblendet und Mobile-Grid auf fünf Spalten reduziert.
+   - Post-Fix: Kartenname, Modus, Umgebung, Dauer und Spielstand bleiben ohne Überdeckung lesbar.
+
+Keine offenen P0-, P1- oder P2-Abweichungen in der umgesetzten Spieleübersicht.
+
+final result: passed
+
+# Design-QA: Seeder-VIP Option 3 — Feinschliff
+
+## Vergleichsgrundlage
+
+- Zielbild: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-5a0cb3d4-fbdb-4e4a-88ae-ad6f8caa41a1.png`
+- Browser-gerenderte Umsetzung: `C:\Users\chris\AppData\Local\Temp\seed-vip-polish-final-desktop.png`
+- Gemeinsamer Vergleich: `C:\Users\chris\AppData\Local\Temp\seed-vip-polish-final-compare.png`
+- Lokale Route: `http://127.0.0.1:3001/settings/others/seed-vip`
+
+## Feinschliff
+
+- Alle fünf Bereichsreiter besitzen nun kurze, vollständig lesbare Untertitel; die Desktop-Navigation zeigt keine abgeschnittenen Satzfragmente mehr.
+- Gleiche Teamziele werden als „25 je Team“ zusammengefasst. Bei abweichenden Zielen nennt die Oberfläche beide Seiten eindeutig.
+- Der Ablauftext verwendet natürliche deutsche und englische Formulierungen statt „25 bzw. 25“.
+- VIP-Dauer, Ablauftext und Ergebnisvorschau verwenden korrekte Einzahl und Mehrzahl für einen bzw. mehrere Tage.
+- Die Zusammenfassung beschreibt die Verlängerungslogik konkret als „verlängert Laufzeit“ bzw. „beginnt ab Abschluss“.
+- Die bestehende eckige Frontline-Designlinie, Seitenstruktur und Feldlogik blieben unverändert.
+
+## Interaktionen und technische Prüfung
+
+- Gekoppelte und getrennte Teamziele, Zusammenfassung und Ablauftext: bestanden.
+- Belohnung auf einen Tag ändern, Einzahl prüfen und auf sieben Tage zurücksetzen: bestanden.
+- Nach dem Rücksetzen entspricht der Formularzustand wieder vollständig den gespeicherten Werten.
+- Desktop bei 1487 × 1058: kein horizontaler Überlauf; `mainScrollWidth` entspricht `mainClientWidth`.
+- Mobil bei 390 × 844: Dokument- und Body-Breite bleiben 390 Pixel; alle Formularbereiche und Bedienelemente sind im DOM erreichbar.
+- Produktionsbuild mit Vite (`--mode fake`): bestanden.
+- Direkter Side-by-Side-Vergleich zeigt keine offenen P0-, P1- oder P2-Abweichungen im bearbeiteten Feinschliff.
 
 final result: passed
 
@@ -260,23 +444,168 @@ final result: passed
 
 ## Interaktionen und technische Prüfung
 
-- Spielerdetail öffnen, nächsten Spieler öffnen und wieder schließen: bestanden.
-- Spieler-ID kopieren sowie alle sechs Card-Buttons auf Fokus- und Zielgröße prüfen: bestanden.
-- Commander-/Statusfilter aktivieren und zurücksetzen: bestanden.
-- Gemeinsames Scrollen von Spieler- und Protokollpanel: bestanden.
-- Responsive Card-QA: kein horizontaler Überlauf bei 1024, 768 oder 390 Pixeln; alle interaktiven Ziele dort mindestens 44 Pixel hoch.
-- Browserkonsole: keine Fehler; nur bestehender React-Router-v7-Future-Flag-Hinweis.
-- Produktionsbuild: bestanden.
-- Admin-Aktionsvertrag: 20 Definitionen / 18 Commands bestanden.
-- Teamkill-Risikovertrag für HLL und HLL Vietnam: bestanden.
-- Touch-Target-Suite: 5 von 6 relevanten Prüfungen bestanden; eine bestehende Gleitkomma-Abweichung am globalen Sprachbutton (`43.999999 px`) liegt außerhalb dieser Änderung.
+### Iteration 1 — blocked
+
+- P2: the first build displayed all team rows and therefore lacked the mockup's compact footer/pagination rhythm.
+- P2: the demo refresh replaced the dense 36-player initial state with six players and removed the next map.
+- P2: sort direction and country used text/emoji-like glyph presentation instead of the selected icon language.
+
+Fixes: independent team pagination, 17-row default page size, durable live-game Mirage data, stable next-map payload, MUI direction/public icons, uppercase mode label, and explicit unknown/offline status handling.
+
+### Iteration 2 — passed
+
+Post-fix evidence: `live-game-option2-qa.png` and `live-game-option2-comparison.png`. The mirrored table density, footer rhythm, persistent demo state, selection/inspector linkage and icon language now match the target without actionable P0/P1/P2 differences.
+
+## Follow-up polish
+
+- P3: capture dedicated 1000 px and 390 px screenshots when the in-app browser exposes viewport emulation; the implemented breakpoints already switch the inspector to a drawer and the teams to tabs.
+- P3: a later backend enhancement could add reliable current squad/role data, but those values should not be inferred in this UI.
+
+final result: passed
+
+---
+
+# Design QA — Completed game command dossier
+
+## Evidence
+
+- Source: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-44b9f318-ef8b-495e-9f98-d8a5adf6363a.png`
+- Implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\game-detail\16-option1-final-desktop.png`
+- Full comparison: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\game-detail\14-design-qa-full.png`
+- Focused content comparison: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\game-detail\15-design-qa-focus.png`
+- Mobile top: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\game-detail\09-option1-mobile-top.png`
+- Mobile table after correction: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\game-detail\12-option1-mobile-table-fixed.png`
+- Mobile expanded player: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\game-detail\13-option1-mobile-expanded.png`
+- Desktop viewport: 1487 × 1058 px, completed game `fln-demo-1`, no open menus or expanded rows.
+- Mobile viewport: 390 × 844 px, completed game `fln-demo-1`, default and expanded-player states.
+
+## Comparison result
+
+The implementation preserves the selected Command Dossier direction: an angular three-part match banner, a continuous 3 × 2 performance matrix, and a full-width analysis table. The implementation uses the existing Frontline navigation, tokens, typography, map asset, icon family, and production-ready controls rather than reproducing decorative placeholders from the mockup.
+
+- Layout and spacing: section order, visual hierarchy, square borders, dense ledger rhythm, and column alignment match the target. The implementation keeps the game table slightly denser so the existing role, squad, country, selection, expansion, and action capabilities remain available.
+- Typography and color: Frontline display/body hierarchy, muted copy, gold headers and values, and faction colors match the target intent. No generic rounded cards, shadows, gradients, emoji, or custom SVG substitutes were introduced.
+- Imagery and icons: the real map asset and the existing MUI icon set are used. The image keeps a stable crop at desktop and becomes a full-width banner on mobile.
+- Responsiveness: the desktop dossier becomes a stacked scorecard, swipeable performance categories, compact player rows, and expandable player statistics at 390 px. Controls remain reachable above the persistent mobile navigation.
+- Accessibility and behavior: semantic regions/headings, labelled search and filters, keyboard-accessible buttons, table selection, row expansion, column selection, CSV export, and player actions remain in place. Browser logs contain no runtime errors.
+
+## QA iterations
+
+1. Initial desktop comparison: matched the selected composition and exposed no P0/P1 desktop issues.
+2. Initial mobile pass: found a P2 overlap where long team/squad/role metadata entered the K/T/TK columns.
+3. Correction: reduced fixed statistic-column widths and explicitly clipped the metadata column with an ellipsis.
+4. Final mobile and desktop pass: no overlap, clipping, broken hierarchy, inaccessible core control, or runtime error remains.
+
+## Verification
+
+- Production build: passed (`vite build`).
+- Desktop browser QA: passed.
+- Mobile browser QA: passed.
+- Search filtering: passed.
+- Desktop and mobile row expansion: passed.
+- Column chooser: passed.
+- Console errors: none.
+
+passed
+
+---
+
+# Design QA — Discord & Kommunikation
+
+## Evidence
+
+- Source visual truth: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-0311286f-9538-4c20-bd89-ed18a87c047c.png`
+- Desktop implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\integrations-hub\implementation-desktop.png`
+- Mobile implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\integrations-hub\implementation-mobile.png`
+- Normalized side-by-side comparison: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\integrations-hub\comparison-full.png`
+- Desktop viewport and capture: 1487 × 1058 px, Kills & Teamkills selected and expanded.
+- Mobile viewport and capture: 390 × 844 px, search term `kills`, Kills & Teamkills selected and expanded.
+
+## Comparison result
+
+The implementation follows the selected full-width ledger direction and the established Frontline design line. Eleven previously separate settings pages are represented as two dense groups: eight Discord webhooks and three related communication or hosting modules. Rows remain square, compact and separated by one-pixel dividers; the active row expands a dedicated compact schema editor inline.
+
+- Layout and hierarchy: the header, search/filter rail, four-column ledger, group labels, module rows and inline editor match the reference composition.
+- Product-safe deviation: the mockup's unverified connection-state filters and status values were replaced by factual category filters and configuration states. This avoids simulating health data and avoids loading all eleven configurations on entry.
+- Form fidelity: the selected mockup used a conceptual short Kills form. The corrected implementation now mounts a dedicated compact schema editor rather than the legacy settings workbench, while preserving validation, Formular/JSON modes, save/reset behavior and permissions.
+- Visual language: existing Frontline typography, gold active state, dark green-black surfaces, MUI icons and square borders are preserved. No rounded card treatment, shadows, gradients, emoji or placeholder artwork were introduced.
+- Responsive behavior: at 390 px the ledger reflows to a compact module/purpose/status stack, the category filters remain horizontally reachable and the expanded form uses the full available width. `documentElement.scrollWidth` and `body.scrollWidth` both remained 390 px.
+
+## Interaction and compatibility checks
+
+- Hub landing route `/settings/integrations`: passed without forcing the Audit permission or loading an arbitrary module.
+- New detail route `/settings/integrations/kills`: passed; selected row and inline form remain synchronized with the URL.
+- Search: passed with `kamera` and `kills`.
+- Category filters: passed for Discord and Hosting.
+- Legacy direct links: passed for `/settings/webhooks/chat` and `/settings/others/rcon-chat-commands`; both retain their URL and open the corresponding row.
+- Permissions: each module retains its exact view/change permissions; change controls are disabled when only view access is present.
+- Secrets: webhook values remain inside the existing masked schema controls and are not summarized in the ledger.
+- Browser console: no runtime errors; only the existing React Router v7 future-flag warnings were present.
+- Unsaved-change guard: present for module switches and navigation. The native confirmation dialog could not be completed by the browser automation runtime, but this is not a visual blocker and the guard path is explicit in the implementation.
+
+## QA history
+
+1. P2 — formatting the complete locale files created a noisy multi-thousand-line diff.
+   - Fix: reverted only the mechanical formatting and reapplied the integration copy as focused additions.
+   - Post-fix evidence: locale diffs are limited to the new hub copy, generic module notification copy and navigation label.
+2. P2 — the first ledger implementation suppressed row dividers through a `first-of-type` selector that matched each row wrapper.
+   - Fix: row separators now use the module index and render consistently between players/modules while preserving the active expanded block.
+   - Post-fix evidence: the final desktop comparison shows continuous, calm one-pixel row separation across both groups.
+3. Final normalized comparison: no actionable P0, P1 or P2 visual discrepancy remains.
+
+final result: passed
+
+---
+
+# Design QA — VIP-Einsatzregister (Option 1)
+
+## Evidence
+
+- Source visual truth: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-352047f9-32f0-4929-9348-dcc45136ef0d.png`
+- Final desktop implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\vips\09-implementation-1704x923-selected-expanded.png`
+- Final full-view comparison: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\vips\10-qa-final-full-comparison.png`
+- Final focused register comparison: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\vips\11-qa-final-register-comparison.png`
+- Mobile implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\vips\04-implementation-mobile.png`
+- Tablet implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\vips\05-implementation-tablet.png`
+- Source pixels: 1704 × 923.
+- Final implementation pixels and CSS viewport: 1704 × 923 at device scale factor 1; no density conversion required.
+- Additional responsive checks: 768 × 900 and 390 × 844 CSS pixels.
+- Compared state: German dark theme, four realistic VIP records, FLN_Wolf selected and expanded, current-server mutation scope.
 
 ## Findings
 
-- Keine verbleibenden P0-, P1- oder P2-Abweichungen in der bearbeiteten Live-Spielertabelle.
+- No actionable P0, P1 or P2 mismatch remains. The implementation preserves the selected Einsatzregister composition: command header, five-part summary strip, narrow filter rail, dense one-line register, selected/expanded VIP case file and sticky bulk-action strip.
+- Fonts and typography: the existing Frontline condensed display hierarchy and compact body labels are retained. Table copy uses the same restrained weights, uppercase labels and line rhythm as the selected visual.
+- Spacing and layout rhythm: square one-pixel borders, compact row height, gold selection line and flat detail surface match the mockup. The register uses the available width without horizontal overflow.
+- Colors and visual tokens: the implementation uses the existing green-black surfaces, ivory text, restrained gold focus state and semantic green/amber/red statuses. No gradients, shadows or generic rounded cards were added.
+- Image and icon fidelity: the selected visual contains no required raster imagery. Existing MUI icons provide a consistent real icon family for VIP, status, edit, delete, profile, refresh and import/export actions; no custom SVG or CSS drawings were introduced.
+- Copy and content: the list source is explicitly labelled as the current server, while the mutation scope clearly distinguishes this server from all servers. The implementation intentionally omits creator/history metadata shown conceptually in the mockup because the current API does not supply reliable values.
+- Responsive behavior: at 390 px the desktop table becomes compact mobile records, filters collapse behind an explicit button, actions retain usable targets and the document remains exactly 390 px wide. At 768 px the detail file uses a four-column information band without clipping.
+- Accessibility and behavior: search, quick filters, duration filter, mutation scope, sorting, page selection, row expansion, profile access, add/edit, import/export, confirmation and bulk actions are keyboard-addressable and labelled. Individual removal now requires confirmation.
 
-## Follow-up Polish
+## Comparison history
 
-- P3: Der globale Sprachbutton kann separat auf eine explizite Mindestbreite von 44 Pixeln gehärtet werden; dies gehört nicht zur Live-Spielertabelle.
+1. P2 — the first mobile summary left the fifth status tile at half width and created an unbalanced empty cell.
+   - Fix: the final status tile now spans both mobile grid columns and returns to one column from the tablet breakpoint onward.
+   - Post-fix evidence: final 390 px viewport has no horizontal overflow and a balanced full-width expired-status row.
+2. P2 — the first comparison used an expanded but unselected implementation row, while the source truth showed both selection and expansion plus a bulk-action strip.
+   - Fix: the final comparison uses the same selected/expanded state and verifies the sticky selection actions.
+   - Post-fix evidence: `10-qa-final-full-comparison.png` and `11-qa-final-register-comparison.png` show matching gold row emphasis, expanded dossier and bulk controls.
+3. Product-safe deviation — the source mock reports two active records despite three non-expired records, and includes profile/creator timestamps unavailable from the current VIP endpoint.
+   - Resolution: the implementation derives the factual active total from expiration data and does not invent unavailable audit metadata.
+
+## Verification
+
+- Production build: passed with `REACT_APP_API_URL=/`.
+- Search and expiring-within-seven-days filter: passed; the result set contains FLN_Valkyrie and excludes FLN_Raven.
+- Desktop and mobile row expansion: passed.
+- Selection and sticky bulk actions: passed.
+- Add/edit and import/export dialogs: passed.
+- Desktop, tablet and mobile horizontal overflow: none.
+- Browser console errors: none; only the existing React Router v7 future-flag warning remains.
+
+## Follow-up polish
+
+- P3: if the backend later exposes creator, creation time and last-update metadata, those fields can be added to the VIP case file without changing its layout.
 
 final result: passed

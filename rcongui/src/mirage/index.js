@@ -214,6 +214,34 @@ export function makeServer({ environment = "development" } = {}) {
       steaminfo: { country: index % 2 ? "AT" : "DE" },
     };
   });
+  const liveScorePlayers = () => Array.from({ length: 36 }, (_, index) => {
+    const base = scorePlayers()[index % demoPlayerNames.length];
+    const team = index % 2 ? "axis" : "allies";
+    const kills = Math.max(0, 34 - index);
+    const deaths = 3 + (index % 11);
+    return {
+      ...base,
+      player_id: `${base.player_id.slice(0, -2)}${String(index + 1).padStart(2, "0")}`,
+      player: index < demoPlayerNames.length ? base.player : `${base.player}_${index + 1}`,
+      team,
+      faction: team === "allies" ? "us" : "ger",
+      status: index % 7 === 0 ? "offline" : index % 5 === 0 ? "idle" : "online",
+      kills,
+      deaths,
+      teamkills: index % 9 === 0 ? 2 : index % 5 === 0 ? 1 : 0,
+      kills_streak: Math.max(1, 10 - (index % 8)),
+      kill_death_ratio: Number((kills / Math.max(1, deaths)).toFixed(2)),
+      kills_per_minute: Number((kills / (58 + (index % 30))).toFixed(2)),
+      time_seconds: Math.max(420, 4080 - index * 88),
+      combat: 610 - index * 9,
+      offense: 340 - index * 4,
+      defense: 300 - index * 3,
+      support: 460 - index * 5,
+      weapons: { "M1 GARAND": Math.max(1, kills - 4), "MK2 GRENADE": index % 5 },
+      most_killed: { [scorePlayers()[(index + 1) % demoPlayerNames.length].player_id]: 4 + (index % 5) },
+      death_by: { [scorePlayers()[(index + 2) % demoPlayerNames.length].player_id]: 2 + (index % 4) },
+    };
+  });
   const autoMod = (enabled, webhook = false) => ({
     enabled,
     discord_webhook_url: webhook ? "https://discord.example/frontline" : "",
@@ -521,6 +549,16 @@ export function makeServer({ environment = "development" } = {}) {
           ],
         })
       );
+      this.get("/get_available_player_flags", () =>
+        ok({
+          flags: [
+            { flag: "admin", player_count: 18 },
+            { flag: "trusted", player_count: 9 },
+            { flag: "name-filter-exempt", player_count: 4 },
+            { flag: "⭐", player_count: 2 },
+          ],
+        })
+      );
       this.get("/get_map", () => ok(currentLayer));
       this.get("/get_map_rotation", () => ok({ maps: mapLayers.slice(0, 3), current_index: 0, next_index: 1 }));
       this.get("/get_map_shuffle_enabled", () => ok(false));
@@ -540,6 +578,7 @@ export function makeServer({ environment = "development" } = {}) {
 
       const completedGames = [0, 1, 2, 3].map((index) => ({
         id: `fln-demo-${index + 1}`,
+        server_number: 2,
         map: mapLayers[index % mapLayers.length],
         result: { allied: index % 2 ? 2 : 3, axis: index % 2 ? 3 : 2 },
         start: new Date(Date.now() - (index + 1) * 7200000).toISOString(),
@@ -550,12 +589,19 @@ export function makeServer({ environment = "development" } = {}) {
         const game = completedGames.find((item) => item.id === request.queryParams.map_id) || completedGames[0];
         return ok({ ...game, player_stats: scorePlayers() });
       });
-      this.get("/get_live_game_stats", () => ok({ stats: scorePlayers() }));
+      this.get("/get_live_game_stats", () => ok({
+        stats: liveScorePlayers(),
+        snapshot_timestamp: Math.floor(Date.now() / 1000),
+        refresh_interval_sec: 15,
+      }));
       this.get("/get_public_info", () => ok({
         time_remaining: 3427,
         score: { allied: 3, axis: 2 },
-        current_map: currentLayer,
-        player_count_by_team: { allied: 49, axis: 49 },
+        current_map: { map: currentLayer, start: Math.floor(Date.now() / 1000) - 3600 },
+        next_map: { map: mapLayers[1], start: null },
+        player_count: 86,
+        max_player_count: 100,
+        player_count_by_team: { allied: 43, axis: 43 },
       }));
 
       this.post("/get_players_history", () => ({ result: { players: playerRecords(), total: playerRecords().length } }));
@@ -631,6 +677,25 @@ export function makeServer({ environment = "development" } = {}) {
         { player_id: "76561198000000003", name: "FLN_Valkyrie", vip_expiration: new Date(Date.now() + 86400000 * 7).toISOString() },
         { player_id: "76561198000000004", name: "FLN_OldGuard", vip_expiration: new Date(Date.now() - 86400000 * 2).toISOString() },
       ]));
+      this.get("/download_vips", () =>
+        new Response(
+          200,
+          { "Content-Type": "text/plain" },
+          [
+            "76561198000000001 FLN_Raven",
+            "76561198000000002 FLN_Wolf",
+            "76561198000000003 FLN_Valkyrie",
+            "76561198000000004 FLN_OldGuard",
+          ].join("\n")
+        )
+      );
+      this.post("/upload_vips", () => ({ failed: false, result: "OK" }));
+      this.get("/upload_vips_result", () =>
+        ok({
+          status: "finished",
+          result: ["4 VIP-Einträge wurden im Demo-Modus verarbeitet."],
+        })
+      );
       const demoBlacklists = [
         { id: 1, name: "FLN Hauptsperrliste", servers: null, sync: "ban_on_connect" },
         { id: 2, name: "Event-Ausschlüsse", servers: [2], sync: "kick_only" },

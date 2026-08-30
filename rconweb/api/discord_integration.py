@@ -55,7 +55,11 @@ from .discord_capabilities import (
     new_capability,
 )
 from .mobile import _error, _json_body
-from .mobile_incidents import DISCORD_GAME_ACTIONS, _execute_action
+from .mobile_incidents import (
+    DISCORD_GAME_ACTIONS,
+    PUNISH_MESSAGE_FALLBACK_OUTCOME,
+    _execute_action,
+)
 from .multi_servers import forward_mobile_request_to_server
 from .models import (
     DiscordInteractionReceipt,
@@ -94,6 +98,17 @@ API_MODEL_OPTIONS = (
     {"id": "gpt-5.6-sol", "name": "GPT-5.6 Sol"},
 )
 _MODEL_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,100}$")
+
+
+def _used_punish_message_fallback(action_result) -> bool:
+    return (
+        isinstance(action_result, dict)
+        and action_result.get("outcome") == PUNISH_MESSAGE_FALLBACK_OUTCOME
+        and action_result.get("message_sent") is True
+        and action_result.get("punished") is False
+    )
+
+
 SQUAD_LEADER_ROLES = {
     "officer",
     "squadleader",
@@ -1556,6 +1571,7 @@ def execute_action(request, preparation_id):
                 )
                 if (
                     prepared.action != SuggestedAction.MESSAGE.value
+                    and not _used_punish_message_fallback(action_result)
                     and _should_auto_resolve_after_action(incident)
                 ):
                     try:

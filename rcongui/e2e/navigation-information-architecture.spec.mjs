@@ -10,6 +10,25 @@ const navigationSource = readFileSync(
   "utf8"
 );
 
+const consolidatedLegacyRoutes = [
+  "/settings/others/chat-commands",
+  "/settings/others/crcon",
+  "/settings/others/game-server",
+  "/settings/others/gtx-server",
+  "/settings/others/log-stream",
+  "/settings/others/rcon-chat-commands",
+  "/settings/others/scoreboard",
+  "/settings/others/steam",
+  "/settings/others/watch-kill-rate",
+  "/settings/webhooks/admin-ping",
+  "/settings/webhooks/audit",
+  "/settings/webhooks/camera",
+  "/settings/webhooks/chat",
+  "/settings/webhooks/kills",
+  "/settings/webhooks/log-line",
+  "/settings/webhooks/watchlist",
+];
+
 test.describe("task-oriented navigation contract", () => {
   test("groups every existing destination once without a catch-all section", () => {
     const rawDefinitions = navigationSource.slice(
@@ -29,7 +48,12 @@ test.describe("task-oriented navigation contract", () => {
 
     expect(definitions).not.toContain('id: "others"');
     expect(new Set(routes).size).toBe(routes.length);
-    expect([...routes, "/"].sort()).toEqual(rawRoutes.sort());
+    expect([...routes, "/", ...consolidatedLegacyRoutes].sort()).toEqual(
+      rawRoutes.sort()
+    );
+    expect(routes).toEqual(
+      expect.not.arrayContaining(consolidatedLegacyRoutes)
+    );
     expect(routes).toEqual(
       expect.arrayContaining([
         "/views/live",
@@ -38,7 +62,8 @@ test.describe("task-oriented navigation contract", () => {
         "/apps/discord-report-bot",
         "/settings/general",
         "/records/audit-logs",
-        "/settings/others/game-server",
+        "/settings/integrations",
+        "/settings/services",
       ])
     );
   });

@@ -1,9 +1,21 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
+  Box,
   Button,
   LinearProgress,
+  Pagination,
+  Skeleton,
+  Stack,
+  Typography,
 } from "@mui/material";
-import Grid from "@mui/material/Grid2";
+import AddIcon from "@mui/icons-material/Add";
+import ListAltIcon from "@mui/icons-material/ListAlt";
+import { List, fromJS } from "immutable";
+import { useTranslation } from "react-i18next";
 import BlacklistRecordsSearch from "@/components/Blacklist/BlacklistRecordsSearch";
+import BlacklistRecordGrid from "@/components/Blacklist/BlacklistRecordGrid";
+import { BlacklistRecordCreateButton } from "@/components/Blacklist/BlacklistRecordCreateDialog";
 import {
   addPlayerToBlacklist,
   get,
@@ -11,48 +23,26 @@ import {
   handle_http_errors,
   showResponse,
 } from "@/utils/fetchUtils";
-import Pagination from '@mui/material/Pagination';
-import BlacklistRecordGrid from "@/components/Blacklist/BlacklistRecordGrid";
-import { List, fromJS } from "immutable";
-import { BlacklistRecordCreateButton } from "@/components/Blacklist/BlacklistRecordCreateDialog";
-import { Skeleton } from '@mui/material';
-import { Link } from "react-router-dom";
-import {useEffect, useState} from "react";
-import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/shared/PageHeader";
-import { demoBlacklists, demoBlacklistRecords, isFakeMode } from "@/mirage/demo-data";
+import {
+  demoBlacklists,
+  demoBlacklistRecords,
+  isFakeMode,
+} from "@/mirage/demo-data";
 
 async function getBlacklistRecords(searchParams) {
-  let path = "get_blacklist_records?" + new URLSearchParams(
-    Object.entries(searchParams)
-      .filter(([_, v]) => v || v === 0)
-  );
-  const response = await get(path)
-  return showResponse(response, "get_blacklist_records")
+  const path =
+    "get_blacklist_records?" +
+    new URLSearchParams(
+      Object.entries(searchParams).filter(([, value]) => value || value === 0)
+    );
+  const response = await get(path);
+  return showResponse(response, "get_blacklist_records");
 }
-
-const MyPagination = ({ pageSize, total, page, setPage, t }) => (
-  <Pagination
-    count={Math.ceil(total / pageSize)}
-    page={page}
-    onChange={(e, val) => setPage(val)}
-    variant="outlined"
-    color="standard"
-    showFirstButton
-    showLastButton
-    getItemAriaLabel={(type, itemPage) =>
-      type === "page"
-        ? t("common.pagination.pageAria", { page: itemPage })
-        : t(`common.pagination.${type}`)
-    }
-  />
-);
 
 const BlacklistRecords = () => {
   const { t } = useTranslation();
-  // inital state, first render
   const [isLoading, setIsLoading] = useState(true);
-  // when fetching loading records
   const [isFetching, setIsFetching] = useState(false);
   const [blacklists, setBlacklists] = useState([]);
   const [records, setRecords] = useState(List());
@@ -63,13 +53,12 @@ const BlacklistRecords = () => {
     reason: undefined,
     blacklist_id: undefined,
     exclude_expired: false,
+    expired_only: false,
     page_size: 50,
   });
 
   useEffect(() => {
-    if (!blacklists.length) {
-      loadBlacklists();
-    }
+    if (!blacklists.length) loadBlacklists();
     loadRecords();
   }, [searchQuery, page]);
 
@@ -85,34 +74,59 @@ const BlacklistRecords = () => {
     setIsFetching(true);
     try {
       if (isFakeMode()) {
-        setRecords(fromJS(demoBlacklistRecords));
-        setTotalRecords(demoBlacklistRecords.length);
-        setIsFetching(false);
-        setIsLoading(false);
+        const filtered = demoBlacklistRecords.filter((record) => {
+          const matchesPlayer =
+            !searchQuery.player_id ||
+            record.player.player_id === searchQuery.player_id;
+          const haystack = `${record.player.names
+            .map((name) => name.name)
+            .join(" ")} ${record.formatted_reason}`.toLowerCase();
+          const matchesReason =
+            !searchQuery.reason ||
+            haystack.includes(searchQuery.reason.toLowerCase());
+          const matchesList =
+            searchQuery.blacklist_id === undefined ||
+            searchQuery.blacklist_id === null ||
+            record.blacklist.id === Number(searchQuery.blacklist_id);
+          const matchesStatus = searchQuery.expired_only
+            ? !record.is_active
+            : searchQuery.exclude_expired
+            ? record.is_active
+            : true;
+          return matchesPlayer && matchesReason && matchesList && matchesStatus;
+        });
+        setRecords(fromJS(filtered));
+        setTotalRecords(filtered.length);
         return;
       }
+
       const data = await getBlacklistRecords({ ...searchQuery, page });
-      const records = data.result;
-      if (records) {
-        setRecords(fromJS(records.records));
-        setTotalRecords(records.total);
+      const result = data.result;
+      if (result) {
+        setRecords(fromJS(result.records));
+        setTotalRecords(result.total);
       }
-      setIsFetching(false);
-      // delay UI, this can be removed along with skeletons
-      await new Promise((res) => setTimeout(res, 500));
-      setIsLoading(false);
     } catch (error) {
       handle_http_errors(error);
+    } finally {
+      setIsFetching(false);
+      setIsLoading(false);
     }
   }
 
   async function createRecord(recordDetails) {
     if (isFakeMode()) {
-      const selectedList = demoBlacklists.find((item) => item.id === recordDetails.blacklistId) || demoBlacklists[0];
+      const selectedList =
+        demoBlacklists.find((item) => item.id === recordDetails.blacklistId) ||
+        demoBlacklists[0];
       const demoRecord = {
         id: Date.now(),
         blacklist: selectedList,
-        player: { player_id: recordDetails.playerId, names: [{ name: recordDetails.playerId }], steaminfo: null },
+        player: {
+          player_id: recordDetails.playerId,
+          names: [{ name: recordDetails.playerId }],
+          steaminfo: null,
+        },
         reason: recordDetails.reason,
         formatted_reason: recordDetails.reason,
         created_at: new Date().toISOString(),
@@ -128,162 +142,124 @@ const BlacklistRecords = () => {
     loadRecords();
   }
 
-  // If you don't like the loading skeletons, just return `null`
-  if (isLoading) {
-    return (
-      <>
+  const handleSearch = (query) => {
+    setPage(1);
+    setSearchQuery(query);
+  };
+
+  const pageCount = Math.max(
+    1,
+    Math.ceil(totalRecords / searchQuery.page_size)
+  );
+  const pageStart = totalRecords ? (page - 1) * searchQuery.page_size + 1 : 0;
+  const pageEnd = Math.min(page * searchQuery.page_size, totalRecords);
+
+  const headerActions = (
+    <Stack direction={{ xs: "column", sm: "row" }} gap={1}>
+      <BlacklistRecordCreateButton
+        blacklists={blacklists}
+        onSubmit={createRecord}
+      >
+        <Stack direction="row" alignItems="center" gap={0.75}>
+          <AddIcon fontSize="small" />
+          <span>{t("records.blacklists.createRecordShort")}</span>
+        </Stack>
+      </BlacklistRecordCreateButton>
+      <Button
+        component={Link}
+        to="manage"
+        variant="outlined"
+        color="inherit"
+        startIcon={<ListAltIcon />}
+        sx={{ borderRadius: 0, minHeight: 42 }}
+      >
+        {t("records.blacklists.manageLists")}
+      </Button>
+    </Stack>
+  );
+
+  return (
+    <Stack spacing={1.25} sx={{ width: "100%", minWidth: 0, pb: 2 }}>
       <PageHeader
         eyebrow={t("records.blacklists.eyebrow")}
         title={t("records.blacklists.title")}
         subtitle={t("records.blacklists.subtitle")}
+        actions={headerActions}
       />
-      <Grid container spacing={4} justifyContent="center">
-        <Grid
-          size={{
-            xl: 6,
-            xs: 12
-          }}>
-          <Skeleton variant="rectangular" height={140} />
-        </Grid>
-        <Grid
-          container
-          justifyContent="center"
-          spacing={2}
-          size={{
-            xl: 3,
-            xs: 12
-          }}>
-          <Grid size={{
-            xl: 12
-          }}>
-            <Skeleton
-              variant="rectangular"
-              width={200}
-              height={42}
-              style={{ margin: "0 auto", borderRadius: 5 }}
-            />
-          </Grid>
-          <Grid size={{
-            xl: 12
-          }}>
-            <Skeleton
-              variant="rectangular"
-              width={155}
-              height={42}
-              style={{ margin: "0 auto", borderRadius: 5 }}
-            />
-          </Grid>
-        </Grid>
-        <Grid size={12}>
-          <Skeleton
-            variant="rectangular"
-            width={360}
-            height={32}
-            style={{ margin: "0 auto" }}
-          />
-        </Grid>
-        <Grid size={12}>
-          <Skeleton variant="rectangular" height={140} />
-        </Grid>
-        <Grid size={12}>
-          <Skeleton
-            variant="rectangular"
-            width={360}
-            height={32}
-            style={{ margin: "0 auto" }}
-          />
-        </Grid>
-      </Grid>
-      </>
-    );
-  }
 
-  return (
-    <>
-    <PageHeader
-      eyebrow={t("records.blacklists.eyebrow")}
-      title={t("records.blacklists.title")}
-      subtitle={t("records.blacklists.subtitle")}
-    />
-    <Grid container spacing={3} justifyContent="center" sx={{ mt: 1 }}>
-      <Grid
-        size={{
-          xl: 6,
-          xs: 12
-        }}>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "minmax(0, 1fr)",
+            lg: "270px minmax(0, 1fr)",
+          },
+          gap: 1.5,
+          alignItems: "start",
+          minWidth: 0,
+        }}
+      >
         <BlacklistRecordsSearch
           blacklists={blacklists}
-          onSearch={setSearchQuery}
+          onSearch={handleSearch}
           disabled={isLoading || isFetching}
+          totalRecords={totalRecords}
         />
-      </Grid>
-      <Grid
-        size={{
-          xl: 3,
-          xs: 12
-        }}>
-        <Grid
-          container
-          spacing={3}
-          alignContent="center"
-          alignItems="center"
-          justifyContent="center"
-          style={{ paddingTop: 6 }}
-        >
-          <Grid size={{
-            xl: 12
-          }}>
-            <BlacklistRecordCreateButton
+
+        <Box sx={{ minWidth: 0 }}>
+          {isFetching && !isLoading ? <LinearProgress sx={{ mb: 1 }} /> : null}
+          {isLoading ? (
+            <Stack gap={1}>
+              <Skeleton variant="rectangular" height={58} />
+              <Skeleton variant="rectangular" height={220} />
+              <Skeleton variant="rectangular" height={58} />
+            </Stack>
+          ) : (
+            <BlacklistRecordGrid
               blacklists={blacklists}
-              onSubmit={createRecord}
-            >
-              {t("records.blacklists.createRecord")}
-            </BlacklistRecordCreateButton>
-          </Grid>
-          <Grid size={{
-            xl: 12
-          }}>
-            <Button
-              component={Link}
-              to={"manage"}
-              variant="contained"
-              color="primary"
-              size="large"
-            >
-              {t("records.blacklists.manageLists")}
-            </Button>
-          </Grid>
-        </Grid>
-      </Grid>
-      <Grid size={12}>
-        <MyPagination
-          pageSize={searchQuery.page_size}
-          page={page}
-          setPage={setPage}
-          total={totalRecords}
-          t={t}
-        />
-      </Grid>
-      <Grid size={12}>
-        {isFetching ? <LinearProgress color="secondary" /> : ""}
-        <BlacklistRecordGrid
-          blacklists={blacklists}
-          records={records}
-          onRefresh={loadRecords}
-        />
-      </Grid>
-      <Grid size={12}>
-        <MyPagination
-          pageSize={searchQuery.page_size}
-          page={page}
-          setPage={setPage}
-          total={totalRecords}
-          t={t}
-        />
-      </Grid>
-    </Grid>
-    </>
+              records={records}
+              onRefresh={loadRecords}
+            />
+          )}
+
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            alignItems={{ xs: "stretch", sm: "center" }}
+            justifyContent="space-between"
+            gap={1}
+            sx={{ mt: 1.25, minHeight: 44 }}
+          >
+            <Typography variant="caption" color="text.secondary">
+              {t("records.blacklists.range", {
+                start: pageStart,
+                end: pageEnd,
+                total: totalRecords,
+              })}
+            </Typography>
+            <Pagination
+              count={pageCount}
+              page={Math.min(page, pageCount)}
+              onChange={(_, value) => setPage(value)}
+              variant="outlined"
+              color="standard"
+              showFirstButton
+              showLastButton
+              disabled={isFetching}
+              getItemAriaLabel={(type, itemPage) =>
+                type === "page"
+                  ? t("common.pagination.pageAria", { page: itemPage })
+                  : t(`common.pagination.${type}`)
+              }
+              sx={{
+                "& .MuiPaginationItem-root": { borderRadius: 0 },
+                alignSelf: { xs: "flex-end", sm: "auto" },
+              }}
+            />
+          </Stack>
+        </Box>
+      </Box>
+    </Stack>
   );
-}
+};
 
 export default BlacklistRecords;

@@ -10,8 +10,13 @@ import {
   stableNumberControlTester,
   stableNumericControlRenderer,
 } from "@/pages/settings/config-form/StableNumericControl";
+import { playerFlagsRenderer, playerFlagsTester } from "./playerFlags";
 
 export const schemaFormCustomRenderers = [
+  {
+    tester: playerFlagsTester,
+    renderer: playerFlagsRenderer,
+  },
   {
     tester: stableIntegerControlTester,
     renderer: stableNumericControlRenderer,

@@ -3,8 +3,7 @@ const en = {
   playerIdentity: {
     linkedAccounts: "Automatically linked to",
     restrictedTitle: "Security warning: linked account is banned",
-    restrictedDescription:
-      "The linked {{game}} “{{name}}” has an active ban. No automatic action was taken.",
+    restrictedDescription: "The linked {{game}} “{{name}}” has an active ban. No automatic action was taken.",
     games: { hll: "HLL account", hll_vietnam: "HLL:V account" },
   },
   common: {
@@ -47,6 +46,7 @@ const en = {
     optionMenu: "Action menu with options",
     selectOption: "Select option",
     search: "Search",
+    reset: "Reset",
     refresh: "Refresh",
     expand: "Expand",
     collapse: "Collapse",
@@ -134,8 +134,7 @@ const en = {
     title: "That did not work",
     unexpected: "An unexpected error occurred.",
     configUnknown: "This configuration is not known.",
-    configDocumentationUnavailable:
-      "Documentation for this configuration is unavailable.",
+    configDocumentationUnavailable: "Documentation for this configuration is unavailable.",
     configLoadFailed: "Configuration data could not be loaded.",
     configSchemaFailed: "The configuration schema could not be loaded.",
     missingParameters: "Required parameters are missing.",
@@ -146,8 +145,7 @@ const en = {
     tryAgain: "Try again",
     unknown: "Unknown error",
     command: "Command",
-    requestFailed:
-      "The request could not be processed. Check the connection and try again.",
+    requestFailed: "The request could not be processed. Check the connection and try again.",
     sectionUnavailable: "This section cannot be displayed right now.",
     commentSaveFailed: "The comment could not be saved.",
   },
@@ -212,8 +210,7 @@ const en = {
       levelMin: "Level must be at least 1.",
       levelMax: "Level cannot exceed 500.",
       platform: "Select a valid platform.",
-      clanTag:
-        "Clan tag may only contain letters, numbers, spaces, hyphens, underscores and brackets.",
+      clanTag: "Clan tag may only contain letters, numbers, spaces, hyphens, underscores and brackets.",
       clanTagLength: "Clan tag cannot exceed four characters.",
       discordId: "Discord ID must be a valid number.",
       country: "Country must be a valid two-letter ISO code.",
@@ -221,8 +218,7 @@ const en = {
     },
     soldier: {
       title: "Add soldier information",
-      description:
-        "Fill in missing soldier information. Existing values are protected and cannot be modified.",
+      description: "Fill in missing soldier information. Existing values are protected and cannot be modified.",
       success: "Soldier information saved successfully.",
       failed: "Soldier information could not be saved.",
       name: "Player name",
@@ -238,8 +234,7 @@ const en = {
     },
     account: {
       title: "Edit account information",
-      description:
-        "Update the player's account information. All fields can be modified.",
+      description: "Update the player's account information. All fields can be modified.",
       success: "Account information saved successfully.",
       failed: "Account information could not be saved.",
       name: "Account name",
@@ -253,106 +248,15 @@ const en = {
       languageHelp: "Select the player's preferred language.",
     },
   },
-  mobileNav: {
-    ariaLabel: "Mobile primary navigation",
-    operations: "Operations",
-    incidents: "Reports",
-    players: "Players",
-    "server-operations": "Server",
-    more: "More",
-  },
-  mobileOperations: {
-    eyebrow: "Server operations",
-    title: "Operations",
-    subtitle: "Check server health and open the most common operating tasks.",
-    cards: {
-      teams: {
-        title: "Teams & squads",
-        description: "Manage leadership issues, squads and players.",
-      },
-      maps: {
-        title: "Maps",
-        description: "Control current, next and immediate map changes.",
-      },
-      balance: {
-        title: "Autobalancer",
-        description: "Review balance health and recent interventions.",
-      },
-      automation: {
-        title: "Automation",
-        description: "Manage rules, effects and active schedules.",
-      },
-      services: {
-        title: "Services",
-        description: "Check CRCON, game server and background services.",
-      },
-      settings: {
-        title: "Server settings",
-        description: "Open gameplay rules and general configuration.",
-      },
-    },
-  },
-  incidents: {
-    eyebrow: "Moderation",
-    title: "Reports",
-    subtitle: "Claim, process and resolve admin reports across servers.",
-    filters: "Filter reports",
-    tabs: {
-      new: "New",
-      claimed: "Claimed",
-      open: "Open",
-      done: "Resolved",
-      dismissed: "Dismissed",
-    },
-    status: {
-      new: "New",
-      claimed: "Claimed",
-      resolved: "Resolved",
-      dismissed: "Dismissed",
-    },
-    server: "Server {{number}}",
-    generalReport: "General report",
-    unknownReporter: "Unknown reporter",
-    assignedTo: "assigned to {{name}}",
-    reason: "Report reason",
-    noReason: "No reason supplied.",
-    reporter: "Reporter",
-    assignee: "Assignee",
-    unassigned: "Not claimed yet",
-    updated: "Last updated",
-    emptyTitle: "All clear",
-    emptyDescription: "There are no reports for this filter right now.",
-    loadFailed:
-      "Reports could not be loaded. Check the connection and try again.",
-    updateFailed: "The report could not be updated. It remains unchanged.",
-    dismissConfirmationTitle: "Dismiss this report?",
-    dismissConfirmationBody:
-      "The dismissal is recorded in the timeline. The report can no longer be handled as open afterwards.",
-    actions: {
-      claim: "Claim",
-      dismiss: "Dismiss",
-      resolve: "Resolve",
-      confirmDismiss: "Confirm dismissal",
-    },
-  },
   views: {
     live: {
       title: "Live operations",
-      reviewNow: "Review now",
-      mobileOperationsTab: "Operations",
-      mobileLogTab: "Log",
-      loadMorePlayers: "Load more players",
-      mobileCombatColumn: "K / D",
-      priorityHigh: "High",
-      priorityMedium: "Medium",
-      priorityInfo: "Info",
       eyebrow: "Server operations",
       subtitle: "Monitor players, battle state and server events in real time.",
       globalSearch: "Search players and logs...",
       players: "Players",
       logs: "Live log",
       scoreboard: "Battle state",
-      score: "Score",
       showPlayers: "Show players",
       hidePlayers: "Hide players",
       showLogs: "Show logs",
@@ -375,53 +279,6 @@ const en = {
       filterActions: "Filter actions",
       noActionFilters: "No action filters selected",
       logQueryLimit: "Log fetch query limit",
-      commandBar: "Live operations control",
-      currentMap: "Current map",
-      remainingTime: "Time remaining",
-      updating: "Updating",
-      liveNow: "Live",
-      layout: "Workspace view",
-      splitView: "Split",
-      assignment: "Team / squad / role",
-      performance: "Combat / risk",
-      status: "Status",
-      warned: "Warned",
-      actionableStatus: "Actionable status and battle state",
-      online: "online",
-      columnPreset: "Column preset",
-      operationsPreset: "Operations",
-      customPreset: "Custom view",
-      allColumnsPreset: "All columns",
-      horizontalTableScroll: "Scroll table columns horizontally",
-      quickFilters: "Player quick filters",
-      suspicious: "Suspicious",
-      selectionFilters: "Selection filters",
-      playersSelected_one: "{{count}} player selected",
-      playersSelected_other: "{{count}} players selected",
-      clearSelection: "Clear selection",
-      selectionActions: "Open actions",
-      moreActions: "More",
-      events: "events",
-      eventStream: "Live event stream",
-      eventFilters: "Filter events",
-      admin: "Admin",
-      chat: "Chat",
-      teamkills: "Teamkills",
-      kills: "Kills",
-      match: "Match",
-      searchLogs: "Search logs...",
-      advancedFilters: "Advanced filters",
-      maximizeLogs: "Maximize live log",
-      restoreSplitView: "Restore split view",
-      copyLog: "Copy original log message",
-      logCopied: "Original log message copied",
-      splitUnavailable: "Split view needs more available width.",
-      serverActions: "Server actions",
-      mobileRoster: "Mobile player list",
-      noSpecialStatus: "No special status",
-      expandPlayer: "Open details for {{name}}",
-      collapsePlayer: "Close details for {{name}}",
-      openPlayerProfile: "Open profile for {{name}}",
     },
     team: {
       title: "Team overview",
@@ -441,71 +298,9 @@ const en = {
       battleOverview: "Current battle status",
       allies: "Allies",
       axis: "Axis",
-      lobby: "Lobby",
       players: "Players",
       liveScore: "Live score",
       attackers: "Attackers",
-      commander: "Commander",
-      commanderPositionOpen: "Position unfilled",
-      statusFilter: "Status",
-      roleFilter: "Role",
-      squadFilter: "Squad",
-      allRoles: "All roles",
-      allSquads: "All squads",
-      squadOrPlayer: "Squad / player",
-      leaderOrRole: "Squad lead / role",
-      statusOrKd: "Status / K/D",
-      selectionActions: "Actions for selected players",
-      selectionHint: "Choose an action for this selection",
-      moreActions: "More",
-      selectionActionLabels: {
-        message: "Message",
-        kick: "Kick",
-        ban: "Temp/Perma ban",
-        switchTeam: "Team",
-        removeFromSquad: "Squad kick",
-      },
-      selectPlayer: "Select {{name}}",
-      selectSquad: "Select squad {{name}}",
-      selectTeam: "Select team {{name}}",
-      expandSquad: "Expand squad",
-      collapseSquad: "Collapse squad",
-      expandSquadNamed: "Expand squad {{name}}",
-      collapseSquadNamed: "Collapse squad {{name}}",
-      expandTeam: "Expand all squads on this team",
-      collapseTeam: "Collapse all squads on this team",
-      expandTeamNamed: "Expand all {{name}} squads",
-      collapseTeamNamed: "Collapse all {{name}} squads",
-      squadsCount_one: "{{count}} squad",
-      squadsCount_other: "{{count}} squads",
-      problemsCount_one: "{{count}} problem",
-      problemsCount_other: "{{count}} problems",
-      noMatches: "No matching players or squads found.",
-      issueCommander_one: "{{count}} team without commander",
-      issueCommander_other: "{{count}} teams without commander",
-      issueCommanderDetail: "Unfilled command positions",
-      issueLeaders_one: "{{count}} squad without leader",
-      issueLeaders_other: "{{count}} squads without leader",
-      issueLeadersDetail: "Squads requiring attention",
-      issueUnassigned_one: "{{count}} player without squad",
-      issueUnassigned_other: "{{count}} players without squad",
-      issueUnassignedDetail: "Lobby and unassigned players",
-      filters: {
-        all: "Show all",
-        issues: "Issues only",
-        noLeader: "No squad leader",
-        unassigned: "Unassigned",
-      },
-      squadTypes: {
-        infantry: "Infantry",
-        armor: "Armor",
-        armour: "Armor",
-        recon: "Recon",
-        artillery: "Artillery",
-        mortar: "Mortar",
-        helicopter: "Helicopter",
-        other: "Other units",
-      },
       gameModes: {
         warfare: "Warfare",
         offensive: "Offensive",
@@ -527,9 +322,7 @@ const en = {
       },
     },
     table: {
-      selection: "Player selection",
       team: "Team",
-      faction: "Faction",
       unit: "Unit",
       role: "Role",
       level: "Level",
@@ -537,15 +330,12 @@ const en = {
       deaths: "Deaths",
       killsPerMinute: "Kills per minute",
       teamKills: "Team kills",
-      teamKillsShort: "TKs",
-      teamKillRiskLabel: "TK risk",
       teamKillRisk: {
         none: "OK",
         caution: "REVIEW",
         high: "HIGH",
         description: "{{count}} team kills · Risk: {{level}}",
-        thresholds:
-          "Guidance: review from 1 team kill; high risk from 3 team kills.",
+        thresholds: "Guidance: review from 1 team kill; high risk from 3 team kills.",
       },
       vehicleKills: "Vehicle kills",
       vehiclesDestroyed: "Vehicles destroyed",
@@ -553,25 +343,15 @@ const en = {
       offense: "Offensive effectiveness",
       defense: "Defensive effectiveness",
       support: "Support effectiveness",
-      combatShort: "Combat",
-      offenseShort: "Offense",
-      defenseShort: "Defense",
-      supportShort: "Support",
       platform: "Platform",
       clanTag: "Clan tag",
       name: "Name",
-      nameOnly: "Name (single column)",
-      playerSummary: "Player (name and level)",
-      playerId: "Player ID",
-      warnings: "Warnings",
-      vip: "VIP",
       recentAction: "Recently received action",
       activeBan: "Existing active ban",
       activeBanDirect: "Active ban on this game account",
       activeBlacklistDirect: "Active entry in {{list}}",
       activeBanLinked: "Active ban on linked {{game}} account {{name}}",
-      activeBlacklistLinked:
-        "Active entry in {{list}} on linked {{game}} account {{name}}",
+      activeBlacklistLinked: "Active entry in {{list}} on linked {{game}} account {{name}}",
       activeBanNoAutomaticAction: "Information only – no automatic action.",
       watchlist: "On watchlist",
       country: "Country",
@@ -594,12 +374,10 @@ const en = {
   actions: {
     menu: "Player actions",
     none: "No actions available",
-    missingPermission:
-      "You do not have the required permission for these actions.",
+    missingPermission: "You do not have the required permission for these actions.",
     noRecipients: "No recipients selected",
     noFlags: "This player has no flags.",
     viewProfile: "View profile",
-    viewProfileCompact: "Profile",
     types: {
       TEMPBAN: "Temporary ban",
       PERMABAN: "Permanent ban",
@@ -612,38 +390,28 @@ const en = {
     deprecated: "Deprecated action",
     deprecatedNote: "We recommend blacklists for more reliable ban management.",
     messageAll: "Message all players",
-    messageAllDescription:
-      "This message will be sent to every player on the server.",
+    messageAllDescription: "This message will be sent to every player on the server.",
     messageSent: "Message sent to all players.",
-    secondConfirmationTitle: "Review action again",
-    secondConfirmationBody:
-      "This action takes effect immediately. Check the target and details before final execution.",
-    executeFinally: "Execute finally",
     sending: "Sending...",
     disbandSquad: "Disband squad",
     context: {
       title: "Execution context",
       noLiveData: "No confirmed live data",
       lastUpdated: "Game-server data last updated successfully: {{time}}",
-      connectionBlocked:
-        "This action is blocked until CRCON and the game server both provide current online data.",
+      connectionBlocked: "This action is blocked until CRCON and the game server both provide current online data.",
     },
     disband: {
       title: "Safely disband squads",
-      effect:
-        "All affected players are redeployed after approximately 10 seconds. The squad slot is then available again.",
+      effect: "All affected players are redeployed after approximately 10 seconds. The squad slot is then available again.",
       permissionMissing: "You do not have the “Disband squad” permission.",
-      auditPermissionMissing:
-        "You do not have permission to view the audit log.",
+      auditPermissionMissing: "You do not have permission to view the audit log.",
       commandFailed: "The game server did not confirm the squad disband.",
       noSquads: "No squads are available to disband.",
       review: "Review impact",
-      reviewWarning:
-        "Review the {{count}} selected squads. Only the next step executes the action.",
+      reviewWarning: "Review the {{count}} selected squads. Only the next step executes the action.",
       targets: "Affected squads",
       targetDetails: "{{count}} players · Squad leader: {{leader}}",
-      irreversible:
-        "An in-progress execution cannot be undone. Players lose their current squad and are redeployed.",
+      irreversible: "An in-progress execution cannot be undone. Players lose their current squad and are redeployed.",
       execute: "Disband selected squads now ({{count}})",
       results: "Results by squad",
       resultSummary: "{{success}} succeeded · {{failed}} failed",
@@ -658,7 +426,6 @@ const en = {
     actionSucceeded: "The action completed successfully.",
     sendMessage: {
       name: "Send message",
-      compact: "Message",
       description: "Shows the message in the top-right corner of the game.",
     },
     addWatch: {
@@ -677,17 +444,14 @@ const en = {
     },
     switchOnDeath: {
       name: "Switch on death",
-      description:
-        "Moves the player to the opposite team after their next death.",
+      description: "Moves the player to the opposite team after their next death.",
     },
     punish: {
       name: "Punish player",
-      compact: "Punish",
       description: "Kills the player in-game when alive.",
     },
     kick: {
       name: "Kick player",
-      compact: "Kick",
       description: "Removes the player from the server.",
     },
     tempBan: {
@@ -704,9 +468,7 @@ const en = {
     },
     blacklist: {
       name: "Add to blacklist",
-      compact: "Ban",
       description: "Adds the player to a blacklist.",
-      confirm: "Add to blacklist",
     },
     addFlag: { name: "Add flag", description: "Assigns a flag to the player." },
     removeFlags: {
@@ -723,8 +485,7 @@ const en = {
     },
     removeFromSquad: {
       name: "Remove from squad",
-      description:
-        "Redeploys the player and removes them from their current squad.",
+      description: "Redeploys the player and removes them from their current squad.",
     },
   },
   fields: {
@@ -752,21 +513,18 @@ const en = {
     emoji: "Emoji",
     note: "Note",
     noteHelp: "A note for this flag.",
-    blacklistReasonHelp:
-      "Message shown to the player. Available variables: {player_id}, {player_name}, {banned_at}, {banned_until}, {expires_at}, {duration}, {expires}, {ban_id}, {blacklist_name}",
+    blacklistReasonHelp: "Message shown to the player. Available variables: {player_id}, {player_name}, {banned_at}, {banned_until}, {expires_at}, {duration}, {expires}, {ban_id}, {blacklist_name}",
     vipPreview: "Description (preview)",
     vipPreviewHelp: "The VIP is displayed as <PREFIX><PLAYER_NAME><SUFFIX>.",
     prefix: "Prefix",
     prefixHelp: "Prefix added before the player's name.",
     suffix: "Suffix",
     suffixHelp: "Suffix added after the player's name.",
-    vipIndefinite:
-      "Selected players receive VIP status without an expiration date.",
+    vipIndefinite: "Selected players receive VIP status without an expiration date.",
     vipQueueHelp: "Helps skip the queue!",
     neverExpires: "Never expires",
     adminGroups: "Admin groups",
-    watchReasonHelp:
-      "This reason is shown in the Discord message when the player connects.",
+    watchReasonHelp: "This reason is shown in the Discord message when the player connects.",
   },
   records: {
     playerDetails: {
@@ -797,8 +555,7 @@ const en = {
       searchComments: "Search comments",
       author: "Author",
       soldier: "Soldier",
-      soldierDescription:
-        "Persistent in-game information updated on each connection.",
+      soldierDescription: "Persistent in-game information updated on each connection.",
       name: "Name",
       clanTag: "Clan tag",
       level: "Level",
@@ -877,8 +634,7 @@ const en = {
       editSelected: "Edit selected",
       removeSelected: "Remove selected",
       removeSelectedTitle: "Remove selected VIPs?",
-      removeSelectedDescription:
-        "Are you sure you want to remove {{count}} selected VIP record(s)?",
+      removeSelectedDescription: "Are you sure you want to remove {{count}} selected VIP record(s)?",
       search: "Search VIP...",
       selection: "{{selected}} of {{total}} selected",
       all: "All",
@@ -895,24 +651,74 @@ const en = {
       recordsFound: "{{count}} VIP records found.",
       uploadProcessing: "Processing VIP records... Please wait.",
       uploadFinished: "VIP records upload finished.",
-      uploadWarning:
-        "This action overrides all VIP records for the current server. Download a backup first whenever possible.",
+      uploadWarning: "This action overrides all VIP records for the current server. Download a backup first whenever possible.",
       uploadFile: "Upload file",
       uploadFromFile: "Upload VIPs from file",
       clear: "Clear",
+      uploadError: "The VIP file could not be processed.",
+      vipRecord: "VIP case file",
+      scopeHint: "This change applies to: {{scope}}.",
+      saving: "Saving...",
+      maintenance: "Data maintenance",
+      importExport: "Import / Export",
+      downloadDescription: "Save the current server's VIP list as a text file.",
+      uploadDescription: "Replace the current server's VIP list with a file.",
+      selectVisible: "Select visible VIP records",
+      selectPlayer: "Select VIP record for {{name}}",
+      player: "Player",
+      editPlayer: "Edit VIP record for {{name}}",
+      removePlayer: "Remove VIP record for {{name}}",
+      collapseDetails: "Close VIP record for {{name}}",
+      expandDetails: "Open VIP record for {{name}}",
+      collapse: "Close details",
+      expand: "Open details",
+      expirationExact: "Expiration (exact)",
+      profile: "Profile",
+      register: "VIP access register",
+      resultCount: "{{shown}} of {{total}} VIPs",
+      selectedCount: "{{count}} selected",
+      clearSelection: "Clear selection",
+      partialFailure: "The change could not be completed on every selected server.",
+      removeSuccess: "The VIP record was removed.",
+      removeError: "The VIP record could not be removed.",
+      saveSuccess: "The VIP record was saved.",
+      saveError: "The VIP record could not be saved.",
+      filters: "Filter VIPs",
+      expiringSoon: "Expires within 7 days",
+      allDurations: "All durations",
+      withinDays: "Within {{count}} days",
+      thisServerShort: "This server",
+      allServersShort: "All servers",
+      listSource: "List source",
+      currentServerOnly: "Current server",
+      updatedAt: "Updated at {{time}}",
+      total: "Total",
+      hideFilters: "Hide filters",
+      showFilters: "Show filters",
+      removeTitle: "Remove VIP record?",
+      removeDescription: "Do you really want to remove VIP access for {{name}}?",
     },
     blacklists: {
       title: "Blacklists",
       eyebrow: "Moderation",
       subtitle: "Search, edit and review cross-server exclusions.",
       manageTitle: "Manage blacklists",
-      manageSubtitle:
-        "Configure lists, server assignment and synchronization behavior.",
+      manageSubtitle: "Configure lists, server assignment and synchronization behavior.",
       createRecord: "Create blacklist record",
+      createRecordShort: "Blacklist record",
       manageLists: "Manage lists",
       searchPlayerId: "Search by player ID",
       searchNameReason: "Search by name or reason",
+      searchNameReasonShort: "Name or reason",
+      filters: "Filters",
       list: "Blacklist",
+      allLists: "All blacklists",
+      status: "Status",
+      statusOptions: {
+        active: "Active",
+        all: "All",
+        expired: "Expired",
+      },
       showExpired: "Show expired",
       editRecord: "Edit blacklist record",
       expireRecord: "Expire blacklist record",
@@ -930,24 +736,46 @@ const en = {
       expiresIn: "Expires in {{duration}}",
       expiredAgo: "Expired {{duration}} ago",
       neverExpires: "Never expires",
+      activePermanent: "Active · permanent",
+      activeUntil: "Active · {{duration}}",
+      expiredSince: "Expired · {{duration}}",
+      recordsCount: "{{count}} records",
+      range: "{{start}}–{{end}} of {{total}}",
+      groups: {
+        today: "Today",
+        recent: "Last 7 days",
+        older: "Older",
+      },
+      serverNumber: "Server {{number}}",
+      openPlayerProfile: "Open player profile",
+      openSteamProfile: "Open Steam profile",
+      aliases: "Aliases",
+      createdBy: "Created by",
+      fullReason: "Full reason",
+      affectedServers: "Affected servers",
+      createdAt: "Created at",
+      synchronization: "Synchronization",
+      expirationDate: "Expiration date",
+      entryId: "Record ID",
+      endBan: "End ban",
+      noRecords: "No blacklist records match these filters.",
+      confirmExpireTitle: "End this ban?",
+      confirmExpireDescription: "The ban for {{name}} ends immediately. The record remains available for auditing.",
+      confirmDeleteTitle: "Delete blacklist record permanently?",
+      confirmDeleteDescription: "The blacklist record for {{name}} will be permanently deleted and cannot be restored.",
       blacklistPlayer: "Blacklist player",
-      dialogDescription:
-        "Blacklisting a player revokes access to one or more servers.",
+      dialogDescription: "Blacklisting a player revokes access to one or more servers.",
       warningNoServers: "This blacklist currently affects no servers.",
-      warningUnknownServer:
-        "The current server could not be determined. Affected servers: [{{servers}}]",
-      warningOtherServers:
-        "This blacklist does not affect this server. Affected servers: [{{servers}}]",
+      warningUnknownServer: "The current server could not be determined. Affected servers: [{{servers}}]",
+      warningOtherServers: "This blacklist does not affect this server. Affected servers: [{{servers}}]",
       expirationHelp: "The date and time when this record expires.",
-      indefiniteNotice:
-        "The selected players will be blacklisted indefinitely.",
+      indefiniteNotice: "The selected players will be blacklisted indefinitely.",
       reason: "Reason",
       availableVariables: "Available variables",
       savedMessages: "Saved messages",
       backToRecords: "Back to records",
       deleteListTitle: "Delete blacklist “{{name}}”?",
-      deleteListDescription:
-        "Are you sure you want to permanently delete the blacklist and all associated records?",
+      deleteListDescription: "Are you sure you want to permanently delete the blacklist and all associated records?",
       listName: "List name",
       servers: "Servers",
       allServers: "All",
@@ -956,8 +784,7 @@ const en = {
       editList: "Edit blacklist",
       createList: "Create list",
       createListTitle: "Create blacklist",
-      listDescription:
-        "Blacklists group exclusion records for flexible management across servers.",
+      listDescription: "Blacklists group exclusion records for flexible management across servers.",
       enableAllServers: "Enable on all servers",
       syncMethods: {
         kick_only: "Kick only",
@@ -965,11 +792,9 @@ const en = {
         ban_immediately: "Ban immediately",
       },
       syncDescriptions: {
-        kick_only:
-          "Players are kicked every time they join and can see the reason.",
+        kick_only: "Players are kicked every time they join and can see the reason.",
         ban_on_connect: "Players see the reason once and are then banned.",
-        ban_immediately:
-          "Players only see the reason if they are online when listed.",
+        ban_immediately: "Players only see the reason if they are online when listed.",
       },
     },
     gameLogs: {
@@ -991,11 +816,94 @@ const en = {
       oldest: "Oldest first",
       clear: "Clear",
       download: "Download logs",
+      timeline: {
+        subtitle: "Filter, search and review chronological events in the context of a match.",
+        loaded: "{{count}} events loaded",
+        export: "Export",
+        playerSearch: "Player name or ID",
+        timeRange: "Time range",
+        lastRound: "Last match",
+        lastHour: "Last hour",
+        lastSixHours: "Last 6 hours",
+        lastDay: "Last 24 hours",
+        allTime: "All time",
+        customRange: "Custom",
+        filter: "Filter",
+        filtering: "Filtering …",
+        advanced: "Advanced",
+        eventCategories: "Event categories",
+        clearAll: "Clear all filters",
+        exactAction: "Match action exactly",
+        exactPlayer: "Match player exactly",
+        maxLoaded: "Maximum events to load",
+        roundHeading: "Match · {{map}}",
+        eventsInSelection: "{{count}} events in this selection",
+        roundOverview: "Match at a glance",
+        map: "Map",
+        gameMode: "Game mode",
+        roundStart: "Match start",
+        roundEnd: "Match end",
+        duration: "Duration",
+        eventsByType: "Events by type",
+        activity: "Activity · Top 5 players",
+        total: "Total",
+        selectedEvent: "Selected event",
+        selectEvent: "Select an event to review all available details.",
+        timestamp: "Timestamp",
+        attacker: "Actor",
+        target: "Target",
+        weapon: "Weapon",
+        message: "Message",
+        rawLog: "Raw log",
+        copy: "Copy",
+        copied: "Copied",
+        copyId: "Copy player ID",
+        profile: "Profile",
+        noEvents: "No events in this selection",
+        adjustFilters: "Adjust the time range or event category.",
+        showAll: "Show all events",
+        noPlayerActivity: "No player activity available.",
+        unknownMap: "Unknown map",
+        system: "System",
+        playerJoined: "{{player}} joined the server",
+        playerLeft: "{{player}} left the server",
+        loadedCount: "{{shown}} of {{total}} loaded",
+        perPage: "Per page",
+        categories: {
+          all: "All",
+          admin: "Admin",
+          chat: "Chat",
+          kills: "Kills",
+          teamkills: "Teamkills",
+          connections: "Connections",
+          round: "Match",
+        },
+        presets: {
+          last_round: "Last match",
+          "1h": "Last hour",
+          "6h": "Last 6 hours",
+          "24h": "Last 24 hours",
+          all: "All time",
+          custom: "Custom",
+        },
+        eventLabels: {
+          admin: "Admin",
+          chat: "Chat",
+          teamChat: "Chat · Team",
+          unitChat: "Chat · Squad",
+          kill: "Kill",
+          teamkill: "Teamkill",
+          connected: "Connected",
+          disconnected: "Disconnected",
+          round: "Match",
+          other: "Event",
+        },
+      },
     },
     auditLogs: {
       title: "Audit logs",
       eyebrow: "Security",
-      subtitle: "Review administrative changes and executed commands.",
+      subtitle: "Trace administrative changes, moderation and system commands end to end.",
       user: "Search by user",
       action: "Search by action",
       parameters: "Search by parameters",
@@ -1013,7 +921,99 @@ const en = {
       arguments: "Arguments",
       result: "Result",
       selectRow: "Select an audit log to view details.",
-      filters: "Filter audit logs",
+      userFilter: "User",
+      commandFilter: "Command",
+      searchPlaceholder: "Search target, player ID or parameter…",
+      category: "Area",
+      categoryPage: "Area · this page",
+      status: "Status",
+      statusPage: "Status · this page",
+      filter: "Filter",
+      filtering: "Filtering…",
+      advanced: "Advanced",
+      clearAll: "Clear all filters",
+      pageSize: "Entries per page",
+      exportPage: "Export this page",
+      totalEntries_one: "{{count}} entry",
+      totalEntries_other: "{{count}} entries",
+      entryCount_one: "{{count}} entry",
+      entryCount_other: "{{count}} entries",
+      loadedRange: "{{start}}–{{end}} of {{total}} · {{visible}} visible",
+      target: "Target",
+      server: "Server",
+      serverUnknown: "Current server",
+      serverNumber: "Server {{number}}",
+      auditId: "Audit ID",
+      openProfile: "Open player profile",
+      submittedValues: "Submitted values",
+      rawData: "Technical raw data",
+      copyRaw: "Copy raw data",
+      noArguments: "No parameters were stored for this action.",
+      resultUnknown: "No unambiguous result status is available for this action.",
+      unknownAction: "Unknown command",
+      unknownUser: "Unknown user",
+      playerTarget: "Player",
+      serverWide: "Server-wide",
+      unknownDate: "Unknown date",
+      today: "Today",
+      yesterday: "Yesterday",
+      emptyTitle: "No audit entries found",
+      emptyDescription: "Adjust or clear the filters to show more entries.",
+      categories: {
+        all: "All areas",
+        moderation: "Moderation",
+        maps: "Maps",
+        access: "Access & roles",
+        settings: "Configuration",
+        system: "System",
+      },
+      statuses: {
+        all: "All statuses",
+        success: "Successful",
+        failed: "Failed",
+        partial: "Partial",
+        unknown: "Unknown",
+      },
+      resultMessages: {
+        success: "The action completed successfully.",
+        failed: "The action failed.",
+        partial: "The action completed only partially.",
+      },
+      actions: {
+        messagePlayer: "Message sent to player",
+        punishPlayer: "Player punished",
+        kickPlayer: "Player kicked",
+        tempBanPlayer: "Player temporarily banned",
+        permaBanPlayer: "Player permanently banned",
+        disbandSquad: "Squad disbanded",
+        switchPlayer: "Player switched to the other team",
+        changeMap: "Map changed",
+        setNextMap: "Next map set",
+        changeRotation: "Map rotation changed",
+        addVip: "VIP added",
+        removeVip: "VIP removed",
+        addAdmin: "Admin role added",
+        removeAdmin: "Admin role removed",
+        changeAutobalance: "Autobalancer changed",
+        changeWelcome: "Welcome message changed",
+        clearCache: "Cache cleared",
+        restartService: "Service restarted",
+        toggleService: "Service status changed",
+        administrativeAction: "Administrative action",
+      },
+      argumentLabels: {
+        playerName: "Player name",
+        playerId: "Player ID",
+        message: "Message",
+        reason: "Reason",
+        duration: "Duration",
+        map: "Map",
+        squad: "Squad",
+        team: "Team",
+        service: "Service",
+        server: "Server",
+      },
+      boolean: { yes: "Yes", no: "No" },
     },
   },
   maps: {
@@ -1046,8 +1046,7 @@ const en = {
     whitelist: "Whitelist",
     status: "Status",
     objectives: "Objectives",
-    objectivesIntro:
-      "Select objectives directly on the map. Confirming immediately restarts the current map; omitted rows are selected at random.",
+    objectivesIntro: "Select objectives directly on the map. Confirming immediately restarts the current map; omitted rows are selected at random.",
     clear: "Clear",
     selectByName: "Select by name",
     objectiveNumber: "Objective {{number}}",
@@ -1056,8 +1055,7 @@ const en = {
     adjacent: "Objectives must be adjacent",
     notStraight: "Objectives must not be aligned in a straight line",
     changeObjectives: "Change objectives",
-    objectiveRestart:
-      "The map immediately restarts with the objectives listed below.",
+    objectiveRestart: "The map immediately restarts with the objectives listed below.",
     mapChanged: "The map has changed!",
     messages: "Messages",
     configuration: "Configuration",
@@ -1077,14 +1075,12 @@ const en = {
     unsupportedMode: "Unsupported game mode",
     objectivesSkirmish: "Objectives cannot be changed in Skirmish mode.",
     rotationShuffle: "Shuffle map rotation",
-    rotationShuffleDescription:
-      "Randomly shuffles the map rotation on every cycle.",
+    rotationShuffleDescription: "Randomly shuffles the map rotation on every cycle.",
     rotationShuffleUpdated: "Map rotation shuffle is now {{state}}.",
     votemapConfigChanged: "Configuration has changed",
     votemapWhitelistSaved: "Map voting whitelist saved.",
     votemapWhitelistReset: "Map voting whitelist reset.",
-    votemapWhitelistOutdated:
-      "Some maps in the whitelist were deleted or renamed: {{maps}}. Reset the whitelist or update automatic settings.",
+    votemapWhitelistOutdated: "Some maps in the whitelist were deleted or renamed: {{maps}}. Reset the whitelist or update automatic settings.",
     resetVotemapWhitelist: "Reset whitelist to all available maps",
     ignoreChanges: "Ignore",
     resetChanges: "Reset changes",
@@ -1094,11 +1090,9 @@ const en = {
     mapList: "Map list",
     mapSelection: "Map selection",
     noMoreMaps: "There are no more maps to add.",
-    objectiveGridCell:
-      "Objective position row {{row}}, column {{column}}: {{state}}",
+    objectiveGridCell: "Objective position row {{row}}, column {{column}}: {{state}}",
     objectiveSelected: "selected",
-    objectivesUnavailable:
-      "This game server does not expose sector-layout controls through RCON.",
+    objectivesUnavailable: "This game server does not expose sector-layout controls through RCON.",
     objectiveAvailable: "available",
     objectiveUnavailable: "unavailable",
     changeMap: "Change map",
@@ -1112,13 +1106,10 @@ const en = {
     disableVotemap: "Disable map voting",
     votemapUpdated: "Map voting has been {{state}}.",
     votemapReset: "Map voting has been reset.",
-    disableVotemapDescription:
-      "Disable map voting and determine maps through the rotation.",
-    enableVotemapDescription:
-      "Enable map voting and determine maps from votes or other conditions.",
+    disableVotemapDescription: "Disable map voting and determine maps through the rotation.",
+    enableVotemapDescription: "Enable map voting and determine maps from votes or other conditions.",
     resetVotemap: "Reset",
-    resetVotemapDescription:
-      "Reset current vote counts and generate a new map pool.",
+    resetVotemapDescription: "Reset current vote counts and generate a new map pool.",
     votemapSettings: {
       updated: "Map voting configuration saved.",
       reset: "Reset",
@@ -1126,14 +1117,11 @@ const en = {
       instructionText: "Vote reminder text",
       instructionTextHelp: "Include {map_selection} in the text.",
       thankYouText: "Confirmation after voting",
-      thankYouTextHelp:
-        "Reply after a player votes. {player_name} and {map_name} are available. Leave blank to disable the confirmation.",
+      thankYouTextHelp: "Reply after a player votes. {player_name} and {map_name} are available. Leave blank to disable the confirmation.",
       helpText: "Help text",
-      helpTextHelp:
-        "Shown after an invalid !votemap command or when a player types !votemap help.",
+      helpTextHelp: "Shown after an invalid !votemap command or when a player types !votemap help.",
       reminderFrequency: "Reminder interval in minutes",
-      reminderFrequencyHelp:
-        "Reminds players who have not voted by direct message. Set 0 to disable reminders.",
+      reminderFrequencyHelp: "Reminds players who have not voted by direct message. Set 0 to disable reminders.",
       warfareOptions: "Warfare maps",
       warfareOptionsHelp: "Number of Warfare maps to offer.",
       offensiveOptions: "Offensive maps",
@@ -1141,16 +1129,12 @@ const en = {
       skirmishOptions: "Control Skirmish maps",
       skirmishOptionsHelp: "Number of Control Skirmish maps to offer.",
       recentMapsExcluded: "Recently played maps excluded",
-      recentMapsExcludedHelp:
-        "Excludes the last N maps; the current map is always excluded.",
+      recentMapsExcludedHelp: "Excludes the last N maps; the current map is always excluded.",
       allowOptOut: "Allow players to opt out with !votemap never",
-      considerOffensiveSameMap:
-        "Treat Offensive maps as the same map when excluding",
-      considerSkirmishesSameMap:
-        "Treat Skirmish maps as the same map when excluding",
+      considerOffensiveSameMap: "Treat Offensive maps as the same map when excluding",
+      considerSkirmishesSameMap: "Treat Skirmish maps as the same map when excluding",
       allowConsecutiveOffensives: "Allow consecutive Offensive maps",
-      allowConsecutiveOffensivesOppositeSides:
-        "Allow consecutive Offensive maps with the same team defending twice",
+      allowConsecutiveOffensivesOppositeSides: "Allow consecutive Offensive maps with the same team defending twice",
       allowConsecutiveSkirmishes: "Allow consecutive Skirmish maps",
       allowDefaultToOffensive: "Allow an Offensive map as the default",
       allowDefaultToSkirmish: "Allow a Skirmish map as the default",
@@ -1160,32 +1144,26 @@ const en = {
       randomAll: "Pick randomly from all maps",
     },
     votemapAdvanced: {
-      considerEnvironmentSameMap:
-        "Treat map environments as the same map when excluding",
-      allowMultipleMapsSameEnvironment:
-        "Allow multiple maps with the same environment in one vote",
+      considerEnvironmentSameMap: "Treat map environments as the same map when excluding",
+      allowMultipleMapsSameEnvironment: "Allow multiple maps with the same environment in one vote",
       remindOnMatchStart: "Send a voting reminder when the match starts",
       remindOnMatchEnd: "Send a voting reminder when the match ends",
       allowVipOnly: "Allow only VIP players to vote",
       playerChoiceHelpText: "Player-choice help text",
-      playerChoiceHelpTextHelp:
-        "Shown when a player uses the player-choice command incorrectly.",
+      playerChoiceHelpTextHelp: "Shown when a player uses the player-choice command incorrectly.",
       noVoteText: "No-vote text",
       noVoteTextHelp: "Shown when no valid vote result is available.",
       vipVoteCount: "VIP vote weight",
       vipVoteCountHelp: "Number of votes assigned to a VIP vote (1–100).",
       voteCountFlags: "Weighted vote flags",
-      voteCountFlagsHelp:
-        "Votes from players with one of these flags count multiple times. If several flags apply, the highest value is used (0–100).",
+      voteCountFlagsHelp: "Votes from players with one of these flags count multiple times. If several flags apply, the highest value is used (0–100).",
       voteCount: "Vote weight",
       voteWhitelistFlags: "Voting whitelist flags",
-      voteWhitelistFlagsHelp:
-        "Only players with one of these flags may vote. If the list is empty, everyone may vote.",
+      voteWhitelistFlagsHelp: "Only players with one of these flags may vote. If the list is empty, everyone may vote.",
       voteBanFlags: "Voting ban flags",
       voteBanFlagsHelp: "Players with one of these flags cannot vote for maps.",
       playerChoiceWhitelistFlags: "Player-choice whitelist flags",
-      playerChoiceWhitelistFlagsHelp:
-        "Only players with one of these flags may use !vm add. If the list is empty, everyone may use it.",
+      playerChoiceWhitelistFlagsHelp: "Only players with one of these flags may use !vm add. If the list is empty, everyone may use it.",
       loadingEmojiPicker: "Loading emoji picker...",
     },
     votemapStatus: {
@@ -1195,8 +1173,7 @@ const en = {
       playerChoice: "Player choice by {{player}}",
       history: "Voting history",
       resultRecorded: "Result recorded on {{date}} with {{map}} on the server.",
-      emptyHistoryResult:
-        "There were no map options or map voting was disabled.",
+      emptyHistoryResult: "There were no map options or map voting was disabled.",
       noHistory: "No historical data has been recorded yet.",
       paused: "(paused)",
       lastReminder: "Last voting reminder",
@@ -1214,10 +1191,202 @@ const en = {
     },
   },
   settings: {
+    integrations: {
+      eyebrow: "Server configuration",
+      title: "Discord & communication",
+      description:
+        "Discord webhooks publish server events to configured Discord destinations. The remaining modules control in-game commands or hosting.",
+      searchPlaceholder: "Search modules …",
+      searchLabel: "Search communication modules",
+      refresh: "Refresh",
+      lastUpdated: "Last updated: {{value}}",
+      unsavedConfirmation:
+        "This module has unsaved changes. Switch to another module anyway?",
+      groups: {
+        discord: "Discord webhooks · {{count}}",
+        communication: "Other communication · {{count}}",
+      },
+      filters: {
+        all: "All",
+        discord: "Discord",
+        commands: "Commands",
+        hosting: "Hosting",
+      },
+      columns: {
+        module: "Module",
+        purpose: "Purpose",
+        configuration: "Configuration",
+        action: "Action",
+      },
+      status: {
+        active: "Active",
+        configured: "Configured",
+        inactive: "Inactive",
+        available: "Open",
+      },
+      emptyTitle: "No modules found",
+      emptyDescription: "Adjust the search or filters to show more modules.",
+      form: {
+        moduleConfiguration: "Module configuration",
+        enabled: "Active",
+        disabled: "Inactive",
+        entryCount_one: "{{count}} entry",
+        entryCount_other: "{{count}} entries",
+        noEntries: "No entry configured yet.",
+        addEntry: "Add entry",
+        removeEntry: "Remove entry {{number}}",
+        secretHelp: "The sensitive access key is shown masked.",
+        showSecret: "Show access key",
+        hideSecret: "Hide access key",
+        sections: {
+          operation: {
+            title: "Operation",
+            description: "Activate or pause the module.",
+          },
+          destinations: {
+            title: "Discord destinations",
+            description: "Manage webhook destinations and public references.",
+          },
+          events: {
+            title: "Events",
+            description: "Choose which events are delivered.",
+          },
+          mentions: {
+            title: "Mentions & triggers",
+            description: "Configure roles, users and trigger words.",
+          },
+          commands: {
+            title: "Commands",
+            description: "Manage chat commands, help calls and effects.",
+          },
+          connection: {
+            title: "Connection",
+            description: "Configure the GTX endpoint for name synchronization.",
+          },
+          scoreboardHeader: {
+            title: "Score & header",
+            description: "Configure core game-state and score output.",
+          },
+          mapRotation: {
+            title: "Map rotation",
+            description: "Configure rotation output and refresh behavior.",
+          },
+          playerStats: {
+            title: "Player statistics",
+            description: "Configure rankings, values and refresh behavior.",
+          },
+          appearance: {
+            title: "Appearance",
+            description: "Adjust labels and visible output.",
+          },
+          advanced: {
+            title: "Additional settings",
+            description: "Manage additional parameters for this module.",
+          },
+        },
+        fields: {
+          listItem: "Value",
+          enabled: "Module status",
+          hooks: "Discord webhooks",
+          webhooks: "Log webhooks",
+          webhook: "Discord destination",
+          url: "Webhook URL",
+          user_mentions: "Mention users",
+          role_mentions: "Mention roles",
+          trigger_words: "Trigger words",
+          allow_mentions: "Allow mentions from chat",
+          send_kills: "Send kills",
+          send_team_kills: "Send team kills",
+          log_types: "Event types",
+          command_words: "Configured commands",
+          describe_words: "Help commands",
+          words: "Command words",
+          description: "Description",
+          message: "Reply message",
+          commands: "Executed RCON commands",
+          conditions: "Conditions",
+          ip: "Server IP",
+          port: "Query port",
+          public_scoreboard_url: "Public scoreboard URL",
+          footer_last_refreshed_text: "Footer: last refreshed",
+          header_gamestate_enabled: "Header enabled",
+          map_rotation_enabled: "Map rotation enabled",
+          player_stats_enabled: "Player statistics enabled",
+          header_gamestate_include_server_name: "Show server name",
+          header_gamestate_time_between_refreshes: "Refresh in seconds",
+          quick_connect_url: "Quick-connect URL",
+          battlemetrics_url: "BattleMetrics URL",
+          show_map_image: "Show map image",
+          objective_score_format_generic: "Generic score format",
+          objective_score_format_ger_v_us: "Germany versus US format",
+          objective_score_format_ger_v_sov: "Germany versus Soviet format",
+          objective_score_format_ger_v_uk: "Germany versus UK format",
+          header_gamestate_embeds: "Header fields",
+          map_rotation_include_server_name: "Show server name in rotation",
+          map_rotation_time_between_refreshes: "Rotation interval in seconds",
+          current_map_format: "Current-map format",
+          next_map_format: "Next-map format",
+          other_map_format: "Other-map format",
+          show_map_legend: "Show map legend",
+          map_rotation_title_text: "Map-rotation title",
+          map_legend: "Map legend",
+          player_stats_include_server_name: "Show server name in statistics",
+          player_stats_title_text: "Player-statistics title",
+          player_stats_time_between_refreshes: "Statistics interval in seconds",
+          player_stats_num_to_display: "Players per statistic",
+          player_stat_embeds: "Player-statistic fields",
+        },
+      },
+      modules: {
+        audit: {
+          name: "Audit",
+          purpose: "Send test-mode and configuration changes to Discord.",
+        },
+        adminPing: {
+          name: "Admin call",
+          purpose: "Send on-demand admin notifications to Discord.",
+        },
+        watchlist: {
+          name: "Watchlist",
+          purpose: "Send watchlist updates to Discord.",
+        },
+        camera: {
+          name: "Admin camera",
+          purpose: "Send admin-camera events to Discord.",
+        },
+        chat: {
+          name: "Chat mirror",
+          purpose: "Mirror player chat to selected Discord channels.",
+        },
+        kills: {
+          name: "Kills & team kills",
+          purpose: "Send kills and team kills to Discord.",
+        },
+        logLine: {
+          name: "Log events",
+          purpose: "Send selected server logs to Discord.",
+        },
+        scoreboard: {
+          name: "Discord scoreboard",
+          purpose: "Send score and scoreboard updates to Discord.",
+        },
+        chatCommands: {
+          name: "Player chat commands",
+          purpose: "Configure in-game chat commands for players.",
+        },
+        rconCommands: {
+          name: "RCON chat commands",
+          purpose: "Configure advanced RCON commands through chat.",
+        },
+        gtxServer: {
+          name: "GTX server name",
+          purpose: "Synchronize the GTX server name and player count.",
+        },
+      },
+    },
     discordReports: {
       title: "Discord Report Bot",
-      subtitle:
-        "Player reports follow the CRCON template; AI is limited to automatic chat and name reviews.",
+      subtitle: "Player reports follow the CRCON template; AI is limited to automatic chat and name reviews.",
       statusConnected: "Connected",
       statusDisconnected: "Disconnected",
       statusActive: "Active",
@@ -1236,23 +1405,16 @@ const en = {
       next: "Next",
       connecting: "Connecting …",
       appInstalled: "The Discord app is connected to this CRCON installation.",
-      installPrivacy:
-        "CRCON opens the official Discord installation. You never need to enter a bot token or server ID.",
+      installPrivacy: "CRCON opens the official Discord installation. You never need to enter a bot token or server ID.",
       guildNotDetected: "No Discord server detected yet",
-      channelRolesHelp:
-        "Select the shared report channel and at least one current Discord moderator role.",
-      actionSafety:
-        "The first moderator to select a report action claims the report. Permanent bans and squad disbands remain protected by a reason, preview, and second confirmation; single blacklist entries execute directly from the fully reviewed form.",
-      testHelp:
-        "Send a test message and verify the service, Discord binding, and callback or central broker.",
-      activateHelp:
-        "Review the effective configuration and activate the bot only after the channel, roles, and test are correct.",
-      activateWithoutTest:
-        "There is no successful test yet. You can save the integration, but should test it before live operation.",
+      channelRolesHelp: "Select the shared report channel and at least one current Discord moderator role.",
+      actionSafety: "The first moderator to select a report action claims the report. Permanent bans, blacklists, and squad disbands remain protected by a reason, preview, and second confirmation.",
+      testHelp: "Send a test message and verify the service, Discord binding, and callback or central broker.",
+      activateHelp: "Review the effective configuration and activate the bot only after the channel, roles, and test are correct.",
+      activateWithoutTest: "There is no successful test yet. You can save the integration, but should test it before live operation.",
       saveAndActivate: "Save & activate",
       savePaused: "Save paused",
-      actionFailed:
-        "The action could not be completed. The existing configuration was not changed silently.",
+      actionFailed: "The action could not be completed. The existing configuration was not changed silently.",
       technicalDetails: "Technical details",
       runDiagnostics: "Run diagnostics",
       diagnosticsComplete: "Discord diagnostics completed.",
@@ -1268,8 +1430,7 @@ const en = {
       brokerMode: "Central broker",
       directMode: "Direct CRCON callback",
       serverFallback: "CRCON server",
-      serverContextUnavailable:
-        "Server and game context is currently unavailable",
+      serverContextUnavailable: "Server and game context is currently unavailable",
       state_active: "Active",
       state_healthy: "Healthy",
       state_online: "Online",
@@ -1285,8 +1446,7 @@ const en = {
       state_idle: "Ready",
       state_paused: "Paused",
       state_not_connected: "Not connected",
-      installHint:
-        "Install the Frontline Discord app first. The Discord server is detected automatically; then select the channel and moderator roles. No customer bot token is required.",
+      installHint: "Install the Frontline Discord app first. The Discord server is detected automatically; then select the channel and moderator roles. No customer bot token is required.",
       install: "Install Discord app",
       detectServer: "Detect Discord server",
       roles: "Moderator roles",
@@ -1301,24 +1461,19 @@ const en = {
       reportChannel: "Report channel",
       guildId: "Discord server ID",
       channelId: "Report channel ID",
-      guildIdHelp:
-        "In Discord, enable Developer Mode, right-click the server, then copy its ID.",
-      guildDetectedHelp:
-        "Securely derived from the server where the Discord app is installed and cannot be changed here.",
-      channelIdHelp:
-        "Right-click the desired Discord channel, then copy its ID.",
+      guildIdHelp: "In Discord, enable Developer Mode, right-click the server, then copy its ID.",
+      guildDetectedHelp: "Securely derived from the server where the Discord app is installed and cannot be changed here.",
+      channelIdHelp: "Right-click the desired Discord channel, then copy its ID.",
       rolesHelp: "Select at least one role for Discord actions.",
       changeConnection: "Change connection",
-      changeConnectionHint:
-        "The current connection remains active until you save the new assignment.",
+      changeConnectionHint: "The current connection remains active until you save the new assignment.",
       saveConnection: "Save assignment",
       cancel: "Cancel",
       chat_enabled: "AI for chat",
       names_enabled: "AI for names",
       shadow_mode: "Shadow mode",
       quality_opt_in: "Anonymized quality examples (opt-in)",
-      externalBilling:
-        "AI calls exclusively use your own API key or ChatGPT/Codex login. Frontline does not provide an AI quota.",
+      externalBilling: "AI calls exclusively use your own API key or ChatGPT/Codex login. Frontline does not provide an AI quota.",
       customTerms: "Custom terms",
       exceptions: "Exceptions",
       regexes: "Regular expressions",
@@ -1326,50 +1481,39 @@ const en = {
       template_claimed: "Report status: claimed",
       template_resolved: "Report status: resolved",
       template_dismissed: "Report status: dismissed",
-      aiSafety:
-        "AI results are suggestions only. Every game action requires a currently authorized moderator; destructive actions also require a reason, preview, and second confirmation.",
+      aiSafety: "AI results are suggestions only. Every game action requires a currently authorized moderator; destructive actions also require a reason, preview, and second confirmation.",
       save: "Save",
       saved: "Discord and AI configuration saved.",
       test: "Test message",
       testSent: "Test message sent.",
       disconnect: "Disconnect",
       sectionConnection: "Discord connection",
-      sectionConnectionHelp:
-        "The server and report channel are securely detected through the installed Discord app.",
+      sectionConnectionHelp: "The server and report channel are securely detected through the installed Discord app.",
       sectionPermissions: "Moderation & permissions",
-      sectionPermissionsHelp:
-        "Choose which Discord roles can use the bot and which actions are available.",
+      sectionPermissionsHelp: "Choose which Discord roles can use the bot and which actions are available.",
       sectionAi: "AI checks",
-      sectionAiHelp:
-        "Automated checks apply to chat and player names; regular player reports do not require AI.",
+      sectionAiHelp: "Automated checks apply to chat and player names; regular player reports do not require AI.",
       aiProvider: "AI provider",
       provider_api_key: "Own OpenAI API key",
-      provider_api_key_help:
-        "The key is encrypted in CRCON. API charges are billed to your OpenAI project.",
+      provider_api_key_help: "The key is encrypted in CRCON. API charges are billed to your OpenAI project.",
       provider_codex: "ChatGPT/Codex subscription",
-      provider_codex_help:
-        "Sign in to ChatGPT with a device code and select a model available to your Codex subscription.",
+      provider_codex_help: "Sign in to ChatGPT with a device code and select a model available to your Codex subscription.",
       apiKey: "OpenAI API key",
-      apiKeyHelp:
-        "The key is encrypted when saved and is never displayed again.",
+      apiKeyHelp: "The key is encrypted when saved and is never displayed again.",
       apiKeyStored: "An encrypted key is stored. Leave this empty to keep it.",
       codexLogin: "Sign in with ChatGPT",
       codexLogout: "Sign out",
       codexConnected: "Signed in as {{email}} ({{plan}}).",
       codexDisconnected: "No ChatGPT/Codex account is connected yet.",
       codexUnavailable: "The Codex runtime is currently unavailable.",
-      codexPending:
-        "Sign-in is pending. Enter code {{code}} on the page that opened.",
+      codexPending: "Sign-in is pending. Enter code {{code}} on the page that opened.",
       codexOpenLogin: "Open sign-in page – code {{code}}",
       ai_model: "Chat review model",
-      ai_modelHelp:
-        "Used only for suspicious chat candidates after the local prefilter.",
+      ai_modelHelp: "Used only for suspicious chat candidates after the local prefilter.",
       player_name_model: "Player-name review model",
-      player_name_modelHelp:
-        "Called only for new or actually changed player names.",
+      player_name_modelHelp: "Called only for new or actually changed player names.",
       sectionTemplates: "Status messages to the reporter",
-      sectionTemplatesHelp:
-        "For each processing step, these CRCON templates are sent exclusively to the player who submitted the admin report.",
+      sectionTemplatesHelp: "For each processing step, these CRCON templates are sent exclusively to the player who submitted the admin report.",
       allowedActions: "Allowed Discord actions",
       action_message: "Message",
       action_punish: "Punish",
@@ -1396,18 +1540,15 @@ const en = {
         },
         words: {
           title: "Triggers",
-          description:
-            "Words that trigger this command. They must start with ! or @.",
+          description: "Words that trigger this command. They must start with ! or @.",
         },
         description: {
           title: "Description",
-          description:
-            "Optional description shown to players through a help command.",
+          description: "Optional description shown to players through a help command.",
         },
         message: {
           title: "Message",
-          description:
-            "Message sent to the player in-game when this command is triggered.",
+          description: "Message sent to the player in-game when this command is triggered.",
         },
         commands: {
           title: "RCON commands",
@@ -1562,14 +1703,12 @@ const en = {
       serverName: "Server name",
       adminCam: "Admin camera",
       crcon: "CRCON app",
-      notice:
-        "Displayed values may differ from current server settings because the HLL server does not provide this data as of U18. Settings can still be adjusted.",
+      notice: "Displayed values may differ from current server settings because the HLL server does not provide this data as of U18. Settings can still be adjusted.",
     },
     game: {
       dynamicWeather: "Dynamic weather",
       dynamicWeatherToggle: "Control dynamic weather",
-      dynamicWeatherDescription:
-        "Enable or disable dynamic weather for a specific map.",
+      dynamicWeatherDescription: "Enable or disable dynamic weather for a specific map.",
       matchTimers: "Match timers",
       matchTimer: "{{mode}} match timer",
       offensiveTimerDescription: "The length of each control point phase.",
@@ -1577,31 +1716,25 @@ const en = {
       warmupTimers: "Warm-up timers",
       warmupTimer: "{{mode}} warm-up timer",
       warmupTimerDescription: "The length of the match warm-up.",
-      timerExample:
-        "Example: Match timer = 93 minutes, warm-up timer = 3 minutes → total match time = 93 minutes.",
+      timerExample: "Example: Match timer = 93 minutes, warm-up timer = 3 minutes → total match time = 93 minutes.",
       changeNote: "Note: Changes apply on the next map change.",
-      removeTimerNote:
-        "Note: Removing the timer restores its default value and removes its label from the HLL server browser.",
+      removeTimerNote: "Note: Removing the timer restores its default value and removes its label from the HLL server browser.",
     },
     adminCam: {
       title: "Admin camera notifications",
-      subtitle:
-        "Choose how players are informed when an admin enters camera mode.",
-      description:
-        "This feature notifies players whenever an admin enters camera mode. You can send a broadcast or change the welcome message. Changing the welcome message is not recommended: the camera notice and default text appear in sequence and cover the left side of every player's screen twice.",
+      subtitle: "Choose how players are informed when an admin enters camera mode.",
+      description: "This feature notifies players whenever an admin enters camera mode. You can send a broadcast or change the welcome message. Changing the welcome message is not recommended: the camera notice and default text appear in sequence and cover the left side of every player's screen twice.",
       broadcast: "Notify by broadcast message",
       welcome: "Notify by welcome message",
       updated: "Admin camera notifications saved.",
-      updateFailed:
-        "Admin camera notifications could not be saved: {{message}}",
+      updateFailed: "Admin camera notifications could not be saved: {{message}}",
     },
     general: {
       updated: "{{name}} saved.",
       updateFailed: "{{name}} could not be saved: {{message}}",
       remove: "Remove",
       timerRemoved: "Timer for {{gameMode}} removed.",
-      timerRemoveFailed:
-        "Timer for {{gameMode}} could not be removed: {{message}}",
+      timerRemoveFailed: "Timer for {{gameMode}} could not be removed: {{message}}",
       votes: "Votes",
       minimumPlayers: "Minimum players",
       noThresholds: "No thresholds set.",
@@ -1649,15 +1782,13 @@ const en = {
         },
         autoVotekick: {
           title: "Automatic votekick system",
-          subtitle:
-            "Control votekick automatically based on available moderators",
+          subtitle: "Control votekick automatically based on available moderators",
         },
       },
       help: {
         default: "Set 0 to disable",
         autobalance_threshold: "0 means both teams must match exactly.",
-        autobalance_enabled:
-          "Autobalance moves players automatically to balance the teams.",
+        autobalance_enabled: "Autobalance moves players automatically to balance the teams.",
         queue_length: "Recommended value: 6",
         vip_slots_num: "Recommended value: 1–2",
         match_warfare_timer: "Default: 90 minutes",
@@ -1665,15 +1796,13 @@ const en = {
         match_skirmish_timer: "Default: 30 minutes",
         warmup_warfare_timer: "Default: 3 minutes",
         warmup_skirmish_timer: "Default: 3 minutes",
-        votekick_thresholds:
-          "Set the votes required to kick a player by team size. The first field is the minimum player count and the second is the required votes. Reasonable values are [0, 1], [10, 5], [25, 12], [50, 20].",
+        votekick_thresholds: "Set the votes required to kick a player by team size. The first field is the minimum player count and the second is the required votes. Reasonable values are [0, 1], [10, 5], [25, 12], [50, 20].",
       },
     },
     serverName: {
       title: "Server name",
       subtitle: "Current display name of the game server",
-      intro:
-        "If your game server is hosted by GTX or another compatible provider with SFTP access, you can update its name without restarting the HLL server.",
+      intro: "If your game server is hosted by GTX or another compatible provider with SFTP access, you can update its name without restarting the HLL server.",
       requirements: "Setup requirements:",
       configureCredentials: "Configure SFTP credentials in the .env file",
       provideHost: "Enter the game server SFTP IP address and port below",
@@ -1692,8 +1821,7 @@ const en = {
     mobile: {
       title: "Frontline App",
       subtitle: "Securely pair your CRCON account with the Frontline App.",
-      pairingWarning:
-        "Only approve the device if its six-digit code matches this page. The QR code expires after two minutes and can only be used once.",
+      pairingWarning: "Only approve the device if its six-digit code matches this page. The QR code expires after two minutes and can only be used once.",
       confirmPassword: "Confirm CRCON password",
       createQr: "Create QR code",
       statusLabel: "Status",
@@ -1715,8 +1843,7 @@ const en = {
       days: "days",
       pushConfigured: "Push configured",
       pushDisabled: "Push disabled",
-      configurationHint:
-        "These security-sensitive deployment values are changed through the CRCON environment file.",
+      configurationHint: "These security-sensitive deployment values are changed through the CRCON environment file.",
       allDevices: "All Frontline devices",
       myDevices: "My Frontline devices",
       noDevices: "No Frontline devices paired.",
@@ -1727,18 +1854,15 @@ const en = {
       deviceRevoked: "Frontline device revoked.",
       cacheTitle: "Cache management",
       cacheSubtitle: "Clear application cache",
-      cacheDescription:
-        "This clears the internal cache used by CRCON components. Avoid using it unnecessarily because data must be recalculated and reloaded.",
-      cacheWarning:
-        "Use this only when instructed by CRCON maintainers or when you understand the consequences.",
+      cacheDescription: "This clears the internal cache used by CRCON components. Avoid using it unnecessarily because data must be recalculated and reloaded.",
+      cacheWarning: "Use this only when instructed by CRCON maintainers or when you understand the consequences.",
       flushing: "Flushing…",
       flushCache: "Flush cache",
       cacheFlushed: "Cache flushed.",
       cacheFlushFailed: "Cache could not be flushed",
       connectionTitle: "Game server connection",
       connectionSubtitle: "Reconnect to game server",
-      connectionDescription:
-        "Reconnects to the game server. Use this when the connection appears unstable.",
+      connectionDescription: "Reconnects to the game server. Use this when the connection appears unstable.",
       reconnecting: "Reconnecting…",
       reconnect: "Reconnect",
       reconnected: "Reconnected to game server.",
@@ -1762,8 +1886,7 @@ const en = {
     campaigns: {
       eyebrow: "Communication",
       title: "Campaigns",
-      subtitle:
-        "Schedule recurring in-game notices for VIP access, community news, events, and other important offers.",
+      subtitle: "Schedule recurring in-game notices for VIP access, community news, events, and other important offers.",
       moduleActive: "Campaign module active",
       modulePaused: "Campaign module paused",
       randomOrder: "Shuffle order",
@@ -1777,10 +1900,8 @@ const en = {
       duplicate: "Duplicate campaign",
       copyName: "{{name}} – Copy",
       message: "In-game message",
-      messageHelp:
-        "The message is shown as a large server broadcast to every connected player.",
-      playerMessageHelp:
-        "The message is sent individually through message_player to eligible players. Available variables include {player_name}, {vip_status}, and {vip_expiration}.",
+      messageHelp: "The message is shown as a large server broadcast to every connected player.",
+      playerMessageHelp: "The message is sent individually through message_player to eligible players. Available variables include {player_name}, {vip_status}, and {vip_expiration}.",
       deliveryMode: "Delivery channel",
       deliveryBroadcast: "Server broadcast",
       deliveryPlayerMessage: "Direct player message",
@@ -1821,8 +1942,7 @@ const en = {
         expired: "expired",
       },
       saved: "Campaigns saved.",
-      invalidRange:
-        "Check the message and player range. The minimum must not exceed the maximum.",
+      invalidRange: "Check the message and player range. The minimum must not exceed the maximum.",
       importTemplate: "Import message template as campaign",
       emptyTitle: "No campaigns yet",
       emptyText: "Create a campaign to send recurring in-game notices.",
@@ -1846,6 +1966,22 @@ const en = {
         unlimited: "Unlimited; do not advance to the next stage",
         noDelay: "No additional delay",
         anySquadSize: "Any squad size",
+      },
+      playerFlagPicker: {
+        noticeTitle: "Select existing player flags",
+        noticeBody:
+          "The catalogue is loaded directly from the player profiles in this CRCON instance. Players with at least one selected flag are exempt from the respective rule.",
+        label: "Exempt player flags",
+        placeholder: "Search for a flag or enter a new one",
+        help: "Select existing flags. You can still type a custom flag and press Enter to add it.",
+        loading: "Loading flags …",
+        noOptions: "No other existing flag found",
+        loadFailed:
+          "The flag catalogue could not be loaded. Custom values can still be entered.",
+        playerCount_one: "{{count}} player profile",
+        playerCount_other: "{{count}} player profiles",
+        catalogueCount_one: "{{count}} existing flag found",
+        catalogueCount_other: "{{count}} existing flags found",
       },
       roles: {
         armycommander: "Commander",
@@ -1876,11 +2012,13 @@ const en = {
       },
       workbench: {
         defaultEyebrow: "Server configuration",
-        defaultIntro:
-          "Configure this area with the guided form, or switch to the advanced JSON view for special cases.",
-        tabsLabel: "Editing mode",
-        formTab: "Form",
-        jsonTab: "JSON (advanced)",
+        defaultIntro: "Configure this area safely with the guided form.",
+        mode: {
+          title: "Operating mode",
+          off: "Off",
+          observe: "Observe",
+          active: "Active",
+        },
         navigation: "Configuration sections",
         mobileNavigation: "Choose section",
         sectionEyebrow: "Section {{current}} of {{total}}",
@@ -1900,6 +2038,20 @@ const en = {
           "You are missing the {{permission}} permission. You can review this rule but cannot change it.",
         validationTitle: "Some entries need attention",
         validationDescription: "Resolve the listed items before saving.",
+        compatibilityTitle: "This configuration cannot be edited safely",
+        compatibilityDescription:
+          "The saved data differs structurally from this CRCON version. It has not been changed. Apply the matching configuration migration first.",
+        compatibilityIssue:
+          "{{path}}: expected {{expected}}, found {{actual}}",
+        types: {
+          array: "list",
+          object: "object",
+          string: "text",
+          integer: "integer",
+          number: "number",
+          boolean: "yes/no value",
+          null: "empty value",
+        },
         navigateToError: "Open",
         choices: {
           skip: "Skip",
@@ -1969,7 +2121,7 @@ const en = {
           messages:
             "Edit the messages players or administrators receive during this workflow.",
           notifications:
-            "Optionally provide a Discord webhook for audit messages.",
+            "Configure the Discord destinations and notifications for this module.",
           advanced:
             "Additional settings that do not belong to one of the main workflow stages.",
         },
@@ -1984,6 +2136,21 @@ const en = {
           count: "{{count}}× · every {{interval}} seconds",
           kick: "Kick after {{seconds}} seconds",
           intervalMinutes: "Check every {{count}} minutes",
+          notificationsActive: "Discord notification enabled",
+          notificationsInactive: "No Discord notification",
+          noDuration: "No duration configured",
+          duration: {
+            minutes_one: "{{count}} minute",
+            minutes_other: "{{count}} minutes",
+            hours_one: "{{count}} hour",
+            hours_other: "{{count}} hours",
+            days_one: "{{count}} day",
+            days_other: "{{count}} days",
+            weeks_one: "{{count}} week",
+            weeks_other: "{{count}} weeks",
+            years_one: "{{count}} year",
+            years_other: "{{count}} years",
+          },
           configured: "{{configured}} of {{total}} values configured",
           activeNotice:
             "The settings shown will be used for this server after saving.",
@@ -2096,14 +2263,77 @@ const en = {
           description:
             "Exemptions are checked before every action. Dry runs follow the same flow but never affect the game.",
         },
+        workbench: {
+          mode: {
+            title: "How should the rule run?",
+            off: "Off",
+            observe: "Observe",
+            active: "Active",
+          },
+          operation: {
+            help: "The global minimum pauses the entire automod. Detection, warnings, and actions only begin once enough players are connected.",
+          },
+          detection: {
+            skipped:
+              "The first warning follows without an additional confirmation stage",
+            result_one:
+              "{{checks}} internal check confirms the violation after about {{seconds}} seconds",
+            result_other:
+              "{{checks}} internal checks confirm the violation after about {{seconds}} seconds",
+            help: "These checks remain invisible to the player and prevent premature actions during short role changes.",
+          },
+          actions: {
+            inactive: "Skipped",
+            unlimited: "Unlimited",
+            configured: "Configured",
+            unreachable: "Unreachable",
+          },
+          notifications: {
+            help: "The webhook receives audit messages for detected violations and applied actions. It is not required for the rule to operate.",
+          },
+          summary: {
+            title: "Rule overview",
+            startCondition: "Start the entire automod from",
+            immediate: "Check immediately",
+            fromPlayers: "{{count}} players",
+            activeNotice:
+              "The rule will actively affect the game after saving.",
+            testNotice: "Log only – no messages or game actions.",
+            inactiveNotice: "The rule is off; all settings are retained.",
+            detection: "Detection",
+            confirmedViolation: "Violation is confirmed",
+            noConfirmation: "No confirmation stage",
+            checks_one: "{{count}} check · every {{interval}} seconds",
+            checks_other: "{{count}} checks · every {{interval}} seconds",
+            exceptions_one: "{{count}} configured exemption",
+            exceptions_other: "{{count}} configured exemptions",
+            reaction: "Action sequence",
+            warn: "Warn",
+            punish: "Punish",
+            kick: "Kick",
+            count: "{{count}}× · every {{interval}} seconds",
+            unlimited: "Unlimited · every {{interval}} seconds",
+            skipped: "Skipped",
+            unreachable: "Unreachable with this sequence",
+            kickAfter: "after a {{seconds}} second grace period",
+          },
+        },
         sections: {
           operation: {
-            title: "Basics",
-            description: "Core settings",
+            title: "Overview",
+            description: "Operating mode and global start condition",
+          },
+          detection: {
+            title: "Detection",
+            description: "Confirm violations reliably",
           },
           exemptions: {
             title: "Exceptions",
             description: "Who is exempt",
+          },
+          actions: {
+            title: "Actions",
+            description: "Build warnings, punishment, and kick",
           },
           observation: {
             title: "Confirm",
@@ -2219,10 +2449,167 @@ const en = {
         },
       },
       level: {
-        eyebrow: "Automod rule",
+        eyebrow: "Automation · Player level",
         title: "Level rules",
         intro:
           "Control minimum and maximum levels as well as role-specific level thresholds. Players can be informed, punished, or removed in progressive stages.",
+        sections: {
+          operation: {
+            title: "Start condition",
+            description: "Server population required before checks begin",
+          },
+          rules: {
+            title: "Level limits",
+            description: "General and role-specific requirements",
+          },
+          exemptions: {
+            title: "Exceptions",
+            description: "Protected flags and level-bug handling",
+          },
+          announcements: {
+            title: "Announcements",
+            description: "Notices before enforcement begins",
+          },
+          warnings: {
+            title: "Warnings",
+            description: "Count, interval, and message",
+          },
+          punishments: {
+            title: "Punishments",
+            description: "Consequences after unsuccessful warnings",
+          },
+          kick: {
+            title: "Kick",
+            description: "Final escalation stage and reason",
+          },
+          notifications: {
+            title: "Audit",
+            description: "Optional Discord notification",
+          },
+          advanced: {
+            title: "Additional settings",
+            description: "Additional fields supplied by the server",
+          },
+        },
+        fields: {
+          dont_do_anything_below_this_number_of_players: {
+            label: "Only check from this player count",
+            help: "Below this number, the level rule remains fully inactive. Set 0 to check at any population.",
+          },
+          min_level: {
+            label: "Server minimum level",
+            help: "Players below this level do not meet the general access requirement.",
+          },
+          max_level: {
+            label: "Server maximum level",
+            help: "Set 0 to disable the general upper limit.",
+          },
+          level_thresholds: {
+            label: "Level limits by role",
+            help: "Define a separate minimum level and population requirement for selected roles.",
+          },
+          label: {
+            label: "Display name",
+            help: "Readable name for this role.",
+          },
+          min_players: {
+            label: "Applies from player count",
+            help: "The role-specific limit is enforced from this server population.",
+          },
+          min_level_message: {
+            label: "Message below minimum level",
+            help: "Message fragment for players below the general minimum level.",
+          },
+          max_level_message: {
+            label: "Message above maximum level",
+            help: "Message fragment for players above the general maximum level.",
+          },
+          violation_message: {
+            label: "Role violation message",
+            help: "Describes the violated role-specific level requirement.",
+          },
+          force_kick_message: {
+            label: "Server-level kick message",
+            help: "Shown when a player is immediately kicked by the general level limit.",
+          },
+          whitelist_flags: {
+            label: "Exempt player flags",
+            help: "Players with at least one of these flags are not checked.",
+          },
+          levelbug_enabled: {
+            label: "Protect players affected by the level-1 bug",
+            help: "Exempts level-1 players when the known HLL level bug is suspected.",
+          },
+          announcement_enabled: {
+            label: "Announce level rules",
+            help: "Tells connecting players about the active level requirements.",
+          },
+          only_announce_impacted_players: {
+            label: "Only notify affected players",
+            help: "Sends the announcement only to players currently violating a limit.",
+          },
+          announcement_message: {
+            label: "Announcement",
+            help: "Message explaining the active level requirements.",
+          },
+          number_of_warnings: {
+            label: "Warnings before punishment",
+            help: "-1 warns indefinitely; 0 skips this stage.",
+          },
+          warning_interval_seconds: {
+            label: "Interval between warnings",
+            help: "Time between two warning messages.",
+          },
+          warning_message: {
+            label: "Warning message",
+            help: "Message sent to players violating a level requirement.",
+          },
+          number_of_punishments: {
+            label: "Number of punishments",
+            help: "-1 punishes indefinitely; 0 skips this stage.",
+          },
+          min_squad_players_for_punish: {
+            label: "Minimum squad size",
+            help: "Punish only when the squad has at least this many players.",
+          },
+          min_server_players_for_punish: {
+            label: "Minimum server population for punishment",
+            help: "No punishment is applied below this value.",
+          },
+          punish_interval_seconds: {
+            label: "Interval between punishments",
+            help: "Time between two punishments.",
+          },
+          punish_message: {
+            label: "Punishment message",
+            help: "Message the player receives with a punishment.",
+          },
+          kick_after_max_punish: {
+            label: "Kick after punishments",
+            help: "Enables the final escalation stage.",
+          },
+          min_squad_players_for_kick: {
+            label: "Minimum squad size for kick",
+            help: "Kick only when the squad has at least this many players.",
+          },
+          min_server_players_for_kick: {
+            label: "Minimum server population for kick",
+            help: "No kick is applied below this value.",
+          },
+          kick_grace_period_seconds: {
+            label: "Final grace period before kick",
+            help: "Time after the final punishment in which the violation can be resolved.",
+          },
+          kick_message: {
+            label: "Kick message",
+            help: "Reason shown when the player is removed.",
+          },
+          discord_webhook_url: {
+            label: "Discord audit webhook",
+            help: "Optional. Records detected violations and applied actions.",
+          },
+        },
+        summary: { levelRange: "Levels {{min}} to {{max}}" },
       },
       seeding: {
         eyebrow: "Automation · Seeding",
@@ -2276,6 +2663,7 @@ const en = {
         },
         status: {
           active: "Active",
+          inactive: "Inactive",
           incomplete: "Not configured",
           skipped: "Skipped",
           unlimited: "Unlimited",
@@ -2287,10 +2675,14 @@ const en = {
             "The rule applies between {{min}} and {{max}} players and checks {{count}} configured entries.",
           inactive:
             "This rule is not fully configured yet and currently does not take action.",
+          disabled: "This rule is disabled. Its settings remain saved.",
           valid: "The rule is ready to use.",
           missing: "Complete the rule before enabling enforcement.",
+          disabledNotice:
+            "Use the switch in the overview to enable this rule again.",
         },
         rules: {
+          toggle: "Enable or disable {{title}}",
           roles: {
             title: "Limit roles",
             description:
@@ -2413,7 +2805,7 @@ const en = {
         },
         summary: {
           title: "Overview",
-          activeRules: "{{count}} of 3 rules configured",
+          activeRules: "{{count}} of 3 rules active",
           roles_one: "{{count}} role blocked",
           roles_other: "{{count}} roles blocked",
           weapons_one: "{{count}} weapon blocked",
@@ -2431,28 +2823,423 @@ const en = {
         },
       },
       noSoloTank: {
-        eyebrow: "Automod rule",
+        eyebrow: "Automation · Vehicles",
         title: "Prevent solo tanks",
         intro:
-          "Choose how CRCON responds to one-person armor squads in Hell Let Loose and HLL: Vietnam.",
+          "Reliably detect one-person armor squads and define a clear response chain for Hell Let Loose and HLL: Vietnam.",
+        summary: {
+          title: "Solo tank rule flow",
+          description:
+            "The confirmation phase avoids premature actions. Exemptions are checked again before every visible action.",
+        },
+        workbench: {
+          mode: {
+            title: "How should the rule run?",
+            off: "Off",
+            observe: "Observe",
+            active: "Active",
+          },
+          operation: {
+            help: "The global minimum pauses the entire rule. Solo tanks are only detected once enough players are connected.",
+          },
+          detection: {
+            skipped:
+              "The first warning follows without an additional confirmation stage",
+            result_one:
+              "{{checks}} internal check confirms the solo tank after about {{seconds}} seconds",
+            result_other:
+              "{{checks}} internal checks confirm the solo tank after about {{seconds}} seconds",
+            help: "Invisible checks give a second crew member time to join and prevent actions during brief squad changes.",
+          },
+          actions: {
+            inactive: "Skipped",
+            unlimited: "Unlimited",
+            configured: "Configured",
+            unreachable: "Unreachable",
+          },
+          notifications: {
+            help: "The webhook receives audit messages for detected solo tanks and applied actions. It is not required for the rule to operate.",
+          },
+          summary: {
+            title: "Rule overview",
+            startCondition: "Check solo tanks from",
+            immediate: "Check immediately",
+            fromPlayers: "{{count}} players",
+            activeNotice:
+              "The rule will actively affect the game after saving.",
+            testNotice: "Log only – no messages or game actions.",
+            inactiveNotice: "The rule is off; all settings are retained.",
+            detection: "Confirmation",
+            confirmedViolation: "Solo occupancy is confirmed",
+            noConfirmation: "No confirmation stage",
+            checks_one: "{{count}} check · every {{interval}} seconds",
+            checks_other: "{{count}} checks · every {{interval}} seconds",
+            exceptions_one: "{{count}} configured exemption",
+            exceptions_other: "{{count}} configured exemptions",
+            reaction: "Action sequence",
+            warn: "Warn",
+            punish: "Punish",
+            kick: "Kick",
+            count: "{{count}}× · every {{interval}} seconds",
+            unlimited: "Unlimited · every {{interval}} seconds",
+            skipped: "Skipped",
+            unreachable: "Unreachable with this sequence",
+            kickAfter: "after a {{seconds}} second grace period",
+          },
+        },
+        sections: {
+          operation: {
+            title: "Overview",
+            description: "Operating mode and global start condition",
+          },
+          detection: {
+            title: "Detect solo tanks",
+            description: "Confirm one-person occupancy reliably",
+          },
+          exemptions: {
+            title: "Exceptions",
+            description: "Protected players and flags",
+          },
+          actions: {
+            title: "Actions",
+            description: "Build warnings, punishment, and kick",
+          },
+          warnings: {
+            title: "Warn",
+            description: "Ask the player to take on another crew member",
+          },
+          punishments: {
+            title: "Punish",
+            description: "Apply the server-side punish action",
+          },
+          kick: {
+            title: "Kick",
+            description: "Remove repeat solo tankers as the final stage",
+          },
+          notifications: {
+            title: "Messages",
+            description: "Optional audit notifications",
+          },
+        },
+        fields: {
+          enabled: {
+            label: "Enable solo tank automod",
+            help: "Monitors armor squads with one member and runs the configured stages.",
+          },
+          dry_run: {
+            label: "Log only (dry run)",
+            help: "Detects solo tanks but sends no messages and applies neither punishments nor kicks.",
+          },
+          discord_webhook_url: {
+            label: "Discord audit webhook",
+            help: "Optional Discord webhook for detected violations and applied actions.",
+            placeholder: "https://discord.com/api/webhooks/…",
+          },
+          whitelist_flags: {
+            label: "Exempt player flags",
+            help: "Players with at least one of these CRCON flags are exempt from every stage.",
+          },
+          immune_player_level: {
+            label: "Exempt players up to level",
+            help: "Players at or below this level are protected. Set 0 to disable this exemption.",
+          },
+          dont_do_anything_below_this_number_of_players: {
+            label: "Minimum server population",
+            help: "The rule pauses below this total player count. Set 0 for no minimum.",
+          },
+          number_of_notes: {
+            label: "Invisible confirmations",
+            help: "Number of internal checks before the first warning. Set 0 to skip this stage.",
+          },
+          notes_interval_seconds: {
+            label: "Time between confirmations",
+            help: "Wait time between two checks of the same armor squad.",
+          },
+          number_of_warnings: {
+            label: "Number of warnings",
+            help: "Set 0 to skip warnings. Set -1 to warn indefinitely and never advance to punishment.",
+          },
+          warning_interval_seconds: {
+            label: "Time between warnings",
+            help: "Wait time before the same player is warned again.",
+          },
+          warning_message: {
+            label: "Warning message",
+            help: "Asks the player to take on a second crew member.",
+          },
+          number_of_punishments: {
+            label: "Number of punishments",
+            help: "Set 0 to skip punishment and make kick unreachable. Set -1 to punish indefinitely.",
+          },
+          min_server_players_for_punish: {
+            label: "Minimum server population for punishments",
+            help: "Punishments start only at this total player count. Set 0 for no minimum.",
+          },
+          punish_interval_seconds: {
+            label: "Time between punishments",
+            help: "Wait time before the same player is punished again.",
+          },
+          punish_message: {
+            label: "Punishment message",
+            help: "Message the player receives with the punish action.",
+          },
+          kick_after_max_punish: {
+            label: "Kick after punishments",
+            help: "Enables kick as the final stage. At least one punishment must have been applied successfully first.",
+          },
+          min_server_players_for_kick: {
+            label: "Minimum server population for kicks",
+            help: "Kicks apply only at this total player count. Set 0 for no minimum.",
+          },
+          kick_grace_period_seconds: {
+            label: "Final grace period before kick",
+            help: "Time after the final punishment in which a second crew member can join.",
+          },
+          kick_message: {
+            label: "Kick message",
+            help: "Reason shown to the player when they are kicked.",
+          },
+        },
       },
       vacBans: {
         eyebrow: "Security & bans",
         title: "Check VAC and game bans",
         intro:
           "Choose which ban history is checked on connect and how CRCON handles affected players.",
+        sections: {
+          rules: {
+            title: "Check criteria",
+            description: "History period and ban threshold",
+          },
+          actions: {
+            title: "Ban action",
+            description: "Blocklist, reason, and expiry behavior",
+          },
+          exemptions: {
+            title: "Exceptions",
+            description: "Protected player flags",
+          },
+          advanced: {
+            title: "Additional settings",
+            description: "Additional fields supplied by the server",
+          },
+        },
+        fields: {
+          vac_history_days: {
+            label: "VAC bans within the last days",
+            help: "Set 0 to disable checking the age of the latest VAC ban.",
+          },
+          game_ban_threshhold: {
+            label: "Allowed game-ban count",
+            help: "The configured ban action is triggered from this threshold.",
+          },
+          blacklist_id: {
+            label: "Target blocklist",
+            help: "ID of the blocklist that receives a matching player.",
+          },
+          ban_on_vac_history_reason: {
+            label: "Ban reason",
+            help: "Reason stored with the blocklist entry. {DAYS_SINCE_LAST_BAN} is available.",
+          },
+          auto_expire: {
+            label: "Expire the ban automatically",
+            help: "Aligns the ban end with the configured history limit instead of banning permanently.",
+          },
+          whitelist_flags: {
+            label: "Exempt player flags",
+            help: "Players with at least one of these flags are not banned.",
+          },
+        },
+        summary: {
+          history: "{{days}} days of history · from {{count}} game bans",
+          action: "Blocklist {{id}} · {{expiry}}",
+          expiring: "with expiry",
+          permanent: "permanent",
+          flags_one: "{{count}} protected flag",
+          flags_other: "{{count}} protected flags",
+        },
       },
       tkBans: {
         eyebrow: "Security & bans",
         title: "Teamkill ban on connect",
         intro:
           "Detect early teamkills after connect, define exceptions, and configure the resulting ban.",
+        sections: {
+          detection: {
+            title: "Detection",
+            description: "Time window and tolerance after connect",
+          },
+          exemptions: {
+            title: "Exceptions",
+            description: "Weapons, VIPs, flags, and established players",
+          },
+          actions: {
+            title: "Ban action",
+            description: "Blocklist, duration, and player message",
+          },
+          notifications: {
+            title: "Audit",
+            description: "Optional Discord notification",
+          },
+          advanced: {
+            title: "Additional settings",
+            description: "Additional fields supplied by the server",
+          },
+        },
+        fields: {
+          max_time_after_connect_minutes: {
+            label: "Time window after connect",
+            help: "Only teamkills within these first minutes are evaluated.",
+          },
+          ignore_tk_after_n_kills: {
+            label: "Stop checking after enemy kills",
+            help: "Ends detection once the player has made this many regular kills.",
+          },
+          ignore_tk_after_n_deaths: {
+            label: "Stop checking after deaths",
+            help: "Ends detection once the player has died this many times.",
+          },
+          teamkill_tolerance_count: {
+            label: "Tolerated teamkills",
+            help: "This many early teamkills remain without an automatic ban.",
+          },
+          excluded_weapons: {
+            label: "Excluded weapons",
+            help: "Teamkills with these internal weapon names do not trigger a ban.",
+          },
+          whitelist_players: {
+            label: "Exempt players",
+            help: "Combines flags, VIP status, and previous sessions.",
+          },
+          has_flag: {
+            label: "Player flags",
+            help: "At least one matching flag exempts the player.",
+          },
+          is_vip: {
+            label: "Exempt VIPs",
+            help: "Active VIP players are not automatically banned.",
+          },
+          has_at_least_n_sessions: {
+            label: "Exempt from this session count",
+            help: "Protects established players with at least this many previous sessions.",
+          },
+          message: {
+            label: "Message shown to the player",
+            help: "Shown to the player together with the automatic ban.",
+          },
+          author_name: {
+            label: "Displayed author",
+            help: "Name of the automated moderator stored with the blocklist entry.",
+          },
+          blacklist_id: {
+            label: "Target blocklist",
+            help: "ID of the blocklist that receives the player.",
+          },
+          ban_duration: {
+            label: "Ban duration",
+            help: "The units are added to form one total ban duration.",
+          },
+          minutes: { label: "Minutes", help: "Additional minutes." },
+          hours: { label: "Hours", help: "Additional hours." },
+          days: { label: "Days", help: "Additional days." },
+          weeks: { label: "Weeks", help: "Additional weeks." },
+          years: { label: "Years", help: "Additional years." },
+          discord_webhook_url: {
+            label: "Discord audit webhook",
+            help: "Optional. Reports automatically created teamkill bans.",
+          },
+          discord_webhook_message: {
+            label: "Discord message",
+            help: "Audit message sent after a ban is applied.",
+          },
+        },
+        summary: {
+          detection: "{{minutes}} minutes · {{count}} TK tolerated",
+          action: "Blocklist {{id}} · {{duration}}",
+          exemptions: "{{weapons}} weapons · {{flags}} flags",
+        },
       },
       nameKicks: {
         eyebrow: "Players & moderation",
         title: "Name filter",
         intro:
           "Check player names against your rules, protect exempt players, and set a clear kick reason.",
+        sections: {
+          rules: {
+            title: "Filter rules",
+            description: "Presets, custom regex, and test run",
+          },
+          exemptions: {
+            title: "Exceptions",
+            description: "Protected player flags",
+          },
+          actions: {
+            title: "Kick action",
+            description: "Clear explanation for affected players",
+          },
+          notifications: {
+            title: "Audit",
+            description: "Optional Discord notification",
+          },
+        },
+        fields: {
+          regular_expressions: {
+            label: "Name rules",
+            help: "Every matching rule immediately removes a newly connected player from the server.",
+          },
+          whitelist_flags: {
+            label: "Exempt player flags",
+            help: "Players with at least one of these CRCON flags are not removed by the name filter.",
+          },
+          kick_reason: {
+            label: "Kick reason shown to the player",
+            help: "A short and clear reason shown when the player is removed.",
+          },
+          discord_webhook_url: {
+            label: "Discord audit webhook",
+            help: "Optional. Sends matches and applied kicks to the configured Discord webhook.",
+          },
+        },
+        flagPicker: {
+          noticeTitle: "Select existing flags directly",
+          noticeBody:
+            "The catalogue is loaded from player profiles in this CRCON instance. A player with at least one selected flag bypasses the name filter.",
+          label: "Exempt flags",
+          placeholder: "Search for a flag or enter a new one",
+          help: "Select existing flags. You can still type a custom flag and press Enter to add it.",
+          loading: "Loading flags…",
+          noOptions: "No additional existing flag found",
+          loadFailed:
+            "The flag catalogue could not be loaded. You can still enter custom values.",
+          playerCount_one: "used by {{count}} player",
+          playerCount_other: "used by {{count}} players",
+          catalogueCount_one: "{{count}} existing flag found",
+          catalogueCount_other: "{{count}} existing flags found",
+        },
+        workbench: {
+          summary: {
+            title: "Name filter overview",
+            filter: "Filter rules",
+            rules_one: "{{count}} rule active",
+            rules_other: "{{count}} rules active",
+            noRules: "No rule active",
+            filterActive: "New player names are checked on connect.",
+            filterInactive: "Without a rule, no players are removed by name.",
+            effect: "Effect on match",
+            kickOnMatch: "Remove from server immediately",
+            reasonMissing: "Add a clear kick reason.",
+            exemptions: "Exceptions",
+            flags_one: "{{count}} flag",
+            flags_other: "{{count}} flags",
+            noFlags: "No flags",
+            exemptionsHelp: "Matching flags bypass the filter.",
+            audit: "Discord audit",
+            webhookActive: "Webhook connected",
+            webhookInactive: "Not configured",
+            webhookActiveHelp: "Matches and kicks are recorded.",
+            webhookInactiveHelp: "The filter still works without a webhook.",
+          },
+        },
         rulesEditor: {
           noticeTitle: "Every match results in a kick",
           noticeBody:
@@ -2513,12 +3300,297 @@ const en = {
         title: "Seeder VIP reward",
         intro:
           "Choose when seeding counts as successful and which VIP reward eligible players receive.",
+        sections: {
+          operation: {
+            title: "Process",
+            description: "Language and polling intervals",
+          },
+          requirements: {
+            title: "Requirements",
+            description: "Targets & qualification",
+          },
+          reward: {
+            title: "VIP reward",
+            description: "Duration & extension",
+          },
+          messages: {
+            title: "Player messages",
+            description: "Progress & completion",
+          },
+          notifications: {
+            title: "Webhooks",
+            description: "External notifications",
+          },
+          advanced: {
+            title: "Additional settings",
+            description: "Additional fields supplied by the server",
+          },
+        },
+        fields: {
+          language: {
+            label: "Language",
+            help: "Locale used for automatically formatted dates and durations, for example en_US.",
+          },
+          poll_time_seeding: {
+            label: "Polling interval while seeding",
+            help: "Seconds between checks while the server is building population.",
+          },
+          poll_time_seeded: {
+            label: "Polling interval after seeding",
+            help: "Seconds between checks after the server is considered seeded.",
+          },
+          requirements: {
+            label: "Seeding requirements",
+            help: "Defines when seeding is active and who qualifies for a reward.",
+          },
+          buffer: {
+            label: "Transition buffer",
+            help: "Additional time between reaching the target population and completing seeding.",
+          },
+          min_allies: {
+            label: "Minimum Allies",
+            help: "Minimum players required on the Allied side.",
+          },
+          min_axis: {
+            label: "Minimum Axis",
+            help: "Minimum players required on the Axis side.",
+          },
+          max_allies: {
+            label: "Maximum Allies",
+            help: "Upper seeding population on the Allied side.",
+          },
+          max_axis: {
+            label: "Maximum Axis",
+            help: "Upper seeding population on the Axis side.",
+          },
+          online_when_seeded: {
+            label: "Player must be online at completion",
+            help: "Rewards only players still connected when seeding succeeds.",
+          },
+          minimum_play_time: {
+            label: "Minimum play time",
+            help: "Time a player must have been present during the seeding phase.",
+          },
+          seconds: { label: "Seconds", help: "Additional seconds." },
+          minutes: { label: "Minutes", help: "Additional minutes." },
+          hours: { label: "Hours", help: "Additional hours." },
+          days: { label: "Days", help: "Additional days." },
+          weeks: { label: "Weeks", help: "Additional weeks." },
+          player_announce_thresholds: {
+            label: "Player-count announcement thresholds",
+            help: "The current seeding progress is announced at these total player counts.",
+          },
+          reward: {
+            label: "VIP reward",
+            help: "Controls duration and behavior when VIP already exists.",
+          },
+          forward: {
+            label: "Calculate duration from today",
+            help: "Calculates the new duration from now instead of the existing expiry date.",
+          },
+          player_name_format_not_current_vip: {
+            label: "Name for a new VIP entry",
+            help: "Name template for players who do not currently have an active VIP entry.",
+          },
+          cumulative: {
+            label: "Add rewards together",
+            help: "Multiple successful seeding rewards extend the existing duration.",
+          },
+          timeframe: {
+            label: "VIP duration",
+            help: "The units are added to form one reward duration.",
+          },
+          nice_time_delta: {
+            label: "Format duration for people",
+            help: "Shows the reward duration in a natural format in player messages.",
+          },
+          nice_expiration_date: {
+            label: "Format expiry date for people",
+            help: "Shows the new VIP expiry in a readable format in player messages.",
+          },
+          player_messages: {
+            label: "Messages to players",
+            help: "Text for progress, completion, and the personal VIP reward.",
+          },
+          seeding_in_progress_message: {
+            label: "Seeding in progress",
+            help: "Message sent when an announcement threshold is reached.",
+          },
+          seeding_complete_message: {
+            label: "Seeding completed",
+            help: "Message sent when the server is considered seeded.",
+          },
+          player_count_message: {
+            label: "Player count",
+            help: "Representation of the current team populations.",
+          },
+          reward_player_message: {
+            label: "Reward message",
+            help: "Personal message sent to a player receiving the VIP reward.",
+          },
+          reward_player_message_no_vip: {
+            label: "Message without reward",
+            help: "Message sent to players who did not meet the requirements.",
+          },
+          hooks: {
+            label: "Notification webhooks",
+            help: "Optional destinations receiving seeding updates.",
+          },
+          url: {
+            label: "Webhook URL",
+            help: "Destination address for the notification.",
+          },
+        },
+        summary: {
+          targetLabel: "Target",
+          targetEqual: "{{count}} per team",
+          target: "Allies {{allies}} · Axis {{axis}}",
+          qualificationLabel: "Qualification",
+          qualification: "{{minutes}} min minimum play time",
+          requirements: "{{allies}} Allies · {{axis}} Axis · {{minutes}} min",
+          reward: "{{duration}} · {{mode}}",
+          cumulative: "extends current VIP",
+          replace: "starts at completion",
+          messages_one: "{{count}} message configured",
+          messages_other: "{{count}} messages configured",
+        },
+        workbench: {
+          custom: "Custom value",
+          advanced: "Advanced settings",
+          brief: {
+            title: "How your seeder reward works",
+            sentenceEqual_one:
+              "Once both teams reach {{target}} players each, active players qualify for {{days}} day of VIP after {{minutes}} minutes.",
+            sentenceEqual_other:
+              "Once both teams reach {{target}} players each, active players qualify for {{days}} days of VIP after {{minutes}} minutes.",
+            sentenceSplit_one:
+              "Once Allies reach {{allies}} and Axis reaches {{axis}} players, active players qualify for {{days}} day of VIP after {{minutes}} minutes.",
+            sentenceSplit_other:
+              "Once Allies reach {{allies}} and Axis reaches {{axis}} players, active players qualify for {{days}} days of VIP after {{minutes}} minutes.",
+            teamTargetEqual: "{{count}} players per team",
+            teamTarget: "{{allies}} / {{axis}} target population",
+            playTime: "Play for {{minutes}} min",
+            online: "Online at completion",
+            accumulated: "Qualified during seeding",
+            reward_one: "+{{days}} day VIP",
+            reward_other: "+{{days}} days VIP",
+          },
+          operation: {
+            language: "Message language",
+            languageHelp:
+              "Controls the language and date/time formatting of automated messages.",
+            german: "German",
+            english: "English",
+            during: "Check while seeding",
+            duringHelp:
+              "How often requirements are checked while the server is building population.",
+            after: "Check after successful seeding",
+            afterHelp:
+              "How often the service checks after the server is considered seeded.",
+            zeroWarning:
+              "0 seconds creates a tight loop. Choose a sensible polling interval.",
+          },
+          requirements: {
+            players_one: "{{count}} player",
+            players_other: "{{count}} players",
+            noAnnouncements: "No announcement thresholds set.",
+            ownValue: "Player count",
+            addThreshold: "Add announcement threshold",
+            targetTitle: "Target population per team",
+            targetHelp: "Each team must reach at least this many players.",
+            allies: "Allies",
+            axis: "Axis",
+            couple: "Link values",
+            playTime: "Qualification time",
+            playTimeHelp:
+              "How long a player must contribute while the server is building.",
+            playTimeControlHelp:
+              "Choose a preset or use the slider for the exact duration.",
+            eligibility: "Who receives the reward?",
+            eligibilityHelp:
+              "Choose whether players must still be present at completion.",
+            onlineAtEnd: "Online at completion",
+            duringSeeding: "Qualified during seeding",
+            announcements: "Announce progress",
+            announcementsHelp:
+              "The current status is posted at these total player counts.",
+            buffer: "Post-seeding fallback buffer",
+            bufferHelp:
+              "Delay before a seeded server returns to seeding mode after the player count drops.",
+            legacyHelp:
+              "These legacy values are stored but not evaluated by the current Seeder VIP service. Change them only for backward compatibility.",
+            legacyAllies: "Legacy minimum Allies",
+            legacyAxis: "Legacy minimum Axis",
+            valid:
+              "The effective requirements are complete and clearly configured.",
+          },
+          reward: {
+            duration: "Reward per successful seeding",
+            days_one: "{{count}} day VIP",
+            days_other: "{{count}} days VIP",
+            dayUnit: "days",
+            existingVip: "Existing VIP duration",
+            extend: "Extend the existing duration",
+            recalculate: "Recalculate from completion",
+            previewCumulative_one:
+              "The {{days}} day is added to the existing VIP duration.",
+            previewCumulative_other:
+              "The {{days}} days are added to the existing VIP duration.",
+            previewReplace_one:
+              "Eligible players receive {{days}} day of VIP from completion. A longer existing remainder is preserved.",
+            previewReplace_other:
+              "Eligible players receive {{days}} days of VIP from completion. A longer existing remainder is preserved.",
+            advanced: "Presentation and compatibility",
+            entryName: "Name of a new VIP entry",
+            entryPreview: "Preview: {{name}}",
+            niceDuration: "Use readable duration text",
+            niceExpiry: "Use a readable expiry date",
+            forwardCompatibility:
+              "The existing compatibility field “forward” is not evaluated by the current service and is preserved unchanged when saving.",
+          },
+          messages: {
+            empty: "No text configured",
+            placeholders: "Available placeholders",
+          },
+          webhooks: {
+            emptyTitle: "No webhooks configured",
+            emptyHelp:
+              "Optionally send seeding progress and completion to external destinations.",
+            url: "Webhook {{number}}",
+            delete: "Remove webhook {{number}}",
+            add: "Add webhook",
+          },
+        },
       },
       expiredVip: {
         eyebrow: "VIP management",
         title: "Clean up expired VIPs",
         intro:
           "Choose how often CRCON checks expired VIP entries and optionally sends a notification.",
+        sections: {
+          schedule: {
+            title: "Check interval",
+            description: "Schedule for automatic cleanup",
+          },
+          notifications: {
+            title: "Audit",
+            description: "Optional Discord notification",
+          },
+          advanced: {
+            title: "Additional settings",
+            description: "Additional fields supplied by the server",
+          },
+        },
+        fields: {
+          interval_minutes: {
+            label: "Check every number of minutes",
+            help: "CRCON checks for and removes expired VIP entries at this interval.",
+          },
+          discord_webhook_url: {
+            label: "Discord audit webhook",
+            help: "Optional. Reports VIP entries removed automatically.",
+          },
+        },
       },
     },
     config: {
@@ -2533,13 +3605,11 @@ const en = {
       closeAutobalancerSettings: "Close settings",
       openAutobalancerSettings: "Open settings · Mode {{mode}}",
       basicMode: "Basic view",
-      advancedJsonMode: "Advanced (JSON)",
       reload: "Reload",
       saveSettings: "Save settings",
       explanation: "Explanation",
       technicalSchema: "Technical schema",
-      objectUnsupported:
-        "The property “{{name}}” is not yet supported in the visual editor. Please use the code editor.",
+      objectUnsupported: "The property “{{name}}” is not yet supported in the visual editor. Please use the code editor.",
       label: "Label",
       minPlayers: "Minimum players",
       minLevel: "Minimum level",
@@ -2562,18 +3632,10 @@ const en = {
       },
     },
     profanity: {
-      eyebrow: "Players & moderation",
-      title: "Profanity filter",
-      subtitle:
-        "Maintain blocked terms, import lists, and apply changes to one or multiple servers in a controlled way.",
       upload: "Upload",
       download: "Download",
       apply: "Apply",
       applyAllServers: "Apply all servers",
-      allServers: "All servers",
-      applyAllTitle: "Apply profanity filter to all servers?",
-      applyAllDescription:
-        "The current term list will be sent to every connected server in this installation.",
       newEntry: "New profanity",
       add: "Add",
       select: "Select",
@@ -2581,10 +3643,6 @@ const en = {
       deleteSelected: "Delete selected",
     },
     templates: {
-      eyebrow: "Players & moderation",
-      title: "Message templates",
-      subtitle:
-        "Manage reusable text for messages, moderation actions, and server operations.",
       categories: "Categories",
       select: "Select message template",
       message: "Message",
@@ -2601,32 +3659,14 @@ const en = {
       search: "Search messages",
     },
     autosettings: {
-      eyebrow: "Server operations",
-      title: "Automatic settings",
-      subtitle:
-        "Choose a template, review the advanced JSON configuration, and apply it in a controlled way.",
       readDocs: "Read documentation",
       apply: "Apply",
       applyAllServers: "Apply all servers",
       templates: "Automatic settings templates",
-      editorTitle: "Advanced configuration",
-      editorHint:
-        "Changes are only written to the selected server after you apply them.",
-      applyAllTitle: "Apply to all servers?",
-      applyAllDescription:
-        "The open configuration will be sent to every connected server in this installation. Check server and game compatibility before confirming.",
     },
     welcome: {
-      eyebrow: "Maps & server operations",
-      title: "Welcome message",
-      subtitle: "Define the message players receive when they join the server.",
       apply: "Apply",
       applyAllServers: "Apply all servers",
-      allServers: "All servers",
-      editorHint: "Leave empty to disable the welcome message.",
-      applyAllTitle: "Apply welcome message to all servers?",
-      applyAllDescription:
-        "The current message will be sent to every connected server in this installation.",
       templates: "Welcome templates",
     },
     services: {
@@ -2658,10 +3698,8 @@ const en = {
       },
       diagnostics: {
         title: "Support diagnostics package",
-        scope:
-          "Includes version, health and aggregate resource metrics ({{services}} services, {{history}} samples, about {{bytes}} bytes).",
-        omitted:
-          "No raw logs, player or chat data, IP addresses, URLs, credentials or tokens.",
+        scope: "Includes version, health and aggregate resource metrics ({{services}} services, {{history}} samples, about {{bytes}} bytes).",
+        omitted: "No raw logs, player or chat data, IP addresses, URLs, credentials or tokens.",
         download: "Download diagnostics package",
       },
       webhooks: {
@@ -2697,40 +3735,254 @@ const en = {
       unassigned: "Unassigned",
       tableSettings: "Live sessions",
       team: "Team",
+      faction: "Faction",
+      factionShort: "F",
       unit: "Unit",
       role: "Role",
+      roleShort: "R",
       level: "Level",
+      levelShort: "LVL",
       name: "Name",
       kills: "Kills",
+      killsShort: "K",
       deaths: "Deaths",
+      deathsShort: "D",
+      kdr: "Kill/death ratio",
+      kdrShort: "K/D",
       combatScore: "Combat score",
       offenseScore: "Offense score",
       defenseScore: "Defense score",
       supportScore: "Support score",
       currentPlaytime: "Current playtime",
+      timeShort: "Time",
+      unknown: "Unknown",
+      updatedAt: "Updated {{time}}",
+      connectionError: "Live data unavailable",
+      loadError: "Live sessions could not be loaded.",
+      sorting: "Sorting",
+      sortKdr: "K/D descending",
+      sortKills: "Kills descending",
+      sortTime: "Session time descending",
+      sortName: "Name ascending",
+      columns: "Columns",
+      selected: "{{count}} selected",
+      noneSelected: "No selection",
+      range: "{{from}}–{{to}} of {{total}} players",
+      selectPlayerHint: "Select a player to inspect the live session.",
+      livePlayer: "Active game session",
+      sessionTime: "Session time",
+      sessionDetails: "Session details",
+      currentPerformance: "Performance in this session",
+      combatShort: "Combat",
+      offenseShort: "Offense",
+      defenseShort: "Defense",
+      supportShort: "Support",
+      actionsTitle: "Actions",
+      playerId: "Player ID",
+      copyPlayerId: "Copy player ID",
+      filters: {
+        all: "All",
+        allies: "Allies",
+        axis: "Axis",
+        unassigned: "Lobby",
+        leaderless: "No leader",
+      },
+      summary: {
+        allies: "Allies",
+        axis: "Axis",
+      },
+      teams: {
+        allies: "Allies",
+        axis: "Axis",
+        unassigned: "Lobby",
+      },
+      actions: {
+        message: "Message",
+        punish: "Punish",
+        kick: "Kick",
+        ban: "Ban",
+        profile: "Profile",
+      },
+      roles: {
+        armycommander: "Commander",
+        officer: "Squad lead",
+        rifleman: "Rifleman",
+        automaticrifleman: "Automatic rifleman",
+        assault: "Assault",
+        medic: "Medic",
+        support: "Support",
+        engineer: "Engineer",
+        antitank: "Anti-tank",
+        heavymachinegunner: "Machine gunner",
+        tankcommander: "Tank commander",
+        crewman: "Crewman",
+        spotter: "Spotter",
+        sniper: "Sniper",
+        artilleryobserver: "Artillery observer",
+        operator: "Operator",
+        gunner: "Gunner",
+        helicopterpilot: "Helicopter pilot",
+        helicopterlogisticsofficer: "Logistics officer",
+        mortarsupport: "Mortar support",
+        mortarobserver: "Mortar observer",
+        mortargunner: "Mortar gunner",
+        unknown: "Unknown",
+      },
     },
     liveGame: {
-      title: "Live game",
-      eyebrow: "Statistics",
-      subtitle: "Track the current score and player performance.",
+      title: "Live statistics",
+      eyebrow: "Live operations",
+      subtitle: "Compare teams, score and performance since the round started.",
       playerStatistics: "Player statistics",
+      liveUpdated: "Live · current",
+      connectionError: "Connection interrupted",
+      staleAge: "Data stale · {{seconds}} sec. ago",
+      currentMap: "Current map",
+      nextMap: "Next map",
+      mode: "Mode",
+      score: "Score",
+      remaining: "Remaining",
+      searchPlayer: "Search players…",
+      filter: "Filter players",
+      filterAll: "All players",
+      filterOnline: "Active only",
+      filterRisk: "Flagged",
+      sorting: "Sort players",
+      sortKdr: "K/D descending",
+      sortKills: "Kills descending",
+      sortTeamkills: "Team kills descending",
+      sortTime: "Time descending",
+      sortName: "Name ascending",
+      toggleSortDirection: "Reverse sort direction",
+      exportCsv: "Export (CSV)",
+      pageSize: "Rows per team",
+      showCount: "Show {{count}}",
+      range: "{{from}}–{{to}} of {{total}}",
+      noneSelected: "No selection",
+      selected: "{{count}} selected",
+      player: "Player",
+      playerCount: "{{count}} players",
+      selectTeam: "Select all {{team}} players",
+      selectPlayer: "Select {{player}}",
+      killsShort: "Kills",
+      kdr: "Kill/death ratio",
+      kpmShort: "K/min.",
+      timeShort: "Time",
+      supportShort: "Support",
+      teamkillWarning: "Player has team kills",
+      noPlayers: "No matching players in this team.",
+      comparison: "Team comparison",
+      balance: "Kill balance",
+      even: "Even",
+      selectPlayerHint: "Select a player to see performance details and profile actions.",
+      playerDetails: "Player details",
+      performance: "Performance since round start",
+      mostKilled: "Most killed",
+      nemesis: "Nemesis",
+      weapons: "Weapons",
+      noDetailData: "No data",
+      level: "Level",
+      country: "Country",
+      playerId: "Player ID",
+      copyPlayerId: "Copy player ID",
+      profile: "Profile",
+      actions: "Actions",
+      statusOnline: "Online",
+      statusIdle: "Idle",
+      statusOffline: "Disconnected",
+      statusUnknown: "Status unknown",
+      unknownTeam: "Unknown team",
+      unknownPlayers: "{{count}} players could not be assigned to a team with confidence.",
+      dataScope: "Data since round start · includes disconnected players",
+      loadError: "Live game and match state could not be loaded.",
+      partialError: "Some live data could not be refreshed. The last known state remains visible.",
+      retry: "Retry",
     },
     games: {
       title: "Games",
       eyebrow: "History",
-      subtitle: "Review completed games, results and map performance.",
+      subtitle: "Browse completed games by day and deployment time.",
       search: "Search games...",
+      searchPage: "Search map or game ID on this page...",
       listSettings: "Games list",
+      archive: "Chronological games archive",
       map: "Map",
       result: "Result",
       start: "Start",
       duration: "Duration",
+      period: "Period",
+      environment: "Environment",
+      allGames: "All games",
+      allEnvironments: "All environments",
+      lastDays: "Last {{count}} days",
+      resetFilters: "Reset filters",
+      modeFilter: "Filter by game mode",
+      today: "Today",
+      yesterday: "Yesterday",
+      unknownDate: "Unknown date",
+      unknownMap: "Unknown map",
+      entries_one: "{{count}} game",
+      entries_other: "{{count}} games",
+      pageMatches_one: "{{count}} result on this page",
+      pageMatches_other: "{{count}} results on this page",
+      allies: "Allies",
+      axis: "Axis",
+      scoreLabel: "Allies {{allied}} to {{axis}} Axis",
+      openGameLabel: "Open {{map}}, {{mode}}, {{environment}}, {{date}}, score {{allied}} to {{axis}}, duration {{duration}}",
+      noGames: "No completed games are available yet.",
+      noMatchesOnPage: "No games match the filters on this page.",
+      loadError: "The games could not be loaded.",
+      partialError: "The refresh failed. The last known state remains visible.",
+      retry: "Retry",
+      updating: "Games are updating",
+      range: "{{from}}–{{to}} of {{total}} games",
+      pageSize: "Games per page",
+      show: "Show {{count}}",
+      pagination: "Games archive pagination",
+      pageIndicator: "Page {{page}} of {{maxPages}}",
+      goToPage: "Open page {{page}}",
     },
     gameDetails: {
       title: "Game details",
+      completedGame: "Completed game",
+      backToArchive: "Back to game archive",
+      bestPerformances: "Top performances",
+      playerAnalysis: "Player analysis",
+      metricFilter: "Select performance metric",
+      noMetricData: "No values are available for this category.",
       score: "Score",
+      date: "Date",
+      start: "Start",
+      end: "End",
       duration: "Duration",
+      server: "Server",
+      serverNumber: "Server {{number}}",
       gameId: "Game ID",
+      team: "Team",
+      role: "Role",
+      squad: "Squad",
+      allTeams: "All teams",
+      mixedTeam: "Mixed",
+      unknownTeam: "Unknown",
+      teamReview: "Mixed / Unknown",
+      allRoles: "All roles",
+      teamFilter: "Filter by team",
+      roleFilter: "Filter by role",
+      csvExport: "CSV export",
+      columns: "Columns",
+      tableSettings: "Table display",
+      selectedPlayers: "{{count}} selected",
+      selectAllPlayers: "Select all players",
+      selectPlayer: "Select {{player}}",
+      selection: "Selection",
+      togglePlayerDetails: "Toggle details for {{player}}",
+      playerActions: "Actions for {{player}}",
+      killDeathRatio: "Kill/death ratio",
+      teamKillStreakShort: "TK streak",
+      teamDeathStreakShort: "TT streak",
+      noPlayersFound: "No players match the filters.",
+      scrollColumns: "Scroll table columns horizontally",
+      playersShown: "{{shown}} of {{total}} players",
       loadError: "Could not load game details: {{message}}",
       topStat: "Top {{stat}}",
       deaths: "Deaths",
@@ -2786,8 +4038,7 @@ const en = {
     toggleMenu: "Toggle navigation",
     search: "Search navigation...",
     navigateTo: "Navigate to",
-    permissionMissing:
-      "This page is visible, but you do not have the required permission.",
+    permissionMissing: "This page is visible, but you do not have the required permission.",
     groups: {
       appsSetup: "Set up apps",
       views: "Views",
@@ -2830,6 +4081,7 @@ const en = {
       templates: "Templates",
       profanityFilter: "Profanity filter",
       autosettings: "Automatic settings",
+      discordCommunication: "Discord & communication",
       audit: "Audit",
       adminPing: "Admin ping",
       watchlist: "Watchlist",
@@ -2857,7 +4109,7 @@ const en = {
       logStream: "Log stream",
       watchKillRate: "Watch kill rate",
       liveSessions: "Live sessions",
-      liveGame: "Live game",
+      liveGame: "Live statistics",
       games: "Games",
     },
   },
@@ -2873,20 +4125,16 @@ const en = {
     hllConnected: "Game server connected",
     gameServerConnected: "Game server connected",
     gameServerOffline: "CRCON is connected, but the game server is offline.",
-    gameServerUnknown:
-      "The game-server connection is unknown because CRCON is offline.",
+    gameServerUnknown: "The game-server connection is unknown because CRCON is offline.",
     crconOffline: "The connection to CRCON has not been established.",
     gameServer: "Game server",
     gameServerState: {
       loading: "Checking the game-server connection.",
       online: "The game server is responding with current data.",
       offline: "CRCON cannot currently reach the game server.",
-      partial:
-        "Some game-server data is current while other data is unavailable or stale.",
-      stale:
-        "The game server responded before, but the current data could not be refreshed.",
-      unknown:
-        "The game-server status is unknown because CRCON has no reliable data.",
+      partial: "Some game-server data is current while other data is unavailable or stale.",
+      stale: "The game server responded before, but the current data could not be refreshed.",
+      unknown: "The game-server status is unknown because CRCON has no reliable data.",
       disabled: "This game-server connection is disabled.",
     },
     crconState: {
@@ -2894,8 +4142,7 @@ const en = {
       online: "CRCON is reachable.",
       offline: "CRCON is currently unreachable.",
       partial: "CRCON is only partially available.",
-      stale:
-        "CRCON responded before, but the connection could not be confirmed again.",
+      stale: "CRCON responded before, but the connection could not be confirmed again.",
       unknown: "The CRCON status is unknown.",
       disabled: "This CRCON connection is disabled.",
     },
@@ -2903,63 +4150,6 @@ const en = {
     serverNumber: "Server {{number}}",
     changePassword: "Change password",
     logout: "Log out",
-  },
-  appearance: {
-    menuLabel: "Appearance & colors",
-    title: "Appearance & colors",
-    subtitle: "Adapt the interface to your workflow and visual needs.",
-    presets: {
-      title: "Color combination",
-      description:
-        "Choose a tested preset or define your own accent color below.",
-      "frontline-gold": "Frontline Gold",
-      "tactical-blue": "Tactical Blue",
-      "signal-green": "Signal Green",
-      "command-red": "Command Red",
-      neutral: "Neutral",
-    },
-    mode: {
-      title: "Display mode",
-      light: "Light",
-      dark: "Dark",
-      system: "System",
-    },
-    custom: {
-      title: "Custom accent color",
-      description:
-        "Contrast, hover and focus colors are adjusted automatically.",
-      picker: "Choose accent color",
-      hex: "Hex color",
-      invalid: "Enter a color in the format #C59A4A.",
-      contrastHint: "Insufficient contrast is corrected automatically.",
-    },
-    colorVision: {
-      title: "Color vision mode",
-      standard: "Standard",
-      deuteranopia: "Deuteranopia (green deficiency)",
-      protanopia: "Protanopia (red deficiency)",
-      tritanopia: "Tritanopia (blue deficiency)",
-      description:
-        "Status colors are adapted while icons, labels and outlines remain available.",
-    },
-    preview: {
-      title: "Live preview",
-      primary: "Primary action",
-      selected: "Selected",
-      info: "Information",
-      success: "Success",
-      warning: "Warning",
-      error: "Error",
-    },
-    accessibilityHint:
-      "Color never communicates state on its own. The interface also uses icons, labels and visible focus outlines.",
-    unsaved: "Unsaved changes",
-    restoreSaved: "Saved values",
-    restoreDefault: "Frontline default",
-    apply: "Apply changes",
-    saved: "Appearance was saved for your account.",
-    savedLocally:
-      "The server was unavailable. Appearance was temporarily saved in this browser.",
   },
   matchStatus: {
     ariaLabel: "Current match status",
@@ -2994,12 +4184,9 @@ const en = {
       messages: {
         warning: "A resource is above the warning threshold.",
         critical: "A resource is above the critical threshold.",
-        partial:
-          "Part of the resource measurement is unavailable. Check the service and container configuration.",
-        stale:
-          "The current measurement could not be refreshed. The last successful measurement remains visible.",
-        unavailable:
-          "CRCON currently has no trustworthy resource values. Check the service and container configuration.",
+        partial: "Part of the resource measurement is unavailable. Check the service and container configuration.",
+        stale: "The current measurement could not be refreshed. The last successful measurement remains visible.",
+        unavailable: "CRCON currently has no trustworthy resource values. Check the service and container configuration.",
       },
       metrics: { cpu: "CPU", ram: "RAM", disk: "SSD" },
       usedTotal: "{{used}} / {{total}} {{unit}} used",
@@ -3013,19 +4200,16 @@ const en = {
         unavailable: "unavailable",
       },
       units: { cores: "cores" },
-      warningDetail:
-        "{{metric}} is at {{percent}}% and exceeds the {{threshold}}% threshold.",
+      warningDetail: "{{metric}} is at {{percent}}% and exceeds the {{threshold}}% threshold.",
       openServices: "Check services",
       history: "History",
       range: "{{minutes}} min · measured every {{interval}} sec",
-      historyUnavailable:
-        "There are not yet enough samples for a history view.",
+      historyUnavailable: "There are not yet enough samples for a history view.",
       sampledAt: "Measured: {{time}}",
       refreshing: "refreshing",
       thresholds: "Warning at 80% · critical at 90%",
       historySummary: "Resource history. {{summary}}",
-      historySummaryMetric:
-        "{{metric}} between {{minimum}} and {{maximum}} percent.",
+      historySummaryMetric: "{{metric}} between {{minimum}} and {{maximum}} percent.",
     },
     situation: "Battle situation",
     players: "Players",
@@ -3080,13 +4264,11 @@ const en = {
     axis: "Axis",
     basedOnGames: "Based on {{count}} valid games since {{date}}",
     invalidGamesExcluded: "{{count}} invalid games excluded",
-    validGameRules:
-      "A valid game lasts 10 to 200 minutes, has complete results and – except for Skirmish – ends with a total score of five.",
+    validGameRules: "A valid game lasts 10 to 200 minutes, has complete results and – except for Skirmish – ends with a total score of five.",
     frontlineApp: {
       eyebrow: "Set up apps",
       title: "Frontline App",
-      description:
-        "Securely pair your account with the mobile or Windows command centre.",
+      description: "Securely pair your account with the mobile or Windows command centre.",
       action: "Set up Frontline App",
       hint: "QR pairing and device management directly in CRCON",
     },
@@ -3094,34 +4276,29 @@ const en = {
   apps: {
     eyebrow: "Overview",
     title: "Set up apps",
-    subtitle:
-      "Connect CRCON to Frontline apps for mobile administration and Discord reports.",
+    subtitle: "Connect CRCON to Frontline apps for mobile administration and Discord reports.",
     frontline: {
       title: "Frontline App",
       description: "The mobile command centre for fast, secure admin work.",
       security: "Account-based permissions",
       qr: "Secure QR pairing",
       devices: "Android & web",
-      detail:
-        "The app only uses your existing CRCON permissions. Every device is paired separately and can be revoked here at any time.",
+      detail: "The app only uses your existing CRCON permissions. Every device is paired separately and can be revoked here at any time.",
       setup: "Pair a device",
       open: "Open Frontline web app",
       openWindows: "Open Frontline for Windows",
-      windowsHint:
-        "Frontline for Windows is available for this platform. It pairs through a short device code.",
+      windowsHint: "Frontline for Windows is available for this platform. It pairs through a short device code.",
     },
     discord: {
       eyebrow: "Set up apps",
       title: "Discord Report Bot",
       description: "Receive and safely process reports directly in Discord.",
-      detail:
-        "Select the Discord server, report channel and moderator roles directly in CRCON. Game actions remain bound to current CRCON permissions.",
+      detail: "Select the Discord server, report channel and moderator roles directly in CRCON. Game actions remain bound to current CRCON permissions.",
       setup: "Set up Discord Report Bot",
       reports: "Live player reports",
       permissions: "Role-based actions",
       ai: "Optional AI checks",
-      pageSubtitle:
-        "Install and manage the central Frontline bot, assign moderator roles and configure reports, actions and AI checks in one place.",
+      pageSubtitle: "Install and manage the central Frontline bot, assign moderator roles and configure reports, actions and AI checks in one place.",
     },
     how: {
       title: "In three steps",
@@ -3135,12 +4312,9 @@ const en = {
     draftValue: "Value in form",
     recommendedValue: "FLN recommendation",
     unsaved: "The value in the form has not been sent to the game server yet.",
-    commandSent:
-      "{{name}} was sent to the game server. The effective value cannot be confirmed automatically.",
-    pendingServerApply:
-      "{{name}} was sent, but the game server still reports a different value. CRCON will reconcile it after the next map change or server restart.",
-    unverified:
-      "The current game protocol does not reliably confirm the value that is actually effective. A successful save therefore only confirms that CRCON sent the command.",
+    commandSent: "{{name}} was sent to the game server. The effective value cannot be confirmed automatically.",
+    pendingServerApply: "{{name}} was sent, but the game server still reports a different value. CRCON will reconcile it after the next map change or server restart.",
+    unverified: "The current game protocol does not reliably confirm the value that is actually effective. A successful save therefore only confirms that CRCON sent the command.",
     games: "In the RCON protocol: HLL and HLL Vietnam",
     appliesImmediately: "Command applies without a CRCON restart",
     lastRead: "Read: {{time}}",
@@ -3149,8 +4323,7 @@ const en = {
     permissionMissing: "You do not have permission to change this setting.",
     useRecommended: "Use recommendation",
     discardDraft: "Discard unsent change",
-    auditUnavailable:
-      "The last administrator and rollback data are not included in this server response. Changes remain traceable in the audit log.",
+    auditUnavailable: "The last administrator and rollback data are not included in this server response. Changes remain traceable in the audit log.",
     units: {
       minutes: "{{value}} min",
       milliseconds: "{{value}} ms",
@@ -3158,14 +4331,10 @@ const en = {
       slots: "{{value}} slots",
     },
     conflicts: {
-      autoSettings:
-        "Dependency: Auto Settings can overwrite this value again when the next matching rule runs.",
-      vipAutomation:
-        "Dependency: Auto Settings or Real VIP can adjust the reserved slots again.",
-      autobalancer:
-        "Dependency: Auto Settings and the Frontline autobalancer can interact with the game's native setting.",
-      autoVotekick:
-        "Dependency: The automatic votekick system can change this setting based on available moderators.",
+      autoSettings: "Dependency: Auto Settings can overwrite this value again when the next matching rule runs.",
+      vipAutomation: "Dependency: Auto Settings or Real VIP can adjust the reserved slots again.",
+      autobalancer: "Dependency: Auto Settings and the Frontline autobalancer can interact with the game's native setting.",
+      autoVotekick: "Dependency: The automatic votekick system can change this setting based on available moderators.",
     },
   },
   serverSettings: {
@@ -3180,16 +4349,14 @@ const en = {
     playersUnit: "players",
     slotsUnit: "slots",
     loading: "Loading server settings…",
-    unavailable:
-      "Server settings are currently unavailable. No fallback values are shown.",
+    unavailable: "Server settings are currently unavailable. No fallback values are shown.",
     lastRead: "Last successfully read: {{time}}",
   },
   login: {
     title: "Sign in",
     documentTitle: "Frontline Network · Sign in",
     eyebrow: "Frontline operations",
-    intro:
-      "Secure access to server management, moderation and live operations.",
+    intro: "Secure access to server management, moderation and live operations.",
     username: "Username",
     password: "Password",
     usernameRequired: "Username is required.",
@@ -3199,8 +4366,7 @@ const en = {
     invalid: "Invalid login credentials. Please try again.",
     sessionExpired: "Your session has expired. Please sign in again.",
     unavailable: "The CRCON server application is not responding.",
-    unknownError:
-      "An unknown error occurred. Please check the browser network log and contact support.",
+    unknownError: "An unknown error occurred. Please check the browser network log and contact support.",
   },
   auth: { preparing: "Preparing Frontline CRCON" },
   about: {
@@ -3208,8 +4374,7 @@ const en = {
     documentation: "Documentation",
     help: "Need help?",
     issue: "Found an issue? Submit a pull request",
-    description:
-      "An extended RCON tool for Hell Let Loose with server management, moderation and automation.",
+    description: "An extended RCON tool for Hell Let Loose with server management, moderation and automation.",
     apiVersion: "API version",
     upToDate: "You are using the latest version.",
     updateAvailable: "A newer version is available.",
@@ -3226,4 +4391,986 @@ Object.assign(en.maps.votemapSettings, {
   dominationOptionsHelp: "Number of Domination maps to offer.",
 });
 
-export default en;
+const mergeMissingTranslations = (preferred, fallback) => {
+  if (
+    !preferred ||
+    typeof preferred !== "object" ||
+    Array.isArray(preferred) ||
+    !fallback ||
+    typeof fallback !== "object" ||
+    Array.isArray(fallback)
+  ) {
+    return preferred ?? fallback;
+  }
+
+  const merged = { ...fallback };
+  for (const [key, value] of Object.entries(preferred)) {
+    merged[key] =
+      value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      fallback[key] &&
+      typeof fallback[key] === "object" &&
+      !Array.isArray(fallback[key])
+        ? mergeMissingTranslations(value, fallback[key])
+        : value;
+  }
+  return merged;
+};
+
+const enMasterFallback = {
+  "mobileNav": {
+    "ariaLabel": "Mobile primary navigation",
+    "operations": "Operations",
+    "incidents": "Reports",
+    "players": "Players",
+    "server-operations": "Server",
+    "more": "More"
+  },
+  "mobileOperations": {
+    "eyebrow": "Server operations",
+    "title": "Operations",
+    "subtitle": "Check server health and open the most common operating tasks.",
+    "cards": {
+      "teams": {
+        "title": "Teams & squads",
+        "description": "Manage leadership issues, squads and players."
+      },
+      "maps": {
+        "title": "Maps",
+        "description": "Control current, next and immediate map changes."
+      },
+      "balance": {
+        "title": "Autobalancer",
+        "description": "Review balance health and recent interventions."
+      },
+      "automation": {
+        "title": "Automation",
+        "description": "Manage rules, effects and active schedules."
+      },
+      "services": {
+        "title": "Services",
+        "description": "Check CRCON, game server and background services."
+      },
+      "settings": {
+        "title": "Server settings",
+        "description": "Open gameplay rules and general configuration."
+      }
+    }
+  },
+  "incidents": {
+    "eyebrow": "Moderation",
+    "title": "Reports",
+    "subtitle": "Claim, process and resolve admin reports across servers.",
+    "filters": "Filter reports",
+    "tabs": {
+      "new": "New",
+      "claimed": "Claimed",
+      "open": "Open",
+      "done": "Resolved",
+      "dismissed": "Dismissed"
+    },
+    "status": {
+      "new": "New",
+      "claimed": "Claimed",
+      "resolved": "Resolved",
+      "dismissed": "Dismissed"
+    },
+    "server": "Server {{number}}",
+    "generalReport": "General report",
+    "unknownReporter": "Unknown reporter",
+    "assignedTo": "assigned to {{name}}",
+    "reason": "Report reason",
+    "noReason": "No reason supplied.",
+    "reporter": "Reporter",
+    "assignee": "Assignee",
+    "unassigned": "Not claimed yet",
+    "updated": "Last updated",
+    "emptyTitle": "All clear",
+    "emptyDescription": "There are no reports for this filter right now.",
+    "loadFailed": "Reports could not be loaded. Check the connection and try again.",
+    "updateFailed": "The report could not be updated. It remains unchanged.",
+    "dismissConfirmationTitle": "Dismiss this report?",
+    "dismissConfirmationBody": "The dismissal is recorded in the timeline. The report can no longer be handled as open afterwards.",
+    "actions": {
+      "claim": "Claim",
+      "dismiss": "Dismiss",
+      "resolve": "Resolve",
+      "confirmDismiss": "Confirm dismissal"
+    }
+  },
+  "views": {
+    "live": {
+      "reviewNow": "Review now",
+      "mobileOperationsTab": "Operations",
+      "mobileLogTab": "Log",
+      "loadMorePlayers": "Load more players",
+      "mobileCombatColumn": "K / D",
+      "priorityHigh": "High",
+      "priorityMedium": "Medium",
+      "priorityInfo": "Info",
+      "score": "Score",
+      "commandBar": "Live operations control",
+      "currentMap": "Current map",
+      "remainingTime": "Time remaining",
+      "updating": "Updating",
+      "liveNow": "Live",
+      "layout": "Workspace view",
+      "splitView": "Split",
+      "assignment": "Team / squad / role",
+      "performance": "Combat / risk",
+      "status": "Status",
+      "warned": "Warned",
+      "actionableStatus": "Actionable status and battle state",
+      "online": "online",
+      "columnPreset": "Column preset",
+      "operationsPreset": "Operations",
+      "customPreset": "Custom view",
+      "allColumnsPreset": "All columns",
+      "horizontalTableScroll": "Scroll table columns horizontally",
+      "quickFilters": "Player quick filters",
+      "suspicious": "Suspicious",
+      "selectionFilters": "Selection filters",
+      "playersSelected_one": "{{count}} player selected",
+      "playersSelected_other": "{{count}} players selected",
+      "clearSelection": "Clear selection",
+      "selectionActions": "Open actions",
+      "moreActions": "More",
+      "events": "events",
+      "eventStream": "Live event stream",
+      "eventFilters": "Filter events",
+      "admin": "Admin",
+      "chat": "Chat",
+      "teamkills": "Teamkills",
+      "kills": "Kills",
+      "match": "Match",
+      "searchLogs": "Search logs...",
+      "advancedFilters": "Advanced filters",
+      "maximizeLogs": "Maximize live log",
+      "restoreSplitView": "Restore split view",
+      "copyLog": "Copy original log message",
+      "logCopied": "Original log message copied",
+      "splitUnavailable": "Split view needs more available width.",
+      "serverActions": "Server actions",
+      "mobileRoster": "Mobile player list",
+      "noSpecialStatus": "No special status",
+      "expandPlayer": "Open details for {{name}}",
+      "collapsePlayer": "Close details for {{name}}",
+      "openPlayerProfile": "Open profile for {{name}}"
+    },
+    "team": {
+      "lobby": "Lobby",
+      "commander": "Commander",
+      "commanderPositionOpen": "Position unfilled",
+      "statusFilter": "Status",
+      "roleFilter": "Role",
+      "squadFilter": "Squad",
+      "allRoles": "All roles",
+      "allSquads": "All squads",
+      "squadOrPlayer": "Squad / player",
+      "leaderOrRole": "Squad lead / role",
+      "statusOrKd": "Status / K/D",
+      "selectionActions": "Actions for selected players",
+      "selectionHint": "Choose an action for this selection",
+      "moreActions": "More",
+      "selectionActionLabels": {
+        "message": "Message",
+        "kick": "Kick",
+        "ban": "Temp/Perma ban",
+        "switchTeam": "Team",
+        "removeFromSquad": "Squad kick"
+      },
+      "selectPlayer": "Select {{name}}",
+      "selectSquad": "Select squad {{name}}",
+      "selectTeam": "Select team {{name}}",
+      "expandSquad": "Expand squad",
+      "collapseSquad": "Collapse squad",
+      "expandSquadNamed": "Expand squad {{name}}",
+      "collapseSquadNamed": "Collapse squad {{name}}",
+      "expandTeam": "Expand all squads on this team",
+      "collapseTeam": "Collapse all squads on this team",
+      "expandTeamNamed": "Expand all {{name}} squads",
+      "collapseTeamNamed": "Collapse all {{name}} squads",
+      "squadsCount_one": "{{count}} squad",
+      "squadsCount_other": "{{count}} squads",
+      "problemsCount_one": "{{count}} problem",
+      "problemsCount_other": "{{count}} problems",
+      "noMatches": "No matching players or squads found.",
+      "issueCommander_one": "{{count}} team without commander",
+      "issueCommander_other": "{{count}} teams without commander",
+      "issueCommanderDetail": "Unfilled command positions",
+      "issueLeaders_one": "{{count}} squad without leader",
+      "issueLeaders_other": "{{count}} squads without leader",
+      "issueLeadersDetail": "Squads requiring attention",
+      "issueUnassigned_one": "{{count}} player without squad",
+      "issueUnassigned_other": "{{count}} players without squad",
+      "issueUnassignedDetail": "Lobby and unassigned players",
+      "filters": {
+        "all": "Show all",
+        "issues": "Issues only",
+        "noLeader": "No squad leader",
+        "unassigned": "Unassigned"
+      },
+      "squadTypes": {
+        "infantry": "Infantry",
+        "armor": "Armor",
+        "armour": "Armor",
+        "recon": "Recon",
+        "artillery": "Artillery",
+        "mortar": "Mortar",
+        "helicopter": "Helicopter",
+        "other": "Other units"
+      }
+    },
+    "table": {
+      "selection": "Player selection",
+      "faction": "Faction",
+      "teamKillsShort": "TKs",
+      "teamKillRiskLabel": "TK risk",
+      "combatShort": "Combat",
+      "offenseShort": "Offense",
+      "defenseShort": "Defense",
+      "supportShort": "Support",
+      "nameOnly": "Name (single column)",
+      "playerSummary": "Player (name and level)",
+      "playerId": "Player ID",
+      "warnings": "Warnings",
+      "vip": "VIP"
+    }
+  },
+  "actions": {
+    "viewProfileCompact": "Profile",
+    "secondConfirmationTitle": "Review action again",
+    "secondConfirmationBody": "This action takes effect immediately. Check the target and details before final execution.",
+    "executeFinally": "Execute finally",
+    "sendMessage": {
+      "compact": "Message"
+    },
+    "punish": {
+      "compact": "Punish"
+    },
+    "kick": {
+      "compact": "Kick"
+    },
+    "blacklist": {
+      "compact": "Ban",
+      "confirm": "Add to blacklist"
+    }
+  },
+  "records": {
+    "auditLogs": {
+      "filters": "Filter audit logs"
+    }
+  },
+  "settings": {
+    "configForms": {
+      "units": {
+        "seconds": "seconds",
+        "players": "players",
+        "squadPlayers": "squad members",
+        "level": "level",
+        "checks": "checks",
+        "messages": "messages",
+        "actions": "actions"
+      },
+      "specialValues": {
+        "disabled": "Disabled",
+        "noMinimum": "No minimum",
+        "skip": "Skip this stage",
+        "unlimited": "Unlimited; do not advance to the next stage",
+        "noDelay": "No additional delay",
+        "anySquadSize": "Any squad size"
+      },
+      "roles": {
+        "armycommander": "Commander",
+        "officer": "Squad leader",
+        "rifleman": "Rifleman",
+        "assault": "Assault",
+        "automaticrifleman": "Automatic rifleman",
+        "medic": "Medic",
+        "support": "Support",
+        "heavymachinegunner": "Machine gunner",
+        "antitank": "Anti-tank",
+        "engineer": "Engineer",
+        "tankcommander": "Tank commander",
+        "crewman": "Crewman",
+        "spotter": "Spotter",
+        "sniper": "Sniper",
+        "artilleryobserver": "Artillery observer",
+        "operator": "Operator",
+        "gunner": "Gunner",
+        "squadleader": "Squad leader",
+        "specialist": "Specialist",
+        "grenadier": "Grenadier",
+        "mortarsupport": "Mortar support",
+        "mortarobserver": "Mortar squad leader",
+        "mortargunner": "Mortar gunner",
+        "helicopterpilot": "Helicopter pilot",
+        "helicopterlogisticsofficer": "Helicopter logistics officer"
+      },
+      "workbench": {
+        "defaultEyebrow": "Server configuration",
+        "defaultIntro": "Configure this area safely with the guided form.",
+        "navigation": "Configuration sections",
+        "mobileNavigation": "Choose section",
+        "sectionEyebrow": "Section {{current}} of {{total}}",
+        "statusActive": "Active",
+        "statusInactive": "Disabled",
+        "statusTest": "Test mode",
+        "statusConfigured": "Configured",
+        "save": "Save changes",
+        "saving": "Saving …",
+        "reset": "Restore saved values",
+        "dirty": "Unsaved changes",
+        "dirtyDescription": "Review the summary and save to apply the new rule.",
+        "saved": "All changes saved",
+        "savedDescription": "The values shown match the saved configuration.",
+        "readOnly": "Read-only access",
+        "readOnlyDescription": "You are missing the {{permission}} permission. You can review this rule but cannot change it.",
+        "validationTitle": "Some entries need attention",
+        "validationDescription": "Resolve the listed items before saving.",
+        "compatibilityTitle": "This configuration cannot be edited safely",
+        "compatibilityDescription": "The saved data differs structurally from this CRCON version. It has not been changed. Apply the matching configuration migration first.",
+        "compatibilityIssue": "{{path}}: expected {{expected}}, found {{actual}}",
+        "types": {
+          "array": "list",
+          "object": "object",
+          "string": "text",
+          "integer": "integer",
+          "number": "number",
+          "boolean": "yes/no value",
+          "null": "empty value"
+        },
+        "navigateToError": "Open",
+        "choices": {
+          "skip": "Skip",
+          "count": "Count",
+          "unlimited": "Unlimited"
+        },
+        "choiceHelp": {
+          "skip": "Send no warnings",
+          "count": "A fixed number of warnings",
+          "unlimited": "Warn continuously"
+        },
+        "warningMode": "Warning mode",
+        "warningModeHelp": "Choose how and when players are warned before punishment.",
+        "warningsBeforePunish": "Warnings before punishment",
+        "warningsBeforePunishHelp": "Number of warnings sent before punishment.",
+        "warningIntervalHelp": "Time between two warnings.",
+        "availablePlaceholders": "Available placeholders",
+        "messagePreview": "Player preview",
+        "messagePreviewEmpty": "No message entered yet.",
+        "warningPreviewMeta": "Warning {{current}} of {{total}} · Next check in {{seconds}} seconds",
+        "sectionTitles": {
+          "operation": "Basics",
+          "scope": "Scope",
+          "requirements": "Requirements",
+          "detection": "Detection",
+          "rules": "Rules",
+          "exemptions": "Exceptions",
+          "schedule": "Schedule",
+          "announcements": "Announcements",
+          "observation": "Confirm",
+          "warnings": "Warnings",
+          "punishments": "Punishments",
+          "kick": "Kick",
+          "actions": "Actions",
+          "reward": "Reward",
+          "messages": "Messages",
+          "notifications": "Notifications",
+          "advanced": "Additional settings"
+        },
+        "sectionDescriptions": {
+          "operation": "Enable the rule and decide whether it should start in dry-run mode.",
+          "scope": "Choose when this feature applies and which players or game situations it covers.",
+          "requirements": "Define the conditions that must be met before this feature intervenes.",
+          "detection": "Choose which events are detected and when they count as a violation.",
+          "rules": "Set the rules, thresholds, and checks used by this configuration.",
+          "exemptions": "Define which players, roles, and flags are exempt from this rule.",
+          "schedule": "Set the check intervals and timing for this service.",
+          "announcements": "Configure the notices players receive on connect or while the rule is active.",
+          "observation": "Choose how often a violation is confirmed internally before a visible warning follows.",
+          "warnings": "Choose how and when players are warned before punishment. Warnings remind players to assign a squad leader.",
+          "punishments": "Set the consequences when warnings have no effect.",
+          "kick": "Configure the final escalation stage and grace period before a kick.",
+          "actions": "Choose the action, its duration, and the reason shown to affected players.",
+          "reward": "Set the amount, duration, and delivery of the reward.",
+          "messages": "Edit the messages players or administrators receive during this workflow.",
+          "notifications": "Optionally provide a Discord webhook for audit messages.",
+          "advanced": "Additional settings that do not belong to one of the main workflow stages."
+        },
+        "profileSummary": {
+          "title": "Summary",
+          "sequence": "Action sequence",
+          "active": "Active – actions are performed",
+          "inactive": "Disabled",
+          "test": "Test mode – log only",
+          "disabled": "Skipped or disabled",
+          "unlimited": "Unlimited · every {{interval}} seconds",
+          "count": "{{count}}× · every {{interval}} seconds",
+          "kick": "Kick after {{seconds}} seconds",
+          "intervalMinutes": "Check every {{count}} minutes",
+          "configured": "{{configured}} of {{total}} values configured",
+          "activeNotice": "The settings shown will be used for this server after saving.",
+          "inactiveNotice": "This feature is disabled. All other values remain saved."
+        },
+        "placeholders": {
+          "player_name": "Player name",
+          "squad_name": "Squad name",
+          "max_warnings": "Maximum warnings",
+          "received_warnings": "Previous warnings",
+          "next_check_seconds": "Next check",
+          "max_punishes": "Maximum punishments",
+          "received_punishes": "Punishments received",
+          "kick_grace_period": "Kick grace period"
+        },
+        "flow": {
+          "title": "Summary",
+          "sequence": "Action sequence",
+          "warn": "Warn",
+          "punish": "Punish",
+          "kick": "Kick",
+          "count": "{{count}}× · every {{interval}} seconds",
+          "unlimited": "Unlimited · every {{interval}} seconds",
+          "afterSeconds": "after {{seconds}} seconds",
+          "punishAction": "Remove squad-leader rights",
+          "kickAfterSeconds": "Kick after {{seconds}} seconds",
+          "disabled": "Disabled",
+          "reachability": "Reachability",
+          "reachable": "All active stages are reachable in this order.",
+          "unreachable": "A later stage cannot be reached with the current values.",
+          "reachabilityStates": {
+            "reachable": {
+              "title": "Kick is reachable",
+              "description": "Warnings and punishments finish before the kick stage begins."
+            },
+            "disabled": {
+              "title": "Kick is disabled",
+              "description": "Enable the kick stage to remove players after punishments."
+            },
+            "warningsUnlimited": {
+              "title": "Kick cannot be reached",
+              "description": "Unlimited warnings never advance to punishment. Choose a fixed warning count."
+            },
+            "punishmentsUnlimited": {
+              "title": "Kick cannot be reached",
+              "description": "Unlimited punishments never advance to the kick stage. Choose a fixed punishment count."
+            },
+            "punishmentsSkipped": {
+              "title": "Kick cannot be reached",
+              "description": "At least one punishment must run before a kick can happen."
+            }
+          }
+        },
+        "ruleDisabledNotice": "The rule is disabled. Your other values are retained and will be used again after enabling it.",
+        "summary": {
+          "status": "Rule status",
+          "sequence": "Effective sequence",
+          "minimumPlayers": "Start condition",
+          "exemptions": "Exceptions",
+          "active": "Automod performs game actions",
+          "inactive": "Automod is disabled",
+          "test": "Log only – no game actions",
+          "minimumPlayersValue": "From {{count}} players",
+          "noMinimumPlayers": "Independent of player count",
+          "exemptionsValue": "{{roles}} roles · {{flags}} flags · up to level {{level}}",
+          "noExemptions": "No additional exceptions",
+          "observation": "{{count}} checks",
+          "observationSkipped": "Checks skipped",
+          "warnings": "{{count}} warnings",
+          "warningsUnlimited": "Warn indefinitely",
+          "warningsSkipped": "Warnings skipped",
+          "punishments": "{{count}} punishments",
+          "punishmentsUnlimited": "Punish indefinitely",
+          "punishmentsSkipped": "Punishments skipped",
+          "kick": "then kick",
+          "noKick": "no kick",
+          "unreachableKick": "Kick is unreachable: configure at least one finite punishment before the kick stage."
+        },
+        "validation": {
+          "required": "This field is required.",
+          "integer": "Enter a whole number.",
+          "minimum": "The minimum allowed value is {{value}}.",
+          "maximum": "The maximum allowed value is {{value}}.",
+          "url": "Enter a valid HTTP or HTTPS address.",
+          "enum": "At least one value is not supported by this server.",
+          "duplicate": "Duplicate values are not allowed.",
+          "emptyRegex": "Empty regular expressions are not allowed because they would match every player name.",
+          "placeholder": "Unknown placeholders: {{values}}. Use one of the provided placeholders."
+        }
+      },
+      "noLeader": {
+        "eyebrow": "Automation",
+        "title": "Squads without a leader",
+        "intro": "This rule works for Hell Let Loose and Hell Let Loose: Vietnam.",
+        "summary": {
+          "title": "Rule flow",
+          "description": "Exemptions are checked before every action. Dry runs follow the same flow but never affect the game."
+        },
+        "sections": {
+          "operation": {
+            "title": "Basics",
+            "description": "Core settings"
+          },
+          "exemptions": {
+            "title": "Exceptions",
+            "description": "Who is exempt"
+          },
+          "observation": {
+            "title": "Confirm",
+            "description": "Conditions and thresholds"
+          },
+          "warnings": {
+            "title": "Warn",
+            "description": "Configure warnings"
+          },
+          "punishments": {
+            "title": "Punish",
+            "description": "Set consequences"
+          },
+          "kick": {
+            "title": "Kick",
+            "description": "Kick rules"
+          },
+          "notifications": {
+            "title": "Messages",
+            "description": "Notifications"
+          }
+        },
+        "fields": {
+          "enabled": {
+            "label": "Enable automod",
+            "help": "Monitors squads without a leader and runs the stages configured below."
+          },
+          "dry_run": {
+            "label": "Log only (dry run)",
+            "help": "Evaluates the full rule but sends no messages and applies neither punishments nor kicks."
+          },
+          "discord_webhook_url": {
+            "label": "Discord audit webhook",
+            "help": "Optional Discord webhook for actions that were applied or detected during a dry run.",
+            "placeholder": "https://discord.com/api/webhooks/…"
+          },
+          "whitelist_flags": {
+            "label": "Exempt player flags",
+            "help": "Players with at least one of these CRCON flags are exempt from every stage."
+          },
+          "immune_roles": {
+            "label": "Exempt roles",
+            "help": "Players in these game roles will not be observed, warned, punished, or kicked."
+          },
+          "immune_player_level": {
+            "label": "Exempt players up to level",
+            "help": "Players at or below this level are protected. Set 0 to disable this exemption."
+          },
+          "dont_do_anything_below_this_number_of_players": {
+            "label": "Minimum server population",
+            "help": "The rule pauses below this total player count. Set 0 for no minimum."
+          },
+          "number_of_notes": {
+            "label": "Invisible checks",
+            "help": "Number of internal checks before the first warning. Players do not see this stage. Set 0 to skip it."
+          },
+          "notes_interval_seconds": {
+            "label": "Time between checks",
+            "help": "Wait time between two invisible checks of the same player."
+          },
+          "number_of_warnings": {
+            "label": "Number of warnings",
+            "help": "Set 0 to skip warnings. Set -1 to warn indefinitely and never advance to punishment."
+          },
+          "warning_interval_seconds": {
+            "label": "Time between warnings",
+            "help": "Wait time before the same player is warned again."
+          },
+          "warning_message": {
+            "label": "Warning message",
+            "help": "Message players receive with every warning."
+          },
+          "number_of_punishments": {
+            "label": "Number of punishments",
+            "help": "Set 0 to skip punishments, but a kick cannot happen without a prior punishment. Set -1 to punish indefinitely and never advance to kick."
+          },
+          "min_squad_players_for_punish": {
+            "label": "Minimum squad size for punishments",
+            "help": "Punishments start only when the affected squad has at least this many members. Set 0 for any squad size."
+          },
+          "min_server_players_for_punish": {
+            "label": "Minimum server population for punishments",
+            "help": "Punishments start only at this total player count. Set 0 for no minimum."
+          },
+          "punish_interval_seconds": {
+            "label": "Time between punishments",
+            "help": "Wait time before the same player is punished again."
+          },
+          "punish_message": {
+            "label": "Punishment message",
+            "help": "Message the player receives with the punish action."
+          },
+          "kick_after_max_punish": {
+            "label": "Kick after punishments",
+            "help": "Enables kick as the final stage. At least one punishment must have been applied successfully first."
+          },
+          "min_squad_players_for_kick": {
+            "label": "Minimum squad size for kicks",
+            "help": "Kicks apply only when the affected squad has at least this many members. Set 0 for any squad size."
+          },
+          "min_server_players_for_kick": {
+            "label": "Minimum server population for kicks",
+            "help": "Kicks apply only at this total player count. Set 0 for no minimum."
+          },
+          "kick_grace_period_seconds": {
+            "label": "Final grace period before kick",
+            "help": "Time after the last punishment in which the squad can still choose a leader."
+          },
+          "kick_message": {
+            "label": "Kick message",
+            "help": "Reason shown to the player when they are kicked."
+          }
+        }
+      },
+      "level": {
+        "eyebrow": "Automod rule",
+        "title": "Level rules",
+        "intro": "Control minimum and maximum levels as well as role-specific level thresholds. Players can be informed, punished, or removed in progressive stages."
+      },
+      "seeding": {
+        "eyebrow": "Automation · Seeding",
+        "title": "Seeding rules",
+        "intro": "Set rules for the server build-up phase and choose how violations are handled while seeding."
+      },
+      "seedingWorkbench": {
+        "players": "players",
+        "seconds": "seconds",
+        "level": "level",
+        "placeholders": "Insert:",
+        "sections": {
+          "operation": {
+            "title": "Overview",
+            "description": "Choose whether rules are off, observed, or actively enforced."
+          },
+          "rules": {
+            "title": "Rules",
+            "description": "Define allowed play and the player windows for each rule."
+          },
+          "exemptions": {
+            "title": "Exemptions",
+            "description": "Protect selected roles, flags, or new players from automatic actions."
+          },
+          "actions": {
+            "title": "Actions",
+            "description": "Build the visible sequence from announcement to kick."
+          },
+          "notifications": {
+            "title": "Notifications",
+            "description": "Optionally send detected violations and actions to Discord."
+          }
+        },
+        "operation": {
+          "modeTitle": "How should the automod run?",
+          "modeHelp": "Test mode evaluates the same rules without affecting players.",
+          "off": "Off",
+          "offHelp": "No checks",
+          "observe": "Observe",
+          "observeHelp": "Log only",
+          "active": "Active",
+          "activeHelp": "Enforce rules",
+          "note": "Rule-level player windows decide when each rule applies. The global minimum pauses the entire seeding automod."
+        },
+        "status": {
+          "active": "Active",
+          "incomplete": "Not configured",
+          "skipped": "Skipped",
+          "unlimited": "Unlimited",
+          "times": "{{count}}×"
+        },
+        "effectPreview": {
+          "title": "How this rule works",
+          "active": "The rule applies between {{min}} and {{max}} players and checks {{count}} configured entries.",
+          "inactive": "This rule is not fully configured yet and currently does not take action.",
+          "valid": "The rule is ready to use.",
+          "missing": "Complete the rule before enabling enforcement."
+        },
+        "rules": {
+          "roles": {
+            "title": "Limit roles",
+            "description": "Blocks roles that have an outsized impact during server build-up."
+          },
+          "weapons": {
+            "title": "Limit weapons",
+            "description": "Punishes selected weapon use directly without escalating to kick.",
+            "empty": "No weapon is blocked yet. Choose one from the catalogue or enter a game identifier that is not known yet."
+          },
+          "cap": {
+            "title": "Limit the combat area",
+            "description": "Keeps fighting in the intended middle area while seeding.",
+            "switchTitle": "Enforce fighting over the middle point",
+            "switchHelp": "Detects players when their team attacks beyond the allowed sectors."
+          }
+        },
+        "fields": {
+          "playerWindow": "Applies to player count",
+          "globalMinimum": "Start the entire automod at",
+          "globalMinimumHelp": "Below this value no rule is evaluated. 0 means immediately.",
+          "fromPlayers": "Applies from",
+          "fromPlayersHelp": "This value is inclusive.",
+          "untilPlayers": "Applies until",
+          "untilPlayersHelp": "The rule ends at this value. 0 disables it.",
+          "blockedRoles": "Disallowed roles",
+          "blockedRolesHelp": "Choose from the shared HLL and HLL: Vietnam role list.",
+          "violationMessage": "Violation text",
+          "roleMessageHelp": "Describes the role violation inside later warning, punish and kick messages.",
+          "weaponMessageHelp": "Describes the weapon violation in the direct punish message.",
+          "capMessageHelp": "Explains why the allowed combat area was exceeded.",
+          "weaponId": "Internal weapon name",
+          "weaponLabel": "Readable name",
+          "weaponPicker": "Choose a weapon",
+          "weaponPickerHelp": "Search the active game's weapon catalogue. You can still enter a new unknown game identifier and confirm it with Enter.",
+          "noWeaponMatches": "No additional matching weapon found",
+          "addWeapon": "Add weapon",
+          "removeWeapon": "Remove weapon",
+          "maxCaps": "Maximum sectors held",
+          "maxCapsHelp": "3 allows fighting through the middle point.",
+          "directPunish": "Punish directly",
+          "directPunishHelp": "Skips warnings for sector violations so the automod can react in time.",
+          "flags": "Exempt player flags",
+          "flagsHelp": "Players with at least one of these CRCON flags are fully exempt.",
+          "immuneRoles": "Exempt roles",
+          "immuneRolesHelp": "Players in these roles are exempt from all seeding actions.",
+          "immuneLevel": "Exempt players up to level",
+          "immuneLevelHelp": "Players at or below this level are protected. 0 disables the exemption.",
+          "announcementEnabled": "Explain seeding on join",
+          "announcementEnabledHelp": "Tells joining players which seeding rules currently apply.",
+          "announcementMessage": "Join announcement",
+          "count": "Count",
+          "interval": "Interval",
+          "minSquad": "Squad size from",
+          "minServer": "Player count from",
+          "warningMessage": "Warning message",
+          "punishMessage": "Punish message",
+          "kickEnabled": "Kick after punishments",
+          "kickEnabledHelp": "Removes players as the final stage when a violation persists after warnings and punishments.",
+          "gracePeriod": "Final grace period",
+          "kickMessage": "Kick message",
+          "webhook": "Discord audit webhook",
+          "webhookHelp": "Optional. Receives logs for detected and executed actions."
+        },
+        "weaponTypes": {
+          "infantry": "Infantry weapon",
+          "bazooka": "Anti-tank weapon",
+          "grenade": "Grenade",
+          "machine_gun": "Machine gun",
+          "sniper": "Sniper weapon",
+          "mine": "Mine",
+          "pak": "Anti-tank gun",
+          "satchel": "Satchel charge",
+          "artillery": "Artillery",
+          "armor": "Vehicle weapon",
+          "commander": "Commander ability",
+          "self_propelled_artillery": "Self-propelled artillery",
+          "unknown": "Custom entry"
+        },
+        "count": {
+          "skip": "Skip",
+          "fixed": "Fixed count",
+          "unlimited": "Unlimited"
+        },
+        "actions": {
+          "announcement": {
+            "title": "Announce rules",
+            "description": "Explains the active seeding phase to new players."
+          },
+          "warning": {
+            "title": "Warn",
+            "description": "Gives players time to change before the first punishment."
+          },
+          "punish": {
+            "title": "Punish",
+            "description": "Runs the server punish action when warnings do not help."
+          },
+          "kick": {
+            "title": "Kick",
+            "description": "Removes players only after previous escalation stages complete."
+          }
+        },
+        "notifications": {
+          "note": "The Discord webhook is only for audit messages. Player messages are still sent through the game server."
+        },
+        "summary": {
+          "title": "Overview",
+          "activeRules": "{{count}} of 3 rules configured",
+          "roles_one": "{{count}} role blocked",
+          "roles_other": "{{count}} roles blocked",
+          "weapons_one": "{{count}} weapon blocked",
+          "weapons_other": "{{count}} weapons blocked",
+          "capActive": "Middle combat area active",
+          "reaction": "Response chain",
+          "count": "{{count}}× · every {{interval}} seconds",
+          "unlimited": "Unlimited · every {{interval}} seconds",
+          "kick": "after {{seconds}} seconds",
+          "activeNotice": "After saving, these rules actively affect the game.",
+          "testNotice": "Test mode: violations are detected without affecting players.",
+          "inactiveNotice": "The automod is off. Its configuration remains saved."
+        }
+      },
+      "noSoloTank": {
+        "eyebrow": "Automod rule",
+        "title": "Prevent solo tanks",
+        "intro": "Choose how CRCON responds to one-person armor squads in Hell Let Loose and HLL: Vietnam."
+      },
+      "vacBans": {
+        "eyebrow": "Security & bans",
+        "title": "Check VAC and game bans",
+        "intro": "Choose which ban history is checked on connect and how CRCON handles affected players."
+      },
+      "tkBans": {
+        "eyebrow": "Security & bans",
+        "title": "Teamkill ban on connect",
+        "intro": "Detect early teamkills after connect, define exceptions, and configure the resulting ban."
+      },
+      "nameKicks": {
+        "eyebrow": "Players & moderation",
+        "title": "Name filter",
+        "intro": "Check player names against your rules, protect exempt players, and set a clear kick reason.",
+        "rulesEditor": {
+          "noticeTitle": "Every match results in a kick",
+          "noticeBody": "The name filter is a blocklist: as soon as a rule matches a newly connected player's name, CRCON removes that player. Templates are stored correctly by the form, so you do not need to escape JSON characters.",
+          "templatesTitle": "Choose a protection goal",
+          "templatesHelp": "Enable only the templates that match your server rules. The strict character list can catch international names and emoji.",
+          "presets": {
+            "unreadable": {
+              "title": "No readable characters",
+              "description": "Removes names made entirely of symbols or non-Latin characters. Letters, digits, German umlauts, and clan tags remain allowed."
+            },
+            "blank": {
+              "title": "Blank name",
+              "description": "Matches empty names and names containing whitespace only."
+            },
+            "strictCharacters": {
+              "title": "Strict character list",
+              "description": "Allows only Latin letters, digits, spaces, and a small set of common punctuation and clan characters."
+            }
+          },
+          "active": "Active",
+          "useTemplate": "Use template",
+          "removeTemplate": "Remove template",
+          "configuredTitle": "Active rules",
+          "configuredHelp": "Templates and custom rules are evaluated together from top to bottom.",
+          "ruleCount_one": "{{count}} rule",
+          "ruleCount_other": "{{count}} rules",
+          "noRules": "No name rule is active. Newly connected players will not be removed based on their name.",
+          "ruleLabel": "RegEx {{number}}",
+          "emptyRule": "An empty RegEx would match every player name. Delete the rule or enter an expression.",
+          "deleteRule": "Delete rule",
+          "customLabel": "Custom Python RegEx",
+          "customPlaceholder": "e.g. (?i)^admin",
+          "addCustom": "Add custom rule",
+          "testTitle": "Test a player name first",
+          "testHelp": "The preview mirrors Python behavior for common expressions. The rule is only stored and activated after you save the changes.",
+          "testLabel": "Test player name",
+          "testPlaceholder": "Enter a player name",
+          "testKick": "“{{name}}” would be removed.",
+          "testAllow": "“{{name}}” would pass the name filter.",
+          "testMatched": "Matched by rule {{number}}.",
+          "testUnsupported_one": "One Python-specific rule could not be evaluated in the browser preview.",
+          "testUnsupported_other": "{{count}} Python-specific rules could not be evaluated in the browser preview."
+        }
+      },
+      "seedVip": {
+        "eyebrow": "Seeding & rewards",
+        "title": "Seeder VIP reward",
+        "intro": "Choose when seeding counts as successful and which VIP reward eligible players receive."
+      },
+      "expiredVip": {
+        "eyebrow": "VIP management",
+        "title": "Clean up expired VIPs",
+        "intro": "Choose how often CRCON checks expired VIP entries and optionally sends a notification."
+      }
+    },
+    "profanity": {
+      "eyebrow": "Players & moderation",
+      "title": "Profanity filter",
+      "subtitle": "Maintain blocked terms, import lists, and apply changes to one or multiple servers in a controlled way.",
+      "allServers": "All servers",
+      "applyAllTitle": "Apply profanity filter to all servers?",
+      "applyAllDescription": "The current term list will be sent to every connected server in this installation."
+    },
+    "templates": {
+      "eyebrow": "Players & moderation",
+      "title": "Message templates",
+      "subtitle": "Manage reusable text for messages, moderation actions, and server operations."
+    },
+    "autosettings": {
+      "eyebrow": "Server operations",
+      "title": "Automatic settings",
+      "subtitle": "Choose a template, review the advanced JSON configuration, and apply it in a controlled way.",
+      "editorTitle": "Advanced configuration",
+      "editorHint": "Changes are only written to the selected server after you apply them.",
+      "applyAllTitle": "Apply to all servers?",
+      "applyAllDescription": "The open configuration will be sent to every connected server in this installation. Check server and game compatibility before confirming."
+    },
+    "welcome": {
+      "eyebrow": "Maps & server operations",
+      "title": "Welcome message",
+      "subtitle": "Define the message players receive when they join the server.",
+      "allServers": "All servers",
+      "editorHint": "Leave empty to disable the welcome message.",
+      "applyAllTitle": "Apply welcome message to all servers?",
+      "applyAllDescription": "The current message will be sent to every connected server in this installation."
+    }
+  },
+  "appearance": {
+    "menuLabel": "Appearance & colors",
+    "title": "Appearance & colors",
+    "subtitle": "Adapt the interface to your workflow and visual needs.",
+    "presets": {
+      "title": "Color combination",
+      "description": "Choose a tested preset or define your own accent color below.",
+      "frontline-gold": "Frontline Gold",
+      "tactical-blue": "Tactical Blue",
+      "signal-green": "Signal Green",
+      "command-red": "Command Red",
+      "neutral": "Neutral"
+    },
+    "mode": {
+      "title": "Display mode",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "custom": {
+      "title": "Custom accent color",
+      "description": "Contrast, hover and focus colors are adjusted automatically.",
+      "picker": "Choose accent color",
+      "hex": "Hex color",
+      "invalid": "Enter a color in the format #C59A4A.",
+      "contrastHint": "Insufficient contrast is corrected automatically."
+    },
+    "colorVision": {
+      "title": "Color vision mode",
+      "standard": "Standard",
+      "deuteranopia": "Deuteranopia (green deficiency)",
+      "protanopia": "Protanopia (red deficiency)",
+      "tritanopia": "Tritanopia (blue deficiency)",
+      "description": "Status colors are adapted while icons, labels and outlines remain available."
+    },
+    "preview": {
+      "title": "Live preview",
+      "primary": "Primary action",
+      "selected": "Selected",
+      "info": "Information",
+      "success": "Success",
+      "warning": "Warning",
+      "error": "Error"
+    },
+    "accessibilityHint": "Color never communicates state on its own. The interface also uses icons, labels and visible focus outlines.",
+    "unsaved": "Unsaved changes",
+    "restoreSaved": "Saved values",
+    "restoreDefault": "Frontline default",
+    "apply": "Apply changes",
+    "saved": "Appearance was saved for your account.",
+    "savedLocally": "The server was unavailable. Appearance was temporarily saved in this browser."
+  }
+};
+
+export default mergeMissingTranslations(en, enMasterFallback);

@@ -1205,6 +1205,153 @@ class MobileContextTests(TestCase):
                 )
 
     @patch("api.mobile_incidents.confirmed_action_subject")
+    def test_rejected_punish_sends_message_fallback_for_both_games(
+        self, confirmed_subject
+    ):
+        from api.mobile_incidents import (
+            PUNISH_MESSAGE_FALLBACK_OUTCOME,
+            _execute_action,
+        )
+        from rcon.connection import HLLCommandError
+        from rcon.types import GameEnum
+
+        confirmed_subject.return_value = {
+            "display_name": "Biene",
+            "player_id": "biene-id",
+        }
+        incident = {"target_id": "biene-id", "target_name": "Biene"}
+
+        for game in (GameEnum.HLL_WW2, GameEnum.HLL_VIETNAM):
+            with self.subTest(game=game):
+                punish = MagicMock(
+                    side_effect=HLLCommandError(500, "server_internal_error")
+                )
+                message_player = MagicMock(return_value=True)
+                api = SimpleNamespace(
+                    config=SimpleNamespace(game=game),
+                    punish=punish,
+                    message_player=message_player,
+                )
+
+                with patch.dict(
+                    sys.modules, {"api.views": SimpleNamespace(rcon_api=api)}
+                ):
+                    result = _execute_action(
+                        "punish",
+                        {"player_id": "biene-id", "reason": "Teamkill"},
+                        "Moderator",
+                        incident,
+                    )
+
+                self.assertEqual(
+                    result,
+                    {
+                        "outcome": PUNISH_MESSAGE_FALLBACK_OUTCOME,
+                        "punished": False,
+                        "message_sent": True,
+                        "possible_reason": "player_not_alive",
+                    },
+                )
+                punish.assert_called_once_with(
+                    "biene-id",
+                    reason="Teamkill",
+                    by="Moderator",
+                    player_name="Biene",
+                )
+                message_player.assert_called_once_with(
+                    "biene-id",
+                    message="Punish-Hinweis / Punishment notice: Teamkill",
+                    by="Moderator",
+                    save_message=True,
+                    player_name="Biene",
+                )
+
+    @patch("api.mobile_incidents.confirmed_action_subject")
+    def test_rejected_punish_remains_failed_when_message_fallback_fails(
+        self, confirmed_subject
+    ):
+        from api.mobile_incidents import _execute_action
+        from rcon.connection import HLLCommandError
+        from rcon.types import GameEnum
+
+        confirmed_subject.return_value = {
+            "display_name": "Biene",
+            "player_id": "biene-id",
+        }
+        original_error = HLLCommandError(500, "server_internal_error")
+        api = SimpleNamespace(
+            config=SimpleNamespace(game=GameEnum.HLL_WW2),
+            punish=MagicMock(side_effect=original_error),
+            message_player=MagicMock(return_value=False),
+        )
+
+        with patch.dict(sys.modules, {"api.views": SimpleNamespace(rcon_api=api)}):
+            with self.assertRaises(HLLCommandError) as raised:
+                _execute_action(
+                    "punish",
+                    {"player_id": "biene-id", "reason": "Teamkill"},
+                    "Moderator",
+                    {"target_id": "biene-id", "target_name": "Biene"},
+                )
+
+        self.assertIs(raised.exception, original_error)
+        api.message_player.assert_called_once()
+
+    @patch("api.mobile_incidents.confirmed_action_subject")
+    def test_punish_authentication_error_does_not_send_fallback_message(
+        self, confirmed_subject
+    ):
+        from api.mobile_incidents import _execute_action
+        from rcon.connection import HLLCommandError
+        from rcon.types import GameEnum
+
+        confirmed_subject.return_value = {
+            "display_name": "Biene",
+            "player_id": "biene-id",
+        }
+        original_error = HLLCommandError(401, "unauthorized")
+        api = SimpleNamespace(
+            config=SimpleNamespace(game=GameEnum.HLL_WW2),
+            punish=MagicMock(side_effect=original_error),
+            message_player=MagicMock(return_value=True),
+        )
+
+        with patch.dict(sys.modules, {"api.views": SimpleNamespace(rcon_api=api)}):
+            with self.assertRaises(HLLCommandError) as raised:
+                _execute_action(
+                    "punish",
+                    {"player_id": "biene-id", "reason": "Teamkill"},
+                    "Moderator",
+                    {"target_id": "biene-id", "target_name": "Biene"},
+                )
+
+        self.assertIs(raised.exception, original_error)
+        api.message_player.assert_not_called()
+
+    def test_punish_message_fallback_does_not_count_as_confirmed_action(self):
+        from api.discord_integration import _used_punish_message_fallback
+
+        self.assertTrue(
+            _used_punish_message_fallback(
+                {
+                    "outcome": "punish_not_confirmed_message_sent",
+                    "punished": False,
+                    "message_sent": True,
+                }
+            )
+        )
+        self.assertFalse(_used_punish_message_fallback(True))
+        self.assertFalse(
+            _used_punish_message_fallback(
+                {
+                    "outcome": "punish_not_confirmed_message_sent",
+                    "punished": True,
+                    "message_sent": True,
+                }
+            )
+        )
+
+    @patch("api.mobile_incidents.confirmed_action_subject")
     def test_all_discord_game_actions_reach_the_expected_crcon_method(
         self, confirmed_subject
     ):

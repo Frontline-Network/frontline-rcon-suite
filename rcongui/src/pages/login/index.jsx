@@ -15,7 +15,7 @@ import { useForm, Controller } from "react-hook-form";
 import { styled } from "@mui/material/styles";
 import { redirect } from "react-router-dom";
 import { cmd } from "@/utils/fetchUtils";
-import {useEffect, useState} from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import FrontlineBrand from "@/components/layout/FrontlineBrand";
 import LanguageSelector from "@/components/layout/LanguageSelector";
@@ -29,7 +29,6 @@ export const loader = async ({ request }) => {
   try {
     user = await cmd.IS_AUTHENTICATED({ throwRouteError: false });
   } catch (error) {
-
     if (error.status === 401) {
       return {
         error: error.name,
@@ -94,7 +93,7 @@ export const action = async ({ request }) => {
       };
     }
 
-    console.error(error)
+    console.error(error);
     return {
       error: error,
       messageKey: "login.unknownError",
@@ -143,6 +142,10 @@ const MainWrapper = styled(Stack)(({ theme }) => ({
   flexBasis: "67vh",
   position: "relative",
   backgroundColor: theme.palette.background.default,
+  color: theme.vars?.palette.text.primary || theme.palette.text.primary,
+  "& .MuiInputLabel-root": {
+    color: theme.vars?.palette.text.secondary || theme.palette.text.secondary,
+  },
   [theme.breakpoints.up("md")]: {
     flexBasis: "40%",
   },
@@ -196,13 +199,28 @@ export default function Login() {
             }}
             spacing={1.5}
           >
-            <Typography variant="caption" color="primary.light" sx={{ textTransform: "uppercase" }}>{t("login.eyebrow")}</Typography>
-            <Typography variant="h2" sx={{ textTransform: "uppercase" }}>Frontline Network</Typography>
-            <Typography color="text.secondary" sx={{ maxWidth: 420 }}>{t("login.intro")}</Typography>
+            <Typography
+              variant="caption"
+              color="primary.light"
+              sx={{ textTransform: "uppercase" }}
+            >
+              {t("login.eyebrow")}
+            </Typography>
+            <Typography variant="h2" sx={{ textTransform: "uppercase" }}>
+              Frontline Network
+            </Typography>
+            <Typography color="text.secondary" sx={{ maxWidth: 420 }}>
+              {t("login.intro")}
+            </Typography>
           </Stack>
         </HeroImageWrapper>
         <MainWrapper>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ p: 2 }}>
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+            sx={{ p: 2 }}
+          >
             <FrontlineBrand compact />
             <LanguageSelector />
           </Stack>
@@ -220,16 +238,24 @@ export default function Login() {
                 justifyContent: "center",
               }}
             >
-              <Typography component="h1" variant="h3" sx={{ alignSelf: "stretch", textTransform: "uppercase" }}>
+              <Typography
+                component="h1"
+                variant="h3"
+                sx={{ alignSelf: "stretch", textTransform: "uppercase" }}
+              >
                 {t("login.title")}
               </Typography>
               {data.error ? (
                 <Box sx={{ py: 2, width: "100%" }}>
-                  <Alert severity="error">{t(data.messageKey || "login.unknownError")}</Alert>
+                  <Alert severity="error">
+                    {t(data.messageKey || "login.unknownError")}
+                  </Alert>
                 </Box>
               ) : authError && !loading ? (
                 <Box sx={{ py: 2, width: "100%" }}>
-                  <Alert severity="error">{t(authError.messageKey || "login.unknownError")}</Alert>
+                  <Alert severity="error">
+                    {t(authError.messageKey || "login.unknownError")}
+                  </Alert>
                 </Box>
               ) : null}
               <Form method="POST" onSubmit={handleSubmit(onSubmit)}>
@@ -290,7 +316,9 @@ export default function Login() {
             </Box>
           </Container>
           <Stack justifyContent={"end"} sx={{ px: 3, pb: 2 }}>
-            <Typography variant="caption" color="text.secondary">Frontline Network · CRCON</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Frontline Network · CRCON
+            </Typography>
           </Stack>
         </MainWrapper>
       </Wrapper>

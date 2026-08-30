@@ -112,7 +112,6 @@ const criticalTranslationKeys = [
   "settings.config.closeAutobalancerSettings",
   "settings.config.openAutobalancerSettings",
   "settings.config.basicMode",
-  "settings.config.advancedJsonMode",
   "settings.config.reload",
   "settings.config.saveSettings",
   "settings.config.explanation",

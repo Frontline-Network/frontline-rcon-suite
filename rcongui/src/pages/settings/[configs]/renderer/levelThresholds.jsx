@@ -23,6 +23,7 @@ const LevelThresholdsRenderer = (props) => {
   const { t } = useTranslation();
   const { data, handleChange, path, label, description, errors } = props;
   const [selectedRole, setSelectedRole] = useState("");
+  const hasErrors = Boolean(errors?.length);
 
   const thresholds = data || {};
   const configuredRoles = Object.keys(thresholds);
@@ -65,8 +66,11 @@ const LevelThresholdsRenderer = (props) => {
   };
 
   return (
-    <FormControl fullWidth margin="normal" error={errors && errors.length > 0}>
-      <InputLabel shrink sx={{ position: "relative", transform: "none", mb: 1 }}>
+    <FormControl fullWidth margin="normal" error={hasErrors}>
+      <InputLabel
+        shrink
+        sx={{ position: "relative", transform: "none", mb: 1 }}
+      >
         {label || "level_thresholds"}
       </InputLabel>
       {description && (
@@ -80,7 +84,12 @@ const LevelThresholdsRenderer = (props) => {
 
           return (
             <Box key={roleKey} sx={{ mb: 2 }}>
-              <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ mb: 1 }}>
+              <Stack
+                direction="row"
+                spacing={1}
+                alignItems="flex-start"
+                sx={{ mb: 1 }}
+              >
                 <Typography variant="body2" sx={{ pt: 1, minWidth: 120 }}>
                   {roleLabel}
                 </Typography>
@@ -90,7 +99,9 @@ const LevelThresholdsRenderer = (props) => {
                       fullWidth
                       label={t("settings.config.label")}
                       value={roleConfig.label || ""}
-                      onChange={(e) => handleUpdateRole(roleKey, "label", e.target.value)}
+                      onChange={(e) =>
+                        handleUpdateRole(roleKey, "label", e.target.value)
+                      }
                       size="small"
                     />
                     <Stack direction="row" spacing={1}>
@@ -98,7 +109,13 @@ const LevelThresholdsRenderer = (props) => {
                         label={t("settings.config.minPlayers")}
                         type="number"
                         value={roleConfig.min_players ?? 0}
-                        onChange={(e) => handleUpdateRole(roleKey, "min_players", e.target.value)}
+                        onChange={(e) =>
+                          handleUpdateRole(
+                            roleKey,
+                            "min_players",
+                            e.target.value
+                          )
+                        }
                         inputProps={{ min: 0, max: 100 }}
                         size="small"
                         sx={{ flex: 1 }}
@@ -107,7 +124,9 @@ const LevelThresholdsRenderer = (props) => {
                         label={t("settings.config.minLevel")}
                         type="number"
                         value={roleConfig.min_level ?? 0}
-                        onChange={(e) => handleUpdateRole(roleKey, "min_level", e.target.value)}
+                        onChange={(e) =>
+                          handleUpdateRole(roleKey, "min_level", e.target.value)
+                        }
                         inputProps={{ min: 0, max: 500 }}
                         size="small"
                         sx={{ flex: 1 }}
@@ -118,7 +137,9 @@ const LevelThresholdsRenderer = (props) => {
                 <IconButton
                   size="small"
                   onClick={() => handleRemoveRole(roleKey)}
-                  aria-label={t("settings.config.removeRole", { role: roleLabel })}
+                  aria-label={t("settings.config.removeRole", {
+                    role: roleLabel,
+                  })}
                   sx={{ mt: 0.5 }}
                 >
                   <DeleteIcon fontSize="small" />
@@ -159,9 +180,7 @@ const LevelThresholdsRenderer = (props) => {
         )}
       </Box>
 
-      {errors && errors.length > 0 && (
-        <FormHelperText error>{errors}</FormHelperText>
-      )}
+      {hasErrors && <FormHelperText error>{errors}</FormHelperText>}
     </FormControl>
   );
 };
@@ -172,4 +191,3 @@ export const levelThresholdsTester = rankWith(
 );
 
 export const renderer = withJsonFormsControlProps(LevelThresholdsRenderer);
-

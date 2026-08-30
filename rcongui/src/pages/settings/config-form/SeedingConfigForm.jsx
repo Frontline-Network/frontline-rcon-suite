@@ -31,6 +31,7 @@ import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import { useTranslation } from "react-i18next";
 import { getAllRoles } from "@/constants/roles";
 import { get } from "@/utils/fetchUtils";
+import PlayerFlagPicker from "./PlayerFlagPicker";
 import StableNumberField from "./StableNumberField";
 
 const ROOT = "settings.configForms.seedingWorkbench";
@@ -112,7 +113,7 @@ function LabeledNumber({
         value={value}
         disabled={disabled}
         onChange={onChange}
-        inputProps={{ min, max }}
+        inputProps={{ min, max, "aria-label": label }}
         InputProps={{
           endAdornment: unit ? (
             <InputAdornment position="end">{unit}</InputAdornment>
@@ -299,8 +300,16 @@ function PlayerWindow({ rule, disabled, onChange }) {
   );
 }
 
-function RuleShell({ icon, title, description, active, children }) {
+function RuleShell({
+  icon,
+  title,
+  description,
+  enabled = true,
+  active,
+  children,
+}) {
   const { t } = useTranslation();
+  const status = !enabled ? "inactive" : active ? "active" : "incomplete";
   return (
     <Box
       sx={{
@@ -345,7 +354,7 @@ function RuleShell({ icon, title, description, active, children }) {
           </Box>
         </Stack>
         <Chip
-          label={t(`${ROOT}.status.${active ? "active" : "incomplete"}`)}
+          label={t(`${ROOT}.status.${status}`)}
           color={active ? "success" : "default"}
           size="small"
           variant={active ? "filled" : "outlined"}
@@ -353,7 +362,15 @@ function RuleShell({ icon, title, description, active, children }) {
         />
       </Stack>
       <Divider sx={{ borderColor: "rgba(214, 184, 112, 0.16)" }} />
-      <Stack spacing={2} sx={{ p: 1.75 }}>
+      <Stack
+        spacing={2}
+        aria-disabled={!enabled}
+        sx={{
+          p: 1.75,
+          opacity: enabled ? 1 : 0.52,
+          transition: "opacity 160ms ease",
+        }}
+      >
         {children}
       </Stack>
     </Box>
@@ -373,7 +390,9 @@ const getRuleMeta = (data) => {
 
   return {
     roles: {
+      enabled: data.disallowed_roles?.enabled !== false,
       active:
+        data.disallowed_roles?.enabled !== false &&
         Object.keys(roles).length > 0 &&
         (!isNestedRule(data.disallowed_roles) ||
           Number(data.disallowed_roles.max_players) > 0),
@@ -382,7 +401,9 @@ const getRuleMeta = (data) => {
       max: data.disallowed_roles?.max_players ?? 40,
     },
     weapons: {
+      enabled: data.disallowed_weapons?.enabled !== false,
       active:
+        data.disallowed_weapons?.enabled !== false &&
         Object.keys(weapons).length > 0 &&
         (!isNestedRule(data.disallowed_weapons) ||
           Number(data.disallowed_weapons.max_players) > 0),
@@ -391,7 +412,8 @@ const getRuleMeta = (data) => {
       max: data.disallowed_weapons?.max_players ?? 40,
     },
     cap: {
-      active: Number(cap.max_players) > 0,
+      enabled: cap.enabled !== false,
+      active: cap.enabled !== false && Number(cap.max_players) > 0,
       count: Number(cap.max_caps) || 0,
       min: cap.min_players ?? 1,
       max: cap.max_players ?? 50,
@@ -407,21 +429,16 @@ function RuleOverviewCard({
   selected,
   disabled,
   onSelect,
+  onToggle,
 }) {
   const { t } = useTranslation();
   return (
-    <Button
-      type="button"
-      onClick={onSelect}
-      disabled={disabled}
-      aria-pressed={selected}
+    <Box
       sx={{
         position: "relative",
         minHeight: 104,
-        p: 1.75,
-        justifyContent: "flex-start",
-        textAlign: "left",
-        color: "text.primary",
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 1fr) auto",
         border: "1px solid",
         borderColor: selected
           ? "rgba(214, 184, 112, 0.5)"
@@ -431,7 +448,6 @@ function RuleOverviewCard({
           ? "rgba(214, 170, 77, 0.08)"
           : "rgba(14, 18, 14, 0.6)",
         borderRadius: 0,
-        textTransform: "none",
         transition: "border-color 160ms ease, background-color 160ms ease",
         "&:hover": {
           bgcolor: "rgba(214, 170, 77, 0.1)",
@@ -439,57 +455,91 @@ function RuleOverviewCard({
         },
       }}
     >
-      <Stack
-        direction="row"
-        spacing={1.25}
-        alignItems="flex-start"
-        width="100%"
+      <Button
+        type="button"
+        onClick={onSelect}
+        disabled={disabled}
+        aria-pressed={selected}
+        sx={{
+          minWidth: 0,
+          p: 1.75,
+          justifyContent: "flex-start",
+          textAlign: "left",
+          color: "text.primary",
+          borderRadius: 0,
+          textTransform: "none",
+          "&:hover": { bgcolor: "transparent" },
+        }}
       >
-        <Box
-          sx={{
-            display: "grid",
-            placeItems: "center",
-            width: 38,
-            height: 38,
-            flex: "0 0 auto",
-            color: selected ? "primary.main" : "text.secondary",
-            bgcolor: "rgba(214, 170, 77, 0.08)",
-            borderRadius: 0,
-          }}
+        <Stack
+          direction="row"
+          spacing={1.25}
+          alignItems="flex-start"
+          width="100%"
         >
-          {icon}
-        </Box>
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Stack direction="row" justifyContent="space-between" spacing={1}>
+          <Box
+            sx={{
+              display: "grid",
+              placeItems: "center",
+              width: 38,
+              height: 38,
+              flex: "0 0 auto",
+              color: selected ? "primary.main" : "text.secondary",
+              bgcolor: "rgba(214, 170, 77, 0.08)",
+              borderRadius: 0,
+            }}
+          >
+            {icon}
+          </Box>
+          <Box sx={{ minWidth: 0, flex: 1 }}>
             <Typography variant="subtitle2" fontWeight={800}>
               {title}
             </Typography>
-            <Chip
-              label={t(
-                `${ROOT}.status.${meta.active ? "active" : "incomplete"}`
-              )}
-              color={meta.active ? "success" : "default"}
-              size="small"
-              variant="outlined"
-              sx={{ height: 22, borderRadius: 0 }}
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              display="block"
+              sx={{ mt: 0.5 }}
+            >
+              {meta.min}–{meta.max} {t(`${ROOT}.players`)} · {detail}
+            </Typography>
+            <LinearProgress
+              variant="determinate"
+              value={Math.min(100, Math.max(0, Number(meta.max) || 0))}
+              sx={{ mt: 1.25, height: 3, bgcolor: "action.hover" }}
             />
-          </Stack>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            display="block"
-            sx={{ mt: 0.5 }}
-          >
-            {meta.min}–{meta.max} {t(`${ROOT}.players`)} · {detail}
-          </Typography>
-          <LinearProgress
-            variant="determinate"
-            value={Math.min(100, Math.max(0, Number(meta.max) || 0))}
-            sx={{ mt: 1.25, height: 3, bgcolor: "action.hover" }}
+          </Box>
+        </Stack>
+      </Button>
+      <FormControlLabel
+        label={t(`${ROOT}.status.${meta.enabled ? "active" : "inactive"}`)}
+        labelPlacement="top"
+        disabled={disabled}
+        control={
+          <Switch
+            size="small"
+            checked={meta.enabled}
+            onChange={(event) => onToggle(event.target.checked)}
+            inputProps={{
+              "aria-label": t(`${ROOT}.rules.toggle`, { title }),
+            }}
           />
-        </Box>
-      </Stack>
-    </Button>
+        }
+        sx={{
+          m: 0,
+          minWidth: 82,
+          px: 1.25,
+          justifyContent: "center",
+          borderLeft: "1px solid",
+          borderColor: "rgba(214, 184, 112, 0.12)",
+          "& .MuiFormControlLabel-label": {
+            fontSize: "0.68rem",
+            fontWeight: 800,
+            color: meta.enabled ? "success.main" : "text.secondary",
+          },
+        }}
+      />
+    </Box>
   );
 }
 
@@ -528,7 +578,12 @@ function RuleEffectPreview({ selectedRule, meta }) {
         color="text.secondary"
         sx={{ mt: 1, lineHeight: 1.7 }}
       >
-        {current.active
+        {!current.enabled
+          ? t(`${ROOT}.effectPreview.disabled`, {
+              defaultValue:
+                "Diese Regel ist deaktiviert. Ihre Einstellungen bleiben gespeichert.",
+            })
+          : current.active
           ? t(`${ROOT}.effectPreview.active`, {
               defaultValue:
                 "Die Regel greift zwischen {{min}} und {{max}} Spielern und prüft {{count}} konfigurierte Einträge.",
@@ -541,8 +596,18 @@ function RuleEffectPreview({ selectedRule, meta }) {
                 "Diese Regel ist noch nicht vollständig eingerichtet und greift aktuell nicht ein.",
             })}
       </Typography>
-      <Alert severity={current.active ? "success" : "warning"} sx={{ mt: 2 }}>
-        {current.active
+      <Alert
+        severity={
+          current.active ? "success" : current.enabled ? "warning" : "info"
+        }
+        sx={{ mt: 2 }}
+      >
+        {!current.enabled
+          ? t(`${ROOT}.effectPreview.disabledNotice`, {
+              defaultValue:
+                "Aktiviere die Regel über den Schalter in der Übersicht, wenn sie wieder eingreifen soll.",
+            })
+          : current.active
           ? t(`${ROOT}.effectPreview.valid`, {
               defaultValue: "Die Regel ist einsatzbereit.",
             })
@@ -582,18 +647,24 @@ function RolesRule({ value, disabled, onChange }) {
     onChange(
       nested ? { ...rule, ...next } : Object.keys(next.roles || roleMap)
     );
+  const ruleDisabled = disabled || rule.enabled === false;
 
   return (
     <RuleShell
       icon={<Groups2OutlinedIcon fontSize="small" />}
       title={t(`${ROOT}.rules.roles.title`)}
       description={t(`${ROOT}.rules.roles.description`)}
-      active={selected.length > 0 && Number(rule.max_players) > 0}
+      enabled={rule.enabled !== false}
+      active={
+        rule.enabled !== false &&
+        selected.length > 0 &&
+        Number(rule.max_players) > 0
+      }
     >
       {nested && (
         <PlayerWindow
           rule={rule}
-          disabled={disabled}
+          disabled={ruleDisabled}
           onChange={(next) => patch(next)}
         />
       )}
@@ -601,7 +672,7 @@ function RolesRule({ value, disabled, onChange }) {
         multiple
         options={roleOptions}
         value={selected}
-        disabled={disabled}
+        disabled={ruleDisabled}
         isOptionEqualToValue={(option, selectedOption) =>
           option.value === selectedOption.value
         }
@@ -625,7 +696,7 @@ function RolesRule({ value, disabled, onChange }) {
           label={t(`${ROOT}.fields.violationMessage`)}
           help={t(`${ROOT}.fields.roleMessageHelp`)}
           value={rule.violation_message}
-          disabled={disabled}
+          disabled={ruleDisabled}
           onChange={(violation_message) => patch({ violation_message })}
           placeholders={["{role}"]}
           rows={2}
@@ -660,7 +731,11 @@ function WeaponsEditor({ value, options = [], disabled, onChange }) {
     });
 
   const defaultReadableName = (name, type) => {
-    if (["artillery", "commander", "pak", "self_propelled_artillery"].includes(type)) {
+    if (
+      ["artillery", "commander", "pak", "self_propelled_artillery"].includes(
+        type
+      )
+    ) {
       return weaponTypeLabel(type);
     }
     return name;
@@ -671,7 +746,8 @@ function WeaponsEditor({ value, options = [], disabled, onChange }) {
       typeof selection === "string"
         ? selection.trim()
         : String(selection?.name || "").trim();
-    if (!name || Object.prototype.hasOwnProperty.call(value || {}, name)) return;
+    if (!name || Object.prototype.hasOwnProperty.call(value || {}, name))
+      return;
 
     const type =
       typeof selection === "string"
@@ -811,21 +887,27 @@ function WeaponsRule({ value, weaponOptions, disabled, onChange }) {
     onChange(
       nested ? { ...rule, ...next } : Object.keys(next.weapons || weapons)
     );
+  const ruleDisabled = disabled || rule.enabled === false;
 
   return (
     <RuleShell
       icon={<SportsEsportsOutlinedIcon fontSize="small" />}
       title={t(`${ROOT}.rules.weapons.title`)}
       description={t(`${ROOT}.rules.weapons.description`)}
-      active={Object.keys(weapons).length > 0 && Number(rule.max_players) > 0}
+      enabled={rule.enabled !== false}
+      active={
+        rule.enabled !== false &&
+        Object.keys(weapons).length > 0 &&
+        Number(rule.max_players) > 0
+      }
     >
       {nested && (
-        <PlayerWindow rule={rule} disabled={disabled} onChange={patch} />
+        <PlayerWindow rule={rule} disabled={ruleDisabled} onChange={patch} />
       )}
       <WeaponsEditor
         value={weapons}
         options={weaponOptions}
-        disabled={disabled}
+        disabled={ruleDisabled}
         onChange={(nextWeapons) => patch({ weapons: nextWeapons })}
       />
       {nested && (
@@ -833,7 +915,7 @@ function WeaponsRule({ value, weaponOptions, disabled, onChange }) {
           label={t(`${ROOT}.fields.violationMessage`)}
           help={t(`${ROOT}.fields.weaponMessageHelp`)}
           value={rule.violation_message}
-          disabled={disabled}
+          disabled={ruleDisabled}
           onChange={(violation_message) => patch({ violation_message })}
           placeholders={["{weapon}"]}
           rows={2}
@@ -854,27 +936,24 @@ function CapRule({ value, disabled, onChange }) {
         max_caps: 3,
         skip_warning: true,
       };
-  const active = nested ? Number(rule.max_players) > 0 : Boolean(value);
+  const enabled = nested ? rule.enabled !== false : Boolean(value);
+  const active =
+    enabled && (nested ? Number(rule.max_players) > 0 : Boolean(value));
   const patch = (next) =>
     onChange(nested ? { ...rule, ...next } : Boolean(next.max_players));
+  const ruleDisabled = disabled || !enabled;
 
   return (
     <RuleShell
       icon={<FlagOutlinedIcon fontSize="small" />}
       title={t(`${ROOT}.rules.cap.title`)}
       description={t(`${ROOT}.rules.cap.description`)}
+      enabled={enabled}
       active={active}
     >
-      <SwitchCard
-        checked={active}
-        disabled={disabled}
-        title={t(`${ROOT}.rules.cap.switchTitle`)}
-        description={t(`${ROOT}.rules.cap.switchHelp`)}
-        onChange={(checked) => patch({ max_players: checked ? 50 : 0 })}
-      />
-      {nested && active && (
+      {nested && (
         <>
-          <PlayerWindow rule={rule} disabled={disabled} onChange={patch} />
+          <PlayerWindow rule={rule} disabled={ruleDisabled} onChange={patch} />
           <Box
             sx={{
               display: "grid",
@@ -890,13 +969,13 @@ function CapRule({ value, disabled, onChange }) {
               help={t(`${ROOT}.fields.maxCapsHelp`)}
               value={rule.max_caps ?? 3}
               onChange={(max_caps) => patch({ max_caps })}
-              disabled={disabled}
+              disabled={ruleDisabled}
               min={2}
               max={4}
             />
             <SwitchCard
               checked={rule.skip_warning}
-              disabled={disabled}
+              disabled={ruleDisabled}
               title={t(`${ROOT}.fields.directPunish`)}
               description={t(`${ROOT}.fields.directPunishHelp`)}
               onChange={(skip_warning) => patch({ skip_warning })}
@@ -906,7 +985,7 @@ function CapRule({ value, disabled, onChange }) {
             label={t(`${ROOT}.fields.violationMessage`)}
             help={t(`${ROOT}.fields.capMessageHelp`)}
             value={rule.violation_message}
-            disabled={disabled}
+            disabled={ruleDisabled}
             onChange={(violation_message) => patch({ violation_message })}
             rows={2}
           />
@@ -920,6 +999,24 @@ function RulesSection({ data, weaponOptions, disabled, patch }) {
   const { t } = useTranslation();
   const [selectedRule, setSelectedRule] = useState("roles");
   const meta = getRuleMeta(data);
+  const toggleRule = (ruleId, enabled) => {
+    const keyByRule = {
+      roles: "disallowed_roles",
+      weapons: "disallowed_weapons",
+      cap: "enforce_cap_fight",
+    };
+    const key = keyByRule[ruleId];
+    const current = data[key];
+
+    if (isNestedRule(current)) {
+      patch({ [key]: { ...current, enabled } });
+      return;
+    }
+
+    // Legacy configurations are only possible before the new schema is loaded.
+    // Keep their former boolean behavior until the backend returns nested rules.
+    if (ruleId === "cap") patch({ [key]: enabled });
+  };
   const ruleCards = [
     {
       id: "roles",
@@ -960,6 +1057,10 @@ function RulesSection({ data, weaponOptions, disabled, patch }) {
             selected={selectedRule === rule.id}
             disabled={disabled}
             onSelect={() => setSelectedRule(rule.id)}
+            onToggle={(enabled) => {
+              setSelectedRule(rule.id);
+              toggleRule(rule.id, enabled);
+            }}
           />
         ))}
       </Box>
@@ -1197,20 +1298,10 @@ function ExemptionsSection({ data, disabled, patch }) {
 
   return (
     <Stack spacing={2}>
-      <Autocomplete
-        multiple
-        freeSolo
-        options={[]}
+      <PlayerFlagPicker
         value={data.whitelist_flags || []}
         disabled={disabled}
-        onChange={(_, whitelist_flags) => patch({ whitelist_flags })}
-        renderInput={(params) => (
-          <TextField
-            {...params}
-            label={t(`${ROOT}.fields.flags`)}
-            helperText={t(`${ROOT}.fields.flagsHelp`)}
-          />
-        )}
+        onChange={(whitelist_flags) => patch({ whitelist_flags })}
       />
       <Autocomplete
         multiple

@@ -9,6 +9,8 @@ export function getVariantWidth(variant) {
       return "1.25em";
     case "short":
       return "4em";
+    case "ratio":
+      return "5.5em";
     case "time":
       return "16ch";
     case "name":
@@ -42,6 +44,8 @@ export function getVariantMinWidth(variant) {
       return "1.25em";
     case "short":
       return "4em";
+    case "ratio":
+      return "5.5em";
     case "time":
       return "16ch";
     case "name":
@@ -149,15 +153,22 @@ export const StyledThead = styled("thead")(({ theme }) => ({
 
 export const StyledTh = styled("th", {
   shouldForwardProp: (prop) =>
-    !["variant", "minWidth", "sticky", "stickyOffset"].includes(prop),
+    ![
+      "variant",
+      "minWidth",
+      "cellAlign",
+      "sticky",
+      "stickyOffset",
+    ].includes(prop),
 })((styledProps) => {
   const variant = styledProps.variant;
+  const cellAlign = styledProps.cellAlign;
   const sticky = styledProps.sticky;
   return {
     width: getVariantWidth(variant),
     minWidth: getVariantMinWidth(variant),
     maxWidth: getVariantMaxWidth(variant),
-    textAlign: variant === "icon" ? "center" : "left",
+    textAlign: cellAlign || (variant === "icon" ? "center" : "left"),
     paddingLeft: variant === "icon" ? 0 : undefined,
     paddingRight: variant === "icon" ? 0 : undefined,
     ...(sticky
@@ -173,16 +184,23 @@ export const StyledTh = styled("th", {
 
 export const StyledTd = styled("td", {
   shouldForwardProp: (prop) =>
-    !["variant", "minWidth", "sticky", "stickyOffset"].includes(prop),
+    ![
+      "variant",
+      "minWidth",
+      "cellAlign",
+      "sticky",
+      "stickyOffset",
+    ].includes(prop),
 })((styledProps) => {
   const variant = styledProps.variant;
+  const cellAlign = styledProps.cellAlign;
   const sticky = styledProps.sticky;
 
   return {
     width: getVariantWidth(variant),
     minWidth: getVariantMinWidth(variant),
     maxWidth: getVariantMaxWidth(variant),
-    textAlign: variant === "icon" ? "center" : "left",
+    textAlign: cellAlign || (variant === "icon" ? "center" : "left"),
     ...(sticky
       ? {
           position: "sticky",
@@ -196,6 +214,19 @@ export const StyledTd = styled("td", {
 
 export const StyledTr = styled("tr")(({ theme }) => ({
   borderBottom: `1px solid ${theme.palette.divider}`,
+  "&[data-interactive='true']": {
+    cursor: "pointer",
+  },
+  "&[data-interactive='true']:hover": {
+    backgroundColor: theme.palette.action.hover,
+  },
+  "&[data-inspected='true']": {
+    backgroundColor: theme.palette.action.selected,
+    boxShadow: `inset 2px 0 0 ${theme.palette.primary.main}`,
+  },
+  "&[data-inspected='true']:hover": {
+    backgroundColor: theme.palette.action.selected,
+  },
 }));
 
 export const Action = styled("div", {
@@ -222,47 +253,60 @@ export const HeaderButton = styled((props) => (
   <Button size="small" {...props} />
 ))(({ theme }) => ({
   width: "100%",
+  minWidth: 0,
+  paddingLeft: 0,
+  paddingRight: 0,
   borderRadius: 0,
   textAlign: "left",
   color: theme.palette.text.primary,
   fontSize: "1em",
   textDecoration: "none",
   textTransform: "none",
-  minWidth: "fit-content",
 }));
 
 export const SortableHeader =
   (text, title) =>
   ({ column }) => {
     const isIconColumn = column.columnDef?.meta?.variant === "icon";
+    const alignment = column.columnDef?.meta?.align;
+    const sortDirection = column.getIsSorted();
+    const justifyContent =
+      alignment === "right"
+        ? "flex-end"
+        : alignment === "center" || isIconColumn
+          ? "center"
+          : "flex-start";
+    const sortIcon = sortDirection ? (
+      sortDirection === "asc" ? (
+        <ArrowUpwardIcon
+          sx={{
+            fontSize: "1em",
+            width: "1em",
+            height: "1em",
+            ...(alignment === "right" ? { mr: 0.5 } : { ml: 0.5 }),
+          }}
+        />
+      ) : (
+        <ArrowDownwardIcon
+          sx={{
+            fontSize: "1em",
+            width: "1em",
+            height: "1em",
+            ...(alignment === "right" ? { mr: 0.5 } : { ml: 0.5 }),
+          }}
+        />
+      )
+    ) : null;
 
     return (
       <HeaderButton
         onClick={column.getToggleSortingHandler()}
         title={title || ""}
-        sx={{ justifyContent: isIconColumn ? "center" : "flex-start" }}
+        sx={{ justifyContent }}
       >
+        {alignment === "right" && sortIcon}
         {text}
-        {column.getIsSorted() &&
-          (column.getIsSorted() === "asc" ? (
-            <ArrowUpwardIcon
-              sx={{
-                fontSize: "1em",
-                width: "1em",
-                height: "1em",
-                ml: 0.5,
-              }}
-            />
-          ) : (
-            <ArrowDownwardIcon
-              sx={{
-                fontSize: "1em",
-                width: "1em",
-                height: "1em",
-                ml: 0.5,
-              }}
-            />
-          ))}
+        {alignment !== "right" && sortIcon}
       </HeaderButton>
     );
   };

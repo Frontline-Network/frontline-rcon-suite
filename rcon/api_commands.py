@@ -179,6 +179,10 @@ class RconAPI(Rcon):
             ],
         }
 
+    def get_available_player_flags(self) -> dict[str, Any]:
+        """Return player markings already used by this CRCON instance."""
+        return {"flags": player_history.get_available_player_flags()}
+
     @staticmethod
     def _validate_user_config(
         command_name: str,
@@ -307,6 +311,7 @@ class RconAPI(Rcon):
         reason: str = None,
         blacklist_id: int = None,
         exclude_expired: bool = False,
+        expired_only: bool = False,
         page_size: int = 50,
         page: int = 1,
     ):
@@ -321,6 +326,7 @@ class RconAPI(Rcon):
                 reason=reason,
                 blacklist_id=blacklist_id,
                 exclude_expired=exclude_expired,
+                expired_only=expired_only,
                 page_size=page_size,
                 page=page,
             )

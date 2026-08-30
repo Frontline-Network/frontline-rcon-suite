@@ -90,9 +90,11 @@ export default function BlacklistRecordCreateDialog({
         .then((server) => setCurrentServer(server))
         .catch(() => setCurrentServer({}));
 
-      getSharedMessages(messageType).then((sharedMessages) => {
-        setPunishMessages(sharedMessages.concat(locallyStoredMessages));
-      });
+      getSharedMessages(messageType)
+        .then((sharedMessages) => {
+          setPunishMessages(sharedMessages.concat(locallyStoredMessages));
+        })
+        .catch(() => setPunishMessages(locallyStoredMessages));
     }
   }, [open]);
 
@@ -225,7 +227,7 @@ export default function BlacklistRecordCreateDialog({
                   <Alert severity="info">
                     {t("records.blacklists.indefiniteNotice")}
                   </Alert>
-                  <input type="hidden" name="expiresAt" value={null} />
+                  <input type="hidden" name="expiresAt" value="" />
                 </>
               )}
               </Grid>

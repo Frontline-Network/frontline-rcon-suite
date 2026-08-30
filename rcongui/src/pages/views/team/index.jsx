@@ -410,7 +410,7 @@ const TeamViewPage = () => {
           <Stack direction="row" spacing={0.5} alignItems="center">
             <MessageAllDialog />
             <DisbandSquadDialog />
-            <Tooltip title={t("common.selectAll")}>
+            <Tooltip disableInteractive title={t("common.selectAll")}>
               <IconButton
                 aria-label={t("common.selectAll")}
                 onClick={selectAllVisible}
@@ -420,6 +420,7 @@ const TeamViewPage = () => {
               </IconButton>
             </Tooltip>
             <Tooltip
+              disableInteractive
               title={
                 anySquadCollapsed
                   ? t("views.team.expandAll")
@@ -619,7 +620,7 @@ const TeamViewPage = () => {
           >
             {t("common.unselectAll")}
           </Button>
-          <Tooltip title={t("common.unselectAll")}>
+          <Tooltip disableInteractive title={t("common.unselectAll")}>
             <IconButton
               aria-label={t("common.unselectAll")}
               onClick={() => setSelectedPlayers(new Map())}

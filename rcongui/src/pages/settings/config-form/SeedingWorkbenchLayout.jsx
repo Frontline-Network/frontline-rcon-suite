@@ -1,18 +1,32 @@
 import { Box, ButtonBase, Chip, Stack, Typography } from "@mui/material";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import CampaignOutlinedIcon from "@mui/icons-material/CampaignOutlined";
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
+import ExitToAppOutlinedIcon from "@mui/icons-material/ExitToAppOutlined";
 import GavelOutlinedIcon from "@mui/icons-material/GavelOutlined";
 import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
+import RedeemOutlinedIcon from "@mui/icons-material/RedeemOutlined";
 import RuleOutlinedIcon from "@mui/icons-material/RuleOutlined";
+import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 
 const sectionIcons = {
   operation: DashboardOutlinedIcon,
+  requirements: CheckCircleOutlineIcon,
+  detection: VisibilityOutlinedIcon,
   rules: RuleOutlinedIcon,
   exemptions: ShieldOutlinedIcon,
+  announcements: CampaignOutlinedIcon,
+  warnings: CampaignOutlinedIcon,
+  punishments: GavelOutlinedIcon,
+  kick: ExitToAppOutlinedIcon,
   actions: GavelOutlinedIcon,
+  reward: RedeemOutlinedIcon,
+  messages: CampaignOutlinedIcon,
+  schedule: ScheduleOutlinedIcon,
   notifications: NotificationsNoneOutlinedIcon,
 };
 
@@ -156,6 +170,7 @@ export default function SeedingWorkbenchLayout({
   actionBar,
   testId = "config-page-shell",
   sx,
+  embedded = false,
 }) {
   const hasNavigation = sections.length > 0;
   const hasSummary = Boolean(summary);
@@ -165,7 +180,7 @@ export default function SeedingWorkbenchLayout({
       data-testid={testId}
       sx={{
         width: "100%",
-        maxWidth: 1460,
+        maxWidth: embedded ? "none" : 1460,
         mx: "auto",
         "& .MuiButton-root, & .MuiToggleButton-root, & .MuiOutlinedInput-root, & .MuiOutlinedInput-notchedOutline, & .MuiAlert-root, & .MuiChip-root":
           {
@@ -184,10 +199,10 @@ export default function SeedingWorkbenchLayout({
           },
           gap: { xs: 1.5, md: 3 },
           alignItems: "end",
-          mb: 1.5,
+          mb: embedded ? 1 : 1.5,
         }}
       >
-        <Box sx={{ minWidth: 0 }}>
+        <Box sx={{ minWidth: 0, display: embedded ? "none" : "block" }}>
           {eyebrow && (
             <Typography
               variant="overline"
@@ -235,6 +250,7 @@ export default function SeedingWorkbenchLayout({
         {headerActions && (
           <Box
             sx={{
+              gridColumn: embedded ? "1 / -1" : undefined,
               justifySelf: { xs: "stretch", md: "end" },
               minWidth: { md: 300 },
               "& [data-testid='config-mode-toggle']": {
@@ -256,6 +272,7 @@ export default function SeedingWorkbenchLayout({
       <Box
         sx={{
           border: "1px solid",
+          borderTopColor: embedded ? "divider" : undefined,
           borderColor: "divider",
           borderRadius: 0,
           bgcolor: "background.paper",
