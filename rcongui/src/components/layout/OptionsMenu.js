@@ -22,7 +22,7 @@ const MenuItem = styled(MuiMenuItem)({
   margin: '2px 0',
 });
 
-export default function OptionsMenu() {
+export default function OptionsMenu({ renderTrigger }) {
   const { t } = useTranslation();
   const [anchorEl, setAnchorEl] = useState(null);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
@@ -43,19 +43,26 @@ export default function OptionsMenu() {
   const handleChangePassword = () => {
     location.href = '/accounts/password_change';
   }
+  const triggerProps = {
+    "aria-label": t("common.actions"),
+    "aria-controls": open ? "user-options-menu-popover" : undefined,
+    "aria-expanded": open || undefined,
+    "aria-haspopup": "menu",
+    "data-testid": "user-options-menu",
+    onClick: handleClick,
+  };
   return (
     <Fragment>
-      <MenuButton
-        aria-label={t("common.actions")}
-        data-testid="user-options-menu"
-        onClick={handleClick}
-        sx={{ borderColor: 'transparent' }}
-      >
-        <MoreVertRoundedIcon />
-      </MenuButton>
+      {renderTrigger ? (
+        renderTrigger(triggerProps)
+      ) : (
+        <MenuButton {...triggerProps} sx={{ borderColor: 'transparent' }}>
+          <MoreVertRoundedIcon />
+        </MenuButton>
+      )}
       <Menu
         anchorEl={anchorEl}
-        id="menu"
+        id="user-options-menu-popover"
         open={open}
         onClose={handleClose}
         onClick={handleClose}

@@ -1,14 +1,24 @@
 import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { Avatar, Box, Stack, Tooltip, Typography } from "@mui/material";
+import {
+  Avatar,
+  Box,
+  IconButton,
+  Stack,
+  Tooltip,
+  Typography,
+} from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { useAppStore } from "@/stores/app-state";
 import { cmd } from "@/utils/fetchUtils";
 import OptionsMenu from "../OptionsMenu";
+import { useTranslation } from "react-i18next";
 
 export const UserActions = ({ compact = false }) => {
+  const { t } = useTranslation();
   const { permissions } = useAuth();
   const userKey = permissions?.user_name;
+  const userLabel = permissions?.user_name ?? "?????";
   const selectAppearanceUser = useAppStore(
     (state) => state.selectAppearanceUser
   );
@@ -44,27 +54,48 @@ export const UserActions = ({ compact = false }) => {
         borderColor: "divider",
       }}
     >
-      <Tooltip
-        title={permissions?.user_name ?? "?????"}
-        placement={compact ? "right" : "top"}
-      >
-        <Avatar
-          sizes="small"
-          alt={permissions?.user_name?.toUpperCase() ?? "?"}
-          sx={{ width: compact ? 34 : 36, height: compact ? 34 : 36 }}
-        />
-      </Tooltip>
+      <OptionsMenu
+        renderTrigger={(triggerProps) => (
+          <Tooltip
+            title={`${userLabel} · ${t("common.actions")}`}
+            placement={compact ? "right" : "top"}
+          >
+            <IconButton
+              {...triggerProps}
+              sx={(theme) => ({
+                width: compact ? 44 : 42,
+                height: compact ? 44 : 42,
+                borderRadius: 0,
+                border: "1px solid transparent",
+                "&:hover": {
+                  bgcolor: "action.hover",
+                  borderColor: "divider",
+                },
+                "&:focus-visible": {
+                  outline: `2px solid ${theme.palette.primary.main}`,
+                  outlineOffset: -2,
+                },
+              })}
+            >
+              <Avatar
+                sizes="small"
+                alt={permissions?.user_name?.toUpperCase() ?? "?"}
+                sx={{ width: compact ? 34 : 36, height: compact ? 34 : 36 }}
+              />
+            </IconButton>
+          </Tooltip>
+        )}
+      />
       {!compact && (
         <Box sx={{ mr: "auto" }}>
           <Typography
             variant="body2"
             sx={{ fontWeight: 500, lineHeight: "16px" }}
           >
-            {permissions?.user_name ?? "?????"}
+            {userLabel}
           </Typography>
         </Box>
       )}
-      <OptionsMenu />
     </Stack>
   );
 };
