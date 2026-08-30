@@ -554,3 +554,58 @@ The implementation follows the selected full-width ledger direction and the esta
 3. Final normalized comparison: no actionable P0, P1 or P2 visual discrepancy remains.
 
 final result: passed
+
+---
+
+# Design QA — VIP-Einsatzregister (Option 1)
+
+## Evidence
+
+- Source visual truth: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-352047f9-32f0-4929-9348-dcc45136ef0d.png`
+- Final desktop implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\vips\09-implementation-1704x923-selected-expanded.png`
+- Final full-view comparison: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\vips\10-qa-final-full-comparison.png`
+- Final focused register comparison: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\vips\11-qa-final-register-comparison.png`
+- Mobile implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\vips\04-implementation-mobile.png`
+- Tablet implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\vips\05-implementation-tablet.png`
+- Source pixels: 1704 × 923.
+- Final implementation pixels and CSS viewport: 1704 × 923 at device scale factor 1; no density conversion required.
+- Additional responsive checks: 768 × 900 and 390 × 844 CSS pixels.
+- Compared state: German dark theme, four realistic VIP records, FLN_Wolf selected and expanded, current-server mutation scope.
+
+## Findings
+
+- No actionable P0, P1 or P2 mismatch remains. The implementation preserves the selected Einsatzregister composition: command header, five-part summary strip, narrow filter rail, dense one-line register, selected/expanded VIP case file and sticky bulk-action strip.
+- Fonts and typography: the existing Frontline condensed display hierarchy and compact body labels are retained. Table copy uses the same restrained weights, uppercase labels and line rhythm as the selected visual.
+- Spacing and layout rhythm: square one-pixel borders, compact row height, gold selection line and flat detail surface match the mockup. The register uses the available width without horizontal overflow.
+- Colors and visual tokens: the implementation uses the existing green-black surfaces, ivory text, restrained gold focus state and semantic green/amber/red statuses. No gradients, shadows or generic rounded cards were added.
+- Image and icon fidelity: the selected visual contains no required raster imagery. Existing MUI icons provide a consistent real icon family for VIP, status, edit, delete, profile, refresh and import/export actions; no custom SVG or CSS drawings were introduced.
+- Copy and content: the list source is explicitly labelled as the current server, while the mutation scope clearly distinguishes this server from all servers. The implementation intentionally omits creator/history metadata shown conceptually in the mockup because the current API does not supply reliable values.
+- Responsive behavior: at 390 px the desktop table becomes compact mobile records, filters collapse behind an explicit button, actions retain usable targets and the document remains exactly 390 px wide. At 768 px the detail file uses a four-column information band without clipping.
+- Accessibility and behavior: search, quick filters, duration filter, mutation scope, sorting, page selection, row expansion, profile access, add/edit, import/export, confirmation and bulk actions are keyboard-addressable and labelled. Individual removal now requires confirmation.
+
+## Comparison history
+
+1. P2 — the first mobile summary left the fifth status tile at half width and created an unbalanced empty cell.
+   - Fix: the final status tile now spans both mobile grid columns and returns to one column from the tablet breakpoint onward.
+   - Post-fix evidence: final 390 px viewport has no horizontal overflow and a balanced full-width expired-status row.
+2. P2 — the first comparison used an expanded but unselected implementation row, while the source truth showed both selection and expansion plus a bulk-action strip.
+   - Fix: the final comparison uses the same selected/expanded state and verifies the sticky selection actions.
+   - Post-fix evidence: `10-qa-final-full-comparison.png` and `11-qa-final-register-comparison.png` show matching gold row emphasis, expanded dossier and bulk controls.
+3. Product-safe deviation — the source mock reports two active records despite three non-expired records, and includes profile/creator timestamps unavailable from the current VIP endpoint.
+   - Resolution: the implementation derives the factual active total from expiration data and does not invent unavailable audit metadata.
+
+## Verification
+
+- Production build: passed with `REACT_APP_API_URL=/`.
+- Search and expiring-within-seven-days filter: passed; the result set contains FLN_Valkyrie and excludes FLN_Raven.
+- Desktop and mobile row expansion: passed.
+- Selection and sticky bulk actions: passed.
+- Add/edit and import/export dialogs: passed.
+- Desktop, tablet and mobile horizontal overflow: none.
+- Browser console errors: none; only the existing React Router v7 future-flag warning remains.
+
+## Follow-up polish
+
+- P3: if the backend later exposes creator, creation time and last-update metadata, those fields can be added to the VIP case file without changing its layout.
+
+final result: passed

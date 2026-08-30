@@ -1,475 +1,612 @@
+import { useCallback, useMemo, useState } from "react";
 import {
-  Stack,
-  Typography,
-  IconButton,
-  TextField,
+  Alert,
+  Box,
   Button,
-  CircularProgress,
-  ToggleButtonGroup,
-  ToggleButton,
+  ButtonBase,
+  Collapse,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Divider,
+  FormControl,
+  InputAdornment,
+  LinearProgress,
+  MenuItem,
+  Select,
+  Snackbar,
+  Stack,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+  Typography,
 } from "@mui/material";
-import getVipColumns from "./vip-columns";
-import VipTable from "./vip-table";
+import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
+import ImportExportOutlinedIcon from "@mui/icons-material/ImportExportOutlined";
+import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
+import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
+import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
+import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
+import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
+import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
+import AllInclusiveOutlinedIcon from "@mui/icons-material/AllInclusiveOutlined";
+import ErrorOutlineOutlinedIcon from "@mui/icons-material/ErrorOutlineOutlined";
 import {
-  QueryClient,
-  useQuery,
-  dehydrate,
   HydrationBoundary,
+  QueryClient,
+  dehydrate,
   useMutation,
+  useQuery,
 } from "@tanstack/react-query";
-import { vipMutationOptions, vipQueryOptions } from "@/queries/vip-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLoaderData } from "react-router-dom";
-import DeleteIcon from "@mui/icons-material/Delete";
-import EditIcon from "@mui/icons-material/Edit";
-import {
-  DesktopDateTimePicker,
-  LocalizationProvider,
-} from "@mui/x-date-pickers";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
-import Padlock from "@/components/shared/Padlock";
-import PlayerSearchField from "@/components/form/custom/PlayerSearchField";
-import { queryClient } from "@/queryClient";
-import ErrorIcon from "@mui/icons-material/Error";
-import CheckIcon from "@mui/icons-material/Check";
-import debug from "@/utils/debug";
-import { VipBulkEditDialog } from "./VipBulkEditDialog";
-import VipDownload from "./VipDownload";
-import VipUpload from "./VipUpload";
 import { useTranslation } from "react-i18next";
+import { useLoaderData } from "react-router-dom";
 import PageHeader from "@/components/shared/PageHeader";
+import { usePlayerSidebar } from "@/hooks/usePlayerSidebar";
+import { queryClient } from "@/queryClient";
+import { vipMutationOptions, vipQueryOptions } from "@/queries/vip-query";
+import debug from "@/utils/debug";
+import VipEditorDialog from "./VipEditorDialog";
+import VipTable from "./vip-table";
+import VipTransferDialog from "./VipTransferDialog";
+import { VipBulkEditDialog } from "./VipBulkEditDialog";
+import {
+  INDEFINITE_EXPIRATION,
+  getVipCategory,
+  isVipExpired,
+  isVipExpiringSoon,
+  isVipIndefinite,
+} from "./vip-utils";
 
 const logger = debug("VIP VIEW");
+const VIP_QUERY_KEY = vipQueryOptions.list().queryKey;
 
-const INDEFINITE_EXPIRATION = "3000-01-01T00:00:00+00:00";
+const getMutationIssue = (response) => {
+  if (response?.failed || response?.result?.failed) {
+    return response?.error || response?.result?.error || "request_failed";
+  }
+  const forwarding =
+    response?.forward_results || response?.result?.forward_results;
+  if (
+    forwarding &&
+    Object.values(forwarding).some((result) => result?.failed)
+  ) {
+    return "partial_forward_failure";
+  }
+  return null;
+};
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const SummaryItem = ({
+  icon,
+  label,
+  value,
+  active,
+  onClick,
+  color,
+  wideOnMobile = false,
+}) => (
+  <ButtonBase
+    onClick={onClick}
+    sx={{
+      minWidth: 0,
+      justifyContent: "flex-start",
+      textAlign: "left",
+      borderRight: { xs: 0, sm: "1px solid" },
+      borderBottom: { xs: "1px solid", sm: 0 },
+      borderColor: "divider",
+      px: 1.75,
+      py: 1.25,
+      bgcolor: active ? "action.selected" : "transparent",
+      boxShadow: active ? "inset 0 -2px 0" : "none",
+      color: active ? "primary.main" : "text.primary",
+      gridColumn: { xs: wideOnMobile ? "1 / -1" : "auto", sm: "auto" },
+      "&:hover": { bgcolor: "action.hover" },
+      "&:focus-visible": {
+        outline: "2px solid",
+        outlineColor: "primary.main",
+        outlineOffset: -2,
+      },
+    }}
+  >
+    <Stack direction="row" alignItems="center" gap={1.25} minWidth={0}>
+      <Box
+        sx={{
+          display: "grid",
+          placeItems: "center",
+          width: 34,
+          height: 34,
+          flex: "0 0 34px",
+          border: "1px solid",
+          borderColor: "divider",
+          color,
+        }}
+      >
+        {icon}
+      </Box>
+      <Box minWidth={0}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          noWrap
+          display="block"
+        >
+          {label}
+        </Typography>
+        <Typography variant="h6" lineHeight={1.05} color="text.primary">
+          {value}
+        </Typography>
+      </Box>
+    </Stack>
+  </ButtonBase>
+);
+
+const FilterOption = ({ active, icon, label, count, onClick }) => (
+  <Button
+    fullWidth
+    onClick={onClick}
+    variant="text"
+    sx={{
+      justifyContent: "flex-start",
+      minHeight: 38,
+      px: 1,
+      color: active ? "primary.main" : "text.secondary",
+      bgcolor: active ? "action.selected" : "transparent",
+      borderLeft: "2px solid",
+      borderColor: active ? "primary.main" : "transparent",
+      "&:hover": { bgcolor: "action.hover" },
+    }}
+  >
+    <Box sx={{ display: "grid", placeItems: "center", width: 22, mr: 0.75 }}>
+      {icon}
+    </Box>
+    <Typography variant="body2" sx={{ flex: 1, textAlign: "left" }}>
+      {label}
+    </Typography>
+    <Typography variant="caption" color="text.secondary">
+      {count}
+    </Typography>
+  </Button>
+);
 
 export const loader = async () => {
-  const queryClient = new QueryClient();
-
+  const loaderQueryClient = new QueryClient();
   logger("prefetching vip list");
-  queryClient.prefetchQuery(vipQueryOptions.list());
-
-  return { dehydratedState: dehydrate(queryClient) };
+  loaderQueryClient.prefetchQuery(vipQueryOptions.list());
+  return { dehydratedState: dehydrate(loaderQueryClient) };
 };
 
 const VipPageContent = () => {
-  const { t, i18n } = useTranslation();
-  const { data, isLoading, isFetching, refetch, dataUpdatedAt } = useQuery(
-    vipQueryOptions.list()
-  );
+  const { t } = useTranslation();
+  const { openWithId } = usePlayerSidebar();
+  const {
+    data = [],
+    isLoading,
+    isFetching,
+    refetch,
+    dataUpdatedAt,
+  } = useQuery(vipQueryOptions.list());
 
   const [operationMode, setOperationMode] = useState("single");
-
-  const forward = operationMode === "multi";
-  const [PENDING, ERROR, SUCCESS, COMPLETED] = [0, 1, 2, 3];
-
-  const { mutate: removeVip } = useMutation({
-    ...vipMutationOptions.remove,
-    retry: 3,
-    retryDelay: 1000,
-    onMutate: async (variables) => {
-      logger("removeVip", "onMutate", variables);
-
-      await queryClient.cancelQueries({
-        queryKey: vipQueryOptions.list().queryKey,
-      });
-
-      const previousData = queryClient.getQueryData(
-        vipQueryOptions.list().queryKey
-      );
-
-      queryClient.setQueryData(vipQueryOptions.list().queryKey, (old) => {
-        return old.map((row) => {
-          if (row.player_id === variables.player_id) {
-            return { ...row, _state: PENDING };
-          }
-          return row;
-        });
-      });
-
-      return { previousData };
-    },
-    onSuccess: async (_, variables, context) => {
-      logger("removeVip", variables.player_id, "onSuccess");
-      // Set the row state to SUCCESS
-      await sleep(1000);
-      queryClient.setQueryData(vipQueryOptions.list().queryKey, (old) => {
-        return old.map((row) => {
-          if (row.player_id === variables.player_id) {
-            return { ...row, _state: SUCCESS };
-          }
-          return row;
-        });
-      });
-    },
-    onError: async (_, variables) => {
-      logger("removeVip", variables.player_id, "onError");
-      await sleep(1000);
-      queryClient.setQueryData(vipQueryOptions.list().queryKey, (old) => {
-        return old.map((row) => {
-          if (row.player_id === variables.player_id) {
-            return { ...row, _state: ERROR };
-          }
-          return row;
-        });
-      });
-    },
-    onSettled: async (_, error, variables) => {
-      logger("removeVip", variables.player_id, "onSettled");
-      await sleep(1000);
-      if (!error) {
-        // Remove the row from the data
-        queryClient.setQueryData(vipQueryOptions.list().queryKey, (old) => {
-          return old.filter((row) => row.player_id !== variables.player_id);
-        });
-      }
-    },
-  });
-
-  const { mutate: addVip } = useMutation({
-    ...vipMutationOptions.add,
-    retry: 3,
-    retryDelay: 1000,
-    onMutate: async (variables) => {
-      logger("addVip", variables.player_id, "onMutate");
-
-      await queryClient.cancelQueries({
-        queryKey: vipQueryOptions.list().queryKey,
-      });
-      const previousData = queryClient.getQueryData(
-        vipQueryOptions.list().queryKey
-      );
-
-      // Update the cache optimistically
-      queryClient.setQueryData(vipQueryOptions.list().queryKey, (old) => {
-        if (!old) return [];
-
-        // If no existing record was found, add the new one
-        const exists = old.some((row) => row.player_id === variables.player_id);
-        if (!exists) {
-          logger("addVip", variables.player_id, "adding new record");
-          return [
-            {
-              player_id: variables.player_id,
-              name: variables.description,
-              vip_expiration: variables.expiration,
-              _state: PENDING,
-            },
-            ...old,
-          ];
-        }
-
-        logger("addVip", variables.player_id, "updating existing record");
-        return old.map((row) => {
-          if (row.player_id === variables.player_id) {
-            return {
-              ...row,
-              name: variables.description,
-              vip_expiration: variables.expiration,
-              _state: PENDING,
-            };
-          }
-          return row;
-        });
-      });
-
-      return { previousData };
-    },
-    onSuccess: async (_, variables) => {
-      logger("addVip", variables.player_id, "onSuccess");
-      await sleep(1000);
-      // Update the cache to reflect the success state
-      queryClient.setQueryData(vipQueryOptions.list().queryKey, (old) => {
-        return old.map((row) => {
-          if (row.player_id === variables.player_id) {
-            return {
-              ...row,
-              _state: SUCCESS,
-            };
-          }
-          return row;
-        });
-      });
-    },
-    onError: async (_, variables) => {
-      logger("addVip", variables.player_id, "onError");
-      await sleep(1000);
-      // Update the cache to reflect the error state
-      queryClient.setQueryData(vipQueryOptions.list().queryKey, (old) => {
-        return old.map((row) => {
-          if (row.player_id === variables.player_id) {
-            return {
-              ...row,
-              _state: ERROR,
-            };
-          }
-          return row;
-        });
-      });
-    },
-    onSettled: async (_, error, variables) => {
-      logger("addVip", variables.player_id, "onSettled");
-      await sleep(1000);
-      if (!error) {
-        // Remove the row from the data
-        queryClient.setQueryData(vipQueryOptions.list().queryKey, (old) => {
-          return old.map((row) => {
-            if (row.player_id === variables.player_id) {
-              return {
-                ...row,
-                _state: COMPLETED,
-              };
-            }
-            return row;
-          });
-        });
-      }
-    },
-  });
-
-  // Form state
-  const [vipIndefinitely, setVipIndefinitely] = useState(false);
-  const [formFields, setFormFields] = useState({
-    description: "",
-    player_id: "",
-    expiration: dayjs().add(5, "minutes"),
-    forward,
-  });
-  const [searchPlayer, setSearchPlayer] = useState({ name: "", player_id: "" });
-
-  useEffect(() => {
-    if (searchPlayer.player_id) {
-      handleVipEdit({
-        description: searchPlayer.name,
-        player_id: searchPlayer.player_id,
-        expiration: dayjs().add(5, "minutes"),
-      });
-    }
-  }, [searchPlayer.player_id]);
-
-  const columns = useMemo(
-    () => [
-      ...getVipColumns(t),
-      {
-        id: "actions",
-        header: t("common.actions"),
-        cell: ({ row }) => {
-          const state = row.original._state;
-          let removeComponent = null;
-          switch (state) {
-            case PENDING:
-              removeComponent = (
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  sx={{ padding: "5px" }}
-                >
-                  <CircularProgress size={20} />
-                </Stack>
-              );
-              break;
-            case SUCCESS:
-              removeComponent = (
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  sx={{ padding: "5px" }}
-                >
-                  <CheckIcon sx={{ fontSize: "1em" }} color="success" />
-                </Stack>
-              );
-              break;
-            case ERROR:
-              removeComponent = (
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  sx={{ padding: "5px" }}
-                >
-                  <ErrorIcon sx={{ fontSize: "1em" }} color="warning" />
-                </Stack>
-              );
-              break;
-            default:
-              removeComponent = (
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <IconButton
-                    aria-label={t("records.vips.remove")}
-                    title={t("records.vips.remove")}
-                    variant="contained"
-                    size="small"
-                    color={"error"}
-                    onClick={() =>
-                      handleRemoveVip(row.original.player_id, forward)
-                    }
-                    disabled={isFetching}
-                  >
-                    <DeleteIcon sx={{ fontSize: "1em" }} />
-                  </IconButton>
-                </Stack>
-              );
-              break;
-          }
-
-          return (
-            <Stack direction="row" alignItems="center" spacing={1}>
-              {removeComponent}
-              <IconButton
-                aria-label={t("records.vips.edit")}
-                title={t("records.vips.edit")}
-                variant="contained"
-                size="small"
-                color="primary"
-                onClick={() => {
-                  handleVipEdit({
-                    description: row.original.name,
-                    player_id: row.original.player_id,
-                    expiration: row.original.vip_expiration,
-                  });
-                }}
-                disabled={isFetching}
-              >
-                <EditIcon sx={{ fontSize: "1em" }} />
-              </IconButton>
-            </Stack>
-          );
-        },
-      },
-    ],
-    [isFetching, forward, t]
-  );
-
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [durationFilter, setDurationFilter] = useState("all");
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingVip, setEditingVip] = useState(null);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [removeCandidate, setRemoveCandidate] = useState(null);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [selectedTable, setSelectedTable] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const forward = operationMode === "multi";
 
-  const handleEditSelected = useCallback(
-    (table) => {
-      setSelectedTable(table);
-      setBulkEditOpen(true);
+  const rollback = useCallback((context) => {
+    if (context?.previousData) {
+      queryClient.setQueryData(VIP_QUERY_KEY, context.previousData);
+    }
+  }, []);
+
+  const { mutate: removeVip, isPending: isRemoving } = useMutation({
+    ...vipMutationOptions.remove,
+    retry: 0,
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: VIP_QUERY_KEY });
+      const previousData = queryClient.getQueryData(VIP_QUERY_KEY) || [];
+      queryClient.setQueryData(VIP_QUERY_KEY, (current = []) =>
+        current.map((row) =>
+          row.player_id === variables.player_id
+            ? { ...row, _state: "pending" }
+            : row
+        )
+      );
+      return { previousData };
     },
-    [setSelectedTable, setBulkEditOpen]
+    onSuccess: (response, variables, context) => {
+      const issue = getMutationIssue(response);
+      if (issue) {
+        rollback(context);
+        setNotice({
+          severity: "error",
+          text: t("records.vips.partialFailure"),
+        });
+        return;
+      }
+      queryClient.setQueryData(VIP_QUERY_KEY, (current = []) =>
+        current.filter((row) => row.player_id !== variables.player_id)
+      );
+      setNotice({ severity: "success", text: t("records.vips.removeSuccess") });
+    },
+    onError: (_, __, context) => {
+      rollback(context);
+      setNotice({ severity: "error", text: t("records.vips.removeError") });
+    },
+  });
+
+  const { mutate: addVip, isPending: isAdding } = useMutation({
+    ...vipMutationOptions.add,
+    retry: 0,
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: VIP_QUERY_KEY });
+      const previousData = queryClient.getQueryData(VIP_QUERY_KEY) || [];
+      queryClient.setQueryData(VIP_QUERY_KEY, (current = []) => {
+        const existing = current.some(
+          (row) => row.player_id === variables.player_id
+        );
+        const optimistic = {
+          player_id: variables.player_id,
+          name: variables.description,
+          vip_expiration: variables.expiration,
+          _state: "pending",
+        };
+        return existing
+          ? current.map((row) =>
+              row.player_id === variables.player_id
+                ? { ...row, ...optimistic }
+                : row
+            )
+          : [optimistic, ...current];
+      });
+      return { previousData };
+    },
+    onSuccess: (response, variables, context) => {
+      const issue = getMutationIssue(response);
+      if (issue) {
+        rollback(context);
+        setNotice({
+          severity: "error",
+          text: t("records.vips.partialFailure"),
+        });
+        return;
+      }
+      queryClient.setQueryData(VIP_QUERY_KEY, (current = []) =>
+        current.map((row) =>
+          row.player_id === variables.player_id
+            ? { ...row, _state: "completed" }
+            : row
+        )
+      );
+      setNotice({ severity: "success", text: t("records.vips.saveSuccess") });
+    },
+    onError: (_, __, context) => {
+      rollback(context);
+      setNotice({ severity: "error", text: t("records.vips.saveError") });
+    },
+  });
+
+  const counts = useMemo(
+    () => ({
+      total: data.length,
+      active: data.filter((vip) => !isVipExpired(vip.vip_expiration)).length,
+      expiring: data.filter((vip) => isVipExpiringSoon(vip.vip_expiration))
+        .length,
+      indefinite: data.filter((vip) => isVipIndefinite(vip.vip_expiration))
+        .length,
+      expired: data.filter((vip) => isVipExpired(vip.vip_expiration)).length,
+    }),
+    [data]
   );
 
+  const filteredData = useMemo(() => {
+    const normalizedSearch = search.trim().toLocaleLowerCase();
+    const durationDays = Number(durationFilter);
+    return data.filter((vip) => {
+      const category = getVipCategory(vip.vip_expiration);
+      const matchesSearch =
+        !normalizedSearch ||
+        `${vip.name} ${vip.player_id}`
+          .toLocaleLowerCase()
+          .includes(normalizedSearch);
+      const matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "active" && category !== "expired") ||
+        category === statusFilter;
+      const matchesDuration =
+        durationFilter === "all" ||
+        (durationFilter === "indefinite" &&
+          isVipIndefinite(vip.vip_expiration)) ||
+        (Number.isFinite(durationDays) &&
+          !isVipIndefinite(vip.vip_expiration) &&
+          !isVipExpired(vip.vip_expiration) &&
+          !dayjs(vip.vip_expiration).isAfter(dayjs().add(durationDays, "day")));
+      return matchesSearch && matchesStatus && matchesDuration;
+    });
+  }, [data, durationFilter, search, statusFilter]);
+
+  const handleSaveVip = (vip) => {
+    addVip({ ...vip, forward });
+    setEditorOpen(false);
+    setEditingVip(null);
+  };
+
+  const handleEdit = useCallback((vip) => {
+    setEditingVip(vip);
+    setEditorOpen(true);
+  }, []);
+
+  const handleRequestRemove = useCallback((vip) => {
+    setRemoveCandidate(vip);
+  }, []);
+
+  const handleConfirmRemove = () => {
+    if (!removeCandidate) return;
+    removeVip({ player_id: removeCandidate.player_id, forward });
+    setRemoveCandidate(null);
+  };
+
+  const handleBulkEditOpen = useCallback((table) => {
+    setSelectedTable(table);
+    setBulkEditOpen(true);
+  }, []);
+
   const handleBulkEdit = ({ mode, value }) => {
-    const selectedIds = selectedTable
-      .getSelectedRowModel()
-      .rows.map((row) => row.original.player_id);
-
-    if (mode === "set") {
-      selectedIds.forEach((playerId) => {
-        addVip({
-          player_id: playerId,
-          expiration: value,
-          description:
-            data.find((row) => row.player_id === playerId)?.name || "",
-          forward,
-        });
-      });
-    } else {
-      // Extend mode
-      selectedIds.forEach((playerId) => {
-        const currentVip = data.find((row) => row.player_id === playerId);
-        if (!currentVip) return;
-
-        // If the expiration is null, we need to set it some value
-        const vipExpiration =
-          currentVip.vip_expiration === null
-            ? INDEFINITE_EXPIRATION
-            : currentVip.vip_expiration;
-
-        // Calculate the new expiration date
-        let newExpiration = dayjs(vipExpiration).add(
-          value.diff(dayjs(), "millisecond")
-        );
-
-        // If the new expiration is after the indefinite expiration date, set it to null
-        if (
-          newExpiration.isSame(dayjs(INDEFINITE_EXPIRATION)) ||
-          newExpiration.isAfter(dayjs(INDEFINITE_EXPIRATION))
-        ) {
-          newExpiration = null;
+    const selectedRows = selectedTable?.getSelectedRowModel().rows || [];
+    selectedRows.forEach(({ original: currentVip }) => {
+      let expiration = value;
+      if (mode === "extend") {
+        if (isVipIndefinite(currentVip.vip_expiration)) {
+          expiration = null;
+        } else {
+          expiration = dayjs(currentVip.vip_expiration).add(
+            value.diff(dayjs(), "millisecond")
+          );
+          if (!expiration.isBefore(dayjs(INDEFINITE_EXPIRATION))) {
+            expiration = null;
+          }
         }
-
-        addVip({
-          player_id: playerId,
-          expiration: newExpiration,
-          description: currentVip.name,
-          forward,
-        });
+      }
+      addVip({
+        player_id: currentVip.player_id,
+        description: currentVip.name,
+        expiration,
+        forward,
       });
-    }
-  };
-
-  const handleVipEdit = ({ description, player_id, expiration }) => {
-    if (!expiration || expiration === INDEFINITE_EXPIRATION) {
-      setVipIndefinitely(true);
-      setFormFields((prev) => ({ ...prev, description, player_id }));
-    } else {
-      setVipIndefinitely(false);
-      setFormFields((prev) => ({
-        ...prev,
-        description,
-        player_id,
-        expiration: dayjs(expiration),
-      }));
-    }
-  };
-
-  const handleAddVip = () => {
-    logger("addVip", formFields.player_id);
-    addVip({
-      ...formFields,
-      forward,
-      expiration: vipIndefinitely ? null : formFields.expiration,
     });
-    handleClear();
-  };
-
-  const handleClear = () => {
-    setFormFields({
-      description: "",
-      player_id: "",
-      expiration: dayjs().add(5, "minutes"),
-      forward,
-    });
-    setSearchPlayer({ name: "", player_id: "" });
-    setVipIndefinitely(false);
-  };
-
-  const handleRemoveVip = (player_id, forward) => {
-    removeVip({ player_id, forward });
+    selectedTable?.resetRowSelection();
   };
 
   const handleBulkRemove = useCallback(
     (table) => {
-      const selectedPlayersIds = table
-        .getSelectedRowModel()
-        .rows.map((row) => row.original.player_id);
-      selectedPlayersIds.forEach((player_id) => {
-        removeVip({ player_id, forward });
+      table.getSelectedRowModel().rows.forEach(({ original }) => {
+        removeVip({ player_id: original.player_id, forward });
       });
-      table.setRowSelection({});
+      table.resetRowSelection();
     },
-    [removeVip]
+    [forward, removeVip]
   );
 
-  const handleOperationModeChange = (newMode) => {
-    setOperationMode(newMode);
-    setFormFields((prev) => ({ ...prev, forward: newMode === "multi" }));
-  };
+  const filterRail = (
+    <Stack
+      component="aside"
+      aria-label={t("records.vips.filters")}
+      sx={{
+        border: "1px solid",
+        borderColor: "divider",
+        bgcolor: "background.paper",
+      }}
+    >
+      <Box sx={{ px: 1.5, py: 1.25 }}>
+        <Typography variant="subtitle2" sx={{ textTransform: "uppercase" }}>
+          {t("records.vips.filters")}
+        </Typography>
+      </Box>
+      <Divider />
+      <Stack gap={1.5} sx={{ p: 1.5 }}>
+        <TextField
+          size="small"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder={t("records.vips.search")}
+          inputProps={{ "aria-label": t("records.vips.search") }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchOutlinedIcon sx={{ fontSize: 18 }} />
+              </InputAdornment>
+            ),
+          }}
+        />
 
-  const handleOnPlayerSelect = (selectedPlayer) => {
-    setSearchPlayer((prev) => ({
-      ...prev,
-      ...selectedPlayer,
-      name: selectedPlayer.names[0]?.name ?? "",
-      player_id: selectedPlayer.player_id ?? prev.player_id,
-    }));
-  };
+        <Box>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ mb: 0.5, display: "block" }}
+          >
+            {t("records.vips.status")}
+          </Typography>
+          <Stack gap={0.25}>
+            <FilterOption
+              active={statusFilter === "active"}
+              icon={
+                <PersonOutlineOutlinedIcon
+                  sx={{ fontSize: 16, color: "success.main" }}
+                />
+              }
+              label={t("records.vips.active")}
+              count={counts.active}
+              onClick={() =>
+                setStatusFilter(statusFilter === "active" ? "all" : "active")
+              }
+            />
+            <FilterOption
+              active={statusFilter === "expiring"}
+              icon={
+                <ScheduleOutlinedIcon
+                  sx={{ fontSize: 16, color: "warning.main" }}
+                />
+              }
+              label={t("records.vips.expiringSoon")}
+              count={counts.expiring}
+              onClick={() =>
+                setStatusFilter(
+                  statusFilter === "expiring" ? "all" : "expiring"
+                )
+              }
+            />
+            <FilterOption
+              active={statusFilter === "indefinite"}
+              icon={<AllInclusiveOutlinedIcon sx={{ fontSize: 16 }} />}
+              label={t("records.vips.indefinite")}
+              count={counts.indefinite}
+              onClick={() =>
+                setStatusFilter(
+                  statusFilter === "indefinite" ? "all" : "indefinite"
+                )
+              }
+            />
+            <FilterOption
+              active={statusFilter === "expired"}
+              icon={
+                <ErrorOutlineOutlinedIcon
+                  sx={{ fontSize: 16, color: "error.main" }}
+                />
+              }
+              label={t("records.vips.expired")}
+              count={counts.expired}
+              onClick={() =>
+                setStatusFilter(statusFilter === "expired" ? "all" : "expired")
+              }
+            />
+          </Stack>
+        </Box>
+
+        <Divider />
+        <Box>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ mb: 0.5, display: "block" }}
+          >
+            {t("records.vips.relativeExpiration")}
+          </Typography>
+          <FormControl size="small" fullWidth>
+            <Select
+              value={durationFilter}
+              onChange={(event) => setDurationFilter(event.target.value)}
+              inputProps={{
+                "aria-label": t("records.vips.relativeExpiration"),
+              }}
+            >
+              <MenuItem value="all">{t("records.vips.allDurations")}</MenuItem>
+              <MenuItem value="7">
+                {t("records.vips.withinDays", { count: 7 })}
+              </MenuItem>
+              <MenuItem value="30">
+                {t("records.vips.withinDays", { count: 30 })}
+              </MenuItem>
+              <MenuItem value="90">
+                {t("records.vips.withinDays", { count: 90 })}
+              </MenuItem>
+              <MenuItem value="indefinite">
+                {t("records.vips.indefinite")}
+              </MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
+
+        <Divider />
+        <Box>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ mb: 0.5, display: "block" }}
+          >
+            {t("records.vips.applyChangesTo")}
+          </Typography>
+          <ToggleButtonGroup
+            value={operationMode}
+            exclusive
+            fullWidth
+            size="small"
+            onChange={(_, value) => value && setOperationMode(value)}
+          >
+            <ToggleButton value="single" color="primary">
+              {t("records.vips.thisServerShort")}
+            </ToggleButton>
+            <ToggleButton value="multi" color="primary">
+              {t("records.vips.allServersShort")}
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+
+        <Button
+          variant="outlined"
+          startIcon={<RefreshOutlinedIcon />}
+          onClick={refetch}
+          disabled={isFetching}
+        >
+          {t("common.refresh")}
+        </Button>
+      </Stack>
+      <Divider />
+      <Box sx={{ p: 1.5, bgcolor: "action.hover" }}>
+        <Typography variant="caption" color="text.secondary" display="block">
+          {t("records.vips.listSource")}
+        </Typography>
+        <Typography variant="caption" color="primary.main">
+          {t("records.vips.currentServerOnly")}
+        </Typography>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          display="block"
+          sx={{ mt: 0.75 }}
+        >
+          {isFetching
+            ? t("records.vips.updating")
+            : dataUpdatedAt
+            ? t("records.vips.updatedAt", {
+                time: dayjs(dataUpdatedAt).format("HH:mm:ss"),
+              })
+            : t("records.vips.never")}
+        </Typography>
+      </Box>
+    </Stack>
+  );
+
+  const headerActions = (
+    <Stack direction={{ xs: "column", sm: "row" }} gap={1}>
+      <Button
+        variant="contained"
+        startIcon={<AddOutlinedIcon />}
+        onClick={() => {
+          setEditingVip(null);
+          setEditorOpen(true);
+        }}
+      >
+        {t("records.vips.addVip")}
+      </Button>
+      <Button
+        variant="outlined"
+        startIcon={<ImportExportOutlinedIcon />}
+        onClick={() => setTransferOpen(true)}
+      >
+        {t("records.vips.importExport")}
+      </Button>
+    </Stack>
+  );
 
   return (
     <>
@@ -477,129 +614,117 @@ const VipPageContent = () => {
         eyebrow={t("records.vips.eyebrow")}
         title={t("records.vips.title")}
         subtitle={t("records.vips.subtitle")}
+        actions={headerActions}
       />
-      <Stack direction={{ xs: "column", lg: "row" }} spacing={2} sx={{ mt: 2 }}>
-      <Stack spacing={1} sx={{ width: { xs: "100%", lg: "400px" } }}>
-        <Stack spacing={2} sx={{ bgcolor: "background.paper", p: 2 }}>
-          <Typography variant="h6">{t("records.vips.applyChangesTo")}</Typography>
-          <ToggleButtonGroup
-            value={operationMode}
-            exclusive
-            onChange={(_, newMode) => {
-              if (newMode !== null) {
-                handleOperationModeChange(newMode);
-              }
-            }}
-            fullWidth
-            size="small"
-          >
-            <ToggleButton value="single" color="primary">
-              {t("records.vips.thisServer")}
-            </ToggleButton>
-            <ToggleButton value="multi" color="primary">
-              {t("records.vips.allServers")}
-            </ToggleButton>
-          </ToggleButtonGroup>
-        </Stack>
 
-        <Stack spacing={2} sx={{ bgcolor: "background.paper", p: 2 }}>
-          <Typography>
-            {t("records.vips.lastUpdated")}{" "}
-            {isFetching
-              ? t("records.vips.updating")
-              : dataUpdatedAt
-              ? dayjs(dataUpdatedAt).format("HH:mm:ss")
-              : t("records.vips.never")}
-          </Typography>
-          <Button
-            variant="contained"
-            color="info"
-            size="small"
-            onClick={refetch}
-            disabled={isFetching}
-          >
-            {t("common.refresh")}
-          </Button>
-        </Stack>
-        <Stack spacing={2} sx={{ bgcolor: "background.paper", p: 2 }}>
-          <Typography variant="h6">{t("records.vips.searchPlayer")}</Typography>
-          <PlayerSearchField onSelect={handleOnPlayerSelect} disableAddBtn={true} direction={"column"} />
-        </Stack>
-        <Stack spacing={2} sx={{ bgcolor: "background.paper", p: 2 }}>
-          <Typography variant="h6">{t("records.vips.addVip")}</Typography>
-          <TextField
-            value={formFields.description}
-            onChange={(e) =>
-              setFormFields({ ...formFields, description: e.target.value })
-            }
-            label={t("records.vips.playerName")}
-            name="description"
-            fullWidth
-          />
-          <TextField
-            value={formFields.player_id}
-            onChange={(e) =>
-              setFormFields({ ...formFields, player_id: e.target.value })
-            }
-            label={t("records.vips.playerId")}
-            name="player_id"
-            fullWidth
-          />
-          <LocalizationProvider
-            dateAdapter={AdapterDayjs}
-            adapterLocale={i18n.resolvedLanguage === "en" ? "en" : "de"}
-            localeText={{ fieldOpenPickerLabel: t("common.chooseDate") }}
-          >
-            <DesktopDateTimePicker
-              value={formFields.expiration}
-              onChange={(e) => setFormFields({ ...formFields, expiration: e })}
-              format="LLL"
-              label={t("records.vips.expiration")}
-              name="expiration"
-              maxDateTime={dayjs(INDEFINITE_EXPIRATION)}
-              disabled={vipIndefinitely}
-              disablePast={true}
-              slotProps={{
-                openPickerButton: {
-                  "aria-label": t("common.chooseDate"),
-                  title: t("common.chooseDate"),
-                },
-              }}
-            />
-          </LocalizationProvider>
-          <Padlock
-            checked={vipIndefinitely}
-            handleChange={setVipIndefinitely}
-            label={t("records.vips.neverExpires")}
-          />
-          <Button variant="contained" color="primary" onClick={handleClear}>
-            {t("records.vips.clear")}
-          </Button>
-          <Button
-            variant="contained"
-            color="primary"
-            disabled={isFetching}
-            onClick={handleAddVip}
-          >
-            {t("records.vips.addVip")}
-          </Button>
-        </Stack>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "1fr 1fr",
+            sm: "repeat(5, minmax(0, 1fr))",
+          },
+          border: "1px solid",
+          borderColor: "divider",
+          mb: 1.5,
+        }}
+      >
+        <SummaryItem
+          icon={<PeopleAltOutlinedIcon sx={{ fontSize: 20 }} />}
+          label={t("records.vips.total")}
+          value={counts.total}
+          active={statusFilter === "all"}
+          onClick={() => setStatusFilter("all")}
+          color="text.secondary"
+        />
+        <SummaryItem
+          icon={<PersonOutlineOutlinedIcon sx={{ fontSize: 20 }} />}
+          label={t("records.vips.active")}
+          value={counts.active}
+          active={statusFilter === "active"}
+          onClick={() => setStatusFilter("active")}
+          color="success.main"
+        />
+        <SummaryItem
+          icon={<ScheduleOutlinedIcon sx={{ fontSize: 20 }} />}
+          label={t("records.vips.expiringSoon")}
+          value={counts.expiring}
+          active={statusFilter === "expiring"}
+          onClick={() => setStatusFilter("expiring")}
+          color="warning.main"
+        />
+        <SummaryItem
+          icon={<AllInclusiveOutlinedIcon sx={{ fontSize: 20 }} />}
+          label={t("records.vips.indefinite")}
+          value={counts.indefinite}
+          active={statusFilter === "indefinite"}
+          onClick={() => setStatusFilter("indefinite")}
+          color="text.primary"
+        />
+        <SummaryItem
+          icon={<ErrorOutlineOutlinedIcon sx={{ fontSize: 20 }} />}
+          label={t("records.vips.expired")}
+          value={counts.expired}
+          active={statusFilter === "expired"}
+          onClick={() => setStatusFilter("expired")}
+          color="error.main"
+          wideOnMobile
+        />
+      </Box>
 
-        <Stack spacing={2} sx={{ bgcolor: "background.paper", p: 2 }}>
-          <Typography variant="h6">{t("records.vips.downloadTitle")}</Typography>
-          <VipDownload />
-          <Divider flexItem orientation="horizontal" />
-          <Typography variant="h6">{t("records.vips.uploadTitle")}</Typography>
-          <VipUpload />
-        </Stack>
-      </Stack>
-      <VipTable
-        data={data}
-        columns={columns}
-        isLoading={isLoading}
-        isFetching={isFetching}
-        handleBulkRemove={handleBulkRemove}
-        editSelected={handleEditSelected}
+      {isFetching ? <LinearProgress sx={{ height: 2, mb: 0.5 }} /> : null}
+
+      <Button
+        variant="outlined"
+        startIcon={<FilterAltOutlinedIcon />}
+        onClick={() => setMobileFiltersOpen((current) => !current)}
+        sx={{ display: { xs: "inline-flex", md: "none" }, mb: 1 }}
+      >
+        {mobileFiltersOpen
+          ? t("records.vips.hideFilters")
+          : t("records.vips.showFilters")}
+      </Button>
+      <Collapse in={mobileFiltersOpen} sx={{ display: { md: "none" }, mb: 1 }}>
+        {filterRail}
+      </Collapse>
+
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", md: "264px minmax(0, 1fr)" },
+          gap: 1.5,
+          alignItems: "start",
+        }}
+      >
+        <Box sx={{ display: { xs: "none", md: "block" } }}>{filterRail}</Box>
+        <VipTable
+          data={filteredData}
+          totalCount={data.length}
+          isLoading={isLoading}
+          isFetching={isFetching || isAdding || isRemoving}
+          mutationScope={operationMode}
+          onEdit={handleEdit}
+          onRequestRemove={handleRequestRemove}
+          onBulkEdit={handleBulkEditOpen}
+          onBulkRemove={handleBulkRemove}
+          openProfile={openWithId}
+        />
+      </Box>
+
+      <VipEditorDialog
+        open={editorOpen}
+        initialVip={editingVip}
+        isSaving={isAdding}
+        mutationScope={operationMode}
+        onClose={() => {
+          setEditorOpen(false);
+          setEditingVip(null);
+        }}
+        onSave={handleSaveVip}
+      />
+      <VipTransferDialog
+        open={transferOpen}
+        onClose={() => setTransferOpen(false)}
       />
       <VipBulkEditDialog
         open={bulkEditOpen}
@@ -607,14 +732,52 @@ const VipPageContent = () => {
         onConfirm={handleBulkEdit}
         selectedCount={selectedTable?.getSelectedRowModel().rows.length || 0}
       />
-      </Stack>
+
+      <Dialog
+        open={Boolean(removeCandidate)}
+        onClose={() => setRemoveCandidate(null)}
+        PaperProps={{ sx: { borderRadius: 0 } }}
+      >
+        <DialogTitle>{t("records.vips.removeTitle")}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {t("records.vips.removeDescription", {
+              name: removeCandidate?.name || "",
+            })}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRemoveCandidate(null)}>
+            {t("common.cancel")}
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={handleConfirmRemove}
+          >
+            {t("records.vips.remove")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={Boolean(notice)}
+        autoHideDuration={4500}
+        onClose={() => setNotice(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        {notice ? (
+          <Alert severity={notice.severity} onClose={() => setNotice(null)}>
+            {notice.text}
+          </Alert>
+        ) : null}
+      </Snackbar>
     </>
   );
 };
 
 const VipPage = () => {
   const { dehydratedState } = useLoaderData();
-
   return (
     <HydrationBoundary state={dehydratedState}>
       <VipPageContent />

@@ -677,6 +677,25 @@ export function makeServer({ environment = "development" } = {}) {
         { player_id: "76561198000000003", name: "FLN_Valkyrie", vip_expiration: new Date(Date.now() + 86400000 * 7).toISOString() },
         { player_id: "76561198000000004", name: "FLN_OldGuard", vip_expiration: new Date(Date.now() - 86400000 * 2).toISOString() },
       ]));
+      this.get("/download_vips", () =>
+        new Response(
+          200,
+          { "Content-Type": "text/plain" },
+          [
+            "76561198000000001 FLN_Raven",
+            "76561198000000002 FLN_Wolf",
+            "76561198000000003 FLN_Valkyrie",
+            "76561198000000004 FLN_OldGuard",
+          ].join("\n")
+        )
+      );
+      this.post("/upload_vips", () => ({ failed: false, result: "OK" }));
+      this.get("/upload_vips_result", () =>
+        ok({
+          status: "finished",
+          result: ["4 VIP-Einträge wurden im Demo-Modus verarbeitet."],
+        })
+      );
       const demoBlacklists = [
         { id: 1, name: "FLN Hauptsperrliste", servers: null, sync: "ban_on_connect" },
         { id: 2, name: "Event-Ausschlüsse", servers: [2], sync: "kick_only" },
