@@ -20,8 +20,8 @@ const ActivityMetric = ({ label, value, title }) => (
   <Box
     sx={{
       minWidth: 0,
-      px: 1,
-      py: 0.875,
+      px: 0.875,
+      py: 0.75,
       "&:not(:last-of-type)": {
         borderRight: (theme) => `1px solid ${theme.palette.divider}`,
       },
@@ -47,7 +47,6 @@ const ActivityMetric = ({ label, value, title }) => (
       title={title ?? value}
       sx={{
         display: "-webkit-box",
-        minHeight: "2.4em",
         overflow: "hidden",
         fontSize: "0.75rem",
         fontWeight: 500,
@@ -64,9 +63,13 @@ const ActivityMetric = ({ label, value, title }) => (
 const PenaltyMetric = ({ label, value, severe = false }) => (
   <Box
     sx={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 0.5,
       minWidth: 0,
-      px: 0.875,
-      py: 0.75,
+      px: 0.75,
+      py: 0.625,
       "&:not(:last-of-type)": {
         borderRight: (theme) => `1px solid ${theme.palette.divider}`,
       },
@@ -76,16 +79,16 @@ const PenaltyMetric = ({ label, value, severe = false }) => (
       variant="caption"
       color="text.secondary"
       noWrap
-      sx={{ display: "block", fontSize: "0.625rem", lineHeight: 1.2 }}
+      sx={{ fontSize: "0.625rem", lineHeight: 1.2 }}
     >
       {label}
     </Typography>
     <Typography
       variant="body2"
       color={
-        value > 0 ? (severe ? "error.main" : "warning.main") : "text.disabled"
+        value > 0 ? (severe ? "error.main" : "warning.main") : "text.secondary"
       }
-      sx={{ mt: 0.25, fontWeight: 600, lineHeight: 1.2 }}
+      sx={{ flexShrink: 0, fontWeight: 600, lineHeight: 1.2 }}
     >
       {value}
     </Typography>
@@ -126,7 +129,7 @@ export default function PlayerCard({
           inputProps={{
             "aria-label": t("records.players.selectPlayer", { name }),
           }}
-          sx={{ width: 24, height: 24 }}
+          sx={{ width: 32, height: 32 }}
         />
         <ProfileActions player={playerProfile} actions={actionList} />
       </Stack>
@@ -183,10 +186,10 @@ export default function PlayerCard({
         sx={{
           display: "flex",
           flexDirection: "column",
-          gap: 1,
+          gap: 0.75,
           height: "100%",
-          p: 1.5,
-          "&:last-child": { pb: 1.5 },
+          p: 1.25,
+          "&:last-child": { pb: 1.25 },
         }}
       >
         <PlayerProfileHeader
@@ -202,31 +205,39 @@ export default function PlayerCard({
         />
         <LinkedAccounts identity={playerProfile.identity} compact />
 
-        <Stack
-          direction="row"
-          alignItems="center"
-          justifyContent="space-between"
-          flexWrap="wrap"
-          gap={0.5}
+        <Box
           sx={{
             minHeight: 36,
-            mx: -1.5,
-            px: 1.5,
-            py: 0.375,
+            mx: -1.25,
+            px: 1.25,
+            py: 0.5,
             borderTop: (theme) => `1px solid ${theme.palette.divider}`,
             borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
             bgcolor: "action.hover",
           }}
         >
           <ActionList playerProfile={playerProfile} />
-          <FlagList player={playerProfile} />
-        </Stack>
+        </Box>
+
+        {playerProfile.flags?.length ? (
+          <Stack direction="row" alignItems="center" spacing={0.75}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ fontSize: "0.625rem", textTransform: "uppercase" }}
+            >
+              {t("records.players.flags")}
+            </Typography>
+            <FlagList player={playerProfile} showAdd={false} />
+          </Stack>
+        ) : null}
 
         <Box
           sx={{
             display: "grid",
             gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-            border: (theme) => `1px solid ${theme.palette.divider}`,
+            borderTop: (theme) => `1px solid ${theme.palette.divider}`,
+            borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
           }}
         >
           <ActivityMetric
@@ -234,7 +245,7 @@ export default function PlayerCard({
             value={firstSeen}
           />
           <ActivityMetric
-            label={t("records.players.totalPlaytime")}
+            label={t("records.players.playtimeCompact")}
             value={`${totalPlaytime} ${t("records.players.hours")}`}
           />
           <ActivityMetric
@@ -246,31 +257,29 @@ export default function PlayerCard({
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
             mt: "auto",
-            border: (theme) => `1px solid ${theme.palette.divider}`,
+            mx: -1.25,
+            mb: -1.25,
+            borderTop: (theme) => `1px solid ${theme.palette.divider}`,
             bgcolor: "background.default",
-            "& > :nth-of-type(-n + 2)": {
-              borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
-            },
-            "& > :nth-of-type(2)": { borderRight: 0 },
           }}
         >
           <PenaltyMetric
-            label={t("actions.types.PUNISH")}
+            label={t("records.players.sanctionPunish")}
             value={penalties?.PUNISH ?? 0}
           />
           <PenaltyMetric
-            label={t("actions.types.KICK")}
+            label={t("records.players.sanctionKick")}
             value={penalties?.KICK ?? 0}
           />
           <PenaltyMetric
-            label={t("actions.types.TEMPBAN")}
+            label={t("records.players.sanctionTempBan")}
             value={penalties?.TEMPBAN ?? 0}
             severe
           />
           <PenaltyMetric
-            label={t("actions.types.PERMABAN")}
+            label={t("records.players.sanctionPermaBan")}
             value={penalties?.PERMABAN ?? 0}
             severe
           />

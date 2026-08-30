@@ -38,7 +38,7 @@ const PlayersGrid = memo(
         {players.map((player) => (
           <Grid
             key={player.player_id}
-            size={{ xs: 12, md: 6, lg: 4 }}
+            size={{ xs: 12, md: 6, lg: 6, xl: 4 }}
             sx={{ "& > .MuiCard-root": { height: "100%", minWidth: 0 } }}
           >
             <MemoizedPlayerCard

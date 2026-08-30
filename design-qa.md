@@ -45,3 +45,31 @@ Keine offenen P0-, P1- oder P2-Abweichungen.
 Ein zusätzlicher Ausschnitt war nicht notwendig. Der kombinierte 2990 × 1058-px-Vergleich zeigt Source und Umsetzung vollständig nebeneinander; die relevanten Hauptbereiche, Zusammenfassung, Matrix und Aktionsleiste sind gleichzeitig beurteilbar.
 
 final result: passed
+---
+
+# Design QA: Spielerakten-Karten, Richtung 1
+
+## Prüfgrundlage
+
+- Referenz: `.codex/audits/player-card-2026-08-30/01-current-player-cards.png`
+- Umsetzung: `.codex/design-qa/player-card-direction-1/implementation.png`
+- Gesamtvergleich: `.codex/design-qa/player-card-direction-1/comparison-full.png`
+- Detailvergleich: `.codex/design-qa/player-card-direction-1/comparison-focus.png`
+- Viewport: 2353 × 1272 Pixel, dunkles Theme, Kartenansicht mit Testdaten
+
+## Ergebnis
+
+- Die Karten sind deutlich kompakter und bilden weiterhin eine klar erkennbare, eckige Einheit.
+- Die vier Statusaktionen sind beschriftet, semantisch gruppiert und per `aria-pressed` als Zustand erkennbar.
+- Aktivität und Maßnahmen sind in zwei ruhige horizontale Informationsreihen verdichtet.
+- Karten mit Markierungen zeigen bestehende Markierungen weiterhin; das Hinzufügen bleibt im Aktionsmenü verfügbar.
+- Drei Spalten werden erst bei sehr breiten Ansichten verwendet. Bei mittleren Desktopbreiten werden zwei Karten pro Zeile gezeigt; mobil bleibt die etablierte Listenansicht erhalten.
+- Auswahl-Checkbox, Kartenaktionen, deutsch/englische Beschriftungen und Produktions-Build wurden geprüft.
+
+## Vergleichshistorie
+
+1. Ausgangslage: hohe Karten, unbeschriftete Statussymbole und 2 × 2 Maßnahmenraster.
+2. Umsetzung: kompakte Statusleiste, reduzierte Rahmenhierarchie und einzeilige Maßnahmenübersicht.
+3. Endkontrolle: keine offenen P0-, P1- oder P2-Abweichungen; keine Funktionsregression im geprüften Karten- und Auswahlfluss.
+
+final result: passed
