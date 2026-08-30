@@ -132,7 +132,7 @@ export default function PlayerAdvancedFilters({
               flex: { xs: "0 0 auto", md: "1 1 260px" },
               minHeight: 44,
               border: (theme) => `1px solid ${theme.palette.divider}`,
-              borderRadius: 1,
+              borderRadius: 0,
               px: 1,
             }}
           >

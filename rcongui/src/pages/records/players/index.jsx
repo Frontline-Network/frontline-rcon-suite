@@ -272,7 +272,20 @@ export default function PlayersRecords() {
   }, [selectedPlayerIds, playerCache]);
 
   return (
-    <Stack spacing={1} sx={{ mt: 2 }}>
+    <Stack
+      spacing={1}
+      sx={{
+        mt: 2,
+        "& .MuiAlert-root": { borderRadius: 0 },
+        "& .MuiButton-root": { borderRadius: 0 },
+        "& .MuiCard-root": { borderRadius: 0 },
+        "& .MuiChip-root": { borderRadius: 0 },
+        "& .MuiIconButton-root": { borderRadius: 0 },
+        "& .MuiOutlinedInput-root": { borderRadius: 0 },
+        "& .MuiPaper-root": { borderRadius: 0 },
+        "& .MuiToggleButton-root": { borderRadius: 0 },
+      }}
+    >
       <PageHeader
         eyebrow={t("records.players.eyebrow")}
         title={t("records.players.title")}
@@ -293,7 +306,7 @@ export default function PlayersRecords() {
           justifyContent="space-between"
           sx={{
             border: (theme) => `1px solid ${theme.palette.divider}`,
-            borderRadius: 1,
+            borderRadius: 0,
             bgcolor: "background.paper",
             px: 1.25,
             py: 1,

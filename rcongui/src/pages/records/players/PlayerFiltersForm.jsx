@@ -93,7 +93,7 @@ export default function PlayerFiltersForm({ fields }) {
         sx={{
           width: "100%",
           border: (theme) => `1px solid ${theme.palette.divider}`,
-          borderRadius: 1,
+          borderRadius: 0,
           bgcolor: "background.paper",
           p: { xs: 1, md: 1.25 },
         }}

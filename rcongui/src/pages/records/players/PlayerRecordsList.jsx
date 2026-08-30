@@ -357,7 +357,7 @@ export default function PlayerRecordsList({ players, selectedIds, onSelect }) {
     <TableContainer
       sx={{
         border: (theme) => `1px solid ${theme.palette.divider}`,
-        borderRadius: 1,
+        borderRadius: 0,
         bgcolor: "background.paper",
       }}
     >
