@@ -68,6 +68,27 @@ test("map pool draft can be changed and restored", async ({ page }) => {
   await expect(shell.getByTestId("config-dirty-indicator")).toBeHidden();
 });
 
+test("map catalog stays available when navigating from settings", async ({
+  page,
+}) => {
+  const main = await openDemoPage(page, "/settings/maps/votemap/settings");
+  const shell = main.getByTestId("votemap-workbench");
+
+  await shell
+    .getByRole("tab", { name: /Kartenpool Auswahl verwalten/ })
+    .click();
+
+  await expect(
+    shell.getByRole("button", { name: "Kursk zum Kartenpool hinzufügen" })
+  ).toBeVisible();
+  await expect(
+    shell.getByText(
+      "Diese Karten-ID ist nicht mehr im Serverkatalog vorhanden.",
+      { exact: false }
+    )
+  ).toHaveCount(0);
+});
+
 test("destructive live actions require confirmation", async ({ page }) => {
   const main = await openDemoPage(page, "/settings/maps/votemap");
   const shell = main.getByTestId("votemap-workbench");

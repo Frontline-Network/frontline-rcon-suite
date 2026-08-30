@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLoaderData, useRouteLoaderData } from "react-router-dom";
+import { useLoaderData } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Box,
@@ -127,8 +127,8 @@ function PoolPanel({ title, subtitle, count, children, testId }) {
 
 export default function VotemapBuilderPage() {
   const { t } = useTranslation();
-  const { maps = [] } = useRouteLoaderData("maps");
   const loaderData = useLoaderData();
+  const { maps = [] } = loaderData;
   const queryClient = useQueryClient();
   const theme = useTheme();
   const mobile = useMediaQuery(theme.breakpoints.down("md"));

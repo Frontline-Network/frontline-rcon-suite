@@ -5,7 +5,7 @@ export const loader = async ({ request }) => {
   const pathname = new URL(request.url).pathname.replace(/\/+$/, "");
   const votemapRouteWithoutCatalog =
     pathname === "/settings/maps/votemap" ||
-    pathname === "/settings/maps/votemap/settings";
+    pathname.startsWith("/settings/maps/votemap/");
 
   if (votemapRouteWithoutCatalog) return { maps: [] };
 
