@@ -153,7 +153,7 @@ function ServerNameSettings() {
             />
             <ControlRow
               title={t("settings.serverName.sftpHost")}
-              description="SFTP-Host für den automatisierten Namenswechsel."
+              description={t("settings.serverName.sftpHostDescription")}
               value={
                 <TextField
                   {...configForm.register("ip")}
@@ -166,7 +166,9 @@ function ServerNameSettings() {
                   sx={{ "& .MuiOutlinedInput-root": { borderRadius: 0 } }}
                 />
               }
-              meta={serverNameConfig?.ip || "Nicht eingerichtet"}
+              meta={
+                serverNameConfig?.ip || t("settings.serverName.notConfigured")
+              }
               status={
                 <RowStatus
                   dirty={configForm.formState.isDirty}
@@ -175,8 +177,8 @@ function ServerNameSettings() {
               }
             />
             <ControlRow
-              title="Port"
-              description="SFTP-Port des Gameserver-Anbieters."
+              title={t("settings.serverName.sftpPort")}
+              description={t("settings.serverName.sftpPortDescription")}
               value={
                 <TextField
                   {...configForm.register("port", { valueAsNumber: true })}
@@ -184,7 +186,11 @@ function ServerNameSettings() {
                   placeholder="22"
                   fullWidth
                   size="small"
-                  inputProps={{ min: 1, max: 65535, "aria-label": "Port" }}
+                  inputProps={{
+                    min: 1,
+                    max: 65535,
+                    "aria-label": t("settings.serverName.sftpPort"),
+                  }}
                   sx={{ "& .MuiOutlinedInput-root": { borderRadius: 0 } }}
                 />
               }

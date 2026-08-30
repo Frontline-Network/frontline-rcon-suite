@@ -26,6 +26,8 @@ import {
 
 export function makeServer({ environment = "development" } = {}) {
   let gameState = createGameState();
+  let demoServerName = "[GER] Frontline Network | #2";
+  let demoServerNameConfig = { ip: "127.0.0.1", port: 10011 };
   const disbandAttempts = new Map();
   const ok = (result) => ({ result });
   const protectedRequestLog = [];
@@ -338,6 +340,38 @@ export function makeServer({ environment = "development" } = {}) {
       );
       this.get("/get_system_usage", () => ok(getDemoSystemUsage()));
       this.get("/get_version", () => ok("11.2.0"));
+      this.get(
+        "/get_name",
+        trackProtectedRequest("/api/get_name", () => ok(demoServerName))
+      );
+      this.post(
+        "/set_server_name",
+        trackProtectedRequest("/api/set_server_name", (_schema, request) => {
+          const payload = JSON.parse(request.requestBody || "{}");
+          demoServerName = String(payload.name || "").trim();
+          return ok(demoServerName);
+        })
+      );
+      this.get(
+        "/get_server_name_change_config",
+        trackProtectedRequest("/api/get_server_name_change_config", () =>
+          ok(demoServerNameConfig)
+        )
+      );
+      this.post(
+        "/set_server_name_change_config",
+        trackProtectedRequest(
+          "/api/set_server_name_change_config",
+          (_schema, request) => {
+            const payload = JSON.parse(request.requestBody || "{}");
+            demoServerNameConfig = {
+              ip: String(payload.ip || "").trim(),
+              port: Number(payload.port),
+            };
+            return ok(demoServerNameConfig);
+          }
+        )
+      );
 
       this.get("/mobile/v1/devices", () => ok([]));
       this.get("/mobile/v1/bootstrap", () => ok({
