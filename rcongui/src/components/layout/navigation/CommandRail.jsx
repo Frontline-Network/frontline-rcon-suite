@@ -9,6 +9,7 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
+import { getCommandRailSurface } from "./navigation-surfaces";
 
 export const COMMAND_RAIL_WIDTH = 64;
 
@@ -120,14 +121,14 @@ export default function CommandRail({
     <Box
       component="aside"
       data-testid="desktop-command-rail"
-      sx={{
+      sx={(theme) => ({
         width: COMMAND_RAIL_WIDTH,
         minWidth: COMMAND_RAIL_WIDTH,
         height: "100dvh",
-        bgcolor: "grey.900",
+        ...getCommandRailSurface(theme),
         borderRight: "1px solid",
         borderColor: "divider",
-      }}
+      })}
     >
       <Stack sx={{ height: "100%", alignItems: "center" }}>
         <Tooltip title={brandLabel} placement="right" arrow>

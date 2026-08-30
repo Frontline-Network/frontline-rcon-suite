@@ -15,6 +15,7 @@ import { useTranslation } from "react-i18next";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { buildCommandRailWorkspaces } from "./navigation/command-rail-navigation";
+import { getContextNavigationSurface } from "./navigation/navigation-surfaces";
 
 const MobileDrawer = ({ open, toggleDrawer, children }) => {
   const { t } = useTranslation();
@@ -29,11 +30,10 @@ const MobileDrawer = ({ open, toggleDrawer, children }) => {
         component: "nav",
         "aria-label": t("navigation.primary"),
       }}
-      sx={{
-        zIndex: (theme) => theme.zIndex.drawer + 1,
+      sx={(theme) => ({
+        zIndex: theme.zIndex.drawer + 1,
         [`& .${drawerClasses.paper}`]: {
-          backgroundImage: "none",
-          backgroundColor: "background.paper",
+          ...getContextNavigationSurface(theme),
           minWidth: 240,
           width: { xs: "100%", sm: "auto" },
           pt: "env(safe-area-inset-top)",
@@ -41,7 +41,7 @@ const MobileDrawer = ({ open, toggleDrawer, children }) => {
           pl: "env(safe-area-inset-left)",
           pr: "env(safe-area-inset-right)",
         },
-      }}
+      })}
     >
       <Stack sx={{ height: "100%" }}>
         <IconButton

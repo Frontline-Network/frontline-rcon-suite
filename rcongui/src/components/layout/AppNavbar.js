@@ -13,6 +13,7 @@ import FrontlineBrand from "./FrontlineBrand";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import MobileBottomNavigation from "./MobileBottomNavigation";
+import { getContextNavigationSurface } from "./navigation/navigation-surfaces";
 
 const Toolbar = styled(MuiToolbar)({
   width: "100%",
@@ -39,15 +40,14 @@ const AppNavbarBase = ({ toggleDrawer, open, isSmallScreen }) => {
   return (
     <AppBar
       position="fixed"
-      sx={{
+      sx={(theme) => ({
         display: { xs: "auto", md: "none" },
         boxShadow: 0,
-        bgcolor: "background.paper",
-        backgroundImage: "none",
+        ...getContextNavigationSurface(theme),
         borderBottom: "1px solid",
         borderColor: "divider",
         pt: "env(safe-area-inset-top)",
-      }}
+      })}
     >
       <Toolbar variant="regular">
         <Stack

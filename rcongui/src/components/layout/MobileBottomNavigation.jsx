@@ -1,16 +1,13 @@
 import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import {
-  BottomNavigation,
-  BottomNavigationAction,
-  Paper,
-} from "@mui/material";
+import { BottomNavigation, BottomNavigationAction, Paper } from "@mui/material";
 import BoltRoundedIcon from "@mui/icons-material/BoltRounded";
 import ReportProblemRoundedIcon from "@mui/icons-material/ReportProblemRounded";
 import PeopleAltRoundedIcon from "@mui/icons-material/PeopleAltRounded";
 import DashboardCustomizeRoundedIcon from "@mui/icons-material/DashboardCustomizeRounded";
 import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
 import { useTranslation } from "react-i18next";
+import { getContextNavigationSurface } from "./navigation/navigation-surfaces";
 
 const NAV_ITEMS = [
   { value: "operations", to: "/views/live", icon: BoltRoundedIcon },
@@ -46,11 +43,17 @@ const routeValue = (pathname) => {
  * available behind “More”; these five destinations cover the daily admin
  * workflow without mirroring the full desktop information architecture.
  */
-export default function MobileBottomNavigation({ onOpenMore, moreOpen = false }) {
+export default function MobileBottomNavigation({
+  onOpenMore,
+  moreOpen = false,
+}) {
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
-  const value = useMemo(() => routeValue(location.pathname), [location.pathname]);
+  const value = useMemo(
+    () => routeValue(location.pathname),
+    [location.pathname]
+  );
 
   return (
     <Paper
@@ -66,7 +69,7 @@ export default function MobileBottomNavigation({ onOpenMore, moreOpen = false })
         bottom: 0,
         left: 0,
         borderTop: `1px solid ${theme.palette.divider}`,
-        bgcolor: "background.paper",
+        ...getContextNavigationSurface(theme),
         pb: "env(safe-area-inset-bottom)",
       })}
     >

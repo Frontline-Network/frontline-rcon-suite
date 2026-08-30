@@ -16,6 +16,10 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import { alpha } from "@mui/material/styles";
 import { NavLink } from "react-router-dom";
+import {
+  getContextNavigationSurface,
+  getNavigationControlSurface,
+} from "./navigation-surfaces";
 
 export const CONTEXT_NAVIGATION_PANEL_WIDTH = 276;
 
@@ -54,20 +58,20 @@ function ContextNavigationItem({ item, active, onSelect }) {
         py: 0.75,
         borderRadius: 0,
         borderLeft: "3px solid",
-        borderLeftColor: active ? "secondary.main" : "transparent",
-        color: active ? "secondary.light" : "text.secondary",
+        borderLeftColor: active ? "primary.main" : "transparent",
+        color: active ? "primary.light" : "text.secondary",
         bgcolor: active
-          ? alpha(theme.palette.secondary.main, 0.11)
+          ? alpha(theme.palette.primary.main, 0.13)
           : "transparent",
         cursor: locked ? "not-allowed" : "pointer",
         "&:hover": {
-          color: active ? "secondary.light" : "text.primary",
+          color: active ? "primary.light" : "text.primary",
           bgcolor: active
-            ? alpha(theme.palette.secondary.main, 0.15)
+            ? alpha(theme.palette.primary.main, 0.17)
             : "action.hover",
         },
         "&:focus-visible": {
-          outline: `2px solid ${theme.palette.secondary.main}`,
+          outline: `2px solid ${theme.palette.primary.main}`,
           outlineOffset: -2,
         },
         ...(locked && { color: "text.disabled" }),
@@ -103,8 +107,8 @@ function ContextNavigationItem({ item, active, onSelect }) {
             px: 0.5,
             py: 0.15,
             border: "1px solid",
-            borderColor: active ? "secondary.dark" : "divider",
-            color: active ? "secondary.light" : "text.disabled",
+            borderColor: active ? "primary.dark" : "divider",
+            color: active ? "primary.light" : "text.disabled",
             textAlign: "center",
             lineHeight: 1.2,
           }}
@@ -182,14 +186,14 @@ export default function ContextNavigationPanel({
       data-testid="desktop-navigation-panel"
       data-presentation={presentation}
       onKeyDown={onKeyDown}
-      sx={{
+      sx={(theme) => ({
         width,
         minWidth: width,
         height: "100dvh",
-        bgcolor: "background.paper",
+        ...getContextNavigationSurface(theme),
         borderRight: "1px solid",
         borderColor: "divider",
-      }}
+      })}
     >
       <Stack sx={{ height: "100%", minHeight: 0 }}>
         {topSlot && (
@@ -296,7 +300,7 @@ export default function ContextNavigationPanel({
                 "& .MuiOutlinedInput-root": {
                   minHeight: 40,
                   borderRadius: 0,
-                  bgcolor: "grey.900",
+                  bgcolor: getNavigationControlSurface,
                 },
               }}
             />
