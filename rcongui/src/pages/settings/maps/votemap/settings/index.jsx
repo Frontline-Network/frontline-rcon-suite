@@ -5,7 +5,7 @@ import {
   mapsManagerQueryKeys,
   mapsManagerQueryOptions,
 } from "../../queries";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import cloneDeep from "lodash/cloneDeep";
 import isEqual from "lodash/isEqual";
 import transform from "lodash/transform";
@@ -15,6 +15,9 @@ import {
   Box,
   Button,
   CircularProgress,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   Divider,
   FormControl,
   IconButton,
@@ -41,33 +44,59 @@ const EmojiPicker = lazy(() => import("@emoji-mart/react"));
 import emojiData from "@emoji-mart/data/sets/15/twitter.json";
 import Emoji from "@/components/shared/Emoji";
 import AddCircleIcon from "@mui/icons-material/AddCircle";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
+import ConfigActionBar from "@/pages/settings/config-form/ConfigActionBar";
+import ConfigFormSection from "@/pages/settings/config-form/ConfigFormSection";
+import StableNumberField from "@/pages/settings/config-form/StableNumberField";
+import { useAuth } from "@/hooks/useAuth";
+import { isFakeMode } from "@/mirage/demo-data";
 
 function VotemapSettingsPage() {
   const { t } = useTranslation();
   const loaderData = useLoaderData();
   const queryClient = useQueryClient();
   const theme = useTheme();
+  const { permissions } = useAuth();
+  const fakeMode = isFakeMode();
+  const canChangeConfig =
+    fakeMode ||
+    permissions?.is_superuser ||
+    (permissions?.permissions ?? []).some(
+      (entry) =>
+        (typeof entry === "string" ? entry : entry.permission) ===
+        "can_change_votemap_config"
+    );
 
   const { data: config } = useQuery({
     ...mapsManagerQueryOptions.voteMapConfig(),
     initialData: loaderData.config,
-    refetchInterval: 5_000,
+    refetchInterval: fakeMode ? false : 5_000,
     staleTime: 5_000,
     refetchOnMount: false,
   });
 
   const { mutate: changeConfig, isPending: isConfigSaving } = useMutation({
-    ...mapsManagerMutationOptions.setVotemapConfig,
-    onSuccess: () => {
+    mutationFn: fakeMode
+      ? async (nextConfig) => ({ arguments: nextConfig })
+      : mapsManagerMutationOptions.setVotemapConfig.mutationFn,
+    onSuccess: (response) => {
       // Update this reference so the user does not get change
       // notification about his own changes
-      prevConfig.current = workingConfig;
-      queryClient.invalidateQueries({
-        queryKey: mapsManagerQueryKeys.voteMapConfig,
-      });
-      queryClient.invalidateQueries({
-        queryKey: mapsManagerQueryKeys.votemapStatus,
-      });
+      prevConfig.current = cloneDeep(workingConfig);
+      if (fakeMode) {
+        queryClient.setQueryData(
+          mapsManagerQueryKeys.voteMapConfig,
+          response.arguments
+        );
+      } else {
+        queryClient.invalidateQueries({
+          queryKey: mapsManagerQueryKeys.voteMapConfig,
+        });
+        queryClient.invalidateQueries({
+          queryKey: mapsManagerQueryKeys.votemapStatus,
+        });
+      }
       toast.success(t("maps.votemapSettings.updated"));
     },
     onError: (error) => {
@@ -85,6 +114,13 @@ function VotemapSettingsPage() {
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [emojiPickerIndex, setEmojiPickerIndex] = useState(null);
   const [emojiPickerMode, setEmojiPickerMode] = useState(null);
+  const [invalidNumberFields, setInvalidNumberFields] = useState(
+    () => new Set()
+  );
+  const isConfigDirty = useMemo(
+    () => !isEqual(workingConfig, config),
+    [workingConfig, config]
+  );
 
   const getLabel = (configItem) =>
     t(
@@ -110,17 +146,21 @@ function VotemapSettingsPage() {
     );
 
     // no changes do nothing
-    const numberOfChanges = diff.length;
-    if (numberOfChanges === 0) return;
-
-    const enabledOnly = numberOfChanges === 1 && diff.includes("enabled");
+    if (diff.length === 0) return;
 
     // update reference
     // this will also prevent infinite toasting for the same changes
     prevConfig.current = cloneDeep(config);
 
-    // if only 'enabled' changed do nothing
-    if (enabledOnly) return;
+    // Keep the hidden runtime flag in sync even when other settings changed at
+    // the same time. Saving this full config must never overwrite an
+    // enable/disable action performed from the live tab.
+    if (diff.includes("enabled")) {
+      setWorkingConfig((prev) => ({ ...prev, enabled: config.enabled }));
+    }
+
+    const actionableDiff = diff.filter((key) => key !== "enabled");
+    if (actionableDiff.length === 0) return;
 
     // announce there have been some changes made
     toast(VotemapChangeNotification, {
@@ -128,11 +168,11 @@ function VotemapSettingsPage() {
         // No-op: all logic is handled in the onAccept callback below
       },
       data: {
-        changes: diff,
+        changes: actionableDiff,
         onAccept: () => {
           setWorkingConfig((prev) => {
             const combined = { ...prev };
-            diff.forEach((key) => {
+            actionableDiff.forEach((key) => {
               combined[key] = cloneDeep(config[key]);
             });
             return combined;
@@ -145,11 +185,23 @@ function VotemapSettingsPage() {
   };
 
   const handleConfigReset = () => {
-    setWorkingConfig(prevConfig.current);
+    setInvalidNumberFields(new Set());
+    setWorkingConfig(cloneDeep(prevConfig.current));
   };
 
   const handleConfigSave = () => {
     changeConfig(workingConfig);
+  };
+
+  const handleNumberValidity = (field) => (valid) => {
+    setInvalidNumberFields((current) => {
+      const currentlyInvalid = current.has(field);
+      if (currentlyInvalid === !valid) return current;
+      const next = new Set(current);
+      if (valid) next.delete(field);
+      else next.add(field);
+      return next;
+    });
   };
 
   const handleWorkingChanges = (propName) => (value) => {
@@ -165,6 +217,10 @@ function VotemapSettingsPage() {
   };
 
   const handleRemoveVoteFlag = (index) => {
+    setInvalidNumberFields(
+      (current) =>
+        new Set([...current].filter((key) => !key.startsWith("vote_flags.")))
+    );
     setWorkingConfig((prev) => ({
       ...prev,
       vote_flags: prev.vote_flags.filter((_, i) => i !== index),
@@ -269,6 +325,9 @@ function VotemapSettingsPage() {
   };
 
   const handleVoteFlagChange = (index, key, value) => {
+    if (key === "vote_count" && (value === undefined || value === null)) {
+      return;
+    }
     setWorkingConfig((prev) => {
       const updated = [...(prev.vote_flags || [])];
       if (key === "vote_count") {
@@ -328,332 +387,402 @@ function VotemapSettingsPage() {
   useEffect(handleIncomingConfigChange, [config, workingConfig]);
 
   return (
-    <Stack
-      component={"section"}
-      direction={{ xs: "column", md: "row" }}
-      spacing={1}
-    >
-      {/* TOP/LEFT SIDE */}
-      <Stack sx={{ width: { xs: "100%", md: "50%" } }} spacing={1}>
-        <Typography variant="h6">{t("maps.messages")}</Typography>
-        {messageFieldConfigs.map((configItem) => (
-          <TextField
-            key={configItem.name}
-            fullWidth
-            variant="filled"
-            multiline
-            rows={configItem.rows}
-            label={getLabel(configItem)}
-            helperText={getHelperText(configItem)}
-            value={workingConfig[configItem.name] ?? ""}
-            onChange={handleWorkingChanges(configItem.name)}
-          />
-        ))}
-      </Stack>
-      <Divider flexItem orientation={"vertical"} />
-      {/* BOTTOM/RIGHT SIDE */}
-      <Stack
-        direction={{ xs: "column-reverse", md: "column" }}
-        sx={{ width: { xs: "100%", md: "50%" } }}
-        spacing={1}
-      >
-        {/* Actions */}
-        <Stack
-          direction="row"
-          spacing={1}
-          justifyContent={"end"}
-          alignItems={"center"}
+    <>
+      <Box sx={{ p: { xs: 1.5, md: 2.5 }, pb: 0 }}>
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="overline" color="primary.main">
+            {t("maps.votemapWorkbench.settingsEyebrow")}
+          </Typography>
+          <Typography component="h2" variant="h5" fontWeight={850}>
+            {t("maps.votemapWorkbench.settingsTitle")}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.35 }}>
+            {t("maps.votemapWorkbench.settingsDescription")}
+          </Typography>
+        </Box>
+
+        <Box
           sx={{
-            height: 50,
-            p: 1,
-            border: (theme) => `1px solid ${theme.palette.divider}`,
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "1fr",
+              lg: "minmax(0, 0.9fr) minmax(0, 1.1fr)",
+            },
+            gap: 2,
+            alignItems: "start",
           }}
         >
-          <Button
-            color="warning"
-            variant="outlined"
-            onClick={handleConfigReset}
-            startIcon={<ReplayIcon />}
+          <ConfigFormSection
+            id="votemap-messages"
+            eyebrow={t("maps.votemapWorkbench.messagesEyebrow")}
+            title={t("maps.messages")}
+            description={t("maps.votemapWorkbench.messagesDescription")}
           >
-            {t("maps.votemapSettings.reset")}
-          </Button>
-          <Button
-            variant="contained"
-            color="primary"
-            disabled={false}
-            onClick={handleConfigSave}
-            startIcon={
-              isConfigSaving ? (
-                <CircularProgress size={20} color="inherit" />
-              ) : (
-                <SaveIcon />
-              )
-            }
-          >
-            {t("common.save")}
-          </Button>
-        </Stack>
-        {/* Form fields */}
-        <Stack spacing={1}>
-          <Typography variant="h6">{t("maps.configuration")}</Typography>
-          <FormControl>
-            <InputLabel id="default_method">
-              {t("maps.votemapSettings.defaultMapMethod")}
-            </InputLabel>
-            <Select
-              value={workingConfig.default_method ?? ""}
-              onChange={handleWorkingChanges("default_method")}
-              label={t("maps.votemapSettings.defaultMapMethod")}
-              labelId="default_method"
-            >
-              {defaultMapOptions.map((option) => (
-                <MenuItem key={option.name} value={option.name}>
-                  {t(`maps.votemapSettings.${option.labelKey}`)}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <Divider flexItem orientation={"horizontal"} />
-
-          {padlockConfigs.map((configItem) => (
-            <Padlock
-              key={configItem.name}
-              label={getLabel(configItem)}
-              checked={workingConfig[configItem.name] ?? false}
-              handleChange={handleWorkingChanges(configItem.name)}
-            />
-          ))}
-
-          <Divider flexItem orientation={"horizontal"} />
-
-          {textFieldConfigs.map((configItem) => (
-            <TextField
-              key={configItem.name}
-              variant="filled"
-              fullWidth
-              type="number"
-              slotProps={{
-                input: configItem.inputProps,
-              }}
-              label={getLabel(configItem)}
-              helperText={getHelperText(configItem)}
-              value={workingConfig[configItem.name] ?? false}
-              onChange={handleWorkingChanges(configItem.name)}
-            />
-          ))}
-
-          <Divider flexItem orientation={"horizontal"} />
-
-          {/* Vote Flags Section */}
-          <Typography variant="subtitle1">
-            {t("maps.votemapAdvanced.voteCountFlags")}
-          </Typography>
-          <Typography variant="caption">
-            {t("maps.votemapAdvanced.voteCountFlagsHelp")}
-          </Typography>
-          <Stack
-            direction="row"
-            gap={1}
-            flexWrap={"wrap"}
-            alignItems={"center"}
-          >
-            {(workingConfig.vote_flags || []).map((item, idx) => (
-              <Stack key={idx} direction="row" gap={0.25} alignItems="center">
-                <Button
-                  variant="outlined"
-                  onClick={() => handleOpenEmojiPicker(idx, "update_vote_flag")}
-                  sx={{ minWidth: 48, fontSize: 24 }}
-                >
-                  <Emoji emoji={item.flag || "❓"} />
-                </Button>
+            <Stack spacing={1.5}>
+              {messageFieldConfigs.map((configItem) => (
                 <TextField
-                  type="number"
-                  label={t("maps.votemapAdvanced.voteCount")}
-                  slotProps={{ input: { min: 1, max: 100 } }}
-                  value={item.vote_count}
-                  onChange={(e) =>
-                    handleVoteFlagChange(idx, "vote_count", e.target.value)
-                  }
-                  sx={{ width: 80 }}
+                  key={configItem.name}
+                  fullWidth
+                  variant="filled"
+                  multiline
+                  rows={configItem.rows}
+                  label={getLabel(configItem)}
+                  helperText={getHelperText(configItem)}
+                  value={workingConfig[configItem.name] ?? ""}
+                  onChange={handleWorkingChanges(configItem.name)}
                 />
-              </Stack>
-            ))}
-            <IconButton
-              variant="outlined"
-              onClick={() =>
-                handleOpenEmojiPicker(
-                  (workingConfig.vote_flags || []).length,
-                  "add_vote_flag"
-                )
-              }
-            >
-              <AddCircleIcon />
-            </IconButton>
-          </Stack>
+              ))}
+            </Stack>
+          </ConfigFormSection>
 
-          <Divider flexItem orientation={"horizontal"} />
+          <ConfigFormSection
+            id="votemap-rules"
+            eyebrow={t("maps.votemapWorkbench.rulesEyebrow")}
+            title={t("maps.configuration")}
+            description={t("maps.votemapWorkbench.rulesDescription")}
+          >
+            <Stack spacing={1.25}>
+              <FormControl>
+                <InputLabel id="default_method">
+                  {t("maps.votemapSettings.defaultMapMethod")}
+                </InputLabel>
+                <Select
+                  value={workingConfig.default_method ?? ""}
+                  onChange={handleWorkingChanges("default_method")}
+                  label={t("maps.votemapSettings.defaultMapMethod")}
+                  labelId="default_method"
+                >
+                  {defaultMapOptions.map((option) => (
+                    <MenuItem key={option.name} value={option.name}>
+                      {t(`maps.votemapSettings.${option.labelKey}`)}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
 
-          {/* Vote Whitelist Flags Section */}
-          <Typography variant="subtitle1">
-            {t("maps.votemapAdvanced.voteWhitelistFlags")}
-          </Typography>
-          <Typography variant="caption">
-            {t("maps.votemapAdvanced.voteWhitelistFlagsHelp")}
-          </Typography>
-          <Stack direction="row" flexWrap={"wrap"} gap={1} alignItems="center">
-            {(workingConfig.allow_flag_only || []).map((item, idx) => (
-              <Button
-                key={idx}
-                variant="outlined"
-                onClick={() =>
-                  handleOpenEmojiPicker(idx, "update_allow_flag_only")
-                }
-                sx={{ minWidth: 48, fontSize: 24 }}
+              <Divider flexItem orientation={"horizontal"} />
+
+              {padlockConfigs.map((configItem) => (
+                <Padlock
+                  key={configItem.name}
+                  label={getLabel(configItem)}
+                  checked={workingConfig[configItem.name] ?? false}
+                  handleChange={handleWorkingChanges(configItem.name)}
+                />
+              ))}
+
+              <Divider flexItem orientation={"horizontal"} />
+
+              {textFieldConfigs.map((configItem) => (
+                <StableNumberField
+                  key={configItem.name}
+                  variant="filled"
+                  fullWidth
+                  slotProps={{
+                    htmlInput: configItem.inputProps,
+                  }}
+                  label={getLabel(configItem)}
+                  helperText={getHelperText(configItem)}
+                  value={workingConfig[configItem.name]}
+                  requiredValue
+                  invalidHelperText={t("maps.votemapWorkbench.invalidNumber")}
+                  onValidityChange={handleNumberValidity(configItem.name)}
+                  onChange={(value) => {
+                    if (value !== undefined) {
+                      handleWorkingChanges(configItem.name)(value);
+                    }
+                  }}
+                />
+              ))}
+
+              <Divider flexItem orientation={"horizontal"} />
+
+              {/* Vote Flags Section */}
+              <Typography variant="subtitle1">
+                {t("maps.votemapAdvanced.voteCountFlags")}
+              </Typography>
+              <Typography variant="caption">
+                {t("maps.votemapAdvanced.voteCountFlagsHelp")}
+              </Typography>
+              <Stack
+                direction="row"
+                gap={1}
+                flexWrap={"wrap"}
+                alignItems={"center"}
               >
-                <Emoji emoji={item ?? "❓"} />
-              </Button>
-            ))}
-            <IconButton
-              variant="outlined"
-              onClick={() =>
-                handleOpenEmojiPicker(
-                  (workingConfig.allow_flag_only || []).length,
-                  "add_allow_flag_only"
-                )
-              }
-            >
-              <AddCircleIcon />
-            </IconButton>
-          </Stack>
-
-          {/* Vote Ban Flags Section */}
-          <Typography variant="subtitle1">
-            {t("maps.votemapAdvanced.voteBanFlags")}
-          </Typography>
-          <Typography variant="caption">
-            {t("maps.votemapAdvanced.voteBanFlagsHelp")}
-          </Typography>
-          <Stack direction="row" flexWrap={"wrap"} gap={1} alignItems="center">
-            {(workingConfig.vote_ban_flags || []).map((item, idx) => (
-              <Button
-                key={idx}
-                variant="outlined"
-                onClick={() =>
-                  handleOpenEmojiPicker(idx, "update_vote_ban_flag")
-                }
-                sx={{ minWidth: 48, fontSize: 24 }}
-              >
-                <Emoji emoji={item ?? "❓"} />
-              </Button>
-            ))}
-            <IconButton
-              variant="outlined"
-              onClick={() =>
-                handleOpenEmojiPicker(
-                  (workingConfig.vote_ban_flags || []).length,
-                  "add_vote_ban_flag"
-                )
-              }
-            >
-              <AddCircleIcon />
-            </IconButton>
-          </Stack>
-
-          <Divider flexItem orientation={"horizontal"} />
-
-          {/* Player Choice Flags Section */}
-          <Typography variant="subtitle1">
-            {t("maps.votemapAdvanced.playerChoiceWhitelistFlags")}
-          </Typography>
-          <Typography variant="caption">
-            {t("maps.votemapAdvanced.playerChoiceWhitelistFlagsHelp")}
-          </Typography>
-          <Stack direction="row" flexWrap={"wrap"} gap={1} alignItems="center">
-            {(workingConfig.player_choice_flags || []).map((item, idx) => (
-              <Button
-                key={idx}
-                variant="outlined"
-                onClick={() =>
-                  handleOpenEmojiPicker(idx, "update_player_choice_flag")
-                }
-                sx={{ minWidth: 48, fontSize: 24 }}
-              >
-                <Emoji emoji={item ?? "❓"} />
-              </Button>
-            ))}
-            <IconButton
-              variant="outlined"
-              onClick={() =>
-                handleOpenEmojiPicker(
-                  (workingConfig.player_choice_flags || []).length,
-                  "add_player_choice_flag"
-                )
-              }
-            >
-              <AddCircleIcon />
-            </IconButton>
-          </Stack>
-          {/* Emoji Picker Dialog */}
-          {emojiPickerOpen && (
-            <div
-              style={{
-                position: "fixed",
-                top: 0,
-                left: 0,
-                width: "100vw",
-                height: "100vh",
-                background: "rgba(0,0,0,0.2)",
-                zIndex: 1300,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-              onClick={handleCloseEmojiPicker}
-            >
-              <div onClick={(e) => e.stopPropagation()}>
-                <Suspense
-                  fallback={
-                    <div>{t("maps.votemapAdvanced.loadingEmojiPicker")}</div>
+                {(workingConfig.vote_flags || []).map((item, idx) => (
+                  <Stack
+                    key={idx}
+                    direction="row"
+                    gap={0.25}
+                    alignItems="center"
+                  >
+                    <Button
+                      variant="outlined"
+                      aria-label={`${t(
+                        "maps.votemapAdvanced.voteCountFlags"
+                      )}: ${item.flag || "?"}`}
+                      onClick={() =>
+                        handleOpenEmojiPicker(idx, "update_vote_flag")
+                      }
+                      sx={{ minWidth: 48, minHeight: 44, fontSize: 24 }}
+                    >
+                      <Emoji emoji={item.flag || "❓"} />
+                    </Button>
+                    <StableNumberField
+                      label={t("maps.votemapAdvanced.voteCount")}
+                      slotProps={{ htmlInput: { min: 1, max: 100 } }}
+                      value={item.vote_count}
+                      requiredValue
+                      invalidHelperText={t(
+                        "maps.votemapWorkbench.invalidNumber"
+                      )}
+                      onValidityChange={handleNumberValidity(
+                        `vote_flags.${idx}`
+                      )}
+                      onChange={(value) =>
+                        handleVoteFlagChange(idx, "vote_count", value)
+                      }
+                      sx={{ width: 112 }}
+                    />
+                  </Stack>
+                ))}
+                <IconButton
+                  variant="outlined"
+                  aria-label={t("maps.votemapWorkbench.addVoteWeightFlag")}
+                  sx={{ width: 44, height: 44 }}
+                  onClick={() =>
+                    handleOpenEmojiPicker(
+                      (workingConfig.vote_flags || []).length,
+                      "add_vote_flag"
+                    )
                   }
                 >
-                  <EmojiPicker
-                    set="twitter"
-                    theme={theme.palette.mode}
-                    data={emojiData}
-                    onEmojiSelect={handleEmojiSelected}
-                  />
-                  {!emojiPickerMode.startsWith("add_") && (
-                    <Stack
-                      sx={{
-                        bgcolor: (theme) => theme.palette.background.paper,
-                        borderBottomLeftRadius: (theme) =>
-                          theme.shape.borderRadius,
-                        borderBottomRightRadius: theme.shape.borderRadius,
-                      }}
-                      direction={"row"}
-                    >
+                  <AddCircleIcon />
+                </IconButton>
+              </Stack>
+
+              <Divider flexItem orientation={"horizontal"} />
+
+              {/* Vote Whitelist Flags Section */}
+              <Typography variant="subtitle1">
+                {t("maps.votemapAdvanced.voteWhitelistFlags")}
+              </Typography>
+              <Typography variant="caption">
+                {t("maps.votemapAdvanced.voteWhitelistFlagsHelp")}
+              </Typography>
+              <Stack
+                direction="row"
+                flexWrap={"wrap"}
+                gap={1}
+                alignItems="center"
+              >
+                {(workingConfig.allow_flag_only || []).map((item, idx) => (
+                  <Button
+                    key={idx}
+                    variant="outlined"
+                    aria-label={`${t(
+                      "maps.votemapAdvanced.voteWhitelistFlags"
+                    )}: ${item || "?"}`}
+                    onClick={() =>
+                      handleOpenEmojiPicker(idx, "update_allow_flag_only")
+                    }
+                    sx={{ minWidth: 48, minHeight: 44, fontSize: 24 }}
+                  >
+                    <Emoji emoji={item ?? "❓"} />
+                  </Button>
+                ))}
+                <IconButton
+                  variant="outlined"
+                  aria-label={t("maps.votemapWorkbench.addAllowedFlag")}
+                  sx={{ width: 44, height: 44 }}
+                  onClick={() =>
+                    handleOpenEmojiPicker(
+                      (workingConfig.allow_flag_only || []).length,
+                      "add_allow_flag_only"
+                    )
+                  }
+                >
+                  <AddCircleIcon />
+                </IconButton>
+              </Stack>
+
+              {/* Vote Ban Flags Section */}
+              <Typography variant="subtitle1">
+                {t("maps.votemapAdvanced.voteBanFlags")}
+              </Typography>
+              <Typography variant="caption">
+                {t("maps.votemapAdvanced.voteBanFlagsHelp")}
+              </Typography>
+              <Stack
+                direction="row"
+                flexWrap={"wrap"}
+                gap={1}
+                alignItems="center"
+              >
+                {(workingConfig.vote_ban_flags || []).map((item, idx) => (
+                  <Button
+                    key={idx}
+                    variant="outlined"
+                    aria-label={`${t("maps.votemapAdvanced.voteBanFlags")}: ${
+                      item || "?"
+                    }`}
+                    onClick={() =>
+                      handleOpenEmojiPicker(idx, "update_vote_ban_flag")
+                    }
+                    sx={{ minWidth: 48, minHeight: 44, fontSize: 24 }}
+                  >
+                    <Emoji emoji={item ?? "❓"} />
+                  </Button>
+                ))}
+                <IconButton
+                  variant="outlined"
+                  aria-label={t("maps.votemapWorkbench.addBlockedFlag")}
+                  sx={{ width: 44, height: 44 }}
+                  onClick={() =>
+                    handleOpenEmojiPicker(
+                      (workingConfig.vote_ban_flags || []).length,
+                      "add_vote_ban_flag"
+                    )
+                  }
+                >
+                  <AddCircleIcon />
+                </IconButton>
+              </Stack>
+
+              <Divider flexItem orientation={"horizontal"} />
+
+              {/* Player Choice Flags Section */}
+              <Typography variant="subtitle1">
+                {t("maps.votemapAdvanced.playerChoiceWhitelistFlags")}
+              </Typography>
+              <Typography variant="caption">
+                {t("maps.votemapAdvanced.playerChoiceWhitelistFlagsHelp")}
+              </Typography>
+              <Stack
+                direction="row"
+                flexWrap={"wrap"}
+                gap={1}
+                alignItems="center"
+              >
+                {(workingConfig.player_choice_flags || []).map((item, idx) => (
+                  <Button
+                    key={idx}
+                    variant="outlined"
+                    aria-label={`${t(
+                      "maps.votemapAdvanced.playerChoiceWhitelistFlags"
+                    )}: ${item || "?"}`}
+                    onClick={() =>
+                      handleOpenEmojiPicker(idx, "update_player_choice_flag")
+                    }
+                    sx={{ minWidth: 48, minHeight: 44, fontSize: 24 }}
+                  >
+                    <Emoji emoji={item ?? "❓"} />
+                  </Button>
+                ))}
+                <IconButton
+                  variant="outlined"
+                  aria-label={t("maps.votemapWorkbench.addPlayerChoiceFlag")}
+                  sx={{ width: 44, height: 44 }}
+                  onClick={() =>
+                    handleOpenEmojiPicker(
+                      (workingConfig.player_choice_flags || []).length,
+                      "add_player_choice_flag"
+                    )
+                  }
+                >
+                  <AddCircleIcon />
+                </IconButton>
+              </Stack>
+              <Dialog
+                open={emojiPickerOpen}
+                onClose={handleCloseEmojiPicker}
+                aria-labelledby="votemap-emoji-picker-title"
+                maxWidth="xs"
+                fullWidth
+              >
+                <DialogTitle id="votemap-emoji-picker-title">
+                  {t("maps.votemapWorkbench.chooseMarker")}
+                </DialogTitle>
+                <DialogContent dividers sx={{ p: 0, overflow: "hidden" }}>
+                  <Suspense
+                    fallback={
+                      <Typography sx={{ p: 3 }}>
+                        {t("maps.votemapAdvanced.loadingEmojiPicker")}
+                      </Typography>
+                    }
+                  >
+                    <EmojiPicker
+                      set="twitter"
+                      theme={theme.palette.mode}
+                      data={emojiData}
+                      onEmojiSelect={handleEmojiSelected}
+                    />
+                    {!emojiPickerMode?.startsWith("add_") && (
                       <Button
                         onClick={() => {
                           handleRemoveFlag(emojiPickerIndex);
                           handleCloseEmojiPicker();
                         }}
-                        sx={{ borderTopLeftRadius: 0, borderTopRightRadius: 0 }}
                         variant="contained"
                         color="error"
                         fullWidth
+                        sx={{ minHeight: 44 }}
                       >
                         {t("settings.general.remove")}
                       </Button>
-                    </Stack>
-                  )}
-                </Suspense>
-              </div>
-            </div>
-          )}
-        </Stack>
-      </Stack>
-    </Stack>
+                    )}
+                  </Suspense>
+                </DialogContent>
+              </Dialog>
+            </Stack>
+          </ConfigFormSection>
+        </Box>
+      </Box>
+
+      <ConfigActionBar
+        dirty={isConfigDirty}
+        dirtyLabel={t("maps.votemapWorkbench.unsavedChanges")}
+        stateIcon={
+          isConfigDirty ? (
+            <WarningAmberOutlinedIcon color="warning" fontSize="small" />
+          ) : (
+            <CheckCircleOutlineIcon color="success" fontSize="small" />
+          )
+        }
+        stateLabel={
+          isConfigDirty
+            ? t("maps.votemapWorkbench.settingsChangesPending")
+            : t("maps.votemapWorkbench.settingsSaved")
+        }
+        stateDescription={t("maps.votemapWorkbench.settingsStateDescription")}
+        secondaryActions={[
+          {
+            id: "reset-votemap-settings",
+            label: t("maps.votemapSettings.reset"),
+            startIcon: <ReplayIcon />,
+            disabled: !isConfigDirty || isConfigSaving,
+            onClick: handleConfigReset,
+          },
+        ]}
+        primaryAction={{
+          label: t("common.save"),
+          loadingLabel: t("common.loading"),
+          startIcon: isConfigSaving ? (
+            <CircularProgress size={18} />
+          ) : (
+            <SaveIcon />
+          ),
+          disabled:
+            !isConfigDirty ||
+            isConfigSaving ||
+            invalidNumberFields.size > 0 ||
+            !canChangeConfig,
+          loading: isConfigSaving,
+          onClick: handleConfigSave,
+        }}
+      />
+    </>
   );
 }
 

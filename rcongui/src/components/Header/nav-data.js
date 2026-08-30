@@ -544,6 +544,7 @@ const linkPermissionKeys = {
   "/settings/maps/votemap": [
     "can_view_votemap_status",
     "can_view_votemap_config",
+    "can_view_map_whitelist",
   ],
   "/settings/welcome-message": ["can_view_welcome_message"],
   "/settings/broadcast-message": ["can_view_broadcast_message"],
@@ -605,9 +606,18 @@ const linkPermissionKeys = {
   "/settings/others/watch-kill-rate": ["can_view_watch_killrate_config"],
 };
 
+const linkPermissionGroups = {
+  "/settings/maps/votemap": [
+    ["can_view_votemap_status"],
+    ["can_view_votemap_config"],
+    ["can_view_map_whitelist", "can_view_all_maps"],
+  ],
+};
+
 const withPermissions = (link) => ({
   ...link,
   requiredPermissions: linkPermissionKeys[link.to] || [],
+  requiredPermissionGroups: linkPermissionGroups[link.to] || [],
 });
 
 export const canAccessNavLink = (link, permissions) => {
@@ -619,6 +629,11 @@ export const canAccessNavLink = (link, permissions) => {
       typeof entry === "string" ? entry : entry.permission
     )
   );
+  if (link.requiredPermissionGroups?.length) {
+    return link.requiredPermissionGroups.some((group) =>
+      group.every((permission) => grantedPermissions.has(permission))
+    );
+  }
   return link.requiredPermissions.some((permission) =>
     grantedPermissions.has(permission)
   );
