@@ -731,8 +731,11 @@ export default function OperationsMatrix({ settings, autokickSettings }) {
       >
         {compact ? (
           <FormControl fullWidth size="small" sx={{ p: 1 }}>
-            <InputLabel sx={{ ml: 1 }}>{copy.columnSetting}</InputLabel>
+            <InputLabel id="general-settings-section-label" sx={{ ml: 1 }}>
+              {copy.columnSetting}
+            </InputLabel>
             <Select
+              labelId="general-settings-section-label"
               value={activeSection}
               label={copy.columnSetting}
               onChange={(event) => {
@@ -833,6 +836,7 @@ export default function OperationsMatrix({ settings, autokickSettings }) {
             return (
               <Box
                 key={row.key}
+                data-testid={`general-setting-${row.key}`}
                 sx={{
                   borderBottom: "1px solid",
                   borderColor: "divider",

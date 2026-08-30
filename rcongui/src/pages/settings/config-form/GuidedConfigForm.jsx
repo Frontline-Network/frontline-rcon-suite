@@ -490,7 +490,7 @@ function MessageField({ name, value, metadata, disabled, onChange, data }) {
       </Box>
       <TextField
         name={name}
-        aria-label={t(metadata.labelKey)}
+        inputProps={{ "aria-label": t(metadata.labelKey) }}
         value={displayValue}
         disabled={disabled}
         onChange={(event) => onChange(toStoredValue(event.target.value))}

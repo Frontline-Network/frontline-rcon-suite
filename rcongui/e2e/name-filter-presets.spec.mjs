@@ -41,14 +41,15 @@ test("name filter templates work in the normal form without JSON escaping", asyn
     "würde den Namensfilter passieren"
   );
   await expect(shell.getByTestId("config-save-button")).toBeEnabled();
-
-  await shell
-    .getByTestId("config-mode-toggle")
-    .getByRole("button", { name: "JSON (erweitert)" })
-    .click();
-  await expect(shell.getByTestId("config-json-editor")).toContainText(
-    "a-zA-Z0-9"
-  );
+  await expect
+    .poll(() =>
+      shell
+        .locator('input[data-testid^="name-kick-rule-"]')
+        .evaluateAll((inputs) => inputs.map((input) => input.value))
+    )
+    .toEqual(expect.arrayContaining([expect.stringMatching(/a-zA-Z0-9/)]));
+  await expect(shell.getByTestId("config-mode-toggle")).toHaveCount(0);
+  await expect(shell.getByTestId("config-json-editor")).toHaveCount(0);
   expect(
     runtimeErrors.filter((error) => !error.startsWith("console: Warning:"))
   ).toEqual([]);

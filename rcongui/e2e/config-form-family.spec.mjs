@@ -16,19 +16,19 @@ const pages = [
   {
     path: "/settings/automods/level",
     title: "Level-Regeln",
-    section: "Regeln",
+    section: "Levelgrenzen",
     sectionId: "rules",
   },
   {
     path: "/settings/automods/no-solo-tank",
     title: "Solo-Panzer verhindern",
-    section: "Bestätigen",
-    sectionId: "observation",
+    section: "Solo-Panzer erkennen",
+    sectionId: "detection",
   },
   {
     path: "/settings/others/vac-bans",
     title: "VAC- und Spielsperren prüfen",
-    section: "Maßnahmen",
+    section: "Sperrmaßnahme",
     sectionId: "actions",
   },
   {
@@ -40,19 +40,19 @@ const pages = [
   {
     path: "/settings/others/name-kicks",
     title: "Namensfilter",
-    section: "Regeln",
+    section: "Filterregeln",
     sectionId: "rules",
   },
   {
     path: "/settings/others/seed-vip",
     title: "Seeder-VIP-Belohnung",
-    section: "Belohnung",
+    section: "VIP-Belohnung",
     sectionId: "reward",
   },
   {
     path: "/settings/others/expired-vip",
     title: "Abgelaufene VIPs bereinigen",
-    section: "Zeitplan",
+    section: "Prüfintervall",
     sectionId: "schedule",
   },
 ];
@@ -82,17 +82,14 @@ for (const configPage of pages) {
       breadcrumbBox.y + breadcrumbBox.height
     );
     await expect(navigation).toBeVisible();
-    await expect(
-      shell.getByRole("heading", { name: "Zusammenfassung" })
-    ).toBeVisible();
+    await expect(shell.getByRole("complementary").first()).toBeVisible();
     await expect(shell.getByTestId("config-save-button")).toBeVisible();
 
-    await navigation
-      .getByRole("button", { name: new RegExp(`^${configPage.section}`) })
-      .click();
-    await expect(
-      shell.getByTestId(`config-section-${configPage.sectionId}`)
-    ).toBeVisible();
+    const sectionButton = navigation.getByRole("button", {
+      name: new RegExp(`^${configPage.section}`),
+    });
+    await sectionButton.click();
+    await expect(sectionButton).toHaveAttribute("aria-current", "step");
     await expectNoHorizontalPageOverflow(page);
     expect(runtimeErrors).toEqual([]);
   });
@@ -108,21 +105,33 @@ test("nested Seeder-VIP settings stay editable in the visual form", async ({
     name: "Konfigurationsbereiche",
   });
 
-  await navigation.getByRole("button", { name: /^Belohnung/ }).click();
-  await expect(
-    shell.getByText("VIP-Dauer in Tagen", { exact: true }).first()
-  ).toBeVisible();
+  await navigation.getByRole("button", { name: /^VIP-Belohnung/ }).click();
+  const duration = shell.getByRole("slider", {
+    name: "Belohnung pro erfolgreichem Seeding",
+  });
+  await expect(duration).toBeVisible();
   await expect(shell).not.toContainText(
     "wird im Formular noch nicht unterstützt"
   );
 
-  await shell
-    .getByTestId("config-mode-toggle")
-    .getByRole("button", { name: "JSON (erweitert)" })
-    .click();
-  await expect(shell.getByTestId("config-json-editor")).toContainText(
-    "vip_days"
+  const originalDuration = Number(await duration.getAttribute("aria-valuenow"));
+  await duration.focus();
+  await duration.press("ArrowRight");
+  await expect(duration).toHaveAttribute(
+    "aria-valuenow",
+    String(originalDuration + 1)
   );
+  await expect(shell.getByTestId("config-dirty-indicator")).toBeVisible();
+
+  await navigation.getByRole("button", { name: /^Ablauf/ }).click();
+  await navigation.getByRole("button", { name: /^VIP-Belohnung/ }).click();
+  await expect(
+    shell.getByRole("slider", {
+      name: "Belohnung pro erfolgreichem Seeding",
+    })
+  ).toHaveAttribute("aria-valuenow", String(originalDuration + 1));
+  await expect(shell.getByTestId("config-mode-toggle")).toHaveCount(0);
+  await expect(shell.getByTestId("config-json-editor")).toHaveCount(0);
   expect(
     runtimeErrors.filter((error) => !error.startsWith("console: Warning:"))
   ).toEqual([]);
@@ -153,7 +162,7 @@ test("schema number fields can be cleared and replaced without restoring the old
 
   await shell
     .getByRole("navigation", { name: "Konfigurationsbereiche" })
-    .getByRole("button", { name: /^Grundlagen/ })
+    .getByRole("button", { name: /^Übersicht/ })
     .click();
   await shell
     .getByRole("navigation", { name: "Konfigurationsbereiche" })
@@ -164,9 +173,12 @@ test("schema number fields can be cleared and replaced without restoring the old
   ).toHaveValue("7");
 });
 
-for (const path of [
-  "/settings/automods/seeding",
-  "/settings/others/seed-vip",
+for (const { path, modeLabel } of [
+  {
+    path: "/settings/automods/seeding",
+    modeLabel: "Wie soll der Automod laufen?",
+  },
+  { path: "/settings/others/seed-vip", modeLabel: "Betriebsmodus" },
 ]) {
   test(`${path} stays usable on a narrow viewport`, async ({ page }) => {
     const runtimeErrors = collectRuntimeErrors(page);
@@ -174,7 +186,9 @@ for (const path of [
     const main = await openDemoPage(page, path);
     const shell = main.getByTestId("config-page-shell");
 
-    await expect(shell.getByTestId("config-mode-toggle")).toBeVisible();
+    await expect(shell.getByRole("group", { name: modeLabel })).toBeVisible();
+    await expect(shell.getByTestId("config-mode-toggle")).toHaveCount(0);
+    await expect(shell.getByTestId("config-json-editor")).toHaveCount(0);
     await expect(shell.getByTestId("config-save-button")).toBeVisible();
     await expect(
       shell.getByRole("navigation", { name: "Konfigurationsbereiche" })

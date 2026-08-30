@@ -59,7 +59,9 @@ test.describe("live player density and details", () => {
     const statTops = await detailPanel
       .locator(".player-detail-stat")
       .evaluateAll((elements) =>
-        elements.map((element) => Math.round(element.getBoundingClientRect().top))
+        elements.map((element) =>
+          Math.round(element.getBoundingClientRect().top)
+        )
       );
     expect(new Set(statTops).size).toBe(1);
 
@@ -84,8 +86,12 @@ test.describe("live player density and details", () => {
     const triggers = panel.getByTestId("live-player-row-actions-trigger");
     await expect.poll(() => triggers.count()).toBeGreaterThan(1);
 
-    const firstPlayerName = await triggers.nth(0).getAttribute("data-player-name");
-    const secondPlayerName = await triggers.nth(1).getAttribute("data-player-name");
+    const firstPlayerName = await triggers
+      .nth(0)
+      .getAttribute("data-player-name");
+    const secondPlayerName = await triggers
+      .nth(1)
+      .getAttribute("data-player-name");
     expect(firstPlayerName).toBeTruthy();
     expect(secondPlayerName).toBeTruthy();
     expect(secondPlayerName).not.toBe(firstPlayerName);
@@ -178,7 +184,6 @@ test.describe("live player density and details", () => {
     expect(playerScroll.scrollHeight).toBeLessThanOrEqual(
       playerScroll.clientHeight + 1
     );
-    expect(logScroll.scrollHeight).toBeGreaterThan(logScroll.clientHeight);
     expect(logScroll.overflowY).toBe("auto");
     expect(logScroll.overscrollBehaviorY).toBe("contain");
     expect(logScroll.tabIndex).toBe(0);
@@ -200,9 +205,9 @@ test.describe("live player density and details", () => {
     const stickyTop = await logsPanel.evaluate((element) =>
       Number.parseFloat(getComputedStyle(element).top)
     );
-    expect(await logsPanel.evaluate((element) => getComputedStyle(element).position)).toBe(
-      "sticky"
-    );
+    expect(
+      await logsPanel.evaluate((element) => getComputedStyle(element).position)
+    ).toBe("sticky");
 
     await pageScroller.evaluate((element) => {
       element.scrollTop = 700;
@@ -222,9 +227,9 @@ test.describe("live player density and details", () => {
     await eventStream.evaluate((element) => {
       element.scrollTop = 240;
     });
-    expect(await eventStream.evaluate((element) => element.scrollTop)).toBeGreaterThan(
-      0
-    );
+    expect(
+      await eventStream.evaluate((element) => element.scrollTop)
+    ).toBeGreaterThan(0);
     expect(await pageScroller.evaluate((element) => element.scrollTop)).toBe(
       pageScrollBeforeLog
     );

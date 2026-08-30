@@ -13,6 +13,24 @@ import {
 
 const path = "/settings/automods/no-leader";
 
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+async function openSection(shell, label, sectionId) {
+  const navigation = shell.getByRole("navigation", {
+    name: "Konfigurationsbereiche",
+  });
+  const button = navigation.getByRole("button", {
+    name: new RegExp(`^${escapeRegExp(label)}`),
+  });
+  await button.click();
+  await expect(button).toHaveAttribute("aria-current", "step");
+  await expect(
+    shell
+      .getByTestId("config-guided-form")
+      .locator(`[data-section="${sectionId}"]`)
+  ).toBeVisible();
+}
+
 test("the No-Leader fixture represents the complete production configuration", () => {
   const fixtureFields = Object.keys(noLeaderConfig).sort();
   const schemaFields = Object.keys(noLeaderSchema.properties).sort();
@@ -45,33 +63,40 @@ for (const [viewportName, viewport] of [
     const main = await openDemoPage(page, path);
     const shell = main.getByTestId("config-page-shell");
 
-    await expect(shell).toBeVisible();
     await expect(
       shell.getByRole("heading", {
         name: noLeaderFormContract.de.title,
         exact: true,
       })
     ).toBeVisible();
+    await expect(
+      shell.getByRole("group", { name: noLeaderFormContract.de.mode })
+    ).toBeVisible();
+    await expect(shell.getByRole("complementary").first()).toBeVisible();
 
     for (const [index, sectionId] of noLeaderSectionIds.entries()) {
-      const section = shell.getByTestId(`config-section-${sectionId}`);
-      await expect(section).toBeAttached();
-      await expect(section).toContainText(
-        noLeaderFormContract.de.sections[index]
+      await openSection(
+        shell,
+        noLeaderFormContract.de.sections[index],
+        sectionId
       );
-    }
-
-    for (const label of noLeaderFormContract.de.labels) {
       await expect(
-        shell.getByText(label, { exact: true }).first()
-      ).toBeAttached();
+        shell
+          .getByRole("heading", {
+            name: noLeaderFormContract.de.sections[index],
+            exact: true,
+          })
+          .last()
+      ).toBeVisible();
     }
 
+    await expect(shell.getByTestId("config-mode-toggle")).toHaveCount(0);
+    await expect(shell.getByTestId("config-json-editor")).toHaveCount(0);
     await expectNoHorizontalPageOverflow(page);
   });
 }
 
-test("uses natural English operator copy without exposing raw schema names", async ({
+test("uses natural English operator copy without exposing schema or JSON controls", async ({
   page,
 }) => {
   const main = await openDemoPage(page, path, { language: "en" });
@@ -84,16 +109,15 @@ test("uses natural English operator copy without exposing raw schema names", asy
     })
   ).toBeVisible();
 
-  for (const [index, sectionId] of noLeaderSectionIds.entries()) {
+  const navigation = shell.getByRole("navigation", {
+    name: "Configuration sections",
+  });
+  for (const section of noLeaderFormContract.en.sections) {
     await expect(
-      shell.getByTestId(`config-section-${sectionId}`)
-    ).toContainText(noLeaderFormContract.en.sections[index]);
-  }
-
-  for (const label of noLeaderFormContract.en.labels) {
-    await expect(
-      shell.getByText(label, { exact: true }).first()
-    ).toBeAttached();
+      navigation.getByRole("button", {
+        name: new RegExp(`^${escapeRegExp(section)}`),
+      })
+    ).toBeVisible();
   }
 
   for (const implementationName of [
@@ -105,201 +129,73 @@ test("uses natural English operator copy without exposing raw schema names", asy
       shell.getByText(implementationName, { exact: true })
     ).toHaveCount(0);
   }
+  await expect(shell.getByTestId("config-json-editor")).toHaveCount(0);
 });
 
-test("switches between the guided form and advanced JSON without losing the draft", async ({
-  page,
-}) => {
-  const main = await openDemoPage(page, path);
-  const modeToggle = main.getByTestId("config-mode-toggle");
-  const form = main.getByTestId("config-guided-form");
-
-  await expect(form).toBeVisible();
-  await modeToggle
-    .getByRole("button", { name: noLeaderFormContract.de.tabs[1] })
-    .click();
-  await expect(main.getByTestId("config-json-editor")).toBeVisible();
-  await expect(main.getByTestId("config-json-editor")).toContainText(
-    "number_of_warnings"
-  );
-
-  await modeToggle
-    .getByRole("button", { name: noLeaderFormContract.de.tabs[0] })
-    .click();
-  await expect(form).toBeVisible();
-  await main
-    .getByRole("button", { name: "Warnen Warnungen konfigurieren" })
-    .click();
-  await expect(
-    form.getByText("Warnungen vor der Bestrafung", { exact: true })
-  ).toBeVisible();
-});
-
-test("shows localized message placeholders while keeping backend tokens in JSON", async ({
+test("keeps a numeric draft while navigating between sections", async ({
   page,
 }) => {
   const main = await openDemoPage(page, path);
   const shell = main.getByTestId("config-page-shell");
 
-  await shell
-    .getByRole("button", { name: "Warnen Warnungen konfigurieren" })
-    .click();
+  await openSection(shell, "Erkennung", "detection");
+  const input = shell.getByRole("spinbutton", {
+    name: "Unsichtbare Prüfungen",
+  });
+  await input.fill("12");
+  await expect(input).toHaveValue("12");
+  await expect(shell.getByTestId("config-dirty-indicator")).toBeVisible();
 
-  const warningMessage = shell
-    .getByTestId("config-section-warnings")
-    .locator("textarea")
-    .first();
+  await openSection(shell, "Ausnahmen", "exemptions");
+  await openSection(shell, "Erkennung", "detection");
+  await expect(
+    shell.getByRole("spinbutton", { name: "Unsichtbare Prüfungen" })
+  ).toHaveValue("12");
+});
+
+test("localizes message placeholders and updates the warning preview", async ({
+  page,
+}) => {
+  const main = await openDemoPage(page, path);
+  const shell = main.getByTestId("config-page-shell");
+
+  await openSection(shell, "Maßnahmen", "actions");
+  const warningMessage = shell.getByRole("textbox", { name: "Warnnachricht" });
   await expect(warningMessage).toHaveValue(/\{Spielername\}/);
   await expect(warningMessage).toHaveValue(/\{Truppname\}/);
   await expect(warningMessage).not.toHaveValue(/\{player_name\}/);
 
-  await shell
-    .getByTestId("config-section-warnings")
-    .getByText("Max. Warnungen", { exact: true })
-    .click();
-  await expect(warningMessage).toHaveValue(/\{Max\. Warnungen\}/);
-  await expect(
-    shell.getByText(/Unbekannte Platzhalter:.*max_warnings/)
-  ).toHaveCount(0);
-
-  await warningMessage.fill(
-    "Hallo {Spielername} aus {Truppname}: {Max. Warnungen}"
-  );
-  await shell
-    .getByTestId("config-mode-toggle")
-    .getByRole("button", { name: noLeaderFormContract.de.tabs[1] })
-    .click();
-  await expect(shell.getByTestId("config-json-editor")).toContainText(
-    "Hallo {player_name} aus {squad_name}: {max_warnings}"
-  );
-
-  await shell
-    .getByTestId("config-mode-toggle")
-    .getByRole("button", { name: noLeaderFormContract.de.tabs[0] })
-    .click();
-  await shell
-    .getByRole("button", { name: "Warnen Warnungen konfigurieren" })
-    .click();
-  await expect(warningMessage).toHaveValue(
-    "Hallo {Spielername} aus {Truppname}: {Max. Warnungen}"
-  );
-});
-
-test("guided number fields keep the operator draft while replacing a value", async ({
-  page,
-}) => {
-  const main = await openDemoPage(page, path);
-  const shell = main.getByTestId("config-page-shell");
-
-  await shell
-    .getByRole("navigation", { name: "Konfigurationsbereiche" })
-    .getByRole("button", { name: /^Bestätigen/ })
-    .click();
-
-  const input = shell.getByRole("spinbutton", {
-    name: "Unsichtbare Prüfungen",
-  });
-  await input.click();
-  await input.press("ControlOrMeta+A");
-  await input.press("Backspace");
-  await expect(input).toHaveValue("");
-  await input.pressSequentially("12");
-  await page.waitForTimeout(400);
-  await expect(input).toHaveValue("12");
-
-  await shell
-    .getByTestId("config-mode-toggle")
-    .getByRole("button", { name: "JSON (erweitert)" })
-    .click();
-  await expect(shell.getByTestId("config-json-editor")).toContainText(
-    '"number_of_notes": 12'
-  );
-});
-
-test("updates the warning preview and action sequence from the stepper", async ({
-  page,
-}) => {
-  const main = await openDemoPage(page, path);
-  const shell = main.getByTestId("config-page-shell");
-
-  await shell
-    .getByRole("button", { name: "Warnen Warnungen konfigurieren" })
-    .click();
   await shell.getByRole("button", { name: "Anzahl Warnungen +" }).click();
-
   await expect(shell).toContainText("Warnung 1 von 3");
-  await expect(shell).toContainText("3× · alle 60 Sekunden");
+  await expect(shell.getByRole("complementary").first()).toContainText(
+    "3× · alle 60 Sekunden"
+  );
 });
 
 test("makes unsaved changes explicit and lets the operator discard the draft", async ({
   page,
 }) => {
   const main = await openDemoPage(page, path);
-  const form = main.getByTestId("config-guided-form");
-  const save = main.getByTestId("config-save-button");
+  const shell = main.getByTestId("config-page-shell");
+  const save = shell.getByTestId("config-save-button");
+  const mode = shell.getByRole("group", { name: noLeaderFormContract.de.mode });
+  const selectedMode = mode.locator('button[aria-pressed="true"]');
+  const originalMode = (await selectedMode.textContent()).trim();
+  const nextMode = originalMode === "Aktiv" ? "Beobachten" : "Aktiv";
 
   await expect(save).toBeDisabled();
-  await form.getByRole("checkbox").first().click();
-  await expect(main.getByTestId("config-dirty-indicator")).toHaveText(
+  await mode.getByRole("button", { name: nextMode, exact: true }).click();
+  await expect(shell.getByTestId("config-dirty-indicator")).toHaveText(
     noLeaderFormContract.de.dirty
   );
   await expect(save).toBeEnabled();
 
-  await main.getByTestId("config-reset-button").click();
-  await expect(main.getByTestId("config-dirty-indicator")).toHaveCount(0);
-  await expect(save).toBeDisabled();
-});
-
-test("persists guided changes through the fake save action", async ({
-  page,
-}) => {
-  const main = await openDemoPage(page, path);
-  const form = main.getByTestId("config-guided-form");
-  const save = main.getByTestId("config-save-button");
-  const dryRun = form.getByRole("checkbox").nth(1);
-  const wasDryRun = await dryRun.isChecked();
-
-  await dryRun.click();
-  await expect(main.getByTestId("config-dirty-indicator")).toBeVisible();
-  await save.click();
-
-  await expect(main.getByTestId("config-dirty-indicator")).toHaveCount(0);
+  await shell.getByTestId("config-reset-button").click();
+  await expect(shell.getByTestId("config-dirty-indicator")).toHaveCount(0);
   await expect(save).toBeDisabled();
   await expect(
-    main.getByText(wasDryRun ? "Aktiv" : "Testbetrieb", { exact: true }).first()
-  ).toBeVisible();
-  if (wasDryRun) {
-    await expect(dryRun).not.toBeChecked();
-  } else {
-    await expect(dryRun).toBeChecked();
-  }
-});
-
-test("keeps invalid JSON visible and does not submit it", async ({ page }) => {
-  const main = await openDemoPage(page, path);
-  await main
-    .getByTestId("config-mode-toggle")
-    .getByRole("button", { name: noLeaderFormContract.de.tabs[1] })
-    .click();
-
-  const editorInput = main
-    .getByTestId("config-json-editor")
-    .locator('[role="textbox"][aria-label="Editor content"]')
-    .first();
-  await editorInput.focus();
-  await page.keyboard.press("ControlOrMeta+A");
-  await page.keyboard.insertText('{"enabled": true');
-
-  await main
-    .getByTestId("config-mode-toggle")
-    .getByRole("button", { name: noLeaderFormContract.de.tabs[0] })
-    .click();
-
-  await expect(main.getByTestId("config-error-summary")).toBeVisible();
-  await expect(main.getByTestId("config-error-summary")).toContainText(
-    "Ungültiges JSON"
-  );
-  await expect(main.getByTestId("config-save-button")).toBeDisabled();
+    mode.getByRole("button", { name: originalMode, exact: true })
+  ).toHaveAttribute("aria-pressed", "true");
 });
 
 for (const [game, gameLabel] of [

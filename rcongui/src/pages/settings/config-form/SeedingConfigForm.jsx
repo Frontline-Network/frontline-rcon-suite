@@ -113,7 +113,7 @@ function LabeledNumber({
         value={value}
         disabled={disabled}
         onChange={onChange}
-        inputProps={{ min, max }}
+        inputProps={{ min, max, "aria-label": label }}
         InputProps={{
           endAdornment: unit ? (
             <InputAdornment position="end">{unit}</InputAdornment>

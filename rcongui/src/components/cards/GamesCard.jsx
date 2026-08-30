@@ -2,6 +2,7 @@ import {
   List,
   Card,
   ListItem,
+  ListItemButton,
   CardHeader,
   CardContent,
   Box,
@@ -43,18 +44,24 @@ const GamesCard = ({ games }) => {
             };
 
             return (
-              <ListItem
-                key={game.id}
-                component={Link}
-                to={`/stats/games/${game.id}`}
-                sx={{
-                  "&:hover": { backgroundColor: "action.hover" },
-                  color: "text.primary",
-                  gap: 2,
-                  py: { xs: 1.5, sm: 1 },
-                }}
-              >
-                  <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: { xs: 0, sm: 1 } }}>
+              <ListItem key={game.id} disablePadding>
+                <ListItemButton
+                  component={Link}
+                  to={`/stats/games/${game.id}`}
+                  sx={{
+                    "&:hover": { backgroundColor: "action.hover" },
+                    color: "text.primary",
+                    gap: 2,
+                    py: { xs: 1.5, sm: 1 },
+                  }}
+                >
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: { xs: "column", sm: "row" },
+                      gap: { xs: 0, sm: 1 },
+                    }}
+                  >
                     <img
                       src={"/maps/icons/" + matchMap.image_name}
                       width={size}
@@ -92,7 +99,7 @@ const GamesCard = ({ games }) => {
                       sx={{
                         display: "flex",
                         flexDirection: "column",
-                        width: "180px"
+                        width: "180px",
                       }}
                     >
                       <Box
@@ -132,7 +139,16 @@ const GamesCard = ({ games }) => {
                         </Typography>
                       </Box>
                     </Box>
-                    <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 1, justifyContent: "space-between", flexGrow: 1 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 1,
+                        justifyContent: "space-between",
+                        flexGrow: 1,
+                      }}
+                    >
                       <Typography
                         variant="h6"
                         sx={{
@@ -157,11 +173,13 @@ const GamesCard = ({ games }) => {
                           width: "70px",
                         }}
                       >
-                        {duration ? `${duration} min` : t("dashboard.inProgress")}
+                        {duration
+                          ? `${duration} min`
+                          : t("dashboard.inProgress")}
                       </Typography>
                     </Box>
                   </Box>
-
+                </ListItemButton>
               </ListItem>
             );
           })}

@@ -111,15 +111,13 @@ export const noLeaderSchema = Object.freeze({
 export const noLeaderFormContract = Object.freeze({
   de: {
     title: "Trupps ohne Truppführer",
-    tabs: ["Formular", "JSON (erweitert)"],
+    mode: "Wie soll die Regel arbeiten?",
     dirty: "Ungespeicherte Änderungen",
     sections: [
-      "Grundlagen",
+      "Übersicht",
+      "Erkennung",
       "Ausnahmen",
-      "Bestätigen",
-      "Warnungen",
-      "Bestrafungen",
-      "Kick",
+      "Maßnahmen",
       "Nachrichten",
     ],
     labels: [
@@ -133,17 +131,9 @@ export const noLeaderFormContract = Object.freeze({
   },
   en: {
     title: "Squads without a leader",
-    tabs: ["Form", "JSON (advanced)"],
+    mode: "How should the rule run?",
     dirty: "Unsaved changes",
-    sections: [
-      "Basics",
-      "Exceptions",
-      "Confirm",
-      "Warnings",
-      "Punishments",
-      "Kick",
-      "Messages",
-    ],
+    sections: ["Overview", "Detection", "Exceptions", "Actions", "Messages"],
     labels: [
       "Enable automod",
       "Log only (dry run)",
@@ -157,10 +147,8 @@ export const noLeaderFormContract = Object.freeze({
 
 export const noLeaderSectionIds = Object.freeze([
   "operation",
+  "detection",
   "exemptions",
-  "observation",
-  "warnings",
-  "punishments",
-  "kick",
+  "actions",
   "notifications",
 ]);

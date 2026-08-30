@@ -32,7 +32,7 @@ export default function LanguageSelector({ touchSafe = false }) {
           size="small"
           aria-label={t("language.label")}
           onClick={(event) => setAnchorEl(event.currentTarget)}
-          sx={touchSafe ? { minWidth: 44, minHeight: 44 } : undefined}
+          sx={touchSafe ? { minWidth: 45, minHeight: 45 } : undefined}
         >
           <TranslateRoundedIcon />
         </IconButton>
@@ -45,8 +45,14 @@ export default function LanguageSelector({ touchSafe = false }) {
         transformOrigin={{ horizontal: "right", vertical: "top" }}
       >
         {languages.map(({ code, key }) => (
-          <MenuItem key={code} selected={language === code} onClick={() => selectLanguage(code)}>
-            <ListItemIcon sx={{ visibility: language === code ? "visible" : "hidden" }}>
+          <MenuItem
+            key={code}
+            selected={language === code}
+            onClick={() => selectLanguage(code)}
+          >
+            <ListItemIcon
+              sx={{ visibility: language === code ? "visible" : "hidden" }}
+            >
               <CheckRoundedIcon fontSize="small" />
             </ListItemIcon>
             <ListItemText>{t(key)}</ListItemText>
