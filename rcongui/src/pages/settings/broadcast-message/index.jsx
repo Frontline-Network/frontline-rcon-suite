@@ -19,11 +19,9 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
   FormControlLabel,
   IconButton,
   MenuItem,
-  Paper,
   Skeleton,
   Stack,
   Switch,
@@ -36,16 +34,14 @@ import CampaignIcon from "@mui/icons-material/Campaign";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
-import SaveIcon from "@mui/icons-material/Save";
-import ShuffleIcon from "@mui/icons-material/Shuffle";
 import { useTranslation } from "react-i18next";
 import isEqual from "lodash/isEqual";
 
 import { AsyncClientError } from "@/components/shared/AsyncClientError";
-import Padlock from "@/components/shared/Padlock";
 import { isFakeMode } from "@/mirage/demo-data";
 import { TEMPLATE_CATEGORY, unpackBroadcastMessage } from "@/utils/lib";
 import { cmd } from "@/utils/fetchUtils";
+import BroadcastCampaignWorkbench from "./BroadcastCampaignWorkbench";
 
 const createCampaign = (index = 0) => ({
   id: `campaign-${Date.now()}-${index}`,
@@ -144,22 +140,48 @@ const CampaignCard = ({
   onTest,
   testing,
   deliveryStatus,
+  testResult,
 }) => {
   const { t } = useTranslation();
   const update = (field, value) =>
     onChange(index, { ...campaign, [field]: value });
-  const intervalMinutes = Math.max(
-    1,
-    Math.round(Number(campaign.time_sec) / 60)
-  );
+  const rawIntervalSeconds = Number(campaign.time_sec);
+  const intervalMinutes = Number.isFinite(rawIntervalSeconds)
+    ? Math.round(rawIntervalSeconds / 60)
+    : "";
   const isPlayerMessage = campaign.delivery_mode === "player_message";
+  const messageInvalid = !campaign.message.trim();
+  const intervalInvalid =
+    !Number.isFinite(rawIntervalSeconds) ||
+    rawIntervalSeconds < 60 ||
+    rawIntervalSeconds > 86400 ||
+    !Number.isFinite(Number(intervalMinutes)) ||
+    intervalMinutes < 1 ||
+    intervalMinutes > 1440;
+  const sessionInvalid =
+    !Number.isFinite(Number(campaign.min_session_minutes)) ||
+    campaign.min_session_minutes < 1 ||
+    campaign.min_session_minutes > 1440;
+  const minPlayersInvalid =
+    !Number.isFinite(Number(campaign.min_players)) ||
+    campaign.min_players < 0 ||
+    campaign.min_players > 100 ||
+    campaign.min_players > campaign.max_players;
+  const maxPlayersInvalid =
+    !Number.isFinite(Number(campaign.max_players)) ||
+    campaign.max_players < 0 ||
+    campaign.max_players > 100 ||
+    campaign.max_players < campaign.min_players;
 
   return (
     <Card
       variant="outlined"
       sx={{
         borderColor: campaign.enabled ? "divider" : "rgba(255,255,255,0.1)",
-        opacity: campaign.enabled ? 1 : 0.72,
+        border: 0,
+        borderRadius: 0,
+        bgcolor: "transparent",
+        boxShadow: "none",
       }}
     >
       <CardContent sx={{ p: { xs: 2, md: 2.5 }, "&:last-child": { pb: 2.5 } }}>
@@ -173,13 +195,14 @@ const CampaignCard = ({
             <Stack direction="row" alignItems="center" gap={1} minWidth={0}>
               <CampaignIcon color={campaign.enabled ? "primary" : "disabled"} />
               <TextField
+                label={t("settings.campaigns.campaignName")}
                 value={campaign.title}
                 onChange={(event) => update("title", event.target.value)}
                 placeholder={t("settings.campaigns.namePlaceholder")}
-                variant="standard"
+                size="small"
                 fullWidth
                 slotProps={{ htmlInput: { maxLength: 80 } }}
-                sx={{ maxWidth: 360 }}
+                sx={{ maxWidth: 420 }}
               />
               <Chip
                 size="small"
@@ -208,12 +231,21 @@ const CampaignCard = ({
                 label={t("common.enabled")}
               />
               <Tooltip title={t("settings.campaigns.duplicate")}>
-                <IconButton onClick={() => onDuplicate(index)}>
+                <IconButton
+                  onClick={() => onDuplicate(index)}
+                  aria-label={t("settings.campaigns.duplicate")}
+                  sx={{ minWidth: 44, minHeight: 44 }}
+                >
                   <ContentCopyIcon />
                 </IconButton>
               </Tooltip>
               <Tooltip title={t("common.delete")}>
-                <IconButton color="error" onClick={() => onDelete(index)}>
+                <IconButton
+                  color="error"
+                  onClick={() => onDelete(index)}
+                  aria-label={t("common.delete")}
+                  sx={{ minWidth: 44, minHeight: 44 }}
+                >
                   <DeleteOutlineIcon />
                 </IconButton>
               </Tooltip>
@@ -228,11 +260,16 @@ const CampaignCard = ({
             minRows={3}
             fullWidth
             required
-            helperText={t(
+            error={messageInvalid}
+            helperText={
+              messageInvalid
+                ? t("settings.campaigns.messageRequired")
+                : t(
               isPlayerMessage
                 ? "settings.campaigns.playerMessageHelp"
                 : "settings.campaigns.messageHelp"
-            )}
+                  )
+            }
           />
 
           <Stack direction={{ xs: "column", md: "row" }} gap={1.5}>
@@ -260,6 +297,12 @@ const CampaignCard = ({
                     update("min_session_minutes", Number(event.target.value))
                   }
                   slotProps={{ htmlInput: { min: 1, max: 1440 } }}
+                  error={sessionInvalid}
+                  helperText={
+                    sessionInvalid
+                      ? t("settings.campaigns.sessionRangeError")
+                      : undefined
+                  }
                   sx={{ minWidth: 190 }}
                 />
                 <TextField
@@ -291,7 +334,12 @@ const CampaignCard = ({
                   update("time_sec", Number(event.target.value) * 60)
                 }
                 slotProps={{ htmlInput: { min: 1, max: 1440 } }}
-                helperText={t("settings.campaigns.intervalUnit")}
+                error={intervalInvalid}
+                helperText={
+                  intervalInvalid
+                    ? t("settings.campaigns.intervalRangeError")
+                    : t("settings.campaigns.intervalUnit")
+                }
                 sx={{ minWidth: 190 }}
               />
             )}
@@ -303,6 +351,12 @@ const CampaignCard = ({
                 update("min_players", Number(event.target.value))
               }
               slotProps={{ htmlInput: { min: 0, max: 100 } }}
+              error={minPlayersInvalid}
+              helperText={
+                minPlayersInvalid
+                  ? t("settings.campaigns.playerRangeError")
+                  : undefined
+              }
               sx={{ width: { xs: "100%", md: 150 } }}
             />
             <TextField
@@ -313,6 +367,12 @@ const CampaignCard = ({
                 update("max_players", Number(event.target.value))
               }
               slotProps={{ htmlInput: { min: 0, max: 100 } }}
+              error={maxPlayersInvalid}
+              helperText={
+                maxPlayersInvalid
+                  ? t("settings.campaigns.playerRangeError")
+                  : undefined
+              }
               sx={{ width: { xs: "100%", md: 150 } }}
             />
             <FormControlLabel
@@ -400,6 +460,10 @@ const CampaignCard = ({
             </Stack>
           )}
 
+          {testResult && (
+            <Alert severity={testResult.severity}>{testResult.text}</Alert>
+          )}
+
           <Box>
             <Button
               size="small"
@@ -407,6 +471,7 @@ const CampaignCard = ({
               startIcon={<PlayArrowIcon />}
               onClick={() => onTest(campaign)}
               disabled={testing || !campaign.message.trim()}
+              sx={{ minHeight: 44 }}
             >
               {testing
                 ? t("settings.campaigns.testing")
@@ -433,9 +498,20 @@ const BroadcastCampaignPage = () => {
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
   const [loadingPlayers, setLoadingPlayers] = useState(false);
   const [deliveryStatus, setDeliveryStatus] = useState(data.deliveryStatus);
+  const [activeSection, setActiveSection] = useState("campaigns");
+  const [selectedCampaignId, setSelectedCampaignId] = useState(
+    () => normalizeConfig(data.config).messages[0]?.id ?? null
+  );
+  const [pendingDeleteIndex, setPendingDeleteIndex] = useState(null);
 
   useEffect(() => {
-    setConfig(normalizeConfig(data.config));
+    const nextConfig = normalizeConfig(data.config);
+    setConfig(nextConfig);
+    setSelectedCampaignId((current) =>
+      nextConfig.messages.some((campaign) => campaign.id === current)
+        ? current
+        : nextConfig.messages[0]?.id ?? null
+    );
   }, [data.config]);
 
   useEffect(() => {
@@ -486,18 +562,17 @@ const BroadcastCampaignPage = () => {
   };
 
   const handleAdd = () => {
+    const campaign = createCampaign(config.messages.length);
     setConfig((previous) => ({
       ...previous,
-      messages: [
-        ...previous.messages,
-        createCampaign(previous.messages.length),
-      ],
+      messages: [...previous.messages, campaign],
     }));
+    setSelectedCampaignId(campaign.id);
+    setActiveSection("campaigns");
   };
 
   const handleDuplicate = (index) => {
-    setConfig((previous) => {
-      const source = previous.messages[index];
+    const source = config.messages[index];
       const duplicate = {
         ...source,
         id: `campaign-${Date.now()}-${index}`,
@@ -505,38 +580,47 @@ const BroadcastCampaignPage = () => {
           ? t("settings.campaigns.copyName", { name: source.title })
           : "",
       };
-      return {
+    setConfig((previous) => ({
         ...previous,
         messages: [
           ...previous.messages.slice(0, index + 1),
           duplicate,
           ...previous.messages.slice(index + 1),
         ],
-      };
-    });
+    }));
+    setSelectedCampaignId(duplicate.id);
   };
 
   const handleDelete = (index) => {
-    setConfig((previous) => ({
-      ...previous,
-      messages: previous.messages.filter((_, itemIndex) => itemIndex !== index),
-    }));
+    setPendingDeleteIndex(index);
+  };
+
+  const confirmDelete = () => {
+    if (pendingDeleteIndex === null) return;
+    const remaining = config.messages.filter(
+      (_, itemIndex) => itemIndex !== pendingDeleteIndex
+    );
+    setConfig((previous) => ({ ...previous, messages: remaining }));
+    setSelectedCampaignId(
+      remaining[Math.min(pendingDeleteIndex, remaining.length - 1)]?.id ?? null
+    );
+    setPendingDeleteIndex(null);
   };
 
   const handleTemplateChange = (_, template) => {
     if (!template) return;
     const templateMessages = unpackBroadcastMessage(template.content);
-    setConfig((previous) => ({
-      ...previous,
-      messages: [
-        ...previous.messages,
-        ...templateMessages.map((message, index) => ({
-          ...createCampaign(previous.messages.length + index),
+    const importedCampaigns = templateMessages.map((message, index) => ({
+      ...createCampaign(config.messages.length + index),
           title: template.title,
           ...message,
-        })),
-      ],
     }));
+    setConfig((previous) => ({
+      ...previous,
+      messages: [...previous.messages, ...importedCampaigns],
+    }));
+    setSelectedCampaignId(importedCampaigns[0]?.id ?? selectedCampaignId);
+    setActiveSection("campaigns");
   };
 
   const handleTest = async (campaign) => {
@@ -621,130 +705,36 @@ const BroadcastCampaignPage = () => {
     submit(config, { method: "post", encType: "application/json" });
   };
 
-  return (
-    <Stack spacing={2.5} sx={{ maxWidth: 1180, mx: "auto" }}>
-      <Box>
-        <Typography variant="overline" color="primary">
-          {t("settings.campaigns.eyebrow")}
-        </Typography>
-        <Typography variant="h4" component="h1">
-          {t("settings.campaigns.title")}
-        </Typography>
-        <Typography color="text.secondary" sx={{ mt: 0.5, maxWidth: 760 }}>
-          {t("settings.campaigns.subtitle")}
-        </Typography>
-      </Box>
-
-      <Paper variant="outlined" sx={{ p: { xs: 2, md: 2.5 } }}>
-        <Stack
-          direction={{ xs: "column", md: "row" }}
-          justifyContent="space-between"
-          alignItems={{ xs: "stretch", md: "center" }}
-          gap={2}
-        >
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            gap={2}
-            alignItems={{ sm: "center" }}
-          >
-            <Padlock
-              label={t(
-                config.enabled
-                  ? "settings.campaigns.moduleActive"
-                  : "settings.campaigns.modulePaused"
-              )}
-              checked={config.enabled}
-              handleChange={(checked) =>
-                setConfig((previous) => ({ ...previous, enabled: checked }))
-              }
-            />
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={config.randomize}
-                  onChange={(event) =>
-                    setConfig((previous) => ({
-                      ...previous,
-                      randomize: event.target.checked,
-                    }))
-                  }
-                />
-              }
-              label={
-                <Stack direction="row" gap={0.75} alignItems="center">
-                  <ShuffleIcon fontSize="small" />
-                  <span>{t("settings.campaigns.randomOrder")}</span>
-                </Stack>
-              }
-            />
-            <Chip
-              color={activeCount ? "success" : "default"}
-              label={t("settings.campaigns.activeCount", {
-                count: activeCount,
-              })}
-            />
-          </Stack>
-          <Stack direction={{ xs: "column", sm: "row" }} gap={1}>
-            <Button
-              variant="outlined"
-              startIcon={<AddIcon />}
-              onClick={handleAdd}
-            >
-              {t("settings.campaigns.add")}
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<SaveIcon />}
-              disabled={!hasChanges || !isValid || saving}
-              onClick={handleSave}
-            >
-              {saving ? t("common.loading") : t("common.save")}
-            </Button>
-          </Stack>
-        </Stack>
-        <Divider sx={{ my: 2 }} />
-        <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
-          <TextField
-            label={t("settings.campaigns.globalSendInterval")}
-            type="number"
-            value={config.player_message_interval_sec}
-            onChange={(event) =>
+  const handleModeChange = (mode) => {
               setConfig((previous) => ({
                 ...previous,
-                player_message_interval_sec: Number(event.target.value),
-              }))
-            }
-            slotProps={{ htmlInput: { min: 5, max: 300 } }}
-            helperText={t("settings.campaigns.seconds")}
-            sx={{ minWidth: 230 }}
-          />
-          <TextField
-            label={t("settings.campaigns.playerGap")}
-            type="number"
-            value={Math.round(config.player_message_gap_sec / 60)}
-            onChange={(event) =>
-              setConfig((previous) => ({
-                ...previous,
-                player_message_gap_sec: Number(event.target.value) * 60,
-              }))
-            }
-            slotProps={{ htmlInput: { min: 1, max: 60 } }}
-            helperText={t("settings.campaigns.minutes")}
-            sx={{ minWidth: 230 }}
-          />
-        </Stack>
-      </Paper>
+      enabled: mode !== "off",
+      randomize: mode === "random",
+    }));
+  };
 
-      {!isValid && (
-        <Alert severity="warning">{t("settings.campaigns.invalidRange")}</Alert>
-      )}
-      {actionData?.saved && (
-        <Alert severity="success">{t("settings.campaigns.saved")}</Alert>
-      )}
-      {testResult && (
-        <Alert severity={testResult.severity}>{testResult.text}</Alert>
-      )}
+  const handleGlobalChange = (field, value) => {
+    setConfig((previous) => ({ ...previous, [field]: value }));
+  };
 
+  const handleReset = () => {
+    const savedConfig = normalizeConfig(data.config);
+    setConfig(savedConfig);
+    setSelectedCampaignId(savedConfig.messages[0]?.id ?? null);
+    setTestResult(null);
+  };
+
+  const selectedCampaignIndex = config.messages.findIndex(
+    (campaign) => campaign.id === selectedCampaignId
+  );
+  const selectedCampaign = config.messages[selectedCampaignIndex] ?? null;
+  const selectedDeliveryStatus = selectedCampaign
+    ? deliveryStatus?.campaigns?.find(
+        (status) => status.campaign_id === selectedCampaign.id
+      )
+    : null;
+
+  const templatePicker = (
       <Suspense fallback={<TemplateSkeleton />}>
         <Await
           resolve={data.templates}
@@ -769,54 +759,63 @@ const BroadcastCampaignPage = () => {
           }
         </Await>
       </Suspense>
+  );
 
-      <Stack spacing={1.5}>
-        {config.messages.map((campaign, index) => (
+  const campaignEditor = selectedCampaign ? (
           <CampaignCard
-            key={campaign.id || index}
-            campaign={campaign}
-            index={index}
+      key={selectedCampaign.id}
+      campaign={selectedCampaign}
+      index={selectedCampaignIndex}
             onChange={handleCampaignChange}
             onDuplicate={handleDuplicate}
             onDelete={handleDelete}
             onTest={handleTest}
-            testing={testingId === campaign.id}
-            deliveryStatus={deliveryStatus?.campaigns?.find(
-              (status) => status.campaign_id === campaign.id
-            )}
+      testing={testingId === selectedCampaign.id}
+      deliveryStatus={selectedDeliveryStatus}
+      testResult={testResult}
           />
-        ))}
-      </Stack>
-
-      {config.messages.length === 0 && (
-        <Paper variant="outlined" sx={{ p: 5, textAlign: "center" }}>
-          <CampaignIcon sx={{ fontSize: 48, color: "text.disabled" }} />
-          <Typography variant="h6" sx={{ mt: 1 }}>
-            {t("settings.campaigns.emptyTitle")}
-          </Typography>
-          <Typography color="text.secondary" sx={{ mb: 2 }}>
+  ) : (
+    <Stack alignItems="center" spacing={1.5} sx={{ p: { xs: 3, md: 6 } }}>
+      <CampaignIcon sx={{ fontSize: 44, color: "text.disabled" }} />
+      <Typography variant="h6">{t("settings.campaigns.emptyTitle")}</Typography>
+      <Typography color="text.secondary" textAlign="center">
             {t("settings.campaigns.emptyText")}
           </Typography>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={handleAdd}
-          >
+      <Button variant="contained" startIcon={<AddIcon />} onClick={handleAdd}>
             {t("settings.campaigns.addFirst")}
           </Button>
-        </Paper>
-      )}
+    </Stack>
+  );
 
-      <Divider />
-      <Typography variant="body2" color="text.secondary">
-        {t("settings.campaigns.priorityNote")}
-      </Typography>
+  return (
+    <>
+      <BroadcastCampaignWorkbench
+        config={config}
+        activeCount={activeCount}
+        activeSection={activeSection}
+        onSectionChange={setActiveSection}
+        selectedCampaignId={selectedCampaignId}
+        onSelectCampaign={setSelectedCampaignId}
+        onAdd={handleAdd}
+        onModeChange={handleModeChange}
+        onGlobalChange={handleGlobalChange}
+        onReset={handleReset}
+        onSave={handleSave}
+        hasChanges={hasChanges}
+        isValid={isValid}
+        saving={saving}
+        actionSaved={actionData?.saved}
+        templatePicker={templatePicker}
+        campaignEditor={campaignEditor}
+        deliveryStatus={deliveryStatus}
+      />
 
       <Dialog
         open={Boolean(testCampaign)}
         onClose={() => !testingId && setTestCampaign(null)}
         fullWidth
         maxWidth="sm"
+        slotProps={{ paper: { sx: { borderRadius: 0 } } }}
       >
         <DialogTitle>{t("settings.campaigns.selectTestPlayer")}</DialogTitle>
         <DialogContent>
@@ -861,7 +860,36 @@ const BroadcastCampaignPage = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Stack>
+
+      <Dialog
+        open={pendingDeleteIndex !== null}
+        onClose={() => setPendingDeleteIndex(null)}
+        fullWidth
+        maxWidth="xs"
+        slotProps={{ paper: { sx: { borderRadius: 0 } } }}
+      >
+        <DialogTitle>{t("settings.campaigns.deleteTitle")}</DialogTitle>
+        <DialogContent>
+          <Typography color="text.secondary">
+            {t("settings.campaigns.deleteDescription", {
+              name:
+                config.messages[pendingDeleteIndex]?.title ||
+                t("settings.campaigns.untitledCampaign", {
+                  count: Number(pendingDeleteIndex) + 1,
+                }),
+            })}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPendingDeleteIndex(null)}>
+            {t("common.cancel")}
+          </Button>
+          <Button color="error" variant="contained" onClick={confirmDelete}>
+            {t("common.delete")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 };
 

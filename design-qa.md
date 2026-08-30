@@ -1,3 +1,75 @@
+# Design QA — Kampagnen-Workbench
+
+## Evidence
+
+- Source visual truth: `http://127.0.0.1:3003/settings/automods/seeding`
+- Source capture: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\broadcast-source-seeding.png`
+- Implementation: `http://127.0.0.1:3003/settings/broadcast-message`
+- Implementation capture: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\broadcast-implementation.png`
+- Browser viewport: 2353 × 1272 CSS px
+- Source pixels: 2353 × 1272 px
+- Implementation pixels: 2353 × 1272 px
+- Device pixel ratio: 1
+- Density normalization: none required; both captures use the same browser tab, viewport and DPR
+- State: dark theme, German locale, demo data, `Kampagnen` section selected, first campaign selected
+
+## Full-view comparison evidence
+
+The implementation uses the same page width, square workbench shell, top-level mode control, horizontal section navigation, three-part summary, muted dark surfaces, amber focus treatment and bottom action bar as the Seeding reference. The campaign-specific master-detail editor is intentionally denser than the Seeding overview while preserving the same hierarchy and spacing system.
+
+## Focused-region comparison evidence
+
+The header, mode selector, section navigation and summary strip were compared at readable size in the combined browser capture. The campaign editor was also checked separately in the rendered page: label placement, selected-list treatment, input alignment, 44 px icon actions and square borders match the established form language. No separate crop was needed because these controls remain legible at the captured 1:1 density.
+
+## Required fidelity surfaces
+
+- Fonts and typography: existing Montserrat/Roboto application typography is reused; heading, overline, label and helper-text weights follow the Seeding hierarchy without new font substitutions.
+- Spacing and layout rhythm: shared `SeedingWorkbenchLayout`, section padding and action-bar spacing are reused. The campaign master-detail region uses the same border and gap tokens.
+- Colors and visual tokens: existing theme background, divider, primary amber, success green, warning and muted-text tokens are reused. No new palette was introduced.
+- Image quality and asset fidelity: no imagery is required for this configuration workflow. All visible icons come from the existing MUI icon library; no placeholder, emoji, CSS drawing or handcrafted SVG was introduced.
+- Copy and content: labels describe campaigns, delivery cadence and delivery state in operator language. German and English strings are complete for the new workbench.
+
+## Findings
+
+No actionable P0, P1 or P2 findings remain.
+
+- [P3] Mobile visual capture remains a follow-up verification gap.
+  - Location: responsive workbench below the desktop breakpoint.
+  - Evidence: responsive rules and a dedicated 390 px E2E scenario were added, but the selected in-app browser surface does not expose viewport resizing.
+  - Impact: low; the layout uses the already-proven shared responsive shell and the desktop page has no horizontal overflow.
+  - Follow-up: run `e2e/broadcast-campaigns.spec.mjs` in the normal browser-test pipeline.
+
+## Comparison history
+
+1. Initial comparison found a P2 horizontal-overflow issue: the full-width three-state mode selector expanded the auto-sized header grid beyond the viewport.
+2. Fix applied: removed the full-width mode and constrained the control to 420 px on desktop and 100% on small screens; each toggle now shares the available width with a 44 px minimum height.
+3. Post-fix evidence: `broadcast-implementation.png` reports document width 2353 px for a 2353 px viewport, with no horizontal scrollbar or clipped persistent controls.
+
+## Primary interactions tested
+
+- Section navigation between campaigns and delivery settings
+- Add a campaign and focus its single editor
+- Dirty-state indicator
+- Delete confirmation and cancellation
+- Restore saved values
+- Runtime fallback/error absence
+- Document-width overflow check
+
+## Implementation checklist
+
+- [x] Match the shared square configuration workbench
+- [x] Replace stacked campaign cards with a focused master-detail editor
+- [x] Keep global delivery cadence separate from campaign content
+- [x] Add clear operating modes and delivery activity
+- [x] Add delete confirmation and accessible icon labels
+- [x] Add responsive/interaction E2E coverage
+- [x] Verify production build and desktop browser rendering
+
+final result: passed
+---
+
+## Archived previous design QA
+
 # Design QA — Live-Spiel / Option 2
 
 ## Evidence
