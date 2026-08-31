@@ -253,3 +253,39 @@ Das Paket ist frontend-, datenbank- und konfigurationsneutral. Es erfordert wede
 ### Rückrollbarkeit
 
 Das Paket ist frontend-, datenbank- und konfigurationsneutral. Es erfordert weder Backup noch Migration und kann als einzelner Git-Commit mit `git revert` zurückgenommen werden. Es wurde weder gepusht noch veröffentlicht, als PR eröffnet, ausgerollt oder auf einer Produktionsinstanz aktiviert.
+
+## Phase 2 · Paket 2.4 – Spielerakten und Sperrlistenverwaltung
+
+### Inventar und Risiko
+
+- Betroffene Routen: `/records/players`, `/records/players/:playerId`, die vorhandenen Spielerprofil-Unteransichten, `/records/blacklists` und `/records/blacklists/manage`.
+- Betroffene Komponenten: Spielerfilter, zentrale Mehrfachauswahl-Aktionen, Statuskennzeichnung der Spielerakte, Profilreihenfolge, Sperrlisten-Karten, Master-Detail-Verwaltung sowie Erstellen-/Bearbeiten-Dialog.
+- Datenverträge und gespeicherte Konfigurationen: unverändert. `GET_PLAYERS_RECORDS`, `GET_BANS`, `GET_PLAYER`, `GET_PLAYER_MESSAGES`, Spielerkommentare, URL-Filter, Sperrlisten-Loader und alle bestehenden Erstellen-/Bearbeiten-/Löschen-Payloads werden unverändert verwendet. Unbekannte Synchronisationsarten und Servernummern bleiben beim Bearbeiten erhalten.
+- Ausgangslage: Mobile war der Spielerfilter zusammen mit einer dauerhaft sichtbaren Symbolleiste zu hoch. In der Spielerakte lag die lange Zusammenfassung vor der eigentlichen Arbeitsfläche. Die Sperrlistenverwaltung war Desktop sehr weit verteilt und Mobile als abgeschnittene Pseudotabelle schwer bedienbar.
+
+### Umsetzung
+
+- Mobile Spielersuche und Filter zu einer kompakten Zweieraktion verdichtet; erweiterte Felder öffnen in einem beschrifteten, scrollbareren Drawer. Alle bestehenden Query-Parameter und Formfeldnamen bleiben erhalten.
+- Die zentrale Spieleraktionsleiste wird nur bei tatsächlicher Auswahl gerendert. Mobile bleibt sie oberhalb der Bottom Navigation erreichbar; Auswahlanzahl und Aufheben sind sichtbar, alle bestehenden Aktionen bleiben zugänglich.
+- Spielerstatus wird mit beschrifteten, eckigen Chips statt ausschließlich über unbeschriftete Symbole vermittelt. Ohne Risiko- oder Sonderstatus erscheint ein neutraler Klartext.
+- Die Spielerakte priorisiert Mobile Identität, Status und aufgabenbezogene Tabs; die lange Aktenübersicht folgt danach. Desktop behält die vertraute Zweispaltenstruktur.
+- Die Sperrlistenverwaltung wurde zu einer eckigen Master-Detail-Arbeitsfläche mit Kennzahlen, auswählbaren Listenkarten, Reichweite, Synchronisationsbeschreibung und Wirkhinweis ausgebaut.
+- Erstellen und Bearbeiten verwenden ein strukturiertes Formular mit Listenname, Synchronisationswirkung und Serverreichweite; Mobile öffnet es vollflächig. Bestehende Werte werden nicht normalisiert oder verworfen.
+- Die bestehende Eintragsseite `/records/blacklists` blieb bewusst erhalten, weil sie bereits der freigegebenen operativen Arbeitsweise entspricht.
+
+### Validierung
+
+- Vite-Production-Build mit API-Basispfad `/api/`: bestanden; nur die bekannte Chunk-Größenwarnung bleibt.
+- Verträge: Design Foundation, Seitensemantik, Action Feedback, Konfigurationskompatibilität, Admin-Aktionen, Operator-Copy und Navigation Shell bestanden.
+- Initiales Bundle-Budget: bestanden mit 1.499,65 kB Rohgröße und 482,85 kB gzip; neu eingeführte UI-Copy verwendet bestehende Übersetzungen, wo sie semantisch passen.
+- Browserprüfung: Spielerakten, Spielerprofil und Sperrlistenverwaltung bei 390 × 844; Sperrlistenverwaltung zusätzlich bei 1440 × 900. Alle geprüften Zustände besitzen keinen horizontalen Dokumentüberlauf.
+- Funktionsprüfung: Spieler-ID-Filter erzeugt die bestehende URL-Query; Mehrfachauswahl blendet die Aktionsregion ein und wieder aus; Profil-Tab wechselt; Sperrlistenwahl per Enter aktualisiert das Detailpanel; bestehende Bearbeitungswerte und mobiles Vollbildformular geprüft.
+- Theme- und Farbsehprüfung: heller Modus plus Deuteranopie live geprüft und anschließend ohne Speicherung verworfen.
+- Semantik: genau eine native H1 pro Route; sichtbare Formfelder und Dialoge sind beschriftet, Status und Auswahl werden nicht allein über Farbe vermittelt.
+- Design QA: Vorher-/Nachher-Vergleich bei identischen Viewports; die erste zu früh erfasste Aufnahme wurde verworfen und nach vollständigem Laden wiederholt. Keine offenen P0/P1/P2-Findings, Ergebnis `passed` in `design-qa.md`.
+- Browserkonsole: keine route-spezifischen Runtime-Fehler. Eine bekannte globale MUI-Tooltip-`anchorEl`-Warnung kann beim Wechsel von den Benutzeraktionen in den Darstellungsdialog auftreten und ist als P3-Shell-Befund dokumentiert.
+- Lint: weiterhin nicht ausführbar, weil im Checkout kein ESLint-Paket beziehungsweise Binary installiert ist.
+
+### Rückrollbarkeit
+
+Das Paket verändert ausschließlich Frontend-Darstellung und Interaktionsreihenfolge. Es erfordert weder Datenmigration noch Backup und kann als einzelner Git-Commit mit `git revert` zurückgenommen werden. Es wurde weder gepusht noch veröffentlicht, als PR eröffnet, ausgerollt oder auf einer Produktionsinstanz aktiviert.

@@ -276,6 +276,7 @@ export default function PlayersRecords() {
       spacing={1}
       sx={{
         mt: 2,
+        pb: selectedPlayerIds.size ? { xs: 15, md: 0 } : 0,
         "& .MuiAlert-root": { borderRadius: 0 },
         "& .MuiButton-root": { borderRadius: 0 },
         "& .MuiCard-root": { borderRadius: 0 },
@@ -291,7 +292,55 @@ export default function PlayersRecords() {
         title={t("records.players.title")}
         subtitle={t("records.players.subtitle")}
       />
-      <ActionBar actions={newRecordActions} recipients={selectedPlayers} />
+      {selectedPlayerIds.size > 0 ? (
+        <Stack
+          component="section"
+          aria-label={t("records.players.selectionActions")}
+          direction={{ xs: "column", md: "row" }}
+          spacing={1}
+          alignItems={{ xs: "stretch", md: "center" }}
+          justifyContent="space-between"
+          sx={{
+            position: { xs: "fixed", md: "static" },
+            left: { xs: 0, md: "auto" },
+            right: { xs: 0, md: "auto" },
+            bottom: { xs: 64, md: "auto" },
+            zIndex: (theme) => theme.zIndex.appBar + 1,
+            border: "1px solid",
+            borderColor: "primary.dark",
+            bgcolor: "background.paper",
+            boxShadow: { xs: 8, md: 0 },
+            p: 1,
+          }}
+        >
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            justifyContent="space-between"
+          >
+            <Typography fontWeight={700}>
+              {t("records.players.selected", {
+                count: selectedPlayerIds.size,
+              })}
+            </Typography>
+            <Button
+              size="small"
+              variant="outlined"
+              color="inherit"
+              onClick={handleUnselectAllPlayers}
+            >
+              {t("common.unselectAll")}
+            </Button>
+          </Stack>
+          <Box sx={{ maxWidth: "100%", overflowX: "auto" }}>
+            <ActionBar
+              actions={newRecordActions}
+              recipients={selectedPlayers}
+            />
+          </Box>
+        </Stack>
+      ) : null}
       <PlayerFiltersForm fields={fields} />
       <Stack
         component="section"

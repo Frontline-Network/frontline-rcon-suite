@@ -474,3 +474,64 @@ Ein zusätzlicher Ausschnitt war nicht erforderlich: Das Ziel ist selbst eine vo
 - [x] Keine blockierenden visuellen oder funktionalen Abweichungen.
 
 final result: passed
+
+---
+
+# Design QA · Phase 2.4 Spielerakten und Sperrlistenverwaltung
+
+## Prüfgrundlage
+
+- Source Visual Truth: bestehende, funktionsfähige Ansichten in `.codex/phase24-baseline/players-mobile-390x844.png`, `.codex/phase24-baseline/player-profile-mobile-390x844.png`, `.codex/phase24-baseline/blacklists-manage-desktop-1440x900.png` und `.codex/phase24-baseline/blacklists-manage-mobile-390x844.png`; Zielhierarchie zusätzlich aus dem freigegebenen Product-Design-Konzept für `/records/players`, `/records/players/:playerId` und `/records/blacklists/manage`.
+- Implementierung: `.codex/phase24-baseline/players-after-mobile-qa2-390x844.png`, `.codex/phase24-baseline/player-profile-after-mobile-qa2-390x844.png`, `.codex/phase24-baseline/blacklists-manage-after-desktop-1440x900.png` und `.codex/phase24-baseline/blacklists-manage-after-mobile-390x844.png`.
+- Theme-Evidenz: `.codex/phase24-baseline/blacklists-manage-theme-light-deuteranopia-1440x900.png`.
+- Viewports und Normalisierung: Mobile jeweils 390 × 844 CSS-Pixel bei Browser-Dichte 1 und 390 × 844 Bildpixeln; Desktop jeweils 1440 × 900 CSS-Pixel bei Browser-Dichte 1 und 1440 × 900 Bildpixeln. Screenshots enthalten nur den App-Viewport ohne Browser-Chrome.
+- Zustände: Frontline Gold, dunkler Modus, Standard-Farbsehen; Spielerakten ohne Auswahl, Spielerprofil im Tab „Profil“, Sperrlistenverwaltung mit ausgewählter Liste. Der Theme-Test verwendet hellen Modus plus Deuteranopie und wurde anschließend ohne Speicherung verworfen.
+
+## Full-View-Vergleich
+
+Die Vorher- und Nachher-Aufnahmen wurden je Route im selben Vergleichseingang geöffnet und bei identischem Viewport beurteilt. Die Spielerakten behalten die kompakte mobile Aktenliste, ersetzen aber die dauerhaft sichtbare Symbolleiste und den hohen Filterblock durch einen klaren Suche-/Filter-Einstieg. Das Profil bringt die aufgabenbezogenen Tabs und den editierbaren Akteninhalt vor die lange Zusammenfassung. Die Sperrlistenverwaltung wechselt von einer weit verteilten Pseudotabelle zu einer eckigen Master-Detail-Arbeitsfläche mit Reichweite, Synchronisationswirkung und klaren Listenaktionen; Mobile wird keine Spalte mehr abgeschnitten.
+
+## Fokusvergleich
+
+Ein zusätzlicher Ausschnitt war nicht erforderlich. Suche, Filterauslöser, Auswahlleiste, Profilstatus, Listenkarte, Detailpanel und Formularaktionen sind in den 390-Pixel- und 1440-Pixel-Aufnahmen vollständig lesbar. Die Formulare wurden zusätzlich interaktiv im Browser geprüft, einschließlich bestehender Werte, Serverauswahl und Vollbilddarstellung auf Mobile.
+
+## Findings
+
+- Keine verbleibenden P0-, P1- oder P2-Abweichungen.
+- [P3] Beim Öffnen der globalen Benutzeraktionen und unmittelbaren Wechsel in den Darstellungsdialog protokolliert der bestehende Shell-Tooltip einmalig eine MUI-`anchorEl`-Warnung. Sie betrifft nicht die Spieler- oder Sperrlistenabläufe, erzeugt kein sichtbares Fehlverhalten und wird in einem globalen Shell-Paket separat bereinigt.
+
+## Pflichtflächen
+
+- Fonts und Typografie: Bestehende Frontline-Schriftfamilie, kondensierte Versalien, Gewichte und Zeilenhöhen bleiben erhalten. Überschriften, Metadaten, Risikostatus und Formlabels besitzen eine klarere Hierarchie ohne problematische Umbrüche.
+- Spacing und Layout: Mobile Filter reduzieren den ersten Viewport, Auswahlaktionen erscheinen nur bei tatsächlicher Auswahl, und das Spielerprofil priorisiert den Arbeitsbereich. Die Sperrlistenverwaltung verwendet ein eckiges, rhythmisches Master-Detail-Raster; bei 390 × 844 und 1440 × 900 gilt `scrollWidth === clientWidth`.
+- Farben und Tokens: Flächen, Rahmen, Auswahl, Erfolg, Gefahr und Information verwenden ausschließlich die vorhandenen Theme-Tokens. Heller Modus plus Deuteranopie wurde live geprüft; Zustand bleibt zusätzlich über Text, Symbol und Umrandung erkennbar.
+- Bild- und Assetqualität: Vorhandene Avatare, Frontline-Logo und MUI-Icons werden unverändert wiederverwendet. Es wurden keine Platzhalter, CSS-Zeichnungen, handgebauten SVGs oder neuen Bildassets eingeführt.
+- Copy und Inhalt: Filter, Aktenstatus, Reichweite, Serveranzahl und Synchronisationswirkung werden auf Deutsch und Englisch verständlich benannt. Unbekannte Synchronisationswerte werden transparent angezeigt und beim Bearbeiten bewahrt.
+- Icons und Zustände: Statussymbole besitzen sichtbare Textlabels; Auswahl- und Listenaktionen haben zugängliche Namen. Aktiv, ausgewählt, deaktiviert und destruktiv sind nicht allein farbcodiert.
+- Responsivität und Accessibility: 390 × 844 und 1440 × 900 ohne horizontalen Dokumentüberlauf; mobiler Filter als Vollhöhen-Drawer, Sperrlistenformular als Vollbilddialog, Tabs scrollbar, Listenkarte per Enter auswählbar und 44-Pixel-Aktionen geprüft.
+
+## Interaktionen und Datenverträge
+
+- Mobile Filter geöffnet, Spieler-ID eingetragen und mit „Ergebnisse anzeigen“ abgesendet; die bestehende Query `player_id=76561198000000001` wurde korrekt in der URL beibehalten.
+- Spieler ausgewählt; die zentrale Aktionsregion erschien nur dann, alle sieben Aktionen besaßen zugängliche Namen, und „Auswahl aufheben“ entfernte die Region wieder.
+- Spielerprofil-Tab „Sitzungen“ aktiviert; Status und Inhalt wechselten ohne Routen- oder Datenvertragänderung.
+- Zweite Sperrliste per Enter ausgewählt; Detailpanel aktualisiert. Bearbeitungsdialog bewahrte Name, Synchronisation und Serverauswahl. Mobiles Erstellformular belegte exakt den 390 × 844-Viewport.
+- Loader, Actions, API-Kommandos, Payloads und gespeicherte Konfigurationen blieben unverändert.
+
+## Vergleichshistorie
+
+1. Ausgangsvergleich: [P2] Mobile Spielerfilter und eine ständig sichtbare Symbolleiste verbrauchten unnötig Höhe; [P2] die lange Aktenzusammenfassung verdrängte die eigentliche Profilaufgabe; [P1] Sperrlistenverwaltung war Mobile als abgeschnittene Pseudotabelle nicht zuverlässig lesbar und Desktop zu weit verteilt.
+2. Umsetzung: Mobile Filter-Drawer, bedingte Auswahlaktionsleiste, aufgabenorientierte Profilreihenfolge sowie eckige Master-Detail-Verwaltung mit responsivem Formular ergänzt. Datenverträge blieben unverändert.
+3. Erste Nachher-Aufnahme: Inhalt war korrekt, aber Statuskopf und Avatare wurden vor vollständigem Laden erfasst. Die Aufnahme war nicht zustandsgleich und wurde nicht zur Freigabe verwendet.
+4. Finale Vergleichsaufnahme nach vollständigem Laden bei identischen Viewports: keine offenen P0-, P1- oder P2-Findings.
+
+## Implementation Checklist
+
+- [x] Ausgangszustände und Implementierung je Route im selben Vergleichseingang geprüft.
+- [x] Desktop und 390 × 844 ohne horizontalen Dokumentüberlauf geprüft.
+- [x] Filter, Auswahlaktionen, Profil-Tabs, Listenwahl und Dialoge funktional geprüft.
+- [x] Tastatur, Theme, Deuteranopie und semantische Beschriftungen geprüft.
+- [x] Bestehende API-, Query-, Payload- und Konfigurationsverträge beibehalten.
+- [x] Keine offenen P0-, P1- oder P2-Findings.
+
+final result: passed

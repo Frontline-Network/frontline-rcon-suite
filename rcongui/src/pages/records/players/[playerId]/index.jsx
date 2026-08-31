@@ -4,6 +4,8 @@ import {
   Tab,
   CardContent,
   Divider,
+  Typography,
+  useMediaQuery,
 } from "@mui/material";
 import {
   useLoaderData,
@@ -43,6 +45,7 @@ export default function PlayerProfilePage() {
   const submit = useSubmit();
   const location = useLocation();
   const navigate = useNavigate();
+  const compact = useMediaQuery((theme) => theme.breakpoints.down("md"));
 
   const onlinePlayers = useGlobalStore((state) => state.onlinePlayers) ?? [];
   const server = useGlobalStore((state) => state.serverState);
@@ -66,12 +69,19 @@ export default function PlayerProfilePage() {
     multiAction: false,
     onlineAction: !!thisOnlinePlayer,
   });
-  const name = profile?.account?.name ?? profileNames[0]?.name ?? profileSoldier.name ?? "???";
+  const name =
+    profile?.account?.name ??
+    profileNames[0]?.name ??
+    profileSoldier.name ??
+    "???";
   const avatar = profile?.steaminfo?.profile?.avatar;
-  const country = profile?.country ?? profile?.account?.country ?? profile?.steaminfo?.country
-  const level = thisOnlinePlayer?.level ?? profile?.soldier?.level ?? 0
-  const clanTag = thisOnlinePlayer?.clan_tag ?? profile?.soldier?.clan_tag
-  const platform = thisOnlinePlayer?.platform ?? profile?.soldier?.platform
+  const country =
+    profile?.country ??
+    profile?.account?.country ??
+    profile?.steaminfo?.country;
+  const level = thisOnlinePlayer?.level ?? profile?.soldier?.level ?? 0;
+  const clanTag = thisOnlinePlayer?.clan_tag ?? profile?.soldier?.clan_tag;
+  const platform = thisOnlinePlayer?.platform ?? profile?.soldier?.platform;
 
   const getActiveTab = () => {
     const path = location.pathname.split("/").pop();
@@ -88,30 +98,48 @@ export default function PlayerProfilePage() {
 
   return (
     <ProfileContainer>
+      <SummaryCard
+        component="section"
+        elevation={0}
+        variant="outlined"
+        sx={{ mb: { xs: 1.5, lg: 2 }, borderRadius: 0 }}
+      >
+        <CardContent sx={{ "&:last-child": { pb: 2 } }}>
+          <PlayerProfileHeader
+            player={profile}
+            isOnline={!!thisOnlinePlayer}
+            ActionList={() => (
+              <ProfileActions player={profile} actions={actionList} />
+            )}
+            avatar={avatar}
+            name={name}
+            country={country}
+            level={level}
+            clanTag={clanTag}
+            platform={platform}
+          />
+          <Divider sx={{ mt: 1.25 }} />
+          <PlayerProfileStatusTags
+            isVip={isVip}
+            isWatched={isWatched}
+            isBlacklisted={isBlacklisted}
+            isBanned={isBanned}
+          />
+        </CardContent>
+      </SummaryCard>
+
       <MainContent>
-        <SummaryCard elevation={0} variant="outlined">
+        <SummaryCard
+          component="section"
+          elevation={0}
+          variant="outlined"
+          sx={{ order: { xs: 2, lg: 1 }, borderRadius: 0 }}
+        >
           <CardContent>
-            <PlayerProfileHeader
-              player={profile}
-              isOnline={!!thisOnlinePlayer}
-              ActionList={() => (
-                <ProfileActions player={profile} actions={actionList} />
-              )}
-              avatar={avatar}
-              name={name}
-              country={country}
-              level={level}
-              clanTag={clanTag}
-              platform={platform}
-            />
+            <Typography component="h2" variant="h6" sx={{ mb: 1.5 }}>
+              {t("records.playerDetails.caseSummary")}
+            </Typography>
             <LinkedAccounts identity={profile.identity} />
-            <Divider />
-            <PlayerProfileStatusTags
-              isVip={isVip}
-              isWatched={isWatched}
-              isBlacklisted={isBlacklisted}
-              isBanned={isBanned}
-            />
             <Divider />
             <PlayerProfileSummary
               player={profile}
@@ -136,13 +164,21 @@ export default function PlayerProfilePage() {
           </CardContent>
         </SummaryCard>
 
-        <DetailCard elevation={0} variant="outlined">
+        <DetailCard
+          component="section"
+          elevation={0}
+          variant="outlined"
+          sx={{ order: { xs: 1, lg: 2 }, borderRadius: 0 }}
+        >
           <CardContent>
             <Tabs
               value={getActiveTab()}
               onChange={handleTabChange}
-              variant="standard"
-              sx={{ mb: 3 }}
+              variant={compact ? "scrollable" : "standard"}
+              scrollButtons={compact ? "auto" : false}
+              allowScrollButtonsMobile
+              aria-label={t("records.playerDetails.sections")}
+              sx={{ mb: { xs: 2, md: 3 } }}
             >
               {DETAIL_LINKS.map((link) => (
                 <Tab key={link.path} label={t(link.label)} />
