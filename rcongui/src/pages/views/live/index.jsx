@@ -41,6 +41,7 @@ import { useGlobalStore } from "@/stores/global-state";
 import { LiveCommandBar } from "./live-workspace";
 import { ActionMenu } from "@/features/player-action/ActionMenu";
 import { generatePlayerActions } from "@/features/player-action/actions";
+import AutobalancerCard from "../team/autobalancer-card";
 
 const interval = 15 * 1000;
 const UNASSIGNED = "unassigned";
@@ -99,10 +100,7 @@ const OPERATIONS_COLUMNS = new Set([
   "actions",
 ]);
 
-const COMPOSITE_COLUMNS = new Set([
-  "performance_summary",
-  "status_summary",
-]);
+const COMPOSITE_COLUMNS = new Set(["performance_summary", "status_summary"]);
 
 const getPresetVisibility = (preset, customVisibility) => {
   if (preset === "custom") return customVisibility;
@@ -479,6 +477,8 @@ const Live = () => {
         onFilter={handleStatusFilter}
         activeFilters={playersColumnFilters}
       />
+
+      <AutobalancerCard teams={teamData} />
 
       <Stack
         direction="row"
