@@ -21,9 +21,15 @@ import {
   getServerShortCode,
 } from "./server-switching.mjs";
 
-const POPOVER_ID = "server-rail-switcher-popover";
+const POPOVER_ID = "global-server-switcher-popover";
 
-export default function ServerRailSwitcher() {
+export default function ServerRailSwitcher({
+  variant = "rail",
+  compact = false,
+  label,
+  value,
+  tone,
+}) {
   const { t } = useTranslation();
   const currentServer = useGlobalStore((state) => state.serverState);
   const peerServers = useGlobalStore((state) => state.servers);
@@ -50,99 +56,215 @@ export default function ServerRailSwitcher() {
   ]
     .filter(Boolean)
     .join(", ");
+  const isStatusTrigger = variant === "status";
+
+  const trigger = isStatusTrigger ? (
+    <ButtonBase
+      id="global-server-switcher-trigger"
+      data-testid="global-server-switcher"
+      aria-label={triggerLabel}
+      aria-haspopup="menu"
+      aria-expanded={open ? "true" : undefined}
+      aria-controls={open ? POPOVER_ID : undefined}
+      onClick={(event) => setAnchorEl(event.currentTarget)}
+      sx={(theme) => ({
+        position: "relative",
+        gridArea: "server",
+        width: "100%",
+        minWidth: 0,
+        height: "100%",
+        justifyContent: "flex-start",
+        gap: compact ? 0.55 : 0.75,
+        px: compact ? 0.75 : 1.25,
+        py: compact ? 0.5 : 0.8,
+        borderRadius: "0 !important",
+        color: "text.primary",
+        textAlign: "left",
+        bgcolor: open ? alpha(theme.palette.primary.main, 0.12) : "transparent",
+        transition: theme.transitions.create(["background-color", "color"], {
+          duration: theme.transitions.duration.shortest,
+        }),
+        "&:hover": {
+          color: "primary.light",
+          bgcolor: alpha(theme.palette.primary.main, 0.08),
+        },
+        "&:focus-visible": {
+          outline: `2px solid ${theme.palette.primary.main}`,
+          outlineOffset: -2,
+        },
+      })}
+    >
+      <Box
+        aria-hidden
+        sx={{
+          position: "relative",
+          display: "flex",
+          flexShrink: 0,
+          color: tone || "primary.main",
+          "& svg": { fontSize: compact ? 16 : 18 },
+        }}
+      >
+        <DnsOutlinedIcon />
+        <Box
+          sx={{
+            position: "absolute",
+            right: -2,
+            bottom: -2,
+            width: 6,
+            height: 6,
+            border: "1px solid",
+            borderColor: "background.paper",
+            bgcolor:
+              state === CONNECTION_STATE.ONLINE
+                ? "success.main"
+                : state === CONNECTION_STATE.OFFLINE
+                ? "error.main"
+                : "warning.main",
+          }}
+        />
+      </Box>
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Typography
+          variant="caption"
+          sx={{
+            display: "block",
+            color: "text.secondary",
+            fontSize: compact ? "0.52rem" : "0.59rem",
+            lineHeight: 1,
+            letterSpacing: "0.055em",
+            textTransform: "uppercase",
+          }}
+        >
+          {label ||
+            `${t("sidebar.serverNumber", {
+              number: currentNumber ?? "–",
+            })} · ${currentGameLabel}`}
+        </Typography>
+        <Typography
+          variant="body2"
+          sx={{
+            mt: 0.25,
+            fontSize: compact ? "0.7rem" : "0.8rem",
+            fontWeight: 700,
+            lineHeight: 1.15,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {value || currentName}
+        </Typography>
+      </Box>
+    </ButtonBase>
+  ) : (
+    <ButtonBase
+      id="server-rail-switcher-trigger"
+      data-testid="server-rail-switcher"
+      aria-label={triggerLabel}
+      aria-haspopup="menu"
+      aria-expanded={open ? "true" : undefined}
+      aria-controls={open ? POPOVER_ID : undefined}
+      onClick={(event) => setAnchorEl(event.currentTarget)}
+      sx={(theme) => ({
+        position: "relative",
+        width: 48,
+        height: 44,
+        my: 0.75,
+        borderRadius: "0 !important",
+        border: "1px solid",
+        borderColor: open
+          ? "primary.main"
+          : alpha(theme.palette.primary.light, 0.22),
+        color: open ? "primary.light" : "text.primary",
+        bgcolor: open
+          ? alpha(theme.palette.primary.main, 0.14)
+          : alpha(theme.palette.background.default, 0.34),
+        transition: theme.transitions.create(
+          ["color", "background-color", "border-color"],
+          { duration: theme.transitions.duration.shortest }
+        ),
+        "&:hover": {
+          color: "primary.light",
+          borderColor: "primary.main",
+          bgcolor: alpha(theme.palette.primary.main, 0.12),
+        },
+        "&:focus-visible": {
+          outline: `2px solid ${theme.palette.primary.main}`,
+          outlineOffset: -2,
+        },
+      })}
+    >
+      <Typography
+        component="span"
+        sx={{
+          fontFamily:
+            '"Bahnschrift Condensed", "Arial Narrow", Bahnschrift, sans-serif',
+          fontSize: 17,
+          fontWeight: 700,
+          letterSpacing: "0.04em",
+        }}
+      >
+        {getServerShortCode(currentServer)}
+      </Typography>
+      <Box
+        aria-hidden
+        sx={{
+          position: "absolute",
+          right: 5,
+          bottom: 5,
+          width: 7,
+          height: 7,
+          border: "1px solid",
+          borderColor: "background.default",
+          bgcolor:
+            state === CONNECTION_STATE.ONLINE
+              ? "success.main"
+              : state === CONNECTION_STATE.OFFLINE
+              ? "error.main"
+              : "warning.main",
+        }}
+      />
+    </ButtonBase>
+  );
 
   return (
     <>
-      <Tooltip
-        title={triggerLabel}
-        placement="right"
-        arrow
-        enterDelay={450}
-        slotProps={{ tooltip: { sx: { borderRadius: 0 } } }}
-      >
-        <ButtonBase
-          id="server-rail-switcher-trigger"
-          data-testid="server-rail-switcher"
-          aria-label={triggerLabel}
-          aria-haspopup="menu"
-          aria-expanded={open ? "true" : undefined}
-          aria-controls={open ? POPOVER_ID : undefined}
-          onClick={(event) => setAnchorEl(event.currentTarget)}
-          sx={(theme) => ({
-            position: "relative",
-            width: 48,
-            height: 44,
-            my: 0.75,
-            borderRadius: "0 !important",
-            border: "1px solid",
-            borderColor: open
-              ? "primary.main"
-              : alpha(theme.palette.primary.light, 0.22),
-            color: open ? "primary.light" : "text.primary",
-            bgcolor: open
-              ? alpha(theme.palette.primary.main, 0.14)
-              : alpha(theme.palette.background.default, 0.34),
-            transition: theme.transitions.create(
-              ["color", "background-color", "border-color"],
-              { duration: theme.transitions.duration.shortest }
-            ),
-            "&:hover": {
-              color: "primary.light",
-              borderColor: "primary.main",
-              bgcolor: alpha(theme.palette.primary.main, 0.12),
-            },
-            "&:focus-visible": {
-              outline: `2px solid ${theme.palette.primary.main}`,
-              outlineOffset: -2,
-            },
-          })}
+      {isStatusTrigger ? (
+        trigger
+      ) : (
+        <Tooltip
+          title={triggerLabel}
+          placement="right"
+          arrow
+          enterDelay={450}
+          slotProps={{ tooltip: { sx: { borderRadius: 0 } } }}
         >
-          <Typography
-            component="span"
-            sx={{
-              fontFamily:
-                '"Bahnschrift Condensed", "Arial Narrow", Bahnschrift, sans-serif',
-              fontSize: 17,
-              fontWeight: 700,
-              letterSpacing: "0.04em",
-            }}
-          >
-            {getServerShortCode(currentServer)}
-          </Typography>
-          <Box
-            aria-hidden
-            sx={{
-              position: "absolute",
-              right: 5,
-              bottom: 5,
-              width: 7,
-              height: 7,
-              border: "1px solid",
-              borderColor: "background.default",
-              bgcolor:
-                state === CONNECTION_STATE.ONLINE
-                  ? "success.main"
-                  : state === CONNECTION_STATE.OFFLINE
-                  ? "error.main"
-                  : "warning.main",
-            }}
-          />
-        </ButtonBase>
-      </Tooltip>
+          {trigger}
+        </Tooltip>
+      )}
 
       <Popover
         id={POPOVER_ID}
         open={open}
         anchorEl={anchorEl}
         onClose={() => setAnchorEl(null)}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-        transformOrigin={{ vertical: "top", horizontal: "left" }}
+        anchorOrigin={
+          isStatusTrigger
+            ? { vertical: "bottom", horizontal: "left" }
+            : { vertical: "top", horizontal: "right" }
+        }
+        transformOrigin={
+          isStatusTrigger
+            ? { vertical: "top", horizontal: "left" }
+            : { vertical: "top", horizontal: "left" }
+        }
         slotProps={{
           paper: {
             sx: {
               width: { xs: "calc(100vw - 72px)", sm: 310 },
               maxWidth: 310,
-              ml: { xs: 0, sm: 1 },
+              mt: isStatusTrigger ? 0.75 : 0,
+              ml: isStatusTrigger ? 0 : { xs: 0, sm: 1 },
               borderRadius: "0 !important",
               border: "1px solid",
               borderColor: "divider",
@@ -169,7 +291,7 @@ export default function ServerRailSwitcher() {
             sx={{ color: "primary.main", fontSize: 18 }}
           />
           <Typography
-            id="server-rail-switcher-title"
+            id="global-server-switcher-title"
             variant="caption"
             sx={{ color: "primary.light", textTransform: "uppercase" }}
           >
@@ -178,7 +300,7 @@ export default function ServerRailSwitcher() {
         </Stack>
         <MenuList
           autoFocusItem
-          aria-labelledby="server-rail-switcher-title"
+          aria-labelledby="global-server-switcher-title"
           sx={{ p: 0 }}
         >
           {servers.map((server) => {

@@ -3,12 +3,12 @@ import { Box, Skeleton, Stack, Typography } from "@mui/material";
 import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 import MapRoundedIcon from "@mui/icons-material/MapRounded";
 import TimerRoundedIcon from "@mui/icons-material/TimerRounded";
-import DnsRoundedIcon from "@mui/icons-material/DnsRounded";
 import { alpha } from "@mui/material/styles";
 import { useTranslation } from "react-i18next";
 import { useGlobalStore } from "@/stores/global-state";
 import { CONNECTION_STATE } from "@/utils/connectionHealth";
 import { getGameLabel } from "@/utils/game-context";
+import ServerRailSwitcher from "@/components/layout/navigation/ServerRailSwitcher";
 
 const formatRemainingTime = (seconds) => {
   const value = Math.max(0, Math.floor(Number(seconds) || 0));
@@ -51,16 +51,10 @@ const StatusItem = ({
       flex: grow ? "1 1 150px" : "0 0 auto",
       gridArea: area,
       height: "100%",
-      px: { xs: 1, sm: 1.25 },
-      py: { xs: 0.75, sm: 0.8 },
+      px: compact ? 0.75 : { xs: 1, sm: 1.25 },
+      py: compact ? 0.5 : { xs: 0.75, sm: 0.8 },
       borderLeft: divider ? "1px solid" : 0,
       borderColor: "divider",
-      ...(compact && area === "server"
-        ? { borderBottom: "1px solid", borderBottomColor: "divider" }
-        : {}),
-      ...(compact && area === "players"
-        ? { borderBottom: "1px solid", borderBottomColor: "divider" }
-        : {}),
     }}
   >
     <Box
@@ -79,7 +73,7 @@ const StatusItem = ({
         sx={{
           display: "block",
           color: "text.secondary",
-          fontSize: { xs: "0.56rem", sm: "0.59rem" },
+          fontSize: compact ? "0.52rem" : { xs: "0.56rem", sm: "0.59rem" },
           lineHeight: 1,
           letterSpacing: "0.055em",
           textTransform: "uppercase",
@@ -91,7 +85,7 @@ const StatusItem = ({
         variant="body2"
         sx={{
           mt: 0.25,
-          fontSize: { xs: "0.75rem", sm: "0.8rem" },
+          fontSize: compact ? "0.7rem" : { xs: "0.75rem", sm: "0.8rem" },
           fontWeight: 700,
           lineHeight: 1.15,
           overflow: "hidden",
@@ -188,7 +182,7 @@ const ServerStatus = ({ compact = false }) => {
         borderLeftWidth: 3,
         borderColor: alpha(theme.palette.text.primary, 0.13),
         borderLeftColor: identityTone,
-        borderRadius: 0.75,
+        borderRadius: 0,
         bgcolor: alpha(theme.palette.background.paper, 0.82),
         boxShadow: `0 8px 24px ${alpha(theme.palette.common.black, 0.14)}`,
         overflow: "hidden",
@@ -198,10 +192,10 @@ const ServerStatus = ({ compact = false }) => {
         sx={{
           display: "grid",
           gridTemplateAreas: compact
-            ? '"server players" "map time"'
+            ? '"server players map time"'
             : '"server players map time"',
           gridTemplateColumns: compact
-            ? "minmax(0, 1fr) minmax(84px, auto)"
+            ? "minmax(104px, 1.4fr) minmax(54px, auto) minmax(72px, 1fr) minmax(58px, auto)"
             : "minmax(170px, 1.25fr) auto minmax(150px, 1fr) auto",
           alignItems: "center",
           minWidth: 0,
@@ -209,13 +203,11 @@ const ServerStatus = ({ compact = false }) => {
       >
         {!isInitialLoading ? (
           <>
-            <StatusItem
-              icon={<DnsRoundedIcon />}
+            <ServerRailSwitcher
+              variant="status"
+              compact={compact}
               label={`${serverNumber} · ${gameLabel}`}
               value={serverLabel}
-              area="server"
-              compact={compact}
-              grow
               tone={identityTone}
             />
             <StatusItem

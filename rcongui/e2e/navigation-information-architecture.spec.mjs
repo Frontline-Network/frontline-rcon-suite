@@ -230,13 +230,29 @@ test.describe("permission-aware navigation", () => {
 test.describe("task-oriented mobile navigation", () => {
   test.use({ viewport: VIEWPORTS.mobile });
 
+  test("uses the operations hub as the mobile start destination", async ({
+    page,
+  }) => {
+    await openDemoPage(page, "/");
+
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("heading", { name: "Betrieb" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Betrieb" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+  });
+
   test("uses the same compact workspace index on mobile", async ({ page }) => {
     await openDemoPage(page, "/views/live");
     await page.getByRole("button", { name: "Navigation öffnen" }).click();
 
     const navigation = page.getByTestId("mobile-command-navigation");
     await expect(navigation).toBeVisible();
-    await expect(navigation.getByTestId("server-rail-switcher")).toBeVisible();
+    await expect(page.getByTestId("global-server-switcher")).toBeVisible();
+    await expect(navigation.getByTestId("global-server-switcher")).toHaveCount(
+      0
+    );
     await expect(
       navigation.getByPlaceholder("Navigation durchsuchen …")
     ).toHaveCount(0);
@@ -274,5 +290,16 @@ test.describe("task-oriented mobile navigation", () => {
     await changeMap.click();
     await expect(page).toHaveURL(/\/settings\/maps\/change$/);
     await expect(page.getByTestId("mobile-command-navigation")).toHaveCount(0);
+  });
+
+  test("provides a clear parent route on mobile detail pages", async ({
+    page,
+  }) => {
+    await openDemoPage(page, "/stats/games/fln-demo-1");
+
+    await expect(page.getByTestId("mobile-route-back")).toHaveAttribute(
+      "href",
+      "/stats/games"
+    );
   });
 });

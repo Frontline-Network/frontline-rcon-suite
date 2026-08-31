@@ -1,4 +1,4 @@
-import { Box, Stack } from "@mui/material";
+import { Box, Stack, useMediaQuery } from "@mui/material";
 import NavbarBreadcrumbs from "./NavbarBreadcrumbs";
 import ToggleWidthMode from "./ToggleWidthMode";
 import LanguageSelector from "./LanguageSelector";
@@ -13,6 +13,9 @@ export default function Header() {
   const { t } = useTranslation();
   const openDrawer = useAppStore((state) => state.openDrawer);
   const toggleDrawer = useAppStore((state) => state.toggleDrawer);
+  const isDesktop = useMediaQuery((theme) => theme.breakpoints.up("md"));
+
+  if (!isDesktop) return null;
 
   return (
     <Stack

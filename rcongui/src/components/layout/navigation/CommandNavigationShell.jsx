@@ -15,7 +15,6 @@ import CommandRail, { COMMAND_RAIL_WIDTH } from "./CommandRail";
 import ContextNavigationPanel, {
   CONTEXT_NAVIGATION_PANEL_WIDTH,
 } from "./ContextNavigationPanel";
-import ServerRailSwitcher from "./ServerRailSwitcher";
 import { buildCommandRailWorkspaces } from "./command-rail-navigation";
 import { doesNavigationRouteMatch } from "./command-rail-workspaces.mjs";
 
@@ -220,7 +219,6 @@ export default function CommandNavigationShell() {
         activeWorkspaceId={effectiveWorkspaceId}
         currentWorkspaceId={routeWorkspaceId}
         onWorkspaceChange={handleWorkspaceChange}
-        topSlot={<ServerRailSwitcher />}
         utilityItems={[
           {
             id: "health",

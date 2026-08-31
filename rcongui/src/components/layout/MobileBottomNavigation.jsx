@@ -8,6 +8,7 @@ import DashboardCustomizeRoundedIcon from "@mui/icons-material/DashboardCustomiz
 import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
 import { useTranslation } from "react-i18next";
 import { getContextNavigationSurface } from "./navigation/navigation-surfaces";
+import { getMobileNavigationValue } from "./mobile-navigation.mjs";
 
 const NAV_ITEMS = [
   { value: "operations", to: "/views/live", icon: BoltRoundedIcon },
@@ -15,28 +16,10 @@ const NAV_ITEMS = [
   { value: "players", to: "/records/players", icon: PeopleAltRoundedIcon },
   {
     value: "server-operations",
-    to: "/mobile/operations",
+    to: "/",
     icon: DashboardCustomizeRoundedIcon,
   },
 ];
-
-const routeValue = (pathname) => {
-  if (pathname.startsWith("/incidents")) return "incidents";
-  if (pathname.startsWith("/records/players")) return "players";
-  if (pathname.startsWith("/mobile/operations")) return "server-operations";
-  if (pathname === "/" || pathname.startsWith("/views/live")) {
-    return "operations";
-  }
-  if (
-    pathname.startsWith("/views/team") ||
-    pathname.startsWith("/views/autobalancer") ||
-    pathname.startsWith("/settings/maps") ||
-    pathname.startsWith("/settings/autosettings")
-  ) {
-    return "server-operations";
-  }
-  return "more";
-};
 
 /**
  * Phone-only task navigation. The complete permission-aware navigation stays
@@ -51,7 +34,7 @@ export default function MobileBottomNavigation({
   const location = useLocation();
   const navigate = useNavigate();
   const value = useMemo(
-    () => routeValue(location.pathname),
+    () => getMobileNavigationValue(location.pathname),
     [location.pathname]
   );
 

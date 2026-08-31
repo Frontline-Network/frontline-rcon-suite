@@ -68,7 +68,7 @@ export default function Root() {
       </Box>
       <Box
         sx={{
-          "--app-header-height": { xs: "128px", sm: "128px", md: "0px" },
+          "--app-header-height": { xs: "108px", sm: "108px", md: "0px" },
           "--mobile-bottom-nav-height": "64px",
           display: "flex",
           minHeight: "100dvh",

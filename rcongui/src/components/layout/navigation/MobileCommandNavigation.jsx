@@ -11,7 +11,6 @@ import { UserActions } from "../sidebar/UserActions";
 import LanguageSelector from "../LanguageSelector";
 import CommandRail, { COMMAND_RAIL_WIDTH } from "./CommandRail";
 import ContextNavigationPanel from "./ContextNavigationPanel";
-import ServerRailSwitcher from "./ServerRailSwitcher";
 import { buildCommandRailWorkspaces } from "./command-rail-navigation";
 import { doesNavigationRouteMatch } from "./command-rail-workspaces.mjs";
 
@@ -178,7 +177,6 @@ export default function MobileCommandNavigation({ open, onClose }) {
         activeWorkspaceId={selectedWorkspace.id}
         currentWorkspaceId={routeWorkspaceId}
         onWorkspaceChange={handleWorkspaceChange}
-        topSlot={<ServerRailSwitcher />}
         statusItems={[
           {
             id: "gameserver",

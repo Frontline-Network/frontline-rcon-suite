@@ -256,3 +256,61 @@ final result: passed
 Keine offenen P0-, P1- oder P2-Befunde.
 
 final result: passed
+
+---
+
+# Design QA · Phase 1 Navigation und mobile Shell
+
+## Vergleichsziel
+
+- Source Visual Truth: `C:\Users\chris\AppData\Local\Temp\codex-clipboard-efcfcd70-49e7-438a-87b0-e8fc0c201459.png` sowie die anschließend bestätigten Abweichungen in `docs/product-design/rcon-product-concept.md` (Navigationssuche entfernen, Serverwechsel in die globale Serverleiste verlagern, Gradient und eckige Frontline-Formensprache bewahren).
+- Implementierung: `.codex/qa/phase1-mobile-game-operations-338x884.png`, `.codex/qa/phase1-mobile-home-390x844.png` und `.codex/qa/phase1-desktop-home-1440x900.png`.
+- Gemeinsamer Direktvergleich: `.codex/qa/phase1-mobile-game-operations-comparison.png`.
+- Primärer Vergleichszustand: Frontline Gold, dunkler Modus, Standard-Farbsehen, mobile Mehr-Navigation im Workspace „Karten & Spielbetrieb“.
+
+## Normalisierung
+
+- Source: 338 × 884 Pixel.
+- Implementierung: 338 × 884 Pixel bei 338 × 884 CSS-Pixeln und Browser-Dichte 1.
+- Vergleichsbild: 676 × 914 Pixel; beide 338 × 884-Ansichten wurden ohne Skalierung nebeneinander angeordnet, darüber liegt lediglich eine 30-Pixel-Beschriftungszeile.
+- Zusätzliche Responsive-Evidenz: 390 × 844 Mobile und 1440 × 900 Desktop, jeweils ohne Browser-Chrome.
+
+## Full-View-Vergleich
+
+Der direkte Vergleich zeigt dieselbe Frontline-Grundstruktur: 64-Pixel-Kommandoleiste, eckige aktive Zustände, identische Gold-/Grün-Dunkel-Tonalität, dieselbe Iconfamilie, klare Workspace-Hierarchie und dieselbe Reihenfolge der sechs Spielbetriebsziele. Die im Source noch vorhandene Suche und Serverkarte fehlen in der Implementierung absichtlich; der Serverwechsel wurde gemäß freigegebenem Konzept in den globalen Serverstatus verschoben. Dadurch gewinnt das Kontextpanel vertikalen Raum, ohne die gewählte Designrichtung zu verlassen.
+
+## Fokusvergleich
+
+Ein zusätzlicher Ausschnitt war nicht erforderlich: Das Ziel ist selbst eine vollständige 338-Pixel-Navigationsoberfläche, und Beschriftungen, Icons, Abstände, Rahmen und Fokusflächen sind im 1:1-Vergleich lesbar. Der globale Serverstatus wurde separat in 390 × 844 und 1440 × 900 geprüft, einschließlich geöffnetem Menü und wiederhergestelltem Tastaturfokus.
+
+## Findings
+
+- Keine verbleibenden P0-, P1- oder P2-Abweichungen.
+- [P3] Die Implementierung verwendet im mobilen Kontextkopf nur das Frontline-Signet statt Signet plus ausgeschriebenem Markennamen. Das ist eine bewusste Platzentscheidung: Der Workspace-Titel bleibt bei 338 Pixeln vollständig lesbar und die Marke ist weiterhin eindeutig.
+
+## Pflichtflächen
+
+- Fonts und Typografie: Bahnschrift-/Arial-Narrow-Hierarchie, kondensierte Großbuchstaben, Gewichte, Zeilenhöhe und Buchstabenabstand bleiben konsistent. Keine ungewollte Umbruch- oder Trunkierungsstelle im primären Vergleich.
+- Spacing und Layout: Rail-Breite, Kontextpanel, 44-Pixel-Touchziele, eckige Rahmen, Trenner und vertikaler Rhythmus sind konsistent. Bei 390 × 844 und 1440 × 900 trat kein horizontaler Dokumentüberlauf auf.
+- Farben und Tokens: Frontline Gold und der bestehende themenfähige Gradient bleiben erhalten. Tactical Blue plus Deuteranopie wurde als Live-Vorschau geprüft und anschließend ohne Speicherung zurückgesetzt.
+- Bild- und Assetqualität: Das vorhandene Frontline-Logo und die etablierte MUI-Iconbibliothek werden wiederverwendet; keine Platzhalter, CSS-Zeichnungen oder neu erfundenen Assets.
+- Copy und Inhalt: „Betrieb“, „Live-Betrieb“, „Karten & Spielbetrieb“, Servernummer und Statusbezeichnungen sind verständlich und konsistent. Die mobile Zurück-Aktion lautet „Zurück: Spiele“.
+- Zustände und Interaktionen: Mobile Startseite, Bottom-Navigation, Mehr-Drawer, Workspace-Wechsel, Servermenü, Escape/Fokuswiederherstellung und Detail-Zurücklink geprüft.
+- Browserfehler: Im sauberen Abschlusslauf ohne HMR- oder Viewportwechsel keine Console-Errors; lediglich die bekannte React-Router-v7-Future-Flag-Warnung im Entwicklungsmodus.
+
+## Vergleichshistorie
+
+1. Erster Vergleich: Implementierung versehentlich im Workspace „Live-Betrieb“ und mit sichtbarem Tooltip erfasst; dadurch war der Zustand nicht sourcegleich. Keine Produktänderung erforderlich.
+2. Korrektur: Workspace „Karten & Spielbetrieb“ geöffnet, Maus aus dem Rail bewegt und bei identischem 338 × 884-Zustand neu erfasst.
+3. Zweiter Vergleich: keine P0/P1/P2-Findings. Suche und Serverkarte sind dokumentierte, beabsichtigte Konzeptänderungen; Gradient, Informationsarchitektur, Icons und Formensprache stimmen mit der gewählten Richtung überein.
+
+## Implementation Checklist
+
+- [x] Source und Implementierung bei identischer Größe und identischem Workspace verglichen.
+- [x] Mobile Startseite bleibt auf `/` und zeigt die Betriebsübersicht.
+- [x] Serverwechsel ist global erreichbar und nicht im Mehr-Drawer dupliziert.
+- [x] Bottom-Navigation und mobile Detail-Zurücknavigation geprüft.
+- [x] Desktop, Mobile, Tastatur, Theme und Farbsehmodus geprüft.
+- [x] Keine blockierenden visuellen oder funktionalen Abweichungen.
+
+final result: passed

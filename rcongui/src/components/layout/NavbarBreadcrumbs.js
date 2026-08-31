@@ -3,6 +3,8 @@ import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { styled } from "@mui/material/styles";
 import Box from "@mui/material/Box";
+import IconButton from "@mui/material/IconButton";
+import Stack from "@mui/material/Stack";
 import Breadcrumbs, { breadcrumbsClasses } from "@mui/material/Breadcrumbs";
 import ClickAwayListener from "@mui/material/ClickAwayListener";
 import List from "@mui/material/List";
@@ -13,6 +15,7 @@ import ListItemText from "@mui/material/ListItemText";
 import Popper from "@mui/material/Popper";
 import Typography from "@mui/material/Typography";
 import NavigateNextRoundedIcon from "@mui/icons-material/NavigateNextRounded";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import Tooltip from "@mui/material/Tooltip";
 import { canAccessNavLink, navMenus } from "@/components/Header/nav-data";
@@ -180,25 +183,61 @@ export default function NavbarBreadcrumbs({ mobileCompact = false }) {
   const currentLabel = current.link
     ? translatedLabel(current.link, t)
     : t("navigation.links.home");
+  const parentPath =
+    current.path && location.pathname !== current.path ? current.path : null;
 
   return (
     <Box sx={{ minWidth: 0, maxWidth: "100%" }}>
       {mobileCompact && (
-        <Typography
-          data-testid="mobile-current-route"
-          aria-current="page"
-          color="text.primary"
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={0.5}
           sx={{
-            display: { xs: "block", sm: "none" },
+            display: { xs: "flex", sm: "none" },
             maxWidth: "100%",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-            fontWeight: 700,
           }}
         >
-          {currentLabel}
-        </Typography>
+          {parentPath && (
+            <IconButton
+              component={Link}
+              to={parentPath}
+              aria-label={`${t("common.previous")}: ${currentLabel}`}
+              data-testid="mobile-route-back"
+              sx={(theme) => ({
+                width: 44,
+                height: 44,
+                flexShrink: 0,
+                borderRadius: "0 !important",
+                color: "text.secondary",
+                "&:hover": {
+                  color: "primary.light",
+                  bgcolor: "action.hover",
+                },
+                "&:focus-visible": {
+                  outline: `2px solid ${theme.palette.primary.main}`,
+                  outlineOffset: -2,
+                },
+              })}
+            >
+              <ArrowBackRoundedIcon />
+            </IconButton>
+          )}
+          <Typography
+            data-testid="mobile-current-route"
+            aria-current="page"
+            color="text.primary"
+            sx={{
+              minWidth: 0,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              fontWeight: 700,
+            }}
+          >
+            {currentLabel}
+          </Typography>
+        </Stack>
       )}
       <StyledBreadcrumbs
         aria-label="breadcrumb"

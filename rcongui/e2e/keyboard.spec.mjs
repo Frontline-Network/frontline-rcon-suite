@@ -22,7 +22,7 @@ test.describe("keyboard navigation", () => {
   }) => {
     await openDemoPage(page, "/");
 
-    const serverSwitcher = page.getByTestId("server-rail-switcher");
+    const serverSwitcher = page.getByTestId("global-server-switcher");
     await serverSwitcher.focus();
     await page.keyboard.press("Enter");
     const serverMenu = page.getByRole("menu", { name: "Server wechseln" });
@@ -50,7 +50,8 @@ test.describe("mobile navigation", () => {
     await expect(navigation).toBeVisible();
     await expect(
       navigation.getByPlaceholder("Navigation durchsuchen …")
-    ).toBeVisible();
+    ).toHaveCount(0);
+    await expect(page.getByTestId("global-server-switcher")).toBeVisible();
   });
 
   test("map operations are reachable with the keyboard", async ({ page }) => {

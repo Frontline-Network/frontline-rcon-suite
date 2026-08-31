@@ -17,15 +17,16 @@ import { getContextNavigationSurface } from "./navigation/navigation-surfaces";
 
 const Toolbar = styled(MuiToolbar)({
   width: "100%",
-  paddingTop: "8px",
-  paddingBottom: "8px",
+  minHeight: "108px !important",
+  paddingTop: "6px",
+  paddingBottom: "6px",
   paddingLeft: "calc(12px + env(safe-area-inset-left))",
   paddingRight: "calc(12px + env(safe-area-inset-right))",
   display: "flex",
   flexDirection: "column",
   alignItems: "start",
   justifyContent: "center",
-  gap: "8px",
+  gap: "6px",
   flexShrink: 0,
   [`& ${tabsClasses.flexContainer}`]: {
     gap: "8px",

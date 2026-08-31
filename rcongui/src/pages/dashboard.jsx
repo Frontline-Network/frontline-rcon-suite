@@ -18,7 +18,7 @@ import BattleOverview from "@/components/dashboard/BattleOverview";
 import { Box, Divider, Stack, Typography, useMediaQuery } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
-import { Navigate } from "react-router-dom";
+import MobileOperationsHub from "@/pages/mobile/operations";
 
 const SMALL_CARD_SIZE = {
   xs: 12,
@@ -147,7 +147,11 @@ const Dashboard = () => {
         sx={{ mb: 2 }}
       >
         <Box>
-          <Typography component="h1" variant="h3" sx={{ textTransform: "uppercase" }}>
+          <Typography
+            component="h1"
+            variant="h3"
+            sx={{ textTransform: "uppercase" }}
+          >
             {t("dashboard.title")}
           </Typography>
           <Typography
@@ -251,7 +255,7 @@ const Dashboard = () => {
 
 const ResponsiveDashboard = () => {
   const compact = useMediaQuery((theme) => theme.breakpoints.down("md"));
-  return compact ? <Navigate to="/views/live" replace /> : <Dashboard />;
+  return compact ? <MobileOperationsHub /> : <Dashboard />;
 };
 
 export default ResponsiveDashboard;

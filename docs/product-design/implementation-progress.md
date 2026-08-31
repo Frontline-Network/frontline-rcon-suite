@@ -99,3 +99,41 @@ Das Paket verändert ausschließlich Frontend-Semantik und Darstellung. Es benö
 ### Rückrollbarkeit
 
 Das Paket ist vollständig frontend- und konfigurationsneutral. Es kann als einzelner Git-Commit mit `git revert` zurückgenommen werden. Es wurde weder zu GitHub übertragen noch veröffentlicht, ausgerollt oder auf einer Produktionsinstanz aktiviert.
+
+## Phase 1 · Globale Navigation, Serverwechsel und mobile Shell
+
+### Inventar und Ausgangslage
+
+- Betroffene Routen: alle 75 Seiten über die globale Shell; funktional besonders `/`, `/mobile/operations`, `/views/live` sowie mobile Detailrouten wie `/stats/games/:gameId`.
+- Betroffene Komponenten: Desktop-Kommandoleiste, mobiles Mehr-Panel, globaler Serverstatus, Mobile Bottom Navigation, Breadcrumb-/Zurücknavigation und Dashboard-Startentscheidung.
+- Datenverträge und gespeicherte Konfigurationen: unverändert. Loader, Actions, API-Kommandos, Serverlistenformat, Ziel-URL-Aufbau und persistierte Benutzereinstellungen bleiben erhalten.
+- Ausgangslage: Mobile `/` leitete still auf die Live-Ansicht um; „Betrieb“ war nur eine Nebenroute. Der Serverwechsel saß separat in Desktop- und Mobile-Rail, während der globale Serverstatus nicht interaktiv war. Mobile Detailseiten boten im festen Kopf keinen eindeutigen Rückweg und der Statuskopf belegte durch ein 2 × 2-Raster unnötig viel Höhe.
+
+### Umsetzung
+
+- Mobile `/` rendert nun die echte Betriebsübersicht; `/mobile/operations` bleibt als kompatible Bestandsroute erhalten.
+- Bottom Navigation trennt „Einsatz“ (`/views/live`) eindeutig von „Betrieb“ (`/`) und markiert beide Ziele korrekt.
+- Der vorhandene Serverwechsel wurde in die globale Serverstatusleiste integriert. Er bewahrt Route, Query und Hash, zeigt Spielkontext und Verbindungszustand, öffnet dasselbe zugängliche Menü und stellt den Fokus nach Escape wieder her.
+- Doppelte Serverwechsel-Controls wurden aus Desktop-Rail und mobilem Mehr-Panel entfernt.
+- Der mobile Statuskopf wurde auf eine kompakte einzeilige Server-/Spieler-/Karten-/Restzeitstruktur reduziert; seine gemessene Höhe beträgt 109 Pixel einschließlich Rahmen und stimmt mit dem 108-Pixel-Layout-Offset überein.
+- Mobile Detailseiten erhalten einen 44 × 44 Pixel großen, beschrifteten Rückweg zur passenden übergeordneten Route.
+- Der auf Mobile nur per CSS versteckte Desktop-Header wird nicht mehr zusätzlich in den DOM gerendert; dadurch bleiben IDs und Testselektoren eindeutig.
+- Ein ausführbarer Navigation-Shell-Contract sowie reine Node-Tests schützen mobile Zielzuordnung und Serverwechsel-URL-Verhalten.
+
+### Validierung
+
+- Production Build: bestanden; nur die bekannte Chunk-Größenwarnung bleibt bestehen.
+- Verträge: Navigation Shell, Design Foundation, Seitensemantik und Konfigurationskompatibilität bestanden.
+- Node-Tests: Workspace-Zuordnung, mobile Zielzuordnung, Serverreihenfolge, Deduplizierung sowie Erhalt von Route/Query/Hash bestanden.
+- Mobile Browserprüfung: 390 × 844 Startseite bleibt auf `/`, zeigt genau eine H1 „Betrieb“, besitzt keinen horizontalen Überlauf und markiert „Betrieb“ in der Bottom Navigation.
+- Mobile Mehr-Panel: keine Navigationssuche, kein doppelter Serverwechsel, alle Workspaces erreichbar, Spielbetrieb mit sechs Zielen und eckigen 44-Pixel-Touchzielen geprüft.
+- Mobile Detailprüfung: `/stats/games/fln-demo-1` zeigt den sichtbaren Rückweg zu `/stats/games`; geladene Seite besitzt eine H1.
+- Desktop Browserprüfung: 1440 × 900 mit genau einer H1, globalem Serverwechsel, unveränderter Rail-/Panelstruktur und ohne horizontalen Überlauf.
+- Tastaturprüfung: Servermenü geöffnet, mit Escape geschlossen und Fokus auf den globalen Trigger zurückgeführt.
+- Theme- und Farbsehprüfung: Tactical Blue plus Deuteranopie live geprüft und ohne Speichern verworfen; Navigation und Serverstatus bewegten sich korrekt mit den Tokens.
+- Design QA: Source und Implementierung im gleichen 338 × 884-Spielbetriebszustand direkt nebeneinander verglichen; keine P0/P1/P2-Findings, Ergebnis `passed` in `design-qa.md`.
+- Browserkonsole: im sauberen Abschlusslauf ohne HMR- oder Viewportwechsel keine Fehler; nur die bekannte React-Router-v7-Future-Flag-Warnung im Entwicklungsmodus.
+
+### Rückrollbarkeit
+
+Das Paket ist frontend-, datenbank- und konfigurationsneutral. Es erfordert weder Backup noch Migration und kann als einzelner Git-Commit mit `git revert` zurückgenommen werden. Es wurde weder gepusht noch veröffentlicht, als PR eröffnet, ausgerollt oder auf einer Produktionsinstanz aktiviert.

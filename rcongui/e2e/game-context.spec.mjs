@@ -7,9 +7,9 @@ test.describe("game and server context", () => {
   test("normalizes the HLL Vietnam API identifier", async ({ page }) => {
     await openDemoPage(page, "/", { query: { demo_game: "hll_vietnam" } });
 
-    await expect(page.getByTestId("server-rail-switcher")).toHaveAccessibleName(
-      /HLL: Vietnam/
-    );
+    await expect(
+      page.getByTestId("global-server-switcher")
+    ).toHaveAccessibleName(/HLL: Vietnam/);
   });
 
   test("distinguishes HLL and HLL Vietnam in a multi-server installation", async ({
@@ -23,7 +23,7 @@ test.describe("game and server context", () => {
       },
     });
 
-    await page.getByTestId("server-rail-switcher").click();
+    await page.getByTestId("global-server-switcher").click();
     const menu = page.getByRole("menu", { name: "Server wechseln" });
     await expect(
       menu.getByRole("menuitem", { name: /Frontline #2.*HLL/ })
