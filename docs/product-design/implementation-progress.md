@@ -322,3 +322,38 @@ Das Paket verändert ausschließlich Frontend-Darstellung und Interaktionsreihen
 ### Rückrollbarkeit
 
 Das Paket verändert ausschließlich Frontend-Darstellung, responsive Anordnung und Interaktionsreihenfolge. Es erfordert weder Datenmigration noch Backup und kann als einzelner Git-Commit mit `git revert` zurückgenommen werden. Es wurde weder gepusht noch veröffentlicht, als PR eröffnet, ausgerollt oder auf einer Produktionsinstanz aktiviert.
+
+## Phase 3 · Paket 3.1 – Konfigurations-Workbench und Level-Wirkungstest
+
+### Inventar und Risiko
+
+- Betroffene Routen: `/settings/automods/level` sowie die gemeinsame Formularbasis aller geführten Konfigurationen; Regressionsevidenz auf `/settings/automods/seeding` und `/settings/automods/no-leader`.
+- Betroffene Komponenten: Modussteuerung, Änderungsleiste, Schema-Profile, Level-Wirkungstest und reine Simulationslogik.
+- Datenverträge und gespeicherte Konfigurationen: unverändert. `enabled`, `dry_run`, alle Level-, Rollen-, Warn-, Bestrafungs-, Kick- und Ausnahmefelder behalten Namen, Typ, Loader-/Action-Pfad, Merge-Verhalten und Payload. Unbekannte Konfigurationswerte werden weiterhin bewahrt.
+- Ausgangslage: Level und Seeding verwendeten nahezu identische dreistufige Modussteuerungen mit getrenntem Code. Die Änderungsleiste benannte weder Serverreichweite noch Validierungszustand. Eine Wirkung der komplexen Level-Regel konnte nur gedanklich abgeschätzt oder nach dem Speichern am Server beobachtet werden.
+
+### Umsetzung
+
+- Eine gemeinsame `ConfigOperationModeControl` bildet Aus, Beobachten und Aktiv auf die vorhandenen Felder `enabled` und `dry_run` ab. Bestehende öffentliche Exportnamen bleiben als kompatible Wrapper erhalten.
+- Die gemeinsame Änderungsleiste kann Geltungsbereich und Validierungszustand anzeigen. Alle Workbench- und Integrationsformulare erhalten „Dieser Server“ sowie „Bereit zum Speichern“ beziehungsweise die Anzahl zu prüfender Angaben.
+- Das Level-Schemaprofil aktiviert einen route-spezifischen Wirkungstest, der per `React.lazy` geladen wird. Andere Konfigurationsrouten bezahlen dessen Code nicht im gemeinsamen Initialpfad.
+- Der eckige Test-Drawer verwendet Mobile den vollständigen Viewport und Desktop ein 480-Pixel-Seitenpanel. Beispiellevel, Spielerzahl, Rolle und optionale Spieler-Markierung lassen sich gegen den aktuellen, noch nicht gespeicherten Formularentwurf prüfen.
+- Die reine Simulation unterscheidet deaktivierte Regeln, wartende Serverauslastung, Flags, Level-1-Schutz, globale Mindest-/Höchstlevel, rollenbezogene Warn-/Bestrafungs-/Kickstufen, erkannte Verstöße ohne aktive Maßnahme und erlaubte Spieler.
+- Der Test führt weder Speicherung noch API-, RCON- oder Gameserveraktion aus. Das Ergebnis wird beim Schließen verworfen, damit ein neuer Test nicht mit veraltetem Kontext startet.
+
+### Validierung
+
+- Vite-Produktionsbuild mit API-Basispfad `/api/`: bestanden; nur die bekannte Warnung zum bestehenden gemeinsamen Konfigurationschunk über 500 kB bleibt.
+- Initiales Bundle-Budget: bestanden mit 1.500,00 kB Rohgröße und 483,02 kB gzip. Der Level-Test liegt in einem separaten Chunk von 6,36 kB raw beziehungsweise 2,77 kB gzip.
+- Verträge: Configuration Workbench mit acht Simulationen, Design Foundation, Seitensemantik, Action Feedback, Konfigurationskompatibilität, Admin-Aktionen, Operator-Copy und Navigation Shell bestanden.
+- Browserprüfung: Level bei 1440 × 900 und 390 × 844; Test-Drawer in beiden Viewports; Seeding bei 1440 × 900 und 390 × 844; Ohne Truppführer bei 390 × 844. Kein horizontaler Dokumentüberlauf, jeweils genau eine H1.
+- Funktionsprüfung: Moduswechsel erzeugt den bestehenden Dirty-Zustand, Wiederherstellen setzt ihn zurück. Simulation im Modus Aus sowie im Beobachtungsmodus geprüft; Rollenbezeichnung „Truppführer“ lokalisiert; erneutes Öffnen beginnt ohne altes Ergebnis.
+- Theme- und Farbsehprüfung: heller Modus plus Deuteranopie live geprüft und ohne Speicherung verworfen.
+- Accessibility: beschriftete Eingaben, zugänglicher Schließen-Button, modaler Fokuskontext, 44-Pixel-Aktionen und `aria-live`-Ergebnis geprüft.
+- Design QA: Ausgangs- und Implementierungsaufnahmen im selben Vergleichseingang; nach Ergebnis-Reset und Lazy Loading keine offenen P0/P1/P2-Findings. Ergebnis `passed` in `design-qa.md`.
+- Browserkonsole: null Errors.
+- Lint: weiterhin nicht ausführbar, weil im Checkout kein ESLint-Paket beziehungsweise Binary installiert ist.
+
+### Rückrollbarkeit
+
+Das Paket verändert ausschließlich Frontend-Komponenten und lokale, reine Simulationslogik. Es erfordert weder Datenmigration noch Backup und kann als einzelner Git-Commit mit `git revert` zurückgenommen werden. Es wurde weder gepusht noch veröffentlicht, als PR eröffnet, ausgerollt oder auf einer Produktionsinstanz aktiviert.

@@ -51,6 +51,7 @@ export default function ConfigActionBar({
   sticky = true,
   mobileSticky = sticky,
   result,
+  metaItems = [],
 }) {
   return (
     <Box
@@ -138,6 +139,39 @@ export default function ConfigActionBar({
               <Typography variant="caption" color="text.secondary">
                 {stateDescription}
               </Typography>
+            )}
+            {metaItems.length > 0 && (
+              <Stack
+                direction="row"
+                spacing={1}
+                useFlexGap
+                flexWrap="wrap"
+                sx={{ mt: 0.5 }}
+              >
+                {metaItems.map((item) => (
+                  <Stack
+                    key={item.id || item.label}
+                    direction="row"
+                    spacing={0.5}
+                    alignItems="baseline"
+                    sx={{ minWidth: 0 }}
+                  >
+                    <Typography
+                      variant="overline"
+                      color="text.secondary"
+                    >
+                      {item.label}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color={item.color || "text.primary"}
+                      fontWeight={800}
+                    >
+                      {item.value}
+                    </Typography>
+                  </Stack>
+                ))}
+              </Stack>
             )}
             {leading}
           </Box>

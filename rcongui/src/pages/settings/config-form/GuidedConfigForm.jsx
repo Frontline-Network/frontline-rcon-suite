@@ -28,6 +28,7 @@ import { useTranslation } from "react-i18next";
 import { getAllRoles } from "@/constants/roles";
 import PlayerFlagPicker from "./PlayerFlagPicker";
 import StableNumberField from "./StableNumberField";
+import ConfigOperationModeControl from "./ConfigOperationModeControl";
 
 const sectionIcons = {
   operation: <PowerSettingsNewIcon fontSize="small" />,
@@ -899,57 +900,19 @@ export function NoLeaderOperationModeControl({
   supportsDryRun = true,
 }) {
   const { t } = useTranslation();
-  const mode = !data.enabled
-    ? "off"
-    : supportsDryRun && data.dry_run
-    ? "observe"
-    : "active";
-
   return (
-    <ToggleButtonGroup
-      value={mode}
-      exclusive
+    <ConfigOperationModeControl
+      data={data}
       disabled={disabled}
-      onChange={(_, nextMode) => {
-        if (!nextMode) return;
-        onChange?.(
-          supportsDryRun
-            ? {
-                enabled: nextMode !== "off",
-                dry_run: nextMode === "observe",
-              }
-            : { enabled: nextMode === "active" }
-        );
+      onChange={onChange}
+      supportsDryRun={supportsDryRun}
+      ariaLabel={t(`${translationRoot}.workbench.mode.title`)}
+      labels={{
+        off: t(`${translationRoot}.workbench.mode.off`),
+        observe: t(`${translationRoot}.workbench.mode.observe`),
+        active: t(`${translationRoot}.workbench.mode.active`),
       }}
-      aria-label={t(`${translationRoot}.workbench.mode.title`)}
-      size="small"
-      sx={{
-        "& .MuiToggleButton-root": {
-          minHeight: 44,
-          minWidth: { xs: 0, sm: 112 },
-          px: { xs: 1.25, sm: 2 },
-          borderRadius: 0,
-          textTransform: "none",
-          fontWeight: 800,
-        },
-        "& .MuiToggleButton-root.Mui-selected": {
-          bgcolor: mode === "active" ? "success.dark" : "action.selected",
-          color: mode === "active" ? "success.contrastText" : "text.primary",
-        },
-      }}
-    >
-      <ToggleButton value="off">
-        {t(`${translationRoot}.workbench.mode.off`)}
-      </ToggleButton>
-      {supportsDryRun && (
-        <ToggleButton value="observe">
-          {t(`${translationRoot}.workbench.mode.observe`)}
-        </ToggleButton>
-      )}
-      <ToggleButton value="active">
-        {t(`${translationRoot}.workbench.mode.active`)}
-      </ToggleButton>
-    </ToggleButtonGroup>
+    />
   );
 }
 

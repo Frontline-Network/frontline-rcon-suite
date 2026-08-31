@@ -1,4 +1,6 @@
 export { default as ConfigActionBar } from "./ConfigActionBar";
+export { default as ConfigOperationModeControl } from "./ConfigOperationModeControl";
+export { default as ConfigTestDrawer } from "./ConfigTestDrawer";
 export { default as ConfigFormLayout } from "./ConfigFormLayout";
 export { default as SeedingWorkbenchLayout } from "./SeedingWorkbenchLayout";
 export { default as ConfigFormShell } from "./ConfigFormShell";

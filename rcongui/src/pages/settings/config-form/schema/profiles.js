@@ -61,7 +61,7 @@ const schemaProfile = (
   page,
   sections,
   summarySectionIds,
-  { operationMode = null } = {}
+  { operationMode = null, testKind = null } = {}
 ) => ({
   ...pageKeys(page),
   page,
@@ -69,6 +69,7 @@ const schemaProfile = (
   layout: "workbench",
   translationRoot: `${ROOT}.${page}`,
   operationMode,
+  testKind,
   sections: sections.map(([id, fields]) => genericSection(page, id, fields)),
   fields: {},
   summarySectionIds,
@@ -496,7 +497,7 @@ const configFormProfiles = {
       ["notifications", ["discord_webhook_url"]],
     ],
     ["rules", "warnings", "punishments", "kick"],
-    { operationMode: "threeState" }
+    { operationMode: "threeState", testKind: "level" }
   ),
   auto_mod_seeding_config: {
     ...pageKeys("seeding"),

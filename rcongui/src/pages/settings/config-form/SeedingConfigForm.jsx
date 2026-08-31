@@ -29,6 +29,7 @@ import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import SportsEsportsOutlinedIcon from "@mui/icons-material/SportsEsportsOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import { useTranslation } from "react-i18next";
+import ConfigOperationModeControl from "./ConfigOperationModeControl";
 import { getAllRoles } from "@/constants/roles";
 import { get } from "@/utils/fetchUtils";
 import PlayerFlagPicker from "./PlayerFlagPicker";
@@ -1115,44 +1116,19 @@ export function SeedingOperationModeControl({
   onChange,
 }) {
   const { t } = useTranslation();
-  const mode = !data.enabled ? "off" : data.dry_run ? "observe" : "active";
   return (
-    <ToggleButtonGroup
-      value={mode}
-      exclusive
+    <ConfigOperationModeControl
+      data={data}
       disabled={disabled}
-      onChange={(_, nextMode) => {
-        if (!nextMode) return;
-        onChange?.({
-          enabled: nextMode !== "off",
-          dry_run: nextMode === "observe",
-        });
+      onChange={onChange}
+      supportsDryRun
+      ariaLabel={t(`${ROOT}.operation.modeTitle`)}
+      labels={{
+        off: t(`${ROOT}.operation.off`),
+        observe: t(`${ROOT}.operation.observe`),
+        active: t(`${ROOT}.operation.active`),
       }}
-      aria-label={t(`${ROOT}.operation.modeTitle`)}
-      size="small"
-      sx={{
-        "& .MuiToggleButton-root": {
-          minHeight: 44,
-          minWidth: { xs: 0, sm: 112 },
-          px: { xs: 1.25, sm: 2 },
-          borderRadius: 0,
-          textTransform: "none",
-          fontWeight: 800,
-        },
-        "& .MuiToggleButton-root.Mui-selected": {
-          bgcolor: mode === "active" ? "success.dark" : "action.selected",
-          color: mode === "active" ? "success.contrastText" : "text.primary",
-        },
-      }}
-    >
-      <ToggleButton value="off">{t(`${ROOT}.operation.off`)}</ToggleButton>
-      <ToggleButton value="observe">
-        {t(`${ROOT}.operation.observe`)}
-      </ToggleButton>
-      <ToggleButton value="active">
-        {t(`${ROOT}.operation.active`)}
-      </ToggleButton>
-    </ToggleButtonGroup>
+    />
   );
 }
 

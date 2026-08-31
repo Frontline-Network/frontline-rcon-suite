@@ -7,7 +7,7 @@ import {
   useRevalidator,
   useSubmit,
 } from "react-router-dom";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { execute, get, handleHttpError } from "@/utils/fetchUtils";
 import {
   Box,
@@ -26,6 +26,7 @@ import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
+import ScienceOutlinedIcon from "@mui/icons-material/ScienceOutlined";
 import { toast } from "react-toastify";
 import { JsonForms } from "@jsonforms/react";
 import {
@@ -70,6 +71,10 @@ import {
   getIntegrationByCommand,
   getIntegrationBySlug,
 } from "@/pages/settings/integrations/registry";
+
+const LevelRuleTestDrawer = lazy(() =>
+  import("@/pages/settings/config-form/LevelRuleTestDrawer")
+);
 
 // Fake-preview saves stay process-local so repeated form interactions are
 // deterministic without changing the production request path.
@@ -530,6 +535,7 @@ const ConfigPage = () => {
   const [editorContent, setEditorContent] = useState("");
   const [activeSection, setActiveSection] = useState("operation");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [testOpen, setTestOpen] = useState(false);
   const revalidator = useRevalidator();
   const actionData = useActionData();
   const submit = useSubmit();
@@ -549,6 +555,7 @@ const ConfigPage = () => {
   const usesSeedVipRenderer = formProfile?.renderer === "seedVip";
   const usesNameKickRenderer = formProfile?.renderer === "nameKick";
   const usesSchemaWorkbench = formProfile?.layout === "workbench";
+  const supportsLevelTest = formProfile?.testKind === "level";
   const WorkbenchLayout =
     usesSeedingRenderer ||
     usesSeedVipRenderer ||
@@ -622,6 +629,7 @@ const ConfigPage = () => {
   useEffect(() => {
     setValidationErrors(null);
     setActiveSection(formProfile?.sections?.[0]?.id || "operation");
+    setTestOpen(false);
   }, [command, formProfile]);
 
   const handleSubmit = (e) => {
@@ -694,6 +702,38 @@ const ConfigPage = () => {
     : t("settings.configForms.workbench.statusConfigured");
   const ruleStatusColor =
     hasEnabledSetting && jsonData?.enabled ? "success" : "default";
+  const localWorkbenchCopy = i18n.language?.startsWith("de")
+    ? {
+        test: "Auswirkung testen",
+        scope: "Geltungsbereich",
+        scopeValue: "Dieser Server",
+        validation: "Validierung",
+        valid: "Bereit zum Speichern",
+        errors: `${allValidationErrors.length} Angaben prüfen`,
+      }
+    : {
+        test: "Test impact",
+        scope: "Scope",
+        scopeValue: "This server",
+        validation: "Validation",
+        valid: "Ready to save",
+        errors: `${allValidationErrors.length} entries need attention`,
+      };
+  const changeMetaItems = [
+    {
+      id: "scope",
+      label: localWorkbenchCopy.scope,
+      value: localWorkbenchCopy.scopeValue,
+    },
+    {
+      id: "validation",
+      label: localWorkbenchCopy.validation,
+      value: hasBlockingErrors
+        ? localWorkbenchCopy.errors
+        : localWorkbenchCopy.valid,
+      color: hasBlockingErrors ? "error.main" : "success.main",
+    },
+  ];
   const activeSectionIndex = (formProfile?.sections || []).findIndex(
     (section) => section.id === activeSection
   );
@@ -808,6 +848,7 @@ const ConfigPage = () => {
                 <CheckCircleOutlineIcon color="success" />
               )
             }
+            metaItems={changeMetaItems}
             secondaryActions={[
               {
                 id: "reset",
@@ -958,6 +999,16 @@ const ConfigPage = () => {
                     supportsDryRun={formProfile.operationMode === "threeState"}
                   />
                 )}
+                {supportsLevelTest && (
+                  <Button
+                    variant="outlined"
+                    startIcon={<ScienceOutlinedIcon />}
+                    onClick={() => setTestOpen(true)}
+                    sx={{ minHeight: 44, minWidth: { lg: 196 } }}
+                  >
+                    {localWorkbenchCopy.test}
+                  </Button>
+                )}
               </Stack>
             }
             summary={
@@ -1001,7 +1052,21 @@ const ConfigPage = () => {
                     <CheckCircleOutlineIcon color="success" />
                   )
                 }
+                metaItems={changeMetaItems}
                 secondaryActions={[
+                  ...(supportsLevelTest
+                    ? [
+                        {
+                          id: "test-impact",
+                          label: localWorkbenchCopy.test,
+                          startIcon: <ScienceOutlinedIcon />,
+                          variant: "outlined",
+                          onClick: () => setTestOpen(true),
+                          disabled: hasCompatibilityIssues,
+                          testId: "config-test-impact-button",
+                        },
+                      ]
+                    : []),
                   {
                     id: "reset",
                     label: t("settings.configForms.workbench.reset"),
@@ -1140,6 +1205,15 @@ const ConfigPage = () => {
           </WorkbenchLayout>
         </Form>
       </Collapse>
+      {supportsLevelTest && (
+        <Suspense fallback={null}>
+          <LevelRuleTestDrawer
+            open={testOpen}
+            onClose={() => setTestOpen(false)}
+            data={jsonData}
+          />
+        </Suspense>
+      )}
     </Stack>
   );
 

@@ -48,6 +48,64 @@ final result: passed
 
 ---
 
+# Design QA · Phase 3.1 Konfigurations-Workbench und Level-Wirkungstest
+
+## Prüfgrundlage
+
+- Source Visual Truth: `.codex/phase3-foundation/level-baseline-mobile-390x844.png` für die bestehende Level-Regelstruktur sowie `.codex/phase3-foundation/seeding-baseline-desktop-1440x900.png` für die freigegebene eckige Konfigurations-Workbench, Modussteuerung und Änderungsleiste.
+- Implementierung: `.codex/phase3-foundation/level-final-desktop-1440x900.png`, `.codex/phase3-foundation/level-final-mobile-390x844.png`, `.codex/phase3-foundation/level-test-final-desktop-1440x900.png` und `.codex/phase3-foundation/level-test-final-mobile-390x844.png`.
+- Viewports und Normalisierung: Mobile jeweils 390 × 844 CSS-Pixel bei Browser-Dichte 1 und 390 × 844 Bildpixeln; Desktop jeweils 1440 × 900 CSS-Pixel bei Browser-Dichte 1 und 1440 × 900 Bildpixeln. Die Aufnahmen enthalten ausschließlich den App-Viewport ohne Browser-Chrome.
+- Zustände: Frontline Gold, dunkler Modus, Standard-Farbsehen; Level-Regel im Modus „Aus“ sowie Wirkungstest vor und nach einer lokalen Simulation. Heller Modus plus Deuteranopie wurde zusätzlich live geprüft und ohne Speicherung verworfen.
+
+## Full-View-Vergleich
+
+Ausgangs- und Implementierungsaufnahmen wurden im selben Vergleichseingang geöffnet. Die Level-Seite bewahrt Navigation, Zusammenfassung, Abschnittsreihenfolge und sämtliche Formfelder, ergänzt aber die bereits freigegebene dreistufige Modussteuerung um einen klaren, lokal arbeitenden Einstieg „Auswirkung testen“. Die gemeinsame Änderungsleiste zeigt nun Geltungsbereich und Validierungszustand, ohne den bestehenden Speicher- und Wiederherstellungsfluss zu verändern. Mobile bleibt die erste Aufgabe im Viewport sichtbar; Desktop nutzt die vorhandene horizontale Arbeitsfläche ohne neue Karten- oder Radius-Sprache.
+
+## Fokusvergleich
+
+Der Wirkungstest wurde als eigener Fokusvergleich in Desktop- und Mobile-Aufnahmen geprüft. Desktop öffnet ein 480-Pixel-Seitenpanel, Mobile einen exakt 390 × 844 Pixel großen Vollbild-Drawer. Überschrift, Sicherheitsinformation, Beispielwerte, Rollenwahl, optionale Markierung und primäre Simulationsaktion sind vollständig lesbar. Es wurden ausschließlich vorhandene MUI-Icons und Theme-Tokens verwendet; keine Platzhalter, CSS-Zeichnungen oder neu erfundenen Bildassets.
+
+## Findings
+
+- Keine verbleibenden P0-, P1- oder P2-Abweichungen.
+- [P3] Der erste Fokus liegt beim Öffnen auf dem semantischen Drawer-Abschnitt und nicht direkt auf dem Schließen-Button. Alle interaktiven Elemente liegen in korrekter Tab-Reihenfolge, besitzen zugängliche Namen und bleiben innerhalb des modalen Fokuskontexts.
+
+## Pflichtflächen
+
+- Fonts und Typografie: bestehende Frontline-Schriftfamilie, kondensierte Versalien, Gewichte, Zeilenhöhen und Laufweiten bleiben unverändert. Der neue Testtitel, Feldlabels, Statusstufen und Footer-Metadaten bilden eine klare Hierarchie ohne problematische Umbrüche.
+- Spacing und Layout: eckige 0-Pixel-Radien, kompakte Rahmen, bestehende Abschnittsabstände und 44-Pixel-Aktionen bleiben konsistent. Level, Seeding und Ohne Truppführer besitzen bei 390 × 844 keinen horizontalen Dokumentüberlauf; der mobile Drawer belegt exakt den Viewport.
+- Farben und Tokens: Akzent, Information, Erfolg, Warnung und deaktivierte Zustände verwenden vorhandene Theme-Tokens. Heller Modus plus Deuteranopie wurde live geprüft; Status bleibt zusätzlich über Text, Symbol und Umrandung erkennbar.
+- Bild- und Assetqualität: vorhandenes Frontline-Logo und die etablierte MUI-Iconbibliothek werden wiederverwendet. Es wurden keine neuen Rasterbilder, handgebauten SVGs, Emoji- oder CSS-Assets eingeführt.
+- Copy und Inhalt: „Auswirkung testen“ und „Simulation ausführen“ unterscheiden Entwurfstest und Persistenz eindeutig. Der Hinweis erklärt ausdrücklich, dass weder gespeichert noch eine Nachricht an den Gameserver gesendet wird. Rollenbezeichnungen sind lokalisiert.
+- Icons und Zustände: Modus, Simulation, Information und Ergebnis verwenden dieselbe Iconfamilie. Aus, Beobachten, Aktiv, bereit, ungültig und Simulationsergebnis werden nicht allein farbcodiert.
+- Responsivität und Accessibility: Desktop 1440 × 900 und Mobile 390 × 844 geprüft; genau eine H1, beschriftete Eingaben, zugänglicher Schließen-Button, `aria-live`-Ergebnis und praktische Touch-Ziele vorhanden.
+
+## Interaktionen und Datenverträge
+
+- Gemeinsame Modussteuerung auf Level, Seeding und Ohne Truppführer geprüft; Wechsel erzeugt den bestehenden Dirty-Zustand, Wiederherstellen setzt gespeicherte Werte zurück.
+- Acht deterministische Level-Szenarien prüfen Aus, Wartezustand, Ausnahmen, globale Grenzen, rollenbezogene Eskalation, erkannte Verstöße ohne aktive Maßnahme und erlaubte Spieler.
+- Der Wirkungstest liest ausschließlich sichtbare Formularwerte, speichert nichts und ruft keine API auf. Loader, Actions, Feldnamen, Merge-Verhalten, Payloads und unbekannte Konfigurationswerte bleiben unverändert.
+- Browserkonsole im Abschlusslauf: null Errors.
+
+## Vergleichshistorie
+
+1. Ausgangsvergleich: [P2] Modussteuerung war zwischen geführten Formularen und Seeding doppelt implementiert; [P2] die neue Simulation zeigte nach Schließen und erneutem Öffnen noch das vorherige Ergebnis; [P2] eine direkte Einbindung hätte den gemeinsamen Konfigurationschunk unnötig vergrößert.
+2. Umsetzung: gemeinsame `ConfigOperationModeControl`, wiederverwendbare Änderungsmetadaten und lazy-geladener Level-Test ergänzt. Der Ergebniszustand wird beim Schließen zurückgesetzt.
+3. Finale Desktop-/Mobile-Aufnahmen bei identischen Viewports und erneute Browserprüfung: keine offenen P0-, P1- oder P2-Findings. Das initiale Bundle-Budget bleibt mit exakt 1.500,00 kB Rohgröße innerhalb des Vertrags.
+
+## Implementation Checklist
+
+- [x] Source und Implementierung im selben Vergleichseingang geprüft.
+- [x] Level, Seeding und Ohne Truppführer funktional gegen den gemeinsamen Modusvertrag geprüft.
+- [x] Wirkungstest vor und nach Simulation sowie nach erneutem Öffnen geprüft.
+- [x] Desktop, Mobile, Theme, Deuteranopie, Semantik und Browserkonsole geprüft.
+- [x] Produktionsbuild, Bundle-Budget und alle relevanten Vertragschecks bestanden.
+- [x] Keine API-, Persistenz- oder Konfigurationsmigration eingeführt.
+
+final result: passed
+
+---
+
 # Design QA · Phase 2.5 Dienste, Spiel- und Audit-Protokolle
 
 ## Prüfgrundlage
