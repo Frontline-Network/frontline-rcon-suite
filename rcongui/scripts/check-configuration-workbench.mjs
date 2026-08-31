@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { simulateLevelRule } from "../src/pages/settings/config-form/simulateLevelRule.mjs";
 import { simulateEscalationRule } from "../src/pages/settings/config-form/simulateEscalationRule.mjs";
+import { simulateTrustRule } from "../src/pages/settings/config-form/simulateTrustRule.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relativePath) =>
@@ -25,12 +26,20 @@ const config = {
 };
 
 const cases = [
-  ["off", { ...config, enabled: false }, { playerLevel: 20, serverPlayers: 60 }],
+  [
+    "off",
+    { ...config, enabled: false },
+    { playerLevel: 20, serverPlayers: 60 },
+  ],
   ["waiting", config, { playerLevel: 20, serverPlayers: 10 }],
   ["exempt", config, { playerLevel: 20, serverPlayers: 60, playerFlag: "VIP" }],
   ["exempt", config, { playerLevel: 1, serverPlayers: 60 }],
   ["immediate", config, { playerLevel: 5, serverPlayers: 60 }],
-  ["escalation", config, { playerLevel: 20, serverPlayers: 60, role: "officer" }],
+  [
+    "escalation",
+    config,
+    { playerLevel: 20, serverPlayers: 60, role: "officer" },
+  ],
   [
     "detected",
     {
@@ -172,9 +181,170 @@ const escalationCases = [
 for (const [expected, kind, rule, sample] of escalationCases) {
   const actual = simulateEscalationRule(kind, rule, sample).outcome;
   if (actual !== expected) {
+    throw new Error(`Expected ${expected} for ${kind}, received ${actual}`);
+  }
+}
+
+const vacConfig = {
+  vac_history_days: 365,
+  game_ban_threshhold: 2,
+  blacklist_id: 1,
+  ban_on_vac_history_reason:
+    "VAC history ({DAYS_SINCE_LAST_BAN}/{MAX_DAYS_SINCE_BAN})",
+  auto_expire: true,
+  whitelist_flags: ["trusted"],
+};
+
+const tkConfig = {
+  enabled: true,
+  max_time_after_connect_minutes: 15,
+  ignore_tk_after_n_kills: 8,
+  ignore_tk_after_n_deaths: 8,
+  teamkill_tolerance_count: 2,
+  excluded_weapons: ["Roadkill"],
+  whitelist_players: {
+    has_flag: ["admin"],
+    is_vip: true,
+    has_at_least_n_sessions: 10,
+  },
+  blacklist_id: 1,
+  ban_duration: { minutes: 0, hours: 24, days: 0, weeks: 0, years: 0 },
+  discord_webhook_url: "https://discord.example/frontline",
+  discord_webhook_message: "Teamkill ban for {player}",
+};
+
+const tkSample = {
+  profileStatus: "available",
+  vipLookupStatus: "available",
+  isVip: false,
+  sessions: 0,
+  playerFlag: "",
+  hasConnectEvent: true,
+  weapon: "Rifle",
+  minutesAfterConnect: 2,
+  ownKillsBeforeEvent: 0,
+  deathsBeforeEvent: 0,
+  teamkillsIncludingCurrent: 3,
+};
+
+const trustCases = [
+  ["off", "vacBans", { ...vacConfig, vac_history_days: 0 }, {}],
+  ["unavailable", "vacBans", vacConfig, { dataStatus: "missing" }],
+  [
+    "exempt",
+    "vacBans",
+    vacConfig,
+    {
+      dataStatus: "current",
+      vacBanned: true,
+      daysSinceLastBan: 30,
+      playerFlag: "trusted",
+    },
+  ],
+  [
+    "noAction",
+    "vacBans",
+    vacConfig,
+    { dataStatus: "current", vacBanned: true, daysSinceLastBan: 0 },
+  ],
+  [
+    "noAction",
+    "vacBans",
+    vacConfig,
+    { dataStatus: "current", vacBanned: true, daysSinceLastBan: 500 },
+  ],
+  [
+    "noAction",
+    "vacBans",
+    vacConfig,
+    {
+      dataStatus: "current",
+      vacBanned: false,
+      gameBans: 1,
+      daysSinceLastBan: 30,
+    },
+  ],
+  [
+    "configError",
+    "vacBans",
+    { ...vacConfig, ban_on_vac_history_reason: "Ban {UNKNOWN}" },
+    { dataStatus: "current", vacBanned: true, daysSinceLastBan: 30 },
+  ],
+  [
+    "action",
+    "vacBans",
+    vacConfig,
+    { dataStatus: "current", vacBanned: true, daysSinceLastBan: 30 },
+  ],
+  [
+    "action",
+    "vacBans",
+    vacConfig,
+    {
+      dataStatus: "stale",
+      vacBanned: false,
+      gameBans: 2,
+      daysSinceLastBan: 30,
+    },
+    "staleData",
+  ],
+  ["off", "tkBans", { ...tkConfig, enabled: false }, tkSample],
+  ["exempt", "tkBans", tkConfig, { ...tkSample, isVip: true }],
+  ["exempt", "tkBans", tkConfig, { ...tkSample, sessions: 10 }],
+  ["exempt", "tkBans", tkConfig, { ...tkSample, playerFlag: "admin" }],
+  ["noAction", "tkBans", tkConfig, { ...tkSample, hasConnectEvent: false }],
+  ["exempt", "tkBans", tkConfig, { ...tkSample, weapon: "Roadkill" }],
+  ["noAction", "tkBans", tkConfig, { ...tkSample, minutesAfterConnect: 16 }],
+  ["noAction", "tkBans", tkConfig, { ...tkSample, ownKillsBeforeEvent: 8 }],
+  ["noAction", "tkBans", tkConfig, { ...tkSample, deathsBeforeEvent: 8 }],
+  [
+    "noAction",
+    "tkBans",
+    tkConfig,
+    { ...tkSample, teamkillsIncludingCurrent: 2 },
+  ],
+  ["action", "tkBans", tkConfig, tkSample],
+  [
+    "action",
+    "tkBans",
+    tkConfig,
+    { ...tkSample, profileStatus: "missing" },
+    "profileUnavailable",
+  ],
+  [
+    "action",
+    "tkBans",
+    { ...tkConfig, discord_webhook_message: "Ban for {player_name}" },
+    tkSample,
+    "notificationTemplate",
+  ],
+  [
+    "action",
+    "tkBans",
+    {
+      ...tkConfig,
+      ban_duration: {
+        minutes: 0,
+        hours: 0,
+        days: 0,
+        weeks: 0,
+        years: 1,
+      },
+    },
+    tkSample,
+    "yearsIgnored",
+  ],
+];
+
+for (const [expected, kind, rule, sample, expectedRisk] of trustCases) {
+  const result = simulateTrustRule(kind, rule, sample);
+  if (result.outcome !== expected) {
     throw new Error(
-      `Expected ${expected} for ${kind}, received ${actual}`
+      `Expected ${expected} for ${kind}, received ${result.outcome}`
     );
+  }
+  if (expectedRisk && !result.risks.includes(expectedRisk)) {
+    throw new Error(`Expected ${expectedRisk} risk for ${kind}`);
   }
 }
 
@@ -196,6 +366,7 @@ for (const [label, source, fragments] of [
     detail,
     ["EscalationRuleTestDrawer", "supportsImpactTest", "testKind"],
   ],
+  ["trust workbench", detail, ["TrustRuleTestDrawer", '"vacBans"', '"tkBans"']],
   ["operation mode", modeControl, ['"off"', '"observe"', '"active"']],
 ]) {
   for (const fragment of fragments) {
@@ -206,5 +377,5 @@ for (const [label, source, fragments] of [
 }
 
 console.log(
-  `Configuration Workbench contract passed: ${cases.length} level simulations, ${escalationCases.length} escalation simulations, shared mode control, scope, validation and impact tests stay connected.`
+  `Configuration Workbench contract passed: ${cases.length} level simulations, ${escalationCases.length} escalation simulations, ${trustCases.length} trust simulations, shared mode control, scope, validation and impact tests stay connected.`
 );

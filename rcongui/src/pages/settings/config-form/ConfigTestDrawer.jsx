@@ -10,6 +10,7 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import ScienceOutlinedIcon from "@mui/icons-material/ScienceOutlined";
+import { useEffect, useRef } from "react";
 
 const toneSeverity = {
   success: "success",
@@ -31,6 +32,12 @@ export default function ConfigTestDrawer({
   closeLabel,
   onRun,
 }) {
+  const resultRef = useRef(null);
+
+  useEffect(() => {
+    if (result) resultRef.current?.scrollIntoView({ block: "nearest" });
+  }, [result]);
+
   return (
     <Drawer
       anchor="right"
@@ -110,6 +117,7 @@ export default function ConfigTestDrawer({
 
           {result && (
             <Box
+              ref={resultRef}
               aria-live="polite"
               sx={{
                 border: "1px solid",

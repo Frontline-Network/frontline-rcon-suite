@@ -550,7 +550,8 @@ const configFormProfiles = {
       ["actions", ["blacklist_id", "ban_on_vac_history_reason", "auto_expire"]],
       ["exemptions", ["whitelist_flags"]],
     ],
-    ["rules", "actions", "exemptions"]
+    ["rules", "actions", "exemptions"],
+    { testKind: "vacBans" }
   ),
   tk_ban_on_connect_config: schemaProfile(
     "tkBans",
@@ -569,7 +570,7 @@ const configFormProfiles = {
       ["notifications", ["discord_webhook_url", "discord_webhook_message"]],
     ],
     ["detection", "actions", "exemptions", "notifications"],
-    { operationMode: "toggle" }
+    { operationMode: "toggle", testKind: "tkBans" }
   ),
   name_kick_config: nameKickProfile,
   seed_vip_config: {

@@ -48,6 +48,70 @@ final result: passed
 
 ---
 
+# Design QA · Phase 3.3 – Vertrauensabhängige Sperrregeln prüfen
+
+## Prüfgrundlage
+
+- Source Visual Truth: die unveränderten Workbench-Ausgangszustände in `.codex/phase33-baseline/vac-bans-baseline-desktop-1440x900.png`, `.codex/phase33-baseline/vac-bans-baseline-mobile-390x844.png`, `.codex/phase33-baseline/tk-bans-baseline-desktop-1440x900.png` und `.codex/phase33-baseline/tk-bans-baseline-mobile-390x844.png`; fachliche Zielwahrheit zusätzlich aus `rcon/hooks.py`, `rcon/workers.py`, `rcon/automods/tk_autoban.py`, `rcon/user_config/vac_game_bans.py` und `rcon/user_config/ban_tk_on_connect.py`.
+- Implementierung: `.codex/phase33-baseline/vac-bans-after-desktop-1440x900.png`, `.codex/phase33-baseline/vac-bans-after-mobile-390x844.png`, `.codex/phase33-baseline/tk-bans-after-desktop-1440x900.png` und `.codex/phase33-baseline/tk-bans-after-mobile-390x844.png`.
+- Fokuszustände: `.codex/phase33-baseline/vac-bans-test-desktop-1440x900.png`, `.codex/phase33-baseline/vac-bans-test-mobile-390x844.png`, `.codex/phase33-baseline/tk-bans-test-desktop-1440x900.png` und `.codex/phase33-baseline/tk-bans-test-mobile-390x844.png`.
+- Theme-Evidenz: `.codex/phase33-baseline/tk-bans-theme-deuteranopia-1440x900.png`.
+- Viewports und Normalisierung: Desktop jeweils 1440 × 900 CSS- und Bildpixel, Mobile jeweils 390 × 844 CSS- und Bildpixel, Browser-Dichte 1. Die Screenshots enthalten ausschließlich den App-Viewport.
+- Primärzustand: Frontline Gold, dunkler Modus, Standard-Farbsehen. Theme-Prüfung in Hell plus Deuteranopie und anschließend ohne Speicherung verworfen.
+
+## Full-View-Vergleich
+
+Ausgangs- und Nachher-Aufnahmen beider Routen wurden bei identischen Viewports und identischem gespeichertem Regelzustand gemeinsam geöffnet. Informationsarchitektur, eckige Workbench-Flächen, Abschnittsnavigation, Formularfelder, Zusammenfassung und Abschlussleiste bleiben unverändert. Neu ist ausschließlich die klare Aktion „Auswirkung testen“: Desktop neben dem Regelkopf und zusätzlich in der Abschlussleiste, Mobile einmal direkt unter dem Modus beziehungsweise Regelkopf. Der zusätzliche Einstieg verschiebt Mobile Inhalt nach unten, priorisiert aber bewusst die sicherheitskritische Vorschau vor den editierbaren Details und erzeugt keinen horizontalen Überlauf.
+
+## Fokusvergleich
+
+Die VAC- und TK-Drawer-Aufnahmen wurden gemeinsam beurteilt. Beide verwenden dieselbe eckige Testoberfläche, unterscheiden aber ihre Datengüte und Ausnahmen fachgerecht. VAC zeigt gespeicherten Steam-Datenzustand, Sperrhistorie, Hintergrundaktualisierung und Folgeprüfung. TK zeigt Profil-/VIP-Verfügbarkeit, Logfenster, Toleranz, Sperrmaßnahme und nachgelagerten Auditstatus. Nach dem Ausführen springt der lange Drawer automatisch so weit, dass die erwartete Entscheidung und ihre nummerierte Ablaufkette sichtbar sind. Desktop und Mobile bleiben vertikal scrollbar; bei 390 × 844 gilt `scrollWidth === clientWidth`.
+
+## Findings
+
+- Keine verbleibenden P0-, P1- oder P2-Abweichungen.
+- [P3] Die aktuelle In-App-Browser-Bindung stellt auf diesem Host keine Console- oder CDP-Ereignisfähigkeit bereit. Es erschien kein Fehler-Overlay und alle Browserpfade sowie Vertragsprüfungen bestanden; ein separater Konsolen-Eventnachweis bleibt für einen späteren Lauf mit verfügbarer Capability offen.
+
+## Pflichtflächen
+
+- Fonts und Typografie: bestehende Frontline-Schriftfamilie, Gewichte, Versalien, Zeilenhöhen und Feldlabels werden wiederverwendet. Lange Vertrauenshinweise und Ergebnisbegründungen umbrechen auf 390 Pixeln lesbar; Stufen bleiben als kompakte, nummerierte Textbausteine scannbar.
+- Spacing und Layout: eckige 0-Pixel-Radien, 44-Pixel-Primäraktionen, vorhandene Abschnittsabstände und das 480-Pixel-Desktop-Seitenpanel bleiben konsistent. Mobile belegt exakt 390 × 844 und besitzt keinen horizontalen Dokumentüberlauf.
+- Farben und Tokens: ausschließlich bestehende Theme-, Rahmen-, Info-, Warn-, Fehler- und Erfolgsfarben. Hell plus Deuteranopie wurde live geprüft; Entscheidung und Risiko bleiben zusätzlich über Überschrift, Text, Icon, Rahmen und Ablaufstufe erkennbar.
+- Bild- und Assetqualität: keine neuen Bildassets erforderlich. Frontline-Logo und etablierte MUI-Icons bleiben erhalten; keine Platzhalter, CSS-Zeichnungen, Emojis oder handgebauten SVGs.
+- Copy und Inhalt: Die Texte unterscheiden fehlende, ungültige, unbekannt alte und veraltete Steam-Daten; sie erklären explizit die erste gespeicherte Prüfung und die spätere Hintergrundprüfung. Bei TK werden unsichere Profil-Ausnahmen, N-plus-eins-Toleranz, ein ignoriertes Jahresfeld und ein möglicherweise erst nach der Sperre fehlschlagender Discord-Platzhalter transparent benannt.
+- Icons und Zustände: Simulation, Information, Entscheidung und Warnung verwenden dieselbe Iconfamilie. Aus, keine Aktion, Ausnahme, nicht belastbar, Konfigurationsfehler und Sperrmaßnahme sind nicht allein farbcodiert.
+- Responsivität und Accessibility: beschriftete Comboboxen und Number Inputs, semantische Buttons, zugänglicher Schließen-Button, modaler Fokuskontext und `aria-live`-Ergebnis. Light-/Farbsehmodus besitzt weiterhin Text- und Symbolredundanz.
+
+## Fachliche und funktionale Prüfung
+
+- VAC: Aus, fehlender/ungültiger Datensatz, unbekanntes Alter, veraltete Daten, Markierungsausnahme, kein belastbarer Sperrzeitpunkt, Zeitraumüberschreitung, Schwelle, ungültiger Grundplatzhalter und Sperrmaßnahme werden deterministisch abgebildet.
+- VAC: Die Oberfläche sagt korrekt, dass gespeicherte Daten zuerst synchron geprüft werden und die Hintergrundaktualisierung danach eine zweite Prüfung auslösen kann. Es wird keine Aktualität vorgetäuscht, wenn `updated` fehlt.
+- TK: deaktivierte Regel, fehlendes Profil, nicht verfügbare VIP-Liste, VIP-/Sitzungs-/Markierungsausnahme, fehlender Beitritt, ausgenommene Waffe, Zeitfenster, eigene Kills/Tode und Teamkilltoleranz werden abgebildet.
+- TK: `teamkill_tolerance_count = 2` löst erst beim dritten Teamkill aus. Die Laufzeit zeigt die explizit konfigurierte Einheit „24 Stunden“ statt der rechnerisch gleichen, aber inkonsistenten Form „1 Tag“.
+- TK: Die bestehende Demokonfiguration mit `{player_name}` wird nicht stillschweigend umgeschrieben; die Vorschau warnt, dass der Backendvertrag nur `{player}` formatiert und die Benachrichtigung nach einer bereits ausgeführten Sperre fehlschlagen kann.
+- Bei fehlendem Spielerprofil läuft die bestehende TK-Prüfung weiter und kennzeichnet VIP-, Sitzungs- und Markierungsausnahmen als unsicher. Ein verfügbarer VIP beendet die Prüfung vor der Maßnahme.
+- Der Wirkungstest liest nur den aktuellen Formularentwurf, speichert nichts und sendet keine API-, RCON-, Steam- oder Gameserveraktion.
+
+## Vergleichshistorie
+
+1. Ausgangsvergleich: Beide Workbenches waren visuell konsistent, besaßen aber keine sichere Vorschau für daten- und vertrauensabhängige Entscheidungen.
+2. Erste Umsetzung: [P2] Eine Laufzeit von 24 Stunden wurde im Testergebnis als „1 Tage“ dargestellt, obwohl die Workbench „24 Stunden“ zeigte. Die Simulation bewahrt nun die explizit konfigurierten Dauerkomponenten und lokalisiert Singular und Plural korrekt.
+3. Erste Interaktionsprüfung: [P1] Das Ergebnis der langen TK-Simulation entstand unterhalb des sichtbaren Drawer-Bereichs. Die gemeinsame Testoberfläche scrollt neue Ergebnisse jetzt ohne Animation in den nächstgelegenen sichtbaren Bereich; die Post-Fix-Messung zeigt das Ergebnis Mobile von y = 392 bis y = 844.
+4. Post-Fix-Vergleich bei identischen Viewports: Dauer, Entscheidung, Risikohinweis und Ablaufstufen sind sichtbar; keine offenen P0-, P1- oder P2-Findings.
+
+## Implementation Checklist
+
+- [x] Vorher und Nachher je Route und Viewport gemeinsam verglichen.
+- [x] VAC- und TK-Fokuszustände auf Desktop und 390 × 844 Mobile geprüft.
+- [x] 23 deterministische Vertrauens- und Fail-safe-Fälle gegen die Backend-Reihenfolge geprüft.
+- [x] Fehlende Daten, veraltete Daten, unsichere Ausnahmen und nachgelagerte Auditfehler sichtbar gemacht.
+- [x] Theme, Deuteranopie, Semantik und Mobile-Overflow geprüft.
+- [x] Keine API-, Payload-, Persistenz-, Steam- oder Gameserveraktion ergänzt.
+
+final result: passed
+
+---
+
 # Design QA · Phase 3.2 – Automod-Eskalation testen
 
 ## Prüfgrundlage

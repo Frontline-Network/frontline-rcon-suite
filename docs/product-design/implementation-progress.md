@@ -394,3 +394,43 @@ Das Paket verändert ausschließlich Frontend-Komponenten und lokale, reine Simu
 ### Rückrollbarkeit
 
 Das Paket verändert ausschließlich Frontend-Komponenten und lokale, reine Simulationslogik. Es erfordert weder Datenmigration noch Backup und kann als einzelner Git-Commit mit `git revert` zurückgenommen werden. Es wurde weder gepusht noch veröffentlicht, als PR eröffnet, ausgerollt oder auf einer Produktionsinstanz aktiviert.
+
+## Phase 3 · Paket 3.3 – Vertrauensabhängige Sperrregeln sicher prüfen
+
+### Inventar und Risiko
+
+- Betroffene Routen: `/settings/others/vac-bans` und `/settings/others/tk-bans`.
+- Betroffene Komponenten: gemeinsame Konfigurations-Workbench, Schemaprofile, gemeinsame Testoberfläche, route-spezifischer Vertrauens-Drawer und reine Simulationslogik.
+- Datenverträge und gespeicherte Konfigurationen: unverändert. VAC-Historie, Game-Ban-Schwelle, Sperrliste, Ablauf, Grund, Spieler-Markierungen sowie sämtliche TK-Zeitfenster-, Toleranz-, Ausnahmen-, Laufzeit- und Discord-Felder behalten Namen, Typ, Loader-/Action-Pfad, Merge-Verhalten und Payload. Unbekannte Werte bleiben bewahrt.
+- Backend-Wahrheit: VAC-Beitrittsprüfung, Steam-Hintergrundjob, `should_ban`, TK-Auswertung der letzten 500 Spielerlogs sowie beide User-Config-Modelle wurden vor der Umsetzung inventarisiert.
+- Zentrales Risiko: Beide Regeln sind nicht allein durch Formularwerte entscheidbar. VAC hängt an Alter und Verfügbarkeit gespeicherter Steam-Daten; TK hängt an Spielerprofil, VIP-Abruf und Logfenster. Die Vorschau muss diese Unsicherheit zeigen, ohne eine belastbare Live-Entscheidung vorzutäuschen.
+
+### Umsetzung
+
+- Beide Workbenches erhalten „Auswirkung testen“ im Regelkopf und in der Abschlussleiste; Mobile zeigt die Aktion einmal direkt vor den Detailbereichen.
+- Ein lazy geladener, eckiger Drawer trennt VAC- und TK-Beispieldaten, verwendet aber dieselbe Ergebnis- und Ablaufstruktur wie die bestehenden Level- und Eskalationstests.
+- VAC unterscheidet aktuellen, älteren als zwölf Stunden, unbekannt alten, fehlenden und ungültigen gespeicherten Datensatz. VAC-Status, Game-Ban-Anzahl, Sperralter und optionale Markierung können gegen den aktuellen Entwurf geprüft werden.
+- Die VAC-Ablaufkette zeigt gespeicherte Erstprüfung, mögliche Hintergrundaktualisierung und anschließende Folgeprüfung. Fehlende oder ungültige Daten führen im ersten Schritt ausdrücklich nicht zu einer automatischen Sperre.
+- TK unterscheidet verfügbares oder fehlendes Spielerprofil, VIP-Abruf, VIP-Status, Sitzungen, Markierung, Beitritt im 500-Zeilen-Logfenster, Waffe, Zeitabstand, eigene Kills/Tode und Teamkillanzahl.
+- Die TK-Simulation bildet die reale N-plus-eins-Toleranz ab, weist auf das vom Backend ignorierte Jahresfeld hin und prüft Discord-Platzhalter gegen den tatsächlich unterstützten Wert `{player}`.
+- Die expliziten Laufzeiteinheiten bleiben in der Ausgabe erhalten; 24 konfigurierte Stunden werden als „24 Stunden“ und nicht als rechnerisch gleiches „1 Tag“ gezeigt.
+- Nach dem Ausführen scrollt die gemeinsame Testoberfläche das neue Ergebnis in den sichtbaren Bereich. Die Bewegung ist sofort und erzeugt keine zusätzliche Animation.
+- Der Test speichert nichts und sendet keine API-, RCON-, Steam- oder Gameserveraktion.
+
+### Validierung
+
+- Vite-Produktionsbuild mit API-Basispfad `/api/`: bestanden; nur die bekannte Chunk-Größenwarnung bleibt.
+- Initiales Bundle-Budget: bestanden mit 1.500,00 kB Rohgröße und 482,99 kB gzip. Der Vertrauens-Drawer liegt als separater Lazy-Chunk bei 22,78 kB raw beziehungsweise 7,34 kB gzip.
+- Verträge: Configuration Workbench mit acht Level-, zwölf Eskalations- und 23 Vertrauenssimulationen, Design Foundation, Seitensemantik, Action Feedback, Konfigurationskompatibilität, Admin-Aktionen, Operator-Copy und Navigation Shell bestanden.
+- Browserprüfung: beide Routen und beide Test-Drawer bei 1440 × 900 sowie 390 × 844; auf Mobile gilt `scrollWidth === clientWidth` und der Drawer belegt exakt den Viewport.
+- VAC-Funktionsprüfung: Standard-Sperre, veralteter Datensatz mit Risiko, fehlender Datensatz mit Hintergrundfolge und Ablaufstufen geprüft.
+- TK-Funktionsprüfung: Standard-Sperre inklusive Discord-Platzhalterrisiko, fehlendes Spielerprofil mit unsicheren Ausnahmen und VIP-Ausnahme geprüft. Das Ergebnis springt Mobile vollständig in den sichtbaren Bereich.
+- Theme- und Farbsehprüfung: heller Modus plus Deuteranopie live geprüft und ohne Speicherung verworfen; DOM-Zustand bestätigte `light` und `deuteranopia`.
+- Accessibility: beschriftete Comboboxen und Eingaben, semantische Primäraktionen, zugänglicher Schließen-Button, modaler Fokuskontext, `aria-live`-Ergebnis sowie Text-/Icon-/Rahmenredundanz für Status.
+- Design QA: Ausgangs-, Nachher- und Fokusaufnahmen bei identischen Viewports gemeinsam verglichen; inkonsistente Laufzeiteinheit und zunächst unterhalb des sichtbaren Bereichs liegendes Ergebnis korrigiert. Keine offenen P0/P1/P2-Findings, Ergebnis `passed` in `design-qa.md`.
+- Browserkonsole: Die aktuelle In-App-Browser-Bindung stellte auf diesem Host keine Console-/CDP-Eventfähigkeit bereit. Es erschien kein Runtime-Fehler-Overlay; Build und sämtliche relevanten Vertragsprüfungen bestanden.
+- Lint: weiterhin nicht als Projektvertrag ausführbar; Build und Parserprüfung der neuen Module bestanden.
+
+### Rückrollbarkeit
+
+Das Paket verändert ausschließlich Frontend-Komponenten und lokale, reine Simulationslogik. Es erfordert weder Datenmigration noch Backup und kann als einzelner Git-Commit mit `git revert` zurückgenommen werden. Es wurde weder gepusht noch veröffentlicht, als PR eröffnet, ausgerollt oder auf einer Produktionsinstanz aktiviert.

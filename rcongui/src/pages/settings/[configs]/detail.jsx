@@ -7,7 +7,14 @@ import {
   useRevalidator,
   useSubmit,
 } from "react-router-dom";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { execute, get, handleHttpError } from "@/utils/fetchUtils";
 import {
   Box,
@@ -77,6 +84,9 @@ const LevelRuleTestDrawer = lazy(() =>
 );
 const EscalationRuleTestDrawer = lazy(() =>
   import("@/pages/settings/config-form/EscalationRuleTestDrawer")
+);
+const TrustRuleTestDrawer = lazy(() =>
+  import("@/pages/settings/config-form/TrustRuleTestDrawer")
 );
 
 // Fake-preview saves stay process-local so repeated form interactions are
@@ -559,9 +569,13 @@ const ConfigPage = () => {
   const usesNameKickRenderer = formProfile?.renderer === "nameKick";
   const usesSchemaWorkbench = formProfile?.layout === "workbench";
   const testKind = formProfile?.testKind || null;
-  const supportsImpactTest = ["level", "noLeader", "noSoloTank"].includes(
-    testKind
-  );
+  const supportsImpactTest = [
+    "level",
+    "noLeader",
+    "noSoloTank",
+    "vacBans",
+    "tkBans",
+  ].includes(testKind);
   const WorkbenchLayout =
     usesSeedingRenderer ||
     usesSeedVipRenderer ||
@@ -1220,8 +1234,15 @@ const ConfigPage = () => {
               onClose={() => setTestOpen(false)}
               data={jsonData}
             />
-          ) : (
+          ) : ["noLeader", "noSoloTank"].includes(testKind) ? (
             <EscalationRuleTestDrawer
+              open={testOpen}
+              onClose={() => setTestOpen(false)}
+              data={jsonData}
+              kind={testKind}
+            />
+          ) : (
+            <TrustRuleTestDrawer
               open={testOpen}
               onClose={() => setTestOpen(false)}
               data={jsonData}
