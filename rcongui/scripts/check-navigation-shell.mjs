@@ -14,6 +14,9 @@ const mobileNavigationRoutes = read(
   "src/components/layout/mobile-navigation.mjs"
 );
 const serverStatus = read("src/components/Header/server-status.jsx");
+const serverSwitcher = read(
+  "src/components/layout/navigation/ServerRailSwitcher.jsx"
+);
 const desktopNavigation = read(
   "src/components/layout/navigation/CommandNavigationShell.jsx"
 );
@@ -37,6 +40,9 @@ assert.match(
 
 assert.match(serverStatus, /<ServerRailSwitcher/);
 assert.match(serverStatus, /variant="status"/);
+assert.match(serverSwitcher, /KeyboardArrowDownRoundedIcon/);
+assert.match(serverSwitcher, /t\("sidebar\.switchServer"\)/);
+assert.match(serverSwitcher, /placement=\{isStatusTrigger \? "bottom" : "right"\}/);
 assert.doesNotMatch(desktopNavigation, /ServerRailSwitcher/);
 assert.doesNotMatch(mobileNavigation, /ServerRailSwitcher/);
 

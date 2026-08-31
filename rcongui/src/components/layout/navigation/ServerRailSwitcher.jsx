@@ -10,6 +10,7 @@ import {
   Typography,
 } from "@mui/material";
 import DnsOutlinedIcon from "@mui/icons-material/DnsOutlined";
+import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import { alpha } from "@mui/material/styles";
 import { useTranslation } from "react-i18next";
 import { useGlobalStore } from "@/stores/global-state";
@@ -81,12 +82,15 @@ export default function ServerRailSwitcher({
         color: "text.primary",
         textAlign: "left",
         bgcolor: open ? alpha(theme.palette.primary.main, 0.12) : "transparent",
-        transition: theme.transitions.create(["background-color", "color"], {
-          duration: theme.transitions.duration.shortest,
-        }),
+        cursor: "pointer",
+        transition: theme.transitions.create(
+          ["background-color", "color", "box-shadow"],
+          { duration: theme.transitions.duration.shortest }
+        ),
         "&:hover": {
           color: "primary.light",
           bgcolor: alpha(theme.palette.primary.main, 0.08),
+          boxShadow: `inset 0 -2px 0 ${theme.palette.primary.main}`,
         },
         "&:focus-visible": {
           outline: `2px solid ${theme.palette.primary.main}`,
@@ -155,6 +159,43 @@ export default function ServerRailSwitcher({
           {value || currentName}
         </Typography>
       </Box>
+      <Stack
+        aria-hidden
+        direction="row"
+        alignItems="center"
+        spacing={0.25}
+        sx={{
+          alignSelf: "stretch",
+          flexShrink: 0,
+          pl: compact ? 0.25 : 0.75,
+          borderLeft: "1px solid",
+          borderColor: "divider",
+          color: open ? "primary.light" : "text.secondary",
+        }}
+      >
+        {!compact && (
+          <Typography
+            component="span"
+            sx={{
+              fontSize: "0.5rem",
+              fontWeight: 700,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+            }}
+          >
+            {t("sidebar.switchServer")}
+          </Typography>
+        )}
+        <KeyboardArrowDownRoundedIcon
+          sx={(theme) => ({
+            fontSize: compact ? 18 : 20,
+            transform: open ? "rotate(180deg)" : "rotate(0deg)",
+            transition: theme.transitions.create("transform", {
+              duration: theme.transitions.duration.shortest,
+            }),
+          })}
+        />
+      </Stack>
     </ButtonBase>
   ) : (
     <ButtonBase
@@ -229,19 +270,15 @@ export default function ServerRailSwitcher({
 
   return (
     <>
-      {isStatusTrigger ? (
-        trigger
-      ) : (
-        <Tooltip
-          title={triggerLabel}
-          placement="right"
-          arrow
-          enterDelay={450}
-          slotProps={{ tooltip: { sx: { borderRadius: 0 } } }}
-        >
-          {trigger}
-        </Tooltip>
-      )}
+      <Tooltip
+        title={isStatusTrigger ? t("sidebar.switchServer") : triggerLabel}
+        placement={isStatusTrigger ? "bottom" : "right"}
+        arrow
+        enterDelay={350}
+        slotProps={{ tooltip: { sx: { borderRadius: 0 } } }}
+      >
+        {trigger}
+      </Tooltip>
 
       <Popover
         id={POPOVER_ID}
