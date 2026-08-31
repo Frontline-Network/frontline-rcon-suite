@@ -78,6 +78,7 @@ const schemaProfile = (
 const noLeaderProfile = {
   ...pageKeys("noLeader"),
   renderer: "guided",
+  testKind: "noLeader",
   translationRoot: `${ROOT}.noLeader`,
   summary: {
     titleKey: `${ROOT}.noLeader.summary.title`,
@@ -219,6 +220,7 @@ const noLeaderProfile = {
 const noSoloTankProfile = {
   ...pageKeys("noSoloTank"),
   renderer: "guided",
+  testKind: "noSoloTank",
   translationRoot: `${ROOT}.noSoloTank`,
   summary: {
     titleKey: `${ROOT}.noSoloTank.summary.title`,

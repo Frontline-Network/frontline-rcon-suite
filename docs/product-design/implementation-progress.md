@@ -357,3 +357,40 @@ Das Paket verändert ausschließlich Frontend-Darstellung, responsive Anordnung 
 ### Rückrollbarkeit
 
 Das Paket verändert ausschließlich Frontend-Komponenten und lokale, reine Simulationslogik. Es erfordert weder Datenmigration noch Backup und kann als einzelner Git-Commit mit `git revert` zurückgenommen werden. Es wurde weder gepusht noch veröffentlicht, als PR eröffnet, ausgerollt oder auf einer Produktionsinstanz aktiviert.
+
+## Phase 3 · Paket 3.2 – Automod-Eskalation sicher voraussehen
+
+### Inventar und Risiko
+
+- Betroffene Routen: `/settings/automods/no-leader` und `/settings/automods/no-solo-tank`.
+- Betroffene Komponenten: gemeinsame Konfigurations-Workbench, Schemaprofile, route-spezifischer Wirkungstest und reine Eskalationssimulation.
+- Datenverträge und gespeicherte Konfigurationen: unverändert. `enabled`, `dry_run`, globale Mindestzahl, Erkennungs-, Notiz-, Warn-, Bestrafungs-, Kick-, Server-/Truppschwellen- und Ausnahmefelder behalten Namen, Typ, Loader-/Action-Pfad und Payload. Unbekannte Werte werden weiterhin bewahrt.
+- Backend-Wahrheit: `rcon/automods/no_leader.py`, `rcon/automods/no_solotank.py`, `rcon/user_config/auto_mod_no_leader.py` und `rcon/user_config/auto_mod_solo_tank.py` wurden vor der Umsetzung inventarisiert. Der Wirkungstest bildet deren Reihenfolge ab, ohne Logik in das Frontend zu verlagern oder eine Serverentscheidung vorzutäuschen.
+- VAC-/Spielsperren und TK-Sperre wurden bewusst nicht in dieses Paket gezogen: Sie hängen an Steam-/Sitzungsdaten und benötigen im nächsten Paket eine eigene Vertrauens-, Datenalter- und Fail-safe-Darstellung.
+
+### Umsetzung
+
+- Die Workbench-Aktion „Auswirkung testen“ steht für beide Regeln Desktop neben der Modussteuerung und in der Abschlussleiste, Mobile einmal direkt unter dem Modus bereit.
+- Ein gemeinsamer, per `React.lazy` geladener Drawer verwendet dieselbe eckige Frontline-Struktur wie der Level-Test, zeigt aber nur fachlich relevante Eingaben.
+- Ohne Truppführer: Truppzustand, Server-/Truppgröße, Spielerlevel, Rolle und optionale Markierung können gegen den noch nicht gespeicherten Entwurf geprüft werden.
+- Kein Solo-Panzer: Trupptyp, Server-/Truppgröße, Spielerlevel und optionale Markierung können geprüft werden.
+- Die reine Simulation unterscheidet Aus, globale Wartebedingung, keinen Verstoß, Flag-/Level-/Rollen-Ausnahme, vollständige Eskalation, pausierte Schwelle und erkannten Verstoß ohne erreichbare Maßnahme.
+- Die Ergebniszeitleiste zeigt Bestätigungen, Warnungen, Bestrafungen, Kickfrist sowie unbegrenzte und schwellenbedingt pausierte Stufen. Beobachten wird ausdrücklich als reine Auditwirkung erklärt.
+- Der Test speichert nichts und sendet keine API-, RCON- oder Gameserveraktion. Beim Profilwechsel werden passende Beispieldaten gesetzt; beim Öffnen beginnt die Ergebnisfläche ohne veraltetes Resultat.
+
+### Validierung
+
+- Vite-Produktionsbuild mit API-Basispfad `/api/`: bestanden; nur die bekannte Chunk-Größenwarnung bleibt.
+- Initiales Bundle-Budget: bestanden mit 1.500,00 kB Rohgröße und 483,00 kB gzip. Der neue Test liegt in einem separaten Lazy-Chunk von 11,06 kB raw beziehungsweise 4,22 kB gzip.
+- Verträge: Configuration Workbench mit acht Level- und zwölf Eskalationssimulationen, Design Foundation, Seitensemantik, Action Feedback, Konfigurationskompatibilität, Admin-Aktionen, Operator-Copy und Navigation Shell bestanden.
+- Browserprüfung: beide Routen und beide Test-Drawer bei 1440 × 900 sowie 390 × 844; auf Mobile gilt `scrollWidth === clientWidth`.
+- Funktionsprüfung: vollständige Wirkungsketten, Beobachtungsmodus, globale Mindestzahl, vorhandener Truppführer und Panzertrupp mit zwei Mitgliedern geprüft. `-1`, deaktivierte Stufen und Server-/Truppschwellen werden zusätzlich deterministisch im Vertragstest abgedeckt.
+- Theme- und Farbsehprüfung: heller Modus plus Deuteranopie live geprüft und ohne Speicherung verworfen.
+- Accessibility: beschriftete Comboboxen und Eingaben, semantische Primäraktionen, zugänglicher Schließen-Button, modaler Fokuskontext und statusunabhängige Text-/Iconkennzeichnung.
+- Design QA: Ausgangs-, Nachher- und Drawer-Aufnahmen bei identischen Viewports gemeinsam verglichen; keine offenen P0/P1/P2-Findings, Ergebnis `passed` in `design-qa.md`.
+- Browserkonsole: null Errors; ausschließlich die bekannte React-Router-v7-Future-Flag-Warnung im Entwicklungsmodus.
+- Lint: weiterhin nicht ausführbar, weil im Checkout kein ESLint-Paket beziehungsweise Binary installiert ist.
+
+### Rückrollbarkeit
+
+Das Paket verändert ausschließlich Frontend-Komponenten und lokale, reine Simulationslogik. Es erfordert weder Datenmigration noch Backup und kann als einzelner Git-Commit mit `git revert` zurückgenommen werden. Es wurde weder gepusht noch veröffentlicht, als PR eröffnet, ausgerollt oder auf einer Produktionsinstanz aktiviert.

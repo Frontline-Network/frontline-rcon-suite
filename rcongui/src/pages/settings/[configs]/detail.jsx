@@ -75,6 +75,9 @@ import {
 const LevelRuleTestDrawer = lazy(() =>
   import("@/pages/settings/config-form/LevelRuleTestDrawer")
 );
+const EscalationRuleTestDrawer = lazy(() =>
+  import("@/pages/settings/config-form/EscalationRuleTestDrawer")
+);
 
 // Fake-preview saves stay process-local so repeated form interactions are
 // deterministic without changing the production request path.
@@ -555,7 +558,10 @@ const ConfigPage = () => {
   const usesSeedVipRenderer = formProfile?.renderer === "seedVip";
   const usesNameKickRenderer = formProfile?.renderer === "nameKick";
   const usesSchemaWorkbench = formProfile?.layout === "workbench";
-  const supportsLevelTest = formProfile?.testKind === "level";
+  const testKind = formProfile?.testKind || null;
+  const supportsImpactTest = ["level", "noLeader", "noSoloTank"].includes(
+    testKind
+  );
   const WorkbenchLayout =
     usesSeedingRenderer ||
     usesSeedVipRenderer ||
@@ -999,11 +1005,12 @@ const ConfigPage = () => {
                     supportsDryRun={formProfile.operationMode === "threeState"}
                   />
                 )}
-                {supportsLevelTest && (
+                {supportsImpactTest && (
                   <Button
                     variant="outlined"
                     startIcon={<ScienceOutlinedIcon />}
                     onClick={() => setTestOpen(true)}
+                    disabled={hasCompatibilityIssues}
                     sx={{ minHeight: 44, minWidth: { lg: 196 } }}
                   >
                     {localWorkbenchCopy.test}
@@ -1054,7 +1061,7 @@ const ConfigPage = () => {
                 }
                 metaItems={changeMetaItems}
                 secondaryActions={[
-                  ...(supportsLevelTest
+                  ...(supportsImpactTest
                     ? [
                         {
                           id: "test-impact",
@@ -1205,13 +1212,22 @@ const ConfigPage = () => {
           </WorkbenchLayout>
         </Form>
       </Collapse>
-      {supportsLevelTest && (
+      {supportsImpactTest && (
         <Suspense fallback={null}>
-          <LevelRuleTestDrawer
-            open={testOpen}
-            onClose={() => setTestOpen(false)}
-            data={jsonData}
-          />
+          {testKind === "level" ? (
+            <LevelRuleTestDrawer
+              open={testOpen}
+              onClose={() => setTestOpen(false)}
+              data={jsonData}
+            />
+          ) : (
+            <EscalationRuleTestDrawer
+              open={testOpen}
+              onClose={() => setTestOpen(false)}
+              data={jsonData}
+              kind={testKind}
+            />
+          )}
         </Suspense>
       )}
     </Stack>

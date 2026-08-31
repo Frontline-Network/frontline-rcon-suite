@@ -48,6 +48,67 @@ final result: passed
 
 ---
 
+# Design QA · Phase 3.2 – Automod-Eskalation testen
+
+## Prüfgrundlage
+
+- Source Visual Truth: die unveränderten Workbench-Ausgangszustände in `.codex/phase32-baseline/no-leader-baseline-desktop-1440x900.png`, `.codex/phase32-baseline/no-leader-baseline-mobile-390x844.png`, `.codex/phase32-baseline/no-solo-tank-baseline-desktop-1440x900.png` und `.codex/phase32-baseline/no-solo-tank-baseline-mobile-390x844.png`; fachliche Zielwahrheit zusätzlich aus `rcon/automods/no_leader.py`, `rcon/automods/no_solotank.py`, `rcon/user_config/auto_mod_no_leader.py` und `rcon/user_config/auto_mod_solo_tank.py`.
+- Implementierung: `.codex/phase32-baseline/no-leader-after-desktop-1440x900.png`, `.codex/phase32-baseline/no-leader-after-mobile-390x844.png`, `.codex/phase32-baseline/no-solo-tank-after-desktop-1440x900.png` und `.codex/phase32-baseline/no-solo-tank-after-mobile-390x844.png`.
+- Fokuszustände: `.codex/phase32-baseline/no-leader-test-desktop-1440x900.png`, `.codex/phase32-baseline/no-leader-test-mobile-390x844.png`, `.codex/phase32-baseline/no-solo-tank-test-desktop-1440x900.png` und `.codex/phase32-baseline/no-solo-tank-test-mobile-390x844.png`.
+- Theme-Evidenz: `.codex/phase32-baseline/no-solo-tank-theme-deuteranopia-1440x900.png`.
+- Viewports und Normalisierung: Desktop jeweils 1440 × 900 CSS-Pixel und Bildpixel, Mobile jeweils 390 × 844 CSS-Pixel und Bildpixel, Browser-Dichte 1. Screenshots enthalten ausschließlich den App-Viewport.
+- Primärzustand: Frontline Gold, dunkler Modus, Standard-Farbsehen; „Ohne Truppführer“ im Modus Beobachten, „Kein Solo-Panzer“ im Modus Aktiv. Theme-Prüfung im hellen Modus plus Deuteranopie und anschließend ohne Speicherung verworfen.
+
+## Full-View-Vergleich
+
+Die Ausgangs- und Nachher-Aufnahmen beider Routen wurden bei identischem Viewport und identischem gespeicherten Regelzustand im selben Vergleichseingang geöffnet. Informationsarchitektur, eckige Oberflächen, Typografie, Abschnittsnavigation und vorhandene Konfigurationsfelder bleiben unverändert. Neu ist ausschließlich die klar beschriftete Aktion „Auswirkung testen“: Desktop steht sie neben der Modussteuerung und zusätzlich in der Abschlussleiste, Mobile einmal kompakt direkt unter dem Modus. Dadurch bleibt die vertraute Workbench-Dichte erhalten und der Test ist vor dem Speichern erreichbar.
+
+## Fokusvergleich
+
+Die vier Drawer-Aufnahmen wurden gemeinsam verglichen. Beide Regeln verwenden dieselbe eckige Testoberfläche, reduzieren die Eingaben aber auf den jeweiligen Fachkontext: Truppzustand und Rolle bei fehlender Führung, Trupptyp und Besatzungsgröße beim Solo-Panzer. Ergebnis, Erläuterung und Stufenfolge bleiben am Desktop und auf 390-Pixel-Mobile lesbar; Mobile scrollt vertikal und erzeugt keinen horizontalen Dokumentüberlauf.
+
+## Findings
+
+- Keine verbleibenden P0-, P1- oder P2-Abweichungen.
+- Keine offenen P3-Polish-Punkte im Umfang dieses Pakets.
+
+## Pflichtflächen
+
+- Fonts und Typografie: vorhandene Frontline-Schriftfamilie, Gewichte, Versalien und Zeilenhöhen werden wiederverwendet. Titel, Hinweis, Felder, Ergebnis und nummerierte Stufen besitzen eine klare Hierarchie ohne problematische Umbrüche.
+- Spacing und Layout: Desktop-Drawer mit bestehender Seitenpanelbreite, Mobile vollflächig und scrollbar; 44-Pixel-Aktionen, eckige Eingabeflächen und der vertikale Rhythmus entsprechen der Workbench. Bei 390 × 844 gilt `scrollWidth === clientWidth`.
+- Farben und Tokens: ausschließlich bestehende Theme-, Rahmen-, Info-, Warn-, Fehler- und Erfolgsfarben. Heller Modus plus Deuteranopie wurde live geprüft; Text, Icon, Überschrift und Rahmen kennzeichnen Zustände zusätzlich zur Farbe.
+- Bild- und Assetqualität: keine neuen Bildassets erforderlich. Vorhandenes Frontline-Logo und etablierte MUI-Icons bleiben erhalten; keine Platzhalter, CSS-Zeichnungen oder handgebauten SVGs.
+- Copy und Inhalt: Deutsche und englische Texte erklären Beispielzustand, Wirkung, Schwellen und die Nicht-Invasivität des Tests. Die Oberfläche sagt ausdrücklich, dass nichts gespeichert und keine Gameserveraktion gesendet wird.
+- Icons und Zustände: vorhandene Beaker-, Info- und Statusicons aus derselben Bibliothek. Aus, Beobachten und Aktiv sowie erlaubt, ausgenommen, wartend, pausiert und eskalierend werden nicht allein farbcodiert.
+- Responsivität und Accessibility: beschriftete Comboboxen, Number Inputs, optionales Flagfeld, zugänglicher Schließen-Button und modaler Fokuskontext. Primäraktionen sind semantische Buttons; bei 390 × 844 kein horizontaler Überlauf.
+
+## Fachliche und funktionale Prüfung
+
+- Die Simulation spiegelt die bestehende Backend-Reihenfolge: globale Mindestzahl, Erkennung, Flag-/Level-/Rollen-Ausnahmen, Bestätigungen, Warnungen, Bestrafungen, Kick sowie Server- und Truppschwellen.
+- `-1` bleibt eine unbegrenzte und terminale Warn- beziehungsweise Bestrafungsstufe. `0` deaktiviert eine Stufe, ohne eine nicht erreichbare Folgeaktion vorzutäuschen.
+- Ohne Truppführer: vollständige Wirkungskette im Beobachtungsmodus, vorhandener Truppführer und globale Mindestzahl im Browser geprüft.
+- Kein Solo-Panzer: vollständige aktive Wirkungskette sowie besetzter Panzertrupp mit zwei Mitgliedern im Browser geprüft.
+- Schließen und erneutes Öffnen verwirft das alte Ergebnis. Ein Wechsel zwischen den beiden Profilarten setzt die Beispieldaten auf passende Standardwerte zurück.
+- Browserkonsole: null Errors; ausschließlich die bekannte React-Router-v7-Future-Flag-Warnung im Entwicklungsmodus.
+
+## Vergleichshistorie
+
+1. Ausgangsvergleich: Beide Workbenches waren visuell bereits konsistent, besaßen aber keine sichere Vorschau ihrer vierstufigen Wirkungskette.
+2. Umsetzung: gemeinsamer, lazy geladener Test-Drawer plus reine, datenvertragsneutrale Simulationslogik ergänzt. Der erste Vertragstest zeigte, dass ein „nur erkannt“-Beispiel wegen des realen Levelschutzes korrekt als Ausnahme galt; der Testdatensatz wurde auf Level 100 korrigiert, nicht die Fachlogik.
+3. Finale Browser- und Bildprüfung bei identischen Viewports: keine offenen P0-, P1- oder P2-Findings.
+
+## Implementation Checklist
+
+- [x] Vorher und Nachher je Route und Viewport gemeinsam verglichen.
+- [x] Drawer-Fokuszustände auf Desktop und Mobile gemeinsam geprüft.
+- [x] Zwölf deterministische Eskalationsfälle gegen die Backend-Reihenfolge geprüft.
+- [x] Theme, Deuteranopie, Semantik und Mobile-Overflow geprüft.
+- [x] Keine API-, Payload-, Persistenz- oder Gameserveraktion ergänzt.
+
+final result: passed
+
+---
+
 # Design QA · Phase 3.1 Konfigurations-Workbench und Level-Wirkungstest
 
 ## Prüfgrundlage
