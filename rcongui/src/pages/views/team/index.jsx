@@ -324,7 +324,10 @@ const TeamViewPage = () => {
       />
 
       <BattleSummary gameData={gameData} teams={summaryTeams} />
-      <AutobalancerCard onHighlightPlayers={setAutobalancerHighlights} />
+      <AutobalancerCard
+        teams={teams}
+        onHighlightPlayers={setAutobalancerHighlights}
+      />
 
       <StickyContainer
         sx={{

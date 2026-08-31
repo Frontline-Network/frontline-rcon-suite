@@ -35,6 +35,7 @@
     "check:config-workbench": "node scripts/check-configuration-workbench.mjs",
     "check:communication-workbench": "node scripts/check-communication-workbench.mjs",
     "check:history-workbench": "node scripts/check-history-workbench.mjs",
+    "check:live-balance": "node scripts/check-live-balance-assistant.mjs",
     "format:write": "prettier src/ --write",
     "lint": "eslint src/"
   },

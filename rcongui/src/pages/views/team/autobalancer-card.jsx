@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Box,
   Button,
   Chip,
   Collapse,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Stack,
-  Tooltip,
   Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
@@ -15,32 +19,13 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
-import { cmd } from "@/utils/fetchUtils";
-import { useAuth } from "@/hooks/useAuth";
+import { ActionButton } from "@/features/player-action/ActionMenu";
+import { Actions } from "@/features/player-action/actions";
+import { buildLiveBalanceStatus } from "./live-balance.mjs";
 
 const TEAM_COLORS = {
   allies: "#65a9d6",
   axis: "#ed6259",
-};
-
-const PHASE_LABELS = {
-  idle: "Bereit",
-  observing: "Beobachtung",
-  volunteer: "Freiwilligenphase",
-  proposed: "Vorschlag",
-  armed: "Beim nächsten Tod",
-  verifying: "Bestätigung läuft",
-  cooldown: "Wartezeit",
-  blocked: "Blockiert",
-};
-
-const MODE_LABELS = {
-  disabled: "Aus",
-  shadow: "Shadow – nur beobachten",
-  manual: "Manuell",
-  auto: "Automatisch",
 };
 
 const clamp = (value, minimum, maximum) =>
@@ -135,44 +120,12 @@ const StrengthBar = ({ allies, axis, label }) => {
   );
 };
 
-const AutobalancerCard = ({ onHighlightPlayers }) => {
-  const queryClient = useQueryClient();
-  const { permissions } = useAuth();
+const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
   const [expanded, setExpanded] = useState(true);
   const [explanationOpen, setExplanationOpen] = useState(false);
-  const canViewAutobalancer =
-    permissions?.is_superuser ||
-    permissions?.permissions?.some(
-      ({ permission }) => permission === "can_view_autobalancer"
-    );
-  const { data: status, isError } = useQuery({
-    queryKey: [{ queryIdentifier: "get_autobalancer_status" }],
-    queryFn: cmd.GET_AUTOBALANCER_STATUS,
-    enabled: Boolean(canViewAutobalancer),
-    refetchInterval: 5_000,
-    retry: false,
-  });
-  const refresh = () =>
-    queryClient.invalidateQueries({
-      queryKey: [{ queryIdentifier: "get_autobalancer_status" }],
-    });
-  const approve = useMutation({
-    mutationFn: () =>
-      cmd.APPROVE_AUTOBALANCER({
-        payload: { decision_id: status?.decision_id },
-      }),
-    onSuccess: refresh,
-  });
-  const cancel = useMutation({
-    mutationFn: () =>
-      cmd.CANCEL_AUTOBALANCER({
-        payload: {
-          incident_id: status?.incident_id,
-          reason: "Über die Teamansicht abgebrochen",
-        },
-      }),
-    onSuccess: refresh,
-  });
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [selectedRecommendation, setSelectedRecommendation] = useState(0);
+  const status = useMemo(() => buildLiveBalanceStatus(teams), [teams]);
 
   const insight = useMemo(() => {
     if (!status) return null;
@@ -350,7 +303,7 @@ const AutobalancerCard = ({ onHighlightPlayers }) => {
     if (insight?.needsAttention) setExpanded(true);
   }, [insight?.headline]);
 
-  if (!canViewAutobalancer || isError || !status || !insight) return null;
+  if (!status || !insight) return null;
 
   const toneColor =
     insight.tone === "success"
@@ -369,6 +322,40 @@ const AutobalancerCard = ({ onHighlightPlayers }) => {
   const alternativesAvailable =
     (status.strength_swap_alternatives || []).length > 0 ||
     Object.values(status.strategy_plans || {}).filter(Boolean).length > 1;
+  const recommendations = swap
+    ? [swap, ...(status.strength_swap_alternatives || [])]
+    : insight.proposal
+    ? [
+        {
+          kind: "move",
+          target_team: insight.targetTeam,
+          player: insight.proposal,
+          rating_gap_before: insight.beforeGap,
+          projected_rating_gap: insight.projectedGap,
+          rating_confidence: insight.proposal.rating_confidence,
+        },
+      ]
+    : [];
+  const activeRecommendation =
+    recommendations[
+      Math.min(selectedRecommendation, recommendations.length - 1)
+    ];
+  const actionRecipients = activeRecommendation
+    ? activeRecommendation.kind === "strength_swap"
+      ? [
+          activeRecommendation.stronger_player,
+          activeRecommendation.weaker_player,
+        ].map((player) => ({
+          player_id: player.player_id,
+          name: player.player_name,
+        }))
+      : [
+          {
+            player_id: activeRecommendation.player.player_id,
+            name: activeRecommendation.player.player_name,
+          },
+        ]
+    : [];
 
   return (
     <Box
@@ -377,10 +364,7 @@ const AutobalancerCard = ({ onHighlightPlayers }) => {
       sx={(theme) => ({
         mb: 1.5,
         border: "1px solid",
-        borderColor: alpha(
-          theme.palette[toneColor.split(".")[0]].main,
-          0.65
-        ),
+        borderColor: alpha(theme.palette[toneColor.split(".")[0]].main, 0.65),
         borderRadius: 0,
         backgroundColor: "background.paper",
         overflow: "hidden",
@@ -426,14 +410,14 @@ const AutobalancerCard = ({ onHighlightPlayers }) => {
         >
           <Chip
             size="small"
-            label={MODE_LABELS[status.mode] || status.mode}
-            color={status.mode === "auto" ? "success" : "default"}
+            label="Direkte Live-Daten"
+            color="info"
             sx={{ borderRadius: 0 }}
           />
           <Chip
             size="small"
             variant="outlined"
-            label={PHASE_LABELS[status.phase] || status.phase}
+            label="Keine Historie nötig"
             sx={{ borderRadius: 0 }}
           />
           <Button
@@ -528,7 +512,7 @@ const AutobalancerCard = ({ onHighlightPlayers }) => {
                 {qualityLabel(insight.effectiveConfidence)}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Live-Daten{" "}
+                Aktueller Snapshot ·{" "}
                 {Number.isFinite(insight.effectiveConfidence)
                   ? `${Math.round(insight.effectiveConfidence * 100)} %`
                   : "unvollständig"}
@@ -561,7 +545,10 @@ const AutobalancerCard = ({ onHighlightPlayers }) => {
                       fontWeight: 800,
                     }}
                   >
-                    <Box component="span" sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <Box
+                      component="span"
+                      sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                    >
                       <span>{swap.stronger_player?.player_name}</span>
                       <ArrowForwardIcon sx={{ fontSize: 16 }} aria-hidden />
                       <span>{insight.teamLabels[swap.weaker_team]}</span>
@@ -574,7 +561,10 @@ const AutobalancerCard = ({ onHighlightPlayers }) => {
                       fontWeight: 800,
                     }}
                   >
-                    <Box component="span" sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <Box
+                      component="span"
+                      sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                    >
                       <span>{swap.weaker_player?.player_name}</span>
                       <ArrowForwardIcon sx={{ fontSize: 16 }} aria-hidden />
                       <span>{insight.teamLabels[swap.stronger_team]}</span>
@@ -637,13 +627,13 @@ const AutobalancerCard = ({ onHighlightPlayers }) => {
               }}
             >
               <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                Die Bewertung verbindet Spielerzahl und geschätzte Teamstärke.
+                Die Bewertung entsteht sofort aus dem aktuellen Server-Snapshot.
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Ein 1:1-Tausch ist nur eine Moderator-Empfehlung und wird nie
-                automatisch ausgeführt. Führungsrollen und Spezialtrupps werden
-                dafür ausgeschlossen. Vor der Entscheidung bleiben Rolle,
-                Truppbindung und Datenqualität zu prüfen.
+                Spielerzahl, Level und bereits vorhandene Werte der laufenden
+                Runde werden direkt ausgewertet. Frühere Runden oder eine
+                Lernphase sind nicht erforderlich. Führungsrollen und
+                Spezialtrupps bleiben von Vorschlägen ausgeschlossen.
               </Typography>
             </Box>
           </Collapse>
@@ -677,46 +667,30 @@ const AutobalancerCard = ({ onHighlightPlayers }) => {
             </Stack>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
               <Button
-                component={Link}
-                to="/views/autobalancer"
                 variant={insight.needsAttention ? "contained" : "outlined"}
-                disabled={insight.blocked}
+                disabled={insight.blocked || recommendations.length === 0}
+                onClick={() => {
+                  setSelectedRecommendation(0);
+                  setReviewOpen(true);
+                }}
               >
                 {swap
                   ? "Tausch prüfen"
                   : proposalName
                   ? "Wechsel prüfen"
-                  : "Dashboard öffnen"}
+                  : "Kein Eingriff nötig"}
               </Button>
               {alternativesAvailable && (
                 <Button
-                  component={Link}
-                  to="/views/autobalancer"
                   variant="outlined"
+                  onClick={() => {
+                    setSelectedRecommendation(
+                      Math.min(1, recommendations.length - 1)
+                    );
+                    setReviewOpen(true);
+                  }}
                 >
                   Alternativen
-                </Button>
-              )}
-              {status.mode === "manual" && status.phase === "proposed" && (
-                <Tooltip title="Gibt den bereits geprüften Vorschlag frei">
-                  <Button
-                    color="success"
-                    variant="outlined"
-                    disabled={approve.isPending}
-                    onClick={() => approve.mutate()}
-                  >
-                    Freigeben
-                  </Button>
-                </Tooltip>
-              )}
-              {status.incident_id && (
-                <Button
-                  color="warning"
-                  variant="outlined"
-                  disabled={cancel.isPending}
-                  onClick={() => cancel.mutate()}
-                >
-                  Abbrechen
                 </Button>
               )}
               <Button color="inherit" onClick={() => setExpanded(false)}>
@@ -726,6 +700,189 @@ const AutobalancerCard = ({ onHighlightPlayers }) => {
           </Stack>
         </Box>
       </Collapse>
+
+      <Dialog
+        open={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+        fullWidth
+        maxWidth="md"
+        aria-labelledby="live-balance-review-title"
+      >
+        <DialogTitle id="live-balance-review-title">
+          {swap ? "Live-Tausch prüfen" : "Live-Teamwechsel prüfen"}
+        </DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={1.5}>
+            <Alert severity="info" variant="outlined">
+              Grundlage ist ausschließlich der aktuelle Server-Snapshot. Es muss
+              keine Historie gesammelt werden. Ausgeführt wird erst nach der
+              regulären Sicherheitsbestätigung.
+            </Alert>
+
+            {recommendations.length > 1 && (
+              <Box>
+                <Typography
+                  variant="overline"
+                  color="text.secondary"
+                  sx={{ display: "block", mb: 0.75 }}
+                >
+                  Vorschlag auswählen
+                </Typography>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                  {recommendations.map((recommendation, index) => (
+                    <Button
+                      key={`${recommendation.stronger_player?.player_id}-${recommendation.weaker_player?.player_id}`}
+                      variant={
+                        selectedRecommendation === index
+                          ? "contained"
+                          : "outlined"
+                      }
+                      onClick={() => setSelectedRecommendation(index)}
+                      sx={{ borderRadius: 0, justifyContent: "flex-start" }}
+                    >
+                      {index === 0 ? "Beste Prognose" : `Alternative ${index}`}
+                    </Button>
+                  ))}
+                </Stack>
+              </Box>
+            )}
+
+            {activeRecommendation?.kind === "strength_swap" ? (
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                  border: "1px solid",
+                  borderColor: "divider",
+                }}
+              >
+                {[
+                  {
+                    player: activeRecommendation.stronger_player,
+                    target: activeRecommendation.weaker_team,
+                  },
+                  {
+                    player: activeRecommendation.weaker_player,
+                    target: activeRecommendation.stronger_team,
+                  },
+                ].map(({ player, target }, index) => (
+                  <Box
+                    key={player.player_id}
+                    sx={{
+                      p: 1.5,
+                      borderRight: { xs: 0, md: index === 0 ? "1px solid" : 0 },
+                      borderBottom: {
+                        xs: index === 0 ? "1px solid" : 0,
+                        md: 0,
+                      },
+                      borderColor: "divider",
+                    }}
+                  >
+                    <Typography variant="caption" color="text.secondary">
+                      {insight.teamLabels[player.team]} →{" "}
+                      {insight.teamLabels[target]}
+                    </Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                      {player.player_name}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {player.unit_name || "Kein Trupp"} ·{" "}
+                      {player.role || "Rolle unbekannt"}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Live-Stärke {formatRating(player.rating)} · Sicherheit{" "}
+                      {Math.round((player.rating_confidence || 0) * 100)} %
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            ) : activeRecommendation ? (
+              <Box sx={{ p: 1.5, border: "1px solid", borderColor: "divider" }}>
+                <Typography variant="caption" color="text.secondary">
+                  {insight.teamLabels[activeRecommendation.player.team]} →{" "}
+                  {insight.teamLabels[activeRecommendation.target_team]}
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                  {activeRecommendation.player.player_name}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {activeRecommendation.player.unit_name || "Kein Trupp"} ·{" "}
+                  {activeRecommendation.player.role || "Rolle unbekannt"}
+                </Typography>
+              </Box>
+            ) : null}
+
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" },
+                border: "1px solid",
+                borderColor: "divider",
+                "& > div": { p: 1.25 },
+                "& > div + div": {
+                  borderLeft: { sm: "1px solid" },
+                  borderTop: { xs: "1px solid", sm: 0 },
+                  borderColor: "divider",
+                },
+              }}
+            >
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Spielerzahl
+                </Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+                  {insight.counts.allies} : {insight.counts.axis}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Stärke vorher
+                </Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+                  {formatRating(activeRecommendation?.rating_gap_before)} Punkte
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Prognose danach
+                </Typography>
+                <Typography
+                  variant="subtitle1"
+                  sx={{ color: "success.main", fontWeight: 800 }}
+                >
+                  {formatRating(activeRecommendation?.projected_rating_gap)}{" "}
+                  Punkte
+                </Typography>
+              </Box>
+            </Box>
+
+            <Typography variant="caption" color="text.secondary">
+              Der Live-Assistent führt keinen automatischen Wechsel aus. Die
+              vorhandene Moderationsaktion prüft Berechtigung und Zielspieler
+              nochmals unmittelbar vor dem RCON-Befehl.
+            </Typography>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 1.5 }}>
+          <Button color="inherit" onClick={() => setReviewOpen(false)}>
+            Schließen
+          </Button>
+          {activeRecommendation && (
+            <ActionButton
+              action={Actions.SwitchPlayer}
+              recipients={actionRecipients}
+              label={
+                activeRecommendation.kind === "strength_swap"
+                  ? "Beide Teams wechseln"
+                  : "Spieler jetzt wechseln"
+              }
+              variant="contained"
+              onBeforeAction={() => setReviewOpen(false)}
+              sx={{ minHeight: 40 }}
+            />
+          )}
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

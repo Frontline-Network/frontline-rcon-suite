@@ -6,6 +6,7 @@
 - Browsergerenderte Implementierung: `.tmp/product-audit/autobalancer/06-live-balance-implementation.png` (1280 × 720 px, CSS-Viewport 1280 × 720, Browser-Dichte 1).
 - Gemeinsamer Vergleichseingang: `.tmp/product-audit/autobalancer/08-design-qa-comparison.png`. Beide Ansichten wurden proportional auf maximal 1280 × 895 px normalisiert und im selben Bild verglichen.
 - Fokusbeleg für die vorgeschlagenen Spieler: `.tmp/product-audit/autobalancer/07-live-balance-roster-highlights.png` (1280 × 720 px).
+- Inline-Prüfung in der Teamansicht: `.tmp/product-audit/autobalancer/09-inline-live-review.png` (2353 × 1272 px).
 - Zustand: dunkles Frontline-Theme, deutsche Sprache, Demo-Server 2, 49:49 Spieler, Achsenmächte mit höherer geschätzter Teamstärke, belastbarer 1:1-Tauschvorschlag.
 
 ## Full-View-Vergleich
@@ -28,14 +29,16 @@ Nach dem Öffnen beider Trupps werden `FLN_Wolf` und `FLN_Falcon` in ihren tats�
 - Farben und Tokens: Frontline-Gold, semantisches Rot/Grün und die vorhandenen Teamfarben werden aus Theme beziehungsweise etablierten Teamwerten abgeleitet. Status wird zusätzlich durch Text, Icons und Richtungspfeile vermittelt.
 - Bild- und Assetqualität: Es sind keine neuen Rasterbilder oder Platzhalter erforderlich. Für UI-Symbole werden ausschließlich vorhandene MUI-Icons verwendet; die Teamstärkebalken sind echte Datenvisualisierungen.
 - Copy und Inhalt: Spielerzahl und Teamstärke werden ausdrücklich getrennt bewertet. Die Oberfläche erklärt, dass ein 1:1-Tausch nur eine Moderator-Empfehlung ist und niemals automatisch ausgeführt wird.
+- Datenquelle: Spielerzahl, Level und Leistungswerte stammen ausschließlich aus dem aktuellen `get_team_view`-Snapshot. Die Teamstärke ist sofort verfügbar und benötigt weder historische Runden noch eine vorgelagerte Lern- oder Sammelphase.
 
 ## Interaktionen und technische Evidenz
 
 - „Warum?“ öffnet die fachliche Erklärung; „Beobachten“ reduziert die Einsatzleiste; „Öffnen“ stellt sie wieder her.
-- „Tausch prüfen“ navigiert auf `/views/autobalancer`; Browser-Rückkehr stellt `/views/team` wieder her.
+- „Tausch prüfen“ öffnet eine Inline-Prüfung mit Kandidaten, Alternativen, Vorher-/Nachher-Prognose und Datenquelle. Die URL bleibt dabei auf `/views/team`.
+- „Beide Teams wechseln“ übergibt die zwei geprüften Spieler an die vorhandene Teamwechsel-Aktion. Deren Berechtigungsprüfung und zweistufige Sicherheitsbestätigung bleiben vollständig erhalten; im QA-Lauf wurde vor der Ausführung abgebrochen.
 - Beide vorgeschlagenen Spieler wurden nach Öffnen der Trupps sichtbar und korrekt nach Zielteam eingefärbt.
 - Browserkonsole: keine Warnungen oder Fehler im Abschlusslauf.
-- Python: 46 Autobalancer-Planer-/Service-Tests bestanden.
+- Live-Balance-Vertragsprüfung: sofortiger Level-Fallback ohne Historie, Führungsrollenausschluss und Live-Teamwechselvorschlag bestanden.
 - Vite-Produktionsbuild: bestanden; nur die bekannte Chunk-Größenwarnung bleibt bestehen.
 - Designfundament, Seitensemantik und Adminaktionsvertrag: bestanden. `git diff --check`: bestanden.
 
@@ -43,7 +46,7 @@ Nach dem Öffnen beider Trupps werden `FLN_Wolf` und `FLN_Falcon` in ihren tats�
 
 1. Der erste gemeinsame Source-/Implementierungsvergleich zeigte keine umsetzungsbedingten P0-, P1- oder P2-Abweichungen.
 2. Die bewusst kleinere Browserhöhe wurde mit einem separaten Fokusbeleg der geöffneten Teamlisten ergänzt; Kandidatenmarkierung und Richtung sind dort vollständig sichtbar.
-3. Nach Interaktions-, Navigations- und Konsolenprüfung blieben keine blockierenden oder mittleren Findings offen.
+3. Die Detailnavigation wurde durch den Inline-Review ersetzt. Nach Dialog-, Aktions-, URL- und Konsolenprüfung blieben keine blockierenden oder mittleren Findings offen.
 
 ## Implementation Checklist
 
@@ -51,7 +54,8 @@ Nach dem Öffnen beider Trupps werden `FLN_Wolf` und `FLN_Falcon` in ihren tats�
 - [x] Review-only 1:1-Tausch ohne automatische Ausführung ergänzt.
 - [x] Führungsrollen und Spezialtrupps aus der Stärkeempfehlung ausgeschlossen.
 - [x] Kandidaten in der Teamliste hervorgehoben.
-- [x] Erklärung, Ein-/Ausklappen und Detailnavigation geprüft.
+- [x] Erklärung, Ein-/Ausklappen, Inline-Review und direkte Moderationsaktion geprüft.
+- [x] Sofortberechnung ausschließlich aus dem aktuellen Live-Snapshot geprüft.
 - [x] Source und Implementierung in einem gemeinsamen Vergleichseingang beurteilt.
 
 final result: passed
