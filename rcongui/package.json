@@ -34,6 +34,7 @@
     "check:navigation-shell": "node scripts/check-navigation-shell.mjs",
     "check:config-workbench": "node scripts/check-configuration-workbench.mjs",
     "check:communication-workbench": "node scripts/check-communication-workbench.mjs",
+    "check:history-workbench": "node scripts/check-history-workbench.mjs",
     "format:write": "prettier src/ --write",
     "lint": "eslint src/"
   },

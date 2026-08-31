@@ -1,3 +1,44 @@
+# Design QA · Phase 5 – Systemdiagnose, Protokolle und Spielarchiv
+
+## Prüfgrundlage
+
+- Source Visual Truth: `.codex/audits/full-rcon-concept/screenshots/desktop/games.png` sowie die bereits freigegebenen Arbeitsflächen für Dienste, Gameserver, CRCON, Steam, Log-Stream, Killrate, Spielprotokolle und Audit-Protokolle. Maßgeblich sind außerdem die Seitenziele 66–75 in `docs/product-design/rcon-product-concept.md`.
+- Implementierung: `.codex/phase5-after/desktop-games-1280x720.png`, `.codex/phase5-after/mobile-games-390x844.png`, `.codex/phase5-after/desktop-games-saved-views-dialog-1280x720.png`, `.codex/phase5-after/mobile-games-saved-views-dialog-390x844.png` und `.codex/phase5-after/desktop-games-light-deuteranopia-1280x720.png`.
+- Same-State-Vergleich: `.codex/phase5-after/compare-desktop-games.png`; Ausgangszustand und finale Implementierung liegen dort ohne Skalierung nebeneinander.
+- Viewports: Desktop 1280 × 720, Mobile 390 × 844, jeweils Browser-Dichte 1. Primärzustand: dunkles Frontline-Theme, deutsche Sprache und lokaler Fake-Server. Zusätzlich wurde Hell plus Deuteranopie geprüft und anschließend wieder auf Dunkel plus Standard zurückgestellt.
+
+## Ergebnis
+
+Die zehn Abschlussrouten behalten ihre bereits freigegebenen Diagnose-, Protokoll- und Detailstrukturen. Im Spielearchiv ergänzt eine neue, zurückhaltende „Ansichten“-Aktion die bestehenden Filter. Nutzer können Suchbegriff, Zeitraum, Umgebung und Spielmodus als benannte Ansicht sichern, wieder anwenden und löschen. Die Ansichten bleiben absichtlich browserlokal: Es gibt keine Servermutation, keine neue API und keine Änderung des bestehenden Archivvertrags.
+
+Auf Mobilgeräten öffnet sich die Ansichtenverwaltung als vollständige Arbeitsfläche. Auf Desktop bleibt sie ein kompakter Dialog. Aktive Ansichten werden am Auslöser und in der Liste zusätzlich als Text beziehungsweise `aria-pressed` ausgewiesen; Zustand wird nicht nur über Farbe vermittelt.
+
+## Findings
+
+- Keine offenen P0-, P1- oder P2-Abweichungen.
+- [behoben] [P1] Das Spielearchiv verwendete im hellen Theme noch fest codierte dunkle Flächen und Rahmen. Dadurch stand dunkler Text auf einem zu dunklen Hintergrund. Archiv, Gruppenzeilen, Hover und Fokus verwenden jetzt die Theme-Tokens `background.paper`, `divider`, `action.hover` und `action.selected`.
+- [behoben] [P2] Das Spielarchiv besaß zwar Filter, aber keine wiederverwendbaren Arbeitsansichten. Bis zu zwölf normalisierte Filteransichten können nun lokal gespeichert werden; beschädigte oder veraltete Browserdaten fallen sicher auf eine leere Liste zurück.
+- [P3] Die lokale Entwicklungsumgebung protokolliert ausschließlich die bekannte React-Router-v7-Future-Flag-Warnung. Es traten keine Console-Errors und kein Runtime-Fehleroverlay auf.
+
+## Responsivität, Semantik und Interaktion
+
+- Alle zehn Routen wurden bei 1280 × 720 und 390 × 844 geprüft: `/settings/services`, `/settings/others/game-server`, `/settings/others/crcon`, `/settings/others/steam`, `/settings/others/log-stream`, `/settings/others/watch-kill-rate`, `/records/game-logs`, `/records/audit-logs`, `/stats/games` und `/stats/games/fln-demo-1`.
+- Jede Route besitzt genau eine `h1`, geladenen Hauptinhalt, keinen horizontalen Dokument- oder Hauptinhaltsüberlauf und keine Browser-Laufzeitfehler. Die vollständige Matrix umfasst 20 bestandene Browserprüfungen.
+- Eine gefüllte mobile Ansichtenverwaltung mit „Letzte Nacht“ wurde zusätzlich auf Speichern, sichtbare Listendarstellung, Löschen und horizontalen Überlauf geprüft. Nach dem Test blieb keine Testansicht zurück.
+- Namen sind auf 120 Zeichen begrenzt, doppelte Namen werden ohne zusätzliche Listenzeile aktualisiert und die Anzahl ist auf zwölf Ansichten begrenzt. Zeitraum, Umgebung, Modus und Suche werden vor Speicherung normalisiert.
+- Dialog, Eingabe, Anwenden- und Löschen-Aktionen besitzen zugängliche Namen. Mobile nutzt den vollständigen 390 × 844 Viewport ohne Überlauf; Desktop und Mobile bleiben in der eckigen Frontline-Formensprache.
+
+## Automatisierte Evidenz
+
+- Produktionsbuild mit `REACT_APP_API_URL=/api/`: bestanden; 14.146 Module transformiert.
+- Zehn Vertragsprüfungen bestanden: Designfundament, Seitensemantik, Aktionsfeedback, Operator-Copy, Navigation, Configuration Workbench, Konfigurationskompatibilität, Adminaktionen, Communication Workbench und History Workbench.
+- Browsermatrix: 20/20 Abschlussrouten bestanden; zusätzlicher gefüllter Mobile-Dialog bestanden.
+- Initial Entry: 400,82 kB raw / 121,48 kB gzip; initiales JavaScript: 1.498,98 kB raw / 480,25 kB gzip. Das neue Spielearchiv bleibt lazy geladen (`games`: 18,73 kB raw / 6,36 kB gzip).
+
+final result: passed
+
+---
+
 # Design QA · Phase 4.3 – Kommunikation und Integrationen
 
 ## Prüfgrundlage

@@ -17,6 +17,7 @@ import {
   useTheme,
 } from "@mui/material";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import BookmarkBorderOutlinedIcon from "@mui/icons-material/BookmarkBorderOutlined";
 import MapOutlinedIcon from "@mui/icons-material/MapOutlined";
 import RadioButtonCheckedIcon from "@mui/icons-material/RadioButtonChecked";
 import ReplayIcon from "@mui/icons-material/Replay";
@@ -27,8 +28,16 @@ import { Link, useSearchParams } from "react-router-dom";
 import { getGameDuration } from "@/utils/lib";
 import { getMapEnvironmentLabel, getMapModeLabel } from "@/utils/mapLabels";
 import NavPagination from "./nav-pagination";
+import { SavedGameViewsDialog } from "./saved-views-dialog";
+import {
+  areGameViewFiltersEqual,
+  loadSavedGameViews,
+  persistSavedGameViews,
+  removeSavedGameView,
+  upsertSavedGameView,
+} from "./saved-game-views";
 
-const JOURNAL_BORDER = "rgba(214, 184, 112, 0.2)";
+const JOURNAL_BORDER = "divider";
 
 function GameMapThumbnail({ game }) {
   const [failed, setFailed] = useState(false);
@@ -139,6 +148,8 @@ export function GameListTable({
   const [period, setPeriod] = useState("all");
   const [environment, setEnvironment] = useState("all");
   const [mode, setMode] = useState("all");
+  const [savedViewsOpen, setSavedViewsOpen] = useState(false);
+  const [savedViews, setSavedViews] = useState(() => loadSavedGameViews());
 
   const safeGames = Array.isArray(games) ? games : [];
   const modeOptions = useMemo(
@@ -228,19 +239,46 @@ export function GameListTable({
   const rangeEnd = Math.min(page * pageSize, total);
   const hasFilters =
     search || period !== "all" || environment !== "all" || mode !== "all";
+  const currentFilters = useMemo(
+    () => ({ search, period, environment, mode }),
+    [environment, mode, period, search]
+  );
+  const activeSavedView = useMemo(
+    () =>
+      savedViews.find((view) =>
+        areGameViewFiltersEqual(view.filters, currentFilters)
+      ),
+    [currentFilters, savedViews]
+  );
+
+  const updateSavedViews = (update) => {
+    setSavedViews((current) => {
+      const next = update(current);
+      return persistSavedGameViews(next);
+    });
+  };
+
+  const applySavedView = (filters) => {
+    setSearch(filters.search);
+    setPeriod(filters.period);
+    setEnvironment(filters.environment);
+    setMode(filters.mode);
+    setSavedViewsOpen(false);
+  };
 
   return (
-    <Box
-      component="section"
-      aria-label={t("stats.games.archive")}
-      aria-busy={isFetching}
-      sx={{
-        border: "1px solid",
-        borderColor: JOURNAL_BORDER,
-        bgcolor: "rgba(8, 12, 9, 0.78)",
-        overflow: "hidden",
-      }}
-    >
+    <>
+      <Box
+        component="section"
+        aria-label={t("stats.games.archive")}
+        aria-busy={isFetching}
+        sx={{
+          border: "1px solid",
+          borderColor: JOURNAL_BORDER,
+          bgcolor: "background.paper",
+          overflow: "hidden",
+        }}
+      >
       <Stack
         direction={{ xs: "column", lg: "row" }}
         sx={{ borderBottom: "1px solid", borderColor: JOURNAL_BORDER }}
@@ -316,6 +354,27 @@ export function GameListTable({
               ))}
             </Select>
           </FormControl>
+          <Button
+            startIcon={<BookmarkBorderOutlinedIcon />}
+            aria-haspopup="dialog"
+            aria-expanded={savedViewsOpen}
+            onClick={() => setSavedViewsOpen(true)}
+            sx={{
+              minHeight: 46,
+              minWidth: 154,
+              borderRadius: 0,
+              borderLeft: "1px solid",
+              borderColor: JOURNAL_BORDER,
+            }}
+          >
+            {activeSavedView
+              ? t("stats.games.activeSavedView", {
+                  name: activeSavedView.name,
+                })
+              : t("stats.games.savedViewsButton", {
+                  count: savedViews.length,
+                })}
+          </Button>
           <Button
             startIcon={<ReplayIcon />}
             onClick={resetFilters}
@@ -422,7 +481,7 @@ export function GameListTable({
                 sx={{
                   minHeight: 36,
                   px: 1.5,
-                  bgcolor: "rgba(255,255,255,0.015)",
+                  bgcolor: "action.hover",
                   borderBottom: "1px solid",
                   borderColor: JOURNAL_BORDER,
                   position: { xs: "sticky", md: "static" },
@@ -497,13 +556,13 @@ export function GameListTable({
                       borderColor: JOURNAL_BORDER,
                       color: "text.primary",
                       "&:hover": {
-                        bgcolor: "rgba(214, 184, 112, 0.06)",
+                        bgcolor: "action.hover",
                       },
                       "&:focus-visible": {
                         outline: "2px solid",
                         outlineColor: "primary.main",
                         outlineOffset: -2,
-                        bgcolor: "rgba(214, 184, 112, 0.08)",
+                        bgcolor: "action.selected",
                       },
                     }}
                   >
@@ -699,6 +758,24 @@ export function GameListTable({
           </FormControl>
         </Stack>
       </Stack>
-    </Box>
+      </Box>
+
+      <SavedGameViewsDialog
+        open={savedViewsOpen}
+        onClose={() => setSavedViewsOpen(false)}
+        currentFilters={currentFilters}
+        activeViewId={activeSavedView?.id}
+        savedViews={savedViews}
+        onSave={(name) =>
+          updateSavedViews((current) =>
+            upsertSavedGameView(current, name, currentFilters)
+          )
+        }
+        onApply={applySavedView}
+        onDelete={(id) =>
+          updateSavedViews((current) => removeSavedGameView(current, id))
+        }
+      />
+    </>
   );
 }
