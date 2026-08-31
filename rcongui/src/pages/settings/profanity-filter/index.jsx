@@ -381,9 +381,9 @@ const ProfanityFilter = () => {
                 inputProps={{
                   "aria-label": t("settings.profanity.selectVisible"),
                 }}
-                sx={{ justifySelf: "start" }}
+                sx={{ justifySelf: "center" }}
               />
-              <Typography variant="subtitle2" sx={{ pl: 0.5 }}>
+              <Typography variant="subtitle2" sx={{ pl: 1 }}>
                 {t("settings.profanity.selectVisible")}
               </Typography>
               <Button
@@ -440,7 +440,13 @@ const ProfanityFilter = () => {
                         onClick={handleToggle(word)}
                         sx={{ minHeight: "100%", px: 1.5, pr: 8 }}
                       >
-                        <ListItemIcon sx={{ minWidth: 44 }}>
+                        <ListItemIcon
+                          sx={{
+                            width: 44,
+                            minWidth: 44,
+                            justifyContent: "center",
+                          }}
+                        >
                           <Checkbox
                             size="small"
                             checked={selected}
