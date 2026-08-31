@@ -28,6 +28,7 @@
     "check:config-compatibility": "node scripts/check-config-form-compatibility.mjs",
     "check:polling": "node scripts/check-polling-budget.mjs",
     "check:teamkill-risk": "node scripts/check-teamkill-risk.mjs",
+    "check:design-foundation": "node scripts/check-design-foundation.mjs",
     "format:write": "prettier src/ --write",
     "lint": "eslint src/"
   },

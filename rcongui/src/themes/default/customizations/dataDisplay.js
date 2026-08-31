@@ -92,7 +92,11 @@ export const dataDisplayCustomizations = ({ gray, green, red }) => ({
     styleOverrides: {
       root: ({ theme }) => ({
         border: '1px solid',
-        borderRadius: '999px',
+        borderRadius: theme.shape.borderRadius,
+        '&.Mui-focusVisible': {
+          outline: `2px solid ${alpha(theme.palette.primary.main, 0.72)}`,
+          outlineOffset: 2,
+        },
         [`& .${chipClasses.label}`]: {
           fontWeight: 600,
         },

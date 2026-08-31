@@ -33,7 +33,7 @@ export const surfacesCustomizations = () => ({
     styleOverrides: {
       root: ({ theme }) => ({
         border: 'none',
-        borderRadius: 8,
+        borderRadius: theme.shape.borderRadius,
         '&:hover': { backgroundColor: theme.palette.action.hover },
         '&:focus-visible': { backgroundColor: 'transparent' },
       }),
