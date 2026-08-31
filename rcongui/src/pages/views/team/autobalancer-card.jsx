@@ -817,22 +817,120 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
 
             <Box
               sx={{
-                p: 1.25,
                 borderLeft: "3px solid",
                 borderColor: "info.main",
                 bgcolor: (theme) => alpha(theme.palette.info.main, 0.06),
               }}
             >
-              <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                Was bedeutet der Stärke-Index?
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Er ist eine Vergleichsskala von 0 bis 100 für die aktuell
-                verbundenen Spieler. 50 entspricht dem momentanen
-                Server-Durchschnitt; ein höherer Wert bedeutet eine stärkere
-                aktuelle Einschätzung. Berechnet wird er aus Spielerlevel und
-                den bereits vorhandenen Werten dieser Runde – er ist kein
-                offizieller Rang des Gameservers.
+              <Box sx={{ p: 1.25 }}>
+                <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                  Was bedeutet der Stärke-Index?
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Er vergleicht ausschließlich die Spieler, die jetzt auf diesem
+                  Server verbunden sind. Der Wert ist kein offizieller Rang und
+                  keine dauerhafte Bewertung eines Spielers.
+                </Typography>
+              </Box>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)" },
+                  borderTop: "1px solid",
+                  borderColor: "divider",
+                  "& > div": { p: 1.25 },
+                  "& > div:nth-of-type(even)": {
+                    borderLeft: { md: "1px solid" },
+                    borderColor: "divider",
+                  },
+                  "& > div:nth-of-type(n+2)": {
+                    borderTop: { xs: "1px solid", md: 0 },
+                    borderColor: "divider",
+                  },
+                  "& > div:nth-of-type(n+3)": {
+                    borderTop: { md: "1px solid" },
+                    borderColor: "divider",
+                  },
+                }}
+              >
+                <Box>
+                  <Typography
+                    variant="overline"
+                    color="text.secondary"
+                    sx={{ display: "block" }}
+                  >
+                    So liest du den Wert
+                  </Typography>
+                  <Typography variant="caption">
+                    0 steht für das untere, 100 für das obere Ende des aktuellen
+                    Spielerfeldes. 50 ist die Mitte dieses Feldes. Der Index
+                    lässt sich deshalb nur innerhalb des gerade laufenden
+                    Servers vergleichen.
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography
+                    variant="overline"
+                    color="text.secondary"
+                    sx={{ display: "block" }}
+                  >
+                    So wird er berechnet
+                  </Typography>
+                  <Typography variant="caption">
+                    Sobald Rundenwerte vorliegen, zählen das Spielerlevel zu 45
+                    % und die aktuelle Rundenleistung zu 55 %. Dafür werden
+                    Kills, Kampfwert sowie Offensive, Defensive und Support pro
+                    Minute miteinander verglichen.
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography
+                    variant="overline"
+                    color="text.secondary"
+                    sx={{ display: "block" }}
+                  >
+                    So entsteht die Teamstärke
+                  </Typography>
+                  <Typography variant="caption">
+                    Die Indizes aller Spieler eines Teams werden gemittelt.
+                    Stehen die Teams beispielsweise bei 53 zu 47, beträgt der
+                    Team-Abstand 6 Indexpunkte. Je näher der Abstand an 0 liegt,
+                    desto ähnlicher ist die geschätzte Teamstärke.
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography
+                    variant="overline"
+                    color="text.secondary"
+                    sx={{ display: "block" }}
+                  >
+                    Was bedeutet Aussagekraft?
+                  </Typography>
+                  <Typography variant="caption">
+                    Ohne verwertbare Rundenwerte dient das Level sofort als
+                    vorläufige Schätzung. Ist ein Level vorhanden, startet die
+                    Aussagekraft bei 65 % und steigt mit Live-Werten während der
+                    ersten 15 Spielminuten auf bis zu 100 %. Fehlt auch das
+                    Level, wird die Aussagekraft entsprechend niedriger
+                    ausgewiesen. Früh in der Runde sollte der Vorschlag daher
+                    vorsichtiger bewertet werden.
+                  </Typography>
+                </Box>
+              </Box>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{
+                  display: "block",
+                  p: 1.25,
+                  borderTop: "1px solid",
+                  borderColor: "divider",
+                }}
+              >
+                Nicht einbezogen werden frühere Runden, Siege,
+                Clan-Zugehörigkeit, VIP-Status oder Moderationsmaßnahmen.
+                Führungsrollen und Spezialtrupps zählen zur Teamstärke, werden
+                aber nicht als Tausch-Kandidaten vorgeschlagen.
               </Typography>
             </Box>
 
