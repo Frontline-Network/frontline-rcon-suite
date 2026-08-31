@@ -48,6 +48,64 @@ final result: passed
 
 ---
 
+# Design QA · Phase 2.1 Meldungsleitstelle
+
+## Vergleichsziel
+
+- Source Visual Truth: `.codex/phase2-baseline/incidents-desktop.png` (1440 × 900) und `.codex/phase2-baseline/incidents-mobile.png` (390 × 844), ergänzt um die Leitstellenanforderungen in `docs/product-design/rcon-product-concept.md`.
+- Implementierung: `.codex/phase2-baseline/incidents-after-desktop-final.png`, `.codex/phase2-baseline/incidents-after-mobile.png` und der fokussierte mobile Bearbeitungszustand `.codex/phase2-baseline/incidents-detail-mobile-final-viewport.png`.
+- Primärer Zustand: Frontline Gold, dunkler Modus, Standard-Farbsehen, neue Meldung ausgewählt; realistische Mirage-Demodaten mit drei Statuszuständen.
+
+## Normalisierung
+
+- Desktop-Source und Desktop-Implementierung: jeweils 1440 × 900 Pixel bei 1440 × 900 CSS-Pixeln, Browser-Dichte 1.
+- Mobile-Source und Mobile-Implementierung: jeweils 390 × 844 Pixel bei 390 × 844 CSS-Pixeln, Browser-Dichte 1.
+- Die Vorher-/Nachher-Paare wurden jeweils gemeinsam in einem Vergleichsinput geöffnet. Browser-Chrome und externe Canvas-Flächen sind nicht Bestandteil der Screenshots.
+
+## Full-View-Vergleich
+
+Die globale Frontline-Shell, die kondensierte Typografie, die eckigen Flächen, feinen Trenner und die Gold-/Grün-Dunkel-Tonalität bleiben unverändert. Die frühere einspaltige Desktop-Liste wurde innerhalb dieser vorhandenen Sprache zu einer Leitstellenansicht erweitert: kompakte Lagekennzahlen, Einsatzwarteschlange und dauerhaft sichtbarer Vorgangskontext bilden nun eine klare Beobachten–Entscheiden–Handeln-Hierarchie. Auf Mobile ersetzt eine vollständig beschriftete Statusauswahl die zuvor rechts abgeschnittene Tabreihe. Dadurch bleibt die Filteraufgabe bei 390 Pixeln vollständig bedienbar, ohne horizontales Scrollen oder verborgene Ziele.
+
+## Fokusvergleich
+
+Der mobile Bearbeitungsdialog wurde separat bei 390 × 844 geprüft. Titel, Status, Server, Alter, Quelle, Meldungsgrund, Zuständigkeit, Zeitpunkte, Originalmeldung, nächster Schritt und alle zulässigen Aktionen sind innerhalb eines einzigen vertikalen Vorgangs lesbar. Die Aktionsflächen besitzen mindestens 44 Pixel Höhe, bleiben eckig und nutzen ausschließlich die vorhandene MUI-Iconfamilie. Für den früheren mobilen Detaildialog lag kein belastbares Source-Capture vor; deshalb wurde dieser Fokuszustand gegen die vorhandenen Frontline-Dialog-, Button-, Typografie- und Tokenmuster geprüft.
+
+## Findings
+
+- Keine verbleibenden P0-, P1- oder P2-Abweichungen.
+- [P3] Der Auto-Update-Chip ist bewusst kompakt und vermittelt seinen Zustand zusätzlich über den Text „Live · 15 s“; das kleine Statussymbol ist im dunklen Theme optisch zurückhaltend. Eine stärkere Hervorhebung ist nicht erforderlich, solange die Aktualisierung normal arbeitet.
+
+## Pflichtflächen
+
+- Fonts und Typografie: vorhandene Bahnschrift-/Arial-Narrow-Hierarchie, Gewichte, Großbuchstaben, Laufweiten und Body-Schrift bleiben erhalten. Seitentitel, Warteschlange, Vorgangstitel, Metadaten und Aktionen sind eindeutig abgestuft.
+- Spacing und Layout: 4er-Kennzahlenraster, 0,9/1,1-Desktop-Split, 16-Pixel-Arbeitsabstände, eckige Rahmen und 44-Pixel-Touchziele erzeugen eine dichte, aber scanbare Leitstellenoberfläche. Mobile besitzt bei 390 × 844 einen Dokument-`scrollWidth` von 390 Pixeln bei 390 Pixeln `clientWidth`.
+- Farben und Tokens: ausschließlich vorhandene Theme-, Divider-, Action- und semantische Statusfarben. Helles Theme sowie Deuteranopie wurden über die echte Darstellungsoberfläche angewendet; Text, Symbol und Umrandung bleiben redundante Zustandsträger. Anschließend wurde der Frontline-Standard wiederhergestellt.
+- Bild- und Assetqualität: Für diesen datengetriebenen Arbeitsbereich sind keine Produktbilder vorgesehen. Frontline-Logo und etablierte MUI-Icons werden unverändert wiederverwendet; keine CSS-Zeichnungen, Platzhalter oder nachgebauten SVGs.
+- Copy und Inhalt: „Einsatzwarteschlange“, „Aktiver Vorgang“ und „Nächster Schritt“ erklären Aufgabe und Arbeitsrichtung. Quelle, Eingang, Aktualisierung und Originalmeldung bleiben nachvollziehbar; Deutsch und Englisch wurden ergänzt.
+- Zustände und Interaktionen: Laden, Leer, Fehler, Auswahl, Live-Aktualisierung, Statusfilter, Übernehmen, Ablehnen mit Bestätigung, Abschließen und geschlossener Verlauf bleiben erhalten. „Übernehmen“ wurde gegen den unveränderten API-Vertrag erfolgreich ausgeführt.
+- Accessibility: genau eine H1; Warteschlange und Detailbereich besitzen beschriftete Regionen; Filter-Select, Dialog und Aktionen haben zugängliche Namen. Escape schließt den mobilen Dialog. Status wird nicht allein über Farbe vermittelt.
+- Browserfehler: null Console-Errors. Es bleibt ausschließlich die bekannte React-Router-v7-Future-Flag-Warnung im Entwicklungsmodus.
+
+## Vergleichshistorie
+
+1. Erster Desktop-Vergleich: [P2] „Übernommen 1“ brach im fünffach geteilten Statusfilter zweizeilig um und störte den horizontalen Rhythmus.
+2. Fix: Tab-Inhalte auf eine Zeile begrenzt und horizontales Innenpadding verdichtet, ohne Zielgröße oder Beschriftung zu verkleinern.
+3. Zweiter Desktop-Vergleich bei identischen 1440 × 900: alle fünf Statusziele stehen einzeilig und gleichmäßig; keine offenen P0/P1/P2-Befunde.
+4. Mobile Vorher-/Nachher-Vergleich bei identischen 390 × 844: die abgeschnittene Tabnavigation ist durch eine vollständige, beschriftete Auswahl ersetzt; kein horizontaler Überlauf.
+
+## Implementation Checklist
+
+- [x] Source und Umsetzung bei identischen Desktop- und Mobile-Viewports verglichen.
+- [x] Desktop-Warteschlange und permanenter Vorgangskontext geprüft.
+- [x] Mobile Statusauswahl und Vollbildbearbeitung geprüft.
+- [x] Statusmutation, Escape, Theme und Farbsehmodus geprüft.
+- [x] Production Build erfolgreich; keine neuen Console-Errors.
+- [x] Keine offenen P0-, P1- oder P2-Findings.
+
+final result: passed
+
+---
+
 # Design QA: Konsolen-Admins, Option 1 „Berechtigungsregister“
 
 ## Prüfgrundlage

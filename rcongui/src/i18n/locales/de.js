@@ -5101,6 +5101,40 @@ const deMasterFallback = {
     "eyebrow": "Moderation",
     "title": "Meldungen",
     "subtitle": "Admin-Reports serverübergreifend übernehmen, bearbeiten und abschließen.",
+    "liveUpdates": "Live · 15 s",
+    "summary": "Zusammenfassung der offenen Meldungen",
+    "metrics": {
+      "open": "Offen",
+      "unassigned": "Nicht zugewiesen",
+      "servers": "Betroffene Server",
+      "oldest": "Älteste Meldung"
+    },
+    "queue": {
+      "title": "Einsatzwarteschlange",
+      "description": "Nach Dringlichkeit sichten und zur Bearbeitung übernehmen."
+    },
+    "detail": {
+      "panel": "Meldungsdetails",
+      "eyebrow": "Aktiver Vorgang",
+      "mobileTitle": "Meldung bearbeiten",
+      "received": "Eingang",
+      "original": "Originalmeldung",
+      "nextAction": "Nächster Schritt",
+      "emptyTitle": "Meldung auswählen",
+      "emptyDescription": "Wähle links einen Vorgang, um Kontext und Aktionen zu öffnen.",
+      "completedHint": "Dieser Vorgang ist abgeschlossen und bleibt im Verlauf nachvollziehbar."
+    },
+    "nextStep": {
+      "claim": "Vorgang übernehmen, Spielkontext prüfen und Maßnahme festlegen.",
+      "resolve": "Prüfung abschließen oder die Meldung mit Begründung ablehnen.",
+      "review": "Abschluss und Bearbeitungsverlauf prüfen."
+    },
+    "sources": {
+      "chat": "Spielchat",
+      "manual": "Manuell",
+      "discord": "Discord",
+      "unknown": "Unbekannte Quelle"
+    },
     "filters": "Meldungen filtern",
     "tabs": {
       "new": "Neu",

@@ -5055,6 +5055,40 @@ const enMasterFallback = {
     "eyebrow": "Moderation",
     "title": "Reports",
     "subtitle": "Claim, process and resolve admin reports across servers.",
+    "liveUpdates": "Live · 15 s",
+    "summary": "Summary of open reports",
+    "metrics": {
+      "open": "Open",
+      "unassigned": "Unassigned",
+      "servers": "Affected servers",
+      "oldest": "Oldest report"
+    },
+    "queue": {
+      "title": "Operations queue",
+      "description": "Review by urgency and claim reports for processing."
+    },
+    "detail": {
+      "panel": "Report details",
+      "eyebrow": "Active case",
+      "mobileTitle": "Process report",
+      "received": "Received",
+      "original": "Original report",
+      "nextAction": "Next step",
+      "emptyTitle": "Select a report",
+      "emptyDescription": "Select a case on the left to open context and actions.",
+      "completedHint": "This case is closed and remains available in the audit trail."
+    },
+    "nextStep": {
+      "claim": "Claim the case, review game context and decide on an action.",
+      "resolve": "Complete the review or dismiss the report with a reason.",
+      "review": "Review the outcome and handling history."
+    },
+    "sources": {
+      "chat": "Game chat",
+      "manual": "Manual",
+      "discord": "Discord",
+      "unknown": "Unknown source"
+    },
     "filters": "Filter reports",
     "tabs": {
       "new": "New",

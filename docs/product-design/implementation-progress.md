@@ -137,3 +137,48 @@ Das Paket ist vollständig frontend- und konfigurationsneutral. Es kann als einz
 ### Rückrollbarkeit
 
 Das Paket ist frontend-, datenbank- und konfigurationsneutral. Es erfordert weder Backup noch Migration und kann als einzelner Git-Commit mit `git revert` zurückgenommen werden. Es wurde weder gepusht noch veröffentlicht, als PR eröffnet, ausgerollt oder auf einer Produktionsinstanz aktiviert.
+
+## Phase 2 · P0-Inventur der betrieblichen Kernpfade
+
+### Routen, Komponenten und Datenverträge
+
+- Meldungen: `/incidents` verwendet React Query mit `GET_MOBILE_INCIDENTS` im 15-Sekunden-Takt und `UPDATE_MOBILE_INCIDENT` mit unveränderter Incident-ID, Operation und Revision.
+- Live-Betrieb: `/views/live` verwendet die bestehenden Live-Spieler-, Spielstatus-, Serveraktions- und Protokollkomponenten. Tabellen-, Aktions- und Logverträge bleiben getrennt und werden in späteren Phase-2-Paketen konsolidiert.
+- Spieler und Moderation: `/records/players` sowie die Spieler-Detailrouten verwenden weiterhin `GET_PLAYERS_RECORDS`, `GET_BANS`, URL-basierte Filter und die zentrale `ActionBar`.
+- Sperrlisten: `/records/blacklists` und `/records/blacklists/manage` behalten ihre bestehenden Loader, Suchparameter, Zuweisungsaktionen und Synchronisationskomponenten.
+- Dienste: `/settings/services` verwendet den Router-Loader für Dienste, Dead Letters, Diagnosevorschau und Operational Health sowie die bestehende POST-Action für `TOGGLE_SERVICE`.
+- Spiel- und Audit-Protokolle: `/records/game-logs` und `/records/audit-logs` verwenden weiterhin URL-basierte Filter, unveränderte Loader-Kommandos und bestehende Exportfunktionen.
+- Ausgangslage: alle priorisierten Routen wurden im Fake-Modus bei 1440 × 900 und 390 × 844 visuell erfasst. Jede vollständig geladene Route besitzt genau eine H1; der sichtbarste verpflichtende Mobile-Überlauf bestand in der abgeschnittenen Statusnavigation der Meldungsseite.
+
+## Phase 2 · Paket 2.1 – Meldungsleitstelle
+
+### Inventar und Risiko
+
+- Betroffene Route: `/incidents`.
+- Betroffene Komponenten: Meldungskarte, Statusfilter, Lagekennzahlen, Desktop-Detailpanel und mobiler Bearbeitungsdialog; deutsche und englische Incident-Copy.
+- Datenverträge und gespeicherte Konfigurationen: unverändert. Abrufintervall, Query-Key, Limit, Incident-ID, Operation, Revision sowie Query-Cache-Aktualisierung bleiben kompatibel. Es gibt keine Datenmigration und keine neue Persistenz.
+- Ausgangslage: Desktop zeigte nur eine breite Liste und öffnete Kontext in einem Dialog. Mobile schnitt die fünfteilige Statusnavigation rechts ab, sodass nicht alle Filter ohne horizontale Navigation sichtbar waren.
+
+### Umsetzung
+
+- Desktop als echte Leitstelle aufgebaut: offene Vorgänge, nicht zugewiesene Meldungen, betroffene Server und älteste offene Meldung bilden eine kompakte Lageübersicht.
+- Einsatzwarteschlange und dauerhaft sichtbarer Vorgangskontext liegen nebeneinander. Der erste sichtbare Vorgang ist auf Desktop direkt prüfbar; Auswahl und Status bleiben zusätzlich durch Text, Symbol, Rahmen und Akzent erkennbar.
+- Der Vorgangskontext zeigt Quelle, Eingang, letzte Änderung, Melder, Zuständigkeit, Originalmeldung und einen klaren nächsten Schritt, ohne neue Backend-Annahmen einzuführen.
+- Mobile ersetzt die abgeschnittene Tabreihe durch ein vollständig beschriftetes Status-Select. Die Bearbeitung öffnet als eckiger Vollbilddialog mit vertikal priorisiertem Kontext und 44-Pixel-Aktionen.
+- Live-Aktualisierung und manuelles Aktualisieren sind sichtbar; Laden, Fehler, Leerzustand, Ablehnungsbestätigung und Mutationsfehler bleiben erhalten.
+- Statusaktionen „Übernehmen“, „Ablehnen“ und „Abschließen“ verwenden exakt die bestehenden Operationen und Revisionswerte.
+
+### Validierung
+
+- Vite-Production-Build im Fake-Modus: bestanden; nur die bekannte Warnung zu bestehenden Chunks über 500 kB bleibt.
+- Browserprüfung: Desktop 1440 × 900, Mobile 390 × 844 und mobiler Detailzustand geprüft. Mobile besitzt `scrollWidth === clientWidth === 390`.
+- Funktionsprüfung: „Übernehmen“ erfolgreich gegen Mirage ausgeführt; aktualisierter Status und Folgeaktionen erschienen ohne Fehler.
+- Tastaturprüfung: Escape schließt den mobilen Bearbeitungsdialog.
+- Theme- und Farbsehprüfung: helles Theme und Deuteranopie über die echte Darstellungsoberfläche angewendet; anschließend Frontline-Standard wiederhergestellt.
+- Design QA: erster Desktopvergleich fand einen zweizeiligen Tab als P2; nach einzeiliger Verdichtung erneuter identischer Vergleich ohne offene P0/P1/P2-Findings. Ergebnis `passed` in `design-qa.md`.
+- Browserkonsole: null Errors; ausschließlich die bekannte React-Router-v7-Future-Flag-Warnung.
+- Lint: weiterhin nicht ausführbar, weil im Checkout kein ESLint-Paket beziehungsweise Binary installiert ist.
+
+### Rückrollbarkeit
+
+Das Paket ist frontend-, datenbank- und konfigurationsneutral. Es erfordert weder Backup noch Migration und kann als einzelner Git-Commit mit `git revert` zurückgenommen werden. Es wurde weder gepusht noch veröffentlicht, als PR eröffnet, ausgerollt oder auf einer Produktionsinstanz aktiviert.
