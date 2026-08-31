@@ -38,9 +38,9 @@ const formatRating = (value) =>
 
 const qualityLabel = (confidence) => {
   if (!Number.isFinite(confidence)) return "Nicht messbar";
-  if (confidence >= 0.8) return "Hohe Sicherheit";
-  if (confidence >= 0.6) return "Mittlere Sicherheit";
-  return "Nur als Hinweis";
+  if (confidence >= 0.8) return "Hohe Aussagekraft";
+  if (confidence >= 0.6) return "Mittlere Aussagekraft";
+  return "Niedrige Aussagekraft";
 };
 
 const qualityColor = (confidence) => {
@@ -187,7 +187,7 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
       headline = "Spielerzahl unausgeglichen";
       tone = "error";
     } else if (strengthUnbalanced) {
-      headline = "Teamstärke unausgeglichen";
+      headline = "Geschätzte Teamstärke unausgeglichen";
       tone = "error";
     } else if (warning) {
       headline = "Balance weiter beobachten";
@@ -474,7 +474,7 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
                   : "Ausgeglichen"}
               </Typography>
             </Metric>
-            <Metric label="Teamstärke">
+            <Metric label="Geschätzte Teamstärke">
               <Typography
                 variant="body2"
                 sx={{
@@ -498,10 +498,12 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
                   : ""}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Differenz {formatRating(insight.ratingDifference)}
+                Stärke-Index {formatRating(insight.ratings.allies)} :{" "}
+                {formatRating(insight.ratings.axis)} · Abstand{" "}
+                {formatRating(insight.ratingDifference)}
               </Typography>
             </Metric>
-            <Metric label="Datenqualität">
+            <Metric label="Aussagekraft">
               <Typography
                 variant="body2"
                 sx={{
@@ -651,7 +653,7 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
               sx={{ minWidth: 0, flex: 1 }}
             >
               <StrengthBar
-                label="Vorher (Teamstärke)"
+                label="Stärke-Index vorher"
                 allies={insight.ratings.allies}
                 axis={insight.ratings.axis}
               />
@@ -660,7 +662,7 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
                 aria-hidden
               />
               <StrengthBar
-                label="Nachher (Prognose)"
+                label="Stärke-Index nachher"
                 allies={insight.projectedRatings.allies}
                 axis={insight.projectedRatings.axis}
               />
@@ -790,7 +792,8 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
                       {player.role || "Rolle unbekannt"}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      Live-Stärke {formatRating(player.rating)} · Sicherheit{" "}
+                      Stärke-Index {formatRating(player.rating)} / 100 ·
+                      Aussagekraft{" "}
                       {Math.round((player.rating_confidence || 0) * 100)} %
                     </Typography>
                   </Box>
@@ -811,6 +814,27 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
                 </Typography>
               </Box>
             ) : null}
+
+            <Box
+              sx={{
+                p: 1.25,
+                borderLeft: "3px solid",
+                borderColor: "info.main",
+                bgcolor: (theme) => alpha(theme.palette.info.main, 0.06),
+              }}
+            >
+              <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                Was bedeutet der Stärke-Index?
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Er ist eine Vergleichsskala von 0 bis 100 für die aktuell
+                verbundenen Spieler. 50 entspricht dem momentanen
+                Server-Durchschnitt; ein höherer Wert bedeutet eine stärkere
+                aktuelle Einschätzung. Berechnet wird er aus Spielerlevel und
+                den bereits vorhandenen Werten dieser Runde – er ist kein
+                offizieller Rang des Gameservers.
+              </Typography>
+            </Box>
 
             <Box
               sx={{
@@ -836,22 +860,23 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
               </Box>
               <Box>
                 <Typography variant="caption" color="text.secondary">
-                  Stärke vorher
+                  Team-Abstand vorher
                 </Typography>
                 <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-                  {formatRating(activeRecommendation?.rating_gap_before)} Punkte
+                  {formatRating(activeRecommendation?.rating_gap_before)}{" "}
+                  Indexpunkte
                 </Typography>
               </Box>
               <Box>
                 <Typography variant="caption" color="text.secondary">
-                  Prognose danach
+                  Team-Abstand danach
                 </Typography>
                 <Typography
                   variant="subtitle1"
                   sx={{ color: "success.main", fontWeight: 800 }}
                 >
                   {formatRating(activeRecommendation?.projected_rating_gap)}{" "}
-                  Punkte
+                  Indexpunkte
                 </Typography>
               </Box>
             </Box>
