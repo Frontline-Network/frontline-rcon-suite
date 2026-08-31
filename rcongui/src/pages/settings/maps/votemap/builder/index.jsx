@@ -396,10 +396,13 @@ export default function VotemapBuilderPage() {
                     fullWidth
                     sx={{ "& .MuiInputBase-root": { minHeight: 44 } }}
                   >
-                    <InputLabel>{t("maps.gameMode")}</InputLabel>
+                    <InputLabel id="votemap-map-mode-label">
+                      {t("maps.gameMode")}
+                    </InputLabel>
                     <Select
                       value={mode}
                       label={t("maps.gameMode")}
+                      labelId="votemap-map-mode-label"
                       onChange={(event) => setMode(event.target.value)}
                     >
                       <MenuItem value="all">
@@ -417,10 +420,13 @@ export default function VotemapBuilderPage() {
                     fullWidth
                     sx={{ "& .MuiInputBase-root": { minHeight: 44 } }}
                   >
-                    <InputLabel>{t("maps.weather")}</InputLabel>
+                    <InputLabel id="votemap-map-environment-label">
+                      {t("maps.weather")}
+                    </InputLabel>
                     <Select
                       value={environment}
                       label={t("maps.weather")}
+                      labelId="votemap-map-environment-label"
                       onChange={(event) => setEnvironment(event.target.value)}
                     >
                       <MenuItem value="all">

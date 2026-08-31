@@ -53,6 +53,7 @@ export function BroadcastFields({ messages, disabled, onChange, ...props }) {
             value={time_sec}
             name={"broadcast-time"}
             onChange={handleRowChange(index, "time_sec")}
+            label={t("common.time")}
             placeholder={t("common.time")}
             sx={{ width: "100px" }}
             slotProps={{
@@ -70,11 +71,16 @@ export function BroadcastFields({ messages, disabled, onChange, ...props }) {
             value={message}
             name={"broadcast-message"}
             onChange={handleRowChange(index, "message")}
+            label={t("common.message")}
             placeholder={t("common.message")}
             disabled={disabled}
           />
           {!disabled && (
-            <IconButton color="error" onClick={() => handleDeleteRow(index)}>
+            <IconButton
+              color="error"
+              aria-label={`${t("common.delete")}: ${index + 1}`}
+              onClick={() => handleDeleteRow(index)}
+            >
               <DeleteIcon />
             </IconButton>
           )}

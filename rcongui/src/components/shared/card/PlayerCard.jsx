@@ -202,6 +202,7 @@ export default function PlayerCard({
           country={country}
           platform={platform}
           clanTag={clanTag}
+          headingComponent="h2"
         />
         <LinkedAccounts identity={playerProfile.identity} compact />
 

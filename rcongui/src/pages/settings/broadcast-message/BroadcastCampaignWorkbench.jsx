@@ -557,6 +557,11 @@ export default function BroadcastCampaignWorkbench({
         <ConfigActionBar
           dirty={hasChanges}
           dirtyLabel={t(`${ROOT}.unsavedChanges`)}
+          result={
+            actionSaved
+              ? { kind: "success", title: t(`${ROOT}.saved`) }
+              : null
+          }
           stateIcon={
             hasChanges ? (
               <WarningAmberOutlinedIcon color="warning" fontSize="small" />
@@ -590,7 +595,6 @@ export default function BroadcastCampaignWorkbench({
         />
       }
     >
-      {actionSaved && <Alert severity="success">{t(`${ROOT}.saved`)}</Alert>}
       {!isValid && (
         <Alert severity="warning">{t(`${ROOT}.invalidRange`)}</Alert>
       )}

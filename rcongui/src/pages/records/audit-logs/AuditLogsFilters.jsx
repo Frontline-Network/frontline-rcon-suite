@@ -108,6 +108,7 @@ export default function AuditLogsFilters({
             name="parameters"
             value={formFields.parameters}
             onChange={(event) => update("parameters", event.target.value)}
+            label={t("records.auditLogs.parameters")}
             placeholder={t("records.auditLogs.searchPlaceholder")}
             InputProps={{
               startAdornment: (

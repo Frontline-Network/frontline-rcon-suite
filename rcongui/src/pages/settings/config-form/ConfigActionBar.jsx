@@ -5,6 +5,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import ActionResult from "@/components/shared/ActionResult";
 
 const renderAction = (action, fallbackVariant, fullWidth = false) => {
   if (!action) return null;
@@ -49,6 +50,7 @@ export default function ConfigActionBar({
   dirtyLabel,
   sticky = true,
   mobileSticky = sticky,
+  result,
 }) {
   return (
     <Box
@@ -87,11 +89,13 @@ export default function ConfigActionBar({
         },
       }}
     >
+      <ActionResult result={result} compact />
       <Stack
         direction={{ xs: "column", md: "row" }}
         justifyContent="space-between"
         alignItems={{ xs: "stretch", md: "center" }}
         spacing={1.25}
+        sx={{ mt: result ? 1.25 : 0 }}
       >
         <Stack
           direction="row"

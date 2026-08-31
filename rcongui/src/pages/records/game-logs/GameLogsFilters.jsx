@@ -165,6 +165,7 @@ export default function GameLogsFilters({
             onChange={(event) =>
               updateField("player_query", event.target.value)
             }
+            label={t("records.gameLogs.timeline.playerSearch")}
             placeholder={t("records.gameLogs.timeline.playerSearch")}
             size="small"
             InputProps={{

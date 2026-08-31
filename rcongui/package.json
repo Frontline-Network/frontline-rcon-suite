@@ -30,6 +30,7 @@
     "check:teamkill-risk": "node scripts/check-teamkill-risk.mjs",
     "check:design-foundation": "node scripts/check-design-foundation.mjs",
     "check:page-semantics": "node scripts/check-page-semantics.mjs",
+    "check:action-feedback": "node scripts/check-action-feedback.mjs",
     "format:write": "prettier src/ --write",
     "lint": "eslint src/"
   },

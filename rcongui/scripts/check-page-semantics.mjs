@@ -11,6 +11,7 @@ const pageState = read("src/components/shared/PageState.jsx");
 const dashboard = read("src/pages/dashboard.jsx");
 const autosettings = read("src/pages/settings/autosettings/index.jsx");
 const playerHeader = read("src/components/player/profile/Header.jsx");
+const playerCard = read("src/components/shared/card/PlayerCard.jsx");
 const systemLayout = read(
   "src/pages/settings/system-diagnostics/SystemDiagnosticsLayout.jsx"
 );
@@ -36,6 +37,21 @@ const discordApp = read("src/pages/apps/discord-report-bot/index.jsx");
 const autobalancer = read(
   "src/pages/settings/[configs]/autobalancer-moderator-dashboard.jsx"
 );
+const rotation = read("src/pages/settings/maps/rotation/index.jsx");
+const liveWorkspace = read("src/pages/views/live/live-workspace.jsx");
+const auditFilters = read("src/pages/records/audit-logs/AuditLogsFilters.jsx");
+const gameLogFilters = read("src/pages/records/game-logs/GameLogsFilters.jsx");
+const blacklistFilters = read(
+  "src/components/Blacklist/BlacklistRecordsSearch.js"
+);
+const broadcastFields = read("src/components/shared/BroadcastFields.jsx");
+const templateDetail = read("src/pages/settings/templates/detail.jsx");
+const votemapBuilder = read(
+  "src/pages/settings/maps/votemap/builder/index.jsx"
+);
+const gamesTable = read("src/pages/stats/games/game-list-table.jsx");
+const liveSessions = read("src/pages/stats/live-sessions/index.jsx");
+const liveGame = read("src/pages/stats/live-game/index.jsx");
 
 assert.match(pageHeader, /component="header"/);
 assert.match(pageHeader, /aria-labelledby=\{titleId\}/);
@@ -48,6 +64,9 @@ for (const state of [
   "offline",
   "conflict",
   "forbidden",
+  "running",
+  "partial",
+  "destructive",
 ]) {
   assert.match(pageState, new RegExp(`${state}:`));
 }
@@ -60,7 +79,6 @@ assert.match(pageState, /aria-live=/);
 
 for (const [name, source] of [
   ["dashboard", dashboard],
-  ["player profile", playerHeader],
   ["apps", apps],
   ["discord app", discordApp],
 ]) {
@@ -70,6 +88,10 @@ for (const [name, source] of [
     `${name} must expose its page title as H1`
   );
 }
+
+assert.match(playerHeader, /headingComponent = "h1"/);
+assert.match(playerHeader, /component=\{headingComponent\}/);
+assert.match(playerCard, /headingComponent="h2"/);
 
 assert.match(autosettings, /<PageHeader/);
 assert.match(systemLayout, /title=\{activeSection\.label\}/);
@@ -85,6 +107,39 @@ assert.match(objectives, /id="alert-dialog-description"/);
 assert.match(objectivePicker, /aria-label=\{t\("maps\.objectiveGridCell"/);
 assert.match(votemapSettings, /id="votemap-default-method"/);
 assert.match(votemapSettings, /labelId="votemap-default-method-label"/);
+assert.match(rotation, /<PageHeader/);
+assert.match(liveWorkspace, /component="h1"/);
+assert.match(auditFilters, /label=\{t\("records\.auditLogs\.parameters"\)\}/);
+assert.match(
+  gameLogFilters,
+  /label=\{t\("records\.gameLogs\.timeline\.playerSearch"\)\}/
+);
+assert.match(blacklistFilters, /id="blacklist-filter-list-label"/);
+assert.match(blacklistFilters, /labelId="blacklist-filter-list-label"/);
+assert.match(blacklistFilters, /id="blacklist-filter-page-size-label"/);
+assert.match(blacklistFilters, /labelId="blacklist-filter-page-size-label"/);
+assert.match(votemapBuilder, /id="votemap-map-mode-label"/);
+assert.match(votemapBuilder, /labelId="votemap-map-mode-label"/);
+assert.match(votemapBuilder, /id="votemap-map-environment-label"/);
+assert.match(votemapBuilder, /labelId="votemap-map-environment-label"/);
+assert.match(templateDetail, /label=\{t\("settings\.templates\.messageTitle"\)\}/);
+assert.match(
+  templateDetail,
+  /label=\{t\("settings\.templates\.messageContent"\)\}/
+);
+assert.match(broadcastFields, /label=\{t\("common\.time"\)\}/);
+assert.match(broadcastFields, /label=\{t\("common\.message"\)\}/);
+assert.match(gamesTable, /inputProps=\{\{ "aria-label": t\("stats\.games\.pageSize"\) \}\}/);
+assert.match(
+  liveSessions,
+  /"aria-label": t\("stats\.liveSessions\.sorting"\)/
+);
+assert.match(
+  liveSessions,
+  /"aria-label": t\("common\.pagination\.pageSize"\)/
+);
+assert.match(liveGame, /"aria-label": t\("stats\.liveGame\.sorting"\)/);
+assert.match(liveGame, /"aria-label": t\("stats\.liveGame\.pageSize"\)/);
 assert.match(controlLayout, /id="control-page-section"/);
 assert.match(controlLayout, /labelId="control-page-section-label"/);
 assert.ok(

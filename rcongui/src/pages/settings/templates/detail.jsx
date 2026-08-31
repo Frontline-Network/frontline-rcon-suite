@@ -286,6 +286,7 @@ function EditorFields({ editor, category, setEditor, compact = false }) {
         name="title"
         value={editor.title}
         onChange={handleOnInputChange}
+        label={t("settings.templates.messageTitle")}
         placeholder={t("settings.templates.messageTitle")}
         fullWidth
         required
@@ -305,6 +306,7 @@ function EditorFields({ editor, category, setEditor, compact = false }) {
             fullWidth
             name="content"
             value={editor.content}
+            label={t("settings.templates.messageContent")}
             required
             readOnly={editor.mode === MODE.READ}
             sx={{ display: editor.mode === MODE.READ ? "block" : "none" }}
@@ -325,6 +327,7 @@ function EditorFields({ editor, category, setEditor, compact = false }) {
           name="content"
           value={editor.content}
           onChange={handleOnInputChange}
+          label={t("settings.templates.messageContent")}
           placeholder={t("settings.templates.messageContent")}
           multiline
           minRows={compact ? 9 : 16}

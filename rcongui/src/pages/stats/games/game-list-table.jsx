@@ -687,7 +687,7 @@ export function GameListTable({
             <Select
               value={pageSize}
               onChange={updatePageSize}
-              aria-label={t("stats.games.pageSize")}
+              inputProps={{ "aria-label": t("stats.games.pageSize") }}
               sx={{ height: 40, borderRadius: 0 }}
             >
               {[25, 50, 100].map((value) => (

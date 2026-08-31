@@ -17,6 +17,7 @@ const PlayerProfileHeader = ({
   country,
   platform,
   clanTag,
+  headingComponent = "h1",
 }) => {
   const currentSoldierData = player?.soldier ?? player?.profile?.soldier;
   const playerId = player?.player_id ?? player?.profile?.player_id;
@@ -42,7 +43,7 @@ const PlayerProfileHeader = ({
           >
             <Stack>
               <Typography
-                component="h1"
+                component={headingComponent}
                 textOverflow={"ellipsis"}
                 fontSize={"1.125rem"}
                 fontWeight={600}

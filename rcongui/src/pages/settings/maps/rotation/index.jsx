@@ -2,6 +2,7 @@ import { Box, Tabs } from "@mui/material";
 import { Outlet, useLocation } from "react-router-dom";
 import { NavLinkTab } from "@/components/shared/NavLinkTab";
 import { useTranslation } from "react-i18next";
+import PageHeader from "@/components/shared/PageHeader";
 
 /**
  * Map Rotation page that contains the map rotation builder component
@@ -21,7 +22,12 @@ function MapRotation() {
 
   return (
     <>
-      <Tabs value={activeTab}>
+      <PageHeader
+        eyebrow={t("maps.eyebrow")}
+        title={t("maps.rotation")}
+        subtitle={t("maps.subtitle")}
+      />
+      <Tabs value={activeTab} aria-label={t("maps.rotation")}>
         <NavLinkTab label={t("maps.builder")} to={""} />
         <NavLinkTab label={t("maps.sequence")} to={"sequence"} />
         <NavLinkTab label={t("maps.settings")} to={"settings"} />

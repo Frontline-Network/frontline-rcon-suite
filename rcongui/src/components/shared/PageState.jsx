@@ -5,6 +5,9 @@ import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import InboxOutlinedIcon from "@mui/icons-material/InboxOutlined";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import SyncProblemOutlinedIcon from "@mui/icons-material/SyncProblemOutlined";
+import AutorenewOutlinedIcon from "@mui/icons-material/AutorenewOutlined";
+import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
+import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 
 const STATE_PRESENTATION = {
   empty: { icon: InboxOutlinedIcon, color: "text.secondary" },
@@ -13,9 +16,19 @@ const STATE_PRESENTATION = {
   offline: { icon: CloudOffOutlinedIcon, color: "warning.main" },
   conflict: { icon: SyncProblemOutlinedIcon, color: "warning.main" },
   forbidden: { icon: LockOutlinedIcon, color: "text.secondary" },
+  running: { icon: AutorenewOutlinedIcon, color: "info.main" },
+  partial: { icon: WarningAmberOutlinedIcon, color: "warning.main" },
+  destructive: { icon: ReportProblemOutlinedIcon, color: "error.main" },
 };
 
-const alertStates = new Set(["error", "offline", "conflict", "forbidden"]);
+const alertStates = new Set([
+  "error",
+  "offline",
+  "conflict",
+  "forbidden",
+  "partial",
+  "destructive",
+]);
 
 export function PageStateSkeleton({
   label,
