@@ -18,6 +18,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
 import { useAuth } from "@/hooks/useAuth";
 import { integrationGroups, integrationModules } from "./registry";
+import { getIntegrationWorkbenchCopy } from "./workbench-copy";
 
 const filterOptions = ["all", "discord", "commands", "hosting"];
 
@@ -54,7 +55,7 @@ export default function IntegrationsHub({
   children,
   isDirty,
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { permissions } = useAuth();
   const navigate = useNavigate();
   const revalidator = useRevalidator();
@@ -63,6 +64,10 @@ export default function IntegrationsHub({
   const [knownStatuses, setKnownStatuses] = useState({});
   const [lastUpdated, setLastUpdated] = useState(() => new Date());
   const granted = useMemo(() => permissionSet(permissions), [permissions]);
+  const workbenchCopy = useMemo(
+    () => getIntegrationWorkbenchCopy(i18n.resolvedLanguage),
+    [i18n.resolvedLanguage]
+  );
 
   const visibleModules = useMemo(
     () =>
@@ -204,10 +209,19 @@ export default function IntegrationsHub({
             ),
           }}
         />
-        <Stack
-          direction="row"
-          spacing={0.75}
-          sx={{ overflowX: "auto", scrollbarWidth: "thin" }}
+        <Box
+          role="group"
+          aria-label={workbenchCopy.filterLabel}
+          sx={{
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "repeat(2, minmax(0, 1fr))",
+              sm: "repeat(4, minmax(0, 1fr))",
+              md: "repeat(4, auto)",
+            },
+            gap: 0.75,
+            minWidth: 0,
+          }}
         >
           {filterOptions.map((value) => (
             <Button
@@ -215,12 +229,12 @@ export default function IntegrationsHub({
               variant={filter === value ? "contained" : "outlined"}
               onClick={() => setFilter(value)}
               aria-pressed={filter === value}
-              sx={{ minWidth: "max-content" }}
+              sx={{ minWidth: 0, width: "100%", px: { xs: 1, md: 2 } }}
             >
               {t(`settings.integrations.filters.${value}`)}
             </Button>
           ))}
-        </Stack>
+        </Box>
       </Box>
 
       <Box

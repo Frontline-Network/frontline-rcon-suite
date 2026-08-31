@@ -1,3 +1,58 @@
+# Design QA · Phase 4.3 – Kommunikation und Integrationen
+
+## Prüfgrundlage
+
+- Source Visual Truth: `.codex/audits/full-rcon-concept/screenshots/desktop/welcome-message.png`, `.codex/audits/full-rcon-concept/screenshots/mobile/welcome-message.png`, `.codex/audits/full-rcon-concept/screenshots/desktop/integrations.png`, `.codex/audits/full-rcon-concept/screenshots/mobile-390/integrations.png`, `.codex/audits/full-rcon-concept/screenshots/desktop/integration-audit.png` sowie die freigegebenen Seitenziele 37–39 und 54–65 in `docs/product-design/rcon-product-concept.md`.
+- Bereits vorhandene Zielstruktur: Willkommensnachricht mit Editor, Vorlagen und Ingame-Vorschau; Kampagnen mit Inhalt, Zielgruppe, Ausspielung, Test und Zustellaktivität; Integrationshub mit elf kompatiblen Modulen und gemeinsamem Connector-Editor.
+- Aktuelle Teiländerung: mobile Integrationsfilter als vollständig sichtbares 2×2-Raster sowie geführte, rekursive Schlüssel-/Wert-Felder anstelle eines JSON-Texteditors für dynamische Konfigurationsobjekte. Schema-definierte Felder bleiben als beschriftete, validierte Controls erhalten und können nicht versehentlich als dynamischer Eintrag gelöscht werden; nur unbekannte Bestandsfelder erscheinen getrennt als „Weitere Einträge (Kompatibilität)“.
+
+## Prüfzustand und Vergleichseingänge
+
+- Implementierung: `.codex/phase43-after/desktop-integrations-1280x720.png`, `.codex/phase43-after/desktop-integration-audit-1280x720.png`, `.codex/phase43-after/mobile-integrations-390x844.png`, `.codex/phase43-after/mobile-integration-audit-390x844.png` und `.codex/phase43-after/mobile-rcon-chat-commands-form-390x844.png`.
+- Gemeinsame Same-State-Vergleiche: `.codex/phase43-after/compare-desktop-audit.png` und `.codex/phase43-after/compare-mobile-integrations.png`. Source und Implementierung liegen dort ohne Skalierung nebeneinander.
+- Theme- und Farbseh-Evidenz: `.codex/phase43-after/desktop-appearance-light-deuteranopia-dialog-1280x720.png` und `.codex/phase43-after/desktop-integration-audit-light-deuteranopia-1280x720.png`.
+- Viewports: Desktop 1280 × 720 CSS- und Bildpixel, Mobile 390 × 844 CSS- und Bildpixel, jeweils Browser-Dichte 1. Der primäre Zustand verwendet Frontline Gold, dunkles Theme, Standard-Farbsehen, deutsche Sprache, Demo-Server 2 und HLL mit 98/100 Spielern.
+
+## Full-View- und Fokusvergleich
+
+Desktop behält die freigegebene tabellarische Integrationsübersicht mit kompaktem Konfigurationsbereich bei. Der Same-State-Vergleich zeigt keine unbeabsichtigte Verschiebung von Header, Spalten, Modulzeile oder Ziel-Editor. Mobile ersetzt dagegen gezielt die zuvor abgeschnittene horizontale Filterleiste durch ein vollständig sichtbares 2×2-Raster. Dadurch sind alle vier Kategorien ohne seitliches Scrollen erreichbar, während die Modulliste und die feste Bottom-Navigation ihren Rhythmus behalten.
+
+Im Fokusvergleich wurden der sensible Audit-Webhook und die tief verschachtelte RCON-Chatbefehls-Konfiguration geprüft. Der Webhook bleibt maskiert und besitzt eine beschriftete Einblenden-Aktion. RCON-Befehle, Bedingungen, Zahlenbereiche, boolesche Zustände, Listen und verschachtelte Objekte erscheinen als geführte Eingaben; Endanwender sehen keinen JSON-Editor und müssen keine JSON-Syntax beherrschen.
+
+## Findings
+
+- Keine verbleibenden P0-, P1- oder P2-Abweichungen.
+- [behoben] [P1] Die vier mobilen Integrationsfilter lagen in einer horizontal scrollenden Zeile und konnten abgeschnitten erscheinen. Sie verwenden jetzt zwei vollständig sichtbare Spalten auf 390 Pixeln und vier Spalten ab dem nächsten Breakpoint.
+- [behoben] [P1] Dynamische Objekte fielen auf einen JSON-Texteditor zurück. Sie werden jetzt als benannte Einstellungen, primitive Werte, Listen und rekursive Untereinstellungen bearbeitet.
+- [behoben] [P1] Schema-definierte Felder und zusätzliche Bestandsfelder wurden bei Objekten mit `additionalProperties` gemeinsam als löschbare Schlüssel-/Wert-Zeilen behandelt. Feste Schemafelder bleiben nun in ihren geführten Controls; nur unbekannte Zusatzfelder erscheinen getrennt unter „Weitere Einträge (Kompatibilität)“.
+- [P3] Die lokale Entwicklungsumgebung protokolliert ausschließlich die bereits bekannte React-Router-v7-Future-Flag-Warnung. Es traten keine Console-Errors und kein sichtbares Runtime-Fehleroverlay auf.
+
+## Pflichtflächen und Accessibility
+
+- Typografie, eckige Formensprache, Abstände, Rahmen, Primärfarbe und Statusfarben verwenden unverändert das Frontline-Designsystem. Hell plus Deuteranopie wurde live geprüft und anschließend wieder auf Dunkel plus Standard zurückgestellt.
+- Mobile Hub, Audit-Detail und RCON-Konfiguration bleiben innerhalb von 390 Pixeln ohne horizontalen Dokumentüberlauf. Desktop bleibt bei 1280 Pixeln ebenfalls überlauffrei und besitzt genau eine `h1`.
+- Alle elf Module sind native Buttons mit `aria-expanded`; Suche und Filter besitzen zugängliche Namen und Gruppensemantik. Entfernen-, Einblenden-, Hinzufügen-, Zurücksetzen- und Speichern-Aktionen sind beschriftet. Die sichtbaren Formularfelder werden über native MUI-Labels oder Gruppennamen zugeordnet; das zusätzliche MUI-Mess-Textarea ist korrekt `aria-hidden` und nicht fokussierbar.
+- Status wird nicht ausschließlich über Farbe vermittelt. Text, Icons, Rahmen und `aria-pressed` ergänzen Aktiv-, Konfiguriert-, Auswahl- und Warnzustände.
+
+## Fachliche und funktionale Prüfung
+
+- Filter „Befehle“ und Suche nach „RCON“ reduzieren die Modulliste korrekt; Zurücksetzen stellt alle Module wieder her.
+- Audit öffnet ohne Laufzeitfehler, zeigt das vorhandene Ziel maskiert und enthält keinen erweiterten JSON-Schalter oder JSON-Textarea.
+- RCON-Chatbefehle rendern bestehende Listen, verschachtelte Bedingungen, Zahlen und boolesche Werte rekursiv. Neue dynamische Schlüssel lassen sich nur mit eindeutigem Namen ergänzen; doppelte oder leere Schlüssel werden verhindert.
+- Unbekannte Bestandsfelder bleiben durch `mergeConfigWithSchema` erhalten. Kein API-, RCON-, Discord- oder Gameserververtrag wurde verändert; während der QA wurde keine mutierende Aktion außerhalb des lokalen Fake-Backends ausgelöst.
+- Theme und Farbsehmodus wurden über die reale Benutzeroberfläche auf Hell plus Deuteranopie umgestellt, auf der Audit-Konfiguration geprüft und anschließend auf Dunkel plus Standard zurückgesetzt.
+
+## Automatisierte Evidenz
+
+- Produktionsbuild mit `REACT_APP_API_URL=/api/`: bestanden.
+- Kommunikations-Workbench, Konfigurationskompatibilität, Designfundament, Seitensemantik, Aktionsfeedback, Operator-Copy, Navigation, Configuration Workbench, Adminaktionen und initiales Bundle-Budget: bestanden.
+- Initial Entry: 400,98 kB raw / 121,50 kB gzip; initiales JavaScript: 1.498,11 kB raw / 480,37 kB gzip.
+- Browsergerenderte Implementierung, Primärinteraktionen, Semantik, Theme/Farbsehmodus, Konsolenprüfung, Mobile-Overflow und visueller Same-State-Vergleich: bestanden.
+
+final result: passed
+
+---
+
 # Design QA · Phase 4.2 – Sektorsteuerung und Kartenabstimmung
 
 ## Prüfgrundlage

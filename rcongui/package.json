@@ -33,6 +33,7 @@
     "check:action-feedback": "node scripts/check-action-feedback.mjs",
     "check:navigation-shell": "node scripts/check-navigation-shell.mjs",
     "check:config-workbench": "node scripts/check-configuration-workbench.mjs",
+    "check:communication-workbench": "node scripts/check-communication-workbench.mjs",
     "format:write": "prettier src/ --write",
     "lint": "eslint src/"
   },
