@@ -24,9 +24,10 @@ function MapListItemBase({ mapLayer, renderActions, sx, ...props }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        p: 0.5,
-        mb: 1,
-        borderRadius: 1,
+        minHeight: 64,
+        p: 0.75,
+        mb: 0.75,
+        borderRadius: 0,
         border: "1px solid",
         borderColor: "divider",
         "&:hover": { bgcolor: "action.hover" },
@@ -53,10 +54,13 @@ export function MapChangeListItem({ mapLayer, onClick, icon, title }) {
         <Tooltip title={title ?? t("maps.setAsCurrent")}>
           <span>
             <IconButton
+              aria-label={title ?? t("maps.setAsCurrent")}
               sx={{
                 borderRadius: 0,
                 bgcolor: "primary.main",
                 color: "primary.contrastText",
+                width: 42,
+                height: 42,
                 "&:hover": {
                   bgcolor: "primary.dark",
                 },
@@ -84,8 +88,14 @@ export function MapBuilderListItem({ mapLayer, onClick }) {
           size="small"
           startIcon={<AddIcon />}
           onClick={() => onClick(mapLayer)}
+          aria-label={t("maps.rotationWorkbench.addNamed", {
+            map: mapLayer.map.pretty_name,
+          })}
+          sx={{ minHeight: 40, minWidth: { xs: 42, xl: 124 } }}
         >
-          {t("maps.add")}
+          <Box component="span" sx={{ display: { xs: "none", xl: "inline" } }}>
+            {t("maps.add")}
+          </Box>
         </Button>
       )}
     />
@@ -207,7 +217,7 @@ export function MapVotemapWhitelistItem({ mapLayer, onClick }) {
         justifyContent: "space-between",
         p: 0.5,
         mb: 1,
-        borderRadius: 1,
+        borderRadius: 0,
         border: "1px solid",
         borderColor: "divider",
         boxShadow: 1,

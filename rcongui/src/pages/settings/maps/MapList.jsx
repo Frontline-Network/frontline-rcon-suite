@@ -59,7 +59,7 @@ export const MapList = ({
   return (
     <Box sx={{ overflow: "auto" }} {...props}>
       {(sort
-        ? maps.sort((a, b) => a.map.name.localeCompare(b.map.name))
+        ? [...maps].sort((a, b) => a.map.name.localeCompare(b.map.name))
         : maps
       ).map((mapLayer, index, arr) =>
         renderItem ? (

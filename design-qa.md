@@ -1,3 +1,70 @@
+# Design QA · Phase 4.1 – Kartenbetrieb und Rotation
+
+## Prüfgrundlage
+
+- Source Visual Truth: die unveränderten Ausgangszustände unter `.codex/phase41-baseline/` sowie das freigegebene Produktkonzept in `docs/product-design/rcon-product-concept.md` für die Routen `/settings/maps/change`, `/settings/maps/rotation`, `/settings/maps/rotation/sequence` und `/settings/maps/rotation/settings`.
+- Implementierung: `.codex/phase41-after/desktop-change.png`, `.codex/phase41-after/desktop-rotation.png`, `.codex/phase41-after/desktop-sequence.png`, `.codex/phase41-after/desktop-settings.png`, `.codex/phase41-after/mobile-change.png`, `.codex/phase41-after/mobile-rotation.png`, `.codex/phase41-after/mobile-rotation-draft.png`, `.codex/phase41-after/mobile-sequence.png` und `.codex/phase41-after/mobile-settings.png`.
+- Gemeinsame Vergleichseingänge: `.codex/phase41-after/compare-desktop-change.png`, `.codex/phase41-after/compare-desktop-rotation.png` und `.codex/phase41-after/compare-mobile-rotation.png`.
+- Theme- und Farbseh-Evidenz: `.codex/phase41-after/desktop-light-deuteranopia.png`.
+- Viewports und Normalisierung: Desktop 1440 × 900 CSS- und Bildpixel, Mobile 390 × 844 CSS- und Bildpixel, Browser-Dichte 1. Die Screenshots enthalten ausschließlich den App-Viewport.
+- Zustand: Frontline Gold, dunkles Theme, deutsche Sprache, Demo-Server 2, HLL, 98/100 Spieler, drei veröffentlichte Karten. Theme-Prüfung in Hell plus Deuteranopie und anschließend ohne Speicherung verworfen.
+
+## Full-View-Vergleich
+
+Der Kartenwechsel ersetzt den generischen Kartenblock durch eine klar benannte Sofortaktion mit aktuellem und nächstem Kartenstatus, gezieltem Katalog und einer einzigen Bestätigung mit Spielerwirkung, Zielserver und Vorlauf. Der Rotationseditor trennt Katalog und unveröffentlichten Entwurf, macht den Serverstand sichtbar und veröffentlicht Änderungen erst über eine eindeutige Abschlussaktion. Die feste Kartenfolge verwendet dieselbe Arbeitslogik, während die Ausspielungseinstellungen ausschließlich die tatsächlich unterstützte Mischoption zeigen. Alle Flächen bleiben eckig, themenfähig und innerhalb der bestehenden Frontline-Hierarchie.
+
+## Fokusvergleich
+
+- Kartenwechsel: der Bestätigungsdialog wurde mit 98/100 betroffenen Spielern, 60 Sekunden Vorlauf und „Frontline #2“ geprüft; Abbrechen schloss ihn ohne API-Aktion.
+- Rotation: eine zweite Carentan-Variante erzeugte den Dirty-Zustand, aktivierte „Rotation veröffentlichen“ und blieb als bewusste Gewichtung sichtbar. Zurücksetzen stellte den gespeicherten Serverstand wieder her.
+- Mobile Entwurfsansicht: Wechsel zwischen „Katalog“ und „Entwurf“, sichtbare Pfeilaktionen und vollständige drei Aufgabentabs bei 390 Pixeln geprüft.
+- Ausspielung: Vorschau der ersten fünf beziehungsweise vorhandenen drei Karten, Entwurfsumschalter sowie statische mobile Abschlussleiste geprüft.
+
+## Findings
+
+- Keine verbleibenden P0-, P1- oder P2-Abweichungen.
+- [P3] Lange Kartennamen werden auf 390 Pixeln gezielt gekürzt, damit Verschiebe- und Entfernen-Aktionen als 44-Pixel-Ziele erreichbar bleiben. Vollständige Namen bleiben über den Kartenkontext und zugängliche Aktionsnamen erhalten.
+
+## Pflichtflächen
+
+- Fonts und Typografie: gemeinsamer `PageHeader`, bestehende Frontline-Schriftfamilie, kondensierte Versalien, Gewichte und Laufweiten. Feldlabels, Statuszeile und Entwurfszustand besitzen eine klare Hierarchie ohne problematische Umbrüche.
+- Spacing und Layout: Desktop als geteilte Arbeitsfläche, Mobile als bewusster Katalog-/Entwurfwechsel. Nach dem Grid-Fix gilt bei 390 × 844 `main.scrollWidth === main.clientWidth === 380`; die mobile Abschlussleiste verdeckt keinen Inhalt.
+- Farben und Tokens: ausschließlich vorhandene Theme-, Rahmen-, Auswahl-, Warn-, Erfolgs- und Gefahrentokens. Hell plus Deuteranopie wurde live geprüft; Zustände bleiben zusätzlich über Text, Icon und Rahmen erkennbar.
+- Bilder und Assets: vorhandene echte Kartenbilder und etablierte MUI-Icons werden wiederverwendet; keine Platzhalter, CSS-Zeichnungen, Emojis oder handgebauten SVGs.
+- Copy und Inhalt: deutsche und englische Kartenwerkstatt-Texte werden erst beim Betreten des Kartenbereichs als i18n-Ressource geladen. Dadurch bleibt die neue Führung verständlich, ohne das anfängliche JavaScript-Budget zu vergrößern.
+- Icons und Zustände: Karte hinzufügen, verschieben, entfernen, kopieren, zurücksetzen und speichern verwenden dieselbe Iconfamilie. Gespeichert, geändert, leer, doppelt und Sofortaktion sind nicht allein farbcodiert.
+- Responsivität und Accessibility: sichtbare Feldlabels, semantische Tabs und Buttons, zugängliche Namen je Karte, Tastaturpfeile zusätzlich zu Drag-and-drop, mobile 44-Pixel-Aktionen und kein horizontaler Überlauf.
+
+## Fachliche und funktionale Prüfung
+
+- Bestehende Verträge bleiben erhalten: `SET_MAP({ map_name })`, `SET_MAP_ROTATION({ map_names })`, `SET_MAP_SEQUENCE({ map_names })` und die vorhandene Shuffle-Einstellung. Keine neue API, kein neues Datenfeld und keine automatische Serveraktion.
+- Suche berücksichtigt Kartenname und interne Karten-ID; Spielmodus und Umgebung bleiben kombinierbar. Filter zurücksetzen und Ergebniszahl wurden geprüft.
+- Drag-and-drop bleibt erhalten; Enter auf einer Verschiebeaktion änderte die Reihenfolge, Zurücksetzen stellte den gespeicherten Zustand wieder her. Doppelte Einträge bleiben bewusst möglich.
+- Leere Entwürfe werden deutlich gewarnt, aber nicht fachlich blockiert, weil der bestehende Serververtrag das vollständige Leeren weiterhin zulässt.
+- Ein mutierendes `maps.sort(...)` wurde durch `[...maps].sort(...)` ersetzt. Dadurch verändert die Ansicht nicht mehr das geteilte Demo-/Loader-Array und erzeugt keinen falschen Dirty-Zustand.
+- Browserkonsole: null Errors. Produktionsbuild und alle Design-, Semantik-, Aktions-, Navigations-, Konfigurations- und Admin-Vertragsprüfungen bestanden.
+- Bundle-Budget: 400,91 kB Entry-JavaScript und 1.498,06 kB initiales JavaScript bei 480,35 kB gzip; alle Grenzwerte eingehalten. Die kartenspezifischen Übersetzungen liegen im lazy geladenen Kartenpaket.
+
+## Vergleichshistorie
+
+1. Erster Vergleich: [P2] Der Entwurf war nach dem Laden fälschlich geändert. Ursache war das mutierende Sortieren eines geteilten Arrays; die Sortierung arbeitet nun auf einer Kopie.
+2. Erste Mobile-Prüfung: [P2] Das zweispaltige MUI-Grid erzeugte negative Breite und horizontalen Überlauf; die Arbeitsfläche verwendet nun ein begrenztes CSS-Grid und eine statische mobile Abschlussleiste.
+3. Zweite Mobile-Prüfung: [P2] Der dritte Aufgabentab war bei 390 Pixeln nicht vollständig erreichbar. Mobile blendet dekorative Tab-Icons aus und verteilt alle drei Aufgaben gleichmäßig.
+4. Finale Vergleichseingänge bei identischen Viewports: Kartenwechsel, Rotation und Mobile besitzen keine offenen P0-, P1- oder P2-Findings.
+
+## Implementation Checklist
+
+- [x] Alle vier Routen vor und nach der Änderung auf Desktop und 390 × 844 Mobile geprüft.
+- [x] Gemeinsame Vorher-/Nachher-Vergleiche bei identischem Zustand visuell beurteilt.
+- [x] Karte auswählen, Bestätigung abbrechen, Filter, Entwurf, Duplikat, Tastaturreihenfolge, Zurücksetzen und Einstellungsentwurf geprüft.
+- [x] Theme, Deuteranopie, Semantik, Browserkonsole und Mobile-Overflow geprüft.
+- [x] Bestehende API-, Payload-, Persistenz- und Serververträge unverändert erhalten.
+- [x] Produktionsbuild, Bundle-Budget und neun statische Vertragsprüfungen bestanden.
+
+final result: passed
+
+---
+
 # Kartenabstimmungs-Einstellungen – Design QA
 
 ## Vergleichsgrundlage

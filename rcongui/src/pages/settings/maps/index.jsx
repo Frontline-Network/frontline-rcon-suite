@@ -1,4 +1,5 @@
 import { Outlet } from "react-router-dom";
+import "./workbench-translations";
 
 /**
  * Maps Manager component that serves as a container for all map-related functionality

@@ -14,7 +14,7 @@ export function MapDetailsCard({ mapLayer }) {
       sx={{
         display: "flex",
         alignItems: "center",
-        gap: 2,
+        gap: 1.5,
         letterSpacing: 0.85,
         flexGrow: 1,
       }}
@@ -23,11 +23,11 @@ export function MapDetailsCard({ mapLayer }) {
         component="img"
         src={getMapLayerImageSrc(mapLayer)}
         alt={mapLayer.map.pretty_name}
-        sx={{ width: 48, height: 32, borderRadius: 1, objectFit: "cover" }}
+        sx={{ width: 64, height: 44, borderRadius: 0, objectFit: "cover" }}
       />
       <Stack direction={"row"} flexWrap={"wrap"} alignItems={"center"}>
         <Typography
-          sx={{ width: { xs: "100%", md: "175px" } }}
+          sx={{ width: { xs: "100%", md: "150px" } }}
           fontWeight="medium"
         >
           <CopyableText
@@ -43,7 +43,7 @@ export function MapDetailsCard({ mapLayer }) {
             spacing={1}
             sx={{
               flexGrow: 1,
-              minWidth: 150,
+              minWidth: 132,
               width: { xs: "100%", sm: "auto" },
             }}
           >
@@ -94,7 +94,7 @@ export function MapDetailsCardCompact({ mapLayer }) {
         component="img"
         src={getMapLayerImageSrc(mapLayer)}
         alt={mapLayer.map.pretty_name}
-        sx={{ width: 48, height: 32, borderRadius: 1, objectFit: "cover" }}
+        sx={{ width: 64, height: 44, borderRadius: 0, objectFit: "cover" }}
       />
       <Stack sx={{ textTransform: "uppercase" }}>
         <Typography fontWeight="medium" fontSize={12}>
