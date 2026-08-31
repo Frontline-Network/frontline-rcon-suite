@@ -48,6 +48,63 @@ final result: passed
 
 ---
 
+# Design QA · Phase 2.2 Mobile Live-Einsatz
+
+## Vergleichsziel
+
+- Source Visual Truth: `.codex/phase23-baseline/live-desktop-1440x900.png`, `.codex/phase23-baseline/live-mobile-390x844.png` und die bestätigte Zielbeschreibung in `docs/product-design/rcon-product-concept.md` für `/views/live`.
+- Implementierung: `.codex/phase23-baseline/live-final-desktop-1440x900.png`, `.codex/phase23-baseline/live-final-mobile-390x844.png` sowie die zusätzliche schmale Evidenz `.codex/phase23-baseline/live-after-mobile-320x720.png`.
+- Zustand: Frontline Gold, dunkler Modus, Standard-Farbsehen, Einsatz-Tab aktiv, sechs Demo-Spieler, zwei Commander-Warnungen, VIP-/Watchlist-Kontext und unveränderte Live-Protokolldaten.
+
+## Normalisierung
+
+- Desktop: Source und Implementierung jeweils 1440 × 900 Pixel bei 1440 × 900 CSS-Pixeln und Dichte 1.
+- Mobile: Source und Implementierung jeweils 390 × 844 Pixel bei 390 × 844 CSS-Pixeln und Dichte 1.
+- Zusätzlicher Responsive-Check: 320 × 720 Pixel bei Dichte 1.
+- Alle Vergleiche zeigen dieselbe Route, Sprache, Theme-Familie und denselben primären Einsatz-Zustand ohne Browser-Chrome.
+
+## Full-View-Vergleich
+
+Desktop bleibt bewusst unverändert: Split View, Lagekarten, Spieleroperationen und Live-Protokoll behalten ihre Proportionen und Informationsdichte. Mobile ersetzt die zwei verpflichtenden horizontalen Suchwege durch eine klare Priorität: Commander-Warnungen liegen vollständig untereinander, mittlere und informative Zustände bilden ein kompaktes Zweispaltenraster, und die Spieler-Schnellfilter werden als sichtbar beschriftetes Select bedient. Die Einsatz/Protokoll-Tabs und die Reihenfolge Serverstatus – Lage – Serveraktionen – Spieler bleiben erhalten.
+
+## Fokusvergleich
+
+Ein separater Bildausschnitt war nicht erforderlich. Die entscheidenden Oberflächen – Warnkarten, Kontextkarten, Einsatz/Protokoll-Tabs, Suchfeld und Spielerzeilen – sind im 1:1-Mobile-Vergleich lesbar. Das unterhalb des ersten Viewports liegende Select wurde zusätzlich im echten Browser per Tastatur geöffnet und von „Alle · 6“ auf „Achsenmächte · 3“ gestellt; die sichtbare Liste reduzierte sich auf drei Spieler. Der Spieler-Detailbereich wurde geöffnet und mit Escape geschlossen.
+
+## Findings
+
+- Keine verbleibenden P0-, P1- oder P2-Abweichungen.
+- [P3] Bei 320 Pixeln kürzt der globale Statuskopf Kartenname und Restzeit früher als bei 390 Pixeln. Das ist die bestehende, beabsichtigte Shell-Priorisierung; alle Werte behalten zugängliche Namen und die Live-Arbeitsfläche selbst bleibt ohne seitlichen Überlauf.
+
+## Pflichtflächen
+
+- Fonts und Typografie: bestehende Bahnschrift-/Arial-Narrow-Hierarchie bleibt erhalten. Mobile Spielernamen und K/D-Werte verwenden nun wie die Desktop-Spielertabelle die dezente Stärke 300; Teamzugehörigkeit bleibt im Kontexttext und über Fraktionssymbole erkennbar.
+- Spacing und Layout: Warnungen erhalten auf Mobile die volle Breite, Sekundärinformationen ein belastbares Zweispaltenraster. Rahmen, Abstände, 44-Pixel-Bedienelemente und eckige Formensprache bleiben konsistent. 390 × 844 und 320 × 720 zeigen keinen sichtbaren Dokumentüberlauf.
+- Farben und Tokens: ausschließlich vorhandene Theme-, Status- und Transparenz-Tokens werden verwendet. Helles Theme plus Deuteranopie wurde in der echten Darstellungsoberfläche geprüft und anschließend ohne Speicherung verworfen.
+- Bild- und Assetqualität: vorhandene MUI-Icons und Frontline-Assets bleiben unverändert; keine Platzhalter, CSS-Zeichnungen, Emojis oder neuen Bildassets.
+- Copy und Inhalt: „Jetzt prüfen“, Prioritäten, Spielstand, nächste Karte und „Spieler-Schnellfilter“ bleiben verständlich. Der mobile Spielstand verwendet die kurze Beschriftung, während Desktop den Teamkontext vollständig behält.
+- Zustände und Interaktionen: Lagekarten-Filter, beschriftetes Mobile-Select, Einsatz/Protokoll-Wechsel, Player-Detail-Sheet und Escape-Schließen geprüft. Die vorhandenen API-, Tabellen- und Aktionsverträge bleiben unverändert.
+- Browserfehler: im sauberen Abschlusslauf null Console-Errors.
+
+## Vergleichshistorie
+
+1. Ausgangsvergleich: Mobile Lagekarten und Spieler-Schnellfilter erforderten horizontales Scrollen; wichtige Zustände und Filter lagen außerhalb des ersten sichtbaren Bereichs. Als P1-Nutzungsproblem aufgenommen.
+2. Erste Korrektur: Warnungen vertikal priorisiert, Sekundärzustände gerastert und Schnellfilter durch ein beschriftetes Select ersetzt. Der direkte Vergleich zeigte noch eine gekürzte Spielstandsbeschriftung und einen unnötig einzeiligen Kartenwert als P2.
+3. Zweite Korrektur: kurze Mobile-Beschriftung für den Spielstand ergänzt und Kontextwerte auf bis zu zwei Zeilen freigegeben. Erneuter 390- und 320-Pixel-Vergleich ohne offene P0/P1/P2-Findings.
+
+## Implementation Checklist
+
+- [x] Desktop-Split-Ansicht ohne visuelle oder funktionale Regression bewahrt.
+- [x] Mobile Lagekarten ohne horizontale Pflichtnavigation priorisiert.
+- [x] Spieler-Schnellfilter vollständig beschriftet und tastaturbedienbar umgesetzt.
+- [x] Mobile Spielerzeilen auf neutrale, dezente Tabellen-Typografie vereinheitlicht.
+- [x] Desktop, 390 × 844, 320 × 720, Tastatur, Dark/Light und Deuteranopie geprüft.
+- [x] Build, Design-, Semantik-, Feedback-, Polling-, Konfigurations-, Admin-Aktions-, Operator-Copy- und Navigation-Verträge bestanden.
+
+final result: passed
+
+---
+
 # Design QA · Phase 2.1 Meldungsleitstelle
 
 ## Vergleichsziel

@@ -7,7 +7,6 @@ import {
   VisibilityOutlined,
 } from "@mui/icons-material";
 import { Box, ButtonBase, Stack, Typography, alpha } from "@mui/material";
-import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 const UNASSIGNED = "unassigned";
@@ -20,7 +19,14 @@ const AlertItem = ({ item, onFilter, isActive }) => {
   const interactive = Boolean(item.filter && onFilter);
   const content = (
     <Stack
-      alignItems="flex-start"
+      alignItems={{
+        xs: item.type === "warning" ? "center" : "flex-start",
+        md: "flex-start",
+      }}
+      direction={{
+        xs: item.type === "warning" ? "row" : "column",
+        md: "column",
+      }}
       justifyContent="space-between"
       spacing={0.75}
       sx={{ height: "100%", minWidth: 0, overflow: "hidden", width: "100%" }}
@@ -35,21 +41,44 @@ const AlertItem = ({ item, onFilter, isActive }) => {
       <Box sx={{ minWidth: 0, textAlign: "left", width: "100%" }}>
         <Typography
           variant="caption"
-          noWrap
-          sx={{ color: "text.secondary", display: "block", width: "100%" }}
+          sx={{
+            color: "text.secondary",
+            display: "block",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            width: "100%",
+          }}
         >
-          {item.label}
+          <Box component="span" sx={{ display: { xs: "inline", md: "none" } }}>
+            {item.mobileLabel ?? item.label}
+          </Box>
+          <Box component="span" sx={{ display: { xs: "none", md: "inline" } }}>
+            {item.label}
+          </Box>
         </Typography>
         <Typography
           variant="h6"
-          noWrap
-          sx={{ fontVariantNumeric: "tabular-nums", lineHeight: 1.15, width: "100%" }}
+          title={item.value}
+          sx={{
+            display: { xs: "-webkit-box", md: "block" },
+            fontVariantNumeric: "tabular-nums",
+            lineHeight: 1.15,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            WebkitBoxOrient: "vertical",
+            WebkitLineClamp: { xs: 2, md: 1 },
+            whiteSpace: { xs: "normal", md: "nowrap" },
+            width: "100%",
+          }}
         >
           {item.value}
         </Typography>
       </Box>
       <Typography
-        color={item.type === "warning" ? `${item.color}.light` : "text.secondary"}
+        color={
+          item.type === "warning" ? `${item.color}.light` : "text.secondary"
+        }
         variant="caption"
         sx={{ mt: "auto" }}
       >
@@ -62,7 +91,8 @@ const AlertItem = ({ item, onFilter, isActive }) => {
     border: `1px solid ${alpha(theme.palette[item.color].main, 0.28)}`,
     borderLeft: `3px solid ${theme.palette[item.color].main}`,
     bgcolor: alpha(theme.palette[item.color].main, 0.045),
-    minHeight: { xs: 124, md: 92 },
+    gridColumn: { xs: item.type === "warning" ? "1 / -1" : "auto", md: "auto" },
+    minHeight: { xs: item.type === "warning" ? 72 : 92, md: 92 },
     minWidth: 0,
     px: 1.25,
     py: 0.75,
@@ -102,7 +132,6 @@ const AlertItem = ({ item, onFilter, isActive }) => {
 
 const InfoPanel = ({ gameData, playersData, onFilter, activeFilters = [] }) => {
   const { t } = useTranslation();
-  const scrollerRef = useRef(null);
   const content = [];
   const teamLabel = (team) => {
     if (team === "axis") return t("views.team.axis");
@@ -194,6 +223,7 @@ const InfoPanel = ({ gameData, playersData, onFilter, activeFilters = [] }) => {
     label: `${t("views.live.score")} · ${t("views.team.allies")} : ${t(
       "views.team.axis"
     )}`,
+    mobileLabel: t("views.live.score"),
     value: `${gameData?.allied_score ?? 0} : ${gameData?.axis_score ?? 0}`,
     color: "secondary",
     icon: SportsScoreOutlined,
@@ -209,20 +239,6 @@ const InfoPanel = ({ gameData, playersData, onFilter, activeFilters = [] }) => {
     icon: MapOutlined,
     priority: t("views.live.priorityInfo"),
   });
-
-  const contentKey = content.map((item) => item.key).join("|");
-  useEffect(() => {
-    const resetScroll = () => {
-      if (scrollerRef.current) scrollerRef.current.scrollLeft = 0;
-    };
-    resetScroll();
-    const frame = window.requestAnimationFrame(resetScroll);
-    const timer = window.setTimeout(resetScroll, 240);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      window.clearTimeout(timer);
-    };
-  }, [contentKey]);
 
   return (
     <Box
@@ -242,32 +258,16 @@ const InfoPanel = ({ gameData, playersData, onFilter, activeFilters = [] }) => {
         {t("views.live.reviewNow", { defaultValue: "Jetzt prüfen" })}
       </Typography>
       <Box
-        ref={scrollerRef}
         sx={{
           display: "grid",
-          gridAutoColumns: {
-            xs: "minmax(148px, 48vw)",
-            sm: "minmax(164px, 32vw)",
-            md: "auto",
-          },
-          gridAutoFlow: { xs: "column", md: "row" },
           gridTemplateColumns: {
-            xs: "none",
+            xs: "repeat(2, minmax(0, 1fr))",
+            sm: "repeat(3, minmax(0, 1fr))",
             md: "repeat(3, minmax(0, 1fr))",
             lg: `repeat(${Math.min(content.length, 6)}, minmax(0, 1fr))`,
           },
           gap: 0.75,
-          mx: { xs: -1.5, md: 0 },
-          overflowX: { xs: "auto", md: "visible" },
-          overscrollBehaviorInline: "contain",
-          px: { xs: 1.5, md: 0 },
-          pb: { xs: 0.5, md: 0 },
-          scrollPaddingInline: { xs: 12, md: 0 },
-          scrollSnapType: { xs: "inline proximity", md: "none" },
-          scrollbarWidth: "thin",
-          "& > *": {
-            scrollSnapAlign: { xs: "start", md: "none" },
-          },
+          minWidth: 0,
         }}
       >
         {content

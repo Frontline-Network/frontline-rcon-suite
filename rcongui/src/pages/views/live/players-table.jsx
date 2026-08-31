@@ -4,7 +4,9 @@ import {
   Box,
   Button,
   Collapse,
+  FormControl,
   IconButton,
+  InputLabel,
   MenuItem,
   Select,
   Stack,
@@ -289,12 +291,45 @@ const PlayersTable = ({
             }
           />
         </Box>
+        <FormControl
+          size="small"
+          sx={{ display: { xs: "flex", md: "none" }, width: "100%" }}
+        >
+          <InputLabel id="live-mobile-quick-filter-label">
+            {t("views.live.quickFilters")}
+          </InputLabel>
+          <Select
+            labelId="live-mobile-quick-filter-label"
+            value={quickFilter ?? "custom"}
+            label={t("views.live.quickFilters")}
+            onChange={(event) => handleQuickFilter(null, event.target.value)}
+          >
+            {quickFilter === null ? (
+              <MenuItem value="custom" disabled>
+                {t("views.live.customPreset")}
+              </MenuItem>
+            ) : null}
+            <MenuItem value="all">
+              {t("common.all")} · {counts.all}
+            </MenuItem>
+            <MenuItem value="axis">
+              {t("views.team.axis")} · {counts.axis}
+            </MenuItem>
+            <MenuItem value="allies">
+              {t("views.team.allies")} · {counts.allies}
+            </MenuItem>
+            <MenuItem value="unassigned">
+              {t("views.live.lobby")} · {counts.lobby}
+            </MenuItem>
+            <MenuItem value="risk">
+              {t("views.live.suspicious")} · {counts.risk}
+            </MenuItem>
+          </Select>
+        </FormControl>
         <Box
           sx={{
+            display: { xs: "none", md: "block" },
             maxWidth: "100%",
-            overflowX: { xs: "auto", md: "visible" },
-            overscrollBehaviorInline: "contain",
-            scrollbarWidth: "thin",
           }}
         >
           <ToggleButtonGroup
@@ -305,9 +340,9 @@ const PlayersTable = ({
             aria-label={t("views.live.quickFilters")}
             sx={{
               display: "inline-flex",
-              flexWrap: { xs: "nowrap", md: "wrap" },
+              flexWrap: "wrap",
               gap: "1px",
-              minWidth: { xs: "max-content", md: 0 },
+              minWidth: 0,
               "& .MuiToggleButtonGroup-grouped": {
                 border: "1px solid",
                 borderColor: "divider",

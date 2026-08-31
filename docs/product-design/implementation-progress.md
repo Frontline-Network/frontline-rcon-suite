@@ -182,3 +182,36 @@ Das Paket ist frontend-, datenbank- und konfigurationsneutral. Es erfordert wede
 ### Rückrollbarkeit
 
 Das Paket ist frontend-, datenbank- und konfigurationsneutral. Es erfordert weder Backup noch Migration und kann als einzelner Git-Commit mit `git revert` zurückgenommen werden. Es wurde weder gepusht noch veröffentlicht, als PR eröffnet, ausgerollt oder auf einer Produktionsinstanz aktiviert.
+
+## Phase 2 · Paket 2.2 – Mobile Live-Einsatzsteuerung
+
+### Inventar und Risiko
+
+- Betroffene Route: `/views/live`.
+- Betroffene Komponenten: Handlungsbedarf-/Gefechtsstatus, Spieler-Schnellfilter und mobile Spielerzeilen.
+- Datenverträge und gespeicherte Konfigurationen: unverändert. `teamsLiveQueryOptions`, `GET_LIVE_LOGS`, globaler Spielstatus, Tabellenfilter, Zeilenauswahl, Serveraktionen und zentrale Spieleraktionen werden unverändert weiterverwendet. Das neue Mobile-Select setzt dieselben TanStack-Tabellenfilter wie die bisherigen Toggle-Buttons.
+- Ausgangslage: Desktop besaß bereits eine belastbare Split View. Mobile versteckte Lagekarten und Filter in zwei horizontalen Scrollbereichen; wichtige Commander-Warnungen, Kontextwerte und einzelne Filter waren ohne seitliches Suchen nicht vollständig sichtbar. Die mobile Spielerzeile färbte Namen zusätzlich nach Team und wich bei der Schriftstärke vom bereits vereinheitlichten Desktop-Tisch ab.
+
+### Umsetzung
+
+- Commander- und Truppführerwarnungen erhalten auf Mobile die volle Breite und stehen in Dringlichkeitsreihenfolge untereinander.
+- VIP-, Watchlist-, Spielstand- und Kartenkontext folgen als kompaktes Zweispaltenraster. Der Spielstand verwendet Mobile eine kurze Beschriftung; längere Kontextwerte dürfen zwei Zeilen belegen.
+- Der horizontale Spieler-Schnellfilter wurde auf Mobile durch ein sichtbar beschriftetes, tastaturbedienbares Select mit denselben fünf Filterwerten und aktuellen Zählern ersetzt. Desktop behält die schnelle Buttonleiste.
+- Mobile Spielernamen und K/D-Werte folgen mit neutraler Textfarbe und Gewicht 300 wieder der vereinbarten Tabellen-Typografie. Fraktion, Trupp und Rolle bleiben direkt in der zweiten Zeile sichtbar.
+- Einsatz/Protokoll-Tabs, Suchfeld, erweiterte Auswahlfilter, Tabellenkonfiguration, Player-Detail-Sheet und alle Server-/Spieleraktionen bleiben unverändert erreichbar.
+
+### Validierung
+
+- Vite-Production-Build mit produktionsäquivalentem API-Basispfad `/api/`: bestanden; nur die bekannte Chunk-Größenwarnung bleibt bestehen.
+- Verträge: Design Foundation, Seitensemantik, Action Feedback, Polling Budget, Konfigurationskompatibilität, Admin-Aktionen, Operator-Copy und Navigation Shell bestanden.
+- Browserprüfung: Desktop 1440 × 900 visuell unverändert; Mobile 390 × 844 und 320 × 720 ohne sichtbaren horizontalen Dokumentüberlauf.
+- Funktionsprüfung: Mobile Schnellfilter per Tastatur geöffnet und „Achsenmächte · 3“ gewählt; die Liste zeigte danach exakt drei Spieler. Einsatz/Protokoll-Wechsel funktionierte in beide Richtungen.
+- Detailprüfung: mobiles Spieler-Detail-Sheet geöffnet und mit Escape geschlossen.
+- Theme- und Farbsehprüfung: helles Theme mit Deuteranopie über die echte Darstellungsoberfläche geprüft und ohne Speicherung verworfen.
+- Design QA: zwei Iterationen nach dem Ausgangsvergleich; gekürzte Kontextbeschriftungen und Zeilenumbruch wurden im zweiten Lauf korrigiert. Keine offenen P0/P1/P2-Findings, Ergebnis `passed` in `design-qa.md`.
+- Browserkonsole: null Errors.
+- Lint: weiterhin nicht ausführbar, weil im Checkout kein ESLint-Paket beziehungsweise Binary installiert ist.
+
+### Rückrollbarkeit
+
+Das Paket ist frontend-, datenbank- und konfigurationsneutral. Es erfordert weder Backup noch Migration und kann als einzelner Git-Commit mit `git revert` zurückgenommen werden. Es wurde weder gepusht noch veröffentlicht, als PR eröffnet, ausgerollt oder auf einer Produktionsinstanz aktiviert.

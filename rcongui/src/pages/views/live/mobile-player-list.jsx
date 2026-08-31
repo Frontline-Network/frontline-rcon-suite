@@ -10,6 +10,7 @@ import {
   IconButton,
   Stack,
   Typography,
+  alpha,
 } from "@mui/material";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import KeyboardArrowRightRoundedIcon from "@mui/icons-material/KeyboardArrowRightRounded";
@@ -359,11 +360,11 @@ export default function MobilePlayerList({ table, isFetching, onOpenProfile }) {
                     >
                       <Typography
                         noWrap
-                        sx={{
-                          color: teamNameColor(player.team),
-                          fontWeight: 700,
+                        sx={(theme) => ({
+                          color: alpha(theme.palette.text.primary, 0.82),
+                          fontWeight: 300,
                           minWidth: 0,
-                        }}
+                        })}
                         variant="body2"
                       >
                         {player.name}
@@ -386,7 +387,7 @@ export default function MobilePlayerList({ table, isFetching, onOpenProfile }) {
                     </Typography>
                   </Box>
                   <Typography
-                    sx={{ fontVariantNumeric: "tabular-nums", fontWeight: 700 }}
+                    sx={{ fontVariantNumeric: "tabular-nums", fontWeight: 300 }}
                     variant="caption"
                   >
                     {player.kills ?? 0}/{player.deaths ?? 0}
