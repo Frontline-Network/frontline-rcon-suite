@@ -61,23 +61,31 @@ const baseDemoNames = [
 ];
 const simulatedAlliesNames = Array.from(
   { length: 46 },
-  (_, index) => `Demo_Allies_${String(index + 1).padStart(2, "0")}`,
+  (_, index) => `Demo_Allies_${String(index + 1).padStart(2, "0")}`
 );
 const simulatedAxisNames = Array.from(
   { length: 46 },
-  (_, index) => `Demo_Axis_${String(index + 1).padStart(2, "0")}`,
+  (_, index) => `Demo_Axis_${String(index + 1).padStart(2, "0")}`
 );
 const demoNames = [
   ...baseDemoNames,
   ...simulatedAlliesNames,
   ...simulatedAxisNames,
+  "FLN_Raven_VN",
 ];
-const demoPlayerId = (index) =>
-  `76561198${String(index + 1).padStart(9, "0")}`;
+const demoClassicPlayerId = "76561198000000001";
+const demoVietnamPlayerId = "f0a11e0d000000000000000000000001";
+const demoVietnamPlayerIndex = demoNames.length - 1;
+const demoPlayerId = (index) => `76561198${String(index + 1).padStart(9, "0")}`;
 
 export const demoPlayerRecords = demoNames.map((name, index) => ({
   id: index + 1,
-  player_id: `7656119800000000${index + 1}`,
+  player_id:
+    index === demoVietnamPlayerIndex
+      ? demoVietnamPlayerId
+      : `7656119800000000${index + 1}`,
+  steam_id: index === demoVietnamPlayerIndex ? demoClassicPlayerId : undefined,
+  game: index === demoVietnamPlayerIndex ? "hll_vietnam" : "hll",
   names: [
     {
       name,
@@ -137,8 +145,35 @@ export const demoPlayerRecords = demoNames.map((name, index) => ({
       creation_time: new Date(now - (index + 1) * 3600000).toISOString(),
     },
   ],
+  identity: {
+    linked_accounts:
+      index === 0
+        ? [
+            {
+              player_id: demoVietnamPlayerId,
+              steam_id: demoClassicPlayerId,
+              name: "FLN_Raven_VN",
+              game: "hll_vietnam",
+              active_blacklists: [],
+              existing_blacklists: [],
+            },
+          ]
+        : index === demoVietnamPlayerIndex
+        ? [
+            {
+              player_id: demoClassicPlayerId,
+              steam_id: null,
+              name: "FLN_Raven",
+              game: "hll",
+              active_blacklists: [],
+              existing_blacklists: [],
+            },
+          ]
+        : [],
+  },
   sessions_count: 4 + index,
-  watchlist: index === 2 ? { is_watched: true, reason: "Beobachtung", count: 1 } : null,
+  watchlist:
+    index === 2 ? { is_watched: true, reason: "Beobachtung", count: 1 } : null,
   vips:
     index === 0
       ? [
@@ -152,9 +187,23 @@ export const demoPlayerRecords = demoNames.map((name, index) => ({
   steaminfo: null,
 }));
 
-const demoLogTypes = ["MATCH START", "CONNECTED", "CHAT[Team]", "KILL", "TEAM KILL", "ADMIN KICKED", "CHAT[Unit]", "DISCONNECTED"];
+const demoLogTypes = [
+  "MATCH START",
+  "CONNECTED",
+  "CHAT[Team]",
+  "KILL",
+  "TEAM KILL",
+  "ADMIN KICKED",
+  "CHAT[Unit]",
+  "DISCONNECTED",
+];
 const demoWeapons = ["Karabiner 98k", "M1 Garand", "MP40", "StG 44"];
-const demoChatMessages = ["Bereit für den Einsatz.", "Rechte Flanke sichern.", "Brauche Munition am Punkt.", "Feindlicher Panzer bei F6."];
+const demoChatMessages = [
+  "Bereit für den Einsatz.",
+  "Rechte Flanke sichern.",
+  "Brauche Munition am Punkt.",
+  "Feindlicher Panzer bei F6.",
+];
 
 export const demoHistoricalLogs = Array.from({ length: 36 }, (_, index) => {
   const type = demoLogTypes[index % demoLogTypes.length];
@@ -164,11 +213,27 @@ export const demoHistoricalLogs = Array.from({ length: 36 }, (_, index) => {
   const playerIndex = index % baseDemoNames.length;
   const targetIndex = (index + 2) % baseDemoNames.length;
   const player1Name = demoNames[playerIndex];
-  const player2Name = ["KILL", "TEAM KILL", "ADMIN KICKED"].includes(type) ? demoNames[targetIndex] : null;
-  const weapon = ["KILL", "TEAM KILL"].includes(type) ? demoWeapons[index % demoWeapons.length] : null;
+  const player2Name = ["KILL", "TEAM KILL", "ADMIN KICKED"].includes(type)
+    ? demoNames[targetIndex]
+    : null;
+  const weapon = ["KILL", "TEAM KILL"].includes(type)
+    ? demoWeapons[index % demoWeapons.length]
+    : null;
   const eventTime = new Date(now - index * 45000).toISOString();
   const chatMessage = demoChatMessages[index % demoChatMessages.length];
-  const content = type.startsWith("CHAT") ? `${player1Name}: ${chatMessage}` : type === "CONNECTED" ? `${player1Name} ist dem Server beigetreten.` : type === "DISCONNECTED" ? `${player1Name} hat den Server verlassen.` : type === "MATCH START" ? "Runde gestartet · Foy · Warfare · Nacht" : type.startsWith("ADMIN") ? `Frontline Admin kickte ${player2Name}. Grund: Teamkill` : `${player1Name} hat ${player2Name} getötet (${weapon}, ${42 + index * 3} m)`;
+  const content = type.startsWith("CHAT")
+    ? `${player1Name}: ${chatMessage}`
+    : type === "CONNECTED"
+    ? `${player1Name} ist dem Server beigetreten.`
+    : type === "DISCONNECTED"
+    ? `${player1Name} hat den Server verlassen.`
+    : type === "MATCH START"
+    ? "Runde gestartet · Foy · Warfare · Nacht"
+    : type.startsWith("ADMIN")
+    ? `Frontline Admin kickte ${player2Name}. Grund: Teamkill`
+    : `${player1Name} hat ${player2Name} getötet (${weapon}, ${
+        42 + index * 3
+      } m)`;
 
   return {
     id: index + 1,
@@ -187,124 +252,132 @@ export const demoHistoricalLogs = Array.from({ length: 36 }, (_, index) => {
 });
 
 const demoAuditEntries = [
-    {
-      id: 1042,
-      creation_time: new Date(now).toISOString(),
-      username: "Frontline Admin",
-      command: "message_player",
-      command_arguments: JSON.stringify({
-        player_name: "FLN_Raven",
-        player_id: "76561198000000001",
-        message: "Bitte beachte die Serverregeln.",
-      }),
-      command_result: JSON.stringify({ failed: false }),
-    },
-    {
-      id: 1041,
-      creation_time: new Date(now - 420000).toISOString(),
-      username: "Leitstelle",
-      command: "kick_player",
-      command_arguments: JSON.stringify({
-        player_name: "Гук в Шльопках",
-        player_id: "76561198000000002",
-        reason: "Namensfilter",
-      }),
-      command_result: JSON.stringify({ failed: false }),
-    },
-    {
-      id: 1040,
-      creation_time: new Date(now - 840000).toISOString(),
-      username: "Frontline Admin",
-      command: "temp_ban_player",
-      command_arguments: JSON.stringify({
-        player_name: "Wotan",
-        player_id: "76561198000000003",
-        duration: "2 hours",
-        reason: "Wiederholter Regelverstoß",
-      }),
-      command_result: JSON.stringify({ failed: false }),
-    },
-    {
-      id: 1039,
-      creation_time: new Date(now - 1260000).toISOString(),
-      username: "Leitstelle",
-      command: "disband_squad_by_name",
-      command_arguments: JSON.stringify({ squad_name: "Able", team_name: "allies" }),
-      command_result: JSON.stringify({ failed: true, error: "Squad not found" }),
-    },
-    {
-      id: 1038,
-      creation_time: new Date(now - 1680000).toISOString(),
-      username: "Map Manager",
-      command: "set_map",
-      command_arguments: JSON.stringify({ map_name: "foy_warfare_night" }),
-      command_result: JSON.stringify({ failed: false }),
-    },
-    {
-      id: 1037,
-      creation_time: new Date(now - 2100000).toISOString(),
-      username: "Frontline Admin",
-      command: "set_autobalance_threshold",
-      command_arguments: JSON.stringify({ threshold: 2 }),
-      command_result: JSON.stringify({ failed: false }),
-    },
-    {
-      id: 1036,
-      creation_time: new Date(now - 2520000).toISOString(),
-      username: "Frontline Admin",
-      command: "add_vip",
-      command_arguments: JSON.stringify({
-        player_name: "FLN_Valkyrie",
-        player_id: "76561198000000004",
-        duration: "30 days",
-      }),
-      command_result: JSON.stringify({ failed: false }),
-    },
-    {
-      id: 1035,
-      creation_time: new Date(now - 2940000).toISOString(),
-      username: "Leitstelle",
-      command: "set_welcome_message",
-      command_arguments: JSON.stringify({ message: "Willkommen auf Frontline #2" }),
-      command_result: JSON.stringify({ failed: false }),
-    },
-    {
-      id: 1034,
-      creation_time: new Date(now - 3360000).toISOString(),
-      username: "System Admin",
-      command: "clear_cache",
-      command_arguments: JSON.stringify({ scope: "players" }),
-      command_result: JSON.stringify({ failed: false }),
-    },
-    {
-      id: 1033,
-      creation_time: new Date(now - 3780000).toISOString(),
-      username: "Frontline Admin",
-      command: "add_admin_roles",
-      command_arguments: JSON.stringify({
-        player_name: "FLN_Wolf",
-        player_id: "76561198000000005",
-        roles: ["moderator", "camera"],
-      }),
-      command_result: JSON.stringify({ failed: false }),
-    },
-    {
-      id: 1032,
-      creation_time: new Date(now - 4200000).toISOString(),
-      username: "System Admin",
-      command: "set_steam_config",
-      command_arguments: JSON.stringify({ api_key: "demo-sensitive-token" }),
-      command_result: JSON.stringify({ failed: true, error: "Steam API unavailable" }),
-    },
-    {
-      id: 1031,
-      creation_time: new Date(now - 4620000).toISOString(),
-      username: "Leitstelle",
-      command: "restart_webserver",
-      command_arguments: "",
-      command_result: "",
-    },
-  ];
+  {
+    id: 1042,
+    creation_time: new Date(now).toISOString(),
+    username: "Frontline Admin",
+    command: "message_player",
+    command_arguments: JSON.stringify({
+      player_name: "FLN_Raven",
+      player_id: "76561198000000001",
+      message: "Bitte beachte die Serverregeln.",
+    }),
+    command_result: JSON.stringify({ failed: false }),
+  },
+  {
+    id: 1041,
+    creation_time: new Date(now - 420000).toISOString(),
+    username: "Leitstelle",
+    command: "kick_player",
+    command_arguments: JSON.stringify({
+      player_name: "Гук в Шльопках",
+      player_id: "76561198000000002",
+      reason: "Namensfilter",
+    }),
+    command_result: JSON.stringify({ failed: false }),
+  },
+  {
+    id: 1040,
+    creation_time: new Date(now - 840000).toISOString(),
+    username: "Frontline Admin",
+    command: "temp_ban_player",
+    command_arguments: JSON.stringify({
+      player_name: "Wotan",
+      player_id: "76561198000000003",
+      duration: "2 hours",
+      reason: "Wiederholter Regelverstoß",
+    }),
+    command_result: JSON.stringify({ failed: false }),
+  },
+  {
+    id: 1039,
+    creation_time: new Date(now - 1260000).toISOString(),
+    username: "Leitstelle",
+    command: "disband_squad_by_name",
+    command_arguments: JSON.stringify({
+      squad_name: "Able",
+      team_name: "allies",
+    }),
+    command_result: JSON.stringify({ failed: true, error: "Squad not found" }),
+  },
+  {
+    id: 1038,
+    creation_time: new Date(now - 1680000).toISOString(),
+    username: "Map Manager",
+    command: "set_map",
+    command_arguments: JSON.stringify({ map_name: "foy_warfare_night" }),
+    command_result: JSON.stringify({ failed: false }),
+  },
+  {
+    id: 1037,
+    creation_time: new Date(now - 2100000).toISOString(),
+    username: "Frontline Admin",
+    command: "set_autobalance_threshold",
+    command_arguments: JSON.stringify({ threshold: 2 }),
+    command_result: JSON.stringify({ failed: false }),
+  },
+  {
+    id: 1036,
+    creation_time: new Date(now - 2520000).toISOString(),
+    username: "Frontline Admin",
+    command: "add_vip",
+    command_arguments: JSON.stringify({
+      player_name: "FLN_Valkyrie",
+      player_id: "76561198000000004",
+      duration: "30 days",
+    }),
+    command_result: JSON.stringify({ failed: false }),
+  },
+  {
+    id: 1035,
+    creation_time: new Date(now - 2940000).toISOString(),
+    username: "Leitstelle",
+    command: "set_welcome_message",
+    command_arguments: JSON.stringify({
+      message: "Willkommen auf Frontline #2",
+    }),
+    command_result: JSON.stringify({ failed: false }),
+  },
+  {
+    id: 1034,
+    creation_time: new Date(now - 3360000).toISOString(),
+    username: "System Admin",
+    command: "clear_cache",
+    command_arguments: JSON.stringify({ scope: "players" }),
+    command_result: JSON.stringify({ failed: false }),
+  },
+  {
+    id: 1033,
+    creation_time: new Date(now - 3780000).toISOString(),
+    username: "Frontline Admin",
+    command: "add_admin_roles",
+    command_arguments: JSON.stringify({
+      player_name: "FLN_Wolf",
+      player_id: "76561198000000005",
+      roles: ["moderator", "camera"],
+    }),
+    command_result: JSON.stringify({ failed: false }),
+  },
+  {
+    id: 1032,
+    creation_time: new Date(now - 4200000).toISOString(),
+    username: "System Admin",
+    command: "set_steam_config",
+    command_arguments: JSON.stringify({ api_key: "demo-sensitive-token" }),
+    command_result: JSON.stringify({
+      failed: true,
+      error: "Steam API unavailable",
+    }),
+  },
+  {
+    id: 1031,
+    creation_time: new Date(now - 4620000).toISOString(),
+    username: "Leitstelle",
+    command: "restart_webserver",
+    command_arguments: "",
+    command_result: "",
+  },
+];
 
 const demoAuditCommands = [
   "message_player",
@@ -363,7 +436,9 @@ export const demoScorePlayers = demoNames.map((name, index) => ({
   kills_streak: Math.max(1, 9 - index),
   time_seconds: 4200 - index * 40,
   kill_death_ratio: Number(((28 - index) / (4 + index)).toFixed(2)),
-  kills_per_minute: Number(((28 - index) / ((4200 - index * 40) / 60)).toFixed(2)),
+  kills_per_minute: Number(
+    ((28 - index) / ((4200 - index * 40) / 60)).toFixed(2)
+  ),
   teamkills: index % 3,
   teamkills_streak: index % 2,
   deaths_by_tk: index % 2,
@@ -428,8 +503,28 @@ const livePlayer = (record, index, team, unitName, role = "rifleman") => ({
   level: record.soldier.level,
 });
 
-const alliesPlayers = demoPlayerRecords.slice(0, 3).map((record, index) => livePlayer(record, index, "allies", "able", index === 0 ? "officer" : "rifleman"));
-const axisPlayers = demoPlayerRecords.slice(3, 6).map((record, index) => livePlayer(record, index, "axis", "baker", index === 0 ? "officer" : "rifleman"));
+const alliesPlayers = demoPlayerRecords
+  .slice(0, 3)
+  .map((record, index) =>
+    livePlayer(
+      record,
+      index,
+      "allies",
+      "able",
+      index === 0 ? "officer" : "rifleman"
+    )
+  );
+const axisPlayers = demoPlayerRecords
+  .slice(3, 6)
+  .map((record, index) =>
+    livePlayer(
+      record,
+      index,
+      "axis",
+      "baker",
+      index === 0 ? "officer" : "rifleman"
+    )
+  );
 
 export const demoTeamView = {
   fail_count: 0,
@@ -499,7 +594,8 @@ const readDemoParameter = (name) => {
   return new URLSearchParams(window.location.search).get(name);
 };
 
-export const getDemoConnectionMode = () => readDemoParameter("demo_connection") || "online";
+export const getDemoConnectionMode = () =>
+  readDemoParameter("demo_connection") || "online";
 
 export const getDemoRole = () => readDemoParameter("demo_role") || "admin";
 
@@ -518,9 +614,12 @@ export const isDemoAuthenticated = () => {
   }
 };
 
-export const isDemoSessionExpired = () => readDemoParameter("demo_auth") === "expired" && readDemoParameter("session_expired") !== "1";
+export const isDemoSessionExpired = () =>
+  readDemoParameter("demo_auth") === "expired" &&
+  readDemoParameter("session_expired") !== "1";
 
-export const shouldFailDemoServerSettings = () => readDemoParameter("demo_settings_error") === "1";
+export const shouldFailDemoServerSettings = () =>
+  readDemoParameter("demo_settings_error") === "1";
 
 const normalizeDemoGame = (value, fallback = "hll") => {
   const game = String(value ?? "")
@@ -545,11 +644,17 @@ export const getDemoServerList = () => {
       name: "[GER] Frontline Network | Vietnam #3",
       short_name: "Frontline Vietnam #3",
       server_number: 3,
-      game: normalizeDemoGame(readDemoParameter("demo_other_game"), "hll_vietnam"),
+      game: normalizeDemoGame(
+        readDemoParameter("demo_other_game"),
+        "hll_vietnam"
+      ),
       current_players: 72,
       max_players: 100,
       port: 4175,
-      link: typeof window === "undefined" ? "http://localhost:4175" : window.location.origin,
+      link:
+        typeof window === "undefined"
+          ? "http://localhost:4175"
+          : window.location.origin,
     },
   ];
 };
@@ -563,7 +668,10 @@ export const demoServerStatus = {
 export const getDemoServerStatus = () => ({
   ...demoServerStatus,
   game: getDemoServerConnection().game,
-  supported_game_modes: getDemoServerConnection().game === "hll_vietnam" ? ["warfare", "offensive", "conquest", "domination"] : ["warfare", "offensive", "conquest", "skirmish", "phased", "majority"],
+  supported_game_modes:
+    getDemoServerConnection().game === "hll_vietnam"
+      ? ["warfare", "offensive", "conquest", "domination"]
+      : ["warfare", "offensive", "conquest", "skirmish", "phased", "majority"],
   game_capabilities:
     getDemoServerConnection().game === "hll_vietnam"
       ? {
@@ -732,7 +840,8 @@ export const demoBlacklistRecords = [
       steaminfo: null,
     },
     reason: "Mehrfaches Teamkilling und absichtliches Stören des Events",
-    formatted_reason: "Mehrfaches Teamkilling und absichtliches Stören des Events",
+    formatted_reason:
+      "Mehrfaches Teamkilling und absichtliches Stören des Events",
     created_at: new Date(Date.now() - 35 * 60_000).toISOString(),
     expires_at: null,
     is_active: true,

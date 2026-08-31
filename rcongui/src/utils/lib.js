@@ -73,6 +73,7 @@ export const mapIdsToLayers = (layers, ids) => {
 
 export const normalizePlayerProfile = (profile) => {
   profile = profile ?? {};
+  const identity = profile.identity ?? {};
 
   return {
     ...profile,
@@ -92,6 +93,12 @@ export const normalizePlayerProfile = (profile) => {
     current_playtime_seconds: profile.current_playtime_seconds ?? 0,
     names: profile.names ?? [],
     bans: profile.bans ?? [],
+    identity: {
+      ...identity,
+      linked_accounts: Array.isArray(identity.linked_accounts)
+        ? identity.linked_accounts
+        : [],
+    },
   };
 };
 

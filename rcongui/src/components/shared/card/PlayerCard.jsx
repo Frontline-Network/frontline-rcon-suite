@@ -204,7 +204,7 @@ export default function PlayerCard({
           clanTag={clanTag}
           headingComponent="h2"
         />
-        <LinkedAccounts identity={playerProfile.identity} compact />
+        <LinkedAccounts player={playerProfile} compact />
 
         <Box
           sx={{

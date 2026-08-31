@@ -139,7 +139,7 @@ export default function PlayerProfilePage() {
             <Typography component="h2" variant="h6" sx={{ mb: 1.5 }}>
               {t("records.playerDetails.caseSummary")}
             </Typography>
-            <LinkedAccounts identity={profile.identity} />
+            <LinkedAccounts player={profile} />
             <Divider />
             <PlayerProfileSummary
               player={profile}

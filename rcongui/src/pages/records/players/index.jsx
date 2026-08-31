@@ -114,12 +114,14 @@ export const loader = async ({ request }) => {
     players: playersRecords.result.players.map((player) => ({
       ...player,
       is_banned: bannedPlayerIds.has(player.player_id),
-      identity: player.identity && {
-        ...player.identity,
-        linked_accounts: player.identity.linked_accounts.map((account) => ({
-          ...account,
-          is_banned: bannedPlayerIds.has(account.player_id),
-        })),
+      identity: {
+        ...(player.identity ?? {}),
+        linked_accounts: (player.identity?.linked_accounts ?? []).map(
+          (account) => ({
+            ...account,
+            is_banned: bannedPlayerIds.has(account.player_id),
+          })
+        ),
       },
     })),
     total_pages:

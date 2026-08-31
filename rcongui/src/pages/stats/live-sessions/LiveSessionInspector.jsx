@@ -17,6 +17,7 @@ import {
 } from "@/features/player-action/actions";
 import { usePlayerSidebar } from "@/hooks/usePlayerSidebar";
 import { getColoredFactionIconSrc } from "@/utils/lib";
+import LinkedAccounts from "@/components/player/profile/LinkedAccounts";
 import {
   formatSessionDuration,
   getPlayerKdr,
@@ -179,6 +180,18 @@ export default function LiveSessionInspector({ player, t }) {
           </IconButton>
         </Tooltip>
       </Stack>
+
+      <Box sx={{ px: 1.5 }}>
+        <LinkedAccounts
+          player={{
+            ...player.profile,
+            player_id: player.player_id,
+            name: player.name,
+          }}
+          compact
+          showWarnings={false}
+        />
+      </Box>
 
       <Divider />
 

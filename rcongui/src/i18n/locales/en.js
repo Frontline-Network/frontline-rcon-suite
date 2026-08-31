@@ -1,10 +1,12 @@
 const en = {
   brand: { product: "CRCON Administration" },
   playerIdentity: {
-    linkedAccounts: "Automatically linked to",
+    linkedAccounts: "Connected game accounts",
+    currentAccount: "Current",
     restrictedTitle: "Security warning: linked account is banned",
     restrictedDescription: "The linked {{game}} “{{name}}” has an active ban. No automatic action was taken.",
-    games: { hll: "HLL account", hll_vietnam: "HLL:V account" },
+    games: { hll: "HLL account", hllv: "HLL:V account", hll_vietnam: "HLL:V account" },
+    gameCodes: { hll: "HLL", hllv: "HLLV", hll_vietnam: "HLLV" },
   },
   common: {
     actions: "Actions",
