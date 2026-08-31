@@ -40,16 +40,17 @@ export default function SystemDiagnosticsLayout({ children }) {
     ...section,
     label: t(section.labelKey),
   }));
-  const active =
-    sections.find((section) => location.pathname.endsWith(section.key))?.key ||
-    sections[0].key;
+  const activeSection =
+    sections.find((section) => location.pathname.endsWith(section.key)) ||
+    sections[0];
+  const active = activeSection.key;
   const english = i18n.resolvedLanguage === "en";
 
   return (
     <>
       <PageHeader
-        eyebrow={english ? "Operations" : "Betrieb"}
-        title={t("navigation.groups.systemDiagnostics")}
+        eyebrow={t("navigation.groups.systemDiagnostics")}
+        title={activeSection.label}
         subtitle={
           english
             ? "Monitor services, connections and diagnostic data in one workspace."

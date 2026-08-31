@@ -965,14 +965,15 @@ function VotemapSettingsPage() {
               )}
               <Divider sx={{ my: 1.25 }} />
               <FormControl fullWidth size="small">
-                <InputLabel id="default_method">
+                <InputLabel id="votemap-default-method-label">
                   {t("maps.votemapWorkbench.fallbackSelection")}
                 </InputLabel>
                 <Select
+                  id="votemap-default-method"
                   value={workingConfig.default_method ?? ""}
                   onChange={handleWorkingChanges("default_method")}
                   label={t("maps.votemapWorkbench.fallbackSelection")}
-                  labelId="default_method"
+                  labelId="votemap-default-method-label"
                 >
                   {defaultMapOptions.map((option) => (
                     <MenuItem key={option.name} value={option.name}>

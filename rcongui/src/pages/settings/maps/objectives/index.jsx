@@ -37,6 +37,8 @@ import {
 } from "../queries";
 import { toast } from "react-toastify";
 import { useTranslation } from "react-i18next";
+import PageHeader from "@/components/shared/PageHeader";
+import PageState from "@/components/shared/PageState";
 
 function MapObjectivesPage() {
   const { t } = useTranslation();
@@ -212,27 +214,28 @@ function MapObjectivesPage() {
 
   if (!sectorLayout.read) {
     return (
-      <Box sx={{ py: 1 }}>
-        <Typography variant="h5" gutterBottom>
-          {t("maps.objectives")}
-        </Typography>
-        <Typography variant="body2" color="textSecondary">
-          {t("maps.objectivesUnavailable")}
-        </Typography>
-      </Box>
+      <>
+        <PageHeader
+          eyebrow={t("navigation.groups.maps")}
+          title={t("maps.objectives")}
+          subtitle={t("maps.objectivesIntro")}
+        />
+        <PageState
+          kind="offline"
+          title={t("maps.objectivesUnavailableTitle")}
+          description={t("maps.objectivesUnavailable")}
+        />
+      </>
     );
   }
 
   return (
     <>
-      <Box sx={{ py: 1 }}>
-        <Typography variant="h5" gutterBottom>
-          {t("maps.objectives")}
-        </Typography>
-        <Typography variant="body2" gutterBottom color="textSecondary">
-          {t("maps.objectivesIntro")}
-        </Typography>
-      </Box>
+      <PageHeader
+        eyebrow={t("navigation.groups.maps")}
+        title={t("maps.objectives")}
+        subtitle={t("maps.objectivesIntro")}
+      />
       <Stack direction={{ xs: "column", md: "row" }}>
         <Box sx={{ width: { xs: "100%", md: "50%" } }}>
           <MapObjectivesPicker
@@ -280,7 +283,7 @@ function MapObjectivesPage() {
                 )
               }
             >
-              {t("common.confirm")}
+              {t("maps.changeObjectives")}
             </Button>
           </Stack>
           <FormControl component="fieldset" sx={{ px: 1, mt: 1 }}>
@@ -364,12 +367,12 @@ function MapObjectivesPage() {
         aria-labelledby="alert-dialog-title"
         aria-describedby="alert-dialog-description"
       >
-        <DialogTitle>
+        <DialogTitle id="alert-dialog-title">
           <div>{t("maps.changeObjectives")}</div>
           <div>{t("maps.server", { server: serverState?.name || t("common.unknown") })}</div>
         </DialogTitle>
         <DialogContent>
-          <DialogContentText>
+          <DialogContentText id="alert-dialog-description">
             {t("maps.objectiveRestart")}
           </DialogContentText>
           <Box
@@ -404,7 +407,7 @@ function MapObjectivesPage() {
             variant="contained"
             startIcon={<CheckCircleIcon />}
           >
-            {t("common.confirm")}
+            {t("maps.changeObjectives")}
           </Button>
         </DialogActions>
       </Dialog>

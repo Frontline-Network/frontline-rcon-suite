@@ -221,7 +221,8 @@ export default function SeedingWorkbenchLayout({
           mb: embedded ? 1 : 1.5,
         }}
       >
-        <Box sx={{ minWidth: 0, display: embedded ? "none" : "block" }}>
+        {!embedded && (
+          <Box sx={{ minWidth: 0 }}>
           {eyebrow && (
             <Typography
               variant="overline"
@@ -264,7 +265,8 @@ export default function SeedingWorkbenchLayout({
               {description}
             </Typography>
           )}
-        </Box>
+          </Box>
+        )}
 
         {headerActions && (
           <Box

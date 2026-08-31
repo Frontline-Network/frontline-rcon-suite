@@ -1,8 +1,21 @@
 import { Box, Stack, Typography } from "@mui/material";
+import { useId } from "react";
 
-export default function PageHeader({ eyebrow, title, subtitle, actions }) {
+export default function PageHeader({
+  eyebrow,
+  title,
+  subtitle,
+  actions,
+  titleId: providedTitleId,
+}) {
+  const generatedTitleId = useId();
+  const titleId = providedTitleId || `page-title-${generatedTitleId.replace(/:/g, "")}`;
+
   return (
     <Stack
+      component="header"
+      aria-labelledby={titleId}
+      data-testid="page-header"
       direction={{ xs: "column", sm: "row" }}
       justifyContent="space-between"
       alignItems={{ xs: "stretch", sm: "flex-end" }}
@@ -14,7 +27,7 @@ export default function PageHeader({ eyebrow, title, subtitle, actions }) {
         borderColor: "divider",
       }}
     >
-      <Box>
+      <Box sx={{ minWidth: 0 }}>
         {eyebrow && (
           <Typography
             variant="overline"
@@ -25,6 +38,7 @@ export default function PageHeader({ eyebrow, title, subtitle, actions }) {
           </Typography>
         )}
         <Typography
+          id={titleId}
           component="h1"
           variant="h4"
           sx={{

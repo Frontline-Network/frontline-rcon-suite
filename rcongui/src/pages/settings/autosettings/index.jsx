@@ -204,13 +204,11 @@ const Autosettings = () => {
 
   return (
     <Stack gap={compact ? 1.25 : 2} sx={{ minWidth: 0, pb: { xs: 2, md: 0 } }}>
-      {compact ? (
-        <PageHeader
-          eyebrow={t("settings.autosettings.eyebrow")}
-          title={t("settings.autosettings.title")}
-          subtitle={t("settings.autosettings.subtitle")}
-        />
-      ) : null}
+      <PageHeader
+        eyebrow={t("settings.autosettings.eyebrow")}
+        title={t("settings.autosettings.title")}
+        subtitle={t("settings.autosettings.subtitle")}
+      />
       <Stack
         component={Paper}
         sx={{ p: { xs: 1.25, md: 1 }, mb: { xs: 0, md: 1 } }}

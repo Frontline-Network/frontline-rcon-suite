@@ -21,7 +21,7 @@ const FrontlineAppsPage = () => {
       <Typography variant="overline" color="primary.main" sx={{ fontWeight: 700 }}>
         {t("apps.eyebrow")}
       </Typography>
-      <Typography variant="h3" sx={{ textTransform: "uppercase" }}>
+      <Typography component="h1" variant="h3" sx={{ textTransform: "uppercase" }}>
         {t("apps.title")}
       </Typography>
       <Typography color="text.secondary" sx={{ mt: 0.5, maxWidth: 720 }}>

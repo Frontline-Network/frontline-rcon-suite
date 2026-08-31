@@ -4,7 +4,6 @@ import {
   Box,
   Button,
   Chip,
-  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -28,6 +27,8 @@ import { useTheme } from "@mui/material/styles";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { cmd } from "@/utils/fetchUtils";
+import PageHeader from "@/components/shared/PageHeader";
+import PageState from "@/components/shared/PageState";
 
 const STATUS_TONES = {
   new: "warning",
@@ -155,11 +156,12 @@ export default function IncidentsPage() {
 
   return (
     <Box component="section" aria-labelledby="incidents-title" sx={{ pb: 2 }}>
-      <Stack spacing={0.5} sx={{ mb: 1.5 }}>
-        <Typography color="primary.light" variant="overline">{t("incidents.eyebrow")}</Typography>
-        <Typography component="h1" id="incidents-title" variant="h4">{t("incidents.title")}</Typography>
-        <Typography color="text.secondary" variant="body2">{t("incidents.subtitle")}</Typography>
-      </Stack>
+      <PageHeader
+        eyebrow={t("incidents.eyebrow")}
+        title={t("incidents.title")}
+        subtitle={t("incidents.subtitle")}
+        titleId="incidents-title"
+      />
 
       <Tabs
         value={filter}
@@ -177,17 +179,19 @@ export default function IncidentsPage() {
       </Tabs>
 
       {query.isLoading ? (
-        <Stack alignItems="center" sx={{ py: 6 }}><CircularProgress size={28} /><Typography sx={{ mt: 1 }} variant="body2">{t("common.loading")}</Typography></Stack>
+        <PageState kind="loading" title={t("common.loading")} />
       ) : query.isError ? (
-        <Alert severity="error" action={<Button onClick={() => query.refetch()}>{t("common.retry")}</Button>}>
-          {t("incidents.loadFailed")}
-        </Alert>
+        <PageState
+          kind="error"
+          title={t("incidents.loadFailed")}
+          action={{ label: t("common.retry"), onClick: () => query.refetch() }}
+        />
       ) : filtered.length === 0 ? (
-        <Stack alignItems="center" spacing={1} sx={{ border: "1px dashed", borderColor: "divider", py: 6, px: 2, textAlign: "center" }}>
-          <DoneRoundedIcon color="success" />
-          <Typography variant="subtitle1">{t("incidents.emptyTitle")}</Typography>
-          <Typography color="text.secondary" variant="body2">{t("incidents.emptyDescription")}</Typography>
-        </Stack>
+        <PageState
+          kind="empty"
+          title={t("incidents.emptyTitle")}
+          description={t("incidents.emptyDescription")}
+        />
       ) : (
         <Stack spacing={1}>{filtered.map((incident) => <IncidentCard key={incident.id} incident={incident} onOpen={setSelected} />)}</Stack>
       )}

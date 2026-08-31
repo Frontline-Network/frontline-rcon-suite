@@ -42,6 +42,7 @@ const PlayerProfileHeader = ({
           >
             <Stack>
               <Typography
+                component="h1"
                 textOverflow={"ellipsis"}
                 fontSize={"1.125rem"}
                 fontWeight={600}

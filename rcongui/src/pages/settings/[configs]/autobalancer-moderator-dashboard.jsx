@@ -480,7 +480,7 @@ const ProposalDetail = ({
           <Typography variant="overline" color="text.secondary">
             Vorschlag vom {formatDate(decision.created_at)}
           </Typography>
-          <Typography variant="h4" sx={{ fontWeight: 700 }}>
+          <Typography component="h1" variant="h4" sx={{ fontWeight: 700 }}>
             {decision.player_name || "Unbekannter Kandidat"} prüfen
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
@@ -1064,7 +1064,7 @@ const AutobalancerModeratorDashboard = ({
         gap={2}
       >
         <Box>
-          <Typography variant="h3" sx={{ fontWeight: 700 }}>
+          <Typography component="h1" variant="h3" sx={{ fontWeight: 700 }}>
             Autobalancer
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>

@@ -18,6 +18,7 @@ import { toast } from "react-toastify";
 import { useAuth } from "@/hooks/useAuth";
 import { cmd } from "@/utils/fetchUtils";
 import AutobalancerModeratorDashboard from "@/pages/settings/[configs]/autobalancer-moderator-dashboard";
+import PageState from "@/components/shared/PageState";
 
 const REJECTION_LABELS = {
   squad_should_stay: "Squad sollte zusammenbleiben",
@@ -125,15 +126,24 @@ const AutobalancerShadowOverview = ({ config, onOpenSettings }) => {
   };
 
   if (isLoading) {
-    return <Alert severity="info">Autobalancer-Dashboard wird geladen …</Alert>;
+    return (
+      <PageState
+        kind="loading"
+        title="Autobalancer-Dashboard wird geladen …"
+        titleComponent="h1"
+      />
+    );
   }
 
   if (isError || !data) {
     return (
-      <Alert severity="error">
-        Das Autobalancer-Dashboard konnte nicht geladen werden. Bitte
-        Berechtigung und Autobalancer-Dienst prüfen.
-      </Alert>
+      <PageState
+        kind="error"
+        title="Autobalancer-Dashboard konnte nicht geladen werden"
+        description="Bitte Berechtigung und Autobalancer-Dienst prüfen."
+        titleComponent="h1"
+        action={{ label: "Erneut versuchen", onClick: refetch }}
+      />
     );
   }
 

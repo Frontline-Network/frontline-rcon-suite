@@ -147,7 +147,7 @@ const Dashboard = () => {
         sx={{ mb: 2 }}
       >
         <Box>
-          <Typography variant="h3" sx={{ textTransform: "uppercase" }}>
+          <Typography component="h1" variant="h3" sx={{ textTransform: "uppercase" }}>
             {t("dashboard.title")}
           </Typography>
           <Typography

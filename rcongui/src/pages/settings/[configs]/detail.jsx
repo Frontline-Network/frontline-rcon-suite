@@ -907,7 +907,7 @@ const ConfigPage = () => {
       >
         <Form id="config-settings-form" method="post" onSubmit={handleSubmit}>
           <WorkbenchLayout
-            embedded={isIntegrationHub}
+            embedded={isIntegrationHub || isSystemDiagnostics}
             eyebrow={pageEyebrow}
             title={pageTitle}
             description={pageDescription}
