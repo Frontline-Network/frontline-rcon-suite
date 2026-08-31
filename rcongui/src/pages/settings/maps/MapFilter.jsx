@@ -108,7 +108,9 @@ export const MapFilter = ({ maps = [], onFilterChange, compact = false }) => {
           display: "grid",
           gridTemplateColumns: {
             xs: "1fr",
-            sm: "minmax(220px, 1.5fr) minmax(150px, 1fr) minmax(150px, 1fr) auto",
+            sm: compact
+              ? "minmax(0, 1fr) minmax(0, 1fr) auto"
+              : "minmax(220px, 1.5fr) minmax(150px, 1fr) minmax(150px, 1fr) auto",
           },
           gap: 1,
           alignItems: "start",
@@ -121,6 +123,11 @@ export const MapFilter = ({ maps = [], onFilterChange, compact = false }) => {
           placeholder={t("maps.filter")}
           size="small"
           fullWidth
+          sx={{
+            gridColumn: {
+              sm: compact ? "1 / -1" : "auto",
+            },
+          }}
           slotProps={{
             input: {
               startAdornment: (
