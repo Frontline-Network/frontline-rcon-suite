@@ -4236,6 +4236,13 @@ const de = {
       lastUpdated: "Zuletzt geändert am {{date}} von {{user}}",
       noMessages: "Keine Nachrichten vorhanden",
       search: "Nachricht suchen",
+      library: "Vorlagenbibliothek",
+      templateCount_one: "{{count}} Vorlage",
+      templateCount_other: "{{count}} Vorlagen",
+      preview: "Vorlagenvorschau",
+      noSelection: "Keine Vorlage ausgewählt",
+      noSelectionDescription:
+        "Wähle links eine Vorlage oder lege eine neue Vorlage an.",
     },
     autosettings: {
       readDocs: "Dokumentation öffnen",

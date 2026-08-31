@@ -157,22 +157,23 @@ function EditorActions({ editor, actions, compact = false }) {
   const { t } = useTranslation();
   const canBeSaved = editor.title.trim() && editor.content.trim();
 
+  if (editor.mode === MODE.READ) return null;
+
   return (
-    <Paper
-      elevation={0}
+    <Box
       sx={(theme) => ({
         display: "flex",
         flexWrap: "wrap",
         gap: theme.spacing(0.75),
-        padding: theme.spacing(1),
-        borderRadius: 0,
+        justifyContent: "flex-end",
+        padding: theme.spacing(1.5, 2),
+        borderTop: "1px solid",
+        borderColor: theme.palette.divider,
+        bgcolor: theme.palette.background.default,
         ...(compact && {
           position: "sticky",
           bottom: "calc(64px + env(safe-area-inset-bottom))",
           zIndex: theme.zIndex.appBar,
-          mt: 1,
-          border: "1px solid",
-          borderColor: theme.palette.divider,
           boxShadow: theme.shadows[8],
         }),
         "& .MuiButton-root": {
@@ -181,18 +182,18 @@ function EditorActions({ editor, actions, compact = false }) {
         },
       })}
     >
-      <Box sx={{ flexGrow: 1 }} />
-      {editor.mode === MODE.READ && editor.id !== 0 && (
-        <Button onClick={actions.update} startIcon={<EditIcon />}>
-          {t("common.edit")}
-        </Button>
-      )}
       {editor.mode === MODE.CREATE && (
         <>
-          <Button onClick={actions.cancelCreate} startIcon={<CancelIcon />}>
+          <Button
+            variant="outlined"
+            color="inherit"
+            onClick={actions.cancelCreate}
+            startIcon={<CancelIcon />}
+          >
             {t("common.cancel")}
           </Button>
           <Button
+            variant="contained"
             type="submit"
             name="intent"
             value={INTENT.CREATE}
@@ -205,10 +206,16 @@ function EditorActions({ editor, actions, compact = false }) {
       )}
       {editor.mode === MODE.EDIT && (
         <>
-          <Button onClick={actions.cancelEdit} startIcon={<CancelIcon />}>
+          <Button
+            variant="outlined"
+            color="inherit"
+            onClick={actions.cancelEdit}
+            startIcon={<CancelIcon />}
+          >
             {t("common.cancel")}
           </Button>
           <Button
+            variant="contained"
             type="submit"
             name="intent"
             value={INTENT.UPDATE}
@@ -218,6 +225,7 @@ function EditorActions({ editor, actions, compact = false }) {
             {t("common.save")}
           </Button>
           <Button
+            variant="outlined"
             type="submit"
             name="intent"
             value={INTENT.CREATE}
@@ -228,27 +236,7 @@ function EditorActions({ editor, actions, compact = false }) {
           </Button>
         </>
       )}
-      {editor.mode !== MODE.CREATE && editor.id !== 0 && (
-        <>
-          <Button
-            color="warning"
-            type="submit"
-            name="intent"
-            value={INTENT.DELETE}
-            startIcon={<DeleteIcon />}
-          >
-            {t("common.delete")}
-          </Button>
-        </>
-      )}
-      {editor.mode === MODE.READ && (
-        <>
-          <Button onClick={actions.create} startIcon={<AddIcon />}>
-            {t("settings.templates.createNew")}
-          </Button>
-        </>
-      )}
-    </Paper>
+    </Box>
   );
 }
 
@@ -282,59 +270,111 @@ function EditorFields({ editor, category, setEditor, compact = false }) {
     <>
       <input name="id" value={editor.id} hidden readOnly />
       <input name="category" value={category} hidden readOnly />
-      <StyledTextField
-        name="title"
-        value={editor.title}
-        onChange={handleOnInputChange}
-        label={t("settings.templates.messageTitle")}
-        placeholder={t("settings.templates.messageTitle")}
-        fullWidth
-        required
-        disabled={editor.mode === MODE.READ}
-      />
-      {category === "broadcast" ? (
-        <BroadcastFields
-          messages={unpackBroadcastMessage(editor.content ?? "")}
-          disabled={editor.mode === MODE.READ}
-          onChange={handleOnBroadcastChange}
-        />
-      ) : category === "auto_settings" ? (
-        <Suspense fallback={<Skeleton variant="rectangular" height="70vh" />}>
-          <StyledTextField
-            multiline
-            minRows={compact ? 9 : 16}
-            fullWidth
-            name="content"
-            value={editor.content}
-            label={t("settings.templates.messageContent")}
-            required
-            readOnly={editor.mode === MODE.READ}
-            sx={{ display: editor.mode === MODE.READ ? "block" : "none" }}
-          />
-          <Box sx={{ display: editor.mode === MODE.READ ? "none" : "block" }}>
-            <Editor
-              height={compact ? "52vh" : "70vh"}
-              defaultLanguage="json"
-              value={editor.content}
-              defaultValue=""
-              theme={theme.palette.mode === "dark" ? "vs-dark" : "vs-light"}
-              onChange={handleAutosettingsChange}
-            />
+      {editor.mode === MODE.READ ? (
+        editor.id ? (
+          <Box
+            component="section"
+            aria-label={t("settings.templates.preview")}
+            sx={{
+              minHeight: { xs: 220, md: 300 },
+              p: { xs: 1.5, sm: 2 },
+              border: "1px solid",
+              borderColor: "divider",
+              bgcolor: "background.default",
+            }}
+          >
+            <Typography variant="overline" color="text.secondary">
+              {t("settings.templates.messageContent")}
+            </Typography>
+            {category === "broadcast" ? (
+              <Box sx={{ mt: 1.5 }}>
+                <BroadcastFields
+                  messages={unpackBroadcastMessage(editor.content ?? "")}
+                  disabled
+                  onChange={handleOnBroadcastChange}
+                />
+              </Box>
+            ) : category === "auto_settings" ? (
+              <Box
+                component="pre"
+                sx={{
+                  m: 0,
+                  mt: 1.5,
+                  whiteSpace: "pre-wrap",
+                  overflowWrap: "anywhere",
+                  color: "text.primary",
+                  fontFamily: "monospace",
+                  fontSize: "0.875rem",
+                  lineHeight: 1.65,
+                }}
+              >
+                {editor.content}
+              </Box>
+            ) : (
+              <Typography
+                variant="body1"
+                sx={{ mt: 1.5, whiteSpace: "pre-wrap", lineHeight: 1.75 }}
+              >
+                {editor.content}
+              </Typography>
+            )}
           </Box>
-        </Suspense>
+        ) : (
+          <Stack
+            alignItems="center"
+            justifyContent="center"
+            spacing={0.75}
+            sx={{ minHeight: 300, px: 2, textAlign: "center" }}
+          >
+            <Typography variant="h6">
+              {t("settings.templates.noSelection")}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {t("settings.templates.noSelectionDescription")}
+            </Typography>
+          </Stack>
+        )
       ) : (
-        <StyledTextField
-          name="content"
-          value={editor.content}
-          onChange={handleOnInputChange}
-          label={t("settings.templates.messageContent")}
-          placeholder={t("settings.templates.messageContent")}
-          multiline
-          minRows={compact ? 9 : 16}
-          fullWidth
-          required
-          disabled={editor.mode === MODE.READ}
-        />
+        <Stack spacing={1.5}>
+          <StyledTextField
+            name="title"
+            value={editor.title}
+            onChange={handleOnInputChange}
+            label={t("settings.templates.messageTitle")}
+            placeholder={t("settings.templates.messageTitle")}
+            fullWidth
+            required
+          />
+          {category === "broadcast" ? (
+            <BroadcastFields
+              messages={unpackBroadcastMessage(editor.content ?? "")}
+              onChange={handleOnBroadcastChange}
+            />
+          ) : category === "auto_settings" ? (
+            <Suspense fallback={<Skeleton variant="rectangular" height="52vh" />}>
+              <Editor
+                height={compact ? "44vh" : "52vh"}
+                defaultLanguage="json"
+                value={editor.content}
+                defaultValue=""
+                theme={theme.palette.mode === "dark" ? "vs-dark" : "vs-light"}
+                onChange={handleAutosettingsChange}
+              />
+            </Suspense>
+          ) : (
+            <StyledTextField
+              name="content"
+              value={editor.content}
+              onChange={handleOnInputChange}
+              label={t("settings.templates.messageContent")}
+              placeholder={t("settings.templates.messageContent")}
+              multiline
+              minRows={compact ? 9 : 12}
+              fullWidth
+              required
+            />
+          )}
+        </Stack>
       )}
     </>
   );
@@ -343,11 +383,10 @@ function EditorFields({ editor, category, setEditor, compact = false }) {
 function MessageList({ messages, onMessageClick, selected, compact = false }) {
   const { t } = useTranslation();
   return (
-    <Paper
+    <Box
       sx={{
-        borderRadius: 0,
-        minHeight: compact ? 0 : "300px",
-        maxHeight: compact ? "none" : "calc(100vh - 256px)",
+        minHeight: compact ? 0 : 280,
+        maxHeight: compact ? "none" : "calc(100vh - 340px)",
         overflowY: compact ? "visible" : "auto",
         overflowX: compact ? "auto" : "hidden",
         scrollbarWidth: "thin",
@@ -355,12 +394,19 @@ function MessageList({ messages, onMessageClick, selected, compact = false }) {
       }}
     >
       <List
-        sx={compact ? {
-          display: "flex",
-          gap: 1,
-          p: 1,
-          width: "max-content",
-        } : undefined}
+        aria-label={t("settings.templates.library")}
+        disablePadding={!compact}
+        sx={
+          compact
+            ? {
+                display: "flex",
+                flexDirection: "row",
+                gap: 1,
+                p: 1,
+                width: "max-content",
+              }
+            : undefined
+        }
       >
         {messages.length ? (
           messages.map((message, index) => (
@@ -372,24 +418,57 @@ function MessageList({ messages, onMessageClick, selected, compact = false }) {
               <ListItemButton
                 onClick={() => onMessageClick(index)}
                 selected={selected !== undefined && message.id === selected}
-                sx={compact ? {
-                  minHeight: 68,
-                  border: "1px solid",
-                  borderColor: message.id === selected ? "primary.main" : "divider",
+                sx={{
+                  minHeight: compact ? 76 : 82,
+                  px: 1.5,
+                  py: 1.25,
+                  border: compact ? "1px solid" : 0,
+                  borderBottom: compact ? undefined : "1px solid",
+                  borderLeft: "3px solid",
+                  borderColor:
+                    message.id === selected ? "primary.main" : "divider",
                   alignItems: "flex-start",
-                } : undefined}
+                  "&.Mui-selected": { bgcolor: "action.selected" },
+                  "&.Mui-selected:hover": { bgcolor: "action.selected" },
+                }}
               >
                 <ListItemText
+                  disableTypography
                   sx={{
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
+                    m: 0,
+                    minWidth: 0,
                   }}
-                  primary={`#${message.id} - ${message.title}`}
-                  secondary={t("settings.templates.lastUpdated", {
-                    date: dayjs(message.updated_at).format("LL"),
-                    user: message.updated_by,
-                  })}
+                  primary={
+                    <Stack direction="row" gap={1} justifyContent="space-between">
+                      <Typography
+                        variant="subtitle2"
+                        sx={{ overflow: "hidden", textOverflow: "ellipsis" }}
+                      >
+                        {message.title}
+                      </Typography>
+                      <Typography variant="overline" color="text.secondary">
+                        #{message.id}
+                      </Typography>
+                    </Stack>
+                  }
+                  secondary={
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{
+                        display: "-webkit-box",
+                        mt: 0.5,
+                        overflow: "hidden",
+                        WebkitBoxOrient: "vertical",
+                        WebkitLineClamp: 2,
+                      }}
+                    >
+                      {t("settings.templates.lastUpdated", {
+                        date: dayjs(message.updated_at).format("LL"),
+                        user: message.updated_by,
+                      })}
+                    </Typography>
+                  }
                 />
               </ListItemButton>
             </ListItem>
@@ -407,7 +486,7 @@ function MessageList({ messages, onMessageClick, selected, compact = false }) {
           </ListItem>
         )}
       </List>
-    </Paper>
+    </Box>
   );
 }
 
@@ -456,9 +535,7 @@ const MessagesDetailPage = () => {
     if (!message) return;
     setEditor({
       mode: MODE.READ,
-      id: message.id,
-      title: message.title,
-      content: message.content,
+      ...message,
     });
   };
 
@@ -467,7 +544,8 @@ const MessagesDetailPage = () => {
   };
 
   const handleCancelCreate = () => {
-    setEditor(initialState);
+    const firstMessage = messages[0];
+    setEditor(firstMessage ? { mode: MODE.READ, ...firstMessage } : initialState);
   };
 
   const handleCancelUpdate = () => {
@@ -494,62 +572,162 @@ const MessagesDetailPage = () => {
       .includes(searchValue.toLowerCase());
   });
 
+  const actionHandlers = {
+    create: handleCreate,
+    update: handleUpdate,
+    cancelCreate: handleCancelCreate,
+    cancelEdit: handleCancelUpdate,
+  };
+
   return (
-    <Stack direction={compact ? "column" : "row"} gap={compact ? 1.5 : 0} sx={{ minWidth: 0 }}>
-      <Stack direction="column" sx={{ minWidth: compact ? 0 : 300, width: compact ? "100%" : 300 }}>
-        <Paper
-          sx={(theme) => ({
-            padding: theme.spacing(0.5),
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            borderRadius: 0,
-            border: "1px solid",
-            borderColor: theme.palette.divider,
-          })}
+    <Stack
+      direction={compact ? "column" : "row"}
+      alignItems="stretch"
+      gap={1.5}
+      sx={{ minWidth: 0 }}
+    >
+      <Paper
+        component="aside"
+        variant="outlined"
+        sx={{
+          minWidth: compact ? 0 : 360,
+          width: compact ? "100%" : 360,
+          borderRadius: 0,
+          overflow: "hidden",
+          flex: "0 0 auto",
+        }}
+      >
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          gap={1}
+          sx={{
+            px: 1.5,
+            py: 1.25,
+            borderBottom: "1px solid",
+            borderColor: "divider",
+          }}
         >
-          <SearchWrapper>
-            <Box sx={{ p: "10px", display: "grid", alignItems: "center" }}>
-              <SearchIcon />
-            </Box>
-            <InputBase
-              sx={{ ml: 1, flex: 1, minWidth: 0 }}
-              placeholder={t("settings.templates.search")}
-              inputProps={{ "aria-label": t("settings.templates.search") }}
-              onChange={handleSearchChange}
-            />
-          </SearchWrapper>
-        </Paper>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography component="h2" variant="h6">
+              {t("settings.templates.library")}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {t("settings.templates.templateCount", { count: messages.length })}
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<AddIcon />}
+            onClick={handleCreate}
+            disabled={editor.mode !== MODE.READ}
+            sx={{ flex: "0 0 auto" }}
+          >
+            {t("settings.templates.createNew")}
+          </Button>
+        </Stack>
+
+        <SearchWrapper
+          sx={{
+            px: 1.25,
+            minHeight: 48,
+            borderBottom: "1px solid",
+            borderColor: "divider",
+          }}
+        >
+          <SearchIcon color="action" fontSize="small" />
+          <InputBase
+            sx={{ ml: 1, flex: 1, minWidth: 0 }}
+            placeholder={t("settings.templates.search")}
+            inputProps={{ "aria-label": t("settings.templates.search") }}
+            onChange={handleSearchChange}
+          />
+        </SearchWrapper>
+
         <MessageList
           selected={editor.id}
           messages={filteredMessages}
           onMessageClick={handleMessageClick}
           compact={compact}
         />
-      </Stack>
-      <Box component={Form} method="POST" sx={{ flexGrow: 1, width: "100%", minWidth: 0 }}>
-        {!compact && <EditorActions
-          editor={editor}
-          actions={{ create: handleCreate, update: handleUpdate, cancelCreate: handleCancelCreate, cancelEdit: handleCancelUpdate }}
-        />}
-        <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 0 }}>
-          <Typography variant="overline" color="primary.main" sx={{ fontWeight: 800 }}>
-            {editor.mode === MODE.CREATE
-              ? t("settings.templates.createNew")
-              : editor.title || t("settings.templates.select")}
-          </Typography>
-        <EditorFields
-          editor={editor}
-          setEditor={setEditor}
-          category={category}
-          compact={compact}
-        />
+      </Paper>
+
+      <Box component={Form} method="POST" sx={{ flex: "1 1 auto", minWidth: 0 }}>
+        <Paper variant="outlined" sx={{ borderRadius: 0, overflow: "hidden" }}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            alignItems={{ xs: "stretch", sm: "center" }}
+            justifyContent="space-between"
+            gap={1.5}
+            sx={{
+              px: { xs: 1.5, sm: 2 },
+              py: 1.5,
+              borderBottom: "1px solid",
+              borderColor: "divider",
+            }}
+          >
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="overline" color="primary.main">
+                {t(`settings.templates.${category}`)}
+              </Typography>
+              <Typography
+                component="h2"
+                variant="h5"
+                sx={{ overflowWrap: "anywhere" }}
+              >
+                {editor.mode === MODE.CREATE
+                  ? t("settings.templates.createNew")
+                  : editor.title || t("settings.templates.select")}
+              </Typography>
+              {editor.mode === MODE.READ && editor.id ? (
+                <Typography variant="caption" color="text.secondary">
+                  {t("settings.templates.lastUpdated", {
+                    date: dayjs(editor.updated_at).format("LL"),
+                    user: editor.updated_by,
+                  })}
+                </Typography>
+              ) : null}
+            </Box>
+
+            {editor.mode === MODE.READ && editor.id ? (
+              <Stack direction="row" gap={0.75} flexWrap="wrap">
+                <Button
+                  variant="outlined"
+                  startIcon={<EditIcon />}
+                  onClick={handleUpdate}
+                >
+                  {t("common.edit")}
+                </Button>
+                <Button
+                  color="error"
+                  type="submit"
+                  name="intent"
+                  value={INTENT.DELETE}
+                  startIcon={<DeleteIcon />}
+                >
+                  {t("common.delete")}
+                </Button>
+              </Stack>
+            ) : null}
+          </Stack>
+
+          <Box sx={{ p: { xs: 1.5, sm: 2 } }}>
+            <EditorFields
+              editor={editor}
+              setEditor={setEditor}
+              category={category}
+              compact={compact}
+            />
+          </Box>
+
+          <EditorActions
+            editor={editor}
+            compact={compact}
+            actions={actionHandlers}
+          />
         </Paper>
-        {compact && <EditorActions
-          editor={editor}
-          compact
-          actions={{ create: handleCreate, update: handleUpdate, cancelCreate: handleCancelCreate, cancelEdit: handleCancelUpdate }}
-        />}
       </Box>
     </Stack>
   );

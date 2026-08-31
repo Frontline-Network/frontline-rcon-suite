@@ -4191,6 +4191,13 @@ const en = {
       lastUpdated: "Last updated {{date}} by {{user}}",
       noMessages: "No messages",
       search: "Search messages",
+      library: "Template library",
+      templateCount_one: "{{count}} template",
+      templateCount_other: "{{count}} templates",
+      preview: "Template preview",
+      noSelection: "No template selected",
+      noSelectionDescription:
+        "Choose a template on the left or create a new one.",
     },
     autosettings: {
       readDocs: "Read documentation",

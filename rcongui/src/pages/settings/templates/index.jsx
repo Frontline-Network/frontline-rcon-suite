@@ -1,17 +1,9 @@
 import { Link, Navigate, Outlet, useLocation } from "react-router-dom";
 import {
-  Avatar,
   Box,
   ButtonBase,
-  ListItemAvatar,
-  ListItemText,
-  ListSubheader,
-  MenuItem,
-  Paper,
-  Select,
   Stack,
   Typography,
-  selectClasses,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
@@ -117,54 +109,66 @@ const MessagesRoot = () => {
           })}
         </Stack>
       ) : (
-        <Paper variant="outlined" sx={{ mb: 1.5 }}>
-          <Select
-            labelId="messages-select"
-            id="messages-simple-select"
-            value={activeCategory.href}
-            displayEmpty
-            inputProps={{ "aria-label": t("settings.templates.select") }}
-            fullWidth
-            MenuProps={{
-              PaperProps: {
-                sx: {
-                  "& .MuiMenuItem-root:not(:last-child)": {
-                    mb: 1,
-                  },
-                },
-              },
-            }}
-            sx={{
-              maxHeight: 56,
-              borderRadius: 0,
-              "&.MuiList-root": { p: "8px" },
-              [`& .${selectClasses.select}`]: {
-                display: "flex",
-                alignItems: "center",
-                gap: "2px",
-                pl: 1,
-              },
-            }}
-          >
-            <ListSubheader sx={{ pt: 0 }}>{t("settings.templates.categories")}</ListSubheader>
-            {categories.map((type) => (
-              <MenuItem
-                key={type.href}
-                value={type.href}
+        <Box
+          component="nav"
+          aria-label={t("settings.templates.categories")}
+          sx={{
+            display: "grid",
+            gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+            mb: 1.5,
+            border: "1px solid",
+            borderColor: "divider",
+            bgcolor: "background.paper",
+          }}
+        >
+          {categories.map((category, index) => {
+            const selected = category.href === activeCategory.href;
+            return (
+              <ButtonBase
+                key={category.href}
                 component={Link}
-                to={type.href}
+                to={category.href}
+                aria-current={selected ? "page" : undefined}
+                sx={{
+                  position: "relative",
+                  minWidth: 0,
+                  minHeight: 64,
+                  px: 1.5,
+                  gap: 1,
+                  justifyContent: "flex-start",
+                  borderRight: index < categories.length - 1 ? "1px solid" : 0,
+                  borderColor: "divider",
+                  color: selected ? "primary.main" : "text.secondary",
+                  bgcolor: selected ? "action.selected" : "transparent",
+                  "&::after": {
+                    content: '""',
+                    position: "absolute",
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: 2,
+                    bgcolor: selected ? "primary.main" : "transparent",
+                  },
+                  "&:hover": {
+                    bgcolor: selected ? "action.selected" : "action.hover",
+                    color: selected ? "primary.main" : "text.primary",
+                  },
+                }}
               >
-                <ListItemAvatar>
-                  <Avatar alt={t(type.label)}>{type.icon}</Avatar>
-                </ListItemAvatar>
-                <ListItemText
-                  sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                  primary={t(type.label)}
-                />
-              </MenuItem>
-            ))}
-          </Select>
-        </Paper>
+                <Box sx={{ display: "grid", placeItems: "center", flex: "0 0 auto" }}>
+                  {category.icon}
+                </Box>
+                <Typography
+                  variant="button"
+                  color="inherit"
+                  sx={{ overflow: "hidden", textOverflow: "ellipsis" }}
+                >
+                  {t(category.label)}
+                </Typography>
+              </ButtonBase>
+            );
+          })}
+        </Box>
       )}
       <Outlet />
     </Box>
