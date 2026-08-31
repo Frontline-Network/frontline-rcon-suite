@@ -280,7 +280,15 @@ export default function VotemapBuilderPage() {
   return (
     <>
       {isLoadingWhitelist && <LinearProgress />}
-      <Box sx={{ p: { xs: 1.5, md: 2.5 }, pb: 0 }}>
+      <Box
+        sx={{
+          width: "100%",
+          minWidth: 0,
+          boxSizing: "border-box",
+          p: { xs: 1.5, md: 2.5 },
+          pb: 1.5,
+        }}
+      >
         <Stack
           direction={{ xs: "column", md: "row" }}
           justifyContent="space-between"
@@ -324,7 +332,14 @@ export default function VotemapBuilderPage() {
             onChange={(_, next) => next && setView(next)}
             fullWidth
             aria-label={t("maps.mobileView")}
-            sx={{ mb: 1.5, "& .MuiToggleButton-root": { minHeight: 44 } }}
+            sx={{
+              mb: 1.5,
+              "& .MuiToggleButton-root": {
+                minWidth: 0,
+                minHeight: 44,
+                px: 1,
+              },
+            }}
           >
             <ToggleButton value="available">
               {t("maps.votemapWorkbench.availableMaps", {
@@ -619,6 +634,7 @@ export default function VotemapBuilderPage() {
       </Box>
 
       <ConfigActionBar
+        mobileSticky={false}
         dirty={hasChanges}
         dirtyLabel={t("maps.votemapWorkbench.unsavedChanges")}
         stateIcon={

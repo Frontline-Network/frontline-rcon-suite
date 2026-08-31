@@ -1364,7 +1364,7 @@ const de = {
       emptyHistoryResult: "Es gab keine Kartenauswahl oder die Kartenabstimmung war deaktiviert.",
       noHistory: "Es wurden noch keine Abstimmungsergebnisse aufgezeichnet.",
       paused: "(pausiert)",
-      lastReminder: "Letzte Abstimmungserinnerung",
+      lastReminder: "Letzte Erinnerung",
       remind: "Erinnern",
       remindHelp: "Allen Spielern im Spiel eine Erinnerung zur Abstimmung senden.",
       add: "Karte hinzufügen",

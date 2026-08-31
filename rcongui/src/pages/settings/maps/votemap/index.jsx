@@ -1,4 +1,11 @@
-import { Box, Stack, Tabs, Typography } from "@mui/material";
+import {
+  Box,
+  Stack,
+  Tabs,
+  Typography,
+  useMediaQuery,
+  useTheme,
+} from "@mui/material";
 import BallotOutlinedIcon from "@mui/icons-material/BallotOutlined";
 import HowToVoteOutlinedIcon from "@mui/icons-material/HowToVoteOutlined";
 import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
@@ -7,10 +14,13 @@ import { useTranslation } from "react-i18next";
 import { NavLinkTab } from "@/components/shared/NavLinkTab";
 import { useAuth } from "@/hooks/useAuth";
 import { isFakeMode } from "@/mirage/demo-data";
+import PageHeader from "@/components/shared/PageHeader";
 
 function VotemapPage() {
   const { t } = useTranslation();
   const location = useLocation();
+  const theme = useTheme();
+  const mobile = useMediaQuery(theme.breakpoints.down("md"));
   const { permissions } = useAuth();
   const fakeMode = isFakeMode();
   const granted = new Set(
@@ -25,6 +35,7 @@ function VotemapPage() {
   const tabs = [
     {
       label: t("maps.votemapWorkbench.liveTab"),
+      mobileLabel: t("navigation.workspaces.live"),
       description: t("maps.votemapWorkbench.liveTabDescription"),
       href: "/settings/maps/votemap",
       icon: <HowToVoteOutlinedIcon fontSize="small" />,
@@ -32,6 +43,7 @@ function VotemapPage() {
     },
     {
       label: t("maps.votemapWorkbench.poolTab"),
+      mobileLabel: t("maps.votemapWorkbench.poolTab"),
       description: t("maps.votemapWorkbench.poolTabDescription"),
       href: "/settings/maps/votemap/whitelist",
       icon: <BallotOutlinedIcon fontSize="small" />,
@@ -39,6 +51,7 @@ function VotemapPage() {
     },
     {
       label: t("maps.votemapWorkbench.settingsTab"),
+      mobileLabel: t("maps.votemapWorkbench.settingsTab"),
       description: t("maps.votemapWorkbench.settingsTabDescription"),
       href: "/settings/maps/votemap/settings",
       icon: <TuneOutlinedIcon fontSize="small" />,
@@ -58,7 +71,8 @@ function VotemapPage() {
     <Box
       data-testid="votemap-workbench"
       sx={{
-        width: "auto",
+        width: "100%",
+        boxSizing: "border-box",
         minWidth: 0,
         maxWidth: 1540,
         mx: "auto",
@@ -69,25 +83,11 @@ function VotemapPage() {
           },
       }}
     >
-      <Box component="header" sx={{ mb: 1.5 }}>
-        <Typography
-          variant="overline"
-          color="primary.main"
-          sx={{ display: "block", letterSpacing: "0.08em", mb: 0.25 }}
-        >
-          {t("maps.votemapWorkbench.eyebrow")}
-        </Typography>
-        <Typography component="h1" variant="h4" fontWeight={850}>
-          {t("maps.votemap")}
-        </Typography>
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          sx={{ mt: 0.5, maxWidth: 880 }}
-        >
-          {t("maps.votemapWorkbench.subtitle")}
-        </Typography>
-      </Box>
+      <PageHeader
+        eyebrow={t("maps.votemapWorkbench.eyebrow")}
+        title={t("maps.votemap")}
+        subtitle={t("maps.votemapWorkbench.subtitle")}
+      />
 
       <Box
         component="nav"
@@ -103,33 +103,54 @@ function VotemapPage() {
         <Tabs
           aria-label={t("maps.votemapWorkbench.navigation")}
           value={activeTab >= 0 ? activeTab : false}
-          variant="scrollable"
-          scrollButtons="auto"
+          variant={mobile ? "fullWidth" : "scrollable"}
+          scrollButtons={mobile ? false : "auto"}
           allowScrollButtonsMobile
           sx={{
             minHeight: 62,
             "& .MuiTabs-indicator": { height: 2 },
+            "& .MuiTabs-list": { width: { xs: "100%", md: "auto" } },
+            "& .MuiTabs-scrollButtons": {
+              display: { xs: "none", md: "inline-flex" },
+            },
+            "& .MuiTab-iconWrapper": {
+              display: { xs: "none", sm: "inline-flex" },
+            },
             "& .MuiTab-root": {
               minHeight: 62,
-              minWidth: { xs: 158, md: 220 },
+              minWidth: { xs: 0, md: 220 },
+              flex: { xs: "0 0 33.333%", md: "0 0 auto" },
               alignItems: "flex-start",
               borderRight: "1px solid",
               borderColor: "divider",
-              px: 2,
+              px: { xs: 0.75, sm: 2 },
               py: 1.15,
+              boxSizing: "border-box",
             },
           }}
         >
-          {tabs.map(({ href, label, description, icon }) => (
+          {tabs.map(({ href, label, mobileLabel, description, icon }) => (
             <NavLinkTab
               key={href}
               to={href}
               icon={icon}
               iconPosition="start"
               label={
-                <Stack alignItems="flex-start" sx={{ minWidth: 0 }}>
-                  <Typography variant="body2" fontWeight={800} noWrap>
-                    {label}
+                <Stack
+                  alignItems="flex-start"
+                  sx={{ minWidth: 0, width: "100%", overflow: "hidden" }}
+                >
+                  <Typography
+                    variant="body2"
+                    fontWeight={800}
+                    noWrap
+                    sx={{
+                      width: "100%",
+                      maxWidth: "100%",
+                      fontSize: { xs: "0.72rem", sm: "0.875rem" },
+                    }}
+                  >
+                    {mobile ? mobileLabel : label}
                   </Typography>
                   <Typography
                     variant="caption"

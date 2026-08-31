@@ -1,3 +1,72 @@
+# Design QA · Phase 4.2 – Sektorsteuerung und Kartenabstimmung
+
+## Prüfgrundlage
+
+- Source Visual Truth: die unveränderten Ausgangszustände unter `.codex/phase42-baseline/` sowie das freigegebene Produktkonzept in `docs/product-design/rcon-product-concept.md` für die Routen `/settings/maps/objectives`, `/settings/maps/votemap`, `/settings/maps/votemap/whitelist` und `/settings/maps/votemap/settings`.
+- Implementierung: `.codex/phase42-after/desktop-objectives.png`, `.codex/phase42-after/desktop-votemap-status.png`, `.codex/phase42-after/desktop-votemap-pool.png`, `.codex/phase42-after/desktop-votemap-settings.png`, die vier gleichnamigen Mobile-Aufnahmen sowie `.codex/phase42-after/mobile-objectives-selection.png`.
+- Gemeinsame Vergleichseingänge: `.codex/phase42-after/compare-desktop-objectives.png`, `.codex/phase42-after/compare-mobile-objectives.png`, `.codex/phase42-after/compare-mobile-votemap-status.png`, `.codex/phase42-after/compare-mobile-votemap-pool.png` und `.codex/phase42-after/compare-mobile-votemap-settings.png`.
+- Theme- und Farbseh-Evidenz: `.codex/phase42-after/desktop-objectives-light-deuteranopia.png`.
+- Viewports und Normalisierung: Desktop 1440 × 900 CSS- und Bildpixel, Mobile 390 × 844 CSS- und Bildpixel, Browser-Dichte 1. Die Screenshots enthalten ausschließlich den App-Viewport.
+- Zustand: Frontline Gold, dunkles Theme, deutsche Sprache, Demo-Server 2, HLL, 98/100 Spieler. Die Theme-Prüfung verwendete Hell plus Deuteranopie und wurde anschließend ohne Speicherung verworfen.
+
+## Full-View-Vergleich
+
+Die Sektorsteuerung ersetzt das defekte, abstrakte Raster durch die echte taktische Karte und eine native 5×5-Zielauswahl. Karte, Reihenfortschritt, Zufallskriterien und die unmittelbare Neustartwirkung bilden nun einen zusammenhängenden Arbeitsablauf. Mobile trennt die Aufgaben bewusst in „Taktische Karte“ und „Sektorfolge“, anstatt beide dichten Bereiche gleichzeitig zu stapeln. Die Kartenabstimmung bleibt fachlich in Live-Betrieb, Kartenpool und Einstellungen gegliedert, zeigt diese drei Aufgaben aber auf 390 Pixeln vollständig, ohne horizontales Dokumentscrollen oder verdeckte Abschlussaktionen.
+
+## Fokusvergleich
+
+- Sektoren: ein gültiges Ziel wurde direkt auf der taktischen Karte gewählt; der Fortschritt wechselte von null auf eine festgelegte Reihe und die mobile Auswahlansicht blieb innerhalb von 390 Pixeln.
+- Neustartbestätigung: der Dialog zeigte Zielserver `[GER] Frontline Network | #2`, aktuelle Karte Foy, betroffene 98 Spieler und alle fünf Reihen. Zufällige Reihen werden lokalisiert als „Zufällig“ bezeichnet. Abbrechen schloss den Dialog ohne API- oder Gameserveraktion.
+- Kartenpool: Kursk wurde dem lokalen Entwurf hinzugefügt, der Dirty-Zustand und drei Poolkarten wurden sichtbar; anschließend wurde der Entwurf zurückgesetzt, ohne zu speichern.
+- Einstellungen: eine Auswahlregel wurde geändert, der Dirty-Zustand erschien und Zurücksetzen stellte den Serverstand wieder her.
+
+## Findings
+
+- Keine verbleibenden P0-, P1- oder P2-Abweichungen.
+- [P3] Die bestehende In-App-Browser-Bindung verlor nach den vollständigen Desktop-/Mobile- und Theme-Aufnahmen ihre lokale Vorschauverbindung. Daher wurden Browserkonsolen-Ereignisse und die Enter-Aktivierung der nativen Sektorbuttons nach der letzten reinen Copy-Kürzung nicht erneut aufgezeichnet. Die Controls sind echte `button`-Elemente mit zugänglichem Namen, `aria-pressed` und Fokusdarstellung; Produktionsbuild und Semantikvertrag prüfen den finalen Codezustand.
+
+## Pflichtflächen
+
+- Fonts und Typografie: gemeinsamer `PageHeader`, vorhandene Frontline-Schriftfamilie, kondensierte Versalien und klar getrennte Status-, Anweisungs- und Wirkungstexte. Die letzten mobilen Tab- und Erinnerungslabels wurden bewusst auf „Live“ und „Letzte Erinnerung“ verkürzt.
+- Spacing und Layout: Desktop als taktische Karte plus Sektorfolge, Mobile als expliziter Aufgabenwechsel. Für alle vier Mobile-Routen gilt in der geprüften Endstruktur `main.scrollWidth === main.clientWidth === 380`; Abschlussleisten verdecken keinen Formularinhalt.
+- Farben und Tokens: ausschließlich vorhandene Theme-, Rahmen-, Auswahl-, Warn-, Erfolgs- und Gefahrentokens. Hell plus Deuteranopie wurde live geprüft; Auswahl und Wirkung werden zusätzlich über Text, Icon, Nummer und Rahmen vermittelt.
+- Bilder und Assets: die vorhandene echte taktische Karte wird über die Karten-ID beziehungsweise als kompatibler Fallback über den Kartennamen geladen. Etablierte MUI-Icons bleiben erhalten; keine Platzhalter, CSS-Zeichnungen, Emojis oder handgebauten SVGs.
+- Copy und Inhalt: aktuelle Karte, Anzahl festgelegter Reihen, Zufallskriterien, Neustartwirkung, Zielserver und betroffene Spieler werden vor der Ausführung erklärt. Die Kartenabstimmung beschreibt Live-Zustand, Poolentwurf und Auswahlregeln getrennt.
+- Icons und Zustände: Ziel gewählt, Zufall, Poolentwurf, gespeichert, geändert, zurücksetzen und unmittelbarer Neustart verwenden dieselbe Iconfamilie. Kein Status ist ausschließlich farbcodiert.
+- Responsivität und Accessibility: native Buttons je taktischem Ziel, `aria-pressed`, individuelle zugängliche Namen, semantische Tabs, beschriftete Auswahlfelder, sichtbare Fokusdarstellung und mobile Aufgabenflächen ohne horizontalen Überlauf.
+
+## Fachliche und funktionale Prüfung
+
+- Bestehende Verträge bleiben erhalten: `changeObjectives({ objectives, random_constraints })`, Kartenpool- und Kartenabstimmungs-Konfiguration sowie Loader- und Query-Verhalten wurden nicht erweitert oder umbenannt.
+- Die Zielauswahl bleibt auf exakt fünf Reihen begrenzt. Nicht gültige Außenfelder bleiben gesperrt; explizite Ziele und zufällige Reihen können weiterhin kombiniert werden.
+- Der Bestätigungsdialog fasst den tatsächlich aktuellen Entwurf zusammen und führt erst über die vorhandene Admin-Aktion zum unmittelbaren Kartenneustart. Während der QA wurde keine mutierende API-, RCON- oder Gameserveraktion ausgelöst.
+- Der Kartenpool behält verfügbare Karten und gespeicherten Pool als getrennte Entwurfsflächen. Die mobile Abschlussleiste ist statisch und überlagert weder Filter noch Karten.
+- Das numerische MUI-Maß `width: 1` im unsichtbaren Live-Bereich wurde zu `1px` korrigiert. Dadurch erzeugt die Statusseite keinen unbeabsichtigten 100-Prozent-Zusatzblock mehr.
+- Produktionsbuild sowie Design-, Semantik-, Aktions-, Operator-Copy-, Navigations-, Konfigurations-, Kompatibilitäts- und Admin-Vertragsprüfungen bestanden.
+- Bundle-Budget: 400,98 kB Entry-JavaScript bei 121,50 kB gzip und 1.498,11 kB initiales JavaScript bei 480,36 kB gzip; alle Grenzwerte eingehalten. Die neuen Workbench-Texte bleiben im lazy geladenen Kartenpaket.
+
+## Vergleichshistorie
+
+1. Ausgangsvergleich: [P1] Die taktische Karte war im Demo-/Fallbackzustand defekt, weil ausschließlich `map.id` verwendet wurde. Die Bildauflösung nutzt nun kompatibel `map.id ?? map.name`.
+2. Erste Mobile-Prüfung: [P1] scrollbare Tabs und Seitenbreiten-Hacks schnitten Aufgaben ab und erzeugten horizontalen Überlauf. Mobile verteilt alle drei Kartenabstimmungsaufgaben gleichmäßig; die Wurzelbreite bleibt 100 Prozent.
+3. Statusprüfung: [P1] der visuell versteckte Live-Bereich nutzte bei MUI `width: 1` und wurde dadurch 100 Prozent breit. Explizite `1px` beseitigen den Zusatzüberlauf.
+4. Kartenpool-Prüfung: [P1] die klebende mobile Abschlussleiste überdeckte Karten und Filter. Der Pool verwendet nun die statische mobile Abschlussleiste.
+5. Finaler Copy- und Dichtevergleich: [P2] lange Live- und Erinnerungslabels waren auf 390 Pixeln zu dominant. Die Labels wurden gekürzt, ohne ihre Bedeutung oder zugänglichen Seitentitel zu verlieren.
+6. Finale gemeinsame Vorher-/Nachher-Vergleiche bei identischen Viewports: keine offenen P0-, P1- oder P2-Findings.
+
+## Implementation Checklist
+
+- [x] Alle vier Routen vor und nach der Änderung auf Desktop und 390 × 844 Mobile geprüft.
+- [x] Fünf gemeinsame Vorher-/Nachher-Vergleiche bei identischem Zustand visuell beurteilt.
+- [x] Taktisches Ziel, mobile Aufgabenansicht, Neustartdialog, Poolentwurf, Einstellungsentwurf und Zurücksetzen geprüft.
+- [x] Theme, Deuteranopie, Semantik und Mobile-Overflow geprüft.
+- [x] Bestehende API-, Payload-, Persistenz- und Gameserververträge unverändert erhalten.
+- [x] Produktionsbuild, Bundle-Budget und neun statische Vertragsprüfungen bestanden.
+
+final result: passed
+
+---
+
 # Design QA · Phase 4.1 – Kartenbetrieb und Rotation
 
 ## Prüfgrundlage

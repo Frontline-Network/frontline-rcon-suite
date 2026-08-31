@@ -2,6 +2,26 @@ import i18n from "@/i18n";
 
 const resources = {
   de: {
+    objectivesWorkbench: {
+      mapTab: "Taktische Karte",
+      selectionTab: "Sektorfolge",
+      mapEyebrow: "Aktuelle Karte",
+      mapDescription:
+        "Wähle pro Reihe genau ein Ziel direkt auf der taktischen Karte.",
+      selectionEyebrow: "Geplanter Neustart",
+      selectionTitle: "Sektorfolge prüfen",
+      selectionDescription:
+        "Benenne Ziele exakt oder überlasse einzelne Reihen dem Server.",
+      selectedCount: "{{count}} von 5 Reihen festgelegt",
+      randomCount: "{{count}} zufällige Reihen",
+      restartTitle: "Sofortiger Kartenneustart",
+      restartDescription:
+        "Die Änderung startet {{map}} unmittelbar neu und betrifft alle verbundenen Spieler.",
+      affectedPlayers: "Spieler betroffen",
+      currentServer: "Zielserver",
+      clearPlan: "Auswahl leeren",
+      applyPlan: "Sektorfolge anwenden",
+    },
     changeWorkbench: {
       eyebrow: "Karten & Spielbetrieb",
       title: "Karte wechseln",
@@ -34,7 +54,8 @@ const resources = {
       catalogTab: "Katalog",
       draftTab: "Entwurf",
       catalogTitle: "Kartenkatalog",
-      catalogDescription: "Varianten suchen, filtern und dem Entwurf hinzufügen.",
+      catalogDescription:
+        "Varianten suchen, filtern und dem Entwurf hinzufügen.",
       draftTitle: "Unveröffentlichter Entwurf",
       draftDescription:
         "Die Reihenfolge wird erst nach dem Speichern auf dem Server aktiv.",
@@ -93,6 +114,26 @@ const resources = {
     },
   },
   en: {
+    objectivesWorkbench: {
+      mapTab: "Tactical map",
+      selectionTab: "Sector order",
+      mapEyebrow: "Current map",
+      mapDescription:
+        "Choose exactly one objective per row on the tactical map.",
+      selectionEyebrow: "Planned restart",
+      selectionTitle: "Review sector order",
+      selectionDescription:
+        "Select exact objectives or let the server choose individual rows.",
+      selectedCount: "{{count}} of 5 rows selected",
+      randomCount: "{{count}} random rows",
+      restartTitle: "Immediate map restart",
+      restartDescription:
+        "Applying this plan restarts {{map}} immediately and affects every connected player.",
+      affectedPlayers: "Players affected",
+      currentServer: "Target server",
+      clearPlan: "Clear selection",
+      applyPlan: "Apply sector order",
+    },
     changeWorkbench: {
       eyebrow: "Maps & game operations",
       title: "Change map",
@@ -127,7 +168,8 @@ const resources = {
       catalogTitle: "Map catalog",
       catalogDescription: "Search, filter, and add variants to the draft.",
       draftTitle: "Unpublished draft",
-      draftDescription: "The order becomes active on the server only after saving.",
+      draftDescription:
+        "The order becomes active on the server only after saving.",
       draftState: "The current draft contains {{count}} maps.",
       duplicateNotice:
         "{{count}} duplicate entries remain in the draft as intentional weighting.",

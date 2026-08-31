@@ -65,7 +65,11 @@ function SummaryCell({ icon, label, value, detail, color = "text.primary" }) {
     >
       <Box sx={{ display: "grid", color: "primary.main", mt: 0.2 }}>{icon}</Box>
       <Box sx={{ minWidth: 0 }}>
-        <Typography variant="overline" color="text.secondary">
+        <Typography
+          variant="overline"
+          color="text.secondary"
+          sx={{ display: "block", lineHeight: 1.2, overflowWrap: "anywhere" }}
+        >
           {label}
         </Typography>
         <Typography
@@ -725,8 +729,8 @@ export default function VotemapStatusPage() {
         aria-live="polite"
         sx={{
           position: "absolute",
-          width: 1,
-          height: 1,
+          width: "1px",
+          height: "1px",
           p: 0,
           m: -1,
           overflow: "hidden",

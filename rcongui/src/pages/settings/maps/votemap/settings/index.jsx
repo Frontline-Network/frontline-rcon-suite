@@ -478,9 +478,7 @@ function VotemapSettingsPage() {
         ...Object.keys(prevConfig.current ?? {}),
         ...Object.keys(config ?? {}),
       ]),
-    ].filter(
-      (key) => !isEqual(prevConfig.current?.[key], config?.[key])
-    );
+    ].filter((key) => !isEqual(prevConfig.current?.[key], config?.[key]));
 
     // no changes do nothing
     if (diff.length === 0) return;
@@ -551,8 +549,7 @@ function VotemapSettingsPage() {
       ]),
     ].filter(
       (key) =>
-        key !== "enabled" &&
-        !isEqual(baseline[key], workingConfig?.[key])
+        key !== "enabled" && !isEqual(baseline[key], workingConfig?.[key])
     );
     const submittedConfig = cloneDeep(config ?? {});
     changedKeys.forEach((key) => {
@@ -801,8 +798,8 @@ function VotemapSettingsPage() {
     <>
       <Box
         sx={{
-          width: { xs: "calc(100vw - 12px)", md: "100%" },
-          maxWidth: { xs: "calc(100vw - 12px)", md: "100%" },
+          width: "100%",
+          maxWidth: "100%",
           boxSizing: "border-box",
           minWidth: 0,
           overflowX: "hidden",
@@ -897,7 +894,7 @@ function VotemapSettingsPage() {
             component="section"
             aria-labelledby="votemap-modes-heading"
             variant="outlined"
-          sx={workbenchCardSx}
+            sx={workbenchCardSx}
           >
             <CardContent
               sx={{

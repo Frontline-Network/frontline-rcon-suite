@@ -1355,7 +1355,7 @@ const en = {
       emptyHistoryResult: "There were no map options or map voting was disabled.",
       noHistory: "No historical data has been recorded yet.",
       paused: "(paused)",
-      lastReminder: "Last voting reminder",
+      lastReminder: "Last reminder",
       remind: "Remind",
       remindHelp: "Send all players an in-game reminder to vote.",
       add: "Add map",
