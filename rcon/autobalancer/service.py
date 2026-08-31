@@ -16,6 +16,7 @@ from .history import load_history
 from .models import BalancePlan, BalanceSnapshot, Phase
 from .planner import (
     build_plan,
+    build_strength_swap_recommendations,
     build_strategy_plans,
     eligible_players,
     protection_tier,
@@ -837,6 +838,20 @@ class AutobalancerService:
             ]
             for team in ("allies", "axis")
         }
+        required_switch_count = max(
+            0,
+            (abs(snapshot.difference) - config.target_difference + 1) // 2,
+        )
+        strength_swaps = (
+            build_strength_swap_recommendations(
+                snapshot,
+                connection_grace_seconds=config.connection_grace_seconds,
+                skill_gap_soft_limit=config.skill_gap_soft_limit,
+                skill_gap_min_improvement=config.skill_gap_min_improvement,
+            )
+            if not hard_blocks and required_switch_count == 0
+            else []
+        )
         return {
             "mode": config.mode,
             "phase": state.get("phase", Phase.IDLE),
@@ -846,10 +861,8 @@ class AutobalancerService:
             "team_counts": snapshot.team_counts,
             "team_labels": dict(snapshot.team_labels),
             "team_difference": snapshot.difference,
-            "required_switches": max(
-                0,
-                (abs(snapshot.difference) - config.target_difference + 1) // 2,
-            ),
+            "target_difference": config.target_difference,
+            "required_switches": required_switch_count,
             "team_ratings": {
                 "allies": round(team_rating(snapshot.players, "allies"), 2),
                 "axis": round(team_rating(snapshot.players, "axis"), 2),
@@ -863,6 +876,17 @@ class AutobalancerService:
             },
             "rating_model_version": RATING_MODEL_VERSION,
             "strategy": config.skill_strategy,
+            "strength_thresholds": {
+                "soft_limit": config.skill_gap_soft_limit,
+                "hard_warning": config.skill_gap_hard_warning,
+                "minimum_improvement": config.skill_gap_min_improvement,
+            },
+            "strength_swap": (
+                strength_swaps[0].public_dict() if strength_swaps else None
+            ),
+            "strength_swap_alternatives": [
+                recommendation.public_dict() for recommendation in strength_swaps[1:]
+            ],
             "data_confidence": round(
                 sum(confidences) / len(confidences) if confidences else 0.0, 3
             ),

@@ -9,6 +9,7 @@ import {
   Typography,
 } from "@mui/material";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import PersonOffOutlinedIcon from "@mui/icons-material/PersonOffOutlined";
@@ -126,6 +127,7 @@ const PlayerInfo = ({
 const PlayerRowWrapper = ({
   player,
   selected,
+  balanceRecommendation,
   isCommander = false,
   onToggle,
   activePlayerActionId,
@@ -135,7 +137,12 @@ const PlayerRowWrapper = ({
   const Row = isCommander ? CommanderRow : PlayerRow;
 
   return (
-    <Row selected={selected} level={player.level} isCommander={isCommander}>
+    <Row
+      selected={selected}
+      level={player.level}
+      isCommander={isCommander}
+      balanceRecommendation={balanceRecommendation}
+    >
       <Checkbox
         size="small"
         checked={selected}
@@ -162,9 +169,20 @@ const PlayerRowWrapper = ({
         {player.level ?? "–"}
       </Typography>
       <Typography className="problem-cell" variant="caption">
-        {getKd(player)} ·{" "}
-        {secondsToTime(
-          player?.time ?? player?.profile?.current_playtime_seconds ?? 0
+        {balanceRecommendation ? (
+          <Tooltip title={balanceRecommendation.label}>
+            <ArrowForwardIcon
+              fontSize="small"
+              aria-label={balanceRecommendation.label}
+            />
+          </Tooltip>
+        ) : (
+          <>
+            {getKd(player)} ·{" "}
+            {secondsToTime(
+              player?.time ?? player?.profile?.current_playtime_seconds ?? 0
+            )}
+          </>
         )}
       </Typography>
     </Row>
@@ -178,6 +196,7 @@ const SquadPlayers = ({
   onTogglePlayer,
   activePlayerActionId,
   onOpenPlayerActionMenu,
+  highlightedPlayers,
 }) => (
   <Collapse in={expanded} timeout="auto" unmountOnExit>
     {squad.players.map((player) => (
@@ -185,6 +204,7 @@ const SquadPlayers = ({
         key={player.player_id}
         player={player}
         selected={selectedPlayers.has(player.player_id)}
+        balanceRecommendation={highlightedPlayers?.[player.player_id]}
         onToggle={onTogglePlayer}
         activePlayerActionId={activePlayerActionId}
         onOpenPlayerActionMenu={onOpenPlayerActionMenu}
@@ -202,6 +222,7 @@ const SquadRow = ({
   onToggleExpand,
   activePlayerActionId,
   onOpenPlayerActionMenu,
+  highlightedPlayers,
 }) => {
   const { t } = useTranslation();
   const themedImg = useThemedImages();
@@ -321,6 +342,7 @@ const SquadRow = ({
         onTogglePlayer={onTogglePlayer}
         activePlayerActionId={activePlayerActionId}
         onOpenPlayerActionMenu={onOpenPlayerActionMenu}
+        highlightedPlayers={highlightedPlayers}
       />
     </Box>
   );
@@ -364,6 +386,7 @@ export const TeamSection = ({
   commanderAvailable,
   activePlayerActionId,
   onOpenPlayerActionMenu,
+  highlightedPlayers = {},
 }) => {
   const { t } = useTranslation();
   const isLobby = team.name === "lobby";
@@ -485,6 +508,7 @@ export const TeamSection = ({
           onToggleExpand={onToggleExpand}
           activePlayerActionId={activePlayerActionId}
           onOpenPlayerActionMenu={onOpenPlayerActionMenu}
+          highlightedPlayers={highlightedPlayers}
         />
       </>
     );
@@ -578,6 +602,7 @@ export const TeamSection = ({
               <PlayerRowWrapper
                 player={commander}
                 selected={selectedPlayers.has(commander.player_id)}
+                balanceRecommendation={highlightedPlayers[commander.player_id]}
                 onToggle={onTogglePlayer}
                 isCommander
                 activePlayerActionId={activePlayerActionId}
@@ -607,6 +632,7 @@ export const TeamSection = ({
                   onToggleExpand={onToggleExpand}
                   activePlayerActionId={activePlayerActionId}
                   onOpenPlayerActionMenu={onOpenPlayerActionMenu}
+                  highlightedPlayers={highlightedPlayers}
                 />
               ))}
             </Box>

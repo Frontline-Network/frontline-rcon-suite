@@ -150,17 +150,29 @@ export const SquadHeader = styled(Box, {
 
 export const PlayerRow = styled(Box, {
   shouldForwardProp: (prop) =>
-    prop !== "selected" && prop !== "level" && prop !== "isCommander",
-})(({ theme, selected, level, isCommander }) => ({
+    prop !== "selected" &&
+    prop !== "level" &&
+    prop !== "isCommander" &&
+    prop !== "balanceRecommendation",
+})(({ theme, selected, level, isCommander, balanceRecommendation }) => ({
   ...responsiveRow(theme),
   minHeight: isCommander ? 52 : 44,
   padding: theme.spacing(0, 1),
   borderBottom: `1px solid ${theme.palette.divider}`,
-  backgroundColor: selected
+  backgroundColor: balanceRecommendation
+    ? balanceRecommendation.targetTeam === "allies"
+      ? "rgba(101,169,214,.12)"
+      : "rgba(237,98,89,.12)"
+    : selected
     ? theme.palette.action.selected
     : isCommander
     ? "rgba(255,255,255,.025)"
     : theme.palette.background.paper,
+  boxShadow: balanceRecommendation
+    ? `inset 3px 0 0 ${
+        balanceRecommendation.targetTeam === "allies" ? "#65a9d6" : "#ed6259"
+      }`
+    : "none",
   "&:hover": { backgroundColor: theme.palette.action.hover },
   "& .player-info": {
     display: "flex",
@@ -173,7 +185,13 @@ export const PlayerRow = styled(Box, {
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
-    color: selected ? theme.palette.primary.main : theme.palette.text.primary,
+    color: balanceRecommendation
+      ? balanceRecommendation.targetTeam === "allies"
+        ? "#65a9d6"
+        : "#ed6259"
+      : selected
+      ? theme.palette.primary.main
+      : theme.palette.text.primary,
   },
   "& .leader-cell": {
     minWidth: 0,
@@ -194,6 +212,16 @@ export const PlayerRow = styled(Box, {
     gap: theme.spacing(0.75),
     color: theme.palette.text.secondary,
     whiteSpace: "nowrap",
+    ...(balanceRecommendation
+      ? {
+          color:
+            balanceRecommendation.targetTeam === "allies"
+              ? "#65a9d6"
+              : "#ed6259",
+          fontSize: "1.2rem",
+          fontWeight: 800,
+        }
+      : {}),
   },
 }));
 

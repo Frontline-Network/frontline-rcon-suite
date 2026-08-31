@@ -3,10 +3,16 @@ from __future__ import annotations
 import math
 from collections import Counter
 from dataclasses import dataclass
-from itertools import combinations
+from itertools import combinations, product
 from typing import Collection
 
-from .models import BalancePlan, BalanceSnapshot, Candidate, PlayerSnapshot
+from .models import (
+    BalancePlan,
+    BalanceSnapshot,
+    Candidate,
+    PlayerSnapshot,
+    StrengthSwapRecommendation,
+)
 
 COMMANDER_ROLES = {"armycommander", "commander"}
 LEADER_ROLES = {
@@ -158,6 +164,128 @@ def _projected_gap(
     source_rating = sum(source_values) / len(source_values) if source_values else 50.0
     target_rating = sum(target_values) / len(target_values) if target_values else 50.0
     return abs(source_rating - target_rating)
+
+
+def _projected_swap_gap(
+    players: list[PlayerSnapshot],
+    stronger_team: str,
+    weaker_team: str,
+    stronger_player: PlayerSnapshot,
+    weaker_player: PlayerSnapshot,
+) -> float:
+    stronger_values = [
+        (
+            weaker_player.rating.value
+            if player.player_id == stronger_player.player_id
+            else player.rating.value
+        )
+        for player in players
+        if player.team == stronger_team
+    ]
+    weaker_values = [
+        (
+            stronger_player.rating.value
+            if player.player_id == weaker_player.player_id
+            else player.rating.value
+        )
+        for player in players
+        if player.team == weaker_team
+    ]
+    stronger_rating = (
+        sum(stronger_values) / len(stronger_values) if stronger_values else 50.0
+    )
+    weaker_rating = sum(weaker_values) / len(weaker_values) if weaker_values else 50.0
+    return abs(stronger_rating - weaker_rating)
+
+
+def build_strength_swap_recommendations(
+    snapshot: BalanceSnapshot,
+    *,
+    connection_grace_seconds: int = 120,
+    skill_gap_soft_limit: float = 8.0,
+    skill_gap_min_improvement: float = 2.5,
+    limit: int = 3,
+) -> list[StrengthSwapRecommendation]:
+    """Suggest safe, review-only 1:1 swaps for a skill-only imbalance.
+
+    This deliberately does not feed the execution state machine. It only gives
+    moderators an inspectable option when player counts are already balanced.
+    Leaders and specialist squads are excluded from this advisory path.
+    """
+
+    if snapshot.larger_team is not None or limit <= 0:
+        return []
+    ratings = {
+        team: team_rating(snapshot.players, team) for team in ("allies", "axis")
+    }
+    rating_gap_before = abs(ratings["allies"] - ratings["axis"])
+    if rating_gap_before <= skill_gap_soft_limit:
+        return []
+
+    stronger_team = max(ratings, key=ratings.get)
+    weaker_team = "axis" if stronger_team == "allies" else "allies"
+    stronger_choices, _ = _eligible_choices(
+        snapshot,
+        stronger_team,
+        (),
+        (),
+        (),
+        connection_grace_seconds,
+    )
+    weaker_choices, _ = _eligible_choices(
+        snapshot,
+        weaker_team,
+        (),
+        (),
+        (),
+        connection_grace_seconds,
+    )
+    # A 1:1 strength correction should never disrupt leaders or specialist squads.
+    stronger_choices = [choice for choice in stronger_choices if choice.base_tier <= 3]
+    weaker_choices = [choice for choice in weaker_choices if choice.base_tier <= 3]
+
+    ranked: list[tuple[tuple, StrengthSwapRecommendation]] = []
+    for stronger_choice, weaker_choice in product(stronger_choices, weaker_choices):
+        projected_gap = _projected_swap_gap(
+            snapshot.players,
+            stronger_team,
+            weaker_team,
+            stronger_choice.player,
+            weaker_choice.player,
+        )
+        improvement = rating_gap_before - projected_gap
+        if improvement < skill_gap_min_improvement:
+            continue
+        recommendation = StrengthSwapRecommendation(
+            stronger_team=stronger_team,
+            weaker_team=weaker_team,
+            stronger_player=stronger_choice.player,
+            weaker_player=weaker_choice.player,
+            stronger_player_tier=stronger_choice.base_tier,
+            weaker_player_tier=weaker_choice.base_tier,
+            stronger_player_reason=stronger_choice.reason,
+            weaker_player_reason=weaker_choice.reason,
+            rating_gap_before=rating_gap_before,
+            projected_rating_gap=projected_gap,
+        )
+        ranked.append(
+            (
+                (
+                    max(stronger_choice.effective_tier, weaker_choice.effective_tier),
+                    stronger_choice.effective_tier + weaker_choice.effective_tier,
+                    projected_gap,
+                    -min(
+                        stronger_choice.player.rating.confidence,
+                        weaker_choice.player.rating.confidence,
+                    ),
+                    stronger_choice.player.player_id,
+                    weaker_choice.player.player_id,
+                ),
+                recommendation,
+            )
+        )
+    ranked.sort(key=lambda item: item[0])
+    return [recommendation for _, recommendation in ranked[:limit]]
 
 
 def _combo_details(

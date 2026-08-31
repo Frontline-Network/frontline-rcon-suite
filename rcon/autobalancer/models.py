@@ -220,5 +220,69 @@ class BalancePlan:
         }
 
 
+@dataclass(slots=True)
+class StrengthSwapRecommendation:
+    """Advisory two-player swap that keeps team sizes unchanged."""
+
+    stronger_team: str
+    weaker_team: str
+    stronger_player: PlayerSnapshot
+    weaker_player: PlayerSnapshot
+    stronger_player_tier: int
+    weaker_player_tier: int
+    stronger_player_reason: str
+    weaker_player_reason: str
+    rating_gap_before: float
+    projected_rating_gap: float
+
+    def public_dict(self) -> dict[str, Any]:
+        def player_dict(
+            player: PlayerSnapshot,
+            protection_tier: int,
+            protection_reason: str,
+        ) -> dict[str, Any]:
+            return {
+                "player_id": player.player_id,
+                "player_name": player.name,
+                "team": player.team,
+                "unit_name": player.unit_name,
+                "unit_type": player.unit_type,
+                "role": player.role,
+                "rating": round(player.rating.value, 2),
+                "rating_confidence": round(player.rating.confidence, 3),
+                "protection_tier": protection_tier,
+                "protection_reason": protection_reason,
+            }
+
+        return {
+            "kind": "strength_swap",
+            "advisory_only": True,
+            "stronger_team": self.stronger_team,
+            "weaker_team": self.weaker_team,
+            "stronger_player": player_dict(
+                self.stronger_player,
+                self.stronger_player_tier,
+                self.stronger_player_reason,
+            ),
+            "weaker_player": player_dict(
+                self.weaker_player,
+                self.weaker_player_tier,
+                self.weaker_player_reason,
+            ),
+            "rating_gap_before": round(self.rating_gap_before, 2),
+            "projected_rating_gap": round(self.projected_rating_gap, 2),
+            "rating_improvement": round(
+                self.rating_gap_before - self.projected_rating_gap, 2
+            ),
+            "rating_confidence": round(
+                min(
+                    self.stronger_player.rating.confidence,
+                    self.weaker_player.rating.confidence,
+                ),
+                3,
+            ),
+        }
+
+
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)

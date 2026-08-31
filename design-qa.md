@@ -1,3 +1,63 @@
+# Design QA · Live-Balance-Assistent – Option 1
+
+## Prüfgrundlage
+
+- Source Visual Truth: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-f1cc3e48-5a7c-446d-b2b8-cbf90e0e39e2.png` (1517 × 1061 px).
+- Browsergerenderte Implementierung: `.tmp/product-audit/autobalancer/06-live-balance-implementation.png` (1280 × 720 px, CSS-Viewport 1280 × 720, Browser-Dichte 1).
+- Gemeinsamer Vergleichseingang: `.tmp/product-audit/autobalancer/08-design-qa-comparison.png`. Beide Ansichten wurden proportional auf maximal 1280 × 895 px normalisiert und im selben Bild verglichen.
+- Fokusbeleg für die vorgeschlagenen Spieler: `.tmp/product-audit/autobalancer/07-live-balance-roster-highlights.png` (1280 × 720 px).
+- Zustand: dunkles Frontline-Theme, deutsche Sprache, Demo-Server 2, 49:49 Spieler, Achsenmächte mit höherer geschätzter Teamstärke, belastbarer 1:1-Tauschvorschlag.
+
+## Full-View-Vergleich
+
+Die Implementierung übernimmt die gewählte kompakte Einsatzleiste direkt zwischen Gefechtszusammenfassung und Teamlisten. Spielerzahl, Teamstärke, Datenqualität, Handlung, vorgeschlagene Spieler und Prognose liegen wie im Mockup in einer horizontalen Entscheidungszeile. Darunter vergleichen zwei Teamstärkebalken den Zustand vor und nach dem vorgeschlagenen 1:1-Tausch. Der schmalere Browser-Viewport zeigt die Teamlisten erst unterhalb des ersten Sichtbereichs; das ist eine erwartete Höhenabweichung zum 1517 × 1061 px großen Mockup und kein Layoutverlust.
+
+## Fokusvergleich
+
+Nach dem Öffnen beider Trupps werden `FLN_Wolf` und `FLN_Falcon` in ihren tatsächlichen Teamzeilen mit Zielteamfarbe, Einzugslinie und Richtungspfeil markiert. Der Fokusbeleg bestätigt, dass die Empfehlung nicht nur in der Einsatzleiste genannt wird, sondern in der bestehenden Teamliste wiederauffindbar bleibt. Andere Spielerzeilen, Rollen, Werte und Moderationsaktionen bleiben unverändert.
+
+## Findings
+
+- Keine offenen P0-, P1- oder P2-Abweichungen.
+- [P3] Das Mockup zeigt die Bezeichnung „Kompakte Einsatzleiste“, während die Implementierung die kürzere produktive Bezeichnung „Live-Balance“ verwendet. Die Informationshierarchie bleibt identisch; die kürzere Copy passt in die vorhandene Teamansicht und ist auf kleineren Viewports stabiler.
+
+## Pflichtflächen
+
+- Fonts und Typografie: vorhandene Frontline-Schriftfamilie, Versalien, Gewichte, Zeilenhöhen und tabellarische Zahlen bleiben erhalten. Überschrift, Status, Kennzahlen und Handlungsbuttons entsprechen der bestehenden optischen Hierarchie.
+- Spacing und Layout: eckige 0-px-Geometrie, feine Trenner, sechs Entscheidungszellen und eine getrennte Prognosezeile. Bei 1280 × 720 besteht kein horizontaler Dokumentüberlauf; die Einsatzleiste bleibt vollständig sichtbar.
+- Farben und Tokens: Frontline-Gold, semantisches Rot/Grün und die vorhandenen Teamfarben werden aus Theme beziehungsweise etablierten Teamwerten abgeleitet. Status wird zusätzlich durch Text, Icons und Richtungspfeile vermittelt.
+- Bild- und Assetqualität: Es sind keine neuen Rasterbilder oder Platzhalter erforderlich. Für UI-Symbole werden ausschließlich vorhandene MUI-Icons verwendet; die Teamstärkebalken sind echte Datenvisualisierungen.
+- Copy und Inhalt: Spielerzahl und Teamstärke werden ausdrücklich getrennt bewertet. Die Oberfläche erklärt, dass ein 1:1-Tausch nur eine Moderator-Empfehlung ist und niemals automatisch ausgeführt wird.
+
+## Interaktionen und technische Evidenz
+
+- „Warum?“ öffnet die fachliche Erklärung; „Beobachten“ reduziert die Einsatzleiste; „Öffnen“ stellt sie wieder her.
+- „Tausch prüfen“ navigiert auf `/views/autobalancer`; Browser-Rückkehr stellt `/views/team` wieder her.
+- Beide vorgeschlagenen Spieler wurden nach Öffnen der Trupps sichtbar und korrekt nach Zielteam eingefärbt.
+- Browserkonsole: keine Warnungen oder Fehler im Abschlusslauf.
+- Python: 46 Autobalancer-Planer-/Service-Tests bestanden.
+- Vite-Produktionsbuild: bestanden; nur die bekannte Chunk-Größenwarnung bleibt bestehen.
+- Designfundament, Seitensemantik und Adminaktionsvertrag: bestanden. `git diff --check`: bestanden.
+
+## Vergleichshistorie
+
+1. Der erste gemeinsame Source-/Implementierungsvergleich zeigte keine umsetzungsbedingten P0-, P1- oder P2-Abweichungen.
+2. Die bewusst kleinere Browserhöhe wurde mit einem separaten Fokusbeleg der geöffneten Teamlisten ergänzt; Kandidatenmarkierung und Richtung sind dort vollständig sichtbar.
+3. Nach Interaktions-, Navigations- und Konsolenprüfung blieben keine blockierenden oder mittleren Findings offen.
+
+## Implementation Checklist
+
+- [x] Spielerzahl und Teamstärke getrennt bewertet.
+- [x] Review-only 1:1-Tausch ohne automatische Ausführung ergänzt.
+- [x] Führungsrollen und Spezialtrupps aus der Stärkeempfehlung ausgeschlossen.
+- [x] Kandidaten in der Teamliste hervorgehoben.
+- [x] Erklärung, Ein-/Ausklappen und Detailnavigation geprüft.
+- [x] Source und Implementierung in einem gemeinsamen Vergleichseingang beurteilt.
+
+final result: passed
+
+---
+
 # Design QA · Phase 5 – Systemdiagnose, Protokolle und Spielarchiv
 
 ## Prüfgrundlage
