@@ -43,7 +43,7 @@ assert.match(serverStatus, /variant="status"/);
 assert.match(serverSwitcher, /KeyboardArrowDownRoundedIcon/);
 assert.match(serverSwitcher, /t\("sidebar\.switchServer"\)/);
 assert.match(serverSwitcher, /placement=\{isStatusTrigger \? "bottom" : "right"\}/);
-assert.doesNotMatch(desktopNavigation, /ServerRailSwitcher/);
+assert.match(desktopNavigation, /topSlot=\{<ServerRailSwitcher \/>\}/);
 assert.doesNotMatch(mobileNavigation, /ServerRailSwitcher/);
 
 assert.match(breadcrumbs, /data-testid="mobile-route-back"/);
