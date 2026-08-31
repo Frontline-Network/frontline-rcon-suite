@@ -48,6 +48,51 @@ final result: passed
 
 ---
 
+# Design QA · Phase 2.3 Teams und Autobalancer
+
+## Vergleichsziel
+
+- Source Visual Truth: `.codex/phase23b-baseline/team-mobile-390x844.png`, `.codex/phase23b-baseline/team-desktop-1440x900.png`, `.codex/phase23b-baseline/autobalancer-mobile-390x844.png` sowie die Routenanforderungen für Teams und Autobalancer in `docs/product-design/rcon-product-concept.md`.
+- Implementierung: `.codex/phase23b-baseline/team-after-mobile-viewport.png`, `.codex/phase23b-baseline/team-after-desktop-viewport.png`, `.codex/phase23b-baseline/autobalancer-final-mobile-390x844.png` und `.codex/phase23b-baseline/autobalancer-final-desktop-1440x900.png`.
+- Primärer Vergleichszustand: Frontline Gold, dunkler Modus, Standard-Farbsehen, simulierte Live-Daten; Teamübersicht mit Gefechtsstatus und Autobalancer-Liveübersicht.
+
+## Normalisierung
+
+- Mobile Source und Implementierung: 390 × 844 CSS-Pixel bei Browser-Dichte 1.
+- Desktop Source und Implementierung: 1440 × 900 CSS-Pixel bei Browser-Dichte 1.
+- Browser-Chrome wurde nicht erfasst. Die vollständigen Viewports enthalten alle für diesen Vergleich relevanten Kopf-, Status-, Filter- und Arbeitsbereiche.
+
+## Full-View- und Fokusvergleich
+
+Die Teamansicht behält auf Desktop ihre dichte Führungsstruktur. Mobile wurde der zuvor hohe, vertikal gestapelte Gefechtsstatus zu einer dreispaltigen Team-/Spielstand-/Team-Zeile mit direkt anschließender dreispaltiger Problemlage verdichtet. Dadurch sind Autobalancer-Hinweis und alle Teamfilter bereits im ersten 390 × 844-Viewport erreichbar. Der Fokusvergleich umfasste Gefechtsstatus, Problemlage, Teamfilter und Kapazitätszustände.
+
+Der Autobalancer ersetzt auf Mobile die abgeschnittene horizontale Tabnavigation durch ein beschriftetes Bereichs-Select. Desktop behält die schnelle Tabreihe. Eine fünfstufige operative Zeitleiste ordnet Live-Zustand, Balance-Delta, geplante Verschiebung, letzten Eingriff und Cooldown. Der Fokusvergleich umfasste den Bereichswechsel, den nächsten empfohlenen Schritt und die vollständige Zeitleiste; zusätzliche Ausschnitte waren nicht erforderlich, da alle Beschriftungen in den Full-View-Aufnahmen lesbar sind.
+
+## Findings und Iterationen
+
+1. Ausgangsvergleich: Der mobile Teamstatus beanspruchte zu viel Höhe; die Autobalancer-Tabs wurden horizontal abgeschnitten.
+2. Erste Umsetzung: Teamstatus, Problemindikatoren, Statusfilter und mobile Bereichsauswahl wurden verdichtet beziehungsweise neu geordnet. Dabei blieben in der deutschen Autobalancer-Ansicht die Backend-Standardbezeichnungen „Allies“ und „Axis“ sichtbar; dies wurde als P2-Copy-Inkonsistenz bewertet.
+3. Korrektur: Die beiden englischen Standardwerte werden in diesem deutschen Dashboard als „Alliierte“ und „Achsenmächte“ normalisiert. Andere, vom Backend gelieferte Teambezeichnungen bleiben unverändert erhalten. Der erneute Vergleich zeigte keine offenen P0-, P1- oder P2-Befunde.
+
+Verbleibende Datenlücken:
+
+- **P3:** Der aktuelle Teamvertrag liefert keinen Zustand für gesperrte Rollen. Der entsprechende Filter wird deshalb nicht vorgetäuscht und bleibt eine spätere, explizite Vertragserweiterung.
+- **P3:** Der Autobalancer-Status liefert keinen verlässlichen letzten tatsächlich ausgeführten Eingriff. Die Zeitleiste kennzeichnet diesen Zustand transparent, statt einen Zeitpunkt zu erfinden.
+
+## Pflichtflächen und Interaktionen
+
+- Typografie und Layout: bestehende Frontline-Hierarchie, eckige Flächen, kompakte Karten und konsistente Abstände; bei 390 × 844 gilt `scrollWidth === clientWidth === 390` auf beiden Routen.
+- Farben und Tokens: ausschließlich bestehende Theme- und Semantik-Tokens. Status bleibt zusätzlich über Text, Icons und Rahmen erkennbar. Helles Theme plus Deuteranopie wurde geprüft und ohne Speicherung verworfen.
+- Assets: vorhandenes Frontline-Branding und die etablierte MUI-Iconbibliothek; keine Platzhalter, CSS-Zeichnungen oder neu erfundenen Bildassets.
+- Copy: kurze deutsche Operator-Texte; keine nicht belegten Zusagen oder erfundenen Zustände.
+- Tastatur: Autobalancer-Bereichsselect sowie Team-Statusselect mit Enter geöffnet und ausgewählt; „Vorschläge prüfen“ und „Überbelegt“ wurden korrekt aktiviert.
+- Semantik: beide Routen besitzen genau eine H1; Autobalancer ist in Breadcrumb und Navigation unter „Live-Betrieb“ eingeordnet.
+- Browserkonsole: null Errors in den sauberen Abschlussläufen.
+
+final result: passed
+
+---
+
 # Design QA · Phase 2.2 Mobile Live-Einsatz
 
 ## Vergleichsziel

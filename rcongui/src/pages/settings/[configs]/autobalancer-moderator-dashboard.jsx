@@ -23,7 +23,11 @@ import {
   CardContent,
   Chip,
   Divider,
+  FormControl,
+  InputLabel,
   LinearProgress,
+  MenuItem,
+  Select,
   Stack,
   Tab,
   Tabs,
@@ -99,8 +103,19 @@ const formatDate = (value) =>
 const formatMinutes = (seconds) =>
   Number.isFinite(seconds) ? `${Math.floor(seconds / 60)} Min.` : "unbekannt";
 
-const getTeamLabels = (value) =>
-  value?.team_labels || { allies: "Allies", axis: "Axis" };
+const getTeamLabels = (value) => {
+  const labels = value?.team_labels || {};
+  const allies = String(labels.allies || "").trim();
+  const axis = String(labels.axis || "").trim();
+  return {
+    allies: /^(allies|allied)$/i.test(allies)
+      ? "Alliierte"
+      : allies || "Alliierte",
+    axis: /^(axis|axis powers)$/i.test(axis)
+      ? "Achsenmächte"
+      : axis || "Achsenmächte",
+  };
+};
 
 const getModeStatus = (mode) => {
   if (mode === "shadow") {
@@ -272,6 +287,95 @@ const MetricCard = ({ label, value, caption, color = "text.primary" }) => (
       </Typography>
     </CardContent>
   </Card>
+);
+
+const OperationsTimeline = ({ steps }) => (
+  <Box
+    component="section"
+    aria-labelledby="autobalancer-operations-title"
+    sx={{ mt: 1.5 }}
+  >
+    <Typography
+      id="autobalancer-operations-title"
+      variant="overline"
+      color="text.secondary"
+    >
+      Einsatz-Timeline
+    </Typography>
+    <Box
+      sx={{
+        mt: 0.75,
+        display: "grid",
+        gridTemplateColumns: {
+          xs: "1fr",
+          sm: "repeat(2, minmax(0, 1fr))",
+          lg: "repeat(5, minmax(0, 1fr))",
+        },
+        border: "1px solid",
+        borderColor: "divider",
+        borderRadius: 1,
+        overflow: "hidden",
+        backgroundColor: "background.paper",
+      }}
+    >
+      {steps.map((step, index) => (
+        <Box
+          key={step.label}
+          sx={{
+            minWidth: 0,
+            p: 1.5,
+            borderLeft: {
+              xs: 0,
+              sm: index % 2 ? "1px solid" : 0,
+              lg: index ? "1px solid" : 0,
+            },
+            borderTop: {
+              xs: index ? "1px solid" : 0,
+              sm: index > 1 ? "1px solid" : 0,
+              lg: 0,
+            },
+            borderColor: "divider",
+          }}
+        >
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Box
+              sx={{
+                width: 28,
+                height: 28,
+                display: "grid",
+                placeItems: "center",
+                flex: "0 0 auto",
+                border: "1px solid",
+                borderColor: step.color || "divider",
+                borderRadius: 0.75,
+                color: step.color || "text.secondary",
+                "& .MuiSvgIcon-root": { fontSize: 17 },
+              }}
+            >
+              {step.icon}
+            </Box>
+            <Typography variant="caption" color="text.secondary">
+              {step.label}
+            </Typography>
+          </Stack>
+          <Typography
+            variant="subtitle1"
+            color={step.color || "text.primary"}
+            sx={{ mt: 1, fontWeight: 700, overflowWrap: "anywhere" }}
+          >
+            {step.value}
+          </Typography>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ mt: 0.35, display: "block" }}
+          >
+            {step.caption}
+          </Typography>
+        </Box>
+      ))}
+    </Box>
+  </Box>
 );
 
 const QualityCard = ({ title, value, explanation, progress, color }) => (
@@ -513,11 +617,15 @@ const ProposalDetail = ({
           {decision.review_category && (
             <>
               {" "}
-              Grund: {REVIEW_CATEGORY_LABELS[decision.review_category] ||
-                decision.review_category}.
+              Grund:{" "}
+              {REVIEW_CATEGORY_LABELS[decision.review_category] ||
+                decision.review_category}
+              .
             </>
           )}
-          {decision.review_comment && <> Kommentar: {decision.review_comment}</>}
+          {decision.review_comment && (
+            <> Kommentar: {decision.review_comment}</>
+          )}
         </Alert>
       )}
 
@@ -1026,6 +1134,71 @@ const AutobalancerModeratorDashboard = ({
     Number.isFinite(counts.allies) && Number.isFinite(counts.axis);
   const difference = hasCounts ? Math.abs(counts.allies - counts.axis) : null;
   const totalReviewsTarget = goals.reviewed_proposals_target ?? 20;
+  const plannedMove = status.proposal || status.plan?.candidate || pending[0];
+  const sourceTeam = plannedMove?.source_team;
+  const targetTeam = plannedMove?.target_team;
+  const plannedMoveCaption = plannedMove
+    ? sourceTeam && targetTeam
+      ? `${teamLabels[sourceTeam] || sourceTeam} → ${
+          teamLabels[targetTeam] || targetTeam
+        }`
+      : "Kandidat aus dem neuesten Vorschlag"
+    : "Wird angelegt, sobald ein Eingriff nötig ist";
+  const timelineSteps = [
+    {
+      label: "Live-Zustand",
+      value: PHASE_LABELS[status.phase] || modeStatus.title,
+      caption: modeStatus.detail,
+      color: status.phase === "blocked" ? "warning.main" : "info.main",
+      icon: <InsightsIcon aria-hidden />,
+    },
+    {
+      label: "Balance-Delta",
+      value: difference == null ? "Nicht messbar" : `${difference} Spieler`,
+      caption:
+        status.required_switches > 0
+          ? `${status.required_switches} Wechsel nötig`
+          : hasCounts
+          ? "Im erlaubten Bereich"
+          : "Live-Snapshot unvollständig",
+      color:
+        difference > (config?.target_difference ?? 2)
+          ? "warning.main"
+          : "success.main",
+      icon: <BalanceIcon aria-hidden />,
+    },
+    {
+      label: "Geplante Verschiebung",
+      value:
+        plannedMove?.player_name || plannedMove?.name || "Noch kein Kandidat",
+      caption: plannedMoveCaption,
+      color: plannedMove ? "primary.main" : "text.secondary",
+      icon: <PlaylistAddCheckIcon aria-hidden />,
+    },
+    {
+      label: "Letzter Eingriff",
+      value:
+        config?.mode === "shadow" ? "Kein Live-Eingriff" : "Nicht gemeldet",
+      caption:
+        config?.mode === "shadow"
+          ? "Shadow-Modus führt keine Spielerwechsel aus"
+          : "Der aktuelle Status liefert noch keine Eingriffshistorie",
+      icon: <HistoryIcon aria-hidden />,
+    },
+    {
+      label: "Cooldown",
+      value:
+        status.phase === "cooldown"
+          ? "Stabilitätsprüfung läuft"
+          : `${config?.cooldown_maps ?? 3} Karten Schutz`,
+      caption:
+        status.phase === "cooldown"
+          ? "Nach dem letzten Wechsel wird die Lage neu geprüft"
+          : "Schutz nach einem bestätigten Wechsel",
+      color: status.phase === "cooldown" ? "warning.main" : "text.primary",
+      icon: <ShieldOutlinedIcon aria-hidden />,
+    },
+  ];
   const nextTask = pending.length
     ? pending.length === 1
       ? "1 Vorschlag wartet auf eine Bewertung"
@@ -1040,6 +1213,11 @@ const AutobalancerModeratorDashboard = ({
   const switchSection = (value) => {
     setSection(value);
     if (value !== "proposals") setSelectedDecisionId(null);
+  };
+
+  const selectSection = (value) => {
+    switchSection(value);
+    if (value === "settings") onOpenSettings();
   };
 
   if (section === "proposals" && selectedDecision) {
@@ -1090,13 +1268,39 @@ const AutobalancerModeratorDashboard = ({
         </Stack>
       </Stack>
 
+      <FormControl
+        fullWidth
+        size="small"
+        sx={{ mt: 2, display: { xs: "flex", md: "none" } }}
+      >
+        <InputLabel id="autobalancer-section-label">Bereich</InputLabel>
+        <Select
+          labelId="autobalancer-section-label"
+          value={section}
+          label="Bereich"
+          onChange={(event) => selectSection(event.target.value)}
+        >
+          <MenuItem value="live">Live-Übersicht</MenuItem>
+          <MenuItem value="proposals">
+            Vorschläge prüfen ({pending.length})
+          </MenuItem>
+          <MenuItem value="pilot">Pilotfreigabe</MenuItem>
+          <MenuItem value="history">Historie</MenuItem>
+          <MenuItem value="settings">Einstellungen</MenuItem>
+        </Select>
+      </FormControl>
+
       <Tabs
         value={section}
-        onChange={(_, value) => switchSection(value)}
+        onChange={(_, value) => selectSection(value)}
         variant="scrollable"
         scrollButtons="auto"
-        allowScrollButtonsMobile
-        sx={{ mt: 2, borderBottom: 1, borderColor: "divider" }}
+        sx={{
+          mt: 2,
+          borderBottom: 1,
+          borderColor: "divider",
+          display: { xs: "none", md: "flex" },
+        }}
       >
         <Tab
           value="live"
@@ -1127,7 +1331,6 @@ const AutobalancerModeratorDashboard = ({
           icon={<SettingsIcon />}
           iconPosition="start"
           label="Einstellungen"
-          onClick={onOpenSettings}
         />
       </Tabs>
 
@@ -1191,32 +1394,27 @@ const AutobalancerModeratorDashboard = ({
             </CardContent>
           </Card>
 
+          <OperationsTimeline steps={timelineSteps} />
+
           <Box
             sx={{
               display: "grid",
               gridTemplateColumns: {
                 xs: "1fr",
-                md: "repeat(3, minmax(0, 1fr))",
+                sm: "repeat(2, minmax(0, 1fr))",
               },
               gap: 1.5,
               mt: 1.5,
             }}
           >
             <MetricCard
-              label="Aktueller Zustand"
-              value={modeStatus.title}
-              caption={modeStatus.detail}
-            />
-            <MetricCard
-              label="Teamunterschied"
+              label="Teamstand"
               value={
-                difference == null ? "Nicht messbar" : `${difference} Spieler`
-              }
-              caption={
                 hasCounts
                   ? `${teamLabels.allies} ${counts.allies} · ${teamLabels.axis} ${counts.axis}`
-                  : "Live-Snapshot unvollständig"
+                  : "Nicht verfügbar"
               }
+              caption="Aktueller Live-Snapshot beider Teams"
             />
             <MetricCard
               label="Pilotstatus"
@@ -1404,10 +1602,7 @@ const AutobalancerModeratorDashboard = ({
 
       {section === "history" && (
         <Box sx={{ mt: 2 }}>
-          <AutobalancerRoundHistory
-            config={config}
-            teamLabels={teamLabels}
-          />
+          <AutobalancerRoundHistory config={config} teamLabels={teamLabels} />
         </Box>
       )}
     </Box>

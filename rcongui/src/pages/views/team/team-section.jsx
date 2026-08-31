@@ -56,6 +56,13 @@ const SQUAD_LIMITS = {
 
 const normalizeType = (value) => String(value || "infantry").toLowerCase();
 
+const getSquadCapacity = (squad) => SQUAD_LIMITS[normalizeType(squad?.type)];
+
+const isSquadOverCapacity = (squad) => {
+  const capacity = getSquadCapacity(squad);
+  return Boolean(capacity && (squad?.players?.length ?? 0) > capacity);
+};
+
 const getLeader = (squad) =>
   squad.players.find((player) =>
     LEADER_ROLES.has(
@@ -206,8 +213,21 @@ const SquadRow = ({
   const partlySelected =
     squad.players.some((player) => selectedPlayers.has(player.player_id)) &&
     !allSelected;
-  const hasProblem = !squad.has_leader || !leader;
-  const capacity = SQUAD_LIMITS[type];
+  const hasLeaderProblem = !squad.has_leader || !leader;
+  const capacity = getSquadCapacity(squad);
+  const overCapacity = isSquadOverCapacity(squad);
+  const problemLabels = [
+    ...(hasLeaderProblem ? [t("views.team.noLeader")] : []),
+    ...(overCapacity
+      ? [
+          t("views.team.squadOverCapacity", {
+            count: squad.players.length,
+            capacity,
+          }),
+        ]
+      : []),
+  ];
+  const hasProblem = problemLabels.length > 0;
 
   return (
     <Box>
@@ -259,7 +279,9 @@ const SquadRow = ({
             variant="outlined"
             label={`${squad.players.length}${capacity ? `/${capacity}` : ""}`}
             color={
-              capacity && squad.players.length >= capacity
+              overCapacity
+                ? "warning"
+                : capacity && squad.players.length === capacity
                 ? "success"
                 : "default"
             }
@@ -272,16 +294,25 @@ const SquadRow = ({
         <Typography className="level-cell" variant="body2">
           Ø {squad.level ?? 0}
         </Typography>
-        <Box className="problem-cell">
-          {hasProblem ? (
-            <>
-              <ReportProblemOutlinedIcon fontSize="small" aria-hidden />
-              <span>1</span>
-            </>
-          ) : (
-            <CheckCircleOutlineIcon fontSize="small" aria-hidden />
-          )}
-        </Box>
+        <Tooltip disableInteractive title={problemLabels.join(" · ")}>
+          <Box
+            className="problem-cell"
+            aria-label={
+              hasProblem
+                ? problemLabels.join(" · ")
+                : t("views.team.noSquadProblems")
+            }
+          >
+            {hasProblem ? (
+              <>
+                <ReportProblemOutlinedIcon fontSize="small" aria-hidden />
+                <span>{problemLabels.length}</span>
+              </>
+            ) : (
+              <CheckCircleOutlineIcon fontSize="small" aria-hidden />
+            )}
+          </Box>
+        </Tooltip>
       </SquadHeader>
       <SquadPlayers
         squad={squad}
@@ -349,10 +380,21 @@ export const TeamSection = ({
       .sort((a, b) => a.name.localeCompare(b.name));
     const unassigned =
       team.squads?.find((squad) => squad.name === UNASSIGNED)?.players ?? [];
-    const problemSquads = allSquads.filter((squad) => !squad.has_leader);
+    const leaderlessSquads = allSquads.filter(
+      (squad) => !squad.has_leader || !getLeader(squad)
+    );
+    const overCapacitySquads = allSquads.filter(isSquadOverCapacity);
+    const problemSquads = allSquads.filter(
+      (squad) =>
+        !squad.has_leader || !getLeader(squad) || isSquadOverCapacity(squad)
+    );
     const visibleSquads =
-      filterMode === "issues" || filterMode === "noLeader"
+      filterMode === "issues"
         ? problemSquads
+        : filterMode === "noLeader"
+        ? leaderlessSquads
+        : filterMode === "overCapacity"
+        ? overCapacitySquads
         : filterMode === "unassigned"
         ? []
         : allSquads;

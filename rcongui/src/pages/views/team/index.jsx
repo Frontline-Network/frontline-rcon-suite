@@ -47,7 +47,7 @@ import BattleSummary from "./battle-summary";
 import { LobbyContainer, TeamContainer } from "./styled";
 import { TeamSection, UNASSIGNED } from "./team-section";
 
-const FILTERS = ["all", "issues", "noLeader", "unassigned"];
+const FILTERS = ["all", "issues", "noLeader", "overCapacity", "unassigned"];
 
 const PRIMARY_SELECTION_ACTIONS = [
   { action: Actions.SendMessage, labelKey: "message" },

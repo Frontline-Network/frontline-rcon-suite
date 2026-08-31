@@ -5223,6 +5223,8 @@ const enMasterFallback = {
       "problemsCount_one": "{{count}} problem",
       "problemsCount_other": "{{count}} problems",
       "noMatches": "No matching players or squads found.",
+      "squadOverCapacity": "Over capacity: {{count}} of {{capacity}} slots",
+      "noSquadProblems": "No squad issues",
       "issueCommander_one": "{{count}} team without commander",
       "issueCommander_other": "{{count}} teams without commander",
       "issueCommanderDetail": "Unfilled command positions",
@@ -5236,6 +5238,7 @@ const enMasterFallback = {
         "all": "Show all",
         "issues": "Issues only",
         "noLeader": "No squad leader",
+        "overCapacity": "Over capacity",
         "unassigned": "Unassigned"
       },
       "squadTypes": {

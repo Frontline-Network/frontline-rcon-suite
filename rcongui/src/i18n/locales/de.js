@@ -5269,6 +5269,8 @@ const deMasterFallback = {
       "problemsCount_one": "{{count}} Problem",
       "problemsCount_other": "{{count}} Probleme",
       "noMatches": "Keine passenden Spieler oder Trupps gefunden.",
+      "squadOverCapacity": "Überbelegt: {{count}} von {{capacity}} Plätzen",
+      "noSquadProblems": "Keine Auffälligkeit im Trupp",
       "issueCommander_one": "{{count}} Team ohne Commander",
       "issueCommander_other": "{{count}} Teams ohne Commander",
       "issueCommanderDetail": "Unbesetzte Führungspositionen",
@@ -5282,6 +5284,7 @@ const deMasterFallback = {
         "all": "Alle anzeigen",
         "issues": "Nur Auffälligkeiten",
         "noLeader": "Ohne Truppführer",
+        "overCapacity": "Überbelegt",
         "unassigned": "Ohne Trupp"
       },
       "squadTypes": {

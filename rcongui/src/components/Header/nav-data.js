@@ -446,7 +446,12 @@ const taskGroupDefinitions = [
     id: "live-operations",
     translationKey: "navigation.groups.liveOperations",
     icon: <BoltIcon />,
-    routes: ["/views/live", "/views/team", "/stats/live-game"],
+    routes: [
+      "/views/live",
+      "/views/team",
+      "/views/autobalancer",
+      "/stats/live-game",
+    ],
   },
   {
     id: "players-moderation",
@@ -479,7 +484,6 @@ const taskGroupDefinitions = [
     translationKey: "navigation.groups.automation",
     icon: <SmartToyIcon />,
     routes: [
-      "/views/autobalancer",
       "/settings/autosettings",
       "/settings/automods/level",
       "/settings/automods/no-leader",

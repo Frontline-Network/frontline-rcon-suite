@@ -215,3 +215,41 @@ Das Paket ist frontend-, datenbank- und konfigurationsneutral. Es erfordert wede
 ### Rückrollbarkeit
 
 Das Paket ist frontend-, datenbank- und konfigurationsneutral. Es erfordert weder Backup noch Migration und kann als einzelner Git-Commit mit `git revert` zurückgenommen werden. Es wurde weder gepusht noch veröffentlicht, als PR eröffnet, ausgerollt oder auf einer Produktionsinstanz aktiviert.
+
+## Phase 2 · Paket 2.3 – Teamführung und Autobalancer
+
+### Inventar und Risiko
+
+- Betroffene Routen: `/views/team` und `/views/autobalancer`.
+- Betroffene Komponenten: Gefechtsstatus, Team- und Truppfilter, Kapazitätsindikatoren, Autobalancer-Navigation, Handlungsempfehlung, operative Zeitleiste und Navigationszuordnung.
+- Datenverträge und gespeicherte Konfigurationen: unverändert. Team-, Trupp-, Autobalancer-Status-, Kandidaten-, Pilot- und Einstellungsverträge werden ausschließlich gelesen beziehungsweise über die bereits vorhandenen Aktionen bedient. Es gibt keine Migration und keine neue Persistenz.
+- Ausgangslage: Mobile verbrauchte der Teamstatus den größten Teil des ersten Viewports. Beim Autobalancer war die horizontale Bereichsnavigation abgeschnitten; der betriebliche Ablauf war als zusammenhängende Entscheidungskette schwer erkennbar.
+
+### Umsetzung
+
+- Die Teamansicht verdichtet Mobile Mannschaften, Spielstand und Problemlage, ohne die informationsreiche Desktopansicht zu verändern. Alle Filter und der Autobalancer-Einstieg liegen nun im ersten mobilen Viewport.
+- Der Statusfilter unterscheidet zusätzlich überbelegte Trupps. Kapazität wird anhand des vorhandenen Trupptyps ermittelt; Problemindikatoren unterscheiden fehlende Führung und Überbelegung über Text, Symbol und zugängliche Beschriftung.
+- Der Autobalancer ist in der Informationsarchitektur dem Live-Betrieb zugeordnet. Mobile verwendet ein beschriftetes Bereichs-Select, Desktop weiterhin die schnelle Tabnavigation.
+- Die neue operative Zeitleiste strukturiert den bestehenden Status in Live-Zustand, Balance-Delta, geplante Verschiebung, letzten Eingriff und Cooldown. Sie erfindet keine ausgeführten Aktionen und kennzeichnet fehlende Backenddaten transparent.
+- Englische Standardbezeichnungen für Alliierte und Achsenmächte werden im deutschen Moderator-Dashboard normalisiert; individuelle Backendbezeichnungen bleiben erhalten.
+
+### Validierung
+
+- Vite-Production-Build mit API-Basispfad `/api/`: bestanden; nur die bekannte Chunk-Größenwarnung bleibt.
+- Verträge: Design Foundation, Seitensemantik, Action Feedback, Polling Budget, Konfigurationskompatibilität, Admin-Aktionen, Operator-Copy, Navigation Shell und initiales Bundle-Budget bestanden.
+- Browserprüfung: Teams und Autobalancer bei 1440 × 900 sowie 390 × 844 geprüft; beide mobilen Routen besitzen keinen horizontalen Dokumentüberlauf.
+- Tastaturprüfung: Autobalancer-Bereichsselect auf „Vorschläge prüfen“ und Team-Statusselect auf „Überbelegt“ umgestellt.
+- Theme- und Farbsehprüfung: helles Theme plus Deuteranopie geprüft und ohne Speicherung verworfen.
+- Semantik: genau eine H1 pro Route; Autobalancer-Breadcrumb unter „Live-Betrieb“.
+- Design QA: drei Vergleichsschritte einschließlich Korrektur englischer Teambezeichnungen; keine offenen P0/P1/P2-Findings, Ergebnis `passed` in `design-qa.md`.
+- Browserkonsole: null Errors.
+- Lint: weiterhin nicht ausführbar, weil im Checkout kein ESLint-Paket beziehungsweise Binary installiert ist.
+
+### Bekannte Datenlücken
+
+- Der Teamvertrag liefert keinen Zustand für gesperrte Rollen. Eine entsprechende Filteroption wird erst mit einer kompatiblen Backend-Erweiterung ergänzt.
+- Der Autobalancer-Status liefert keinen belastbaren letzten tatsächlich ausgeführten Eingriff. Die Oberfläche benennt diesen Zustand ausdrücklich, statt einen Zeitwert vorzutäuschen.
+
+### Rückrollbarkeit
+
+Das Paket ist frontend-, datenbank- und konfigurationsneutral. Es erfordert weder Backup noch Migration und kann als einzelner Git-Commit mit `git revert` zurückgenommen werden. Es wurde weder gepusht noch veröffentlicht, als PR eröffnet, ausgerollt oder auf einer Produktionsinstanz aktiviert.
