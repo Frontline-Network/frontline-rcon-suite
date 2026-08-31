@@ -289,3 +289,36 @@ Das Paket ist frontend-, datenbank- und konfigurationsneutral. Es erfordert wede
 ### Rückrollbarkeit
 
 Das Paket verändert ausschließlich Frontend-Darstellung und Interaktionsreihenfolge. Es erfordert weder Datenmigration noch Backup und kann als einzelner Git-Commit mit `git revert` zurückgenommen werden. Es wurde weder gepusht noch veröffentlicht, als PR eröffnet, ausgerollt oder auf einer Produktionsinstanz aktiviert.
+
+## Phase 2 · Paket 2.5 – Dienste, Spiel- und Audit-Protokolle
+
+### Inventar und Risiko
+
+- Betroffene Routen: `/settings/services`, `/records/game-logs` und `/records/audit-logs`.
+- Betroffene Komponenten: Dienstzusammenfassung, Abhängigkeitskette, Dienststeuerung, mobile Spielprotokollfilter und Timelinezeilen, mobile Auditfilter sowie Listen-/Detailzustände.
+- Datenverträge und gespeicherte Konfigurationen: unverändert. Dienste-Loader, Operational Health, Supportdiagnose, Dead Letters, `TOGGLE_SERVICE`, alle GET-Queryfelder der Spiel- und Audit-Protokolle sowie die Exportpfade bleiben kompatibel. Es gibt keine Migration und keine neue Persistenz.
+- Ausgangslage: Die Diensteansicht zeigte Einzelzustände, aber keine klare betriebliche Kette. Auf Mobile nahmen die vollständigen Filter beider Protokollseiten so viel Höhe ein, dass die eigentlichen Daten kaum im ersten Viewport sichtbar waren. Spielprotokollzeilen überlagerten auf schmalen Displays Zeit- und Ereignisdetails.
+
+### Umsetzung
+
+- Die Diensteansicht führt über eine kompakte Lagezeile und die Abhängigkeitskette RCON → Worker → Scheduler zu den einzelnen Steuerungen. Zustand, Laufzeit, letzter Start/Stopp, Fehler und Betriebswirkung bleiben direkt prüfbar.
+- Mobile stapelt die Betriebskette vertikal und ordnet die Zusammenfassung in drei kompakte Kennzahlen, ohne die bestehende Steuerung oder Diagnosefunktionen zu entfernen.
+- Spiel- und Audit-Protokolle behalten Desktop ihre dichten Arbeitsflächen. Mobile priorisiert Suche und wenige häufige Kategorien; sämtliche erweiterten Felder liegen in einem beschrifteten Bottom Drawer.
+- Portal-rendernde Drawer bewahren über versteckte Felder alle bisherigen URL- und Formverträge. Export, Sortierung, Exaktsuche, Zeitraum, Serverfilter, Benutzer, Befehle und Seitengröße bleiben erreichbar.
+- Mobile Spielprotokollzeilen erhalten eine eigene Metazeile für Ereignistyp und vollständigen Zeitpunkt; die bisherigen Desktopspalten bleiben unverändert.
+
+### Validierung
+
+- Vite-Production-Build bestanden; nur die bekannte Chunk-Größenwarnung bleibt.
+- Verträge: Design Foundation, Seitensemantik, Action Feedback, Konfigurationskompatibilität, Admin-Aktionen, Operator-Copy und Navigation Shell bestanden.
+- Initiales Bundle-Budget: bestanden mit 1.499,96 kB Rohgröße und 483,01 kB gzip; Entry 401,44 kB raw und 121,64 kB gzip.
+- Browserprüfung: alle drei Routen bei 1440 × 900 und 390 × 844; kein horizontaler Dokumentüberlauf und jeweils genau eine H1.
+- Funktionsprüfung: Audit-Suche `Wotan`, Audit-Detail-Drawer und Spielprotokoll-Suche `FLN_Wolf` gegen die unveränderten Queryverträge ausgeführt. Dienststeuerungen visuell und semantisch geprüft, ohne einen simulierten Prozess unnötig zu starten oder zu stoppen.
+- Theme- und Farbsehprüfung: heller Modus plus Deuteranopie live geprüft und ohne Speicherung verworfen.
+- Tastaturprüfung: sichtbare Fokusdarstellung auf den primären Aktionen geprüft. Wiederholtes Browser-CUA-Tabbing blieb werkzeugbedingt auf demselben Element; der automatisierte Fokusvertrag bestand.
+- Design QA: Vorher-/Nachher-Vergleiche bei identischen Desktop- und Mobile-Viewports; mobile Timeline-Überlagerung und zu breite Clear-Aktion nach dem ersten Lauf korrigiert. Keine offenen P0/P1/P2-Findings, Ergebnis `passed` in `design-qa.md`.
+- Browserkonsole: keine Errors; ausschließlich die bekannte React-Router-v7-Future-Flag-Warnung.
+
+### Rückrollbarkeit
+
+Das Paket verändert ausschließlich Frontend-Darstellung, responsive Anordnung und Interaktionsreihenfolge. Es erfordert weder Datenmigration noch Backup und kann als einzelner Git-Commit mit `git revert` zurückgenommen werden. Es wurde weder gepusht noch veröffentlicht, als PR eröffnet, ausgerollt oder auf einer Produktionsinstanz aktiviert.

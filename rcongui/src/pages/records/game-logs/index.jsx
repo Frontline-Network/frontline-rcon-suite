@@ -152,7 +152,10 @@ const GameLogsPage = () => {
             <Typography
               variant="caption"
               color="text.secondary"
-              sx={{ whiteSpace: "nowrap" }}
+              sx={{
+                whiteSpace: "nowrap",
+                display: { xs: "none", sm: "block" },
+              }}
             >
               {t("records.gameLogs.timeline.loaded", { count: logs.length })}
             </Typography>
@@ -160,6 +163,7 @@ const GameLogsPage = () => {
               variant="outlined"
               startIcon={<DownloadIcon />}
               onClick={() => downloadLogs(logs)}
+              size="small"
               sx={{ borderRadius: 0, whiteSpace: "nowrap" }}
             >
               {t("records.gameLogs.timeline.export")}

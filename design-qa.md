@@ -48,6 +48,73 @@ final result: passed
 
 ---
 
+# Design QA · Phase 2.5 Dienste, Spiel- und Audit-Protokolle
+
+## Prüfgrundlage
+
+- Source Visual Truth: bestehende funktionsfähige Ansichten in `.codex/phase25-baseline/services-desktop-1440x900.png`, `.codex/phase25-baseline/services-mobile-390x844.png`, `.codex/phase25-baseline/game-logs-desktop-1440x900.png`, `.codex/phase25-baseline/game-logs-mobile-390x844.png`, `.codex/phase25-baseline/audit-logs-desktop-1440x900.png` und `.codex/phase25-baseline/audit-logs-mobile-390x844.png`; Zielhierarchie zusätzlich aus dem freigegebenen Product-Design-Konzept für `/settings/services`, `/records/game-logs` und `/records/audit-logs`.
+- Implementierung: `.codex/phase25-baseline/services-after-desktop-1440x900.png`, `.codex/phase25-baseline/services-after-mobile-390x844.png`, `.codex/phase25-baseline/game-logs-after-desktop-1440x900.png`, `.codex/phase25-baseline/game-logs-after-mobile-390x844.png`, `.codex/phase25-baseline/audit-logs-after-desktop-1440x900.png` und `.codex/phase25-baseline/audit-logs-after-mobile-390x844.png`.
+- Viewports und Normalisierung: Mobile jeweils 390 × 844 CSS-Pixel bei Browser-Dichte 1 und 390 × 844 Bildpixeln; Desktop jeweils 1440 × 900 CSS-Pixel bei Browser-Dichte 1 und 1440 × 900 Bildpixeln. Die Aufnahmen enthalten nur den App-Viewport ohne Browser-Chrome.
+- Zustände: Frontline Gold, dunkler Modus, Standard-Farbsehen; Dienste mit simulierten Laufzeitdaten, Spiel- und Audit-Protokolle mit realistischen Mirage-Demodaten. Helles Theme plus Deuteranopie wurde separat live geprüft und anschließend ohne Speicherung verworfen.
+
+## Full-View-Vergleich
+
+Die Vorher- und Nachher-Aufnahmen wurden je Route bei identischem Viewport gemeinsam beurteilt. Die Diensteansicht führt jetzt von Betriebsbereitschaft und Fehlerlage über die Abhängigkeitskette RCON → Worker → Scheduler zu den einzelnen Steuerungen. Desktop bleibt kompakt, während Mobile die Kette vertikal und bereits im ersten Viewport verständlich zeigt. Spiel- und Audit-Protokolle bewahren ihre dichten Desktop-Arbeitsflächen, reduzieren Mobile aber die zuvor hohen Filterblöcke auf Suche, klaren Filtereinstieg und wenige aktive Kategorien. Dadurch erscheinen die ersten relevanten Ereignisse beziehungsweise Auditzeilen bereits im ersten mobilen Viewport.
+
+## Fokusvergleich
+
+Ein zusätzlicher Bildausschnitt war nicht erforderlich. Statuszusammenfassung, Dienstekette, Dienststeuerung, mobile Such-/Filterleiste sowie erste Protokollzeilen sind in den vollständigen Desktop- und Mobile-Aufnahmen lesbar. Die Filter-Drawer und der Audit-Detail-Drawer wurden zusätzlich interaktiv im Browser geprüft, weil ihre Zustände nicht gleichzeitig mit der Listenansicht sichtbar sein können.
+
+## Findings
+
+- Keine verbleibenden P0-, P1- oder P2-Abweichungen.
+- [P3] Im Entwicklungsmodus protokolliert React Router weiterhin die bekannte Future-Flag-Warnung zu `v7_startTransition`. Es gibt keine route-spezifischen Runtime-Fehler und kein sichtbares Fehlverhalten.
+
+## Pflichtflächen
+
+- Fonts und Typografie: bestehende Frontline-Schriftfamilie, kondensierte Versalien, Gewichte und Zeilenhöhen bleiben erhalten. Kennzahlen, Dienstzustände, Ereignistypen, Zeitangaben und Filterbeschriftungen besitzen eine klare, scanbare Hierarchie ohne problematische Überlagerung.
+- Spacing und Layout: Dienste nutzen eine eckige, eng geführte Betriebskette. Mobile Filter reduzieren den ersten Viewport auf die primäre Suchaufgabe und öffnen Detailfelder in einem Vollhöhen-Drawer. Bei 390 × 844 und 1440 × 900 entsteht kein horizontaler Dokumentüberlauf.
+- Farben und Tokens: Flächen, Rahmen, Status und Auswahl verwenden ausschließlich vorhandene Theme- und Semantik-Tokens. Heller Modus plus Deuteranopie wurde live geprüft; Zustand bleibt zusätzlich über Text, Icon und Umrandung verständlich.
+- Bild- und Assetqualität: Die datengetriebenen Ansichten benötigen keine neuen Bilder. Frontline-Branding und etablierte MUI-Icons werden wiederverwendet; keine Platzhalter, CSS-Zeichnungen, Emojis oder handgebauten SVG-Ersatzassets wurden eingeführt.
+- Copy und Inhalt: Betriebsbereitschaft, Fehlerlage, Abhängigkeit, Betriebswirkung sowie die mobilen Filteraktionen sind auf Deutsch und Englisch knapp benannt. Es werden keine Zustände oder Betriebszusagen erfunden.
+- Icons und Zustände: RCON, Worker, Scheduler, Start, Stopp, Filter, Export und Detailansicht verwenden eine gemeinsame Iconfamilie und zugängliche Beschriftungen. Aktiv, Fehler, ausgewählt und deaktiviert werden nicht allein über Farbe vermittelt.
+- Responsivität und Accessibility: je Route genau eine H1; 390 × 844 und 1440 × 900 ohne horizontalen Überlauf; beschriftete Filter-Drawer, 44-Pixel-Aktionen, semantische Formfelder und bestehende Tastatur-Fokusdarstellung geprüft.
+
+## Interaktionen und Datenverträge
+
+- Audit-Suche mit `Wotan` abgesendet; die bestehende Query `parameters=Wotan&time_sort=desc&page_size=50&page=1` blieb vollständig erhalten und reduzierte die Liste auf einen Treffer.
+- Auditzeile geöffnet; der bestehende Detail-Drawer zeigte Akteur, Ziel, ID, Server, lokale und UTC-Zeit, übermittelte Werte und Ergebnis.
+- Spielprotokoll-Suche mit `FLN_Wolf` abgesendet; die bestehende Query bewahrte `limit=500`, `time_sort=desc`, `exact_player=false`, `exact_action=false` und `player_name=FLN_Wolf`.
+- Die mobilen Drawer führen weiterhin sämtliche bisherigen Zeit-, Server-, Aktions-, Exakt-, Sortier- und Seitengrößenfelder. Versteckte Formfelder sichern beim Portal-Rendering die vorhandenen GET-Verträge.
+- Dienst-Loader, Dead-Letter-, Diagnose- und Health-Verträge sowie die POST-Felder `service_name` und `action` (`start`/`stop`) bleiben unverändert. Für die QA wurde keine laufende Dienstaktion ausgelöst.
+
+## Vergleichshistorie
+
+1. Ausgangsvergleich: [P2] Mobile Dienste erklärten Abhängigkeiten nicht zusammenhängend; [P2] Spiel- und Audit-Filter verdrängten den eigentlichen Protokollinhalt aus dem ersten Viewport; [P1] die mobile Spielprotokollzeile überlagerte Zeit- und Ereignisspalten.
+2. Umsetzung: Betriebskette und kompakte Dienststeuerungen ergänzt; mobile Primärfilter mit Detail-Drawern eingeführt; mobile Timeline-Metadaten in eine eigene, nicht überlagernde Zeile verschoben.
+3. Erste Nachher-Prüfung: Die „Alle Filter entfernen“-Beschriftung beanspruchte auf Mobile unnötig Breite. Der mobile Zustand wurde auf eine zugänglich beschriftete Iconaktion verdichtet.
+4. Finale Vorher-/Nachher-Vergleiche bei identischen Viewports: keine offenen P0-, P1- oder P2-Findings.
+
+## Technische Validierung
+
+- Produktionsbuild bestanden; ausschließlich die bekannte Warnung für bestehende Chunks über 500 kB bleibt.
+- Design Foundation, Seitensemantik, Action Feedback, Konfigurationskompatibilität, Admin-Aktionsvertrag, Operator-Copy und Navigation Shell bestanden.
+- Initiales Bundle-Budget bestanden: 1.499,96 kB raw / 483,01 kB gzip; Entry 401,44 kB raw / 121,64 kB gzip.
+- Browserkonsole: keine Errors; zwei Instanzen der bekannten React-Router-v7-Future-Flag-Warnung im Entwicklungsmodus.
+
+## Implementation Checklist
+
+- [x] Source und Umsetzung je Route im selben Vergleichseingang geprüft.
+- [x] Desktop und 390 × 844 ohne horizontalen Dokumentüberlauf geprüft.
+- [x] Spiel- und Auditfilter sowie Audit-Detail funktional geprüft.
+- [x] Theme, Deuteranopie, Semantik und sichtbare Fokusdarstellung geprüft.
+- [x] Loader-, GET-, POST-, Export- und Konfigurationsverträge beibehalten.
+- [x] Keine offenen P0-, P1- oder P2-Findings.
+
+final result: passed
+
+---
+
 # Design QA · Phase 2.3 Teams und Autobalancer
 
 ## Vergleichsziel

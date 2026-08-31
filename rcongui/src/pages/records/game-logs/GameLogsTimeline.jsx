@@ -142,6 +142,7 @@ function TimelineRow({ log, selected, onSelect }) {
       <Typography
         variant="caption"
         sx={{
+          display: { xs: "none", sm: "block" },
           gridArea: "time",
           px: 1,
           color: "text.secondary",
@@ -156,6 +157,7 @@ function TimelineRow({ log, selected, onSelect }) {
         alignItems="center"
         spacing={0.75}
         sx={{
+          display: { xs: "none", sm: "flex" },
           gridArea: "type",
           minWidth: 0,
           px: 1,
@@ -198,7 +200,8 @@ function TimelineRow({ log, selected, onSelect }) {
           color: "text.secondary",
         }}
       >
-        {formatEventTime(log.event_time, "DD.MM.YYYY")}
+        {getEventLabel(log.type, t)} ·{" "}
+        {formatEventTime(log.event_time, "DD.MM.YYYY · HH:mm:ss")}
       </Typography>
     </Box>
   );

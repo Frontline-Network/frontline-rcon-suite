@@ -4262,6 +4262,8 @@ const de = {
       missingDescription: "Keine Dienstbeschreibung vorhanden.",
       stop: "Dienst stoppen",
       start: "Dienst starten",
+      notRunning: "Nicht aktiv",
+      impactTitle: "Auswirkung auf den Betrieb",
       health: {
         title: "Betriebszustand",
         window: "{{minutes}} Min.",

@@ -4217,6 +4217,8 @@ const en = {
       missingDescription: "Service description missing.",
       stop: "Stop service",
       start: "Start service",
+      notRunning: "Not active",
+      impactTitle: "Operational impact",
       health: {
         title: "Operational health",
         window: "{{minutes}} min",
