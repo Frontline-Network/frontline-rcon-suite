@@ -4,10 +4,12 @@ from datetime import datetime, time, timedelta, timezone
 
 from django.views.decorators.csrf import csrf_exempt
 
+from rcon.api_commands import get_rcon_api
 from rcon.autobalancer.history import RoundHistoryRepository
 from rcon.autobalancer.models import Phase
 from rcon.autobalancer.repository import DecisionRepository
 from rcon.autobalancer.review import validate_shadow_review
+from rcon.autobalancer.squad_switch import validate_squad_switch_moves
 from rcon.autobalancer.store import AutobalancerStore
 from rcon.user_config.autobalancer import AutobalancerUserConfig
 from rcon.utils import get_server_number
@@ -96,6 +98,137 @@ def get_autobalancer_status(request):
     return api_response(
         result=AutobalancerStore().load_status(),
         command="get_autobalancer_status",
+        failed=False,
+    )
+
+
+@csrf_exempt
+@login_required()
+@permission_required(
+    (
+        "api.can_execute_autobalancer",
+        "api.can_message_players",
+        "api.can_switch_players_immediately",
+    ),
+    raise_exception=True,
+)
+@record_audit
+@require_http_methods(["POST"])
+def execute_autobalancer_squad_switch(request):
+    command = "execute_autobalancer_squad_switch"
+    data = _get_data(request)
+    operation_id = str(data.get("player_id") or data.get("operation_id") or "squad")
+    config = AutobalancerUserConfig.load_from_db()
+    if not config.coordinated_squad_switches_enabled:
+        return api_response(
+            result=None,
+            command=command,
+            arguments={"player_id": operation_id},
+            failed=True,
+            error="Koordinierte Squad-Wechsel sind in den Einstellungen deaktiviert",
+        )
+
+    rcon_api = get_rcon_api()
+    try:
+        moves = validate_squad_switch_moves(
+            rcon_api.get_team_view(compact=True), data.get("moves")
+        )
+    except (TypeError, ValueError) as error:
+        return api_response(
+            result=None,
+            command=command,
+            arguments={"player_id": operation_id},
+            failed=True,
+            error=str(error),
+        )
+
+    notified: list[dict] = []
+    notification_failures: list[dict] = []
+    for move in moves:
+        message = config.messages.squad_switch_selected.format(
+            squad_name=move["squad_name"], target_team=move["target_label"]
+        )
+        for player in move["players"]:
+            try:
+                success = rcon_api.message_player(
+                    player["player_id"], message=message
+                )
+            except Exception as error:
+                success = False
+                player = {**player, "error": str(error)}
+            (notified if success else notification_failures).append(player)
+
+    if notification_failures:
+        for move in moves:
+            abort_message = config.messages.squad_switch_aborted.format(
+                squad_name=move["squad_name"]
+            )
+            for player in move["players"]:
+                try:
+                    rcon_api.message_player(player["player_id"], message=abort_message)
+                except Exception:
+                    pass
+        return api_response(
+            result={
+                "status": "aborted_before_switch",
+                "notified": notified,
+                "notification_failures": notification_failures,
+            },
+            command=command,
+            arguments={"player_id": operation_id},
+            failed=True,
+            error="Nicht alle Squad-Mitglieder konnten vor dem Wechsel informiert werden",
+        )
+
+    switched: list[dict] = []
+    switch_failures: list[dict] = []
+    for move in moves:
+        for player in move["players"]:
+            try:
+                success = rcon_api.switch_player_now(player["player_id"])
+            except Exception as error:
+                success = False
+                player = {**player, "error": str(error)}
+            (switched if success else switch_failures).append(player)
+
+    if switch_failures:
+        for move in moves:
+            abort_message = config.messages.squad_switch_aborted.format(
+                squad_name=move["squad_name"]
+            )
+            for player in move["players"]:
+                try:
+                    rcon_api.message_player(player["player_id"], message=abort_message)
+                except Exception:
+                    pass
+        return api_response(
+            result={
+                "status": "partially_executed",
+                "switched": switched,
+                "switch_failures": switch_failures,
+            },
+            command=command,
+            arguments={"player_id": operation_id},
+            failed=True,
+            error=(
+                "Der Gameserver hat einen Teil des Squad-Wechsels abgelehnt; "
+                "die Moderation muss den Live-Zustand prüfen"
+            ),
+        )
+
+    for move in moves:
+        message = config.messages.squad_switch_completed.format(
+            squad_name=move["squad_name"], target_team=move["target_label"]
+        )
+        for player in move["players"]:
+            try:
+                rcon_api.message_player(player["player_id"], message=message)
+            except Exception:
+                pass
+    return api_response(
+        result={"status": "executed", "moves": moves, "switched": switched},
+        command=command,
+        arguments={"player_id": operation_id},
         failed=False,
     )
 

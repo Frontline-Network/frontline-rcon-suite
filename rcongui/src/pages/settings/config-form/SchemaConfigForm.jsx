@@ -19,6 +19,8 @@ import QueryStatsOutlinedIcon from "@mui/icons-material/QueryStatsOutlined";
 import SpeedOutlinedIcon from "@mui/icons-material/SpeedOutlined";
 import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
 import SyncOutlinedIcon from "@mui/icons-material/SyncOutlined";
+import BalanceOutlinedIcon from "@mui/icons-material/BalanceOutlined";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import { JsonForms } from "@jsonforms/react";
 import { Generate } from "@jsonforms/core";
 import {
@@ -33,6 +35,9 @@ import NameKickRulesField from "./NameKickRulesField";
 
 const sectionIcons = {
   operation: <PowerSettingsNewIcon fontSize="small" />,
+  intervention: <BalanceOutlinedIcon fontSize="small" />,
+  squads: <GroupsOutlinedIcon fontSize="small" />,
+  safety: <ShieldOutlinedIcon fontSize="small" />,
   scope: <TuneOutlinedIcon fontSize="small" />,
   requirements: <RuleOutlinedIcon fontSize="small" />,
   detection: <VisibilityOutlinedIcon fontSize="small" />,

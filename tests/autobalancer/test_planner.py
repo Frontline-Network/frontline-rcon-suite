@@ -122,6 +122,17 @@ def test_volunteer_reduces_soft_tier_by_two():
     assert plan.candidates[0].effective_tier == 1
 
 
+def test_individual_fallback_can_keep_multi_player_squads_together():
+    squad_member = player("squad-member", unit="able", size=4)
+    unassigned = player("unassigned", unit=None, size=0)
+    plan = build_plan(
+        snapshot([squad_member, unassigned]),
+        allow_individual_squad_fallback=False,
+    )
+    assert [item.player.player_id for item in plan.candidates] == ["unassigned"]
+    assert any("zusammenbleiben" in reason for reason in plan.blocked_reasons)
+
+
 def test_multi_player_plan_uses_other_squad_when_equivalent():
     players = [
         player("a1", unit="able", unit_type="infantry", rating=40),

@@ -21,11 +21,20 @@ import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import { ActionButton } from "@/features/player-action/ActionMenu";
 import { Actions } from "@/features/player-action/actions";
+import { cmd } from "@/utils/fetchUtils";
 import { buildLiveBalanceStatus } from "./live-balance.mjs";
 
 const TEAM_COLORS = {
   allies: "#65a9d6",
   axis: "#ed6259",
+};
+
+const DEFAULT_BALANCE_SETTINGS = {
+  targetDifference: 2,
+  skillGapSoftLimit: 8,
+  minimumImprovement: 2.5,
+  coordinatedSquadSwitchesEnabled: false,
+  allowIndividualSquadFallback: true,
 };
 
 const clamp = (value, minimum, maximum) =>
@@ -125,7 +134,42 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
   const [explanationOpen, setExplanationOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [selectedRecommendation, setSelectedRecommendation] = useState(0);
-  const status = useMemo(() => buildLiveBalanceStatus(teams), [teams]);
+  const [balanceSettings, setBalanceSettings] = useState(
+    DEFAULT_BALANCE_SETTINGS
+  );
+
+  useEffect(() => {
+    let mounted = true;
+    cmd
+      .GET_AUTOBALANCER_CONFIG({ throwRouteError: false })
+      .then((config) => {
+        if (!mounted || !config) return;
+        setBalanceSettings({
+          targetDifference:
+            config.target_difference ??
+            DEFAULT_BALANCE_SETTINGS.targetDifference,
+          skillGapSoftLimit:
+            config.skill_gap_soft_limit ??
+            DEFAULT_BALANCE_SETTINGS.skillGapSoftLimit,
+          minimumImprovement:
+            config.skill_gap_min_improvement ??
+            DEFAULT_BALANCE_SETTINGS.minimumImprovement,
+          coordinatedSquadSwitchesEnabled:
+            config.coordinated_squad_switches_enabled === true,
+          allowIndividualSquadFallback:
+            config.allow_individual_squad_fallback !== false,
+        });
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const status = useMemo(
+    () => buildLiveBalanceStatus(teams, balanceSettings),
+    [balanceSettings, teams]
+  );
 
   const insight = useMemo(() => {
     if (!status) return null;
@@ -147,6 +191,9 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
     const countUnbalanced = Number(status.required_switches || 0) > 0;
     const strengthUnbalanced =
       Boolean(status.strength_swap) ||
+      Boolean(
+        !countUnbalanced && status.squad_recommendation?.kind === "squad_swap"
+      ) ||
       (Number.isFinite(ratingDifference) && ratingDifference > strengthLimit);
     const blocked = (status.block_reasons || []).length > 0;
     const warning = (status.warnings || []).length > 0;
@@ -162,18 +209,24 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
         : strongerTeam === "axis"
         ? "allies"
         : null;
+    const squadRecommendation = status.squad_recommendation;
     const strengthSwap = status.strength_swap;
     const proposal = status.proposal;
     const plan = status.plan || {};
     const targetTeam = plan.target_team;
     const projectedGap =
-      strengthSwap?.projected_rating_gap ?? plan.projected_rating_gap;
+      squadRecommendation?.projected_rating_gap ??
+      strengthSwap?.projected_rating_gap ??
+      plan.projected_rating_gap;
     const beforeGap =
+      squadRecommendation?.rating_gap_before ??
       strengthSwap?.rating_gap_before ??
       plan.rating_gap_before ??
       ratingDifference;
     const dataConfidence = Number(status.data_confidence);
-    const pairConfidence = Number(strengthSwap?.rating_confidence);
+    const pairConfidence = Number(
+      squadRecommendation?.rating_confidence ?? strengthSwap?.rating_confidence
+    );
     const effectiveConfidence = Number.isFinite(pairConfidence)
       ? Math.min(dataConfidence, pairConfidence)
       : dataConfidence;
@@ -194,7 +247,16 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
       tone = "warning";
     }
 
-    const recommendation = strengthSwap
+    const recommendation = squadRecommendation
+      ? {
+          kind: squadRecommendation.kind,
+          title:
+            squadRecommendation.kind === "squad_swap"
+              ? "Koordinierter Squad-Tausch"
+              : "Squad gemeinsam wechseln",
+          detail: `${squadRecommendation.member_count} Spieler bleiben als Gruppe zusammen`,
+        }
+      : strengthSwap
       ? {
           kind: "swap",
           title: "Kontrollierter 1:1-Tausch",
@@ -241,6 +303,7 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
       warning,
       strongerTeam,
       weakerTeam,
+      squadRecommendation,
       strengthSwap,
       proposal,
       plan,
@@ -257,12 +320,33 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
         countUnbalanced ||
         strengthUnbalanced ||
         warning ||
+        Boolean(squadRecommendation) ||
         Boolean(proposal),
     };
   }, [status]);
 
   const highlights = useMemo(() => {
     if (!insight) return {};
+    if (insight.squadRecommendation) {
+      return Object.fromEntries(
+        insight.squadRecommendation.moves.flatMap((move) => {
+          const squad = insight.squadRecommendation.squads.find(
+            (item) =>
+              item.team === move.source_team &&
+              item.squad_name === move.squad_name
+          );
+          return (squad?.members || []).map((player) => [
+            player.player_id,
+            {
+              targetTeam: move.target_team,
+              label: `${move.squad_name} gemeinsam nach ${
+                insight.teamLabels[move.target_team]
+              }`,
+            },
+          ]);
+        })
+      );
+    }
     if (insight.strengthSwap) {
       const { stronger_player: stronger, weaker_player: weaker } =
         insight.strengthSwap;
@@ -318,11 +402,15 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
       ? ReportProblemOutlinedIcon
       : BalanceOutlinedIcon;
   const swap = insight.strengthSwap;
+  const squad = insight.squadRecommendation;
   const proposalName = insight.proposal?.player_name;
   const alternativesAvailable =
+    (status.squad_recommendation_alternatives || []).length > 0 ||
     (status.strength_swap_alternatives || []).length > 0 ||
     Object.values(status.strategy_plans || {}).filter(Boolean).length > 1;
-  const recommendations = swap
+  const recommendations = squad
+    ? [squad, ...(status.squad_recommendation_alternatives || [])]
+    : swap
     ? [swap, ...(status.strength_swap_alternatives || [])]
     : insight.proposal
     ? [
@@ -341,7 +429,19 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
       Math.min(selectedRecommendation, recommendations.length - 1)
     ];
   const actionRecipients = activeRecommendation
-    ? activeRecommendation.kind === "strength_swap"
+    ? activeRecommendation.kind === "squad_move" ||
+      activeRecommendation.kind === "squad_swap"
+      ? [
+          {
+            player_id: `squad:${activeRecommendation.moves
+              .map((move) => `${move.source_team}:${move.squad_name}`)
+              .join("+")}`,
+            name: activeRecommendation.squads
+              .map((item) => `Squad ${item.squad_name}`)
+              .join(" ↔ "),
+          },
+        ]
+      : activeRecommendation.kind === "strength_swap"
       ? [
           activeRecommendation.stronger_player,
           activeRecommendation.weaker_player,
@@ -356,6 +456,17 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
           },
         ]
     : [];
+  const squadActionParams =
+    activeRecommendation?.kind === "squad_move" ||
+    activeRecommendation?.kind === "squad_swap"
+      ? {
+          moves: activeRecommendation.moves.map((move) => ({
+            ...move,
+            target_label:
+              insight.teamLabels[move.target_team] || move.target_team,
+          })),
+        }
+      : undefined;
 
   return (
     <Box
@@ -522,9 +633,9 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
             </Metric>
             <Metric label="Empfehlung">
               <Stack direction="row" alignItems="center" spacing={0.75}>
-                {insight.recommendation.kind === "swap" && (
-                  <SwapHorizIcon fontSize="small" aria-hidden />
-                )}
+                {["swap", "squad_move", "squad_swap"].includes(
+                  insight.recommendation.kind
+                ) && <SwapHorizIcon fontSize="small" aria-hidden />}
                 <Typography variant="body2" sx={{ fontWeight: 800 }}>
                   {insight.recommendation.title}
                 </Typography>
@@ -535,10 +646,33 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
             </Metric>
             <Metric
               label={
-                swap ? "Vorgeschlagene Spieler" : "Vorgeschlagener Spieler"
+                squad
+                  ? "Vorgeschlagener Squad"
+                  : swap
+                  ? "Vorgeschlagene Spieler"
+                  : "Vorgeschlagener Spieler"
               }
             >
-              {swap ? (
+              {squad ? (
+                <>
+                  {squad.squads.map((item, index) => {
+                    const move = squad.moves[index];
+                    return (
+                      <Typography
+                        key={`${item.team}:${item.squad_name}`}
+                        variant="body2"
+                        sx={{ fontWeight: 800 }}
+                      >
+                        Squad {item.squad_name} ({item.member_count}) →{" "}
+                        {insight.teamLabels[move.target_team]}
+                      </Typography>
+                    );
+                  })}
+                  <Typography variant="caption" color="text.secondary">
+                    Vor dem Wechsel werden alle Mitglieder informiert.
+                  </Typography>
+                </>
+              ) : swap ? (
                 <>
                   <Typography
                     variant="body2"
@@ -676,7 +810,9 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
                   setReviewOpen(true);
                 }}
               >
-                {swap
+                {squad
+                  ? "Squad-Wechsel prüfen"
+                  : swap
                   ? "Tausch prüfen"
                   : proposalName
                   ? "Wechsel prüfen"
@@ -711,7 +847,11 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
         aria-labelledby="live-balance-review-title"
       >
         <DialogTitle id="live-balance-review-title">
-          {swap ? "Live-Tausch prüfen" : "Live-Teamwechsel prüfen"}
+          {squad
+            ? "Koordinierten Squad-Wechsel prüfen"
+            : swap
+            ? "Live-Tausch prüfen"
+            : "Live-Teamwechsel prüfen"}
         </DialogTitle>
         <DialogContent dividers>
           <Stack spacing={1.5}>
@@ -733,7 +873,14 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                   {recommendations.map((recommendation, index) => (
                     <Button
-                      key={`${recommendation.stronger_player?.player_id}-${recommendation.weaker_player?.player_id}`}
+                      key={
+                        recommendation.moves
+                          ?.map(
+                            (move) => `${move.source_team}:${move.squad_name}`
+                          )
+                          .join("+") ||
+                        `${recommendation.stronger_player?.player_id}-${recommendation.weaker_player?.player_id}`
+                      }
                       variant={
                         selectedRecommendation === index
                           ? "contained"
@@ -749,7 +896,58 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
               </Box>
             )}
 
-            {activeRecommendation?.kind === "strength_swap" ? (
+            {activeRecommendation?.kind === "squad_move" ||
+            activeRecommendation?.kind === "squad_swap" ? (
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: {
+                    xs: "1fr",
+                    md:
+                      activeRecommendation.squads.length > 1
+                        ? "1fr 1fr"
+                        : "1fr",
+                  },
+                  border: "1px solid",
+                  borderColor: "divider",
+                }}
+              >
+                {activeRecommendation.squads.map((item, index) => {
+                  const move = activeRecommendation.moves[index];
+                  return (
+                    <Box
+                      key={`${item.team}:${item.squad_name}`}
+                      sx={{
+                        p: 1.5,
+                        borderLeft: {
+                          xs: 0,
+                          md: index > 0 ? "1px solid" : 0,
+                        },
+                        borderTop: {
+                          xs: index > 0 ? "1px solid" : 0,
+                          md: 0,
+                        },
+                        borderColor: "divider",
+                      }}
+                    >
+                      <Typography variant="caption" color="text.secondary">
+                        {insight.teamLabels[item.team]} →{" "}
+                        {insight.teamLabels[move.target_team]}
+                      </Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                        Squad {item.squad_name}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {item.member_count} Mitglieder ·{" "}
+                        {item.members
+                          .map((member) => member.player_name)
+                          .join(", ")}
+                      </Typography>
+                    </Box>
+                  );
+                })}
+              </Box>
+            ) : activeRecommendation?.kind === "strength_swap" ? (
               <Box
                 sx={{
                   display: "grid",
@@ -980,10 +1178,19 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
             </Box>
 
             <Typography variant="caption" color="text.secondary">
-              Der Live-Assistent führt keinen automatischen Wechsel aus. Die
-              vorhandene Moderationsaktion prüft Berechtigung und Zielspieler
-              nochmals unmittelbar vor dem RCON-Befehl.
+              Der Live-Assistent führt keinen automatischen Wechsel aus. Vor
+              einer Squad-Aktion werden Live-Mitglieder, Teamzuordnung und
+              Berechtigungen nochmals geprüft. Alle Mitglieder erhalten zuerst
+              eine Nachricht; danach müssen sie ihren Squad im Zielteam neu
+              bilden.
             </Typography>
+            {squad && !status.coordinated_squad_switches_enabled && (
+              <Alert severity="warning" variant="outlined">
+                Koordinierte Squad-Wechsel sind in den
+                Autobalancer-Einstellungen noch deaktiviert. Aktiviere sie dort,
+                bevor diese Moderationsaktion ausgeführt werden kann.
+              </Alert>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ p: 1.5 }}>
@@ -992,13 +1199,27 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
           </Button>
           {activeRecommendation && (
             <ActionButton
-              action={Actions.SwitchPlayer}
+              action={
+                activeRecommendation.kind === "squad_move" ||
+                activeRecommendation.kind === "squad_swap"
+                  ? Actions.CoordinatedSquadSwitch
+                  : Actions.SwitchPlayer
+              }
               recipients={actionRecipients}
+              params={squadActionParams}
               label={
-                activeRecommendation.kind === "strength_swap"
+                activeRecommendation.kind === "squad_move" ||
+                activeRecommendation.kind === "squad_swap"
+                  ? "Squad(s) informieren und wechseln"
+                  : activeRecommendation.kind === "strength_swap"
                   ? "Beide Teams wechseln"
                   : "Spieler jetzt wechseln"
               }
+              {...((activeRecommendation.kind === "squad_move" ||
+                activeRecommendation.kind === "squad_swap") &&
+              !status.coordinated_squad_switches_enabled
+                ? { disabled: true }
+                : {})}
               variant="contained"
               onBeforeAction={() => setReviewOpen(false)}
               sx={{ minHeight: 40 }}

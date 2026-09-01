@@ -55,4 +55,40 @@ assert.equal(countStatus.required_switches, 1);
 assert.equal(countStatus.plan.target_team, "axis");
 assert.ok(countStatus.proposal, "a live move candidate is expected");
 
+const squadStatus = buildLiveBalanceStatus(
+  {
+    allies: {
+      commander: null,
+      squads: {
+        Able: {
+          type: "infantry",
+          players: [player("able-1", 90), player("able-2", 85)],
+        },
+        Baker: {
+          type: "infantry",
+          players: [player("baker-1", 80), player("baker-2", 75)],
+        },
+        Charlie: {
+          type: "infantry",
+          players: [player("charlie-1", 70), player("charlie-2", 65)],
+        },
+      },
+    },
+    axis: team("infantry", [player("axis-1", 60), player("axis-2", 55)]),
+  },
+  {
+    targetDifference: 2,
+    coordinatedSquadSwitchesEnabled: true,
+    allowIndividualSquadFallback: false,
+  }
+);
+
+assert.equal(squadStatus.required_switches, 1);
+assert.equal(squadStatus.coordinated_squad_switches_enabled, true);
+assert.equal(squadStatus.proposal, null, "individual fallback stays disabled");
+assert.equal(squadStatus.squad_recommendation.kind, "squad_move");
+assert.equal(squadStatus.squad_recommendation.member_count, 2);
+assert.equal(squadStatus.squad_recommendation.projected_count_difference, 0);
+assert.equal(squadStatus.squad_recommendation.moves[0].player_ids.length, 2);
+
 console.log("Live balance assistant contract passed.");

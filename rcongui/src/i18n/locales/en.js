@@ -2491,6 +2491,92 @@ const en = {
             "Unknown placeholders: {{values}}. Use one of the provided placeholders.",
         },
       },
+      autobalancer: {
+        eyebrow: "Live operations",
+        title: "Autobalancer",
+        intro:
+          "Define when balancing starts, how squads are protected, and which safety limits apply.",
+        sections: {
+          operation: {
+            title: "Operating mode",
+            description: "From safe observation to approved live operation.",
+          },
+          intervention: {
+            title: "When to intervene",
+            description:
+              "Three clear thresholds determine when an imbalance is actionable.",
+          },
+          squads: {
+            title: "Keep squads together",
+            description:
+              "Control coordinated squad moves and the optional individual fallback.",
+          },
+          safety: {
+            title: "Safety limits",
+            description:
+              "Protect map start, map end, new connections, and recently moved players.",
+          },
+          messages: {
+            title: "Notify players",
+            description:
+              "Messages and volunteer command for individual and coordinated squad moves.",
+          },
+          advanced: {
+            title: "Advanced",
+            description:
+              "Technical timeouts, strength limits, and history parameters for experienced operators.",
+          },
+        },
+        fields: {
+          mode: { label: "Operating mode" },
+          target_difference: {
+            label: "Allowed player difference",
+            help: "Up to this difference, the player count is considered balanced.",
+          },
+          minimum_players: {
+            label: "Minimum players",
+            help: "The autobalancer does not intervene below this total player count.",
+          },
+          stable_difference_seconds: {
+            label: "Confirm imbalance after",
+            help: "The difference must persist for this many seconds.",
+          },
+          coordinated_squad_switches_enabled: {
+            label: "Allow coordinated squad moves",
+            help: "Complete infantry squads can be moved after a live recheck and second confirmation.",
+          },
+          allow_individual_squad_fallback: {
+            label: "Allow individual squad members as fallback",
+            help: "When disabled, multi-player squads remain fully protected.",
+          },
+          volunteer_phase_seconds: { label: "Volunteer phase" },
+          map_start_grace_minutes: { label: "Protection after map start" },
+          map_end_guard_minutes: { label: "Protection before map end" },
+          connection_grace_seconds: { label: "Protection for new connections" },
+          cooldown_maps: { label: "Move cooldown" },
+          max_switches_per_incident: { label: "Maximum moves per incident" },
+          volunteer_command: { label: "Volunteer command" },
+          messages: { label: "Player messages" },
+          poll_interval_seconds: { label: "Check interval" },
+          candidate_timeout_seconds: { label: "Candidate timeout" },
+          manual_proposal_timeout_seconds: { label: "Approval timeout" },
+          death_event_max_age_seconds: { label: "Death-event age" },
+          switch_confirmation_timeout_seconds: { label: "Move confirmation" },
+          skill_strategy: { label: "Team-strength strategy" },
+          skill_gap_soft_limit: { label: "Strength-gap notice limit" },
+          skill_gap_hard_warning: { label: "Strength-gap warning level" },
+          skill_gap_min_improvement: { label: "Minimum improvement" },
+          history_server_numbers: { label: "History servers" },
+          history_half_life_days: { label: "History half-life" },
+          volunteer_request: { label: "Volunteer request" },
+          volunteer_registered: { label: "Volunteer registration confirmed" },
+          candidate_selected: { label: "Individual player selected" },
+          switch_completed: { label: "Individual move completed" },
+          squad_switch_selected: { label: "Squad move announced" },
+          squad_switch_completed: { label: "Squad move completed" },
+          squad_switch_aborted: { label: "Squad move aborted" },
+        },
+      },
       noLeader: {
         eyebrow: "Automation",
         title: "Squads without a leader",

@@ -378,6 +378,7 @@ class AutobalancerService:
             snapshot,
             cooldown_player_ids=self._cooldown_ids(snapshot, config),
             connection_grace_seconds=config.connection_grace_seconds,
+            allow_individual_squad_fallback=config.allow_individual_squad_fallback,
         )
         message = config.messages.volunteer_request.format(
             target_team=snapshot.team_labels.get(
@@ -420,6 +421,7 @@ class AutobalancerService:
                 0,
                 config.max_switches_per_incident - int(state.get("executed_count", 0)),
             ),
+            allow_individual_squad_fallback=config.allow_individual_squad_fallback,
             strategy=config.skill_strategy,
             skill_gap_soft_limit=config.skill_gap_soft_limit,
             skill_gap_hard_warning=config.skill_gap_hard_warning,
@@ -451,6 +453,7 @@ class AutobalancerService:
                 0,
                 config.max_switches_per_incident - int(state.get("executed_count", 0)),
             ),
+            allow_individual_squad_fallback=config.allow_individual_squad_fallback,
             skill_gap_soft_limit=config.skill_gap_soft_limit,
             skill_gap_hard_warning=config.skill_gap_hard_warning,
             skill_gap_min_improvement=config.skill_gap_min_improvement,
@@ -848,6 +851,7 @@ class AutobalancerService:
                 connection_grace_seconds=config.connection_grace_seconds,
                 skill_gap_soft_limit=config.skill_gap_soft_limit,
                 skill_gap_min_improvement=config.skill_gap_min_improvement,
+                allow_individual_squad_fallback=config.allow_individual_squad_fallback,
             )
             if not hard_blocks and required_switch_count == 0
             else []

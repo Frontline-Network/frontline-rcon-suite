@@ -775,6 +775,23 @@ export function makeServer({ environment = "development" } = {}) {
 
       this.get("/get_autobalancer_config", () => ok(autobalancerConfig));
       this.get("/describe_autobalancer_config", () => ok(autobalancerSchema));
+      this.post("/set_autobalancer_config", (schema, request) => {
+        const payload = request.requestBody
+          ? JSON.parse(request.requestBody)
+          : {};
+        Object.assign(autobalancerConfig, payload);
+        return ok(autobalancerConfig);
+      });
+      this.post("/execute_autobalancer_squad_switch", (schema, request) => {
+        const payload = request.requestBody
+          ? JSON.parse(request.requestBody)
+          : {};
+        return {
+          result: { status: "executed", moves: payload.moves || [] },
+          arguments: { player_id: payload.player_id },
+          failed: false,
+        };
+      });
       this.get("/get_autobalancer_status", () =>
         ok({ ...autobalancerStatus, updated_at: new Date().toISOString() })
       );

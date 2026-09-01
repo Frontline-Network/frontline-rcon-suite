@@ -49,6 +49,41 @@ class AutobalancerMessages(BaseModel):
             "{target_team} und {cooldown_maps}."
         ),
     )
+    squad_switch_selected: str = Field(
+        default=(
+            "Euer Squad {squad_name} wird jetzt gemeinsam zu {target_team} "
+            "verschoben. Bitte bildet den Squad dort anschließend neu."
+        ),
+        title="Ankündigung eines Squad-Wechsels",
+        description=(
+            "Direktnachricht an jedes aktuelle Mitglied vor einem manuell "
+            "freigegebenen Squad-Wechsel. Erlaubte Platzhalter: {squad_name} "
+            "und {target_team}."
+        ),
+    )
+    squad_switch_completed: str = Field(
+        default=(
+            "Der gemeinsame Wechsel zu {target_team} ist abgeschlossen. "
+            "Bitte bildet Squad {squad_name} in diesem Team neu."
+        ),
+        title="Bestätigung eines Squad-Wechsels",
+        description=(
+            "Direktnachricht nach dem erfolgreichen Wechsel eines Mitglieds. "
+            "Erlaubte Platzhalter: {squad_name} und {target_team}."
+        ),
+    )
+    squad_switch_aborted: str = Field(
+        default=(
+            "Der gemeinsame Wechsel von Squad {squad_name} konnte nicht vollständig "
+            "ausgeführt werden. Bitte wartet auf eine Anweisung der Moderation."
+        ),
+        title="Abbruchmeldung eines Squad-Wechsels",
+        description=(
+            "Direktnachricht, falls sich die Squad-Zusammensetzung geändert hat "
+            "oder der Gameserver einen Teil des Wechsels ablehnt. Erlaubter "
+            "Platzhalter: {squad_name}."
+        ),
+    )
 
     @model_validator(mode="after")
     def validate_templates(self):
@@ -57,6 +92,13 @@ class AutobalancerMessages(BaseModel):
             self.volunteer_registered.format()
             self.candidate_selected.format(target_team="Axis", cooldown_maps=3)
             self.switch_completed.format(target_team="Axis", cooldown_maps=3)
+            self.squad_switch_selected.format(
+                squad_name="Able", target_team="Axis"
+            )
+            self.squad_switch_completed.format(
+                squad_name="Able", target_team="Axis"
+            )
+            self.squad_switch_aborted.format(squad_name="Able")
         except (KeyError, IndexError, ValueError) as exc:
             raise ValueError(f"Ungültiger Platzhalter in Nachrichtenvorlage: {exc}")
         return self
@@ -182,6 +224,24 @@ class AutobalancerUserConfig(BaseUserConfig):
         description=(
             "Sicherheitsgrenze. Nach jedem einzelnen Wechsel werden alle Daten "
             "neu geprüft und der übrige Plan verworfen."
+        ),
+    )
+    coordinated_squad_switches_enabled: bool = Field(
+        default=False,
+        title="Koordinierte Squad-Wechsel erlauben",
+        description=(
+            "Erlaubt Administratoren, einen aus den Live-Daten geprüften "
+            "Infanterie-Squad gemeinsam zu verschieben. Die Aktion wird niemals "
+            "automatisch ausgeführt und benötigt eine gesonderte Bestätigung."
+        ),
+    )
+    allow_individual_squad_fallback: bool = Field(
+        default=True,
+        title="Einzelspieler aus Squads als Rückfall zulassen",
+        description=(
+            "Wenn deaktiviert, darf der automatische Einzelspieler-Plan nur "
+            "unzugewiesene Spieler oder alleinige Squad-Mitglieder auswählen. "
+            "Manuelle vollständige Squad-Wechsel bleiben davon unberührt."
         ),
     )
     death_event_max_age_seconds: int = Field(

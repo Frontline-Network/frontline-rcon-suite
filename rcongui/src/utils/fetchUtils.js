@@ -346,6 +346,12 @@ export const cmd = {
       cmd: "get_autobalancer_status",
       ...params,
     }),
+  GET_AUTOBALANCER_CONFIG: (params) =>
+    requestFactory({
+      method: "GET",
+      cmd: "get_autobalancer_config",
+      ...params,
+    }),
   GET_AUTOBALANCER_SHADOW_OVERVIEW: (params) =>
     requestFactory({
       method: "GET",

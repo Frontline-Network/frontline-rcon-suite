@@ -16,6 +16,8 @@ def test_v2_shadow_calibration_defaults_are_safe():
     assert config.skill_gap_hard_warning == 12
     assert config.skill_gap_min_improvement == 2.5
     assert config.history_half_life_days == 30
+    assert config.coordinated_squad_switches_enabled is False
+    assert config.allow_individual_squad_fallback is True
 
 
 def test_hard_warning_must_not_be_below_soft_limit():

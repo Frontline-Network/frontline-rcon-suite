@@ -2517,6 +2517,92 @@ const de = {
             "Unbekannte Platzhalter: {{values}}. Verwende einen der angebotenen Platzhalter.",
         },
       },
+      autobalancer: {
+        eyebrow: "Live-Betrieb",
+        title: "Autobalancer",
+        intro:
+          "Lege fest, wann der Balancer eingreift, wie Squads geschützt werden und welche Sicherheitsgrenzen gelten.",
+        sections: {
+          operation: {
+            title: "Betriebsmodus",
+            description: "Vom sicheren Beobachten bis zum freigegebenen Betrieb.",
+          },
+          intervention: {
+            title: "Wann eingreifen?",
+            description:
+              "Drei verständliche Grenzwerte bestimmen, wann ein echtes Ungleichgewicht vorliegt.",
+          },
+          squads: {
+            title: "Squads zusammenhalten",
+            description:
+              "Steuere gemeinsame Squad-Wechsel und den optionalen Einzelspieler-Fallback.",
+          },
+          safety: {
+            title: "Sicherheitsgrenzen",
+            description:
+              "Schütze Kartenstart, Kartenende, neue Verbindungen und kürzlich gewechselte Spieler.",
+          },
+          messages: {
+            title: "Spieler informieren",
+            description:
+              "Texte und Befehl für Freiwillige sowie koordinierte Squad-Wechsel.",
+          },
+          advanced: {
+            title: "Erweitert",
+            description:
+              "Technische Zeitlimits, Stärke-Grenzen und Historienparameter für erfahrene Betreiber.",
+          },
+        },
+        fields: {
+          mode: { label: "Betriebsmodus" },
+          target_difference: {
+            label: "Erlaubter Spielerunterschied",
+            help: "Bis zu dieser Differenz gilt die Spielerzahl noch als ausgeglichen.",
+          },
+          minimum_players: {
+            label: "Mindestanzahl Spieler",
+            help: "Unterhalb dieser Gesamtzahl greift der Autobalancer nicht ein.",
+          },
+          stable_difference_seconds: {
+            label: "Ungleichgewicht bestätigen nach",
+            help: "So lange muss die Differenz ohne Unterbrechung bestehen.",
+          },
+          coordinated_squad_switches_enabled: {
+            label: "Koordinierte Squad-Wechsel erlauben",
+            help: "Vollständige Infanterie-Squads können nach Live-Prüfung und zweiter Bestätigung gewechselt werden.",
+          },
+          allow_individual_squad_fallback: {
+            label: "Einzelspieler aus Squads als Fallback erlauben",
+            help: "Ist dies aus, bleiben Mehrspieler-Squads vollständig geschützt.",
+          },
+          volunteer_phase_seconds: { label: "Freiwilligenphase" },
+          map_start_grace_minutes: { label: "Schutz nach Kartenstart" },
+          map_end_guard_minutes: { label: "Schutz vor Kartenende" },
+          connection_grace_seconds: { label: "Schutz für neue Verbindungen" },
+          cooldown_maps: { label: "Wechsel-Cooldown" },
+          max_switches_per_incident: { label: "Maximale Wechsel pro Vorfall" },
+          volunteer_command: { label: "Befehl für Freiwillige" },
+          messages: { label: "Spielernachrichten" },
+          poll_interval_seconds: { label: "Prüfintervall" },
+          candidate_timeout_seconds: { label: "Kandidaten-Zeitlimit" },
+          manual_proposal_timeout_seconds: { label: "Zeitlimit für Freigaben" },
+          death_event_max_age_seconds: { label: "Alter eines Tod-Ereignisses" },
+          switch_confirmation_timeout_seconds: { label: "Wechselbestätigung" },
+          skill_strategy: { label: "Strategie für Teamstärke" },
+          skill_gap_soft_limit: { label: "Hinweisgrenze für Stärke-Abstand" },
+          skill_gap_hard_warning: { label: "Warnstufe für Stärke-Abstand" },
+          skill_gap_min_improvement: { label: "Mindestverbesserung" },
+          history_server_numbers: { label: "Historien-Server" },
+          history_half_life_days: { label: "Halbwertszeit der Historie" },
+          volunteer_request: { label: "Aufruf für Freiwillige" },
+          volunteer_registered: { label: "Freiwillige Anmeldung bestätigt" },
+          candidate_selected: { label: "Einzelspieler ausgewählt" },
+          switch_completed: { label: "Einzelwechsel abgeschlossen" },
+          squad_switch_selected: { label: "Squad-Wechsel angekündigt" },
+          squad_switch_completed: { label: "Squad-Wechsel abgeschlossen" },
+          squad_switch_aborted: { label: "Squad-Wechsel abgebrochen" },
+        },
+      },
       noLeader: {
         eyebrow: "Automatisierung",
         title: "Trupps ohne Truppführer",

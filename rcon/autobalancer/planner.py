@@ -80,6 +80,7 @@ def _eligible_choices(
     cooldown_player_ids: Collection[str],
     pending_player_ids: Collection[str],
     connection_grace_seconds: int,
+    allow_individual_squad_fallback: bool = True,
 ) -> tuple[list[_Choice], list[str]]:
     volunteers = set(volunteers)
     cooldown_player_ids = set(cooldown_player_ids)
@@ -100,6 +101,11 @@ def _eligible_choices(
             continue
         if player.connected_seconds < connection_grace_seconds:
             blocked.append(f"{player.name}: Verbindungs-Schutzfrist")
+            continue
+        if not allow_individual_squad_fallback and player.unit_size > 1:
+            blocked.append(
+                f"{player.name}: Squad {player.unit_name or 'unbekannt'} soll zusammenbleiben"
+            )
             continue
         tier, reason = protection_tier(player)
         if tier is None:
@@ -123,6 +129,7 @@ def eligible_players(
     cooldown_player_ids: Collection[str] = (),
     pending_player_ids: Collection[str] = (),
     connection_grace_seconds: int = 120,
+    allow_individual_squad_fallback: bool = True,
 ) -> list[PlayerSnapshot]:
     if snapshot.larger_team is None:
         return []
@@ -133,6 +140,7 @@ def eligible_players(
         cooldown_player_ids,
         pending_player_ids,
         connection_grace_seconds,
+        allow_individual_squad_fallback,
     )
     return [
         choice.player
@@ -204,6 +212,7 @@ def build_strength_swap_recommendations(
     connection_grace_seconds: int = 120,
     skill_gap_soft_limit: float = 8.0,
     skill_gap_min_improvement: float = 2.5,
+    allow_individual_squad_fallback: bool = True,
     limit: int = 3,
 ) -> list[StrengthSwapRecommendation]:
     """Suggest safe, review-only 1:1 swaps for a skill-only imbalance.
@@ -231,6 +240,7 @@ def build_strength_swap_recommendations(
         (),
         (),
         connection_grace_seconds,
+        allow_individual_squad_fallback,
     )
     weaker_choices, _ = _eligible_choices(
         snapshot,
@@ -239,6 +249,7 @@ def build_strength_swap_recommendations(
         (),
         (),
         connection_grace_seconds,
+        allow_individual_squad_fallback,
     )
     # A 1:1 strength correction should never disrupt leaders or specialist squads.
     stronger_choices = [choice for choice in stronger_choices if choice.base_tier <= 3]
@@ -429,6 +440,7 @@ def build_plan(
     pending_player_ids: Collection[str] = (),
     connection_grace_seconds: int = 120,
     max_switches: int = 3,
+    allow_individual_squad_fallback: bool = True,
     *,
     strategy: str = "squad-first",
     skill_gap_soft_limit: float = 8.0,
@@ -466,6 +478,7 @@ def build_plan(
         cooldown_player_ids,
         pending_player_ids,
         connection_grace_seconds,
+        allow_individual_squad_fallback,
     )
     planned_count = min(count, max_switches, len(choices))
     combo = _choose_combo(

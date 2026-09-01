@@ -365,6 +365,52 @@ const nameKickProfile = {
 };
 
 const configFormProfiles = {
+  autobalancer_config: schemaProfile(
+    "autobalancer",
+    [
+      ["operation", ["mode"]],
+      [
+        "intervention",
+        ["target_difference", "minimum_players", "stable_difference_seconds"],
+      ],
+      [
+        "squads",
+        [
+          "coordinated_squad_switches_enabled",
+          "allow_individual_squad_fallback",
+        ],
+      ],
+      [
+        "safety",
+        [
+          "volunteer_phase_seconds",
+          "map_start_grace_minutes",
+          "map_end_guard_minutes",
+          "connection_grace_seconds",
+          "cooldown_maps",
+          "max_switches_per_incident",
+        ],
+      ],
+      ["messages", ["volunteer_command", "messages"]],
+      [
+        "advanced",
+        [
+          "poll_interval_seconds",
+          "candidate_timeout_seconds",
+          "manual_proposal_timeout_seconds",
+          "death_event_max_age_seconds",
+          "switch_confirmation_timeout_seconds",
+          "skill_strategy",
+          "skill_gap_soft_limit",
+          "skill_gap_hard_warning",
+          "skill_gap_min_improvement",
+          "history_server_numbers",
+          "history_half_life_days",
+        ],
+      ],
+    ],
+    ["operation", "intervention", "squads", "safety"]
+  ),
   rcon_connection_settings_config: schemaProfile(
     "rconConnection",
     [
@@ -601,6 +647,9 @@ const configFormProfiles = {
 
 const sectionOrder = [
   "operation",
+  "intervention",
+  "squads",
+  "safety",
   "scope",
   "requirements",
   "detection",
