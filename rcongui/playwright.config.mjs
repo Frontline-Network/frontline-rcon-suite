@@ -11,13 +11,15 @@ export default defineConfig({
   // CI failures should surface quickly and deterministically. Retrying every
   // failing route can turn a broken shell into an hour-long feedback loop.
   retries: 0,
-  // The suite contains more than 200 browser scenarios. Three workers stay
-  // within the hosted runner's CPU budget while keeping the complete gate
-  // comfortably below the job timeout.
-  workers: process.env.CI ? 3 : undefined,
-  timeout: 30_000,
+  // Vite serves a large, route-split admin application in fake mode. Running
+  // several browsers against the two-core hosted runner makes initial route
+  // compilation slower rather than faster and can race late fixture loads.
+  // One CI worker keeps the release gate deterministic; local runs may still
+  // use Playwright's automatically selected worker count.
+  workers: process.env.CI ? 1 : undefined,
+  timeout: process.env.CI ? 60_000 : 30_000,
   expect: {
-    timeout: 8_000,
+    timeout: process.env.CI ? 12_000 : 8_000,
     toHaveScreenshot: {
       animations: "disabled",
       caret: "hide",
