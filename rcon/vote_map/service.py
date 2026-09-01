@@ -517,7 +517,7 @@ class VoteMap:
                 )
                 state["votes_count"] += vote["vote_count"]
             except KeyError:
-                logger.exception("Invalid vote. Map not in the selection", vote)
+                logger.exception("Invalid vote. Map not in the selection: %r", vote)
 
         results = list(map_states.values())
         if sort_by_vote:

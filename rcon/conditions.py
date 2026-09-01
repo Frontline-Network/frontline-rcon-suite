@@ -199,7 +199,7 @@ class TimeOfDayCondition(Condition):
             min = datetime.now(tz=self.tz).replace(hour=min_h, minute=min_m)
             max = datetime.now(tz=self.tz).replace(hour=max_h, minute=max_m)
         except Exception as e:
-            logger.exception("Time Of Day condition is invalid and is ignored", e)
+            logger.exception("Time Of Day condition is invalid and is ignored: %s", e)
             return False  # The condition should fail
         comparand = datetime.now(tz=self.tz)
         res = min <= comparand <= max

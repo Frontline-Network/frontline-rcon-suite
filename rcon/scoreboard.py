@@ -582,7 +582,7 @@ def run():
             time.sleep(sleep_time)
 
     except Exception as e:
-        logger.exception("The bot stopped", e)
+        logger.exception("The bot stopped: %s", e)
         raise
 
 
