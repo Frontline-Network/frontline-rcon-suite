@@ -67,8 +67,28 @@ test.describe("desktop operational overview", () => {
     await expect(
       overview.getByText("Stärke-Index", { exact: true }).first()
     ).toBeVisible();
+    await expect(
+      overview.getByText("1 Punkt braucht Aufmerksamkeit")
+    ).toBeVisible();
+    await expect(
+      overview.getByText("Aktuell relevant: 1 Balance-Hinweis.")
+    ).toBeVisible();
     await expect(overview.getByText("VIP online")).toBeVisible();
     await expect(overview.getByText("Letzte Ereignisse")).toBeVisible();
+
+    const balanceTask = overview.getByTestId("operations-task-balance");
+    const balanceAction = balanceTask.getByRole("link", {
+      name: "Ausgleichen",
+    });
+    const [taskBox, actionBox] = await Promise.all([
+      balanceTask.boundingBox(),
+      balanceAction.boundingBox(),
+    ]);
+    expect(taskBox).not.toBeNull();
+    expect(actionBox).not.toBeNull();
+    expect(actionBox.x + actionBox.width).toBeLessThanOrEqual(
+      taskBox.x + taskBox.width + 0.5
+    );
   });
 
   test("keeps the operational dashboard game-neutral in English", async ({
@@ -80,13 +100,18 @@ test.describe("desktop operational overview", () => {
     });
 
     await expect(
-      page.getByTestId("global-server-switcher").filter({ visible: true }).first()
+      page
+        .getByTestId("global-server-switcher")
+        .filter({ visible: true })
+        .first()
     ).toContainText("HLL");
     await expect(
       page.getByText("Operational situation of the selected game server")
     ).toBeVisible();
     await expect(page.getByText("Live team status")).toBeVisible();
     await expect(page.getByText("Resources & capacity")).toHaveCount(0);
-    await expect(page.getByText("HLL: Vietnam", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("HLL: Vietnam", { exact: true })).toHaveCount(
+      0
+    );
   });
 });

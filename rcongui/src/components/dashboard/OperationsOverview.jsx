@@ -35,6 +35,7 @@ import { buildLiveBalanceStatus } from "@/pages/views/team/live-balance.mjs";
 
 const TEAM_NAMES = ["allies", "axis"];
 const TEAM_TONES = { allies: "info.main", axis: "error.main" };
+const TASK_GRID_COLUMNS = "96px minmax(0, 1fr) 56px 132px";
 
 const EVENT_META = {
   ADMIN_REPORTS: {
@@ -166,7 +167,7 @@ function TaskRow({ task, t }) {
       data-testid={`operations-task-${task.key}`}
       sx={{
         display: "grid",
-        gridTemplateColumns: "96px minmax(0, 1fr) 64px 112px",
+        gridTemplateColumns: TASK_GRID_COLUMNS,
         minHeight: 66,
         borderBottom: "1px solid",
         borderColor: "divider",
@@ -213,6 +214,10 @@ function TaskRow({ task, t }) {
           borderLeft: "1px solid",
           borderColor: "divider",
           borderRadius: 0,
+          minWidth: 0,
+          px: 1,
+          whiteSpace: "nowrap",
+          "& .MuiButton-endIcon": { ml: 0.35, mr: -0.25 },
         }}
       >
         {t(task.actionKey)}
@@ -377,8 +382,8 @@ export default function OperationsOverview({ logs, logsLoading }) {
         ? "allies"
         : "axis"
       : balance.team_ratings.allies >= balance.team_ratings.axis
-        ? "allies"
-        : "axis"
+      ? "allies"
+      : "axis"
     : null;
   const adminReport = logs.find((group) => group.group === "ADMIN_REPORTS")
     ?.logs?.[0];
@@ -474,6 +479,23 @@ export default function OperationsOverview({ logs, logsLoading }) {
     (task) => task.key !== "notable-player"
   ).length;
   const primaryTask = tasks.find((task) => task.key !== "notable-player");
+  const situationItems = [
+    adminReport
+      ? t("dashboard.operations.situation.adminReports", { count: 1 })
+      : null,
+    noLeaderSquads.length
+      ? t("dashboard.operations.situation.leaderlessSquads", {
+          count: noLeaderSquads.length,
+        })
+      : null,
+    needsBalance
+      ? t("dashboard.operations.situation.balanceNotices", { count: 1 })
+      : null,
+  ].filter(Boolean);
+  const situationSummary = new Intl.ListFormat(language, {
+    style: "long",
+    type: "conjunction",
+  }).format(situationItems);
   const serverName =
     status?.name ||
     status?.short_name ||
@@ -524,20 +546,18 @@ export default function OperationsOverview({ logs, logsLoading }) {
     : needsBalance
     ? {
         title: t("dashboard.operations.teamStatus.advantage", {
-            team: t(
-              advantagedTeam === "allies"
-                ? "dashboard.allies"
-                : "dashboard.axis"
-            ),
+          team: t(
+            advantagedTeam === "allies" ? "dashboard.allies" : "dashboard.axis"
+          ),
         }),
         description:
           balance.required_switches > 0
             ? t("dashboard.operations.teamStatus.moveRecommendation", {
                 count: balance.required_switches,
                 team: t(
-                    advantagedTeam === "allies"
-                      ? "dashboard.axis"
-                      : "dashboard.allies"
+                  advantagedTeam === "allies"
+                    ? "dashboard.axis"
+                    : "dashboard.allies"
                 ),
               })
             : t("dashboard.operations.teamStatus.strengthRecommendation"),
@@ -592,9 +612,7 @@ export default function OperationsOverview({ logs, logsLoading }) {
             <Typography color="text.secondary" sx={{ mt: 1, maxWidth: 720 }}>
               {attentionCount
                 ? t("dashboard.operations.situation.summary", {
-                    reports: adminReport ? 1 : 0,
-                    squads: noLeaderSquads.length,
-                    balance: needsBalance ? 1 : 0,
+                    details: situationSummary,
                   })
                 : t("dashboard.operations.situation.clearSummary")}
             </Typography>
@@ -747,6 +765,7 @@ export default function OperationsOverview({ logs, logsLoading }) {
             md: "minmax(0, 1.05fr) minmax(360px, 0.95fr)",
           },
           gap: 1.5,
+          alignItems: "start",
         }}
       >
         <Box
@@ -763,21 +782,24 @@ export default function OperationsOverview({ logs, logsLoading }) {
             aria-hidden
             sx={{
               display: "grid",
-              gridTemplateColumns: "96px minmax(0, 1fr) 64px 112px",
-              px: 1.5,
+              gridTemplateColumns: TASK_GRID_COLUMNS,
               minHeight: 30,
               alignItems: "center",
               borderBottom: "1px solid",
               borderColor: "divider",
             }}
           >
-            <Typography variant="caption" color="text.secondary">
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ px: 1.5 }}
+            >
               {t("dashboard.operations.tasks.columns.priority")}
             </Typography>
             <Typography
               variant="caption"
               color="text.secondary"
-              sx={{ pl: 1.5 }}
+              sx={{ px: 1.5 }}
             >
               {t("dashboard.operations.tasks.columns.context")}
             </Typography>

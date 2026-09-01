@@ -166,5 +166,7 @@ Die gewählte In-App-Browser-Automation blockiert den Zugriff auf die lokale Vor
 1. Das ausgewählte Mockup wurde als eindeutige visuelle Zielrichtung geöffnet und gegen die bestehenden Datenquellen sowie das Frontline-Theme abgeglichen.
 2. Die Implementierung wurde gebaut und technisch geprüft.
 3. Der verpflichtende Browser-Capture und Same-State-Vergleich konnten wegen der lokalen Browser-Sicherheitsblockade nicht durchgeführt werden.
+4. Zwei aktuelle Nutzer-Captures zeigten eine überlaufende Aufgabenaktion und eine fehlerhafte Singularform in der Schichtlage.
+5. Die Aufgaben-Spalten wurden neu vermessen, die Aktionsbreite vergrößert und die Singular-/Plural-Texte samt natürlicher Detailzusammenfassung korrigiert. Ein browsergerenderter Nachher-Capture steht weiterhin aus.
 
 final result: blocked
