@@ -35,6 +35,7 @@ import { buildLiveBalanceStatus } from "@/pages/views/team/live-balance.mjs";
 
 const TEAM_NAMES = ["allies", "axis"];
 const TEAM_TONES = { allies: "info.main", axis: "error.main" };
+const MAX_VISIBLE_TASKS = 5;
 const TASK_GRID_COLUMNS = "96px minmax(0, 1fr) 56px 132px";
 
 const EVENT_META = {
@@ -472,7 +473,7 @@ export default function OperationsOverview({ logs, logsLoading }) {
         icon: watched ? VisibilityRoundedIcon : StarRoundedIcon,
       });
     }
-    return result.slice(0, 4);
+    return result.slice(0, MAX_VISIBLE_TASKS);
   }, [adminReport, balance, needsBalance, noLeaderSquads, notablePlayer, t]);
 
   const attentionCount = tasks.filter(

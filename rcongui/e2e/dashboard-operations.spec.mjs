@@ -75,6 +75,9 @@ test.describe("desktop operational overview", () => {
     ).toBeVisible();
     await expect(overview.getByText("VIP online")).toBeVisible();
     await expect(overview.getByText("Letzte Ereignisse")).toBeVisible();
+    expect(
+      await overview.locator('[data-testid^="operations-task-"]').count()
+    ).toBeLessThanOrEqual(5);
 
     const balanceTask = overview.getByTestId("operations-task-balance");
     const balanceAction = balanceTask.getByRole("link", {
