@@ -144,7 +144,9 @@ test("keeps a numeric draft while navigating between sections", async ({
   });
   await input.fill("12");
   await expect(input).toHaveValue("12");
-  await expect(shell.getByTestId("config-dirty-indicator")).toBeVisible();
+  const dirtyIndicator = shell.getByTestId("config-dirty-indicator");
+  await dirtyIndicator.scrollIntoViewIfNeeded();
+  await expect(dirtyIndicator).toBeVisible();
 
   await openSection(shell, "Ausnahmen", "exemptions");
   await openSection(shell, "Erkennung", "detection");
