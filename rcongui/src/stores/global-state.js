@@ -4,7 +4,7 @@ import { queryOptions, useQueries, useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { create } from "zustand";
 import {
-  demoGameState,
+  getDemoGameState,
   getDemoConnectionMode,
   getDemoServerConnection,
   getDemoServerList,
@@ -131,12 +131,12 @@ const globalQueries = [
       ) {
         throw new Error("Demo game state is unavailable");
       }
-      return isFakeMode() ? demoGameState : cmd.GET_GAME_STATE();
+      return isFakeMode() ? getDemoGameState() : cmd.GET_GAME_STATE();
     },
     initialData:
       isFakeMode() &&
       ["gameserver_stale", "game_state_stale"].includes(getDemoConnectionMode())
-        ? demoGameState
+        ? getDemoGameState()
         : undefined,
   }),
   queryOptions({

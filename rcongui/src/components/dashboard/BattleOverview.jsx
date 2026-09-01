@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 import { useGlobalStore } from "@/stores/global-state";
 import { CONNECTION_STATE } from "@/utils/connectionHealth";
+import { resolveMapImageName } from "@/utils/map-images.mjs";
 
 const environmentNames = {
   de: {
@@ -94,7 +95,7 @@ export default function BattleOverview() {
     ? environmentNames[language][currentMap.environment] ||
       currentMap.environment
     : t("common.unknown");
-  const imageName = currentMap?.image_name || null;
+  const imageName = resolveMapImageName(currentMap);
   const serverName =
     status?.name ||
     status?.short_name ||

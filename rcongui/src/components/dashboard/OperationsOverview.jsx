@@ -31,6 +31,7 @@ import dayjs from "dayjs";
 import { teamsLiveQuery } from "@/queries/teams-live-query";
 import { useGlobalStore } from "@/stores/global-state";
 import { CONNECTION_STATE } from "@/utils/connectionHealth";
+import { resolveMapImageName } from "@/utils/map-images.mjs";
 import { buildLiveBalanceStatus } from "@/pages/views/team/live-balance.mjs";
 
 const TEAM_NAMES = ["allies", "axis"];
@@ -346,7 +347,7 @@ export default function OperationsOverview({ logs, logsLoading }) {
   const [mapImageFailed, setMapImageFailed] = useState(false);
   const currentMap = gameState?.current_map;
   const nextMap = gameState?.next_map;
-  const imageName = currentMap?.image_name;
+  const imageName = resolveMapImageName(currentMap);
 
   useEffect(() => setMapImageFailed(false), [imageName]);
 

@@ -28,6 +28,12 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
       await expect(
         overview.getByRole("link", { name: /^Teams$/ })
       ).toHaveAttribute("href", "/views/team");
+      await expect(
+        overview.getByText(/Cam Ranh Port/).first()
+      ).toBeVisible();
+      await expect(
+        overview.locator('img[src="/maps/wdev_e-day.webp"]').first()
+      ).toBeVisible();
 
       await expect(page.getByTestId("resource-telemetry-card")).toHaveCount(0);
       await expect(page.getByText("Ressourcen & Kapazität")).toHaveCount(0);

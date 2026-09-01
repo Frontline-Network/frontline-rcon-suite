@@ -51,6 +51,37 @@ export const demoMapLayers = [
   },
 ];
 
+const demoVietnamMapDefinitions = [
+  ["a", "WDEV_A", "Vạn Tường", "horizontal"],
+  ["b", "WDEV_B", "Quảng Ngãi", "horizontal"],
+  ["c", "WDEV_C", "Huế Outskirts", "vertical"],
+  ["d", "WDEV_D", "Đăk Tô Airfield", "horizontal"],
+  ["e", "WDEV_E", "Cam Ranh Port", "horizontal"],
+  ["f", "WDEV_F", "Thanh Hòa Bridge", "vertical"],
+];
+
+export const demoVietnamMapLayers = demoVietnamMapDefinitions.map(
+  ([suffix, mapId, prettyName, orientation]) => ({
+    id: `wdev${suffix}_warfare_day`,
+    name: `wdev${suffix}_warfare_day`,
+    pretty_name: `${prettyName} · Warfare`,
+    game_mode: "warfare",
+    environment: "day",
+    attackers: null,
+    image_name: `wdev_${suffix}-day.webp`,
+    map: {
+      id: mapId,
+      name: prettyName.toUpperCase(),
+      pretty_name: prettyName,
+      shortname: prettyName,
+      attackers: null,
+      allies: { name: "us", team: "Alliierte" },
+      axis: { name: "nva", team: "Achsenmächte" },
+      orientation,
+    },
+  })
+);
+
 const baseDemoNames = [
   "FLN_Raven",
   "FLN_Wolf",
@@ -635,6 +666,21 @@ export const getDemoServerConnection = () => ({
   ...demoServerConnection,
   game: normalizeDemoGame(readDemoParameter("demo_game")),
 });
+
+export const getDemoMapLayers = () =>
+  getDemoServerConnection().game === "hll_vietnam"
+    ? demoVietnamMapLayers
+    : demoMapLayers;
+
+export const getDemoGameState = () => {
+  if (getDemoServerConnection().game !== "hll_vietnam") return demoGameState;
+
+  return {
+    ...demoGameState,
+    current_map: demoVietnamMapLayers[4],
+    next_map: demoVietnamMapLayers[3],
+  };
+};
 
 export const getDemoServerList = () => {
   if (readDemoParameter("demo_multiserver") !== "1") return [];

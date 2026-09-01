@@ -1,4 +1,5 @@
 import zip from "lodash/zip";
+import { getMapIconSrc } from "@/utils/map-images.mjs";
 
 // a little function to help us with reordering the result
 export const reorder = (list, startIndex, endIndex) => {
@@ -49,7 +50,7 @@ export const generateObjectivesGrid = (orientation) => {
 };
 
 export const getMapLayerImageSrc = (mapLayer) =>
-  `/maps/icons/${mapLayer?.image_name ?? "unknown.webp"}`;
+  getMapIconSrc(mapLayer);
 export const getTacMapImageSrc = (mapLayer) =>
   `/tac-maps/${mapLayer.map.id ?? mapLayer.map.name}.webp`;
 export const isNotSupportedGameMode = (mapLayer) =>

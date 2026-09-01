@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Box, Button, Typography } from "@mui/material";
 import { getGameDuration } from "@/utils/lib";
 import { SortableHeader } from "@/components/table/styles";
+import { getMapIconSrc } from "@/utils/map-images.mjs";
 import { getMapEnvironmentLabel, getMapModeLabel } from "@/utils/mapLabels";
 
 export const createGameListColumns = (t) => [
@@ -43,7 +44,7 @@ export const createGameListColumns = (t) => [
         }}
       >
         <img
-          src={"/maps/icons/" + matchMap.image_name}
+          src={getMapIconSrc(matchMap)}
           width={size}
           height={size * ratio}
           alt=""

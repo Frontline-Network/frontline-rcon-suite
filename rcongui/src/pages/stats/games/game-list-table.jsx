@@ -26,6 +26,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router-dom";
 import { getGameDuration } from "@/utils/lib";
+import { getMapIconSrc, resolveMapImageName } from "@/utils/map-images.mjs";
 import { getMapEnvironmentLabel, getMapModeLabel } from "@/utils/mapLabels";
 import NavPagination from "./nav-pagination";
 import { SavedGameViewsDialog } from "./saved-views-dialog";
@@ -41,7 +42,7 @@ const JOURNAL_BORDER = "divider";
 
 function GameMapThumbnail({ game }) {
   const [failed, setFailed] = useState(false);
-  const imageName = game?.map?.image_name;
+  const imageName = resolveMapImageName(game?.map);
 
   if (!imageName || failed) {
     return (
@@ -67,7 +68,7 @@ function GameMapThumbnail({ game }) {
   return (
     <Box
       component="img"
-      src={`/maps/icons/${imageName}`}
+      src={getMapIconSrc(game?.map)}
       alt=""
       onError={() => setFailed(true)}
       sx={{

@@ -12,6 +12,7 @@ import {
 import { useMemo } from "react";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
+import { resolveMapImageName } from "@/utils/map-images.mjs";
 
 const isValidGame = (game) => {
   const MIN_GAME_DURATION = 10 * 60 * 1000;
@@ -86,7 +87,7 @@ const MapStatsCard = ({ games }) => {
       if (!acc[mapName]) {
         acc[mapName] = {
           mapName,
-          imageName: game.map.image_name,
+          imageName: resolveMapImageName(game.map),
           totalGames: 0,
           alliedWins: 0,
           axisWins: 0,
