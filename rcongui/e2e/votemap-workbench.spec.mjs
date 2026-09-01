@@ -66,8 +66,7 @@ test("map pool draft can be changed and restored", async ({ page }) => {
     .getByRole("button", { name: "Kursk zum Kartenpool hinzufügen" })
     .click();
   const dirtyIndicator = shell.getByTestId("config-dirty-indicator");
-  await dirtyIndicator.scrollIntoViewIfNeeded();
-  await expect(dirtyIndicator).toBeVisible();
+  await expect(dirtyIndicator).toHaveText("Ungespeicherte Änderungen");
   await expect(shell.getByTestId("config-save-button")).toBeEnabled();
 
   await shell.getByRole("button", { name: "Änderungen zurücksetzen" }).click();
