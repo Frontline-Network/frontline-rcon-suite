@@ -75,21 +75,20 @@ test.describe("effective server-settings context", () => {
     await expect(input).toHaveValue("2");
   });
 
-  test("does not present missing dashboard data as disabled settings", async ({
+  test("keeps unavailable settings out of the operations dashboard", async ({
     page,
   }) => {
     const main = await openDemoPage(page, "/", {
       query: { demo_settings_error: "1" },
     });
 
-    const heading = main.getByText("Servereinstellungen", { exact: true });
-    const card = heading.locator(
-      "xpath=ancestor::*[contains(@class, 'MuiCard-root')]"
-    );
-    await expect(card).toContainText(
-      "Die Servereinstellungen sind derzeit nicht verfügbar"
-    );
-    await expect(card.getByText("Deaktiviert", { exact: true })).toHaveCount(0);
+    await expect(main.getByTestId("operations-overview")).toBeVisible();
+    await expect(
+      main.getByText("Servereinstellungen", { exact: true })
+    ).toHaveCount(0);
+    await expect(
+      main.getByText("Deaktiviert", { exact: true })
+    ).toHaveCount(0);
   });
 });
 

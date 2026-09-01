@@ -523,6 +523,13 @@ export default function OperationsOverview({ logs, logsLoading }) {
       : t("common.unknown");
   const isOnline =
     connectionHealth.gameServer.state === CONNECTION_STATE.ONLINE;
+  const statusHelper = connectionHealth.gameServer.lastSuccessAt
+    ? t("dashboard.lastUpdated", {
+        time: new Date(
+          connectionHealth.gameServer.lastSuccessAt
+        ).toLocaleTimeString(language),
+      })
+    : t("dashboard.noLiveData");
   const statusLabel = t(
     `connectionStates.${
       connectionHealth.gameServer.state || CONNECTION_STATE.UNKNOWN
@@ -648,6 +655,7 @@ export default function OperationsOverview({ logs, logsLoading }) {
         <Box
           component="section"
           aria-labelledby="current-match-title"
+          data-testid="battle-overview"
           sx={panelSx}
         >
           <Stack direction="row" sx={{ minHeight: 210, height: "100%" }}>
@@ -694,6 +702,14 @@ export default function OperationsOverview({ logs, logsLoading }) {
                   color="primary.main"
                 >
                   {t("dashboard.operations.match.title")}
+                </Typography>
+                <Typography
+                  component="h2"
+                  variant="h6"
+                  color="text.secondary"
+                  noWrap
+                >
+                  {serverName}
                 </Typography>
                 <Typography
                   variant="h4"
@@ -751,7 +767,16 @@ export default function OperationsOverview({ logs, logsLoading }) {
                         fontSize: 14,
                       }}
                     />
-                    <Typography variant="h6">{statusLabel}</Typography>
+                    <Stack spacing={0.15} sx={{ minWidth: 0 }}>
+                      <Typography variant="h6">{statusLabel}</Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        noWrap
+                      >
+                        {statusHelper}
+                      </Typography>
+                    </Stack>
                   </Stack>
                 </Box>
               </Stack>
