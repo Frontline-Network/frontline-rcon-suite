@@ -8,7 +8,11 @@ from channels.layers import get_channel_layer
 
 from django.conf import settings as django_settings
 
-if not django_settings.configured:
+if not django_settings.configured and not os.getenv("DJANGO_SETTINGS_MODULE"):
+    # Standalone RCON workers do not boot Django, so they still need a minimal
+    # Channels configuration. When a Django settings module is declared, leave
+    # initialization to Django instead of permanently replacing the configured
+    # application registry with this partial settings object at import time.
     django_settings.configure(
         CHANNEL_LAYERS={
             "default": {
