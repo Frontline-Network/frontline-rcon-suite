@@ -15,6 +15,7 @@ const OPERATOR_SURFACES = [
   "src/features/player-action/ActionForm.jsx",
   "src/features/player-action/DisbandSquad.jsx",
   "src/components/dashboard/BattleOverview.jsx",
+  "src/components/dashboard/OperationsOverview.jsx",
   "src/components/cards/ResourceTelemetryCard.jsx",
   "src/pages/dashboard.jsx",
 ];

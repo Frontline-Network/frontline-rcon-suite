@@ -129,3 +129,42 @@ The source and final desktop component were inspected together in one focused co
 4. Re-captured both viewports, verified no overflow or console error, and inspected the focused source/final comparison.
 
 final result: passed
+
+---
+
+# Design QA · Operative Startseite – Option 2
+
+## Prüfgrundlage
+
+- Source Visual Truth: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-23f129ec-eca3-48df-b391-deca1b0a64e1.png` (1536 × 1080 px).
+- Zielroute: `/` in der lokalen Vite-Fake-Umgebung.
+- Geplanter Vergleichszustand: dunkles Frontline-Theme, deutsche Sprache, HLL: Vietnam, Demo-Server 2, 98/100 Spieler, laufende Runde.
+- Geplanter CSS-Viewport: 1536 × 1080 bei Browser-Dichte 1.
+- Browsergerenderte Implementierung: nicht verfügbar.
+
+## Blocker
+
+Die gewählte In-App-Browser-Automation blockiert den Zugriff auf die lokale Vorschauadresse. Dadurch konnten weder ein browsergerenderter Implementierungs-Screenshot noch ein gemeinsamer Source-/Implementierungsvergleich erstellt werden. Produktionsbuild, Vertragsprüfungen und Quellcodeinspektion sind bestanden, ersetzen laut Product-Design-Vertrag aber keine visuelle Browser-QA.
+
+## Noch nicht visuell verifizierte Pflichtflächen
+
+- Fonts und Typografie: Frontline-Typografie und vorhandene Theme-Hierarchie werden im Code wiederverwendet; Zeilenumbrüche und optische Dichte müssen noch im Browser geprüft werden.
+- Spacing und Layout: das 2-Spalten-Raster, die eckigen Panels, Aufgabenzeilen und Ereigniszeilen benötigen einen Same-State-Screenshot bei 1536 × 1080.
+- Farben und Tokens: ausschließlich Theme-Tokens und semantische Statusfarben werden verwendet; die tatsächliche Wirkung in Standard- und Farbenblindmodus ist noch visuell offen.
+- Bildqualität: das vorhandene aktuelle Kartenbild wird mit produktiver Karten-ID geladen; Crop, Schärfe und Fallback müssen im Browser geprüft werden.
+- Copy und Inhalt: deutsche und englische Operator-Copy sind durch den statischen Vertrag abgedeckt; sichtbare Kürzungen und Überläufe sind noch offen.
+
+## Technische Evidenz
+
+- Produktionsbuild: bestanden, 14.130 Module transformiert.
+- Designfundament, Seitensemantik, Aktionsfeedback, Operator-Copy, Navigation, Farbsehmodus, Polling-Budget, Live-Balance und initiales Bundle-Budget: bestanden.
+- Die Startseite nutzt vorhandene Game-State-, Team-Snapshot-, Spielerprofil- und Dashboard-Log-Daten. Es wurde kein neuer API-Endpunkt und kein zusätzlicher Polling-Timer ergänzt.
+- Technische Ressourcen, Diensteliste, Serverkonfiguration, Spielhistorie und App-Promotion wurden aus der operativen Startseite entfernt; die zugrunde liegenden Seiten und Komponenten bleiben erhalten.
+
+## Vergleichshistorie
+
+1. Das ausgewählte Mockup wurde als eindeutige visuelle Zielrichtung geöffnet und gegen die bestehenden Datenquellen sowie das Frontline-Theme abgeglichen.
+2. Die Implementierung wurde gebaut und technisch geprüft.
+3. Der verpflichtende Browser-Capture und Same-State-Vergleich konnten wegen der lokalen Browser-Sicherheitsblockade nicht durchgeführt werden.
+
+final result: blocked
