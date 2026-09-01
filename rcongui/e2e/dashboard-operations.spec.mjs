@@ -50,17 +50,14 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
       ).toBeVisible();
     } else {
       await expect(
-        page.getByRole("tab", { name: "Einsatz", exact: true })
+        page.getByRole("region", { name: "Betrieb" })
       ).toBeVisible();
       await expect(
-        page.getByRole("tab", { name: "Protokoll", exact: true })
-      ).toBeVisible();
+        page.getByRole("link", { name: /Teams & Trupps/ })
+      ).toHaveAttribute("href", "/views/team");
       await expect(
-        page.getByRole("region", {
-          name: "Handlungsbedarf und Gefechtsstatus",
-        })
-      ).toBeVisible();
-      await expect(page.getByTestId("live-players-panel")).toBeVisible();
+        page.getByRole("link", { name: /Autobalancer/ })
+      ).toHaveAttribute("href", "/views/autobalancer");
     }
 
     const visibleMatchStatus = page
@@ -145,7 +142,9 @@ test.describe("dashboard resource states", () => {
       query: { demo_game: "hll" },
     });
 
-    await expect(page.getByText("HLL", { exact: true }).first()).toBeVisible();
+    await expect(
+      page.getByTestId("global-server-switcher").filter({ visible: true }).first()
+    ).toContainText("HLL");
     await expect(
       page.getByText("Central overview of the selected game server")
     ).toBeVisible();

@@ -141,7 +141,7 @@ test.describe("permission-aware navigation", () => {
       navigation.getByRole("link", { name: "Live-Ansicht" })
     ).toHaveCount(0);
 
-    await liveView.focus();
+    await liveView.hover();
     await expect(
       page.getByRole("tooltip", {
         name: "Diese Seite ist sichtbar, aber dir fehlt die erforderliche Berechtigung.",
@@ -209,9 +209,8 @@ test.describe("permission-aware navigation", () => {
   test("selects only the current app entry", async ({ page }) => {
     await openDemoPage(page, "/apps/discord-report-bot");
 
-    const rail = page.getByTestId("desktop-command-rail");
     const navigation = page.getByTestId("desktop-navigation-panel");
-    await rail.getByRole("button", { name: "Integrationen" }).click();
+    await expect(navigation).toBeVisible();
 
     const frontlineApp = navigation.getByRole("link", {
       name: "Frontline App",

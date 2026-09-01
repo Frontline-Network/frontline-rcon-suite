@@ -127,6 +127,7 @@ function ContextNavigationItem({ item, active, onSelect }) {
       {locked ? (
         <Tooltip
           title={item.lockedReason || ""}
+          describeChild
           placement="right"
           arrow
           slotProps={{ tooltip: { sx: { borderRadius: 0 } } }}

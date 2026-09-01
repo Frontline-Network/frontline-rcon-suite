@@ -210,6 +210,7 @@ export default function CommandRail({
                 >
                   <Box
                     component="span"
+                    role="img"
                     aria-label={status.label}
                     sx={{
                       width: 7,

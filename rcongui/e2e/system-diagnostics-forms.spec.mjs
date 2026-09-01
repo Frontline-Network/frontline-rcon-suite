@@ -58,7 +58,7 @@ for (const configPage of pages) {
     });
 
     await expect(
-      shell.getByRole("heading", { name: configPage.title, exact: true })
+      main.getByRole("heading", { name: configPage.title, exact: true })
     ).toBeVisible();
     await expect(navigation).toBeVisible();
     await expect(shell).not.toContainText(

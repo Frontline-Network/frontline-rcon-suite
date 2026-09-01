@@ -18,6 +18,7 @@ const routes = [
   {
     path: "/settings/maps/votemap/settings",
     heading: "Abstimmung konfigurieren",
+    contentHeading: "Modi & Anzahl",
   },
 ];
 
@@ -41,7 +42,10 @@ for (const [viewportName, viewport] of Object.entries(VOTEMAP_VIEWPORTS)) {
         shell.getByRole("heading", { name: "Kartenabstimmung", exact: true })
       ).toBeVisible();
       await expect(
-        shell.getByRole("heading", { name: route.heading, exact: true })
+        shell.getByRole("heading", {
+          name: route.contentHeading || route.heading,
+          exact: true,
+        })
       ).toBeVisible();
       await expect(
         shell.getByRole("tablist", {

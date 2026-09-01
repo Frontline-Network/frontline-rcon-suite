@@ -73,6 +73,7 @@ export default function ServerRailSwitcher({
         gridArea: "server",
         width: "100%",
         minWidth: 0,
+        minHeight: 44,
         height: "100%",
         justifyContent: "flex-start",
         gap: compact ? 0.55 : 0.75,

@@ -12,11 +12,11 @@ test.describe("connection state contract", () => {
     });
 
     await expect(
-      page.getByText("CRCON · Offline", { exact: true })
+      page.getByRole("img", { name: "CRCON · Offline" })
     ).toBeVisible();
     await expect(
-      page.getByTestId("gameserver-connection-status")
-    ).toHaveAttribute("data-connection-state", "unknown");
+      page.getByRole("img", { name: "Gameserver · Status unbekannt" })
+    ).toBeVisible();
   });
 
   test("shows CRCON online while the game server is offline", async ({
@@ -27,9 +27,11 @@ test.describe("connection state contract", () => {
     });
 
     await expect(
-      page.getByText("CRCON · Online", { exact: true })
+      page.getByRole("img", { name: "CRCON · Online" })
     ).toBeVisible();
-    await expect(page.getByText("Offline", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("img", { name: "Gameserver · Offline" })
+    ).toBeVisible();
   });
 
   test("marks cached game-server data as stale after a failed refresh", async ({
@@ -40,8 +42,8 @@ test.describe("connection state contract", () => {
     });
 
     await expect(
-      page.getByTestId("gameserver-connection-status")
-    ).toHaveAttribute("data-connection-state", "stale");
+      page.getByRole("img", { name: "Gameserver · Daten veraltet" })
+    ).toBeVisible();
     await expect(
       page.getByText("Daten veraltet", { exact: true }).first()
     ).toBeVisible();

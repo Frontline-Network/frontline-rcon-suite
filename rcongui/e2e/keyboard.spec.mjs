@@ -61,9 +61,7 @@ test.describe("mobile navigation", () => {
     await menuButton.focus();
     await page.keyboard.press("Enter");
 
-    const navigation = page.getByRole("navigation", {
-      name: "Hauptnavigation",
-    });
+    const navigation = page.getByTestId("mobile-command-navigation");
     const mapsGroup = navigation.getByRole("button", {
       name: "Spielbetrieb",
     });
