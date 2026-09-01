@@ -350,7 +350,7 @@ export default function LiveGamePage() {
                 setSortKey(value);
                 setSortDescending(value !== "player");
               }}
-              aria-label={t("stats.liveGame.sorting")}
+              inputProps={{ "aria-label": t("stats.liveGame.sorting") }}
               sx={{ minHeight: 42, borderRadius: 0, "& fieldset": { border: 0 } }}
             >
               <MenuItem value="kill_death_ratio">{t("stats.liveGame.sortKdr")}</MenuItem>
@@ -383,7 +383,7 @@ export default function LiveGamePage() {
             <Select
               value={pageSize}
               onChange={(event) => setPageSize(Number(event.target.value))}
-              aria-label={t("stats.liveGame.pageSize")}
+              inputProps={{ "aria-label": t("stats.liveGame.pageSize") }}
               sx={{ minHeight: 42, borderRadius: 0, "& fieldset": { border: 0 } }}
             >
               {[17, 25, 50, 100].map((size) => (

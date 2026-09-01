@@ -39,21 +39,24 @@ import {
 import PlayerProfileHeader from "../player/profile/Header";
 import PlayerProfileSummary from "../player/profile/Summary";
 import PlayerProfileStatusTags from "../player/profile/StatusTags";
+import LinkedAccounts from "../player/profile/LinkedAccounts";
 import { ActionMenuButton } from "@/features/player-action/ActionMenu";
 
 const Penalties = ({ punish, kick, tempBan, parmaBan }) => {
   const { t } = useTranslation();
 
-  return <dl>
-    <dt>{t("playerDrawer.penalties.punish")}</dt>
-    <dd>{punish ?? 0}</dd>
-    <dt>{t("playerDrawer.penalties.kick")}</dt>
-    <dd>{kick ?? 0}</dd>
-    <dt>{t("playerDrawer.penalties.tempBan")}</dt>
-    <dd>{tempBan ?? 0}</dd>
-    <dt>{t("playerDrawer.penalties.permaBan")}</dt>
-    <dd>{parmaBan ?? 0}</dd>
-  </dl>;
+  return (
+    <dl>
+      <dt>{t("playerDrawer.penalties.punish")}</dt>
+      <dd>{punish ?? 0}</dd>
+      <dt>{t("playerDrawer.penalties.kick")}</dt>
+      <dd>{kick ?? 0}</dd>
+      <dt>{t("playerDrawer.penalties.tempBan")}</dt>
+      <dd>{tempBan ?? 0}</dd>
+      <dt>{t("playerDrawer.penalties.permaBan")}</dt>
+      <dd>{parmaBan ?? 0}</dd>
+    </dl>
+  );
 };
 
 const ReceivedActions = ({ actions }) => {
@@ -207,7 +210,8 @@ const PlayerDetails = ({ player, onClose }) => {
     multiAction: false,
     onlineAction: isOnline,
   });
-  const name = profile?.account?.name ?? player?.name ?? profile?.soldier?.name ?? "???";
+  const name =
+    profile?.account?.name ?? player?.name ?? profile?.soldier?.name ?? "???";
   const avatar = profile?.steaminfo?.profile?.avatar;
   const country =
     profile?.account?.country ??
@@ -260,6 +264,9 @@ const PlayerDetails = ({ player, onClose }) => {
         isBlacklisted={isBlacklisted}
         isBanned={isBanned}
       />
+      <Box sx={{ px: 2 }}>
+        <LinkedAccounts player={profile} />
+      </Box>
       <Divider />
       <TabContext value={openedTab}>
         <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
@@ -271,7 +278,9 @@ const PlayerDetails = ({ player, onClose }) => {
             aria-label={t("playerDrawer.details")}
           >
             <Tab label={t("playerDrawer.tabs.profile")} value="profile" />
-            {isOnline && <Tab label={t("playerDrawer.tabs.game")} value="game" />}
+            {isOnline && (
+              <Tab label={t("playerDrawer.tabs.game")} value="game" />
+            )}
             <Tab label={t("playerDrawer.tabs.admin")} value="admin" />
             <Tab
               label={t("playerDrawer.tabs.messages")}
@@ -292,7 +301,11 @@ const PlayerDetails = ({ player, onClose }) => {
               value="bans"
               disabled={player.bans.length === 0}
             />
-            <Tab label={t("playerDrawer.tabs.logs")} value="logs" disabled={true} />
+            <Tab
+              label={t("playerDrawer.tabs.logs")}
+              value="logs"
+              disabled={true}
+            />
           </Tabs>
         </Box>
         <TabPanel value="profile">

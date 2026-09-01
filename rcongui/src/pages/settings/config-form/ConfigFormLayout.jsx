@@ -33,7 +33,8 @@ export default function ConfigFormLayout({
       }}
     >
       <Stack spacing={1.5} sx={{ mb: 1 }}>
-        <Box sx={{ display: embedded ? "none" : "block" }}>
+        {!embedded && (
+          <Box>
           {eyebrow && (
             <Typography
               variant="overline"
@@ -71,7 +72,8 @@ export default function ConfigFormLayout({
               {description}
             </Typography>
           )}
-        </Box>
+          </Box>
+        )}
         {headerActions && <Box>{headerActions}</Box>}
       </Stack>
 

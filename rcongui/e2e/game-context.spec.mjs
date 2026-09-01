@@ -7,10 +7,14 @@ test.describe("game and server context", () => {
   test("normalizes the HLL Vietnam API identifier", async ({ page }) => {
     await openDemoPage(page, "/", { query: { demo_game: "hll_vietnam" } });
 
-    await expect(page.getByText("HLL: Vietnam", { exact: true })).toBeVisible();
+    await expect(
+      page.getByTestId("global-server-switcher")
+    ).toHaveAccessibleName(/HLL: Vietnam/);
   });
 
-  test("distinguishes HLL and HLL Vietnam in a multi-server installation", async ({ page }) => {
+  test("distinguishes HLL and HLL Vietnam in a multi-server installation", async ({
+    page,
+  }) => {
     await openDemoPage(page, "/", {
       query: {
         demo_game: "hll",
@@ -19,15 +23,24 @@ test.describe("game and server context", () => {
       },
     });
 
-    await page.getByRole("combobox", { name: "Server auswählen" }).click();
-    await expect(page.getByRole("option", { name: /Frontline Network \| #2.*HLL/ })).toBeVisible();
-    await expect(page.getByRole("option", { name: /Vietnam #3.*HLL: Vietnam/ })).toBeVisible();
+    await page.getByTestId("global-server-switcher").click();
+    const menu = page.getByRole("menu", { name: "Server wechseln" });
+    await expect(
+      menu.getByRole("menuitem", { name: /Frontline #2.*HLL/ })
+    ).toBeVisible();
+    await expect(
+      menu.getByRole("menuitem", { name: /Vietnam #3.*HLLV/ })
+    ).toBeVisible();
   });
 
-  test("does not invent a game label for an unknown identifier", async ({ page }) => {
+  test("does not invent a game label for an unknown identifier", async ({
+    page,
+  }) => {
     await openDemoPage(page, "/", { query: { demo_game: "future_game" } });
 
     await expect(page.getByText("HLL", { exact: true })).toHaveCount(0);
-    await expect(page.getByText("HLL: Vietnam", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("HLL: Vietnam", { exact: true })).toHaveCount(
+      0
+    );
   });
 });

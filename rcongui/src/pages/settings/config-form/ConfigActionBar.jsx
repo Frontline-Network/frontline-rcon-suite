@@ -5,6 +5,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import ActionResult from "@/components/shared/ActionResult";
 
 const renderAction = (action, fallbackVariant, fullWidth = false) => {
   if (!action) return null;
@@ -48,16 +49,23 @@ export default function ConfigActionBar({
   dirty = false,
   dirtyLabel,
   sticky = true,
+  mobileSticky = sticky,
+  result,
+  metaItems = [],
 }) {
   return (
     <Box
       component="footer"
       sx={{
-        position: sticky ? "sticky" : "static",
+        position: sticky
+          ? { xs: mobileSticky ? "sticky" : "static", md: "sticky" }
+          : "static",
         bottom: sticky
           ? {
-              xs: "calc(var(--mobile-bottom-nav-height, 0px) + env(safe-area-inset-bottom))",
-              sm: 0,
+              xs: mobileSticky
+                ? "calc(var(--mobile-bottom-nav-height, 0px) + env(safe-area-inset-bottom))"
+                : "auto",
+              md: 0,
             }
           : "auto",
         zIndex: (theme) => theme.zIndex.appBar - 1,
@@ -69,19 +77,26 @@ export default function ConfigActionBar({
         borderTop: 0,
         borderColor: "divider",
         bgcolor: "background.paper",
-        borderRadius: "0 0 8px 8px",
-        boxShadow: sticky ? "0 -4px 12px rgba(0,0,0,0.06)" : 0,
+        borderRadius: 0,
+        boxShadow: sticky
+          ? {
+              xs: mobileSticky ? "0 -4px 12px rgba(0,0,0,0.06)" : 0,
+              md: "0 -4px 12px rgba(0,0,0,0.06)",
+            }
+          : 0,
         "& .MuiButton-root": {
-          width: { xs: "100%", sm: "auto" },
-          minHeight: { xs: 44, sm: 36 },
+          width: { xs: "100%", md: "auto" },
+          minHeight: { xs: 44, md: 36 },
         },
       }}
     >
+      <ActionResult result={result} compact />
       <Stack
-        direction={{ xs: "column", sm: "row" }}
+        direction={{ xs: "column", md: "row" }}
         justifyContent="space-between"
-        alignItems={{ xs: "stretch", sm: "center" }}
+        alignItems={{ xs: "stretch", md: "center" }}
         spacing={1.25}
+        sx={{ mt: result ? 1.25 : 0 }}
       >
         <Stack
           direction="row"
@@ -98,7 +113,7 @@ export default function ConfigActionBar({
                 width: 30,
                 height: 30,
                 bgcolor: dirty ? "rgba(214, 170, 77, 0.08)" : "action.hover",
-                borderRadius: 0.75,
+                borderRadius: 0,
               }}
             >
               {stateIcon}
@@ -125,14 +140,54 @@ export default function ConfigActionBar({
                 {stateDescription}
               </Typography>
             )}
+            {metaItems.length > 0 && (
+              <Stack
+                direction="row"
+                spacing={1}
+                useFlexGap
+                flexWrap="wrap"
+                sx={{ mt: 0.5 }}
+              >
+                {metaItems.map((item) => (
+                  <Stack
+                    key={item.id || item.label}
+                    direction="row"
+                    spacing={0.5}
+                    alignItems="baseline"
+                    sx={{ minWidth: 0 }}
+                  >
+                    <Typography
+                      variant="overline"
+                      color="text.secondary"
+                    >
+                      {item.label}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color={item.color || "text.primary"}
+                      fontWeight={800}
+                    >
+                      {item.value}
+                    </Typography>
+                  </Stack>
+                ))}
+              </Stack>
+            )}
             {leading}
           </Box>
         </Stack>
 
-        <Stack
-          direction={{ xs: "column-reverse", sm: "row" }}
-          spacing={1}
-          sx={{ flexShrink: 0 }}
+        <Box
+          sx={{
+            display: { xs: "grid", md: "flex" },
+            gridTemplateColumns:
+              secondaryActions.length > 1 ? "repeat(2, minmax(0, 1fr))" : "1fr",
+            gap: 1,
+            flexShrink: 0,
+            "& > :last-child": {
+              gridColumn: secondaryActions.length > 1 ? "1 / -1" : "auto",
+            },
+          }}
         >
           {secondaryActions.map((action) =>
             renderAction(action, "outlined", false)
@@ -147,7 +202,7 @@ export default function ConfigActionBar({
             "contained",
             false
           )}
-        </Stack>
+        </Box>
       </Stack>
     </Box>
   );

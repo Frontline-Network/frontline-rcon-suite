@@ -8,6 +8,7 @@ os.environ.setdefault("HLL_MAINTENANCE_CONTAINER", "1")
 from rcon.autobalancer.models import BalanceSnapshot, PlayerSnapshot, SkillRating
 from rcon.autobalancer.planner import (
     build_plan,
+    build_strength_swap_recommendations,
     build_strategy_plans,
     protection_tier,
     required_switches,
@@ -121,6 +122,17 @@ def test_volunteer_reduces_soft_tier_by_two():
     assert plan.candidates[0].effective_tier == 1
 
 
+def test_individual_fallback_can_keep_multi_player_squads_together():
+    squad_member = player("squad-member", unit="able", size=4)
+    unassigned = player("unassigned", unit=None, size=0)
+    plan = build_plan(
+        snapshot([squad_member, unassigned]),
+        allow_individual_squad_fallback=False,
+    )
+    assert [item.player.player_id for item in plan.candidates] == ["unassigned"]
+    assert any("zusammenbleiben" in reason for reason in plan.blocked_reasons)
+
+
 def test_multi_player_plan_uses_other_squad_when_equivalent():
     players = [
         player("a1", unit="able", unit_type="infantry", rating=40),
@@ -154,6 +166,58 @@ def test_skill_only_balance_never_creates_a_plan():
         player("weak", team="axis", rating=0),
     ]
     assert build_plan(snapshot(players, allies_count=40, axis_count=40)) is None
+
+
+def test_skill_only_balance_can_create_a_review_only_swap_recommendation():
+    players = [
+        player("allies-low", team="allies", unit=None, size=0, rating=20),
+        player("allies-mid", team="allies", unit="able", rating=40),
+        player("axis-high", team="axis", unit=None, size=0, rating=90),
+        player("axis-mid", team="axis", unit="baker", rating=70),
+    ]
+    recommendations = build_strength_swap_recommendations(
+        snapshot(players, allies_count=40, axis_count=40),
+        skill_gap_soft_limit=8,
+        skill_gap_min_improvement=2.5,
+    )
+    assert recommendations
+    recommendation = recommendations[0]
+    assert recommendation.stronger_team == "axis"
+    assert recommendation.weaker_team == "allies"
+    assert recommendation.stronger_player.player_id == "axis-high"
+    assert recommendation.weaker_player.player_id == "allies-low"
+    assert recommendation.projected_rating_gap < recommendation.rating_gap_before
+    assert recommendation.public_dict()["advisory_only"] is True
+
+
+def test_strength_swap_never_recommends_leaders_or_specialist_squads():
+    players = [
+        player("allies-low", team="allies", unit=None, size=0, rating=20),
+        player("allies-mid", team="allies", rating=40),
+        player(
+            "axis-leader",
+            team="axis",
+            role="officer",
+            leader=True,
+            rating=100,
+        ),
+        player(
+            "axis-armor",
+            team="axis",
+            role="crewman",
+            unit_type="armor",
+            rating=95,
+        ),
+        player("axis-safe", team="axis", rating=80),
+    ]
+    recommendations = build_strength_swap_recommendations(
+        snapshot(players, allies_count=40, axis_count=40)
+    )
+    assert recommendations
+    assert {
+        recommendation.stronger_player.player_id
+        for recommendation in recommendations
+    } == {"axis-safe"}
 
 
 def test_odd_one_player_difference_never_creates_an_overshooting_candidate():

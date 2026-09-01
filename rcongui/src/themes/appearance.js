@@ -185,6 +185,9 @@ export function applyAppearanceToThemeOptions(baseOptions, value) {
       light: { palette: appearancePalette("light", appearance) },
       dark: { palette: appearancePalette("dark", appearance) },
     },
-    frontline: { appearance },
+    frontline: {
+      ...baseOptions.frontline,
+      appearance,
+    },
   };
 }

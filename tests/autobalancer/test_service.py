@@ -155,6 +155,31 @@ def test_shadow_creates_audit_proposal_without_messages_or_rcon(monkeypatch):
     assert instance.rcon.switches == []
 
 
+def test_status_exposes_count_and_strength_decision_limits(monkeypatch):
+    instance = service()
+    monkeypatch.setattr(
+        "rcon.autobalancer.service.load_history", lambda *args, **kwargs: {}
+    )
+    config = AutobalancerUserConfig(
+        mode="shadow",
+        minimum_players=0,
+        target_difference=3,
+        skill_gap_soft_limit=7,
+        skill_gap_hard_warning=11,
+        skill_gap_min_improvement=2,
+        map_start_grace_minutes=0,
+        map_end_guard_minutes=0,
+    )
+    now = datetime.fromtimestamp(3000, timezone.utc)
+    status = instance.tick(config, make_snapshot(now, allies=40, axis=40), now)
+    assert status["target_difference"] == 3
+    assert status["strength_thresholds"] == {
+        "soft_limit": 7,
+        "hard_warning": 11,
+        "minimum_improvement": 2,
+    }
+
+
 def test_stale_death_event_never_switches():
     instance = service()
     now = datetime.fromtimestamp(3000, timezone.utc)

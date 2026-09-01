@@ -110,15 +110,30 @@ test.describe("task-oriented navigation contract", () => {
 test.describe("permission-aware navigation", () => {
   test.use({ viewport: VIEWPORTS.desktop });
 
+  test("opens the overview directly without a secondary navigation panel", async ({
+    page,
+  }) => {
+    await openDemoPage(page, "/views/live");
+
+    const overview = page
+      .getByTestId("desktop-command-rail")
+      .getByRole("button", { name: "Übersicht" });
+    await overview.click();
+
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByTestId("desktop-navigation-panel")).toHaveCount(0);
+    await expect(overview).toHaveAttribute("aria-current", "page");
+    await expect(overview).not.toHaveAttribute("aria-controls");
+  });
+
   test("keeps a protected destination discoverable and explains why a viewer cannot open it", async ({
     page,
   }) => {
     await openDemoPage(page, "/", { query: { demo_role: "viewer" } });
 
-    const navigation = page.getByRole("navigation", {
-      name: "Hauptnavigation",
-    });
-    await navigation.getByRole("button", { name: "Live-Betrieb" }).click();
+    const rail = page.getByTestId("desktop-command-rail");
+    const navigation = page.getByTestId("desktop-navigation-panel");
+    await rail.getByRole("button", { name: "Live" }).click();
 
     const liveView = navigation.getByRole("button", { name: "Live-Ansicht" });
     await expect(liveView).toHaveAttribute("aria-disabled", "true");
@@ -126,7 +141,7 @@ test.describe("permission-aware navigation", () => {
       navigation.getByRole("link", { name: "Live-Ansicht" })
     ).toHaveCount(0);
 
-    await liveView.focus();
+    await liveView.hover();
     await expect(
       page.getByRole("tooltip", {
         name: "Diese Seite ist sichtbar, aber dir fehlt die erforderliche Berechtigung.",
@@ -139,29 +154,53 @@ test.describe("permission-aware navigation", () => {
   }) => {
     await openDemoPage(page, "/");
 
-    const navigation = page.getByRole("navigation", {
-      name: "Hauptnavigation",
-    });
-    await navigation.getByRole("button", { name: "Live-Betrieb" }).click();
+    const rail = page.getByTestId("desktop-command-rail");
+    const navigation = page.getByTestId("desktop-navigation-panel");
+    await rail.getByRole("button", { name: "Live" }).click();
     await expect(
       navigation.getByRole("link", { name: "Live-Ansicht" })
     ).toHaveAttribute("href", "/views/live");
   });
 
+  test("renders the compact mission index without legacy search or server card", async ({
+    page,
+  }) => {
+    await openDemoPage(page, "/");
+
+    const rail = page.getByTestId("desktop-command-rail");
+    await expect(page.getByTestId("desktop-navigation-panel")).toHaveCount(0);
+    await rail.getByRole("button", { name: "Live" }).click();
+    const navigation = page.getByTestId("desktop-navigation-panel");
+
+    await expect(
+      navigation.getByRole("heading", { name: "Live-Betrieb" })
+    ).toBeVisible();
+    await expect(
+      navigation.getByText("Betrieb", { exact: true })
+    ).toBeVisible();
+    await expect(navigation.getByText(/Server 2 · HLL/)).toBeVisible();
+    await expect(
+      navigation.getByRole("link", { name: "Live-Ansicht" })
+    ).toHaveCSS("border-radius", "0px");
+    await expect(
+      navigation.getByPlaceholder("Navigation durchsuchen …")
+    ).toHaveCount(0);
+    await expect(
+      navigation.getByRole("combobox", { name: "Server auswählen" })
+    ).toHaveCount(0);
+  });
+
   test("shows map changes under maps and game operations", async ({ page }) => {
     await openDemoPage(page, "/");
 
-    const navigation = page.getByRole("navigation", {
-      name: "Hauptnavigation",
-    });
-    await navigation.getByRole("button", { name: "Live-Betrieb" }).click();
+    const rail = page.getByTestId("desktop-command-rail");
+    const navigation = page.getByTestId("desktop-navigation-panel");
+    await rail.getByRole("button", { name: "Live" }).click();
     await expect(
       navigation.getByRole("link", { name: "Karte wechseln" })
     ).toHaveCount(0);
 
-    await navigation
-      .getByRole("button", { name: "Karten & Spielbetrieb" })
-      .click();
+    await rail.getByRole("button", { name: "Spielbetrieb" }).click();
     await expect(
       navigation.getByRole("link", { name: "Karte wechseln" })
     ).toHaveAttribute("href", "/settings/maps/change");
@@ -170,10 +209,8 @@ test.describe("permission-aware navigation", () => {
   test("selects only the current app entry", async ({ page }) => {
     await openDemoPage(page, "/apps/discord-report-bot");
 
-    const navigation = page.getByRole("navigation", {
-      name: "Hauptnavigation",
-    });
-    await navigation.getByRole("button", { name: "Apps einrichten" }).click();
+    const navigation = page.getByTestId("desktop-navigation-panel");
+    await expect(navigation).toBeVisible();
 
     const frontlineApp = navigation.getByRole("link", {
       name: "Frontline App",
@@ -192,30 +229,76 @@ test.describe("permission-aware navigation", () => {
 test.describe("task-oriented mobile navigation", () => {
   test.use({ viewport: VIEWPORTS.mobile });
 
-  test("keeps the task groups usable in the full-width drawer", async ({
+  test("uses the operations hub as the mobile start destination", async ({
+    page,
+  }) => {
+    await openDemoPage(page, "/");
+
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("heading", { name: "Betrieb" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Betrieb" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+  });
+
+  test("uses the same compact workspace index on mobile", async ({ page }) => {
+    await openDemoPage(page, "/views/live");
+    await page.getByRole("button", { name: "Navigation öffnen" }).click();
+
+    const navigation = page.getByTestId("mobile-command-navigation");
+    await expect(navigation).toBeVisible();
+    await expect(page.getByTestId("global-server-switcher")).toBeVisible();
+    await expect(navigation.getByTestId("global-server-switcher")).toHaveCount(
+      0
+    );
+    await expect(
+      navigation.getByPlaceholder("Navigation durchsuchen …")
+    ).toHaveCount(0);
+    await expect(
+      navigation.getByRole("heading", { name: "Live-Betrieb" })
+    ).toBeVisible();
+    await expect(
+      navigation.getByRole("link", { name: "Live-Ansicht" })
+    ).toHaveCSS("border-radius", "0px");
+  });
+
+  test("switches workspaces and closes after mobile navigation", async ({
     page,
   }) => {
     await openDemoPage(page, "/");
     await page.getByRole("button", { name: "Navigation öffnen" }).click();
 
-    const navigation = page.getByRole("navigation", {
-      name: "Hauptnavigation",
+    const navigation = page.getByTestId("mobile-command-navigation");
+    const moderation = navigation.getByRole("button", {
+      name: "Moderation",
+      exact: true,
     });
-    const playersGroup = navigation.getByRole("button", {
-      name: "Spieler & Moderation",
-    });
-    await expect(playersGroup).toBeVisible();
-    await expect(playersGroup).toHaveCSS("min-height", "44px");
-    await playersGroup.click();
+    await moderation.click();
     await expect(
       navigation.getByRole("link", { name: "Spieler" })
     ).toBeVisible();
 
     await navigation
-      .getByRole("button", { name: "Karten & Spielbetrieb" })
+      .getByRole("button", { name: "Spielbetrieb", exact: true })
       .click();
-    await expect(
-      navigation.getByRole("link", { name: "Karte wechseln" })
-    ).toBeVisible();
+    const changeMap = navigation.getByRole("link", {
+      name: "Karte wechseln",
+    });
+    await expect(changeMap).toBeVisible();
+    await changeMap.click();
+    await expect(page).toHaveURL(/\/settings\/maps\/change$/);
+    await expect(page.getByTestId("mobile-command-navigation")).toHaveCount(0);
+  });
+
+  test("provides a clear parent route on mobile detail pages", async ({
+    page,
+  }) => {
+    await openDemoPage(page, "/stats/games/fln-demo-1");
+
+    await expect(page.getByTestId("mobile-route-back")).toHaveAttribute(
+      "href",
+      "/stats/games"
+    );
   });
 });

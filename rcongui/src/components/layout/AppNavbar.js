@@ -13,18 +13,20 @@ import FrontlineBrand from "./FrontlineBrand";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import MobileBottomNavigation from "./MobileBottomNavigation";
+import { getContextNavigationSurface } from "./navigation/navigation-surfaces";
 
 const Toolbar = styled(MuiToolbar)({
   width: "100%",
-  paddingTop: "8px",
-  paddingBottom: "8px",
+  minHeight: "108px !important",
+  paddingTop: "6px",
+  paddingBottom: "6px",
   paddingLeft: "calc(12px + env(safe-area-inset-left))",
   paddingRight: "calc(12px + env(safe-area-inset-right))",
   display: "flex",
   flexDirection: "column",
   alignItems: "start",
   justifyContent: "center",
-  gap: "8px",
+  gap: "6px",
   flexShrink: 0,
   [`& ${tabsClasses.flexContainer}`]: {
     gap: "8px",
@@ -39,15 +41,14 @@ const AppNavbarBase = ({ toggleDrawer, open, isSmallScreen }) => {
   return (
     <AppBar
       position="fixed"
-      sx={{
-        display: { xs: "auto", lg: "none" },
+      sx={(theme) => ({
+        display: { xs: "auto", md: "none" },
         boxShadow: 0,
-        bgcolor: "background.paper",
-        backgroundImage: "none",
+        ...getContextNavigationSurface(theme),
         borderBottom: "1px solid",
         borderColor: "divider",
         pt: "env(safe-area-inset-top)",
-      }}
+      })}
     >
       <Toolbar variant="regular">
         <Stack
@@ -58,7 +59,11 @@ const AppNavbarBase = ({ toggleDrawer, open, isSmallScreen }) => {
             width: "100%",
           }}
         >
-          <MenuButton aria-label={t("navigation.openMenu")} onClick={toggleDrawer}>
+          <MenuButton
+            aria-label={t("navigation.openMenu")}
+            onClick={toggleDrawer}
+            sx={{ borderRadius: "0 !important" }}
+          >
             <MenuRoundedIcon />
           </MenuButton>
           <FrontlineBrand compact />
@@ -86,7 +91,7 @@ export default function AppNavbar() {
   const [openDrawer, setOpenDrawer] = useState(false);
   const toggleDrawer = () => setOpenDrawer((current) => !current);
   const theme = useTheme();
-  const isSmallScreen = useMediaQuery(theme.breakpoints.down("lg"));
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down("md"));
 
   return (
     <>

@@ -5,8 +5,11 @@ import {
   Button,
   Chip,
   Collapse,
+  Divider,
+  Drawer,
   FormControl,
   FormControlLabel,
+  IconButton,
   InputAdornment,
   InputLabel,
   MenuItem,
@@ -15,10 +18,12 @@ import {
   Switch,
   TextField,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import TuneIcon from "@mui/icons-material/Tune";
 import FilterAltOffIcon from "@mui/icons-material/FilterAltOff";
+import CloseIcon from "@mui/icons-material/Close";
 import { DesktopDateTimePicker } from "@mui/x-date-pickers/DesktopDateTimePicker";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -30,6 +35,7 @@ import { logActions } from "@/utils/lib";
 import { EVENT_CATEGORIES, getCategoryCounts } from "./event-utils";
 
 const actionOptions = Object.keys(logActions).map((name) => ({ name }));
+const formId = "game-log-filter-form";
 
 const getPresetDates = (preset, logs) => {
   const now = dayjs();
@@ -77,9 +83,11 @@ export default function GameLogsFilters({
 }) {
   const { t } = useTranslation();
   const navigation = useNavigation();
+  const isMobile = useMediaQuery("(max-width: 599px)");
   const server = useGlobalStore((state) => state.serverState);
   const otherServers = useGlobalStore((state) => state.servers);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [formFields, setFormFields] = useState({
     player_query: fields.player_id || fields.player_name || "",
     action: fields.action || "",
@@ -109,6 +117,16 @@ export default function GameLogsFilters({
   const selectedServer = serverOptions.find(
     (option) => option.value === String(formFields.server_filter)
   );
+  const activeFilterCount = [
+    category !== "all",
+    formFields.time_preset !== "all",
+    Boolean(formFields.server_filter),
+    Boolean(formFields.action),
+    formFields.exact_player,
+    formFields.exact_action,
+    Number(formFields.limit) !== 500,
+    formFields.time_sort !== "desc",
+  ].filter(Boolean).length;
 
   const updateField = (name, value) => {
     setFormFields((current) => ({ ...current, [name]: value }));
@@ -122,7 +140,7 @@ export default function GameLogsFilters({
       time_preset: preset,
       ...(dates || {}),
     }));
-    if (preset === "custom") setAdvancedOpen(true);
+    if (preset === "custom" && !isMobile) setAdvancedOpen(true);
   };
 
   const handleClear = () => {
@@ -139,18 +157,194 @@ export default function GameLogsFilters({
       time_preset: "all",
     });
     setAdvancedOpen(false);
+    setMobileFiltersOpen(false);
     onCategoryChange("all");
     onReset();
   };
 
+  const timeRangeControl = (
+    <FormControl size="small" fullWidth>
+      <InputLabel id="game-log-time-preset-label">
+        {t("records.gameLogs.timeline.timeRange")}
+      </InputLabel>
+      <Select
+        labelId="game-log-time-preset-label"
+        value={formFields.time_preset}
+        label={t("records.gameLogs.timeline.timeRange")}
+        onChange={handlePresetChange}
+      >
+        <MenuItem value="last_round">
+          {t("records.gameLogs.timeline.lastRound")}
+        </MenuItem>
+        <MenuItem value="1h">
+          {t("records.gameLogs.timeline.lastHour")}
+        </MenuItem>
+        <MenuItem value="6h">
+          {t("records.gameLogs.timeline.lastSixHours")}
+        </MenuItem>
+        <MenuItem value="24h">
+          {t("records.gameLogs.timeline.lastDay")}
+        </MenuItem>
+        <MenuItem value="all">
+          {t("records.gameLogs.timeline.allTime")}
+        </MenuItem>
+        <MenuItem value="custom">
+          {t("records.gameLogs.timeline.customRange")}
+        </MenuItem>
+      </Select>
+    </FormControl>
+  );
+
+  const serverControl = (
+    <FormControl size="small" fullWidth>
+      <InputLabel id="game-log-server-label">
+        {t("records.gameLogs.server")}
+      </InputLabel>
+      <Select
+        labelId="game-log-server-label"
+        value={formFields.server_filter}
+        onChange={(event) => updateField("server_filter", event.target.value)}
+        label={t("records.gameLogs.server")}
+      >
+        <MenuItem value="">{t("records.gameLogs.allServers")}</MenuItem>
+        {serverOptions.map((option) => (
+          <MenuItem key={option.value} value={option.value}>
+            {option.label}
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
+  );
+
+  const advancedControls = (
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "repeat(2, minmax(0, 1fr))",
+            xl: "repeat(4, minmax(0, 1fr))",
+          },
+          gap: 1,
+        }}
+      >
+        <Stack spacing={0.5}>
+          <Autocomplete
+            freeSolo
+            options={actionOptions}
+            getOptionLabel={(option) =>
+              typeof option === "string" ? option : option.name
+            }
+            value={
+              actionOptions.find(
+                (option) => option.name === formFields.action
+              ) ||
+              formFields.action ||
+              null
+            }
+            onChange={(event, value) =>
+              updateField(
+                "action",
+                typeof value === "string" ? value : value?.name || ""
+              )
+            }
+            onInputChange={(event, value, reason) => {
+              if (reason === "input") updateField("action", value);
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                size="small"
+                label={t("records.gameLogs.action")}
+              />
+            )}
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                size="small"
+                checked={formFields.exact_action}
+                onChange={(event) =>
+                  updateField("exact_action", event.target.checked)
+                }
+              />
+            }
+            label={t("records.gameLogs.timeline.exactAction")}
+          />
+        </Stack>
+
+        <Stack spacing={0.5}>
+          <TextField
+            size="small"
+            type="number"
+            label={t("records.gameLogs.timeline.maxLoaded")}
+            value={formFields.limit}
+            inputProps={{ min: 1, max: 5000 }}
+            onChange={(event) => updateField("limit", event.target.value)}
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                size="small"
+                checked={formFields.exact_player}
+                onChange={(event) =>
+                  updateField("exact_player", event.target.checked)
+                }
+              />
+            }
+            label={t("records.gameLogs.timeline.exactPlayer")}
+          />
+        </Stack>
+
+        <DesktopDateTimePicker
+          value={formFields.from}
+          label={t("records.gameLogs.from")}
+          onChange={(value) => {
+            updateField("from", value);
+            updateField("time_preset", "custom");
+          }}
+          format="YYYY/MM/DD HH:mm"
+          ampm={false}
+          slotProps={{ textField: { size: "small", fullWidth: true } }}
+        />
+        <DesktopDateTimePicker
+          value={formFields.till}
+          label={t("records.gameLogs.until")}
+          onChange={(value) => {
+            updateField("till", value);
+            updateField("time_preset", "custom");
+          }}
+          format="YYYY/MM/DD HH:mm"
+          ampm={false}
+          slotProps={{ textField: { size: "small", fullWidth: true } }}
+        />
+        <FormControl size="small">
+          <InputLabel id="game-log-sort-label">
+            {t("records.gameLogs.sort")}
+          </InputLabel>
+          <Select
+            labelId="game-log-sort-label"
+            value={formFields.time_sort}
+            onChange={(event) => updateField("time_sort", event.target.value)}
+            label={t("records.gameLogs.sort")}
+          >
+            <MenuItem value="desc">{t("records.gameLogs.newest")}</MenuItem>
+            <MenuItem value="asc">{t("records.gameLogs.oldest")}</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
+    </LocalizationProvider>
+  );
+
   return (
-    <Form onSubmit={onSubmit}>
+    <Form id={formId} onSubmit={onSubmit}>
       <Box sx={filterShellSx}>
         <Box
           sx={{
             display: "grid",
             gridTemplateColumns: {
-              xs: "1fr",
+              xs: "minmax(0, 1fr) auto",
               sm: "minmax(220px, 1.5fr) minmax(170px, .8fr)",
               lg: "minmax(260px, 1.4fr) minmax(180px, .8fr) minmax(190px, 1fr) auto auto",
             },
@@ -165,6 +359,7 @@ export default function GameLogsFilters({
             onChange={(event) =>
               updateField("player_query", event.target.value)
             }
+            label={t("records.gameLogs.timeline.playerSearch")}
             placeholder={t("records.gameLogs.timeline.playerSearch")}
             size="small"
             InputProps={{
@@ -176,136 +371,127 @@ export default function GameLogsFilters({
             }}
           />
 
-          <FormControl size="small">
-            <InputLabel id="game-log-time-preset-label">
-              {t("records.gameLogs.timeline.timeRange")}
-            </InputLabel>
-            <Select
-              labelId="game-log-time-preset-label"
-              value={formFields.time_preset}
-              label={t("records.gameLogs.timeline.timeRange")}
-              onChange={handlePresetChange}
+          {isMobile ? (
+            <Button
+              type="button"
+              variant="outlined"
+              startIcon={<TuneIcon />}
+              onClick={() => setMobileFiltersOpen(true)}
+              aria-haspopup="dialog"
+              sx={{ minWidth: 104, px: 1.5 }}
             >
-              <MenuItem value="last_round">
-                {t("records.gameLogs.timeline.lastRound")}
-              </MenuItem>
-              <MenuItem value="1h">
-                {t("records.gameLogs.timeline.lastHour")}
-              </MenuItem>
-              <MenuItem value="6h">
-                {t("records.gameLogs.timeline.lastSixHours")}
-              </MenuItem>
-              <MenuItem value="24h">
-                {t("records.gameLogs.timeline.lastDay")}
-              </MenuItem>
-              <MenuItem value="all">
-                {t("records.gameLogs.timeline.allTime")}
-              </MenuItem>
-              <MenuItem value="custom">
-                {t("records.gameLogs.timeline.customRange")}
-              </MenuItem>
-            </Select>
-          </FormControl>
-
-          <FormControl size="small">
-            <InputLabel id="game-log-server-label">
-              {t("records.gameLogs.server")}
-            </InputLabel>
-            <Select
-              labelId="game-log-server-label"
-              name="server_filter"
-              value={formFields.server_filter}
-              onChange={(event) =>
-                updateField("server_filter", event.target.value)
-              }
-              label={t("records.gameLogs.server")}
-            >
-              <MenuItem value="">{t("records.gameLogs.allServers")}</MenuItem>
-              {serverOptions.map((option) => (
-                <MenuItem key={option.value} value={option.value}>
-                  {option.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <Button
-            type="submit"
-            variant="contained"
-            disabled={navigation.state === "loading"}
-            sx={{ minHeight: 40, px: 2.5 }}
-          >
-            {navigation.state === "loading"
-              ? t("records.gameLogs.timeline.filtering")
-              : t("records.gameLogs.timeline.filter")}
-          </Button>
-          <Button
-            type="button"
-            variant="outlined"
-            startIcon={<TuneIcon />}
-            onClick={() => setAdvancedOpen((open) => !open)}
-            aria-expanded={advancedOpen}
-            sx={{ minHeight: 40, px: 2 }}
-          >
-            {t("records.gameLogs.timeline.advanced")}
-          </Button>
-        </Box>
-
-        <Box
-          role="tablist"
-          aria-label={t("records.gameLogs.timeline.eventCategories")}
-          sx={{
-            display: "flex",
-            overflowX: "auto",
-            borderTop: "1px solid",
-            borderColor: "divider",
-            scrollbarWidth: "thin",
-          }}
-        >
-          {EVENT_CATEGORIES.map((item) => {
-            const selected = category === item.id;
-            return (
+              {t("records.gameLogs.timeline.filter")}
+              {activeFilterCount ? ` · ${activeFilterCount}` : ""}
+            </Button>
+          ) : (
+            <>
+              {timeRangeControl}
+              {serverControl}
               <Button
-                key={item.id}
-                role="tab"
-                aria-selected={selected}
-                onClick={() => onCategoryChange(item.id)}
-                color="inherit"
-                sx={{
-                  minWidth: "max-content",
-                  minHeight: 42,
-                  px: 2,
-                  borderBottom: "2px solid",
-                  borderBottomColor: selected ? "primary.main" : "transparent",
-                  color: selected ? "text.primary" : "text.secondary",
-                  bgcolor: selected ? "action.selected" : "transparent",
-                }}
+                type="submit"
+                variant="contained"
+                disabled={navigation.state === "loading"}
+                sx={{ minHeight: 40, px: 2.5 }}
               >
-                {t(`records.gameLogs.timeline.categories.${item.labelKey}`)}
-                <Typography
-                  component="span"
-                  variant="caption"
-                  sx={{ ml: 0.75, color: "inherit" }}
-                >
-                  {categoryCounts[item.id] || 0}
-                </Typography>
+                {navigation.state === "loading"
+                  ? t("records.gameLogs.timeline.filtering")
+                  : t("records.gameLogs.timeline.filter")}
               </Button>
-            );
-          })}
+              <Button
+                type="button"
+                variant="outlined"
+                startIcon={<TuneIcon />}
+                onClick={() => setAdvancedOpen((open) => !open)}
+                aria-expanded={advancedOpen}
+                sx={{ minHeight: 40, px: 2 }}
+              >
+                {t("records.gameLogs.timeline.advanced")}
+              </Button>
+            </>
+          )}
         </Box>
+
+        {isMobile ? (
+          <Box sx={{ p: 1, pt: 0, display: "grid", gap: 0.75 }}>
+            <FormControl size="small" fullWidth>
+              <InputLabel id="game-log-mobile-category-label">
+                {t("records.gameLogs.timeline.eventCategories")}
+              </InputLabel>
+              <Select
+                labelId="game-log-mobile-category-label"
+                value={category}
+                label={t("records.gameLogs.timeline.eventCategories")}
+                onChange={(event) => onCategoryChange(event.target.value)}
+              >
+                {EVENT_CATEGORIES.map((item) => (
+                  <MenuItem key={item.id} value={item.id}>
+                    {t(`records.gameLogs.timeline.categories.${item.labelKey}`)}{" "}
+                    ({categoryCounts[item.id] || 0})
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+        ) : (
+          <Box
+            role="tablist"
+            aria-label={t("records.gameLogs.timeline.eventCategories")}
+            sx={{
+              display: "flex",
+              overflowX: "auto",
+              borderTop: "1px solid",
+              borderColor: "divider",
+              scrollbarWidth: "thin",
+            }}
+          >
+            {EVENT_CATEGORIES.map((item) => {
+              const selected = category === item.id;
+              return (
+                <Button
+                  key={item.id}
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => onCategoryChange(item.id)}
+                  color="inherit"
+                  sx={{
+                    minWidth: "max-content",
+                    minHeight: 42,
+                    px: 2,
+                    borderBottom: "2px solid",
+                    borderBottomColor: selected
+                      ? "primary.main"
+                      : "transparent",
+                    color: selected ? "text.primary" : "text.secondary",
+                    bgcolor: selected ? "action.selected" : "transparent",
+                  }}
+                >
+                  {t(`records.gameLogs.timeline.categories.${item.labelKey}`)}
+                  <Typography
+                    component="span"
+                    variant="caption"
+                    sx={{ ml: 0.75, color: "inherit" }}
+                  >
+                    {categoryCounts[item.id] || 0}
+                  </Typography>
+                </Button>
+              );
+            })}
+          </Box>
+        )}
 
         <Stack
           direction="row"
           alignItems="center"
           spacing={0.75}
           useFlexGap
-          flexWrap="wrap"
+          flexWrap={isMobile ? "nowrap" : "wrap"}
           sx={{
             minHeight: 42,
             px: 1,
             py: 0.75,
             borderTop: "1px solid",
             borderColor: "divider",
+            overflowX: isMobile ? "auto" : "visible",
           }}
         >
           <Chip
@@ -331,150 +517,123 @@ export default function GameLogsFilters({
             />
           )}
           <Box sx={{ flexGrow: 1 }} />
-          <Button
-            type="button"
-            size="small"
-            color="inherit"
-            startIcon={<FilterAltOffIcon />}
-            onClick={handleClear}
-            sx={{ color: "text.secondary" }}
-          >
-            {t("records.gameLogs.timeline.clearAll")}
-          </Button>
+          {isMobile ? (
+            <IconButton
+              size="small"
+              color="inherit"
+              onClick={handleClear}
+              aria-label={t("records.gameLogs.timeline.clearAll")}
+              sx={{ color: "text.secondary", flexShrink: 0, borderRadius: 0 }}
+            >
+              <FilterAltOffIcon fontSize="small" />
+            </IconButton>
+          ) : (
+            <Button
+              type="button"
+              size="small"
+              color="inherit"
+              startIcon={<FilterAltOffIcon />}
+              onClick={handleClear}
+              sx={{ color: "text.secondary", flexShrink: 0 }}
+            >
+              {t("records.gameLogs.timeline.clearAll")}
+            </Button>
+          )}
         </Stack>
 
-        <Collapse in={advancedOpen}>
-          <LocalizationProvider dateAdapter={AdapterDayjs}>
+        {!isMobile && (
+          <Collapse in={advancedOpen}>
             <Box
               sx={{
-                display: "grid",
-                gridTemplateColumns: {
-                  xs: "1fr",
-                  sm: "repeat(2, minmax(0, 1fr))",
-                  xl: "repeat(4, minmax(0, 1fr))",
-                },
-                gap: 1,
                 p: 1,
                 borderTop: "1px solid",
                 borderColor: "divider",
                 bgcolor: "background.default",
               }}
             >
-              <Stack spacing={0.5}>
-                <Autocomplete
-                  freeSolo
-                  options={actionOptions}
-                  getOptionLabel={(option) =>
-                    typeof option === "string" ? option : option.name
-                  }
-                  value={
-                    actionOptions.find(
-                      (option) => option.name === formFields.action
-                    ) ||
-                    formFields.action ||
-                    null
-                  }
-                  onChange={(event, value) =>
-                    updateField(
-                      "action",
-                      typeof value === "string" ? value : value?.name || ""
-                    )
-                  }
-                  onInputChange={(event, value, reason) => {
-                    if (reason === "input") updateField("action", value);
-                  }}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      size="small"
-                      label={t("records.gameLogs.action")}
-                    />
-                  )}
-                />
-                <FormControlLabel
-                  control={
-                    <Switch
-                      size="small"
-                      checked={formFields.exact_action}
-                      onChange={(event) =>
-                        updateField("exact_action", event.target.checked)
-                      }
-                    />
-                  }
-                  label={t("records.gameLogs.timeline.exactAction")}
-                />
-              </Stack>
-
-              <Stack spacing={0.5}>
-                <TextField
-                  size="small"
-                  type="number"
-                  label={t("records.gameLogs.timeline.maxLoaded")}
-                  value={formFields.limit}
-                  inputProps={{ min: 1, max: 5000 }}
-                  onChange={(event) => updateField("limit", event.target.value)}
-                />
-                <FormControlLabel
-                  control={
-                    <Switch
-                      size="small"
-                      checked={formFields.exact_player}
-                      onChange={(event) =>
-                        updateField("exact_player", event.target.checked)
-                      }
-                    />
-                  }
-                  label={t("records.gameLogs.timeline.exactPlayer")}
-                />
-              </Stack>
-
-              <DesktopDateTimePicker
-                value={formFields.from}
-                label={t("records.gameLogs.from")}
-                onChange={(value) => {
-                  updateField("from", value);
-                  updateField("time_preset", "custom");
-                }}
-                format="YYYY/MM/DD HH:mm"
-                ampm={false}
-                slotProps={{ textField: { size: "small", fullWidth: true } }}
-              />
-              <DesktopDateTimePicker
-                value={formFields.till}
-                label={t("records.gameLogs.until")}
-                onChange={(value) => {
-                  updateField("till", value);
-                  updateField("time_preset", "custom");
-                }}
-                format="YYYY/MM/DD HH:mm"
-                ampm={false}
-                slotProps={{ textField: { size: "small", fullWidth: true } }}
-              />
-              <FormControl size="small">
-                <InputLabel id="game-log-sort-label">
-                  {t("records.gameLogs.sort")}
-                </InputLabel>
-                <Select
-                  labelId="game-log-sort-label"
-                  value={formFields.time_sort}
-                  onChange={(event) =>
-                    updateField("time_sort", event.target.value)
-                  }
-                  label={t("records.gameLogs.sort")}
-                >
-                  <MenuItem value="desc">
-                    {t("records.gameLogs.newest")}
-                  </MenuItem>
-                  <MenuItem value="asc">
-                    {t("records.gameLogs.oldest")}
-                  </MenuItem>
-                </Select>
-              </FormControl>
+              {advancedControls}
             </Box>
-          </LocalizationProvider>
-        </Collapse>
+          </Collapse>
+        )}
       </Box>
 
+      <Drawer
+        anchor="bottom"
+        open={isMobile && mobileFiltersOpen}
+        onClose={() => setMobileFiltersOpen(false)}
+        PaperProps={{
+          role: "dialog",
+          "aria-label": t("records.gameLogs.timeline.filter"),
+          sx: {
+            maxHeight: "92dvh",
+            bgcolor: "background.default",
+            borderTop: "1px solid",
+            borderColor: "divider",
+            borderRadius: 0,
+          },
+        }}
+      >
+        <Stack
+          direction="row"
+          alignItems="center"
+          sx={{
+            px: 1.5,
+            minHeight: 52,
+            borderBottom: "1px solid",
+            borderColor: "divider",
+          }}
+        >
+          <Box>
+            <Typography variant="overline" color="primary.main">
+              {t("records.gameLogs.timeline.eventCategories")}
+            </Typography>
+            <Typography variant="h6">
+              {t("records.gameLogs.timeline.filter")}
+            </Typography>
+          </Box>
+          <Box sx={{ flexGrow: 1 }} />
+          <IconButton
+            onClick={() => setMobileFiltersOpen(false)}
+            aria-label={t("common.close")}
+            sx={{ borderRadius: 0 }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </Stack>
+        <Stack spacing={1.25} sx={{ p: 1.5, overflowY: "auto" }}>
+          {timeRangeControl}
+          {serverControl}
+          <Divider />
+          {advancedControls}
+        </Stack>
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ p: 1.5, borderTop: "1px solid", borderColor: "divider" }}
+        >
+          <Button variant="outlined" onClick={handleClear} fullWidth>
+            {t("records.gameLogs.timeline.clearAll")}
+          </Button>
+          <Button
+            type="submit"
+            form={formId}
+            variant="contained"
+            disabled={navigation.state === "loading"}
+            onClick={() => setMobileFiltersOpen(false)}
+            fullWidth
+          >
+            {navigation.state === "loading"
+              ? t("records.gameLogs.timeline.filtering")
+              : t("records.gameLogs.timeline.filter")}
+          </Button>
+        </Stack>
+      </Drawer>
+
+      <input
+        type="hidden"
+        name="server_filter"
+        value={formFields.server_filter}
+      />
       <input type="hidden" name="action" value={formFields.action} />
       <input type="hidden" name="limit" value={formFields.limit} />
       <input type="hidden" name="time_sort" value={formFields.time_sort} />

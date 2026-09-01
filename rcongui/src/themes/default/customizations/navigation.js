@@ -62,7 +62,9 @@ export const navigationCustomizations = ({ gray }) => ({
         borderRadius: theme.shape.borderRadius,
         padding: '6px 8px',
         [`&.${menuItemClasses.focusVisible}`]: {
-          backgroundColor: 'transparent',
+          backgroundColor: theme.palette.action.focus,
+          outline: `2px solid ${alpha(theme.palette.primary.main, 0.72)}`,
+          outlineOffset: -2,
         },
         [`&.${menuItemClasses.selected}`]: {
           [`&.${menuItemClasses.focusVisible}`]: {
@@ -122,6 +124,7 @@ export const navigationCustomizations = ({ gray }) => ({
         [`&.${selectClasses.focused}`]: {
           outlineOffset: 0,
           borderColor: theme.palette.primary.main,
+          boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.34)}`,
         },
         '&:before, &:after': {
           display: 'none',
@@ -138,7 +141,8 @@ export const navigationCustomizations = ({ gray }) => ({
           },
           [`&.${selectClasses.focused}`]: {
             outlineOffset: 0,
-            borderColor: gray[900],
+            borderColor: theme.palette.primary.main,
+            boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.34)}`,
           },
           '&:before, &:after': {
             display: 'none',
@@ -243,6 +247,8 @@ export const navigationCustomizations = ({ gray }) => ({
         },
         '&.Mui-focusVisible': {
           backgroundColor: theme.palette.action.focus,
+          outline: `2px solid ${alpha(theme.palette.primary.main, 0.72)}`,
+          outlineOffset: -2,
         },
         ...theme.applyStyles('dark', {
           ':hover': {

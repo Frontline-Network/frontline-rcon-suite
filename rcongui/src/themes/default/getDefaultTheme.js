@@ -1,10 +1,12 @@
 import {
   dataDisplayCustomizations,
   feedbackCustomizations,
+  foundationCustomizations,
   navigationCustomizations,
   surfacesCustomizations,
   // inputsCustomizations,
 } from "./customizations";
+import { FRONTLINE_GEOMETRY } from "../foundation.mjs";
 
 async function getColorPrimitives(schemeName) {
   switch (schemeName) {
@@ -31,6 +33,7 @@ export default async function getDefaultTheme(themeComponents, selectedScheme = 
     typography,
     shadows,
     shape,
+    geometry,
     colorSchemes,
   } = await getColorPrimitives(selectedScheme);
 
@@ -47,11 +50,13 @@ export default async function getDefaultTheme(themeComponents, selectedScheme = 
     typography,
     shadows,
     shape,
+    frontline: { geometry: geometry ?? FRONTLINE_GEOMETRY },
     components: {
       ...dataDisplayCustomizations(colors),
       ...feedbackCustomizations(colors),
       ...navigationCustomizations(colors),
       ...surfacesCustomizations(colors),
+      ...foundationCustomizations(colors),
       // This needs to be worked on
       // ...inputsCustomizations(colors),
       ...themeComponents,

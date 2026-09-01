@@ -93,6 +93,14 @@ export const ADMIN_ACTION_CONTRACTS = Object.freeze({
     scope: ADMIN_ACTION_SCOPE.CURRENT_SERVER,
     reviewFields: ["scope"],
   }),
+  execute_autobalancer_squad_switch: contract({
+    command: "execute_autobalancer_squad_switch",
+    risk: ADMIN_ACTION_RISK.CRITICAL,
+    reversibility: ADMIN_ACTION_REVERSIBILITY.LIMITED,
+    scope: ADMIN_ACTION_SCOPE.CURRENT_SERVER,
+    confirmation: ADMIN_ACTION_CONFIRMATION.SECOND,
+    reviewFields: ["squads", "members", "target_team", "scope"],
+  }),
   switch_player_on_death: contract({
     command: "switch_player_on_death",
     risk: ADMIN_ACTION_RISK.MEDIUM,

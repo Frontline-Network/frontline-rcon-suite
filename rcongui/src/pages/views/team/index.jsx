@@ -47,7 +47,7 @@ import BattleSummary from "./battle-summary";
 import { LobbyContainer, TeamContainer } from "./styled";
 import { TeamSection, UNASSIGNED } from "./team-section";
 
-const FILTERS = ["all", "issues", "noLeader", "unassigned"];
+const FILTERS = ["all", "issues", "noLeader", "overCapacity", "unassigned"];
 
 const PRIMARY_SELECTION_ACTIONS = [
   { action: Actions.SendMessage, labelKey: "message" },
@@ -118,6 +118,7 @@ const TeamViewPage = () => {
   const [roleFilter, setRoleFilter] = useState("all");
   const [squadFilter, setSquadFilter] = useState("all");
   const [activeTeam, setActiveTeam] = useState("allies");
+  const [autobalancerHighlights, setAutobalancerHighlights] = useState({});
   const [playerActionMenu, setPlayerActionMenu] = useState({
     anchorEl: null,
     player: null,
@@ -297,6 +298,7 @@ const TeamViewPage = () => {
           playerActionMenu.anchorEl ? playerActionMenu.player?.player_id : null
         }
         onOpenPlayerActionMenu={openPlayerActionMenu}
+        highlightedPlayers={autobalancerHighlights}
       />
     );
   };
@@ -322,7 +324,10 @@ const TeamViewPage = () => {
       />
 
       <BattleSummary gameData={gameData} teams={summaryTeams} />
-      <AutobalancerCard />
+      <AutobalancerCard
+        teams={teams}
+        onHighlightPlayers={setAutobalancerHighlights}
+      />
 
       <StickyContainer
         sx={{

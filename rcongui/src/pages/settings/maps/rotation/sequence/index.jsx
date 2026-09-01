@@ -59,6 +59,8 @@ function MapSequenceBuilder() {
         isSaveDisabled={isPending}
         selectedMapListProps={{
           title: t("maps.sequence"),
+          description: t("maps.rotationWorkbench.sequenceDraftDescription"),
+          saveLabel: t("maps.rotationWorkbench.publishSequence"),
           emptyTitle: t("maps.noMapsInSequence"),
           emptyDescription: t("maps.addMapsToSequence"),
           removeTooltip: t("maps.removeFromSequence"),

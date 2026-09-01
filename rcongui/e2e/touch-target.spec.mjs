@@ -44,12 +44,10 @@ test("the mobile app shell stays within a 320px viewport and keeps navigation av
     .toBe(true);
 
   await page.getByRole("button", { name: "Navigation öffnen" }).click();
-  const navigation = page.getByRole("navigation", {
-    name: "Hauptnavigation",
-  });
+  const navigation = page.getByTestId("mobile-command-navigation");
   await expect(navigation).toBeVisible();
   await expect(
-    navigation.getByRole("button", { name: "Spieler & Moderation" })
+    navigation.getByRole("button", { name: "Moderation" })
   ).toBeVisible();
   await expect
     .poll(() =>
@@ -67,23 +65,25 @@ test("important mobile navigation controls meet the 44px target size", async ({
   await openDemoPage(page, "/");
 
   const menuButton = page.getByRole("button", { name: "Navigation öffnen" });
+  const serverSwitcher = page
+    .getByTestId("global-server-switcher")
+    .filter({ visible: true })
+    .first();
   await expectMinimumTouchTarget(menuButton, "mobile menu button");
+  await expectMinimumTouchTarget(serverSwitcher, "server selector");
   await menuButton.click();
 
+  const navigation = page.getByTestId("mobile-command-navigation");
   await expectMinimumTouchTarget(
-    page.getByRole("combobox", { name: "Server auswählen" }),
-    "server selector"
+    navigation.getByRole("button", { name: "Übersicht" }),
+    "overview workspace"
   );
   await expectMinimumTouchTarget(
-    page.getByRole("link", { name: "Übersicht" }),
-    "overview link"
-  );
-  await expectMinimumTouchTarget(
-    page.getByRole("button", { name: "Schließen" }),
+    navigation.getByRole("button", { name: "Schließen" }),
     "drawer close button"
   );
   await expectMinimumTouchTarget(
-    page.getByRole("button", { name: "Sprache" }),
+    navigation.getByRole("button", { name: "Sprache" }),
     "language button"
   );
 });

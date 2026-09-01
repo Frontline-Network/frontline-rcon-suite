@@ -350,7 +350,7 @@ export default function LiveSessionsPage() {
                 const id = event.target.value;
                 setSorting([{ id, desc: id !== "name" }]);
               }}
-              aria-label={t("stats.liveSessions.sorting")}
+              inputProps={{ "aria-label": t("stats.liveSessions.sorting") }}
               sx={{ borderRadius: 0 }}
             >
               <MenuItem value="kdr">{t("stats.liveSessions.sortKdr")}</MenuItem>
@@ -571,7 +571,9 @@ export default function LiveSessionsPage() {
                   onChange={(event) =>
                     table.setPageSize(Number(event.target.value))
                   }
-                  aria-label={t("common.pagination.pageSize")}
+                  inputProps={{
+                    "aria-label": t("common.pagination.pageSize"),
+                  }}
                   sx={{ borderRadius: 0 }}
                 >
                   {[16, 25, 50, 100].map((size) => (

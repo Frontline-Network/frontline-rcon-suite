@@ -1,11 +1,12 @@
 import { alpha } from '@mui/material/styles';
+import { FRONTLINE_GEOMETRY } from '../../foundation.mjs';
 
 /* eslint-disable import/prefer-default-export */
 export const feedbackCustomizations = ({ orange, gray }) => ({
   MuiAlert: {
     styleOverrides: {
       root: ({ theme, ownerState }) => ({
-        borderRadius: 10,
+        borderRadius: FRONTLINE_GEOMETRY.radius.control,
         ...(ownerState.severity === 'warning' && {
           backgroundColor: orange[100],
           color: theme.palette.text.primary,
@@ -25,6 +26,7 @@ export const feedbackCustomizations = ({ orange, gray }) => ({
     styleOverrides: {
       root: ({ theme }) => ({
         '& .MuiDialog-paper': {
+          borderRadius: FRONTLINE_GEOMETRY.radius.overlay,
           border: '1px solid',
           borderColor: theme.palette.divider,
         },

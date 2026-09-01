@@ -159,7 +159,10 @@ test.describe("live player density and details", () => {
   test("keeps players in page flow and isolates log scrolling in split mode", async ({
     page,
   }) => {
+    await page.setViewportSize({ width: 1920, height: 1000 });
     await openDemoPage(page, "/views/live");
+
+    await page.getByRole("button", { name: "Geteilt" }).click();
 
     const playersPanel = page.getByTestId("live-players-panel");
     const logsPanel = page.getByTestId("live-logs-panel");

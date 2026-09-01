@@ -197,7 +197,10 @@ export default function AuditLogsPage() {
             <Typography
               variant="caption"
               color="text.secondary"
-              sx={{ whiteSpace: "nowrap" }}
+              sx={{
+                whiteSpace: "nowrap",
+                display: { xs: "none", sm: "block" },
+              }}
             >
               {t("records.auditLogs.totalEntries", { count: total_entries })}
             </Typography>
@@ -206,6 +209,7 @@ export default function AuditLogsPage() {
               startIcon={<DownloadIcon />}
               onClick={() => downloadLogs(audit_logs)}
               disabled={!audit_logs.length}
+              size="small"
               sx={{ borderRadius: 0, whiteSpace: "nowrap" }}
             >
               {t("records.auditLogs.exportPage")}

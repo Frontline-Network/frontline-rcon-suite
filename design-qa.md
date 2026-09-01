@@ -1,611 +1,1083 @@
-# Design QA — Live-Spiel / Option 2
-
-## Evidence
-
-- Source visual truth: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-1da4afa6-0f8a-48d1-a98d-1440a8f4302d.png`
-- Browser-rendered implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\live-game-option2-qa.png`
-- Normalized implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\live-game-option2-qa-normalized.png`
-- Same-input comparison: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\live-game-option2-comparison.png`
-- Source pixels: 1487 × 1058 at 1×.
-- Implementation pixels: 2353 × 1272 at 1×; CSS browser viewport 2353 × 1272.
-- Normalization: the implementation was downsampled proportionally to 1487 × 804 and placed on the same 1487 × 1058 dark canvas as the source. No crop or aspect distortion was applied.
-- State: German dark Frontline theme, 36 simulated players, K/D descending, one selected player, player inspector visible, 17 rows per team.
-
-## Full-view comparison
-
-The normalized same-input comparison was reviewed for composition, hierarchy and density. The implementation preserves the selected option's command-board structure: flat match strip, shared command toolbar, mirrored allied/axis tables, central comparison rail and right-side player inspector. Main edges align, both team surfaces are symmetrical, selection is gold, faction meaning uses icon plus label, and the page avoids rounded nested cards.
-
-The source is a 1487 px concept while the available in-app browser viewport is materially wider. The implementation intentionally uses the additional width instead of stretching type or rows; after proportional normalization, the major-region proportions and visual hierarchy remain equivalent. Responsive behavior is defined at 1440, 900 and mobile breakpoints; the current in-app browser did not expose a viewport override for a second pixel capture.
-
-Focused region comparison was not necessary because the original-resolution implementation capture keeps the table headers, dense rows, center metrics and inspector typography legible. Those four regions were still reviewed separately at original resolution.
-
-## Required fidelity surfaces
-
-- Fonts and typography: passed. Existing Frontline display/body type is preserved; labels are uppercase with restrained tracking; player names remain lighter than headers; all metrics use tabular numerals.
-- Spacing and layout rhythm: passed. Flat 1 px surfaces, 8–10 px major gaps, dense 34 px desktop rows, matched team widths, and an inspector aligned to the table block.
-- Colors and tokens: passed. Existing theme tokens drive background, dividers and text; cyan/allied, muted red/axis, gold/selection and semantic warning/success tones match the reference intent.
-- Image and icon fidelity: passed. Existing faction image assets and MUI icons are used. No custom SVG, CSS drawing, placeholder image or emoji was introduced in the redesigned page.
-- Copy and content: passed with intentional product constraints. Squad and role are not shown because the live-game endpoint does not provide reliable values. Profile-safe actions are retained for disconnected historical match participants.
-
-## Interaction verification
-
-- Search filters both teams together and preserves symmetric sorting.
-- All / active / flagged filters work.
-- Row selection updates the player inspector.
-- Checkbox selection enables the shared selection action.
-- Both team pagers work independently; page-size selection is available.
-- Sort field and direction are interactive.
-- CSV export remains connected to the full filtered live-game dataset.
-- Query refresh retains the 36-player demo dataset and next-map data.
-- Page reload and 15-second refetch were tested without row-count collapse.
-- Production build completed successfully.
-
-## Ergebnis Konfigurationsformulare
-
-Keine offenen P0-, P1- oder P2-Designabweichungen im umgesetzten Formularfluss.
-
-## Formularfamilie
-
-Die freigegebene Arbeitsfläche wurde anschließend auf die weiteren schema-basierten
-Konfigurationsseiten übertragen. Visuell geprüft wurden die Referenz und die lokale
-Seeding-Seite in derselben Vergleichsansicht. Dabei bleiben Seitentitel, Status,
-Formular/JSON-Umschaltung, nummerierte Abschnittsnavigation, zusammenhängende
-Drei-Spalten-Arbeitsfläche, Wirkungskette und Speicherleiste konsistent. Der Inhalt
-der Schritte wird fachlich aus dem jeweiligen Schema gebildet und nicht künstlich
-an die No-Leader-Felder angeglichen.
-
-Direkt abgedeckte Seiten:
-
-- Level-Regeln
-- Seeding-Regeln
-- Solo-Panzer verhindern
-- VAC- und Spielsperren prüfen
-- Teamkill-Sperre beim Beitritt
-- Namensfilter
-- Seeder-VIP-Belohnung
-- Abgelaufene VIPs bereinigen
-
-Weitere Konfigurationen mit JSON-Schema verwenden denselben Arbeitsflächen-Rahmen
-und werden automatisch in verständliche Abschnitte gruppiert. Verschachtelte
-Seeder-VIP-Felder bleiben im visuellen Formular editierbar; die vollständige
-Rohkonfiguration bleibt im erweiterten JSON-Modus erreichbar.
-
-- Acht benannte Desktop-Seiten: Navigation, Zusammenfassung und Speichern geprüft.
-- Seeding und Seeder-VIP: 390 × 844 ohne horizontalen Überlauf geprüft.
-- Neue Formularfamilie: 11 von 11 E2E-Tests erfolgreich.
-- Bestehende No-Leader-Seite: 12 von 12 Regressionstests erfolgreich.
-- Produktions-Build: erfolgreich.
-
-## Live-Einsatz — Option 1
-
-- Referenz: `exec-61a73ce0-5b1a-48a7-9aa9-4c09f0575469.png`
-- Implementierung: `/views/live` im lokalen Demo-Modus, 1683 × 935 Pixel
-- Gemeinsamer Vergleich: `frontline-live-design-qa.png`
-- Geteilte Spieler-/Protokoll-Arbeitsfläche, Schnellfilter und kompaktes Einsatzprofil geprüft.
-- Spieler-, Protokoll- und geteilte Ansicht wechseln ohne Datenverlust.
-- Spielerauswahl blendet Nachricht, Bestrafung, Kick und weitere Aktionen als sticky Aktionsleiste ein.
-- Aktionsdialog für ausgewählte Spieler öffnet korrekt, ohne bei der Prüfung eine Spielaktion auszuführen.
-- Unter 1100 Pixel wird die gleichzeitige Teilung deaktiviert; Spieler und Protokoll bleiben über die Ansichtsumschaltung erreichbar.
-- Produktions-Build erfolgreich; keine Browser-Laufzeitfehler festgestellt.
-- Keine offenen P0-, P1- oder P2-Designabweichungen.
-
-## Live-Protokoll — kompakte Ereignisdarstellung
-
-- Die geteilte Arbeitsfläche priorisiert die Spielerliste mit einem Verhältnis von 72/28; das Protokoll kann weiterhin maximiert werden.
-- Die Seitenzuordnung wird platzsparend über die Farbe des Spielernamens dargestellt. Die redundante Angabe `(axis|allies/Spieler-ID)` wird unabhängig von Groß-/Kleinschreibung aus Anzeige und Kopiertext entfernt.
-- Spielernamen bleiben vollständig sichtbar, sind per Tastatur erreichbar und öffnen weiterhin das Spielerprofil.
-- Kill- und Teamkill-Ereignisse verwenden Pfeil und neutrales Waffensymbol; der unveränderte Waffenname steht als Tooltip bereit.
-- Chat-Ereignisse zeigen den Spieler in einer eigenen Zeile und die Nachricht darunter. Lange Texte brechen in der geteilten wie in der maximierten Ansicht um.
-- Der Kopierbutton übernimmt den bereinigten Nachrichtentext ohne versteckte Spieler-ID; bei nicht verfügbarer Clipboard-API bleibt der manuelle Fallback erreichbar.
-- Geteilte Ansicht visuell und per DOM-Messung geprüft: Protokollbreite 405 Pixel, keine horizontale Überbreite, lange Zeilen erhöhen die Ereignishöhe korrekt.
-- Maximierte Protokollansicht geprüft: kein horizontaler Seitenüberlauf und keine gekappten Nachrichten.
-- Frischer Browserstart: keine neuen Laufzeitfehler; verbleibend ist ausschließlich die bekannte React-Router-Zukunftswarnung.
-- Semantische Ereignissymbole im Live-Protokoll verwenden gezielt Font Awesome: Sprechblasen für Chat, Fadenkreuz für Kills, Totenkopf für Teamkills, Richterhammer für Admin-Aktionen und Flagge für Match-Ereignisse. Die Fraktion wird direkt am Spielernamen dargestellt; die übrige Bedienoberfläche bleibt bei MUI.
-- Kill-Darstellung mit Font-Awesome-Pfeil und -Waffensymbol geprüft; der exakte Waffenname bleibt im Tooltip erhalten. Auch Kopieren und Kopiert-Bestätigung verwenden innerhalb des Live-Protokolls die kompakteren Font-Awesome-Symbole.
-- Geteilte Ansicht mit Chat- und Kill-Filter erneut geprüft: alle neuen Symbole werden bei 405 Pixel Protokollbreite vollständig dargestellt; horizontaler Überlauf bleibt bei 0 Pixel.
-- Die separate Fraktionsmarke wurde zugunsten von mehr Textbreite wieder entfernt. Stattdessen sind die Spielernamen selbst eingefärbt: Achsenmächte rot, Alliierte blau; bei Kills wird jede beteiligte Person separat ausgewertet, bei Teamkills bleibt die gemeinsame Seite erhalten.
-- Die Fraktionszuordnung bleibt trotz der kompakten Darstellung über Tooltip und zugängliche Namensbeschriftung lesbar. Im Kill-Filter wurden 0 Lobby-Zuordnungen und 0 Pixel horizontaler Überlauf gemessen.
-- Die zusätzlichen Live-Protokoll-Symbole erhöhen den komprimierten Live-Chunk um rund 1,7 kB.
-- Produktions-Build erfolgreich.
-
-## Live-Spielertabelle — kompakte Einsatzansicht
-
-- Die geteilte Spieler-/Protokollansicht ist bei jedem neuen Seitenaufruf der Standard; Fokusansichten bleiben innerhalb der laufenden Sitzung auswählbar.
-- Die Mindestbreiten der Sammelspalten wurden nach Inhalt priorisiert: Name, Team/Trupp/Rolle, Kampf/Risiko und Status benötigen keine pauschalen 30 Zeichen mehr.
-- Spielernamen zeigen ihre Seite direkt über die Textfarbe: Achsenmächte rot, Alliierte blau. Lange Namen werden gekürzt und bleiben vollständig per Tooltip lesbar.
-- Die redundante Fraktionsgrafik in der Zuordnung wurde entfernt; Team, Trupp und Rolle bleiben ausgeschrieben und bei langen Werten per Tooltip zugänglich.
-- Statuswerte verwenden kompakte, beschriftete Symbole mit Tooltip und `aria-label`; VIP, Beobachtung, Warnung und aktive Sperre bleiben unterscheidbar.
-- Schnellfilter können bei geringer Breite umbrechen, statt eine schwer erreichbare horizontale Scrollleiste zu erzeugen.
-- In der geteilten Ansicht gemessen: Spielertabelle 1069 Pixel breit, 0 Pixel horizontaler Überlauf, Name und Aktionsspalte bleiben sticky erreichbar.
-- Der Test erfolgt mit „Alle Spieler“, nicht mit dem leeren Filter „Auffällig“: Eine einzeln ausgewählte Zusatzspalte erzeugt exakt eine zusätzliche Tabellenspalte und wechselt nachvollziehbar zu „Eigene Ansicht“.
-- Der Spaltenwähler zeigt verständliche deutsche Bezeichnungen statt interner IDs; zusammengesetzter Spielername und einzelne Namensspalte sind eindeutig voneinander unterschieden.
-- Mit 27 eingeblendeten Spalten wurde eine Überbreite von 672 Pixeln erzeugt. Die synchronisierte obere Scrollleiste erscheint automatisch, entspricht mit 1741 Pixeln exakt der Tabellenbreite und lässt Name sowie Aktionen sticky erreichbar.
-- Bei einer einzelnen Zusatzspalte bleibt die Tabelle ohne Überbreite; die obere Scrollleiste wird dann automatisch ausgeblendet.
-- Produktions-Build und Browser-Laufzeittest erfolgreich.
-
-## Seeder-VIP-Belohnung — Option 3
-
-- Referenz: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-5a0cb3d4-fbdb-4e4a-88ae-ad6f8caa41a1.png`
-- Implementierung: `/settings/others/seed-vip` im lokalen Demo-Modus
-- Vergleichszustand: Deutsch, Formularmodus, Aktiv, Abschnitt „Voraussetzungen“, gespeicherte Ausgangswerte
-- Gemeinsamer Vergleich: `C:\Users\chris\AppData\Local\Temp\seed-vip-option3-comparison-final.png`
-- Vergleichsgröße: Referenz und Umsetzung jeweils 1487 × 1058 Pixel
-
-### Sichtbarer Vergleich
-
-- Die ausgewählte Option 3 wurde in die bestehende Frontline-Arbeitsfläche übertragen, ohne Navigation, Typografie, Farbwelt oder eckige Komponenten neu zu erfinden.
-- Ziel, Qualifikation und Belohnung bilden oberhalb des Formulars eine kompakte, sofort verständliche Wirkungskette.
-- Das Ergebnis-Briefing löst die aktuelle Konfiguration in einen verständlichen Satz und vier operative Schritte auf.
-- Team-Zielwerte, Mindestspielzeit, Anwesenheitsbedingung und Fortschrittsmeldungen sind als vier flache Entscheidungszeilen aufgebaut.
-- Wirksame Werte stehen im Hauptfluss. Legacy-Minimalwerte, Rückfallpuffer und Darstellungsoptionen befinden sich in klar bezeichneten erweiterten Bereichen.
-- Die Speicherleiste bleibt bei der Referenzgröße vollständig sichtbar; die zuvor doppelte Abschnittsüberschrift und die redundante Gültigkeitsmeldung wurden entfernt.
-
-### Fachliche und funktionale Prüfung
-
-- Die Zusammenfassung verwendet die tatsächlich wirksamen Felder `max_allies` und `max_axis`; die gespeicherten, aber aktuell nicht ausgewerteten `min_*`-Felder werden nicht als wirksame Zielspanne dargestellt.
-- Gekoppelte Teamwerte geprüft: eine Änderung bei den Alliierten aktualisiert bei aktiver Kopplung beide Seiten und die Wirkungsvorschau sofort.
-- Qualifikations-Presets und Anwesenheitsmodus aktualisieren Formular, Zusammenfassung und Dirty-State korrekt.
-- Belohnungsdauer und kumulative beziehungsweise neu berechnete VIP-Laufzeit werden mit einer Ergebnisvorschau erklärt.
-- Spielertexte bleiben einzeln aufklappbar; vorhandene Platzhalter sind direkt einsetzbar.
-- Webhook-Liste wird editierbar dargestellt; leere und vorhandene Zustände sind abgedeckt.
-- JSON-Modus bleibt als vollständiger technischer Fallback erhalten. Das nicht wirksame Kompatibilitätsfeld `forward` wird im vereinfachten Hauptfluss nicht als funktionierende Steuerung ausgegeben.
-
-### Responsive und technische Prüfung
-
-- 1487 × 1058: vollständige Entscheidungsoberfläche und Speicherleiste ohne Überdeckung geprüft.
-- 390 × 844: kein horizontaler Seitenüberlauf (`scrollWidth = innerWidth = 390`); Navigation und Zusammenfassung brechen kontrolliert um.
-- Produktionsnaher Vite-Build im Fake-Modus: bestanden.
-- Browserkonsole: keine neuen Fehler; ausschließlich die bestehende React-Router-v7-Future-Flag-Warnung.
-- Keine offenen P0-, P1- oder P2-Designabweichungen im neuen Seeder-VIP-Formular.
-
-final result: passed
-
----
-
-# Sperrlisten / Moderations-Journal – Design QA
+# Design QA · Live-Balance-Assistent – Option 1
 
 ## Prüfgrundlage
 
-- Referenz: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-a2889daa-9885-4371-85b1-30b2964d3a7f.png`
-- Implementierung: `.tmp/product-design/blacklists/implementation-option-3.png`
-- Direkter Vergleich: `.tmp/product-design/blacklists/option-3-comparison.png`
-- Referenz- und Prüfviewport: 1705 × 923 px
-- Zusätzliche Responsive-Prüfung: 1280 × 720 px und 390 × 844 px
-- Zustand: Filterleiste sichtbar, sechs realistische Demo-Einträge in drei Zeitgruppen, erster Eintrag als Fallakte geöffnet
-
-## Vergleichsergebnis
-
-Die Implementierung übernimmt die ausgewählte Richtung als dichtes Moderations-Journal: feste Filterleiste, chronologische Gruppen, kompakte Eintragszeilen, eckige Bedienelemente, goldene Zustandsakzente und eine inline aufklappbare Fallakte. Die vorhandene Frontline-Navigation, Typografie, Farbtokens und Komponenten bleiben erhalten. Abweichende Beispieldaten und leicht kompaktere Abstände sind beabsichtigt und passen zur bestehenden Anwendung.
-
-## Interaction und Kompatibilität
-
-- Statusfilter Aktiv / Alle / Abgelaufen inklusive Suche und Zurücksetzen: passed
-- Auf- und Zuklappen einer Fallakte: passed
-- Öffnen und Schließen des Bearbeiten-Dialogs: passed
-- Pagination und Seitengröße: passed
-- Horizontale Überbreite bei 1705 px, 1280 px und 390 px: keine
-- Deutsche relative und absolute Datumsdarstellung: passed
-- Browserkonsole: keine Anwendungsfehler; nur bestehender React-Router-v7-Zukunftshinweis
-
-## QA history
-
-1. P2 — Die sechs Metadatenspalten wurden bereits bei mittlerer Breite aktiviert und erzeugten Überbreite.
-   - Fix: breite Zeilendarstellung erst am XL-Breakpoint; darunter bleibt die kompakte Ein-Zeilen-Darstellung erhalten.
-2. P2 — Relative Zeitangaben erschienen trotz deutscher Oberfläche auf Englisch.
-   - Fix: relative und absolute Datumswerte werden über `Intl` konsistent lokalisiert.
-3. P2 — Der Bearbeiten-Dialog erzeugte im Demo-Modus einen unbehandelten Vorlagenfehler und eine React-Warnung für einen `null`-Inputwert.
-   - Fix: lokaler Vorlagen-Fallback und gültiger leerer Hidden-Inputwert.
-4. P2 — Zwei Demodatensätze reichten nicht aus, um alle Journalgruppen und Filterzustände zu prüfen.
-   - Fix: aktive, befristete und abgelaufene Fälle für Heute, letzte sieben Tage und ältere Einträge ergänzt.
-
-Keine P0-, P1- oder P2-Abweichung bleibt offen.
-
-final result: passed
-
----
-
-# Design QA — Compact integration forms
-
-## Evidence
-
-- Source visual truth: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-0311286f-9538-4c20-bd89-ed18a87c047c.png`
-- Final implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\integration-kills-compact.png`
-- Side-by-side comparison: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\integration-qa-comparison.png`
-- Browser states reviewed: Kills & Teamkills, RCON-Chatbefehle, Discord-Scoreboard and the legacy `/settings/webhooks/kills` direct route.
-
-## Comparison result
-
-The inline module area now uses a purpose-built, schema-driven integration editor. The former settings workbench — including its step rail, large empty canvas and unrelated form chrome — is no longer mounted inside the integrations ledger.
-
-- Layout: compact square sections sit directly beneath the selected ledger row and use the full available width.
-- Hierarchy: module header, Formular/JSON switch, numbered groups, inputs and save state follow the selected reference direction without copying the legacy form shell.
-- Field coverage: nested arrays, primitive lists, enums, booleans, arbitrary JSON objects and masked webhook URLs remain editable from the real schemas.
-- Compatibility: permissions, validation, save/reset, dirty navigation guard, JSON expert mode and legacy direct URLs remain intact.
-- Complex modules: RCON commands render list and JSON-object fields without raw schema names; Scoreboard renders its larger configuration as grouped square sections.
-- Interaction: enable/disable, add/remove and reset behavior passed in the browser. The legacy Kills URL resolves to the compact editor.
-
-## QA result
-
-No actionable P0, P1 or P2 visual or functional discrepancy remains. A dedicated 390 px browser capture is still a P3 follow-up because this in-app browser session did not expose viewport resizing; the editor itself uses one-column `xs` breakpoints and contains no fixed-width content.
-
-final result: passed
-
-# Design-QA: Spiele — Einsatzjournal (Option 2)
-
-## Vergleichsgrundlage
-
-- Source Visual Truth: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\games-journal-selected.png`
-- Browser-gerenderte Umsetzung: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\games-journal-implementation.jpg`
-- Gemeinsamer Full-View-Vergleich: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\games-journal-comparison.png`
-- Gemeinsamer Fokusvergleich: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\games-journal-comparison-focus.png`
-- Mobile Umsetzung: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\games-journal-mobile-final.jpg`
-- Route: `http://127.0.0.1:3003/stats/games`
-- Vergleichsviewport: Referenz auf 1440 × 1024 normalisiert; Implementierung bei 1440 × 1024 CSS-Pixeln.
-- Zustand: Deutsch, dunkles Frontline-Theme, vier lokale Beispieldatensätze, erste Serverseite, keine aktiven Filter.
-
-## Visueller Abgleich
-
-- Die gewählte chronologische Journalstruktur ist vollständig umgesetzt: Kommandoleiste, Modusreiter, Tagesgruppen, Einsatzzeit, Kartenbild, Karte/Modus/Umgebung, klar beschrifteter Spielstand, Dauer, technische ID und Zeilen-Navigation.
-- Die bestehende Frontline-Navigation, Statusleiste, eckige 1-Pixel-Flächen und Typografie bleiben unverändert. Die neue Seite wirkt deshalb wie ein Bestandteil des Produkts und nicht wie ein fremdes Dashboard.
-- Desktop-Zeilen folgen derselben ruhigen horizontalen Leserichtung wie die Referenz. Bei geringer Datendichte bleibt die Oberfläche bewusst kompakt, statt leeren Beispielinhalt zu erfinden.
-- Die Implementierung nutzt reale Kartenassets; fehlt ein Bild, erscheint ein neutrales Kartensymbol innerhalb derselben festen Thumbnail-Fläche.
-- Der Footer zeigt Bereich, serverseitige Seitennavigation und Seitengröße ohne die doppelte Seitenzahl aus dem Konzeptbild.
-
-## Responsive Prüfung
-
-- 1440 × 1024: vollständige Journalansicht ohne horizontalen Überlauf.
-- 1024 × 768: Filter und Zeilen brechen kontrolliert um; `scrollWidth = clientWidth = 1024`.
-- 390 × 844: kein horizontaler Seitenüberlauf; `scrollWidth = clientWidth = 390`.
-- Mobil werden technische ID und Fraktionslabels ausgeblendet, der Spielstand bleibt sichtbar, Dauer wechselt in die Kartenmetazeile und jede Spielzeile bleibt als vollständiges Touch-Ziel erreichbar.
-- Die zunächst zu hohe mobile Suchzeile wurde korrigiert, indem ihre Desktop-Flexbasis auf schmalen Ansichten deaktiviert wurde. Anschließend wurde der dekorative Timeline-Punkt mobil entfernt, um Karte, Metadaten und Spielstand sauber voneinander zu trennen.
-
-## Interaktionen und Datenverhalten
-
-- Suche nach Karte oder Spiel-ID filtert die aktuell geladene Serverseite; der Platzhalter benennt diese Reichweite ausdrücklich.
-- Zeitraum, Umgebung und Modus lassen sich kombinieren; „Filter zurücksetzen“ stellt den Ausgangszustand wieder her.
-- Modusreiter zeigen die Trefferzahl des aktuellen Filterkontexts.
-- Jede Zeile ist als vollständiger Link bedienbar; Navigation zu `/stats/games/fln-demo-1` wurde im Browser bestätigt.
-- Serverpagination und Seitengröße bleiben in den URL-Parametern erhalten; der Loader fordert exakt die gewählte Seite und Größe an.
-- Lade-, Aktualisierungs-, Leer-, Teilfehler- und Fehlerzustände sind sichtbar und zugänglich abgedeckt.
-- Browserkonsole: keine Fehler.
-- Produktionsnaher Vite-Build im Fake-Modus: bestanden.
-
-## Vergleichshistorie
-
-1. P2 — Die mobile Suchleiste beanspruchte wegen ihrer Desktop-Flexbasis rund 320 Pixel Höhe.
-   - Fix: auf schmalen Ansichten `flex: 0 0 auto`, Desktopbasis erst ab `lg`.
-   - Post-Fix: Suchfeld, Auswahlfelder, Zurücksetzen und Modusreiter erscheinen kompakt oberhalb der ersten Tagesgruppe.
-2. P2 — Der mobile Timeline-Punkt reduzierte die verfügbare Textbreite und drängte Metadaten an den Spielstand.
-   - Fix: Punkt unter `sm` ausgeblendet und Mobile-Grid auf fünf Spalten reduziert.
-   - Post-Fix: Kartenname, Modus, Umgebung, Dauer und Spielstand bleiben ohne Überdeckung lesbar.
-
-Keine offenen P0-, P1- oder P2-Abweichungen in der umgesetzten Spieleübersicht.
-
-final result: passed
-
-# Design-QA: Seeder-VIP Option 3 — Feinschliff
-
-## Vergleichsgrundlage
-
-- Zielbild: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-5a0cb3d4-fbdb-4e4a-88ae-ad6f8caa41a1.png`
-- Browser-gerenderte Umsetzung: `C:\Users\chris\AppData\Local\Temp\seed-vip-polish-final-desktop.png`
-- Gemeinsamer Vergleich: `C:\Users\chris\AppData\Local\Temp\seed-vip-polish-final-compare.png`
-- Lokale Route: `http://127.0.0.1:3001/settings/others/seed-vip`
-
-## Feinschliff
-
-- Alle fünf Bereichsreiter besitzen nun kurze, vollständig lesbare Untertitel; die Desktop-Navigation zeigt keine abgeschnittenen Satzfragmente mehr.
-- Gleiche Teamziele werden als „25 je Team“ zusammengefasst. Bei abweichenden Zielen nennt die Oberfläche beide Seiten eindeutig.
-- Der Ablauftext verwendet natürliche deutsche und englische Formulierungen statt „25 bzw. 25“.
-- VIP-Dauer, Ablauftext und Ergebnisvorschau verwenden korrekte Einzahl und Mehrzahl für einen bzw. mehrere Tage.
-- Die Zusammenfassung beschreibt die Verlängerungslogik konkret als „verlängert Laufzeit“ bzw. „beginnt ab Abschluss“.
-- Die bestehende eckige Frontline-Designlinie, Seitenstruktur und Feldlogik blieben unverändert.
-
-## Interaktionen und technische Prüfung
-
-- Gekoppelte und getrennte Teamziele, Zusammenfassung und Ablauftext: bestanden.
-- Belohnung auf einen Tag ändern, Einzahl prüfen und auf sieben Tage zurücksetzen: bestanden.
-- Nach dem Rücksetzen entspricht der Formularzustand wieder vollständig den gespeicherten Werten.
-- Desktop bei 1487 × 1058: kein horizontaler Überlauf; `mainScrollWidth` entspricht `mainClientWidth`.
-- Mobil bei 390 × 844: Dokument- und Body-Breite bleiben 390 Pixel; alle Formularbereiche und Bedienelemente sind im DOM erreichbar.
-- Produktionsbuild mit Vite (`--mode fake`): bestanden.
-- Direkter Side-by-Side-Vergleich zeigt keine offenen P0-, P1- oder P2-Abweichungen im bearbeiteten Feinschliff.
-
-final result: passed
-
-# Live-Ansicht: natürliche Spielerliste und festes Live-Protokoll
-
-## Vergleichsgrundlage
-
-- Ausgangszustand: `C:\Users\chris\.codex\visualizations\2026\08\15\01a0052a-7e8d-7411-8b78-1a415453783b\live-scroll-behavior-before.png`
-- Seitenscroll-Test: `C:\Users\chris\.codex\visualizations\2026\08\15\01a0052a-7e8d-7411-8b78-1a415453783b\live-scroll-behavior-after-page.png`
-- Protokollscroll-Test: `C:\Users\chris\.codex\visualizations\2026\08\15\01a0052a-7e8d-7411-8b78-1a415453783b\live-scroll-behavior-after-feed.png`
-- Lokale Route: `http://127.0.0.1:3001/views/live`
-- Testzustand: geteilte Desktopansicht mit 98 simulierten Spielern, davon 49 Alliierte und 49 Achsenmächte.
-
-## Korrigiertes Höhen- und Scrollmodell
-
-- Die Spielerliste besitzt keine feste oder an das Protokoll gekoppelte Höhe. Ihre Länge ergibt sich ausschließlich aus Suchergebnis, Filtern und Spielerzeilen.
-- Das Live-Protokoll besitzt in der geteilten Desktopansicht eine feste, viewportbezogene Höhe und bleibt als vollständige Card am rechten Rand klebend erreichbar.
-- Nur der Ereignisbereich des Live-Protokolls scrollt intern. Kopf, Filter und Seitennavigation bleiben innerhalb der festen Card sichtbar.
-- Ein Mausradereignis außerhalb des Protokoll-Feeds bewegt die Seite und damit die natürliche Spielerliste; das klebende Protokoll bleibt erreichbar.
-- Ein Mausradereignis über dem Feed bewegt ausschließlich dessen Ereignisse. `overscroll-behavior: contain` verhindert ungewolltes Weiterreichen an die Seite.
-- Auf schmalen beziehungsweise nicht geteilten Ansichten fällt die Card wieder in den normalen Seitenfluss zurück.
-- Diese Festlegung ersetzt die frühere QA-Annahme, beide Panels müssten dieselbe Höhe besitzen und gemeinsam über den Hauptbereich scrollen.
-
-## Testdaten und Prüfung
-
-- 92 zusätzliche lokale Demo-Spieler ergänzt; zusammen mit den sechs vorhandenen Spielern werden 98 von 100 Plätzen dargestellt.
-- Spieler-IDs, Level, Spielzeiten und Leistungswerte bleiben realistisch, positiv und reproduzierbar.
-- Browserprüfung Seitenscroll: bestanden; Spielerzeilen bewegen sich, die Protokoll-Card bleibt vollständig sichtbar.
-- Browserprüfung Feedscroll: bestanden; Spielerposition und Seitenstand bleiben unverändert, nur Protokollereignisse wechseln.
-- Produktionsbuild: bestanden.
-- Keine P0-, P1- oder P2-Abweichung im bearbeiteten Höhen- und Scrollverhalten.
-
-final result: passed
-
-## Live-Spielerdetails — einzeilige Tabelle mit Aufklappbereich
-
-- Referenz: `C:\Users\chris\AppData\Local\Temp\codex-clipboard-293adc55-14e9-4b10-887e-206a35b38935.png`.
-- Implementierung: `/views/live` im lokalen Demo-Modus mit genau einer kompakten Tabellenzeile pro Spieler und höchstens einem geöffneten Detailbereich.
-- Finalaufnahme: `C:\Users\chris\.codex\visualizations\2026\08\15\01a0052a-7e8d-7411-8b78-1a415453783b\live-player-list-implementation\04-expanded-anthracite.png`.
-- Gemeinsamer Vergleich: `C:\Users\chris\.codex\visualizations\2026\08\15\01a0052a-7e8d-7411-8b78-1a415453783b\live-player-list-implementation\reference-vs-anthracite.png`.
-- Geschlossene Spielerzeilen sind am Desktop 38 Pixel hoch; Identität, Truppzuordnung, Kampf/Risiko, Status, Aktionen und Zeit bleiben in einer Zeile.
-- Der geöffnete Bereich zeigt Identität, Werte, Status und die kompakten Aktionen Nachricht, Bestrafen, Kicken, Bannen und Profil. Die getrennten Temp-/Permabann-Aktionen und das redundante Drei-Punkte-Menü wurden entfernt.
-- Der Detailbereich verwendet dieselbe neutrale Anthrazitfläche wie die Trupp- und Spielerzeilen (`rgb(10, 13, 10)`); die goldene linke Kante kennzeichnet weiterhin den aktiven Datensatz.
-- Öffnen eines zweiten Spielers schließt den vorherigen Detailbereich; Escape schließt den Bereich und gibt den Fokus an den Auslöser zurück.
-- Produktions-Build sowie der HLL-/HLL-Vietnam-Teamkill-Vertragstest sind erfolgreich.
-- Der visuelle Side-by-Side-Vergleich zeigt keine offenen P0-, P1- oder P2-Abweichungen für die umgesetzte Spielerliste.
-
-final result: passed
-
-## Teamübersicht — Option 1
-
-- Zielbild: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-8f0fad35-c9c7-4410-8440-541bfec882af.png`
-- Implementierung: `/views/team` im lokalen Demo-Modus.
-- Implementierungsaufnahme: `team-implementation-final.png`
-- Gemeinsamer Vergleich: `team-design-comparison-final.png`
-- Visuelle Hierarchie entspricht Lösung 1: Gefechtslage, Problemlage, kompakter Autobalancer, Filterleiste und zweispaltige Teamkarten.
-- Trupps sind standardmäßig kompakt und lassen sich gezielt öffnen; Spielerwerte erscheinen erst in der Detailstufe.
-- Suche, Rollenfilter, Truppfilter und Statusfilter sind beschriftet und in der zentralen Arbeitsleiste gebündelt.
-- Truppauswahl, Mehrfachauswahl, feste Aktionsleiste und Zurücksetzen der Auswahl wurden im Browser ausgeführt.
-- HLL und HLL: Vietnam rendern ohne rohe Rollen- oder Trupptypen und ohne Browserfehler.
-- Desktop, Tablet und Mobilzustände wurden ohne horizontalen Seitenüberlauf geprüft; unterhalb des Desktop-Breakpoints wird auf ein Team mit Team-Tabs umgestellt.
-- Keine doppelten DOM-IDs und keine unbeschrifteten sichtbaren Buttons in der Teamansicht.
-- Deutsch und Englisch sind für alle neuen statischen Texte vorhanden.
-- Produktionsbuild mit Vite (`--mode fake`) und `git diff --check` erfolgreich.
-- Die lokale Fake-Datenquelle enthält nur einen Beispieltrupp pro Team; Raster, Gruppierung, Scrollverhalten und Aufklappmechanik sind für vollständige Serverbesetzungen ausgelegt.
-- Auswahlzustand erneut gegen das Zielbild geprüft: Die Aktionsleiste ist nun viewport-fest und erscheint unmittelbar nach der Auswahl eines Trupps, unabhängig von der Scrollposition.
-- Direkte Mehrfachaktionen sind ohne verborgenes Drei-Punkte-Menü erreichbar: Nachricht, Kick, Temp/Perma-Bann über die Sperrliste, Teamwechsel und Trupp-Kick; weitere berechtigte Aktionen bleiben unter „Weitere“ verfügbar. Die veralteten separaten Tempban- und Permaban-Einträge wurden dort entfernt.
-- Vergleichsaufnahme: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\product-design-references\team-view\team-selection-actions-comparison.png`.
-- Bei 1280 × 900 liegen alle sieben sichtbaren Aktionsbuttons vollständig innerhalb der Leiste; es gibt keinen internen Überlauf. Bei 760 × 850 und 390 × 844 bleibt die Leiste vollständig im Viewport, die Aktionen sind horizontal erreichbar und die Seite erzeugt keinen horizontalen Überlauf.
-- Dieselbe Truppauswahl und Aktionsleiste wurde für HLL und HLL: Vietnam ohne Browserfehler geprüft.
-
-final result: passed
-
-# Design-QA: Live-Spielertabelle
-
-## Vergleichsgrundlage
-
-- Source Visual Truth (Detail-Mockup): `C:\Users\chris\AppData\Local\Temp\codex-clipboard-293adc55-14e9-4b10-887e-206a35b38935.png`
-- Source Visual Truth (produktiver Ausgangszustand): `C:\Users\chris\AppData\Local\Temp\codex-clipboard-d6f03925-9527-48ab-8ff9-03ca04147fc2.png`
-- Browser-gerenderte Umsetzung: `C:\Users\chris\.codex\visualizations\2026\08\15\01a0052a-7e8d-7411-8b78-1a415453783b\live-player-card-professional-final.png`
-- Lokale Route: `http://127.0.0.1:3001/views/live`
-- Zustand: Dark Theme, geteilte Ansicht, Operationsspalten, erster Spieler ausgeklappt, Fake-Daten.
-
-## Maße und Normalisierung
-
-- Detail-Mockup: 1487 × 1058 Pixel.
-- Produktiver Ausgangszustand: 3440 × 1440 Pixel.
-- Implementierung und finale Browseraufnahme: CSS-Viewport 1600 × 1000 Pixel.
-- Zusätzlich geprüft: 1024 × 900, 768 × 900 und 390 × 844 CSS-Pixel.
-- Weil Ausgangsbilder und Browseraufnahme unterschiedliche Datensätze, Dichten und Browserrahmen besitzen, erfolgte der Vergleich über dieselben sichtbaren Produktregionen: Split-Verhältnis, geschlossene Einzeiler, ausgeklapptes Detailband, Aktionsleiste, Panelunterkanten und Scrollverhalten.
+- Source Visual Truth: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-f1cc3e48-5a7c-446d-b2b8-cbf90e0e39e2.png` (1517 × 1061 px).
+- Browsergerenderte Implementierung: `.tmp/product-audit/autobalancer/06-live-balance-implementation.png` (1280 × 720 px, CSS-Viewport 1280 × 720, Browser-Dichte 1).
+- Gemeinsamer Vergleichseingang: `.tmp/product-audit/autobalancer/08-design-qa-comparison.png`. Beide Ansichten wurden proportional auf maximal 1280 × 895 px normalisiert und im selben Bild verglichen.
+- Fokusbeleg für die vorgeschlagenen Spieler: `.tmp/product-audit/autobalancer/07-live-balance-roster-highlights.png` (1280 × 720 px).
+- Inline-Prüfung in der Teamansicht: `.tmp/product-audit/autobalancer/09-inline-live-review.png` (2353 × 1272 px).
+- Zustand: dunkles Frontline-Theme, deutsche Sprache, Demo-Server 2, 49:49 Spieler, Achsenmächte mit höherer geschätzter Teamstärke, belastbarer 1:1-Tauschvorschlag.
 
 ## Full-View-Vergleich
 
-- Die Spieler- und Protokollspalte behalten die gewünschte 72/28-Gewichtung.
-- Beide Panels reichen bis zu derselben Unterkante und bewegen sich über den zentralen Seiten-Scroller gemeinsam.
-- Weder Spielertabelle noch Live-Protokoll besitzen eine eigene vertikale Scrollfläche.
-- Die Spielerzeilen bleiben geschlossen einzeilig und entsprechen der Dichte des Mockups.
-- Horizontales Scrollen bleibt ausschließlich für tatsächlich zusätzliche Spalten erhalten.
+Die Implementierung übernimmt die gewählte kompakte Einsatzleiste direkt zwischen Gefechtszusammenfassung und Teamlisten. Spielerzahl, Teamstärke, Datenqualität, Handlung, vorgeschlagene Spieler und Prognose liegen wie im Mockup in einer horizontalen Entscheidungszeile. Darunter vergleichen zwei Teamstärkebalken den Zustand vor und nach dem vorgeschlagenen 1:1-Tausch. Der schmalere Browser-Viewport zeigt die Teamlisten erst unterhalb des ersten Sichtbereichs; das ist eine erwartete Höhenabweichung zum 1517 × 1061 px großen Mockup und kein Layoutverlust.
 
-## Fokusvergleich: ausgeklappter Spieler
+## Fokusvergleich
 
-- Das Detailband ist bündig mit der sichtbaren Tabellenfläche und überschreitet sie auch bei horizontal konfigurierten Zusatzspalten nicht.
-- Die aktive Tabellenzeile, der warme Chevron-Hintergrund und die goldene linke Detailkante bilden eine zusammenhängende Auswahlfläche.
-- Identität, Clan und Truppkontext bilden eine flache, klar getrennte Kopfzeile ohne unnötige Label-Leerflächen.
-- Leistungswerte stehen auf Desktop in einer einzigen ruhigen Zeile mit tabellarischen Zahlen; auf schmalen Ansichten brechen sie kontrolliert in gleichmäßige Raster um.
-- VIP-, Beobachtungs- und Warnstatus sind als kompakte Status-Chips von den Aktionen getrennt.
-- Nachricht, Bestrafen, Kicken, Bannen und Profil bleiben kompakt; die Bannaktion besitzt den vereinbarten Hammer und eine zurückhaltende Warnfarbe.
-- Bei 1024, 768 und 390 Pixeln gruppieren sich Identität, Kontext, Statistiken und Aktionen ohne abgeschnittene Inhalte und ohne horizontalen Überlauf neu.
-
-## Pflichtflächen
-
-- Typografie: bestehende Frontline-Familien, Gewichte und Großschreibung beibehalten; Zahlen mit tabellarischen Ziffern und lokalisierter Dezimaldarstellung.
-- Spacing/Layout: gleichmäßige 1-Pixel-Trenner, kompakte 30-Pixel-Aktionen auf Desktop, 44-Pixel-Ziele auf schmalen Ansichten; keine unnötige braune Detailfläche.
-- Farben/Tokens: ausschließlich bestehende MUI-/Frontline-Tokens; Gold als Auswahlkante, semantische Warn- und Fehlerfarben nur für Status und Bannaktion.
-- Assets/Icons: vorhandene MUI- und Font-Awesome-Icons weiterverwendet; keine Ersatzzeichnungen oder Platzhalter.
-- Copy/Inhalt: Fraktion statt generischem Team im Detailkopf; bestehende deutsche Kurzlabels (TKs, Kampf, Offensive, Defensive, Support, Zeit) beibehalten.
-
-## Vergleichshistorie
-
-1. P1 – Spieler- und Protokollbereich hatten voneinander unabhängige, höhenbegrenzte Scrollflächen.
-   - Fix: Maximalhöhen und internes vertikales Overflow entfernt; beide Panels an den zentralen Seiten-Scroller gebunden und im Grid auf gleiche Höhe gestreckt.
-   - Post-Fix-Evidenz: Browsermessung zeigt identische Panelunterkanten; Tabellenviewport und Eventstream haben jeweils `scrollHeight <= clientHeight`; der App-Hauptbereich besitzt den einzigen vertikalen Overflow.
-2. P2 – Das Spieler-Detail wirkte als lose Folge von Informationen und Aktionen.
-   - Fix: responsive Drei-Band-Struktur für Identität, Werte sowie Status/Aktionen; neutrale anthrazitfarbene Fläche und Goldkante für die Auswahl.
-   - Post-Fix-Evidenz: Desktop-, 1024- und 768-Pixel-Aufnahmen zeigen klare Gruppierung ohne Überdeckung oder abgeschnittene Aktionen.
-3. P2 – Die Tabelle erzeugte im Operationsmodus eine horizontale Zwei-Pixel-Scheinüberbreite.
-   - Fix: redundante linke/rechte Tabellenränder innerhalb des bereits umrandeten Spielerpanels entfernt und Box-Sizing stabilisiert.
-   - Post-Fix-Evidenz: Tabellenviewport `clientWidth = scrollWidth`; die obere horizontale Leiste ist im Standardmodus ausgeblendet.
-4. P2 – Das ausgeklappte Detailband wirkte im Vergleich zum Mockup noch technisch und visuell von seiner Tabellenzeile getrennt.
-   - Fix: aktive Tabellenzeile hervorgehoben, Chevron als Auswahlindikator gestaltet, neutrale Flächenhierarchie eingeführt, Status-Chips mit semantischen Icons ergänzt und Desktop-Statistiken auf eine Zeile verdichtet.
-   - Post-Fix-Evidenz: direkter Bildvergleich zwischen Referenz-Mockup und finaler Browseraufnahme zeigt dieselbe Informationshierarchie; die Umsetzung bleibt kompakter und respektiert die bereits vereinbarte gemeinsame Bannaktion.
-
-## Interaktionen und technische Prüfung
-
-### Iteration 1 — blocked
-
-- P2: the first build displayed all team rows and therefore lacked the mockup's compact footer/pagination rhythm.
-- P2: the demo refresh replaced the dense 36-player initial state with six players and removed the next map.
-- P2: sort direction and country used text/emoji-like glyph presentation instead of the selected icon language.
-
-Fixes: independent team pagination, 17-row default page size, durable live-game Mirage data, stable next-map payload, MUI direction/public icons, uppercase mode label, and explicit unknown/offline status handling.
-
-### Iteration 2 — passed
-
-Post-fix evidence: `live-game-option2-qa.png` and `live-game-option2-comparison.png`. The mirrored table density, footer rhythm, persistent demo state, selection/inspector linkage and icon language now match the target without actionable P0/P1/P2 differences.
-
-## Follow-up polish
-
-- P3: capture dedicated 1000 px and 390 px screenshots when the in-app browser exposes viewport emulation; the implemented breakpoints already switch the inspector to a drawer and the teams to tabs.
-- P3: a later backend enhancement could add reliable current squad/role data, but those values should not be inferred in this UI.
-
-final result: passed
-
----
-
-# Design QA — Completed game command dossier
-
-## Evidence
-
-- Source: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-44b9f318-ef8b-495e-9f98-d8a5adf6363a.png`
-- Implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\game-detail\16-option1-final-desktop.png`
-- Full comparison: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\game-detail\14-design-qa-full.png`
-- Focused content comparison: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\game-detail\15-design-qa-focus.png`
-- Mobile top: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\game-detail\09-option1-mobile-top.png`
-- Mobile table after correction: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\game-detail\12-option1-mobile-table-fixed.png`
-- Mobile expanded player: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\game-detail\13-option1-mobile-expanded.png`
-- Desktop viewport: 1487 × 1058 px, completed game `fln-demo-1`, no open menus or expanded rows.
-- Mobile viewport: 390 × 844 px, completed game `fln-demo-1`, default and expanded-player states.
-
-## Comparison result
-
-The implementation preserves the selected Command Dossier direction: an angular three-part match banner, a continuous 3 × 2 performance matrix, and a full-width analysis table. The implementation uses the existing Frontline navigation, tokens, typography, map asset, icon family, and production-ready controls rather than reproducing decorative placeholders from the mockup.
-
-- Layout and spacing: section order, visual hierarchy, square borders, dense ledger rhythm, and column alignment match the target. The implementation keeps the game table slightly denser so the existing role, squad, country, selection, expansion, and action capabilities remain available.
-- Typography and color: Frontline display/body hierarchy, muted copy, gold headers and values, and faction colors match the target intent. No generic rounded cards, shadows, gradients, emoji, or custom SVG substitutes were introduced.
-- Imagery and icons: the real map asset and the existing MUI icon set are used. The image keeps a stable crop at desktop and becomes a full-width banner on mobile.
-- Responsiveness: the desktop dossier becomes a stacked scorecard, swipeable performance categories, compact player rows, and expandable player statistics at 390 px. Controls remain reachable above the persistent mobile navigation.
-- Accessibility and behavior: semantic regions/headings, labelled search and filters, keyboard-accessible buttons, table selection, row expansion, column selection, CSV export, and player actions remain in place. Browser logs contain no runtime errors.
-
-## QA iterations
-
-1. Initial desktop comparison: matched the selected composition and exposed no P0/P1 desktop issues.
-2. Initial mobile pass: found a P2 overlap where long team/squad/role metadata entered the K/T/TK columns.
-3. Correction: reduced fixed statistic-column widths and explicitly clipped the metadata column with an ellipsis.
-4. Final mobile and desktop pass: no overlap, clipping, broken hierarchy, inaccessible core control, or runtime error remains.
-
-## Verification
-
-- Production build: passed (`vite build`).
-- Desktop browser QA: passed.
-- Mobile browser QA: passed.
-- Search filtering: passed.
-- Desktop and mobile row expansion: passed.
-- Column chooser: passed.
-- Console errors: none.
-
-passed
-
----
-
-# Design QA — Discord & Kommunikation
-
-## Evidence
-
-- Source visual truth: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-0311286f-9538-4c20-bd89-ed18a87c047c.png`
-- Desktop implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\integrations-hub\implementation-desktop.png`
-- Mobile implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\integrations-hub\implementation-mobile.png`
-- Normalized side-by-side comparison: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\integrations-hub\comparison-full.png`
-- Desktop viewport and capture: 1487 × 1058 px, Kills & Teamkills selected and expanded.
-- Mobile viewport and capture: 390 × 844 px, search term `kills`, Kills & Teamkills selected and expanded.
-
-## Comparison result
-
-The implementation follows the selected full-width ledger direction and the established Frontline design line. Eleven previously separate settings pages are represented as two dense groups: eight Discord webhooks and three related communication or hosting modules. Rows remain square, compact and separated by one-pixel dividers; the active row expands a dedicated compact schema editor inline.
-
-- Layout and hierarchy: the header, search/filter rail, four-column ledger, group labels, module rows and inline editor match the reference composition.
-- Product-safe deviation: the mockup's unverified connection-state filters and status values were replaced by factual category filters and configuration states. This avoids simulating health data and avoids loading all eleven configurations on entry.
-- Form fidelity: the selected mockup used a conceptual short Kills form. The corrected implementation now mounts a dedicated compact schema editor rather than the legacy settings workbench, while preserving validation, Formular/JSON modes, save/reset behavior and permissions.
-- Visual language: existing Frontline typography, gold active state, dark green-black surfaces, MUI icons and square borders are preserved. No rounded card treatment, shadows, gradients, emoji or placeholder artwork were introduced.
-- Responsive behavior: at 390 px the ledger reflows to a compact module/purpose/status stack, the category filters remain horizontally reachable and the expanded form uses the full available width. `documentElement.scrollWidth` and `body.scrollWidth` both remained 390 px.
-
-## Interaction and compatibility checks
-
-- Hub landing route `/settings/integrations`: passed without forcing the Audit permission or loading an arbitrary module.
-- New detail route `/settings/integrations/kills`: passed; selected row and inline form remain synchronized with the URL.
-- Search: passed with `kamera` and `kills`.
-- Category filters: passed for Discord and Hosting.
-- Legacy direct links: passed for `/settings/webhooks/chat` and `/settings/others/rcon-chat-commands`; both retain their URL and open the corresponding row.
-- Permissions: each module retains its exact view/change permissions; change controls are disabled when only view access is present.
-- Secrets: webhook values remain inside the existing masked schema controls and are not summarized in the ledger.
-- Browser console: no runtime errors; only the existing React Router v7 future-flag warnings were present.
-- Unsaved-change guard: present for module switches and navigation. The native confirmation dialog could not be completed by the browser automation runtime, but this is not a visual blocker and the guard path is explicit in the implementation.
-
-## QA history
-
-1. P2 — formatting the complete locale files created a noisy multi-thousand-line diff.
-   - Fix: reverted only the mechanical formatting and reapplied the integration copy as focused additions.
-   - Post-fix evidence: locale diffs are limited to the new hub copy, generic module notification copy and navigation label.
-2. P2 — the first ledger implementation suppressed row dividers through a `first-of-type` selector that matched each row wrapper.
-   - Fix: row separators now use the module index and render consistently between players/modules while preserving the active expanded block.
-   - Post-fix evidence: the final desktop comparison shows continuous, calm one-pixel row separation across both groups.
-3. Final normalized comparison: no actionable P0, P1 or P2 visual discrepancy remains.
-
-final result: passed
-
----
-
-# Design QA — VIP-Einsatzregister (Option 1)
-
-## Evidence
-
-- Source visual truth: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-352047f9-32f0-4929-9348-dcc45136ef0d.png`
-- Final desktop implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\vips\09-implementation-1704x923-selected-expanded.png`
-- Final full-view comparison: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\vips\10-qa-final-full-comparison.png`
-- Final focused register comparison: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\vips\11-qa-final-register-comparison.png`
-- Mobile implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\vips\04-implementation-mobile.png`
-- Tablet implementation: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\product-design\vips\05-implementation-tablet.png`
-- Source pixels: 1704 × 923.
-- Final implementation pixels and CSS viewport: 1704 × 923 at device scale factor 1; no density conversion required.
-- Additional responsive checks: 768 × 900 and 390 × 844 CSS pixels.
-- Compared state: German dark theme, four realistic VIP records, FLN_Wolf selected and expanded, current-server mutation scope.
+Nach dem Öffnen beider Trupps werden `FLN_Wolf` und `FLN_Falcon` in ihren tatsächlichen Teamzeilen mit Zielteamfarbe, Einzugslinie und Richtungspfeil markiert. Der Fokusbeleg bestätigt, dass die Empfehlung nicht nur in der Einsatzleiste genannt wird, sondern in der bestehenden Teamliste wiederauffindbar bleibt. Andere Spielerzeilen, Rollen, Werte und Moderationsaktionen bleiben unverändert.
 
 ## Findings
 
-- No actionable P0, P1 or P2 mismatch remains. The implementation preserves the selected Einsatzregister composition: command header, five-part summary strip, narrow filter rail, dense one-line register, selected/expanded VIP case file and sticky bulk-action strip.
-- Fonts and typography: the existing Frontline condensed display hierarchy and compact body labels are retained. Table copy uses the same restrained weights, uppercase labels and line rhythm as the selected visual.
-- Spacing and layout rhythm: square one-pixel borders, compact row height, gold selection line and flat detail surface match the mockup. The register uses the available width without horizontal overflow.
-- Colors and visual tokens: the implementation uses the existing green-black surfaces, ivory text, restrained gold focus state and semantic green/amber/red statuses. No gradients, shadows or generic rounded cards were added.
-- Image and icon fidelity: the selected visual contains no required raster imagery. Existing MUI icons provide a consistent real icon family for VIP, status, edit, delete, profile, refresh and import/export actions; no custom SVG or CSS drawings were introduced.
-- Copy and content: the list source is explicitly labelled as the current server, while the mutation scope clearly distinguishes this server from all servers. The implementation intentionally omits creator/history metadata shown conceptually in the mockup because the current API does not supply reliable values.
-- Responsive behavior: at 390 px the desktop table becomes compact mobile records, filters collapse behind an explicit button, actions retain usable targets and the document remains exactly 390 px wide. At 768 px the detail file uses a four-column information band without clipping.
-- Accessibility and behavior: search, quick filters, duration filter, mutation scope, sorting, page selection, row expansion, profile access, add/edit, import/export, confirmation and bulk actions are keyboard-addressable and labelled. Individual removal now requires confirmation.
+- Keine offenen P0-, P1- oder P2-Abweichungen.
+- [P3] Das Mockup zeigt die Bezeichnung „Kompakte Einsatzleiste“, während die Implementierung die kürzere produktive Bezeichnung „Live-Balance“ verwendet. Die Informationshierarchie bleibt identisch; die kürzere Copy passt in die vorhandene Teamansicht und ist auf kleineren Viewports stabiler.
 
-## Comparison history
+## Pflichtflächen
 
-1. P2 — the first mobile summary left the fifth status tile at half width and created an unbalanced empty cell.
-   - Fix: the final status tile now spans both mobile grid columns and returns to one column from the tablet breakpoint onward.
-   - Post-fix evidence: final 390 px viewport has no horizontal overflow and a balanced full-width expired-status row.
-2. P2 — the first comparison used an expanded but unselected implementation row, while the source truth showed both selection and expansion plus a bulk-action strip.
-   - Fix: the final comparison uses the same selected/expanded state and verifies the sticky selection actions.
-   - Post-fix evidence: `10-qa-final-full-comparison.png` and `11-qa-final-register-comparison.png` show matching gold row emphasis, expanded dossier and bulk controls.
-3. Product-safe deviation — the source mock reports two active records despite three non-expired records, and includes profile/creator timestamps unavailable from the current VIP endpoint.
-   - Resolution: the implementation derives the factual active total from expiration data and does not invent unavailable audit metadata.
+- Fonts und Typografie: vorhandene Frontline-Schriftfamilie, Versalien, Gewichte, Zeilenhöhen und tabellarische Zahlen bleiben erhalten. Überschrift, Status, Kennzahlen und Handlungsbuttons entsprechen der bestehenden optischen Hierarchie.
+- Spacing und Layout: eckige 0-px-Geometrie, feine Trenner, sechs Entscheidungszellen und eine getrennte Prognosezeile. Bei 1280 × 720 besteht kein horizontaler Dokumentüberlauf; die Einsatzleiste bleibt vollständig sichtbar.
+- Farben und Tokens: Frontline-Gold, semantisches Rot/Grün und die vorhandenen Teamfarben werden aus Theme beziehungsweise etablierten Teamwerten abgeleitet. Status wird zusätzlich durch Text, Icons und Richtungspfeile vermittelt.
+- Bild- und Assetqualität: Es sind keine neuen Rasterbilder oder Platzhalter erforderlich. Für UI-Symbole werden ausschließlich vorhandene MUI-Icons verwendet; die Teamstärkebalken sind echte Datenvisualisierungen.
+- Copy und Inhalt: Spielerzahl und Teamstärke werden ausdrücklich getrennt bewertet. Die Oberfläche erklärt, dass ein 1:1-Tausch nur eine Moderator-Empfehlung ist und niemals automatisch ausgeführt wird.
+- Datenquelle: Spielerzahl, Level und Leistungswerte stammen ausschließlich aus dem aktuellen `get_team_view`-Snapshot. Die Teamstärke ist sofort verfügbar und benötigt weder historische Runden noch eine vorgelagerte Lern- oder Sammelphase.
 
-## Verification
+## Interaktionen und technische Evidenz
 
-- Production build: passed with `REACT_APP_API_URL=/`.
-- Search and expiring-within-seven-days filter: passed; the result set contains FLN_Valkyrie and excludes FLN_Raven.
-- Desktop and mobile row expansion: passed.
-- Selection and sticky bulk actions: passed.
-- Add/edit and import/export dialogs: passed.
-- Desktop, tablet and mobile horizontal overflow: none.
-- Browser console errors: none; only the existing React Router v7 future-flag warning remains.
+- „Warum?“ öffnet die fachliche Erklärung; „Beobachten“ reduziert die Einsatzleiste; „Öffnen“ stellt sie wieder her.
+- „Tausch prüfen“ öffnet eine Inline-Prüfung mit Kandidaten, Alternativen, Vorher-/Nachher-Prognose und Datenquelle. Die URL bleibt dabei auf `/views/team`.
+- „Beide Teams wechseln“ übergibt die zwei geprüften Spieler an die vorhandene Teamwechsel-Aktion. Deren Berechtigungsprüfung und zweistufige Sicherheitsbestätigung bleiben vollständig erhalten; im QA-Lauf wurde vor der Ausführung abgebrochen.
+- Beide vorgeschlagenen Spieler wurden nach Öffnen der Trupps sichtbar und korrekt nach Zielteam eingefärbt.
+- Browserkonsole: keine Warnungen oder Fehler im Abschlusslauf.
+- Live-Balance-Vertragsprüfung: sofortiger Level-Fallback ohne Historie, Führungsrollenausschluss und Live-Teamwechselvorschlag bestanden.
+- Vite-Produktionsbuild: bestanden; nur die bekannte Chunk-Größenwarnung bleibt bestehen.
+- Designfundament, Seitensemantik und Adminaktionsvertrag: bestanden. `git diff --check`: bestanden.
 
-## Follow-up polish
+## Vergleichshistorie
 
-- P3: if the backend later exposes creator, creation time and last-update metadata, those fields can be added to the VIP case file without changing its layout.
+1. Der erste gemeinsame Source-/Implementierungsvergleich zeigte keine umsetzungsbedingten P0-, P1- oder P2-Abweichungen.
+2. Die bewusst kleinere Browserhöhe wurde mit einem separaten Fokusbeleg der geöffneten Teamlisten ergänzt; Kandidatenmarkierung und Richtung sind dort vollständig sichtbar.
+3. Die Detailnavigation wurde durch den Inline-Review ersetzt. Nach Dialog-, Aktions-, URL- und Konsolenprüfung blieben keine blockierenden oder mittleren Findings offen.
+
+## Implementation Checklist
+
+- [x] Spielerzahl und Teamstärke getrennt bewertet.
+- [x] Review-only 1:1-Tausch ohne automatische Ausführung ergänzt.
+- [x] Führungsrollen und Spezialtrupps aus der Stärkeempfehlung ausgeschlossen.
+- [x] Kandidaten in der Teamliste hervorgehoben.
+- [x] Erklärung, Ein-/Ausklappen, Inline-Review und direkte Moderationsaktion geprüft.
+- [x] Sofortberechnung ausschließlich aus dem aktuellen Live-Snapshot geprüft.
+- [x] Source und Implementierung in einem gemeinsamen Vergleichseingang beurteilt.
+
+final result: passed
+
+---
+
+# Design QA · Phase 5 – Systemdiagnose, Protokolle und Spielarchiv
+
+## Prüfgrundlage
+
+- Source Visual Truth: `.codex/audits/full-rcon-concept/screenshots/desktop/games.png` sowie die bereits freigegebenen Arbeitsflächen für Dienste, Gameserver, CRCON, Steam, Log-Stream, Killrate, Spielprotokolle und Audit-Protokolle. Maßgeblich sind außerdem die Seitenziele 66–75 in `docs/product-design/rcon-product-concept.md`.
+- Implementierung: `.codex/phase5-after/desktop-games-1280x720.png`, `.codex/phase5-after/mobile-games-390x844.png`, `.codex/phase5-after/desktop-games-saved-views-dialog-1280x720.png`, `.codex/phase5-after/mobile-games-saved-views-dialog-390x844.png` und `.codex/phase5-after/desktop-games-light-deuteranopia-1280x720.png`.
+- Same-State-Vergleich: `.codex/phase5-after/compare-desktop-games.png`; Ausgangszustand und finale Implementierung liegen dort ohne Skalierung nebeneinander.
+- Viewports: Desktop 1280 × 720, Mobile 390 × 844, jeweils Browser-Dichte 1. Primärzustand: dunkles Frontline-Theme, deutsche Sprache und lokaler Fake-Server. Zusätzlich wurde Hell plus Deuteranopie geprüft und anschließend wieder auf Dunkel plus Standard zurückgestellt.
+
+## Ergebnis
+
+Die zehn Abschlussrouten behalten ihre bereits freigegebenen Diagnose-, Protokoll- und Detailstrukturen. Im Spielearchiv ergänzt eine neue, zurückhaltende „Ansichten“-Aktion die bestehenden Filter. Nutzer können Suchbegriff, Zeitraum, Umgebung und Spielmodus als benannte Ansicht sichern, wieder anwenden und löschen. Die Ansichten bleiben absichtlich browserlokal: Es gibt keine Servermutation, keine neue API und keine Änderung des bestehenden Archivvertrags.
+
+Auf Mobilgeräten öffnet sich die Ansichtenverwaltung als vollständige Arbeitsfläche. Auf Desktop bleibt sie ein kompakter Dialog. Aktive Ansichten werden am Auslöser und in der Liste zusätzlich als Text beziehungsweise `aria-pressed` ausgewiesen; Zustand wird nicht nur über Farbe vermittelt.
+
+## Findings
+
+- Keine offenen P0-, P1- oder P2-Abweichungen.
+- [behoben] [P1] Das Spielearchiv verwendete im hellen Theme noch fest codierte dunkle Flächen und Rahmen. Dadurch stand dunkler Text auf einem zu dunklen Hintergrund. Archiv, Gruppenzeilen, Hover und Fokus verwenden jetzt die Theme-Tokens `background.paper`, `divider`, `action.hover` und `action.selected`.
+- [behoben] [P2] Das Spielarchiv besaß zwar Filter, aber keine wiederverwendbaren Arbeitsansichten. Bis zu zwölf normalisierte Filteransichten können nun lokal gespeichert werden; beschädigte oder veraltete Browserdaten fallen sicher auf eine leere Liste zurück.
+- [P3] Die lokale Entwicklungsumgebung protokolliert ausschließlich die bekannte React-Router-v7-Future-Flag-Warnung. Es traten keine Console-Errors und kein Runtime-Fehleroverlay auf.
+
+## Responsivität, Semantik und Interaktion
+
+- Alle zehn Routen wurden bei 1280 × 720 und 390 × 844 geprüft: `/settings/services`, `/settings/others/game-server`, `/settings/others/crcon`, `/settings/others/steam`, `/settings/others/log-stream`, `/settings/others/watch-kill-rate`, `/records/game-logs`, `/records/audit-logs`, `/stats/games` und `/stats/games/fln-demo-1`.
+- Jede Route besitzt genau eine `h1`, geladenen Hauptinhalt, keinen horizontalen Dokument- oder Hauptinhaltsüberlauf und keine Browser-Laufzeitfehler. Die vollständige Matrix umfasst 20 bestandene Browserprüfungen.
+- Eine gefüllte mobile Ansichtenverwaltung mit „Letzte Nacht“ wurde zusätzlich auf Speichern, sichtbare Listendarstellung, Löschen und horizontalen Überlauf geprüft. Nach dem Test blieb keine Testansicht zurück.
+- Namen sind auf 120 Zeichen begrenzt, doppelte Namen werden ohne zusätzliche Listenzeile aktualisiert und die Anzahl ist auf zwölf Ansichten begrenzt. Zeitraum, Umgebung, Modus und Suche werden vor Speicherung normalisiert.
+- Dialog, Eingabe, Anwenden- und Löschen-Aktionen besitzen zugängliche Namen. Mobile nutzt den vollständigen 390 × 844 Viewport ohne Überlauf; Desktop und Mobile bleiben in der eckigen Frontline-Formensprache.
+
+## Automatisierte Evidenz
+
+- Produktionsbuild mit `REACT_APP_API_URL=/api/`: bestanden; 14.146 Module transformiert.
+- Zehn Vertragsprüfungen bestanden: Designfundament, Seitensemantik, Aktionsfeedback, Operator-Copy, Navigation, Configuration Workbench, Konfigurationskompatibilität, Adminaktionen, Communication Workbench und History Workbench.
+- Browsermatrix: 20/20 Abschlussrouten bestanden; zusätzlicher gefüllter Mobile-Dialog bestanden.
+- Initial Entry: 400,82 kB raw / 121,48 kB gzip; initiales JavaScript: 1.498,98 kB raw / 480,25 kB gzip. Das neue Spielearchiv bleibt lazy geladen (`games`: 18,73 kB raw / 6,36 kB gzip).
+
+final result: passed
+
+---
+
+# Design QA · Phase 4.3 – Kommunikation und Integrationen
+
+## Prüfgrundlage
+
+- Source Visual Truth: `.codex/audits/full-rcon-concept/screenshots/desktop/welcome-message.png`, `.codex/audits/full-rcon-concept/screenshots/mobile/welcome-message.png`, `.codex/audits/full-rcon-concept/screenshots/desktop/integrations.png`, `.codex/audits/full-rcon-concept/screenshots/mobile-390/integrations.png`, `.codex/audits/full-rcon-concept/screenshots/desktop/integration-audit.png` sowie die freigegebenen Seitenziele 37–39 und 54–65 in `docs/product-design/rcon-product-concept.md`.
+- Bereits vorhandene Zielstruktur: Willkommensnachricht mit Editor, Vorlagen und Ingame-Vorschau; Kampagnen mit Inhalt, Zielgruppe, Ausspielung, Test und Zustellaktivität; Integrationshub mit elf kompatiblen Modulen und gemeinsamem Connector-Editor.
+- Aktuelle Teiländerung: mobile Integrationsfilter als vollständig sichtbares 2×2-Raster sowie geführte, rekursive Schlüssel-/Wert-Felder anstelle eines JSON-Texteditors für dynamische Konfigurationsobjekte. Schema-definierte Felder bleiben als beschriftete, validierte Controls erhalten und können nicht versehentlich als dynamischer Eintrag gelöscht werden; nur unbekannte Bestandsfelder erscheinen getrennt als „Weitere Einträge (Kompatibilität)“.
+
+## Prüfzustand und Vergleichseingänge
+
+- Implementierung: `.codex/phase43-after/desktop-integrations-1280x720.png`, `.codex/phase43-after/desktop-integration-audit-1280x720.png`, `.codex/phase43-after/mobile-integrations-390x844.png`, `.codex/phase43-after/mobile-integration-audit-390x844.png` und `.codex/phase43-after/mobile-rcon-chat-commands-form-390x844.png`.
+- Gemeinsame Same-State-Vergleiche: `.codex/phase43-after/compare-desktop-audit.png` und `.codex/phase43-after/compare-mobile-integrations.png`. Source und Implementierung liegen dort ohne Skalierung nebeneinander.
+- Theme- und Farbseh-Evidenz: `.codex/phase43-after/desktop-appearance-light-deuteranopia-dialog-1280x720.png` und `.codex/phase43-after/desktop-integration-audit-light-deuteranopia-1280x720.png`.
+- Viewports: Desktop 1280 × 720 CSS- und Bildpixel, Mobile 390 × 844 CSS- und Bildpixel, jeweils Browser-Dichte 1. Der primäre Zustand verwendet Frontline Gold, dunkles Theme, Standard-Farbsehen, deutsche Sprache, Demo-Server 2 und HLL mit 98/100 Spielern.
+
+## Full-View- und Fokusvergleich
+
+Desktop behält die freigegebene tabellarische Integrationsübersicht mit kompaktem Konfigurationsbereich bei. Der Same-State-Vergleich zeigt keine unbeabsichtigte Verschiebung von Header, Spalten, Modulzeile oder Ziel-Editor. Mobile ersetzt dagegen gezielt die zuvor abgeschnittene horizontale Filterleiste durch ein vollständig sichtbares 2×2-Raster. Dadurch sind alle vier Kategorien ohne seitliches Scrollen erreichbar, während die Modulliste und die feste Bottom-Navigation ihren Rhythmus behalten.
+
+Im Fokusvergleich wurden der sensible Audit-Webhook und die tief verschachtelte RCON-Chatbefehls-Konfiguration geprüft. Der Webhook bleibt maskiert und besitzt eine beschriftete Einblenden-Aktion. RCON-Befehle, Bedingungen, Zahlenbereiche, boolesche Zustände, Listen und verschachtelte Objekte erscheinen als geführte Eingaben; Endanwender sehen keinen JSON-Editor und müssen keine JSON-Syntax beherrschen.
+
+## Findings
+
+- Keine verbleibenden P0-, P1- oder P2-Abweichungen.
+- [behoben] [P1] Die vier mobilen Integrationsfilter lagen in einer horizontal scrollenden Zeile und konnten abgeschnitten erscheinen. Sie verwenden jetzt zwei vollständig sichtbare Spalten auf 390 Pixeln und vier Spalten ab dem nächsten Breakpoint.
+- [behoben] [P1] Dynamische Objekte fielen auf einen JSON-Texteditor zurück. Sie werden jetzt als benannte Einstellungen, primitive Werte, Listen und rekursive Untereinstellungen bearbeitet.
+- [behoben] [P1] Schema-definierte Felder und zusätzliche Bestandsfelder wurden bei Objekten mit `additionalProperties` gemeinsam als löschbare Schlüssel-/Wert-Zeilen behandelt. Feste Schemafelder bleiben nun in ihren geführten Controls; nur unbekannte Zusatzfelder erscheinen getrennt unter „Weitere Einträge (Kompatibilität)“.
+- [P3] Die lokale Entwicklungsumgebung protokolliert ausschließlich die bereits bekannte React-Router-v7-Future-Flag-Warnung. Es traten keine Console-Errors und kein sichtbares Runtime-Fehleroverlay auf.
+
+## Pflichtflächen und Accessibility
+
+- Typografie, eckige Formensprache, Abstände, Rahmen, Primärfarbe und Statusfarben verwenden unverändert das Frontline-Designsystem. Hell plus Deuteranopie wurde live geprüft und anschließend wieder auf Dunkel plus Standard zurückgestellt.
+- Mobile Hub, Audit-Detail und RCON-Konfiguration bleiben innerhalb von 390 Pixeln ohne horizontalen Dokumentüberlauf. Desktop bleibt bei 1280 Pixeln ebenfalls überlauffrei und besitzt genau eine `h1`.
+- Alle elf Module sind native Buttons mit `aria-expanded`; Suche und Filter besitzen zugängliche Namen und Gruppensemantik. Entfernen-, Einblenden-, Hinzufügen-, Zurücksetzen- und Speichern-Aktionen sind beschriftet. Die sichtbaren Formularfelder werden über native MUI-Labels oder Gruppennamen zugeordnet; das zusätzliche MUI-Mess-Textarea ist korrekt `aria-hidden` und nicht fokussierbar.
+- Status wird nicht ausschließlich über Farbe vermittelt. Text, Icons, Rahmen und `aria-pressed` ergänzen Aktiv-, Konfiguriert-, Auswahl- und Warnzustände.
+
+## Fachliche und funktionale Prüfung
+
+- Filter „Befehle“ und Suche nach „RCON“ reduzieren die Modulliste korrekt; Zurücksetzen stellt alle Module wieder her.
+- Audit öffnet ohne Laufzeitfehler, zeigt das vorhandene Ziel maskiert und enthält keinen erweiterten JSON-Schalter oder JSON-Textarea.
+- RCON-Chatbefehle rendern bestehende Listen, verschachtelte Bedingungen, Zahlen und boolesche Werte rekursiv. Neue dynamische Schlüssel lassen sich nur mit eindeutigem Namen ergänzen; doppelte oder leere Schlüssel werden verhindert.
+- Unbekannte Bestandsfelder bleiben durch `mergeConfigWithSchema` erhalten. Kein API-, RCON-, Discord- oder Gameserververtrag wurde verändert; während der QA wurde keine mutierende Aktion außerhalb des lokalen Fake-Backends ausgelöst.
+- Theme und Farbsehmodus wurden über die reale Benutzeroberfläche auf Hell plus Deuteranopie umgestellt, auf der Audit-Konfiguration geprüft und anschließend auf Dunkel plus Standard zurückgesetzt.
+
+## Automatisierte Evidenz
+
+- Produktionsbuild mit `REACT_APP_API_URL=/api/`: bestanden.
+- Kommunikations-Workbench, Konfigurationskompatibilität, Designfundament, Seitensemantik, Aktionsfeedback, Operator-Copy, Navigation, Configuration Workbench, Adminaktionen und initiales Bundle-Budget: bestanden.
+- Initial Entry: 400,98 kB raw / 121,50 kB gzip; initiales JavaScript: 1.498,11 kB raw / 480,37 kB gzip.
+- Browsergerenderte Implementierung, Primärinteraktionen, Semantik, Theme/Farbsehmodus, Konsolenprüfung, Mobile-Overflow und visueller Same-State-Vergleich: bestanden.
+
+final result: passed
+
+---
+
+# Design QA · Phase 4.2 – Sektorsteuerung und Kartenabstimmung
+
+## Prüfgrundlage
+
+- Source Visual Truth: die unveränderten Ausgangszustände unter `.codex/phase42-baseline/` sowie das freigegebene Produktkonzept in `docs/product-design/rcon-product-concept.md` für die Routen `/settings/maps/objectives`, `/settings/maps/votemap`, `/settings/maps/votemap/whitelist` und `/settings/maps/votemap/settings`.
+- Implementierung: `.codex/phase42-after/desktop-objectives.png`, `.codex/phase42-after/desktop-votemap-status.png`, `.codex/phase42-after/desktop-votemap-pool.png`, `.codex/phase42-after/desktop-votemap-settings.png`, die vier gleichnamigen Mobile-Aufnahmen sowie `.codex/phase42-after/mobile-objectives-selection.png`.
+- Gemeinsame Vergleichseingänge: `.codex/phase42-after/compare-desktop-objectives.png`, `.codex/phase42-after/compare-mobile-objectives.png`, `.codex/phase42-after/compare-mobile-votemap-status.png`, `.codex/phase42-after/compare-mobile-votemap-pool.png` und `.codex/phase42-after/compare-mobile-votemap-settings.png`.
+- Theme- und Farbseh-Evidenz: `.codex/phase42-after/desktop-objectives-light-deuteranopia.png`.
+- Viewports und Normalisierung: Desktop 1440 × 900 CSS- und Bildpixel, Mobile 390 × 844 CSS- und Bildpixel, Browser-Dichte 1. Die Screenshots enthalten ausschließlich den App-Viewport.
+- Zustand: Frontline Gold, dunkles Theme, deutsche Sprache, Demo-Server 2, HLL, 98/100 Spieler. Die Theme-Prüfung verwendete Hell plus Deuteranopie und wurde anschließend ohne Speicherung verworfen.
+
+## Full-View-Vergleich
+
+Die Sektorsteuerung ersetzt das defekte, abstrakte Raster durch die echte taktische Karte und eine native 5×5-Zielauswahl. Karte, Reihenfortschritt, Zufallskriterien und die unmittelbare Neustartwirkung bilden nun einen zusammenhängenden Arbeitsablauf. Mobile trennt die Aufgaben bewusst in „Taktische Karte“ und „Sektorfolge“, anstatt beide dichten Bereiche gleichzeitig zu stapeln. Die Kartenabstimmung bleibt fachlich in Live-Betrieb, Kartenpool und Einstellungen gegliedert, zeigt diese drei Aufgaben aber auf 390 Pixeln vollständig, ohne horizontales Dokumentscrollen oder verdeckte Abschlussaktionen.
+
+## Fokusvergleich
+
+- Sektoren: ein gültiges Ziel wurde direkt auf der taktischen Karte gewählt; der Fortschritt wechselte von null auf eine festgelegte Reihe und die mobile Auswahlansicht blieb innerhalb von 390 Pixeln.
+- Neustartbestätigung: der Dialog zeigte Zielserver `[GER] Frontline Network | #2`, aktuelle Karte Foy, betroffene 98 Spieler und alle fünf Reihen. Zufällige Reihen werden lokalisiert als „Zufällig“ bezeichnet. Abbrechen schloss den Dialog ohne API- oder Gameserveraktion.
+- Kartenpool: Kursk wurde dem lokalen Entwurf hinzugefügt, der Dirty-Zustand und drei Poolkarten wurden sichtbar; anschließend wurde der Entwurf zurückgesetzt, ohne zu speichern.
+- Einstellungen: eine Auswahlregel wurde geändert, der Dirty-Zustand erschien und Zurücksetzen stellte den Serverstand wieder her.
+
+## Findings
+
+- Keine verbleibenden P0-, P1- oder P2-Abweichungen.
+- [P3] Die bestehende In-App-Browser-Bindung verlor nach den vollständigen Desktop-/Mobile- und Theme-Aufnahmen ihre lokale Vorschauverbindung. Daher wurden Browserkonsolen-Ereignisse und die Enter-Aktivierung der nativen Sektorbuttons nach der letzten reinen Copy-Kürzung nicht erneut aufgezeichnet. Die Controls sind echte `button`-Elemente mit zugänglichem Namen, `aria-pressed` und Fokusdarstellung; Produktionsbuild und Semantikvertrag prüfen den finalen Codezustand.
+
+## Pflichtflächen
+
+- Fonts und Typografie: gemeinsamer `PageHeader`, vorhandene Frontline-Schriftfamilie, kondensierte Versalien und klar getrennte Status-, Anweisungs- und Wirkungstexte. Die letzten mobilen Tab- und Erinnerungslabels wurden bewusst auf „Live“ und „Letzte Erinnerung“ verkürzt.
+- Spacing und Layout: Desktop als taktische Karte plus Sektorfolge, Mobile als expliziter Aufgabenwechsel. Für alle vier Mobile-Routen gilt in der geprüften Endstruktur `main.scrollWidth === main.clientWidth === 380`; Abschlussleisten verdecken keinen Formularinhalt.
+- Farben und Tokens: ausschließlich vorhandene Theme-, Rahmen-, Auswahl-, Warn-, Erfolgs- und Gefahrentokens. Hell plus Deuteranopie wurde live geprüft; Auswahl und Wirkung werden zusätzlich über Text, Icon, Nummer und Rahmen vermittelt.
+- Bilder und Assets: die vorhandene echte taktische Karte wird über die Karten-ID beziehungsweise als kompatibler Fallback über den Kartennamen geladen. Etablierte MUI-Icons bleiben erhalten; keine Platzhalter, CSS-Zeichnungen, Emojis oder handgebauten SVGs.
+- Copy und Inhalt: aktuelle Karte, Anzahl festgelegter Reihen, Zufallskriterien, Neustartwirkung, Zielserver und betroffene Spieler werden vor der Ausführung erklärt. Die Kartenabstimmung beschreibt Live-Zustand, Poolentwurf und Auswahlregeln getrennt.
+- Icons und Zustände: Ziel gewählt, Zufall, Poolentwurf, gespeichert, geändert, zurücksetzen und unmittelbarer Neustart verwenden dieselbe Iconfamilie. Kein Status ist ausschließlich farbcodiert.
+- Responsivität und Accessibility: native Buttons je taktischem Ziel, `aria-pressed`, individuelle zugängliche Namen, semantische Tabs, beschriftete Auswahlfelder, sichtbare Fokusdarstellung und mobile Aufgabenflächen ohne horizontalen Überlauf.
+
+## Fachliche und funktionale Prüfung
+
+- Bestehende Verträge bleiben erhalten: `changeObjectives({ objectives, random_constraints })`, Kartenpool- und Kartenabstimmungs-Konfiguration sowie Loader- und Query-Verhalten wurden nicht erweitert oder umbenannt.
+- Die Zielauswahl bleibt auf exakt fünf Reihen begrenzt. Nicht gültige Außenfelder bleiben gesperrt; explizite Ziele und zufällige Reihen können weiterhin kombiniert werden.
+- Der Bestätigungsdialog fasst den tatsächlich aktuellen Entwurf zusammen und führt erst über die vorhandene Admin-Aktion zum unmittelbaren Kartenneustart. Während der QA wurde keine mutierende API-, RCON- oder Gameserveraktion ausgelöst.
+- Der Kartenpool behält verfügbare Karten und gespeicherten Pool als getrennte Entwurfsflächen. Die mobile Abschlussleiste ist statisch und überlagert weder Filter noch Karten.
+- Das numerische MUI-Maß `width: 1` im unsichtbaren Live-Bereich wurde zu `1px` korrigiert. Dadurch erzeugt die Statusseite keinen unbeabsichtigten 100-Prozent-Zusatzblock mehr.
+- Produktionsbuild sowie Design-, Semantik-, Aktions-, Operator-Copy-, Navigations-, Konfigurations-, Kompatibilitäts- und Admin-Vertragsprüfungen bestanden.
+- Bundle-Budget: 400,98 kB Entry-JavaScript bei 121,50 kB gzip und 1.498,11 kB initiales JavaScript bei 480,36 kB gzip; alle Grenzwerte eingehalten. Die neuen Workbench-Texte bleiben im lazy geladenen Kartenpaket.
+
+## Vergleichshistorie
+
+1. Ausgangsvergleich: [P1] Die taktische Karte war im Demo-/Fallbackzustand defekt, weil ausschließlich `map.id` verwendet wurde. Die Bildauflösung nutzt nun kompatibel `map.id ?? map.name`.
+2. Erste Mobile-Prüfung: [P1] scrollbare Tabs und Seitenbreiten-Hacks schnitten Aufgaben ab und erzeugten horizontalen Überlauf. Mobile verteilt alle drei Kartenabstimmungsaufgaben gleichmäßig; die Wurzelbreite bleibt 100 Prozent.
+3. Statusprüfung: [P1] der visuell versteckte Live-Bereich nutzte bei MUI `width: 1` und wurde dadurch 100 Prozent breit. Explizite `1px` beseitigen den Zusatzüberlauf.
+4. Kartenpool-Prüfung: [P1] die klebende mobile Abschlussleiste überdeckte Karten und Filter. Der Pool verwendet nun die statische mobile Abschlussleiste.
+5. Finaler Copy- und Dichtevergleich: [P2] lange Live- und Erinnerungslabels waren auf 390 Pixeln zu dominant. Die Labels wurden gekürzt, ohne ihre Bedeutung oder zugänglichen Seitentitel zu verlieren.
+6. Finale gemeinsame Vorher-/Nachher-Vergleiche bei identischen Viewports: keine offenen P0-, P1- oder P2-Findings.
+
+## Implementation Checklist
+
+- [x] Alle vier Routen vor und nach der Änderung auf Desktop und 390 × 844 Mobile geprüft.
+- [x] Fünf gemeinsame Vorher-/Nachher-Vergleiche bei identischem Zustand visuell beurteilt.
+- [x] Taktisches Ziel, mobile Aufgabenansicht, Neustartdialog, Poolentwurf, Einstellungsentwurf und Zurücksetzen geprüft.
+- [x] Theme, Deuteranopie, Semantik und Mobile-Overflow geprüft.
+- [x] Bestehende API-, Payload-, Persistenz- und Gameserververträge unverändert erhalten.
+- [x] Produktionsbuild, Bundle-Budget und neun statische Vertragsprüfungen bestanden.
+
+final result: passed
+
+---
+
+# Design QA · Phase 4.1 – Kartenbetrieb und Rotation
+
+## Prüfgrundlage
+
+- Source Visual Truth: die unveränderten Ausgangszustände unter `.codex/phase41-baseline/` sowie das freigegebene Produktkonzept in `docs/product-design/rcon-product-concept.md` für die Routen `/settings/maps/change`, `/settings/maps/rotation`, `/settings/maps/rotation/sequence` und `/settings/maps/rotation/settings`.
+- Implementierung: `.codex/phase41-after/desktop-change.png`, `.codex/phase41-after/desktop-rotation.png`, `.codex/phase41-after/desktop-sequence.png`, `.codex/phase41-after/desktop-settings.png`, `.codex/phase41-after/mobile-change.png`, `.codex/phase41-after/mobile-rotation.png`, `.codex/phase41-after/mobile-rotation-draft.png`, `.codex/phase41-after/mobile-sequence.png` und `.codex/phase41-after/mobile-settings.png`.
+- Gemeinsame Vergleichseingänge: `.codex/phase41-after/compare-desktop-change.png`, `.codex/phase41-after/compare-desktop-rotation.png` und `.codex/phase41-after/compare-mobile-rotation.png`.
+- Theme- und Farbseh-Evidenz: `.codex/phase41-after/desktop-light-deuteranopia.png`.
+- Viewports und Normalisierung: Desktop 1440 × 900 CSS- und Bildpixel, Mobile 390 × 844 CSS- und Bildpixel, Browser-Dichte 1. Die Screenshots enthalten ausschließlich den App-Viewport.
+- Zustand: Frontline Gold, dunkles Theme, deutsche Sprache, Demo-Server 2, HLL, 98/100 Spieler, drei veröffentlichte Karten. Theme-Prüfung in Hell plus Deuteranopie und anschließend ohne Speicherung verworfen.
+
+## Full-View-Vergleich
+
+Der Kartenwechsel ersetzt den generischen Kartenblock durch eine klar benannte Sofortaktion mit aktuellem und nächstem Kartenstatus, gezieltem Katalog und einer einzigen Bestätigung mit Spielerwirkung, Zielserver und Vorlauf. Der Rotationseditor trennt Katalog und unveröffentlichten Entwurf, macht den Serverstand sichtbar und veröffentlicht Änderungen erst über eine eindeutige Abschlussaktion. Die feste Kartenfolge verwendet dieselbe Arbeitslogik, während die Ausspielungseinstellungen ausschließlich die tatsächlich unterstützte Mischoption zeigen. Alle Flächen bleiben eckig, themenfähig und innerhalb der bestehenden Frontline-Hierarchie.
+
+## Fokusvergleich
+
+- Kartenwechsel: der Bestätigungsdialog wurde mit 98/100 betroffenen Spielern, 60 Sekunden Vorlauf und „Frontline #2“ geprüft; Abbrechen schloss ihn ohne API-Aktion.
+- Rotation: eine zweite Carentan-Variante erzeugte den Dirty-Zustand, aktivierte „Rotation veröffentlichen“ und blieb als bewusste Gewichtung sichtbar. Zurücksetzen stellte den gespeicherten Serverstand wieder her.
+- Mobile Entwurfsansicht: Wechsel zwischen „Katalog“ und „Entwurf“, sichtbare Pfeilaktionen und vollständige drei Aufgabentabs bei 390 Pixeln geprüft.
+- Ausspielung: Vorschau der ersten fünf beziehungsweise vorhandenen drei Karten, Entwurfsumschalter sowie statische mobile Abschlussleiste geprüft.
+
+## Findings
+
+- Keine verbleibenden P0-, P1- oder P2-Abweichungen.
+- [P3] Lange Kartennamen werden auf 390 Pixeln gezielt gekürzt, damit Verschiebe- und Entfernen-Aktionen als 44-Pixel-Ziele erreichbar bleiben. Vollständige Namen bleiben über den Kartenkontext und zugängliche Aktionsnamen erhalten.
+
+## Pflichtflächen
+
+- Fonts und Typografie: gemeinsamer `PageHeader`, bestehende Frontline-Schriftfamilie, kondensierte Versalien, Gewichte und Laufweiten. Feldlabels, Statuszeile und Entwurfszustand besitzen eine klare Hierarchie ohne problematische Umbrüche.
+- Spacing und Layout: Desktop als geteilte Arbeitsfläche, Mobile als bewusster Katalog-/Entwurfwechsel. Nach dem Grid-Fix gilt bei 390 × 844 `main.scrollWidth === main.clientWidth === 380`; die mobile Abschlussleiste verdeckt keinen Inhalt.
+- Farben und Tokens: ausschließlich vorhandene Theme-, Rahmen-, Auswahl-, Warn-, Erfolgs- und Gefahrentokens. Hell plus Deuteranopie wurde live geprüft; Zustände bleiben zusätzlich über Text, Icon und Rahmen erkennbar.
+- Bilder und Assets: vorhandene echte Kartenbilder und etablierte MUI-Icons werden wiederverwendet; keine Platzhalter, CSS-Zeichnungen, Emojis oder handgebauten SVGs.
+- Copy und Inhalt: deutsche und englische Kartenwerkstatt-Texte werden erst beim Betreten des Kartenbereichs als i18n-Ressource geladen. Dadurch bleibt die neue Führung verständlich, ohne das anfängliche JavaScript-Budget zu vergrößern.
+- Icons und Zustände: Karte hinzufügen, verschieben, entfernen, kopieren, zurücksetzen und speichern verwenden dieselbe Iconfamilie. Gespeichert, geändert, leer, doppelt und Sofortaktion sind nicht allein farbcodiert.
+- Responsivität und Accessibility: sichtbare Feldlabels, semantische Tabs und Buttons, zugängliche Namen je Karte, Tastaturpfeile zusätzlich zu Drag-and-drop, mobile 44-Pixel-Aktionen und kein horizontaler Überlauf.
+
+## Fachliche und funktionale Prüfung
+
+- Bestehende Verträge bleiben erhalten: `SET_MAP({ map_name })`, `SET_MAP_ROTATION({ map_names })`, `SET_MAP_SEQUENCE({ map_names })` und die vorhandene Shuffle-Einstellung. Keine neue API, kein neues Datenfeld und keine automatische Serveraktion.
+- Suche berücksichtigt Kartenname und interne Karten-ID; Spielmodus und Umgebung bleiben kombinierbar. Filter zurücksetzen und Ergebniszahl wurden geprüft.
+- Drag-and-drop bleibt erhalten; Enter auf einer Verschiebeaktion änderte die Reihenfolge, Zurücksetzen stellte den gespeicherten Zustand wieder her. Doppelte Einträge bleiben bewusst möglich.
+- Leere Entwürfe werden deutlich gewarnt, aber nicht fachlich blockiert, weil der bestehende Serververtrag das vollständige Leeren weiterhin zulässt.
+- Ein mutierendes `maps.sort(...)` wurde durch `[...maps].sort(...)` ersetzt. Dadurch verändert die Ansicht nicht mehr das geteilte Demo-/Loader-Array und erzeugt keinen falschen Dirty-Zustand.
+- Browserkonsole: null Errors. Produktionsbuild und alle Design-, Semantik-, Aktions-, Navigations-, Konfigurations- und Admin-Vertragsprüfungen bestanden.
+- Bundle-Budget: 400,91 kB Entry-JavaScript und 1.498,06 kB initiales JavaScript bei 480,35 kB gzip; alle Grenzwerte eingehalten. Die kartenspezifischen Übersetzungen liegen im lazy geladenen Kartenpaket.
+
+## Vergleichshistorie
+
+1. Erster Vergleich: [P2] Der Entwurf war nach dem Laden fälschlich geändert. Ursache war das mutierende Sortieren eines geteilten Arrays; die Sortierung arbeitet nun auf einer Kopie.
+2. Erste Mobile-Prüfung: [P2] Das zweispaltige MUI-Grid erzeugte negative Breite und horizontalen Überlauf; die Arbeitsfläche verwendet nun ein begrenztes CSS-Grid und eine statische mobile Abschlussleiste.
+3. Zweite Mobile-Prüfung: [P2] Der dritte Aufgabentab war bei 390 Pixeln nicht vollständig erreichbar. Mobile blendet dekorative Tab-Icons aus und verteilt alle drei Aufgaben gleichmäßig.
+4. Finale Vergleichseingänge bei identischen Viewports: Kartenwechsel, Rotation und Mobile besitzen keine offenen P0-, P1- oder P2-Findings.
+
+## Implementation Checklist
+
+- [x] Alle vier Routen vor und nach der Änderung auf Desktop und 390 × 844 Mobile geprüft.
+- [x] Gemeinsame Vorher-/Nachher-Vergleiche bei identischem Zustand visuell beurteilt.
+- [x] Karte auswählen, Bestätigung abbrechen, Filter, Entwurf, Duplikat, Tastaturreihenfolge, Zurücksetzen und Einstellungsentwurf geprüft.
+- [x] Theme, Deuteranopie, Semantik, Browserkonsole und Mobile-Overflow geprüft.
+- [x] Bestehende API-, Payload-, Persistenz- und Serververträge unverändert erhalten.
+- [x] Produktionsbuild, Bundle-Budget und neun statische Vertragsprüfungen bestanden.
+
+final result: passed
+
+---
+
+# Kartenabstimmungs-Einstellungen – Design QA
+
+## Vergleichsgrundlage
+
+- Gewählte visuelle Richtung: Option 2 „Regelwerk-Matrix“.
+- Source visual truth: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-51d781dc-d5d7-4954-af99-e90d525b712f.png`
+- Implementierte Route: `http://127.0.0.1:3005/settings/maps/votemap/settings`
+- Desktop-Screenshot: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\votemap-settings-option2-desktop.png`
+- Kombinierter Vergleich: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\votemap-settings-option2-comparison.png`
+- Mobile Evidenz: `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\votemap-settings-option2-mobile-390.png` und `C:\Users\chris\OneDrive\Dokumente\Autobalancer\hll_rcon_tool-steam-enrichment\.tmp\votemap-settings-option2-mobile-320.png`
+- Source und Desktop-Implementierung: jeweils 1487 × 1058 px, Geräteskalierung 1.
+- Zustand: dunkles Frontline-Theme, deutsche Sprache, Demo-Server, Einstellungen gespeichert, Detailbereiche geschlossen.
+
+## Visuelles Ergebnis
+
+Keine offenen P0-, P1- oder P2-Abweichungen.
+
+- Informationsarchitektur: Die Effekt-Zusammenfassung, die zweispaltige Matrix aus Modusanzahl und Auswahlregeln sowie die drei nachgelagerten Detailbereiche entsprechen der gewählten Richtung.
+- Designlinie: eckige Konturen, dunkle grün-schwarze Flächen, goldene Akzente, kompakte Typografie und bestehende Theme-Tokens bleiben erhalten.
+- Datenmodell: Die im Mockup angedeutete Gewichtung je Spielmodus wurde bewusst nicht übernommen, da sie im Servermodell nicht existiert. Vorhandene globale VIP- und Markierungsgewichte bleiben vollständig konfigurierbar.
+- Dichte: Zeilen, Schalter und Abstände wurden nach dem ersten Vergleich verdichtet, ohne Touch-Ziele oder Lesbarkeit zu verlieren.
+- Mobile: Hauptbereiche stapeln sich, die Effektwerte laufen einspaltig, die Seite erzeugt bei 390 px und 320 px keinen horizontalen Dokument-Overflow. Die Aktionsleiste liegt mobil nicht mehr über dem Formular.
+
+## Vergleichsverlauf
+
+1. Der erste gemeinsame Vergleich zeigte als P2, dass die beiden Hauptbereiche erst bei einer zu großen Viewport-Breite nebeneinander standen. Der Breakpoint wurde von `xl` auf `lg` verschoben.
+2. Der zweite Vergleich zeigte als P2 eine zu große vertikale Dichte in den Auswahlregeln. Zeilenhöhen, Innenabstände und Trenner wurden kompakter abgestimmt.
+3. Die mobile Prüfung zeigte als P1, dass die klebende Aktionsleiste auf 320 px den Formularinhalt weitgehend überdeckte. `ConfigActionBar` unterstützt nun eine separat abschaltbare mobile Klebeposition; diese Seite verwendet den statischen mobilen Modus.
+4. Die mobile Prüfung zeigte außerdem als P1 eine abgeschnittene Effekt-Zusammenfassung. Die Seitenbreite wird am Viewport begrenzt und die vier Kennzahlen wechseln auf kleinen Displays in eine einspaltige Anordnung.
+5. Post-Fix-Evidenz: 390 px und 320 px haben jeweils `scrollWidth === clientWidth`; die Desktop-Matrix bleibt zweispaltig.
+
+## Funktions- und Qualitätsprüfung
+
+- Modus-Stepper getestet: Warfare `4 → 5`, Gesamtsumme `7 → 8`, Dirty-Zustand und Save-Aktivierung; Zurücksetzen stellte `7` und den sauberen Zustand wieder her.
+- Detailbereich Nachrichten getestet: öffnen, Textentwurf ändern, schließen, erneut öffnen; der Entwurf blieb erhalten.
+- Pflichtplatzhalter getestet: Fehlt `{map_selection}`, erscheint die Fehlermeldung und Speichern bleibt gesperrt.
+- Zahlenvalidierung, Null-Untergrenze und deaktivierte Minus-Schaltflächen bei `0` sind sichtbar und funktionsfähig.
+- Unbekannte künftige Serverfelder werden beim Speichern erhalten; der extern änderbare Runtime-Schalter `enabled` wird weiterhin separat zusammengeführt.
+- Browserkonsole: keine Laufzeitfehler; ausschließlich die bereits bestehende React-Router-Future-Flag-Warnung.
+- Produktionsbuild: bestanden; nur die bestehende Warnung für große Chunks.
+- Vertragsprüfungen: Config-Kompatibilität, Polling-Budget und Admin-Aktionsvertrag bestanden.
+
+## Fokusvergleich
+
+Ein zusätzlicher Ausschnitt war nicht notwendig. Der kombinierte 2990 × 1058-px-Vergleich zeigt Source und Umsetzung vollständig nebeneinander; die relevanten Hauptbereiche, Zusammenfassung, Matrix und Aktionsleiste sind gleichzeitig beurteilbar.
+
+final result: passed
+
+---
+
+# Design QA · Phase 3.3 – Vertrauensabhängige Sperrregeln prüfen
+
+## Prüfgrundlage
+
+- Source Visual Truth: die unveränderten Workbench-Ausgangszustände in `.codex/phase33-baseline/vac-bans-baseline-desktop-1440x900.png`, `.codex/phase33-baseline/vac-bans-baseline-mobile-390x844.png`, `.codex/phase33-baseline/tk-bans-baseline-desktop-1440x900.png` und `.codex/phase33-baseline/tk-bans-baseline-mobile-390x844.png`; fachliche Zielwahrheit zusätzlich aus `rcon/hooks.py`, `rcon/workers.py`, `rcon/automods/tk_autoban.py`, `rcon/user_config/vac_game_bans.py` und `rcon/user_config/ban_tk_on_connect.py`.
+- Implementierung: `.codex/phase33-baseline/vac-bans-after-desktop-1440x900.png`, `.codex/phase33-baseline/vac-bans-after-mobile-390x844.png`, `.codex/phase33-baseline/tk-bans-after-desktop-1440x900.png` und `.codex/phase33-baseline/tk-bans-after-mobile-390x844.png`.
+- Fokuszustände: `.codex/phase33-baseline/vac-bans-test-desktop-1440x900.png`, `.codex/phase33-baseline/vac-bans-test-mobile-390x844.png`, `.codex/phase33-baseline/tk-bans-test-desktop-1440x900.png` und `.codex/phase33-baseline/tk-bans-test-mobile-390x844.png`.
+- Theme-Evidenz: `.codex/phase33-baseline/tk-bans-theme-deuteranopia-1440x900.png`.
+- Viewports und Normalisierung: Desktop jeweils 1440 × 900 CSS- und Bildpixel, Mobile jeweils 390 × 844 CSS- und Bildpixel, Browser-Dichte 1. Die Screenshots enthalten ausschließlich den App-Viewport.
+- Primärzustand: Frontline Gold, dunkler Modus, Standard-Farbsehen. Theme-Prüfung in Hell plus Deuteranopie und anschließend ohne Speicherung verworfen.
+
+## Full-View-Vergleich
+
+Ausgangs- und Nachher-Aufnahmen beider Routen wurden bei identischen Viewports und identischem gespeichertem Regelzustand gemeinsam geöffnet. Informationsarchitektur, eckige Workbench-Flächen, Abschnittsnavigation, Formularfelder, Zusammenfassung und Abschlussleiste bleiben unverändert. Neu ist ausschließlich die klare Aktion „Auswirkung testen“: Desktop neben dem Regelkopf und zusätzlich in der Abschlussleiste, Mobile einmal direkt unter dem Modus beziehungsweise Regelkopf. Der zusätzliche Einstieg verschiebt Mobile Inhalt nach unten, priorisiert aber bewusst die sicherheitskritische Vorschau vor den editierbaren Details und erzeugt keinen horizontalen Überlauf.
+
+## Fokusvergleich
+
+Die VAC- und TK-Drawer-Aufnahmen wurden gemeinsam beurteilt. Beide verwenden dieselbe eckige Testoberfläche, unterscheiden aber ihre Datengüte und Ausnahmen fachgerecht. VAC zeigt gespeicherten Steam-Datenzustand, Sperrhistorie, Hintergrundaktualisierung und Folgeprüfung. TK zeigt Profil-/VIP-Verfügbarkeit, Logfenster, Toleranz, Sperrmaßnahme und nachgelagerten Auditstatus. Nach dem Ausführen springt der lange Drawer automatisch so weit, dass die erwartete Entscheidung und ihre nummerierte Ablaufkette sichtbar sind. Desktop und Mobile bleiben vertikal scrollbar; bei 390 × 844 gilt `scrollWidth === clientWidth`.
+
+## Findings
+
+- Keine verbleibenden P0-, P1- oder P2-Abweichungen.
+- [P3] Die aktuelle In-App-Browser-Bindung stellt auf diesem Host keine Console- oder CDP-Ereignisfähigkeit bereit. Es erschien kein Fehler-Overlay und alle Browserpfade sowie Vertragsprüfungen bestanden; ein separater Konsolen-Eventnachweis bleibt für einen späteren Lauf mit verfügbarer Capability offen.
+
+## Pflichtflächen
+
+- Fonts und Typografie: bestehende Frontline-Schriftfamilie, Gewichte, Versalien, Zeilenhöhen und Feldlabels werden wiederverwendet. Lange Vertrauenshinweise und Ergebnisbegründungen umbrechen auf 390 Pixeln lesbar; Stufen bleiben als kompakte, nummerierte Textbausteine scannbar.
+- Spacing und Layout: eckige 0-Pixel-Radien, 44-Pixel-Primäraktionen, vorhandene Abschnittsabstände und das 480-Pixel-Desktop-Seitenpanel bleiben konsistent. Mobile belegt exakt 390 × 844 und besitzt keinen horizontalen Dokumentüberlauf.
+- Farben und Tokens: ausschließlich bestehende Theme-, Rahmen-, Info-, Warn-, Fehler- und Erfolgsfarben. Hell plus Deuteranopie wurde live geprüft; Entscheidung und Risiko bleiben zusätzlich über Überschrift, Text, Icon, Rahmen und Ablaufstufe erkennbar.
+- Bild- und Assetqualität: keine neuen Bildassets erforderlich. Frontline-Logo und etablierte MUI-Icons bleiben erhalten; keine Platzhalter, CSS-Zeichnungen, Emojis oder handgebauten SVGs.
+- Copy und Inhalt: Die Texte unterscheiden fehlende, ungültige, unbekannt alte und veraltete Steam-Daten; sie erklären explizit die erste gespeicherte Prüfung und die spätere Hintergrundprüfung. Bei TK werden unsichere Profil-Ausnahmen, N-plus-eins-Toleranz, ein ignoriertes Jahresfeld und ein möglicherweise erst nach der Sperre fehlschlagender Discord-Platzhalter transparent benannt.
+- Icons und Zustände: Simulation, Information, Entscheidung und Warnung verwenden dieselbe Iconfamilie. Aus, keine Aktion, Ausnahme, nicht belastbar, Konfigurationsfehler und Sperrmaßnahme sind nicht allein farbcodiert.
+- Responsivität und Accessibility: beschriftete Comboboxen und Number Inputs, semantische Buttons, zugänglicher Schließen-Button, modaler Fokuskontext und `aria-live`-Ergebnis. Light-/Farbsehmodus besitzt weiterhin Text- und Symbolredundanz.
+
+## Fachliche und funktionale Prüfung
+
+- VAC: Aus, fehlender/ungültiger Datensatz, unbekanntes Alter, veraltete Daten, Markierungsausnahme, kein belastbarer Sperrzeitpunkt, Zeitraumüberschreitung, Schwelle, ungültiger Grundplatzhalter und Sperrmaßnahme werden deterministisch abgebildet.
+- VAC: Die Oberfläche sagt korrekt, dass gespeicherte Daten zuerst synchron geprüft werden und die Hintergrundaktualisierung danach eine zweite Prüfung auslösen kann. Es wird keine Aktualität vorgetäuscht, wenn `updated` fehlt.
+- TK: deaktivierte Regel, fehlendes Profil, nicht verfügbare VIP-Liste, VIP-/Sitzungs-/Markierungsausnahme, fehlender Beitritt, ausgenommene Waffe, Zeitfenster, eigene Kills/Tode und Teamkilltoleranz werden abgebildet.
+- TK: `teamkill_tolerance_count = 2` löst erst beim dritten Teamkill aus. Die Laufzeit zeigt die explizit konfigurierte Einheit „24 Stunden“ statt der rechnerisch gleichen, aber inkonsistenten Form „1 Tag“.
+- TK: Die bestehende Demokonfiguration mit `{player_name}` wird nicht stillschweigend umgeschrieben; die Vorschau warnt, dass der Backendvertrag nur `{player}` formatiert und die Benachrichtigung nach einer bereits ausgeführten Sperre fehlschlagen kann.
+- Bei fehlendem Spielerprofil läuft die bestehende TK-Prüfung weiter und kennzeichnet VIP-, Sitzungs- und Markierungsausnahmen als unsicher. Ein verfügbarer VIP beendet die Prüfung vor der Maßnahme.
+- Der Wirkungstest liest nur den aktuellen Formularentwurf, speichert nichts und sendet keine API-, RCON-, Steam- oder Gameserveraktion.
+
+## Vergleichshistorie
+
+1. Ausgangsvergleich: Beide Workbenches waren visuell konsistent, besaßen aber keine sichere Vorschau für daten- und vertrauensabhängige Entscheidungen.
+2. Erste Umsetzung: [P2] Eine Laufzeit von 24 Stunden wurde im Testergebnis als „1 Tage“ dargestellt, obwohl die Workbench „24 Stunden“ zeigte. Die Simulation bewahrt nun die explizit konfigurierten Dauerkomponenten und lokalisiert Singular und Plural korrekt.
+3. Erste Interaktionsprüfung: [P1] Das Ergebnis der langen TK-Simulation entstand unterhalb des sichtbaren Drawer-Bereichs. Die gemeinsame Testoberfläche scrollt neue Ergebnisse jetzt ohne Animation in den nächstgelegenen sichtbaren Bereich; die Post-Fix-Messung zeigt das Ergebnis Mobile von y = 392 bis y = 844.
+4. Post-Fix-Vergleich bei identischen Viewports: Dauer, Entscheidung, Risikohinweis und Ablaufstufen sind sichtbar; keine offenen P0-, P1- oder P2-Findings.
+
+## Implementation Checklist
+
+- [x] Vorher und Nachher je Route und Viewport gemeinsam verglichen.
+- [x] VAC- und TK-Fokuszustände auf Desktop und 390 × 844 Mobile geprüft.
+- [x] 23 deterministische Vertrauens- und Fail-safe-Fälle gegen die Backend-Reihenfolge geprüft.
+- [x] Fehlende Daten, veraltete Daten, unsichere Ausnahmen und nachgelagerte Auditfehler sichtbar gemacht.
+- [x] Theme, Deuteranopie, Semantik und Mobile-Overflow geprüft.
+- [x] Keine API-, Payload-, Persistenz-, Steam- oder Gameserveraktion ergänzt.
+
+final result: passed
+
+---
+
+# Design QA · Phase 3.2 – Automod-Eskalation testen
+
+## Prüfgrundlage
+
+- Source Visual Truth: die unveränderten Workbench-Ausgangszustände in `.codex/phase32-baseline/no-leader-baseline-desktop-1440x900.png`, `.codex/phase32-baseline/no-leader-baseline-mobile-390x844.png`, `.codex/phase32-baseline/no-solo-tank-baseline-desktop-1440x900.png` und `.codex/phase32-baseline/no-solo-tank-baseline-mobile-390x844.png`; fachliche Zielwahrheit zusätzlich aus `rcon/automods/no_leader.py`, `rcon/automods/no_solotank.py`, `rcon/user_config/auto_mod_no_leader.py` und `rcon/user_config/auto_mod_solo_tank.py`.
+- Implementierung: `.codex/phase32-baseline/no-leader-after-desktop-1440x900.png`, `.codex/phase32-baseline/no-leader-after-mobile-390x844.png`, `.codex/phase32-baseline/no-solo-tank-after-desktop-1440x900.png` und `.codex/phase32-baseline/no-solo-tank-after-mobile-390x844.png`.
+- Fokuszustände: `.codex/phase32-baseline/no-leader-test-desktop-1440x900.png`, `.codex/phase32-baseline/no-leader-test-mobile-390x844.png`, `.codex/phase32-baseline/no-solo-tank-test-desktop-1440x900.png` und `.codex/phase32-baseline/no-solo-tank-test-mobile-390x844.png`.
+- Theme-Evidenz: `.codex/phase32-baseline/no-solo-tank-theme-deuteranopia-1440x900.png`.
+- Viewports und Normalisierung: Desktop jeweils 1440 × 900 CSS-Pixel und Bildpixel, Mobile jeweils 390 × 844 CSS-Pixel und Bildpixel, Browser-Dichte 1. Screenshots enthalten ausschließlich den App-Viewport.
+- Primärzustand: Frontline Gold, dunkler Modus, Standard-Farbsehen; „Ohne Truppführer“ im Modus Beobachten, „Kein Solo-Panzer“ im Modus Aktiv. Theme-Prüfung im hellen Modus plus Deuteranopie und anschließend ohne Speicherung verworfen.
+
+## Full-View-Vergleich
+
+Die Ausgangs- und Nachher-Aufnahmen beider Routen wurden bei identischem Viewport und identischem gespeicherten Regelzustand im selben Vergleichseingang geöffnet. Informationsarchitektur, eckige Oberflächen, Typografie, Abschnittsnavigation und vorhandene Konfigurationsfelder bleiben unverändert. Neu ist ausschließlich die klar beschriftete Aktion „Auswirkung testen“: Desktop steht sie neben der Modussteuerung und zusätzlich in der Abschlussleiste, Mobile einmal kompakt direkt unter dem Modus. Dadurch bleibt die vertraute Workbench-Dichte erhalten und der Test ist vor dem Speichern erreichbar.
+
+## Fokusvergleich
+
+Die vier Drawer-Aufnahmen wurden gemeinsam verglichen. Beide Regeln verwenden dieselbe eckige Testoberfläche, reduzieren die Eingaben aber auf den jeweiligen Fachkontext: Truppzustand und Rolle bei fehlender Führung, Trupptyp und Besatzungsgröße beim Solo-Panzer. Ergebnis, Erläuterung und Stufenfolge bleiben am Desktop und auf 390-Pixel-Mobile lesbar; Mobile scrollt vertikal und erzeugt keinen horizontalen Dokumentüberlauf.
+
+## Findings
+
+- Keine verbleibenden P0-, P1- oder P2-Abweichungen.
+- Keine offenen P3-Polish-Punkte im Umfang dieses Pakets.
+
+## Pflichtflächen
+
+- Fonts und Typografie: vorhandene Frontline-Schriftfamilie, Gewichte, Versalien und Zeilenhöhen werden wiederverwendet. Titel, Hinweis, Felder, Ergebnis und nummerierte Stufen besitzen eine klare Hierarchie ohne problematische Umbrüche.
+- Spacing und Layout: Desktop-Drawer mit bestehender Seitenpanelbreite, Mobile vollflächig und scrollbar; 44-Pixel-Aktionen, eckige Eingabeflächen und der vertikale Rhythmus entsprechen der Workbench. Bei 390 × 844 gilt `scrollWidth === clientWidth`.
+- Farben und Tokens: ausschließlich bestehende Theme-, Rahmen-, Info-, Warn-, Fehler- und Erfolgsfarben. Heller Modus plus Deuteranopie wurde live geprüft; Text, Icon, Überschrift und Rahmen kennzeichnen Zustände zusätzlich zur Farbe.
+- Bild- und Assetqualität: keine neuen Bildassets erforderlich. Vorhandenes Frontline-Logo und etablierte MUI-Icons bleiben erhalten; keine Platzhalter, CSS-Zeichnungen oder handgebauten SVGs.
+- Copy und Inhalt: Deutsche und englische Texte erklären Beispielzustand, Wirkung, Schwellen und die Nicht-Invasivität des Tests. Die Oberfläche sagt ausdrücklich, dass nichts gespeichert und keine Gameserveraktion gesendet wird.
+- Icons und Zustände: vorhandene Beaker-, Info- und Statusicons aus derselben Bibliothek. Aus, Beobachten und Aktiv sowie erlaubt, ausgenommen, wartend, pausiert und eskalierend werden nicht allein farbcodiert.
+- Responsivität und Accessibility: beschriftete Comboboxen, Number Inputs, optionales Flagfeld, zugänglicher Schließen-Button und modaler Fokuskontext. Primäraktionen sind semantische Buttons; bei 390 × 844 kein horizontaler Überlauf.
+
+## Fachliche und funktionale Prüfung
+
+- Die Simulation spiegelt die bestehende Backend-Reihenfolge: globale Mindestzahl, Erkennung, Flag-/Level-/Rollen-Ausnahmen, Bestätigungen, Warnungen, Bestrafungen, Kick sowie Server- und Truppschwellen.
+- `-1` bleibt eine unbegrenzte und terminale Warn- beziehungsweise Bestrafungsstufe. `0` deaktiviert eine Stufe, ohne eine nicht erreichbare Folgeaktion vorzutäuschen.
+- Ohne Truppführer: vollständige Wirkungskette im Beobachtungsmodus, vorhandener Truppführer und globale Mindestzahl im Browser geprüft.
+- Kein Solo-Panzer: vollständige aktive Wirkungskette sowie besetzter Panzertrupp mit zwei Mitgliedern im Browser geprüft.
+- Schließen und erneutes Öffnen verwirft das alte Ergebnis. Ein Wechsel zwischen den beiden Profilarten setzt die Beispieldaten auf passende Standardwerte zurück.
+- Browserkonsole: null Errors; ausschließlich die bekannte React-Router-v7-Future-Flag-Warnung im Entwicklungsmodus.
+
+## Vergleichshistorie
+
+1. Ausgangsvergleich: Beide Workbenches waren visuell bereits konsistent, besaßen aber keine sichere Vorschau ihrer vierstufigen Wirkungskette.
+2. Umsetzung: gemeinsamer, lazy geladener Test-Drawer plus reine, datenvertragsneutrale Simulationslogik ergänzt. Der erste Vertragstest zeigte, dass ein „nur erkannt“-Beispiel wegen des realen Levelschutzes korrekt als Ausnahme galt; der Testdatensatz wurde auf Level 100 korrigiert, nicht die Fachlogik.
+3. Finale Browser- und Bildprüfung bei identischen Viewports: keine offenen P0-, P1- oder P2-Findings.
+
+## Implementation Checklist
+
+- [x] Vorher und Nachher je Route und Viewport gemeinsam verglichen.
+- [x] Drawer-Fokuszustände auf Desktop und Mobile gemeinsam geprüft.
+- [x] Zwölf deterministische Eskalationsfälle gegen die Backend-Reihenfolge geprüft.
+- [x] Theme, Deuteranopie, Semantik und Mobile-Overflow geprüft.
+- [x] Keine API-, Payload-, Persistenz- oder Gameserveraktion ergänzt.
+
+final result: passed
+
+---
+
+# Design QA · Phase 3.1 Konfigurations-Workbench und Level-Wirkungstest
+
+## Prüfgrundlage
+
+- Source Visual Truth: `.codex/phase3-foundation/level-baseline-mobile-390x844.png` für die bestehende Level-Regelstruktur sowie `.codex/phase3-foundation/seeding-baseline-desktop-1440x900.png` für die freigegebene eckige Konfigurations-Workbench, Modussteuerung und Änderungsleiste.
+- Implementierung: `.codex/phase3-foundation/level-final-desktop-1440x900.png`, `.codex/phase3-foundation/level-final-mobile-390x844.png`, `.codex/phase3-foundation/level-test-final-desktop-1440x900.png` und `.codex/phase3-foundation/level-test-final-mobile-390x844.png`.
+- Viewports und Normalisierung: Mobile jeweils 390 × 844 CSS-Pixel bei Browser-Dichte 1 und 390 × 844 Bildpixeln; Desktop jeweils 1440 × 900 CSS-Pixel bei Browser-Dichte 1 und 1440 × 900 Bildpixeln. Die Aufnahmen enthalten ausschließlich den App-Viewport ohne Browser-Chrome.
+- Zustände: Frontline Gold, dunkler Modus, Standard-Farbsehen; Level-Regel im Modus „Aus“ sowie Wirkungstest vor und nach einer lokalen Simulation. Heller Modus plus Deuteranopie wurde zusätzlich live geprüft und ohne Speicherung verworfen.
+
+## Full-View-Vergleich
+
+Ausgangs- und Implementierungsaufnahmen wurden im selben Vergleichseingang geöffnet. Die Level-Seite bewahrt Navigation, Zusammenfassung, Abschnittsreihenfolge und sämtliche Formfelder, ergänzt aber die bereits freigegebene dreistufige Modussteuerung um einen klaren, lokal arbeitenden Einstieg „Auswirkung testen“. Die gemeinsame Änderungsleiste zeigt nun Geltungsbereich und Validierungszustand, ohne den bestehenden Speicher- und Wiederherstellungsfluss zu verändern. Mobile bleibt die erste Aufgabe im Viewport sichtbar; Desktop nutzt die vorhandene horizontale Arbeitsfläche ohne neue Karten- oder Radius-Sprache.
+
+## Fokusvergleich
+
+Der Wirkungstest wurde als eigener Fokusvergleich in Desktop- und Mobile-Aufnahmen geprüft. Desktop öffnet ein 480-Pixel-Seitenpanel, Mobile einen exakt 390 × 844 Pixel großen Vollbild-Drawer. Überschrift, Sicherheitsinformation, Beispielwerte, Rollenwahl, optionale Markierung und primäre Simulationsaktion sind vollständig lesbar. Es wurden ausschließlich vorhandene MUI-Icons und Theme-Tokens verwendet; keine Platzhalter, CSS-Zeichnungen oder neu erfundenen Bildassets.
+
+## Findings
+
+- Keine verbleibenden P0-, P1- oder P2-Abweichungen.
+- [P3] Der erste Fokus liegt beim Öffnen auf dem semantischen Drawer-Abschnitt und nicht direkt auf dem Schließen-Button. Alle interaktiven Elemente liegen in korrekter Tab-Reihenfolge, besitzen zugängliche Namen und bleiben innerhalb des modalen Fokuskontexts.
+
+## Pflichtflächen
+
+- Fonts und Typografie: bestehende Frontline-Schriftfamilie, kondensierte Versalien, Gewichte, Zeilenhöhen und Laufweiten bleiben unverändert. Der neue Testtitel, Feldlabels, Statusstufen und Footer-Metadaten bilden eine klare Hierarchie ohne problematische Umbrüche.
+- Spacing und Layout: eckige 0-Pixel-Radien, kompakte Rahmen, bestehende Abschnittsabstände und 44-Pixel-Aktionen bleiben konsistent. Level, Seeding und Ohne Truppführer besitzen bei 390 × 844 keinen horizontalen Dokumentüberlauf; der mobile Drawer belegt exakt den Viewport.
+- Farben und Tokens: Akzent, Information, Erfolg, Warnung und deaktivierte Zustände verwenden vorhandene Theme-Tokens. Heller Modus plus Deuteranopie wurde live geprüft; Status bleibt zusätzlich über Text, Symbol und Umrandung erkennbar.
+- Bild- und Assetqualität: vorhandenes Frontline-Logo und die etablierte MUI-Iconbibliothek werden wiederverwendet. Es wurden keine neuen Rasterbilder, handgebauten SVGs, Emoji- oder CSS-Assets eingeführt.
+- Copy und Inhalt: „Auswirkung testen“ und „Simulation ausführen“ unterscheiden Entwurfstest und Persistenz eindeutig. Der Hinweis erklärt ausdrücklich, dass weder gespeichert noch eine Nachricht an den Gameserver gesendet wird. Rollenbezeichnungen sind lokalisiert.
+- Icons und Zustände: Modus, Simulation, Information und Ergebnis verwenden dieselbe Iconfamilie. Aus, Beobachten, Aktiv, bereit, ungültig und Simulationsergebnis werden nicht allein farbcodiert.
+- Responsivität und Accessibility: Desktop 1440 × 900 und Mobile 390 × 844 geprüft; genau eine H1, beschriftete Eingaben, zugänglicher Schließen-Button, `aria-live`-Ergebnis und praktische Touch-Ziele vorhanden.
+
+## Interaktionen und Datenverträge
+
+- Gemeinsame Modussteuerung auf Level, Seeding und Ohne Truppführer geprüft; Wechsel erzeugt den bestehenden Dirty-Zustand, Wiederherstellen setzt gespeicherte Werte zurück.
+- Acht deterministische Level-Szenarien prüfen Aus, Wartezustand, Ausnahmen, globale Grenzen, rollenbezogene Eskalation, erkannte Verstöße ohne aktive Maßnahme und erlaubte Spieler.
+- Der Wirkungstest liest ausschließlich sichtbare Formularwerte, speichert nichts und ruft keine API auf. Loader, Actions, Feldnamen, Merge-Verhalten, Payloads und unbekannte Konfigurationswerte bleiben unverändert.
+- Browserkonsole im Abschlusslauf: null Errors.
+
+## Vergleichshistorie
+
+1. Ausgangsvergleich: [P2] Modussteuerung war zwischen geführten Formularen und Seeding doppelt implementiert; [P2] die neue Simulation zeigte nach Schließen und erneutem Öffnen noch das vorherige Ergebnis; [P2] eine direkte Einbindung hätte den gemeinsamen Konfigurationschunk unnötig vergrößert.
+2. Umsetzung: gemeinsame `ConfigOperationModeControl`, wiederverwendbare Änderungsmetadaten und lazy-geladener Level-Test ergänzt. Der Ergebniszustand wird beim Schließen zurückgesetzt.
+3. Finale Desktop-/Mobile-Aufnahmen bei identischen Viewports und erneute Browserprüfung: keine offenen P0-, P1- oder P2-Findings. Das initiale Bundle-Budget bleibt mit exakt 1.500,00 kB Rohgröße innerhalb des Vertrags.
+
+## Implementation Checklist
+
+- [x] Source und Implementierung im selben Vergleichseingang geprüft.
+- [x] Level, Seeding und Ohne Truppführer funktional gegen den gemeinsamen Modusvertrag geprüft.
+- [x] Wirkungstest vor und nach Simulation sowie nach erneutem Öffnen geprüft.
+- [x] Desktop, Mobile, Theme, Deuteranopie, Semantik und Browserkonsole geprüft.
+- [x] Produktionsbuild, Bundle-Budget und alle relevanten Vertragschecks bestanden.
+- [x] Keine API-, Persistenz- oder Konfigurationsmigration eingeführt.
+
+final result: passed
+
+---
+
+# Design QA · Phase 2.5 Dienste, Spiel- und Audit-Protokolle
+
+## Prüfgrundlage
+
+- Source Visual Truth: bestehende funktionsfähige Ansichten in `.codex/phase25-baseline/services-desktop-1440x900.png`, `.codex/phase25-baseline/services-mobile-390x844.png`, `.codex/phase25-baseline/game-logs-desktop-1440x900.png`, `.codex/phase25-baseline/game-logs-mobile-390x844.png`, `.codex/phase25-baseline/audit-logs-desktop-1440x900.png` und `.codex/phase25-baseline/audit-logs-mobile-390x844.png`; Zielhierarchie zusätzlich aus dem freigegebenen Product-Design-Konzept für `/settings/services`, `/records/game-logs` und `/records/audit-logs`.
+- Implementierung: `.codex/phase25-baseline/services-after-desktop-1440x900.png`, `.codex/phase25-baseline/services-after-mobile-390x844.png`, `.codex/phase25-baseline/game-logs-after-desktop-1440x900.png`, `.codex/phase25-baseline/game-logs-after-mobile-390x844.png`, `.codex/phase25-baseline/audit-logs-after-desktop-1440x900.png` und `.codex/phase25-baseline/audit-logs-after-mobile-390x844.png`.
+- Viewports und Normalisierung: Mobile jeweils 390 × 844 CSS-Pixel bei Browser-Dichte 1 und 390 × 844 Bildpixeln; Desktop jeweils 1440 × 900 CSS-Pixel bei Browser-Dichte 1 und 1440 × 900 Bildpixeln. Die Aufnahmen enthalten nur den App-Viewport ohne Browser-Chrome.
+- Zustände: Frontline Gold, dunkler Modus, Standard-Farbsehen; Dienste mit simulierten Laufzeitdaten, Spiel- und Audit-Protokolle mit realistischen Mirage-Demodaten. Helles Theme plus Deuteranopie wurde separat live geprüft und anschließend ohne Speicherung verworfen.
+
+## Full-View-Vergleich
+
+Die Vorher- und Nachher-Aufnahmen wurden je Route bei identischem Viewport gemeinsam beurteilt. Die Diensteansicht führt jetzt von Betriebsbereitschaft und Fehlerlage über die Abhängigkeitskette RCON → Worker → Scheduler zu den einzelnen Steuerungen. Desktop bleibt kompakt, während Mobile die Kette vertikal und bereits im ersten Viewport verständlich zeigt. Spiel- und Audit-Protokolle bewahren ihre dichten Desktop-Arbeitsflächen, reduzieren Mobile aber die zuvor hohen Filterblöcke auf Suche, klaren Filtereinstieg und wenige aktive Kategorien. Dadurch erscheinen die ersten relevanten Ereignisse beziehungsweise Auditzeilen bereits im ersten mobilen Viewport.
+
+## Fokusvergleich
+
+Ein zusätzlicher Bildausschnitt war nicht erforderlich. Statuszusammenfassung, Dienstekette, Dienststeuerung, mobile Such-/Filterleiste sowie erste Protokollzeilen sind in den vollständigen Desktop- und Mobile-Aufnahmen lesbar. Die Filter-Drawer und der Audit-Detail-Drawer wurden zusätzlich interaktiv im Browser geprüft, weil ihre Zustände nicht gleichzeitig mit der Listenansicht sichtbar sein können.
+
+## Findings
+
+- Keine verbleibenden P0-, P1- oder P2-Abweichungen.
+- [P3] Im Entwicklungsmodus protokolliert React Router weiterhin die bekannte Future-Flag-Warnung zu `v7_startTransition`. Es gibt keine route-spezifischen Runtime-Fehler und kein sichtbares Fehlverhalten.
+
+## Pflichtflächen
+
+- Fonts und Typografie: bestehende Frontline-Schriftfamilie, kondensierte Versalien, Gewichte und Zeilenhöhen bleiben erhalten. Kennzahlen, Dienstzustände, Ereignistypen, Zeitangaben und Filterbeschriftungen besitzen eine klare, scanbare Hierarchie ohne problematische Überlagerung.
+- Spacing und Layout: Dienste nutzen eine eckige, eng geführte Betriebskette. Mobile Filter reduzieren den ersten Viewport auf die primäre Suchaufgabe und öffnen Detailfelder in einem Vollhöhen-Drawer. Bei 390 × 844 und 1440 × 900 entsteht kein horizontaler Dokumentüberlauf.
+- Farben und Tokens: Flächen, Rahmen, Status und Auswahl verwenden ausschließlich vorhandene Theme- und Semantik-Tokens. Heller Modus plus Deuteranopie wurde live geprüft; Zustand bleibt zusätzlich über Text, Icon und Umrandung verständlich.
+- Bild- und Assetqualität: Die datengetriebenen Ansichten benötigen keine neuen Bilder. Frontline-Branding und etablierte MUI-Icons werden wiederverwendet; keine Platzhalter, CSS-Zeichnungen, Emojis oder handgebauten SVG-Ersatzassets wurden eingeführt.
+- Copy und Inhalt: Betriebsbereitschaft, Fehlerlage, Abhängigkeit, Betriebswirkung sowie die mobilen Filteraktionen sind auf Deutsch und Englisch knapp benannt. Es werden keine Zustände oder Betriebszusagen erfunden.
+- Icons und Zustände: RCON, Worker, Scheduler, Start, Stopp, Filter, Export und Detailansicht verwenden eine gemeinsame Iconfamilie und zugängliche Beschriftungen. Aktiv, Fehler, ausgewählt und deaktiviert werden nicht allein über Farbe vermittelt.
+- Responsivität und Accessibility: je Route genau eine H1; 390 × 844 und 1440 × 900 ohne horizontalen Überlauf; beschriftete Filter-Drawer, 44-Pixel-Aktionen, semantische Formfelder und bestehende Tastatur-Fokusdarstellung geprüft.
+
+## Interaktionen und Datenverträge
+
+- Audit-Suche mit `Wotan` abgesendet; die bestehende Query `parameters=Wotan&time_sort=desc&page_size=50&page=1` blieb vollständig erhalten und reduzierte die Liste auf einen Treffer.
+- Auditzeile geöffnet; der bestehende Detail-Drawer zeigte Akteur, Ziel, ID, Server, lokale und UTC-Zeit, übermittelte Werte und Ergebnis.
+- Spielprotokoll-Suche mit `FLN_Wolf` abgesendet; die bestehende Query bewahrte `limit=500`, `time_sort=desc`, `exact_player=false`, `exact_action=false` und `player_name=FLN_Wolf`.
+- Die mobilen Drawer führen weiterhin sämtliche bisherigen Zeit-, Server-, Aktions-, Exakt-, Sortier- und Seitengrößenfelder. Versteckte Formfelder sichern beim Portal-Rendering die vorhandenen GET-Verträge.
+- Dienst-Loader, Dead-Letter-, Diagnose- und Health-Verträge sowie die POST-Felder `service_name` und `action` (`start`/`stop`) bleiben unverändert. Für die QA wurde keine laufende Dienstaktion ausgelöst.
+
+## Vergleichshistorie
+
+1. Ausgangsvergleich: [P2] Mobile Dienste erklärten Abhängigkeiten nicht zusammenhängend; [P2] Spiel- und Audit-Filter verdrängten den eigentlichen Protokollinhalt aus dem ersten Viewport; [P1] die mobile Spielprotokollzeile überlagerte Zeit- und Ereignisspalten.
+2. Umsetzung: Betriebskette und kompakte Dienststeuerungen ergänzt; mobile Primärfilter mit Detail-Drawern eingeführt; mobile Timeline-Metadaten in eine eigene, nicht überlagernde Zeile verschoben.
+3. Erste Nachher-Prüfung: Die „Alle Filter entfernen“-Beschriftung beanspruchte auf Mobile unnötig Breite. Der mobile Zustand wurde auf eine zugänglich beschriftete Iconaktion verdichtet.
+4. Finale Vorher-/Nachher-Vergleiche bei identischen Viewports: keine offenen P0-, P1- oder P2-Findings.
+
+## Technische Validierung
+
+- Produktionsbuild bestanden; ausschließlich die bekannte Warnung für bestehende Chunks über 500 kB bleibt.
+- Design Foundation, Seitensemantik, Action Feedback, Konfigurationskompatibilität, Admin-Aktionsvertrag, Operator-Copy und Navigation Shell bestanden.
+- Initiales Bundle-Budget bestanden: 1.499,96 kB raw / 483,01 kB gzip; Entry 401,44 kB raw / 121,64 kB gzip.
+- Browserkonsole: keine Errors; zwei Instanzen der bekannten React-Router-v7-Future-Flag-Warnung im Entwicklungsmodus.
+
+## Implementation Checklist
+
+- [x] Source und Umsetzung je Route im selben Vergleichseingang geprüft.
+- [x] Desktop und 390 × 844 ohne horizontalen Dokumentüberlauf geprüft.
+- [x] Spiel- und Auditfilter sowie Audit-Detail funktional geprüft.
+- [x] Theme, Deuteranopie, Semantik und sichtbare Fokusdarstellung geprüft.
+- [x] Loader-, GET-, POST-, Export- und Konfigurationsverträge beibehalten.
+- [x] Keine offenen P0-, P1- oder P2-Findings.
+
+final result: passed
+
+---
+
+# Design QA · Phase 2.3 Teams und Autobalancer
+
+## Vergleichsziel
+
+- Source Visual Truth: `.codex/phase23b-baseline/team-mobile-390x844.png`, `.codex/phase23b-baseline/team-desktop-1440x900.png`, `.codex/phase23b-baseline/autobalancer-mobile-390x844.png` sowie die Routenanforderungen für Teams und Autobalancer in `docs/product-design/rcon-product-concept.md`.
+- Implementierung: `.codex/phase23b-baseline/team-after-mobile-viewport.png`, `.codex/phase23b-baseline/team-after-desktop-viewport.png`, `.codex/phase23b-baseline/autobalancer-final-mobile-390x844.png` und `.codex/phase23b-baseline/autobalancer-final-desktop-1440x900.png`.
+- Primärer Vergleichszustand: Frontline Gold, dunkler Modus, Standard-Farbsehen, simulierte Live-Daten; Teamübersicht mit Gefechtsstatus und Autobalancer-Liveübersicht.
+
+## Normalisierung
+
+- Mobile Source und Implementierung: 390 × 844 CSS-Pixel bei Browser-Dichte 1.
+- Desktop Source und Implementierung: 1440 × 900 CSS-Pixel bei Browser-Dichte 1.
+- Browser-Chrome wurde nicht erfasst. Die vollständigen Viewports enthalten alle für diesen Vergleich relevanten Kopf-, Status-, Filter- und Arbeitsbereiche.
+
+## Full-View- und Fokusvergleich
+
+Die Teamansicht behält auf Desktop ihre dichte Führungsstruktur. Mobile wurde der zuvor hohe, vertikal gestapelte Gefechtsstatus zu einer dreispaltigen Team-/Spielstand-/Team-Zeile mit direkt anschließender dreispaltiger Problemlage verdichtet. Dadurch sind Autobalancer-Hinweis und alle Teamfilter bereits im ersten 390 × 844-Viewport erreichbar. Der Fokusvergleich umfasste Gefechtsstatus, Problemlage, Teamfilter und Kapazitätszustände.
+
+Der Autobalancer ersetzt auf Mobile die abgeschnittene horizontale Tabnavigation durch ein beschriftetes Bereichs-Select. Desktop behält die schnelle Tabreihe. Eine fünfstufige operative Zeitleiste ordnet Live-Zustand, Balance-Delta, geplante Verschiebung, letzten Eingriff und Cooldown. Der Fokusvergleich umfasste den Bereichswechsel, den nächsten empfohlenen Schritt und die vollständige Zeitleiste; zusätzliche Ausschnitte waren nicht erforderlich, da alle Beschriftungen in den Full-View-Aufnahmen lesbar sind.
+
+## Findings und Iterationen
+
+1. Ausgangsvergleich: Der mobile Teamstatus beanspruchte zu viel Höhe; die Autobalancer-Tabs wurden horizontal abgeschnitten.
+2. Erste Umsetzung: Teamstatus, Problemindikatoren, Statusfilter und mobile Bereichsauswahl wurden verdichtet beziehungsweise neu geordnet. Dabei blieben in der deutschen Autobalancer-Ansicht die Backend-Standardbezeichnungen „Allies“ und „Axis“ sichtbar; dies wurde als P2-Copy-Inkonsistenz bewertet.
+3. Korrektur: Die beiden englischen Standardwerte werden in diesem deutschen Dashboard als „Alliierte“ und „Achsenmächte“ normalisiert. Andere, vom Backend gelieferte Teambezeichnungen bleiben unverändert erhalten. Der erneute Vergleich zeigte keine offenen P0-, P1- oder P2-Befunde.
+
+Verbleibende Datenlücken:
+
+- **P3:** Der aktuelle Teamvertrag liefert keinen Zustand für gesperrte Rollen. Der entsprechende Filter wird deshalb nicht vorgetäuscht und bleibt eine spätere, explizite Vertragserweiterung.
+- **P3:** Der Autobalancer-Status liefert keinen verlässlichen letzten tatsächlich ausgeführten Eingriff. Die Zeitleiste kennzeichnet diesen Zustand transparent, statt einen Zeitpunkt zu erfinden.
+
+## Pflichtflächen und Interaktionen
+
+- Typografie und Layout: bestehende Frontline-Hierarchie, eckige Flächen, kompakte Karten und konsistente Abstände; bei 390 × 844 gilt `scrollWidth === clientWidth === 390` auf beiden Routen.
+- Farben und Tokens: ausschließlich bestehende Theme- und Semantik-Tokens. Status bleibt zusätzlich über Text, Icons und Rahmen erkennbar. Helles Theme plus Deuteranopie wurde geprüft und ohne Speicherung verworfen.
+- Assets: vorhandenes Frontline-Branding und die etablierte MUI-Iconbibliothek; keine Platzhalter, CSS-Zeichnungen oder neu erfundenen Bildassets.
+- Copy: kurze deutsche Operator-Texte; keine nicht belegten Zusagen oder erfundenen Zustände.
+- Tastatur: Autobalancer-Bereichsselect sowie Team-Statusselect mit Enter geöffnet und ausgewählt; „Vorschläge prüfen“ und „Überbelegt“ wurden korrekt aktiviert.
+- Semantik: beide Routen besitzen genau eine H1; Autobalancer ist in Breadcrumb und Navigation unter „Live-Betrieb“ eingeordnet.
+- Browserkonsole: null Errors in den sauberen Abschlussläufen.
+
+final result: passed
+
+---
+
+# Design QA · Phase 2.2 Mobile Live-Einsatz
+
+## Vergleichsziel
+
+- Source Visual Truth: `.codex/phase23-baseline/live-desktop-1440x900.png`, `.codex/phase23-baseline/live-mobile-390x844.png` und die bestätigte Zielbeschreibung in `docs/product-design/rcon-product-concept.md` für `/views/live`.
+- Implementierung: `.codex/phase23-baseline/live-final-desktop-1440x900.png`, `.codex/phase23-baseline/live-final-mobile-390x844.png` sowie die zusätzliche schmale Evidenz `.codex/phase23-baseline/live-after-mobile-320x720.png`.
+- Zustand: Frontline Gold, dunkler Modus, Standard-Farbsehen, Einsatz-Tab aktiv, sechs Demo-Spieler, zwei Commander-Warnungen, VIP-/Watchlist-Kontext und unveränderte Live-Protokolldaten.
+
+## Normalisierung
+
+- Desktop: Source und Implementierung jeweils 1440 × 900 Pixel bei 1440 × 900 CSS-Pixeln und Dichte 1.
+- Mobile: Source und Implementierung jeweils 390 × 844 Pixel bei 390 × 844 CSS-Pixeln und Dichte 1.
+- Zusätzlicher Responsive-Check: 320 × 720 Pixel bei Dichte 1.
+- Alle Vergleiche zeigen dieselbe Route, Sprache, Theme-Familie und denselben primären Einsatz-Zustand ohne Browser-Chrome.
+
+## Full-View-Vergleich
+
+Desktop bleibt bewusst unverändert: Split View, Lagekarten, Spieleroperationen und Live-Protokoll behalten ihre Proportionen und Informationsdichte. Mobile ersetzt die zwei verpflichtenden horizontalen Suchwege durch eine klare Priorität: Commander-Warnungen liegen vollständig untereinander, mittlere und informative Zustände bilden ein kompaktes Zweispaltenraster, und die Spieler-Schnellfilter werden als sichtbar beschriftetes Select bedient. Die Einsatz/Protokoll-Tabs und die Reihenfolge Serverstatus – Lage – Serveraktionen – Spieler bleiben erhalten.
+
+## Fokusvergleich
+
+Ein separater Bildausschnitt war nicht erforderlich. Die entscheidenden Oberflächen – Warnkarten, Kontextkarten, Einsatz/Protokoll-Tabs, Suchfeld und Spielerzeilen – sind im 1:1-Mobile-Vergleich lesbar. Das unterhalb des ersten Viewports liegende Select wurde zusätzlich im echten Browser per Tastatur geöffnet und von „Alle · 6“ auf „Achsenmächte · 3“ gestellt; die sichtbare Liste reduzierte sich auf drei Spieler. Der Spieler-Detailbereich wurde geöffnet und mit Escape geschlossen.
+
+## Findings
+
+- Keine verbleibenden P0-, P1- oder P2-Abweichungen.
+- [P3] Bei 320 Pixeln kürzt der globale Statuskopf Kartenname und Restzeit früher als bei 390 Pixeln. Das ist die bestehende, beabsichtigte Shell-Priorisierung; alle Werte behalten zugängliche Namen und die Live-Arbeitsfläche selbst bleibt ohne seitlichen Überlauf.
+
+## Pflichtflächen
+
+- Fonts und Typografie: bestehende Bahnschrift-/Arial-Narrow-Hierarchie bleibt erhalten. Mobile Spielernamen und K/D-Werte verwenden nun wie die Desktop-Spielertabelle die dezente Stärke 300; Teamzugehörigkeit bleibt im Kontexttext und über Fraktionssymbole erkennbar.
+- Spacing und Layout: Warnungen erhalten auf Mobile die volle Breite, Sekundärinformationen ein belastbares Zweispaltenraster. Rahmen, Abstände, 44-Pixel-Bedienelemente und eckige Formensprache bleiben konsistent. 390 × 844 und 320 × 720 zeigen keinen sichtbaren Dokumentüberlauf.
+- Farben und Tokens: ausschließlich vorhandene Theme-, Status- und Transparenz-Tokens werden verwendet. Helles Theme plus Deuteranopie wurde in der echten Darstellungsoberfläche geprüft und anschließend ohne Speicherung verworfen.
+- Bild- und Assetqualität: vorhandene MUI-Icons und Frontline-Assets bleiben unverändert; keine Platzhalter, CSS-Zeichnungen, Emojis oder neuen Bildassets.
+- Copy und Inhalt: „Jetzt prüfen“, Prioritäten, Spielstand, nächste Karte und „Spieler-Schnellfilter“ bleiben verständlich. Der mobile Spielstand verwendet die kurze Beschriftung, während Desktop den Teamkontext vollständig behält.
+- Zustände und Interaktionen: Lagekarten-Filter, beschriftetes Mobile-Select, Einsatz/Protokoll-Wechsel, Player-Detail-Sheet und Escape-Schließen geprüft. Die vorhandenen API-, Tabellen- und Aktionsverträge bleiben unverändert.
+- Browserfehler: im sauberen Abschlusslauf null Console-Errors.
+
+## Vergleichshistorie
+
+1. Ausgangsvergleich: Mobile Lagekarten und Spieler-Schnellfilter erforderten horizontales Scrollen; wichtige Zustände und Filter lagen außerhalb des ersten sichtbaren Bereichs. Als P1-Nutzungsproblem aufgenommen.
+2. Erste Korrektur: Warnungen vertikal priorisiert, Sekundärzustände gerastert und Schnellfilter durch ein beschriftetes Select ersetzt. Der direkte Vergleich zeigte noch eine gekürzte Spielstandsbeschriftung und einen unnötig einzeiligen Kartenwert als P2.
+3. Zweite Korrektur: kurze Mobile-Beschriftung für den Spielstand ergänzt und Kontextwerte auf bis zu zwei Zeilen freigegeben. Erneuter 390- und 320-Pixel-Vergleich ohne offene P0/P1/P2-Findings.
+
+## Implementation Checklist
+
+- [x] Desktop-Split-Ansicht ohne visuelle oder funktionale Regression bewahrt.
+- [x] Mobile Lagekarten ohne horizontale Pflichtnavigation priorisiert.
+- [x] Spieler-Schnellfilter vollständig beschriftet und tastaturbedienbar umgesetzt.
+- [x] Mobile Spielerzeilen auf neutrale, dezente Tabellen-Typografie vereinheitlicht.
+- [x] Desktop, 390 × 844, 320 × 720, Tastatur, Dark/Light und Deuteranopie geprüft.
+- [x] Build, Design-, Semantik-, Feedback-, Polling-, Konfigurations-, Admin-Aktions-, Operator-Copy- und Navigation-Verträge bestanden.
+
+final result: passed
+
+---
+
+# Design QA · Phase 2.1 Meldungsleitstelle
+
+## Vergleichsziel
+
+- Source Visual Truth: `.codex/phase2-baseline/incidents-desktop.png` (1440 × 900) und `.codex/phase2-baseline/incidents-mobile.png` (390 × 844), ergänzt um die Leitstellenanforderungen in `docs/product-design/rcon-product-concept.md`.
+- Implementierung: `.codex/phase2-baseline/incidents-after-desktop-final.png`, `.codex/phase2-baseline/incidents-after-mobile.png` und der fokussierte mobile Bearbeitungszustand `.codex/phase2-baseline/incidents-detail-mobile-final-viewport.png`.
+- Primärer Zustand: Frontline Gold, dunkler Modus, Standard-Farbsehen, neue Meldung ausgewählt; realistische Mirage-Demodaten mit drei Statuszuständen.
+
+## Normalisierung
+
+- Desktop-Source und Desktop-Implementierung: jeweils 1440 × 900 Pixel bei 1440 × 900 CSS-Pixeln, Browser-Dichte 1.
+- Mobile-Source und Mobile-Implementierung: jeweils 390 × 844 Pixel bei 390 × 844 CSS-Pixeln, Browser-Dichte 1.
+- Die Vorher-/Nachher-Paare wurden jeweils gemeinsam in einem Vergleichsinput geöffnet. Browser-Chrome und externe Canvas-Flächen sind nicht Bestandteil der Screenshots.
+
+## Full-View-Vergleich
+
+Die globale Frontline-Shell, die kondensierte Typografie, die eckigen Flächen, feinen Trenner und die Gold-/Grün-Dunkel-Tonalität bleiben unverändert. Die frühere einspaltige Desktop-Liste wurde innerhalb dieser vorhandenen Sprache zu einer Leitstellenansicht erweitert: kompakte Lagekennzahlen, Einsatzwarteschlange und dauerhaft sichtbarer Vorgangskontext bilden nun eine klare Beobachten–Entscheiden–Handeln-Hierarchie. Auf Mobile ersetzt eine vollständig beschriftete Statusauswahl die zuvor rechts abgeschnittene Tabreihe. Dadurch bleibt die Filteraufgabe bei 390 Pixeln vollständig bedienbar, ohne horizontales Scrollen oder verborgene Ziele.
+
+## Fokusvergleich
+
+Der mobile Bearbeitungsdialog wurde separat bei 390 × 844 geprüft. Titel, Status, Server, Alter, Quelle, Meldungsgrund, Zuständigkeit, Zeitpunkte, Originalmeldung, nächster Schritt und alle zulässigen Aktionen sind innerhalb eines einzigen vertikalen Vorgangs lesbar. Die Aktionsflächen besitzen mindestens 44 Pixel Höhe, bleiben eckig und nutzen ausschließlich die vorhandene MUI-Iconfamilie. Für den früheren mobilen Detaildialog lag kein belastbares Source-Capture vor; deshalb wurde dieser Fokuszustand gegen die vorhandenen Frontline-Dialog-, Button-, Typografie- und Tokenmuster geprüft.
+
+## Findings
+
+- Keine verbleibenden P0-, P1- oder P2-Abweichungen.
+- [P3] Der Auto-Update-Chip ist bewusst kompakt und vermittelt seinen Zustand zusätzlich über den Text „Live · 15 s“; das kleine Statussymbol ist im dunklen Theme optisch zurückhaltend. Eine stärkere Hervorhebung ist nicht erforderlich, solange die Aktualisierung normal arbeitet.
+
+## Pflichtflächen
+
+- Fonts und Typografie: vorhandene Bahnschrift-/Arial-Narrow-Hierarchie, Gewichte, Großbuchstaben, Laufweiten und Body-Schrift bleiben erhalten. Seitentitel, Warteschlange, Vorgangstitel, Metadaten und Aktionen sind eindeutig abgestuft.
+- Spacing und Layout: 4er-Kennzahlenraster, 0,9/1,1-Desktop-Split, 16-Pixel-Arbeitsabstände, eckige Rahmen und 44-Pixel-Touchziele erzeugen eine dichte, aber scanbare Leitstellenoberfläche. Mobile besitzt bei 390 × 844 einen Dokument-`scrollWidth` von 390 Pixeln bei 390 Pixeln `clientWidth`.
+- Farben und Tokens: ausschließlich vorhandene Theme-, Divider-, Action- und semantische Statusfarben. Helles Theme sowie Deuteranopie wurden über die echte Darstellungsoberfläche angewendet; Text, Symbol und Umrandung bleiben redundante Zustandsträger. Anschließend wurde der Frontline-Standard wiederhergestellt.
+- Bild- und Assetqualität: Für diesen datengetriebenen Arbeitsbereich sind keine Produktbilder vorgesehen. Frontline-Logo und etablierte MUI-Icons werden unverändert wiederverwendet; keine CSS-Zeichnungen, Platzhalter oder nachgebauten SVGs.
+- Copy und Inhalt: „Einsatzwarteschlange“, „Aktiver Vorgang“ und „Nächster Schritt“ erklären Aufgabe und Arbeitsrichtung. Quelle, Eingang, Aktualisierung und Originalmeldung bleiben nachvollziehbar; Deutsch und Englisch wurden ergänzt.
+- Zustände und Interaktionen: Laden, Leer, Fehler, Auswahl, Live-Aktualisierung, Statusfilter, Übernehmen, Ablehnen mit Bestätigung, Abschließen und geschlossener Verlauf bleiben erhalten. „Übernehmen“ wurde gegen den unveränderten API-Vertrag erfolgreich ausgeführt.
+- Accessibility: genau eine H1; Warteschlange und Detailbereich besitzen beschriftete Regionen; Filter-Select, Dialog und Aktionen haben zugängliche Namen. Escape schließt den mobilen Dialog. Status wird nicht allein über Farbe vermittelt.
+- Browserfehler: null Console-Errors. Es bleibt ausschließlich die bekannte React-Router-v7-Future-Flag-Warnung im Entwicklungsmodus.
+
+## Vergleichshistorie
+
+1. Erster Desktop-Vergleich: [P2] „Übernommen 1“ brach im fünffach geteilten Statusfilter zweizeilig um und störte den horizontalen Rhythmus.
+2. Fix: Tab-Inhalte auf eine Zeile begrenzt und horizontales Innenpadding verdichtet, ohne Zielgröße oder Beschriftung zu verkleinern.
+3. Zweiter Desktop-Vergleich bei identischen 1440 × 900: alle fünf Statusziele stehen einzeilig und gleichmäßig; keine offenen P0/P1/P2-Befunde.
+4. Mobile Vorher-/Nachher-Vergleich bei identischen 390 × 844: die abgeschnittene Tabnavigation ist durch eine vollständige, beschriftete Auswahl ersetzt; kein horizontaler Überlauf.
+
+## Implementation Checklist
+
+- [x] Source und Umsetzung bei identischen Desktop- und Mobile-Viewports verglichen.
+- [x] Desktop-Warteschlange und permanenter Vorgangskontext geprüft.
+- [x] Mobile Statusauswahl und Vollbildbearbeitung geprüft.
+- [x] Statusmutation, Escape, Theme und Farbsehmodus geprüft.
+- [x] Production Build erfolgreich; keine neuen Console-Errors.
+- [x] Keine offenen P0-, P1- oder P2-Findings.
+
+final result: passed
+
+---
+
+# Design QA: Konsolen-Admins, Option 1 „Berechtigungsregister“
+
+## Prüfgrundlage
+
+- Gewählte visuelle Richtung: Option 1 „Berechtigungsregister“.
+- Source visual truth: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-a5416038-aef0-4b7d-bee3-e0bda743fa61.png`
+- Implementierte Route: `http://127.0.0.1:3005/settings/console-admins`
+- Implementierung: `.codex/design-qa/console-admins-option-1/implementation.png`
+- Gesamtvergleich: `.codex/design-qa/console-admins-option-1/comparison-full.png`
+- Fokusvergleich: `.codex/design-qa/console-admins-option-1/comparison-focus.png`
+- Mobile Evidenz: `.codex/design-qa/console-admins-option-1/mobile.png`
+- Source und Desktop-Implementierung: jeweils 1487 × 1058 px, dunkles Frontline-Theme, deutsche Sprache und derselbe vorgemerkte Änderungszustand.
+
+## Ergebnis
+
+- Die Seite folgt der gewählten Register-Struktur: kompakter Seitenkopf mit Rollenübersicht, feste Erfassungsspalte, vollbreite Admin-Tabelle und gemeinsame Aktionsleiste.
+- Die eckige Frontline-Designlinie, dunkle grün-schwarze Flächen, goldene Akzente, feine Trenner und die bestehende Typografie wurden konsequent beibehalten.
+- Hinzufügen, Rollenwechsel und Entfernen sind als getrennte, farblich codierte Änderungszustände sichtbar. Keine dieser Änderungen wird vor dem abschließenden Speichern an den Server übertragen.
+- Mehrfachauswahl, Namens- und Steam64-Suche, Rollenfilter sowie Import und Export sind im Tabellenkopf zusammengeführt.
+- Der vom Nutzer gemeldete Höhenversatz wurde behoben: Die Mehrfachaktion lautet kompakt „3 entfernen“, bleibt einzeilig und ist nun exakt auf „Import / Export“ ausgerichtet.
+- Mobil wird die Erfassung eingeklappt, die Tabelle wechselt in lesbare Einzelkarten und die Aktionsleiste bleibt nur bei tatsächlich ungespeicherten Änderungen klebend.
+
+## Vergleichsverlauf
+
+1. Der erste Vergleich zeigte als P1, dass das Suchfeld in der mobilen Spaltenanordnung wegen seiner Desktop-Flexbasis unnötig viel Höhe belegte. Die Flexbasis wird nun breakpointabhängig gesetzt.
+2. Die mobile Prüfung zeigte als P1, dass die immer klebende Aktionsleiste Karten verdecken konnte. Im sauberen Zustand ist sie mobil statisch; bei Änderungen bleibt sie erreichbar.
+3. Die Rollenreihenfolge wurde an die gewählte Richtung angepasst: Senior, Junior, Spectator. Der sichere Standard für neue Einträge bleibt bewusst Spectator.
+4. Markierte Tabellenzeilen verwenden jetzt dezente, statusbezogene Flächen statt einer starken einheitlichen Auswahlfarbe.
+5. Der abschließende Fokusvergleich zeigte keine offenen P0-, P1- oder P2-Abweichungen.
+
+## Funktions- und Qualitätsprüfung
+
+- Neuer Admin mit Name, Steam64-ID und Rolle vorgemerkt; Status „Neu“ und Änderungszähler geprüft.
+- Bestehende Rolle Senior → Junior geändert; Inline-Auswahl und Status „Rolle geändert“ geprüft.
+- Bestehenden Admin zum Entfernen vorgemerkt und Rückgängig-Aktion sichtbar geprüft.
+- Namenssuche, Zurücksetzen der Suche sowie Einzel- und Mehrfachauswahl geprüft.
+- Speicherbestätigung bei vorgemerkter Entfernung geöffnet und ohne Servermutation abgebrochen.
+- Datei-Upload-Komponente korrigiert: `accept` und `onChange` liegen jetzt auf dem echten Dateifeld; der Upload-Button bleibt per Tastatur erreichbar.
+- Produktionsbuild und Prettier-Prüfung bestanden; nur die bereits bestehende Chunk-Größenwarnung.
+- Browserkonsole: keine Laufzeitfehler; ausschließlich die bereits bestehende React-Router-Future-Flag-Warnung.
+
+final result: passed
+---
+
+# Design QA: Spielerakten-Karten, Richtung 1
+
+## Prüfgrundlage
+
+- Referenz: `.codex/audits/player-card-2026-08-30/01-current-player-cards.png`
+- Umsetzung: `.codex/design-qa/player-card-direction-1/implementation.png`
+- Gesamtvergleich: `.codex/design-qa/player-card-direction-1/comparison-full.png`
+- Detailvergleich: `.codex/design-qa/player-card-direction-1/comparison-focus.png`
+- Viewport: 2353 × 1272 Pixel, dunkles Theme, Kartenansicht mit Testdaten
+
+## Ergebnis
+
+- Die Karten sind deutlich kompakter und bilden weiterhin eine klar erkennbare, eckige Einheit.
+- Die vier Statusaktionen sind beschriftet, semantisch gruppiert und per `aria-pressed` als Zustand erkennbar.
+- Aktivität und Maßnahmen sind in zwei ruhige horizontale Informationsreihen verdichtet.
+- Karten mit Markierungen zeigen bestehende Markierungen weiterhin; das Hinzufügen bleibt im Aktionsmenü verfügbar.
+- Drei Spalten werden erst bei sehr breiten Ansichten verwendet. Bei mittleren Desktopbreiten werden zwei Karten pro Zeile gezeigt; mobil bleibt die etablierte Listenansicht erhalten.
+- Auswahl-Checkbox, Kartenaktionen, deutsch/englische Beschriftungen und Produktions-Build wurden geprüft.
+
+## Vergleichshistorie
+
+1. Ausgangslage: hohe Karten, unbeschriftete Statussymbole und 2 × 2 Maßnahmenraster.
+2. Umsetzung: kompakte Statusleiste, reduzierte Rahmenhierarchie und einzeilige Maßnahmenübersicht.
+3. Endkontrolle: keine offenen P0-, P1- oder P2-Abweichungen; keine Funktionsregression im geprüften Karten- und Auswahlfluss.
+
+final result: passed
+
+---
+
+# Design QA: Desktop-Navigation – Präzisionsindex mit Theme-Verlauf
+
+## Prüfgrundlage
+
+- Gewählte visuelle Richtung: verfeinerte Option 1 „Präzisionsindex“.
+- Source visual truth: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-84d33f44-fabe-4685-87f9-264aa3be6c94.png`.
+- Farb- und Oberflächenreferenz: der bestehende themeabhängige Verlauf der produktiven Navigation.
+- Implementierte Route und Zustand: `http://127.0.0.1:3005/`, Arbeitsbereich „Live“ geöffnet, Serverauswahl geschlossen.
+- Finale Browseraufnahme: `.tmp/nav-audit/07-final-square-navigation.png`.
+- Gemeinsamer Gesamtvergleich: `.tmp/nav-audit/08-design-qa-final-comparison.png`.
+- Fokusvergleich der Navigation: `.tmp/nav-audit/08-design-qa-final-navigation-crop.png`.
+- Source und Umsetzung wurden bei 1586 × 992 px und Geräteskalierung 1 verglichen.
+
+## Ergebnis
+
+- Das dauerhafte 64-px-Kommando-Rail und der kompakte 244-px-Präzisionsindex ersetzen die frühere breite Navigationsleiste.
+- Die Navigationssuche, die doppelte Serverkarte, die zusätzliche Markenwiederholung und der Versionsblock wurden aus dem Desktop-Kontextpanel entfernt.
+- Der Serverwechsel sitzt als dauerhaft erreichbares `S2`-Kommando direkt unter dem Logo. Die Auswahl erhält echte Links, Servernummer, Spielkennung und einen textlich ergänzten Status.
+- Der vom Nutzer gewünschte bestehende Theme-Verlauf bleibt auf Rail und Kontextpanel erhalten und reagiert weiterhin auf das gewählte Farbschema.
+- Navigationseinträge, aktive Zustände, Server-Schalter, Server-Menüeinträge, Popover und Tooltips verwenden konsequent 0 px Radius. Computed-Style-Prüfung: Kontextnavigation `0px`, Rail `0px`, Server-Schalter `0px`, Server-Menü `0px`.
+- Der Bereichstitel, die Abschnittsüberschriften, feinen Trenner und die kompakte Statuszeile folgen der eckigen Frontline-Designlinie.
+
+## Verhalten und Accessibility
+
+- Arbeitsbereiche lassen sich weiterhin über das Rail öffnen und schließen; Ziele bleiben semantische Links.
+- Der Serverwechsler öffnet per Tastatur, schließt mit `Escape` und gibt den Fokus an den Auslöser zurück.
+- Status wird zusätzlich zu Farbe durch zugängliche Namen und Textlabels vermittelt.
+- Bei 1024 px bleibt die Navigation ohne horizontalen Dokument-Overflow (`scrollWidth === viewportWidth`) als Overlay bedienbar.
+- Die mobile Navigation wurde im nachfolgenden QA-Schritt auf dieselbe Rail-/Präzisionsindex-Logik umgestellt.
+
+## Technische Verifikation
+
+- Produktionsbuild erfolgreich; nur die bereits bekannte Warnung für große Chunks bleibt bestehen.
+- Pfad-, Query- und Hash-Erhalt beim Serverwechsel sowie Sortierung/Deduplizierung der Serveroptionen wurden geprüft.
+- Browserinteraktionen für Arbeitsbereich, Servermenü und `Escape` ohne sichtbares Fehler-Overlay geprüft.
+- Keine offenen P0-, P1- oder P2-Befunde.
+
+final result: passed
+
+---
+
+# Design QA: Mobile Navigation – Präzisionsindex
+
+## Prüfgrundlage
+
+- Responsive Designziel: die gewählte Desktop-Richtung „Präzisionsindex“, übertragen auf einen vollflächigen mobilen Drawer.
+- Ausgangszustand: `.tmp/nav-mobile-audit/02-current-mobile-drawer.png`.
+- Finale Browseraufnahme bei 390 × 844 px: `.tmp/nav-mobile-audit/03-new-mobile-navigation.png`.
+- Gemeinsamer Vorher-/Nachher-Vergleich: `.tmp/nav-mobile-audit/04-mobile-before-after.png`.
+- Zusätzlich geprüft: 320 × 700 px, Arbeitsbereich „Spielbetrieb“ und geöffnete Serverauswahl.
+
+## Ergebnis
+
+- Die alte mobile Akkordeon-Navigation wurde durch dasselbe 64-px-Kommando-Rail und einen kontextabhängigen Präzisionsindex wie am Desktop ersetzt.
+- Navigationssuche, breite Serverkarte, CPU-/RAM-/SSD-Block und Versionszeile entfallen aus dem mobilen Hauptfluss.
+- Der Serverwechsel sitzt als eckiges `S2`-Kommando direkt unter dem Logo; das Servermenü bleibt selbst bei 320 px innerhalb des Viewports.
+- Arbeitsbereiche wechseln ohne Seitenreload. Ein Navigationsziel schließt den Drawer nach dem Routenwechsel automatisch.
+- Sprache und Benutzeraktionen bleiben im unteren Rail erreichbar. Alle Navigations-, Server-, Sprach- und Schließen-Schaltflächen folgen der eckigen 0-px-Radius-Designlinie.
+- Der vorhandene themeabhängige Verlauf bleibt auf Rail und Kontextpanel erhalten.
+
+## Responsivität und Accessibility
+
+- 390 × 844 px: Rail 64 px, Kontextpanel 326 px, kein horizontaler Dokument-Overflow.
+- 320 × 700 px: Rail 64 px, Kontextpanel 256 px, Servermenü 248 px breit und vollständig sichtbar.
+- Zugängliche Namen für Arbeitsbereiche, Serverauswahl, Sprache, Benutzeraktionen und Schließen sind vorhanden.
+- Touch-Ziele sind mindestens 44 px hoch beziehungsweise breit; aktive Navigation wird zusätzlich durch Linie, Fläche und `aria-current` vermittelt.
+- Die Kerninteraktion Moderation → Spieler sowie Spielbetrieb → Karte wechseln wurde im lokalen In-App-Browser geprüft.
+
+## Technische Verifikation
+
+- Vite-Produktionsbuild erfolgreich; nur die bereits bekannte Chunk-Größenwarnung bleibt bestehen.
+- `git diff --check` ohne Fehler.
+- Keine offenen P0-, P1- oder P2-Befunde.
+
+final result: passed
+
+---
+
+# Design QA: Frontline Command Rail, Option 1
+
+## Prüfgrundlage
+
+- Designziel: `C:\Users\chris\.codex\generated_images\01a0052a-7e8d-7411-8b78-1a415453783b\exec-c4dbe56a-f770-44a3-a78a-302baa69a3dc.png`
+- Browser-Umsetzung: `.tmp/navigation-design-qa/command-rail-implementation-1440.png`
+- Direkter Vergleich: `.tmp/navigation-design-qa/command-rail-comparison.png`
+- Referenzgröße: 1487 × 1058 px
+- Browser-Viewport: 1440 × 1024 px
+- Geprüfter Zustand: dunkles Frontline-Theme, `/settings/console-admins`, Arbeitsbereich „Moderation“ geöffnet
+
+## Vergleich und Iterationen
+
+1. Der erste Browser-Abgleich zeigte ein doppeltes Logo, ein zu schmales 228-px-Kontextpanel und dadurch unnötige Umbrüche bei langen Bereichsnamen und im Suchfeld.
+2. Das Kontextpanel wurde auf 276 px verbreitert, die Marke im Panel auf die Textvariante reduziert und die Arbeitsbereiche auf klare Kurzbezeichnungen umgestellt.
+3. Der finale Vergleich zeigt dieselbe Hierarchie wie das Designziel: dauerhaftes Icon-Rail, kontextabhängiges Navigationspanel, sichtbarer Serverkontext, globale Suche und ein klar markierter aktiver Eintrag.
+
+## Fidelity-Prüfung
+
+- **Layout und Abstände:** Rail und Kontextpanel bilden eine eigenständige Navigationszone. Die eckigen Flächen, feinen Trennlinien und kompakten Abstände entsprechen der bestehenden Frontline-Designlinie. Das produktive Konsolen-Admin-Formular bleibt breiter und informationsreicher als das vereinfachte Mockup, ohne die Navigationshierarchie zu beeinträchtigen.
+- **Typografie:** Bestehende Frontline-Schriften, Versalien, Gewichtungen und Laufweiten werden weiterverwendet. Arbeitsbereich, Seitentitel und Navigationseinträge besitzen eine klare Abstufung; im finalen 276-px-Panel entstehen keine problematischen Umbrüche.
+- **Farben:** Grün-dunkle Flächen, warmer Frontline-Akzent, cyanfarbene Funktionshinweise und semantische Statusfarben werden aus den vorhandenen Tokens übernommen. Der aktive Bereich bleibt deutlich, ohne den Seiteninhalt zu überstrahlen.
+- **Formen und Oberflächen:** Keine generischen runden Karten wurden eingeführt. Rail, Panel, Suchfeld, Serverwähler und Navigationseinträge folgen der eckigen Produktoberfläche.
+- **Icons:** Ausschließlich vorhandene MUI-Icons aus derselben Stilfamilie; Größen, Ausrichtung, aktive und inaktive Zustände wurden im Browser geprüft.
+- **Bilder und Assets:** Das vorhandene Frontline-Logo wird wiederverwendet. Es wurden keine Platzhalter, CSS-Zeichnungen oder nachgebauten SVG-Assets ergänzt.
+- **Copy:** Kurze, verständliche Arbeitsbereichsnamen in Deutsch und Englisch. Die Suche besitzt einen verständlichen Leerzustand.
+
+## Verhalten und Responsivität
+
+- Desktop ab 1280 px: Rail und Kontextpanel bleiben stabil sichtbar; das Panel kann reduziert werden, das Rail bleibt erreichbar.
+- Tablet 900–1279 px: Das Kontextpanel öffnet als Overlay. `Escape` schließt es und setzt den Fokus auf den auslösenden Arbeitsbereich zurück.
+- Mobile unter 900 px: Die bestehende mobile Kopfzeile, der Vollbild-Drawer und die Bottom-Navigation bleiben aktiv; das Desktop-Rail ist ausgeblendet.
+- `Ctrl+K` öffnet das Kontextpanel aus dem reduzierten Zustand und fokussiert die globale Navigationssuche.
+- Die Suche filtert berechtigte und sichtbare Ziele über alle Arbeitsbereiche. Gesperrte Ziele bleiben erkennbar und semantisch deaktiviert.
+- Geprüft bei 1440 × 1024, 1024 × 900 und 390 × 844: kein horizontaler Dokument-Overflow, keine überlappenden Navigationselemente.
+
+## Accessibility
+
+- Semantische Buttons und Links mit zugänglichen Namen, `aria-expanded`, `aria-controls` und sichtbaren Fokuszuständen.
+- Tastaturzugriff für Rail, Suche und Navigationsziele; Fokus-Rückgabe nach `Escape` geprüft.
+- Praktische Touch-Ziele in der mobilen Navigation bleiben erhalten.
+- Status wird nicht allein über Farbe vermittelt; Text und Icons ergänzen die semantischen Zustände.
+
+## Technische Verifikation
+
+- Workspace-Zuordnung und Pfadnormalisierung: 4/4 Node-Tests bestanden.
+- Vite-Produktionsbuild erfolgreich; nur die bereits bekannte Chunk-Größenwarnung bleibt bestehen.
+- Browserprüfung ohne sichtbares Runtime-Fehler-Overlay.
+
+## Verbleibende Abweichungen
+
+- **P3:** Das Designziel nutzt eine vereinfachte Beispieltabelle. Die Umsetzung behält bewusst das produktive Konsolen-Admin-Formular und seine höhere Informationsdichte bei.
+- **P3:** Die Serverbezeichnung wird im kompakten Panel bei sehr langen Namen visuell gekürzt; der Serverwähler selbst bleibt vollständig bedienbar.
+
+Keine offenen P0-, P1- oder P2-Befunde.
+
+final result: passed
+
+---
+
+# Design QA · Phase 1 Navigation und mobile Shell
+
+## Vergleichsziel
+
+- Source Visual Truth: `C:\Users\chris\AppData\Local\Temp\codex-clipboard-efcfcd70-49e7-438a-87b0-e8fc0c201459.png` sowie die anschließend bestätigten Abweichungen in `docs/product-design/rcon-product-concept.md` (Navigationssuche entfernen, Serverwechsel in die globale Serverleiste verlagern, Gradient und eckige Frontline-Formensprache bewahren).
+- Implementierung: `.codex/qa/phase1-mobile-game-operations-338x884.png`, `.codex/qa/phase1-mobile-home-390x844.png` und `.codex/qa/phase1-desktop-home-1440x900.png`.
+- Gemeinsamer Direktvergleich: `.codex/qa/phase1-mobile-game-operations-comparison.png`.
+- Primärer Vergleichszustand: Frontline Gold, dunkler Modus, Standard-Farbsehen, mobile Mehr-Navigation im Workspace „Karten & Spielbetrieb“.
+
+## Normalisierung
+
+- Source: 338 × 884 Pixel.
+- Implementierung: 338 × 884 Pixel bei 338 × 884 CSS-Pixeln und Browser-Dichte 1.
+- Vergleichsbild: 676 × 914 Pixel; beide 338 × 884-Ansichten wurden ohne Skalierung nebeneinander angeordnet, darüber liegt lediglich eine 30-Pixel-Beschriftungszeile.
+- Zusätzliche Responsive-Evidenz: 390 × 844 Mobile und 1440 × 900 Desktop, jeweils ohne Browser-Chrome.
+
+## Full-View-Vergleich
+
+Der direkte Vergleich zeigt dieselbe Frontline-Grundstruktur: 64-Pixel-Kommandoleiste, eckige aktive Zustände, identische Gold-/Grün-Dunkel-Tonalität, dieselbe Iconfamilie, klare Workspace-Hierarchie und dieselbe Reihenfolge der sechs Spielbetriebsziele. Die im Source noch vorhandene Suche und Serverkarte fehlen in der Implementierung absichtlich; der Serverwechsel wurde gemäß freigegebenem Konzept in den globalen Serverstatus verschoben. Dadurch gewinnt das Kontextpanel vertikalen Raum, ohne die gewählte Designrichtung zu verlassen.
+
+## Fokusvergleich
+
+Ein zusätzlicher Ausschnitt war nicht erforderlich: Das Ziel ist selbst eine vollständige 338-Pixel-Navigationsoberfläche, und Beschriftungen, Icons, Abstände, Rahmen und Fokusflächen sind im 1:1-Vergleich lesbar. Der globale Serverstatus wurde separat in 390 × 844 und 1440 × 900 geprüft, einschließlich geöffnetem Menü und wiederhergestelltem Tastaturfokus.
+
+## Findings
+
+- Keine verbleibenden P0-, P1- oder P2-Abweichungen.
+- [P3] Die Implementierung verwendet im mobilen Kontextkopf nur das Frontline-Signet statt Signet plus ausgeschriebenem Markennamen. Das ist eine bewusste Platzentscheidung: Der Workspace-Titel bleibt bei 338 Pixeln vollständig lesbar und die Marke ist weiterhin eindeutig.
+
+## Pflichtflächen
+
+- Fonts und Typografie: Bahnschrift-/Arial-Narrow-Hierarchie, kondensierte Großbuchstaben, Gewichte, Zeilenhöhe und Buchstabenabstand bleiben konsistent. Keine ungewollte Umbruch- oder Trunkierungsstelle im primären Vergleich.
+- Spacing und Layout: Rail-Breite, Kontextpanel, 44-Pixel-Touchziele, eckige Rahmen, Trenner und vertikaler Rhythmus sind konsistent. Bei 390 × 844 und 1440 × 900 trat kein horizontaler Dokumentüberlauf auf.
+- Farben und Tokens: Frontline Gold und der bestehende themenfähige Gradient bleiben erhalten. Tactical Blue plus Deuteranopie wurde als Live-Vorschau geprüft und anschließend ohne Speicherung zurückgesetzt.
+- Bild- und Assetqualität: Das vorhandene Frontline-Logo und die etablierte MUI-Iconbibliothek werden wiederverwendet; keine Platzhalter, CSS-Zeichnungen oder neu erfundenen Assets.
+- Copy und Inhalt: „Betrieb“, „Live-Betrieb“, „Karten & Spielbetrieb“, Servernummer und Statusbezeichnungen sind verständlich und konsistent. Die mobile Zurück-Aktion lautet „Zurück: Spiele“.
+- Zustände und Interaktionen: Mobile Startseite, Bottom-Navigation, Mehr-Drawer, Workspace-Wechsel, Servermenü, Escape/Fokuswiederherstellung und Detail-Zurücklink geprüft.
+- Browserfehler: Im sauberen Abschlusslauf ohne HMR- oder Viewportwechsel keine Console-Errors; lediglich die bekannte React-Router-v7-Future-Flag-Warnung im Entwicklungsmodus.
+
+## Vergleichshistorie
+
+1. Erster Vergleich: Implementierung versehentlich im Workspace „Live-Betrieb“ und mit sichtbarem Tooltip erfasst; dadurch war der Zustand nicht sourcegleich. Keine Produktänderung erforderlich.
+2. Korrektur: Workspace „Karten & Spielbetrieb“ geöffnet, Maus aus dem Rail bewegt und bei identischem 338 × 884-Zustand neu erfasst.
+3. Zweiter Vergleich: keine P0/P1/P2-Findings. Suche und Serverkarte sind dokumentierte, beabsichtigte Konzeptänderungen; Gradient, Informationsarchitektur, Icons und Formensprache stimmen mit der gewählten Richtung überein.
+
+## Implementation Checklist
+
+- [x] Source und Implementierung bei identischer Größe und identischem Workspace verglichen.
+- [x] Mobile Startseite bleibt auf `/` und zeigt die Betriebsübersicht.
+- [x] Serverwechsel ist global erreichbar und nicht im Mehr-Drawer dupliziert.
+- [x] Bottom-Navigation und mobile Detail-Zurücknavigation geprüft.
+- [x] Desktop, Mobile, Tastatur, Theme und Farbsehmodus geprüft.
+- [x] Keine blockierenden visuellen oder funktionalen Abweichungen.
+
+final result: passed
+
+---
+
+# Design QA · Phase 2.4 Spielerakten und Sperrlistenverwaltung
+
+## Prüfgrundlage
+
+- Source Visual Truth: bestehende, funktionsfähige Ansichten in `.codex/phase24-baseline/players-mobile-390x844.png`, `.codex/phase24-baseline/player-profile-mobile-390x844.png`, `.codex/phase24-baseline/blacklists-manage-desktop-1440x900.png` und `.codex/phase24-baseline/blacklists-manage-mobile-390x844.png`; Zielhierarchie zusätzlich aus dem freigegebenen Product-Design-Konzept für `/records/players`, `/records/players/:playerId` und `/records/blacklists/manage`.
+- Implementierung: `.codex/phase24-baseline/players-after-mobile-qa2-390x844.png`, `.codex/phase24-baseline/player-profile-after-mobile-qa2-390x844.png`, `.codex/phase24-baseline/blacklists-manage-after-desktop-1440x900.png` und `.codex/phase24-baseline/blacklists-manage-after-mobile-390x844.png`.
+- Theme-Evidenz: `.codex/phase24-baseline/blacklists-manage-theme-light-deuteranopia-1440x900.png`.
+- Viewports und Normalisierung: Mobile jeweils 390 × 844 CSS-Pixel bei Browser-Dichte 1 und 390 × 844 Bildpixeln; Desktop jeweils 1440 × 900 CSS-Pixel bei Browser-Dichte 1 und 1440 × 900 Bildpixeln. Screenshots enthalten nur den App-Viewport ohne Browser-Chrome.
+- Zustände: Frontline Gold, dunkler Modus, Standard-Farbsehen; Spielerakten ohne Auswahl, Spielerprofil im Tab „Profil“, Sperrlistenverwaltung mit ausgewählter Liste. Der Theme-Test verwendet hellen Modus plus Deuteranopie und wurde anschließend ohne Speicherung verworfen.
+
+## Full-View-Vergleich
+
+Die Vorher- und Nachher-Aufnahmen wurden je Route im selben Vergleichseingang geöffnet und bei identischem Viewport beurteilt. Die Spielerakten behalten die kompakte mobile Aktenliste, ersetzen aber die dauerhaft sichtbare Symbolleiste und den hohen Filterblock durch einen klaren Suche-/Filter-Einstieg. Das Profil bringt die aufgabenbezogenen Tabs und den editierbaren Akteninhalt vor die lange Zusammenfassung. Die Sperrlistenverwaltung wechselt von einer weit verteilten Pseudotabelle zu einer eckigen Master-Detail-Arbeitsfläche mit Reichweite, Synchronisationswirkung und klaren Listenaktionen; Mobile wird keine Spalte mehr abgeschnitten.
+
+## Fokusvergleich
+
+Ein zusätzlicher Ausschnitt war nicht erforderlich. Suche, Filterauslöser, Auswahlleiste, Profilstatus, Listenkarte, Detailpanel und Formularaktionen sind in den 390-Pixel- und 1440-Pixel-Aufnahmen vollständig lesbar. Die Formulare wurden zusätzlich interaktiv im Browser geprüft, einschließlich bestehender Werte, Serverauswahl und Vollbilddarstellung auf Mobile.
+
+## Findings
+
+- Keine verbleibenden P0-, P1- oder P2-Abweichungen.
+- [P3] Beim Öffnen der globalen Benutzeraktionen und unmittelbaren Wechsel in den Darstellungsdialog protokolliert der bestehende Shell-Tooltip einmalig eine MUI-`anchorEl`-Warnung. Sie betrifft nicht die Spieler- oder Sperrlistenabläufe, erzeugt kein sichtbares Fehlverhalten und wird in einem globalen Shell-Paket separat bereinigt.
+
+## Pflichtflächen
+
+- Fonts und Typografie: Bestehende Frontline-Schriftfamilie, kondensierte Versalien, Gewichte und Zeilenhöhen bleiben erhalten. Überschriften, Metadaten, Risikostatus und Formlabels besitzen eine klarere Hierarchie ohne problematische Umbrüche.
+- Spacing und Layout: Mobile Filter reduzieren den ersten Viewport, Auswahlaktionen erscheinen nur bei tatsächlicher Auswahl, und das Spielerprofil priorisiert den Arbeitsbereich. Die Sperrlistenverwaltung verwendet ein eckiges, rhythmisches Master-Detail-Raster; bei 390 × 844 und 1440 × 900 gilt `scrollWidth === clientWidth`.
+- Farben und Tokens: Flächen, Rahmen, Auswahl, Erfolg, Gefahr und Information verwenden ausschließlich die vorhandenen Theme-Tokens. Heller Modus plus Deuteranopie wurde live geprüft; Zustand bleibt zusätzlich über Text, Symbol und Umrandung erkennbar.
+- Bild- und Assetqualität: Vorhandene Avatare, Frontline-Logo und MUI-Icons werden unverändert wiederverwendet. Es wurden keine Platzhalter, CSS-Zeichnungen, handgebauten SVGs oder neuen Bildassets eingeführt.
+- Copy und Inhalt: Filter, Aktenstatus, Reichweite, Serveranzahl und Synchronisationswirkung werden auf Deutsch und Englisch verständlich benannt. Unbekannte Synchronisationswerte werden transparent angezeigt und beim Bearbeiten bewahrt.
+- Icons und Zustände: Statussymbole besitzen sichtbare Textlabels; Auswahl- und Listenaktionen haben zugängliche Namen. Aktiv, ausgewählt, deaktiviert und destruktiv sind nicht allein farbcodiert.
+- Responsivität und Accessibility: 390 × 844 und 1440 × 900 ohne horizontalen Dokumentüberlauf; mobiler Filter als Vollhöhen-Drawer, Sperrlistenformular als Vollbilddialog, Tabs scrollbar, Listenkarte per Enter auswählbar und 44-Pixel-Aktionen geprüft.
+
+## Interaktionen und Datenverträge
+
+- Mobile Filter geöffnet, Spieler-ID eingetragen und mit „Ergebnisse anzeigen“ abgesendet; die bestehende Query `player_id=76561198000000001` wurde korrekt in der URL beibehalten.
+- Spieler ausgewählt; die zentrale Aktionsregion erschien nur dann, alle sieben Aktionen besaßen zugängliche Namen, und „Auswahl aufheben“ entfernte die Region wieder.
+- Spielerprofil-Tab „Sitzungen“ aktiviert; Status und Inhalt wechselten ohne Routen- oder Datenvertragänderung.
+- Zweite Sperrliste per Enter ausgewählt; Detailpanel aktualisiert. Bearbeitungsdialog bewahrte Name, Synchronisation und Serverauswahl. Mobiles Erstellformular belegte exakt den 390 × 844-Viewport.
+- Loader, Actions, API-Kommandos, Payloads und gespeicherte Konfigurationen blieben unverändert.
+
+## Vergleichshistorie
+
+1. Ausgangsvergleich: [P2] Mobile Spielerfilter und eine ständig sichtbare Symbolleiste verbrauchten unnötig Höhe; [P2] die lange Aktenzusammenfassung verdrängte die eigentliche Profilaufgabe; [P1] Sperrlistenverwaltung war Mobile als abgeschnittene Pseudotabelle nicht zuverlässig lesbar und Desktop zu weit verteilt.
+2. Umsetzung: Mobile Filter-Drawer, bedingte Auswahlaktionsleiste, aufgabenorientierte Profilreihenfolge sowie eckige Master-Detail-Verwaltung mit responsivem Formular ergänzt. Datenverträge blieben unverändert.
+3. Erste Nachher-Aufnahme: Inhalt war korrekt, aber Statuskopf und Avatare wurden vor vollständigem Laden erfasst. Die Aufnahme war nicht zustandsgleich und wurde nicht zur Freigabe verwendet.
+4. Finale Vergleichsaufnahme nach vollständigem Laden bei identischen Viewports: keine offenen P0-, P1- oder P2-Findings.
+
+## Implementation Checklist
+
+- [x] Ausgangszustände und Implementierung je Route im selben Vergleichseingang geprüft.
+- [x] Desktop und 390 × 844 ohne horizontalen Dokumentüberlauf geprüft.
+- [x] Filter, Auswahlaktionen, Profil-Tabs, Listenwahl und Dialoge funktional geprüft.
+- [x] Tastatur, Theme, Deuteranopie und semantische Beschriftungen geprüft.
+- [x] Bestehende API-, Query-, Payload- und Konfigurationsverträge beibehalten.
+- [x] Keine offenen P0-, P1- oder P2-Findings.
 
 final result: passed

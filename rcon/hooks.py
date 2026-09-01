@@ -362,7 +362,7 @@ def handle_new_match_start(rcon: Rcon, struct_log):
                     "set": loaded.get("set", []),
                 }
         except Exception as e:
-            logger.error("Could not fetch Game Layout", e)
+            logger.error("Could not fetch Game Layout: %s", e)
             pass
         maps_history.save_new_map(
             new_map=str(map_to_save),

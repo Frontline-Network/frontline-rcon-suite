@@ -10,10 +10,12 @@ import { useLoaderData, useRouteLoaderData } from "react-router-dom";
 import { toast } from "react-toastify";
 import { SortableRotationList } from "./SortableRotationList";
 import { MapBuilderListItem } from "../../MapListItem";
+import { useTranslation } from "react-i18next";
 
 function MapRotationBuilder() {
+  const { t } = useTranslation();
   const { maps } = useRouteLoaderData("maps");
-  const loaderData = useLoaderData()
+  const loaderData = useLoaderData();
   const queryClient = useQueryClient();
 
   // Query to get current map rotation
@@ -26,11 +28,11 @@ function MapRotationBuilder() {
 
   const { mutate: saveRotation, isPending: isRotationSaving } = useMutation({
     ...mapsManagerMutationOptions.setMapRotation,
-    onSuccess: (response) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: mapsManagerQueryKeys.mapRotation,
       });
-      toast.success("Map rotation saved!");
+      toast.success(t("maps.rotationWorkbench.rotationSaved"));
     },
     onError: (error) => {
       toast.error(
@@ -68,6 +70,11 @@ function MapRotationBuilder() {
         params={{
           nextMapIndex: currentRotation.next_index,
           currentMapIndex: currentRotation.current_index,
+        }}
+        selectedMapListProps={{
+          title: t("maps.rotationWorkbench.rotationDraftTitle"),
+          description: t("maps.rotationWorkbench.rotationDraftDescription"),
+          saveLabel: t("maps.rotationWorkbench.publishRotation"),
         }}
       />
     </>

@@ -280,6 +280,7 @@ export function ActionButton({
   params,
   sx,
   label,
+  tooltipLabel,
   icon: Icon,
   onBeforeAction,
   ...props
@@ -291,20 +292,24 @@ export function ActionButton({
   const actionLabel =
     label ||
     (action.translationKey ? t(`${action.translationKey}.name`) : action.name);
+  const accessibleActionLabel = tooltipLabel || actionLabel;
 
   return (
-    <Tooltip title={allowed ? actionLabel : t("actions.missingPermission")}>
+    <Tooltip
+      title={allowed ? accessibleActionLabel : t("actions.missingPermission")}
+    >
       <span>
         <Button
           size="small"
           variant="outlined"
           startIcon={Icon ? <Icon /> : <action.icon />}
+          aria-label={accessibleActionLabel}
           disabled={!allowed}
           onClick={() => {
             onBeforeAction?.();
             openDialog(action, recipients, params);
           }}
-          sx={{ opacity: action.deprecated ? 0.5 : 1, ...sx }}
+          sx={[{ opacity: action.deprecated ? 0.5 : 1 }, sx]}
           {...props}
         >
           {actionLabel}

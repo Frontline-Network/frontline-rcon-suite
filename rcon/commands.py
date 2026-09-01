@@ -251,7 +251,7 @@ class ServerCtl:
         try:
             conn.connect(self.config.host, int(self.config.port), self.config.password)
         except (TypeError, ValueError) as e:
-            logger.exception("Invalid connection information", e)
+            logger.exception("Invalid connection information: %s", e)
             raise
 
     def send(
@@ -271,9 +271,9 @@ class ServerCtl:
             connection = nullcontext(enter_result=conn)
 
         if log_info:
-            logger.info("Sending command:", command, content)
+            logger.info("Sending command: %s %r", command, content)
         else:
-            logger.debug("Sending command:", command, content)
+            logger.debug("Sending command: %s %r", command, content)
 
         self.perf_stats.increment("send")
         self.perf_stats.increment("send_size", len(content))

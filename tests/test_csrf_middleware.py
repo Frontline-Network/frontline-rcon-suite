@@ -16,23 +16,18 @@ from django.http import HttpResponse
 from django.test import RequestFactory
 from django.views.decorators.csrf import csrf_exempt
 
-try:
-    # Repository-root test runs use the outer namespace package.
-    from rconweb.api import auth, views
-    from rconweb.api import urls as api_urls
-    from rconweb.api.decorators import ENDPOINT_HTTP_METHODS
-    from rconweb.rconweb.csrf import csrf_failure
-    from rconweb.rconweb.middleware import (
-        READ_ONLY_POST_PATHS,
-        SessionCsrfProtectionMiddleware,
-    )
-except ModuleNotFoundError:
-    # Django's manage.py adds ``rconweb/`` directly to sys.path.
-    from api import auth, views
-    from api import urls as api_urls
-    from api.decorators import ENDPOINT_HTTP_METHODS
-    from rconweb.csrf import csrf_failure
-    from rconweb.middleware import READ_ONLY_POST_PATHS, SessionCsrfProtectionMiddleware
+# Django registers the historical application as ``api``. Import it under that
+# canonical name so model classes are not loaded a second time through the
+# repository-root ``rconweb.api`` namespace. The project package itself is
+# addressed through its repository-root path used by DJANGO_SETTINGS_MODULE.
+from api import auth, views
+from api import urls as api_urls
+from api.decorators import ENDPOINT_HTTP_METHODS
+from rconweb.rconweb.csrf import csrf_failure
+from rconweb.rconweb.middleware import (
+    READ_ONLY_POST_PATHS,
+    SessionCsrfProtectionMiddleware,
+)
 
 
 @csrf_exempt

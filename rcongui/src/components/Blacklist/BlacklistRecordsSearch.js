@@ -148,8 +148,11 @@ const BlacklistRecordsSearch = ({
           }}
         />
         <FormControl fullWidth size="small">
-          <InputLabel>{t("records.blacklists.list")}</InputLabel>
+          <InputLabel id="blacklist-filter-list-label">
+            {t("records.blacklists.list")}
+          </InputLabel>
           <Select
+            labelId="blacklist-filter-list-label"
             value={blacklistQuery}
             label={t("records.blacklists.list")}
             onChange={(event) => setBlacklistQuery(event.target.value)}
@@ -210,8 +213,11 @@ const BlacklistRecordsSearch = ({
           {t("records.blacklists.recordsCount", { count: totalRecords })}
         </Typography>
         <FormControl fullWidth size="small">
-          <InputLabel>{t("common.pagination.pageSize")}</InputLabel>
+          <InputLabel id="blacklist-filter-page-size-label">
+            {t("common.pagination.pageSize")}
+          </InputLabel>
           <Select
+            labelId="blacklist-filter-page-size-label"
             value={pageSize}
             label={t("common.pagination.pageSize")}
             onChange={(event) => setPageSize(Number(event.target.value))}

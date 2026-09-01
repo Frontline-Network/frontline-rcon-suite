@@ -26,13 +26,33 @@ export const LiveCommandBar = ({
   return (
     <Box
       component="section"
-      aria-label={t("views.live.commandBar")}
+      aria-labelledby="live-operations-title"
       sx={(theme) => ({
         border: `1px solid ${theme.palette.divider}`,
         bgcolor: "background.paper",
         mb: 1,
       })}
     >
+      <Typography
+        id="live-operations-title"
+        component="h1"
+        variant="subtitle1"
+        sx={{
+          borderBottom: "1px solid",
+          borderColor: "divider",
+          color: "text.primary",
+          fontFamily: '"Bahnschrift Condensed", "Arial Narrow", sans-serif',
+          fontWeight: 800,
+          letterSpacing: "0.08em",
+          lineHeight: 1,
+          m: 0,
+          px: 1.5,
+          py: 1,
+          textTransform: "uppercase",
+        }}
+      >
+        {t("views.live.title")}
+      </Typography>
       {isCompact ? (
         <Box
           role="tablist"

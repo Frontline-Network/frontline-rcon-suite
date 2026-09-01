@@ -1,13 +1,19 @@
 import {
   Badge,
+  Box,
   Button,
   Collapse,
+  Divider,
+  Drawer,
+  IconButton,
   InputAdornment,
   Skeleton,
   Stack,
   TextField,
+  Typography,
   useMediaQuery,
 } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import SearchIcon from "@mui/icons-material/Search";
@@ -87,13 +93,13 @@ export default function PlayerFiltersForm({ fields }) {
   };
 
   return (
-    <Form method="GET">
+    <Form id="player-records-filter-form" method="GET">
       <Stack
         spacing={1}
         sx={{
           width: "100%",
           border: (theme) => `1px solid ${theme.palette.divider}`,
-          borderRadius: 1,
+          borderRadius: 0,
           bgcolor: "background.paper",
           p: { xs: 1, md: 1.25 },
         }}
@@ -136,16 +142,62 @@ export default function PlayerFiltersForm({ fields }) {
             />
           ) : null}
 
-          <Button
-            type="submit"
-            variant="contained"
-            color="primary"
-            startIcon={<SearchIcon />}
-            disabled={navigation.state === "loading"}
-            sx={{ minHeight: 44, minWidth: 118 }}
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ width: { xs: "100%", md: "auto" } }}
           >
-            {t("common.search")}
-          </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              startIcon={<SearchIcon />}
+              disabled={navigation.state === "loading"}
+              sx={{
+                minHeight: 44,
+                minWidth: 118,
+                flex: { xs: 1, md: "0 0 auto" },
+              }}
+            >
+              {t("common.search")}
+            </Button>
+
+            <Button
+              variant="outlined"
+              color="inherit"
+              startIcon={
+                <Badge badgeContent={advancedFilterCount} color="primary">
+                  <TuneIcon />
+                </Badge>
+              }
+              endIcon={
+                !compact ? (
+                  <ExpandMoreIcon
+                    sx={{
+                      transform: advancedOpen ? "rotate(180deg)" : "none",
+                      transition: (theme) =>
+                        theme.transitions.create("transform"),
+                    }}
+                  />
+                ) : null
+              }
+              aria-expanded={advancedOpen}
+              aria-controls="player-advanced-filters"
+              onClick={() => {
+                setAdvancedLoaded(true);
+                setAdvancedOpen((value) => !value);
+              }}
+              sx={{
+                minHeight: 44,
+                whiteSpace: "nowrap",
+                flex: { xs: 1, md: "0 0 auto" },
+              }}
+            >
+              {compact
+                ? t("records.players.filters")
+                : t("records.players.moreFilters")}
+            </Button>
+          </Stack>
 
           <Button
             variant="outlined"
@@ -157,53 +209,125 @@ export default function PlayerFiltersForm({ fields }) {
           >
             {t("records.players.reset")}
           </Button>
-
-          <Button
-            variant="outlined"
-            color="inherit"
-            startIcon={
-              <Badge badgeContent={advancedFilterCount} color="primary">
-                <TuneIcon />
-              </Badge>
-            }
-            endIcon={
-              <ExpandMoreIcon
-                sx={{
-                  transform: advancedOpen ? "rotate(180deg)" : "none",
-                  transition: (theme) => theme.transitions.create("transform"),
-                }}
-              />
-            }
-            aria-expanded={advancedOpen}
-            aria-controls="player-advanced-filters"
-            onClick={() => {
-              setAdvancedLoaded(true);
-              setAdvancedOpen((value) => !value);
-            }}
-            sx={{ minHeight: 44, whiteSpace: "nowrap" }}
-          >
-            {t("records.players.moreFilters")}
-          </Button>
         </Stack>
 
-        <Collapse in={advancedOpen}>
-          {advancedLoaded ? (
-            <Suspense fallback={<Skeleton variant="rectangular" height={180} />}>
-              <PlayerAdvancedFilters
-                compact={compact}
-                formFields={formFields}
-                handleInputChange={handleInputChange}
-                handleReset={handleReset}
-                navigationState={navigation.state}
-                selectedCountry={selectedCountry}
-                selectedEmoji={selectedEmoji}
-                setFormFields={setFormFields}
-                setSelectedCountry={setSelectedCountry}
-                setSelectedEmoji={setSelectedEmoji}
-              />
-            </Suspense>
-          ) : null}
-        </Collapse>
+        {!compact ? (
+          <Collapse in={advancedOpen}>
+            {advancedLoaded ? (
+              <Suspense
+                fallback={<Skeleton variant="rectangular" height={180} />}
+              >
+                <PlayerAdvancedFilters
+                  compact={compact}
+                  formFields={formFields}
+                  handleInputChange={handleInputChange}
+                  selectedCountry={selectedCountry}
+                  selectedEmoji={selectedEmoji}
+                  setFormFields={setFormFields}
+                  setSelectedCountry={setSelectedCountry}
+                  setSelectedEmoji={setSelectedEmoji}
+                />
+              </Suspense>
+            ) : null}
+          </Collapse>
+        ) : (
+          <Drawer
+            anchor="bottom"
+            open={advancedOpen}
+            onClose={() => setAdvancedOpen(false)}
+            ModalProps={{ keepMounted: true, disablePortal: true }}
+            PaperProps={{
+              sx: {
+                maxHeight: "calc(100dvh - 72px)",
+                borderRadius: 0,
+                borderTop: "1px solid",
+                borderColor: "divider",
+              },
+            }}
+          >
+            <Box
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="player-filter-drawer-title"
+              sx={{ display: "flex", flexDirection: "column", minHeight: 0 }}
+            >
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{ px: 1.5, py: 1.25 }}
+              >
+                <Box>
+                  <Typography
+                    id="player-filter-drawer-title"
+                    component="h2"
+                    variant="h6"
+                  >
+                    {t("records.players.filterTitle")}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {t("records.players.filterDescription")}
+                  </Typography>
+                </Box>
+                <IconButton
+                  onClick={() => setAdvancedOpen(false)}
+                  aria-label={t("common.close")}
+                  sx={{ minWidth: 44, minHeight: 44 }}
+                >
+                  <CloseIcon />
+                </IconButton>
+              </Stack>
+              <Divider />
+              <Box sx={{ overflowY: "auto", px: 1.5, pb: 1.5 }}>
+                {advancedLoaded ? (
+                  <Suspense
+                    fallback={
+                      <Skeleton
+                        variant="rectangular"
+                        height={360}
+                        sx={{ mt: 1.5 }}
+                      />
+                    }
+                  >
+                    <PlayerAdvancedFilters
+                      compact={compact}
+                      formFields={formFields}
+                      handleInputChange={handleInputChange}
+                      selectedCountry={selectedCountry}
+                      selectedEmoji={selectedEmoji}
+                      setFormFields={setFormFields}
+                      setSelectedCountry={setSelectedCountry}
+                      setSelectedEmoji={setSelectedEmoji}
+                    />
+                  </Suspense>
+                ) : null}
+              </Box>
+              <Divider />
+              <Stack direction="row" spacing={1} sx={{ p: 1.5 }}>
+                <Button
+                  variant="outlined"
+                  color="inherit"
+                  startIcon={<RestartAltIcon />}
+                  onClick={handleReset}
+                  disabled={navigation.state === "loading"}
+                  sx={{ minHeight: 44, flex: 1 }}
+                >
+                  {t("records.players.reset")}
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  startIcon={<SearchIcon />}
+                  onClick={() => setAdvancedOpen(false)}
+                  disabled={navigation.state === "loading"}
+                  sx={{ minHeight: 44, flex: 1 }}
+                >
+                  {t("records.players.showResults")}
+                </Button>
+              </Stack>
+            </Box>
+          </Drawer>
+        )}
       </Stack>
 
       <input

@@ -112,6 +112,10 @@ endpoints: list[tuple[str, Callable]] = [
     ("set_autobalancer_config", autobalancer.set_autobalancer_config),
     ("get_autobalancer_status", autobalancer.get_autobalancer_status),
     (
+        "execute_autobalancer_squad_switch",
+        autobalancer.execute_autobalancer_squad_switch,
+    ),
+    (
         "approve_autobalancer_proposal",
         autobalancer.approve_autobalancer_proposal,
     ),

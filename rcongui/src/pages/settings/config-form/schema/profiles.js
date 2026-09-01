@@ -61,7 +61,7 @@ const schemaProfile = (
   page,
   sections,
   summarySectionIds,
-  { operationMode = null } = {}
+  { operationMode = null, testKind = null } = {}
 ) => ({
   ...pageKeys(page),
   page,
@@ -69,6 +69,7 @@ const schemaProfile = (
   layout: "workbench",
   translationRoot: `${ROOT}.${page}`,
   operationMode,
+  testKind,
   sections: sections.map(([id, fields]) => genericSection(page, id, fields)),
   fields: {},
   summarySectionIds,
@@ -77,6 +78,7 @@ const schemaProfile = (
 const noLeaderProfile = {
   ...pageKeys("noLeader"),
   renderer: "guided",
+  testKind: "noLeader",
   translationRoot: `${ROOT}.noLeader`,
   summary: {
     titleKey: `${ROOT}.noLeader.summary.title`,
@@ -218,6 +220,7 @@ const noLeaderProfile = {
 const noSoloTankProfile = {
   ...pageKeys("noSoloTank"),
   renderer: "guided",
+  testKind: "noSoloTank",
   translationRoot: `${ROOT}.noSoloTank`,
   summary: {
     titleKey: `${ROOT}.noSoloTank.summary.title`,
@@ -362,6 +365,52 @@ const nameKickProfile = {
 };
 
 const configFormProfiles = {
+  autobalancer_config: schemaProfile(
+    "autobalancer",
+    [
+      ["operation", ["mode"]],
+      [
+        "intervention",
+        ["target_difference", "minimum_players", "stable_difference_seconds"],
+      ],
+      [
+        "squads",
+        [
+          "coordinated_squad_switches_enabled",
+          "allow_individual_squad_fallback",
+        ],
+      ],
+      [
+        "safety",
+        [
+          "volunteer_phase_seconds",
+          "map_start_grace_minutes",
+          "map_end_guard_minutes",
+          "connection_grace_seconds",
+          "cooldown_maps",
+          "max_switches_per_incident",
+        ],
+      ],
+      ["messages", ["volunteer_command", "messages"]],
+      [
+        "advanced",
+        [
+          "poll_interval_seconds",
+          "candidate_timeout_seconds",
+          "manual_proposal_timeout_seconds",
+          "death_event_max_age_seconds",
+          "switch_confirmation_timeout_seconds",
+          "skill_strategy",
+          "skill_gap_soft_limit",
+          "skill_gap_hard_warning",
+          "skill_gap_min_improvement",
+          "history_server_numbers",
+          "history_half_life_days",
+        ],
+      ],
+    ],
+    ["operation", "intervention", "squads", "safety"]
+  ),
   rcon_connection_settings_config: schemaProfile(
     "rconConnection",
     [
@@ -496,7 +545,7 @@ const configFormProfiles = {
       ["notifications", ["discord_webhook_url"]],
     ],
     ["rules", "warnings", "punishments", "kick"],
-    { operationMode: "threeState" }
+    { operationMode: "threeState", testKind: "level" }
   ),
   auto_mod_seeding_config: {
     ...pageKeys("seeding"),
@@ -547,7 +596,8 @@ const configFormProfiles = {
       ["actions", ["blacklist_id", "ban_on_vac_history_reason", "auto_expire"]],
       ["exemptions", ["whitelist_flags"]],
     ],
-    ["rules", "actions", "exemptions"]
+    ["rules", "actions", "exemptions"],
+    { testKind: "vacBans" }
   ),
   tk_ban_on_connect_config: schemaProfile(
     "tkBans",
@@ -566,7 +616,7 @@ const configFormProfiles = {
       ["notifications", ["discord_webhook_url", "discord_webhook_message"]],
     ],
     ["detection", "actions", "exemptions", "notifications"],
-    { operationMode: "toggle" }
+    { operationMode: "toggle", testKind: "tkBans" }
   ),
   name_kick_config: nameKickProfile,
   seed_vip_config: {
@@ -597,6 +647,9 @@ const configFormProfiles = {
 
 const sectionOrder = [
   "operation",
+  "intervention",
+  "squads",
+  "safety",
   "scope",
   "requirements",
   "detection",

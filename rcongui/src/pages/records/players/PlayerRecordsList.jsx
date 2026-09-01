@@ -24,6 +24,7 @@ import PlatformChip from "@/components/player/profile/Platform";
 import CountryChip from "@/components/player/profile/Country";
 import LevelChip from "@/components/player/profile/Level";
 import { OnlineStatusBadge } from "@/components/player/profile/styled";
+import LinkedAccounts from "@/components/player/profile/LinkedAccounts";
 
 const PlayerRecordsListRow = memo(function PlayerRecordsListRow({
   player,
@@ -57,7 +58,6 @@ const PlayerRecordsListRow = memo(function PlayerRecordsListRow({
   const platform = player?.platform ?? player?.soldier?.platform;
   const country =
     player?.country ?? player?.account?.country ?? player?.steaminfo?.country;
-  const linkedAccounts = player?.identity?.linked_accounts ?? [];
 
   return (
     <TableRow
@@ -135,17 +135,13 @@ const PlayerRecordsListRow = memo(function PlayerRecordsListRow({
         </Stack>
       </TableCell>
       <TableCell>
-        {linkedAccounts.length > 0 ? (
-          <Stack spacing={0.25}>
-            <Typography variant="body2" color="success.main">
-              {t("records.players.linked")}
-            </Typography>
-            <Typography variant="caption" color="text.secondary" noWrap>
-              {t("records.players.linkedCount", {
-                count: linkedAccounts.length,
-              })}
-            </Typography>
-          </Stack>
+        {player?.identity?.linked_accounts?.length ? (
+          <LinkedAccounts
+            player={player}
+            compact
+            showLabel={false}
+            showWarnings={false}
+          />
         ) : (
           <Typography color="text.secondary">—</Typography>
         )}
@@ -220,7 +216,7 @@ const MobilePlayerRecordsListRow = memo(function MobilePlayerRecordsListRow({
   const lastSeen = dayjs(player.last_seen_timestamp_ms)
     .locale(i18n.language)
     .fromNow();
-  const linkedCount = player?.identity?.linked_accounts?.length ?? 0;
+  const hasLinkedAccounts = Boolean(player?.identity?.linked_accounts?.length);
 
   return (
     <Box
@@ -281,21 +277,16 @@ const MobilePlayerRecordsListRow = memo(function MobilePlayerRecordsListRow({
           >
             {name}
           </Typography>
-          {linkedCount > 0 ? (
-            <Typography
-              variant="caption"
-              color="success.main"
-              sx={{ flex: "0 0 auto" }}
-            >
-              {t("records.players.linkedCount", { count: linkedCount })}
-            </Typography>
-          ) : null}
         </Stack>
         <Stack
           direction="row"
           spacing={0.75}
           alignItems="center"
-          divider={<Box component="span" sx={{ color: "text.disabled" }}>·</Box>}
+          divider={
+            <Box component="span" sx={{ color: "text.disabled" }}>
+              ·
+            </Box>
+          }
           sx={{ minWidth: 0, mt: 0.25 }}
         >
           <Typography variant="caption" color="text.secondary" noWrap>
@@ -313,6 +304,15 @@ const MobilePlayerRecordsListRow = memo(function MobilePlayerRecordsListRow({
             {lastSeen}
           </Typography>
         </Stack>
+        {hasLinkedAccounts ? (
+          <LinkedAccounts
+            player={player}
+            compact
+            interactive={false}
+            showLabel={false}
+            showWarnings={false}
+          />
+        ) : null}
       </Box>
       <ProfileActions
         player={player}
@@ -357,7 +357,7 @@ export default function PlayerRecordsList({ players, selectedIds, onSelect }) {
     <TableContainer
       sx={{
         border: (theme) => `1px solid ${theme.palette.divider}`,
-        borderRadius: 1,
+        borderRadius: 0,
         bgcolor: "background.paper",
       }}
     >

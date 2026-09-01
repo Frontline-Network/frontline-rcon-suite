@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Box,
@@ -14,6 +14,7 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
+import { getIntegrationWorkbenchCopy } from "./workbench-copy";
 
 const sectionOrder = [
   "operation",
@@ -112,44 +113,6 @@ const isSensitiveField = (path) => {
   const key = String(path.at(-1) || "").toLowerCase();
   return key === "url" || key.includes("webhook_url");
 };
-
-function JsonObjectField({ disabled, label, onChange, value }) {
-  const [draft, setDraft] = useState(() =>
-    JSON.stringify(value || {}, null, 2)
-  );
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    setDraft(JSON.stringify(value || {}, null, 2));
-    setError("");
-  }, [value]);
-
-  const commit = () => {
-    try {
-      onChange(JSON.parse(draft || "{}"));
-      setError("");
-    } catch (parseError) {
-      setError(parseError.message);
-    }
-  };
-
-  return (
-    <TextField
-      fullWidth
-      multiline
-      minRows={4}
-      disabled={disabled}
-      label={label}
-      value={draft}
-      error={Boolean(error)}
-      helperText={error}
-      onChange={(event) => setDraft(event.target.value)}
-      onBlur={commit}
-      inputProps={{ spellCheck: false }}
-      sx={{ gridColumn: "1 / -1" }}
-    />
-  );
-}
 
 function PrimitiveField({
   disabled,
@@ -297,6 +260,213 @@ function PrimitiveField({
   );
 }
 
+function KeyValueObjectField({
+  disabled,
+  label,
+  onChange,
+  path,
+  rootSchema,
+  schema,
+  value,
+}) {
+  const { t, i18n } = useTranslation();
+  const workbenchCopy = getIntegrationWorkbenchCopy(i18n.resolvedLanguage);
+  const [newKey, setNewKey] = useState("");
+  const [newKeyError, setNewKeyError] = useState("");
+  const entries = Object.entries(value || {});
+  const itemSchema =
+    schema.additionalProperties &&
+    typeof schema.additionalProperties === "object"
+      ? schema.additionalProperties
+      : {};
+  const sampleValue = entries[0]?.[1];
+  const defaultDynamicValue = () => {
+    if (Object.keys(itemSchema).length) {
+      return defaultForSchema(rootSchema, itemSchema);
+    }
+    if (Array.isArray(sampleValue)) return [];
+    if (sampleValue !== null && typeof sampleValue === "object") return {};
+    if (typeof sampleValue === "boolean") return false;
+    if (typeof sampleValue === "number") return 0;
+    return "";
+  };
+
+  const updateEntry = (key, nextValue) => {
+    onChange({ ...(value || {}), [key]: nextValue });
+  };
+
+  const removeEntry = (key) => {
+    const nextValue = { ...(value || {}) };
+    delete nextValue[key];
+    onChange(nextValue);
+  };
+
+  const addEntry = () => {
+    const key = newKey.trim();
+    if (!key) {
+      setNewKeyError(workbenchCopy.keyRequired);
+      return;
+    }
+    if (Object.prototype.hasOwnProperty.call(value || {}, key)) {
+      setNewKeyError(workbenchCopy.keyExists);
+      return;
+    }
+    onChange({
+      ...(value || {}),
+      [key]: defaultDynamicValue(),
+    });
+    setNewKey("");
+    setNewKeyError("");
+  };
+
+  return (
+    <Box sx={{ gridColumn: "1 / -1", minWidth: 0 }}>
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="baseline"
+        gap={1}
+        sx={{ mb: 1 }}
+      >
+        <Typography variant="subtitle2">{label}</Typography>
+        <Typography variant="caption" color="text.secondary">
+          {t("settings.integrations.form.entryCount", {
+            count: entries.length,
+          })}
+        </Typography>
+      </Stack>
+
+      <Stack spacing={1}>
+        {entries.map(([key, entryValue]) => {
+          const complex =
+            entryValue !== null && typeof entryValue === "object";
+          return (
+            <Box
+              key={key}
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "minmax(0, 1fr) auto",
+                  sm: "minmax(150px, 0.42fr) minmax(0, 1fr) auto",
+                },
+                gap: 1,
+                alignItems: "start",
+                border: "1px solid",
+                borderColor: "divider",
+                p: 1.25,
+                bgcolor: "background.default",
+              }}
+            >
+              <TextField
+                size="small"
+                label={workbenchCopy.keyLabel}
+                value={key}
+                disabled
+                sx={{ gridColumn: { xs: "1 / -1", sm: "auto" } }}
+              />
+              {complex ? (
+                <Box
+                  sx={{
+                    minWidth: 0,
+                    p: 1,
+                    border: "1px solid",
+                    borderColor: "divider",
+                  }}
+                >
+                  <ConfigField
+                    disabled={disabled}
+                    fieldKey="listItem"
+                    rootSchema={rootSchema}
+                    schema={
+                      Array.isArray(entryValue)
+                        ? { type: "array", items: {} }
+                        : { type: "object", additionalProperties: true }
+                    }
+                    value={entryValue}
+                    path={[...path, key]}
+                    onChange={(nextValue) => updateEntry(key, nextValue)}
+                  />
+                </Box>
+              ) : (
+                <PrimitiveField
+                  disabled={disabled}
+                  fieldKey="listItem"
+                  rootSchema={rootSchema}
+                  schema={itemSchema}
+                  value={entryValue}
+                  path={[...path, key]}
+                  onChange={(nextValue) => updateEntry(key, nextValue)}
+                />
+              )}
+              <IconButton
+                size="small"
+                disabled={disabled}
+                aria-label={workbenchCopy.removeNamedEntry(key)}
+                onClick={() => removeEntry(key)}
+              >
+                <DeleteOutlineIcon fontSize="small" />
+              </IconButton>
+            </Box>
+          );
+        })}
+
+        {entries.length === 0 && (
+          <Box
+            sx={{
+              border: "1px dashed",
+              borderColor: "divider",
+              px: 1.5,
+              py: 1.25,
+            }}
+          >
+            <Typography variant="body2" color="text.secondary">
+              {t("settings.integrations.form.noEntries")}
+            </Typography>
+          </Box>
+        )}
+
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", sm: "minmax(0, 1fr) auto" },
+            gap: 1,
+            alignItems: "start",
+          }}
+        >
+          <TextField
+            size="small"
+            disabled={disabled}
+            label={workbenchCopy.newKeyLabel}
+            value={newKey}
+            error={Boolean(newKeyError)}
+            helperText={
+              newKeyError || workbenchCopy.newKeyHelp
+            }
+            onChange={(event) => {
+              setNewKey(event.target.value);
+              setNewKeyError("");
+            }}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter") return;
+              event.preventDefault();
+              addEntry();
+            }}
+          />
+          <Button
+            variant="outlined"
+            startIcon={<AddIcon />}
+            disabled={disabled || !newKey.trim()}
+            onClick={addEntry}
+            sx={{ minHeight: 40 }}
+          >
+            {workbenchCopy.addSetting}
+          </Button>
+        </Box>
+      </Stack>
+    </Box>
+  );
+}
+
 function ConfigField({
   disabled,
   fieldKey,
@@ -306,7 +476,8 @@ function ConfigField({
   schema: inputSchema,
   value,
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const workbenchCopy = getIntegrationWorkbenchCopy(i18n.resolvedLanguage);
   const schema = resolveSchema(rootSchema, inputSchema);
   const type = inferType(schema, value);
   const label = getFieldLabel(t, fieldKey, schema);
@@ -377,6 +548,21 @@ function ConfigField({
                       />
                     )
                   )}
+                  {!Object.keys(itemSchema.properties || {}).length && (
+                    <KeyValueObjectField
+                      disabled={disabled}
+                      label={getFieldLabel(t, "listItem", itemSchema)}
+                      rootSchema={rootSchema}
+                      schema={{ type: "object", additionalProperties: true }}
+                      value={item}
+                      path={[...path, index]}
+                      onChange={(nextValue) => {
+                        const nextItems = [...items];
+                        nextItems[index] = nextValue;
+                        onChange(nextItems);
+                      }}
+                    />
+                  )}
                 </Box>
               ) : (
                 <PrimitiveField
@@ -440,16 +626,25 @@ function ConfigField({
 
   if (type === "object") {
     const properties = schema.properties || {};
-    if (!Object.keys(properties).length || schema.additionalProperties) {
+    const propertyKeys = Object.keys(properties);
+    if (!propertyKeys.length) {
       return (
-        <JsonObjectField
+        <KeyValueObjectField
           disabled={disabled}
           label={label}
           value={value}
           onChange={onChange}
+          path={path}
+          rootSchema={rootSchema}
+          schema={schema}
         />
       );
     }
+    const additionalValue = Object.fromEntries(
+      Object.entries(value || {}).filter(
+        ([key]) => !Object.prototype.hasOwnProperty.call(properties, key)
+      )
+    );
     return (
       <Box
         sx={{
@@ -484,6 +679,24 @@ function ConfigField({
               }
             />
           ))}
+          {schema.additionalProperties && (
+            <KeyValueObjectField
+              disabled={disabled}
+              label={workbenchCopy.additionalSettingsLabel}
+              rootSchema={rootSchema}
+              schema={schema}
+              value={additionalValue}
+              path={path}
+              onChange={(nextAdditionalValue) => {
+                const fixedValue = Object.fromEntries(
+                  Object.entries(value || {}).filter(([key]) =>
+                    Object.prototype.hasOwnProperty.call(properties, key)
+                  )
+                );
+                onChange({ ...fixedValue, ...nextAdditionalValue });
+              }}
+            />
+          )}
         </Box>
       </Box>
     );

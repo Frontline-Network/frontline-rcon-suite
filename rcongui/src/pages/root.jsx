@@ -68,7 +68,7 @@ export default function Root() {
       </Box>
       <Box
         sx={{
-          "--app-header-height": { xs: "128px", sm: "128px", lg: "0px" },
+          "--app-header-height": { xs: "108px", sm: "108px", md: "0px" },
           "--mobile-bottom-nav-height": "64px",
           display: "flex",
           minHeight: "100dvh",
@@ -101,13 +101,13 @@ export default function Root() {
               // Keep the first page heading below the fixed bar at every mobile width.
               pt: {
                 xs: "calc(var(--app-header-height) + env(safe-area-inset-top))",
-                lg: 0,
+                md: 0,
               },
               minHeight: "100%",
             }}
           >
             <Header />
-            <Container 
+            <Container
               maxWidth={widthMode}
               sx={{
                 display: "flex",

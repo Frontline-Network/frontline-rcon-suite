@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 from statistics import median
 from typing import Any
 
-from rcon.rcon import get_rcon
 from rcon.user_config.autobalancer import AutobalancerUserConfig
 from rcon.utils import get_server_number
 
@@ -16,6 +15,7 @@ from .history import load_history
 from .models import BalancePlan, BalanceSnapshot, Phase
 from .planner import (
     build_plan,
+    build_strength_swap_recommendations,
     build_strategy_plans,
     eligible_players,
     protection_tier,
@@ -32,7 +32,14 @@ logger = logging.getLogger(__name__)
 
 class AutobalancerService:
     def __init__(self, rcon=None, store=None, repository=None):
-        self.rcon = rcon or get_rcon()
+        if rcon is None:
+            # Importing the full RCON stack also initializes legacy Django/
+            # Channels compatibility modules. Keep that side effect out of
+            # pure planner/service imports and load it only for the real worker.
+            from rcon.rcon import get_rcon
+
+            rcon = get_rcon()
+        self.rcon = rcon
         self.server_number = int(get_server_number())
         self.store = store or AutobalancerStore(server_number=self.server_number)
         self.repository = repository or DecisionRepository(self.server_number)
@@ -377,6 +384,7 @@ class AutobalancerService:
             snapshot,
             cooldown_player_ids=self._cooldown_ids(snapshot, config),
             connection_grace_seconds=config.connection_grace_seconds,
+            allow_individual_squad_fallback=config.allow_individual_squad_fallback,
         )
         message = config.messages.volunteer_request.format(
             target_team=snapshot.team_labels.get(
@@ -419,6 +427,7 @@ class AutobalancerService:
                 0,
                 config.max_switches_per_incident - int(state.get("executed_count", 0)),
             ),
+            allow_individual_squad_fallback=config.allow_individual_squad_fallback,
             strategy=config.skill_strategy,
             skill_gap_soft_limit=config.skill_gap_soft_limit,
             skill_gap_hard_warning=config.skill_gap_hard_warning,
@@ -450,6 +459,7 @@ class AutobalancerService:
                 0,
                 config.max_switches_per_incident - int(state.get("executed_count", 0)),
             ),
+            allow_individual_squad_fallback=config.allow_individual_squad_fallback,
             skill_gap_soft_limit=config.skill_gap_soft_limit,
             skill_gap_hard_warning=config.skill_gap_hard_warning,
             skill_gap_min_improvement=config.skill_gap_min_improvement,
@@ -837,6 +847,21 @@ class AutobalancerService:
             ]
             for team in ("allies", "axis")
         }
+        required_switch_count = max(
+            0,
+            (abs(snapshot.difference) - config.target_difference + 1) // 2,
+        )
+        strength_swaps = (
+            build_strength_swap_recommendations(
+                snapshot,
+                connection_grace_seconds=config.connection_grace_seconds,
+                skill_gap_soft_limit=config.skill_gap_soft_limit,
+                skill_gap_min_improvement=config.skill_gap_min_improvement,
+                allow_individual_squad_fallback=config.allow_individual_squad_fallback,
+            )
+            if not hard_blocks and required_switch_count == 0
+            else []
+        )
         return {
             "mode": config.mode,
             "phase": state.get("phase", Phase.IDLE),
@@ -846,10 +871,8 @@ class AutobalancerService:
             "team_counts": snapshot.team_counts,
             "team_labels": dict(snapshot.team_labels),
             "team_difference": snapshot.difference,
-            "required_switches": max(
-                0,
-                (abs(snapshot.difference) - config.target_difference + 1) // 2,
-            ),
+            "target_difference": config.target_difference,
+            "required_switches": required_switch_count,
             "team_ratings": {
                 "allies": round(team_rating(snapshot.players, "allies"), 2),
                 "axis": round(team_rating(snapshot.players, "axis"), 2),
@@ -863,6 +886,17 @@ class AutobalancerService:
             },
             "rating_model_version": RATING_MODEL_VERSION,
             "strategy": config.skill_strategy,
+            "strength_thresholds": {
+                "soft_limit": config.skill_gap_soft_limit,
+                "hard_warning": config.skill_gap_hard_warning,
+                "minimum_improvement": config.skill_gap_min_improvement,
+            },
+            "strength_swap": (
+                strength_swaps[0].public_dict() if strength_swaps else None
+            ),
+            "strength_swap_alternatives": [
+                recommendation.public_dict() for recommendation in strength_swaps[1:]
+            ],
             "data_confidence": round(
                 sum(confidences) / len(confidences) if confidences else 0.0, 3
             ),

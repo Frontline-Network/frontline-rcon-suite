@@ -1,11 +1,33 @@
-import { Box, Chip, IconButton, Stack, Tooltip } from "@mui/material";
+import {
+  Box,
+  Chip,
+  IconButton,
+  Stack,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import CloseIcon from "@mui/icons-material/Close";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { MapDetailsCard } from "../../MapDetailsCard";
 import { useTranslation } from "react-i18next";
+import { getMapEnvironmentLabel, getMapModeLabel } from "@/utils/mapLabels";
+import {
+  getMapLayerImageSrc,
+  unifiedGamemodeName,
+} from "../../objectives/helpers";
 
-function SortableRotationItem({ item, onRemove, isNext, removeTooltip }) {
+function SortableRotationItem({
+  item,
+  index,
+  total,
+  onMove,
+  onRemove,
+  isNext,
+  removeTooltip,
+}) {
   const { t } = useTranslation();
   const {
     attributes,
@@ -14,62 +36,124 @@ function SortableRotationItem({ item, onRemove, isNext, removeTooltip }) {
     transform,
     transition,
     isDragging,
-  } = useSortable({
-    id: item.selectionId,
-  });
-
-  const mapLayer = item;
-
+  } = useSortable({ id: item.selectionId });
+  const mode = unifiedGamemodeName(item.game_mode);
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     zIndex: isDragging ? 10 : 1,
-    opacity: isDragging ? 0.8 : 1,
-    touchAction: "manipulation"
+    opacity: isDragging ? 0.75 : 1,
   };
 
   return (
     <Box
       ref={setNodeRef}
       style={style}
+      component="article"
       sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        p: 0.5,
-        mb: 1,
-        borderRadius: 1,
-        border: "1px solid",
+        display: "grid",
+        gridTemplateColumns: {
+          xs: "34px 66px minmax(0, 1fr) auto",
+          sm: "42px 78px minmax(0, 1fr) auto",
+        },
+        minHeight: 72,
+        alignItems: "stretch",
+        borderBottom: "1px solid",
         borderColor: "divider",
-        boxShadow: isDragging ? 3 : 1,
+        bgcolor: isNext ? "action.selected" : "transparent",
+        boxShadow: isDragging ? 6 : 0,
+        "&:hover": { bgcolor: "action.hover" },
       }}
     >
-      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-        <Box
+      <Tooltip title={t("maps.rotationWorkbench.dragHint")}>
+        <IconButton
           {...attributes}
           {...listeners}
+          aria-label={t("maps.rotationWorkbench.moveMap", {
+            map: item.map.pretty_name,
+          })}
           sx={{
-            cursor: "grab",
-            "&:active": { cursor: "grabbing" },
-            p: 1,
-            borderRadius: 1,
-            "&:hover": { bgcolor: "action.hover" },
+            borderRight: "1px solid",
+            borderColor: "divider",
+            cursor: isDragging ? "grabbing" : "grab",
             touchAction: "none",
           }}
         >
-          <svg width="24" height="24" viewBox="0 0 24 24">
-            <path
-              fill="currentColor"
-              d="M7,19V17H9V19H7M11,19V17H13V19H11M15,19V17H17V19H15M7,15V13H9V15H7M11,15V13H13V15H11M15,15V13H17V15H15M7,11V9H9V11H7M11,11V9H13V11H11M15,11V9H17V11H15M7,7V5H9V7H7M11,7V5H13V7H11M15,7V5H17V7H15Z"
+          <DragIndicatorIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+
+      <Box
+        component="img"
+        src={getMapLayerImageSrc(item)}
+        alt=""
+        sx={{ width: "100%", height: "100%", minHeight: 72, objectFit: "cover" }}
+      />
+
+      <Stack justifyContent="center" sx={{ px: 1.5, minWidth: 0 }}>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+          <Typography variant="overline" color="text.secondary">
+            {String(index + 1).padStart(2, "0")}
+          </Typography>
+          <Typography variant="body2" fontWeight={850} noWrap>
+            {item.map.pretty_name}
+          </Typography>
+          {isNext && (
+            <Chip
+              size="small"
+              color="secondary"
+              label={t("maps.next")}
+              sx={{ height: 22 }}
             />
-          </svg>
-        </Box>
-        <MapDetailsCard mapLayer={mapLayer} />
-      </Box>
-      <Stack direction={"row"} gap={0.25} alignItems={"center"}>
-        {isNext && <Chip color="secondary" label={t("maps.next")} />}
+          )}
+        </Stack>
+        <Typography variant="caption" color="text.secondary" noWrap>
+          {getMapModeLabel(t, mode)}
+          {mode === "offensive" && item.attackers ? ` (${item.attackers})` : ""} ·{" "}
+          {getMapEnvironmentLabel(t, item.environment)}
+        </Typography>
+      </Stack>
+
+      <Stack
+        direction="row"
+        alignItems="center"
+        sx={{ px: 0.5, borderLeft: "1px solid", borderColor: "divider" }}
+      >
+        <Tooltip title={t("maps.rotationWorkbench.moveUp")}>
+          <span>
+            <IconButton
+              size="small"
+              disabled={index === 0}
+              onClick={() => onMove(index, index - 1)}
+              aria-label={t("maps.rotationWorkbench.moveUpNamed", {
+                map: item.map.pretty_name,
+              })}
+            >
+              <ArrowUpwardIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
+        <Tooltip title={t("maps.rotationWorkbench.moveDown")}>
+          <span>
+            <IconButton
+              size="small"
+              disabled={index === total - 1}
+              onClick={() => onMove(index, index + 1)}
+              aria-label={t("maps.rotationWorkbench.moveDownNamed", {
+                map: item.map.pretty_name,
+              })}
+            >
+              <ArrowDownwardIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
         <Tooltip title={removeTooltip || t("maps.removeFromRotation")}>
-          <IconButton size="small" onClick={() => onRemove(mapLayer)} color="error">
+          <IconButton
+            size="small"
+            onClick={() => onRemove(item)}
+            color="error"
+            aria-label={removeTooltip || t("maps.removeFromRotation")}
+          >
             <CloseIcon fontSize="small" />
           </IconButton>
         </Tooltip>

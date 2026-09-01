@@ -8,18 +8,32 @@ test.describe("keyboard navigation", () => {
     await openDemoPage(page, "/");
 
     await page.keyboard.press("Tab");
-    const skipLink = page.getByRole("link", { name: "Zum Hauptinhalt springen" });
+    const skipLink = page.getByRole("link", {
+      name: "Zum Hauptinhalt springen",
+    });
     await expect(skipLink).toBeFocused();
     await page.keyboard.press("Enter");
 
     await expect(page.locator("#main-content")).toBeFocused();
   });
 
-  test("Ctrl+K focuses the navigation search", async ({ page }) => {
+  test("server switcher opens and restores focus with Escape", async ({
+    page,
+  }) => {
     await openDemoPage(page, "/");
 
-    await page.keyboard.press("Control+K");
-    await expect(page.getByPlaceholder("Navigation durchsuchen …")).toBeFocused();
+    const serverSwitcher = page.getByTestId("global-server-switcher");
+    await serverSwitcher.focus();
+    await page.keyboard.press("Enter");
+    const serverMenu = page.getByRole("menu", { name: "Server wechseln" });
+    await expect(serverMenu).toBeVisible();
+    await expect(serverMenu.getByRole("menuitem").first()).toHaveCSS(
+      "border-radius",
+      "0px"
+    );
+
+    await page.keyboard.press("Escape");
+    await expect(serverSwitcher).toBeFocused();
   });
 });
 
@@ -30,11 +44,14 @@ test.describe("mobile navigation", () => {
     await openDemoPage(page, "/");
 
     await page.getByRole("button", { name: "Navigation öffnen" }).click();
-    const navigation = page.getByRole("navigation", { name: "Hauptnavigation" });
+    const navigation = page.getByRole("navigation", {
+      name: "Hauptnavigation",
+    });
     await expect(navigation).toBeVisible();
     await expect(
-      navigation.getByPlaceholder("Navigation durchsuchen …"),
-    ).toBeVisible();
+      navigation.getByPlaceholder("Navigation durchsuchen …")
+    ).toHaveCount(0);
+    await expect(page.getByTestId("global-server-switcher")).toBeVisible();
   });
 
   test("map operations are reachable with the keyboard", async ({ page }) => {
@@ -44,11 +61,9 @@ test.describe("mobile navigation", () => {
     await menuButton.focus();
     await page.keyboard.press("Enter");
 
-    const navigation = page.getByRole("navigation", {
-      name: "Hauptnavigation",
-    });
+    const navigation = page.getByTestId("mobile-command-navigation");
     const mapsGroup = navigation.getByRole("button", {
-      name: "Karten & Spielbetrieb",
+      name: "Spielbetrieb",
     });
     await mapsGroup.focus();
     await page.keyboard.press("Enter");

@@ -1,4 +1,5 @@
 from contextlib import nullcontext
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, call
 
@@ -212,6 +213,27 @@ def test_hllv_legacy_catalog_preserves_historical_layer_metadata():
     assert layer.map.allies.name == "us"
     assert layer.map.axis.name == "nva"
     assert layer.game_mode is GameMode.WARFARE
+
+
+def test_hllv_catalog_map_images_exist():
+    map_images = Path("assets/images/maps")
+    map_icons = map_images / "icons"
+
+    expected_images = {
+        HLLV_PROFILE.parse_layer(f"wdev{map_suffix}_warfare_day").image_name
+        for map_suffix in "abcdef"
+    }
+
+    assert expected_images == {
+        "wdev_a-day.webp",
+        "wdev_b-day.webp",
+        "wdev_c-day.webp",
+        "wdev_d-day.webp",
+        "wdev_e-day.webp",
+        "wdev_f-day.webp",
+    }
+    assert all((map_images / image_name).is_file() for image_name in expected_images)
+    assert all((map_icons / image_name).is_file() for image_name in expected_images)
 
 
 def test_hllv_legacy_alias_migrates_to_canonical_executable_layer():

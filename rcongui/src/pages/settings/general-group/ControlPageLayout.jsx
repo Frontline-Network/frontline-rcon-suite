@@ -13,6 +13,7 @@ import {
 } from "@mui/material";
 import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
+import { useTranslation } from "react-i18next";
 
 export function ControlPageLayout({
   sections,
@@ -22,6 +23,7 @@ export function ControlPageLayout({
   navigationWidth = "190px",
 }) {
   const theme = useTheme();
+  const { t } = useTranslation();
   const compact = useMediaQuery(theme.breakpoints.down("md"));
 
   return (
@@ -36,10 +38,14 @@ export function ControlPageLayout({
     >
       {compact ? (
         <FormControl fullWidth size="small" sx={{ p: 1 }}>
-          <InputLabel sx={{ ml: 1 }}>Bereich</InputLabel>
+          <InputLabel id="control-page-section-label" sx={{ ml: 1 }}>
+            {t("common.section")}
+          </InputLabel>
           <Select
+            id="control-page-section"
+            labelId="control-page-section-label"
             value={active}
-            label="Bereich"
+            label={t("common.section")}
             onChange={(event) => onChange(event.target.value)}
             sx={{ borderRadius: 0 }}
           >

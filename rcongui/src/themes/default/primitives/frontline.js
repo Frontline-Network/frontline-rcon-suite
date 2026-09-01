@@ -1,5 +1,7 @@
 import { alpha, createTheme } from "@mui/material/styles";
 
+import { FRONTLINE_GEOMETRY } from "../../foundation.mjs";
+
 const baseTheme = createTheme();
 
 export const brand = {
@@ -187,7 +189,9 @@ export const typography = {
   },
 };
 
-export const shape = { borderRadius: 8 };
+export const geometry = FRONTLINE_GEOMETRY;
+
+export const shape = { borderRadius: geometry.radius.control };
 
 export const shadows = [
   "none",

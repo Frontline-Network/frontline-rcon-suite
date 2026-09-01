@@ -1,4 +1,4 @@
-import { Box, Stack } from "@mui/material";
+import { Box, Stack, useMediaQuery } from "@mui/material";
 import NavbarBreadcrumbs from "./NavbarBreadcrumbs";
 import ToggleWidthMode from "./ToggleWidthMode";
 import LanguageSelector from "./LanguageSelector";
@@ -13,18 +13,21 @@ export default function Header() {
   const { t } = useTranslation();
   const openDrawer = useAppStore((state) => state.openDrawer);
   const toggleDrawer = useAppStore((state) => state.toggleDrawer);
+  const isDesktop = useMediaQuery((theme) => theme.breakpoints.up("md"));
+
+  if (!isDesktop) return null;
 
   return (
     <Stack
       direction="row"
       sx={{
-        display: { xs: "none", lg: "flex" },
+        display: { xs: "none", md: "flex" },
         width: "100%",
-        alignItems: { xs: "flex-start", lg: "center" },
+        alignItems: { xs: "flex-start", md: "center" },
         justifyContent: "space-between",
         minHeight: 60,
         py: 1,
-        px: { xs: 0, lg: 2.5 },
+        px: { xs: 0, md: 2.5 },
         borderBottom: "1px solid",
         borderColor: "divider",
       }}
@@ -34,7 +37,7 @@ export default function Header() {
         <MenuButton
           aria-label={t("navigation.toggleMenu")}
           onClick={toggleDrawer}
-          sx={{ display: { xs: "none", lg: "inline-flex" } }}
+          sx={{ display: { xs: "none", md: "inline-flex" } }}
         >
           {!openDrawer ? <MenuRoundedIcon /> : <MenuOpenIcon />}
         </MenuButton>

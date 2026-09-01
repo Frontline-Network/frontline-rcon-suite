@@ -55,7 +55,7 @@ const DiscordReportBotPage = () => {
             <Typography variant="overline" color="primary.main" sx={{ fontWeight: 800 }}>
               {t("apps.discord.eyebrow")}
             </Typography>
-            <Typography variant="h3" sx={{ fontWeight: 800 }}>
+            <Typography component="h1" variant="h3" sx={{ fontWeight: 800 }}>
               {t("settings.discordReports.title")}
             </Typography>
             <Typography color="text.secondary" sx={{ mt: 0.75, maxWidth: 760 }}>

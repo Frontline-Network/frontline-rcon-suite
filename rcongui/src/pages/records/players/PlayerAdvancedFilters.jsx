@@ -1,7 +1,6 @@
 import {
   Autocomplete,
   Box,
-  Button,
   Chip,
   FormControlLabel,
   IconButton,
@@ -13,7 +12,6 @@ import {
   Typography,
 } from "@mui/material";
 import AddReactionIcon from "@mui/icons-material/AddReaction";
-import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import { lazy, Suspense, useMemo, useState } from "react";
 import countries from "country-list";
 import emojiData from "@emoji-mart/data/sets/15/twitter.json";
@@ -37,8 +35,6 @@ export default function PlayerAdvancedFilters({
   compact,
   formFields,
   handleInputChange,
-  handleReset,
-  navigationState,
   selectedCountry,
   selectedEmoji,
   setFormFields,
@@ -80,7 +76,11 @@ export default function PlayerAdvancedFilters({
       )}
       renderInput={(params) => (
         <>
-          <TextField {...params} label={t("records.players.country")} size="small" />
+          <TextField
+            {...params}
+            label={t("records.players.country")}
+            size="small"
+          />
           <input type="hidden" name="country" value={selectedCountry ?? ""} />
         </>
       )}
@@ -90,7 +90,10 @@ export default function PlayerAdvancedFilters({
   return (
     <Box
       id="player-advanced-filters"
-      sx={{ borderTop: (theme) => `1px solid ${theme.palette.divider}`, pt: 1.25 }}
+      sx={{
+        borderTop: (theme) => `1px solid ${theme.palette.divider}`,
+        pt: 1.25,
+      }}
     >
       <Stack spacing={1.25}>
         {compact ? (
@@ -104,16 +107,6 @@ export default function PlayerAdvancedFilters({
               fullWidth
             />
             {countryField}
-            <Button
-              variant="outlined"
-              color="secondary"
-              startIcon={<RestartAltIcon />}
-              onClick={handleReset}
-              disabled={navigationState === "loading"}
-              sx={{ minHeight: 44 }}
-            >
-              {t("records.players.reset")}
-            </Button>
           </Stack>
         ) : null}
 
@@ -122,7 +115,9 @@ export default function PlayerAdvancedFilters({
           spacing={1}
           alignItems={{ xs: "stretch", md: "center" }}
         >
-          {!compact ? <Box sx={{ flex: "0 1 220px" }}>{countryField}</Box> : null}
+          {!compact ? (
+            <Box sx={{ flex: "0 1 220px" }}>{countryField}</Box>
+          ) : null}
           <Stack
             direction="row"
             spacing={1}
@@ -132,18 +127,26 @@ export default function PlayerAdvancedFilters({
               flex: { xs: "0 0 auto", md: "1 1 260px" },
               minHeight: 44,
               border: (theme) => `1px solid ${theme.palette.divider}`,
-              borderRadius: 1,
+              borderRadius: 0,
               px: 1,
             }}
           >
-            <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
+            <Stack
+              direction="row"
+              spacing={0.75}
+              alignItems="center"
+              flexWrap="wrap"
+              useFlexGap
+            >
               {selectedEmoji.map((emoji) => (
                 <Chip
                   key={emoji.id}
                   size="small"
                   label={<Emoji emoji={emoji} size={18} />}
                   onDelete={() =>
-                    setSelectedEmoji(selectedEmoji.filter((item) => item.id !== emoji.id))
+                    setSelectedEmoji(
+                      selectedEmoji.filter((item) => item.id !== emoji.id)
+                    )
                   }
                 />
               ))}
@@ -164,33 +167,52 @@ export default function PlayerAdvancedFilters({
 
           <LocalizationProvider dateAdapter={AdapterDayjs}>
             <DateTimePicker
-              localeText={{ openDatePickerDialogue: () => t("common.chooseDate") }}
+              localeText={{
+                openDatePickerDialogue: () => t("common.chooseDate"),
+              }}
               value={asDayjs(formFields.last_seen_from)}
               onChange={(newValue) =>
-                setFormFields((previous) => ({ ...previous, last_seen_from: newValue }))
+                setFormFields((previous) => ({
+                  ...previous,
+                  last_seen_from: newValue,
+                }))
               }
               label={t("records.players.lastSeenFrom")}
               name="last_seen_from"
               format="DD.MM.YYYY HH:mm"
               ampm={false}
-              slotProps={{ textField: { size: "small", sx: { minWidth: { md: 210 } } } }}
+              slotProps={{
+                textField: { size: "small", sx: { minWidth: { md: 210 } } },
+              }}
             />
             <DateTimePicker
-              localeText={{ openDatePickerDialogue: () => t("common.chooseDate") }}
+              localeText={{
+                openDatePickerDialogue: () => t("common.chooseDate"),
+              }}
               value={asDayjs(formFields.last_seen_till)}
               onChange={(newValue) =>
-                setFormFields((previous) => ({ ...previous, last_seen_till: newValue }))
+                setFormFields((previous) => ({
+                  ...previous,
+                  last_seen_till: newValue,
+                }))
               }
               label={t("records.players.lastSeenUntil")}
               name="last_seen_till"
               format="DD.MM.YYYY HH:mm"
               ampm={false}
-              slotProps={{ textField: { size: "small", sx: { minWidth: { md: 210 } } } }}
+              slotProps={{
+                textField: { size: "small", sx: { minWidth: { md: 210 } } },
+              }}
             />
           </LocalizationProvider>
         </Stack>
 
-        <Stack direction="row" spacing={{ xs: 1, md: 2 }} flexWrap="wrap" useFlexGap>
+        <Stack
+          direction="row"
+          spacing={{ xs: 1, md: 2 }}
+          flexWrap="wrap"
+          useFlexGap
+        >
           {[
             ["blacklisted", "blacklistedOnly"],
             ["exact_name_match", "exactName"],
@@ -219,7 +241,9 @@ export default function PlayerAdvancedFilters({
         onClose={() => setAnchorEl(null)}
         anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
       >
-        <Suspense fallback={<Skeleton variant="rectangular" height={400} width={300} />}>
+        <Suspense
+          fallback={<Skeleton variant="rectangular" height={400} width={300} />}
+        >
           <EmojiPicker
             set="twitter"
             data={emojiData}

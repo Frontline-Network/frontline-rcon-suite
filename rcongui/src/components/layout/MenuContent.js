@@ -7,7 +7,7 @@ import Stack from "@mui/material/Stack";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import {
   Collapse,
   TextField,
@@ -23,6 +23,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { canAccessNavLink } from "@/components/Header/nav-data";
 
 const NavigationLink = ({ to, icon, text, onClick, locked, lockedReason }) => {
+  const navigate = useNavigate();
   const [lockedReasonOpen, setLockedReasonOpen] = useState(false);
   // `/apps` is an index page next to more specific app routes. Without an
   // exact match React Router also marks it active on `/apps/...`, which makes
@@ -38,6 +39,19 @@ const NavigationLink = ({ to, icon, text, onClick, locked, lockedReason }) => {
         if (locked) {
           event.preventDefault();
           return;
+        }
+
+        const modifiedClick =
+          event.metaKey || event.altKey || event.ctrlKey || event.shiftKey;
+        const opensCurrentTab =
+          event.button === 0 &&
+          !modifiedClick &&
+          (!event.currentTarget.target ||
+            event.currentTarget.target === "_self");
+
+        if (opensCurrentTab) {
+          event.preventDefault();
+          navigate(to);
         }
         onClick();
       }}
@@ -174,7 +188,9 @@ export default function MenuContent({ navigationTree, isMobile, onNavigate }) {
 
   const handleLinkClick = () => {
     if (isMobile) {
-      (onNavigate ?? toggleDrawer)();
+      // Let React Router process the link before closing and unmounting the
+      // mobile drawer. Closing synchronously can cancel client-side routing.
+      window.requestAnimationFrame(() => (onNavigate ?? toggleDrawer)());
     }
   };
 

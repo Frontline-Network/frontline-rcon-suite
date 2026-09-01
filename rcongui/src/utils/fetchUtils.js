@@ -220,6 +220,15 @@ async function handleFetchResponse(req, res, cmd) {
   const contentType = res.headers.get("content-type");
   const isJSON = contentType && contentType.includes("application/json");
   const isText = contentType && contentType.includes("text/");
+  const isHTML = contentType && contentType.includes("text/html");
+
+  // A missing Vite/Mirage API route may fall through to the SPA document with
+  // HTTP 200. Never let that HTML become a seemingly valid form value.
+  if (isHTML) {
+    throw new NotJSONResponseError(
+      `The API command "${cmd}" returned an HTML document instead of data.`
+    );
+  }
 
   if (isJSON) {
     data = await parseJsonResponse(res);
@@ -335,6 +344,12 @@ export const cmd = {
     requestFactory({
       method: "GET",
       cmd: "get_autobalancer_status",
+      ...params,
+    }),
+  GET_AUTOBALANCER_CONFIG: (params) =>
+    requestFactory({
+      method: "GET",
+      cmd: "get_autobalancer_config",
       ...params,
     }),
   GET_AUTOBALANCER_SHADOW_OVERVIEW: (params) =>

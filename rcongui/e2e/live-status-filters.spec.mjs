@@ -9,14 +9,12 @@ test.describe("live status shortcuts", () => {
   }) => {
     await openDemoPage(page, "/views/live");
 
-    const commandBar = page.locator(
-      'section[aria-label="Live-Einsatzsteuerung"]'
-    );
+    const commandBar = page.getByRole("region", { name: "Live-Einsatz" });
 
     await expect(commandBar).toBeVisible();
     await expect(
-      commandBar.getByText("Live-Einsatz", { exact: true })
-    ).toHaveCount(0);
+      commandBar.getByRole("heading", { name: "Live-Einsatz" })
+    ).toBeVisible();
     await expect(
       commandBar.getByText("Aktuelle Karte", { exact: true })
     ).toHaveCount(0);

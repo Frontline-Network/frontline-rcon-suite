@@ -11,13 +11,15 @@ export default defineConfig({
   // CI failures should surface quickly and deterministically. Retrying every
   // failing route can turn a broken shell into an hour-long feedback loop.
   retries: 0,
-  // The Vite development transform and four browser workers compete for the
-  // same small CI runner. Two workers keep route startup deterministic while
-  // still exercising the suite in parallel.
-  workers: process.env.CI ? 2 : undefined,
-  timeout: 30_000,
+  // Vite serves a large, route-split admin application in fake mode. Running
+  // several browsers against the two-core hosted runner makes initial route
+  // compilation slower rather than faster and can race late fixture loads.
+  // One CI worker keeps the release gate deterministic; local runs may still
+  // use Playwright's automatically selected worker count.
+  workers: process.env.CI ? 1 : undefined,
+  timeout: process.env.CI ? 60_000 : 30_000,
   expect: {
-    timeout: 8_000,
+    timeout: process.env.CI ? 12_000 : 8_000,
     toHaveScreenshot: {
       animations: "disabled",
       caret: "hide",
@@ -48,14 +50,19 @@ export default defineConfig({
       use: { browserName: "chromium" },
     },
   ],
-  webServer: {
-    command: "npm run dev:fake -- --host 127.0.0.1 --port 3000",
-    url: baseURL,
-    // Reusing an arbitrary local server can silently capture snapshots from
-    // the normal live mode instead of the deterministic fake backend.
-    reuseExistingServer: false,
-    timeout: 120_000,
-    stdout: "pipe",
-    stderr: "pipe",
-  },
+  // CI owns the Vite process explicitly so a completed browser suite cannot
+  // be held open by an orphaned npm child process. Local runs keep the
+  // convenient Playwright-managed fake server.
+  webServer: process.env.CI
+    ? undefined
+    : {
+        command: "npm run dev:fake -- --host 127.0.0.1 --port 3000",
+        url: baseURL,
+        // Reusing an arbitrary local server can silently capture snapshots from
+        // the normal live mode instead of the deterministic fake backend.
+        reuseExistingServer: false,
+        timeout: 120_000,
+        stdout: "pipe",
+        stderr: "pipe",
+      },
 });

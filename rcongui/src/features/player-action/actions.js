@@ -138,6 +138,21 @@ export const switchAction = {
   permission: ["can_switch_players_immediately"],
 };
 
+export const coordinatedSquadSwitchAction = {
+  safety: getAdminActionContract("execute_autobalancer_squad_switch"),
+  name: "Koordinierter Squad-Wechsel",
+  description:
+    "Informiert zuerst alle Mitglieder, prüft den aktuellen Squad erneut und wechselt die bestätigte Gruppe gemeinsam ins Gegenteam.",
+  component: ConfirmationOnly,
+  icon: SyncIcon,
+  execute: executeAction("execute_autobalancer_squad_switch"),
+  permission: [
+    "can_execute_autobalancer",
+    "can_message_players",
+    "can_switch_players_immediately",
+  ],
+};
+
 export const switchOnDeathAction = {
   safety: getAdminActionContract("switch_player_on_death"),
   translationKey: "actions.switchOnDeath",
@@ -402,6 +417,7 @@ export const Actions = {
   AddVIP: vipAction,
   RemoveVIP: removeVipAction,
   SwitchPlayer: switchAction,
+  CoordinatedSquadSwitch: coordinatedSquadSwitchAction,
   SwitchPlayerOnDeath: switchOnDeathAction,
   PunishPlayer: punishAction,
   KickPlayer: kickAction,

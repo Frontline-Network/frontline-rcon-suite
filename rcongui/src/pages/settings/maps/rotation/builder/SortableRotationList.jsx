@@ -1,176 +1,105 @@
-import { Box, Typography, Stack, Tooltip, IconButton, Divider } from "@mui/material";
-import DeleteIcon from "@mui/icons-material/Delete";
-import SaveIcon from "@mui/icons-material/Save";
+import { Box, Button, Stack, Typography } from "@mui/material";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import MapOutlinedIcon from "@mui/icons-material/MapOutlined";
 import {
   DndContext,
-  PointerSensor,
   KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  closestCenter,
   useSensor,
   useSensors,
-  closestCenter,
-  TouchSensor,
 } from "@dnd-kit/core";
 import {
   SortableContext,
-  verticalListSortingStrategy,
+  arrayMove,
   sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { arrayMove } from "@dnd-kit/sortable";
-import SortableRotationItem from "./SortableRotationItem";
-import CopyToClipboardButton from "@/components/shared/CopyToClipboardButton";
-import ReplayIcon from "@mui/icons-material/Replay";
 import { useTranslation } from "react-i18next";
+import CopyToClipboardButton from "@/components/shared/CopyToClipboardButton";
+import SortableRotationItem from "./SortableRotationItem";
 
 export function SortableRotationList({
   maps,
   setMaps,
   onRemove,
-  isSaving,
-  onReset,
   onClear,
-  onSave,
-  isDisabled,
   actions,
   params,
-  title,
   emptyTitle,
   emptyDescription,
   removeTooltip,
   showNext = true,
 }) {
   const { t } = useTranslation();
-  // Set up DnD sensors
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      // Require the mouse to move by 10 pixels before activating
-      activationConstraint: {
-        distance: 10,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    }),
-    useSensor(TouchSensor),
+    useSensor(PointerSensor, { activationConstraint: { distance: 10 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(TouchSensor)
   );
 
-  // Handle drag end event
-  const handleDragEnd = (event) => {
-    const { active, over } = event;
+  const moveItem = (from, to) => {
+    if (to < 0 || to >= maps.length || from === to) return;
+    setMaps((items) => arrayMove(items, from, to));
+  };
 
-    if (over && active.id !== over.id) {
-      setMaps((items) => {
-        const oldIndex = items.findIndex(
-          (item) => item.selectionId === active.id
-        );
-        const newIndex = items.findIndex(
-          (item) => item.selectionId === over.id
-        );
-
-        return arrayMove(items, oldIndex, newIndex);
-      });
-    }
+  const handleDragEnd = ({ active, over }) => {
+    if (!over || active.id === over.id) return;
+    const oldIndex = maps.findIndex((item) => item.selectionId === active.id);
+    const newIndex = maps.findIndex((item) => item.selectionId === over.id);
+    moveItem(oldIndex, newIndex);
   };
 
   return (
-    <Box
-      sx={{
-        border: "1px solid",
-        borderColor: "divider",
-        borderRadius: 1,
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      <Box sx={{ p: 2, borderBottom: "1px solid", borderColor: "divider" }}>
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          gap={1}
-          alignItems={{ sx: "flex-start", md: "center" }}
-          justifyContent={"space-between"}
-        >
-          <Typography variant="h6">{title || t("maps.rotation")} ({maps.length})</Typography>
-          <Stack
-            direction="row"
-            spacing={1}
-            justifyContent={{ sx: "center", md: "flex-end" }}
-          >
-            {actions && (
-              <>
-                <Box
-                  sx={{
-                    flexGrow: 1,
-                    display: "flex",
-                    justifyContent: "flex-end",
-                    gap: 1,
-                  }}
-                >
-                  {actions}
-                </Box>
-                <Divider flexItem orientation="vertical" />
-              </>
+    <Box>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        justifyContent="space-between"
+        alignItems={{ xs: "stretch", sm: "center" }}
+        gap={1}
+        sx={{
+          px: 1.5,
+          py: 1,
+          borderBottom: "1px solid",
+          borderColor: "divider",
+        }}
+      >
+        <Typography variant="caption" color="text.secondary">
+          {t("maps.rotationWorkbench.orderHint")}
+        </Typography>
+        <Stack direction="row" spacing={0.75} justifyContent="flex-end">
+          {actions}
+          <CopyToClipboardButton
+            title={t("maps.copySelectedMapIds")}
+            text={JSON.stringify(
+              maps.map((item) => item.mapId || item.id),
+              null,
+              2
             )}
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 1,
-              }}
-            >
-              <Tooltip title={t("maps.resetChanges")}>
-                <IconButton
-                  variant="outlined"
-                  size={"small"}
-                  color="error"
-                  onClick={onReset}
-                >
-                  <ReplayIcon />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title={t("common.clearSelection")}>
-                <IconButton
-                  variant="outlined"
-                  size={"small"}
-                  color="error"
-                  onClick={onClear}
-                >
-                  <DeleteIcon />
-                </IconButton>
-              </Tooltip>
-              <CopyToClipboardButton
-                iconOnly={true}
-                title={
-                  <div>
-                    <div>
-                      {t("maps.copySelectedMapIds")}
-                    </div>
-                    <div>{t("maps.copyMapIdsHint")}</div>
-                  </div>
-                }
-                text={JSON.stringify(
-                  maps.map((item) => item.mapId || item.id),
-                  null,
-                  2
-                )}
-                size={"small"}
-              />
-              <Tooltip title={t("common.save")}>
-                <IconButton
-                  variant="contained"
-                  size={"small"}
-                  color="primary"
-                  disabled={isDisabled}
-                  onClick={onSave}
-                >
-                  <SaveIcon />
-                </IconButton>
-              </Tooltip>
-            </Box>
-          </Stack>
+            size="small"
+          />
+          <Button
+            variant="text"
+            color="error"
+            size="small"
+            startIcon={<DeleteOutlineIcon />}
+            disabled={!maps.length}
+            onClick={onClear}
+          >
+            {t("common.clearSelection")}
+          </Button>
         </Stack>
-      </Box>
+      </Stack>
 
-      <Box sx={{ p: 2, flexGrow: 1, overflow: "auto" }}>
+      <Box
+        sx={{
+          minHeight: 260,
+          maxHeight: { xs: "none", md: 580 },
+          overflowY: { xs: "visible", md: "auto" },
+          scrollbarWidth: "thin",
+        }}
+      >
         {maps.length > 0 ? (
           <DndContext
             sensors={sensors}
@@ -181,54 +110,49 @@ export function SortableRotationList({
               items={maps.map((item) => item.selectionId)}
               strategy={verticalListSortingStrategy}
             >
-              {maps.map((item, index, tempRotation) => {
+              {maps.map((item, index) => {
                 let isNext = false;
-                if (showNext && tempRotation.length === 1) {
-                  isNext = true
-                } else if (showNext && params.currentMapIndex === params.nextMapIndex) {
-                  isNext = (index + 1) === params.nextMapIndex
+                if (showNext && maps.length === 1) {
+                  isNext = true;
+                } else if (
+                  showNext &&
+                  params.currentMapIndex === params.nextMapIndex
+                ) {
+                  isNext = index + 1 === params.nextMapIndex;
                 } else if (showNext) {
-                  isNext = index === params.nextMapIndex
+                  isNext = index === params.nextMapIndex;
                 }
 
                 return (
                   <SortableRotationItem
                     key={item.selectionId}
                     item={item}
+                    index={index}
+                    total={maps.length}
+                    onMove={moveItem}
                     onRemove={onRemove}
                     isNext={isNext}
                     removeTooltip={removeTooltip}
                   />
-                )
+                );
               })}
             </SortableContext>
           </DndContext>
         ) : (
-          <Box
-            sx={{
-              py: 5,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "text.secondary",
-            }}
+          <Stack
+            alignItems="center"
+            justifyContent="center"
+            spacing={1}
+            sx={{ minHeight: 300, px: 2, textAlign: "center" }}
           >
-            <Box sx={{ mb: 2, opacity: 0.5 }}>
-              <svg width="48" height="48" viewBox="0 0 24 24">
-                <path
-                  fill="currentColor"
-                  d="M12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,12.5A1.5,1.5 0 0,1 10.5,11A1.5,1.5 0 0,1 12,9.5A1.5,1.5 0 0,1 13.5,11A1.5,1.5 0 0,1 12,12.5M12,7.2C9.9,7.2 8.2,8.9 8.2,11C8.2,14 12,17.5 12,17.5C12,17.5 15.8,14 15.8,11C15.8,8.9 14.1,7.2 12,7.2Z"
-                />
-              </svg>
-            </Box>
-            <Typography variant="h6" gutterBottom>
+            <MapOutlinedIcon sx={{ fontSize: 44, color: "text.disabled" }} />
+            <Typography variant="h6">
               {emptyTitle || t("maps.noMapsInRotation")}
             </Typography>
-            <Typography variant="body2">
+            <Typography variant="body2" color="text.secondary">
               {emptyDescription || t("maps.addMapsToRotation")}
             </Typography>
-          </Box>
+          </Stack>
         )}
       </Box>
     </Box>

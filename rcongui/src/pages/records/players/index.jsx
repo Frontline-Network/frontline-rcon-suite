@@ -38,7 +38,7 @@ const PlayersGrid = memo(
         {players.map((player) => (
           <Grid
             key={player.player_id}
-            size={{ xs: 12, md: 6, lg: 4 }}
+            size={{ xs: 12, md: 6, lg: 6, xl: 4 }}
             sx={{ "& > .MuiCard-root": { height: "100%", minWidth: 0 } }}
           >
             <MemoizedPlayerCard
@@ -114,12 +114,14 @@ export const loader = async ({ request }) => {
     players: playersRecords.result.players.map((player) => ({
       ...player,
       is_banned: bannedPlayerIds.has(player.player_id),
-      identity: player.identity && {
-        ...player.identity,
-        linked_accounts: player.identity.linked_accounts.map((account) => ({
-          ...account,
-          is_banned: bannedPlayerIds.has(account.player_id),
-        })),
+      identity: {
+        ...(player.identity ?? {}),
+        linked_accounts: (player.identity?.linked_accounts ?? []).map(
+          (account) => ({
+            ...account,
+            is_banned: bannedPlayerIds.has(account.player_id),
+          })
+        ),
       },
     })),
     total_pages:
@@ -272,13 +274,75 @@ export default function PlayersRecords() {
   }, [selectedPlayerIds, playerCache]);
 
   return (
-    <Stack spacing={1} sx={{ mt: 2 }}>
+    <Stack
+      spacing={1}
+      sx={{
+        mt: 2,
+        pb: selectedPlayerIds.size ? { xs: 15, md: 0 } : 0,
+        "& .MuiAlert-root": { borderRadius: 0 },
+        "& .MuiButton-root": { borderRadius: 0 },
+        "& .MuiCard-root": { borderRadius: 0 },
+        "& .MuiChip-root": { borderRadius: 0 },
+        "& .MuiIconButton-root": { borderRadius: 0 },
+        "& .MuiOutlinedInput-root": { borderRadius: 0 },
+        "& .MuiPaper-root": { borderRadius: 0 },
+        "& .MuiToggleButton-root": { borderRadius: 0 },
+      }}
+    >
       <PageHeader
         eyebrow={t("records.players.eyebrow")}
         title={t("records.players.title")}
         subtitle={t("records.players.subtitle")}
       />
-      <ActionBar actions={newRecordActions} recipients={selectedPlayers} />
+      {selectedPlayerIds.size > 0 ? (
+        <Stack
+          component="section"
+          aria-label={t("records.players.selectionActions")}
+          direction={{ xs: "column", md: "row" }}
+          spacing={1}
+          alignItems={{ xs: "stretch", md: "center" }}
+          justifyContent="space-between"
+          sx={{
+            position: { xs: "fixed", md: "static" },
+            left: { xs: 0, md: "auto" },
+            right: { xs: 0, md: "auto" },
+            bottom: { xs: 64, md: "auto" },
+            zIndex: (theme) => theme.zIndex.appBar + 1,
+            border: "1px solid",
+            borderColor: "primary.dark",
+            bgcolor: "background.paper",
+            boxShadow: { xs: 8, md: 0 },
+            p: 1,
+          }}
+        >
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            justifyContent="space-between"
+          >
+            <Typography fontWeight={700}>
+              {t("records.players.selected", {
+                count: selectedPlayerIds.size,
+              })}
+            </Typography>
+            <Button
+              size="small"
+              variant="outlined"
+              color="inherit"
+              onClick={handleUnselectAllPlayers}
+            >
+              {t("common.unselectAll")}
+            </Button>
+          </Stack>
+          <Box sx={{ maxWidth: "100%", overflowX: "auto" }}>
+            <ActionBar
+              actions={newRecordActions}
+              recipients={selectedPlayers}
+            />
+          </Box>
+        </Stack>
+      ) : null}
       <PlayerFiltersForm fields={fields} />
       <Stack
         component="section"
@@ -293,7 +357,7 @@ export default function PlayersRecords() {
           justifyContent="space-between"
           sx={{
             border: (theme) => `1px solid ${theme.palette.divider}`,
-            borderRadius: 1,
+            borderRadius: 0,
             bgcolor: "background.paper",
             px: 1.25,
             py: 1,

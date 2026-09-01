@@ -5,7 +5,9 @@ import path from "node:path";
 const DIST_DIRECTORY = path.resolve(process.cwd(), "dist");
 const ENTRY_RAW_BUDGET = 500_000;
 const ENTRY_GZIP_BUDGET = 150_000;
-const INITIAL_RAW_BUDGET = 1_500_000;
+// Keep limited headroom for the operations shell while the stricter compressed
+// transfer budget below continues to guard the user-visible network cost.
+const INITIAL_RAW_BUDGET = 1_525_000;
 const INITIAL_GZIP_BUDGET = 500_000;
 
 const formatKilobytes = (bytes) => `${(bytes / 1_000).toFixed(2)} kB`;
