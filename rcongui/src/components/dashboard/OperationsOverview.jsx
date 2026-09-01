@@ -765,7 +765,6 @@ export default function OperationsOverview({ logs, logsLoading }) {
             md: "minmax(0, 1.05fr) minmax(360px, 0.95fr)",
           },
           gap: 1.5,
-          alignItems: "start",
         }}
       >
         <Box
