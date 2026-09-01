@@ -29,22 +29,51 @@ jobs:
       - name: run admin UI browser tests
         shell: bash
         run: |
+          cleanup() {
+            if [ -n "${preview_pid:-}" ]; then
+              kill "$preview_pid" 2>/dev/null || true
+            fi
+            if [ -n "${dev_pid:-}" ]; then
+              kill "$dev_pid" 2>/dev/null || true
+            fi
+          }
+          wait_for_server() {
+            local port="$1"
+            local pid="$2"
+            local log_file="$3"
+            for attempt in {1..60}; do
+              if curl --fail --silent "http://127.0.0.1:${port}/" >/dev/null; then
+                return 0
+              fi
+              if ! kill -0 "$pid" 2>/dev/null; then
+                cat "$log_file"
+                return 1
+              fi
+              sleep 1
+            done
+            curl --fail --silent "http://127.0.0.1:${port}/" >/dev/null
+          }
+
+          preview_pid=""
+          dev_pid=""
+          trap cleanup EXIT
           npm run copy-assets
-          npx vite dev --mode fake --host 127.0.0.1 --port 3000 > "$RUNNER_TEMP/rcongui-vite.log" 2>&1 &
-          vite_pid=$!
-          trap 'kill "$vite_pid" 2>/dev/null || true' EXIT
-          for attempt in {1..60}; do
-            if curl --fail --silent http://127.0.0.1:3000/ >/dev/null; then
-              break
-            fi
-            if ! kill -0 "$vite_pid" 2>/dev/null; then
-              cat "$RUNNER_TEMP/rcongui-vite.log"
-              exit 1
-            fi
-            sleep 1
-          done
-          curl --fail --silent http://127.0.0.1:3000/ >/dev/null
-          npm test
+          npx vite build --mode fake
+          npx vite preview --host 127.0.0.1 --port 3000 > "$RUNNER_TEMP/rcongui-preview.log" 2>&1 &
+          preview_pid=$!
+          wait_for_server 3000 "$preview_pid" "$RUNNER_TEMP/rcongui-preview.log"
+          PLAYWRIGHT_BASE_URL=http://127.0.0.1:3000 npx playwright test \
+            --grep-invert "filters protected destinations unless locked links are explicit"
+
+          kill "$preview_pid" 2>/dev/null || true
+          wait "$preview_pid" 2>/dev/null || true
+          preview_pid=""
+          npx vite dev --mode fake --host 127.0.0.1 --port 3001 > "$RUNNER_TEMP/rcongui-vite.log" 2>&1 &
+          dev_pid=$!
+          wait_for_server 3001 "$dev_pid" "$RUNNER_TEMP/rcongui-vite.log"
+          PLAYWRIGHT_BASE_URL=http://127.0.0.1:3001 npx playwright test \
+            e2e/command-rail-navigation.spec.mjs \
+            --grep "filters protected destinations unless locked links are explicit"
       - run: npm run build
       - run: npm run check:bundle
       - name: upload admin UI test report
