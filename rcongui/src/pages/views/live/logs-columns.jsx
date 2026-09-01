@@ -5,7 +5,8 @@ import { generatePlayerActions } from "@/features/player-action/actions";
 import { LogMessage } from "@/components/shared/LogMessage";
 import { getLogTeam, getTeamColor } from "@/utils/lib";
 import { Box } from "@mui/material";
-import { blue, red } from "@mui/material/colors";
+import { alpha } from "@mui/material/styles";
+import { getThemeTeamColor } from "@/themes/teamColors";
 
 const TIME_FORMAT = "HH:mm:ss, MMM DD";
 
@@ -64,14 +65,18 @@ export const getLogsColumns = (t) => [
       if (!team) return null;
       return (
         <Box
-          sx={{
-            backgroundColor: team === "Axis" ? red[400] : blue[400],
-            textTransform: "uppercase",
-            fontWeight: "bold",
-            fontSize: "0.75em",
-            color: "black",
-            padding: "0.15em 0.25em",
-            textAlign: "center",
+          sx={(theme) => {
+            const teamColor = getThemeTeamColor(theme, team);
+            return {
+              backgroundColor: alpha(teamColor, 0.82),
+              border: `1px solid ${teamColor}`,
+              textTransform: "uppercase",
+              fontWeight: "bold",
+              fontSize: "0.75em",
+              color: theme.palette.getContrastText(teamColor),
+              padding: "0.15em 0.25em",
+              textAlign: "center",
+            };
           }}
         >
           {team}
@@ -155,7 +160,9 @@ export const getLogsColumns = (t) => [
     id: "message_with_id",
     accessorKey: "message",
     cell: ({ row }) => {
-      return <LogMessage log={row.original} colored={true} include_ids = {true}/>;
+      return (
+        <LogMessage log={row.original} colored={true} include_ids={true} />
+      );
     },
   },
   {

@@ -11,6 +11,7 @@ import {
   Stack,
   TextField,
   Typography,
+  useTheme,
 } from "@mui/material";
 import { BarChart } from "@mui/x-charts/BarChart";
 import { LineChart } from "@mui/x-charts/LineChart";
@@ -71,6 +72,7 @@ const ChartShell = ({ title, subtitle, children }) => (
 );
 
 const WeeklyBalanceChart = ({ weekly }) => {
+  const theme = useTheme();
   const rows = (weekly || []).filter((row) => row.balanced_ratio != null);
   if (rows.length < 2) {
     return <Alert severity="info">Noch zu wenige messbare Wochen.</Alert>;
@@ -100,7 +102,7 @@ const WeeklyBalanceChart = ({ weekly }) => {
         {
           label: "Zeit im Zielbereich",
           data: rows.map((row) => Math.round(row.balanced_ratio * 100)),
-          color: "#0f766e",
+          color: theme.palette.success.main,
           showMark: rows.length < 16,
           valueFormatter: (value) => `${value} %`,
         },
@@ -111,6 +113,7 @@ const WeeklyBalanceChart = ({ weekly }) => {
 };
 
 const WhatIfCharts = ({ rows }) => {
+  const theme = useTheme();
   if (!rows?.length) return null;
   const labels = rows.map((row) => row.label);
   return (
@@ -139,7 +142,7 @@ const WhatIfCharts = ({ rows }) => {
                   ? null
                   : Math.round(row.balanced_time_ratio * 100)
               ),
-              color: "#0f766e",
+              color: theme.palette.success.main,
               valueFormatter: (value) =>
                 value == null ? "nicht messbar" : `${value} %`,
             },
@@ -159,7 +162,7 @@ const WhatIfCharts = ({ rows }) => {
             {
               label: "Wechsel je Runde",
               data: rows.map((row) => row.switches_per_round),
-              color: "#d97706",
+              color: theme.palette.warning.main,
               valueFormatter: (value) =>
                 value == null ? "nicht messbar" : `${value} Wechsel/Runde`,
             },
@@ -172,6 +175,7 @@ const WhatIfCharts = ({ rows }) => {
 };
 
 const BreakdownCharts = ({ summary }) => {
+  const theme = useTheme();
   const quality = Object.entries(summary?.quality_levels || {});
   const differences = summary?.difference_distribution || [];
   const maps = (summary?.maps || [])
@@ -197,7 +201,7 @@ const BreakdownCharts = ({ summary }) => {
             {
               label: "Runden",
               data: quality.map(([, count]) => count),
-              color: "#2563eb",
+              color: theme.palette.info.main,
               valueFormatter: (value) => `${value} Runden`,
             },
           ]}
@@ -221,7 +225,7 @@ const BreakdownCharts = ({ summary }) => {
             {
               label: "Runden",
               data: differences.map((row) => row.rounds),
-              color: "#7c3aed",
+              color: theme.palette.warning.main,
               valueFormatter: (value) => `${value} Runden`,
             },
           ]}
@@ -250,7 +254,7 @@ const BreakdownCharts = ({ summary }) => {
                 {
                   label: "Zeit im Zielbereich",
                   data: maps.map((row) => Math.round(row.balanced_ratio * 100)),
-                  color: "#0f766e",
+                  color: theme.palette.success.main,
                   valueFormatter: (value) => `${value} %`,
                 },
               ]}
@@ -264,6 +268,7 @@ const BreakdownCharts = ({ summary }) => {
 };
 
 const CalibrationCharts = ({ quality }) => {
+  const theme = useTheme();
   const roles = quality?.role_confidence || [];
   const confidence = quality?.confidence_distribution || [];
   const strategies = quality?.strategies || [];
@@ -308,7 +313,7 @@ const CalibrationCharts = ({ quality }) => {
                 data: roles.map((row) =>
                   Math.round((row.median_confidence || 0) * 100)
                 ),
-                color: "#2563eb",
+                color: theme.palette.info.main,
                 valueFormatter: (value) => `${value} %`,
               },
             ]}
@@ -336,7 +341,7 @@ const CalibrationCharts = ({ quality }) => {
               {
                 label: "Beobachtungen",
                 data: confidence.map((row) => row.observations),
-                color: "#7c3aed",
+                color: theme.palette.warning.main,
                 valueFormatter: (value) => `${value} Beobachtungen`,
               },
             ]}
@@ -367,7 +372,7 @@ const CalibrationCharts = ({ quality }) => {
                 {
                   label: "Ø projizierte Ratingdifferenz",
                   data: strategies.map((row) => row.average_projected_gap),
-                  color: "#0f766e",
+                  color: theme.palette.success.main,
                   valueFormatter: (value) =>
                     value == null ? "noch keine Daten" : value.toFixed(1),
                 },

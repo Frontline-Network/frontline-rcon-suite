@@ -145,7 +145,8 @@ const LiveBalance = ({ status, targetDifference, minimumPlayers }) => {
           </Stack>
           {unreliable && (
             <Typography variant="body1" sx={{ mt: 1 }}>
-              Der Snapshot ist unvollständig. Aus diesen Zahlen wird keine Balanceentscheidung abgeleitet.
+              Der Snapshot ist unvollständig. Aus diesen Zahlen wird keine
+              Balanceentscheidung abgeleitet.
             </Typography>
           )}
         </Box>
@@ -232,6 +233,7 @@ const LiveBalance = ({ status, targetDifference, minimumPlayers }) => {
 };
 
 const DifferenceTimeline = ({ timeline, targetDifference, teamLabels }) => {
+  const theme = useTheme();
   const points = (timeline || [])
     .map((sample) => ({
       time: new Date(sample.updated_at),
@@ -283,7 +285,7 @@ const DifferenceTimeline = ({ timeline, targetDifference, teamLabels }) => {
         {
           label: "Teamdifferenz",
           data: points.map((point) => point.difference),
-          color: "#2563eb",
+          color: theme.palette.info.main,
           showMark: points.length < 40,
           curve: "linear",
           valueFormatter: (value) =>
@@ -299,22 +301,29 @@ const DifferenceTimeline = ({ timeline, targetDifference, teamLabels }) => {
       <ChartsReferenceLine
         y={targetDifference}
         label={`Grenze +${targetDifference}`}
-        lineStyle={{ stroke: "#d97706", strokeDasharray: "6 4" }}
+        lineStyle={{
+          stroke: theme.palette.warning.main,
+          strokeDasharray: "6 4",
+        }}
       />
       <ChartsReferenceLine
         y={-targetDifference}
         label={`Grenze -${targetDifference}`}
-        lineStyle={{ stroke: "#d97706", strokeDasharray: "6 4" }}
+        lineStyle={{
+          stroke: theme.palette.warning.main,
+          strokeDasharray: "6 4",
+        }}
       />
       <ChartsReferenceLine
         y={0}
-        lineStyle={{ stroke: "#64748b", strokeWidth: 1.5 }}
+        lineStyle={{ stroke: theme.palette.text.secondary, strokeWidth: 1.5 }}
       />
     </LineChart>
   );
 };
 
 const DistributionCharts = ({ summary }) => {
+  const theme = useTheme();
   const tiers = Object.entries(summary?.protection_tiers || {});
   const reviews = [
     { label: "Akzeptabel", value: summary?.accepted || 0 },
@@ -350,7 +359,7 @@ const DistributionCharts = ({ summary }) => {
               {
                 data: tiers.map(([, count]) => count),
                 label: "Vorschläge",
-                color: "#2563eb",
+                color: theme.palette.info.main,
                 valueFormatter: (value) => `${value} Vorschläge`,
               },
             ]}
@@ -376,7 +385,7 @@ const DistributionCharts = ({ summary }) => {
               {
                 data: reviews.map((item) => item.value),
                 label: "Vorschläge",
-                color: "#0f766e",
+                color: theme.palette.success.main,
                 valueFormatter: (value) => `${value} Vorschläge`,
               },
             ]}
@@ -409,7 +418,7 @@ const DistributionCharts = ({ summary }) => {
                 {
                   data: rejectionReasons.map(([, count]) => count),
                   label: "Ablehnungen",
-                  color: "#d97706",
+                  color: theme.palette.warning.main,
                   valueFormatter: (value) => `${value} Ablehnungen`,
                 },
               ]}

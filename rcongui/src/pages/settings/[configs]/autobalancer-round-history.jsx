@@ -22,6 +22,7 @@ import { ChartsReferenceLine } from "@mui/x-charts/ChartsReferenceLine";
 import { LineChart } from "@mui/x-charts/LineChart";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { useTheme } from "@mui/material/styles";
 import { cmd } from "@/utils/fetchUtils";
 
 const formatMap = (name) =>
@@ -125,6 +126,7 @@ const CandidateWhatIf = ({ analysis, teamLabels }) => {
 };
 
 const HistoricalChart = ({ analysis, targetDifference, teamLabels }) => {
+  const theme = useTheme();
   const points = (analysis?.timeline || [])
     .map((sample) => ({
       time: new Date(sample.updated_at),
@@ -168,7 +170,7 @@ const HistoricalChart = ({ analysis, targetDifference, teamLabels }) => {
         {
           label: "Historische Teamdifferenz",
           data: points.map((point) => point.difference),
-          color: "#2563eb",
+          color: theme.palette.info.main,
           showMark: false,
           curve: "linear",
           valueFormatter: (value) =>
@@ -184,16 +186,22 @@ const HistoricalChart = ({ analysis, targetDifference, teamLabels }) => {
       <ChartsReferenceLine
         y={targetDifference}
         label={`Grenze +${targetDifference}`}
-        lineStyle={{ stroke: "#d97706", strokeDasharray: "6 4" }}
+        lineStyle={{
+          stroke: theme.palette.warning.main,
+          strokeDasharray: "6 4",
+        }}
       />
       <ChartsReferenceLine
         y={-targetDifference}
         label={`Grenze -${targetDifference}`}
-        lineStyle={{ stroke: "#d97706", strokeDasharray: "6 4" }}
+        lineStyle={{
+          stroke: theme.palette.warning.main,
+          strokeDasharray: "6 4",
+        }}
       />
       <ChartsReferenceLine
         y={0}
-        lineStyle={{ stroke: "#64748b", strokeWidth: 1.5 }}
+        lineStyle={{ stroke: theme.palette.text.secondary, strokeWidth: 1.5 }}
       />
     </LineChart>
   );

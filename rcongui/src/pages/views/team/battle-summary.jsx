@@ -6,6 +6,7 @@ import PersonOffOutlinedIcon from "@mui/icons-material/PersonOffOutlined";
 import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
 import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
 import { useTranslation } from "react-i18next";
+import { alpha } from "@mui/material/styles";
 
 const formatRemainingTime = (value) => {
   if (value == null || value === "") return "–";
@@ -103,15 +104,21 @@ const BattleSummary = ({ gameData, teams }) => {
         },
         "& .battle-team--allies": {
           color: "info.light",
-          background:
-            "linear-gradient(90deg, rgba(33,150,243,.10), transparent)",
+          background: (theme) =>
+            `linear-gradient(90deg, ${alpha(
+              theme.palette.info.main,
+              0.1
+            )}, transparent)`,
         },
         "& .battle-team--axis": {
           justifyContent: "flex-end",
           textAlign: "right",
           color: "error.light",
-          background:
-            "linear-gradient(270deg, rgba(244,67,54,.10), transparent)",
+          background: (theme) =>
+            `linear-gradient(270deg, ${alpha(
+              theme.palette.error.main,
+              0.1
+            )}, transparent)`,
         },
         "& .battle-score": {
           minWidth: { xs: 88, sm: 180 },

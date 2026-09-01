@@ -1,51 +1,52 @@
-import { LockOutlined } from '@mui/icons-material'
-import { Box, styled } from '@mui/material'
+import { LockOutlined } from "@mui/icons-material";
+import { Box, styled } from "@mui/material";
+import { alpha } from "@mui/material/styles";
+import { getThemeTeamTone } from "@/themes/teamColors";
 
-const romanDigits = ['I', 'II', 'III', 'IV', 'V']
+const romanDigits = ["I", "II", "III", "IV", "V"];
 
 // Base shape styles for both components
 const shapeStyles = {
-  flex: '0 0 20%',
-  width: '20%',
-  textAlign: 'center',
-  display: 'grid',
-  placeItems: 'center',
-}
+  flex: "0 0 20%",
+  width: "20%",
+  textAlign: "center",
+  display: "grid",
+  placeItems: "center",
+};
 
 // Styled component for the neutral rectangle
 const NeutralBox = styled(Box)({
   ...shapeStyles,
-  backgroundColor: '#3d433c',
-  clipPath: 'polygon(0% 0%, 100% 0, 95% 50%, 100% 100%, 0% 100%, 5% 50%)',
-})
+  backgroundColor: "#3d433c",
+  clipPath: "polygon(0% 0%, 100% 0, 95% 50%, 100% 100%, 0% 100%, 5% 50%)",
+});
 
 export function RectangleNeutral() {
-  return <NeutralBox />
+  return <NeutralBox />;
 }
 
 export function Arrow({ team, highlighted, mode, order, direction, ...props }) {
   return (
     <Box
-      sx={{
-        ...shapeStyles,
-        clipPath:
-          direction === 'right'
-            ? 'polygon(0% 0%, 95% 0%, 100% 50%, 95% 100%, 0% 100%, 5% 50%)'
-            : 'polygon(5% 0%, 100% 0, 95% 50%, 100% 100%, 5% 100%, 0% 50%)',
-        borderTop: highlighted ? 'none' : '4px solid',
-        borderColor: team === 'axis' ? '#c55f51' : '#6f9ea3',
-        backgroundColor: highlighted
-          ? team === 'axis'
-            ? '#a63f34'
-            : '#466d72'
-          : team === 'axis'
-          ? '#5f2923'
-          : '#294d52',
-        opacity: highlighted ? 1 : undefined,
+      sx={(theme) => {
+        const tone = getThemeTeamTone(theme, team);
+        return {
+          ...shapeStyles,
+          clipPath:
+            direction === "right"
+              ? "polygon(0% 0%, 95% 0%, 100% 50%, 95% 100%, 0% 100%, 5% 50%)"
+              : "polygon(5% 0%, 100% 0, 95% 50%, 100% 100%, 5% 100%, 0% 50%)",
+          borderTop: highlighted ? "none" : "4px solid",
+          borderColor: tone.main,
+          backgroundColor: highlighted
+            ? tone.dark
+            : alpha(tone.dark, theme.palette.mode === "dark" ? 0.56 : 0.32),
+          opacity: highlighted ? 1 : undefined,
+        };
       }}
       {...props}
     >
-      {!highlighted && mode === 'warfare' && (
+      {!highlighted && mode === "warfare" && (
         <LockOutlined
           sx={{
             strokeWidth: {
@@ -54,34 +55,36 @@ export function Arrow({ team, highlighted, mode, order, direction, ...props }) {
               lg: 5,
             },
             fontSize: {
-              xs: '0.75rem',
-              sm: '1rem',
-              md: '1.25rem',
-              lg: '1.5rem',
+              xs: "0.75rem",
+              sm: "1rem",
+              md: "1.25rem",
+              lg: "1.5rem",
             },
           }}
         />
       )}
-      {mode === 'offensive' && order !== undefined && <span>{romanDigits[order]}</span>}
+      {mode === "offensive" && order !== undefined && (
+        <span>{romanDigits[order]}</span>
+      )}
     </Box>
-  )
+  );
 }
 
 export const ArrowsContainer = styled(Box)({
-  width: '100%',
-  display: 'flex',
-  flexDirection: 'row',
-  overflow: 'hidden',
+  width: "100%",
+  display: "flex",
+  flexDirection: "row",
+  overflow: "hidden",
   borderRadius: 4,
-  marginBottom: '8px',
+  marginBottom: "8px",
   height: {
-    xs: '1rem',
-    md: '1.5rem',
-    lg: '2rem',
+    xs: "1rem",
+    md: "1.5rem",
+    lg: "2rem",
   },
-})
+});
 
-const MAX_SCORE = 5
+const MAX_SCORE = 5;
 
 export const OffensiveArrows = ({ score, map }) => (
   <>
@@ -90,7 +93,7 @@ export const OffensiveArrows = ({ score, map }) => (
       .map((_, index) => (
         <Arrow
           key={`score-${index}`}
-          direction={map.attackers === 'allies' ? 'right' : 'left'}
+          direction={map.attackers === "allies" ? "right" : "left"}
           team="allies"
           mode="offensive"
           order={index}
@@ -102,7 +105,7 @@ export const OffensiveArrows = ({ score, map }) => (
       .map((_, index) => (
         <Arrow
           key={`score-${index}`}
-          direction={map.attackers === 'allies' ? 'right' : 'left'}
+          direction={map.attackers === "allies" ? "right" : "left"}
           team="axis"
           mode="offensive"
           highlighted={index === 0}
@@ -110,12 +113,12 @@ export const OffensiveArrows = ({ score, map }) => (
         />
       ))}
   </>
-)
+);
 
 export const WarfareArrows = ({ score }) => {
-  const isGameFinished = score.allies === MAX_SCORE || score.axis === MAX_SCORE
-  const isTied = score.allies === score.axis
-  const shouldHighlight = !isTied && !isGameFinished
+  const isGameFinished = score.allies === MAX_SCORE || score.axis === MAX_SCORE;
+  const isTied = score.allies === score.axis;
+  const shouldHighlight = !isTied && !isGameFinished;
 
   return (
     <>
@@ -143,5 +146,5 @@ export const WarfareArrows = ({ score }) => {
           />
         ))}
     </>
-  )
-}
+  );
+};
