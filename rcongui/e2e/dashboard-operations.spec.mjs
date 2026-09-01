@@ -67,7 +67,12 @@ test.describe("desktop operational overview", () => {
     const overview = page.getByTestId("operations-overview");
 
     await expect(
-      overview.getByText("[GER] Frontline Network | #2")
+      overview
+        .getByTestId("battle-overview")
+        .getByRole("heading", {
+          name: "[GER] Frontline Network | #2",
+          exact: true,
+        })
     ).toBeVisible();
     await expect(overview.getByText("98/100")).toBeVisible();
     await expect(
