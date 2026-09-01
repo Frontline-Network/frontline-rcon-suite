@@ -30,7 +30,16 @@ DATABASES = {
 ROOT_URLCONF = "rconweb.rconweb.test_urls"
 CSRF_FAILURE_VIEW = "rconweb.rconweb.csrf.csrf_failure"
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
-LOGGING = {"version": 1, "disable_existing_loggers": False}
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    # Production owns dedicated file/console handlers. Tests need RCON records
+    # to reach pytest's root capture handler so logging assertions remain
+    # deterministic after Django initializes during collection.
+    "loggers": {
+        "rcon": {"handlers": [], "level": "DEBUG", "propagate": True},
+    },
+}
 SILENCED_SYSTEM_CHECKS = ["fields.E120", "models.W042"]
 
 # Historical CRCON migrations contain an unbounded CharField. PostgreSQL accepts
