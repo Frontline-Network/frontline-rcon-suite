@@ -29,6 +29,7 @@ import { ActionMenu } from "@/features/player-action/ActionMenu";
 import { generatePlayerActions } from "@/features/player-action/actions";
 import { gameQueryOptions } from "@/queries/game-query";
 import { getGameDuration } from "@/utils/lib";
+import { resolveMapImageName } from "@/utils/map-images.mjs";
 import { getMapEnvironmentLabel, getMapModeLabel } from "@/utils/mapLabels";
 
 import { createGameColumns } from "./game-columns";
@@ -290,7 +291,7 @@ export const MatchDossier = ({
   ]
     .filter(Boolean)
     .join(" · ");
-  const imageName = mapLayer?.image_name;
+  const imageName = resolveMapImageName(mapLayer);
   const alliesScore = result?.allied ?? "?";
   const axisScore = result?.axis ?? "?";
 

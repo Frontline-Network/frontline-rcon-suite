@@ -12,7 +12,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { alpha } from "@mui/material/styles";
+import { alpha, useTheme } from "@mui/material/styles";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import BalanceOutlinedIcon from "@mui/icons-material/BalanceOutlined";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
@@ -22,12 +22,8 @@ import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import { ActionButton } from "@/features/player-action/ActionMenu";
 import { Actions } from "@/features/player-action/actions";
 import { cmd } from "@/utils/fetchUtils";
+import { getThemeTeamColors } from "@/themes/teamColors";
 import { buildLiveBalanceStatus } from "./live-balance.mjs";
-
-const TEAM_COLORS = {
-  allies: "#65a9d6",
-  axis: "#ed6259",
-};
 
 const DEFAULT_BALANCE_SETTINGS = {
   targetDifference: 2,
@@ -83,6 +79,8 @@ const Metric = ({ label, children, divider = true }) => (
 );
 
 const StrengthBar = ({ allies, axis, label }) => {
+  const theme = useTheme();
+  const teamColors = getThemeTeamColors(theme);
   const hasRatings = Number.isFinite(allies) && Number.isFinite(axis);
   const difference = hasRatings ? allies - axis : 0;
   const alliesShare = hasRatings ? clamp(50 + difference / 2, 12, 88) : 50;
@@ -112,8 +110,8 @@ const StrengthBar = ({ allies, axis, label }) => {
           backgroundColor: "background.default",
         }}
       >
-        <Box sx={{ width: `${alliesShare}%`, bgcolor: TEAM_COLORS.allies }} />
-        <Box sx={{ flex: 1, bgcolor: TEAM_COLORS.axis }} />
+        <Box sx={{ width: `${alliesShare}%`, bgcolor: teamColors.allies }} />
+        <Box sx={{ flex: 1, bgcolor: teamColors.axis }} />
         <Box
           aria-hidden
           sx={{
@@ -130,6 +128,8 @@ const StrengthBar = ({ allies, axis, label }) => {
 };
 
 const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
+  const theme = useTheme();
+  const teamColors = getThemeTeamColors(theme);
   const [expanded, setExpanded] = useState(true);
   const [explanationOpen, setExplanationOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -589,7 +589,7 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
               <Typography
                 variant="body2"
                 sx={{
-                  color: TEAM_COLORS[insight.weakerTeam],
+                  color: teamColors[insight.weakerTeam],
                   fontWeight: 700,
                 }}
               >
@@ -600,7 +600,7 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
               <Typography
                 variant="body2"
                 sx={{
-                  color: TEAM_COLORS[insight.strongerTeam],
+                  color: teamColors[insight.strongerTeam],
                   fontWeight: 700,
                 }}
               >
@@ -677,7 +677,7 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
                   <Typography
                     variant="body2"
                     sx={{
-                      color: TEAM_COLORS[swap.weaker_team],
+                      color: teamColors[swap.weaker_team],
                       fontWeight: 800,
                     }}
                   >
@@ -693,7 +693,7 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
                   <Typography
                     variant="body2"
                     sx={{
-                      color: TEAM_COLORS[swap.stronger_team],
+                      color: teamColors[swap.stronger_team],
                       fontWeight: 800,
                     }}
                   >

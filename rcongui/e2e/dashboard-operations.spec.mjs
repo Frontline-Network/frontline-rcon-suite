@@ -5,17 +5,8 @@ import {
   VIEWPORTS,
 } from "./helpers.mjs";
 
-const orderedSections = [
-  "dashboard-section-operations",
-  "resource-telemetry-card",
-  "dashboard-section-moderation",
-  "dashboard-section-configuration",
-  "dashboard-section-analysis",
-  "dashboard-section-apps",
-];
-
 for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
-  test(`${viewportName} dashboard keeps operations before promotion`, async ({
+  test(`${viewportName} dashboard opens the right operational workspace`, async ({
     page,
   }) => {
     await page.setViewportSize(viewport);
@@ -24,34 +15,31 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
     });
 
     if (viewportName === "desktop") {
-      const positions = await page.evaluate((testIds) => {
-        return testIds.map((testId) => {
-          const element = document.querySelector(`[data-testid="${testId}"]`);
-          return {
-            testId,
-            top: element
-              ? element.getBoundingClientRect().top + window.scrollY
-              : null,
-          };
-        });
-      }, orderedSections);
+      const overview = page.getByTestId("operations-overview");
+      await expect(overview).toBeVisible();
+      await expect(page.getByText("Schichtlage")).toBeVisible();
+      await expect(page.getByText("Offene Aufgaben")).toBeVisible();
+      await expect(page.getByText("Live-Teamstatus")).toBeVisible();
+      await expect(page.getByText("Aktuelle Runde")).toBeVisible();
+      await expect(page.getByText("Letzte Ereignisse")).toBeVisible();
+      await expect(
+        overview.getByRole("link", { name: /Live-Ansicht öffnen/ })
+      ).toHaveAttribute("href", "/views/live");
+      await expect(
+        overview.getByRole("link", { name: /^Teams$/ })
+      ).toHaveAttribute("href", "/views/team");
+      await expect(
+        overview.getByText(/Cam Ranh Port/).first()
+      ).toBeVisible();
+      await expect(
+        overview.locator('img[src="/maps/wdev_e-day.webp"]').first()
+      ).toBeVisible();
 
-      expect(positions.every(({ top }) => Number.isFinite(top))).toBe(true);
-      for (let index = 1; index < positions.length; index += 1) {
-        expect(
-          positions[index].top,
-          `${positions[index].testId} must follow ${
-            positions[index - 1].testId
-          }`
-        ).toBeGreaterThan(positions[index - 1].top);
-      }
-      await expect(
-        page.getByText("Zentrale Übersicht des ausgewählten Gameservers")
-      ).toBeVisible();
+      await expect(page.getByTestId("resource-telemetry-card")).toHaveCount(0);
+      await expect(page.getByText("Ressourcen & Kapazität")).toHaveCount(0);
+      await expect(page.getByText("Dienste", { exact: true })).toHaveCount(0);
     } else {
-      await expect(
-        page.getByRole("region", { name: "Betrieb" })
-      ).toBeVisible();
+      await expect(page.getByRole("region", { name: "Betrieb" })).toBeVisible();
       await expect(
         page.getByRole("link", { name: /Teams & Trupps/ })
       ).toHaveAttribute("href", "/views/team");
@@ -69,72 +57,50 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
   });
 }
 
-test.describe("dashboard resource states", () => {
+test.describe("desktop operational overview", () => {
   test.use({ viewport: VIEWPORTS.desktop });
 
-  test("shows current used and total capacity with provenance", async ({
+  test("uses current match, live team and activity data without technical widgets", async ({
     page,
   }) => {
     await openDemoPage(page, "/");
-    const card = page.getByTestId("resource-telemetry-card");
+    const overview = page.getByTestId("operations-overview");
 
-    await expect(card.getByTestId("resource-status")).toHaveText("Normal");
-    await expect(card.getByText(/0,72 \/ 4 Kerne verwendet/)).toBeVisible();
-    await expect(card.getByText(/3,68 \/ 8 GiB verwendet/)).toBeVisible();
     await expect(
-      card.getByText(/Quelle: Container \(cgroup v2\)/).first()
+      overview.getByText("[GER] Frontline Network | #2")
     ).toBeVisible();
-    await expect(card.getByText(/Warnung ab 80 %/)).toBeVisible();
+    await expect(overview.getByText("98/100")).toBeVisible();
     await expect(
-      card.getByRole("progressbar", { name: "CPU" })
-    ).toHaveAttribute("aria-valuetext", "18 Prozent verwendet");
-  });
+      overview.getByText("Stärke-Index", { exact: true }).first()
+    ).toBeVisible();
+    await expect(
+      overview.getByText("1 Punkt braucht Aufmerksamkeit")
+    ).toBeVisible();
+    await expect(
+      overview.getByText("Aktuell relevant: 1 Balance-Hinweis.")
+    ).toBeVisible();
+    await expect(overview.getByText("VIP online")).toBeVisible();
+    await expect(overview.getByText("Letzte Ereignisse")).toBeVisible();
+    expect(
+      await overview.locator('[data-testid^="operations-task-"]').count()
+    ).toBeLessThanOrEqual(5);
 
-  const resourceStates = [
-    {
-      mode: "warning",
-      label: "Warnung",
-      message: /RAM liegt bei 86 %/,
-    },
-    {
-      mode: "stale",
-      label: "Daten veraltet",
-      message: /letzte erfolgreiche Messung bleibt sichtbar/,
-    },
-    {
-      mode: "partial",
-      label: "Teilweise verfügbar",
-      message: /Teil der Ressourcenmessung ist nicht verfügbar/,
-    },
-    {
-      mode: "unavailable",
-      label: "Nicht verfügbar",
-      message: /keine belastbaren Ressourcenwerte/,
-    },
-  ];
-
-  for (const state of resourceStates) {
-    test(`explains the ${state.mode} resource state`, async ({ page }) => {
-      await openDemoPage(page, "/", {
-        query: { demo_resources: state.mode },
-      });
-      const card = page.getByTestId("resource-telemetry-card");
-      await expect(card.getByTestId("resource-status")).toHaveText(state.label);
-      await expect(card.getByText(state.message)).toBeVisible();
+    const balanceTask = overview.getByTestId("operations-task-balance");
+    const balanceAction = balanceTask.getByRole("link", {
+      name: "Ausgleichen",
     });
-  }
-
-  test("opens moderation incidents as the first log category", async ({
-    page,
-  }) => {
-    await openDemoPage(page, "/");
-
-    await expect(
-      page.getByRole("tab", { name: /Admin-Meldungen/ })
-    ).toHaveAttribute("aria-selected", "true");
+    const [taskBox, actionBox] = await Promise.all([
+      balanceTask.boundingBox(),
+      balanceAction.boundingBox(),
+    ]);
+    expect(taskBox).not.toBeNull();
+    expect(actionBox).not.toBeNull();
+    expect(actionBox.x + actionBox.width).toBeLessThanOrEqual(
+      taskBox.x + taskBox.width + 0.5
+    );
   });
 
-  test("keeps the HLL dashboard and resource contract game-neutral in English", async ({
+  test("keeps the operational dashboard game-neutral in English", async ({
     page,
   }) => {
     await openDemoPage(page, "/", {
@@ -143,12 +109,16 @@ test.describe("dashboard resource states", () => {
     });
 
     await expect(
-      page.getByTestId("global-server-switcher").filter({ visible: true }).first()
+      page
+        .getByTestId("global-server-switcher")
+        .filter({ visible: true })
+        .first()
     ).toContainText("HLL");
     await expect(
-      page.getByText("Central overview of the selected game server")
+      page.getByText("Operational situation of the selected game server")
     ).toBeVisible();
-    await expect(page.getByText("Resources & capacity")).toBeVisible();
+    await expect(page.getByText("Live team status")).toBeVisible();
+    await expect(page.getByText("Resources & capacity")).toHaveCount(0);
     await expect(page.getByText("HLL: Vietnam", { exact: true })).toHaveCount(
       0
     );

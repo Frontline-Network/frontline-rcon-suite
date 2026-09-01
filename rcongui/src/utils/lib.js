@@ -1,6 +1,7 @@
 import { blue, green, grey, purple, red, yellow } from "@mui/material/colors";
 import dayjs from "dayjs";
 import { getFactionIconSrc as getFactionIcon } from "@/utils/factionIcons";
+import { getThemeTeamColor } from "@/themes/teamColors";
 
 export const TEMPLATE_CATEGORY = {
   WELCOME: "WELCOME",
@@ -291,10 +292,7 @@ export function getLogTeam(log) {
 }
 
 export function getTeamColor(team) {
-  return (theme) =>
-    theme.palette.text[
-      team === "Axis" ? "red" : team === "Allies" ? "blue" : "inherit"
-    ];
+  return (theme) => getThemeTeamColor(theme, team);
 }
 
 // Returns tier colors based on theme mode ("light" or "dark")

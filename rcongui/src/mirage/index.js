@@ -16,6 +16,7 @@ import {
 } from "./data/autobalancer";
 import {
   getDemoServerConnection,
+  demoVietnamMapLayers,
   getDemoServerList,
   getDemoServerStatus,
   getDemoRole,
@@ -104,7 +105,8 @@ export function makeServer({ environment = "development" } = {}) {
   if (typeof window !== "undefined") {
     window.__CRCON_DEMO_PROTECTED_REQUESTS__ = protectedRequestLog;
   }
-  const currentLayer = {
+  const isVietnamDemo = getDemoServerConnection().game === "hll_vietnam";
+  const ww2CurrentLayer = {
     id: "foy_warfare_night",
     name: "foy_warfare_night",
     pretty_name: "Foy · Warfare · Nacht",
@@ -117,19 +119,19 @@ export function makeServer({ environment = "development" } = {}) {
       axis: { name: "ger", team: "Achsenmächte" },
     },
   };
-  const nextLayer = {
-    ...currentLayer,
+  const ww2NextLayer = {
+    ...ww2CurrentLayer,
     id: "carentan_warfare",
     name: "carentan_warfare",
     pretty_name: "Carentan · Warfare",
     environment: "day",
-    map: { ...currentLayer.map, pretty_name: "Carentan" },
+    map: { ...ww2CurrentLayer.map, pretty_name: "Carentan" },
   };
-  const mapLayers = [
-    { ...currentLayer, image_name: "foy-night.webp", map: { ...currentLayer.map, orientation: "vertical" } },
-    { ...nextLayer, image_name: "carentan-day.webp", map: { ...nextLayer.map, orientation: "horizontal" } },
+  const ww2MapLayers = [
+    { ...ww2CurrentLayer, image_name: "foy-night.webp", map: { ...ww2CurrentLayer.map, orientation: "vertical" } },
+    { ...ww2NextLayer, image_name: "carentan-day.webp", map: { ...ww2NextLayer.map, orientation: "horizontal" } },
     {
-      ...currentLayer,
+      ...ww2CurrentLayer,
       id: "kursk_offensive_ger",
       name: "kursk_offensive_ger",
       pretty_name: "Kursk · Offensive · Deutschland",
@@ -137,19 +139,22 @@ export function makeServer({ environment = "development" } = {}) {
       environment: "day",
       attackers: "ger",
       image_name: "kursk-day.webp",
-      map: { ...currentLayer.map, pretty_name: "Kursk", orientation: "horizontal" },
+      map: { ...ww2CurrentLayer.map, pretty_name: "Kursk", orientation: "horizontal" },
     },
     {
-      ...currentLayer,
+      ...ww2CurrentLayer,
       id: "mortain_skirmish_day",
       name: "mortain_skirmish_day",
       pretty_name: "Mortain · Skirmish",
       game_mode: "skirmish",
       environment: "day",
       image_name: "mortain-day.webp",
-      map: { ...currentLayer.map, pretty_name: "Mortain", orientation: "vertical" },
+      map: { ...ww2CurrentLayer.map, pretty_name: "Mortain", orientation: "vertical" },
     },
   ];
+  const mapLayers = isVietnamDemo ? demoVietnamMapLayers : ww2MapLayers;
+  const currentLayer = isVietnamDemo ? demoVietnamMapLayers[4] : ww2CurrentLayer;
+  const nextLayer = isVietnamDemo ? demoVietnamMapLayers[3] : ww2NextLayer;
   const collectPlayers = () => ["axis", "allies"].flatMap((team) => [
     ...(gameState[team].commander ? [gameState[team].commander] : []),
     ...Object.values(gameState[team].squads).flatMap((squad) => squad.players),

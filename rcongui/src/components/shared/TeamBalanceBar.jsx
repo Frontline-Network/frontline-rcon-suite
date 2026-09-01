@@ -1,10 +1,6 @@
 import { Box, Stack, Typography } from "@mui/material";
-import { alpha } from "@mui/material/styles";
-
-const TEAM_COLORS = {
-  allies: "#4f91cb",
-  axis: "#d25a4f",
-};
+import { alpha, useTheme } from "@mui/material/styles";
+import { getThemeTeamColors } from "@/themes/teamColors";
 
 const TeamBalanceBar = ({
   allies,
@@ -14,6 +10,8 @@ const TeamBalanceBar = ({
   alliesLabel = "Allies",
   axisLabel = "Axis",
 }) => {
+  const theme = useTheme();
+  const teamColors = getThemeTeamColors(theme);
   const hasCounts = Number.isFinite(allies) && Number.isFinite(axis);
   const total = hasCounts ? allies + axis : 0;
   const alliesShare = total > 0 ? (allies / total) * 100 : 50;
@@ -43,7 +41,12 @@ const TeamBalanceBar = ({
     >
       <Typography
         variant="caption"
-        sx={{ color, fontWeight: 800, letterSpacing: 0.7, textTransform: "uppercase" }}
+        sx={{
+          color,
+          fontWeight: 800,
+          letterSpacing: 0.7,
+          textTransform: "uppercase",
+        }}
       >
         {label}
       </Typography>
@@ -55,7 +58,11 @@ const TeamBalanceBar = ({
       >
         <Typography
           variant={compact ? "h6" : "h4"}
-          sx={{ fontWeight: 800, fontVariantNumeric: "tabular-nums", lineHeight: 1.1 }}
+          sx={{
+            fontWeight: 800,
+            fontVariantNumeric: "tabular-nums",
+            lineHeight: 1.1,
+          }}
         >
           {count ?? "–"}
         </Typography>
@@ -76,8 +83,20 @@ const TeamBalanceBar = ({
       sx={{ mt: compact ? 1 : 1.5 }}
     >
       <Stack direction="row" spacing={compact ? 0.75 : 1}>
-        {teamSummary(alliesLabel, allies, alliesShare, TEAM_COLORS.allies, "left")}
-        {teamSummary(axisLabel, axis, 100 - alliesShare, TEAM_COLORS.axis, "right")}
+        {teamSummary(
+          alliesLabel,
+          allies,
+          alliesShare,
+          teamColors.allies,
+          "left"
+        )}
+        {teamSummary(
+          axisLabel,
+          axis,
+          100 - alliesShare,
+          teamColors.axis,
+          "right"
+        )}
       </Stack>
       <Box
         sx={{
@@ -96,10 +115,10 @@ const TeamBalanceBar = ({
           sx={{
             width: `${alliesShare}%`,
             minWidth: hasCounts && allies > 0 ? 3 : 0,
-            bgcolor: TEAM_COLORS.allies,
+            bgcolor: teamColors.allies,
           }}
         />
-        <Box sx={{ flexGrow: 1, bgcolor: TEAM_COLORS.axis }} />
+        <Box sx={{ flexGrow: 1, bgcolor: teamColors.axis }} />
         <Box
           aria-hidden
           sx={{
@@ -119,7 +138,11 @@ const TeamBalanceBar = ({
         sx={{
           display: "block",
           mt: 0.6,
-          color: withinTarget ? "success.main" : difference === null ? "text.secondary" : "error.main",
+          color: withinTarget
+            ? "success.main"
+            : difference === null
+            ? "text.secondary"
+            : "error.main",
           fontWeight: 700,
           textAlign: "center",
         }}

@@ -1,5 +1,7 @@
 import { Box, styled } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import { getTierColors, getPlayerTier } from "@/utils/lib";
+import { getThemeTeamColor } from "@/themes/teamColors";
 
 export const TeamContainer = styled(Box)(({ theme }) => ({
   display: "grid",
@@ -28,9 +30,9 @@ export const TeamBox = styled(Box, {
   backgroundColor: theme.palette.background.paper,
   boxShadow:
     teamName === "allies"
-      ? "inset 0 2px 0 rgba(66,165,245,.45)"
+      ? `inset 0 2px 0 ${alpha(getThemeTeamColor(theme, "allies"), 0.45)}`
       : teamName === "axis"
-      ? "inset 0 2px 0 rgba(239,83,80,.45)"
+      ? `inset 0 2px 0 ${alpha(getThemeTeamColor(theme, "axis"), 0.45)}`
       : "none",
 }));
 
@@ -161,17 +163,18 @@ export const PlayerRow = styled(Box, {
   borderBottom: `1px solid ${theme.palette.divider}`,
   backgroundColor: balanceRecommendation
     ? balanceRecommendation.targetTeam === "allies"
-      ? "rgba(101,169,214,.12)"
-      : "rgba(237,98,89,.12)"
+      ? alpha(getThemeTeamColor(theme, "allies"), 0.12)
+      : alpha(getThemeTeamColor(theme, "axis"), 0.12)
     : selected
     ? theme.palette.action.selected
     : isCommander
     ? "rgba(255,255,255,.025)"
     : theme.palette.background.paper,
   boxShadow: balanceRecommendation
-    ? `inset 3px 0 0 ${
-        balanceRecommendation.targetTeam === "allies" ? "#65a9d6" : "#ed6259"
-      }`
+    ? `inset 3px 0 0 ${getThemeTeamColor(
+        theme,
+        balanceRecommendation.targetTeam
+      )}`
     : "none",
   "&:hover": { backgroundColor: theme.palette.action.hover },
   "& .player-info": {
@@ -186,9 +189,7 @@ export const PlayerRow = styled(Box, {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     color: balanceRecommendation
-      ? balanceRecommendation.targetTeam === "allies"
-        ? "#65a9d6"
-        : "#ed6259"
+      ? getThemeTeamColor(theme, balanceRecommendation.targetTeam)
       : selected
       ? theme.palette.primary.main
       : theme.palette.text.primary,
@@ -214,10 +215,7 @@ export const PlayerRow = styled(Box, {
     whiteSpace: "nowrap",
     ...(balanceRecommendation
       ? {
-          color:
-            balanceRecommendation.targetTeam === "allies"
-              ? "#65a9d6"
-              : "#ed6259",
+          color: getThemeTeamColor(theme, balanceRecommendation.targetTeam),
           fontSize: "1.2rem",
           fontWeight: 800,
         }

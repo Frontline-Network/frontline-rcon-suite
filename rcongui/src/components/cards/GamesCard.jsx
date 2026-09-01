@@ -13,6 +13,7 @@ import dayjs from "dayjs";
 import PlayCircleIcon from "@mui/icons-material/PlayCircle";
 import StopCircleIcon from "@mui/icons-material/StopCircle";
 import { useTranslation } from "react-i18next";
+import { getMapIconSrc } from "@/utils/map-images.mjs";
 import { getMapModeLabel } from "@/utils/mapLabels";
 
 const GamesCard = ({ games }) => {
@@ -63,7 +64,7 @@ const GamesCard = ({ games }) => {
                     }}
                   >
                     <img
-                      src={"/maps/icons/" + matchMap.image_name}
+                      src={getMapIconSrc(matchMap)}
                       width={size}
                       height={size * ratio}
                       alt=""
