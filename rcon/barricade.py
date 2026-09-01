@@ -8,25 +8,22 @@ from channels.layers import get_channel_layer
 
 from django.conf import settings as django_settings
 
-if not django_settings.configured and not os.getenv("DJANGO_SETTINGS_MODULE"):
-    # Standalone RCON workers do not boot Django, so they still need a minimal
-    # Channels configuration. When a Django settings module is declared, leave
-    # initialization to Django instead of permanently replacing the configured
-    # application registry with this partial settings object at import time.
-    django_settings.configure(
-        CHANNEL_LAYERS={
-            "default": {
-                "BACKEND": "channels_redis.core.RedisChannelLayer",
-                "CONFIG": {
-                    "hosts": [
-                        {
-                            "address": os.getenv("HLL_REDIS_URL"),
-                        }
-                    ],
-                },
-            }
-        }
-    )
+_standalone_channel_layer = None
+
+
+def _get_barricade_channel_layer():
+    """Resolve Channels lazily without configuring global Django settings."""
+    if django_settings.configured or os.getenv("DJANGO_SETTINGS_MODULE"):
+        return get_channel_layer()
+
+    global _standalone_channel_layer
+    if _standalone_channel_layer is None:
+        from channels_redis.core import RedisChannelLayer
+
+        _standalone_channel_layer = RedisChannelLayer(
+            hosts=[{"address": os.getenv("HLL_REDIS_URL")}]
+        )
+    return _standalone_channel_layer
 
 GROUP_NAME = "barricade"
 
@@ -110,7 +107,7 @@ class BarricadeRequestError(Exception):
 
 
 def send_to_barricade(request_type: ServerRequestType, payload: dict | None):
-    channel_layer = get_channel_layer()
+    channel_layer = _get_barricade_channel_layer()
     async_to_sync(channel_layer.group_send)(
         GROUP_NAME,
         {

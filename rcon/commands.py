@@ -251,7 +251,7 @@ class ServerCtl:
         try:
             conn.connect(self.config.host, int(self.config.port), self.config.password)
         except (TypeError, ValueError) as e:
-            logger.exception("Invalid connection information", e)
+            logger.exception("Invalid connection information: %s", e)
             raise
 
     def send(

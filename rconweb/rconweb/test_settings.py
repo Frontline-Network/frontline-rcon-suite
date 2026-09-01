@@ -28,8 +28,9 @@ DATABASES = {
     }
 }
 ROOT_URLCONF = "rconweb.rconweb.test_urls"
+CSRF_FAILURE_VIEW = "rconweb.rconweb.csrf.csrf_failure"
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
-LOGGING = {"version": 1, "disable_existing_loggers": True}
+LOGGING = {"version": 1, "disable_existing_loggers": False}
 SILENCED_SYSTEM_CHECKS = ["fields.E120", "models.W042"]
 
 # Historical CRCON migrations contain an unbounded CharField. PostgreSQL accepts

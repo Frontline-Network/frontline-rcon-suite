@@ -20,7 +20,9 @@ class FakeConnection:
 
 def test_terminated_thread_connection_is_closed_and_removed_on_next_access():
     perf_stats = Mock()
-    controller = HLLServerCtl(ServerInfo(), perf_stats)
+    controller = HLLServerCtl(
+        ServerInfo(host="127.0.0.1", port=12345, password="test"), perf_stats
+    )
     connections = [FakeConnection("worker"), FakeConnection("main")]
 
     with patch("rcon.commands.HLLConnection", side_effect=connections):
@@ -46,7 +48,9 @@ def test_terminated_thread_connection_is_closed_and_removed_on_next_access():
 
 def test_live_thread_connection_is_not_cleaned_up():
     perf_stats = Mock()
-    controller = HLLServerCtl(ServerInfo(), perf_stats)
+    controller = HLLServerCtl(
+        ServerInfo(host="127.0.0.1", port=12345, password="test"), perf_stats
+    )
     connections = [FakeConnection("worker"), FakeConnection("main")]
     worker_started = threading.Event()
     release_worker = threading.Event()
