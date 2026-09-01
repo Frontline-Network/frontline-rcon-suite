@@ -12,9 +12,9 @@ import django
 django.setup()
 
 try:
-    from rconweb.api import auto_settings
-except ModuleNotFoundError:
     from api import auto_settings
+except ModuleNotFoundError:
+    from rconweb.api import auto_settings
 
 
 class AutoSettingsServiceRestartTests(TestCase):

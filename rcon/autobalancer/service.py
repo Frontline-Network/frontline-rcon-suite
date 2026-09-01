@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 from statistics import median
 from typing import Any
 
-from rcon.rcon import get_rcon
 from rcon.user_config.autobalancer import AutobalancerUserConfig
 from rcon.utils import get_server_number
 
@@ -33,7 +32,14 @@ logger = logging.getLogger(__name__)
 
 class AutobalancerService:
     def __init__(self, rcon=None, store=None, repository=None):
-        self.rcon = rcon or get_rcon()
+        if rcon is None:
+            # Importing the full RCON stack also initializes legacy Django/
+            # Channels compatibility modules. Keep that side effect out of
+            # pure planner/service imports and load it only for the real worker.
+            from rcon.rcon import get_rcon
+
+            rcon = get_rcon()
+        self.rcon = rcon
         self.server_number = int(get_server_number())
         self.store = store or AutobalancerStore(server_number=self.server_number)
         self.repository = repository or DecisionRepository(self.server_number)
