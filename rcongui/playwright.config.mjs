@@ -48,14 +48,19 @@ export default defineConfig({
       use: { browserName: "chromium" },
     },
   ],
-  webServer: {
-    command: "npm run dev:fake -- --host 127.0.0.1 --port 3000",
-    url: baseURL,
-    // Reusing an arbitrary local server can silently capture snapshots from
-    // the normal live mode instead of the deterministic fake backend.
-    reuseExistingServer: false,
-    timeout: 120_000,
-    stdout: "pipe",
-    stderr: "pipe",
-  },
+  // CI owns the Vite process explicitly so a completed browser suite cannot
+  // be held open by an orphaned npm child process. Local runs keep the
+  // convenient Playwright-managed fake server.
+  webServer: process.env.CI
+    ? undefined
+    : {
+        command: "npm run dev:fake -- --host 127.0.0.1 --port 3000",
+        url: baseURL,
+        // Reusing an arbitrary local server can silently capture snapshots from
+        // the normal live mode instead of the deterministic fake backend.
+        reuseExistingServer: false,
+        timeout: 120_000,
+        stdout: "pipe",
+        stderr: "pipe",
+      },
 });
