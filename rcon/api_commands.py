@@ -837,12 +837,43 @@ class RconAPI(Rcon):
         return True
 
     def get_auto_broadcasts_config(self) -> AutoBroadcastUserConfig:
-        return AutoBroadcastUserConfig.load_from_db()
+        config = AutoBroadcastUserConfig.load_from_db()
+        from rcon.vip_lifecycle import feature_enabled
+
+        if not feature_enabled():
+            # Keep the private extension inert even if a database was copied from
+            # an installation where it had previously been enabled.
+            config.vip_lifecycle.enabled = False
+        return config
 
     def get_campaign_delivery_status(self, limit: int = 20) -> dict[str, Any]:
         from rcon.campaign_delivery import get_delivery_status
 
         return get_delivery_status(limit=limit)
+
+    def get_vip_lifecycle_status(self, limit: int = 50) -> dict[str, Any]:
+        from rcon.vip_lifecycle import delivery_status
+
+        return delivery_status(limit=limit)
+
+    def preview_vip_lifecycle(self) -> dict[str, Any]:
+        from rcon.vip_lifecycle import preview
+
+        config = AutoBroadcastUserConfig.load_from_db()
+        return preview(self, config.vip_lifecycle)
+
+    def test_vip_lifecycle_message(
+        self, player_id: str, rule: str, by: str = ""
+    ) -> str:
+        from rcon.vip_lifecycle import send_test_message
+
+        config = AutoBroadcastUserConfig.load_from_db()
+        return send_test_message(
+            self,
+            config.vip_lifecycle,
+            player_id=player_id,
+            rule=rule,
+        )
 
     def test_player_campaign(
         self, player_id: str, campaign: dict[str, Any], by: str = ""
@@ -875,11 +906,22 @@ class RconAPI(Rcon):
         reset_to_default: bool = False,
         **kwargs,
     ) -> bool:
+        from rcon.vip_lifecycle import feature_enabled
+
+        data = config or kwargs
+        if not feature_enabled():
+            if isinstance(data, AutoBroadcastUserConfig):
+                data.vip_lifecycle.enabled = False
+            elif isinstance(data, dict):
+                data = dict(data)
+                lifecycle = dict(data.get("vip_lifecycle") or {})
+                lifecycle["enabled"] = False
+                data["vip_lifecycle"] = lifecycle
         return self._validate_user_config(
             command_name=inspect.currentframe().f_code.co_name,  # type: ignore
             by=by,
             model=AutoBroadcastUserConfig,
-            data=config or kwargs,
+            data=data,
             dry_run=False,
             reset_to_default=reset_to_default,
         )

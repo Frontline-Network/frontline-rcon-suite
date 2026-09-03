@@ -71,7 +71,14 @@ def test_invalid_command_is_answered_without_network_request():
 def test_valid_command_submits_verified_gameserver_identity():
     rcon = Mock()
     response = Mock(ok=True, content=b"{}")
-    response.json.return_value = {"success": True, "message": "Verknüpft"}
+    response.json.return_value = {
+        "success": True,
+        "activated": True,
+        "verification_bonus_status": "granted",
+        "verification_bonus_days": 7,
+        "verification_bonus_expiration": "2026-08-26T12:00:00+00:00",
+        "message": "Verknüpft. Dein einmaliger 7-Tage-VIP-Bonus wurde aktiviert.",
+    }
 
     with (
         patch.dict(
@@ -117,3 +124,4 @@ def test_valid_command_submits_verified_gameserver_identity():
         "server": "4",
     }
     assert rcon.message_player.call_count == 2
+    assert "7-Tage-VIP-Bonus" in rcon.message_player.call_args.kwargs["message"]

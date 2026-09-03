@@ -42,6 +42,7 @@ import { isFakeMode } from "@/mirage/demo-data";
 import { TEMPLATE_CATEGORY, unpackBroadcastMessage } from "@/utils/lib";
 import { cmd } from "@/utils/fetchUtils";
 import BroadcastCampaignWorkbench from "./BroadcastCampaignWorkbench";
+import VipLifecyclePanel from "./VipLifecyclePanel";
 
 const createCampaign = (index = 0) => ({
   id: `campaign-${Date.now()}-${index}`,
@@ -57,19 +58,49 @@ const createCampaign = (index = 0) => ({
   recipient_group: "all",
 });
 
-const normalizeConfig = (config) => ({
-  enabled: Boolean(config?.enabled),
-  randomize: Boolean(config?.randomize),
-  player_message_interval_sec: Number(
-    config?.player_message_interval_sec ?? 10
-  ),
-  player_message_gap_sec: Number(config?.player_message_gap_sec ?? 300),
-  messages: (config?.messages ?? []).map((campaign, index) => ({
-    ...createCampaign(index),
-    ...campaign,
-    id: campaign.id || `legacy-campaign-${index}`,
-  })),
+const createVipLifecycleConfig = () => ({
+  enabled: false,
+  server_family: "hll_vietnam",
+  expiry_window_hours: 48,
+  unverified_cooldown_days: 7,
+  status_cache_seconds: 60,
+  test_mode: false,
+  messages: {
+    unverified:
+      "Volle Server? Sichere dir einmalig 7 Tage VIP gratis – bevorzugter Zugang, kein Abo: fln.gg/vip",
+    trial_active:
+      "Mit VIP kommst du bei vollen Servern bevorzugt in die Warteschlange. Deine Laufzeit und Angebote findest du unter fln.gg/vip",
+    trial_expiring:
+      "Dein Gratis-VIP endet bald – verlängere ab 4,99 € für 30 Tage. Kein Abo: fln.gg/vip",
+    trial_expired:
+      "Dein Gratis-VIP ist abgelaufen. Vietnam-VIP gibt es für 30, 90, 180 oder 365 Tage – ohne Abo: fln.gg/vip",
+  },
 });
+
+const normalizeConfig = (config) => {
+  const lifecycleDefaults = createVipLifecycleConfig();
+  return {
+    enabled: Boolean(config?.enabled),
+    randomize: Boolean(config?.randomize),
+    player_message_interval_sec: Number(
+      config?.player_message_interval_sec ?? 10
+    ),
+    player_message_gap_sec: Number(config?.player_message_gap_sec ?? 300),
+    vip_lifecycle: {
+      ...lifecycleDefaults,
+      ...(config?.vip_lifecycle ?? {}),
+      messages: {
+        ...lifecycleDefaults.messages,
+        ...(config?.vip_lifecycle?.messages ?? {}),
+      },
+    },
+    messages: (config?.messages ?? []).map((campaign, index) => ({
+      ...createCampaign(index),
+      ...campaign,
+      id: campaign.id || `legacy-campaign-${index}`,
+    })),
+  };
+};
 
 let fakeCampaignConfig = normalizeConfig({
   enabled: true,
@@ -106,12 +137,14 @@ export const loader = async () => {
       config: fakeCampaignConfig,
       templates: Promise.resolve([]),
       deliveryStatus: { campaigns: [] },
+      vipLifecycleStatus: { available: true, deliveries: [] },
     });
   }
 
   return defer({
     config: normalizeConfig(await cmd.GET_BROADCAST_CONFIG()),
     deliveryStatus: await cmd.GET_CAMPAIGN_DELIVERY_STATUS(),
+    vipLifecycleStatus: await cmd.GET_VIP_LIFECYCLE_STATUS(),
     templates: cmd.GET_MESSAGE_TEMPLATES({
       params: { category: TEMPLATE_CATEGORY.BROADCAST },
     }),
@@ -498,6 +531,7 @@ const BroadcastCampaignPage = () => {
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
   const [loadingPlayers, setLoadingPlayers] = useState(false);
   const [deliveryStatus, setDeliveryStatus] = useState(data.deliveryStatus);
+  const lifecycleAvailable = data.vipLifecycleStatus?.available === true;
   const [activeSection, setActiveSection] = useState("campaigns");
   const [selectedCampaignId, setSelectedCampaignId] = useState(
     () => normalizeConfig(data.config).messages[0]?.id ?? null
@@ -549,7 +583,17 @@ const BroadcastCampaignPage = () => {
     config.player_message_interval_sec >= 5 &&
     config.player_message_interval_sec <= 300 &&
     config.player_message_gap_sec >= 60 &&
-    config.player_message_gap_sec <= 3600;
+    config.player_message_gap_sec <= 3600 &&
+    (!lifecycleAvailable ||
+      (config.vip_lifecycle.expiry_window_hours >= 1 &&
+        config.vip_lifecycle.expiry_window_hours <= 168 &&
+        config.vip_lifecycle.unverified_cooldown_days >= 1 &&
+        config.vip_lifecycle.unverified_cooldown_days <= 90 &&
+        config.vip_lifecycle.status_cache_seconds >= 30 &&
+        config.vip_lifecycle.status_cache_seconds <= 900 &&
+        Object.values(config.vip_lifecycle.messages).every((message) =>
+          message.trim()
+        )));
   const saving = navigation.state === "submitting";
 
   const handleCampaignChange = (index, campaign) => {
@@ -787,6 +831,19 @@ const BroadcastCampaignPage = () => {
     </Stack>
   );
 
+  const vipLifecyclePanel = lifecycleAvailable ? (
+    <VipLifecyclePanel
+      value={config.vip_lifecycle}
+      onChange={(vipLifecycle) =>
+        setConfig((previous) => ({
+          ...previous,
+          vip_lifecycle: vipLifecycle,
+        }))
+      }
+      initialStatus={data.vipLifecycleStatus}
+    />
+  ) : null;
+
   return (
     <>
       <BroadcastCampaignWorkbench
@@ -808,6 +865,8 @@ const BroadcastCampaignPage = () => {
         templatePicker={templatePicker}
         campaignEditor={campaignEditor}
         deliveryStatus={deliveryStatus}
+        lifecycleAvailable={lifecycleAvailable}
+        lifecyclePanel={vipLifecyclePanel}
       />
 
       <Dialog

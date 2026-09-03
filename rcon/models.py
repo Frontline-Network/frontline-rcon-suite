@@ -754,6 +754,54 @@ class CampaignDelivery(Base):
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class VipLifecycleDelivery(Base):
+    """Persistent VIP lifecycle decision and delivery audit trail."""
+
+    __tablename__ = "vip_lifecycle_deliveries"
+    __table_args__ = (
+        UniqueConstraint(
+            "server_family",
+            "rule",
+            "player_id_id",
+            "status_fingerprint",
+            name="unique_vip_lifecycle_status_delivery",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    server_number: Mapped[int] = mapped_column(nullable=False, index=True)
+    server_family: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    rule: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    player_id_id: Mapped[int] = mapped_column(
+        ForeignKey("steam_id_64.id"), nullable=False, index=True
+    )
+    player_name: Mapped[str] = mapped_column(String, nullable=False)
+    status_fingerprint: Mapped[str] = mapped_column(
+        String(64), nullable=False, index=True
+    )
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    attempt_count: Mapped[int] = mapped_column(nullable=False, default=0)
+    test_mode: Mapped[bool] = mapped_column(nullable=False, default=False)
+    status_checked_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    sent_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 class PlayersAction(Base):
     __tablename__ = "players_actions"
 

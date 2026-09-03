@@ -292,6 +292,12 @@ export const cmd = {
     requestFactory({ method: "POST", cmd: "message_player", ...params }),
   TEST_PLAYER_CAMPAIGN: (params) =>
     requestFactory({ method: "POST", cmd: "test_player_campaign", ...params }),
+  TEST_VIP_LIFECYCLE_MESSAGE: (params) =>
+    requestFactory({
+      method: "POST",
+      cmd: "test_vip_lifecycle_message",
+      ...params,
+    }),
   MESSAGE_ALL_PLAYERS: (params) =>
     requestFactory({ method: "POST", cmd: "message_all_players", ...params }),
   BULK_MESSAGE_PLAYERS: (params) =>
@@ -384,6 +390,18 @@ export const cmd = {
     requestFactory({
       method: "GET",
       cmd: "get_campaign_delivery_status",
+      ...params,
+    }),
+  GET_VIP_LIFECYCLE_STATUS: (params) =>
+    requestFactory({
+      method: "GET",
+      cmd: "get_vip_lifecycle_status",
+      ...params,
+    }),
+  PREVIEW_VIP_LIFECYCLE: (params) =>
+    requestFactory({
+      method: "GET",
+      cmd: "preview_vip_lifecycle",
       ...params,
     }),
   GET_BROADCAST_MESSAGE: (params) =>

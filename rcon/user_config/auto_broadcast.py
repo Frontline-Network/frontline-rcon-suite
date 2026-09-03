@@ -15,9 +15,63 @@ class AutoBroadcastRequiredType(TypedDict):
     messages: Iterable[str | AutoBroadcastMessageType]
 
 
+class VipLifecycleMessagesType(TypedDict, total=False):
+    unverified: str
+    trial_active: str
+    trial_expiring: str
+    trial_expired: str
+
+
+class VipLifecycleConfigType(TypedDict, total=False):
+    enabled: bool
+    server_family: Literal["hll", "hll_vietnam"]
+    expiry_window_hours: int
+    unverified_cooldown_days: int
+    status_cache_seconds: int
+    test_mode: bool
+    messages: VipLifecycleMessagesType
+
+
 class AutoBroadcastType(AutoBroadcastRequiredType, total=False):
     player_message_interval_sec: int
     player_message_gap_sec: int
+    vip_lifecycle: VipLifecycleConfigType
+
+
+class VipLifecycleMessages(BaseModel):
+    unverified: str = (
+        "Volle Server? Sichere dir einmalig 7 Tage VIP gratis – bevorzugter "
+        "Zugang, kein Abo: fln.gg/vip"
+    )
+    trial_active: str = (
+        "Mit VIP kommst du bei vollen Servern bevorzugt in die Warteschlange. "
+        "Deine Laufzeit und Angebote findest du unter fln.gg/vip"
+    )
+    trial_expiring: str = (
+        "Dein Gratis-VIP endet bald – verlängere ab 4,99 € für 30 Tage. "
+        "Kein Abo: fln.gg/vip"
+    )
+    trial_expired: str = (
+        "Dein Gratis-VIP ist abgelaufen. Vietnam-VIP gibt es für 30, 90, 180 "
+        "oder 365 Tage – ohne Abo: fln.gg/vip"
+    )
+
+
+class VipLifecycleConfig(BaseModel):
+    """Status-driven, personal VIP communication.
+
+    The feature is deliberately disabled by default. Existing campaign
+    installations therefore keep their behaviour until an administrator has
+    configured the authenticated WordPress status endpoint and enables it.
+    """
+
+    enabled: bool = Field(default=False, strict=True)
+    server_family: Literal["hll", "hll_vietnam"] = "hll_vietnam"
+    expiry_window_hours: int = Field(default=48, ge=1, le=168)
+    unverified_cooldown_days: int = Field(default=7, ge=1, le=90)
+    status_cache_seconds: int = Field(default=60, ge=30, le=900)
+    test_mode: bool = Field(default=False, strict=True)
+    messages: VipLifecycleMessages = Field(default_factory=VipLifecycleMessages)
 
 
 class AutoBroadcastMessageType(TypedDict, total=False):
@@ -104,6 +158,7 @@ class AutoBroadcastUserConfig(BaseUserConfig):
     )
     player_message_interval_sec: int = Field(default=10, ge=5, le=300)
     player_message_gap_sec: int = Field(default=300, ge=60, le=3600)
+    vip_lifecycle: VipLifecycleConfig = Field(default_factory=VipLifecycleConfig)
 
     @staticmethod
     def save_to_db(values: AutoBroadcastType, dry_run=False):
@@ -145,6 +200,7 @@ class AutoBroadcastUserConfig(BaseUserConfig):
             messages=validated_messages,
             player_message_interval_sec=values.get("player_message_interval_sec", 10),
             player_message_gap_sec=values.get("player_message_gap_sec", 300),
+            vip_lifecycle=values.get("vip_lifecycle", {}),
         )
 
         if not dry_run:
