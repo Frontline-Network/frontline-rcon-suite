@@ -6358,23 +6358,24 @@ Object.assign(de.dashboard, {
 de.settings.campaigns.vipLifecycle = {
   title: "VIP-Lebenszyklus",
   subtitle:
-    "Persönliche Hinweise passend zu Verifizierung, Gratisphase und Kaufstatus senden.",
+    "Vier direkte Kampagnen nach VIP-Status – genau einmal je Spielersitzung.",
   testMode: "Testmodus",
   testModeHelp:
     "Im Testmodus werden Zielgruppen und Protokolle erzeugt, aber keine automatischen Spielernachrichten versendet. Eine ausdrücklich ausgelöste Testnachricht wird weiterhin an den ausgewählten Spieler gesendet.",
   serverFamily: "Ziel-Serverfamilie",
   expiryWindow: "Hinweis vor Ablauf (Stunden)",
-  unverifiedCooldown: "Abstand für Unverifizierte (Tage)",
   cacheSeconds: "Status-Cache (Sekunden)",
   message: "Persönliche Ingame-Nachricht",
+  oncePerSession: "Einmal pro Sitzung",
   previewTitle: "Zielgruppenvorschau",
   previewHelp:
-    "Prüft alle aktuell verbundenen Spieler gesammelt gegen die geschützte VIP-Schnittstelle. Es wird nichts versendet.",
+    "Prüft VIP-Status, Sitzungsdauer, Spielerzahl und Seeding-Pause aller verbundenen Spieler. Es wird nichts versendet.",
   previewAction: "Zielgruppe prüfen",
   targetCount_one: "{{count}} Spieler würde eine Nachricht erhalten.",
   targetCount_other: "{{count}} Spieler würden eine Nachricht erhalten.",
   unknownStatus: "Status nicht eindeutig ermittelbar",
   blocked: "Gesperrt – kein Versand",
+  notEligible: "Aktuell pausiert oder Wartezeit nicht erreicht",
   noMessage: "Keine Nachricht",
   familyMismatch:
     "Die ausgewählte Serverfamilie passt nicht zu diesem Gameserver. Es wird nichts versendet.",
@@ -6383,7 +6384,7 @@ de.settings.campaigns.vipLifecycle = {
   previewFailed: "Die Zielgruppe konnte nicht ermittelt werden: {{message}}",
   testTitle: "Gezielte Testnachricht",
   testHelp:
-    "Sendet den gewählten Text bewusst an genau einen aktuell verbundenen, nicht gesperrten Spieler. Der reguläre Versandstatus wird dadurch nicht verbraucht.",
+    "Sendet den Text der gewählten Statuskampagne bewusst an einen aktuell verbundenen, nicht gesperrten Spieler. Der reguläre Sitzungsversand wird dadurch nicht verbraucht.",
   testPlayer: "Online-Spieler",
   testRule: "Nachrichtentyp",
   loadPlayers: "Spieler laden",
@@ -6393,7 +6394,7 @@ de.settings.campaigns.vipLifecycle = {
   playersFailed: "Die Online-Spieler konnten nicht geladen werden: {{message}}",
   logTitle: "Versandprotokoll",
   logHelp:
-    "Spieler-ID, Regel, Zeitpunkt und Ergebnis der letzten Lebenszyklus-Prüfungen.",
+    "Spieler-ID, Statuskampagne, Sitzung, Zeitpunkt und Ergebnis der letzten Zustellungen.",
   logFailed: "Das Versandprotokoll konnte nicht geladen werden: {{message}}",
   noLog: "Noch keine Lebenszyklus-Prüfungen protokolliert.",
   rules: {
@@ -6401,25 +6402,21 @@ de.settings.campaigns.vipLifecycle = {
       title: "Noch nicht verifiziert",
       description:
         "Spieleridentität ist dieser Serverfamilie noch keinem FLN-Konto zugeordnet.",
-      limit: "Max. alle 7 Tage",
     },
     trial_active: {
       title: "Gratis-VIP aktiv",
       description:
         "Gratisphase ist aktiv und endet erst nach dem eingestellten Hinweisfenster.",
-      limit: "Einmal pro Gratisphase",
     },
     trial_expiring: {
       title: "Gratis-VIP endet bald",
       description:
         "Gratisphase läuft innerhalb des eingestellten Zeitfensters ab.",
-      limit: "Einmal im Zeitfenster",
     },
     trial_expired: {
       title: "Gratis-VIP abgelaufen",
       description:
         "Gratisphase ist beendet und es gab bisher keinen bezahlten VIP-Kauf.",
-      limit: "Einmal nach Ablauf",
     },
   },
   deliveryStatus: {

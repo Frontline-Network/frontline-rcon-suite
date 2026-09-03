@@ -60,10 +60,13 @@ const VipLifecyclePanel = ({ value, onChange, initialStatus }) => {
 
   const update = (field, nextValue) =>
     onChange({ ...value, [field]: nextValue });
-  const updateMessage = (rule, message) =>
+  const updateCampaign = (rule, field, nextValue) =>
     onChange({
       ...value,
-      messages: { ...value.messages, [rule]: message },
+      campaigns: {
+        ...value.campaigns,
+        [rule]: { ...value.campaigns[rule], [field]: nextValue },
+      },
     });
 
   const targets = useMemo(
@@ -147,7 +150,11 @@ const VipLifecyclePanel = ({ value, onChange, initialStatus }) => {
     try {
       if (!isFakeMode()) {
         await cmd.TEST_VIP_LIFECYCLE_MESSAGE({
-          payload: { player_id: selectedPlayer, rule: selectedRule },
+          payload: {
+            player_id: selectedPlayer,
+            rule: selectedRule,
+            campaign: value.campaigns[selectedRule],
+          },
         });
       }
       setFeedback({ severity: "success", key: "testSent" });
@@ -230,8 +237,7 @@ const VipLifecyclePanel = ({ value, onChange, initialStatus }) => {
             display: "grid",
             gridTemplateColumns: {
               xs: "1fr",
-              sm: "repeat(2, minmax(0, 1fr))",
-              lg: "repeat(4, minmax(0, 1fr))",
+              sm: "repeat(3, minmax(0, 1fr))",
             },
             gap: 1.5,
           }}
@@ -256,15 +262,6 @@ const VipLifecyclePanel = ({ value, onChange, initialStatus }) => {
           />
           <TextField
             type="number"
-            label={t("settings.campaigns.vipLifecycle.unverifiedCooldown")}
-            value={value.unverified_cooldown_days}
-            onChange={(event) =>
-              update("unverified_cooldown_days", Number(event.target.value))
-            }
-            slotProps={{ htmlInput: { min: 1, max: 90 } }}
-          />
-          <TextField
-            type="number"
             label={t("settings.campaigns.vipLifecycle.cacheSeconds")}
             value={value.status_cache_seconds}
             onChange={(event) =>
@@ -281,37 +278,143 @@ const VipLifecyclePanel = ({ value, onChange, initialStatus }) => {
             gap: 1.5,
           }}
         >
-          {RULES.map((rule) => (
-            <Paper key={rule} variant="outlined" sx={{ p: 2 }}>
-              <Stack spacing={1.25}>
-                <Stack direction="row" justifyContent="space-between" gap={1}>
-                  <Typography variant="subtitle2">
-                    {t(`settings.campaigns.vipLifecycle.rules.${rule}.title`)}
-                  </Typography>
+          {RULES.map((rule) => {
+            const campaign = value.campaigns[rule];
+            return (
+              <Paper
+                key={rule}
+                variant="outlined"
+                sx={{
+                  p: 2,
+                  borderColor: campaign.enabled ? "primary.main" : "divider",
+                }}
+              >
+                <Stack spacing={1.5}>
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="flex-start"
+                    gap={1}
+                  >
+                    <Box>
+                      <Typography variant="subtitle2">
+                        {t(
+                          `settings.campaigns.vipLifecycle.rules.${rule}.title`
+                        )}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {t(
+                          `settings.campaigns.vipLifecycle.rules.${rule}.description`
+                        )}
+                      </Typography>
+                    </Box>
+                    <FormControlLabel
+                      label={t("common.enabled")}
+                      labelPlacement="start"
+                      sx={{ m: 0, flexShrink: 0 }}
+                      control={
+                        <Switch
+                          size="small"
+                          checked={campaign.enabled}
+                          onChange={(event) =>
+                            updateCampaign(rule, "enabled", event.target.checked)
+                          }
+                        />
+                      }
+                    />
+                  </Stack>
                   <Chip
                     size="small"
                     variant="outlined"
                     label={t(
-                      `settings.campaigns.vipLifecycle.rules.${rule}.limit`
+                      "settings.campaigns.vipLifecycle.oncePerSession"
                     )}
+                    sx={{ alignSelf: "flex-start" }}
+                  />
+                  <TextField
+                    multiline
+                    minRows={3}
+                    value={campaign.message}
+                    onChange={(event) =>
+                      updateCampaign(rule, "message", event.target.value)
+                    }
+                    label={t("settings.campaigns.vipLifecycle.message")}
+                    disabled={!campaign.enabled}
+                    fullWidth
+                  />
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: {
+                        xs: "1fr",
+                        sm: "repeat(3, minmax(0, 1fr))",
+                      },
+                      gap: 1.25,
+                    }}
+                  >
+                    <TextField
+                      type="number"
+                      label={t("settings.campaigns.minSessionMinutes")}
+                      value={campaign.min_session_minutes}
+                      onChange={(event) =>
+                        updateCampaign(
+                          rule,
+                          "min_session_minutes",
+                          Number(event.target.value)
+                        )
+                      }
+                      slotProps={{ htmlInput: { min: 1, max: 1440 } }}
+                      disabled={!campaign.enabled}
+                    />
+                    <TextField
+                      type="number"
+                      label={t("settings.campaigns.minPlayers")}
+                      value={campaign.min_players}
+                      onChange={(event) =>
+                        updateCampaign(
+                          rule,
+                          "min_players",
+                          Number(event.target.value)
+                        )
+                      }
+                      slotProps={{ htmlInput: { min: 0, max: 100 } }}
+                      disabled={!campaign.enabled}
+                    />
+                    <TextField
+                      type="number"
+                      label={t("settings.campaigns.maxPlayers")}
+                      value={campaign.max_players}
+                      onChange={(event) =>
+                        updateCampaign(
+                          rule,
+                          "max_players",
+                          Number(event.target.value)
+                        )
+                      }
+                      slotProps={{ htmlInput: { min: 0, max: 100 } }}
+                      disabled={!campaign.enabled}
+                    />
+                  </Box>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={campaign.pause_during_seeding}
+                        onChange={(event) =>
+                          updateCampaign(
+                            rule,
+                            "pause_during_seeding",
+                            event.target.checked
+                          )
+                        }
+                        disabled={!campaign.enabled}
+                      />
+                    }
+                    label={t("settings.campaigns.pauseDuringSeeding")}
                   />
                 </Stack>
-                <Typography variant="caption" color="text.secondary">
-                  {t(
-                    `settings.campaigns.vipLifecycle.rules.${rule}.description`
-                  )}
-                </Typography>
-                <TextField
-                  multiline
-                  minRows={3}
-                  value={value.messages[rule]}
-                  onChange={(event) => updateMessage(rule, event.target.value)}
-                  label={t("settings.campaigns.vipLifecycle.message")}
-                  fullWidth
-                />
-              </Stack>
-            </Paper>
-          ))}
+              </Paper>
+            );
+          })}
         </Box>
 
         <Paper variant="outlined" sx={{ p: 2 }}>
@@ -377,6 +480,8 @@ const VipLifecyclePanel = ({ value, onChange, initialStatus }) => {
                           ? t(
                               `settings.campaigns.vipLifecycle.rules.${player.rule}.title`
                             )
+                          : player.matched_rule
+                          ? t("settings.campaigns.vipLifecycle.notEligible")
                           : t("settings.campaigns.vipLifecycle.noMessage")
                       }
                     />

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import func, or_, text
@@ -12,6 +12,7 @@ from rcon.models import (
     CampaignDelivery,
     PlayerID,
     PlayerSession,
+    VipLifecycleDelivery,
     enter_session,
 )
 from rcon.user_config.auto_broadcast import (
@@ -58,7 +59,9 @@ def global_send_is_due(
     interval_seconds: int,
     now: datetime,
 ) -> bool:
-    return last_attempt is None or now >= last_attempt + timedelta(
+    return last_attempt is None or _clock_time(now) >= _clock_time(
+        last_attempt
+    ) + timedelta(
         seconds=interval_seconds
     )
 
@@ -68,9 +71,24 @@ def player_gap_is_due(
     gap_seconds: int,
     now: datetime,
 ) -> bool:
-    return last_delivery is None or now >= last_delivery + timedelta(
+    return last_delivery is None or _clock_time(now) >= _clock_time(
+        last_delivery
+    ) + timedelta(
         seconds=gap_seconds
     )
+
+
+def _clock_time(value: datetime) -> datetime:
+    """Compare legacy naive and newer timezone-aware delivery timestamps."""
+
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def _latest_delivery_time(*values: datetime | None) -> datetime | None:
+    populated = [value for value in values if value is not None]
+    return max(populated, key=_clock_time) if populated else None
 
 
 def _direct_campaigns(
@@ -249,13 +267,23 @@ def claim_next_delivery(
         ).scalar()
         if not acquired:
             return None
-        last_attempt = (
+        last_direct_attempt = (
             sess.query(func.max(CampaignDelivery.last_attempt_at))
             .filter(CampaignDelivery.server_number == server_number)
             .scalar()
         )
+        last_lifecycle_attempt = (
+            sess.query(func.max(VipLifecycleDelivery.last_attempt_at))
+            .filter(
+                VipLifecycleDelivery.server_number == server_number,
+                VipLifecycleDelivery.test_mode.is_(False),
+            )
+            .scalar()
+        )
         if not global_send_is_due(
-            last_attempt, config.player_message_interval_sec, now
+            _latest_delivery_time(last_direct_attempt, last_lifecycle_attempt),
+            config.player_message_interval_sec,
+            now,
         ):
             return None
 
@@ -304,7 +332,7 @@ def claim_next_delivery(
             if not session_is_eligible(campaign, player_session["start"], now):
                 continue
 
-            previous_player_delivery = (
+            previous_direct_delivery = (
                 sess.query(func.max(CampaignDelivery.sent_at))
                 .filter(
                     CampaignDelivery.server_number == server_number,
@@ -313,8 +341,23 @@ def claim_next_delivery(
                 )
                 .scalar()
             )
+            previous_lifecycle_delivery = (
+                sess.query(func.max(VipLifecycleDelivery.sent_at))
+                .filter(
+                    VipLifecycleDelivery.server_number == server_number,
+                    VipLifecycleDelivery.player_session_id
+                    == delivery.player_session_id,
+                    VipLifecycleDelivery.status == "sent",
+                    VipLifecycleDelivery.test_mode.is_(False),
+                )
+                .scalar()
+            )
             if not player_gap_is_due(
-                previous_player_delivery, config.player_message_gap_sec, now
+                _latest_delivery_time(
+                    previous_direct_delivery, previous_lifecycle_delivery
+                ),
+                config.player_message_gap_sec,
+                now,
             ):
                 continue
 
@@ -557,7 +600,12 @@ def run() -> None:
             elif lifecycle_enabled:
                 # Keep lifecycle traffic behind already queued direct campaigns so
                 # a player never receives two campaign messages in one cycle.
-                process_vip_lifecycle(ctl, config.vip_lifecycle)
+                process_vip_lifecycle(
+                    ctl,
+                    config.vip_lifecycle,
+                    player_message_interval_sec=config.player_message_interval_sec,
+                    player_message_gap_sec=config.player_message_gap_sec,
+                )
 
         except Exception:
             logger.exception("Campaign player-message loop failed")

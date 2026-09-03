@@ -3,9 +3,7 @@ import hmac
 import json
 import os
 import re
-from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
-from types import SimpleNamespace
 from unittest.mock import Mock
 
 import requests
@@ -21,13 +19,14 @@ from rcon.vip_lifecycle import (
     RULE_UNVERIFIED,
     LifecycleDecision,
     _prepare_delivery,
+    _session_fingerprint,
+    _session_is_eligible,
     classify_status,
     clear_status_cache,
     delivery_status,
     feature_enabled,
     fetch_statuses,
     process_once,
-    unverified_cooldown_elapsed,
 )
 
 NOW = datetime(2026, 9, 3, 12, 0, tzinfo=timezone.utc)
@@ -132,15 +131,54 @@ def test_expiry_window_boundary_is_exact():
     assert outside_boundary and outside_boundary.rule == RULE_TRIAL_ACTIVE
 
 
-def test_unverified_cooldown_is_inclusive():
-    assert not unverified_cooldown_elapsed(
-        NOW - timedelta(days=7, microseconds=-1),
-        cooldown_days=7,
-        now=NOW,
+def test_v060_messages_are_migrated_to_session_campaigns():
+    config = VipLifecycleConfig.model_validate(
+        {
+            "enabled": True,
+            "unverified_cooldown_days": 7,
+            "messages": {"unverified": "Bestehender Text"},
+        }
     )
-    assert unverified_cooldown_elapsed(
-        NOW - timedelta(days=7), cooldown_days=7, now=NOW
+
+    assert config.campaigns.unverified.message == "Bestehender Text"
+    assert config.campaigns.unverified.enabled is True
+    assert config.campaigns.unverified.min_session_minutes == 5
+    assert not hasattr(config, "unverified_cooldown_days")
+
+
+def test_session_wait_time_is_inclusive_and_timezone_safe():
+    campaign = VipLifecycleConfig().campaigns.unverified
+
+    assert not _session_is_eligible(
+        campaign, NOW.replace(tzinfo=None) - timedelta(minutes=4), NOW
     )
+    assert _session_is_eligible(
+        campaign, NOW.replace(tzinfo=None) - timedelta(minutes=5), NOW
+    )
+
+
+def test_session_fingerprint_changes_with_session_and_mode():
+    first = _session_fingerprint(
+        server_number=1,
+        rule=RULE_TRIAL_ACTIVE,
+        player_session_id=11,
+        test_mode=False,
+    )
+    second = _session_fingerprint(
+        server_number=1,
+        rule=RULE_TRIAL_ACTIVE,
+        player_session_id=12,
+        test_mode=False,
+    )
+    simulated = _session_fingerprint(
+        server_number=1,
+        rule=RULE_TRIAL_ACTIVE,
+        player_session_id=11,
+        test_mode=True,
+    )
+
+    assert len(first) == 64
+    assert len({first, second, simulated}) == 3
 
 
 def test_paid_or_ambiguous_players_never_receive_advertising():
@@ -303,6 +341,16 @@ def test_process_test_mode_never_sends_a_real_message(monkeypatch):
     )
     monkeypatch.setattr("rcon.vip_lifecycle._blocked_player_ids", lambda *_: set())
     monkeypatch.setattr(
+        "rcon.vip_lifecycle._active_sessions",
+        lambda *_: {
+            "player-1": {
+                "player_db_id": 7,
+                "session_id": 17,
+                "start": NOW - timedelta(minutes=10),
+            }
+        },
+    )
+    monkeypatch.setattr(
         "rcon.vip_lifecycle.fetch_statuses",
         lambda *_args, **_kwargs: {"player-1": status()},
     )
@@ -329,6 +377,16 @@ def test_process_skips_delivery_when_status_api_is_unavailable(monkeypatch):
     )
     monkeypatch.setattr("rcon.vip_lifecycle._blocked_player_ids", lambda *_: set())
     monkeypatch.setattr(
+        "rcon.vip_lifecycle._active_sessions",
+        lambda *_: {
+            "player-1": {
+                "player_db_id": 7,
+                "session_id": 17,
+                "start": NOW - timedelta(minutes=10),
+            }
+        },
+    )
+    monkeypatch.setattr(
         "rcon.vip_lifecycle.fetch_statuses", lambda *_args, **_kwargs: {}
     )
     monkeypatch.setattr("rcon.vip_lifecycle._prepare_delivery", prepare)
@@ -353,8 +411,7 @@ def test_process_is_inert_when_private_feature_is_not_enabled(monkeypatch):
 
 
 def test_existing_persistent_claim_is_never_retried(monkeypatch):
-    player = SimpleNamespace(id=7)
-    existing_delivery = SimpleNamespace(status="failed", attempt_count=1)
+    existing_delivery = Mock(status="failed", attempt_count=1)
 
     class FakeQuery:
         def __init__(self, value):
@@ -367,34 +424,78 @@ def test_existing_persistent_claim_is_never_retried(monkeypatch):
             return self.value
 
     class FakeSession:
-        def query(self, model):
-            from rcon.models import PlayerID, VipLifecycleDelivery
-
-            if model is PlayerID:
-                return FakeQuery(player)
-            if model is VipLifecycleDelivery:
-                return FakeQuery(existing_delivery)
-            raise AssertionError(f"Unexpected model: {model}")
+        def query(self, _model):
+            return FakeQuery(existing_delivery)
 
         def add(self, _value):
             raise AssertionError("An existing lifecycle claim must not be recreated")
 
-    @contextmanager
+    class FakeContext:
+        def __enter__(self):
+            return FakeSession()
+
+        def __exit__(self, *_args):
+            return False
+
     def fake_enter_session():
-        yield FakeSession()
+        return FakeContext()
 
     monkeypatch.setattr("rcon.vip_lifecycle.enter_session", fake_enter_session)
 
     assert (
         _prepare_delivery(
-            player_id="player-1",
+            player_db_id=7,
+            player_session_id=17,
             player_name="Alice",
             decision=LifecycleDecision(RULE_TRIAL_ACTIVE, "f" * 64),
-            message="Personal message",
+            campaign=VipLifecycleConfig(enabled=True).campaigns.trial_active,
             config=VipLifecycleConfig(enabled=True),
             server_number=1,
+            player_message_interval_sec=10,
+            player_message_gap_sec=300,
             now=NOW,
         )
         is None
     )
+
+
+def test_disabled_status_campaign_is_not_prepared(monkeypatch):
+    monkeypatch.setenv("FRONTLINE_VIP_LIFECYCLE_ENABLED", "true")
+    config = VipLifecycleConfig.model_validate(
+        {
+            "enabled": True,
+            "campaigns": {
+                "trial_active": {"enabled": False, "message": "Hinweis"}
+            },
+        }
+    )
+    ctl = Mock()
+    prepare = Mock()
+    monkeypatch.setattr(
+        "rcon.vip_lifecycle._local_server_family", lambda: "hll_vietnam"
+    )
+    monkeypatch.setattr(
+        "rcon.vip_lifecycle._online_players", lambda _ctl: {"player-1": "Alice"}
+    )
+    monkeypatch.setattr("rcon.vip_lifecycle._blocked_player_ids", lambda *_: set())
+    monkeypatch.setattr(
+        "rcon.vip_lifecycle._active_sessions",
+        lambda *_: {
+            "player-1": {
+                "player_db_id": 7,
+                "session_id": 17,
+                "start": NOW - timedelta(minutes=10),
+            }
+        },
+    )
+    monkeypatch.setattr(
+        "rcon.vip_lifecycle.fetch_statuses",
+        lambda *_args, **_kwargs: {"player-1": status()},
+    )
+    monkeypatch.setattr("rcon.vip_lifecycle._prepare_delivery", prepare)
+
+    result = process_once(ctl, config, now=NOW)
+
+    assert result["eligible"] == 0
+    prepare.assert_not_called()
     _prepare_delivery,
