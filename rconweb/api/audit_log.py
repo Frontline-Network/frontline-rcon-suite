@@ -26,8 +26,11 @@ def _to_list(value):
 def record_audit(func):
     @wraps(func)
     def wrapper(request, **kwargs):
-        name = request.path.split("/")[-1]
+        name = request.path.rstrip("/").split("/")[-1]
         data = _get_data(request)
+        if name == "send_frontline_vip_verification_code" and "code" in data:
+            data = dict(data)
+            data["code"] = "[redacted]"
         user = request.user.username
 
         try:

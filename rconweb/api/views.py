@@ -302,8 +302,16 @@ def expose_api_endpoint(
                             f"Missing mandatory parameter: {pname}"
                         )
 
+        safe_arguments = dict(arguments)
+        safe_response_data = dict(data)
+        if command_name == "send_frontline_vip_verification_code":
+            if "code" in safe_arguments:
+                safe_arguments["code"] = "[redacted]"
+            if "code" in safe_response_data:
+                safe_response_data["code"] = "[redacted]"
+
         try:
-            logger.debug("%s %s", command_name, arguments)
+            logger.debug("%s %s", command_name, safe_arguments)
             res = func(**arguments)
 
             # A few get_ methods can be called w/ POST but don't modify anything
@@ -315,7 +323,7 @@ def expose_api_endpoint(
                 and not command_name.startswith("validate_")
                 and not command_name.endswith("_config")
             ):
-                audit(command_name, request, arguments)
+                audit(command_name, request, safe_arguments)
 
         # This is a bit janky but catch any UserConfig validation errors that have bubbled up and convert
         # the error message as required
@@ -378,7 +386,7 @@ def expose_api_endpoint(
             dict(
                 result=res,
                 command=command_name,
-                arguments=data,
+                arguments=safe_response_data,
                 failed=failure,
                 error=error,
                 forward_results=others,
@@ -464,6 +472,7 @@ ENDPOINT_PERMISSIONS: dict[Callable, list[str] | set[str] | str] = {
     rcon_api.flag_player: "api.can_flag_player",
     rcon_api.kick: "api.can_kick_players",
     rcon_api.message_player: "api.can_message_players",
+    rcon_api.send_frontline_vip_verification_code: "api.can_message_players",
     rcon_api.test_player_campaign: "api.can_message_players",
     rcon_api.test_vip_lifecycle_message: "api.can_message_players",
     rcon_api.perma_ban: {
@@ -879,6 +888,7 @@ RCON_ENDPOINT_HTTP_METHODS: dict[Callable, list[str]] = {
     rcon_api.get_welcome_message: ["GET"],
     rcon_api.kick: ["POST"],
     rcon_api.message_player: ["POST"],
+    rcon_api.send_frontline_vip_verification_code: ["POST"],
     rcon_api.test_player_campaign: ["POST"],
     rcon_api.test_vip_lifecycle_message: ["POST"],
     rcon_api.perma_ban: ["POST"],

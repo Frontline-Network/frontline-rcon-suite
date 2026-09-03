@@ -1,5 +1,7 @@
 import functools
 import inspect
+import re
+import unicodedata
 from collections import defaultdict
 from datetime import datetime, timedelta
 from logging import getLogger
@@ -95,6 +97,7 @@ from rcon.watchlist import PlayerWatch
 logger = getLogger(__name__)
 
 PLAYER_ID = "player_id"
+FRONTLINE_VIP_BROWSER_CODE = re.compile(r"^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$")
 
 CTL: Optional["RconAPI"] = None
 
@@ -850,6 +853,84 @@ class RconAPI(Rcon):
         from rcon.campaign_delivery import get_delivery_status
 
         return get_delivery_status(limit=limit)
+
+    def send_frontline_vip_verification_code(
+        self, player_name: str, code: str
+    ) -> dict[str, str]:
+        """Privately send a short browser-verification code to one online player.
+
+        Name lookup, canonical identity resolution and message delivery deliberately
+        happen in one call. The website therefore never receives the online-player
+        list and cannot accidentally link an identity that changed between requests.
+        """
+
+        requested_name = str(player_name or "").strip()
+        verification_code = str(code or "").strip().upper()
+        if not requested_name or len(requested_name) > 100:
+            raise HLLCommandFailedError("Invalid player name")
+        if not FRONTLINE_VIP_BROWSER_CODE.fullmatch(verification_code):
+            raise HLLCommandFailedError("Invalid verification code")
+
+        def normalize_name(value: object) -> str:
+            return unicodedata.normalize("NFKC", str(value or "")).strip().casefold()
+
+        normalized_name = normalize_name(requested_name)
+        matches = [
+            player
+            for player in self.get_players()
+            if normalize_name(player.get("name")) == normalized_name
+        ]
+        if len(matches) != 1:
+            raise HLLCommandFailedError("Player is not uniquely online")
+
+        player = matches[0]
+        player_id = str(player.get(PLAYER_ID) or "").strip()
+        if not player_id:
+            raise HLLCommandFailedError("Player identity is unavailable")
+
+        details = self.get_detailed_player_info(player_id, player=player)
+        resolved_player_id = str(details.get(PLAYER_ID) or "").strip()
+        if not resolved_player_id or resolved_player_id != player_id:
+            raise HLLCommandFailedError("Player identity changed during lookup")
+
+        raw_platform = str(details.get("platform") or "").strip().lower()
+        platform_family = raw_platform.rsplit("::", 1)[-1]
+        if "steam" in platform_family:
+            platform = "steam"
+        elif "xbox" in platform_family:
+            platform = "xbox"
+        elif platform_family in {"ps5", "psn", "playstation"}:
+            platform = "playstation"
+        elif "eos" in platform_family:
+            platform = "eos"
+        else:
+            platform = "unknown"
+
+        # The CRCON response still calls this legacy cross-platform field
+        # ``steam_id``. Keep it only as optional platform metadata; player_id is
+        # the canonical identity used for linking and VIP operations.
+        platform_account_id = str(details.get("steam_id") or "").strip()
+        resolved_name = str(details.get("name") or player.get("name") or requested_name)
+        delivered = self.message_player(
+            player_id=resolved_player_id,
+            player_name=resolved_name,
+            message=(
+                "FLN-Verifizierung\n\n"
+                f"Dein Code: {verification_code}\n\n"
+                "Gib ihn innerhalb von 10 Minuten im bereits geöffneten Browser ein. "
+                "Teile diesen Code mit niemandem."
+            ),
+            save_message=False,
+        )
+        if not delivered:
+            raise HLLCommandFailedError("Verification message could not be delivered")
+
+        return {
+            "player_id": resolved_player_id,
+            "player_name": resolved_name,
+            "platform": platform,
+            "platform_account_id": platform_account_id,
+        }
 
     def get_vip_lifecycle_status(self, limit: int = 50) -> dict[str, Any]:
         from rcon.vip_lifecycle import delivery_status
