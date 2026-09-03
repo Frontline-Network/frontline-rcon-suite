@@ -483,6 +483,8 @@ export default function BroadcastCampaignWorkbench({
   templatePicker,
   campaignEditor,
   deliveryStatus,
+  lifecycleAvailable,
+  lifecyclePanel,
 }) {
   const { t } = useTranslation();
   const sections = [
@@ -504,6 +506,16 @@ export default function BroadcastCampaignWorkbench({
       description: t(`${ROOT}.deliveryDescription`),
       status: "complete",
     },
+    ...(lifecycleAvailable
+      ? [
+          {
+            id: "vip-lifecycle",
+            label: t(`${ROOT}.vipLifecycle.title`),
+            description: t(`${ROOT}.vipLifecycle.subtitle`),
+            status: config.vip_lifecycle?.enabled ? "complete" : "pending",
+          },
+        ]
+      : []),
     {
       id: "activity",
       label: t(`${ROOT}.activity`),
@@ -660,6 +672,8 @@ export default function BroadcastCampaignWorkbench({
       {activeSection === "delivery" && (
         <DeliverySettings config={config} onChange={onGlobalChange} />
       )}
+
+      {activeSection === "vip-lifecycle" && lifecyclePanel}
 
       {activeSection === "activity" && (
         <ActivityPanel deliveryStatus={deliveryStatus} />

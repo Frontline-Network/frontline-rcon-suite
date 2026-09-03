@@ -1,23 +1,29 @@
 # Frontline VIP verification
 
-Frontline VIP links a paid WordPress/WooCommerce order to the player identity
-reported by the game server. The customer does not enter a Steam ID or EOS ID
-in checkout.
+Frontline VIP links a WordPress account to the player identity reported by the
+game server. The customer does not enter a Steam ID or EOS ID in checkout.
 
 ## Flow
 
-1. The customer purchases VIP while signed in to the FLN website.
-2. For a new player identity, the customer generates a one-time code on the
-   WooCommerce order page.
+1. The customer signs in to the FLN website and generates a one-time code in
+   the WooCommerce account area before buying VIP.
+2. The code is bound to that FLN account and the selected game world.
 3. The customer sends `!vipverify CODE` in the game chat on a participating
    FLN server.
 4. CRCON submits the chat sender's actual player ID, player name, platform,
    game and server number to the signed WordPress REST endpoint.
 5. WordPress permanently links that game identity to the FLN account and
-   consumes the code.
-6. The WooCommerce order activates VIP on RCON endpoints configured for the
-   corresponding game. If activation fails, the verified identity remains
-   linked and the order can be retried without another verification.
+   consumes the code. The first successful verification of the FLN account
+   reserves a one-time seven-day VIP bonus for that exact game identity.
+6. WordPress synchronizes the bonus to every RCON endpoint configured for the
+   corresponding game. The claim is uniquely bound to both the FLN account and
+   the game identity, so generating another code cannot extend it again. A
+   failed sync reuses the stored absolute expiration instead of adding another
+   seven days.
+7. Later WooCommerce purchases extend the centrally stored expiration and are
+   synchronized normally. Existing paid-order verification codes remain
+   supported as a legacy flow. If activation fails, the verified identity
+   remains linked and the order can be retried without another verification.
 
 A code stays valid until it is redeemed or replaced. A game identity can only
 belong to one FLN account. Player names are display metadata and are never used

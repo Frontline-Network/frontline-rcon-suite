@@ -463,6 +463,10 @@ def send_test_message(ctl, campaign: AutoBroadcastMessage, player_id: str) -> st
 
 def run() -> None:
     from rcon.rcon import get_rcon
+    from rcon.vip_lifecycle import (
+        feature_enabled as vip_lifecycle_feature_enabled,
+    )
+    from rcon.vip_lifecycle import process_once as process_vip_lifecycle
 
     ctl = get_rcon()
     server_number = int(get_server_number())
@@ -479,37 +483,43 @@ def run() -> None:
             config = AutoBroadcastUserConfig.load_from_db()
             all_campaigns = _all_direct_campaigns(config)
             campaigns = _direct_campaigns(config)
-            if not config.enabled or not campaigns:
+            direct_enabled = config.enabled and bool(campaigns)
+            lifecycle_enabled = (
+                vip_lifecycle_feature_enabled() and config.vip_lifecycle.enabled
+            )
+            if not direct_enabled and not lifecycle_enabled:
                 time.sleep(CHECK_INTERVAL)
                 continue
 
-            online_players = _online_players(ctl)
-            active_sessions = _active_sessions(set(online_players), server_number)
-            player_count = len(online_players)
-            seeding_config = (
-                AutoModSeedingUserConfig.load_from_db()
-                if any(campaign.pause_during_seeding for campaign in campaigns)
-                else None
-            )
-            enqueue_eligible_deliveries(
-                campaigns=campaigns,
-                online_players=online_players,
-                active_sessions=active_sessions,
-                server_number=server_number,
-                player_count=player_count,
-                seeding_config=seeding_config,
-                now=now,
-            )
-            delivery = claim_next_delivery(
-                config=config,
-                campaigns=all_campaigns,
-                online_players=online_players,
-                active_sessions=active_sessions,
-                player_count=player_count,
-                seeding_config=seeding_config,
-                server_number=server_number,
-                now=now,
-            )
+            delivery = None
+            if direct_enabled:
+                online_players = _online_players(ctl)
+                active_sessions = _active_sessions(set(online_players), server_number)
+                player_count = len(online_players)
+                seeding_config = (
+                    AutoModSeedingUserConfig.load_from_db()
+                    if any(campaign.pause_during_seeding for campaign in campaigns)
+                    else None
+                )
+                enqueue_eligible_deliveries(
+                    campaigns=campaigns,
+                    online_players=online_players,
+                    active_sessions=active_sessions,
+                    server_number=server_number,
+                    player_count=player_count,
+                    seeding_config=seeding_config,
+                    now=now,
+                )
+                delivery = claim_next_delivery(
+                    config=config,
+                    campaigns=all_campaigns,
+                    online_players=online_players,
+                    active_sessions=active_sessions,
+                    player_count=player_count,
+                    seeding_config=seeding_config,
+                    server_number=server_number,
+                    now=now,
+                )
             if delivery:
                 try:
                     formatted = format_message(
@@ -544,6 +554,10 @@ def run() -> None:
                     )
                 else:
                     finish_delivery(delivery["id"], success=True, now=datetime.utcnow())
+            elif lifecycle_enabled:
+                # Keep lifecycle traffic behind already queued direct campaigns so
+                # a player never receives two campaign messages in one cycle.
+                process_vip_lifecycle(ctl, config.vip_lifecycle)
 
         except Exception:
             logger.exception("Campaign player-message loop failed")
