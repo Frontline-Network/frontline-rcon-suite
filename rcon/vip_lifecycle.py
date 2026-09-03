@@ -14,17 +14,20 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
 import requests
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 
-from rcon.broadcast import format_message
+from rcon.broadcast import campaign_is_eligible, format_message
 from rcon.models import (
     Blacklist,
     BlacklistRecord,
+    CampaignDelivery,
     PlayerID,
+    PlayerSession,
     VipLifecycleDelivery,
     enter_session,
 )
-from rcon.user_config.auto_broadcast import VipLifecycleConfig
+from rcon.user_config.auto_broadcast import VipLifecycleCampaign, VipLifecycleConfig
+from rcon.user_config.auto_mod_seeding import AutoModSeedingUserConfig
 from rcon.utils import get_server_number
 
 logger = logging.getLogger(__name__)
@@ -86,14 +89,6 @@ def parse_utc_timestamp(value: Any) -> datetime | None:
     if parsed.tzinfo is None:
         return None
     return parsed.astimezone(timezone.utc)
-
-
-def unverified_cooldown_elapsed(
-    last_sent: datetime | None, *, cooldown_days: int, now: datetime
-) -> bool:
-    if last_sent is None:
-        return True
-    return _as_utc(now) >= _as_utc(last_sent) + timedelta(days=cooldown_days)
 
 
 def classify_status(
@@ -361,110 +356,177 @@ def _blocked_player_ids(player_ids: set[str], server_number: int) -> set[str]:
         }
 
 
-def _message_for_rule(config: VipLifecycleConfig, rule: str) -> str:
-    return str(getattr(config.messages, rule, "") or "").strip()
+def _campaign_for_rule(
+    config: VipLifecycleConfig, rule: str
+) -> VipLifecycleCampaign:
+    return getattr(config.campaigns, rule)
 
 
-def _unverified_fingerprint(
-    sess,
-    player_db_id: int,
-    *,
-    server_family: str,
-    test_mode: bool,
-) -> tuple[str, datetime | None]:
-    latest = (
-        sess.query(VipLifecycleDelivery)
-        .filter(
-            VipLifecycleDelivery.server_family == server_family,
-            VipLifecycleDelivery.player_id_id == player_db_id,
-            VipLifecycleDelivery.rule == RULE_UNVERIFIED,
-            VipLifecycleDelivery.test_mode.is_(test_mode),
+def _active_sessions(
+    player_ids: set[str], server_number: int
+) -> dict[str, dict[str, Any]]:
+    """Return the newest active CRCON session for each online player."""
+
+    if not player_ids:
+        return {}
+    with enter_session() as sess:
+        rows = (
+            sess.query(PlayerID, PlayerSession)
+            .join(PlayerSession, PlayerSession.player_id_id == PlayerID.id)
+            .filter(
+                PlayerID.player_id.in_(player_ids),
+                PlayerSession.server_number == server_number,
+                PlayerSession.end.is_(None),
+            )
+            .order_by(PlayerSession.created.desc())
+            .all()
         )
-        .order_by(VipLifecycleDelivery.created_at.desc())
-        .first()
+        result: dict[str, dict[str, Any]] = {}
+        for player, player_session in rows:
+            result.setdefault(
+                player.player_id,
+                {
+                    "player_db_id": player.id,
+                    "session_id": player_session.id,
+                    "start": player_session.start or player_session.created,
+                },
+            )
+        return result
+
+
+def _session_is_eligible(
+    campaign: VipLifecycleCampaign,
+    session_start: datetime,
+    now: datetime,
+) -> bool:
+    return _as_utc(now) >= _as_utc(session_start) + timedelta(
+        minutes=campaign.min_session_minutes
     )
-    seed = f"after:{latest.id}" if latest else "initial"
-    last_sent = _as_utc(latest.created_at) if latest else None
-    digest = hashlib.sha256(
-        f"{server_family}|{RULE_UNVERIFIED}|{test_mode}|{seed}".encode()
+
+
+def _latest_timestamp(*values: datetime | None) -> datetime | None:
+    normalized = [_as_utc(value) for value in values if value is not None]
+    return max(normalized) if normalized else None
+
+
+def _interval_is_due(
+    last_event: datetime | None,
+    interval_seconds: int,
+    now: datetime,
+) -> bool:
+    return last_event is None or _as_utc(now) >= _as_utc(last_event) + timedelta(
+        seconds=interval_seconds
+    )
+
+
+def _session_fingerprint(
+    *, server_number: int, rule: str, player_session_id: int, test_mode: bool
+) -> str:
+    namespace = "test" if test_mode else "live"
+    return hashlib.sha256(
+        f"{namespace}|{server_number}|{rule}|{player_session_id}".encode()
     ).hexdigest()
-    return digest, last_sent
 
 
 def _prepare_delivery(
     *,
-    player_id: str,
+    player_db_id: int,
+    player_session_id: int,
     player_name: str,
     decision: LifecycleDecision,
-    message: str,
+    campaign: VipLifecycleCampaign,
     config: VipLifecycleConfig,
     server_number: int,
+    player_message_interval_sec: int,
+    player_message_gap_sec: int,
     now: datetime,
 ) -> int | None:
     with enter_session() as sess:
-        player = (
-            sess.query(PlayerID).filter(PlayerID.player_id == player_id).one_or_none()
-        )
-        if player is None:
-            return None
-        fingerprint = decision.status_fingerprint
-        if decision.rule == RULE_UNVERIFIED:
-            fingerprint, last_sent = _unverified_fingerprint(
-                sess,
-                player.id,
-                server_family=config.server_family,
-                test_mode=config.test_mode,
-            )
-            if not unverified_cooldown_elapsed(
-                last_sent,
-                cooldown_days=config.unverified_cooldown_days,
-                now=now,
-            ):
-                return None
-
-        # Test-mode simulations intentionally use a separate dedupe namespace.
-        fingerprint = hashlib.sha256(
-            f"{'test' if config.test_mode else 'live'}|{fingerprint}".encode()
-        ).hexdigest()
-        delivery = (
+        existing = (
             sess.query(VipLifecycleDelivery)
             .filter(
-                VipLifecycleDelivery.server_family == config.server_family,
+                VipLifecycleDelivery.server_number == server_number,
                 VipLifecycleDelivery.rule == decision.rule,
-                VipLifecycleDelivery.player_id_id == player.id,
-                VipLifecycleDelivery.status_fingerprint == fingerprint,
+                VipLifecycleDelivery.player_session_id == player_session_id,
+                VipLifecycleDelivery.test_mode.is_(config.test_mode),
             )
             .one_or_none()
         )
-        if delivery is not None:
-            # The claim itself is the dedupe boundary. Never retry the same
-            # state automatically: if the process dies after RCON accepted a
-            # message but before the result update, a retry could duplicate it.
+        if existing is not None:
+            # The session claim is the dedupe boundary. Never retry it
+            # automatically because RCON may have accepted a timed-out send.
             return None
-        else:
-            delivery = VipLifecycleDelivery(
-                server_number=server_number,
-                server_family=config.server_family,
-                rule=decision.rule,
-                player_id_id=player.id,
-                player_name=player_name,
-                status_fingerprint=fingerprint,
-                message=message,
-                status="queued",
-                attempt_count=0,
-                test_mode=config.test_mode,
-                status_checked_at=now,
-                created_at=now,
-                updated_at=now,
+
+        if not config.test_mode:
+            latest_direct_attempt = (
+                sess.query(func.max(CampaignDelivery.last_attempt_at))
+                .filter(CampaignDelivery.server_number == server_number)
+                .scalar()
             )
-            sess.add(delivery)
-            sess.flush()
-        delivery.status = "sending"
-        delivery.attempt_count = 1
-        delivery.updated_at = now
-        delivery.status_checked_at = now
-        delivery.player_name = player_name
-        delivery.message = message
+            latest_lifecycle_attempt = (
+                sess.query(func.max(VipLifecycleDelivery.last_attempt_at))
+                .filter(
+                    VipLifecycleDelivery.server_number == server_number,
+                    VipLifecycleDelivery.test_mode.is_(False),
+                )
+                .scalar()
+            )
+            if not _interval_is_due(
+                _latest_timestamp(latest_direct_attempt, latest_lifecycle_attempt),
+                player_message_interval_sec,
+                now,
+            ):
+                return None
+
+            latest_direct_send = (
+                sess.query(func.max(CampaignDelivery.sent_at))
+                .filter(
+                    CampaignDelivery.server_number == server_number,
+                    CampaignDelivery.player_session_id == player_session_id,
+                    CampaignDelivery.status == "sent",
+                )
+                .scalar()
+            )
+            latest_lifecycle_send = (
+                sess.query(func.max(VipLifecycleDelivery.sent_at))
+                .filter(
+                    VipLifecycleDelivery.server_number == server_number,
+                    VipLifecycleDelivery.player_session_id == player_session_id,
+                    VipLifecycleDelivery.status == "sent",
+                    VipLifecycleDelivery.test_mode.is_(False),
+                )
+                .scalar()
+            )
+            if not _interval_is_due(
+                _latest_timestamp(latest_direct_send, latest_lifecycle_send),
+                player_message_gap_sec,
+                now,
+            ):
+                return None
+
+        delivery = VipLifecycleDelivery(
+            server_number=server_number,
+            server_family=config.server_family,
+            rule=decision.rule,
+            player_id_id=player_db_id,
+            player_session_id=player_session_id,
+            player_name=player_name,
+            status_fingerprint=_session_fingerprint(
+                server_number=server_number,
+                rule=decision.rule,
+                player_session_id=player_session_id,
+                test_mode=config.test_mode,
+            ),
+            message=campaign.message.strip(),
+            status="sending",
+            attempt_count=1,
+            test_mode=config.test_mode,
+            status_checked_at=now,
+            created_at=now,
+            updated_at=now,
+            last_attempt_at=None if config.test_mode else now,
+        )
+        sess.add(delivery)
         sess.flush()
         return delivery.id
 
@@ -490,6 +552,8 @@ def process_once(
     ctl,
     config: VipLifecycleConfig,
     *,
+    player_message_interval_sec: int = 10,
+    player_message_gap_sec: int = 300,
     now: datetime | None = None,
 ) -> dict[str, int]:
     """Evaluate one batch and deliver at most one lifecycle message."""
@@ -508,15 +572,26 @@ def process_once(
     counters["online"] = len(players)
     blocked = _blocked_player_ids(set(players), server_number)
     candidate_ids = set(players) - blocked
+    active_sessions = _active_sessions(candidate_ids, server_number)
     statuses = fetch_statuses(
         candidate_ids,
         server_family=config.server_family,
         cache_seconds=config.status_cache_seconds,
     )
+    seeding_config = (
+        AutoModSeedingUserConfig.load_from_db()
+        if any(
+            _campaign_for_rule(config, rule).pause_during_seeding
+            for rule in RULES
+        )
+        else None
+    )
+    player_count = len(players)
 
     for player_id in sorted(candidate_ids):
         status = statuses.get(player_id)
-        if status is None:
+        player_session = active_sessions.get(player_id)
+        if status is None or player_session is None:
             continue
         decision = classify_status(
             status,
@@ -525,17 +600,24 @@ def process_once(
         )
         if decision is None:
             continue
-        message = _message_for_rule(config, decision.rule)
-        if not message:
+        campaign = _campaign_for_rule(config, decision.rule)
+        if not campaign.message.strip():
+            continue
+        if not campaign_is_eligible(campaign, player_count, seeding_config):
+            continue
+        if not _session_is_eligible(campaign, player_session["start"], now):
             continue
         counters["eligible"] += 1
         delivery_id = _prepare_delivery(
-            player_id=player_id,
+            player_db_id=player_session["player_db_id"],
+            player_session_id=player_session["session_id"],
             player_name=players[player_id],
             decision=decision,
-            message=message,
+            campaign=campaign,
             config=config,
             server_number=server_number,
+            player_message_interval_sec=player_message_interval_sec,
+            player_message_gap_sec=player_message_gap_sec,
             now=now,
         )
         if delivery_id is None:
@@ -547,7 +629,7 @@ def process_once(
         try:
             formatted = format_message(
                 ctl,
-                message,
+                campaign.message.strip(),
                 player_id=player_id,
                 context={"player_id": player_id, "player_name": players[player_id]},
             )
@@ -588,6 +670,7 @@ def preview(ctl, config: VipLifecycleConfig) -> dict[str, Any]:
             "server_family": config.server_family,
         }
     blocked = _blocked_player_ids(set(players), server_number)
+    active_sessions = _active_sessions(set(players) - blocked, server_number)
     statuses = fetch_statuses(
         set(players) - blocked,
         server_family=config.server_family,
@@ -595,6 +678,14 @@ def preview(ctl, config: VipLifecycleConfig) -> dict[str, Any]:
         force=True,
     )
     now = utc_now()
+    seeding_config = (
+        AutoModSeedingUserConfig.load_from_db()
+        if any(
+            _campaign_for_rule(config, rule).pause_during_seeding
+            for rule in RULES
+        )
+        else None
+    )
     rows = []
     for player_id, player_name in players.items():
         status = statuses.get(player_id)
@@ -607,13 +698,30 @@ def preview(ctl, config: VipLifecycleConfig) -> dict[str, Any]:
             if status
             else None
         )
+        player_session = active_sessions.get(player_id)
+        campaign = (
+            _campaign_for_rule(config, decision.rule) if decision else None
+        )
+        eligible = bool(
+            decision
+            and campaign
+            and player_session
+            and campaign.message.strip()
+            and campaign_is_eligible(campaign, len(players), seeding_config)
+            and _session_is_eligible(campaign, player_session["start"], now)
+        )
         rows.append(
             {
                 "player_id": player_id,
                 "player_name": player_name,
                 "blocked": player_id in blocked,
                 "status_known": status is not None,
-                "rule": decision.rule if decision else None,
+                "matched_rule": decision.rule if decision else None,
+                "rule": decision.rule if eligible else None,
+                "eligible": eligible,
+                "session_started_at": (
+                    player_session["start"] if player_session else None
+                ),
                 "verified": status.get("verified") if status else None,
                 "vip_active": status.get("vip_active") if status else None,
                 "grant_source": status.get("grant_source") if status else None,
@@ -659,6 +767,7 @@ def delivery_status(limit: int = 50) -> dict[str, Any]:
                 "status": delivery.status,
                 "attempt_count": delivery.attempt_count,
                 "test_mode": delivery.test_mode,
+                "player_session_id": delivery.player_session_id,
                 "status_checked_at": delivery.status_checked_at,
                 "updated_at": delivery.updated_at,
                 "sent_at": delivery.sent_at,
@@ -688,7 +797,7 @@ def send_test_message(
         raise ValueError("The selected player is no longer online")
     if player_id in _blocked_player_ids({player_id}, int(get_server_number())):
         raise ValueError("Messages cannot be sent to a blocked player")
-    message = _message_for_rule(config, rule)
+    message = _campaign_for_rule(config, rule).message.strip()
     if not message:
         raise ValueError("The selected VIP lifecycle message is empty")
     formatted = format_message(
@@ -716,6 +825,9 @@ def send_test_message(
                 server_family=config.server_family,
                 rule=rule,
                 player_id_id=player.id,
+                # Manual tests use no session id so they neither consume nor
+                # collide with the automatic once-per-session claim.
+                player_session_id=None,
                 player_name=players[player_id],
                 status_fingerprint=hashlib.sha256(
                     f"manual|{uuid.uuid4()}".encode()
@@ -727,6 +839,7 @@ def send_test_message(
                 status_checked_at=now,
                 created_at=now,
                 updated_at=now,
+                last_attempt_at=now,
                 sent_at=now,
             )
         )

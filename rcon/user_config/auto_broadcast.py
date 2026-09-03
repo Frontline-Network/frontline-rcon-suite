@@ -22,14 +22,33 @@ class VipLifecycleMessagesType(TypedDict, total=False):
     trial_expired: str
 
 
+class VipLifecycleCampaignType(TypedDict, total=False):
+    enabled: bool
+    message: str
+    min_session_minutes: int
+    min_players: int
+    max_players: int
+    pause_during_seeding: bool
+
+
+class VipLifecycleCampaignsType(TypedDict, total=False):
+    unverified: VipLifecycleCampaignType
+    trial_active: VipLifecycleCampaignType
+    trial_expiring: VipLifecycleCampaignType
+    trial_expired: VipLifecycleCampaignType
+
+
 class VipLifecycleConfigType(TypedDict, total=False):
     enabled: bool
     server_family: Literal["hll", "hll_vietnam"]
     expiry_window_hours: int
+    # Accepted for backwards compatibility with v0.6.0. New configurations
+    # use one direct-message campaign per lifecycle rule.
     unverified_cooldown_days: int
     status_cache_seconds: int
     test_mode: bool
     messages: VipLifecycleMessagesType
+    campaigns: VipLifecycleCampaignsType
 
 
 class AutoBroadcastType(AutoBroadcastRequiredType, total=False):
@@ -38,22 +57,64 @@ class AutoBroadcastType(AutoBroadcastRequiredType, total=False):
     vip_lifecycle: VipLifecycleConfigType
 
 
-class VipLifecycleMessages(BaseModel):
-    unverified: str = (
-        "Volle Server? Sichere dir einmalig 7 Tage VIP gratis – bevorzugter "
-        "Zugang, kein Abo: fln.gg/vip"
+VIP_LIFECYCLE_DEFAULT_MESSAGES = {
+    "unverified": (
+        "Du kannst einmalig kostenlos VIP freischalten und erhältst damit "
+        "bevorzugten Zugang bei voller Warteschlange. Weitere Informationen: "
+        "fln.gg/vip"
+    ),
+    "trial_active": (
+        "Dein kostenloser VIP-Zugang ist aktiv. Die verbleibende Laufzeit "
+        "findest du in deinem Konto unter fln.gg/mein-konto"
+    ),
+    "trial_expiring": (
+        "Dein kostenloser VIP-Zugang endet bald. Deine Laufzeit und "
+        "Verlängerungsmöglichkeiten findest du unter fln.gg/mein-konto"
+    ),
+    "trial_expired": (
+        "Dein kostenloser VIP-Zugang ist abgelaufen. Wenn du VIP weiter "
+        "nutzen möchtest, findest du die verfügbaren Laufzeiten unter fln.gg/vip"
+    ),
+}
+
+
+class VipLifecycleCampaign(BaseModel):
+    """One status-targeted campaign delivered once per player session."""
+
+    enabled: bool = Field(default=True, strict=True)
+    message: str
+    min_session_minutes: int = Field(default=5, ge=1, le=1440)
+    min_players: int = Field(default=0, ge=0, le=100)
+    max_players: int = Field(default=100, ge=0, le=100)
+    pause_during_seeding: bool = Field(default=False, strict=True)
+
+    @model_validator(mode="after")
+    def validate_player_range(self):
+        if self.max_players < self.min_players:
+            raise ValueError("max_players must be greater than or equal to min_players")
+        return self
+
+
+class VipLifecycleCampaigns(BaseModel):
+    unverified: VipLifecycleCampaign = Field(
+        default_factory=lambda: VipLifecycleCampaign(
+            message=VIP_LIFECYCLE_DEFAULT_MESSAGES["unverified"]
+        )
     )
-    trial_active: str = (
-        "Mit VIP kommst du bei vollen Servern bevorzugt in die Warteschlange. "
-        "Deine Laufzeit und Angebote findest du unter fln.gg/vip"
+    trial_active: VipLifecycleCampaign = Field(
+        default_factory=lambda: VipLifecycleCampaign(
+            message=VIP_LIFECYCLE_DEFAULT_MESSAGES["trial_active"]
+        )
     )
-    trial_expiring: str = (
-        "Dein Gratis-VIP endet bald – verlängere ab 4,99 € für 30 Tage. "
-        "Kein Abo: fln.gg/vip"
+    trial_expiring: VipLifecycleCampaign = Field(
+        default_factory=lambda: VipLifecycleCampaign(
+            message=VIP_LIFECYCLE_DEFAULT_MESSAGES["trial_expiring"]
+        )
     )
-    trial_expired: str = (
-        "Dein Gratis-VIP ist abgelaufen. Vietnam-VIP gibt es für 30, 90, 180 "
-        "oder 365 Tage – ohne Abo: fln.gg/vip"
+    trial_expired: VipLifecycleCampaign = Field(
+        default_factory=lambda: VipLifecycleCampaign(
+            message=VIP_LIFECYCLE_DEFAULT_MESSAGES["trial_expired"]
+        )
     )
 
 
@@ -68,10 +129,26 @@ class VipLifecycleConfig(BaseModel):
     enabled: bool = Field(default=False, strict=True)
     server_family: Literal["hll", "hll_vietnam"] = "hll_vietnam"
     expiry_window_hours: int = Field(default=48, ge=1, le=168)
-    unverified_cooldown_days: int = Field(default=7, ge=1, le=90)
     status_cache_seconds: int = Field(default=60, ge=30, le=900)
     test_mode: bool = Field(default=False, strict=True)
-    messages: VipLifecycleMessages = Field(default_factory=VipLifecycleMessages)
+    campaigns: VipLifecycleCampaigns = Field(default_factory=VipLifecycleCampaigns)
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_v060_messages(cls, values):
+        """Preserve v0.6.0 message customisations in the session model."""
+
+        if not isinstance(values, dict) or "campaigns" in values:
+            return values
+        migrated = dict(values)
+        legacy_messages = migrated.get("messages")
+        campaigns = VipLifecycleCampaigns().model_dump()
+        if isinstance(legacy_messages, dict):
+            for rule, message in legacy_messages.items():
+                if rule in campaigns and isinstance(message, str):
+                    campaigns[rule]["message"] = message
+        migrated["campaigns"] = campaigns
+        return migrated
 
 
 class AutoBroadcastMessageType(TypedDict, total=False):

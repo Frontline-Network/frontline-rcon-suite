@@ -755,7 +755,7 @@ class CampaignDelivery(Base):
 
 
 class VipLifecycleDelivery(Base):
-    """Persistent VIP lifecycle decision and delivery audit trail."""
+    """Persistent VIP lifecycle delivery for one player session."""
 
     __tablename__ = "vip_lifecycle_deliveries"
     __table_args__ = (
@@ -766,6 +766,13 @@ class VipLifecycleDelivery(Base):
             "status_fingerprint",
             name="unique_vip_lifecycle_status_delivery",
         ),
+        UniqueConstraint(
+            "server_number",
+            "rule",
+            "player_session_id",
+            "test_mode",
+            name="unique_vip_lifecycle_delivery_session",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -774,6 +781,9 @@ class VipLifecycleDelivery(Base):
     rule: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     player_id_id: Mapped[int] = mapped_column(
         ForeignKey("steam_id_64.id"), nullable=False, index=True
+    )
+    player_session_id: Mapped[int | None] = mapped_column(
+        ForeignKey("player_sessions.id"), nullable=True, index=True
     )
     player_name: Mapped[str] = mapped_column(String, nullable=False)
     status_fingerprint: Mapped[str] = mapped_column(
@@ -795,6 +805,9 @@ class VipLifecycleDelivery(Base):
         TIMESTAMP(timezone=True),
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
+    )
+    last_attempt_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
     )
     sent_at: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True

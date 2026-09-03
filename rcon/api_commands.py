@@ -863,11 +863,24 @@ class RconAPI(Rcon):
         return preview(self, config.vip_lifecycle)
 
     def test_vip_lifecycle_message(
-        self, player_id: str, rule: str, by: str = ""
+        self,
+        player_id: str,
+        rule: str,
+        campaign: dict[str, Any] | None = None,
+        by: str = "",
     ) -> str:
         from rcon.vip_lifecycle import send_test_message
+        from rcon.user_config.auto_broadcast import VipLifecycleCampaign
 
         config = AutoBroadcastUserConfig.load_from_db()
+        if campaign is not None:
+            if not hasattr(config.vip_lifecycle.campaigns, rule):
+                raise ValueError("Unknown VIP lifecycle rule")
+            setattr(
+                config.vip_lifecycle.campaigns,
+                rule,
+                VipLifecycleCampaign.model_validate(campaign),
+            )
         return send_test_message(
             self,
             config.vip_lifecycle,

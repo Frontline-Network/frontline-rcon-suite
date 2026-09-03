@@ -6312,23 +6312,24 @@ Object.assign(en.dashboard, {
 en.settings.campaigns.vipLifecycle = {
   title: "VIP lifecycle",
   subtitle:
-    "Send personal notices based on verification, free trial, and purchase status.",
+    "Four direct campaigns selected by VIP status – once per player session.",
   testMode: "Test mode",
   testModeHelp:
     "Test mode records audiences and delivery logs without sending automatic player messages. A manually triggered test message is still sent to the selected player.",
   serverFamily: "Target server family",
   expiryWindow: "Expiry notice window (hours)",
-  unverifiedCooldown: "Unverified cooldown (days)",
   cacheSeconds: "Status cache (seconds)",
   message: "Personal in-game message",
+  oncePerSession: "Once per session",
   previewTitle: "Audience preview",
   previewHelp:
-    "Checks all currently connected players in one authenticated VIP API request. Nothing is sent.",
+    "Checks VIP status, session time, player count, and seeding pause for every connected player. Nothing is sent.",
   previewAction: "Check audience",
   targetCount_one: "{{count}} player would receive a message.",
   targetCount_other: "{{count}} players would receive a message.",
   unknownStatus: "Status could not be determined safely",
   blocked: "Blocked – no delivery",
+  notEligible: "Currently paused or waiting time not reached",
   noMessage: "No message",
   familyMismatch:
     "The selected server family does not match this game server. Nothing will be sent.",
@@ -6337,7 +6338,7 @@ en.settings.campaigns.vipLifecycle = {
   previewFailed: "The audience could not be determined: {{message}}",
   testTitle: "Targeted test message",
   testHelp:
-    "Deliberately sends the selected text to one connected, non-blocked player. It does not consume regular delivery state.",
+    "Deliberately sends the selected status campaign to one connected, non-blocked player. It does not consume regular session delivery state.",
   testPlayer: "Online player",
   testRule: "Message type",
   loadPlayers: "Load players",
@@ -6346,7 +6347,7 @@ en.settings.campaigns.vipLifecycle = {
   testFailed: "The test message could not be sent: {{message}}",
   playersFailed: "Online players could not be loaded: {{message}}",
   logTitle: "Delivery log",
-  logHelp: "Player ID, rule, timestamp, and result of recent lifecycle checks.",
+  logHelp: "Player ID, status campaign, session, timestamp, and result of recent deliveries.",
   logFailed: "The delivery log could not be loaded: {{message}}",
   noLog: "No lifecycle checks have been logged yet.",
   rules: {
@@ -6354,25 +6355,21 @@ en.settings.campaigns.vipLifecycle = {
       title: "Not verified",
       description:
         "The player identity is not linked to an FLN account for this server family.",
-      limit: "At most every 7 days",
     },
     trial_active: {
       title: "Free VIP active",
       description:
         "The free period is active beyond the configured expiry window.",
-      limit: "Once per free period",
     },
     trial_expiring: {
       title: "Free VIP ending soon",
       description:
         "The free period expires inside the configured notice window.",
-      limit: "Once in the window",
     },
     trial_expired: {
       title: "Free VIP expired",
       description:
         "The free period ended and there has been no paid VIP purchase.",
-      limit: "Once after expiry",
     },
   },
   deliveryStatus: {

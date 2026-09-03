@@ -58,27 +58,58 @@ const createCampaign = (index = 0) => ({
   recipient_group: "all",
 });
 
+const VIP_LIFECYCLE_DEFAULT_MESSAGES = {
+  unverified:
+    "Du kannst einmalig kostenlos VIP freischalten und erhältst damit bevorzugten Zugang bei voller Warteschlange. Weitere Informationen: fln.gg/vip",
+  trial_active:
+    "Dein kostenloser VIP-Zugang ist aktiv. Die verbleibende Laufzeit findest du in deinem Konto unter fln.gg/mein-konto",
+  trial_expiring:
+    "Dein kostenloser VIP-Zugang endet bald. Deine Laufzeit und Verlängerungsmöglichkeiten findest du unter fln.gg/mein-konto",
+  trial_expired:
+    "Dein kostenloser VIP-Zugang ist abgelaufen. Wenn du VIP weiter nutzen möchtest, findest du die verfügbaren Laufzeiten unter fln.gg/vip",
+};
+
+const createVipLifecycleCampaign = (message) => ({
+  enabled: true,
+  message,
+  min_session_minutes: 5,
+  min_players: 0,
+  max_players: 100,
+  pause_during_seeding: false,
+});
+
 const createVipLifecycleConfig = () => ({
   enabled: false,
   server_family: "hll_vietnam",
   expiry_window_hours: 48,
-  unverified_cooldown_days: 7,
   status_cache_seconds: 60,
   test_mode: false,
-  messages: {
-    unverified:
-      "Volle Server? Sichere dir einmalig 7 Tage VIP gratis – bevorzugter Zugang, kein Abo: fln.gg/vip",
-    trial_active:
-      "Mit VIP kommst du bei vollen Servern bevorzugt in die Warteschlange. Deine Laufzeit und Angebote findest du unter fln.gg/vip",
-    trial_expiring:
-      "Dein Gratis-VIP endet bald – verlängere ab 4,99 € für 30 Tage. Kein Abo: fln.gg/vip",
-    trial_expired:
-      "Dein Gratis-VIP ist abgelaufen. Vietnam-VIP gibt es für 30, 90, 180 oder 365 Tage – ohne Abo: fln.gg/vip",
-  },
+  campaigns: Object.fromEntries(
+    Object.entries(VIP_LIFECYCLE_DEFAULT_MESSAGES).map(([rule, message]) => [
+      rule,
+      createVipLifecycleCampaign(message),
+    ])
+  ),
 });
 
 const normalizeConfig = (config) => {
   const lifecycleDefaults = createVipLifecycleConfig();
+  const lifecycleConfig = config?.vip_lifecycle ?? {};
+  const lifecycleSettings = { ...lifecycleConfig };
+  delete lifecycleSettings.messages;
+  const lifecycleCampaigns = Object.fromEntries(
+    Object.entries(lifecycleDefaults.campaigns).map(([rule, defaults]) => [
+      rule,
+      {
+        ...defaults,
+        ...(lifecycleConfig.campaigns?.[rule] ?? {}),
+        message:
+          lifecycleConfig.campaigns?.[rule]?.message ??
+          lifecycleConfig.messages?.[rule] ??
+          defaults.message,
+      },
+    ])
+  );
   return {
     enabled: Boolean(config?.enabled),
     randomize: Boolean(config?.randomize),
@@ -88,11 +119,8 @@ const normalizeConfig = (config) => {
     player_message_gap_sec: Number(config?.player_message_gap_sec ?? 300),
     vip_lifecycle: {
       ...lifecycleDefaults,
-      ...(config?.vip_lifecycle ?? {}),
-      messages: {
-        ...lifecycleDefaults.messages,
-        ...(config?.vip_lifecycle?.messages ?? {}),
-      },
+      ...lifecycleSettings,
+      campaigns: lifecycleCampaigns,
     },
     messages: (config?.messages ?? []).map((campaign, index) => ({
       ...createCampaign(index),
@@ -587,12 +615,16 @@ const BroadcastCampaignPage = () => {
     (!lifecycleAvailable ||
       (config.vip_lifecycle.expiry_window_hours >= 1 &&
         config.vip_lifecycle.expiry_window_hours <= 168 &&
-        config.vip_lifecycle.unverified_cooldown_days >= 1 &&
-        config.vip_lifecycle.unverified_cooldown_days <= 90 &&
         config.vip_lifecycle.status_cache_seconds >= 30 &&
         config.vip_lifecycle.status_cache_seconds <= 900 &&
-        Object.values(config.vip_lifecycle.messages).every((message) =>
-          message.trim()
+        Object.values(config.vip_lifecycle.campaigns).every(
+          (campaign) =>
+            (!campaign.enabled || campaign.message.trim()) &&
+            campaign.min_session_minutes >= 1 &&
+            campaign.min_session_minutes <= 1440 &&
+            campaign.min_players >= 0 &&
+            campaign.max_players <= 100 &&
+            campaign.min_players <= campaign.max_players
         )));
   const saving = navigation.state === "submitting";
 
