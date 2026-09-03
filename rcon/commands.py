@@ -270,10 +270,16 @@ class ServerCtl:
             logger.debug("using passed in connection")
             connection = nullcontext(enter_result=conn)
 
+        log_content = content
+        if command == "MessagePlayer" and isinstance(content, dict):
+            log_content = dict(content)
+            if "Message" in log_content:
+                log_content["Message"] = "[redacted]"
+
         if log_info:
-            logger.info("Sending command: %s %r", command, content)
+            logger.info("Sending command: %s %r", command, log_content)
         else:
-            logger.debug("Sending command: %s %r", command, content)
+            logger.debug("Sending command: %s %r", command, log_content)
 
         self.perf_stats.increment("send")
         self.perf_stats.increment("send_size", len(content))
