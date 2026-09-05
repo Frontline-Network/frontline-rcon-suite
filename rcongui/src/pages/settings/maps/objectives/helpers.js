@@ -1,5 +1,5 @@
 import zip from "lodash/zip";
-import { getMapIconSrc } from "@/utils/map-images.mjs";
+import { getMapIconSrc, getTacticalMapImageSrc } from "@/utils/map-images.mjs";
 
 // a little function to help us with reordering the result
 export const reorder = (list, startIndex, endIndex) => {
@@ -49,10 +49,8 @@ export const generateObjectivesGrid = (orientation) => {
     });
 };
 
-export const getMapLayerImageSrc = (mapLayer) =>
-  getMapIconSrc(mapLayer);
-export const getTacMapImageSrc = (mapLayer) =>
-  `/tac-maps/${mapLayer.map.id ?? mapLayer.map.name}.webp`;
+export const getMapLayerImageSrc = (mapLayer) => getMapIconSrc(mapLayer);
+export const getTacMapImageSrc = (mapLayer) => getTacticalMapImageSrc(mapLayer);
 export const isNotSupportedGameMode = (mapLayer) =>
   unifiedGamemodeName(mapLayer.game_mode) === "skirmish";
 
