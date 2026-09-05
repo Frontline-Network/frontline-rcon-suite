@@ -36,6 +36,7 @@ if not os.getenv("HLL_MAINTENANCE_CONTAINER") and not os.getenv(
         path("accounts/", include("django.contrib.auth.urls")),
         path("api/", include("api.urls")),
         path("api/v1/", include("api.capability_urls")),
+        path("api/live-map/v1/", include("api.live_map")),
         path("api/mobile/v1/", include("api.mobile_urls")),
         path("api/discord/v1/", include("api.discord_urls")),
         path("api/logs/", list_logs),

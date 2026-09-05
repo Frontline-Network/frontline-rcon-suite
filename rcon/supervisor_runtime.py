@@ -123,7 +123,13 @@ def _run_broadcasts(stop_event: threading.Event) -> None:
     broadcast.run(stop_event=stop_event)
 
 
+def _run_live_map(stop_event: threading.Event) -> None:
+    from rcon.live_map.service import run
+    run(stop_event)
+
+
 DEFAULT_SERVICES: tuple[ServiceSpec, ...] = (
+    ServiceSpec("live_map", _run_live_map),
     ServiceSpec("expiring_vips", _run_expiring_vips),
     ServiceSpec("live_stats_refresh", _run_live_stats),
     ServiceSpec("autobalancer", _run_autobalancer),

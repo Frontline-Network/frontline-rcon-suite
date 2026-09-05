@@ -425,7 +425,7 @@ def get_connection_info(request):
 
 @csrf_exempt
 @login_required()
-@permission_required("api.can_run_raw_commands", raise_exception=True)
+@permission_required(["api.can_run_raw_commands", "api.can_view_live_map"], raise_exception=True)
 # Specifically allow GET requests because some raw commands are very simple
 # and can be used with query parameters in your browser
 @require_http_methods(["GET", "POST"])

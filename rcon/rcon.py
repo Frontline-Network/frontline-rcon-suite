@@ -311,6 +311,12 @@ class Rcon(ServerCtl):
 
         return [p for p in players.values()]
 
+    @ttl_cache(ttl=2, cache_falsy=False)
+    def get_raw_player_snapshot(self) -> dict:
+        """One bulk sample shared by roster consumers and the tactical collector."""
+        rows = super().get_all_player_info()
+        return {"captured_at": datetime.now(timezone.utc).timestamp(), "players": rows}
+
     def get_all_player_info(self) -> list[CanonicalPlayerInfo]:
         """Expose only validated, game-neutral player DTOs above the RCON boundary."""
         adapter = self.game_profile.player_adapter
@@ -318,7 +324,7 @@ class Rcon(ServerCtl):
             raise RuntimeError(f"No player adapter configured for {self.config.game!r}")
 
         players: list[CanonicalPlayerInfo] = []
-        for raw in super().get_all_player_info():
+        for raw in self.get_raw_player_snapshot()["players"]:
             try:
                 players.append(adapter.adapt(raw))
             except PlayerResponseAdapterError as exc:
