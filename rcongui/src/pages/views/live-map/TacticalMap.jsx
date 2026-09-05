@@ -3,6 +3,7 @@ import { Box, Button, Stack, Typography, useTheme } from "@mui/material";
 import { getThemeTeamColor } from "@/themes/teamColors";
 import { getTacticalMapImageSrc } from "@/utils/map-images.mjs";
 import { projectionReady } from "./geometry.mjs";
+import { pointerOnMap, wheelZoomFactor, zoomCamera } from "./interaction.mjs";
 
 export default function TacticalMap({
   frame,
@@ -10,20 +11,43 @@ export default function TacticalMap({
   selected,
   following,
   onSelect,
+  onManualNavigate,
   trails,
-  showNames,
   showPlayers,
   encounter,
   t,
 }) {
   const theme = useTheme();
   const [camera, setCamera] = useState({ x: 0, y: 0, scale: 1 });
+  const [isDragging, setIsDragging] = useState(false);
   const drag = useRef(null);
   const svg = useRef(null);
   const mapId = frame?.map?.id;
   useEffect(() => {
+    drag.current = null;
+    setIsDragging(false);
     setCamera({ x: 0, y: 0, scale: 1 });
   }, [mapId]);
+  useEffect(() => {
+    const element = svg.current;
+    const onWheel = (event) => {
+      const anchor = pointerOnMap(element, event.clientX, event.clientY);
+      if (!anchor || !event.deltaY) return;
+      event.preventDefault();
+      onManualNavigate();
+      setCamera((c) =>
+        zoomCamera(
+          c,
+          wheelZoomFactor(event.deltaY, event.deltaMode, element.clientHeight),
+          anchor
+        )
+      );
+    };
+    // React's delegated wheel handler can be passive. This listener must be
+    // non-passive so zooming the map never also scrolls the page underneath it.
+    element.addEventListener("wheel", onWheel, { passive: false });
+    return () => element.removeEventListener("wheel", onWheel);
+  }, [onManualNavigate]);
   const target = players.find((p) => p.player_id === selected)?.map_position;
   useEffect(() => {
     if (following && target)
@@ -39,23 +63,57 @@ export default function TacticalMap({
       ? encounter.map_position
       : null;
   const image = getTacticalMapImageSrc(frame?.map);
-  const zoom = (factor) =>
-    setCamera((c) => {
-      const scale = Math.max(1, Math.min(8, c.scale * factor));
-      return {
-        scale,
-        x: 0.5 - ((0.5 - c.x) * scale) / c.scale,
-        y: 0.5 - ((0.5 - c.y) * scale) / c.scale,
-      };
-    });
+  const zoom = (factor) => {
+    onManualNavigate();
+    setCamera((c) => zoomCamera(c, factor));
+  };
+  const onDown = (e) => {
+    if (!e.isPrimary || ![0, 1].includes(e.button) || drag.current) return;
+    const point = pointerOnMap(svg.current, e.clientX, e.clientY);
+    if (!point) return;
+    drag.current = {
+      id: e.pointerId,
+      button: e.button,
+      startX: e.clientX,
+      startY: e.clientY,
+      point,
+      moved: false,
+      playerId: e.target.closest("[data-player-id]")?.dataset.playerId,
+    };
+    setIsDragging(true);
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
   const onMove = (e) => {
-    if (!drag.current) return;
-    const rect = svg.current.getBoundingClientRect();
-    const size = Math.min(rect.width, rect.height);
-    const dx = (e.clientX - drag.current.x) / size;
-    const dy = (e.clientY - drag.current.y) / size;
+    const gesture = drag.current;
+    if (!gesture || gesture.id !== e.pointerId) return;
+    if (
+      !gesture.moved &&
+      Math.hypot(e.clientX - gesture.startX, e.clientY - gesture.startY) < 4
+    )
+      return;
+    const point = pointerOnMap(svg.current, e.clientX, e.clientY);
+    if (!point) return;
+    if (!gesture.moved) onManualNavigate();
+    gesture.moved = true;
+    const dx = point.x - gesture.point.x,
+      dy = point.y - gesture.point.y;
+    gesture.point = point;
     setCamera((c) => ({ ...c, x: c.x + dx, y: c.y + dy }));
-    drag.current = { x: e.clientX, y: e.clientY };
+  };
+  const endGesture = (e, cancelled = false) => {
+    const gesture = drag.current;
+    if (!gesture || gesture.id !== e.pointerId) return;
+    drag.current = null;
+    setIsDragging(false);
+    if (e.currentTarget.hasPointerCapture(e.pointerId))
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    if (
+      !cancelled &&
+      !gesture.moved &&
+      gesture.button === 0 &&
+      gesture.playerId
+    )
+      onSelect(gesture.playerId);
   };
   return (
     <Box
@@ -84,7 +142,10 @@ export default function TacticalMap({
         </Button>
         <Button
           size="small"
-          onClick={() => setCamera({ x: 0, y: 0, scale: 1 })}
+          onClick={() => {
+            onManualNavigate();
+            setCamera({ x: 0, y: 0, scale: 1 });
+          }}
         >
           {t("resetView")}
         </Button>
@@ -105,23 +166,18 @@ export default function TacticalMap({
           width: "100%",
           maxHeight: "72vh",
           touchAction: "none",
-          cursor: drag.current ? "grabbing" : "grab",
+          userSelect: "none",
+          cursor: isDragging ? "grabbing" : "grab",
         }}
-        onPointerDown={(e) => {
-          if (e.target === e.currentTarget || e.target.tagName === "image") {
-            drag.current = { x: e.clientX, y: e.clientY };
-            e.currentTarget.setPointerCapture(e.pointerId);
-          }
-        }}
+        onDragStart={(e) => e.preventDefault()}
+        onPointerDown={onDown}
         onPointerMove={onMove}
-        onPointerUp={() => {
-          drag.current = null;
-        }}
-        onPointerCancel={() => {
-          drag.current = null;
-        }}
+        onPointerUp={(e) => endGesture(e)}
+        onPointerCancel={(e) => endGesture(e, true)}
+        onLostPointerCapture={(e) => endGesture(e, true)}
       >
         <g
+          data-testid="map-camera"
           transform={`translate(${camera.x * 1000} ${camera.y * 1000}) scale(${
             camera.scale
           })`}
@@ -188,11 +244,16 @@ export default function TacticalMap({
                     })`}
                     role="button"
                     data-testid="player-map-marker"
+                    data-player-id={p.player_id}
                     tabIndex={0}
                     aria-label={`${p.name} · ${p.team} · ${p.unit_name || "–"}`}
                     aria-pressed={selected === p.player_id}
-                    style={{ cursor: "pointer" }}
-                    onClick={() => onSelect(p.player_id)}
+                    style={{ cursor: isDragging ? "grabbing" : "pointer" }}
+                    onClick={(e) => {
+                      // Pointer clicks are handled on release because pointer
+                      // capture retargets them to the SVG. Keep AT activation.
+                      if (e.detail === 0) onSelect(p.player_id);
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
@@ -200,9 +261,6 @@ export default function TacticalMap({
                       }
                     }}
                   >
-                    <title>{`${p.name} · ${p.role} · ${
-                      p.unit_name || "–"
-                    }`}</title>
                     {p.team === "axis" ? (
                       <path
                         d={`M 0 ${-size} L ${size} 0 L 0 ${size} L ${-size} 0 Z`}
@@ -218,9 +276,9 @@ export default function TacticalMap({
                         strokeWidth={2 / camera.scale}
                       />
                     )}
-                    {((showNames && camera.scale >= 2) ||
-                      selected === p.player_id) && (
+                    {selected === p.player_id && (
                       <text
+                        data-testid="player-map-name"
                         x={12 / camera.scale}
                         y={4 / camera.scale}
                         fill={theme.palette.common.white}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -67,10 +67,10 @@ export default function LiveMapPage() {
   const [search, setSearch] = useState("");
   const [team, setTeam] = useState("all");
   const [squad, setSquad] = useState("all");
-  const [showNames, setShowNames] = useState(true);
   const [showPlayers, setShowPlayers] = useState(true);
   const [showTrails, setShowTrails] = useState(true);
   const [following, setFollowing] = useState(false);
+  const stopFollowing = useCallback(() => setFollowing(false), []);
   const [scope, setScope] = useState("session");
   const [replay, setReplay] = useState(null);
   const [frames, setFrames] = useState([]);
@@ -573,15 +573,6 @@ export default function LiveMapPage() {
             <FormControlLabel
               control={
                 <Checkbox
-                  checked={showNames}
-                  onChange={(_, v) => setShowNames(v)}
-                />
-              }
-              label={t("names")}
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
                   checked={showTrails}
                   onChange={(_, v) => setShowTrails(v)}
                 />
@@ -596,8 +587,8 @@ export default function LiveMapPage() {
             selected={selected}
             following={following}
             onSelect={selectPlayer}
+            onManualNavigate={stopFollowing}
             trails={trails}
-            showNames={showNames}
             showPlayers={showPlayers}
             t={t}
           />
@@ -712,6 +703,7 @@ export default function LiveMapPage() {
                 <Stack direction="row" flexWrap="wrap" gap={1} sx={{ my: 1 }}>
                   <Button
                     variant={following ? "contained" : "outlined"}
+                    aria-pressed={following}
                     disabled={!selectedPlayer.map_position}
                     onClick={() => setFollowing(!following)}
                   >
