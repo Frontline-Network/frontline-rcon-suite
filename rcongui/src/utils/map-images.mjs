@@ -58,3 +58,16 @@ export const getMapImageSrc = (layer, fallback = null) => {
 
 export const getMapIconSrc = (layer, fallback = "unknown.webp") =>
   `/maps/icons/${resolveMapImageName(layer, fallback)}`;
+
+export const resolveTacticalMapImageName = (layer, fallback = null) => {
+  const hllvSuffix = getHllvImageSuffix(layer);
+  if (hllvSuffix) return `wdev_${hllvSuffix}.webp`;
+
+  const mapIdentifier = layer?.map?.id ?? layer?.map?.name;
+  return mapIdentifier ? `${mapIdentifier}.webp` : fallback;
+};
+
+export const getTacticalMapImageSrc = (layer, fallback = null) => {
+  const imageName = resolveTacticalMapImageName(layer, fallback);
+  return imageName ? `/tac-maps/${imageName}` : null;
+};

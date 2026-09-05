@@ -218,6 +218,7 @@ def test_hllv_legacy_catalog_preserves_historical_layer_metadata():
 def test_hllv_catalog_map_images_exist():
     map_images = Path("assets/images/maps")
     map_icons = map_images / "icons"
+    tactical_maps = Path("assets/images/tac-maps")
 
     expected_images = {
         HLLV_PROFILE.parse_layer(f"wdev{map_suffix}_warfare_day").image_name
@@ -234,6 +235,10 @@ def test_hllv_catalog_map_images_exist():
     }
     assert all((map_images / image_name).is_file() for image_name in expected_images)
     assert all((map_icons / image_name).is_file() for image_name in expected_images)
+    assert all(
+        (tactical_maps / f"wdev_{map_suffix}.webp").is_file()
+        for map_suffix in "abcdef"
+    )
 
 
 def test_hllv_legacy_alias_migrates_to_canonical_executable_layer():
