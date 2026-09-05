@@ -1,5 +1,12 @@
 export const copy = {
   de: {
+    receiving: "Live-Daten werden aktualisiert.",
+    connectionDelayed:
+      "Verbindung verzögert – letzter Messstand bleibt sichtbar.",
+    estimated: "Vorläufige Kartenabbildung",
+    estimatedHelp:
+      "Live-Positionen auf der anhand von Spielreferenzen ausgerichteten Karte. Genauigkeit noch nicht abschließend geprüft; keine meterbasierte Monitorbewertung.",
+    mapped: "Auf der Karte",
     viewEncounter: "Ort im Rückblick ansehen",
     gapBetween: "Abstand",
     calibrationTitle: "Kartenabbildung prüfen (Einrichtung)",
@@ -57,7 +64,7 @@ export const copy = {
     unknown: "Position unbekannt",
     uncalibrated: "Kartenabbildung noch nicht geprüft",
     uncalibratedHelp:
-      "Spielermarker und Laufwege werden erst nach bestätigter Kalibrierung eingeblendet.",
+      "Für diese Karte fehlt noch eine passende Positionsabbildung. Live-Koordinaten bleiben in den Spielerdetails verfügbar.",
     unavailable: "Vom Gameserver nicht verfügbar",
     garrisons: "Garnisonen / Outposts",
     objectHelp:
@@ -89,7 +96,8 @@ export const copy = {
     lastKnown: "Letzter bekannter Messpunkt",
     fresh: "Datenalter",
     seconds: "Sek.",
-    stale: "Veraltete Messung – keine aktuelle Live-Position",
+    stale:
+      "Messung verzögert – angezeigte Positionen sind der letzte bekannte Stand.",
     round: "Runde",
     time: "Zeitpunkt",
     zoomIn: "Vergrößern",
@@ -113,6 +121,12 @@ export const copy = {
     status: "Bearbeitungsstatus",
   },
   en: {
+    receiving: "Live data is updating.",
+    connectionDelayed: "Connection delayed — the last sample remains visible.",
+    estimated: "Provisional map projection",
+    estimatedHelp:
+      "Live positions on a map aligned using in-game references. Accuracy is not fully verified; no metre-based monitor assessment.",
+    mapped: "On the map",
     viewEncounter: "View location in replay",
     gapBetween: "apart",
     calibrationTitle: "Verify map projection (setup)",
@@ -169,7 +183,7 @@ export const copy = {
     unknown: "Position unknown",
     uncalibrated: "Map projection not verified",
     uncalibratedHelp:
-      "Player markers and trails become available after verified calibration.",
+      "A suitable projection is still missing for this map. Live coordinates remain available in player details.",
     unavailable: "Unavailable from game server",
     garrisons: "Garrisons / outposts",
     objectHelp:
@@ -200,7 +214,7 @@ export const copy = {
     lastKnown: "Last known sample",
     fresh: "Data age",
     seconds: "sec",
-    stale: "Stale sample — not a current live position",
+    stale: "Sample delayed — positions show the last known state.",
     round: "Round",
     time: "Time",
     zoomIn: "Zoom in",

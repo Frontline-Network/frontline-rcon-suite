@@ -11,6 +11,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from rcon.live_map import storage
 from rcon.live_map.domain import UNAVAILABLE, calibrate
+from rcon.live_map.projections import projection_ready
 from rcon.live_map.service import key, read_pending, read_snapshot
 from rcon.admin_incidents import IncidentConflict, IncidentNotFound
 from .auth import api_response, login_required
@@ -85,6 +86,7 @@ def capabilities(request):
               "positions": "observed" if snapshot and snapshot["quality"]["valid_positions"] else "not_observed",
               "objects": {k: {"available": False, "reason": UNAVAILABLE} for k in ("positions", "losses", "actors")},
               "calibrated": bool(snapshot and snapshot.get("calibration", {}) and snapshot["calibration"].get("verified")),
+              "display_ready": projection_ready((snapshot or {}).get("calibration")),
               "permissions": {"manage": request.user.has_perm(MANAGE), "cases": request.user.has_perm(CASES)},
               "retention_hours": 24, "case_retention_days": 30}
     audit(request, "open", server)
@@ -100,7 +102,7 @@ def snapshot(request):
     frame = read_snapshot(red, server)
     if frame:
         frame["age_seconds"] = max(0, time.time() - frame["captured_at"])
-        frame["stale"] = frame["age_seconds"] > max(6, frame["collector_interval"] * 3)
+        frame["stale"] = frame["age_seconds"] > max(12, frame["collector_interval"] * 3 + 2)
         if not settings["monitor_enabled"]:
             frame["signals"] = []
         statuses = storage.review_statuses(server)

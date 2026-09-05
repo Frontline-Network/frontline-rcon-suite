@@ -1,6 +1,26 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { filterPlayers, frameAt, trailSegments } from "./geometry.mjs";
+import {
+  filterPlayers,
+  frameAt,
+  trailSegments,
+  projectionReady,
+} from "./geometry.mjs";
+
+test("provisional rendering is explicit and distinct from verified calibration", () => {
+  assert.equal(projectionReady(null), false);
+  assert.equal(projectionReady({ verified: false }), false);
+  assert.equal(projectionReady({ display_ready: true }), false);
+  assert.equal(projectionReady({ verified: true }), true);
+  assert.equal(
+    projectionReady({
+      verified: false,
+      display_ready: true,
+      quality: "estimated",
+    }),
+    true
+  );
+});
 
 const f = (time, segment, point = { x: 0.1, y: 0.2 }, round = "r") => ({
   captured_at: time,

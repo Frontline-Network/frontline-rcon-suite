@@ -11,6 +11,7 @@ let monitors = [
   },
 ];
 const reviews = {};
+let snapshotCount = 0;
 function frame(time) {
   const uncalibrated =
     new URLSearchParams(window.location.search).get("tacticalScenario") ===
@@ -39,6 +40,7 @@ function frame(time) {
     game: "hllv",
     round_id: roundId,
     captured_at: time,
+    age_seconds: 0,
     map: {
       id: "wdeve_warfare_day",
       pretty_name: "Cam Ranh Port · Warfare",
@@ -94,7 +96,27 @@ export async function demoRequest(path, data, method) {
     };
   if (url.pathname === "/settings") return Object.assign(config, data);
   if (url.pathname === "/snapshot") {
-    const f = frame(time);
+    const scenario = new URLSearchParams(window.location.search).get(
+      "tacticalScenario"
+    );
+    const ages = [1, 1, 1, 8, 20, 20, 8, 1];
+    const age =
+      scenario === "stale-recovery"
+        ? ages[Math.min(snapshotCount++, ages.length - 1)]
+        : 0;
+    const f = frame(time - age);
+    f.age_seconds = age;
+    if (scenario === "estimated") {
+      f.calibration = {
+        verified: false,
+        display_ready: true,
+        quality: "estimated",
+        units_per_meter: null,
+      };
+      f.players.forEach((p) => {
+        p.position_m = null;
+      });
+    }
     f.signals = config.monitor_enabled && monitors.length ? [signal(time)] : [];
     return { enabled: config.enabled, snapshot: config.enabled ? f : null };
   }

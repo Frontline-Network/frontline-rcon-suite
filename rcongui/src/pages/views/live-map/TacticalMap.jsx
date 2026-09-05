@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Box, Button, Stack, Typography, useTheme } from "@mui/material";
 import { getThemeTeamColor } from "@/themes/teamColors";
 import { getTacticalMapImageSrc } from "@/utils/map-images.mjs";
+import { projectionReady } from "./geometry.mjs";
 
 export default function TacticalMap({
   frame,
@@ -32,7 +33,8 @@ export default function TacticalMap({
         y: 0.5 - target.y * c.scale,
       }));
   }, [following, target?.x, target?.y]);
-  const calibrated = Boolean(frame?.calibration?.verified);
+  const calibrated = projectionReady(frame?.calibration);
+  const estimated = calibrated && frame?.calibration?.quality === "estimated";
   const encounterPoint =
     calibrated && encounter?.round_id === frame?.round_id
       ? encounter.map_position
@@ -94,6 +96,24 @@ export default function TacticalMap({
           {Math.round(camera.scale * 100)} %
         </Typography>
       </Stack>
+      {estimated && (
+        <Box
+          sx={{
+            px: 1.5,
+            py: 1,
+            borderBottom: 1,
+            borderColor: "divider",
+            bgcolor: "background.paper",
+          }}
+        >
+          <Typography variant="body2" fontWeight={700} color="warning.main">
+            {t("estimated")}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {t("estimatedHelp")}
+          </Typography>
+        </Box>
+      )}
       <svg
         ref={svg}
         viewBox="0 0 1000 1000"
@@ -186,6 +206,7 @@ export default function TacticalMap({
                       p.map_position.y * 1000
                     })`}
                     role="button"
+                    data-testid="player-map-marker"
                     tabIndex={0}
                     aria-label={`${p.name} · ${p.team} · ${p.unit_name || "–"}`}
                     aria-pressed={selected === p.player_id}

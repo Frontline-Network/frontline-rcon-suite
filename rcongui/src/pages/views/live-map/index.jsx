@@ -33,7 +33,7 @@ import CalibrationPanel from "./CalibrationPanel";
 import { liveMapRequest, canUse } from "./api";
 import { filterPlayers, frameAt, trailSegments } from "./geometry.mjs";
 import { copy } from "./copy";
-import { tacticalPollInterval } from "./polling.mjs";
+import { tacticalPollInterval, sampleAge, sampleIsStale } from "./polling.mjs";
 
 const ACTIONS = generatePlayerActions({
   multiAction: false,
@@ -83,7 +83,8 @@ export default function LiveMapPage() {
   const [historyRound, setHistoryRound] = useState("");
   const [savedSignal, setSavedSignal] = useState(null);
   const [focusedEncounter, setFocusedEncounter] = useState(null);
-  const [clock, setClock] = useState(Date.now() / 1000);
+  const [clock, setClock] = useState(performance.now() / 1000);
+  const [wasStale, setWasStale] = useState(false);
   const options = {
     enabled: allowed,
     retry: false,
@@ -102,7 +103,21 @@ export default function LiveMapPage() {
     ...options,
     enabled: allowed && !denied && capabilities.data?.enabled === true,
     queryKey: [...queryKey, "snapshot"],
-    queryFn: () => liveMapRequest("snapshot"),
+    queryFn: async () => {
+      const started = performance.now() / 1000;
+      const result = await liveMapRequest("snapshot");
+      const received = performance.now() / 1000;
+      return {
+        ...result,
+        snapshot: result.snapshot
+          ? {
+              ...result.snapshot,
+              received_at_monotonic: received,
+              transport_seconds: received - started,
+            }
+          : null,
+      };
+    },
     refetchInterval: (q) =>
       tacticalPollInterval(
         q,
@@ -154,7 +169,7 @@ export default function LiveMapPage() {
   });
 
   useEffect(() => {
-    const timer = setInterval(() => setClock(Date.now() / 1000), 1000);
+    const timer = setInterval(() => setClock(performance.now() / 1000), 1000);
     return () => clearInterval(timer);
   }, []);
   useEffect(() => {
@@ -165,7 +180,14 @@ export default function LiveMapPage() {
       client.removeQueries({ queryKey });
     }
   }, [forbidden]);
-  const current = capabilities.data?.enabled ? live.data?.snapshot : null;
+  // Keep the last dated sample during a temporary empty response. This keeps
+  // the camera and selection stable; age/action guards still disable actions.
+  const current = capabilities.data?.enabled
+    ? live.data?.snapshot ?? liveFrames.at(-1) ?? null
+    : null;
+  useEffect(() => {
+    if (capabilities.data?.enabled === false) setLiveFrames([]);
+  }, [capabilities.data?.enabled]);
   useEffect(() => {
     if (
       capabilities.data?.permissions.cases === false ||
@@ -249,7 +271,12 @@ export default function LiveMapPage() {
   const canCases =
     canUse(permissions, "can_view_live_map_cases") &&
     capabilities.data?.permissions.cases === true;
-  const age = frame ? Math.max(0, clock - frame.captured_at) : null;
+  const age = frame && replay === null ? sampleAge(frame, clock) : null;
+  const stale =
+    replay === null &&
+    Boolean(current) &&
+    sampleIsStale(age, current.collector_interval, wasStale);
+  useEffect(() => setWasStale(stale), [stale]);
   const actionable =
     replay === null &&
     current &&
@@ -336,11 +363,6 @@ export default function LiveMapPage() {
         eyebrow={t("group")}
       />
       {isFakeMode() && <Alert severity="info">{t("demo")}</Alert>}
-      {(capabilities.error || live.error) && (
-        <Alert severity="error">
-          {(capabilities.error || live.error).message}
-        </Alert>
-      )}
       {notice && (
         <Alert
           severity={notice.severity}
@@ -374,8 +396,12 @@ export default function LiveMapPage() {
             : t("collecting")}
         </Typography>
         {replay === null && age !== null && (
-          <Typography variant="body2">
-            {t("fresh")}: {Math.floor(age)} {t("seconds")}
+          <Typography
+            variant="body2"
+            sx={{ minWidth: "18ch", fontVariantNumeric: "tabular-nums" }}
+          >
+            {t("fresh")}: {Number.isFinite(age) ? Math.floor(age) : "–"}{" "}
+            {t("seconds")}
           </Typography>
         )}
         {canManage && (
@@ -410,19 +436,52 @@ export default function LiveMapPage() {
           </Stack>
         )}
       </Stack>
-      {!capabilities.data?.enabled && (
-        <Alert severity="info" sx={{ mb: 1 }}>
-          {t("disabled")}
-        </Alert>
-      )}
-      {replay === null &&
-        current &&
-        age > Math.max(6, current.collector_interval * 3) && (
-          <Alert severity="warning">{t("stale")}</Alert>
-        )}
-      {current?.quality?.round_confirmed === false && (
-        <Alert severity="info">{t("roundUnknown")}</Alert>
-      )}
+      <Box
+        data-testid="live-map-status"
+        role="status"
+        aria-live="polite"
+        sx={{
+          ...panel,
+          height: 44,
+          boxSizing: "border-box",
+          px: 1.5,
+          mb: 1.5,
+          display: "flex",
+          alignItems: "center",
+          overflow: "hidden",
+        }}
+      >
+        <Typography
+          variant="body2"
+          noWrap
+          color={
+            capabilities.error || live.error
+              ? "error.main"
+              : stale
+              ? "warning.main"
+              : "text.secondary"
+          }
+          title={
+            capabilities.error || live.error
+              ? (capabilities.error || live.error).message
+              : undefined
+          }
+        >
+          {capabilities.error || live.error
+            ? t("connectionDelayed")
+            : replay !== null
+            ? t("replay")
+            : !capabilities.data?.enabled
+            ? t("disabled")
+            : !current
+            ? t("collecting")
+            : stale
+            ? t("stale")
+            : current.quality?.round_confirmed === false
+            ? t("roundUnknown")
+            : t("receiving")}
+        </Typography>
+      </Box>
       {mobile && (
         <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="fullWidth">
           <Tab label={t("map")} />
@@ -528,11 +587,6 @@ export default function LiveMapPage() {
                 />
               }
               label={t("trails")}
-            />
-            <FormControlLabel
-              disabled
-              control={<Checkbox checked={false} />}
-              label={t("garrisons")}
             />
           </Stack>
           <TacticalMap
@@ -717,6 +771,10 @@ export default function LiveMapPage() {
             <Typography sx={{ px: 1.5 }} variant="caption">
               {t("quality")}: {frame?.quality?.valid_positions ?? 0}/
               {players.length}
+            </Typography>
+            <Typography sx={{ px: 1.5 }} variant="caption" display="block">
+              {t("mapped")}: {visible.filter((p) => p.map_position).length}/
+              {visible.length}
             </Typography>
             <Box sx={{ maxHeight: 240, overflowY: "auto" }}>
               {!visible.length && (
@@ -966,11 +1024,6 @@ export default function LiveMapPage() {
               ))}
             </Box>
           )}
-          <Box sx={{ ...panel, p: 1.5 }}>
-            <Typography fontWeight={800}>{t("garrisons")}</Typography>
-            <Typography color="text.secondary">{t("unavailable")}</Typography>
-            <Typography variant="caption">{t("objectHelp")}</Typography>
-          </Box>
         </Box>
       </Box>
     </Box>

@@ -5,6 +5,7 @@ import hashlib
 import json
 import math
 from collections import defaultdict
+from rcon.live_map.projections import projection_ready
 
 RULE_VERSION = "1"
 WINDOW_SECONDS = 900
@@ -31,7 +32,7 @@ def distance(a, b):
 
 
 def project(point, calibration):
-    if point is None or not calibration or not calibration.get("verified"):
+    if point is None or not projection_ready(calibration):
         return None
     a, b, c, d, e, f = calibration["matrix"]
     x, y = point["x"], point["y"]
@@ -91,7 +92,7 @@ def calibrate(points, checks, units_per_meter, source):
             "max_error_m": max(errors), "source": str(source)[:1000], "anchors": points, "checks": checks}
 
 
-def segment_break(previous, current, previous_time, current_time, units_per_meter=None):
+def segment_break(previous, current, previous_time, current_time, units_per_meter=None, display_only=False):
     if not previous or not current.get("position_valid") or not previous.get("position_valid"):
         return True
     elapsed = current_time - previous_time
@@ -101,6 +102,11 @@ def segment_break(previous, current, previous_time, current_time, units_per_mete
         return True
     if units_per_meter:
         return distance(previous["position"], current["position"]) / units_per_meter > max(150, elapsed * 100)
+    if display_only:
+        a, b = previous.get("map_position"), current.get("map_position")
+        # Only a visual trace: cut jumps above 10% of an image edge (or 5%/s).
+        # No physical distance or movement-speed claim is derived from this.
+        return not a or not b or distance(a, b) > max(.1, elapsed * .05)
     # Without a validated scale no trajectory is advertised as continuous.
     return True
 

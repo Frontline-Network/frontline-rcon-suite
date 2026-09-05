@@ -1,3 +1,12 @@
+export function projectionReady(calibration) {
+  return Boolean(
+    calibration &&
+      (calibration.verified === true ||
+        (calibration.display_ready === true &&
+          calibration.quality === "estimated"))
+  );
+}
+
 export function filterPlayers(players, search, team, squad) {
   const needle = search.toLocaleLowerCase();
   return players.filter(

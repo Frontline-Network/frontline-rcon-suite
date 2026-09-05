@@ -2,9 +2,23 @@
 
 ## Stand und Freigabegrenzen
 
-Implementierung auf `codex/live-map-player-protection`, Basis v0.6.3. Noch **kein Release und keine Aktivierung auf den Gameservern**. Beide Schalter sind für jede Instanz standardmäßig aus. Die Browser-Demo ist ausdrücklich synthetisch und wird niemals als Live-Fallback verwendet.
+Implementierung auf `codex/live-map-player-protection`, Basis v0.6.3; PR #237 als separater Teststand auf RCON3, noch kein reguläres Release. Beide Schalter sind für neue Instanzen standardmäßig aus. Die Browser-Demo ist ausdrücklich synthetisch und wird niemals als Live-Fallback verwendet.
 
-Die Seite `/views/live-map` liegt unter **Live-Betrieb → Live-Karte**. Sie verwendet die vorhandenen taktischen Kartenbilder, einschließlich der sechs HLLV-Karten, und die Theme-/Farbenblindheitsfarben. Eine existierende Bilddatei ist keine bestätigte Weltkoordinaten-Abbildung: Ohne geprüfte Referenzen bleiben Marker und Laufwege verborgen.
+Die Seite `/views/live-map` liegt unter **Live-Betrieb → Live-Karte**. Sie verwendet die vorhandenen taktischen Kartenbilder, einschließlich der sechs HLLV-Karten, und die Theme-/Farbenblindheitsfarben. Eine existierende Bilddatei ist keine bestätigte Weltkoordinaten-Abbildung. Anzeigequalität und metrische Beweisqualität werden getrennt behandelt.
+
+### Nutzbarer Testbetrieb: vorläufige Anzeige
+
+Auf Wunsch des Betreibers ist für Quảng Ngãi (`wdev_b`) und Thanh Hóa (`wdev_f`) eine **vorläufige Kartenabbildung** verfügbar. Grundlage sind stationär erfasste Weltpositionen und die dazugehörigen Spiel-Screenshots vom 5. September 2026. Die nordorientierte Anzeige verwendet vorläufig X/Y −100000 bis +100000 über das gesamte Bild, X nach rechts, Y nach unten. Quảng Ngãi wurde anhand F4/G3 und einer getrennten G4-Halbinselreferenz verglichen; Thanh Hóa anhand C8/C7. Die Bilder aus dem Spielarchiv und die vorhandenen taktischen Bilder zeigen korrespondierende Fluss-/Straßenverläufe.
+
+Das ist eine aus Referenzen abgeleitete **Display-Annahme**, keine ausgelesene Engine-Kartengrenze und keine nachgewiesene Zehn-Meter-Kalibrierung. Für diese Abbildung gelten `verified: false`, `display_ready: true`, `quality: estimated`, `units_per_meter: null`. Die Oberfläche kennzeichnet sie dauerhaft. Spieler können ausgewählt und verfolgt werden; Laufwege sind nur visuelle Verläufe. Große Sprünge (>10 % einer Bildkante bzw. >5 % pro Sekunde), Tod, Sitzungs-/Teamwechsel, fehlende Positionen und Lücken >12 s unterbrechen sie. Positionen außerhalb des Bildes werden nicht an den Rand geklemmt. Unabhängig von dieser Anzeige bleiben `position_m` und damit meterbasierte Monitor-Eskalationen gesperrt.
+
+Andere Karten erhalten **keine ungeprüfte Kopie dieser Abbildung**. Deren Bilder können angezeigt werden, Marker benötigen eigene Referenzen. Explizit gespeicherte Betreiberkalibrierungen haben immer Vorrang. Die strenge Kalibrierungs-API mit drei Referenzen, zwei unabhängigen Prüfungen und maximal zehn Metern Fehler bleibt unverändert.
+
+Garnisonen-/Outpost-Platzhalter und die funktionslose Checkbox sind aus der Benutzeroberfläche entfernt. Die API meldet die nicht verfügbaren Objektfähigkeiten weiterhin ehrlich als nicht verfügbar.
+
+### Ruhige Aktualisierung
+
+Ein fester Statusstreifen ersetzt ein- und ausblendende Veraltet-/Verbindungsbanner. Das Alter basiert auf der serverseitigen Altersangabe plus lokaler monotoner Zeit seit Empfang; die Browser-Wanduhr wird nicht mit der Server-Wanduhr verglichen. Die Verzögerungswarnung beginnt nach `max(12 s, 3 × Sammlerintervall + 2 s)` und verschwindet erst mit einem frischen Messstand innerhalb `max(4 s, 2 × Intervall)`. Das verhindert Flackern an der Warnschwelle. Bestehende strengere Altersgrenzen für Moderationsaktionen bleiben erhalten. Bei vorübergehend leeren Antworten bleibt der letzte datierte Messstand sichtbar; Kamera/Zoom werden nicht zurückgesetzt. Rechteentzug und ausgeschaltete Erfassung werden weiterhin respektiert.
 
 ### Lesende Datenprüfung vom 5. September 2026
 

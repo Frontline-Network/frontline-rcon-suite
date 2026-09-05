@@ -7,6 +7,7 @@ from collections import deque
 
 from rcon.live_map import storage
 from rcon.live_map.domain import evaluate_encounters, normalize_event, observed_death_totals, position, project, segment_break
+from rcon.live_map.projections import display_projection, projection_ready
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ def capture(api, server, previous, settings):
             or map_history.get("name") != layer_id or map_history.get("end") is not None):
         round_start = None
     round_id = f"{server}:{game}:{layer_id}:{round_start or 'unknown'}"
-    calibration = settings["calibrations"].get(f"{game}:{map_data['map']['id'].lower()}")
+    calibration = display_projection(game, map_data['map']['id'], settings["calibrations"])
     scale = calibration["units_per_meter"] if calibration and calibration.get("verified") else None
     adapted = []
     for raw in raw_sample["players"][:200]:
@@ -81,13 +82,15 @@ def capture(api, server, previous, settings):
         prior = old.get(p["player_id"])
         broken = (not previous or previous["round_id"] != round_id
                   or previous.get("calibration") != calibration
-                  or segment_break(prior, p, previous["captured_at"], now, scale))
+                  or segment_break(prior, p, previous["captured_at"], now, scale,
+                                   display_only=projection_ready(calibration) and scale is None))
         p["segment_id"] = f"{round_id}:{p['player_id']}:{now}" if broken else prior["segment_id"]
     return {"schema_version": 1, "server_number": server, "game": game, "round_id": round_id,
             "round_start": round_start, "captured_at": now, "map": map_data, "players": adapted,
             "calibration": calibration, "objects": [], "events": [], "signals": [],
             "collector_interval": 2, "collection_seconds": 0,
             "quality": {"valid_positions": sum(p["position_valid"] for p in adapted),
+                        "mapped_positions": sum(p["map_position"] is not None for p in adapted),
                         "total_players": len(adapted), "round_confirmed": round_start is not None}}
 
 
