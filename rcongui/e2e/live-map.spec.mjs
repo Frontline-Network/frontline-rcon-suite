@@ -135,7 +135,10 @@ test("dragging players and labels pans without accidental selection or follow sn
   // Assistive technologies may activate a marker without pointer events.
   await marker.dispatchEvent("click", { detail: 0 });
   await expect(marker).toHaveAttribute("aria-pressed", "true");
-  await marker.click();
+  // The selected group's bounding box includes the nameplate. Its centre can
+  // sit on a neighbouring live marker; click the actual player symbol instead.
+  await marker.locator(":scope > path, :scope > circle").click();
+  await expect(marker).toHaveAttribute("aria-pressed", "true");
   const follow = page.getByRole("button", { name: "Verfolgen", exact: true });
   await follow.click();
   await expect(follow).toHaveAttribute("aria-pressed", "true");
@@ -242,15 +245,52 @@ test("100 synthetic players, search, replay and protected evidence", async ({
   expect(errors).toEqual([]);
 });
 
-test("unverified maps never display precise markers", async ({ page }) => {
+test("unknown projections keep the map unobstructed and explain missing markers in details", async ({
+  page,
+}) => {
   await openDemoPage(page, "/views/live-map", {
     query: { tacticalScenario: "uncalibrated" },
   });
   await expect(
     page.getByText("Kartenabbildung noch nicht geprüft")
-  ).toBeVisible();
+  ).toHaveCount(0);
+  const quality = page.getByTestId("map-projection-details");
+  await expect(quality).not.toHaveAttribute("open", "");
+  await quality.locator("summary").click();
+  await expect(quality).toContainText(
+    "fehlt noch eine passende Positionsabbildung"
+  );
   await expect(page.locator('svg g[role="button"]')).toHaveCount(0);
 });
+
+for (const mapId of ["junobeach", "foy", "carentan"]) {
+  test(`HLL ${mapId} shows its image and 100 players without a blocking calibration notice`, async ({
+    page,
+  }) => {
+    await openDemoPage(page, "/views/live-map", {
+      query: { tacticalHllMap: mapId },
+    });
+    await expect(page.getByTestId("player-map-marker")).toHaveCount(100);
+    const mapImage = page.locator(`svg image[href="/tac-maps/${mapId}.webp"]`);
+    await expect(mapImage).toHaveCount(1);
+    const response = await page.request.get(`/tac-maps/${mapId}.webp`);
+    expect(response.ok()).toBeTruthy();
+    expect(response.headers()["content-type"]).toContain("image/webp");
+    await expect(
+      page.getByText("Kartenabbildung noch nicht geprüft")
+    ).toHaveCount(0);
+    await expect(
+      page.getByTestId("map-projection-details")
+    ).not.toHaveAttribute("open", "");
+    await expectNoHorizontalPageOverflow(page);
+    if (mapId === "junobeach") {
+      await page.screenshot({
+        path: "test-results/live-map-hll-junobeach.png",
+        fullPage: true,
+      });
+    }
+  });
+}
 
 test("ordinary viewer gets no tactical page", async ({ page }) => {
   await openDemoPage(page, "/views/live-map", {

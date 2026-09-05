@@ -31,7 +31,12 @@ import { normalizeGame } from "@/utils/game-context";
 import TacticalMap from "./TacticalMap";
 import CalibrationPanel from "./CalibrationPanel";
 import { liveMapRequest, canUse } from "./api";
-import { filterPlayers, frameAt, trailSegments } from "./geometry.mjs";
+import {
+  filterPlayers,
+  frameAt,
+  trailSegments,
+  projectionReady,
+} from "./geometry.mjs";
 import { copy } from "./copy";
 import { tacticalPollInterval, sampleAge, sampleIsStale } from "./polling.mjs";
 
@@ -768,7 +773,7 @@ export default function LiveMapPage() {
               {t("mapped")}: {visible.filter((p) => p.map_position).length}/
               {visible.length}
             </Typography>
-            {frame?.calibration?.quality === "estimated" && (
+            {frame && frame.calibration?.verified !== true && (
               <Box
                 component="details"
                 data-testid="map-projection-details"
@@ -782,7 +787,11 @@ export default function LiveMapPage() {
                   {t("projectionDetails")}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {t("projectionHelp")}
+                  {t(
+                    projectionReady(frame.calibration)
+                      ? "projectionHelp"
+                      : "uncalibratedHelp"
+                  )}
                 </Typography>
               </Box>
             )}

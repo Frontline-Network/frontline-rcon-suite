@@ -61,7 +61,6 @@ export const copy = {
     signals: "Prüfhinweise",
     noSignals: "Keine wiederholten Begegnungen im aktuellen Zeitfenster.",
     unknown: "Position unbekannt",
-    uncalibrated: "Kartenabbildung noch nicht geprüft",
     uncalibratedHelp:
       "Für diese Karte fehlt noch eine passende Positionsabbildung. Live-Koordinaten bleiben in den Spielerdetails verfügbar.",
     unavailable: "Vom Gameserver nicht verfügbar",
@@ -179,7 +178,6 @@ export const copy = {
     signals: "Review hints",
     noSignals: "No repeated encounters in the current window.",
     unknown: "Position unknown",
-    uncalibrated: "Map projection not verified",
     uncalibratedHelp:
       "A suitable projection is still missing for this map. Live coordinates remain available in player details.",
     unavailable: "Unavailable from game server",

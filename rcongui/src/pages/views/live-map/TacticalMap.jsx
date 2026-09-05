@@ -368,25 +368,6 @@ export default function TacticalMap({
               })}
         </g>
       </svg>
-      {!calibrated && (
-        <Box
-          sx={{
-            position: "absolute",
-            top: "45%",
-            left: "10%",
-            right: "10%",
-            p: 2,
-            border: 1,
-            borderColor: "warning.main",
-            bgcolor: "background.paper",
-            textAlign: "center",
-            pointerEvents: "none",
-          }}
-        >
-          <Typography fontWeight={800}>{t("uncalibrated")}</Typography>
-          <Typography variant="body2">{t("uncalibratedHelp")}</Typography>
-        </Box>
-      )}
     </Box>
   );
 }
