@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Box, Button, Stack, Typography, useTheme } from "@mui/material";
 import { getThemeTeamColor } from "@/themes/teamColors";
 import { getTacticalMapImageSrc } from "@/utils/map-images.mjs";
@@ -22,6 +22,8 @@ export default function TacticalMap({
   const [isDragging, setIsDragging] = useState(false);
   const drag = useRef(null);
   const svg = useRef(null);
+  const nameLabel = useRef(null);
+  const [nameWidth, setNameWidth] = useState(120);
   const mapId = frame?.map?.id;
   useEffect(() => {
     drag.current = null;
@@ -48,7 +50,13 @@ export default function TacticalMap({
     element.addEventListener("wheel", onWheel, { passive: false });
     return () => element.removeEventListener("wheel", onWheel);
   }, [onManualNavigate]);
-  const target = players.find((p) => p.player_id === selected)?.map_position;
+  const selectedPlayer = players.find((p) => p.player_id === selected);
+  const selectedCharacters = Array.from(selectedPlayer?.name || "");
+  const selectedName =
+    selectedCharacters.length > 32
+      ? selectedCharacters.slice(0, 31).join("") + "…"
+      : selectedCharacters.join("");
+  const target = selectedPlayer?.map_position;
   useEffect(() => {
     if (following && target)
       setCamera((c) => ({
@@ -63,6 +71,24 @@ export default function TacticalMap({
       ? encounter.map_position
       : null;
   const image = getTacticalMapImageSrc(frame?.map);
+  useLayoutEffect(() => {
+    let active = true;
+    const measure = () => {
+      if (active && nameLabel.current)
+        setNameWidth(Math.ceil(nameLabel.current.getComputedTextLength()));
+    };
+    measure();
+    document.fonts?.ready.then(measure);
+    return () => {
+      active = false;
+    };
+  }, [
+    selected,
+    selectedName,
+    showPlayers,
+    calibrated,
+    theme.typography.fontFamily,
+  ]);
   const zoom = (factor) => {
     onManualNavigate();
     setCamera((c) => zoomCamera(c, factor));
@@ -123,6 +149,11 @@ export default function TacticalMap({
         borderColor: "divider",
         bgcolor: "background.default",
         overflow: "hidden",
+        // Keyboard focus surrounds only the point, not point plus nameplate.
+        "& [data-testid='player-map-marker']:focus-visible [data-marker-focus-ring]":
+          {
+            opacity: 1,
+          },
       }}
     >
       <Stack
@@ -234,7 +265,7 @@ export default function TacticalMap({
             players
               .filter((p) => p.map_position)
               .map((p) => {
-                const size = (p.player_id === selected ? 10 : 6) / camera.scale;
+                const size = (p.player_id === selected ? 7 : 6) / camera.scale;
                 const color = getThemeTeamColor(theme, p.team);
                 return (
                   <g
@@ -248,7 +279,10 @@ export default function TacticalMap({
                     tabIndex={0}
                     aria-label={`${p.name} · ${p.team} · ${p.unit_name || "–"}`}
                     aria-pressed={selected === p.player_id}
-                    style={{ cursor: isDragging ? "grabbing" : "pointer" }}
+                    style={{
+                      cursor: isDragging ? "grabbing" : "pointer",
+                      outline: "none",
+                    }}
                     onClick={(e) => {
                       // Pointer clicks are handled on release because pointer
                       // capture retargets them to the SVG. Keep AT activation.
@@ -261,6 +295,34 @@ export default function TacticalMap({
                       }
                     }}
                   >
+                    <rect
+                      data-marker-focus-ring="true"
+                      x={-14 / camera.scale}
+                      y={-14 / camera.scale}
+                      width={28 / camera.scale}
+                      height={28 / camera.scale}
+                      fill="none"
+                      stroke={theme.palette.primary.main}
+                      strokeWidth={2 / camera.scale}
+                      strokeDasharray={`${3 / camera.scale} ${
+                        2 / camera.scale
+                      }`}
+                      opacity={0}
+                      pointerEvents="none"
+                    />
+                    {selected === p.player_id && (
+                      <rect
+                        data-testid="player-map-selection"
+                        x={-10 / camera.scale}
+                        y={-10 / camera.scale}
+                        width={20 / camera.scale}
+                        height={20 / camera.scale}
+                        fill="none"
+                        stroke={color}
+                        strokeWidth={1 / camera.scale}
+                        pointerEvents="none"
+                      />
+                    )}
                     {p.team === "axis" ? (
                       <path
                         d={`M 0 ${-size} L ${size} 0 L 0 ${size} L ${-size} 0 Z`}
@@ -277,18 +339,29 @@ export default function TacticalMap({
                       />
                     )}
                     {selected === p.player_id && (
-                      <text
-                        data-testid="player-map-name"
-                        x={12 / camera.scale}
-                        y={4 / camera.scale}
-                        fill={theme.palette.common.white}
-                        stroke={theme.palette.common.black}
-                        strokeWidth={3 / camera.scale}
-                        paintOrder="stroke"
-                        fontSize={14 / camera.scale}
-                      >
-                        {p.name}
-                      </text>
+                      <g transform={`scale(${1 / camera.scale})`}>
+                        <rect
+                          data-testid="player-map-nameplate"
+                          x={16}
+                          y={-12}
+                          width={nameWidth + 14}
+                          height={25}
+                          fill={theme.palette.background.paper}
+                          stroke={color}
+                          strokeWidth={1}
+                        />
+                        <text
+                          ref={nameLabel}
+                          data-testid="player-map-name"
+                          x={23}
+                          y={5}
+                          fill={theme.palette.text.primary}
+                          fontFamily={theme.typography.fontFamily}
+                          fontSize={14}
+                        >
+                          {selectedName}
+                        </text>
+                      </g>
                     )}
                   </g>
                 );

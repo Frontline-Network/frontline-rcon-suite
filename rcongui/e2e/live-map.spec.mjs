@@ -32,6 +32,21 @@ test("zoom never reveals unselected names, pointer and keyboard selection still 
   await expect(page.getByLabel("Namen bei Zoom")).toHaveCount(0);
   await expect(page.getByTestId("player-map-name")).toHaveCount(0);
   await marker.click();
+  await expect(marker).toHaveCSS("outline-style", "none");
+  await expect(page.getByTestId("player-map-nameplate")).toHaveAttribute(
+    "stroke-width",
+    "1"
+  );
+  await expect(page.getByTestId("player-map-name")).not.toHaveAttribute(
+    "stroke"
+  );
+  await expect(page.getByTestId("player-map-nameplate")).not.toHaveAttribute(
+    "rx"
+  );
+  await expect(marker.locator("[data-marker-focus-ring]")).toHaveCSS(
+    "opacity",
+    "0"
+  );
   await expect(page.getByTestId("player-map-name")).toHaveText(
     "Demo Spieler 56"
   );
@@ -41,10 +56,17 @@ test("zoom never reveals unselected names, pointer and keyboard selection still 
   const other = page.locator('[data-player-id="demo-56"]');
   await other.focus();
   await other.press("Enter");
+  await expect(other.locator("[data-marker-focus-ring]")).toHaveCSS(
+    "opacity",
+    "1"
+  );
   await expect(page.getByTestId("player-map-name")).toHaveText(
     "Demo Spieler 57"
   );
   await expect(marker).toHaveAttribute("aria-pressed", "false");
+  await mapCanvas(page).screenshot({
+    path: "test-results/live-map-compact-selection.png",
+  });
 });
 
 test("wheel zoom is pointer anchored and never scrolls the page", async ({
