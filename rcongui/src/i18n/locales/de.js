@@ -4864,6 +4864,7 @@ const de = {
       systemDiagnostics: "System & Diagnose",
     },
     links: {
+      liveMap: "Live-Karte",
       home: "Übersicht",
       frontlineApp: "Frontline App",
       discordReportBot: "Discord Report Bot",

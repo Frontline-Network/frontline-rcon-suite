@@ -225,6 +225,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "rconweb.middleware.SessionCsrfProtectionMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "api.tactical_privacy.TacticalPrivacyMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]

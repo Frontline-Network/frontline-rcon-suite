@@ -123,6 +123,12 @@ const router = createBrowserRouter([
             errorElement: <RouteError />,
           },
           {
+            path: "live-map",
+            handle: { crumb: () => <Link to="/views/live-map">Live-Karte</Link> },
+            lazy: lazyPage(() => import("./pages/views/live-map")),
+            errorElement: <RouteError />,
+          },
+          {
             path: "team",
             handle: { crumb: () => <Link to={"/views/team"}>Team</Link> },
             lazy: lazyPage(() => import("./pages/views/team")),

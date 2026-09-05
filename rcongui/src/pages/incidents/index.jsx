@@ -35,6 +35,7 @@ import FiberManualRecordRoundedIcon from "@mui/icons-material/FiberManualRecordR
 import { useTheme } from "@mui/material/styles";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router-dom";
 import { cmd } from "@/utils/fetchUtils";
 import PageHeader from "@/components/shared/PageHeader";
 import PageState from "@/components/shared/PageState";
@@ -493,11 +494,14 @@ const IncidentDetail = ({
 };
 
 export default function IncidentsPage() {
+  const [searchParams] = useSearchParams();
+  const requestedIncident = searchParams.get("incident");
+  const openedIncident = useRef(null);
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const queryClient = useQueryClient();
-  const [filter, setFilter] = useState("new");
+  const [filter, setFilter] = useState(requestedIncident ? "all" : "new");
   const [selected, setSelected] = useState(null);
   const [dismissConfirmation, setDismissConfirmation] = useState(false);
 
@@ -525,6 +529,11 @@ export default function IncidentsPage() {
   });
 
   const incidents = Array.isArray(query.data) ? query.data : [];
+  useEffect(() => {
+    if (!requestedIncident || openedIncident.current === requestedIncident) return;
+    const item = incidents.find(incident => incident.id === requestedIncident);
+    if (item) { setSelected(item); openedIncident.current = requestedIncident; }
+  }, [requestedIncident, incidents]);
   const counts = useMemo(
     () =>
       Object.fromEntries(

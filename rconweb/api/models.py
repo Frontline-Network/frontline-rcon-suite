@@ -109,6 +109,18 @@ class MobileDevice(models.Model):
         )
 
 
+class TacticalAccess(models.Model):
+    """Permission carrier; tactical data is managed by SQLAlchemy/Alembic."""
+    class Meta:
+        managed = False
+        default_permissions = ()
+        permissions = (
+            ("can_view_live_map", "Can view private tactical positions and history"),
+            ("can_manage_live_map", "Can configure tactical collection and protected players"),
+            ("can_view_live_map_cases", "Can access private tactical case evidence"),
+        )
+
+
 class MobilePairing(models.Model):
     class Kind(models.TextChoices):
         QR = "qr", "QR"

@@ -4818,6 +4818,7 @@ const en = {
       systemDiagnostics: "System & diagnostics",
     },
     links: {
+      liveMap: "Live map",
       home: "Overview",
       frontlineApp: "Frontline App",
       discordReportBot: "Discord Report Bot",

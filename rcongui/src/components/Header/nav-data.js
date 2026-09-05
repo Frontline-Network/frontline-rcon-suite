@@ -91,6 +91,7 @@ const rawNavMenus = [
         to: "/views/team",
         icon: <GroupsIcon />,
       },
+      { name: "Live map", to: "/views/live-map", icon: <MapIcon /> },
       {
         name: "Autobalancer",
         to: "/views/autobalancer",
@@ -378,6 +379,7 @@ const linkTranslationKeys = {
   "/apps/discord-report-bot": "navigation.links.discordReportBot",
   "/views/live": "navigation.links.live",
   "/views/team": "navigation.links.team",
+  "/views/live-map": "navigation.links.liveMap",
   "/settings/maps/change": "navigation.links.changeMap",
   "/settings/maps/rotation": "navigation.links.rotation",
   "/settings/maps/objectives": "navigation.links.objectives",
@@ -449,6 +451,7 @@ const taskGroupDefinitions = [
     routes: [
       "/views/live",
       "/views/team",
+      "/views/live-map",
       "/views/autobalancer",
       "/stats/live-game",
     ],
@@ -536,6 +539,7 @@ const taskGroupDefinitions = [
 const linkPermissionKeys = {
   "/views/live": ["can_view_recent_logs"],
   "/views/team": ["can_view_team_view"],
+  "/views/live-map": ["can_view_live_map"],
   "/settings/maps/change": ["can_view_current_map", "can_change_current_map"],
   "/records/players": ["can_view_player_history", "can_view_player_info"],
   "/records/vips": ["can_view_vip_ids"],
