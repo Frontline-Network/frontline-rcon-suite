@@ -81,6 +81,7 @@ export default function LiveMapPage() {
   );
   const [historyRound, setHistoryRound] = useState("");
   const [savedSignal, setSavedSignal] = useState(null);
+  const [focusedEncounter, setFocusedEncounter] = useState(null);
   const [clock, setClock] = useState(Date.now() / 1000);
   const options = {
     enabled: allowed,
@@ -205,7 +206,15 @@ export default function LiveMapPage() {
     return () => clearInterval(timer);
   }, [playing, replay === null, frames]);
 
-  const frame = replay === null ? current : frameAt(frames, replay);
+  const evidenceAllowed =
+    capabilities.data?.permissions.cases === true &&
+    ![401, 403].includes(cases.error?.status);
+  const frame =
+    replay === null
+      ? current
+      : savedSignal && !evidenceAllowed
+      ? null
+      : frameAt(frames, replay);
   const players = frame?.players || [];
   const visible = useMemo(
     () => filterPlayers(players, search, team, squad),
@@ -224,15 +233,16 @@ export default function LiveMapPage() {
         : [],
     [showTrails, selected, frame, replay, frames, liveFrames]
   );
-  const signals = savedSignal
-    ? [savedSignal]
-    : replay !== null
-    ? []
-    : current?.signals?.filter((s) =>
-        !selected
-          ? s.kind !== "encounter"
-          : s.victim === selected || s.attacker === selected
-      ) || [];
+  const signals =
+    savedSignal && evidenceAllowed
+      ? [savedSignal]
+      : replay !== null
+      ? []
+      : current?.signals?.filter((s) =>
+          !selected
+            ? s.kind !== "encounter"
+            : s.victim === selected || s.attacker === selected
+        ) || [];
   const canManage =
     canUse(permissions, "can_manage_live_map") &&
     capabilities.data?.permissions.manage === true;
@@ -245,6 +255,7 @@ export default function LiveMapPage() {
     current &&
     age <= Math.max(6, current.collector_interval * 3);
   const goLive = () => {
+    setFocusedEncounter(null);
     setReplay(null);
     setPlaying(false);
     setSavedSignal(null);
@@ -254,6 +265,7 @@ export default function LiveMapPage() {
     setFollowing(false);
   };
   const loadHistory = () => {
+    setFocusedEncounter(null);
     const end = Math.min(
       Date.now() / 1000,
       new Date(historyEnd).getTime() / 1000
@@ -266,6 +278,23 @@ export default function LiveMapPage() {
     });
     setSavedSignal(null);
     historyMutation.mutate(`history?${params}`);
+  };
+  const viewEncounter = (event, signal) => {
+    const params = new URLSearchParams({
+      start: event.time - 20,
+      end: Math.min(Date.now() / 1000, event.time + 5),
+      round_id: signal.round_id,
+    });
+    setSavedSignal(null);
+    historyMutation.mutate(`history?${params}`, {
+      onSuccess: () => {
+        setFocusedEncounter({ ...event, round_id: signal.round_id });
+        setReplay(event.time);
+        setSelected(signal.victim);
+        setFollowing(true);
+        setTab(0);
+      },
+    });
   };
   const review = (signal, action) =>
     mutation.mutate({
@@ -507,6 +536,7 @@ export default function LiveMapPage() {
             />
           </Stack>
           <TacticalMap
+            encounter={focusedEncounter}
             frame={frame}
             players={visible}
             selected={selected}
@@ -827,13 +857,26 @@ export default function LiveMapPage() {
                   <Typography component="summary" sx={{ cursor: "pointer" }}>
                     {t("encounters")}
                   </Typography>
-                  {signal.events.map((e) => (
+                  {signal.events.map((e, index) => (
                     <Typography key={e.id} variant="caption" display="block">
                       {new Date(e.time * 1000).toLocaleTimeString(
                         i18n.language
                       )}{" "}
                       · {e.weapon || "–"} ·{" "}
                       {e.position_sample_at ? t("lastKnown") : t("unknown")}
+                      {index > 0 &&
+                        ` · ${Math.round(
+                          e.time - signal.events[index - 1].time
+                        )} ${t("seconds")} ${t("gapBetween")}`}
+                      {e.map_position && (
+                        <Button
+                          size="small"
+                          disabled={historyMutation.isPending}
+                          onClick={() => viewEncounter(e, signal)}
+                        >
+                          {t("viewEncounter")}
+                        </Button>
+                      )}
                     </Typography>
                   ))}
                   {signal.events.map(

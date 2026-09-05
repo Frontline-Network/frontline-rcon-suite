@@ -10,7 +10,9 @@ def test_alembic_has_one_production_compatible_head():
     config = Config(str(ROOT / "alembic.ini"))
     config.set_main_option("script_location", str(ROOT / "alembic"))
 
-    assert ScriptDirectory.from_config(config).get_heads() == ["a6d8c4e2f190"]
+    scripts = ScriptDirectory.from_config(config)
+    assert scripts.get_heads() == ["b7e9d5026a31"]
+    assert scripts.get_revision("b7e9d5026a31").down_revision == "a6d8c4e2f190"
 
 
 def test_audit_time_index_is_created_concurrently():

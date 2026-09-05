@@ -77,6 +77,7 @@ const signal = (time) => ({
     id: `demo-event-${i}`,
     time: time - offset,
     position_sample_at: time - offset - 1,
+    map_position: { x: 0.3 + i * 0.1, y: 0.4 },
     weapon: "Demo-Waffe",
   })),
 });

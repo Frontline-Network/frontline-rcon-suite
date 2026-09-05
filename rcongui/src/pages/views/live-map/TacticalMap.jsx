@@ -12,6 +12,7 @@ export default function TacticalMap({
   trails,
   showNames,
   showPlayers,
+  encounter,
   t,
 }) {
   const theme = useTheme();
@@ -32,6 +33,10 @@ export default function TacticalMap({
       }));
   }, [following, target?.x, target?.y]);
   const calibrated = Boolean(frame?.calibration?.verified);
+  const encounterPoint =
+    calibrated && encounter?.round_id === frame?.round_id
+      ? encounter.map_position
+      : null;
   const image = getTacticalMapImageSrc(frame?.map);
   const zoom = (factor) =>
     setCamera((c) => {
@@ -141,6 +146,32 @@ export default function TacticalMap({
                 strokeDasharray={`${8 / camera.scale} ${4 / camera.scale}`}
               />
             ))}
+          {encounterPoint && (
+            <g
+              data-testid="encounter-marker"
+              transform={`translate(${encounterPoint.x * 1000} ${
+                encounterPoint.y * 1000
+              })`}
+            >
+              <circle
+                r={18 / camera.scale}
+                fill="none"
+                stroke={theme.palette.warning.main}
+                strokeWidth={3 / camera.scale}
+              />
+              <text
+                x={22 / camera.scale}
+                y={0}
+                fontSize={13 / camera.scale}
+                fill={theme.palette.common.white}
+                stroke={theme.palette.common.black}
+                strokeWidth={3 / camera.scale}
+                paintOrder="stroke"
+              >
+                {t("lastKnown")}
+              </text>
+            </g>
+          )}
           {calibrated &&
             showPlayers &&
             players

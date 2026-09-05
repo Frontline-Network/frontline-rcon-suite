@@ -1,5 +1,7 @@
 export const copy = {
   de: {
+    viewEncounter: "Ort im Rückblick ansehen",
+    gapBetween: "Abstand",
     calibrationTitle: "Kartenabbildung prüfen (Einrichtung)",
     calibrationSource: "Quelle und Datum der Referenzmessung",
     unitsPerMeter: "Welteinheiten pro Meter (bestätigter Maßstab)",
@@ -111,6 +113,8 @@ export const copy = {
     status: "Bearbeitungsstatus",
   },
   en: {
+    viewEncounter: "View location in replay",
+    gapBetween: "apart",
     calibrationTitle: "Verify map projection (setup)",
     calibrationSource: "Reference measurement source and date",
     unitsPerMeter: "World units per metre (verified scale)",

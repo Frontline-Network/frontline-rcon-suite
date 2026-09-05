@@ -26,6 +26,13 @@ test("100 synthetic players, search, replay and protected evidence", async ({
   ).toBeEnabled();
   await view.getByRole("button", { name: "Vergrößern", exact: true }).click();
   await expect(view.getByText("150 %")).toBeVisible();
+  await view.locator("summary").filter({ hasText: "Begegnungen" }).click();
+  await view
+    .getByRole("button", { name: "Ort im Rückblick ansehen" })
+    .first()
+    .click();
+  await expect(view.getByTestId("encounter-marker")).toBeVisible();
+  await view.getByRole("button", { name: "Zurück zu Live" }).click();
   await view
     .getByRole("button", { name: "Als Fall sichern", exact: true })
     .click();
