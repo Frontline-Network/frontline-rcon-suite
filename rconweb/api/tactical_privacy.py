@@ -20,6 +20,9 @@ class TacticalPrivacyMiddleware:
         user = getattr(request, "user", None)
         allowed = bool(user and user.is_authenticated and user.is_active and user.has_perm("api.can_view_live_map"))
         if allowed:
+            # Privileged legacy responses can contain vectors as well. Never
+            # allow a browser/shared HTTP cache to preserve those responses.
+            response["Cache-Control"] = "private, no-store"
             return response
         if getattr(response, "streaming", False):
             # There is no HTTP streaming API contract today. A future generic

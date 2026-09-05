@@ -94,7 +94,9 @@ def test_legacy_roster_public_mobile_and_nested_raw_are_redacted():
         assert json.loads(parsed["raw"]) == {}
     assert source == original
     request.user = SimpleNamespace(is_authenticated=True, is_active=True, has_perm=lambda _: True)
-    assert json.loads(TacticalPrivacyMiddleware(lambda _: JsonResponse(source))(request).content) == source
+    authorized = TacticalPrivacyMiddleware(lambda _: JsonResponse(source))(request)
+    assert json.loads(authorized.content) == source
+    assert authorized["Cache-Control"] == "private, no-store"
 
 
 def test_all_tactical_writes_use_existing_session_csrf_guard():

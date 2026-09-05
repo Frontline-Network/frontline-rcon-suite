@@ -33,6 +33,7 @@ import CalibrationPanel from "./CalibrationPanel";
 import { liveMapRequest, canUse } from "./api";
 import { filterPlayers, frameAt, trailSegments } from "./geometry.mjs";
 import { copy } from "./copy";
+import { tacticalPollInterval } from "./polling.mjs";
 
 const ACTIONS = generatePlayerActions({
   multiAction: false,
@@ -94,7 +95,7 @@ export default function LiveMapPage() {
     ...options,
     queryKey: [...queryKey, "capabilities"],
     queryFn: () => liveMapRequest("capabilities"),
-    refetchInterval: (q) => (q.state.error ? false : 30000),
+    refetchInterval: (q) => tacticalPollInterval(q, 30000),
   });
   const denied = !allowed || [401, 403].includes(capabilities.error?.status);
   const live = useQuery({
@@ -103,12 +104,10 @@ export default function LiveMapPage() {
     queryKey: [...queryKey, "snapshot"],
     queryFn: () => liveMapRequest("snapshot"),
     refetchInterval: (q) =>
-      q.state.error
-        ? false
-        : Math.max(
-            2000,
-            (q.state.data?.snapshot?.collector_interval || 2) * 1000
-          ),
+      tacticalPollInterval(
+        q,
+        Math.max(2000, (q.state.data?.snapshot?.collector_interval || 2) * 1000)
+      ),
   });
   const forbidden = denied || [401, 403].includes(live.error?.status);
   const monitors = useQuery({
@@ -116,13 +115,14 @@ export default function LiveMapPage() {
     enabled: allowed && !forbidden,
     queryKey: [...queryKey, "monitors"],
     queryFn: () => liveMapRequest("monitors"),
+    refetchInterval: (q) => tacticalPollInterval(q, 30000),
   });
   const rounds = useQuery({
     ...options,
     enabled: allowed && !forbidden,
     queryKey: [...queryKey, "rounds"],
     queryFn: () => liveMapRequest("rounds"),
-    refetchInterval: (q) => (q.state.error ? false : 30000),
+    refetchInterval: (q) => tacticalPollInterval(q, 30000),
   });
   const cases = useQuery({
     ...options,
@@ -130,7 +130,7 @@ export default function LiveMapPage() {
       allowed && !forbidden && capabilities.data?.permissions.cases === true,
     queryKey: [...queryKey, "reviews"],
     queryFn: () => liveMapRequest("reviews"),
-    refetchInterval: (q) => (q.state.error ? false : 30000),
+    refetchInterval: (q) => tacticalPollInterval(q, 30000),
   });
   const mutation = useMutation({
     mutationFn: ({ path, data, method }) => liveMapRequest(path, data, method),
