@@ -3,9 +3,9 @@ export const copy = {
     receiving: "Live-Daten werden aktualisiert.",
     connectionDelayed:
       "Verbindung verzögert – letzter Messstand bleibt sichtbar.",
-    estimated: "Vorläufige Kartenabbildung",
-    estimatedHelp:
-      "Live-Positionen auf der anhand von Spielreferenzen ausgerichteten Karte. Genauigkeit noch nicht abschließend geprüft; keine meterbasierte Monitorbewertung.",
+    projectionDetails: "Datenqualität & Kartenabbildung",
+    projectionHelp:
+      "Die Spielerpositionen stammen aus den Live-Koordinaten des Gameservers. Die Kartendarstellung ist freigeschaltet; eine unabhängige Gegenprüfung der metergenauen Abbildung steht noch aus. Meterbasierte Monitorbewertungen bleiben davon getrennt deaktiviert.",
     mapped: "Auf der Karte",
     viewEncounter: "Ort im Rückblick ansehen",
     gapBetween: "Abstand",
@@ -123,9 +123,9 @@ export const copy = {
   en: {
     receiving: "Live data is updating.",
     connectionDelayed: "Connection delayed — the last sample remains visible.",
-    estimated: "Provisional map projection",
-    estimatedHelp:
-      "Live positions on a map aligned using in-game references. Accuracy is not fully verified; no metre-based monitor assessment.",
+    projectionDetails: "Data quality & map projection",
+    projectionHelp:
+      "Player positions use live coordinates from the game server. Map display is enabled; an independent check of metre-level accuracy is still pending. Metre-based monitor assessments remain separately disabled.",
     mapped: "On the map",
     viewEncounter: "View location in replay",
     gapBetween: "apart",

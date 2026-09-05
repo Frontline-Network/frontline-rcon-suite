@@ -79,7 +79,7 @@ test("ordinary viewer gets no tactical page", async ({ page }) => {
   await expect(page.locator('svg g[role="button"]')).toHaveCount(0);
 });
 
-test("provisional display renders players without unavailable object controls", async ({
+test("enabled display renders players without warning banners or unavailable objects", async ({
   page,
 }) => {
   await openDemoPage(page, "/views/live-map", {
@@ -88,7 +88,12 @@ test("provisional display renders players without unavailable object controls", 
   await expect(page.getByTestId("player-map-marker")).toHaveCount(100);
   await expect(
     page.getByText("Vorläufige Kartenabbildung", { exact: true })
-  ).toBeVisible();
+  ).toHaveCount(0);
+  const quality = page.getByTestId("map-projection-details");
+  await expect(quality).not.toHaveAttribute("open", "");
+  await quality.locator("summary").click();
+  await expect(quality).toHaveAttribute("open", "");
+  await expect(quality).toContainText("Gegenprüfung");
   await expect(
     page.getByText("Garnisonen / Outposts", { exact: true })
   ).toHaveCount(0);

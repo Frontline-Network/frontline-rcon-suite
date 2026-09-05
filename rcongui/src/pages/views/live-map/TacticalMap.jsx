@@ -34,7 +34,6 @@ export default function TacticalMap({
       }));
   }, [following, target?.x, target?.y]);
   const calibrated = projectionReady(frame?.calibration);
-  const estimated = calibrated && frame?.calibration?.quality === "estimated";
   const encounterPoint =
     calibrated && encounter?.round_id === frame?.round_id
       ? encounter.map_position
@@ -96,24 +95,6 @@ export default function TacticalMap({
           {Math.round(camera.scale * 100)} %
         </Typography>
       </Stack>
-      {estimated && (
-        <Box
-          sx={{
-            px: 1.5,
-            py: 1,
-            borderBottom: 1,
-            borderColor: "divider",
-            bgcolor: "background.paper",
-          }}
-        >
-          <Typography variant="body2" fontWeight={700} color="warning.main">
-            {t("estimated")}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {t("estimatedHelp")}
-          </Typography>
-        </Box>
-      )}
       <svg
         ref={svg}
         viewBox="0 0 1000 1000"

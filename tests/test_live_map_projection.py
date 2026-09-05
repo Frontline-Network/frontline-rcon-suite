@@ -19,10 +19,21 @@ def test_field_frame_is_display_only_and_does_not_spread_to_unknown_maps():
     assert project({"x": -100000, "y": 100000}, p) == {"x": 0, "y": 1}
     assert project({"x": 100001, "y": 0}, p) is None
     assert display_projection("hll", "WDEV_B", {}) is None
-    for map_id in ("unknown", "wdev_a", "wdev_c", "wdev_d", "wdev_e"):
+    for map_id in ("unknown", "wdev_g"):
         assert display_projection("hllv", map_id, {}) is None
     assert display_projection("hllv", "wdev_f", {})["quality"] == "estimated"
     assert not projection_ready({"verified": False})
+
+
+@pytest.mark.parametrize("map_id", [f"wdev_{letter}" for letter in "abcdef"])
+def test_all_six_vietnam_maps_have_explicit_nonmetric_previews(map_id):
+    p = display_projection("hllv", map_id, {})
+    assert projection_ready(p) and p["quality"] == "estimated"
+    assert not p["verified"]
+    assert p["units_per_meter"] is None and p["max_error_m"] is None
+    assert p["map_id"] == map_id and p["source"]
+    assert project({"x": 20000, "y": -40000}, p) == {"x": .6, "y": .3}
+    assert display_projection("hll", map_id, {}) is None
 
 
 def test_existing_operator_calibration_is_preserved_and_not_mutated():
@@ -57,7 +68,8 @@ def test_preview_traces_cut_missing_positions_deaths_jumps_and_time_gaps():
     assert segment_break(a, b, 0, 13, display_only=True)
 
 
-def test_bulk_capture_maps_100_players_without_metric_monitor_positions(monkeypatch):
+@pytest.mark.parametrize("map_id", [f"WDEV_{letter}" for letter in "ABCDEF"])
+def test_bulk_capture_maps_100_players_without_metric_monitor_positions(monkeypatch, map_id):
     monkeypatch.setattr("rcon.utils.MapsHistory", lambda: SimpleNamespace(get_current_map=lambda: {"name": "layer", "start": 900, "end": None}))
     monkeypatch.setattr(service, "session_ids", lambda server, ids: {p: "s" for p in ids})
     raw = [{"iD": str(76561198000000000 + i), "Name": f"fixture-{i}", "Team": i % 2 + 1,
@@ -67,7 +79,7 @@ def test_bulk_capture_maps_100_players_without_metric_monitor_positions(monkeypa
         calls.append(True)
         return {"captured_at": 1000 + 2 * len(calls), "players": raw}
     api = SimpleNamespace(config=SimpleNamespace(game=HLLV_PROFILE.game), game_profile=HLLV_PROFILE,
-        get_gamestate=lambda: {"current_map": {"id": "layer", "map": {"id": "WDEV_B"}}},
+        get_gamestate=lambda: {"current_map": {"id": "layer", "map": {"id": map_id}}},
         get_raw_player_snapshot=sample)
     settings = copy.deepcopy(storage.DEFAULT_SETTINGS)
     frame = service.capture(api, 3, None, settings)

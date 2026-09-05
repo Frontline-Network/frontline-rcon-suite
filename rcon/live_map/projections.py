@@ -1,15 +1,21 @@
 """Display-only projections, separate from independently verified calibration.
 
-The two HLLV maps below have paired stationary WorldPosition / in-game-grid
-observations. Their north-up grid suggests a -100000..100000 XY display frame.
+Quang Ngai and Thanh Hoa have paired stationary WorldPosition / in-game-grid
+observations suggesting a -100000..100000 XY display frame. The operator has
+explicitly requested this provisional display for all six extracted HLLV maps,
+confirming alignment of the tactical images with the game maps. Applying the
+same world frame to the other four maps remains an unvalidated assumption.
 This is NOT decoded map metadata, a measured metre scale, or a <=10 m claim.
-Do not apply this frame to other maps just because their texture is also square.
 """
 from copy import deepcopy
 
 
-FIELD_PREVIEWS = {
+DISPLAY_PREVIEWS = {
+    "wdev_a": "Van Tuong: operator-requested preview; image alignment confirmed, world frame unvalidated, 2026-09-05",
     "wdev_b": "Quang Ngai: stationary F4/G3 references and separate G4 peninsula check, 2026-09-05",
+    "wdev_c": "Hue Outskirts: operator-requested preview; image alignment confirmed, world frame unvalidated, 2026-09-05",
+    "wdev_d": "Dak To Airfield: operator-requested preview; image alignment confirmed, world frame unvalidated, 2026-09-05",
+    "wdev_e": "Cam Ranh Port: operator-requested preview; image alignment confirmed, world frame unvalidated, 2026-09-05",
     "wdev_f": "Thanh Hoa: stationary C8/C7 in-game grid references, 2026-09-05",
 }
 
@@ -20,7 +26,7 @@ def display_projection(game, map_id, calibrations):
     if configured is not None:
         # Never override an operator's explicit per-map configuration.
         return deepcopy(configured)
-    if game != "hllv" or map_id not in FIELD_PREVIEWS:
+    if game != "hllv" or map_id not in DISPLAY_PREVIEWS:
         return None
     return {
         "verified": False,
@@ -29,9 +35,9 @@ def display_projection(game, map_id, calibrations):
         "matrix": [1 / 200000, 0, .5, 0, 1 / 200000, .5],
         "units_per_meter": None,
         "max_error_m": None,
-        "source": FIELD_PREVIEWS[map_id],
+        "source": DISPLAY_PREVIEWS[map_id],
         "map_id": map_id,
-        "revision": "hllv-field-grid-20260905-v1",
+        "revision": "hllv-display-preview-20260905-v2",
     }
 
 

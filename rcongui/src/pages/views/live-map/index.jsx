@@ -776,6 +776,24 @@ export default function LiveMapPage() {
               {t("mapped")}: {visible.filter((p) => p.map_position).length}/
               {visible.length}
             </Typography>
+            {frame?.calibration?.quality === "estimated" && (
+              <Box
+                component="details"
+                data-testid="map-projection-details"
+                sx={{ px: 1.5, py: 1 }}
+              >
+                <Typography
+                  component="summary"
+                  variant="caption"
+                  sx={{ cursor: "pointer" }}
+                >
+                  {t("projectionDetails")}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {t("projectionHelp")}
+                </Typography>
+              </Box>
+            )}
             <Box sx={{ maxHeight: 240, overflowY: "auto" }}>
               {!visible.length && (
                 <Typography sx={{ p: 1.5 }} variant="body2">
