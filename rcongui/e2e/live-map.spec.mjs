@@ -135,7 +135,10 @@ test("dragging players and labels pans without accidental selection or follow sn
   // Assistive technologies may activate a marker without pointer events.
   await marker.dispatchEvent("click", { detail: 0 });
   await expect(marker).toHaveAttribute("aria-pressed", "true");
-  await marker.click();
+  // The selected group's bounding box includes the nameplate. Its centre can
+  // sit on a neighbouring live marker; click the actual player symbol instead.
+  await marker.locator(":scope > path, :scope > circle").click();
+  await expect(marker).toHaveAttribute("aria-pressed", "true");
   const follow = page.getByRole("button", { name: "Verfolgen", exact: true });
   await follow.click();
   await expect(follow).toHaveAttribute("aria-pressed", "true");
