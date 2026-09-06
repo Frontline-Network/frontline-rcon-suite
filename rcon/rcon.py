@@ -670,6 +670,10 @@ class Rcon(ServerCtl):
 
     @ttl_cache(ttl=60 * 5)
     def get_vip_ids(self) -> list[VipIdType]:
+        return self.get_live_vip_ids()
+
+    def get_live_vip_ids(self) -> list[VipIdType]:
+        """Read current game-server VIPs with per-server database expirations."""
         res: list[VipId] = super().get_vip_ids()
         player_dicts = []
 
