@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
 import {
   Box,
   Button,
@@ -33,6 +34,8 @@ import { useGlobalStore } from "@/stores/global-state";
 import { CONNECTION_STATE } from "@/utils/connectionHealth";
 import { resolveMapImageName } from "@/utils/map-images.mjs";
 import { buildLiveBalanceStatus } from "@/pages/views/team/live-balance.mjs";
+import { useAuth } from "@/hooks/useAuth";
+import { canUse, liveMapRequest } from "@/pages/views/live-map/api";
 
 const TEAM_NAMES = ["allies", "axis"];
 const TEAM_TONES = { allies: "info.main", axis: "error.main" };
@@ -334,12 +337,23 @@ function EventRow({ event, language, t }) {
 
 export default function OperationsOverview({ logs, logsLoading }) {
   const { t, i18n } = useTranslation();
+  const { permissions } = useAuth();
   const language = i18n.resolvedLanguage === "en" ? "en" : "de";
   const status = useGlobalStore((state) => state.status);
   const serverState = useGlobalStore((state) => state.serverState);
   const gameState = useGlobalStore((state) => state.gameState);
   const onlinePlayers = useGlobalStore((state) => state.onlinePlayers);
   const connectionHealth = useGlobalStore((state) => state.connectionHealth);
+  const canSeeTacticalCases =
+    canUse(permissions, "can_view_live_map") &&
+    canUse(permissions, "can_view_live_map_cases");
+  const tacticalDetections = useQuery({
+    queryKey: ["live-map", window.location.origin, "dashboard-detections"],
+    queryFn: () => liveMapRequest("detections?status=open&limit=20"),
+    enabled: canSeeTacticalCases,
+    retry: false,
+    refetchInterval: 15000,
+  });
   const { data: teams, isLoading: teamsLoading } = teamsLiveQuery({
     staleTime: 15_000,
     refetchInterval: false,
@@ -392,6 +406,14 @@ export default function OperationsOverview({ logs, logsLoading }) {
   const notablePlayer = onlinePlayers.find(
     (player) => player?.profile?.watchlist?.is_watched || player?.is_vip
   );
+  const reviewDetection = (tacticalDetections.data?.detections || [])
+    .filter((item) => ["review", "high"].includes(item.severity))
+    .sort((a, b) => {
+      const priority = { high: 2, review: 1 };
+      return (
+        priority[b.severity] - priority[a.severity] || b.last_at - a.last_at
+      );
+    })[0];
 
   const tasks = useMemo(() => {
     const taskAge = (timestamp) => {
@@ -403,6 +425,30 @@ export default function OperationsOverview({ logs, logsLoading }) {
       return t("dashboard.operations.tasks.minutes", { count: minutes });
     };
     const result = [];
+    if (reviewDetection) {
+      result.push({
+        key: `tactical-${reviewDetection.id}`,
+        priorityKey:
+          reviewDetection.severity === "high"
+            ? "dashboard.operations.priorities.high"
+            : "dashboard.operations.priorities.medium",
+        titleKey: "dashboard.operations.tasks.gameplayPattern",
+        context: t("dashboard.operations.tasks.gameplayPatternContext", {
+          player: reviewDetection.player_name || reviewDetection.player_id,
+          count: reviewDetection.evidence?.signals?.length || 0,
+        }),
+        age: taskAge(reviewDetection.last_at * 1000),
+        actionKey: "dashboard.operations.tasks.reviewReplay",
+        to: `/views/live-map?round=${encodeURIComponent(
+          reviewDetection.round_id
+        )}&time=${reviewDetection.last_at}&player=${encodeURIComponent(
+          reviewDetection.player_id
+        )}`,
+        tone:
+          reviewDetection.severity === "high" ? "error.main" : "warning.main",
+        icon: ShieldRoundedIcon,
+      });
+    }
     if (adminReport) {
       result.push({
         key: "admin-report",
@@ -475,7 +521,15 @@ export default function OperationsOverview({ logs, logsLoading }) {
       });
     }
     return result.slice(0, MAX_VISIBLE_TASKS);
-  }, [adminReport, balance, needsBalance, noLeaderSquads, notablePlayer, t]);
+  }, [
+    adminReport,
+    balance,
+    needsBalance,
+    noLeaderSquads,
+    notablePlayer,
+    reviewDetection,
+    t,
+  ]);
 
   const attentionCount = tasks.filter(
     (task) => task.key !== "notable-player"
@@ -492,6 +546,9 @@ export default function OperationsOverview({ logs, logsLoading }) {
       : null,
     needsBalance
       ? t("dashboard.operations.situation.balanceNotices", { count: 1 })
+      : null,
+    reviewDetection
+      ? t("dashboard.operations.situation.playerReviewNotices", { count: 1 })
       : null,
   ].filter(Boolean);
   const situationSummary = new Intl.ListFormat(language, {

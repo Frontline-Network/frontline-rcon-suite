@@ -118,6 +118,7 @@ class TacticalAccess(models.Model):
             ("can_view_live_map", "Can view private tactical positions and history"),
             ("can_manage_live_map", "Can configure tactical collection and protected players"),
             ("can_view_live_map_cases", "Can access private tactical case evidence"),
+            ("can_manage_live_map_archives", "Can create, extend and delete tactical round archives"),
         )
 
 

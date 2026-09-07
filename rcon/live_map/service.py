@@ -6,7 +6,15 @@ import time
 from collections import deque
 
 from rcon.live_map import storage
-from rcon.live_map.domain import evaluate_encounters, normalize_event, observed_death_totals, position, project, segment_break
+from rcon.live_map.domain import (
+    evaluate_encounters,
+    evaluate_gameplay_patterns,
+    normalize_event,
+    observed_death_totals,
+    position,
+    project,
+    segment_break,
+)
 from rcon.live_map.projections import display_projection, projection_ready
 
 logger = logging.getLogger(__name__)
@@ -28,6 +36,7 @@ def read_pending(red, server):
 
 def session_ids(server, player_ids):
     from sqlalchemy import func, select
+
     from rcon.models import PlayerID, PlayerSession, enter_session
     if not player_ids:
         return {}
@@ -87,7 +96,7 @@ def capture(api, server, previous, settings):
         p["segment_id"] = f"{round_id}:{p['player_id']}:{now}" if broken else prior["segment_id"]
     return {"schema_version": 1, "server_number": server, "game": game, "round_id": round_id,
             "round_start": round_start, "captured_at": now, "map": map_data, "players": adapted,
-            "calibration": calibration, "objects": [], "events": [], "signals": [],
+            "calibration": calibration, "objects": [], "events": [], "signals": [], "detections": [],
             "collector_interval": 2, "collection_seconds": 0,
             "quality": {"valid_positions": sum(p["position_valid"] for p in adapted),
                         "mapped_positions": sum(p["map_position"] is not None for p in adapted),
@@ -99,12 +108,26 @@ def attach_event_position(event, frames):
         if frame["round_id"] != event["round_id"] or not 0 <= event["time"] - frame["captured_at"] <= 3:
             continue
         player = next((p for p in frame["players"] if p["player_id"] == event["victim"]), None)
+        attacker = next(
+            (p for p in frame["players"] if p["player_id"] == event["attacker"]),
+            None,
+        )
         if player and player["position_valid"]:
             event.update(position=player["position"], position_m=player["position_m"],
                          position_sample_at=frame["captured_at"], map_position=player["map_position"],
                          victim_role=player["role"], victim_squad=player["unit_name"])
-            attacker = next((p for p in frame["players"] if p["player_id"] == event["attacker"]), {})
-            event.update(attacker_role=attacker.get("role"), attacker_squad=attacker.get("unit_name"))
+        if attacker:
+            event.update(
+                attacker_role=attacker.get("role"),
+                attacker_squad=attacker.get("unit_name"),
+                attacker_position=attacker.get("position"),
+                attacker_position_m=attacker.get("position_m"),
+                attacker_map_position=attacker.get("map_position"),
+                attacker_position_sample_at=(
+                    frame["captured_at"] if attacker.get("position_valid") else None
+                ),
+            )
+        if (player and player.get("position_valid")) or attacker:
             return
 
 
@@ -135,7 +158,7 @@ def run(stop_event=None):
     stop = stop_event or threading.Event()
     red, api, server = get_redis_client(), get_rcon(), int(get_server_number())
     lease = None
-    pending, events, recent = [], {}, deque(maxlen=512)
+    pending, events, recent, first_seen = [], {}, deque(maxlen=512), {}
     previous, cleanup_at, interval = None, 0, 2
     while not stop.is_set():
         started = time.monotonic()
@@ -152,8 +175,16 @@ def run(stop_event=None):
                 pending = read_pending(red, server)
                 restored = storage.history(server, now - 900, now) + pending
                 restored = sorted({(f["round_id"], f["captured_at"]): f for f in restored}.values(), key=lambda f: f["captured_at"])
+                if previous and previous.get("quality", {}).get("round_confirmed"):
+                    stored_events, first_seen = storage.round_events(server, previous["round_id"])
+                    events.update({event["id"]: event for event in stored_events})
                 for frame in restored:
                     events.update({e["id"]: e for e in frame.get("events", [])})
+                    for player in frame.get("players", []):
+                        if player.get("player_id"):
+                            first_seen.setdefault(
+                                player["player_id"], frame["captured_at"]
+                            )
                 recent.extend(restored[-512:])
             lease.extend(120, replace_ttl=True)
             # Retry failed persistence before querying again. A database outage
@@ -178,11 +209,20 @@ def run(stop_event=None):
             if previous and frame["captured_at"] <= previous["captured_at"]:
                 stop.wait(interval)
                 continue
-            if pending and pending[0]["round_id"] != frame["round_id"]:
-                storage.save_block(server, pending)
-                pending = []
+            if previous and previous["round_id"] != frame["round_id"]:
+                storage.finish_archive(
+                    server, previous["round_id"], previous["captured_at"]
+                )
+                if pending:
+                    storage.save_block(server, pending)
+                    pending = []
+                events = {}
+                first_seen = {}
+                recent.clear()
             recent.append(frame)
             now = frame["captured_at"]
+            for player in frame["players"]:
+                first_seen.setdefault(player["player_id"], now)
             if frame["round_start"] is not None:
                 for raw in LogsHistory().iter_range(stop=5000, page_size=250):
                     if float(raw.get("timestamp_ms") or 0) / 1000 < now - 900:
@@ -192,11 +232,17 @@ def run(stop_event=None):
                         attach_event_position(event, recent)
                         events[event["id"]] = event
                         frame["events"].append(event)
-            events = {k: e for k, e in events.items() if e["time"] >= now - 900 and e["round_id"] == frame["round_id"]}
+            events = {k: e for k, e in events.items() if e["round_id"] == frame["round_id"]}
             protected = active_protected_ids(settings["monitors"], frame["players"])
             if settings["monitor_enabled"]:
                 totals = observed_death_totals(recent, protected, now, frame["round_id"])
                 frame["signals"] = evaluate_encounters(events.values(), protected, now, frame["round_id"], totals)
+            if settings["detection_enabled"] and frame["quality"]["round_confirmed"]:
+                frame["detections"] = evaluate_gameplay_patterns(
+                    events.values(), recent, now, frame["round_id"], first_seen,
+                    settings["detection_profile"], bool(frame.get("calibration", {}).get("verified")),
+                )
+                storage.upsert_detections(server, frame["detections"], now)
             duration = time.monotonic() - started
             interval = 10 if duration >= 4 else 5 if duration >= 1.5 else 2
             frame.update(collector_interval=interval, collection_seconds=round(duration, 3))
@@ -204,7 +250,7 @@ def run(stop_event=None):
                 raise RuntimeError("Collector lease lost")
             previous = frame
             # Signals are derived; only store raw evidence once per chunk.
-            pending.append({**frame, "signals": []})
+            pending.append({**frame, "signals": [], "detections": []})
             red.set(key(server, "snapshot"), json.dumps(frame, allow_nan=False), ex=120)
             red.set(key(server, "pending"), json.dumps(pending, allow_nan=False), ex=120)
             if pending[-1]["captured_at"] - pending[0]["captured_at"] >= 30:

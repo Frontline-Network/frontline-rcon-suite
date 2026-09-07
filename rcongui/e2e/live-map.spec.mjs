@@ -229,10 +229,8 @@ test("100 synthetic players, search, replay and protected evidence", async ({
   await expect(
     view.getByRole("button", { name: "Zurück zu Live" })
   ).toBeVisible();
-  await expect(
-    view.getByRole("button", { name: "Übernehmen", exact: true })
-  ).toHaveCount(0);
   await view.getByRole("button", { name: "Zurück zu Live" }).click();
+  await view.getByRole("tab", { name: "Rückblick", exact: true }).click();
   await view.getByRole("button", { name: "Verlauf laden" }).click();
   await expect(
     view.getByText(/Im Rückblick werden keine aktuellen Live-Hinweise/)
@@ -243,6 +241,38 @@ test("100 synthetic players, search, replay and protected evidence", async ({
     fullPage: true,
   });
   expect(errors).toEqual([]);
+});
+
+test("full replay controls, event legend and round archive work together", async ({
+  page,
+}) => {
+  await openDemoPage(page, "/views/live-map");
+  const view = page.getByTestId("live-map-page");
+  await view.getByRole("tab", { name: "Rückblick", exact: true }).click();
+  await view.getByRole("button", { name: "Verlauf laden" }).click();
+  await expect(view.getByRole("slider", { name: "Zeitpunkt" })).toBeVisible();
+  await expect(view.getByText(/Kill: 4/)).toBeVisible();
+  await expect(view.getByText(/Prüfhinweis: 1/)).toBeVisible();
+  await view.getByRole("button", { name: "Details & Kontext" }).click();
+  await expect(
+    view.getByText("Frühere Runden der letzten 24 Stunden")
+  ).toBeVisible();
+  await expect(
+    view.getByText("Keine gemeldeten VAC- oder Game-Bans.")
+  ).toBeVisible();
+  await view.getByRole("button", { name: "Abspielen", exact: true }).click();
+  await expect(
+    view.getByRole("button", { name: "Pause", exact: true })
+  ).toBeVisible();
+  await view.getByRole("button", { name: "Pause", exact: true }).click();
+  await view
+    .getByRole("button", { name: "Runde sichern", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Runde sichern" });
+  await dialog.getByLabel("Begründung").fill("E2E-Rundenprüfung");
+  await dialog.getByRole("button", { name: "Sichern", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(view.getByText(/\d{2}:\d{2}:\d{2} · 30 Tage/)).toBeVisible();
 });
 
 test("unknown projections keep the map unobstructed and explain missing markers in details", async ({

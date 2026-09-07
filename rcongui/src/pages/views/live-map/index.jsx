@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -11,7 +11,6 @@ import {
   Divider,
   FormControlLabel,
   MenuItem,
-  Slider,
   Stack,
   Switch,
   Tab,
@@ -30,6 +29,10 @@ import { isFakeMode } from "@/mirage/demo-data";
 import { normalizeGame } from "@/utils/game-context";
 import TacticalMap from "./TacticalMap";
 import CalibrationPanel from "./CalibrationPanel";
+import ArchiveDialog from "./ArchiveDialog";
+import DetectionPanel from "./DetectionPanel";
+import DetectionSettings from "./DetectionSettings";
+import ReplayControls from "./ReplayControls";
 import { liveMapRequest, canUse } from "./api";
 import {
   filterPlayers,
@@ -74,22 +77,35 @@ export default function LiveMapPage() {
   const [squad, setSquad] = useState("all");
   const [showPlayers, setShowPlayers] = useState(true);
   const [showTrails, setShowTrails] = useState(true);
+  const [showEvents, setShowEvents] = useState(false);
   const [following, setFollowing] = useState(false);
   const stopFollowing = useCallback(() => setFollowing(false), []);
   const [scope, setScope] = useState("session");
+  const [mode, setMode] = useState("live");
   const [replay, setReplay] = useState(null);
+  const [replayRange, setReplayRange] = useState(null);
   const [frames, setFrames] = useState([]);
   const [liveFrames, setLiveFrames] = useState([]);
   const [playing, setPlaying] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [timelineEvents, setTimelineEvents] = useState({
+    events: [],
+    markers: [],
+  });
   const [notice, setNotice] = useState(null);
   const [historyEnd, setHistoryEnd] = useState(
     localDateTime(Date.now() / 1000)
   );
   const [historyRound, setHistoryRound] = useState("");
   const [savedSignal, setSavedSignal] = useState(null);
+  const [detectionDetailId, setDetectionDetailId] = useState(null);
+  const [archiveTarget, setArchiveTarget] = useState(null);
   const [focusedEncounter, setFocusedEncounter] = useState(null);
   const [clock, setClock] = useState(performance.now() / 1000);
   const [wasStale, setWasStale] = useState(false);
+  const chunkCache = useRef(new Map());
+  const timelineCache = useRef(new Map());
+  const deepLinkHandled = useRef(false);
   const options = {
     enabled: allowed,
     retry: false,
@@ -152,6 +168,43 @@ export default function LiveMapPage() {
     queryFn: () => liveMapRequest("reviews"),
     refetchInterval: (q) => tacticalPollInterval(q, 30000),
   });
+  const tacticalSettings = useQuery({
+    ...options,
+    enabled:
+      allowed &&
+      !forbidden &&
+      capabilities.data?.permissions.manage === true &&
+      canUse(permissions, "can_manage_live_map"),
+    queryKey: [...queryKey, "settings"],
+    queryFn: () => liveMapRequest("settings"),
+  });
+  const detections = useQuery({
+    ...options,
+    enabled:
+      allowed && !forbidden && capabilities.data?.permissions.cases === true,
+    queryKey: [...queryKey, "detections"],
+    queryFn: () => liveMapRequest("detections?limit=200"),
+    refetchInterval: (q) => tacticalPollInterval(q, 15000),
+  });
+  const detectionDetail = useQuery({
+    ...options,
+    enabled:
+      allowed &&
+      !forbidden &&
+      capabilities.data?.permissions.cases === true &&
+      Boolean(detectionDetailId),
+    queryKey: [...queryKey, "detections", detectionDetailId],
+    queryFn: () =>
+      liveMapRequest(`detections/${encodeURIComponent(detectionDetailId)}`),
+  });
+  const archives = useQuery({
+    ...options,
+    enabled:
+      allowed && !forbidden && capabilities.data?.permissions.cases === true,
+    queryKey: [...queryKey, "archives"],
+    queryFn: () => liveMapRequest("archives"),
+    refetchInterval: (q) => tacticalPollInterval(q, 30000),
+  });
   const mutation = useMutation({
     mutationFn: ({ path, data, method }) => liveMapRequest(path, data, method),
     onSuccess: () => {
@@ -162,13 +215,81 @@ export default function LiveMapPage() {
       setNotice({ severity: "error", text: `${t("error")}: ${error.message}` }),
   });
   const historyMutation = useMutation({
-    mutationFn: (path) => liveMapRequest(path),
+    mutationFn: async ({
+      round,
+      time,
+      archiveId = null,
+      preservePlaying = false,
+    }) => {
+      const target = Math.max(round.start, Math.min(time, round.end));
+      const currentStart =
+        round.start + Math.floor((target - round.start) / 300) * 300;
+      const starts = [currentStart - 300, currentStart, currentStart + 300]
+        .map((value) => Math.max(round.start, value))
+        .filter(
+          (value, index, values) =>
+            value < round.end && values.indexOf(value) === index
+        );
+      const keys = starts.map(
+        (start) => `${archiveId || "recent"}:${round.round_id}:${start}`
+      );
+      await Promise.all(
+        starts.map(async (start, index) => {
+          const key = keys[index];
+          if (chunkCache.current.has(key)) return;
+          const params = new URLSearchParams({
+            start,
+            end: Math.min(round.end, start + 300),
+            round_id: round.round_id,
+            ...(archiveId ? { archive_id: archiveId } : {}),
+          });
+          const result = await liveMapRequest(`history?${params}`);
+          chunkCache.current.set(key, result.frames || []);
+        })
+      );
+      chunkCache.current = new Map(
+        keys.map((key) => [key, chunkCache.current.get(key) || []])
+      );
+      const timelineKey = `${archiveId || "recent"}:${round.round_id}`;
+      let timeline = timelineCache.current.get(timelineKey);
+      if (!timeline) {
+        const params = new URLSearchParams({
+          start: round.start,
+          end: round.end,
+          round_id: round.round_id,
+          ...(archiveId ? { archive_id: archiveId } : {}),
+        });
+        timeline = await liveMapRequest(`events?${params}`);
+        timelineCache.current.set(timelineKey, timeline);
+      }
+      return {
+        frames: [...chunkCache.current.values()]
+          .flat()
+          .filter(
+            (frame, index, values) =>
+              values.findIndex(
+                (candidate) =>
+                  candidate.round_id === frame.round_id &&
+                  candidate.captured_at === frame.captured_at
+              ) === index
+          )
+          .sort((a, b) => a.captured_at - b.captured_at),
+        timeline,
+        round,
+        target,
+        archiveId,
+        preservePlaying,
+      };
+    },
     onSuccess: (result) => {
-      const values = result.frames || [];
-      setFrames(values);
-      setReplay(values[0]?.captured_at ?? Date.now() / 1000);
-      setPlaying(false);
-      if (!values.length) setNotice({ severity: "info", text: t("noHistory") });
+      setFrames(result.frames);
+      setTimelineEvents(result.timeline);
+      setReplayRange({ ...result.round, archive_id: result.archiveId });
+      setReplay(result.target);
+      setMode(result.archiveId ? "archive" : "replay");
+      if (!result.preservePlaying) setPlaying(false);
+      if (!result.frames.length)
+        setNotice({ severity: "info", text: t("noHistory") });
     },
     onError: (error) => setNotice({ severity: "error", text: error.message }),
   });
@@ -220,18 +341,35 @@ export default function LiveMapPage() {
     );
   }, [current?.captured_at, forbidden]);
   useEffect(() => {
-    if (!playing || replay === null) return;
+    if (!playing || replay === null || !replayRange) return;
     const timer = setInterval(
       () =>
-        setReplay((time) => {
-          const last = frames.at(-1)?.captured_at ?? time;
-          if (time + 1 >= last) setPlaying(false);
-          return Math.min(time + 1, last);
+        setReplay((value) => {
+          const next = Math.min(value + playbackSpeed * 0.25, replayRange.end);
+          if (next >= replayRange.end) setPlaying(false);
+          return next;
         }),
-      1000
+      250
     );
     return () => clearInterval(timer);
-  }, [playing, replay === null, frames]);
+  }, [playing, replay === null, replayRange, playbackSpeed]);
+  useEffect(() => {
+    if (
+      !playing ||
+      replay === null ||
+      !replayRange ||
+      historyMutation.isPending ||
+      replayRange.end <= (frames.at(-1)?.captured_at || 0) ||
+      replay < (frames.at(-1)?.captured_at || 0) - 10
+    )
+      return;
+    historyMutation.mutate({
+      round: replayRange,
+      time: replay,
+      archiveId: replayRange.archive_id,
+      preservePlaying: true,
+    });
+  }, [playing, replay, replayRange, frames, historyMutation.isPending]);
 
   const evidenceAllowed =
     capabilities.data?.permissions.cases === true &&
@@ -260,6 +398,15 @@ export default function LiveMapPage() {
         : [],
     [showTrails, selected, frame, replay, frames, liveFrames]
   );
+  const mapEvents = useMemo(() => {
+    if (!showEvents || !frame) return [];
+    const at = replay ?? frame.captured_at;
+    const values =
+      replay === null ? frame.events || [] : timelineEvents.events || [];
+    return values.filter(
+      (event) => event.map_position && event.time <= at && event.time >= at - 10
+    );
+  }, [showEvents, frame, replay, timelineEvents]);
   const signals =
     savedSignal && evidenceAllowed
       ? [savedSignal]
@@ -270,12 +417,20 @@ export default function LiveMapPage() {
             ? s.kind !== "encounter"
             : s.victim === selected || s.attacker === selected
         ) || [];
+  const detectionValues = (detections.data?.detections || []).filter(
+    (item) => replay === null || item.round_id === replayRange?.round_id
+  );
   const canManage =
     canUse(permissions, "can_manage_live_map") &&
     capabilities.data?.permissions.manage === true;
   const canCases =
     canUse(permissions, "can_view_live_map_cases") &&
     capabilities.data?.permissions.cases === true;
+  const canArchive =
+    canCases &&
+    capabilities.data?.archive_enabled === true &&
+    capabilities.data?.permissions.archives === true &&
+    canUse(permissions, "can_manage_live_map_archives");
   const age = frame && replay === null ? sampleAge(frame, clock) : null;
   const stale =
     replay === null &&
@@ -289,6 +444,9 @@ export default function LiveMapPage() {
   const goLive = () => {
     setFocusedEncounter(null);
     setReplay(null);
+    setReplayRange(null);
+    setTimelineEvents({ events: [], markers: [] });
+    setMode("live");
     setPlaying(false);
     setSavedSignal(null);
   };
@@ -298,35 +456,34 @@ export default function LiveMapPage() {
   };
   const loadHistory = () => {
     setFocusedEncounter(null);
-    const end = Math.min(
-      Date.now() / 1000,
-      new Date(historyEnd).getTime() / 1000
-    );
-    const start = Math.max(Date.now() / 1000 - 86390, end - 900);
-    const params = new URLSearchParams({
-      start,
-      end,
-      ...(historyRound ? { round_id: historyRound } : {}),
-    });
+    const round = rounds.data?.find((item) => item.round_id === historyRound);
+    if (!round) return;
+    const target = new Date(historyEnd).getTime() / 1000;
     setSavedSignal(null);
-    historyMutation.mutate(`history?${params}`);
+    historyMutation.mutate({
+      round,
+      time: Number.isFinite(target) ? target : round.start,
+      archiveId: mode === "archive" ? round.archive?.id : null,
+    });
   };
   const viewEncounter = (event, signal) => {
-    const params = new URLSearchParams({
-      start: event.time - 20,
-      end: Math.min(Date.now() / 1000, event.time + 5),
-      round_id: signal.round_id,
-    });
+    const round = rounds.data?.find(
+      (item) => item.round_id === signal.round_id
+    );
+    if (!round) return;
     setSavedSignal(null);
-    historyMutation.mutate(`history?${params}`, {
-      onSuccess: () => {
-        setFocusedEncounter({ ...event, round_id: signal.round_id });
-        setReplay(event.time);
-        setSelected(signal.victim);
-        setFollowing(true);
-        setTab(0);
-      },
-    });
+    historyMutation.mutate(
+      { round, time: event.time, archiveId: round.archive?.id || null },
+      {
+        onSuccess: () => {
+          setFocusedEncounter({ ...event, round_id: signal.round_id });
+          setReplay(event.time);
+          setSelected(signal.victim);
+          setFollowing(true);
+          setTab(0);
+        },
+      }
+    );
   };
   const review = (signal, action) =>
     mutation.mutate({
@@ -342,13 +499,150 @@ export default function LiveMapPage() {
     try {
       const data = await liveMapRequest(`reviews/${id}`);
       setSavedSignal(data.signal);
-      setFrames(data.frames);
-      setReplay(data.frames[0]?.captured_at ?? data.signal.first_at);
+      if (data.archive_id) {
+        const round = (rounds.data || []).find(
+          (item) => item.round_id === data.signal.round_id
+        );
+        if (!round) throw new Error(t("noHistory"));
+        setSelected(data.signal.player_id || null);
+        historyMutation.mutate({
+          round,
+          time: data.signal.last_at || data.signal.first_at,
+          archiveId: data.archive_id,
+        });
+      } else {
+        const evidenceFrames = data.frames || [];
+        const evidenceStart =
+          evidenceFrames[0]?.captured_at ?? data.signal.first_at;
+        const evidenceEnd =
+          evidenceFrames.at(-1)?.captured_at ?? data.signal.last_at;
+        setFrames(evidenceFrames);
+        setReplay(evidenceStart);
+        setReplayRange({
+          round_id: data.signal.round_id,
+          start: evidenceStart,
+          end: evidenceEnd,
+          archive_id: null,
+        });
+        setMode("replay");
+      }
       setPlaying(false);
     } catch (error) {
       setNotice({ severity: "error", text: error.message });
     }
   };
+  const viewDetection = (detection) => {
+    const round = rounds.data?.find(
+      (item) => item.round_id === detection.round_id
+    );
+    if (!round) {
+      setNotice({ severity: "info", text: t("noHistory") });
+      return;
+    }
+    setSelected(detection.player_id);
+    historyMutation.mutate({
+      round,
+      time: detection.last_at,
+      archiveId: round.archive?.id || null,
+    });
+  };
+  const stepReplay = (kind, amount) => {
+    if (replay === null || !replayRange) return;
+    if (kind === "seconds") {
+      const target = Math.max(
+        replayRange.start,
+        Math.min(replay + amount, replayRange.end)
+      );
+      setReplay(target);
+      historyMutation.mutate({
+        round: replayRange,
+        time: target,
+        archiveId: replayRange.archive_id,
+      });
+      return;
+    }
+    const values = frames.map((item) => item.captured_at);
+    const target =
+      amount < 0
+        ? [...values].reverse().find((value) => value < replay)
+        : values.find((value) => value > replay);
+    if (target !== undefined) setReplay(target);
+  };
+  const commitSeek = (time) => {
+    if (!replayRange) return;
+    historyMutation.mutate({
+      round: replayRange,
+      time,
+      archiveId: replayRange.archive_id,
+    });
+  };
+  const eventMarks = useMemo(() => {
+    const values = [
+      ...(timelineEvents.events || []).map((item) => ({
+        value: item.time,
+        kind: item.kind || (item.teamkill ? "teamkill" : "kill"),
+      })),
+      ...(timelineEvents.markers || []).map((item) => ({
+        value: item.time,
+        kind: "detection",
+      })),
+    ];
+    if (values.length <= 100) return values;
+    return values.filter(
+      (_, index) => index % Math.ceil(values.length / 100) === 0
+    );
+  }, [timelineEvents]);
+  const markerCounts = useMemo(() => {
+    const values = [
+      ...(timelineEvents.events || []).map(
+        (item) => item.kind || (item.teamkill ? "teamkill" : "kill")
+      ),
+      ...(timelineEvents.markers || []).map(() => "detection"),
+    ];
+    return values.reduce((counts, kind) => {
+      counts[kind] = (counts[kind] || 0) + 1;
+      return counts;
+    }, {});
+  }, [timelineEvents]);
+  const selectedRound = (rounds.data || []).find(
+    (item) => item.round_id === (historyRound || frame?.round_id)
+  );
+  const changeMode = (value) => {
+    if (value === "live") {
+      goLive();
+      return;
+    }
+    setMode(value);
+    setPlaying(false);
+    const available = (rounds.data || []).filter(
+      (item) => value !== "archive" || item.archive
+    );
+    const round =
+      available.find((item) => item.round_id === historyRound) || available[0];
+    if (round) {
+      setHistoryRound(round.round_id);
+      setHistoryEnd(localDateTime(round.end));
+    }
+  };
+  useEffect(() => {
+    if (deepLinkHandled.current || !rounds.data?.length) return;
+    const params = new URLSearchParams(window.location.search);
+    const round = rounds.data.find(
+      (item) => item.round_id === params.get("round")
+    );
+    const time = Number(params.get("time"));
+    if (!round || !Number.isFinite(time)) return;
+    deepLinkHandled.current = true;
+    const player = params.get("player");
+    if (player) setSelected(player);
+    setHistoryRound(round.round_id);
+    setHistoryEnd(localDateTime(time));
+    historyMutation.mutate({
+      round,
+      time,
+      archiveId: round.archive?.id || null,
+    });
+  }, [rounds.data]);
 
   if (forbidden) return <Alert severity="warning">{t("forbidden")}</Alert>;
   if (capabilities.isLoading)
@@ -584,6 +878,15 @@ export default function LiveMapPage() {
               }
               label={t("trails")}
             />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={showEvents}
+                  onChange={(_, v) => setShowEvents(v)}
+                />
+              }
+              label={t("events")}
+            />
           </Stack>
           <TacticalMap
             encounter={focusedEncounter}
@@ -594,6 +897,7 @@ export default function LiveMapPage() {
             onSelect={selectPlayer}
             onManualNavigate={stopFollowing}
             trails={trails}
+            events={mapEvents}
             showPlayers={showPlayers}
             t={t}
           />
@@ -605,86 +909,71 @@ export default function LiveMapPage() {
               t={t}
             />
           )}
-          <Box sx={{ ...panel, p: 1.5, mt: 1 }}>
+          <Box sx={{ ...panel, mt: 1 }}>
+            <ReplayControls
+              t={t}
+              language={i18n.language}
+              mode={mode}
+              onMode={changeMode}
+              rounds={rounds.data || []}
+              roundId={historyRound}
+              onRound={(value) => {
+                setHistoryRound(value);
+                const round = rounds.data?.find(
+                  (item) => item.round_id === value
+                );
+                if (round) setHistoryEnd(localDateTime(round.end));
+              }}
+              historyEnd={historyEnd}
+              onHistoryEnd={setHistoryEnd}
+              onLoad={loadHistory}
+              loading={historyMutation.isPending}
+              replay={replay}
+              range={replayRange}
+              playing={playing}
+              onPlaying={setPlaying}
+              onSeek={(time) => {
+                setReplay(time);
+                setPlaying(false);
+              }}
+              onSeekCommitted={commitSeek}
+              onStep={stepReplay}
+              speed={playbackSpeed}
+              onSpeed={setPlaybackSpeed}
+              eventMarks={eventMarks}
+              markerCounts={markerCounts}
+              onLive={goLive}
+            />
             <Stack
               direction="row"
               useFlexGap
               flexWrap="wrap"
               gap={1}
-              alignItems="center"
+              sx={{ px: 1.5, pb: 1.5 }}
             >
-              <TextField
-                size="small"
-                type="datetime-local"
-                label={t("time")}
-                value={historyEnd}
-                onChange={(e) => setHistoryEnd(e.target.value)}
-                slotProps={{ inputLabel: { shrink: true } }}
-              />
-              <TextField
-                size="small"
-                select
-                label={t("round")}
-                value={historyRound}
-                onChange={(e) => {
-                  setHistoryRound(e.target.value);
-                  const r = rounds.data?.find(
-                    (r) => r.round_id === e.target.value
-                  );
-                  if (r) setHistoryEnd(localDateTime(r.end));
-                }}
-                sx={{ minWidth: 180, maxWidth: 260 }}
-              >
-                <MenuItem value="">{t("all")}</MenuItem>
-                {rounds.data?.map((r) => (
-                  <MenuItem key={r.round_id} value={r.round_id}>
-                    {new Date(r.end * 1000).toLocaleString(i18n.language)}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <Button
-                disabled={historyMutation.isPending}
-                onClick={loadHistory}
-              >
-                {t("history")}
-              </Button>
-              {replay !== null && (
-                <>
-                  <Button
-                    onClick={() => setPlaying(!playing)}
-                    disabled={frames.length < 2}
-                  >
-                    {t(playing ? "pause" : "play")}
-                  </Button>
-                  <Button variant="contained" onClick={goLive}>
-                    {t("backLive")}
-                  </Button>
-                </>
+              {canArchive && selectedRound && !selectedRound.archive && (
+                <Button
+                  onClick={() => setArchiveTarget({ round: selectedRound })}
+                >
+                  {t("saveRound")}
+                </Button>
               )}
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ alignSelf: "center" }}
+              >
+                {t("retention")} · {t("gap")}
+              </Typography>
             </Stack>
-            {replay !== null && frames.length > 1 && (
-              <Slider
-                aria-label={t("time")}
-                min={frames[0].captured_at}
-                max={frames.at(-1).captured_at}
-                value={Math.max(
-                  frames[0].captured_at,
-                  Math.min(replay, frames.at(-1).captured_at)
-                )}
-                onChange={(_, time) => {
-                  setReplay(time);
-                  setPlaying(false);
-                }}
-                valueLabelDisplay="auto"
-                valueLabelFormat={(v) =>
-                  new Date(v * 1000).toLocaleTimeString(i18n.language)
-                }
-              />
-            )}
-            <Typography variant="caption" color="text.secondary">
-              {t("retention")} · {t("gap")}
-            </Typography>
           </Box>
+          {canManage && (
+            <DetectionSettings
+              settings={tacticalSettings.data}
+              mutation={mutation}
+              t={t}
+            />
+          )}
         </Box>
         <Box sx={{ display: mobile && tab !== 1 ? "none" : "grid", gap: 1.5 }}>
           <Box sx={{ ...panel, p: 1.5 }}>
@@ -875,6 +1164,33 @@ export default function LiveMapPage() {
               </Stack>
             ))}
           </Box>
+          {canCases && (
+            <DetectionPanel
+              detections={detectionValues}
+              detail={detectionDetail.data}
+              detailLoading={detectionDetail.isLoading}
+              selected={selected}
+              canCases={canCases}
+              canArchive={canArchive}
+              permissions={permissions}
+              canUse={canUse}
+              mutation={mutation}
+              onReview={review}
+              onReplay={viewDetection}
+              onDetails={(detection) =>
+                setDetectionDetailId((current) =>
+                  current === detection.id ? null : detection.id
+                )
+              }
+              onArchive={(detection) => {
+                const round = (rounds.data || []).find(
+                  (item) => item.round_id === detection.round_id
+                );
+                if (round) setArchiveTarget({ round, detection });
+              }}
+              t={t}
+            />
+          )}
           <Box sx={{ ...panel, p: 1.5 }}>
             <Stack direction="row" justifyContent="space-between">
               <Typography fontWeight={800}>{t("signals")}</Typography>
@@ -1043,8 +1359,86 @@ export default function LiveMapPage() {
               ))}
             </Box>
           )}
+          {canCases && (
+            <Box sx={{ ...panel, p: 1.5 }}>
+              <Typography fontWeight={800}>{t("archives")}</Typography>
+              {!(archives.data?.archives || []).length && (
+                <Typography variant="body2" color="text.secondary">
+                  {t("noArchives")}
+                </Typography>
+              )}
+              {(archives.data?.archives || []).map((archive) => (
+                <Box
+                  key={archive.id}
+                  sx={{ borderTop: 1, borderColor: "divider", py: 1 }}
+                >
+                  <Typography variant="body2" fontWeight={700}>
+                    {new Date(archive.end * 1000).toLocaleString(i18n.language)}{" "}
+                    · {archive.retention_days} {t("days")}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    color={
+                      archive.expires_soon ? "warning.main" : "text.secondary"
+                    }
+                    display="block"
+                  >
+                    {t("expires")}:{" "}
+                    {new Date(archive.expires_at * 1000).toLocaleDateString(
+                      i18n.language
+                    )}{" "}
+                    · {(archive.bytes / 1024 / 1024).toFixed(1)} MiB
+                    {archive.expires_soon ? ` · ⚠ ${t("expiresSoon")}` : ""}
+                  </Typography>
+                  {canArchive && (
+                    <Stack direction="row" gap={0.5}>
+                      <Button
+                        size="small"
+                        disabled={
+                          mutation.isPending || archive.retention_days === 90
+                        }
+                        onClick={() =>
+                          mutation.mutate({
+                            path: `archives/${archive.id}`,
+                            method: "PATCH",
+                            data: { retention_days: 90 },
+                          })
+                        }
+                      >
+                        {t("changeRetention")}
+                      </Button>
+                      <Button
+                        size="small"
+                        color="error"
+                        disabled={mutation.isPending}
+                        onClick={() => {
+                          if (window.confirm(t("releaseArchiveConfirm"))) {
+                            mutation.mutate({
+                              path: `archives/${archive.id}`,
+                              method: "DELETE",
+                              data: {},
+                            });
+                          }
+                        }}
+                      >
+                        {t("releaseArchive")}
+                      </Button>
+                    </Stack>
+                  )}
+                </Box>
+              ))}
+            </Box>
+          )}
         </Box>
       </Box>
+      <ArchiveDialog
+        open={Boolean(archiveTarget)}
+        onClose={() => setArchiveTarget(null)}
+        round={archiveTarget?.round}
+        detection={archiveTarget?.detection}
+        mutation={mutation}
+        t={t}
+      />
     </Box>
   );
 }

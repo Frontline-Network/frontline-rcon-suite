@@ -1,7 +1,24 @@
 // Loaded only by the existing fake-build flag. Never used as a live fallback.
 const now = () => Date.now() / 1000;
 const roundId = "demo-hllv-round";
-const config = { enabled: true, monitor_enabled: true };
+const config = {
+  enabled: true,
+  monitor_enabled: true,
+  archive_enabled: true,
+  detection_enabled: true,
+  detection_profile: {
+    min_kills: 25,
+    killrate_infantry: 1.25,
+    killrate_mg: 1.5,
+    killrate_armor: 2,
+    killrate_artillery: 3,
+    burst_kills: 6,
+    burst_unique_victims: 4,
+    burst_seconds: 60,
+    movement_mps: 50,
+    movement_consecutive: 2,
+  },
+};
 let monitors = [
   {
     player_id: "demo-0",
@@ -11,6 +28,7 @@ let monitors = [
   },
 ];
 const reviews = {};
+let archives = [];
 let snapshotCount = 0;
 function frame(time) {
   const params = new URLSearchParams(window.location.search);
@@ -104,6 +122,36 @@ const signal = (time) => ({
     weapon: "Demo-Waffe",
   })),
 });
+const detection = (time) => ({
+  id: "demo-detection",
+  round_id: roundId,
+  player_id: "demo-2",
+  player_name: "Demo Spieler 03",
+  kind: "gameplay_pattern",
+  severity: "review",
+  first_at: time - 900,
+  last_at: time - 30,
+  rule_version: "2",
+  status: "open",
+  review: reviews["demo-detection"],
+  evidence: {
+    signals: [
+      {
+        kind: "kill_rate",
+        category: "infantry",
+        kills: 27,
+        kpm: 1.42,
+        threshold: 1.25,
+      },
+      {
+        kind: "kill_burst",
+        kills: 6,
+        unique_victims: 5,
+        seconds: 48,
+      },
+    ],
+  },
+});
 
 export async function demoRequest(path, data, method) {
   const url = new URL(path, "https://demo.invalid/");
@@ -117,7 +165,9 @@ export async function demoRequest(path, data, method) {
         ? 1
         : 3,
       positions: "observed",
-      permissions: { manage: true, cases: true },
+      permissions: { manage: true, cases: true, archives: true },
+      archive_retention_days: [30, 90],
+      archive_limits: { rounds: 50, bytes: 1073741824 },
     };
   if (url.pathname === "/settings") return Object.assign(config, data);
   if (url.pathname === "/snapshot") {
@@ -132,6 +182,7 @@ export async function demoRequest(path, data, method) {
     const f = frame(time - age);
     f.age_seconds = age;
     f.signals = config.monitor_enabled && monitors.length ? [signal(time)] : [];
+    f.detections = config.detection_enabled ? [detection(time)] : [];
     return { enabled: config.enabled, snapshot: config.enabled ? f : null };
   }
   if (url.pathname === "/monitors") {
@@ -147,7 +198,14 @@ export async function demoRequest(path, data, method) {
     return monitors;
   }
   if (url.pathname === "/rounds")
-    return [{ round_id: roundId, start: time - 3600, end: time }];
+    return [
+      {
+        round_id: roundId,
+        start: time - 3600,
+        end: time,
+        archive: archives.find((item) => item.round_id === roundId),
+      },
+    ];
   if (url.pathname === "/history") {
     const start = Number(url.searchParams.get("start")),
       end = Number(url.searchParams.get("end"));
@@ -158,16 +216,97 @@ export async function demoRequest(path, data, method) {
       ),
     };
   }
+  if (url.pathname === "/events")
+    return {
+      events: signal(time).events.map((item) => ({
+        ...item,
+        attacker: "demo-1",
+        victim: "demo-0",
+        attacker_name: "Demo Spieler 02",
+        victim_name: "Demo Spieler 01",
+        teamkill: false,
+      })),
+      markers: [
+        {
+          id: "demo-detection",
+          time: time - 30,
+          kind: "detection",
+          severity: "review",
+          player_id: "demo-2",
+          player_name: "Demo Spieler 03",
+        },
+      ],
+    };
+  if (url.pathname === "/detections")
+    return { detections: config.detection_enabled ? [detection(time)] : [] };
+  if (url.pathname === "/detections/demo-detection")
+    return {
+      ...detection(time),
+      previous_24h: [
+        {
+          ...detection(time - 7200),
+          id: "demo-detection-previous",
+          round_id: "demo-hllv-previous-round",
+          severity: "observation",
+        },
+      ],
+      profile_context: {
+        source: "Steam Web API",
+        has_bans: false,
+        steam_bans: {},
+        note: "Profilkontext; fließt nicht in Auslösung oder Priorität ein.",
+      },
+    };
+  if (url.pathname === "/archives") {
+    if (method === "POST") {
+      const item = {
+        id: `demo-archive-${Date.now()}`,
+        round_id: data.round_id,
+        start: time - 3600,
+        end: time,
+        expires_at: time + data.retention_days * 86400,
+        retention_days: data.retention_days,
+        reason: data.reason,
+        status: "collecting",
+        bytes: 12582912,
+        expires_soon: false,
+      };
+      archives = [item];
+      return item;
+    }
+    return { archives };
+  }
+  if (url.pathname.startsWith("/archives/")) {
+    const id = url.pathname.split("/").at(-1);
+    if (method === "DELETE") {
+      const result = archives.find((item) => item.id === id);
+      archives = archives.filter((item) => item.id !== id);
+      return result;
+    }
+    archives = archives.map((item) =>
+      item.id === id
+        ? {
+            ...item,
+            retention_days: data.retention_days,
+            expires_at: time + data.retention_days * 86400,
+          }
+        : item
+    );
+    return archives.find((item) => item.id === id);
+  }
   if (url.pathname === "/reviews") return reviews;
   if (url.pathname.startsWith("/reviews/")) {
     if (method === "GET")
       return {
-        signal: signal(time),
+        signal: url.pathname.endsWith("demo-detection")
+          ? detection(time)
+          : signal(time),
         frames: Array.from({ length: 120 }, (_, i) =>
           frame(time - 240 + i * 2)
         ),
       };
-    reviews["demo-signal"] = {
+    const id = url.pathname.split("/").at(-1);
+    reviews[id] = {
       incident_id: "demo-case",
       status:
         data.action === "claim"
@@ -178,7 +317,7 @@ export async function demoRequest(path, data, method) {
       saved: data.action === "save",
       revision: 1,
     };
-    return reviews["demo-signal"];
+    return reviews[id];
   }
   throw new Error("Unknown demo route");
 }
