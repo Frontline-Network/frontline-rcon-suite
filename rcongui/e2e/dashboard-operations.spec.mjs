@@ -28,9 +28,7 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
       await expect(
         overview.getByRole("link", { name: /^Teams$/ })
       ).toHaveAttribute("href", "/views/team");
-      await expect(
-        overview.getByText(/Cam Ranh Port/).first()
-      ).toBeVisible();
+      await expect(overview.getByText(/Cam Ranh Port/).first()).toBeVisible();
       await expect(
         overview.locator('img[src="/maps/wdev_e-day.webp"]').first()
       ).toBeVisible();
@@ -67,23 +65,31 @@ test.describe("desktop operational overview", () => {
     const overview = page.getByTestId("operations-overview");
 
     await expect(
-      overview
-        .getByTestId("battle-overview")
-        .getByRole("heading", {
-          name: "[GER] Frontline Network | #2",
-          exact: true,
-        })
+      overview.getByTestId("battle-overview").getByRole("heading", {
+        name: "[GER] Frontline Network | #2",
+        exact: true,
+      })
     ).toBeVisible();
     await expect(overview.getByText("98/100")).toBeVisible();
     await expect(
       overview.getByText("Stärke-Index", { exact: true }).first()
     ).toBeVisible();
     await expect(
-      overview.getByText("1 Punkt braucht Aufmerksamkeit")
+      overview.getByText("2 Punkte brauchen Aufmerksamkeit")
     ).toBeVisible();
     await expect(
-      overview.getByText("Aktuell relevant: 1 Balance-Hinweis.")
+      overview.getByText(
+        "Aktuell relevant: 1 Balance-Hinweis und 1 Spieler-Prüfhinweis."
+      )
     ).toBeVisible();
+    await expect(
+      overview
+        .getByTestId("operations-task-tactical-demo-detection")
+        .getByRole("link", { name: "Rückblick" })
+    ).toHaveAttribute(
+      "href",
+      /\/views\/live-map\?round=demo-hllv-round&time=\d+(?:\.\d+)?&player=demo-2/
+    );
     await expect(overview.getByText("VIP online")).toBeVisible();
     await expect(overview.getByText("Letzte Ereignisse")).toBeVisible();
     expect(
