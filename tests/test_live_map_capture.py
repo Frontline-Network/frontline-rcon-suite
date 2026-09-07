@@ -55,3 +55,33 @@ def test_additive_sql_migration_creates_expected_tables_and_indexes():
         indexes = {i["name"] for i in inspector.get_indexes("tactical_block")}
         assert "ix_tactical_block_server_round_time" in indexes
     engine.dispose()
+
+
+def test_replay_archive_migration_is_additive():
+    import importlib.util
+    from pathlib import Path
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+    from sqlalchemy import create_engine, inspect
+
+    root = Path(__file__).resolve().parents[1] / "alembic/versions"
+    migrations = []
+    for name in ("b7e9d5026a31_live_map.py", "d2f7a4c9b8e1_live_map_replay_archives.py"):
+        spec = importlib.util.spec_from_file_location(name, root / name)
+        migration = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(migration)
+        migrations.append(migration)
+    engine = create_engine("sqlite://")
+    with engine.begin() as conn:
+        with Operations.context(MigrationContext.configure(conn)):
+            for migration in migrations:
+                migration.upgrade()
+        inspector = inspect(conn)
+        assert {"tactical_archive", "tactical_detection"} <= set(inspector.get_table_names())
+        assert "ix_tactical_archive_server_expiry" in {
+            item["name"] for item in inspector.get_indexes("tactical_archive")
+        }
+        assert "ix_tactical_detection_server_round" in {
+            item["name"] for item in inspector.get_indexes("tactical_detection")
+        }
+    engine.dispose()

@@ -4,7 +4,17 @@ import math
 
 import pytest
 
-from rcon.live_map.domain import calibrate, evaluate_encounters, normalize_event, observed_death_totals, position, project, redact_positions, segment_break
+from rcon.live_map.domain import (
+    calibrate,
+    evaluate_encounters,
+    evaluate_gameplay_patterns,
+    normalize_event,
+    observed_death_totals,
+    position,
+    project,
+    redact_positions,
+    segment_break,
+)
 from rcon.live_map.service import active_protected_ids, attach_event_position
 from rcon.live_map.storage import pack, unpack
 
@@ -155,3 +165,106 @@ def test_compressed_blocks_preserve_100_players_without_individual_rows():
     compressed = pack(data)
     assert unpack(compressed) == data
     assert len(compressed) < len(json.dumps(data)) / 5
+
+
+def gameplay_event(index, now, weapon="M1 GARAND"):
+    return {
+        "id": f"kill-{index}",
+        "round_id": "round",
+        "time": now - 100 + index * 4,
+        "attacker": "player",
+        "attacker_name": "Player",
+        "victim": f"victim-{index}",
+        "victim_name": f"Victim {index}",
+        "weapon": weapon,
+        "teamkill": False,
+    }
+
+
+def test_kill_rate_and_infantry_burst_create_explainable_review_not_action():
+    from rcon.live_map.storage import DETECTION_PROFILE
+
+    now = 2000.0
+    events = [gameplay_event(index, now) for index in range(25)]
+    frames = [{"round_id": "round", "captured_at": now, "players": [{"player_id": "player", "name": "Player"}]}]
+    result = evaluate_gameplay_patterns(
+        events + copy.deepcopy(events),
+        frames,
+        now,
+        "round",
+        {"player": now - 600},
+        DETECTION_PROFILE,
+        False,
+    )
+    assert len(result) == 1
+    assert result[0]["severity"] == "review"
+    assert {item["kind"] for item in result[0]["signals"]} == {"kill_rate", "kill_burst"}
+    assert result[0]["metrics"]["kills"] == 25
+    assert "action" not in result[0]
+
+
+def test_special_weapon_multikill_alone_does_not_create_hint():
+    from rcon.live_map.storage import DETECTION_PROFILE
+
+    now = 2000.0
+    events = [
+        gameplay_event(index, now, "155MM HOWITZER [M114]")
+        for index in range(10)
+    ]
+    assert evaluate_gameplay_patterns(
+        events, [], now, "round", {"player": now - 60}, DETECTION_PROFILE, False
+    ) == []
+    grenades = [
+        gameplay_event(index, now, "MK2 GRENADE") for index in range(30)
+    ]
+    assert evaluate_gameplay_patterns(
+        grenades,
+        [],
+        now,
+        "round",
+        {"player": now - 60},
+        DETECTION_PROFILE,
+        False,
+    ) == []
+    unknown = [
+        gameplay_event(index, now, "FUTURE UNKNOWN EXPLOSIVE")
+        for index in range(30)
+    ]
+    assert evaluate_gameplay_patterns(
+        unknown,
+        [],
+        now,
+        "round",
+        {"player": now - 60},
+        DETECTION_PROFILE,
+        False,
+    ) == []
+
+
+def test_two_consecutive_metric_jumps_remain_diagnostic_after_normal_movement():
+    from rcon.live_map.storage import DETECTION_PROFILE
+
+    def sample(at, x):
+        return {
+            "round_id": "round",
+            "captured_at": at,
+            "players": [{
+                "player_id": "player",
+                "name": "Player",
+                "session_id": "session",
+                "team": "allies",
+                "deaths": 0,
+                "position_m": {"x": x, "y": 0},
+                "map_position": {"x": x / 1000, "y": 0.5},
+            }],
+        }
+
+    frames = [sample(0, 0), sample(2, 120), sample(4, 240), sample(6, 242)]
+    result = evaluate_gameplay_patterns(
+        [], frames, 6, "round", {"player": 0}, DETECTION_PROFILE, True
+    )
+    assert result[0]["severity"] == "observation"
+    assert result[0]["signals"][0]["kind"] == "movement_anomaly"
+    assert evaluate_gameplay_patterns(
+        [], frames, 6, "round", {"player": 0}, DETECTION_PROFILE, False
+    ) == []

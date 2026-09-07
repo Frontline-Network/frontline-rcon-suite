@@ -13,6 +13,7 @@ export default function TacticalMap({
   onSelect,
   onManualNavigate,
   trails,
+  events,
   showPlayers,
   encounter,
   t,
@@ -260,6 +261,43 @@ export default function TacticalMap({
               </text>
             </g>
           )}
+          {calibrated &&
+            (events || []).map((event) => {
+              const point = event.map_position;
+              const color = event.teamkill
+                ? theme.palette.error.main
+                : theme.palette.warning.main;
+              const size = 9 / camera.scale;
+              return (
+                <g
+                  key={event.id}
+                  data-testid="map-event-marker"
+                  transform={`translate(${point.x * 1000} ${point.y * 1000})`}
+                  pointerEvents="none"
+                >
+                  <title>
+                    {t(event.teamkill ? "teamkill" : "kill")} ·{" "}
+                    {event.attacker_name || event.attacker} →{" "}
+                    {event.victim_name || event.victim}
+                  </title>
+                  {event.teamkill ? (
+                    <path
+                      d={`M ${-size} ${-size} L ${size} ${size} M ${size} ${-size} L ${-size} ${size}`}
+                      fill="none"
+                      stroke={color}
+                      strokeWidth={3 / camera.scale}
+                    />
+                  ) : (
+                    <circle
+                      r={size}
+                      fill="none"
+                      stroke={color}
+                      strokeWidth={3 / camera.scale}
+                    />
+                  )}
+                </g>
+              );
+            })}
           {calibrated &&
             showPlayers &&
             players

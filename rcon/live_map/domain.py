@@ -5,9 +5,10 @@ import hashlib
 import json
 import math
 from collections import defaultdict
+
 from rcon.live_map.projections import projection_ready
 
-RULE_VERSION = "1"
+RULE_VERSION = "2"
 WINDOW_SECONDS = 900
 HISTORY_SECONDS = 86400
 CASE_SECONDS = 30 * 86400
@@ -195,6 +196,244 @@ def evaluate_encounters(events, protected_ids, now, round_id, death_totals=None)
                                    "Positionen sind letzte Messpunkte, keine exakten Schusspositionen.",
                                    "Kein Nachweis für Streamsniping oder Ghosting."]})
     return sorted(result, key=lambda s: (s["kind"] == "review", s["count"], s["last_at"]), reverse=True)
+
+
+def _weapon_category(weapon):
+    # Use the shared game profiles. Explosives, mines, commander abilities and
+    # other multi-kill sources remain context, but never count as infantry
+    # kill-rate or burst evidence.
+    from rcon.weapons import ALL_WEAPONS, WeaponType
+
+    kind = ALL_WEAPONS.get(weapon)
+    if kind is None:
+        try:
+            from rcon.game.hllv.weapons import HLLV_WEAPONS
+
+            kind = HLLV_WEAPONS.get(weapon)
+        except (ImportError, RuntimeError):
+            kind = None
+    if kind == WeaponType.Armor:
+        return "armor"
+    if kind in {WeaponType.Artillery, WeaponType.SPA}:
+        return "artillery"
+    if kind == WeaponType.MachineGun:
+        return "mg"
+    if kind in {WeaponType.Infantry, WeaponType.Sniper}:
+        return "infantry"
+    return None
+
+
+def _burst(events, count, unique_victims, seconds):
+    start = 0
+    for end, event in enumerate(events):
+        while event["time"] - events[start]["time"] > seconds:
+            start += 1
+        window = events[start : end + 1]
+        if len(window) >= count and len({item["victim"] for item in window}) >= unique_victims:
+            return window
+    return []
+
+
+def _movement_anomalies(frames, round_id, profile):
+    """Return repeated, metrically verified jumps without labelling their cause."""
+    previous, consecutive, qualified, result = (
+        {},
+        defaultdict(int),
+        set(),
+        defaultdict(list),
+    )
+    limit = float(profile["movement_mps"])
+    required = int(profile["movement_consecutive"])
+    for frame in sorted(
+        (item for item in frames if item.get("round_id") == round_id),
+        key=lambda item: item["captured_at"],
+    ):
+        captured = frame["captured_at"]
+        for player in frame.get("players", []):
+            player_id = player.get("player_id")
+            prior = previous.get(player_id)
+            previous[player_id] = (captured, player)
+            if not prior or not player.get("position_m") or not prior[1].get("position_m"):
+                consecutive[player_id] = 0
+                continue
+            prior_time, prior_player = prior
+            elapsed = captured - prior_time
+            comparable = (
+                0 < elapsed <= 12
+                and player.get("session_id") == prior_player.get("session_id")
+                and player.get("team") == prior_player.get("team")
+                and player.get("deaths") == prior_player.get("deaths")
+            )
+            if not comparable:
+                consecutive[player_id] = 0
+                continue
+            speed = distance(prior_player["position_m"], player["position_m"]) / elapsed
+            if speed <= limit:
+                consecutive[player_id] = 0
+                continue
+            consecutive[player_id] += 1
+            result[player_id].append(
+                {
+                    "time": captured,
+                    "speed_mps": round(speed, 1),
+                    "from": prior_player.get("map_position"),
+                    "to": player.get("map_position"),
+                }
+            )
+            if consecutive[player_id] >= required:
+                qualified.add(player_id)
+    return {player_id: result[player_id] for player_id in qualified}
+
+
+def evaluate_gameplay_patterns(events, frames, now, round_id, first_seen, profile, metric_ready):
+    """Build explainable review candidates; never returns an enforcement action."""
+    unique = {
+        event["id"]: event
+        for event in events
+        if event.get("round_id") == round_id
+        and not event.get("teamkill")
+        and event.get("attacker")
+        and event.get("victim")
+        and event.get("time", now + 1) <= now
+    }
+    by_attacker = defaultdict(list)
+    for event in unique.values():
+        by_attacker[event["attacker"]].append(event)
+    for values in by_attacker.values():
+        values.sort(key=lambda item: item["time"])
+
+    players = {}
+    for frame in frames:
+        for player in frame.get("players", []):
+            players[player.get("player_id")] = player
+    movement = _movement_anomalies(frames, round_id, profile) if metric_ready else {}
+    result = []
+    for player_id in set(by_attacker) | set(movement):
+        kills = by_attacker.get(player_id, [])
+        signals, rates = [], {}
+        observed_start = float(first_seen.get(player_id, now))
+        observed_seconds = max(0.0, now - observed_start)
+        scored_kills = [event for event in kills if event["time"] >= observed_start]
+        categories = defaultdict(list)
+        for event in scored_kills:
+            category = _weapon_category(event.get("weapon"))
+            if category:
+                categories[category].append(event)
+        relevant_kills = [event for values in categories.values() for event in values]
+        played = max(60.0, observed_seconds)
+        for category, values in categories.items():
+            rate = len(values) / played * 60
+            rates[category] = round(rate, 2)
+            threshold = float(profile[f"killrate_{category}"])
+            if (
+                observed_seconds >= 60
+                and len(values) >= int(profile["min_kills"])
+                and rate >= threshold
+            ):
+                signals.append(
+                    {
+                        "kind": "kill_rate",
+                        "category": category,
+                        "kills": len(values),
+                        "kpm": round(rate, 2),
+                        "threshold": threshold,
+                    }
+                )
+        infantry = categories.get("infantry", [])
+        burst = _burst(
+            infantry,
+            int(profile["burst_kills"]),
+            int(profile["burst_unique_victims"]),
+            int(profile["burst_seconds"]),
+        )
+        if burst:
+            signals.append(
+                {
+                    "kind": "kill_burst",
+                    "kills": len(burst),
+                    "unique_victims": len({event["victim"] for event in burst}),
+                    "seconds": round(burst[-1]["time"] - burst[0]["time"], 1),
+                }
+            )
+        recent_pairs = defaultdict(list)
+        for event in kills:
+            if now - WINDOW_SECONDS <= event["time"]:
+                recent_pairs[event["victim"]].append(event)
+        repeated = max(recent_pairs.values(), key=len, default=[])
+        if len(repeated) >= 3:
+            signals.append(
+                {
+                    "kind": "repeated_target",
+                    "victim": repeated[-1]["victim"],
+                    "victim_name": repeated[-1].get("victim_name"),
+                    "kills": len(repeated),
+                    "seconds": round(repeated[-1]["time"] - repeated[0]["time"], 1),
+                }
+            )
+        jumps = movement.get(player_id, [])
+        if jumps:
+            signals.append(
+                {
+                    "kind": "movement_anomaly",
+                    "count": len(jumps),
+                    "maximum_mps": max(item["speed_mps"] for item in jumps),
+                    "threshold_mps": float(profile["movement_mps"]),
+                    "diagnostic_only": True,
+                }
+            )
+        if not signals:
+            continue
+        combat = any(item["kind"] in {"kill_rate", "kill_burst"} for item in signals)
+        severity = "high" if combat and len(signals) >= 3 else "review" if combat and len(signals) >= 2 else "observation"
+        player = players.get(player_id, {})
+        times = [event["time"] for event in kills]
+        times += [item["time"] for item in jumps]
+        first_at, last_at = min(times or [now]), max(times or [now])
+        detection_id = hashlib.sha256(
+            f"{RULE_VERSION}:{round_id}:{player_id}:gameplay_pattern".encode()
+        ).hexdigest()
+        result.append(
+            {
+                "id": detection_id,
+                "round_id": round_id,
+                "player_id": player_id,
+                "player_name": player.get("name") or (kills[-1].get("attacker_name") if kills else None),
+                "kind": "gameplay_pattern",
+                "severity": severity,
+                "first_at": first_at,
+                "last_at": last_at,
+                "rule_version": RULE_VERSION,
+                "signals": signals,
+                "metrics": {
+                    "kills": len(relevant_kills),
+                    "all_logged_kills": len(kills),
+                    "playtime_seconds": round(played),
+                    "observed_seconds": round(observed_seconds),
+                    "kills_per_minute": rates,
+                    "unique_victims": len({event["victim"] for event in kills}),
+                },
+                "events": relevant_kills[-50:],
+                "movement_events": jumps[-20:],
+                "data_quality": {
+                    "metric_positions": bool(metric_ready),
+                    "movement_assessed": bool(metric_ready),
+                    "position_note": "Positionssprünge sind ein technischer Prüfkontext und kein eigenständiger Cheatnachweis.",
+                },
+                "context": [
+                    "Waffen, Rollen, Fahrzeuge, Spawnkämpfe und gemeinsame Frontabschnitte prüfen.",
+                    "Keine Schussrichtung, Sichtlinie, Trefferquote oder Client-Anti-Cheat-Daten vorhanden.",
+                    "Der Hinweis ist keine Cheat-Wahrscheinlichkeit und löst keine automatische Maßnahme aus.",
+                ],
+            }
+        )
+    return sorted(
+        result,
+        key=lambda item: (
+            {"high": 2, "review": 1, "observation": 0}[item["severity"]],
+            item["last_at"],
+        ),
+        reverse=True,
+    )
 
 
 def redact_positions(value):
