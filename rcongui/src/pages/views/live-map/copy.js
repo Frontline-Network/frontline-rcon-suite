@@ -54,6 +54,11 @@ export const copy = {
     players: "Spieler",
     trails: "Laufweg",
     events: "Ereignisse",
+    killConnections: "Kill-Verbindungen",
+    allKillConnections: "Alle Kills",
+    killConnectionHelp:
+      "Die Verbindung zeigt letzte bekannte Messpunkte – keine Flugbahn oder Schussrichtung.",
+    killConnectionLastKnown: "Verbindung letzter bekannter Messpunkte",
     kill: "Kill",
     teamkill: "Teamkill",
     data_gap: "Datenlücke",
@@ -250,6 +255,11 @@ export const copy = {
     players: "Players",
     trails: "Trail",
     events: "Events",
+    killConnections: "Kill connections",
+    allKillConnections: "All kills",
+    killConnectionHelp:
+      "The connection uses last known samples — it is not a bullet path or firing direction.",
+    killConnectionLastKnown: "Connection between last known samples",
     kill: "Kill",
     teamkill: "Team kill",
     data_gap: "Data gap",

@@ -42,6 +42,7 @@ import {
 } from "./geometry.mjs";
 import { copy } from "./copy";
 import { tacticalPollInterval, sampleAge, sampleIsStale } from "./polling.mjs";
+import { visibleKillConnections } from "./kill-events.mjs";
 
 const ACTIONS = generatePlayerActions({
   multiAction: false,
@@ -78,6 +79,7 @@ export default function LiveMapPage() {
   const [showPlayers, setShowPlayers] = useState(true);
   const [showTrails, setShowTrails] = useState(true);
   const [showEvents, setShowEvents] = useState(false);
+  const [showAllKillConnections, setShowAllKillConnections] = useState(false);
   const [following, setFollowing] = useState(false);
   const stopFollowing = useCallback(() => setFollowing(false), []);
   const [scope, setScope] = useState("session");
@@ -400,13 +402,28 @@ export default function LiveMapPage() {
   );
   const mapEvents = useMemo(() => {
     if (!showEvents || !frame) return [];
-    const at = replay ?? frame.captured_at;
+    const at =
+      replay ?? frame.captured_at + Math.max(0, sampleAge(frame, clock));
     const values =
-      replay === null ? frame.events || [] : timelineEvents.events || [];
-    return values.filter(
-      (event) => event.map_position && event.time <= at && event.time >= at - 10
-    );
-  }, [showEvents, frame, replay, timelineEvents]);
+      replay === null
+        ? liveFrames.flatMap((item) => item.events || [])
+        : timelineEvents.events || [];
+    return visibleKillConnections({
+      events: values,
+      at,
+      selected,
+      showAll: showAllKillConnections,
+    });
+  }, [
+    showEvents,
+    frame,
+    replay,
+    timelineEvents,
+    liveFrames,
+    selected,
+    showAllKillConnections,
+    clock,
+  ]);
   const signals =
     savedSignal && evidenceAllowed
       ? [savedSignal]
@@ -885,9 +902,29 @@ export default function LiveMapPage() {
                   onChange={(_, v) => setShowEvents(v)}
                 />
               }
-              label={t("events")}
+              label={t("killConnections")}
             />
+            {showEvents && selected && (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={showAllKillConnections}
+                    onChange={(_, v) => setShowAllKillConnections(v)}
+                  />
+                }
+                label={t("allKillConnections")}
+              />
+            )}
           </Stack>
+          {showEvents && (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: "block", px: 2, pb: 1 }}
+            >
+              {t("killConnectionHelp")}
+            </Typography>
+          )}
           <TacticalMap
             encounter={focusedEncounter}
             frame={frame}
@@ -898,6 +935,8 @@ export default function LiveMapPage() {
             onManualNavigate={stopFollowing}
             trails={trails}
             events={mapEvents}
+            animateConnections={replay === null || playing}
+            connectionSpeed={replay === null ? 1 : playbackSpeed}
             showPlayers={showPlayers}
             t={t}
           />

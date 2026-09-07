@@ -88,7 +88,22 @@ function frame(time) {
       : { verified: true, units_per_meter: 100 },
     players,
     objects: [],
-    events: [],
+    events: [
+      {
+        id: "demo-live-kill",
+        time: time - 1,
+        attacker: "demo-1",
+        victim: "demo-0",
+        attacker_name: "Demo Spieler 02",
+        victim_name: "Demo Spieler 01",
+        attacker_position_sample_at: time - 2,
+        attacker_map_position: players[1].map_position,
+        position_sample_at: time - 2,
+        map_position: players[0].map_position,
+        weapon: "Demo-Waffe",
+        teamkill: false,
+      },
+    ],
     signals: [],
     collector_interval: 2,
     quality: {
@@ -114,11 +129,13 @@ const signal = (time) => ({
   first_at: time - 700,
   last_at: time - 20,
   review: reviews["demo-signal"],
-  events: [700, 500, 200, 20].map((offset, i) => ({
+  events: [700, 500, 200, 5].map((offset, i) => ({
     id: `demo-event-${i}`,
     time: time - offset,
     position_sample_at: time - offset - 1,
     map_position: { x: 0.3 + i * 0.1, y: 0.4 },
+    attacker_position_sample_at: time - offset - 1,
+    attacker_map_position: { x: 0.15 + i * 0.1, y: 0.25 },
     weapon: "Demo-Waffe",
   })),
 });
@@ -224,7 +241,7 @@ export async function demoRequest(path, data, method) {
         victim: "demo-0",
         attacker_name: "Demo Spieler 02",
         victim_name: "Demo Spieler 01",
-        teamkill: false,
+        teamkill: item.id === "demo-event-3",
       })),
       markers: [
         {
