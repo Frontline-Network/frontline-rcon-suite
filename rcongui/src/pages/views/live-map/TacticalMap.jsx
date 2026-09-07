@@ -1,5 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Box, Button, Stack, Typography, useTheme } from "@mui/material";
+import {
+  Box,
+  Button,
+  Stack,
+  Typography,
+  useMediaQuery,
+  useTheme,
+} from "@mui/material";
 import { getThemeTeamColor } from "@/themes/teamColors";
 import { getTacticalMapImageSrc } from "@/utils/map-images.mjs";
 import { projectionReady } from "./geometry.mjs";
@@ -14,11 +21,14 @@ export default function TacticalMap({
   onManualNavigate,
   trails,
   events,
+  animateConnections = true,
+  connectionSpeed = 1,
   showPlayers,
   encounter,
   t,
 }) {
   const theme = useTheme();
+  const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const [camera, setCamera] = useState({ x: 0, y: 0, scale: 1 });
   const [isDragging, setIsDragging] = useState(false);
   const drag = useRef(null);
@@ -263,38 +273,106 @@ export default function TacticalMap({
           )}
           {calibrated &&
             (events || []).map((event) => {
-              const point = event.map_position;
+              const from = event.connection.from;
+              const to = event.connection.to;
               const color = event.teamkill
                 ? theme.palette.error.main
                 : theme.palette.warning.main;
               const size = 9 / camera.scale;
+              const duration = Math.max(0.25, 1.1 / connectionSpeed);
+              const label = `${t("killConnectionLastKnown")}: ${t(
+                event.teamkill ? "teamkill" : "kill"
+              )} · ${event.attacker_name || event.attacker} → ${
+                event.victim_name || event.victim
+              }${event.weapon ? ` · ${event.weapon}` : ""}`;
               return (
                 <g
-                  key={event.id}
-                  data-testid="map-event-marker"
-                  transform={`translate(${point.x * 1000} ${point.y * 1000})`}
+                  key={`${event.id}:${event.time}`}
+                  data-testid="kill-connection"
+                  data-teamkill={event.teamkill ? "true" : "false"}
+                  role="img"
+                  aria-label={label}
                   pointerEvents="none"
                 >
                   <title>
+                    {t("killConnectionLastKnown")} ·{" "}
                     {t(event.teamkill ? "teamkill" : "kill")} ·{" "}
                     {event.attacker_name || event.attacker} →{" "}
                     {event.victim_name || event.victim}
+                    {event.weapon ? ` · ${event.weapon}` : ""}
                   </title>
-                  {event.teamkill ? (
-                    <path
-                      d={`M ${-size} ${-size} L ${size} ${size} M ${size} ${-size} L ${-size} ${size}`}
-                      fill="none"
-                      stroke={color}
-                      strokeWidth={3 / camera.scale}
-                    />
-                  ) : (
-                    <circle
-                      r={size}
-                      fill="none"
-                      stroke={color}
-                      strokeWidth={3 / camera.scale}
-                    />
-                  )}
+                  <line
+                    x1={from.x * 1000}
+                    y1={from.y * 1000}
+                    x2={to.x * 1000}
+                    y2={to.y * 1000}
+                    fill="none"
+                    stroke={color}
+                    strokeWidth={2.5 / camera.scale}
+                    strokeDasharray={
+                      event.teamkill
+                        ? `${4 / camera.scale} ${6 / camera.scale}`
+                        : `${12 / camera.scale} ${8 / camera.scale}`
+                    }
+                    opacity={0.72}
+                  />
+                  {animateConnections &&
+                    !reduceMotion &&
+                    [0, 1, 2].map((index) => (
+                      <circle
+                        key={index}
+                        data-testid="kill-connection-particle"
+                        cx={from.x * 1000}
+                        cy={from.y * 1000}
+                        r={(event.teamkill ? 3.5 : 4.5) / camera.scale}
+                        fill={color}
+                        stroke={theme.palette.background.default}
+                        strokeWidth={1 / camera.scale}
+                        opacity="0"
+                      >
+                        <animate
+                          attributeName="cx"
+                          from={from.x * 1000}
+                          to={to.x * 1000}
+                          begin={`${index * 0.18}s`}
+                          dur={`${duration}s`}
+                          repeatCount="2"
+                        />
+                        <animate
+                          attributeName="cy"
+                          from={from.y * 1000}
+                          to={to.y * 1000}
+                          begin={`${index * 0.18}s`}
+                          dur={`${duration}s`}
+                          repeatCount="2"
+                        />
+                        <animate
+                          attributeName="opacity"
+                          values="0;1;1;0"
+                          keyTimes="0;0.15;0.8;1"
+                          begin={`${index * 0.18}s`}
+                          dur={`${duration}s`}
+                          repeatCount="2"
+                        />
+                      </circle>
+                    ))}
+                  <g transform={`translate(${to.x * 1000} ${to.y * 1000})`}>
+                    {event.teamkill ? (
+                      <path
+                        d={`M ${-size} ${-size} L ${size} ${size} M ${size} ${-size} L ${-size} ${size}`}
+                        fill="none"
+                        stroke={color}
+                        strokeWidth={3 / camera.scale}
+                      />
+                    ) : (
+                      <circle
+                        r={size}
+                        fill="none"
+                        stroke={color}
+                        strokeWidth={3 / camera.scale}
+                      />
+                    )}
+                  </g>
                 </g>
               );
             })}

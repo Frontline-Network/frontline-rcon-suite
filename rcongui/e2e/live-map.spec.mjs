@@ -193,6 +193,28 @@ test("pointer capture keeps dragging outside the map and releases cleanly", asyn
   await expect(canvas).toHaveCSS("cursor", "grab");
 });
 
+test("live kill connections stay readable and follow the selected-player filter", async ({
+  page,
+}) => {
+  await openDemoPage(page, "/views/live-map");
+  await page.getByLabel("Kill-Verbindungen").check();
+  const connection = page.getByTestId("kill-connection");
+  await expect(connection).toHaveCount(1);
+  await expect(connection).toHaveAttribute("data-teamkill", "false");
+  await expect(connection).toHaveAttribute(
+    "aria-label",
+    /Demo Spieler 02 → Demo Spieler 01 · Demo-Waffe/
+  );
+  await expect(
+    page.getByText(/keine Flugbahn oder Schussrichtung/)
+  ).toBeVisible();
+
+  await page.locator('[data-player-id="demo-55"]').click();
+  await expect(connection).toHaveCount(0);
+  await page.getByLabel("Alle Kills").check();
+  await expect(connection).toHaveCount(1);
+});
+
 test("100 synthetic players, search, replay and protected evidence", async ({
   page,
 }) => {
@@ -251,8 +273,15 @@ test("full replay controls, event legend and round archive work together", async
   await view.getByRole("tab", { name: "Rückblick", exact: true }).click();
   await view.getByRole("button", { name: "Verlauf laden" }).click();
   await expect(view.getByRole("slider", { name: "Zeitpunkt" })).toBeVisible();
-  await expect(view.getByText(/Kill: 4/)).toBeVisible();
+  await expect(view.getByText(/Kill: 3/)).toBeVisible();
+  await expect(view.getByText(/Teamkill: 1/)).toBeVisible();
   await expect(view.getByText(/Prüfhinweis: 1/)).toBeVisible();
+  await view.getByLabel("Kill-Verbindungen").check();
+  await view.getByRole("slider", { name: "Zeitpunkt" }).press("End");
+  await expect(view.getByTestId("kill-connection")).toHaveAttribute(
+    "data-teamkill",
+    "true"
+  );
   await view.getByRole("button", { name: "Details & Kontext" }).click();
   await expect(
     view.getByText("Frühere Runden der letzten 24 Stunden")
@@ -273,6 +302,22 @@ test("full replay controls, event legend and round archive work together", async
   await dialog.getByRole("button", { name: "Sichern", exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect(view.getByText(/\d{2}:\d{2}:\d{2} · 30 Tage/)).toBeVisible();
+});
+
+test.describe("motion preference", () => {
+  test.use({ reducedMotion: "no-preference" });
+  test("kill direction uses a small bounded particle animation", async ({
+    page,
+  }) => {
+    await openDemoPage(page, "/views/live-map");
+    await page.getByLabel("Kill-Verbindungen").check();
+    const connection = page.getByTestId("kill-connection");
+    await expect(connection).toHaveCount(1);
+    await expect(
+      connection.getByTestId("kill-connection-particle")
+    ).toHaveCount(3);
+    await expect(connection.locator("animate")).toHaveCount(9);
+  });
 });
 
 test("unknown projections keep the map unobstructed and explain missing markers in details", async ({
