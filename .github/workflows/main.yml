@@ -18,6 +18,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: '0'
+      - name: Trust checkout in containerized tag action
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/_github_home"
+          git config --file "$RUNNER_TEMP/_github_home/.gitconfig" \
+            --add safe.directory /github/workspace
       - name: Bump version and push tag
         uses: anothrNick/github-tag-action@1.26.0
         env:
