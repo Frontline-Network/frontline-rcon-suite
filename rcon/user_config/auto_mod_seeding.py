@@ -104,9 +104,9 @@ class EnforceCapFight(BaseModel):
     enabled: bool = Field(default=True, title="Enabled", description="Whether this individual seeding rule is enabled")
     min_players: int = Field(ge=0, le=100, default=0, title="Minimum Players", description="The minimum players on the server to enforce this rule")
     max_players: int = Field(ge=0, le=100, default=100, title="Maximum Players", description="The maximum players on the server to enforce this rule")
-    max_caps: int = Field(ge=2, le=4, default=3, title="Maximum capped Points", description="The maximum number of cap points that can be capped by one team. Starting to cap another point will violate this rule")
-    skip_warning: bool = Field(default=False, title="Skip Warning", description="If set to true the Automod will skip the warning punishment level and directly continue to punish when this rule is violated. Enable this, if capping more points than allowed should absolutely be prevented. The game will report that a point is being capped no later than 60 seconds after the cap begins to cap, which could mean that the Automod may reach a corrective measure (punish, kick) too late (if warning is, e.g., set to 60 seconds)")
-    violation_message: str = Field(default=ENFORCE_CAP_FIGHT_VIOLATION_MESSAGE, title="Violation Message", description="The message send to the player when they use one of the disallowed roles")
+    max_caps: int = Field(ge=2, le=4, default=3, title="Maximum capped Points", description="The maximum number of sectors that one team may hold. Player world positions are checked against the next sector boundary; offensive points are used only when positions are unavailable")
+    skip_warning: bool = Field(default=False, title="Skip Warning", description="If set to true the Automod skips the warning level and punishes a player as soon as they are detected beyond the allowed sector boundary")
+    violation_message: str = Field(default=ENFORCE_CAP_FIGHT_VIOLATION_MESSAGE, title="Violation Message", description="The message sent when a player crosses the configured combat-area boundary")
 
 
 class AutoModSeedingUserConfig(BaseUserConfig):

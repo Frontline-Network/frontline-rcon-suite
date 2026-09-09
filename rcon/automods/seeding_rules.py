@@ -13,6 +13,11 @@ from typing import Literal
 
 import redis
 
+from rcon.automods.geofence import (
+    is_outside_combat_area,
+    is_spawned,
+    normalize_world_position,
+)
 from rcon.automods.get_team_count import get_team_count
 from rcon.automods.is_time import is_time
 from rcon.automods.models import (
@@ -27,7 +32,7 @@ from rcon.automods.models import (
 from rcon.automods.num_or_inf import num_or_inf
 from rcon.cache_utils import get_redis_client
 from rcon.logs.loop import on_match_start
-from rcon.maps import GameMode, parse_layer
+from rcon.maps import GameMode
 from rcon.rcon import StructuredLogLineType
 from rcon.types import GameStateType, GetDetailedPlayer, normalize_role
 from rcon.user_config.auto_mod_seeding import AutoModSeedingUserConfig
@@ -304,6 +309,66 @@ class SeedingRulesAutomod:
             except Exception:
                 self.logger.exception("tried to cleanup punished time but failed")
 
+    def _position_cap_violation(
+        self,
+        watch_status: WatchStatus,
+        player: dict,
+        team: Literal["axis", "allies"],
+        game_state: GameStateType,
+    ) -> bool | None:
+        """Return a position-based decision while filtering bogus join samples.
+
+        The game may initially report a random HQ for a newly connected player.
+        Mirroring hll-geofences, a first non-zero sample is therefore ignored
+        until the player moves. Players first observed as unspawned can be
+        evaluated immediately after they spawn.
+        """
+        position = normalize_world_position(player.get("world_position"))
+        if position is None:
+            return None
+
+        current_map = game_state.get("current_map")
+        if not isinstance(current_map, dict):
+            return None
+        map_data = current_map.get("map")
+        if not isinstance(map_data, dict) or not map_data.get("id"):
+            return None
+        map_id = str(map_data["id"])
+
+        tracked_map_id = getattr(watch_status, "world_position_map_id", None)
+        if tracked_map_id != map_id:
+            watch_status.initial_world_positions = {}
+            watch_status.world_position_map_id = map_id
+
+        initial_positions = getattr(watch_status, "initial_world_positions", None)
+        if initial_positions is None:
+            # Pickles created before positional seeding detection do not have
+            # the new dataclass fields. Upgrade them lazily in place.
+            initial_positions = {}
+            watch_status.initial_world_positions = initial_positions
+
+        player_id = player["player_id"]
+        if not is_spawned(position):
+            initial_positions[player_id] = None
+            return False
+
+        if player_id not in initial_positions:
+            initial_positions[player_id] = position
+            return False
+
+        initial_position = initial_positions[player_id]
+        if initial_position is not None:
+            if position == initial_position:
+                return False
+            initial_positions[player_id] = None
+
+        return is_outside_combat_area(
+            position,
+            map_id=map_id,
+            team=team,
+            max_caps=self.config.enforce_cap_fight.max_caps,
+        )
+
     def punitions_to_apply(
         self,
         team_view,
@@ -406,10 +471,23 @@ class SeedingRulesAutomod:
                 if game_state["game_mode"] != GameMode.WARFARE:
                     self._disable_for_round("enforce_cap_fight")
 
-                if not self._is_seeding_rule_disabled("enforce_cap_fight") and (
-                    (team == "axis" and game_state["axis_score"] >= ecf.max_caps)
-                    or (team == "allies" and game_state["allied_score"] >= ecf.max_caps)
-                ):
+                cap_rule_active = not self._is_seeding_rule_disabled(
+                    "enforce_cap_fight"
+                )
+                position_violation = (
+                    self._position_cap_violation(
+                        watch_status, player, team, game_state
+                    )
+                    if cap_rule_active
+                    else None
+                )
+                team_reached_cap_limit = (
+                    team == "axis" and game_state["axis_score"] >= ecf.max_caps
+                ) or (
+                    team == "allies" and game_state["allied_score"] >= ecf.max_caps
+                )
+
+                if cap_rule_active and team_reached_cap_limit:
                     self.logger.debug("Player is on %s side and winning", team)
                     op = player["offense"]
                     oop = watch_status.offensive_points.setdefault(aplayer.name, -1)
@@ -419,8 +497,21 @@ class SeedingRulesAutomod:
                         str(oop),
                         str(op),
                     )
-                    if oop != -1 and oop < op:
+                    if position_violation is True or (
+                        position_violation is None and oop != -1 and oop < op
+                    ):
                         violations.append(ecf.violation_message)
+
+                        detection = (
+                            "world position"
+                            if position_violation is True
+                            else "offensive-points fallback"
+                        )
+                        self.logger.info(
+                            "Detected seeding combat-area violation for %s via %s",
+                            aplayer.short_repr(),
+                            detection,
+                        )
 
                         if ecf.skip_warning:
                             warnings = watch_status.warned.setdefault(aplayer.name, [])

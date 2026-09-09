@@ -577,6 +577,102 @@ def test_cycles_warn_punish_kick_cap_fight_players(team_view):
     assert [expected_warned_players[0]] == punitions.kick
 
 
+def position_cap_fight_mod(team_view):
+    player_count = get_team_count(team_view, "allies") + get_team_count(
+        team_view, "axis"
+    )
+    return mod_with_config(
+        AutoModSeedingUserConfig(
+            enabled=True,
+            number_of_warnings=1,
+            warning_message="",
+            disallowed_roles=DisallowedRoles(enabled=False),
+            disallowed_weapons=DisallowedWeapons(enabled=False),
+            enforce_cap_fight=EnforceCapFight(
+                min_players=0,
+                max_players=player_count + 1,
+                max_caps=3,
+            ),
+        )
+    )
+
+
+def test_position_detection_warns_before_offense_score_changes(team_view):
+    squad = team_view["allies"]["squads"]["able"]
+    squad["players"] = [squad["players"][0]]
+    player = squad["players"][0]
+    player["world_position"] = {"x": 0, "y": 0, "z": 1}
+    mod = position_cap_fight_mod(team_view)
+
+    assert PunitionsToApply() == mod.punitions_to_apply(
+        team_view, "able", "allies", squad, game_state
+    )
+
+    player["world_position"] = {"x": 20_160, "y": 0, "z": 1}
+    punitions = mod.punitions_to_apply(
+        team_view, "able", "allies", squad, game_state
+    )
+
+    assert [expected_warned_players[0]] == punitions.warning
+
+
+def test_position_detection_ignores_offense_increase_inside_boundary(team_view):
+    squad = team_view["allies"]["squads"]["able"]
+    squad["players"] = [squad["players"][0]]
+    player = squad["players"][0]
+    player["world_position"] = {"x": 0, "y": 0, "z": 1}
+    mod = position_cap_fight_mod(team_view)
+    mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
+
+    player["world_position"] = {"x": 100, "y": 0, "z": 1}
+    player["offense"] += 1
+
+    assert PunitionsToApply() == mod.punitions_to_apply(
+        team_view, "able", "allies", squad, game_state
+    )
+
+
+def test_position_detection_filters_random_initial_hq_sample(team_view):
+    squad = team_view["allies"]["squads"]["able"]
+    squad["players"] = [squad["players"][0]]
+    player = squad["players"][0]
+    player["world_position"] = {"x": 50_000, "y": 0, "z": 1}
+    mod = position_cap_fight_mod(team_view)
+
+    assert PunitionsToApply() == mod.punitions_to_apply(
+        team_view, "able", "allies", squad, game_state
+    )
+    assert PunitionsToApply() == mod.punitions_to_apply(
+        team_view, "able", "allies", squad, game_state
+    )
+
+    player["world_position"] = {"x": 50_001, "y": 0, "z": 1}
+    punitions = mod.punitions_to_apply(
+        team_view, "able", "allies", squad, game_state
+    )
+
+    assert [expected_warned_players[0]] == punitions.warning
+
+
+def test_position_detection_checks_first_spawn_after_zero_sample(team_view):
+    squad = team_view["allies"]["squads"]["able"]
+    squad["players"] = [squad["players"][0]]
+    player = squad["players"][0]
+    player["world_position"] = {"x": 0, "y": 0, "z": 0}
+    mod = position_cap_fight_mod(team_view)
+
+    assert PunitionsToApply() == mod.punitions_to_apply(
+        team_view, "able", "allies", squad, game_state
+    )
+
+    player["world_position"] = {"x": 20_160, "y": 0, "z": 1}
+    punitions = mod.punitions_to_apply(
+        team_view, "able", "allies", squad, game_state
+    )
+
+    assert [expected_warned_players[0]] == punitions.warning
+
+
 def test_punishes_commander_cap_fight(team_view):
     config = AutoModSeedingUserConfig(
         enabled=True,

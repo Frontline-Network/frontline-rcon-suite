@@ -38,6 +38,10 @@ class OffensiveDefensiveState(TypedDict):
 @dataclass
 class WatchStatus:
     offensive_points: Mapping[str, int] = field(default_factory=dict)
+    initial_world_positions: Mapping[
+        str, tuple[float, float, float] | None
+    ] = field(default_factory=dict)
+    world_position_map_id: str | None = None
 
     noted: Mapping[str, List[datetime]] = field(default_factory=dict)
     warned: Mapping[str, List[datetime]] = field(default_factory=dict)
