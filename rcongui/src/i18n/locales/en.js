@@ -3022,10 +3022,10 @@ const en = {
           cap: {
             title: "Limit the combat area",
             description:
-              "Keeps fighting in the intended middle area while seeding.",
+              "Keeps fighting in the intended middle area by checking each player's actual position.",
             switchTitle: "Enforce fighting over the middle point",
             switchHelp:
-              "Detects players when their team attacks beyond the allowed sectors.",
+              "Checks map direction and the sector boundary directly; offensive points are only a fallback when position data is unavailable.",
           },
         },
         fields: {
@@ -5902,9 +5902,9 @@ const enMasterFallback = {
           },
           "cap": {
             "title": "Limit the combat area",
-            "description": "Keeps fighting in the intended middle area while seeding.",
+            "description": "Keeps fighting in the intended middle area by checking each player's actual position.",
             "switchTitle": "Enforce fighting over the middle point",
-            "switchHelp": "Detects players when their team attacks beyond the allowed sectors."
+            "switchHelp": "Checks map direction and the sector boundary directly; offensive points are only a fallback when position data is unavailable."
           }
         },
         "fields": {

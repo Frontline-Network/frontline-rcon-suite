@@ -3051,10 +3051,10 @@ const de = {
           cap: {
             title: "Kampfbereich begrenzen",
             description:
-              "Hält das Gefecht während des Seedings im vorgesehenen mittleren Kartenbereich.",
+              "Hält das Gefecht anhand der tatsächlichen Spielerposition im vorgesehenen mittleren Kartenbereich.",
             switchTitle: "Kampf um den mittleren Punkt erzwingen",
             switchHelp:
-              "Spieler werden erkannt, wenn ihr Team mehr Sektoren als erlaubt angreift.",
+              "Prüft Kartenrichtung und Sektorgrenze direkt; Offensivpunkte dienen nur als Rückfallebene ohne Positionsdaten.",
           },
         },
         fields: {
@@ -5948,9 +5948,9 @@ const deMasterFallback = {
           },
           "cap": {
             "title": "Kampfbereich begrenzen",
-            "description": "Hält das Gefecht während des Seedings im vorgesehenen mittleren Kartenbereich.",
+            "description": "Hält das Gefecht anhand der tatsächlichen Spielerposition im vorgesehenen mittleren Kartenbereich.",
             "switchTitle": "Kampf um den mittleren Punkt erzwingen",
-            "switchHelp": "Spieler werden erkannt, wenn ihr Team mehr Sektoren als erlaubt angreift."
+            "switchHelp": "Prüft Kartenrichtung und Sektorgrenze direkt; Offensivpunkte dienen nur als Rückfallebene ohne Positionsdaten."
           }
         },
         "fields": {
