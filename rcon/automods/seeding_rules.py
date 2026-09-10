@@ -338,6 +338,7 @@ class SeedingRulesAutomod:
         tracked_map_id = getattr(watch_status, "world_position_map_id", None)
         if tracked_map_id != map_id:
             watch_status.initial_world_positions = {}
+            watch_status.combat_area_outside_player_ids = set()
             watch_status.world_position_map_id = map_id
 
         initial_positions = getattr(watch_status, "initial_world_positions", None)
@@ -368,6 +369,40 @@ class SeedingRulesAutomod:
             team=team,
             max_caps=self.config.enforce_cap_fight.max_caps,
         )
+
+    @staticmethod
+    def _clear_player_progress(watch_status: WatchStatus, player_name: str) -> None:
+        """Start warnings and punishments fresh for a new boundary excursion."""
+        for states in (watch_status.noted, watch_status.warned, watch_status.punished):
+            states.pop(player_name, None)
+
+    def _update_combat_area_excursion(
+        self,
+        watch_status: WatchStatus,
+        *,
+        player_id: str,
+        player_name: str,
+        outside: bool,
+    ) -> None:
+        """Track transitions instead of treating every five-second poll as new."""
+        outside_player_ids = getattr(
+            watch_status, "combat_area_outside_player_ids", None
+        )
+        if outside_player_ids is None:
+            # Upgrade WatchStatus pickles written before excursion tracking.
+            outside_player_ids = set()
+            watch_status.combat_area_outside_player_ids = outside_player_ids
+
+        was_outside = player_id in outside_player_ids
+        if outside:
+            if not was_outside:
+                self._clear_player_progress(watch_status, player_name)
+                outside_player_ids.add(player_id)
+            return
+
+        if was_outside:
+            outside_player_ids.discard(player_id)
+            self._clear_player_progress(watch_status, player_name)
 
     def punitions_to_apply(
         self,
@@ -474,6 +509,7 @@ class SeedingRulesAutomod:
                 cap_rule_active = not self._is_seeding_rule_disabled(
                     "enforce_cap_fight"
                 )
+                combat_area_violation = False
                 position_violation = (
                     self._position_cap_violation(
                         watch_status, player, team, game_state
@@ -488,6 +524,14 @@ class SeedingRulesAutomod:
                 )
 
                 if cap_rule_active and team_reached_cap_limit:
+                    if position_violation is not None:
+                        self._update_combat_area_excursion(
+                            watch_status,
+                            player_id=aplayer.player_id,
+                            player_name=aplayer.name,
+                            outside=position_violation,
+                        )
+
                     self.logger.debug("Player is on %s side and winning", team)
                     op = player["offense"]
                     oop = watch_status.offensive_points.setdefault(aplayer.name, -1)
@@ -501,6 +545,7 @@ class SeedingRulesAutomod:
                         position_violation is None and oop != -1 and oop < op
                     ):
                         violations.append(ecf.violation_message)
+                        combat_area_violation = True
 
                         detection = (
                             "world position"
@@ -513,9 +558,12 @@ class SeedingRulesAutomod:
                             detection,
                         )
 
-                        if ecf.skip_warning:
+                        if ecf.skip_warning and self.config.number_of_warnings > 0:
                             warnings = watch_status.warned.setdefault(aplayer.name, [])
-                            for _ in range(self.config.number_of_warnings):
+                            missing_warnings = max(
+                                0, self.config.number_of_warnings - len(warnings)
+                            )
+                            for _ in range(missing_warnings):
                                 warnings.append(
                                     datetime.now()
                                     - timedelta(
@@ -525,6 +573,12 @@ class SeedingRulesAutomod:
                     watch_status.offensive_points[aplayer.name] = op
                 else:
                     watch_status.offensive_points.clear()
+                    self._update_combat_area_excursion(
+                        watch_status,
+                        player_id=aplayer.player_id,
+                        player_name=aplayer.name,
+                        outside=False,
+                    )
 
                 if len(violations) == 0:
                     continue
@@ -555,7 +609,12 @@ class SeedingRulesAutomod:
 
                 # Punish
                 state = self.should_punish_player(
-                    watch_status, team_view, squad_name, squad, aplayer
+                    watch_status,
+                    team_view,
+                    squad_name,
+                    squad,
+                    aplayer,
+                    repeat_when_kick_disabled=combat_area_violation,
                 )
 
                 if state == PunishStepState.APPLY:
@@ -662,6 +721,8 @@ class SeedingRulesAutomod:
         squad_name: str,
         squad,
         aplayer: PunishPlayer,
+        *,
+        repeat_when_kick_disabled: bool = False,
     ):
         """
         Punish (kill) trespassers
@@ -719,6 +780,23 @@ class SeedingRulesAutomod:
                 aplayer.short_repr(),
                 len(punishes),
                 num_or_inf(self.config.number_of_punishments),
+            )
+            punishes.append(datetime.now())
+            return PunishStepState.APPLY
+
+        if not self.config.kick_after_max_punish and repeat_when_kick_disabled:
+            # A disabled kick must not leave an outside player permanently
+            # unmoderated after the finite punishment counter is exhausted.
+            # Keep a bounded rolling window so the configured interval still
+            # controls repetition without growing Redis state indefinitely.
+            keep = max(0, self.config.number_of_punishments - 1)
+            if keep:
+                del punishes[:-keep]
+            else:
+                punishes.clear()
+            self.logger.info(
+                "%s Kick disabled; repeating punishment after configured interval",
+                aplayer.short_repr(),
             )
             punishes.append(datetime.now())
             return PunishStepState.APPLY
