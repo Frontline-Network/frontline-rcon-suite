@@ -42,6 +42,7 @@ class WatchStatus:
         str, tuple[float, float, float] | None
     ] = field(default_factory=dict)
     world_position_map_id: str | None = None
+    combat_area_outside_player_ids: set[str] = field(default_factory=set)
 
     noted: Mapping[str, List[datetime]] = field(default_factory=dict)
     warned: Mapping[str, List[datetime]] = field(default_factory=dict)

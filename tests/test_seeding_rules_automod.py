@@ -673,6 +673,107 @@ def test_position_detection_checks_first_spawn_after_zero_sample(team_view):
     assert [expected_warned_players[0]] == punitions.warning
 
 
+def position_cap_fight_skip_warning_mod(team_view, *, punishments=2):
+    player_count = get_team_count(team_view, "allies") + get_team_count(
+        team_view, "axis"
+    )
+    return mod_with_config(
+        AutoModSeedingUserConfig(
+            enabled=True,
+            number_of_warnings=2,
+            warning_interval_seconds=60,
+            number_of_punishments=punishments,
+            punish_interval_seconds=60,
+            kick_after_max_punish=False,
+            disallowed_roles=DisallowedRoles(enabled=False),
+            disallowed_weapons=DisallowedWeapons(enabled=False),
+            enforce_cap_fight=EnforceCapFight(
+                skip_warning=True,
+                min_players=0,
+                max_players=player_count + 1,
+                max_caps=3,
+            ),
+        )
+    )
+
+
+def test_position_skip_warning_state_stays_bounded_while_outside(team_view):
+    squad = team_view["allies"]["squads"]["able"]
+    squad["players"] = [squad["players"][0]]
+    player = squad["players"][0]
+    player["world_position"] = {"x": 0, "y": 0, "z": 1}
+    mod = position_cap_fight_skip_warning_mod(team_view)
+    mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
+
+    player["world_position"] = {"x": 20_160, "y": 0, "z": 1}
+    mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
+    for _ in range(5):
+        mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
+
+    watch_status = state["alliesable"]
+    assert len(watch_status.warned[player["name"]]) == 2
+    assert len(watch_status.punished[player["name"]]) == 1
+
+
+def test_position_progress_resets_after_returning_inside(team_view):
+    squad = team_view["allies"]["squads"]["able"]
+    squad["players"] = [squad["players"][0]]
+    player = squad["players"][0]
+    player["world_position"] = {"x": 0, "y": 0, "z": 1}
+    mod = position_cap_fight_skip_warning_mod(team_view, punishments=1)
+    mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
+
+    player["world_position"] = {"x": 20_160, "y": 0, "z": 1}
+    first = mod.punitions_to_apply(
+        team_view, "able", "allies", squad, game_state
+    )
+    assert [expected_warned_players[0]] == first.punish
+
+    player["world_position"] = {"x": 100, "y": 0, "z": 1}
+    assert PunitionsToApply() == mod.punitions_to_apply(
+        team_view, "able", "allies", squad, game_state
+    )
+    watch_status = state["alliesable"]
+    assert player["name"] not in watch_status.warned
+    assert player["name"] not in watch_status.punished
+    assert player["player_id"] not in watch_status.combat_area_outside_player_ids
+
+    player["world_position"] = {"x": 20_160, "y": 0, "z": 1}
+    second = mod.punitions_to_apply(
+        team_view, "able", "allies", squad, game_state
+    )
+    assert [expected_warned_players[0]] == second.punish
+
+
+def test_position_repeats_punishment_when_kick_is_disabled(team_view):
+    squad = team_view["allies"]["squads"]["able"]
+    squad["players"] = [squad["players"][0]]
+    player = squad["players"][0]
+    player["world_position"] = {"x": 0, "y": 0, "z": 1}
+    mod = position_cap_fight_skip_warning_mod(team_view, punishments=2)
+    mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
+
+    player["world_position"] = {"x": 20_160, "y": 0, "z": 1}
+    first = mod.punitions_to_apply(
+        team_view, "able", "allies", squad, game_state
+    )
+    assert [expected_warned_players[0]] == first.punish
+
+    watch_status = state["alliesable"]
+    watch_status.punished[player["name"]][-1] -= timedelta(seconds=61)
+    second = mod.punitions_to_apply(
+        team_view, "able", "allies", squad, game_state
+    )
+    assert [expected_warned_players[0]] == second.punish
+
+    watch_status.punished[player["name"]][-1] -= timedelta(seconds=61)
+    repeated = mod.punitions_to_apply(
+        team_view, "able", "allies", squad, game_state
+    )
+    assert [expected_warned_players[0]] == repeated.punish
+    assert len(watch_status.punished[player["name"]]) == 2
+
+
 def test_punishes_commander_cap_fight(team_view):
     config = AutoModSeedingUserConfig(
         enabled=True,
