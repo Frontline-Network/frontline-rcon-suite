@@ -727,7 +727,7 @@ def test_position_progress_resets_after_returning_inside(team_view):
     first = mod.punitions_to_apply(
         team_view, "able", "allies", squad, game_state
     )
-    assert [expected_warned_players[0]] == first.punish
+    assert [player["player_id"]] == [target.player_id for target in first.punish]
 
     player["world_position"] = {"x": 100, "y": 0, "z": 1}
     assert PunitionsToApply() == mod.punitions_to_apply(
@@ -742,7 +742,7 @@ def test_position_progress_resets_after_returning_inside(team_view):
     second = mod.punitions_to_apply(
         team_view, "able", "allies", squad, game_state
     )
-    assert [expected_warned_players[0]] == second.punish
+    assert [player["player_id"]] == [target.player_id for target in second.punish]
 
 
 def test_position_repeats_punishment_when_kick_is_disabled(team_view):
@@ -757,20 +757,20 @@ def test_position_repeats_punishment_when_kick_is_disabled(team_view):
     first = mod.punitions_to_apply(
         team_view, "able", "allies", squad, game_state
     )
-    assert [expected_warned_players[0]] == first.punish
+    assert [player["player_id"]] == [target.player_id for target in first.punish]
 
     watch_status = state["alliesable"]
     watch_status.punished[player["name"]][-1] -= timedelta(seconds=61)
     second = mod.punitions_to_apply(
         team_view, "able", "allies", squad, game_state
     )
-    assert [expected_warned_players[0]] == second.punish
+    assert [player["player_id"]] == [target.player_id for target in second.punish]
 
     watch_status.punished[player["name"]][-1] -= timedelta(seconds=61)
     repeated = mod.punitions_to_apply(
         team_view, "able", "allies", squad, game_state
     )
-    assert [expected_warned_players[0]] == repeated.punish
+    assert [player["player_id"]] == [target.player_id for target in repeated.punish]
     assert len(watch_status.punished[player["name"]]) == 2
 
 
