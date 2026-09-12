@@ -10,12 +10,23 @@ export const DEFAULT_LIVE_CARDS = Object.freeze({
 export function normalizeLiveViewPreferences(value) {
   return {
     version: 1,
+    balance_expanded:
+      typeof value?.balance_expanded === "boolean"
+        ? value.balance_expanded
+        : true,
     cards: Object.fromEntries(
       Object.entries(DEFAULT_LIVE_CARDS).map(([key, fallback]) => [
         key,
         typeof value?.cards?.[key] === "boolean" ? value.cards[key] : fallback,
       ])
     ),
+  };
+}
+
+export function resetLiveStatusCards(value) {
+  return {
+    ...normalizeLiveViewPreferences(value),
+    cards: { ...DEFAULT_LIVE_CARDS },
   };
 }
 

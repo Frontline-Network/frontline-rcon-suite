@@ -56,7 +56,7 @@ class UserLiveViewPreferenceTests(TestCase):
 
     def test_account_isolation_and_persistence_across_clients(self):
         preferences = normalize_live_view(
-            {"cards": {"commander": True, "vips": True, "score": False}}
+            {"cards": {"commander": True, "vips": True, "score": False}, "balance_expanded": False}
         )
         self.assertEqual(self.put(preferences).status_code, 200)
         second_device = Client()
@@ -83,6 +83,8 @@ class UserLiveViewPreferenceTests(TestCase):
             [], None, {"cards": []}, {"cards": {"score": "false"}},
             {"cards": {"score": 0}}, {"cards": {"unknown": True}},
             {"version": 2}, {"version": True}, {"user_id": self.other.pk},
+            {"balance_expanded": "false"}, {"balance_expanded": 0},
+            {"balance_expanded": None},
         ]:
             with self.subTest(invalid=invalid):
                 self.assertEqual(self.put(invalid).status_code, 400)
@@ -124,3 +126,13 @@ class UserLiveViewPreferenceTests(TestCase):
         )
         record.refresh_from_db()
         self.assertEqual(record.preferences, [])
+
+    def test_existing_card_preferences_default_to_expanded_balance(self):
+        old = {"version": 1, "cards": {"vips": True, "score": False}}
+        record = UserLiveViewPreference.objects.create(user=self.user, preferences=old)
+        result = self.client.get("/api/get_own_user_live_view").json()["result"]
+        self.assertTrue(result["balance_expanded"])
+        self.assertTrue(result["cards"]["vips"])
+        self.assertFalse(result["cards"]["score"])
+        record.refresh_from_db()
+        self.assertEqual(record.preferences, old)

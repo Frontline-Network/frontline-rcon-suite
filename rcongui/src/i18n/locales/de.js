@@ -5345,6 +5345,8 @@ const deMasterFallback = {
     "live": {
       "reviewNow": "Jetzt prüfen",
       "statusCards": "Spielstatus",
+      "balanceDetails": "Details",
+      "balanceDetailsToggle": "Live-Balance-Details anzeigen",
       "mobileOperationsTab": "Einsatz",
       "mobileLogTab": "Protokoll",
       "loadMorePlayers": "Weitere Spieler laden",

@@ -20,6 +20,7 @@ import {
   DEFAULT_LIVE_CARDS,
   liveViewPreferencesKey,
   normalizeLiveViewPreferences,
+  resetLiveStatusCards,
 } from "./live-view-preferences.mjs";
 
 export function useLiveViewPreferences() {
@@ -82,6 +83,7 @@ export function LiveViewSettings({ settings }) {
     <>
       <Button
         size="small"
+        disabled={busy}
         aria-label={t("views.live.customizeView")}
         startIcon={<TuneOutlined />}
         onClick={() => {
@@ -147,7 +149,7 @@ export function LiveViewSettings({ settings }) {
           </Stack>
           <Button
             disabled={!ready || busy}
-            onClick={() => setDraft(normalizeLiveViewPreferences())}
+            onClick={() => setDraft(resetLiveStatusCards(selection))}
             sx={{ mt: 1 }}
           >
             {t("views.live.resetDisplaySettings")}

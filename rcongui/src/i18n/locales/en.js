@@ -5299,6 +5299,8 @@ const enMasterFallback = {
     "live": {
       "reviewNow": "Review now",
       "statusCards": "Game status",
+      "balanceDetails": "Details",
+      "balanceDetailsToggle": "Show live balance details",
       "mobileOperationsTab": "Operations",
       "mobileLogTab": "Log",
       "loadMorePlayers": "Load more players",

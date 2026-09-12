@@ -625,6 +625,32 @@ const readDemoParameter = (name) => {
   return new URLSearchParams(window.location.search).get(name);
 };
 
+// Deterministic imbalance for checking compact-mode intervention controls.
+const demoUnbalancedTeamView = {
+  ...demoTeamView,
+  allies: {
+    ...demoTeamView.allies,
+    count: 5,
+    squads: {
+      able: demoTeamView.allies.squads.able,
+      charlie: {
+        type: "infantry", has_leader: false,
+        players: axisPlayers.slice(1).map((player) => ({
+          ...player, team: "allies", unit_name: "charlie",
+        })),
+      },
+    },
+  },
+  axis: {
+    ...demoTeamView.axis,
+    count: 1,
+    squads: { baker: { ...demoTeamView.axis.squads.baker, players: axisPlayers.slice(0, 1) } },
+  },
+};
+
+export const getDemoTeamView = () =>
+  readDemoParameter("demo_balance") === "unbalanced" ? demoUnbalancedTeamView : demoTeamView;
+
 export const getDemoConnectionMode = () =>
   readDemoParameter("demo_connection") || "online";
 

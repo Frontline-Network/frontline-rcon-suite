@@ -4,6 +4,7 @@ import {
   DEFAULT_LIVE_CARDS,
   liveViewPreferencesKey,
   normalizeLiveViewPreferences,
+  resetLiveStatusCards,
 } from "./live-view-preferences.mjs";
 
 test("only score and next map are enabled by default", () => {
@@ -38,4 +39,29 @@ test("query caches are isolated by user account", () => {
     liveViewPreferencesKey("Alice"),
     liveViewPreferencesKey("Bob")
   );
+});
+
+test("older preferences keep balance details expanded by default", () => {
+  assert.equal(
+    normalizeLiveViewPreferences({ cards: { vips: true } }).balance_expanded,
+    true
+  );
+  assert.equal(
+    normalizeLiveViewPreferences({ balance_expanded: "false" })
+      .balance_expanded,
+    true
+  );
+});
+
+test("keeps compact balance and status-card preferences independently", () => {
+  const value = normalizeLiveViewPreferences({
+    balance_expanded: false,
+    cards: { vips: true },
+  });
+  assert.equal(value.balance_expanded, false);
+  assert.equal(value.cards.vips, true);
+  const reset = resetLiveStatusCards(value);
+  assert.equal(reset.balance_expanded, false);
+  assert.deepEqual(reset.cards, DEFAULT_LIVE_CARDS);
+  assert.equal(value.cards.vips, true);
 });

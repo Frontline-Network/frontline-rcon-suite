@@ -41,7 +41,7 @@ import { useGlobalStore } from "@/stores/global-state";
 import { LiveCommandBar } from "./live-workspace";
 import { ActionMenu } from "@/features/player-action/ActionMenu";
 import { generatePlayerActions } from "@/features/player-action/actions";
-import AutobalancerCard from "../team/autobalancer-card";
+import { LiveBalanceCard } from "./live-balance-card";
 import { LiveViewSettings, useLiveViewPreferences } from "./live-view-settings";
 
 const interval = 15 * 1000;
@@ -487,7 +487,7 @@ const Live = () => {
         visibility={liveViewSettings.preferences.cards}
       />
 
-      <AutobalancerCard teams={teamData} />
+      <LiveBalanceCard teams={teamData} settings={liveViewSettings} />
 
       <Stack
         direction="row"
