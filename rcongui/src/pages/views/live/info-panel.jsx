@@ -8,6 +8,7 @@ import {
 } from "@mui/icons-material";
 import { Box, ButtonBase, Stack, Typography, alpha } from "@mui/material";
 import { useTranslation } from "react-i18next";
+import { DEFAULT_LIVE_CARDS } from "./live-view-preferences.mjs";
 
 const UNASSIGNED = "unassigned";
 
@@ -130,7 +131,13 @@ const AlertItem = ({ item, onFilter, isActive }) => {
   );
 };
 
-const InfoPanel = ({ gameData, playersData, onFilter, activeFilters = [] }) => {
+const InfoPanel = ({
+  gameData,
+  playersData,
+  onFilter,
+  activeFilters = [],
+  visibility = DEFAULT_LIVE_CARDS,
+}) => {
   const { t } = useTranslation();
   const content = [];
   const teamLabel = (team) => {
@@ -140,7 +147,7 @@ const InfoPanel = ({ gameData, playersData, onFilter, activeFilters = [] }) => {
   };
 
   const vipsCount = playersData.filter((player) => player.is_vip).length;
-  if (vipsCount > 0) {
+  if (visibility.vips && vipsCount > 0) {
     content.push({
       key: "vips",
       type: "info",
@@ -156,7 +163,7 @@ const InfoPanel = ({ gameData, playersData, onFilter, activeFilters = [] }) => {
   const watchedCount = playersData.filter(
     (player) => player.profile.watchlist?.is_watched
   ).length;
-  if (watchedCount > 0) {
+  if (visibility.watched && watchedCount > 0) {
     content.push({
       key: "watched",
       type: "info",
@@ -183,7 +190,8 @@ const InfoPanel = ({ gameData, playersData, onFilter, activeFilters = [] }) => {
       team !== "lobby" &&
       playersData.length > 0 &&
       state &&
-      !state.commander
+      !state.commander &&
+      visibility.commander
     ) {
       content.push({
         key: `${team}-commander`,
@@ -200,7 +208,8 @@ const InfoPanel = ({ gameData, playersData, onFilter, activeFilters = [] }) => {
     if (
       team !== "lobby" &&
       playersData.length > 0 &&
-      state?.no_sl_squads.length > 0
+      state?.no_sl_squads.length > 0 &&
+      visibility.squad_leaders
     ) {
       content.push({
         key: `${team}-leaders`,
@@ -217,28 +226,32 @@ const InfoPanel = ({ gameData, playersData, onFilter, activeFilters = [] }) => {
     }
   }
 
-  content.push({
-    key: "score",
-    type: "info",
-    label: `${t("views.live.score")} · ${t("views.team.allies")} : ${t(
-      "views.team.axis"
-    )}`,
-    mobileLabel: t("views.live.score"),
-    value: `${gameData?.allied_score ?? 0} : ${gameData?.axis_score ?? 0}`,
-    color: "secondary",
-    icon: SportsScoreOutlined,
-    priority: t("views.live.priorityInfo"),
-  });
+  if (visibility.score)
+    content.push({
+      key: "score",
+      type: "info",
+      label: `${t("views.live.score")} · ${t("views.team.allies")} : ${t(
+        "views.team.axis"
+      )}`,
+      mobileLabel: t("views.live.score"),
+      value: `${gameData?.allied_score ?? 0} : ${gameData?.axis_score ?? 0}`,
+      color: "secondary",
+      icon: SportsScoreOutlined,
+      priority: t("views.live.priorityInfo"),
+    });
 
-  content.push({
-    key: "next-map",
-    type: "info",
-    label: t("views.live.nextMap"),
-    value: gameData?.next_map?.pretty_name ?? "–",
-    color: "info",
-    icon: MapOutlined,
-    priority: t("views.live.priorityInfo"),
-  });
+  if (visibility.next_map)
+    content.push({
+      key: "next-map",
+      type: "info",
+      label: t("views.live.nextMap"),
+      value: gameData?.next_map?.pretty_name ?? "–",
+      color: "info",
+      icon: MapOutlined,
+      priority: t("views.live.priorityInfo"),
+    });
+
+  if (content.length === 0) return null;
 
   return (
     <Box
@@ -255,15 +268,19 @@ const InfoPanel = ({ gameData, playersData, onFilter, activeFilters = [] }) => {
         }}
         variant="overline"
       >
-        {t("views.live.reviewNow", { defaultValue: "Jetzt prüfen" })}
+        {t(
+          content.some((item) => item.type === "warning")
+            ? "views.live.reviewNow"
+            : "views.live.statusCards"
+        )}
       </Typography>
       <Box
         sx={{
           display: "grid",
           gridTemplateColumns: {
-            xs: "repeat(2, minmax(0, 1fr))",
-            sm: "repeat(3, minmax(0, 1fr))",
-            md: "repeat(3, minmax(0, 1fr))",
+            xs: `repeat(${Math.min(content.length, 2)}, minmax(0, 1fr))`,
+            sm: `repeat(${Math.min(content.length, 3)}, minmax(0, 1fr))`,
+            md: `repeat(${Math.min(content.length, 3)}, minmax(0, 1fr))`,
             lg: `repeat(${Math.min(content.length, 6)}, minmax(0, 1fr))`,
           },
           gap: 0.75,

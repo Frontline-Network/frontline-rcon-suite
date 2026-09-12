@@ -42,6 +42,7 @@ import { LiveCommandBar } from "./live-workspace";
 import { ActionMenu } from "@/features/player-action/ActionMenu";
 import { generatePlayerActions } from "@/features/player-action/actions";
 import AutobalancerCard from "../team/autobalancer-card";
+import { LiveViewSettings, useLiveViewPreferences } from "./live-view-settings";
 
 const interval = 15 * 1000;
 const UNASSIGNED = "unassigned";
@@ -121,6 +122,7 @@ export const loader = () => ({ initialLogsView: undefined });
 const Live = () => {
   const { t } = useTranslation();
   const { initialLogsView } = useLoaderData();
+  const liveViewSettings = useLiveViewPreferences();
   const gameState = useGlobalStore((state) => state.gameState);
   const factionByTeam = useMemo(
     () => ({
@@ -469,6 +471,12 @@ const Live = () => {
         layoutMode={effectiveLayout}
         onLayoutModeChange={setLayoutMode}
         splitDisabled={!splitAvailable}
+        settingsControl={
+          <LiveViewSettings
+            key={liveViewSettings.userName}
+            settings={liveViewSettings}
+          />
+        }
       />
 
       <InfoPanel
@@ -476,6 +484,7 @@ const Live = () => {
         playersData={playersData}
         onFilter={handleStatusFilter}
         activeFilters={playersColumnFilters}
+        visibility={liveViewSettings.preferences.cards}
       />
 
       <AutobalancerCard teams={teamData} />

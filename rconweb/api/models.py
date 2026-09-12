@@ -5,6 +5,7 @@ from django.contrib.auth.models import User
 from django.db import models
 
 from rconweb.settings import SECRET_KEY
+from .live_view_preferences import default_user_live_view
 
 
 def default_user_appearance():
@@ -57,6 +58,19 @@ class UserAppearancePreference(models.Model):
         User, on_delete=models.CASCADE, related_name="appearance_preference"
     )
     preferences = models.JSONField(default=default_user_appearance)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        default_permissions = ()
+
+
+class UserLiveViewPreference(models.Model):
+    """Personal status-card visibility, independent from server automation."""
+
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="live_view_preference"
+    )
+    preferences = models.JSONField(default=default_user_live_view)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

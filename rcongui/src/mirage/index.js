@@ -1,4 +1,5 @@
 import { createServer, Response } from "miragejs";
+import { normalizeLiveViewPreferences } from "../pages/views/live/live-view-preferences.mjs";
 import { handleTeamView } from "./routes/team-view";
 import { createGameState } from "./state/game";
 import {
@@ -301,6 +302,31 @@ export function makeServer({ environment = "development" } = {}) {
         })
       );
       this.get("/logout", () => ok(true));
+      const liveViewStorageKey = () => `crcon.demo.live-view.${getDemoRole()}`;
+      this.get(
+        "/get_own_user_live_view",
+        trackProtectedRequest("/api/get_own_user_live_view", () => {
+          if (new URLSearchParams(window.location.search).get("demo_live_view_error") === "load") {
+            return new Response(503, {}, { error: "Demo settings load failed" });
+          }
+          let preferences;
+          try {
+            preferences = JSON.parse(localStorage.getItem(liveViewStorageKey()));
+          } catch { /* use defaults */ }
+          return ok(normalizeLiveViewPreferences(preferences));
+        })
+      );
+      this.put(
+        "/set_own_user_live_view",
+        trackProtectedRequest("/api/set_own_user_live_view", (_schema, request) => {
+          if (new URLSearchParams(window.location.search).get("demo_live_view_error") === "save") {
+            return new Response(503, {}, { error: "Demo settings save failed" });
+          }
+          const preferences = normalizeLiveViewPreferences(JSON.parse(request.requestBody));
+          localStorage.setItem(liveViewStorageKey(), JSON.stringify(preferences));
+          return ok(preferences);
+        })
+      );
 
       this.get(
         "/get_connection_info",

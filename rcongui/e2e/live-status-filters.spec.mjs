@@ -1,6 +1,18 @@
 import { expect, test } from "@playwright/test";
 import { openDemoPage, VIEWPORTS } from "./helpers.mjs";
 
+async function enableCommanderCards(page) {
+  await page
+    .getByRole("button", { name: "Live-Ansicht anpassen", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Live-Ansicht anpassen" });
+  await dialog
+    .getByRole("checkbox", { name: "Commander-Hinweise (beide Teams)" })
+    .check();
+  await dialog.getByRole("button", { name: "Speichern", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+}
+
 test.describe("live status shortcuts", () => {
   test.use({ viewport: VIEWPORTS.desktop });
 
@@ -32,6 +44,7 @@ test.describe("live status shortcuts", () => {
     await openDemoPage(page, "/views/live");
 
     const players = page.getByTestId("live-players-panel");
+    await enableCommanderCards(page);
     const rows = players.getByRole("row");
     const initialRowCount = await rows.count();
     const commanderWarning = page
@@ -54,6 +67,7 @@ test.describe("live status shortcuts", () => {
     await openDemoPage(page, "/views/live");
 
     const players = page.getByTestId("live-players-panel");
+    await enableCommanderCards(page);
     const rows = players.getByRole("row");
     const initialRowCount = await rows.count();
     const commanderWarning = page

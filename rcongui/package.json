@@ -37,6 +37,7 @@
     "check:history-workbench": "node scripts/check-history-workbench.mjs",
     "check:live-balance": "node scripts/check-live-balance-assistant.mjs",
     "check:log-stacks": "node --test src/pages/views/live/log-stacks.test.mjs",
+    "check:live-view": "node --test src/pages/views/live/live-view-preferences.test.mjs",
     "check:color-vision": "node scripts/check-color-vision-contract.mjs",
     "format:write": "prettier src/ --write",
     "lint": "eslint src/"
