@@ -1,5 +1,6 @@
 import { faker } from '@faker-js/faker';
 import { generateGameLog, generateGameLogs } from '../factories/gameLog';
+import { createLogStackDemo } from '../data/live-log-stacks.mjs';
 
 // In-memory storage for logs
 let storedLogs = [];
@@ -34,15 +35,20 @@ export const handleRecentLogs = (gameState, params = {}) => {
     inclusive_filter = true
   } = params;
 
-  // Initialize logs if empty
-  initializeLogs(gameState);
+  const stackDemo = new URLSearchParams(window.location.search)
+    .get("demo_log_stacks") === "1";
+  if (stackDemo) {
+    storedLogs = createLogStackDemo(
+      new URLSearchParams(window.location.search).get("demo_log_stack_size")
+    ).slice(0, end);
+  } else {
+    initializeLogs(gameState);
 
-  // Add new logs
-  storedLogs = [...generateNewLogs(gameState, 10), ...storedLogs]
-    // Keep only the specified number of logs
-    .slice(0, end)
-    // Sort by timestamp (most recent first)
-    .sort((a, b) => b.timestamp_ms - a.timestamp_ms);
+    // Add new logs, keep the requested limit and sort most recent first.
+    storedLogs = [...generateNewLogs(gameState, 10), ...storedLogs]
+      .slice(0, end)
+      .sort((a, b) => b.timestamp_ms - a.timestamp_ms);
+  }
 
   // Apply filters if they exist
   let filteredLogs = storedLogs;
