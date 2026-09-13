@@ -26,7 +26,16 @@ import { ActionButton } from "@/features/player-action/ActionMenu";
 import { Actions } from "@/features/player-action/actions";
 import { cmd } from "@/utils/fetchUtils";
 import { getThemeTeamColors } from "@/themes/teamColors";
-import { buildLiveBalanceStatus } from "./live-balance.mjs";
+import {
+  buildLiveBalanceStatus,
+  validateLiveRecommendation,
+} from "./live-balance.mjs";
+import {
+  balanceRecommendations,
+  holdRecommendations,
+  recommendationStatus,
+} from "./balance-recommendations.mjs";
+import { balanceActionPreflight } from "./balance-action-guard.mjs";
 
 const DEFAULT_BALANCE_SETTINGS = {
   targetDifference: 2,
@@ -35,6 +44,20 @@ const DEFAULT_BALANCE_SETTINGS = {
   coordinatedSquadSwitchesEnabled: false,
   allowIndividualSquadFallback: true,
 };
+
+const settingsFromConfig = (config) => ({
+  targetDifference:
+    config.target_difference ?? DEFAULT_BALANCE_SETTINGS.targetDifference,
+  skillGapSoftLimit:
+    config.skill_gap_soft_limit ?? DEFAULT_BALANCE_SETTINGS.skillGapSoftLimit,
+  minimumImprovement:
+    config.skill_gap_min_improvement ??
+    DEFAULT_BALANCE_SETTINGS.minimumImprovement,
+  coordinatedSquadSwitchesEnabled:
+    config.coordinated_squad_switches_enabled === true,
+  allowIndividualSquadFallback:
+    config.allow_individual_squad_fallback !== false,
+});
 
 const clamp = (value, minimum, maximum) =>
   Math.min(maximum, Math.max(minimum, value));
@@ -162,21 +185,7 @@ const AutobalancerCard = ({
       .GET_AUTOBALANCER_CONFIG({ throwRouteError: false })
       .then((config) => {
         if (!mounted || !config) return;
-        setBalanceSettings({
-          targetDifference:
-            config.target_difference ??
-            DEFAULT_BALANCE_SETTINGS.targetDifference,
-          skillGapSoftLimit:
-            config.skill_gap_soft_limit ??
-            DEFAULT_BALANCE_SETTINGS.skillGapSoftLimit,
-          minimumImprovement:
-            config.skill_gap_min_improvement ??
-            DEFAULT_BALANCE_SETTINGS.minimumImprovement,
-          coordinatedSquadSwitchesEnabled:
-            config.coordinated_squad_switches_enabled === true,
-          allowIndividualSquadFallback:
-            config.allow_individual_squad_fallback !== false,
-        });
+        setBalanceSettings(settingsFromConfig(config));
       })
       .catch(() => {});
     return () => {
@@ -184,10 +193,57 @@ const AutobalancerCard = ({
     };
   }, []);
 
-  const status = useMemo(
+  const liveStatus = useMemo(
     () => buildLiveBalanceStatus(teams, balanceSettings),
     [balanceSettings, teams]
   );
+
+  const [held, setHeld] = useState(null);
+  useEffect(() => {
+    const update = () =>
+      setHeld((previous) =>
+        holdRecommendations(
+          previous,
+          balanceRecommendations(liveStatus),
+          Date.now(),
+          reviewOpen
+        )
+      );
+    update();
+    if (reviewOpen || !held?.items.length) return;
+    const timer = setTimeout(update, Math.max(0, held.expiresAt - Date.now()));
+    return () => clearTimeout(timer);
+  }, [liveStatus, held, reviewOpen]);
+
+  const validated = useMemo(
+    () =>
+      (held?.items ?? []).map((item) =>
+        validateLiveRecommendation(teams, balanceSettings, item)
+      ),
+    [held, teams, balanceSettings]
+  );
+  const recommendations = useMemo(
+    () =>
+      (held?.items ?? []).map(
+        (item, index) =>
+          validated[index] ?? {
+            ...item,
+            projected_rating_gap: null,
+            projected_team_ratings: null,
+          }
+      ),
+    [held, validated]
+  );
+  const status = useMemo(
+    () => recommendationStatus(liveStatus, recommendations),
+    [liveStatus, recommendations]
+  );
+  const refreshRecommendations = () => {
+    setSelectedRecommendation(0);
+    setHeld(
+      holdRecommendations(null, balanceRecommendations(liveStatus), Date.now())
+    );
+  };
 
   const insight = useMemo(() => {
     if (!status) return null;
@@ -208,9 +264,10 @@ const AutobalancerCard = ({
     const strengthLimit = status.strength_thresholds?.soft_limit ?? 8;
     const countUnbalanced = Number(status.required_switches || 0) > 0;
     const strengthUnbalanced =
-      Boolean(status.strength_swap) ||
+      Boolean(liveStatus.strength_swap) ||
       Boolean(
-        !countUnbalanced && status.squad_recommendation?.kind === "squad_swap"
+        !countUnbalanced &&
+          liveStatus.squad_recommendation?.kind === "squad_swap"
       ) ||
       (Number.isFinite(ratingDifference) && ratingDifference > strengthLimit);
     const blocked = (status.block_reasons || []).length > 0;
@@ -298,16 +355,10 @@ const AutobalancerCard = ({
               : "Innerhalb der Grenzwerte",
         };
 
-    const projectedRatings = (() => {
-      if (!Number.isFinite(projectedGap) || !strongerTeam) return ratings;
-      const midpoint = (ratings.allies + ratings.axis) / 2;
-      const halfGap = projectedGap / 2;
-      return {
-        allies:
-          strongerTeam === "allies" ? midpoint + halfGap : midpoint - halfGap,
-        axis: strongerTeam === "axis" ? midpoint + halfGap : midpoint - halfGap,
-      };
-    })();
+    const projectedRatings =
+      squadRecommendation?.projected_team_ratings ??
+      strengthSwap?.projected_team_ratings ??
+      plan.projected_team_ratings;
 
     return {
       counts,
@@ -341,10 +392,10 @@ const AutobalancerCard = ({
         Boolean(squadRecommendation) ||
         Boolean(proposal),
     };
-  }, [status]);
+  }, [status, liveStatus]);
 
   const highlights = useMemo(() => {
-    if (!insight) return {};
+    if (!insight || !validated[0]) return {};
     if (insight.squadRecommendation) {
       return Object.fromEntries(
         insight.squadRecommendation.moves.flatMap((move) => {
@@ -394,7 +445,7 @@ const AutobalancerCard = ({
       };
     }
     return {};
-  }, [insight]);
+  }, [insight, validated]);
 
   useEffect(() => {
     onHighlightPlayers?.(highlights);
@@ -424,30 +475,17 @@ const AutobalancerCard = ({
   const swap = insight.strengthSwap;
   const squad = insight.squadRecommendation;
   const proposalName = insight.proposal?.player_name;
-  const alternativesAvailable =
-    (status.squad_recommendation_alternatives || []).length > 0 ||
-    (status.strength_swap_alternatives || []).length > 0 ||
-    Object.values(status.strategy_plans || {}).filter(Boolean).length > 1;
-  const recommendations = squad
-    ? [squad, ...(status.squad_recommendation_alternatives || [])]
-    : swap
-    ? [swap, ...(status.strength_swap_alternatives || [])]
-    : insight.proposal
-    ? [
-        {
-          kind: "move",
-          target_team: insight.targetTeam,
-          player: insight.proposal,
-          rating_gap_before: insight.beforeGap,
-          projected_rating_gap: insight.projectedGap,
-          rating_confidence: insight.proposal.rating_confidence,
-        },
-      ]
-    : [];
+  const alternativesAvailable = recommendations.length > 1;
   const activeRecommendation =
     recommendations[
       Math.min(selectedRecommendation, recommendations.length - 1)
     ];
+  const activeValid = Boolean(
+    validated[Math.min(selectedRecommendation, recommendations.length - 1)]
+  );
+  const hasProjection =
+    Number.isFinite(insight.projectedRatings?.allies) &&
+    Number.isFinite(insight.projectedRatings?.axis);
   const actionRecipients = activeRecommendation
     ? activeRecommendation.kind === "squad_move" ||
       activeRecommendation.kind === "squad_swap"
@@ -487,6 +525,24 @@ const AutobalancerCard = ({
           })),
         }
       : undefined;
+
+  const baseAction = activeRecommendation?.kind.startsWith("squad_")
+    ? Actions.CoordinatedSquadSwitch
+    : Actions.SwitchPlayer;
+  const reviewedAction = activeRecommendation
+    ? {
+        ...baseAction,
+        preflight: balanceActionPreflight({
+          recommendation: activeRecommendation,
+          recipientIds: actionRecipients.map((player) => player.player_id),
+          readTeams: () => cmd.GET_LIVE_TEAMS({ throwRouteError: false }),
+          readSettings: async () =>
+            settingsFromConfig(
+              await cmd.GET_AUTOBALANCER_CONFIG({ throwRouteError: false })
+            ),
+        }),
+      }
+    : null;
 
   return (
     <Box
@@ -599,6 +655,26 @@ const AutobalancerCard = ({
       </Stack>
 
       {detailsFeedback}
+
+      {recommendations.length > 0 && (
+        <Alert
+          severity={validated[0] ? "info" : "warning"}
+          sx={{ borderRadius: 0 }}
+          action={
+            <Button
+              color="inherit"
+              onClick={refreshRecommendations}
+              disabled={reviewOpen}
+            >
+              Neu bewerten
+            </Button>
+          }
+        >
+          {validated[0]
+            ? "Vorschlag für 60 Sekunden festgehalten. Live-Werte und Gültigkeit werden weiter geprüft."
+            : "Festgehaltener Vorschlag nicht mehr gültig: Teams, Spieler oder Voraussetzungen haben sich geändert. Kein Eingriff möglich."}
+        </Alert>
+      )}
 
       <Collapse id={detailsId} in={expanded} unmountOnExit>
         <Box>
@@ -790,9 +866,7 @@ const AutobalancerCard = ({
                     (status.strength_thresholds?.soft_limit ?? 8)
                     ? "Nahezu ausgeglichen"
                     : `${formatRating(insight.projectedGap)} Punkte Abstand`
-                  : insight.needsAttention
-                  ? "Prüfung nötig"
-                  : "Stabil"}
+                  : "Keine Prognose verfügbar"}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 {Number.isFinite(insight.projectedGap)
@@ -843,20 +917,28 @@ const AutobalancerCard = ({
             allies={insight.ratings.allies}
             axis={insight.ratings.axis}
           />
-          <ArrowForwardIcon
-            sx={{ color: "text.secondary", alignSelf: "center" }}
-            aria-hidden
-          />
-          <StrengthBar
-            label="Stärke-Index-Prognose"
-            allies={insight.projectedRatings.allies}
-            axis={insight.projectedRatings.axis}
-          />
+          {hasProjection ? (
+            <>
+              <ArrowForwardIcon
+                sx={{ color: "text.secondary", alignSelf: "center" }}
+                aria-hidden
+              />
+              <StrengthBar
+                label="Stärke-Index-Prognose"
+                allies={insight.projectedRatings.allies}
+                axis={insight.projectedRatings.axis}
+              />
+            </>
+          ) : (
+            <Typography variant="caption" color="text.secondary">
+              Keine Prognose verfügbar
+            </Typography>
+          )}
         </Stack>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
           <Button
             variant={insight.needsAttention ? "contained" : "outlined"}
-            disabled={insight.blocked || recommendations.length === 0}
+            disabled={recommendations.length === 0}
             onClick={() => {
               setSelectedRecommendation(0);
               setReviewOpen(true);
@@ -914,6 +996,11 @@ const AutobalancerCard = ({
               keine Historie gesammelt werden. Ausgeführt wird erst nach der
               regulären Sicherheitsbestätigung.
             </Alert>
+            <Alert severity={activeValid ? "info" : "warning"}>
+              {activeValid
+                ? "Diese Auswahl bleibt bis zum Schließen unverändert. Vor der Ausführung wird sie erneut mit frischen Live-Daten geprüft."
+                : "Dieser Vorschlag ist nicht mehr gültig. Es wird kein Wechsel ausgeführt. Dialog schließen und neu bewerten."}
+            </Alert>
 
             {recommendations.length > 1 && (
               <Box>
@@ -943,7 +1030,9 @@ const AutobalancerCard = ({
                       onClick={() => setSelectedRecommendation(index)}
                       sx={{ borderRadius: 0, justifyContent: "flex-start" }}
                     >
-                      {index === 0 ? "Beste Prognose" : `Alternative ${index}`}
+                      {index === 0
+                        ? "Festgehaltener Vorschlag"
+                        : `Alternative ${index}`}
                     </Button>
                   ))}
                 </Stack>
@@ -1253,12 +1342,7 @@ const AutobalancerCard = ({
           </Button>
           {activeRecommendation && (
             <ActionButton
-              action={
-                activeRecommendation.kind === "squad_move" ||
-                activeRecommendation.kind === "squad_swap"
-                  ? Actions.CoordinatedSquadSwitch
-                  : Actions.SwitchPlayer
-              }
+              action={reviewedAction}
               recipients={actionRecipients}
               params={squadActionParams}
               label={
@@ -1269,9 +1353,11 @@ const AutobalancerCard = ({
                   ? "Beide Teams wechseln"
                   : "Spieler jetzt wechseln"
               }
-              {...((activeRecommendation.kind === "squad_move" ||
+              {...(!activeValid ||
+              insight.blocked ||
+              ((activeRecommendation.kind === "squad_move" ||
                 activeRecommendation.kind === "squad_swap") &&
-              !status.coordinated_squad_switches_enabled
+                !status.coordinated_squad_switches_enabled)
                 ? { disabled: true }
                 : {})}
               variant="contained"

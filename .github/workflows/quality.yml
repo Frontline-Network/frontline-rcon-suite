@@ -27,6 +27,8 @@ jobs:
       - run: npm run check:polling
       - run: npm run check:log-stacks
       - run: npm run check:live-view
+      - run: npm run check:player-warnings
+      - run: npm run check:live-balance
       - run: npx playwright install --with-deps chromium
       - name: run admin UI browser tests
         shell: bash
@@ -144,3 +146,4 @@ jobs:
           export HLL_REDIS_URL=redis://${HLL_REDIS_HOST}:${HLL_REDIS_PORT}/${HLL_REDIS_DB}
           PYTHONPATH=. pytest tests/
           PYTHONPATH=. python -m django test api.test_live_view --settings=rconweb.rconweb.test_settings --verbosity=1
+          PYTHONPATH=. python ./rconweb/manage.py test api.test_eventador_control --settings=rconweb.eventador_test_settings --verbosity=1

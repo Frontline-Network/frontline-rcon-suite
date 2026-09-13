@@ -15,10 +15,10 @@ import { CountryFlag } from "@/components/shared/CountryFlag";
 import {
   getPlayerTier,
   getSteamProfileUrl,
-  hasRecentWarnings,
   isSteamPlayer,
   getTierColors,
 } from "@/utils/lib";
+import { hasRecentWarnings } from "@/utils/player-warnings.mjs";
 import { SortableHeader, TextButton } from "@/components/table/styles";
 import RemoveRedEyeIcon from "@mui/icons-material/RemoveRedEye";
 import { usePlayerSidebar } from "@/hooks/usePlayerSidebar";

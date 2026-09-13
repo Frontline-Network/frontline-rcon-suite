@@ -109,6 +109,39 @@ const demoVietnamPlayerId = "f0a11e0d000000000000000000000001";
 const demoVietnamPlayerIndex = demoNames.length - 1;
 const demoPlayerId = (index) => `76561198${String(index + 1).padStart(9, "0")}`;
 
+const demoWarningActions = (index) => {
+  if (
+    typeof window === "undefined" ||
+    new URLSearchParams(window.location.search).get("demo_warning_sources") !==
+      "1"
+  )
+    return null;
+
+  const message = (by) => ({
+    action_type: "MESSAGE",
+    by,
+    reason: "Demo-Regelhinweis",
+    time: new Date(now - 3600000).toISOString(),
+  });
+  const campaign = message("Campaign: Mic-Pflicht DE");
+  return (
+    [
+      Array.from({ length: 100 }, () => ({ ...campaign })),
+      [message("VIP lifecycle: unverified")],
+      [message("Frontline Admin")],
+      [campaign, message("AUTOMOD_NO_LEADER")],
+      [campaign, { ...message("Frontline Admin"), action_type: "PUNISH" }],
+      [
+        campaign,
+        {
+          ...message("Frontline Admin"),
+          time: new Date(now - 172800000).toISOString(),
+        },
+      ],
+    ][index] ?? null
+  );
+};
+
 export const demoPlayerRecords = demoNames.map((name, index) => ({
   id: index + 1,
   player_id:
@@ -145,7 +178,8 @@ export const demoPlayerRecords = demoNames.map((name, index) => ({
         ]
       : [],
   received_actions:
-    index % 2
+    demoWarningActions(index) ??
+    (index % 2
       ? [
           {
             action_type: "KICK",
@@ -161,7 +195,7 @@ export const demoPlayerRecords = demoNames.map((name, index) => ({
             by: "Leitstelle",
             time: new Date(now - (index + 1) * 7200000).toISOString(),
           },
-        ],
+        ]),
   sessions: [
     {
       start: new Date(now - (index + 2) * 7200000).toISOString(),
@@ -656,10 +690,27 @@ const demoUnbalancedTeamView = {
   },
 };
 
-export const getDemoTeamView = () =>
-  readDemoParameter("demo_balance") === "unbalanced"
-    ? demoUnbalancedTeamView
-    : demoTeamView;
+export const getDemoTeamView = () => {
+  const mode = readDemoParameter("demo_balance");
+  if (mode === "unbalanced") return demoUnbalancedTeamView;
+  if (mode === "changed_squad")
+    return {
+      ...demoUnbalancedTeamView,
+      allies: {
+        ...demoUnbalancedTeamView.allies,
+        squads: {
+          able: demoUnbalancedTeamView.allies.squads.able,
+          delta: {
+            ...demoUnbalancedTeamView.allies.squads.charlie,
+            players: demoUnbalancedTeamView.allies.squads.charlie.players.map(
+              (player) => ({ ...player, unit_name: "delta" })
+            ),
+          },
+        },
+      },
+    };
+  return demoTeamView;
+};
 
 export const getDemoConnectionMode = () =>
   readDemoParameter("demo_connection") || "online";

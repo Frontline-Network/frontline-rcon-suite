@@ -181,14 +181,6 @@ export function getPlayerTier(level) {
   }
 }
 
-export function hasRecentWarnings(received_actions) {
-  const warningsFrom = dayjs().subtract(1, "day").toISOString();
-  const warnings = received_actions.filter(
-    (action) => action.time > warningsFrom
-  );
-  return warnings.length > 0;
-}
-
 export const logActions = {
   ADMIN: "🚨",
   "ADMIN MISC": "🚨",
