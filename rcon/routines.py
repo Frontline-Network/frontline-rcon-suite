@@ -40,7 +40,7 @@ def toggle_votekick(rcon: Rcon):
 
 
 def dump_rcon_performance_stats():
-    pl = PerformanceStatistics('rcon', True)
+    pl = PerformanceStatistics("rcon", True)
     d = pl.dump()
     for k, v in d.items():
         logger.info(f"{k}: {v}")
@@ -67,37 +67,52 @@ def run(stop_event: threading.Event | None = None):
     max_fails = 5
     rcon = get_rcon()
     performance_interval = float(rcon.performance_stats_interval())
-    next_performance_dump = (
-        time.monotonic() if performance_interval > 0 else None
-    )
+    next_performance_dump = time.monotonic() if performance_interval > 0 else None
     next_routines_run = time.monotonic()
 
-    while not stop_event.is_set():
-        now = time.monotonic()
-        if next_performance_dump is not None and now >= next_performance_dump:
-            try:
-                dump_rcon_performance_stats()
-            except Exception:
-                # Statistics must never stop gameplay routines. The former
-                # dedicated scheduler process provided the same isolation.
-                logger.exception("Unable to dump RCON performance statistics")
-            next_performance_dump = _next_deadline(performance_interval)
+    from rcon.leadership_vote.service import Runtime
 
-        if now >= next_routines_run:
-            try:
-                toggle_votekick(rcon)
-                VoteMap().send_reminder()
-                max_fails = 5
-            except HLLCommandFailedError:
-                max_fails -= 1
-                if max_fails <= 0:
-                    logger.exception("Routines failed 5 times in a row; stopping")
-                    raise
-            next_routines_run = _next_deadline(30.0)
+    leadership = Runtime()
+    next_leadership_step = time.monotonic()
+    try:
+        while not stop_event.is_set():
+            now = time.monotonic()
+            if now >= next_leadership_step:
+                try:
+                    leadership.step(rcon)
+                except Exception:
+                    logger.exception("Leadership voting must not stop other routines")
+                next_leadership_step = _next_deadline(5.0)
+            if next_performance_dump is not None and now >= next_performance_dump:
+                try:
+                    dump_rcon_performance_stats()
+                except Exception:
+                    # Statistics must never stop gameplay routines. The former
+                    # dedicated scheduler process provided the same isolation.
+                    logger.exception("Unable to dump RCON performance statistics")
+                next_performance_dump = _next_deadline(performance_interval)
 
-        stop_event.wait(
-            _sleep_until_next_deadline(
-                next_routines_run,
-                next_performance_dump,
+            if now >= next_routines_run:
+                try:
+                    toggle_votekick(rcon)
+                    VoteMap().send_reminder()
+                    max_fails = 5
+                except HLLCommandFailedError:
+                    max_fails -= 1
+                    if max_fails <= 0:
+                        logger.exception("Routines failed 5 times in a row; stopping")
+                        raise
+                next_routines_run = _next_deadline(30.0)
+
+            stop_event.wait(
+                _sleep_until_next_deadline(
+                    next_leadership_step,
+                    next_routines_run,
+                    next_performance_dump,
+                )
             )
-        )
+    finally:
+        try:
+            leadership.close()
+        except Exception:
+            logger.exception("Unable to close leadership runtime")

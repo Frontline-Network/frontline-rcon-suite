@@ -112,6 +112,32 @@ def test_event_delivery_is_capability_checked_and_idempotent():
         assert "reason" not in IncidentMessage.__table__.columns
         assert "preview" not in PreparedActionRelay.__table__.columns
 
+@pytest.mark.parametrize("event_type,alerts", [
+    ("leadership_vote_ballot", 0), ("leadership_vote_warning", 0),
+    ("leadership_vote_rejected", 1), ("leadership_vote_cancelled", 1),
+    ("leadership_vote_unknown", 1), ("leadership_vote_dry_run", 1),
+    ("leadership_vote_kicked", 0),
+])
+def test_leadership_edits_same_case_and_realerts_only_when_admin_review_needed(event_type, alerts):
+    capability = _seed()
+    data = _event()
+    data["event_type"] = event_type
+    data["incident"].update(admin_notification_role_ids=["456", "@everyone"],
+        leadership_vote={"status": event_type.removeprefix("leadership_vote_"),
+                         "mode": "dry_run", "target_role": "commander", "target_name": "Example"})
+    headers = {"Authorization": f"Bearer {capability}", "Idempotency-Key": "leadership:test"}
+    with patch.object(DiscordClient, "upsert", return_value="123") as post:
+        first = TestClient(app).post("/v1/events", headers=headers, json=data)
+        assert first.status_code == 202
+        assert post.call_count == 1 + alerts
+        assert "Commander Example" in str(post.call_args_list[0])
+        if alerts:
+            alert = post.call_args.args[1]
+            assert alert["message_reference"]["message_id"] == "123"
+            assert alert["allowed_mentions"] == {"parse": [], "roles": ["456"], "replied_user": False}
+        assert TestClient(app).post("/v1/events", headers=headers, json=data).json()["cached"]
+        assert post.call_count == 1 + alerts
+
 
 def test_unknown_capability_is_indistinguishable_from_unknown_installation():
     _seed()
@@ -690,6 +716,27 @@ def test_embed_exposes_every_configured_report_action_with_valid_row_sizes():
         "disband_squad",
     }
     assert all(len(row["components"]) <= 5 for row in payload["components"])
+
+
+@pytest.mark.parametrize("language", ["de", "en"])
+def test_leadership_vote_updates_existing_report_and_has_cancel_button(language):
+    event = _event()
+    event["event_type"] = "leadership_vote_ballot"
+    event["incident"]["discord_language"] = language
+    event["incident"]["leadership_vote"] = {
+        "id": "vote", "status": "active", "target_name": "Target", "squad": "Able", "ends_at": 2000000090,
+        "yes": 3, "no": 1, "required": 6, "electorate": {"one": {"name": "Leader One"}},
+        "ballots": {"one": {"yes": True}}, "result": None,
+    }
+    result = render_message(IncidentEventEnvelope.model_validate(event), None)
+    buttons = [c for row in result["components"] for c in row["components"]]
+    assert len(result["components"]) <= 5
+    assert all(len(row["components"]) <= 5 for row in result["components"])
+    assert any(c.get("custom_id", "").startswith("cancel_leadership_vote:") for c in buttons)
+    assert any("Leader One" in field["value"] and "2000000090" in field["value"] for field in result["embeds"][0]["fields"])
+    event["incident"]["leadership_vote"]["status"] = "unknown"
+    result = render_message(IncidentEventEnvelope.model_validate(event), None)
+    assert not any(c.get("custom_id", "").startswith("cancel_leadership_vote:") for row in result["components"] for c in row["components"])
 
 
 @pytest.mark.parametrize(

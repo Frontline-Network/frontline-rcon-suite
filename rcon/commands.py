@@ -3,6 +3,7 @@ import logging
 import threading
 import time
 from contextlib import contextmanager, nullcontext
+from contextvars import ContextVar
 from functools import wraps
 from typing import Generator, Literal, Sequence, Any, List
 
@@ -31,6 +32,7 @@ from rcon.types import (
 from rcon.utils import exception_in_chain
 
 logger = logging.getLogger(__name__)
+_automatic_retries_disabled = ContextVar("rcon_automatic_retries_disabled", default=False)
 
 
 def escape_string(s):
@@ -88,6 +90,20 @@ class ServerCtl:
         self._connection_threads: dict[int, threading.Thread] = {}
         self._retry_gates: dict[str, CommandRetryGate] = {}
         self._retry_gates_mu = threading.Lock()
+
+    @contextmanager
+    def without_retries(self):
+        """Never retransmit an uncertain command in this execution context.
+
+        Controllers are shared across supervisor threads. A context-local guard
+        leaves retries for other workers unchanged, including on exceptions.
+        Wrap the complete synchronous command (send AND receive).
+        """
+        token = _automatic_retries_disabled.set(True)
+        try:
+            yield
+        finally:
+            _automatic_retries_disabled.reset(token)
 
     def _retry_delay(self, command: str, error: BaseException) -> float | None:
         """Reserve one safe retry, or return ``None`` for terminal failures."""
@@ -292,7 +308,11 @@ class ServerCtl:
             UnicodeDecodeError,
             OSError,
         ) as error:
-            if self.auto_retry is False or provided_conn is not None:
+            if (
+                self.auto_retry is False
+                or provided_conn is not None
+                or _automatic_retries_disabled.get()
+            ):
                 raise
 
             retry_delay = self._retry_delay(command, error)
@@ -322,7 +342,7 @@ class ServerCtl:
             UnicodeDecodeError,
             OSError,
         ) as e:
-            if not self.auto_retry:
+            if not self.auto_retry or _automatic_retries_disabled.get():
                 raise
 
             retry_delay = self._retry_delay(handle.request.name, e)
@@ -366,7 +386,7 @@ class ServerCtl:
                 if ignore_internal_errors:
                     return None
 
-            if not self.auto_retry:
+            if not self.auto_retry or _automatic_retries_disabled.get():
                 raise
 
             retry_delay = self._retry_delay(handle.request.name, e)

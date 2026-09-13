@@ -832,6 +832,9 @@ class Rcon(ServerCtl):
         save_message: bool = False,
         player_name: str | None = None,
     ) -> bool:
+        if save_message:
+            from rcon.leadership_vote.storage import before_manual_action
+            before_manual_action(player_id, by)
         config = RconServerSettingsUserConfig.load_from_db()
         if config.message_enhancements.enabled:
             message_header: str = config.message_enhancements.message_header
@@ -1165,6 +1168,8 @@ class Rcon(ServerCtl):
     def punish(
         self, player_id: str, reason: str, by: str, player_name: str | None = None
     ) -> bool:
+        from rcon.leadership_vote.storage import before_manual_action
+        before_manual_action(player_id, by)
         res = super().punish(player_id, reason)
         if res:
             safe_save_player_action(
@@ -1177,12 +1182,30 @@ class Rcon(ServerCtl):
         return res
 
     def switch_player_now(self, player_id: str) -> bool:
+        from rcon.leadership_vote.storage import before_manual_action
+        before_manual_action(player_id)
         return super().switch_player_now(player_id)
 
+    def remove_player_from_squad(self, player_id: str, reason: str) -> bool:
+        from rcon.leadership_vote.storage import before_manual_action
+        before_manual_action(player_id)
+        return super().remove_player_from_squad(player_id, reason)
+
+    def disband_squad(self, team_index: int, squad_index: int, reason: str) -> None:
+        from rcon.leadership_vote.storage import before_manual_action
+        # Native numeric squad indexes are not stable player/seat identities.
+        # Conservatively stop this server's open procedures before restructuring.
+        before_manual_action(None, all_targets=True)
+        return super().disband_squad(team_index, squad_index, reason)
+
     def switch_player_on_death(self, player_id, by) -> bool:
+        from rcon.leadership_vote.storage import before_manual_action
+        before_manual_action(player_id, by)
         return super().switch_player_on_death(player_id)
 
     def kick(self, player_id: str, reason, by, player_name: str | None = None) -> bool:
+        from rcon.leadership_vote.storage import before_manual_action
+        before_manual_action(player_id, by)
         with invalidates(Rcon.get_players):
             res = super().kick(player_id, reason)
 
@@ -1204,6 +1227,8 @@ class Rcon(ServerCtl):
         by: str = "",
         player_name: str | None = None,
     ) -> bool:
+        from rcon.leadership_vote.storage import before_manual_action
+        before_manual_action(player_id, by)
         with invalidates(Rcon.get_players, Rcon.get_temp_bans):
             res = super().temp_ban(player_id, duration_hours, reason, admin_name=by)
 
@@ -1232,6 +1257,8 @@ class Rcon(ServerCtl):
     def perma_ban(
         self, player_id: str, reason="", by="", player_name: str | None = None
     ) -> bool:
+        from rcon.leadership_vote.storage import before_manual_action
+        before_manual_action(player_id, by)
         with invalidates(Rcon.get_players, Rcon.get_perma_bans):
             res = super().perma_ban(player_id, reason, admin_name=by)
 
