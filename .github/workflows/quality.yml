@@ -27,6 +27,7 @@ jobs:
       - run: npm run check:polling
       - run: npm run check:log-stacks
       - run: npm run check:live-view
+      - run: npm run check:player-warnings
       - run: npx playwright install --with-deps chromium
       - name: run admin UI browser tests
         shell: bash

@@ -27,6 +27,7 @@ import {
 } from "@/features/player-action/actions";
 import { getPlatformLabel } from "@/constants/platforms";
 import { getTeamkillRisk } from "@/utils/teamkill-risk.mjs";
+import { countRecentWarnings } from "@/utils/player-warnings.mjs";
 import { formatRoleLabel, formatSquadLabel } from "./player-display-labels";
 
 const EMPTY_VALUE = "–";
@@ -50,14 +51,6 @@ const formatPlaytime = (seconds) => {
 
   if (hours > 0) return `${hours}h ${String(minutes).padStart(2, "0")}m`;
   return `${minutes}m`;
-};
-
-const countRecentActions = (actions) => {
-  const earliest = Date.now() - 24 * 60 * 60 * 1000;
-  return actions.filter((action) => {
-    const timestamp = Date.parse(action?.time);
-    return Number.isFinite(timestamp) && timestamp > earliest;
-  }).length;
 };
 
 /**
@@ -121,7 +114,7 @@ export const getPlayerDetailModel = (value = {}) => {
     },
     isVip: Boolean(player.is_vip || profile.vips?.length),
     isWatched: Boolean(profile.watchlist?.is_watched),
-    warningsCount: countRecentActions(receivedActions),
+    warningsCount: countRecentWarnings(receivedActions),
     bansCount: hasActiveBan ? Math.max(1, banDetails.length) : 0,
   };
 };
