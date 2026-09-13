@@ -39,6 +39,9 @@ import { useSearchParams } from "react-router-dom";
 import { cmd } from "@/utils/fetchUtils";
 import PageHeader from "@/components/shared/PageHeader";
 import PageState from "@/components/shared/PageState";
+import VotePanel from "@/pages/settings/leadership-votes/VotePanel";
+import { useAuth } from "@/hooks/useAuth";
+import { canUse } from "@/pages/views/live-map/api";
 
 const STATUS_TONES = {
   new: "warning",
@@ -230,6 +233,7 @@ const IncidentDetail = ({
 }) => {
   const { t, i18n } = useTranslation();
   const dismissCancelRef = useRef(null);
+  const { permissions } = useAuth();
   const subject = getSubject(incident);
   const target = subject?.name ?? incident?.target_name;
 
@@ -329,6 +333,14 @@ const IncidentDetail = ({
       </Box>
 
       <Stack spacing={2} sx={{ p: 2 }}>
+        {incident.leadership_vote && (
+          <VotePanel
+            vote={incident.leadership_vote}
+            canCancel={canUse(permissions, "can_claim_admin_incidents")}
+            pending={mutation.isPending}
+            onCancel={() => onOperation("cancel_leadership_vote")}
+          />
+        )}
         <Box>
           <Typography color="text.secondary" variant="caption">
             {t("incidents.reason")}
