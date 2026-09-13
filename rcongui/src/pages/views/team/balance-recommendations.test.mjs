@@ -9,6 +9,7 @@ import {
   holdRecommendations,
   preferRecommendation,
   recommendationKey,
+  recommendationNotice,
   recommendationStatus,
 } from "./balance-recommendations.mjs";
 import { balanceActionPreflight } from "./balance-action-guard.mjs";
@@ -36,6 +37,60 @@ const teams = () => ({
 });
 const choice = (snapshot, settings = {}) =>
   balanceRecommendations(buildLiveBalanceStatus(snapshot, settings))[0];
+
+test("notice explains visibility separately from the live validity check", () => {
+  const notice = recommendationNotice({ valid: true });
+  assert.equal(notice.severity, "info");
+  assert.match(notice.description, /bis zu 60 Sekunden sichtbar/);
+  assert.match(notice.description, /mit jedem Live-Update geprüft/);
+  const review = recommendationNotice({ valid: true, reviewing: true });
+  assert.match(review.description, /solange die Prüfung geöffnet ist/);
+  assert.doesNotMatch(review.description, /60 Sekunden/);
+});
+
+test("an outdated proposal is an actionable status, not a blanket intervention error", () => {
+  const notice = recommendationNotice({ valid: false, balanced: false });
+  assert.equal(notice.severity, "info");
+  assert.equal(notice.title, "Vorschlag bitte aktualisieren");
+  assert.match(notice.description, /Dieser vorgemerkte Wechsel/);
+  assert.match(notice.description, /Neu bewerten/);
+  assert.doesNotMatch(
+    notice.description,
+    /Kein Eingriff möglich|Teams, Spieler oder Voraussetzungen/
+  );
+});
+
+test("a no-longer-needed proposal explains the current balance", () => {
+  const notice = recommendationNotice({ valid: false, balanced: true });
+  assert.equal(notice.severity, "info");
+  assert.equal(notice.title, "Aktuell kein Wechsel nötig");
+  assert.match(notice.description, /innerhalb der eingestellten Grenzwerte/);
+});
+
+test("incomplete data never masquerades as balanced teams", () => {
+  const notice = recommendationNotice({
+    valid: false,
+    blocked: true,
+    balanced: true,
+  });
+  assert.equal(notice.severity, "warning");
+  assert.equal(notice.title, "Live-Daten gerade unvollständig");
+  assert.doesNotMatch(notice.description, /nicht mehr benötigt/);
+});
+
+test("invalid selections in an open review give an available next step", () => {
+  for (const context of [{}, { balanced: true }, { blocked: true }]) {
+    const notice = recommendationNotice({
+      ...context,
+      valid: false,
+      reviewing: true,
+    });
+    assert.match(
+      notice.description,
+      /Schließe die Prüfung und wähle „Neu bewerten“/
+    );
+  }
+});
 
 test("keeps the exact choice for 60 seconds, then adopts the latest proposal", () => {
   const first = choice(teams());
