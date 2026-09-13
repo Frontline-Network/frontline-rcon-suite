@@ -20,6 +20,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/useAuth";
 import { cmd } from "@/utils/fetchUtils";
 import { PlayerTableSettings } from "./player-table-settings";
+import { LogDisplaySettings } from "./log-display-settings";
 import {
   DEFAULT_LIVE_CARDS,
   liveViewPreferencesKey,
@@ -127,7 +128,16 @@ export function LiveViewSettings({
           onChange={(_, value) => onSectionChange(value)}
           variant="fullWidth"
           aria-label={t("views.live.displaySections")}
-          sx={{ borderBottom: 1, borderColor: "divider" }}
+          sx={{
+            borderBottom: 1,
+            borderColor: "divider",
+            "& .MuiTab-root": {
+              minWidth: 0,
+              px: { xs: 0.5, sm: 2 },
+              fontSize: { xs: "0.75rem", sm: "0.875rem" },
+              letterSpacing: { xs: "0.02em", sm: "0.08em" },
+            },
+          }}
         >
           <Tab
             id="live-display-tab-status"
@@ -140,6 +150,12 @@ export function LiveViewSettings({
             aria-controls="live-display-panel-players"
             value="players"
             label={t("views.live.playerTableTab")}
+          />
+          <Tab
+            id="live-display-tab-logs"
+            aria-controls="live-display-panel-logs"
+            value="logs"
+            label={t("views.live.logs")}
           />
         </Tabs>
         {mutation.isError ? (
@@ -163,6 +179,20 @@ export function LiveViewSettings({
               {t("views.live.loadSettingsFailed")}
             </Alert>
           ) : null}
+          <Box
+            role="tabpanel"
+            id="live-display-panel-logs"
+            aria-labelledby="live-display-tab-logs"
+            hidden={section !== "logs"}
+          >
+            <LogDisplaySettings
+              value={selection.logs}
+              disabled={!ready || busy}
+              onChange={(logs) =>
+                setDraft((current) => ({ ...(current ?? preferences), logs }))
+              }
+            />
+          </Box>
           <Box
             role="tabpanel"
             id="live-display-panel-players"

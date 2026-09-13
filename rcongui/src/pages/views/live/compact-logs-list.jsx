@@ -24,6 +24,10 @@ import { PlayerDrawerLink } from "@/components/shared/PlayerDrawerLink";
 import { useGlobalStore } from "@/stores/global-state";
 import { getLogTeam, removeLogPlayerIds } from "@/utils/lib";
 import { getMessageBody, groupLogRows } from "./log-stacks.mjs";
+import {
+  getLogPresentation,
+  matchesLogActions,
+} from "./log-display-preferences.mjs";
 
 let previousOnlinePlayerSource;
 let previousOnlinePlayerContexts = [];
@@ -317,7 +321,12 @@ const ChatEvent = ({ event, team, t }) => {
   );
 };
 
-function LogMessageStack({ group, table }) {
+function LogMessageStack({
+  group,
+  table,
+  displaySettings,
+  highlightedActions,
+}) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
@@ -325,17 +334,23 @@ function LogMessageStack({ group, table }) {
   const body = getCleanLogText(group.body);
   const start = dayjs(group.start);
   const end = dayjs(group.end);
+  const presentation = getLogPresentation(displaySettings);
+  const highlighted = matchesLogActions("MESSAGE", highlightedActions);
   return (
     <Box
       component="li"
       role="listitem"
       data-testid="live-log-stack"
+      data-highlighted={highlighted}
       sx={(theme) => ({
         borderBottom: `1px solid ${theme.palette.divider}`,
         borderLeft: `3px solid ${alpha(theme.palette.primary.main, 0.75)}`,
-        bgcolor: alpha(theme.palette.primary.main, 0.035),
+        bgcolor: alpha(theme.palette.primary.main, highlighted ? 0.16 : 0.035),
+        boxShadow: highlighted
+          ? `inset 0 0 0 1px ${theme.palette.primary.main}`
+          : undefined,
         px: 1.25,
-        py: 1,
+        py: presentation.paddingY,
       })}
     >
       <Stack direction="row" alignItems="flex-start" spacing={0.8}>
@@ -423,7 +438,13 @@ function LogMessageStack({ group, table }) {
                 },
               })}
             >
-              <CompactLogsList table={table} rows={group.rows} stackedDetail />
+              <CompactLogsList
+                table={table}
+                rows={group.rows}
+                stackedDetail
+                displaySettings={displaySettings}
+                highlightedActions={highlightedActions}
+              />
             </Box>
           </>
         ) : null}
@@ -437,8 +458,11 @@ function CompactLogsList({
   rows,
   scrollable = false,
   stackedDetail = false,
+  displaySettings,
+  highlightedActions = [],
 }) {
   const { t } = useTranslation();
+  const presentation = getLogPresentation(displaySettings);
   const groups = useMemo(
     () =>
       stackedDetail
@@ -495,6 +519,11 @@ function CompactLogsList({
         minHeight: 0,
         outline: "none",
         position: "relative",
+        "--log-font-size": presentation.fontSize,
+        fontSize: "var(--log-font-size)",
+        "& .MuiTypography-body2, & .MuiTypography-body1, & a": {
+          fontSize: "var(--log-font-size)",
+        },
         ...(scrollable
           ? {
               flex: "1 1 auto",
@@ -523,11 +552,21 @@ function CompactLogsList({
         {groups.map((group) => {
           if (group.rows.length > 1) {
             return (
-              <LogMessageStack key={group.key} group={group} table={table} />
+              <LogMessageStack
+                key={group.key}
+                group={group}
+                table={table}
+                displaySettings={displaySettings}
+                highlightedActions={highlightedActions}
+              />
             );
           }
           const row = group.rows[0];
           const event = row.original;
+          const highlighted = matchesLogActions(
+            event.action,
+            highlightedActions
+          );
           const rawText =
             typeof event.message === "string"
               ? event.message
@@ -578,6 +617,7 @@ function CompactLogsList({
               key={group.key}
               component="li"
               role="listitem"
+              data-highlighted={highlighted}
               sx={(theme) => ({
                 borderBottom: `1px solid ${theme.palette.divider}`,
                 borderLeft: `3px solid ${alpha(
@@ -585,13 +625,24 @@ function CompactLogsList({
                   0.75
                 )}`,
                 px: 1.25,
-                py: 1,
+                py: presentation.paddingY,
+                bgcolor: highlighted
+                  ? alpha(theme.palette.primary.main, 0.16)
+                  : undefined,
+                boxShadow: highlighted
+                  ? `inset 0 0 0 1px ${theme.palette.primary.main}`
+                  : undefined,
                 // A bounded detail list needs real row heights. Estimated
                 // offscreen heights otherwise make End stop before entry 100.
                 contentVisibility: stackedDetail ? "visible" : "auto",
                 containIntrinsicSize: stackedDetail ? undefined : "0 88px",
                 transition: "background-color 120ms ease",
-                "&:hover": { bgcolor: alpha(theme.palette[color].main, 0.055) },
+                "&:hover": {
+                  bgcolor: alpha(
+                    theme.palette[highlighted ? "primary" : color].main,
+                    highlighted ? 0.2 : 0.055
+                  ),
+                },
               })}
             >
               <Stack direction="row" alignItems="flex-start" spacing={0.8}>

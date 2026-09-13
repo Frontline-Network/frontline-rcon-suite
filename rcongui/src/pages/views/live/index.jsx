@@ -467,6 +467,9 @@ const Live = () => {
               isExpanded={effectiveLayout === "logs"}
               onToggleExpanded={handleToggleLogsExpanded}
               viewportSticky={effectiveLayout === "split"}
+              displaySettings={liveViewSettings.preferences.logs}
+              onConfigure={() => openDisplaySettings("logs")}
+              settingsBusy={liveViewSettings.mutation.isPending}
             />
           </Box>
         ) : null}

@@ -59,6 +59,7 @@ class UserLiveViewPreferenceTests(TestCase):
             {
                 "cards": {"commander": True, "vips": True, "score": False},
                 "balance_expanded": False,
+                "logs": {"fontSize": "large", "density": "comfortable"},
                 "players_table": {
                     "preset": "custom", "fontSize": "large", "density": "comfortable",
                     "columnVisibility": {"kills": False, "role": True},
@@ -101,6 +102,9 @@ class UserLiveViewPreferenceTests(TestCase):
             {"players_table": {"columnVisibility": {"unknown": True}}},
             {"players_table": {"columnVisibility": {"kills": "false"}}},
             {"players_table": {"columnVisibility": {"kills": 0}}},
+            {"logs": None}, {"logs": []}, {"logs": {"fontSize": "huge"}},
+            {"logs": {"density": 1}}, {"logs": {"fontSize": False}},
+            {"logs": {"rows": []}},
         ]:
             with self.subTest(invalid=invalid):
                 self.assertEqual(self.put(invalid).status_code, 400)
@@ -148,6 +152,7 @@ class UserLiveViewPreferenceTests(TestCase):
         record = UserLiveViewPreference.objects.create(user=self.user, preferences=old)
         result = self.client.get("/api/get_own_user_live_view").json()["result"]
         self.assertTrue(result["balance_expanded"])
+        self.assertEqual(result["logs"], {"fontSize": "small", "density": "dense"})
         self.assertTrue(result["cards"]["vips"])
         self.assertFalse(result["cards"]["score"])
         self.assertEqual(result["players_table"], default_user_live_view()["players_table"])

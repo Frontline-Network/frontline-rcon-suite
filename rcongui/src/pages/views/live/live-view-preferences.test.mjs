@@ -2,6 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import {
+  getLogPresentation,
+  normalizeLogDisplayPreferences,
+  matchesLogActions,
+  isValidLogQueryLimit,
+} from "./log-display-preferences.mjs";
+import {
   FIXED_PLAYER_COLUMNS,
   PLAYER_COLUMN_IDS,
   getPlayerColumnVisibility,
@@ -173,4 +179,74 @@ test("preference whitelist covers the actual player columns", () => {
     (match) => match[1]
   );
   assert.deepEqual([...ids, "details"].sort(), [...PLAYER_COLUMN_IDS].sort());
+});
+
+test("log display is account-serializable and independent of other sections", () => {
+  const preferences = normalizeLiveViewPreferences({
+    logs: { fontSize: "large", density: "comfortable" },
+    players_table: { preset: "all" },
+    balance_expanded: false,
+    cards: { vips: true },
+  });
+  assert.deepEqual(
+    normalizeLiveViewPreferences(JSON.parse(JSON.stringify(preferences))),
+    preferences
+  );
+  assert.deepEqual(resetLiveStatusCards(preferences).logs, preferences.logs);
+  const reset = { ...preferences, logs: normalizeLogDisplayPreferences() };
+  assert.deepEqual(reset.players_table, preferences.players_table);
+  assert.deepEqual(reset.cards, preferences.cards);
+  assert.equal(reset.balance_expanded, false);
+});
+
+test("log display defaults preserve current density and ignore invalid stored values", () => {
+  assert.deepEqual(normalizeLiveViewPreferences().logs, {
+    fontSize: "small",
+    density: "dense",
+  });
+  assert.deepEqual(
+    normalizeLogDisplayPreferences({
+      fontSize: 1,
+      density: false,
+      filters: [],
+    }),
+    normalizeLogDisplayPreferences()
+  );
+  assert.deepEqual(getLogPresentation(), { fontSize: "0.875rem", paddingY: 1 });
+  assert.deepEqual(
+    getLogPresentation({ fontSize: "large", density: "comfortable" }),
+    { fontSize: "1.15rem", paddingY: 2 }
+  );
+  assert.equal(getLogPresentation({ density: "normal" }).paddingY, 1.5);
+});
+
+test("action filtering and highlighting share the server action-prefix semantics", () => {
+  assert.equal(matchesLogActions("CHAT[Team][Allies]", ["CHAT"]), true);
+  assert.equal(matchesLogActions("ADMIN KICK", ["ADMIN"]), true);
+  assert.equal(matchesLogActions("MATCH START", ["MATCH"]), true);
+  assert.equal(matchesLogActions("TEAM KILL", ["KILL"]), false);
+  assert.equal(matchesLogActions("MESSAGE", ["MESSAGE"]), true);
+  assert.equal(matchesLogActions("MESSAGE", []), false);
+  assert.equal(matchesLogActions("CHAT[Allies][Team]", ["CHAT[Allies]"]), true);
+  assert.equal(matchesLogActions("TK AUTO BANNED", ["TK AUTO"]), true);
+  assert.equal(matchesLogActions("TK AUTO KICKED", ["TK AUTO BANNED"]), false);
+});
+
+test("log retrieval rejects empty, fractional, non-finite and out-of-range limits", () => {
+  for (const value of [
+    "",
+    " ",
+    null,
+    undefined,
+    "no",
+    NaN,
+    Infinity,
+    9,
+    100001,
+    10.5,
+  ]) {
+    assert.equal(isValidLogQueryLimit(value), false, String(value));
+  }
+  for (const value of [10, 500, 100000, "250"])
+    assert.equal(isValidLogQueryLimit(value), true);
 });

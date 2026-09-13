@@ -1,4 +1,5 @@
 import { normalizePlayerTablePreferences } from "./player-table-preferences.mjs";
+import { normalizeLogDisplayPreferences } from "./log-display-preferences.mjs";
 
 export const DEFAULT_LIVE_CARDS = Object.freeze({
   commander: false,
@@ -13,6 +14,7 @@ export function normalizeLiveViewPreferences(value) {
   return {
     version: 1,
     players_table: normalizePlayerTablePreferences(value?.players_table),
+    logs: normalizeLogDisplayPreferences(value?.logs),
     balance_expanded:
       typeof value?.balance_expanded === "boolean"
         ? value.balance_expanded

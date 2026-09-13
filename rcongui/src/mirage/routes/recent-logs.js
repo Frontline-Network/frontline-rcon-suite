@@ -54,14 +54,14 @@ export const handleRecentLogs = (gameState, params = {}) => {
   let filteredLogs = storedLogs;
   if (filter_action.length > 0 || filter_player.length > 0) {
     filteredLogs = storedLogs.filter(log => {
-      const matchesAction = filter_action.length === 0 || filter_action.includes(log.action);
+      // The real API includes/excludes action prefixes, then narrows by player.
+      const actionSelected = filter_action.some(action => String(log.action).toLowerCase().startsWith(action.toLowerCase()));
+      const matchesAction = filter_action.length === 0 || (inclusive_filter ? actionSelected : !actionSelected);
       const matchesPlayer = filter_player.length === 0 || 
         filter_player.includes(log.player_name_1) || 
         (log.player_name_2 && filter_player.includes(log.player_name_2));
 
-      return inclusive_filter 
-        ? (matchesAction || matchesPlayer)
-        : (matchesAction && matchesPlayer);
+      return matchesAction && matchesPlayer;
     });
   }
 
