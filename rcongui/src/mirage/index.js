@@ -18,6 +18,7 @@ import {
 import {
   getDemoServerConnection,
   getDemoTeamView,
+  demoPlayerRecords,
   demoVietnamMapLayers,
   getDemoServerList,
   getDemoServerStatus,
@@ -672,7 +673,10 @@ export function makeServer({ environment = "development" } = {}) {
 
       this.post("/get_players_history", () => ({ result: { players: playerRecords(), total: playerRecords().length } }));
       this.get("/get_player_profile", (schema, request) => {
-        const player = playerRecords().find(
+        const records = new URLSearchParams(window.location.search).get("demo_warning_sources") === "1"
+          ? demoPlayerRecords
+          : playerRecords();
+        const player = records.find(
           (entry) => entry.player_id === request.queryParams.player_id,
         );
         return player

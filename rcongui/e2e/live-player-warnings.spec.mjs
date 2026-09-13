@@ -60,6 +60,18 @@ test("campaign recipients have no warning badge or warning count; moderation rem
   }
 
   // Information is only excluded from warning indicators, never from history.
+  // The dedicated profile fetch must agree with the compact live roster;
+  // otherwise its late response can silently replace the message history.
+  const profileActionCount = await page.evaluate(async () => {
+    const response = await fetch(
+      "/api/get_player_profile?player_id=76561198000000001"
+    );
+    const data = await response.json();
+    return data.result.received_actions.filter(
+      (action) => action.by === "Campaign: Mic-Pflicht DE"
+    ).length;
+  });
+  expect(profileActionCount).toBe(100);
   await panel.getByRole("button", { name: "FLN_Raven", exact: true }).click();
   await page.getByRole("tab", { name: "Nachrichten", exact: true }).click();
   await expect(
