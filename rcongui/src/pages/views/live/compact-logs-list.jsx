@@ -1,6 +1,8 @@
 import {
   faArrowRight,
   faCheckDouble,
+  faChevronDown,
+  faChevronRight,
   faCircleExclamation,
   faComments,
   faCopy,
@@ -11,9 +13,9 @@ import {
   faSkull,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { Box, Stack, Tooltip, Typography, alpha } from "@mui/material";
+import { Box, Button, Stack, Tooltip, Typography, alpha } from "@mui/material";
 import dayjs from "dayjs";
-import { memo, useMemo } from "react";
+import { memo, useId, useMemo, useState } from "react";
 import { LogMessage } from "@/components/shared/LogMessage";
 import { NoRowsOverlay } from "@/components/NoRowsOverlay";
 import { useTranslation } from "react-i18next";
@@ -21,6 +23,11 @@ import CopyToClipboardButton from "@/components/shared/CopyToClipboardButton";
 import { PlayerDrawerLink } from "@/components/shared/PlayerDrawerLink";
 import { useGlobalStore } from "@/stores/global-state";
 import { getLogTeam, removeLogPlayerIds } from "@/utils/lib";
+import { getMessageBody, groupLogRows } from "./log-stacks.mjs";
+import {
+  getLogPresentation,
+  matchesLogActions,
+} from "./log-display-preferences.mjs";
 
 let previousOnlinePlayerSource;
 let previousOnlinePlayerContexts = [];
@@ -314,8 +321,155 @@ const ChatEvent = ({ event, team, t }) => {
   );
 };
 
-function CompactLogsList({ table, rows, scrollable = false }) {
+function LogMessageStack({
+  group,
+  table,
+  displaySettings,
+  highlightedActions,
+}) {
   const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const detailsId = useId();
+  const count = group.rows.length;
+  const body = getCleanLogText(group.body);
+  const start = dayjs(group.start);
+  const end = dayjs(group.end);
+  const presentation = getLogPresentation(displaySettings);
+  const highlighted = matchesLogActions("MESSAGE", highlightedActions);
+  return (
+    <Box
+      component="li"
+      role="listitem"
+      data-testid="live-log-stack"
+      data-highlighted={highlighted}
+      sx={(theme) => ({
+        borderBottom: `1px solid ${theme.palette.divider}`,
+        borderLeft: `3px solid ${alpha(theme.palette.primary.main, 0.75)}`,
+        bgcolor: alpha(theme.palette.primary.main, highlighted ? 0.16 : 0.035),
+        boxShadow: highlighted
+          ? `inset 0 0 0 1px ${theme.palette.primary.main}`
+          : undefined,
+        px: 1.25,
+        py: presentation.paddingY,
+      })}
+    >
+      <Stack direction="row" alignItems="flex-start" spacing={0.8}>
+        <Typography
+          component="time"
+          dateTime={end.toISOString()}
+          title={`${start.format("HH:mm:ss")} – ${end.format("HH:mm:ss")}`}
+          variant="caption"
+          sx={{ color: "text.secondary", flex: "0 0 42px", pt: 0.15 }}
+        >
+          {end.format("HH:mm")}
+        </Typography>
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          <Typography variant="caption" color="primary.light">
+            <FontAwesomeIcon icon={faCircleExclamation} fixedWidth /> MESSAGE
+          </Typography>
+          <Typography
+            variant="body2"
+            sx={{
+              mt: 0.5,
+              overflowWrap: "anywhere",
+              whiteSpace: "pre-wrap",
+              unicodeBidi: "plaintext",
+            }}
+          >
+            {body}
+          </Typography>
+          <Button
+            size="small"
+            aria-expanded={expanded}
+            aria-controls={detailsId}
+            onClick={() => setExpanded((value) => !value)}
+            startIcon={
+              <FontAwesomeIcon
+                icon={expanded ? faChevronDown : faChevronRight}
+                fixedWidth
+              />
+            }
+            sx={{
+              mt: 0.5,
+              textTransform: "none",
+              textAlign: "left",
+              whiteSpace: "normal",
+            }}
+          >
+            {t("views.live.repeatedMessages", { count })}
+            {" · "}
+            {t(
+              expanded
+                ? "views.live.hideLogDetails"
+                : "views.live.showLogDetails"
+            )}
+          </Button>
+        </Box>
+      </Stack>
+      <Box id={detailsId} hidden={!expanded} sx={{ mt: expanded ? 1 : 0 }}>
+        {expanded ? (
+          <>
+            <Typography
+              variant="caption"
+              component="p"
+              color="text.secondary"
+              sx={{ mb: 0.5 }}
+            >
+              {t("views.live.scrollLogDetails", { count })}
+            </Typography>
+            <Box
+              role="region"
+              aria-label={t("views.live.repeatedMessages", { count })}
+              tabIndex={0}
+              data-testid="live-log-stack-scroll"
+              sx={(theme) => ({
+                maxHeight: "min(45vh, 360px)",
+                overflowY: "auto",
+                overflowX: "hidden",
+                scrollbarGutter: "stable",
+                scrollbarWidth: "thin",
+                scrollbarColor: `${alpha(
+                  theme.palette.primary.main,
+                  0.52
+                )} transparent`,
+                "&:focus-visible": {
+                  outline: `2px solid ${theme.palette.primary.main}`,
+                  outlineOffset: -2,
+                },
+              })}
+            >
+              <CompactLogsList
+                table={table}
+                rows={group.rows}
+                stackedDetail
+                displaySettings={displaySettings}
+                highlightedActions={highlightedActions}
+              />
+            </Box>
+          </>
+        ) : null}
+      </Box>
+    </Box>
+  );
+}
+
+function CompactLogsList({
+  table,
+  rows,
+  scrollable = false,
+  stackedDetail = false,
+  displaySettings,
+  highlightedActions = [],
+}) {
+  const { t } = useTranslation();
+  const presentation = getLogPresentation(displaySettings);
+  const groups = useMemo(
+    () =>
+      stackedDetail
+        ? rows.map((row) => ({ key: row.id, rows: [row] }))
+        : groupLogRows(rows),
+    [rows, stackedDetail]
+  );
   const onlinePlayers = useGlobalStore(selectOnlinePlayerContexts);
   const playersById = useMemo(() => {
     const players = new Map();
@@ -354,15 +508,22 @@ function CompactLogsList({ table, rows, scrollable = false }) {
 
   return (
     <Box
-      component="section"
-      role="region"
-      aria-label={t("views.live.eventStream")}
-      data-testid="live-event-stream"
+      component={stackedDetail ? "div" : "section"}
+      role={stackedDetail ? undefined : "region"}
+      aria-label={stackedDetail ? undefined : t("views.live.eventStream")}
+      data-testid={
+        stackedDetail ? "live-log-stack-details" : "live-event-stream"
+      }
       tabIndex={scrollable ? 0 : undefined}
       sx={(theme) => ({
         minHeight: 0,
         outline: "none",
         position: "relative",
+        "--log-font-size": presentation.fontSize,
+        fontSize: "var(--log-font-size)",
+        "& .MuiTypography-body2, & .MuiTypography-body1, & a": {
+          fontSize: "var(--log-font-size)",
+        },
         ...(scrollable
           ? {
               flex: "1 1 auto",
@@ -388,8 +549,24 @@ function CompactLogsList({ table, rows, scrollable = false }) {
       })}
     >
       <Box component="ol" role="list" sx={{ listStyle: "none", m: 0, p: 0 }}>
-        {rows.map((row) => {
+        {groups.map((group) => {
+          if (group.rows.length > 1) {
+            return (
+              <LogMessageStack
+                key={group.key}
+                group={group}
+                table={table}
+                displaySettings={displaySettings}
+                highlightedActions={highlightedActions}
+              />
+            );
+          }
+          const row = group.rows[0];
           const event = row.original;
+          const highlighted = matchesLogActions(
+            event.action,
+            highlightedActions
+          );
           const rawText =
             typeof event.message === "string"
               ? event.message
@@ -437,9 +614,10 @@ function CompactLogsList({ table, rows, scrollable = false }) {
           const weapon = getWeaponName(safeEvent, cleanText);
           return (
             <Box
-              key={row.id}
+              key={group.key}
               component="li"
               role="listitem"
+              data-highlighted={highlighted}
               sx={(theme) => ({
                 borderBottom: `1px solid ${theme.palette.divider}`,
                 borderLeft: `3px solid ${alpha(
@@ -447,11 +625,24 @@ function CompactLogsList({ table, rows, scrollable = false }) {
                   0.75
                 )}`,
                 px: 1.25,
-                py: 1,
-                contentVisibility: "auto",
-                containIntrinsicSize: "0 88px",
+                py: presentation.paddingY,
+                bgcolor: highlighted
+                  ? alpha(theme.palette.primary.main, 0.16)
+                  : undefined,
+                boxShadow: highlighted
+                  ? `inset 0 0 0 1px ${theme.palette.primary.main}`
+                  : undefined,
+                // A bounded detail list needs real row heights. Estimated
+                // offscreen heights otherwise make End stop before entry 100.
+                contentVisibility: stackedDetail ? "visible" : "auto",
+                containIntrinsicSize: stackedDetail ? undefined : "0 88px",
                 transition: "background-color 120ms ease",
-                "&:hover": { bgcolor: alpha(theme.palette[color].main, 0.055) },
+                "&:hover": {
+                  bgcolor: alpha(
+                    theme.palette[highlighted ? "primary" : color].main,
+                    highlighted ? 0.2 : 0.055
+                  ),
+                },
               })}
             >
               <Stack direction="row" alignItems="flex-start" spacing={0.8}>
@@ -461,9 +652,15 @@ function CompactLogsList({ table, rows, scrollable = false }) {
                     eventTime.isValid() ? eventTime.toISOString() : undefined
                   }
                   variant="caption"
-                  sx={{ color: "text.secondary", flex: "0 0 42px", pt: 0.15 }}
+                  sx={{
+                    color: "text.secondary",
+                    flex: stackedDetail ? "0 0 58px" : "0 0 42px",
+                    pt: 0.15,
+                  }}
                 >
-                  {eventTime.isValid() ? eventTime.format("HH:mm") : "--:--"}
+                  {eventTime.isValid()
+                    ? eventTime.format(stackedDetail ? "HH:mm:ss" : "HH:mm")
+                    : "--:--"}
                 </Typography>
                 <Box sx={{ minWidth: 0, flex: 1, maxWidth: "100%" }}>
                   <Stack
@@ -539,6 +736,30 @@ function CompactLogsList({ table, rows, scrollable = false }) {
                         team={playerTeams[0]}
                         t={t}
                       />
+                    ) : safeEvent.action === "MESSAGE" ? (
+                      <Stack spacing={0.25}>
+                        {stackedDetail ? (
+                          <Typography
+                            component="div"
+                            variant="caption"
+                            color="text.secondary"
+                          >
+                            {t("views.live.messageRecipient")}{" "}
+                            <PlayerName
+                              id={event.player_id_1}
+                              name={playerName1 || event.player_id_1}
+                              team={playerTeams[0]}
+                              teamLabel={getTeamLabel(playerTeams[0], t)}
+                            />
+                          </Typography>
+                        ) : null}
+                        <Typography
+                          variant="body2"
+                          sx={{ whiteSpace: "pre-wrap" }}
+                        >
+                          {getCleanLogText(getMessageBody(event)) || "–"}
+                        </Typography>
+                      </Stack>
                     ) : (
                       <Typography
                         component="div"

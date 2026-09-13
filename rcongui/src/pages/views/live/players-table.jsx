@@ -1,11 +1,9 @@
 import Table from "@/components/table/Table";
-import TableConfigDrawer from "@/components/table/TableConfigDrawer";
 import {
   Box,
   Button,
   Collapse,
   FormControl,
-  IconButton,
   InputLabel,
   MenuItem,
   Select,
@@ -18,10 +16,7 @@ import {
 } from "@mui/material";
 import { memo, useCallback, useMemo, useState } from "react";
 import { DebouncedSearchInput } from "@/components/shared/DebouncedSearchInput";
-import SettingsIcon from "@mui/icons-material/Settings";
 import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
-import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
-import UnfoldLessIcon from "@mui/icons-material/UnfoldLess";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import { TeamSelectionToolbar } from "./TeamSelectionToolbar";
 import {
@@ -34,9 +29,7 @@ import {
   messageAction,
   punishAction,
 } from "@/features/player-action/actions";
-import TableColumnSelection from "@/components/table/TableColumnSelection";
 import { TableToolbar } from "@/components/table/TableToolbar";
-import { usePlayersTableStore } from "@/stores/table-config";
 import { useTranslation } from "react-i18next";
 import { getTeamkillRisk } from "@/utils/teamkill-risk.mjs";
 import PlayerDetailPanel from "./player-detail-panel";
@@ -86,10 +79,10 @@ const PlayersTable = ({
   table,
   teamData,
   selectedPlayers,
-  onColumnVisibilityChange,
   isFetching,
-  preset,
-  onPresetChange,
+  tableConfig,
+  onConfigure,
+  settingsBusy,
 }) => {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -98,7 +91,6 @@ const PlayersTable = ({
   // either, so it receives the same touch-native roster and action sheet.
   const isCompactOperations = useMediaQuery(theme.breakpoints.down("md"));
   const { openWithId } = usePlayerSidebar();
-  const [tableConfigDrawerOpen, setTableConfigDrawerOpen] = useState(false);
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const activeColumnFilters = table.getState().columnFilters;
   const teamFilter = table.getColumn("team")?.getFilterValue();
@@ -110,50 +102,6 @@ const PlayersTable = ({
     : activeColumnFilters.length === 0
     ? "all"
     : null;
-
-  const columnLabels = useMemo(
-    () => ({
-      select: t("views.table.selection"),
-      details: t("common.details", { defaultValue: "Details" }),
-      player_summary: t("views.table.playerSummary"),
-      performance_summary: t("views.live.performance"),
-      status_summary: t("views.live.status"),
-      team: t("views.table.team"),
-      unit: t("views.table.unit"),
-      role: t("views.table.role"),
-      level: t("views.table.level"),
-      kills: t("views.table.kills"),
-      deaths: t("views.table.deaths"),
-      kpm: t("views.table.killsPerMinute"),
-      team_kills: t("views.table.teamKills"),
-      combat: t("views.table.combat"),
-      offense: t("views.table.offense"),
-      defense: t("views.table.defense"),
-      support: t("views.table.support"),
-      vehicle_kills: t("views.table.vehicleKills"),
-      vehicles_destroyed: t("views.table.vehiclesDestroyed"),
-      actions: t("common.actions"),
-      platform: t("views.table.platform"),
-      "clan-tag": t("views.table.clanTag"),
-      name: t("views.table.nameOnly"),
-      player_id: t("views.table.playerId"),
-      active_ban: t("views.table.activeBan"),
-      warnings: t("views.table.warnings"),
-      watchlist: t("views.table.watchlist"),
-      country: t("views.table.country"),
-      vip: t("views.table.vip"),
-      flags: t("views.table.flags"),
-      visits: t("views.table.visits"),
-      time: t("views.table.currentPlaytime"),
-    }),
-    [t]
-  );
-
-  const tableConfig = usePlayersTableStore();
-  const setConfig = usePlayersTableStore((state) => state.setConfig);
-  const setExpandedView = usePlayersTableStore(
-    (state) => state.setExpandedView
-  );
 
   const counts = useMemo(() => {
     const rows = table.options.data ?? [];
@@ -253,19 +201,15 @@ const PlayersTable = ({
             }}
           />
         </Stack>
-        <Select
-          value={preset}
-          onChange={(event) => onPresetChange(event.target.value)}
+        <Button
           size="small"
-          inputProps={{ "aria-label": t("views.live.columnPreset") }}
-          sx={{ display: { xs: "none", md: "inline-flex" }, minWidth: 150 }}
+          startIcon={<TuneOutlinedIcon />}
+          onClick={onConfigure}
+          disabled={settingsBusy}
+          sx={{ minHeight: 44 }}
         >
-          <MenuItem value="operations">
-            {t("views.live.operationsPreset")}
-          </MenuItem>
-          <MenuItem value="custom">{t("views.live.customPreset")}</MenuItem>
-          <MenuItem value="all">{t("views.live.allColumnsPreset")}</MenuItem>
-        </Select>
+          {t("views.live.configurePlayerTable")}
+        </Button>
       </Stack>
 
       <Stack
@@ -391,30 +335,6 @@ const PlayersTable = ({
           {t("views.live.selectionFilters")}
         </Button>
         <Box sx={{ flexGrow: 1 }} />
-        <IconButton
-          size="small"
-          aria-label={
-            tableConfig.expandedView ? t("common.collapse") : t("common.expand")
-          }
-          onClick={() => setExpandedView(!tableConfig.expandedView)}
-          sx={{ display: { xs: "none", md: "inline-flex" } }}
-        >
-          {tableConfig.expandedView ? <UnfoldLessIcon /> : <UnfoldMoreIcon />}
-        </IconButton>
-        <Box sx={{ display: { xs: "none", md: "contents" } }}>
-          <TableColumnSelection
-            table={table}
-            onColumnVisibilityChange={onColumnVisibilityChange}
-            getColumnLabel={(column) => columnLabels[column.id]}
-          />
-        </Box>
-        <IconButton
-          size="small"
-          aria-label={t("common.settings")}
-          onClick={() => setTableConfigDrawerOpen(true)}
-        >
-          <SettingsIcon />
-        </IconButton>
       </TableToolbar>
 
       <Collapse in={advancedFiltersOpen}>
@@ -432,7 +352,10 @@ const PlayersTable = ({
           onOpenProfile={(player) => openWithId(player.player_id)}
         />
       ) : (
-        <PlayerTableLayout data-testid="live-player-table-layout">
+        <PlayerTableLayout
+          data-testid="live-player-table-layout"
+          tableConfig={tableConfig}
+        >
           <Table
             table={table}
             config={tableConfig}
@@ -497,16 +420,6 @@ const PlayersTable = ({
           />
         </Stack>
       ) : null}
-
-      <TableConfigDrawer
-        name={t("views.live.players")}
-        open={tableConfigDrawerOpen}
-        onClose={(config) => {
-          setTableConfigDrawerOpen(false);
-          setConfig(config);
-        }}
-        config={tableConfig}
-      />
     </Box>
   );
 };

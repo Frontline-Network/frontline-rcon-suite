@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   Box,
@@ -9,7 +10,9 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   Stack,
+  Switch,
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -127,10 +130,25 @@ const StrengthBar = ({ allies, axis, label }) => {
   );
 };
 
-const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
+const AutobalancerCard = ({
+  teams,
+  onHighlightPlayers,
+  detailsExpanded,
+  onDetailsExpandedChange,
+  detailsDisabled = false,
+  detailsFeedback,
+}) => {
+  const { t } = useTranslation();
+  const detailsId = useId();
   const theme = useTheme();
   const teamColors = getThemeTeamColors(theme);
-  const [expanded, setExpanded] = useState(true);
+  const [localExpanded, setLocalExpanded] = useState(true);
+  const controlled = detailsExpanded !== undefined;
+  const expanded = controlled ? detailsExpanded : localExpanded;
+  const setExpanded = (value) => {
+    if (controlled) onDetailsExpandedChange?.(value);
+    else setLocalExpanded(value);
+  };
   const [explanationOpen, setExplanationOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [selectedRecommendation, setSelectedRecommendation] = useState(0);
@@ -384,8 +402,10 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
   }, [highlights, onHighlightPlayers]);
 
   useEffect(() => {
-    if (insight?.needsAttention) setExpanded(true);
-  }, [insight?.headline]);
+    // A saved compact view stays compact when the live status changes.
+    // The headline and its warning color remain visible and keep updating.
+    if (!controlled && insight?.needsAttention) setLocalExpanded(true);
+  }, [controlled, insight?.headline]);
 
   if (!status || !insight) return null;
 
@@ -490,7 +510,7 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
           minHeight: 46,
           px: 1.5,
           py: 0.75,
-          borderBottom: expanded ? "1px solid" : 0,
+          borderBottom: "1px solid",
           borderColor: "divider",
           backgroundColor: "background.default",
         }}
@@ -519,38 +539,68 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
           spacing={0.75}
           flexWrap="wrap"
         >
-          <Chip
-            size="small"
-            label="Direkte Live-Daten"
-            color="info"
-            sx={{ borderRadius: 0 }}
-          />
-          <Chip
-            size="small"
-            variant="outlined"
-            label="Keine Historie nötig"
-            sx={{ borderRadius: 0 }}
-          />
+          {expanded && (
+            <Chip
+              size="small"
+              label="Direkte Live-Daten"
+              color="info"
+              sx={{ borderRadius: 0 }}
+            />
+          )}
+          {expanded && (
+            <Chip
+              size="small"
+              variant="outlined"
+              label="Keine Historie nötig"
+              sx={{ borderRadius: 0 }}
+            />
+          )}
           <Button
             size="small"
             color="inherit"
             startIcon={<InfoOutlinedIcon />}
+            disabled={!expanded && detailsDisabled}
             onClick={() => {
-              setExpanded(true);
+              if (!expanded) setExpanded(true);
               setExplanationOpen((value) => !value);
             }}
           >
             Warum?
           </Button>
-          {!expanded && (
-            <Button size="small" onClick={() => setExpanded(true)}>
-              Öffnen
-            </Button>
+          {controlled ? (
+            <FormControlLabel
+              label={t("views.live.balanceDetails")}
+              sx={{
+                m: 0,
+                "& .MuiFormControlLabel-label": { fontSize: "0.75rem" },
+              }}
+              control={
+                <Switch
+                  size="small"
+                  checked={expanded}
+                  disabled={detailsDisabled}
+                  onChange={(_, checked) => setExpanded(checked)}
+                  inputProps={{
+                    role: "switch",
+                    "aria-label": t("views.live.balanceDetailsToggle"),
+                    "aria-controls": detailsId,
+                  }}
+                />
+              }
+            />
+          ) : (
+            !expanded && (
+              <Button size="small" onClick={() => setExpanded(true)}>
+                Öffnen
+              </Button>
+            )
           )}
         </Stack>
       </Stack>
 
-      <Collapse in={expanded}>
+      {detailsFeedback}
+
+      <Collapse id={detailsId} in={expanded} unmountOnExit>
         <Box>
           <Box
             sx={{
@@ -773,71 +823,75 @@ const AutobalancerCard = ({ teams, onHighlightPlayers }) => {
               </Typography>
             </Box>
           </Collapse>
-
-          <Stack
-            direction={{ xs: "column", lg: "row" }}
-            alignItems={{ lg: "center" }}
-            gap={1.5}
-            sx={{ px: 1.5, py: 1.25 }}
-          >
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              alignItems={{ sm: "center" }}
-              gap={1.5}
-              sx={{ minWidth: 0, flex: 1 }}
-            >
-              <StrengthBar
-                label="Stärke-Index vorher"
-                allies={insight.ratings.allies}
-                axis={insight.ratings.axis}
-              />
-              <ArrowForwardIcon
-                sx={{ color: "text.secondary", alignSelf: "center" }}
-                aria-hidden
-              />
-              <StrengthBar
-                label="Stärke-Index nachher"
-                allies={insight.projectedRatings.allies}
-                axis={insight.projectedRatings.axis}
-              />
-            </Stack>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-              <Button
-                variant={insight.needsAttention ? "contained" : "outlined"}
-                disabled={insight.blocked || recommendations.length === 0}
-                onClick={() => {
-                  setSelectedRecommendation(0);
-                  setReviewOpen(true);
-                }}
-              >
-                {squad
-                  ? "Squad-Wechsel prüfen"
-                  : swap
-                  ? "Tausch prüfen"
-                  : proposalName
-                  ? "Wechsel prüfen"
-                  : "Kein Eingriff nötig"}
-              </Button>
-              {alternativesAvailable && (
-                <Button
-                  variant="outlined"
-                  onClick={() => {
-                    setSelectedRecommendation(
-                      Math.min(1, recommendations.length - 1)
-                    );
-                    setReviewOpen(true);
-                  }}
-                >
-                  Alternativen
-                </Button>
-              )}
-              <Button color="inherit" onClick={() => setExpanded(false)}>
-                Beobachten
-              </Button>
-            </Stack>
-          </Stack>
         </Box>
       </Collapse>
+
+      <Stack
+        direction={{ xs: "column", lg: "row" }}
+        alignItems={{ lg: "center" }}
+        gap={1.5}
+        sx={{ px: 1.5, py: 1.25 }}
+      >
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          alignItems={{ sm: "center" }}
+          gap={1.5}
+          sx={{ minWidth: 0, flex: 1 }}
+        >
+          <StrengthBar
+            label="Stärke-Index Live"
+            allies={insight.ratings.allies}
+            axis={insight.ratings.axis}
+          />
+          <ArrowForwardIcon
+            sx={{ color: "text.secondary", alignSelf: "center" }}
+            aria-hidden
+          />
+          <StrengthBar
+            label="Stärke-Index-Prognose"
+            allies={insight.projectedRatings.allies}
+            axis={insight.projectedRatings.axis}
+          />
+        </Stack>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+          <Button
+            variant={insight.needsAttention ? "contained" : "outlined"}
+            disabled={insight.blocked || recommendations.length === 0}
+            onClick={() => {
+              setSelectedRecommendation(0);
+              setReviewOpen(true);
+            }}
+          >
+            {squad
+              ? "Squad-Wechsel prüfen"
+              : swap
+              ? "Tausch prüfen"
+              : proposalName
+              ? "Wechsel prüfen"
+              : "Kein Eingriff nötig"}
+          </Button>
+          {alternativesAvailable && (
+            <Button
+              variant="outlined"
+              onClick={() => {
+                setSelectedRecommendation(
+                  Math.min(1, recommendations.length - 1)
+                );
+                setReviewOpen(true);
+              }}
+            >
+              Alternativen
+            </Button>
+          )}
+          <Button
+            color="inherit"
+            disabled={detailsDisabled || !expanded}
+            onClick={() => setExpanded(false)}
+          >
+            Beobachten
+          </Button>
+        </Stack>
+      </Stack>
 
       <Dialog
         open={reviewOpen}

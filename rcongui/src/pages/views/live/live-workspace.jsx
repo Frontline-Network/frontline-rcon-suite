@@ -18,6 +18,7 @@ export const LiveCommandBar = ({
   layoutMode,
   onLayoutModeChange,
   splitDisabled,
+  settingsControl,
 }) => {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -33,26 +34,36 @@ export const LiveCommandBar = ({
         mb: 1,
       })}
     >
-      <Typography
-        id="live-operations-title"
-        component="h1"
-        variant="subtitle1"
+      <Box
         sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
           borderBottom: "1px solid",
           borderColor: "divider",
-          color: "text.primary",
-          fontFamily: '"Bahnschrift Condensed", "Arial Narrow", sans-serif',
-          fontWeight: 800,
-          letterSpacing: "0.08em",
-          lineHeight: 1,
-          m: 0,
-          px: 1.5,
-          py: 1,
-          textTransform: "uppercase",
         }}
       >
-        {t("views.live.title")}
-      </Typography>
+        <Typography
+          id="live-operations-title"
+          component="h1"
+          variant="subtitle1"
+          sx={{
+            minWidth: 0,
+            color: "text.primary",
+            fontFamily: '"Bahnschrift Condensed", "Arial Narrow", sans-serif',
+            fontWeight: 800,
+            letterSpacing: "0.08em",
+            lineHeight: 1,
+            m: 0,
+            px: 1.5,
+            py: 1,
+            textTransform: "uppercase",
+          }}
+        >
+          {t("views.live.title")}
+        </Typography>
+        {settingsControl}
+      </Box>
       {isCompact ? (
         <Box
           role="tablist"

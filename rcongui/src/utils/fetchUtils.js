@@ -550,6 +550,10 @@ export const cmd = {
       cmd: "get_own_user_appearance",
       ...params,
     }),
+  GET_OWN_LIVE_VIEW: () =>
+    requestFactory({ method: "GET", cmd: "get_own_user_live_view" }),
+  SET_OWN_LIVE_VIEW: (payload) =>
+    requestFactory({ method: "PUT", cmd: "set_own_user_live_view", payload }),
   SET_OWN_APPEARANCE: (payload, params = {}) =>
     requestFactory({
       method: "PUT",

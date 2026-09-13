@@ -7,6 +7,7 @@ import { getLogTeam, getTeamColor } from "@/utils/lib";
 import { Box } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { getThemeTeamColor } from "@/themes/teamColors";
+import { matchesLogActions } from "./log-display-preferences.mjs";
 
 const TIME_FORMAT = "HH:mm:ss, MMM DD";
 
@@ -23,18 +24,7 @@ const playerNameFilter = (row, columnId, filterValue = []) => {
 
 const actionFilter = (row, columnId, filterValue = []) => {
   if (!filterValue) return true;
-  const anyStartsWith = filterValue.some((action) => {
-    switch (action) {
-      case "CHAT":
-      case "ADMIN":
-      case "VOTE":
-      case "MATCH":
-        return row.original.action.startsWith(action);
-      default:
-        return row.original.action === action;
-    }
-  });
-  return anyStartsWith;
+  return matchesLogActions(row.original.action, filterValue);
 };
 
 const teamFilter = (row, columnId, filterValue = []) => {

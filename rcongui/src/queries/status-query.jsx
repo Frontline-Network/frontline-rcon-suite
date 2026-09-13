@@ -1,29 +1,27 @@
-import {
-  getDemoConnectionMode,
-  getDemoServerStatus,
-  isFakeMode,
-} from "@/mirage/demo-data";
 import { cmd } from "@/utils/fetchUtils";
 import { queryOptions } from "@tanstack/react-query";
+
+import { getDemoConnectionMode, getDemoServerStatus } from "@/mirage/demo-data";
 
 export const gameStatusQueryOptions = () =>
   queryOptions({
     queryKey: [{ queryIdentifier: "get_status" }],
     queryFn: async () => {
       if (
-        isFakeMode() &&
+        import.meta.env.MODE === "fake" &&
         ["gameserver_offline", "gameserver_stale"].includes(
           getDemoConnectionMode()
         )
       ) {
         throw new Error("Demo game server is unavailable");
       }
-      return isFakeMode()
+      return import.meta.env.MODE === "fake"
         ? getDemoServerStatus()
         : cmd.GET_GAME_SERVER_STATUS();
     },
     initialData:
-      isFakeMode() && getDemoConnectionMode() === "gameserver_stale"
+      import.meta.env.MODE === "fake" &&
+      getDemoConnectionMode() === "gameserver_stale"
         ? getDemoServerStatus()
         : undefined,
     staleTime: 15 * 1000,

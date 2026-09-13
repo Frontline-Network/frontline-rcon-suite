@@ -16,7 +16,6 @@ import LogsTable from "./logs-table";
 import { getLogsColumns } from "./logs-columns";
 import {
   useLogsSearchStore,
-  usePlayersTableStore,
   useLogsTableStore,
 } from "@/stores/table-config";
 import { teamsLiveQueryOptions } from "@/queries/teams-live-query";
@@ -41,7 +40,9 @@ import { useGlobalStore } from "@/stores/global-state";
 import { LiveCommandBar } from "./live-workspace";
 import { ActionMenu } from "@/features/player-action/ActionMenu";
 import { generatePlayerActions } from "@/features/player-action/actions";
-import AutobalancerCard from "../team/autobalancer-card";
+import { LiveBalanceCard } from "./live-balance-card";
+import { LiveViewSettings, useLiveViewPreferences } from "./live-view-settings";
+import { getPlayerColumnVisibility } from "./player-table-preferences.mjs";
 
 const interval = 15 * 1000;
 const UNASSIGNED = "unassigned";
@@ -51,68 +52,6 @@ const ONLINE_PLAYER_ACTIONS = generatePlayerActions({
   onlineAction: true,
 });
 
-const PLAYER_COLUMN_IDS = [
-  "select",
-  "details",
-  "team",
-  "unit",
-  "player_summary",
-  "performance_summary",
-  "status_summary",
-  "role",
-  "level",
-  "kills",
-  "deaths",
-  "kpm",
-  "team_kills",
-  "combat",
-  "offense",
-  "defense",
-  "support",
-  "vehicle_kills",
-  "vehicles_destroyed",
-  "actions",
-  "platform",
-  "clan-tag",
-  "name",
-  "player_id",
-  "active_ban",
-  "warnings",
-  "watchlist",
-  "country",
-  "vip",
-  "flags",
-  "visits",
-  "time",
-];
-
-const OPERATIONS_COLUMNS = new Set([
-  "select",
-  "details",
-  "team",
-  "unit",
-  "player_summary",
-  "kills",
-  "deaths",
-  "team_kills",
-  "status_summary",
-  "time",
-  "actions",
-]);
-
-const COMPOSITE_COLUMNS = new Set(["performance_summary", "status_summary"]);
-
-const getPresetVisibility = (preset, customVisibility) => {
-  if (preset === "custom") return customVisibility;
-  return PLAYER_COLUMN_IDS.reduce((visibility, id) => {
-    if (preset === "operations") visibility[id] = OPERATIONS_COLUMNS.has(id);
-    if (preset === "all")
-      visibility[id] =
-        id !== "player_id" && id !== "name" && !COMPOSITE_COLUMNS.has(id);
-    return visibility;
-  }, {});
-};
-
 // Keep route navigation immediate. React Query owns the single log request and
 // renders the existing loading state instead of blocking navigation and then
 // immediately repeating the request with the user's persisted filters.
@@ -121,6 +60,13 @@ export const loader = () => ({ initialLogsView: undefined });
 const Live = () => {
   const { t } = useTranslation();
   const { initialLogsView } = useLoaderData();
+  const liveViewSettings = useLiveViewPreferences();
+  const [displaySettingsOpen, setDisplaySettingsOpen] = useState(false);
+  const [displaySection, setDisplaySection] = useState("status");
+  const openDisplaySettings = (section) => {
+    setDisplaySection(section);
+    setDisplaySettingsOpen(true);
+  };
   const gameState = useGlobalStore((state) => state.gameState);
   const factionByTeam = useMemo(
     () => ({
@@ -195,7 +141,6 @@ const Live = () => {
   // Every visit starts in the operator-focused split workspace. Switching to
   // the player or log focus remains possible for the current page session.
   const [layoutMode, setLayoutMode] = useState("split");
-  const [playerPreset, setPlayerPreset] = useState("operations");
   const [playerActionMenu, setPlayerActionMenu] = useState({
     anchorEl: null,
     player: null,
@@ -316,25 +261,11 @@ const Live = () => {
   const [playersRowSelection, setPlayersRowSelection] = useState({});
   const [playersExpanded, setPlayersExpanded] = useState({});
   const [playersColumnFilters, setPlayersColumnFilters] = useState([]);
-  const playersTableConfig = usePlayersTableStore();
-  const setPlayersTableConfig = usePlayersTableStore(
-    (state) => state.setConfig
-  );
+  const playersTableConfig = liveViewSettings.preferences.players_table;
   const playersColumnVisibility = useMemo(
-    () =>
-      getPresetVisibility(playerPreset, playersTableConfig.columnVisibility),
-    [playerPreset, playersTableConfig.columnVisibility]
+    () => getPlayerColumnVisibility(playersTableConfig),
+    [playersTableConfig]
   );
-
-  const handlePlayersColumnVisibilityChange = (columnId, isVisible) => {
-    const columnVisibility = {
-      ...playersColumnVisibility,
-      [columnId]: isVisible,
-    };
-
-    setPlayerPreset("custom");
-    setPlayersTableConfig((prev) => ({ ...prev, columnVisibility }));
-  };
 
   const playersTable = useReactTable({
     data: playersData,
@@ -348,14 +279,6 @@ const Live = () => {
     onExpandedChange: setPlayersExpanded,
     onRowSelectionChange: setPlayersRowSelection,
     onColumnFiltersChange: setPlayersColumnFilters,
-    onColumnVisibilityChange: (updater) => {
-      const next =
-        typeof updater === "function"
-          ? updater(playersColumnVisibility)
-          : updater;
-      setPlayerPreset("custom");
-      setPlayersTableConfig((prev) => ({ ...prev, columnVisibility: next }));
-    },
     getRowId: (row) => row.player_id,
     meta: {
       openPlayerActionMenu,
@@ -469,6 +392,17 @@ const Live = () => {
         layoutMode={effectiveLayout}
         onLayoutModeChange={setLayoutMode}
         splitDisabled={!splitAvailable}
+        settingsControl={
+          <LiveViewSettings
+            key={liveViewSettings.userName}
+            settings={liveViewSettings}
+            open={displaySettingsOpen}
+            onOpen={openDisplaySettings}
+            onClose={() => setDisplaySettingsOpen(false)}
+            section={displaySection}
+            onSectionChange={setDisplaySection}
+          />
+        }
       />
 
       <InfoPanel
@@ -476,9 +410,10 @@ const Live = () => {
         playersData={playersData}
         onFilter={handleStatusFilter}
         activeFilters={playersColumnFilters}
+        visibility={liveViewSettings.preferences.cards}
       />
 
-      <AutobalancerCard teams={teamData} />
+      <LiveBalanceCard teams={teamData} settings={liveViewSettings} />
 
       <Stack
         direction="row"
@@ -513,10 +448,10 @@ const Live = () => {
             table={playersTable}
             teamData={teamData}
             selectedPlayers={selectedPlayers}
-            onColumnVisibilityChange={handlePlayersColumnVisibilityChange}
             isFetching={isTeamFetching}
-            preset={playerPreset}
-            onPresetChange={setPlayerPreset}
+            tableConfig={playersTableConfig}
+            onConfigure={() => openDisplaySettings("players")}
+            settingsBusy={liveViewSettings.mutation.isPending}
           />
         ) : null}
 
@@ -532,6 +467,9 @@ const Live = () => {
               isExpanded={effectiveLayout === "logs"}
               onToggleExpanded={handleToggleLogsExpanded}
               viewportSticky={effectiveLayout === "split"}
+              displaySettings={liveViewSettings.preferences.logs}
+              onConfigure={() => openDisplaySettings("logs")}
+              settingsBusy={liveViewSettings.mutation.isPending}
             />
           </Box>
         ) : null}
