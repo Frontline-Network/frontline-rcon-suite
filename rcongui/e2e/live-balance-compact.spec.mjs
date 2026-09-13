@@ -18,13 +18,20 @@ async function compact(page) {
     card(page).getByText("Geschätzte Teamstärke", { exact: true })
   ).toHaveCount(0);
 }
-async function expectSummary(page) {
+async function expectSummary(page, hasProjection = false) {
   await expect(
     card(page).getByRole("img", { name: /^Stärke-Index Live:/ })
   ).toBeVisible();
-  await expect(
-    card(page).getByRole("img", { name: /^Stärke-Index-Prognose:/ })
-  ).toBeVisible();
+  const forecast = card(page).getByRole("img", {
+    name: /^Stärke-Index-Prognose:/,
+  });
+  if (hasProjection) await expect(forecast).toBeVisible();
+  else {
+    await expect(forecast).toHaveCount(0);
+    await expect(
+      card(page).getByText("Keine Prognose verfügbar", { exact: true }).first()
+    ).toBeVisible();
+  }
   await expect(
     card(page).getByRole("button", { name: "Beobachten", exact: true })
   ).toBeVisible();
@@ -82,7 +89,7 @@ test("an imbalance stays compact and an intervention can still be reviewed witho
   await expect(
     card(page).getByRole("heading", { name: "Spielerzahl unausgeglichen" })
   ).toBeVisible();
-  await expectSummary(page);
+  await expectSummary(page, true);
   await card(page)
     .getByRole("button", { name: "Squad-Wechsel prüfen", exact: true })
     .click();

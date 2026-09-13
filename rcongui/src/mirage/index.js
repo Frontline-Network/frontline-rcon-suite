@@ -17,6 +17,7 @@ import {
 } from "./data/autobalancer";
 import {
   getDemoServerConnection,
+  getDemoTeamView,
   demoVietnamMapLayers,
   getDemoServerList,
   getDemoServerStatus,
@@ -814,6 +815,7 @@ export function makeServer({ environment = "development" } = {}) {
         return ok(autobalancerConfig);
       });
       this.post("/execute_autobalancer_squad_switch", (schema, request) => {
+        protectedRequestLog.push("/api/execute_autobalancer_squad_switch");
         const payload = request.requestBody
           ? JSON.parse(request.requestBody)
           : {};
@@ -902,7 +904,9 @@ export function makeServer({ environment = "development" } = {}) {
       this.get(
         "/get_team_view",
         trackProtectedRequest("/api/get_team_view", () =>
-          handleTeamView(gameState)
+          new URLSearchParams(window.location.search).has("demo_balance")
+            ? ok(getDemoTeamView())
+            : handleTeamView(gameState)
         )
       );
 

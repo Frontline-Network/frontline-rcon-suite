@@ -690,10 +690,27 @@ const demoUnbalancedTeamView = {
   },
 };
 
-export const getDemoTeamView = () =>
-  readDemoParameter("demo_balance") === "unbalanced"
-    ? demoUnbalancedTeamView
-    : demoTeamView;
+export const getDemoTeamView = () => {
+  const mode = readDemoParameter("demo_balance");
+  if (mode === "unbalanced") return demoUnbalancedTeamView;
+  if (mode === "changed_squad")
+    return {
+      ...demoUnbalancedTeamView,
+      allies: {
+        ...demoUnbalancedTeamView.allies,
+        squads: {
+          able: demoUnbalancedTeamView.allies.squads.able,
+          delta: {
+            ...demoUnbalancedTeamView.allies.squads.charlie,
+            players: demoUnbalancedTeamView.allies.squads.charlie.players.map(
+              (player) => ({ ...player, unit_name: "delta" })
+            ),
+          },
+        },
+      },
+    };
+  return demoTeamView;
+};
 
 export const getDemoConnectionMode = () =>
   readDemoParameter("demo_connection") || "online";

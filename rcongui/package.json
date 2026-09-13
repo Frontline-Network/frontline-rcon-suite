@@ -36,7 +36,7 @@
     "check:config-workbench": "node scripts/check-configuration-workbench.mjs",
     "check:communication-workbench": "node scripts/check-communication-workbench.mjs",
     "check:history-workbench": "node scripts/check-history-workbench.mjs",
-    "check:live-balance": "node scripts/check-live-balance-assistant.mjs",
+    "check:live-balance": "node scripts/check-live-balance-assistant.mjs && node --test src/pages/views/team/balance-recommendations.test.mjs",
     "check:log-stacks": "node --test src/pages/views/live/log-stacks.test.mjs",
     "check:live-view": "node --test src/pages/views/live/live-view-preferences.test.mjs",
     "check:color-vision": "node scripts/check-color-vision-contract.mjs",

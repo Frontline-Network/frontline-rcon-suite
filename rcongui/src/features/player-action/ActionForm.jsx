@@ -49,8 +49,7 @@ export const ActionForm = ({
     },
   });
   const { recipients, action, params } = actionState;
-  const { submitRef, setLoading, setError, setSuccess } =
-    actionHandlers;
+  const { submitRef, setLoading, setError, setSuccess } = actionHandlers;
   const [recipientStates, setRecipientStates] = useState(
     initRecipients(recipients)
   );
@@ -86,6 +85,15 @@ export const ActionForm = ({
           ...data,
           ...params,
         });
+      }
+      // Validate a reviewed group once, before any member is switched. The
+      // final confirmation may be much later than opening the action dialog.
+      try {
+        await action.preflight?.(payloads);
+      } catch (error) {
+        setError(error);
+        setLoading(false);
+        return;
       }
       // Update UI to signalize pending state
       setRecipientStates((prevState) =>
@@ -157,7 +165,15 @@ export const ActionForm = ({
         setLoading(false);
       }
     },
-    [action, params, queryClient, recipientStates, setError, setLoading, setSuccess]
+    [
+      action,
+      params,
+      queryClient,
+      recipientStates,
+      setError,
+      setLoading,
+      setSuccess,
+    ]
   );
 
   const handleDeleteRecipient = (player) => {

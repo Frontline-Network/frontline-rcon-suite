@@ -1,3 +1,9 @@
+import {
+  balanceRecommendations,
+  preferRecommendation,
+  recommendationKey,
+} from "./balance-recommendations.mjs";
+
 const TEAM_NAMES = ["allies", "axis"];
 
 const LEADER_ROLES = new Set([
@@ -205,7 +211,7 @@ const regularSquads = (players) => {
   return [...groups.values()].filter((squad) => squad.members.length >= 2);
 };
 
-const projectedGroupGap = (players, moves) => {
+const projectedGroupRatings = (players, moves) => {
   const targetByPlayer = new Map();
   moves.forEach((move) =>
     move.squad.members.forEach((player) =>
@@ -216,10 +222,15 @@ const projectedGroupGap = (players, moves) => {
     ...player,
     team: targetByPlayer.get(player.player_id) ?? player.team,
   }));
-  return Math.abs(
-    teamRating(projected, "allies") - teamRating(projected, "axis")
+  return Object.fromEntries(
+    TEAM_NAMES.map((team) => [
+      team,
+      Number(teamRating(projected, team).toFixed(2)),
+    ])
   );
 };
+
+const ratingGap = (ratings) => Math.abs(ratings.allies - ratings.axis);
 
 const squadMovePayload = (squad, targetTeam) => ({
   source_team: squad.team,
@@ -234,13 +245,14 @@ const buildSquadMoveRecommendations = (
   counts,
   teamRatings,
   sourceTeam,
-  targetTeam
+  targetTeam,
+  preferred
 ) => {
   if (!sourceTeam || !targetTeam) return [];
   const beforeCountDifference = Math.abs(counts.allies - counts.axis);
   const ratingGapBefore = Math.abs(teamRatings.allies - teamRatings.axis);
 
-  return squads
+  const recommendations = squads
     .filter((squad) => squad.team === sourceTeam)
     .map((squad) => {
       const projectedCounts = { ...counts };
@@ -250,9 +262,10 @@ const buildSquadMoveRecommendations = (
         projectedCounts.allies - projectedCounts.axis
       );
       if (projectedCountDifference >= beforeCountDifference) return null;
-      const projectedRatingGap = projectedGroupGap(players, [
+      const projectedRatings = projectedGroupRatings(players, [
         { squad, target_team: targetTeam },
       ]);
+      const projectedRatingGap = ratingGap(projectedRatings);
       return {
         kind: "squad_move",
         advisory_only: true,
@@ -266,6 +279,7 @@ const buildSquadMoveRecommendations = (
         projected_count_difference: projectedCountDifference,
         rating_gap_before: Number(ratingGapBefore.toFixed(2)),
         projected_rating_gap: Number(projectedRatingGap.toFixed(2)),
+        projected_team_ratings: projectedRatings,
         rating_improvement: Number(
           (ratingGapBefore - projectedRatingGap).toFixed(2)
         ),
@@ -282,8 +296,8 @@ const buildSquadMoveRecommendations = (
         left.projected_count_difference - right.projected_count_difference ||
         left.projected_rating_gap - right.projected_rating_gap ||
         left.member_count - right.member_count
-    )
-    .slice(0, 3);
+    );
+  return preferRecommendation(recommendations, preferred).slice(0, 3);
 };
 
 const buildSquadSwapRecommendations = (
@@ -304,10 +318,11 @@ const buildSquadSwapRecommendations = (
   strongerSquads.forEach((strongerSquad) => {
     weakerSquads.forEach((weakerSquad) => {
       if (strongerSquad.members.length !== weakerSquad.members.length) return;
-      const projectedRatingGap = projectedGroupGap(players, [
+      const projectedRatings = projectedGroupRatings(players, [
         { squad: strongerSquad, target_team: weakerTeam },
         { squad: weakerSquad, target_team: strongerTeam },
       ]);
+      const projectedRatingGap = ratingGap(projectedRatings);
       const improvement = ratingGapBefore - projectedRatingGap;
       if (improvement < options.minimumImprovement) return;
       recommendations.push({
@@ -326,6 +341,7 @@ const buildSquadSwapRecommendations = (
         projected_count_difference: 0,
         rating_gap_before: Number(ratingGapBefore.toFixed(2)),
         projected_rating_gap: Number(projectedRatingGap.toFixed(2)),
+        projected_team_ratings: projectedRatings,
         rating_improvement: Number(improvement.toFixed(2)),
         rating_confidence: Number(
           Math.min(
@@ -339,17 +355,16 @@ const buildSquadSwapRecommendations = (
     });
   });
 
-  return recommendations
-    .sort(
-      (left, right) =>
-        left.projected_rating_gap - right.projected_rating_gap ||
-        right.rating_confidence - left.rating_confidence ||
-        left.member_count - right.member_count
-    )
-    .slice(0, 3);
+  recommendations.sort(
+    (left, right) =>
+      left.projected_rating_gap - right.projected_rating_gap ||
+      right.rating_confidence - left.rating_confidence ||
+      left.member_count - right.member_count
+  );
+  return preferRecommendation(recommendations, options.preferred).slice(0, 3);
 };
 
-const projectedSwapGap = (players, first, second) => {
+const projectedSwapRatings = (players, first, second) => {
   const projected = players.map((player) => {
     if (player.player_id === first.player_id)
       return { ...player, team: second.team };
@@ -357,8 +372,11 @@ const projectedSwapGap = (players, first, second) => {
       return { ...player, team: first.team };
     return player;
   });
-  return Math.abs(
-    teamRating(projected, "allies") - teamRating(projected, "axis")
+  return Object.fromEntries(
+    TEAM_NAMES.map((team) => [
+      team,
+      Number(teamRating(projected, team).toFixed(2)),
+    ])
   );
 };
 
@@ -382,11 +400,12 @@ const buildStrengthSwaps = (players, teamRatings, options) => {
 
   strongerPlayers.forEach((strongerPlayer) => {
     weakerPlayers.forEach((weakerPlayer) => {
-      const projectedRatingGap = projectedSwapGap(
+      const projectedRatings = projectedSwapRatings(
         players,
         strongerPlayer,
         weakerPlayer
       );
+      const projectedRatingGap = ratingGap(projectedRatings);
       const improvement = ratingGapBefore - projectedRatingGap;
       if (improvement < options.minimumImprovement) return;
       recommendations.push({
@@ -399,6 +418,7 @@ const buildStrengthSwaps = (players, teamRatings, options) => {
         weaker_player: publicPlayer(weakerPlayer),
         rating_gap_before: Number(ratingGapBefore.toFixed(2)),
         projected_rating_gap: Number(projectedRatingGap.toFixed(2)),
+        projected_team_ratings: projectedRatings,
         rating_improvement: Number(improvement.toFixed(2)),
         rating_confidence: Number(
           Math.min(
@@ -410,21 +430,23 @@ const buildStrengthSwaps = (players, teamRatings, options) => {
     });
   });
 
-  return recommendations
-    .sort(
-      (left, right) =>
-        left.projected_rating_gap - right.projected_rating_gap ||
-        right.rating_confidence - left.rating_confidence
-    )
-    .slice(0, 3);
+  recommendations.sort(
+    (left, right) =>
+      left.projected_rating_gap - right.projected_rating_gap ||
+      right.rating_confidence - left.rating_confidence
+  );
+  return preferRecommendation(recommendations, options.preferred).slice(0, 3);
 };
 
-const projectedMoveGap = (players, player, targetTeam) => {
+const projectedMoveRatings = (players, player, targetTeam) => {
   const projected = players.map((item) =>
     item.player_id === player.player_id ? { ...item, team: targetTeam } : item
   );
-  return Math.abs(
-    teamRating(projected, "allies") - teamRating(projected, "axis")
+  return Object.fromEntries(
+    TEAM_NAMES.map((team) => [
+      team,
+      Number(teamRating(projected, team).toFixed(2)),
+    ])
   );
 };
 
@@ -432,7 +454,8 @@ const buildMoveProposal = (
   players,
   sourceTeam,
   targetTeam,
-  allowIndividualSquadFallback
+  allowIndividualSquadFallback,
+  preferred
 ) => {
   if (!sourceTeam || !targetTeam) return null;
   const candidates = players
@@ -443,23 +466,37 @@ const buildMoveProposal = (
     )
     .map((player) => ({
       player,
-      projectedGap: projectedMoveGap(players, player, targetTeam),
+      projectedRatings: projectedMoveRatings(players, player, targetTeam),
     }))
     .sort(
       (left, right) =>
-        left.projectedGap - right.projectedGap ||
+        ratingGap(left.projectedRatings) - ratingGap(right.projectedRatings) ||
         right.player.live_confidence - left.player.live_confidence
     );
   if (!candidates.length) return null;
-  const candidate = candidates[0];
+  const candidate =
+    candidates.find(
+      ({ player }) =>
+        preferred?.kind === "move" &&
+        preferred.source_team === sourceTeam &&
+        preferred.target_team === targetTeam &&
+        preferred.player.player_id === player.player_id
+    ) ?? candidates[0];
   return {
     ...publicPlayer(candidate.player),
-    projected_rating_gap: Number(candidate.projectedGap.toFixed(2)),
+    projected_rating_gap: Number(
+      ratingGap(candidate.projectedRatings).toFixed(2)
+    ),
+    projected_team_ratings: candidate.projectedRatings,
     reason: "Live-Vorschlag aus dem aktuell größeren Team",
   };
 };
 
-export const buildLiveBalanceStatus = (teams, settings = {}) => {
+export const buildLiveBalanceStatus = (
+  teams,
+  settings = {},
+  preferred = null
+) => {
   const players = addLiveRatings(flattenLivePlayers(teams));
   if (!players.length) return null;
   const counts = Object.fromEntries(
@@ -510,12 +547,14 @@ export const buildLiveBalanceStatus = (teams, settings = {}) => {
         counts,
         teamRatings,
         sourceTeam,
-        targetTeam
+        targetTeam,
+        preferred
       )
     : difference === 0
     ? buildSquadSwapRecommendations(players, squads, teamRatings, {
         skillGapSoftLimit,
         minimumImprovement,
+        preferred,
       })
     : [];
   const strengthSwaps =
@@ -524,6 +563,7 @@ export const buildLiveBalanceStatus = (teams, settings = {}) => {
           skillGapSoftLimit,
           minimumImprovement,
           allowIndividualSquadFallback,
+          preferred,
         })
       : [];
   const proposal = allowIndividualSquadFallback
@@ -531,7 +571,8 @@ export const buildLiveBalanceStatus = (teams, settings = {}) => {
         players,
         sourceTeam,
         targetTeam,
-        allowIndividualSquadFallback
+        allowIndividualSquadFallback,
+        preferred
       )
     : null;
   const confidences = players
@@ -562,6 +603,7 @@ export const buildLiveBalanceStatus = (teams, settings = {}) => {
           source_team: sourceTeam,
           target_team: targetTeam,
           projected_rating_gap: proposal.projected_rating_gap,
+          projected_team_ratings: proposal.projected_team_ratings,
           rating_gap_before: Number(
             Math.abs(teamRatings.allies - teamRatings.axis).toFixed(2)
           ),
@@ -575,3 +617,24 @@ export const buildLiveBalanceStatus = (teams, settings = {}) => {
       : [],
   };
 };
+
+// Re-evaluate the exact held choice even when it has dropped out of the top 3.
+// Never silently substitute another player, squad, or direction.
+export function validateLiveRecommendation(teams, settings, recommendation) {
+  const status = buildLiveBalanceStatus(teams, settings, recommendation);
+  if (!status || status.block_reasons.length) return null;
+  const groups = [
+    ...balanceRecommendations(status),
+    ...balanceRecommendations({ ...status, squad_recommendation: null }),
+    ...balanceRecommendations({
+      ...status,
+      squad_recommendation: null,
+      strength_swap: null,
+    }),
+  ];
+  return (
+    groups.find(
+      (value) => recommendationKey(value) === recommendationKey(recommendation)
+    ) ?? null
+  );
+}
