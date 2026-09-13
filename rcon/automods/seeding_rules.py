@@ -523,7 +523,13 @@ class SeedingRulesAutomod:
                     team == "allies" and game_state["allied_score"] >= ecf.max_caps
                 )
 
-                if cap_rule_active and team_reached_cap_limit:
+                # A known position enforces the same boundary for both teams,
+                # including the team that does not currently hold the middle.
+                # Only the offense-points fallback needs the score guard: the
+                # losing team also earns offense points in the allowed middle.
+                if cap_rule_active and (
+                    position_violation is not None or team_reached_cap_limit
+                ):
                     if position_violation is not None:
                         self._update_combat_area_excursion(
                             watch_status,
@@ -532,7 +538,12 @@ class SeedingRulesAutomod:
                             outside=position_violation,
                         )
 
-                    self.logger.debug("Player is on %s side and winning", team)
+                    self.logger.debug(
+                        "Checking %s combat area: position=%s, fallback eligible=%s",
+                        team,
+                        position_violation,
+                        team_reached_cap_limit,
+                    )
                     op = player["offense"]
                     oop = watch_status.offensive_points.setdefault(aplayer.name, -1)
 

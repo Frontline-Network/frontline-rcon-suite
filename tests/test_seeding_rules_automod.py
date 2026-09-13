@@ -616,6 +616,102 @@ def test_position_detection_warns_before_offense_score_changes(team_view):
     assert [expected_warned_players[0]] == punitions.warning
 
 
+@pytest.mark.parametrize("team", ["allies", "axis"])
+@pytest.mark.parametrize(
+    "map_id,allies_x,axis_x",
+    [("carentan", 20_160, -20_161), ("WDEV_A", -19_841, 19_840)],
+)
+@pytest.mark.parametrize("score", [2, 3])
+def test_position_boundary_applies_to_both_teams_regardless_of_score(
+    team_view, team, map_id, allies_x, axis_x, score
+):
+    squad_name = "able"
+    squad = team_view[team]["squads"][squad_name]
+    squad["players"] = [squad["players"][0]]
+    player = squad["players"][0]
+    player["world_position"] = {"x": 0, "y": 0, "z": 1}
+    score_key = "allied_score" if team == "allies" else "axis_score"
+    other_key = "axis_score" if team == "allies" else "allied_score"
+    snapshot = {**game_state, score_key: score, other_key: 5 - score}
+    snapshot["current_map"] = {"map": {"id": map_id}}
+    mod = position_cap_fight_mod(team_view)
+    mod.config.number_of_warnings = 2
+    mod.config.warning_interval_seconds = 60
+
+    assert not mod.punitions_to_apply(team_view, squad_name, team, squad, snapshot)
+    player["world_position"]["x"] = allies_x if team == "allies" else axis_x
+    first = mod.punitions_to_apply(team_view, squad_name, team, squad, snapshot)
+    assert [player["player_id"]] == [p.player_id for p in first.warning]
+    assert not first.punish
+
+    # Capturing/losing the middle must not restart the warning grace period.
+    snapshot.update({score_key: 5 - score, other_key: score})
+    waiting = mod.punitions_to_apply(team_view, squad_name, team, squad, snapshot)
+    assert not waiting.warning and not waiting.punish
+    watch_status = state[team + squad_name]
+    assert len(watch_status.warned.get(player["name"], [])) == 1
+    watch_status.warned[player["name"]][-1] -= timedelta(seconds=61)
+    second = mod.punitions_to_apply(team_view, squad_name, team, squad, snapshot)
+    assert [player["player_id"]] == [p.player_id for p in second.warning]
+    assert not second.punish
+    watch_status.warned[player["name"]][-1] -= timedelta(seconds=61)
+    punished = mod.punitions_to_apply(team_view, squad_name, team, squad, snapshot)
+    assert [player["player_id"]] == [p.player_id for p in punished.punish]
+
+    player["world_position"]["x"] = 0
+    assert not mod.punitions_to_apply(team_view, squad_name, team, squad, snapshot)
+    assert player["name"] not in watch_status.warned
+    assert player["name"] not in watch_status.punished
+
+
+@pytest.mark.parametrize("team,squad_name", [("allies", "able"), ("axis", "able")])
+@pytest.mark.parametrize("score", [2, 3])
+@pytest.mark.parametrize("unknown_map", [False, True])
+def test_offense_fallback_keeps_score_guard_for_both_teams(
+    team_view, team, squad_name, score, unknown_map
+):
+    squad = team_view[team]["squads"][squad_name]
+    squad["players"] = [squad["players"][0]]
+    player = squad["players"][0]
+    score_key = "allied_score" if team == "allies" else "axis_score"
+    snapshot = {**game_state, score_key: score}
+    mod = position_cap_fight_mod(team_view)
+    if unknown_map:
+        snapshot["current_map"] = {"map": {"id": "unknown-map"}}
+        player["world_position"] = {"x": 0, "y": 0, "z": 0}
+    mod.punitions_to_apply(team_view, squad_name, team, squad, snapshot)
+    if unknown_map:
+        player["world_position"] = {"x": 50_000, "y": 0, "z": 1}
+    player["offense"] += 1
+    result = mod.punitions_to_apply(team_view, squad_name, team, squad, snapshot)
+    assert len(result.warning) == (1 if score >= 3 else 0)
+    assert not result.punish
+
+
+@pytest.mark.parametrize("guard", ["disabled", "min_players", "max_players", "mode"])
+@pytest.mark.parametrize("map_id,outside_x", [("carentan", -20_161), ("WDEV_A", 19_840)])
+def test_position_detection_still_respects_seeding_guards(team_view, guard, map_id, outside_x):
+    squad = team_view["axis"]["squads"]["able"]
+    player = squad["players"][0]
+    player["world_position"] = {"x": 0, "y": 0, "z": 0}
+    mod = position_cap_fight_mod(team_view)
+    snapshot = {**game_state, "axis_score": 2, "current_map": {"map": {"id": map_id}}}
+    mod.punitions_to_apply(team_view, "able", "axis", squad, snapshot)
+    if guard == "disabled":
+        mod.config.enforce_cap_fight.enabled = False
+    elif guard == "min_players":
+        mod.config.enforce_cap_fight.min_players = 99
+    elif guard == "max_players":
+        mod.config.enforce_cap_fight.max_players = 0
+    else:
+        snapshot["game_mode"] = GameMode.OFFENSIVE
+    player["world_position"]["x"] = outside_x
+    player["world_position"]["z"] = 1
+    player["offense"] += 100
+    result = mod.punitions_to_apply(team_view, "able", "axis", squad, snapshot)
+    assert not result.warning and not result.punish and not result.kick
+
+
 def test_position_detection_ignores_offense_increase_inside_boundary(team_view):
     squad = team_view["allies"]["squads"]["able"]
     squad["players"] = [squad["players"][0]]

@@ -579,6 +579,21 @@ class LevelThresholdsAutomod:
             punishes.append(datetime.now())
             return PunishStepState.APPLY
 
+        if not self.config.kick_after_max_punish:
+            # With no kick to escalate to, keep enforcing an ongoing role
+            # violation. Retain a bounded window and honor the interval above.
+            keep = max(0, self.config.number_of_punishments - 1)
+            if keep:
+                del punishes[:-keep]
+            else:
+                punishes.clear()
+            self.logger.info(
+                "%s Kick disabled; repeating punishment after configured interval",
+                aplayer.short_repr(),
+            )
+            punishes.append(datetime.now())
+            return PunishStepState.APPLY
+
         self.logger.info(
             "%s Max punish reached (%s/%s)",
             aplayer.short_repr(),
