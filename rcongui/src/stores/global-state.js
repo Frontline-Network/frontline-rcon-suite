@@ -3,13 +3,6 @@ import { cmd } from "@/utils/fetchUtils";
 import { queryOptions, useQueries, useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { create } from "zustand";
-import {
-  getDemoGameState,
-  getDemoConnectionMode,
-  getDemoServerConnection,
-  getDemoServerList,
-  isFakeMode,
-} from "@/mirage/demo-data";
 import { gameStatusQueryOptions } from "@/queries/status-query";
 import {
   CONNECTION_STATE,
@@ -24,6 +17,13 @@ import {
   shouldPollLiveRoster,
   shouldPollModeratorPresence,
 } from "@/queries/polling-policy";
+
+import {
+  getDemoGameState,
+  getDemoConnectionMode,
+  getDemoServerConnection,
+  getDemoServerList,
+} from "@/mirage/demo-data";
 
 // Create the Zustand store
 export const useGlobalStore = create((set) => ({
@@ -57,7 +57,7 @@ const demoHealthLastAttemptAt = Date.now();
 const demoHealthLastSuccessAt = demoHealthLastAttemptAt - 30_000;
 
 const applyDemoHealth = (health, target) => {
-  if (!isFakeMode()) return health;
+  if (import.meta.env.MODE !== "fake") return health;
 
   const mode = getDemoConnectionMode();
   const lastSuccessAt = health.lastSuccessAt || demoHealthLastSuccessAt;
@@ -121,7 +121,7 @@ const globalQueries = [
     queryKey: [{ queryIdentifier: "get_gamestate" }],
     queryFn: async () => {
       if (
-        isFakeMode() &&
+        import.meta.env.MODE === "fake" &&
         [
           "gameserver_offline",
           "gameserver_stale",
@@ -131,27 +131,36 @@ const globalQueries = [
       ) {
         throw new Error("Demo game state is unavailable");
       }
-      return isFakeMode() ? getDemoGameState() : cmd.GET_GAME_STATE();
+      return import.meta.env.MODE === "fake"
+        ? getDemoGameState()
+        : cmd.GET_GAME_STATE();
     },
     initialData:
-      isFakeMode() &&
+      import.meta.env.MODE === "fake" &&
       ["gameserver_stale", "game_state_stale"].includes(getDemoConnectionMode())
         ? getDemoGameState()
         : undefined,
   }),
   queryOptions({
     queryKey: [{ queryIdentifier: "get_server_list" }],
-    queryFn: isFakeMode()
-      ? () => Promise.resolve(getDemoServerList())
-      : cmd.GET_GAME_SERVER_LIST,
+    queryFn:
+      import.meta.env.MODE === "fake"
+        ? () => Promise.resolve(getDemoServerList())
+        : cmd.GET_GAME_SERVER_LIST,
   }),
   queryOptions({
     queryKey: [{ queryIdentifier: "get_ingame_mods" }],
-    queryFn: isFakeMode() ? () => Promise.resolve([]) : cmd.GET_INGAME_MODS,
+    queryFn:
+      import.meta.env.MODE === "fake"
+        ? () => Promise.resolve([])
+        : cmd.GET_INGAME_MODS,
   }),
   queryOptions({
     queryKey: [{ queryIdentifier: "get_online_mods" }],
-    queryFn: isFakeMode() ? () => Promise.resolve([]) : cmd.GET_CRCON_MODS,
+    queryFn:
+      import.meta.env.MODE === "fake"
+        ? () => Promise.resolve([])
+        : cmd.GET_CRCON_MODS,
   }),
   teamsLiveQueryOptions,
 ];
@@ -171,21 +180,22 @@ export const GlobalState = () => {
     queryKey: [{ queryIdentifier: "get_connection_info" }],
     queryFn: async () => {
       if (
-        isFakeMode() &&
+        import.meta.env.MODE === "fake" &&
         ["crcon_offline", "crcon_stale"].includes(getDemoConnectionMode())
       ) {
         throw new Error("Demo CRCON is unavailable");
       }
-      return isFakeMode()
+      return import.meta.env.MODE === "fake"
         ? getDemoServerConnection()
         : cmd.GET_CRCON_SERVER_CONNECTION();
     },
     initialData:
-      isFakeMode() && getDemoConnectionMode() === "crcon_stale"
+      import.meta.env.MODE === "fake" &&
+      getDemoConnectionMode() === "crcon_stale"
         ? getDemoServerConnection()
         : undefined,
     refetchInterval: defaultRefetchInterval,
-    retry: isFakeMode() ? 0 : 1,
+    retry: import.meta.env.MODE === "fake" ? 0 : 1,
   });
   const crconHealth = applyDemoHealth(
     createConnectionHealth(crconQuery),
