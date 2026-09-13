@@ -5,37 +5,8 @@ import siteConfig from "@/config/siteConfig";
 const prefix = siteConfig.appName + ".";
 const withPrefix = (key) => prefix + key;
 
-// Players table store
-export const usePlayersTableStore = create(
-  persist(
-    (set) => ({
-      columnVisibility: {
-        player_id: false,
-        combat: false,
-        offense: false,
-        defense: false,
-        support: false,
-      },
-      expandedView: false,
-      fontSize: "small",
-      density: "dense",
-
-      setColumnVisibility: (columnId, isVisible) =>
-        set((state) => {
-          const columnVisibility = { ...state.columnVisibility };
-          columnVisibility[columnId] === false
-            ? delete columnVisibility[columnId]
-            : (columnVisibility[columnId] = isVisible);
-          return { ...state, columnVisibility };
-        }),
-      setExpandedView: (expanded) => set({ expandedView: expanded }),
-      setConfig: (config) => set(config),
-    }),
-    {
-      name: withPrefix("players-table"),
-    }
-  )
-);
+// Player-table presentation is account-owned via useLiveViewPreferences.
+// Do not import the old shared-browser players-table storage into an account.
 
 // Logs table store
 export const useLogsTableStore = create(

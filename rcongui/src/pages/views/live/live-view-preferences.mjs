@@ -1,3 +1,5 @@
+import { normalizePlayerTablePreferences } from "./player-table-preferences.mjs";
+
 export const DEFAULT_LIVE_CARDS = Object.freeze({
   commander: false,
   squad_leaders: false,
@@ -10,6 +12,7 @@ export const DEFAULT_LIVE_CARDS = Object.freeze({
 export function normalizeLiveViewPreferences(value) {
   return {
     version: 1,
+    players_table: normalizePlayerTablePreferences(value?.players_table),
     balance_expanded:
       typeof value?.balance_expanded === "boolean"
         ? value.balance_expanded

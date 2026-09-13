@@ -56,7 +56,14 @@ class UserLiveViewPreferenceTests(TestCase):
 
     def test_account_isolation_and_persistence_across_clients(self):
         preferences = normalize_live_view(
-            {"cards": {"commander": True, "vips": True, "score": False}, "balance_expanded": False}
+            {
+                "cards": {"commander": True, "vips": True, "score": False},
+                "balance_expanded": False,
+                "players_table": {
+                    "preset": "custom", "fontSize": "large", "density": "comfortable",
+                    "columnVisibility": {"kills": False, "role": True},
+                },
+            }
         )
         self.assertEqual(self.put(preferences).status_code, 200)
         second_device = Client()
@@ -85,6 +92,15 @@ class UserLiveViewPreferenceTests(TestCase):
             {"version": 2}, {"version": True}, {"user_id": self.other.pk},
             {"balance_expanded": "false"}, {"balance_expanded": 0},
             {"balance_expanded": None},
+            {"players_table": None}, {"players_table": []},
+            {"players_table": {"preset": "unknown"}},
+            {"players_table": {"fontSize": 100}},
+            {"players_table": {"density": "tiny"}},
+            {"players_table": {"rows": []}},
+            {"players_table": {"columnVisibility": []}},
+            {"players_table": {"columnVisibility": {"unknown": True}}},
+            {"players_table": {"columnVisibility": {"kills": "false"}}},
+            {"players_table": {"columnVisibility": {"kills": 0}}},
         ]:
             with self.subTest(invalid=invalid):
                 self.assertEqual(self.put(invalid).status_code, 400)
@@ -134,5 +150,25 @@ class UserLiveViewPreferenceTests(TestCase):
         self.assertTrue(result["balance_expanded"])
         self.assertTrue(result["cards"]["vips"])
         self.assertFalse(result["cards"]["score"])
+        self.assertEqual(result["players_table"], default_user_live_view()["players_table"])
         record.refresh_from_db()
         self.assertEqual(record.preferences, old)
+
+    def test_table_presets_round_trip_and_essential_columns_stay_visible(self):
+        for preset in ("operations", "all", "custom"):
+            with self.subTest(preset=preset):
+                payload = default_user_live_view()
+                payload["players_table"]["preset"] = preset
+                payload["players_table"]["columnVisibility"] = dict.fromkeys(
+                    payload["players_table"]["columnVisibility"], False
+                )
+                result = self.put(payload).json()["result"]
+                self.assertEqual(result["players_table"]["preset"], preset)
+                visible = result["players_table"]["columnVisibility"]
+                self.assertEqual(
+                    {key for key, enabled in visible.items() if enabled},
+                    {"select", "details", "player_summary", "actions"},
+                )
+                self.assertEqual(
+                    self.client.get("/api/get_own_user_live_view").json()["result"], result
+                )

@@ -1,9 +1,12 @@
 """Account-owned live-view display settings; never automation settings."""
 
+from .player_table_preferences import default_player_table, normalize_player_table
+
 
 def default_user_live_view():
     return {
         "version": 1,
+        "players_table": default_player_table(),
         "balance_expanded": True,
         "cards": {
             "commander": False,
@@ -17,12 +20,14 @@ def default_user_live_view():
 
 
 def normalize_live_view(value):
-    if not isinstance(value, dict) or set(value) - {"version", "cards", "balance_expanded"}:
+    allowed = {"version", "cards", "balance_expanded", "players_table"}
+    if not isinstance(value, dict) or set(value) - allowed:
         raise ValueError("Expected a live-view preferences object.")
     version = value.get("version", 1)
     if type(version) is not int or version != 1:
         raise ValueError("Unsupported live-view preferences version.")
     result = default_user_live_view()
+    result["players_table"] = normalize_player_table(value.get("players_table", {}))
     balance_expanded = value.get("balance_expanded", True)
     if type(balance_expanded) is not bool:
         raise ValueError("Balance detail visibility must be true or false.")
