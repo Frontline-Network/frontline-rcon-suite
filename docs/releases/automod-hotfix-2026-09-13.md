@@ -16,10 +16,14 @@
   the HLL `officer` and HLLV `squadleader` alias, finite/unlimited punishment
   settings, and kicks both enabled and disabled.
 
-HLL1 deployment scope: a commit-addressed supervisor hotfix image derived from
-the installed v0.8.2 image, replacing only the two automod modules. No frontend,
-database migration, settings change, or rollout to other RCONs is included.
-The public frontend version therefore remains v0.8.2. The effective hotfix
-revision is recorded in the supervisor image labels and private deployment
-manifest. Preserve the tested pre-v0.8.2 backups and create a fresh rollback
-backup before deploying. Do not restore the production database automatically.
+Publication: merge into the main branch and publish the next official patch
+release, v0.8.4, with backend/frontend images for amd64 and arm64. The operator
+requested an official release after the initial narrow hotfix plan; the narrow
+v0.8.2-derived image was not deployed.
+
+Deployment scope: HLL1 only, using the official release images. Upgrading from
+v0.8.2 also includes the v0.8.3 changes and its merged Django migration. Restore
+the fresh backup into an isolated database and rehearse migrations before
+updating production. Preserve automod settings, permissions, the pre-v0.8.2
+backups, and the original runtime configuration. Do not restore the production
+database automatically. No rollout to other RCONs is included.
