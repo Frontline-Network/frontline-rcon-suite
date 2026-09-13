@@ -118,6 +118,9 @@ docs/                 Mobile Admin, Production Deploy usw.
 
 Die genaue Verzeichnisstruktur kann sich weiterentwickeln; diese Bereiche sind aus dem geprüften Source-/Doku-Stand belegt.
 
+Der private, revisionsgebundene Eventador-Vertrag ist in
+[`docs/eventador-control-api-v1.md`](docs/eventador-control-api-v1.md) beschrieben.
+
 ## 5. CRCON-Core bleibt Grundlage
 
 Frontline ersetzt nicht die grundlegende CRCON-Architektur.
