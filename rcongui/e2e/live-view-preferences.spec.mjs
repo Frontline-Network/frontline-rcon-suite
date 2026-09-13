@@ -7,6 +7,10 @@ import {
 
 const statusCards = (page) =>
   page.getByRole("region", { name: "Handlungsbedarf und Gefechtsstatus" });
+// Both responsive label variants are mounted; only one is displayed at a time.
+// Keep strict matching so two visible copies would still fail the assertion.
+const visibleStatusLabel = (page, text) =>
+  statusCards(page).getByText(text, { exact: true }).filter({ visible: true });
 async function openSettings(page) {
   await page
     .getByRole("button", { name: "Live-Ansicht anpassen", exact: true })
@@ -44,13 +48,9 @@ test("defaults to score and next map, saves immediately and survives reload", as
   }
   await dialog.getByRole("checkbox", { name: "VIPs", exact: true }).check();
   await save(dialog);
-  await expect(
-    statusCards(page).getByText("VIPs", { exact: true })
-  ).toBeVisible();
+  await expect(visibleStatusLabel(page, "VIPs")).toBeVisible();
   await page.reload();
-  await expect(
-    statusCards(page).getByText("VIPs", { exact: true })
-  ).toBeVisible();
+  await expect(visibleStatusLabel(page, "VIPs")).toBeVisible();
 });
 
 test("cancels unsaved changes and can hide all cards or restore defaults", async ({
@@ -87,9 +87,7 @@ test("cancels unsaved changes and can hide all cards or restore defaults", async
     .getByRole("button", { name: "Standard: nur Spielstand und nächste Karte" })
     .click();
   await save(dialog);
-  await expect(
-    statusCards(page).getByText("Nächste Karte", { exact: true })
-  ).toBeVisible();
+  await expect(visibleStatusLabel(page, "Nächste Karte")).toBeVisible();
 });
 
 test("keeps account selections separate, including a viewer account", async ({
@@ -108,9 +106,7 @@ test("keeps account selections separate, including a viewer account", async ({
     .getByRole("checkbox", { name: "Beobachtet", exact: true })
     .check();
   await save(dialog);
-  await expect(
-    statusCards(page).getByText("Beobachtet", { exact: true })
-  ).toBeVisible();
+  await expect(visibleStatusLabel(page, "Beobachtet")).toBeVisible();
   await openDemoPage(page, "/views/live");
   dialog = await openSettings(page);
   await expect(
@@ -167,7 +163,5 @@ test("mobile settings stay within the screen and remain usable", async ({
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(VIEWPORTS.mobile.width);
   await dialog.getByRole("checkbox", { name: "VIPs", exact: true }).check();
   await save(dialog);
-  await expect(
-    statusCards(page).getByText("VIPs", { exact: true })
-  ).toBeVisible();
+  await expect(visibleStatusLabel(page, "VIPs")).toBeVisible();
 });
