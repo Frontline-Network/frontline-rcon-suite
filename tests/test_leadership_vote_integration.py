@@ -199,7 +199,9 @@ def test_context_uses_bulk_calls_for_100_players_and_rejects_staleness(monkeypat
         "players": {p["player_id"]: p for p in players},
         "fail_count": 0,
     }
-    api.get_raw_player_snapshot.return_value = {"captured_at": NOW}
+    api.game_profile.player_adapter.adapt.side_effect = lambda row: row
+    monkeypatch.setattr(service, "parse_raw_player_info", lambda row, game: row)
+    api.get_raw_player_snapshot.return_value = {"captured_at": NOW, "players": players}
     monkeypatch.setattr(service.time, "time", lambda: NOW)
     monkeypatch.setattr(
         service,
@@ -209,10 +211,105 @@ def test_context_uses_bulk_calls_for_100_players_and_rejects_staleness(monkeypat
         ),
     )
     assert len(service.read_context(api)["players"]) == 100
-    api.get_detailed_players.assert_called_once_with(compact=True)
+    api.get_detailed_players.assert_not_called()
+    api.get_players.assert_not_called()
+    api.get_raw_player_snapshot.assert_called_once_with()
     api.get_player_info.assert_not_called()
     api.get_raw_player_snapshot.return_value = {"captured_at": NOW - 11}
     with pytest.raises(ValueError, match="Stale"):
+        service.read_context(api)
+
+
+def test_bulk_context_keeps_tenure_during_unrelated_roster_churn(db, monkeypatch):
+    """Cached UI roster divergence must not reset unchanged leadership seats."""
+    players = roster()
+    api = Mock()
+    api.get_gamestate.return_value = {"current_map": {"id": "test-map"}}
+    # Reproduce production: two UI caches disagree while the bulk roster is valid.
+    api.get_players.return_value = players + [player("just-joined", "Rifleman")]
+    api.get_detailed_players.return_value = {"players": {}, "fail_count": 1}
+    api.game_profile.player_adapter.adapt.side_effect = lambda row: row
+    monkeypatch.setattr(service, "parse_raw_player_info", lambda row, game: row)
+    monkeypatch.setattr(
+        service,
+        "MapsHistory",
+        lambda: SimpleNamespace(
+            get_current_map=lambda: {"name": "test-map", "start": NOW - 600}
+        ),
+    )
+    for step in range(62):
+        db.clock.now = NOW + step * 5
+        visitors = [player(f"visitor-{step}", "Rifleman")]
+        api.get_raw_player_snapshot.return_value = {
+            "captured_at": db.clock.now,
+            "players": players + visitors,
+        }
+        storage.observe(1, service.read_context(api))
+    with db() as sess:
+        observations = storage.presence(sess, 1)
+        target = dict(domain.identity(players[0]), player_id="target")
+        assert observations["v0"]["since"] == NOW
+        assert (
+            len(domain.electorate(players, target, observations, db.clock.now, 300))
+            >= 3
+        )
+    api.get_players.assert_not_called()
+    api.get_detailed_players.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "rows", [None, {}, [{"player_id": ""}], [player("x"), player("x")]]
+)
+def test_bulk_context_rejects_missing_and_duplicate_identities(monkeypatch, rows):
+    api = Mock()
+    api.get_gamestate.return_value = {"current_map": {"id": "test-map"}}
+    api.get_raw_player_snapshot.return_value = {"captured_at": NOW, "players": rows}
+    api.game_profile.player_adapter.adapt.side_effect = lambda row: row
+    monkeypatch.setattr(service, "parse_raw_player_info", lambda row, game: row)
+    monkeypatch.setattr(service.time, "time", lambda: NOW)
+    monkeypatch.setattr(
+        service,
+        "MapsHistory",
+        lambda: SimpleNamespace(
+            get_current_map=lambda: {"name": "test-map", "start": NOW - 600}
+        ),
+    )
+    with pytest.raises(ValueError):
+        service.read_context(api)
+
+
+@pytest.mark.parametrize("game,team,role", [("hll", 2, 1), ("hllv", 6, 28)])
+def test_bulk_context_uses_real_game_adapter(monkeypatch, game, team, role):
+    from rcon.game import get_game_profile
+    from rcon.game.player_adapter import PlayerResponseAdapterError
+    from rcon.types import GameEnum
+
+    api = Mock()
+    api.game_profile = get_game_profile(game)
+    api.config.game = GameEnum(game)
+    api.get_gamestate.return_value = {"current_map": {"id": "test-map"}}
+    raw = {
+        "iD": "test-account",
+        "name": "Synthetic Player",
+        "team": team,
+        "role": role,
+        "platoon": "Able",
+        "level": 50,
+    }
+    api.get_raw_player_snapshot.return_value = {"captured_at": NOW, "players": [raw]}
+    monkeypatch.setattr(service.time, "time", lambda: NOW)
+    monkeypatch.setattr(
+        service,
+        "MapsHistory",
+        lambda: SimpleNamespace(
+            get_current_map=lambda: {"name": "test-map", "start": NOW - 600}
+        ),
+    )
+    current = service.read_context(api)
+    assert current["players"][0]["player_id"] == "test-account"
+    assert current["players"][0]["unit_name"] == "able"
+    api.get_raw_player_snapshot.return_value["players"].append({})
+    with pytest.raises(PlayerResponseAdapterError):
         service.read_context(api)
 
 

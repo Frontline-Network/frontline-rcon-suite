@@ -7,7 +7,7 @@ from copy import deepcopy
 from sqlalchemy import select, text
 from rcon.models import LeadershipMessage, LeadershipVote
 from rcon.user_config.leadership_vote import LeadershipVoteUserConfig as Config
-from rcon.utils import MapsHistory, get_server_number
+from rcon.utils import MapsHistory, get_server_number, parse_raw_player_info
 from . import storage
 from .storage import enter_session
 from .domain import answer, event_time, private_chat, message, _normalize_team
@@ -16,7 +16,13 @@ logger = logging.getLogger(__name__)
 
 
 def read_context(api):
-    """Existing bulk caches only; never N individual player requests."""
+    """One timestamped bulk roster, never a join of independently cached lists.
+
+    The UI's detailed/player lists can describe different instants. Joining
+    those lists during ordinary connects/disconnects reset every leader's
+    tenure and cancelled votes even though their own seats had not changed.
+    Adapt every row of the same bulk sample and fail closed on invalid rows.
+    """
     state = api.get_gamestate()
     history = MapsHistory().get_current_map() or {}
     now = time.time()
@@ -29,15 +35,22 @@ def read_context(api):
         or history.get("name") != layer
     ):
         raise ValueError("No recorder-confirmed current round")
-    detailed = api.get_detailed_players(compact=True)
     snapshot = api.get_raw_player_snapshot()
     captured = snapshot.get("captured_at", 0)
     if not 0 <= time.time() - captured <= 10:
         raise ValueError("Stale bulk player snapshot")
-    players = list((detailed.get("players") or {}).values())
-    ids = {str(p["player_id"]) for p in api.get_players(compact=True)}
-    if detailed.get("fail_count") or ids != {str(p.get("player_id")) for p in players}:
-        raise ValueError("Incomplete live roster")
+    rows = snapshot.get("players")
+    if not isinstance(rows, list):
+        raise ValueError("Incomplete bulk player snapshot")
+    players = [
+        parse_raw_player_info(
+            api.game_profile.player_adapter.adapt(row), api.config.game
+        )
+        for row in rows
+    ]
+    ids = [str(p.get("player_id") or "") for p in players]
+    if not all(ids) or len(set(ids)) != len(ids):
+        raise ValueError("Invalid or duplicate bulk player identity")
     return {
         "round_id": f"{get_server_number()}:{layer}:{start}",
         "players": players,
