@@ -223,6 +223,7 @@ def summary(v):
             for k in (
                 "target_name",
                 "target_role",
+                "target_resolution",
                 "squad",
                 "reason",
                 "rules",
@@ -394,6 +395,7 @@ def enqueue(sess, incident, context, now):
         [s.to_dict() for s in incident.subjects],
         incident.reporter_context,
         context["players"],
+        incident.raw_message,
     )
     if not target:
         return
@@ -440,6 +442,46 @@ def enqueue(sess, incident, context, now):
         for v in recent
     ):
         return
+    # Link the canonical current target only for an eligible offer, after all
+    # gates. Preserve the original text and existing suggestions for admins.
+    # This also keeps manual takeover/target-change guards and Discord actions
+    # bound to the same player as the vote, including newly recognized aliases.
+    from rcon.admin_incidents import _subject_from_payload, _sync_primary_target
+
+    primary = next(
+        (
+            s
+            for s in incident.subjects
+            if s.state == "confirmed"
+            and (s.player_id if s.kind == "player" else s.leader_player_id)
+            == target["player_id"]
+        ),
+        None,
+    )
+    if primary is None:
+        is_commander = target["kind"] == "commander"
+        primary = _subject_from_payload(
+            {
+                "kind": "player" if is_commander else "squad",
+                "state": "confirmed",
+                "display_name": target["name"] if is_commander else target["squad"],
+                "player_id": target["player_id"] if is_commander else None,
+                "leader_player_id": None if is_commander else target["player_id"],
+                "leader_name": None if is_commander else target["name"],
+                "team": target["team"],
+                "squad_name": target["squad"],
+                "squad_id": target["squad_id"],
+                "role": target["role"],
+                "match_method": "leadership_reference",
+                "parser_version": target["resolution"]["version"],
+                "snapshot": {"leadership_resolution": target["resolution"]},
+            },
+            actor="system:leadership-vote",
+        )
+        incident.subjects.append(primary)
+    for subject in incident.subjects:
+        subject.is_primary = subject is primary
+    _sync_primary_target(incident)
     v = LeadershipVote(
         server_number=server,
         team=target["team"],
@@ -452,6 +494,7 @@ def enqueue(sess, incident, context, now):
         payload={
             "target_name": target["name"],
             "target_role": target["kind"],
+            "target_resolution": target["resolution"],
             "squad": target["squad"],
             "target_identity": target_obs["identity"],
             "target_token": target_obs["token"],

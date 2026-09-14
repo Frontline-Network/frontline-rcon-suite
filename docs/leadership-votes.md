@@ -67,6 +67,96 @@ Admin-Bearbeitung. Die ursprüngliche Meldung bleibt unverändert erhalten.
 Die üblichen Berechtigungen und Schutzregeln gelten weiterhin; die Meldung allein
 startet weder eine Warnung noch eine Abstimmung.
 
+### Erweiterte Zielerkennung
+
+Die Führungsabstimmung verwendet eine eigene deterministische Zielauflösung.
+Die normale Report-Suche mit ihren unscharfen Spielervorschlägen bleibt erhalten;
+ein bloß ähnlicher Spielername wird nicht automatisch zum Abstimmungsziel.
+
+- Aktuelle Squadnamen des eigenen Teams werden unabhängig von ihrer Position
+  nach `!admin` erkannt, auch mit Satzzeichen und wechselnder Großschreibung.
+- NATO-Bezeichnungen werden über denselben Buchstaben zugeordnet, beispielsweise
+  `Bravo` zu `Baker`, `Echo` zu `Easy`, `Kilo` zu `King`. Die Zuordnung erfolgt
+  ausschließlich gegen vorhandene Squadnamen, niemals über numerische RCON-IDs.
+  Gibt es etwa gleichzeitig Baker und Bravo im selben Team, wird nicht geraten.
+- Einzelbuchstaben brauchen einen eindeutigen Rollenbezug: `SL B`, `B SL`,
+  `Squad B` oder `B squad`. Ein alleinstehendes `a`, `I` oder `B` genügt nicht.
+  Zusammenschreibungen wie `echosquad` und `SquadBravo` sind ebenfalls möglich.
+- Die in echten Reports gefundenen Squad-Tippfehler `Eays`, `Gorge` und `Geoge`
+  sind ausdrücklich hinterlegt. Es gibt keine beliebige Ähnlichkeitssuche für
+  automatische Ziele. Neue Schreibfehler benötigen eine geprüfte Ergänzung.
+- Commander-Aliasse umfassen `commander`, `kommandant`, `kommandeur`, `cmd`,
+  `cmdr`, `cdr`, `kommi`, `kommander`, `komander`, `comander`, `kommandar` und
+  `kommandat`. **Nicht** `com`: In vielen Meldungen heißt das Kommunikation.
+- Squad und vollständiger aktueller Spielername werden über dieselbe Spieler-ID
+  zusammengeführt. `SL` plus vollständiger, eindeutiger Name eines aktuellen
+  Squadleaders ist ebenfalls möglich. Ein Spielername ohne Führungsbezug bleibt
+  ein normaler Admin-Report. Namensbestandteile sind kein zweites Squad-Ziel.
+- Verschiedene Ziele, doppelte Namen, fehlende oder doppelte Amtsinhaber und
+  Hinweise auf bereits ausgeschiedene Spieler führen zu keinem Angebot.
+  Ein gemeldeter Amtsvorgänger wird nicht durch seinen Nachfolger ersetzt.
+
+Vor der Warnung nennt die private Rückfrage immer den tatsächlich erkannten
+Squad und Spielernamen beziehungsweise den Commander. Bei falscher Zuordnung
+antwortet der Melder mit `!no`. Erst sein `!yes` bestätigt Ziel und
+Kommunikationsanliegen. Worterkennung ist kein Beweis für die Bedeutung eines
+Satzes: Ein Wort wie „love“ kann auch beiläufig vorkommen. Die Rückfrage und alle
+Berechtigungsprüfungen bleiben deshalb notwendig.
+
+Nur wenn sämtliche Angebotsvoraussetzungen erfüllt sind, wird der kanonische
+Zielspieler als primäres Ziel mit dem bestehenden Admin-Fall verknüpft. Text,
+Grund und weitere Vorschläge bleiben erhalten. Ohne Angebot wird der normale
+Fall nicht umgeschrieben. `leadership_vote.target_resolution` dokumentiert die
+verwendeten Textstellen und Erkennungsregeln für berechtigte Admins. Diese
+Erweiterung nutzt bestehende JSON-Felder und benötigt keine neue Migration.
+
+### Datengrundlage der Erweiterung (14. September 2026)
+
+Read-only-Suche auf RCON1–4: 640 Chat-Logzeilen mit `!admin` im abgefragten
+Zeitraum 1. Juni bis 14. September 2026 (UTC). Davon stammen 166 aus Juni/Juli
+(RCON1: 143, RCON2: 23; keine Treffer auf RCON3/4) und 474 aus August/September
+(37, 48, 291 und 98 auf RCON1 bis RCON4). Zusätzlich wurden 443 gespeicherte
+Admin-Fälle aus August/September auf die bisherige Zielerkennung geprüft.
+Diese Fälle überlappen mit den Chat-Logs und werden **nicht hinzuaddiert**.
+
+Die Quelle enthält auch Tests und andere Admin-Anliegen, nicht nur Beschwerden
+gegen Führungskräfte. Daraus folgt weder eine 95-%-Quote für Kommunikation noch
+eine garantierte Vollständigkeit aller zukünftigen Schreibweisen. Historische
+Nachrichten beweisen auch keine damalige Stimmberechtigung oder fehlende Sprache.
+
+Beispiele aus den geprüften Meldungen:
+
+| Tatsächliche Formulierung (ohne Spielernamen) | Verarbeitung bei passendem aktuellem Team |
+| --- | --- |
+| `!admin bitte How SL kicken, redet nicht` | How, unabhängig vom Satzbau |
+| `!admin Bravo SL kicken aufgrund fehlender komms` | Baker über NATO-Alias |
+| `!admin Bitte KILO SL kicken, redet nicht` | King über NATO-Alias |
+| `!Admin Eays SL kicken, der redet nicht` | Easy über geprüften Tippfehler |
+| `!admin SL Gorge keine Com plz ban` | George; „Com“ ist kein Commander-Ziel |
+| `!admin sl B hat kein mic` | Baker über Squad-Buchstaben |
+| `!admin echosquad not communicating` | Easy trotz Zusammenschreibung |
+| `!admin Kommander spricht nicht` | Aktueller eigener Commander |
+| `!admin item` | Rückfrage auch ohne ausgeschriebenen Grund |
+| `!admin how fox redet nicht` | Kein Angebot: zwei Squad-Ziele |
+| `!ADMIN BEIDE AUFKLÄRER sprechen nicht` | Normaler Admin-Fall: kein einzelnes Ziel |
+
+Auch Kombinationen aus „SL + Squad + Spielername“ kamen wiederholt vor.
+In den Tests sind alle Spieleridentitäten synthetisch. Rohdaten, Spielernamen,
+IDs und Zugänge aus Produktion werden nicht ins Repository übernommen.
+Die NATO-Schreibweisen wurden anhand der
+[offiziellen NATO-Liste](https://www.nato.int/en/about-us/nato-history/history-by-theme/symbols-of-nato/nato-phonetic-alphabet)
+abgeglichen; die Zuordnung zu den aktuellen Spiel-Squads ist unsere eigene
+Implementierungsregel, keine Aussage dieser Quelle über HLL oder HLLV.
+
+Regressionen: `tests/test_leadership_targets.py` prüft Buchstaben, NATO-Aliasse,
+beobachtete Formulierungen und bewusste Ablehnungen. Die Integrationssuite
+spielt zusätzliche echte Formulierungen mit synthetischen Spielern durch den
+vollständigen Probelauf und prüft Admin-Übernahme, Nachfolge, Abschalten und
+unveränderte gewöhnliche Reports. Das ersetzt keine spielseitige Live-Abnahme.
+Prüfstand dieser Erweiterung: 477 ausgewählte Backend-/Regressionstests und
+vier Browser-Tests bestanden; keine Produktionsaktionen. Die Browser-Prüfung
+umfasst die neuen Hinweise auf Deutsch/Englisch und auf Desktop/Mobilgeräten.
+
 ## Wer darf teilnehmen?
 
 - Ausschließlich Commander und Squadleader des betroffenen Teams.

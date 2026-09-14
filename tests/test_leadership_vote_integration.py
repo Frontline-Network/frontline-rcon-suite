@@ -17,6 +17,10 @@ from tests.test_leadership_vote import (
     observe_for,
     ready_to_kick,
     transport,
+    cast,
+    confirm,
+    deliver,
+    elapse,
 )
 from rcon import (
     admin_incidents as incidents,
@@ -27,6 +31,111 @@ from rcon import (
 from rcon.leadership_vote import domain, hooks, service, storage
 from rcon.models import AdminIncident, LeadershipMessage
 from rcon.user_config.leadership_vote import LeadershipVoteUserConfig as Config
+
+
+@pytest.mark.parametrize(
+    "text,squad,commander",
+    [
+        ("!admin Bravo SL kicken aufgrund fehlender komms", "Baker", False),
+        ("!Admin Eays SL kicken, der redet nicht", "Easy", False),
+        ("!admin SL Gorge keine Com plz ban", "George", False),
+        ("!admin echosquad not communicating", "Easy", False),
+        ("!admin sl B hat kein mic", "Baker", False),
+        ("!admin Bitte KILO SL kicken, redet nicht", "King", False),
+        ("!admin Squad Easy SL redet nicht (Person-target)", "Easy", False),
+        ("!admin SL Person-target redet nicht", "Easy", False),
+        ("!admin Kommander spricht nicht", "", True),
+        ("!admin cmd keine com", "", True),
+    ],
+)
+def test_real_alias_report_stays_bound_through_complete_dry_run(
+    db, monkeypatch, text, squad, commander
+):
+    players = roster(commander=commander)
+    players[0]["unit_name"] = squad
+    observe_for(db, players)
+    incident = report(players, text=text)
+    vid = incident["leadership_vote"]["id"]
+    assert incident["target_id"] == "target"
+    assert incident["raw_message"] == text
+    assert incident["leadership_vote"]["target_resolution"]["matches"]
+    assert sum(s["is_primary"] for s in incident["subjects"]) == 1
+    api = deliver(db, players)
+    confirmation = api.message_player.call_args.args[1]
+    assert "Person-target" in confirmation
+    assert "Wrong target: !no" in confirmation
+    assert "DRY RUN" in confirmation
+    assert confirm(db, players, incident) == vid
+    assert vote(db, vid)["yes"] == 0
+    elapse(db, players, 60)
+    storage.advance(1, context(players))
+    deliver(db, players, api)
+    storage.advance(1, context(players))
+    assert vote(db, vid)["status"] == "active"
+    for i in range(4):
+        assert cast(db, players, f"v{i}")
+    elapse(db, players, 120)
+    assert storage.advance(1, context(players)) == []
+    assert vote(db, vid)["status"] == "dry_run"
+    result = incidents.get_incident(incident["id"])
+    assert result["status"] == "new" and result["target_id"] == "target"
+    monkeypatch.setattr(service, "read_context", lambda _: context(players))
+    service.execute(api, 1, vote(db, vid))
+    api.kick.assert_not_called()
+
+
+@pytest.mark.parametrize("change", ["takeover", "successor", "disable", "retarget"])
+def test_new_alias_offer_keeps_admin_and_identity_guards(db, change):
+    players = roster()
+    observe_for(db, players)
+    incident = report(players, text="!admin alpha")
+    vid = confirm(db, players, incident)
+    current = incidents.get_incident(incident["id"])
+    if change == "takeover":
+        incidents.mutate_incident(
+            current["id"],
+            actor="admin",
+            expected_revision=current["revision"],
+            operation="claim",
+        )
+    elif change == "retarget":
+        # Even an out-of-band primary-ID change must stop this workflow.
+        with db() as sess:
+            sess.get(AdminIncident, current["id"]).target_id = "v1"
+    elif change == "successor":
+        players[0]["player_id"] = "successor"
+    else:
+        storage.configure(1, Config(), "admin")
+    storage.observe(1, context(players))
+    storage.advance(1, context(players))
+    assert vote(db, vid)["status"] == "cancelled"
+
+
+@pytest.mark.parametrize("gate", ["disabled", "nonleader", "no_history", "global"])
+def test_ordinary_reports_not_rewritten_when_alias_offer_ineligible(db, gate):
+    players = roster()
+    if gate == "disabled":
+        storage.configure(1, Config(), "admin")
+    if gate == "nonleader":
+        players[2]["role"] = "Rifleman"
+    if gate != "no_history":
+        observe_for(db, players)
+    text = "!admin alpha"
+    parsed = incidents.parse_chat_report(
+        text,
+        current_players=players,
+        current_squads=squads(players),
+        reporter_context=players[2],
+        context_mode="enabled",
+    )
+    incident = report(players, text=text, private=gate != "global")
+    assert not incident["leadership_vote"]
+    assert incident["raw_message"] == text and incident["reason"] == parsed["reason"]
+    assert [
+        (s["display_name"], s["state"], s["match_method"]) for s in incident["subjects"]
+    ] == [
+        (s["display_name"], s["state"], s["match_method"]) for s in parsed["subjects"]
+    ]
 
 
 @pytest.mark.parametrize("unavailable", [False, True])

@@ -122,6 +122,7 @@ export default function LeadershipVotes() {
               <Alert severity="info">{c.kickPermission}</Alert>
             )}
             <Typography>{c.flow}</Typography>
+            <Typography color="text.secondary">{c.references}</Typography>
             <Box
               sx={{
                 display: "grid",

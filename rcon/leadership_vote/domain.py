@@ -77,47 +77,18 @@ def leader(player, team):
     return bool(ident and ident["team"] == team)
 
 
-def squad_target(subjects, reporter, players):
-    """Resolve exactly one confirmed own-team squad or commander; no fuzzy targets."""
-    team = _normalize_team((reporter or {}).get("team"))
-    candidates = [s for s in subjects if s.get("state") != "rejected"]
-    if team not in {"allies", "axis"} or len(candidates) != 1:
+def squad_target(subjects, reporter, players, message):
+    from .targets import resolve
+
+    resolved = resolve(message, subjects, reporter, players)
+    if not resolved:
         return None
-    subject = candidates[0]
-    if (
-        subject.get("state") != "confirmed"
-        or _normalize_team(subject.get("team")) != team
-    ):
-        return None
-    if subject.get("kind") == "squad" and subject.get("match_method") == "squad_exact":
-        matching = [
-            p
-            for p in players
-            if (i := identity(p))
-            and i["team"] == team
-            and i["kind"] == "squadleader"
-            and i["squad"] == subject.get("squad_name")
-        ]
-        expected = subject.get("leader_player_id")
-    elif (
-        subject.get("kind") == "player"
-        and subject.get("match_method") == "team_commander"
-    ):
-        matching = [
-            p
-            for p in players
-            if (i := identity(p)) and i["team"] == team and i["kind"] == "commander"
-        ]
-        expected = subject.get("player_id")
-    else:
-        return None
-    if len(matching) != 1 or str(matching[0].get("player_id")) != str(expected):
-        return None
-    p = matching[0]
+    p = resolved["player"]
     return dict(
         identity(p),
-        player_id=str(expected),
+        player_id=str(p["player_id"]),
         name=str(p.get("name") or p.get("player_name") or ""),
+        resolution=resolved["resolution"],
     )
 
 
@@ -179,7 +150,7 @@ def message(vote, purpose, value=None):
     )
     channel = "\nNur Team-/Squadchat / Team or squad chat only."
     if purpose == "confirm":
-        text = f"{target}\nGeht es um fehlende Kommunikation? Mit !yes bestätigen: erst Warnung, dann Abstimmung über Server-Kick.\nIs this about missing communication? Confirm with !yes: warning first, then a server-kick vote.\nAnderer Grund / Other reason: !no. Admin-Report bleibt offen / Admin report stays open.\n{p['rules']['confirmation_seconds']} Sekunden / seconds. Bestätigung ist keine Stimme / Confirmation is not a ballot."
+        text = f"{target}\nGeht es um fehlende Kommunikation? Mit !yes bestätigen: erst Warnung, dann Abstimmung über Server-Kick.\nIs this about missing communication? Confirm with !yes: warning first, then a server-kick vote.\nFalsches Ziel / Wrong target: !no. Anderer Grund / Other reason: !no.\nAdmin-Report bleibt offen / Admin report stays open.\n{p['rules']['confirmation_seconds']} Sekunden / seconds. Bestätigung ist keine Stimme / Confirmation is not a ballot."
     elif purpose == "target":
         text = f"{target}\nDu wurdest als nicht erreichbar gemeldet. Melde dich im Führungskanal oder gib die Rolle ab.\nYou were reported as unresponsive. Speak in leadership voice chat or give up the role.\n{p['rules']['warning_seconds']} Sekunden / seconds; danach Vote über Server-Kick / then server-kick vote."
     elif purpose == "warning":

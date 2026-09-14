@@ -55,6 +55,9 @@ test("leadership settings, fixed quorum, ballot details and cancellation", async
     main.getByRole("heading", { name: "Führungsabstimmung", exact: true })
   ).toBeVisible();
   await expect(
+    main.getByText("Auch NATO-Namen wie Bravo", { exact: false })
+  ).toBeVisible();
+  await expect(
     main.getByLabel("Führungsabstimmung aktivieren")
   ).not.toBeChecked();
   await expect(
@@ -98,6 +101,9 @@ test("English mobile layout and permission denial", async ({ page }) => {
     page.getByText("The reason can be freely worded or omitted.", {
       exact: false,
     })
+  ).toBeVisible();
+  await expect(
+    page.getByText("NATO names such as Bravo", { exact: false })
   ).toBeVisible();
   await expectNoHorizontalPageOverflow(page);
   await page
