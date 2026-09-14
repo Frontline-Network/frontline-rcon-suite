@@ -14,12 +14,15 @@ Aktivmodus und weitere Server benötigen eine separate Freigabe.
 ## Spielerablauf
 
 1. Eine berechtigte Führungskraft meldet im **Team- oder Squadchat**:
-   `!admin able redet nicht`, `!admin baker is not talking` oder
-   `!admin commander redet nicht`. Auch `kommandant` und `kommandeur` sind Ziele.
+   `!admin able`, `!admin bitte mal prüfen able redet nicht` oder
+   `!admin commander`. Auch `kommandant` und `kommandeur` sind Ziele.
 2. Die normale Admin-Meldung wird sofort gespeichert und über die bestehenden
-   Admin-Kanäle zugestellt. Eindeutige Kommunikationsbeschwerden können zusätzlich
+   Admin-Kanäle zugestellt. Ein eindeutig erkanntes Führungsziel kann zusätzlich
    eine private Rückfrage mit Zielrolle, Squad und Spielernamen auslösen.
-3. Der Melder bestätigt innerhalb von **60 Sekunden** mit `!yes`.
+   Der ausgeschriebene Grund ist dafür keine Voraussetzung.
+3. Der Melder bestätigt innerhalb von **60 Sekunden** mit `!yes`, dass es um
+   fehlende Kommunikation geht und er das Verfahren starten möchte.
+   Bei einem anderen Anliegen antwortet er mit `!no` zur normalen Admin-Bearbeitung.
    `!no` oder Ablauf beendet das Angebot, nicht den Admin-Fall.
    Bestätigung ist **keine Ja-Stimme**. Bevor die Warnung beginnt, muss die
    ursprüngliche Meldung nachweislich beim Discord-Bot zugestellt worden sein.
@@ -37,7 +40,7 @@ Aktivmodus und weitere Server benötigen eine separate Freigabe.
    Admin-Fall automatisch.
 
 Alle Workflow-Nachrichten sind Deutsch und Englisch. Es gibt keine globale
-Einladung oder Ergebnisnachricht. Nicht zuordenbare Ziele, andere Beschwerden,
+Einladung oder Ergebnisnachricht. Nicht zuordenbare Ziele,
 fehlende Berechtigungen oder unbekannter/globaler Chat bleiben normale
 Admin-Meldungen.
 
@@ -49,16 +52,20 @@ danach vorkommen. Ein fester Satzbau ist nicht erforderlich. Zum Beispiel:
 
 - `!admin der commander redet nicht`
 - `!admin bitte mal prüfen able redet nicht`
+- `!admin able`
+- `!admin commander`
 - `!admin redet nicht: able`
 - `!admin please check, the squadleader of Able is not talking`
 
-Zusätzlich zum eindeutig erkannten Ziel im eigenen Team muss eine eindeutige,
-unterstützte Kommunikationsbeschwerde enthalten sein, etwa `redet nicht`,
-`spricht nicht` oder `is not talking`. `!admin able` allein oder andere Gründe
-bleiben normale Admin-Reports. Die Erkennung verwendet feste Sprachmuster,
-keine KI; sie versteht nicht jede beliebige Umschreibung. Die üblichen
-Berechtigungen gelten weiterhin, und zuerst erhält der Melder die private
-Rückfrage, noch keine sofortige Abstimmung.
+Es reicht ein eindeutig erkanntes Ziel im eigenen Team; der Grund darf fehlen
+oder frei formuliert sein. Die Automatik beurteilt den Grund nicht und benötigt
+keine KI. Ob es tatsächlich um fehlende Kommunikation geht, bestätigt der Melder
+erst in der privaten Rückfrage. Auch bei einem anders begründeten Report wird
+lediglich dieses Angebot gemacht, keine Behauptung über fehlende Kommunikation
+aufgestellt. Bei `!no` oder ohne Antwort bleibt ausschließlich die normale
+Admin-Bearbeitung. Die ursprüngliche Meldung bleibt unverändert erhalten.
+Die üblichen Berechtigungen und Schutzregeln gelten weiterhin; die Meldung allein
+startet weder eine Warnung noch eine Abstimmung.
 
 ## Wer darf teilnehmen?
 
@@ -142,9 +149,12 @@ konkurrierende Maßnahmen erhalten dann einen Konflikt bis zum Ergebnis.
   kein Erfolgsbeweis. Keine automatische Wiederholung eines unklaren Kicks.
 - `!yes` und `!no` werden bei Aktivierung auf Konflikte geprüft.
   Konfigurierte Chatbefehle werden nicht still überschrieben.
-- Abstimmungsbezogene `!admin`-Kommunikationsmeldungen und exakte Antworten
-  werden bei eingeschalteter Funktion aus allgemeinen Chat-/Log-Webhooks
-  herausgefiltert. Der Admin-Report und private Admin-Protokolle bleiben erhalten.
+- Mit `!admin` beginnende Meldungen und exakte Antworten werden bei
+  eingeschalteter Funktion aus allgemeinen Chat-/Log-Webhooks herausgefiltert.
+  Dies gilt vorsorglich für alle solchen Admin-Rufe, weil die Spiegelung vor
+  der Zielauflösung erfolgt und auch Meldungen ohne Grund ein Angebot auslösen
+  können. Bei ausgeschalteter Funktion bleibt die bisherige Spiegelung erhalten.
+  Der Admin-Report und private Admin-Protokolle bleiben immer erhalten.
 
 **Grenzen:** RCON kann weder Sprache beurteilen noch bereits global geschriebene
 Spielernachrichten verstecken. Rollen werden regelmäßig beobachtet, nicht als

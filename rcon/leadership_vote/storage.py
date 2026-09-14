@@ -5,7 +5,6 @@ A send marker is committed before network I/O. Uncertain outcomes are never retr
 """
 
 import math
-import re
 import time
 import uuid
 from copy import deepcopy
@@ -29,10 +28,10 @@ from rcon.user_config.utils import _invalidate_user_config_cache
 from .domain import (
     OPEN,
     MAX_OBSERVATION_GAP,
-    communication_report,
     electorate,
     identity,
     message,
+    report_command,
     squad_target,
 )
 
@@ -382,8 +381,7 @@ def enqueue(sess, incident, context, now):
     if (
         not cfg.enabled
         or command_conflicts(sess, server)
-        or not communication_report(incident.reason)
-        or not re.match(r"^\s*!admin\b", incident.raw_message or "", re.I)
+        or not report_command(incident.raw_message)
         or not discord_ready(sess)
     ):
         return

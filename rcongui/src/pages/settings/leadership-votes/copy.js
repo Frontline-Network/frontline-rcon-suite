@@ -25,7 +25,7 @@ export const copy = {
     leadership_seconds: "Mindestdauer in Führungsrolle (Sekunden)",
     team_gap_seconds: "Team-Pause nach Abschluss (Sekunden)",
     target_cooldown_seconds: "Schutz für denselben Zielspieler (Sekunden)",
-    flow: "!admin able redet nicht oder !admin commander is not talking: Berechtigte Führungskraft bestätigt privat mit !yes. Danach erhält das Ziel eine Warnung. Anschließend stimmen die übrigen berechtigten Führungskräfte mit !yes / !no im Team- oder Squadchat ab. Das Ziel und dessen Squad sind ausgeschlossen. Ein Commander hat keine Sonderstimme.",
+    flow: "!admin able oder !admin commander reicht: !admin zuerst, Squadname oder Commander an beliebiger Stelle danach. Der Grund ist frei formulierbar und darf fehlen. Die berechtigte Führungskraft bestätigt in der privaten Rückfrage mit !yes, dass es um fehlende Kommunikation geht. Bei anderem Grund: !no; der Admin-Report bleibt offen. Erst nach !yes erhält das Ziel eine Warnung. Danach stimmen die übrigen berechtigten Führungskräfte mit !yes / !no im Team- oder Squadchat ab. Das Ziel und dessen Squad sind ausgeschlossen. Ein Commander hat keine Sonderstimme.",
     frozen:
       "Der Teilnehmerkreis wird bei Bestätigung festgehalten. Rollenwechsel entfernen Stimmen, senken aber nicht die Mehrheit. Änderungen an diesen Einstellungen beenden offene Verfahren. Ein bereits gesendeter Kick kann nicht zurückgenommen werden.",
     quorum:
@@ -83,7 +83,7 @@ export const copy = {
     leadership_seconds: "Minimum continuous leadership (seconds)",
     team_gap_seconds: "Team cooldown after completion (seconds)",
     target_cooldown_seconds: "Same-player protection (seconds)",
-    flow: "!admin able is not talking or !admin commander is not talking: an eligible leader privately confirms with !yes. The target receives a warning. Then the other eligible leaders vote with !yes / !no in team or squad chat. The target and their squad are excluded. Commanders have no extra voting powers.",
+    flow: "!admin able or !admin commander is enough: !admin first, squad name or commander anywhere afterwards. The reason can be freely worded or omitted. The eligible leader privately confirms with !yes that this is about missing communication. For another reason: !no; the admin report stays open. Only after !yes does the target receive a warning. Then the other eligible leaders vote with !yes / !no in team or squad chat. The target and their squad are excluded. Commanders have no extra voting powers.",
     frozen:
       "The electorate is frozen at confirmation. Role changes invalidate votes but never lower the threshold. Changing these settings cancels open proceedings. A kick already sent cannot be undone.",
     quorum:

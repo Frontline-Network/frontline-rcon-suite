@@ -1,4 +1,4 @@
-"""Pure, conservative communication, identity and event-time rules."""
+"""Pure report, identity and event-time rules."""
 
 import math
 import re
@@ -31,40 +31,24 @@ def private_chat(log, team=None):
     )
 
 
+def report_command(message):
+    return bool(re.match(r"^\s*!admin\b", str(message or ""), re.I))
+
+
 def suppress_public_chat(log):
     from rcon.user_config.leadership_vote import LeadershipVoteUserConfig
 
     text = str(log.get("sub_content") or "").strip()
-    candidate = answer(text) is not None or (
-        re.match(r"^!admin\b", text, re.I) and communication_report(text)
-    )
+    # Webhooks run before live target resolution. Any !admin report may now
+    # offer a private workflow, including reports without a written reason.
+    # Keep all such reports out of general chat mirrors; admin delivery stays.
+    candidate = answer(text) is not None or report_command(text)
     if not candidate:
         return False
     try:
         return LeadershipVoteUserConfig.load_from_db().enabled
     except Exception:
         return True  # do not disclose possible team proceedings during an outage
-
-
-def communication_report(reason):
-    text = str(reason or "").casefold().replace("’", "'")
-    # Conservative explicit statements only. Negated/resolved allegations and
-    # questions stay with admins rather than becoming automatic kick workflows.
-    if "?" in text or re.search(
-        r"\b(nicht mehr|wieder|inzwischen|doch|now|anymore|any more|started talking|not true|nicht wahr)\b",
-        text,
-    ):
-        return False
-    return bool(
-        re.search(
-            r"\b(?:redet|spricht|antwortet|reagiert|kommuniziert)\s+(?:im\s+(?:funk|führungschat|fuehrungschat)\s+)?nicht\b"
-            r"|\b(?:kein|keine|ohne)\s+(?:mikrofon|mikro|mikrokommunikation|kommunikation)\b"
-            r"|\b(?:is\s+not|isn't|not)\s+(?:talking|speaking|communicating|responding)\b"
-            r"|\b(?:does\s+not|doesn't|won't)\s+(?:talk|speak|communicate|respond)\b"
-            r"|\bno\s+(?:mic|microphone|communication)\b",
-            text,
-        )
-    )
 
 
 def identity(player):
@@ -195,7 +179,7 @@ def message(vote, purpose, value=None):
     )
     channel = "\nNur Team-/Squadchat / Team or squad chat only."
     if purpose == "confirm":
-        text = f"{target}\nFehlende Kommunikation gemeldet. Nach Warnung über Server-Kick abstimmen?\nReported not communicating. Warn, then hold a server-kick vote?\n!yes / !no – {p['rules']['confirmation_seconds']} Sekunden / seconds.\nBestätigung ist keine Stimme / Confirmation is not a ballot."
+        text = f"{target}\nGeht es um fehlende Kommunikation? Mit !yes bestätigen: erst Warnung, dann Abstimmung über Server-Kick.\nIs this about missing communication? Confirm with !yes: warning first, then a server-kick vote.\nAnderer Grund / Other reason: !no. Admin-Report bleibt offen / Admin report stays open.\n{p['rules']['confirmation_seconds']} Sekunden / seconds. Bestätigung ist keine Stimme / Confirmation is not a ballot."
     elif purpose == "target":
         text = f"{target}\nDu wurdest als nicht erreichbar gemeldet. Melde dich im Führungskanal oder gib die Rolle ab.\nYou were reported as unresponsive. Speak in leadership voice chat or give up the role.\n{p['rules']['warning_seconds']} Sekunden / seconds; danach Vote über Server-Kick / then server-kick vote."
     elif purpose == "warning":

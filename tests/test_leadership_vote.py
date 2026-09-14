@@ -256,9 +256,15 @@ def cast(db, players, pid="v0", yes=True):
         "!admin redet nicht: able",
         "!admin please check, the squadleader of Able is not talking",
         "  !ADMIN bitte mal prüfen ABLE redet nicht  ",
+        "!admin able",
+        "!admin bitte mal prüfen able",
+        "!admin able sabotiert",
+        "!admin able redet nicht?",
+        "!admin able redet wieder",
+        "!admin able is not talking anymore",
     ],
 )
-def test_explicit_communication_reports(db, text):
+def test_unique_target_offered_regardless_of_reason(db, text):
     players = roster()
     observe_for(db, players)
     result = report(players, text)
@@ -275,6 +281,9 @@ def test_explicit_communication_reports(db, text):
         "!admin der {alias} redet nicht",
         "!admin bitte mal prüfen, der {alias} redet nicht",
         "!admin redet nicht: {alias}",
+        "!admin {alias}",
+        "!admin bitte mal prüfen, der {alias}",
+        "!admin {alias} teamkillt",
     ],
 )
 def test_commander_target_and_only_squadleader_voters(db, alias, message):
@@ -293,22 +302,55 @@ def test_commander_target_and_only_squadleader_voters(db, alias, message):
 @pytest.mark.parametrize(
     "text",
     [
-        "!admin able",
-        "!admin able sabotiert",
-        "!admin able redet nicht?",
-        "!admin able redet wieder",
-        "!admin able is not talking anymore",
+        "!admin",
+        "!admin bitte mal prüfen",
+        "!admin cheater",
         "!admin able und Squad-1 redet nicht",
         "!admin Person-v1 redet nicht",
-        "!admin bitte mal prüfen able",
-        "!admin bitte mal prüfen able sabotiert",
         "bitte mal prüfen !admin able redet nicht",
         "bitte mal prüfen !admin commander redet nicht",
     ],
 )
-def test_ambiguous_or_other_reports_stay_ordinary(db, text):
+def test_missing_or_ambiguous_target_and_misplaced_command_stay_ordinary(db, text):
     observe_for(db, roster())
     assert not report(text=text)["leadership_vote"]
+
+
+@pytest.mark.parametrize("commander", [False, True])
+@pytest.mark.parametrize("decline", [False, True])
+def test_target_only_report_requires_communication_confirmation(db, commander, decline):
+    players = roster(commander=commander)
+    observe_for(db, players)
+    text = "!admin commander" if commander else "!admin able"
+    incident = report(players, text)
+    vid = incident["leadership_vote"]["id"]
+    api = deliver(db, players)
+    api.message_player.assert_called_once()
+    assert api.message_player.call_args.args[0] == "v0"
+    prompt = api.message_player.call_args.args[1]
+    assert "Geht es um fehlende Kommunikation?" in prompt
+    assert "Is this about missing communication?" in prompt
+    assert "Anderer Grund / Other reason: !no" in prompt
+    assert "kein automatischer Kick / no automatic kick" in prompt
+    assert "Person-target" in prompt
+    assert vote(db, vid)["status"] == "confirming"
+    assert vote(db, vid)["yes"] == 0
+    if decline:
+        assert cast(db, players, yes=False)
+    elapse(db, players, 61)
+    assert storage.advance(1, context(players)) == []
+    deliver(db, players, api)
+    assert vote(db, vid)["status"] == "cancelled"
+    with db() as sess:
+        saved = sess.scalar(select(AdminIncident))
+        assert saved.status == "new"
+        assert saved.raw_message == text
+        assert saved.reason == incident["reason"]
+        assert all(
+            item.purpose not in {"target", "invite"}
+            for item in sess.scalars(select(LeadershipMessage))
+        )
+    api.kick.assert_not_called()
 
 
 @pytest.mark.parametrize("role", sorted(incidents.SQUAD_LEADER_ROLES))

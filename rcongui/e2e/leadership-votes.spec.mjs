@@ -47,6 +47,11 @@ test("leadership settings, fixed quorum, ballot details and cancellation", async
     exact: true,
   });
   await expect(
+    main.getByText("Der Grund ist frei formulierbar und darf fehlen.", {
+      exact: false,
+    })
+  ).toBeVisible();
+  await expect(
     main.getByRole("heading", { name: "Führungsabstimmung", exact: true })
   ).toBeVisible();
   await expect(
@@ -88,6 +93,11 @@ test("English mobile layout and permission denial", async ({ page }) => {
   });
   await expect(
     page.getByRole("heading", { name: "Leadership vote", exact: true })
+  ).toBeVisible();
+  await expect(
+    page.getByText("The reason can be freely worded or omitted.", {
+      exact: false,
+    })
   ).toBeVisible();
   await expectNoHorizontalPageOverflow(page);
   await page

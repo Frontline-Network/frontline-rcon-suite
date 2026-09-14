@@ -36,6 +36,9 @@ from rcon.user_config.leadership_vote import LeadershipVoteUserConfig as Config
         ("!admin able redet nicht", False),
         ("!admin bitte mal prüfen able redet nicht", False),
         ("!admin der commander redet nicht", True),
+        ("!admin able", False),
+        ("!admin bitte mal prüfen able", False),
+        ("!admin commander", True),
     ],
 )
 def test_report_survives_discord_outage_and_disabled_optional_context(
@@ -159,7 +162,12 @@ def test_last_validation_failure_prevents_kick(db, monkeypatch, failure):
         ("!admin commander is not talking", True),
         ("!admin der commander redet nicht", True),
         ("!admin bitte mal prüfen able redet nicht", True),
-        ("!admin cheater", False),
+        ("!admin able", True),
+        ("!admin bitte mal prüfen able", True),
+        ("!admin commander", True),
+        ("!admin cheater", True),
+        ("!administrator able", False),
+        ("bitte !admin able", False),
         ("hello team", False),
         ("!yes please", False),
     ],
@@ -168,7 +176,13 @@ def test_public_webhook_privacy_classification(db, text, hidden):
     assert bool(domain.suppress_public_chat({"sub_content": text})) is hidden
 
 
-def test_private_admin_report_kept_but_general_chat_webhook_suppressed(db, monkeypatch):
+@pytest.mark.parametrize(
+    "text",
+    ["!admin commander redet nicht", "!admin able", "!admin bitte mal prüfen able"],
+)
+def test_private_admin_report_kept_but_general_chat_webhook_suppressed(
+    db, monkeypatch, text
+):
     handler = object.__new__(discord_chat.DiscordWebhookHandler)
     handler.chat_webhooks = [Mock()]
     admin = Mock()
@@ -182,9 +196,20 @@ def test_private_admin_report_kept_but_general_chat_webhook_suppressed(db, monke
     handler.create_chat_message = lambda _: Mock()
     enqueued = Mock()
     monkeypatch.setattr(discord_chat, "enqueue_message", enqueued)
-    handler.send_chat_message({"sub_content": "!admin commander redet nicht"})
+    handler.send_chat_message({"sub_content": text})
     assert enqueued.call_count == 1
     assert enqueued.call_args.kwargs["message"].message_type.value == "admin_ping"
+
+
+def test_public_report_privacy_disabled_and_config_failure(db, monkeypatch):
+    storage.configure(1, Config(), "admin")
+    log = {"sub_content": "!admin able"}
+    assert not domain.suppress_public_chat(log)
+    monkeypatch.setattr(
+        Config, "load_from_db", Mock(side_effect=OSError("DB unavailable"))
+    )
+    assert domain.suppress_public_chat(log)
+    assert not domain.suppress_public_chat({"sub_content": "hello team"})
 
 
 @pytest.mark.parametrize(
