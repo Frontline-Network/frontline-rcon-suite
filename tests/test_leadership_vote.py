@@ -251,6 +251,11 @@ def cast(db, players, pid="v0", yes=True):
         "!admin Able is not talking",
         "!admin able spricht nicht",
         "!admin able doesn't communicate",
+        "!admin bitte mal prüfen able redet nicht",
+        "!admin bitte mal prüfen, der Squadleader von Able redet nicht",
+        "!admin redet nicht: able",
+        "!admin please check, the squadleader of Able is not talking",
+        "  !ADMIN bitte mal prüfen ABLE redet nicht  ",
     ],
 )
 def test_explicit_communication_reports(db, text):
@@ -263,10 +268,19 @@ def test_explicit_communication_reports(db, text):
 
 
 @pytest.mark.parametrize("alias", ["commander", "kommandant", "kommandeur"])
-def test_commander_target_and_only_squadleader_voters(db, alias):
+@pytest.mark.parametrize(
+    "message",
+    [
+        "!admin {alias} is not talking",
+        "!admin der {alias} redet nicht",
+        "!admin bitte mal prüfen, der {alias} redet nicht",
+        "!admin redet nicht: {alias}",
+    ],
+)
+def test_commander_target_and_only_squadleader_voters(db, alias, message):
     players = roster(commander=True)
     observe_for(db, players)
-    incident = report(players, f"!admin {alias} is not talking")
+    incident = report(players, message.format(alias=alias))
     vid = confirm(db, players, incident)
     result = vote(db, vid)
     assert result["target_role"] == "commander"
@@ -286,6 +300,10 @@ def test_commander_target_and_only_squadleader_voters(db, alias):
         "!admin able is not talking anymore",
         "!admin able und Squad-1 redet nicht",
         "!admin Person-v1 redet nicht",
+        "!admin bitte mal prüfen able",
+        "!admin bitte mal prüfen able sabotiert",
+        "bitte mal prüfen !admin able redet nicht",
+        "bitte mal prüfen !admin commander redet nicht",
     ],
 )
 def test_ambiguous_or_other_reports_stay_ordinary(db, text):

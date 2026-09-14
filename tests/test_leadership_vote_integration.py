@@ -30,10 +30,18 @@ from rcon.user_config.leadership_vote import LeadershipVoteUserConfig as Config
 
 
 @pytest.mark.parametrize("unavailable", [False, True])
+@pytest.mark.parametrize(
+    "text,commander",
+    [
+        ("!admin able redet nicht", False),
+        ("!admin bitte mal prüfen able redet nicht", False),
+        ("!admin der commander redet nicht", True),
+    ],
+)
 def test_report_survives_discord_outage_and_disabled_optional_context(
-    db, monkeypatch, unavailable
+    db, monkeypatch, unavailable, text, commander
 ):
-    players = roster()
+    players = roster(commander=commander)
     observe_for(db, players)
     monkeypatch.setattr(incident_settings, "incident_capture_enabled", lambda: True)
     monkeypatch.setattr(incident_settings, "incident_context_mode", lambda: "disabled")
@@ -58,7 +66,7 @@ def test_report_survives_discord_outage_and_disabled_optional_context(
         action="CHAT[Allies][Team]",
         player_id_1="v0",
         player_name_1="Person-v0",
-        sub_content="!admin able redet nicht",
+        sub_content=text,
         timestamp_ms=NOW * 1000,
     )
     discord_chat.handle_on_chat(api, log)
@@ -149,6 +157,8 @@ def test_last_validation_failure_prevents_kick(db, monkeypatch, failure):
         (" !NO ", True),
         ("!admin Able redet nicht", True),
         ("!admin commander is not talking", True),
+        ("!admin der commander redet nicht", True),
+        ("!admin bitte mal prüfen able redet nicht", True),
         ("!admin cheater", False),
         ("hello team", False),
         ("!yes please", False),
@@ -212,6 +222,7 @@ def test_duplicate_report_log_has_only_one_offer(db):
 
 def test_leadership_failure_does_not_stop_other_routines(monkeypatch):
     from rcon import routines
+
     runtime = Mock()
     runtime.step.side_effect = OSError("isolated vote failure")
     runtime.close.side_effect = OSError("isolated cleanup failure")

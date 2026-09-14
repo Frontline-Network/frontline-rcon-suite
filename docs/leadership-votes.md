@@ -41,6 +41,25 @@ Einladung oder Ergebnisnachricht. Nicht zuordenbare Ziele, andere Beschwerden,
 fehlende Berechtigungen oder unbekannter/globaler Chat bleiben normale
 Admin-Meldungen.
 
+### Formulierung der Meldung
+
+Für das Abstimmungsangebot muss `!admin` am Anfang stehen. Der Squadname oder
+`commander` / `kommandant` / `kommandeur` darf dagegen an beliebiger Stelle
+danach vorkommen. Ein fester Satzbau ist nicht erforderlich. Zum Beispiel:
+
+- `!admin der commander redet nicht`
+- `!admin bitte mal prüfen able redet nicht`
+- `!admin redet nicht: able`
+- `!admin please check, the squadleader of Able is not talking`
+
+Zusätzlich zum eindeutig erkannten Ziel im eigenen Team muss eine eindeutige,
+unterstützte Kommunikationsbeschwerde enthalten sein, etwa `redet nicht`,
+`spricht nicht` oder `is not talking`. `!admin able` allein oder andere Gründe
+bleiben normale Admin-Reports. Die Erkennung verwendet feste Sprachmuster,
+keine KI; sie versteht nicht jede beliebige Umschreibung. Die üblichen
+Berechtigungen gelten weiterhin, und zuerst erhält der Melder die private
+Rückfrage, noch keine sofortige Abstimmung.
+
 ## Wer darf teilnehmen?
 
 - Ausschließlich Commander und Squadleader des betroffenen Teams.
