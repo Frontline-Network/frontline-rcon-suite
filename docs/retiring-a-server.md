@@ -30,3 +30,21 @@ database or revert newer versions of unrelated services just to reactivate it.
 
 Stopping the instance does not remove DNS, certificates, or historical reports.
 Changing those is a separate task.
+
+## Frontline retirement record — 2026-09-14
+
+- RCON1 (`rcon.fln.gg`): retired after the operator confirmed that its game server
+  was no longer active.
+- RCON2 (`rcon2.fln.gg`): retired immediately at the operator's request, ahead of
+  the game server going offline the following day. This operation stopped the
+  RCON management services, not the game server itself.
+
+Both instances have their backend/frontend/supervisor stopped, Docker autostart
+disabled, and zero scale with separate retired profiles in the active compose
+manifests. Their discovery registrations are removed; data and backups remain.
+The active numbered instances are RCON3 and RCON4. Shared services remain running,
+and the shared Discord callback uses RCON4.
+
+Future deployments must preserve **both** retirements unless the operator
+explicitly authorizes reactivation. When restoring one instance, do not restore
+an entire older manifest that would inadvertently reactivate the other one.
