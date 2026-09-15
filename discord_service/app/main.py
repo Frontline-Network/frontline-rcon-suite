@@ -1,4 +1,5 @@
 from __future__ import annotations
+import hashlib
 
 import copy
 import ipaddress
@@ -1046,6 +1047,23 @@ def receive_event(
             message_payload,
             mapping.message_id if mapping else None,
         )
+        # Ballots only edit the central case. A terminal failure/dry run needs a
+        # new admin alert (editing a Discord card does not notify subscribers).
+        if envelope.event_type in {
+            "leadership_vote_cancelled", "leadership_vote_rejected",
+            "leadership_vote_unknown", "leadership_vote_dry_run",
+        } and envelope.incident.get("status") not in {"resolved", "dismissed"}:
+            roles = [str(r) for r in envelope.incident.get("admin_notification_role_ids", [])
+                     if str(r).isdigit()][:100]
+            nonce = hashlib.sha256(idempotency_key.encode()).hexdigest()[:24]
+            DiscordClient().upsert(integration.channel_id, {
+                "content": (" ".join(f"<@&{role}>" for role in roles)
+                    + " Führungsabstimmung beendet: Admin-Bearbeitung erforderlich. / "
+                      "Leadership vote ended: admin review required."),
+                "message_reference": {"message_id": message_id, "fail_if_not_exists": False},
+                "allowed_mentions": {"parse": [], "roles": roles, "replied_user": False},
+                "nonce": nonce, "enforce_nonce": True,
+            })
     except httpx.HTTPStatusError as exc:
         status_code = exc.response.status_code
         if status_code == 429:
@@ -1643,7 +1661,7 @@ async def discord_interaction(
         match = True
     else:
         match = re.fullmatch(
-            r"(action|dismiss|trash|manual|finish|logs):"
+            r"(action|dismiss|trash|manual|finish|logs|cancel_leadership_vote):"
             r"([0-9a-f-]{36}):(\d+)(?::([a-z_]+))?",
             custom_id,
         )

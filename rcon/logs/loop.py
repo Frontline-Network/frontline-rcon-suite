@@ -175,6 +175,9 @@ def send_log_line_webhook_message(
         log_line: Dict[str, str | int | float | None],
 ) -> None:
     """Send a time stammped embed of the log_line and mentions to the provided Discord Webhook"""
+    from rcon.leadership_vote.domain import suppress_public_chat
+    if suppress_public_chat(log_line):
+        return
 
     config = RconServerSettingsUserConfig.load_from_db()
 

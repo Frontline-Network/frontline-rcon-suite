@@ -196,11 +196,12 @@ class DiscordWebhookHandler:
         return embed
 
     def send_chat_message(self, log):
+        from rcon.leadership_vote.domain import suppress_public_chat
         try:
             content, admin_embed, triggered = self.create_admin_ping_message(log)
             chat_embed = self.create_chat_message(log)
 
-            for wh in self.chat_webhooks:
+            for wh in ([] if suppress_public_chat(log) else self.chat_webhooks):
                 wh.remove_embeds()
                 wh.add_embed(chat_embed)
                 enqueue_message(
@@ -276,7 +277,15 @@ def get_handler():
 
 @on_chat
 def handle_on_chat(rcon, log):
-    get_handler().send_chat_message(log)
+    from rcon.leadership_vote.service import handle_answer, read_context
+    from rcon.leadership_vote.domain import event_time, private_chat
+    from rcon.user_config.leadership_vote import LeadershipVoteUserConfig
+    try:
+        get_handler().send_chat_message(log)
+    except Exception:
+        logger.exception("Discord chat delivery failed; local report processing continues")
+    if handle_answer(rcon, log):
+        return
     captured_report = False
     from rcon.incident_settings import (
         incident_capture_enabled,
@@ -304,42 +313,66 @@ def handle_on_chat(rcon, log):
             message = str(log.get("sub_content") or "")
             if chat_report_triggered(message, triggers):
                 context_mode = incident_context_mode()
-                recent_players = []
-                if context_mode in {"enabled", "shadow"}:
-                    detailed = rcon.get_detailed_players()
-                    current_players = list((detailed.get("players") or {}).values())
-                    current_squads = flatten_team_view(rcon.get_team_view())
-
+                include_recent_context = context_mode in {"enabled", "shadow"}
+                leadership_context = None
+                if LeadershipVoteUserConfig.load_from_db().enabled:
+                    context_mode = "enabled"
                     try:
-                        from rcon.player_stats import get_cached_live_game_stats
-                        from rcon.utils import LogsHistorySnapshot, MapsHistory
-
-                        cached = get_cached_live_game_stats() or {}
-                        current_map = MapsHistory().get_current_map() or {}
-                        recent_players = recent_report_players(
-                            message,
-                            recent_logs=LogsHistorySnapshot().iter_range(
-                                stop=RECENT_PLAYER_LOG_LIMIT
-                            ),
-                            current_players=current_players,
-                            reporter_id=str(log.get("player_id_1") or "") or None,
-                            report_timestamp_ms=log.get("timestamp_ms"),
-                            cached_stats=cached.get("stats") or (),
-                            cached_player_context=current_map.get("player_stats") or {},
-                        )
+                        leadership_context = read_context(rcon)
                     except Exception:
-                        # The historical context is an optional enhancement. A
-                        # cache problem must never suppress the report itself.
-                        logger.exception("Unable to recover recent report players")
-                else:
-                    current_players = rcon.get_players()
-                    current_squads = []
+                        logger.warning("No complete leadership context; preserve report for moderation", exc_info=True)
+                        leadership_context = {}
+                    leadership_context["event_time"] = event_time(log)
+                    reporter = next((p for p in leadership_context.get("players", [])
+                        if str(p.get("player_id")) == str(log.get("player_id_1"))), {})
+                    leadership_context["private_chat"] = bool(
+                        reporter and private_chat(log, reporter.get("team")))
+                try:
+                    recent_players = []
+                    if context_mode in {"enabled", "shadow"}:
+                        if leadership_context and "players" in leadership_context:
+                            current_players = leadership_context["players"]
+                        else:
+                            detailed = rcon.get_detailed_players(compact=True)
+                            current_players = list((detailed.get("players") or {}).values())
+                        current_squads = flatten_team_view(rcon.get_team_view(compact=True))
+
+                        try:
+                            from rcon.player_stats import get_cached_live_game_stats
+                            from rcon.utils import LogsHistorySnapshot, MapsHistory
+
+                            cached = (get_cached_live_game_stats() or {}) if include_recent_context else {}
+                            current_map = (MapsHistory().get_current_map() or {}) if include_recent_context else {}
+                            recent_players = recent_report_players(
+                                message,
+                                recent_logs=LogsHistorySnapshot().iter_range(
+                                    stop=RECENT_PLAYER_LOG_LIMIT
+                                ),
+                                current_players=current_players,
+                                reporter_id=str(log.get("player_id_1") or "") or None,
+                                report_timestamp_ms=log.get("timestamp_ms"),
+                                cached_stats=cached.get("stats") or (),
+                                cached_player_context=current_map.get("player_stats") or {},
+                            ) if include_recent_context else []
+                        except Exception:
+                            # The historical context is an optional enhancement. A
+                            # cache problem must never suppress the report itself.
+                            logger.exception("Unable to recover recent report players")
+                    else:
+                        current_players = rcon.get_players()
+                        current_squads = []
+                except Exception:
+                    logger.exception("Live report context unavailable; saving ordinary admin report")
+                    current_players, recent_players, current_squads = [], [], []
+                    if leadership_context is not None:
+                        leadership_context = {"event_time": event_time(log)}
                 result = create_incident_from_chat(
                     log,
                     current_players=current_players,
                     recent_players=recent_players,
                     current_squads=current_squads,
                     trigger_words=triggers,
+                    leadership_context=leadership_context,
                 )
                 if result:
                     incident, created = result

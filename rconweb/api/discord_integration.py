@@ -1425,7 +1425,7 @@ def transition_incident(request):
         interaction_data = dict(data)
         interaction_data.pop("forwarded", None)
         interaction = DiscordInteractionRequest.model_validate(interaction_data)
-        if interaction.operation not in {"claim", "unclaim", "resolve", "dismiss"}:
+        if interaction.operation not in {"claim", "unclaim", "resolve", "dismiss", "cancel_leadership_vote"}:
             raise ValueError("Unsupported Discord incident transition")
         _validate_binding(
             integration,

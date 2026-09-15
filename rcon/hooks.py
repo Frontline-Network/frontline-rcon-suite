@@ -105,6 +105,10 @@ def frontline_vip_verification(rcon: Rcon, struct_log: StructuredLogLineWithMeta
 
 @on_chat
 def chat_commands(rcon: Rcon, struct_log: StructuredLogLineWithMetaData):
+    from rcon.leadership_vote.domain import answer
+    from rcon.user_config.leadership_vote import LeadershipVoteUserConfig
+    if answer(struct_log.get("sub_content")) is not None and LeadershipVoteUserConfig.load_from_db().enabled:
+        return
     chat_config = ChatCommandsUserConfig.load_from_db()
     rcon_config = RConChatCommandsUserConfig.load_from_db()
 
