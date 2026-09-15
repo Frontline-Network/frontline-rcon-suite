@@ -150,9 +150,7 @@ def execute_autobalancer_squad_switch(request):
         )
         for player in move["players"]:
             try:
-                success = rcon_api.message_player(
-                    player["player_id"], message=message
-                )
+                success = rcon_api.message_player(player["player_id"], message=message)
             except Exception as error:
                 success = False
                 player = {**player, "error": str(error)}
@@ -243,9 +241,12 @@ def approve_autobalancer_proposal(request):
     decision_id = str(data.get("decision_id") or "")
     store = AutobalancerStore()
     state = store.load_state()
+    approved_at = datetime.now(timezone.utc).timestamp()
     if (
         state.get("phase") != Phase.PROPOSED
+        or "data_pause_started_at" in state
         or state.get("decision_id") != decision_id
+        or approved_at >= float(state.get("proposal_expires_at", 0))
         or AutobalancerUserConfig.load_from_db().mode != "manual"
     ):
         return api_response(
@@ -254,7 +255,6 @@ def approve_autobalancer_proposal(request):
             failed=True,
             error="Proposal is no longer eligible for approval",
         )
-    approved_at = datetime.now(timezone.utc).timestamp()
     state["approved_at"] = approved_at
     state["approved_by"] = request.user.username
     store.save_state(state)
@@ -306,6 +306,20 @@ def cancel_autobalancer_incident(request):
             "cooldown_until": cancelled_at + config.stable_difference_seconds,
             "cancelled_by": request.user.username,
             "cancel_reason": reason,
+            "cancelled_incident_id": incident_id,
+            # The worker sends private closure messages; do not block this HTTP
+            # request on messages to every invited player.
+            "cancel_notification": {
+                key: state.get(key)
+                for key in (
+                    "mode",
+                    "phase",
+                    "volunteers",
+                    "volunteer_notified",
+                    "pending_volunteers",
+                    "candidate",
+                )
+            },
         }
     )
     if state.get("decision_id"):

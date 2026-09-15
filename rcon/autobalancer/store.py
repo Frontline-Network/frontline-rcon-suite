@@ -75,8 +75,7 @@ class AutobalancerStore:
             ex=STATUS_HISTORY_SAMPLE_SECONDS,
         ):
             sample = {
-                "updated_at": status.get("updated_at")
-                or datetime.utcnow().isoformat(),
+                "updated_at": status.get("updated_at") or datetime.utcnow().isoformat(),
                 "round_id": status.get("round_id"),
                 "mode": status.get("mode"),
                 "phase": status.get("phase"),
@@ -127,9 +126,7 @@ class AutobalancerStore:
         )
 
     def claim_snapshot_prune(self, ttl: int = 24 * 3600) -> bool:
-        return bool(
-            self.red.set(self.key("snapshot_prune_gate"), "1", nx=True, ex=ttl)
-        )
+        return bool(self.red.set(self.key("snapshot_prune_gate"), "1", nx=True, ex=ttl))
 
     def set_active(self, active: bool) -> None:
         if active:
@@ -139,6 +136,15 @@ class AutobalancerStore:
 
     def is_active(self) -> bool:
         return bool(self.red.exists(self.key("active")))
+
+    def claim_volunteer_command(self, player_id: str, event_id: str) -> bool:
+        """Deduplicate replayed chat and limit command replies per player/server."""
+        digest = hashlib.sha256(event_id.encode("utf-8")).hexdigest()
+        if not self.red.set(self.key(f"command_seen:{digest}"), "1", nx=True, ex=3600):
+            return False
+        return bool(
+            self.red.set(self.key(f"command_reply:{player_id}"), "1", nx=True, ex=5)
+        )
 
     def arm_player(self, player_id: str | None) -> None:
         if player_id:

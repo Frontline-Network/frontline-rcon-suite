@@ -11,6 +11,14 @@ from typing import Any
 from rcon.user_config.autobalancer import AutobalancerUserConfig
 from rcon.utils import get_server_number
 
+from .feedback import (
+    MANUAL_NOTICE,
+    closed_command_message,
+    ended_message,
+    event_seconds,
+    fresh_command,
+    send_private,
+)
 from .history import load_history
 from .models import BalancePlan, BalanceSnapshot, Phase
 from .planner import (
@@ -28,6 +36,8 @@ from .store import AutobalancerStore, new_instance_token
 from .telemetry import persist_snapshot, prune_snapshots
 
 logger = logging.getLogger(__name__)
+COUNTS_MISMATCH = "Teamzählungen stimmen nicht überein"
+DATA_PAUSE_MAX_SECONDS = 15
 
 
 class AutobalancerService:
@@ -100,6 +110,18 @@ class AutobalancerService:
             self.store.set_active(False)
             self.store.save_state({})
             self._abort_state(state, "Autobalancer wurde deaktiviert")
+            events = self.store.read_events()
+            for event in events:
+                if event.get("type") == "volunteer" and fresh_command(
+                    event, now.timestamp()
+                ):
+                    send_private(
+                        self.rcon,
+                        event.get("player_id"),
+                        closed_command_message(config.mode, {}),
+                    )
+            if events:
+                self.store.acknowledge_events(events)
             status = {
                 "mode": "disabled",
                 "phase": Phase.IDLE,
@@ -133,7 +155,8 @@ class AutobalancerService:
                 logger.exception("Unable to prune old autobalancer snapshots")
 
         state = self.store.load_state()
-        events = self.store.read_events()
+        new_events = self.store.read_events()
+        events = list((state.get("pending_volunteers", {}) or {}).values()) + new_events
         hard_blocks = self._hard_blocks(snapshot, config)
         warnings = self._warnings(snapshot, config)
 
@@ -149,26 +172,40 @@ class AutobalancerService:
             self._abort_state(state, "Matchwechsel")
             self.store.arm_player(None)
             state = {}
-        else:
-            state = self._apply_events(state, events, config, snapshot)
+        paused = self._pause_for_counts(state, hard_blocks, now)
+        state = self._apply_events(
+            state,
+            events,
+            config,
+            snapshot,
+            now,
+            defer_volunteers=paused,
+            blocked=bool(hard_blocks),
+        )
 
-        if hard_blocks:
-            if state.get("decision_id"):
-                self._abort_state(state, "; ".join(hard_blocks))
+        if hard_blocks and paused and state.get("data_pause_started_at") is not None:
+            # Keep the incident, but never advance, arm or execute on unsafe data.
+            self.store.arm_player(None)
+        elif hard_blocks:
+            self._abort_state(state, "; ".join(hard_blocks))
             self.store.arm_player(None)
             state = {
                 "phase": Phase.BLOCKED,
                 "round_id": snapshot.round_id,
                 "observed_at": now.timestamp(),
             }
+        elif state.get("phase") == Phase.VERIFYING:
+            # A successful switch can itself put the counts within the target.
+            # Confirm and record it before the generic "already balanced" reset.
+            state = self._advance(state, snapshot, config, events, now)
         elif abs(snapshot.difference) <= config.target_difference:
-            if state.get("decision_id") and state.get("phase") in {
-                Phase.PROPOSED,
-                Phase.ARMED,
-            }:
-                self._abort_state(state, "Teams sind bereits ausgeglichen")
             self.store.arm_player(None)
-            state = {"phase": Phase.IDLE, "round_id": snapshot.round_id}
+            if not (
+                state.get("phase") == Phase.VOLUNTEER
+                and now.timestamp() < float(state.get("volunteer_until", 0))
+            ):
+                self._abort_state(state, "Teams sind bereits ausgeglichen")
+                state = {"phase": Phase.IDLE, "round_id": snapshot.round_id}
         else:
             direction = snapshot.larger_team
             if state.get("source_team") and state.get("source_team") != direction:
@@ -181,9 +218,43 @@ class AutobalancerService:
         self.store.save_state(state)
         status = self._status(state, snapshot, config, hard_blocks, warnings)
         self.store.save_status(status)
-        if events:
-            self.store.acknowledge_events(events)
+        if new_events:
+            self.store.acknowledge_events(new_events)
         return status
+
+    def _pause_for_counts(
+        self, state: dict[str, Any], hard_blocks: list[str], now: datetime
+    ) -> bool:
+        """Tolerate at most 15s of count-only jitter per observation/incident.
+
+        Invitations and approval deadlines are not extended. Pending chat keeps
+        its original timestamp; no death events are saved for later execution.
+        Armed candidates still abort immediately on inconsistent data.
+        """
+        now_ts = now.timestamp()
+        if hard_blocks == [COUNTS_MISMATCH] and state.get("phase") in {
+            Phase.OBSERVING,
+            Phase.VOLUNTEER,
+            Phase.PROPOSED,
+            Phase.VERIFYING,
+        }:
+            started = state.setdefault("data_pause_started_at", now_ts)
+            elapsed = max(0, now_ts - float(started))
+            used = float(state.get("data_pause_seconds", 0)) + elapsed
+            if state.get("phase") == Phase.VERIFYING and now_ts >= float(
+                state.get("confirmation_expires_at", 0)
+            ):
+                return False
+            return used < DATA_PAUSE_MAX_SECONDS
+        if not hard_blocks and "data_pause_started_at" in state:
+            elapsed = max(0, now_ts - float(state.pop("data_pause_started_at")))
+            used = float(state.get("data_pause_seconds", 0)) + elapsed
+            state["data_pause_seconds"] = used
+            if used >= DATA_PAUSE_MAX_SECONDS:
+                hard_blocks.append("Teamzählungen waren zu lange nicht verlässlich")
+            elif state.get("phase") == Phase.OBSERVING:
+                state["observed_at"] = float(state.get("observed_at", now_ts)) + elapsed
+        return False
 
     def _load_history(
         self,
@@ -218,7 +289,7 @@ class AutobalancerService:
         if snapshot.fail_count:
             reasons.append("Spielerdaten sind unvollständig")
         if not snapshot.counts_match:
-            reasons.append("Teamzählungen stimmen nicht überein")
+            reasons.append(COUNTS_MISMATCH)
         if not snapshot.stable_map:
             reasons.append("Kartendaten sind nicht stabil")
         if snapshot.allies_count + snapshot.axis_count < config.minimum_players:
@@ -296,7 +367,11 @@ class AutobalancerService:
             if config.mode == "shadow" or config.volunteer_phase_seconds == 0:
                 return self._propose(state, snapshot, config, now)
             state["phase"] = Phase.VOLUNTEER
+            state["volunteer_started_at"] = now_ts
             state["volunteer_until"] = now_ts + config.volunteer_phase_seconds
+            # A quick reply can reach the log worker while invitations are still
+            # being sent. Make the context visible before the first message.
+            self.store.save_state({**state, "mode": config.mode})
             self._request_volunteers(state, snapshot, config)
             return state
         if phase == Phase.VOLUNTEER:
@@ -306,16 +381,16 @@ class AutobalancerService:
         if phase == Phase.PROPOSED:
             if config.mode == "shadow":
                 return self._validate_candidate(state, snapshot, now)
-            if config.mode == "manual" and state.get("approved_at"):
-                validated = self._validate_candidate(state, snapshot, now)
-                if validated.get("phase") != Phase.PROPOSED:
-                    return validated
-                return self._arm(validated, config, now)
             if config.mode == "manual" and now_ts >= float(
                 state.get("proposal_expires_at", 0)
             ):
                 self._abort_state(state, "Manuelle Freigabe ist abgelaufen")
                 return self._restart_observation(snapshot, now)
+            if config.mode == "manual" and state.get("approved_at"):
+                validated = self._validate_candidate(state, snapshot, now)
+                if validated.get("phase") != Phase.PROPOSED:
+                    return validated
+                return self._arm(validated, config, now)
             return state
         if phase == Phase.ARMED:
             candidate = state.get("candidate") or {}
@@ -392,9 +467,14 @@ class AutobalancerService:
             ),
             seconds=config.volunteer_phase_seconds,
         )
+        if config.volunteer_command != "!balance":
+            message = message.replace("!balance", config.volunteer_command)
+        if config.mode == "manual":
+            message = f"{message}\n{MANUAL_NOTICE}"
+        state["volunteer_notified"] = []
         for player in recipients:
-            self.rcon.message_player(player.player_id, message=message)
-        state["volunteer_notified"] = [player.player_id for player in recipients]
+            if send_private(self.rcon, player.player_id, message):
+                state["volunteer_notified"].append(player.player_id)
 
     def _cooldown_ids(
         self,
@@ -485,6 +565,7 @@ class AutobalancerService:
             state["block_reasons"] = (
                 plan.blocked_reasons if plan else ["Kein Wechsel erforderlich"]
             )
+            self._abort_state(state, "; ".join(state["block_reasons"]))
             return state
         candidate = plan.candidates[0]
         decision_id = uuid.uuid4().hex
@@ -667,6 +748,7 @@ class AutobalancerService:
                 },
             )
             self.store.arm_player(None)
+            self._notify_ended(state, "Teamwechsel wurde nicht bestätigt")
             return self._restart_observation(snapshot, now)
         state["phase"] = Phase.VERIFYING
         state["pre_switch_difference"] = before
@@ -692,7 +774,8 @@ class AutobalancerService:
             after_snapshot=snapshot.audit_dict(),
         )
         self.store.arm_player(None)
-        self.rcon.message_player(
+        send_private(
+            self.rcon,
             candidate["player_id"],
             message=config.messages.switch_completed.format(
                 target_team=snapshot.team_labels.get(
@@ -732,8 +815,13 @@ class AutobalancerService:
         events: list[dict[str, Any]],
         config: AutobalancerUserConfig,
         snapshot: BalanceSnapshot,
+        now: datetime | None = None,
+        *,
+        defer_volunteers: bool = False,
+        blocked: bool = False,
     ) -> dict[str, Any]:
-        cooldown_ids: set[str] | None = None
+        now = now or snapshot.captured_at
+        state.pop("pending_volunteers", None)
         for event in events:
             if (
                 event.get("type") == "approval"
@@ -745,9 +833,16 @@ class AutobalancerService:
                     event.get("approved_at") or snapshot.captured_at.timestamp()
                 )
                 state["approved_by"] = event.get("approved_by")
-            elif event.get("type") == "cancel" and event.get(
-                "incident_id"
-            ) == state.get("incident_id"):
+            elif (
+                event.get("type") == "cancel"
+                and event.get("incident_id")
+                and event.get("incident_id")
+                in {state.get("incident_id"), state.get("cancelled_incident_id")}
+            ):
+                if state.get("cancel_notification"):
+                    self._notify_ended(
+                        state["cancel_notification"], "Manuell abgebrochen"
+                    )
                 self._abort_state(
                     state, str(event.get("reason") or "Manuell abgebrochen")
                 )
@@ -763,37 +858,9 @@ class AutobalancerService:
                     "cancelled_by": event.get("cancelled_by"),
                     "cancel_reason": event.get("reason"),
                 }
-            elif (
-                event.get("type") == "volunteer"
-                and state.get("phase") == Phase.VOLUNTEER
-                and event.get("incident_id") == state.get("incident_id")
-                and event.get("player_id")
-            ):
-                player = next(
-                    (
-                        current
-                        for current in snapshot.players
-                        if current.player_id == event["player_id"]
-                        and current.team == state.get("source_team")
-                    ),
-                    None,
-                )
-                if (
-                    player is None
-                    or protection_tier(player)[0] is None
-                    or player.connected_seconds < config.connection_grace_seconds
-                ):
-                    continue
-                if cooldown_ids is None:
-                    cooldown_ids = self._cooldown_ids(snapshot, config)
-                if player.player_id in cooldown_ids:
-                    continue
-                volunteers = set(state.get("volunteers") or [])
-                volunteers.add(event["player_id"])
-                state["volunteers"] = sorted(volunteers)
-                self.rcon.message_player(
-                    event["player_id"],
-                    message=config.messages.volunteer_registered,
+            elif event.get("type") == "volunteer" and event.get("player_id"):
+                self._register_volunteer(
+                    state, event, config, snapshot, now, defer_volunteers, blocked
                 )
             elif (
                 event.get("type") == "team_switch"
@@ -813,6 +880,81 @@ class AutobalancerService:
                 state["team_switch_seen"] = True
         return state
 
+    def _register_volunteer(
+        self,
+        state: dict[str, Any],
+        event: dict[str, Any],
+        config: AutobalancerUserConfig,
+        snapshot: BalanceSnapshot,
+        now: datetime,
+        defer: bool,
+        blocked: bool,
+    ) -> None:
+        if not fresh_command(event, now.timestamp()):
+            return
+        player_id = event["player_id"]
+        timestamp = event_seconds(event)
+        until = float(state.get("volunteer_until", 0))
+        started = float(
+            state.get("volunteer_started_at", until - config.volunteer_phase_seconds)
+        )
+        if (
+            config.mode not in {"manual", "auto"}
+            or state.get("phase") != Phase.VOLUNTEER
+            or not state.get("incident_id")
+            or event.get("incident_id") != state.get("incident_id")
+        ):
+            send_private(
+                self.rcon, player_id, closed_command_message(config.mode, state)
+            )
+            return
+        if not started <= timestamp < until:
+            send_private(
+                self.rcon,
+                player_id,
+                "Deine Meldung liegt außerhalb der Freiwilligenfrist. Bitte warte auf eine neue Einladung.",
+            )
+            return
+        if defer:
+            # One pending command per player, with its original incident/deadline.
+            pending = state.setdefault("pending_volunteers", {})
+            pending.setdefault(player_id, event)
+            return
+        if blocked or self._hard_blocks(snapshot, config):
+            send_private(
+                self.rcon,
+                player_id,
+                "Deine Meldung konnte nicht angenommen werden: Der Teamausgleich ist momentan aus Sicherheitsgründen blockiert.",
+            )
+            return
+        player = next((p for p in snapshot.players if p.player_id == player_id), None)
+        reason = None
+        if player is None or player.team != state.get("source_team"):
+            reason = "Der Aufruf gilt nur für Spieler des ursprünglich größeren Teams."
+        elif protection_tier(player)[0] is None:
+            reason = "Commander sind vom automatischen Teamwechsel ausgeschlossen."
+        elif player.connected_seconds < config.connection_grace_seconds:
+            reason = "Du bist noch durch die Schonzeit nach dem Verbinden geschützt."
+        elif not config.allow_individual_squad_fallback and player.unit_size > 1:
+            reason = "Dein Squad soll zusammenbleiben; einzelne Mitglieder können sich nicht melden."
+        elif player_id in self._cooldown_ids(snapshot, config):
+            reason = "Du bist nach einem früheren Teamwechsel noch geschützt."
+        if reason:
+            send_private(self.rcon, player_id, f"Nicht vorgemerkt: {reason}")
+            return
+        volunteers = set(state.get("volunteers") or [])
+        already_registered = player_id in volunteers
+        volunteers.add(player_id)
+        state["volunteers"] = sorted(volunteers)
+        message = (
+            "Du bist für diesen Aufruf bereits vorgemerkt."
+            if already_registered
+            else config.messages.volunteer_registered
+        )
+        if config.mode == "manual":
+            message = f"{message}\n{MANUAL_NOTICE}"
+        send_private(self.rcon, player_id, message)
+
     def _abort_state(self, state: dict[str, Any], reason: str) -> None:
         if state.get("decision_id"):
             self.repository.update(
@@ -825,6 +967,22 @@ class AutobalancerService:
                     "strategies": state.get("strategy_plans"),
                 },
             )
+        self._notify_ended(state, reason)
+
+    def _notify_ended(self, state: dict[str, Any], reason: str) -> None:
+        if state.get("mode") != "shadow" and not state.get("abort_notified"):
+            recipients = (
+                set(state.get("volunteer_notified") or [])
+                | set(state.get("volunteers") or [])
+                | set(state.get("pending_volunteers") or {})
+            )
+            if state.get("phase") in {Phase.ARMED, Phase.VERIFYING} and (
+                state.get("candidate") or {}
+            ).get("player_id"):
+                recipients.add(state["candidate"]["player_id"])
+            state["abort_notified"] = True
+            for player_id in sorted(recipients):
+                send_private(self.rcon, player_id, ended_message(reason))
 
     def _status(
         self,
@@ -864,7 +1022,15 @@ class AutobalancerService:
         )
         return {
             "mode": config.mode,
-            "phase": state.get("phase", Phase.IDLE),
+            "phase": (
+                Phase.BLOCKED
+                if "data_pause_started_at" in state
+                else state.get("phase", Phase.IDLE)
+            ),
+            "paused_phase": (
+                state.get("phase") if "data_pause_started_at" in state else None
+            ),
+            "volunteer_until": state.get("volunteer_until"),
             "incident_id": state.get("incident_id"),
             "decision_id": state.get("decision_id"),
             "round_id": snapshot.round_id,
