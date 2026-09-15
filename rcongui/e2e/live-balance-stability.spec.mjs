@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { openDemoPage, VIEWPORTS } from "./helpers.mjs";
+import {
+  expectNoHorizontalPageOverflow,
+  openDemoPage,
+  VIEWPORTS,
+} from "./helpers.mjs";
 
 test.use({ viewport: VIEWPORTS.desktop });
 const card = (page) =>
@@ -10,7 +14,9 @@ async function start(page) {
   await openDemoPage(page, "/views/live", {
     query: { demo_balance: "unbalanced" },
   });
-  await expect(card(page).getByText(/Vorschlag für 60 Sekunden/)).toBeVisible();
+  await expect(
+    card(page).getByText(/Auswahl bleibt bis zu 60 Sekunden sichtbar/)
+  ).toBeVisible();
   await card(page)
     .getByRole("button", { name: "Squad-Wechsel prüfen", exact: true })
     .click();
@@ -42,7 +48,10 @@ test("a review holds its exact squad beyond 60 seconds and blocks an invalidated
   await changeSnapshot(page, "changed_squad");
   await page.clock.runFor(11_000);
   await expect(
-    review(page).getByText(/Dieser Vorschlag ist nicht mehr gültig/)
+    review(page).getByText("Vorschlag bitte aktualisieren", { exact: true })
+  ).toBeVisible();
+  await expect(
+    review(page).getByText(/Schließe die Prüfung und wähle „Neu bewerten“/)
   ).toBeVisible();
   await page.clock.fastForward(65_000);
   await expect(
@@ -82,8 +91,16 @@ test("an invalid proposal stays visible until explicitly refreshed; live balance
     card(page).getByRole("heading", { name: "Teams ausgeglichen", exact: true })
   ).toBeVisible();
   await expect(
-    card(page).getByText(/Festgehaltener Vorschlag nicht mehr gültig/)
+    card(page)
+      .getByRole("status")
+      .filter({ hasText: "Aktuell kein Wechsel nötig" })
   ).toBeVisible();
+  await expect(
+    card(page).getByText(/innerhalb der eingestellten Grenzwerte/)
+  ).toBeVisible();
+  await expect(
+    card(page).getByText(/Kein Eingriff möglich|nicht mehr gültig/)
+  ).toHaveCount(0);
   await expect(
     card(page).getByRole("img", { name: /^Stärke-Index Live:/ })
   ).toBeVisible();
@@ -143,11 +160,13 @@ test("without an open review the proposal refreshes automatically after the hold
   await changeSnapshot(page, "changed_squad");
   await page.clock.runFor(11_000);
   await expect(
-    card(page).getByText(/Festgehaltener Vorschlag nicht mehr gültig/)
+    card(page)
+      .getByRole("status")
+      .filter({ hasText: "Vorschlag bitte aktualisieren" })
   ).toBeVisible();
   await page.clock.fastForward(60_000);
   await expect(
-    card(page).getByText(/Vorschlag für 60 Sekunden festgehalten/)
+    card(page).getByText(/Auswahl bleibt bis zu 60 Sekunden sichtbar/)
   ).toBeVisible();
   await card(page)
     .getByRole("button", { name: "Squad-Wechsel prüfen", exact: true })
@@ -155,6 +174,65 @@ test("without an open review the proposal refreshes automatically after the hold
   await expect(
     review(page).getByText("Squad delta", { exact: true })
   ).toBeVisible();
+});
+
+test("the refresh hint remains readable and actionable on mobile", async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize(VIEWPORTS.mobile);
+  await page.clock.install();
+  await openDemoPage(page, "/views/live", {
+    query: { demo_balance: "unbalanced" },
+  });
+  await expect(
+    card(page).getByText(/Auswahl bleibt bis zu 60 Sekunden sichtbar/)
+  ).toBeVisible();
+  await changeSnapshot(page, "changed_squad");
+  await page.clock.runFor(11_000);
+  await expect(
+    card(page)
+      .getByRole("status")
+      .filter({ hasText: "Vorschlag bitte aktualisieren" })
+  ).toBeVisible();
+  await expect(
+    card(page).getByRole("button", { name: "Neu bewerten", exact: true })
+  ).toBeEnabled();
+  await expectNoHorizontalPageOverflow(page);
+  await page.screenshot({
+    path: testInfo.outputPath("proposal-refresh-mobile.png"),
+    fullPage: true,
+  });
+  await card(page)
+    .getByRole("button", { name: "Neu bewerten", exact: true })
+    .click();
+  await expect(
+    card(page).getByText("Vorschlag zur Prüfung vorgemerkt", { exact: true })
+  ).toBeVisible();
+});
+
+test("the teams view explains a no-longer-needed proposal too", async ({
+  page,
+}, testInfo) => {
+  await page.clock.install();
+  await openDemoPage(page, "/views/team", {
+    query: { demo_balance: "unbalanced" },
+  });
+  await expect(
+    card(page).getByText(/Auswahl bleibt bis zu 60 Sekunden sichtbar/)
+  ).toBeVisible();
+  await changeSnapshot(page, "balanced");
+  await page.clock.runFor(11_000);
+  const notice = card(page)
+    .getByRole("status")
+    .filter({ hasText: "Aktuell kein Wechsel nötig" });
+  await expect(notice).toBeVisible();
+  await expect(
+    notice.getByRole("button", { name: "Neu bewerten", exact: true })
+  ).toBeEnabled();
+  await expectNoHorizontalPageOverflow(page);
+  await notice.screenshot({
+    path: testInfo.outputPath("proposal-balanced-desktop.png"),
+  });
 });
 
 test("a still-valid review reaches the existing confirmed action exactly once", async ({

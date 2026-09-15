@@ -33,6 +33,7 @@ import {
 import {
   balanceRecommendations,
   holdRecommendations,
+  recommendationNotice,
   recommendationStatus,
 } from "./balance-recommendations.mjs";
 import { balanceActionPreflight } from "./balance-action-guard.mjs";
@@ -483,6 +484,23 @@ const AutobalancerCard = ({
   const activeValid = Boolean(
     validated[Math.min(selectedRecommendation, recommendations.length - 1)]
   );
+  const noticeContext = {
+    blocked: insight.blocked,
+    balanced:
+      !insight.countUnbalanced &&
+      !insight.strengthUnbalanced &&
+      !insight.warning,
+    reviewing: reviewOpen,
+  };
+  const notice = recommendationNotice({
+    ...noticeContext,
+    valid: Boolean(validated[0]),
+  });
+  const reviewNotice = recommendationNotice({
+    ...noticeContext,
+    valid: activeValid,
+    reviewing: true,
+  });
   const hasProjection =
     Number.isFinite(insight.projectedRatings?.allies) &&
     Number.isFinite(insight.projectedRatings?.axis);
@@ -658,7 +676,8 @@ const AutobalancerCard = ({
 
       {recommendations.length > 0 && (
         <Alert
-          severity={validated[0] ? "info" : "warning"}
+          severity={notice.severity}
+          role="status"
           sx={{ borderRadius: 0 }}
           action={
             <Button
@@ -670,9 +689,10 @@ const AutobalancerCard = ({
             </Button>
           }
         >
-          {validated[0]
-            ? "Vorschlag für 60 Sekunden festgehalten. Live-Werte und Gültigkeit werden weiter geprüft."
-            : "Festgehaltener Vorschlag nicht mehr gültig: Teams, Spieler oder Voraussetzungen haben sich geändert. Kein Eingriff möglich."}
+          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+            {notice.title}
+          </Typography>
+          {notice.description}
         </Alert>
       )}
 
@@ -996,10 +1016,11 @@ const AutobalancerCard = ({
               keine Historie gesammelt werden. Ausgeführt wird erst nach der
               regulären Sicherheitsbestätigung.
             </Alert>
-            <Alert severity={activeValid ? "info" : "warning"}>
-              {activeValid
-                ? "Diese Auswahl bleibt bis zum Schließen unverändert. Vor der Ausführung wird sie erneut mit frischen Live-Daten geprüft."
-                : "Dieser Vorschlag ist nicht mehr gültig. Es wird kein Wechsel ausgeführt. Dialog schließen und neu bewerten."}
+            <Alert severity={reviewNotice.severity} role="status">
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                {reviewNotice.title}
+              </Typography>
+              {reviewNotice.description}
             </Alert>
 
             {recommendations.length > 1 && (

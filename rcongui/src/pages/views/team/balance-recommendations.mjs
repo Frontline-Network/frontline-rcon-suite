@@ -1,5 +1,40 @@
 export const RECOMMENDATION_HOLD_MS = 60_000;
 
+// Being kept on screen is not a promise that a move remains safe to execute.
+export function recommendationNotice({ valid, blocked, balanced, reviewing }) {
+  if (valid) {
+    return {
+      severity: "info",
+      title: "Vorschlag zur Prüfung vorgemerkt",
+      description: reviewing
+        ? "Deine Auswahl bleibt sichtbar, solange die Prüfung geöffnet ist. Ob der Wechsel noch passt, wird mit jedem Live-Update geprüft."
+        : "Die Auswahl bleibt bis zu 60 Sekunden sichtbar. Ob der Wechsel noch passt, wird mit jedem Live-Update geprüft.",
+    };
+  }
+  const nextStep = reviewing
+    ? "Schließe die Prüfung und wähle „Neu bewerten“."
+    : "Mit „Neu bewerten“ prüfst du die aktuelle Empfehlung.";
+  if (blocked) {
+    return {
+      severity: "warning",
+      title: "Live-Daten gerade unvollständig",
+      description: `Dieser Vorschlag kann erst mit vollständigen Live-Daten erneut geprüft werden. ${nextStep}`,
+    };
+  }
+  if (balanced) {
+    return {
+      severity: "info",
+      title: "Aktuell kein Wechsel nötig",
+      description: `Die Teams liegen jetzt innerhalb der eingestellten Grenzwerte. Der bisherige Vorschlag wird nicht mehr benötigt. ${nextStep}`,
+    };
+  }
+  return {
+    severity: "info",
+    title: "Vorschlag bitte aktualisieren",
+    description: `Dieser vorgemerkte Wechsel passt nicht mehr zur aktuellen Spielsituation. ${nextStep}`,
+  };
+}
+
 // Identity describes the reviewed move, never its changing rank or score.
 export function recommendationKey(value) {
   if (!value) return null;
