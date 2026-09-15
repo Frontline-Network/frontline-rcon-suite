@@ -110,6 +110,20 @@ def test_duplicate_events_are_idempotent():
     assert store.read_events() == []
 
 
+def test_volunteer_command_deduplication_and_throttle_are_server_scoped():
+    redis = FakeRedis()
+    first = AutobalancerStore(redis, server_number=1)
+    second = AutobalancerStore(redis, server_number=2)
+    assert first.claim_volunteer_command("a", "event-1")
+    assert not first.claim_volunteer_command("a", "event-1")
+    assert not first.claim_volunteer_command("a", "event-2")
+    assert first.claim_volunteer_command("b", "event-3")
+    assert second.claim_volunteer_command("a", "event-1")
+    redis.delete(first.key("command_reply:a"))
+    assert not first.claim_volunteer_command("a", "event-1")
+    assert first.claim_volunteer_command("a", "event-4")
+
+
 def test_byte_mode_redis_streams_and_armed_player_are_supported():
     store = AutobalancerStore(ByteStreamRedis(), server_number=1)
     store.arm_player("victim")

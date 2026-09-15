@@ -770,6 +770,27 @@ def render_message(
             {"name": "KI / AI", "value": labels["unavailable"], "inline": False}
         )
     action_log = _action_log_field(incident, language)
+    vote = incident.get("leadership_vote")
+    if vote:
+        deadline = f"<t:{int(vote['ends_at'])}:R>" if vote.get("ends_at") and vote.get("status") in {"confirming", "warning", "active", "inviting"} else "–"
+        roster = vote.get("electorate") or {}
+        ballots = vote.get("ballots") or {}
+        lines = [f"{roster.get(pid, {}).get('name') or pid}: {'Ja / Yes' if b['yes'] else 'Nein / No'}" for pid, b in ballots.items()]
+        target_role = "Commander" if vote.get("target_role") == "commander" else f"Squad {vote.get('squad')} – Squadleader"
+        mode = "PROBELAUF / DRY RUN – kein Kick / no kick" if vote.get("mode") != "active" else "AKTIV / ACTIVE – Server-Kick"
+        phases = {
+            "confirming": "Bestätigung / Confirmation", "warning": "Warnfrist / Warning",
+            "inviting": "Einladungen / Invitations", "active": "Abstimmung / Voting",
+            "executing": "Kick-Prüfung / Execution", "kicked": "Kick bestätigt / Confirmed",
+            "dry_run": "Probelauf erfolgreich – manuell bearbeiten / Dry run passed – manual review",
+            "rejected": "Mehrheit fehlt – Admins erforderlich / No majority – admins needed",
+            "cancelled": "Abgebrochen – Admins erforderlich / Cancelled – admins needed",
+            "unknown": "Unklar – keine Wiederholung / Uncertain – no retry",
+        }
+        fields.append({"name": "🗳 Führungsabstimmung" if language == "de" else "🗳 Leadership vote",
+            "value": _truncate(f"{mode}\n{target_role} {vote.get('target_name')}\n{phases.get(vote.get('status'), vote.get('status'))} · {deadline}\n"
+                f"Ja / Yes: {vote.get('yes', 0)} · Nein / No: {vote.get('no', 0)} · ≥ {vote.get('required') or '–'} / {vote.get('participant_count', len(roster))}\n"
+                f"{vote.get('result') or ''}\n" + "\n".join(lines), 1024), "inline": False})
     if action_log:
         fields.append(action_log)
     if multi_squad_report:
@@ -991,6 +1012,15 @@ def render_message(
                     ],
                 }
             )
+    if vote and vote.get("status") in {"confirming", "warning", "inviting", "active", "executing"} and moderation_ready and status not in {"resolved", "dismissed"}:
+        button = {"type": 2, "style": 2, "label": "Vote abbrechen" if language == "de" else "Cancel vote",
+                  "custom_id": f"cancel_leadership_vote:{incident_id}:{revision}"}
+        # Keep Discord's maximum five action rows / five buttons per row.
+        button_row = next((row for row in reversed(components) if len(row["components"]) < 5 and all(c["type"] == 2 for c in row["components"])), None)
+        if button_row:
+            button_row["components"].append(button)
+        elif len(components) < 5:
+            components.append({"type": 1, "components": [button]})
     if source == "ai_player_name":
         title = labels["name_title"].format(name=target_name)
     elif source == "ai_chat":

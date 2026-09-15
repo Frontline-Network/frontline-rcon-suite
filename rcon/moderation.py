@@ -207,6 +207,7 @@ class DiscordInteractionRequest(BaseModel):
     incident_revision: int = Field(ge=1)
     actor: DiscordActor
     operation: Literal[
+        "cancel_leadership_vote",
         "claim",
         "unclaim",
         "resolve",

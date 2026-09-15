@@ -7,6 +7,7 @@ import {
 import { Box, Chip, Stack, Typography } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import DiscordReportBotCard from "@/pages/settings/general-group/crcon-app/DiscordReportBotCard";
+import LeadershipVotes from "@/pages/settings/leadership-votes";
 
 const DiscordReportBotPage = () => {
   const { t } = useTranslation();
@@ -35,7 +36,11 @@ const DiscordReportBotPage = () => {
           },
         })}
       >
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={2.5} alignItems={{ sm: "center" }}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2.5}
+          alignItems={{ sm: "center" }}
+        >
           <Box
             sx={{
               display: "grid",
@@ -52,7 +57,11 @@ const DiscordReportBotPage = () => {
             <DiscordBotIcon sx={{ fontSize: 38 }} />
           </Box>
           <Box sx={{ position: "relative", zIndex: 1 }}>
-            <Typography variant="overline" color="primary.main" sx={{ fontWeight: 800 }}>
+            <Typography
+              variant="overline"
+              color="primary.main"
+              sx={{ fontWeight: 800 }}
+            >
               {t("apps.discord.eyebrow")}
             </Typography>
             <Typography component="h1" variant="h3" sx={{ fontWeight: 800 }}>
@@ -61,9 +70,18 @@ const DiscordReportBotPage = () => {
             <Typography color="text.secondary" sx={{ mt: 0.75, maxWidth: 760 }}>
               {t("apps.discord.pageSubtitle")}
             </Typography>
-            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mt: 2 }}>
+            <Stack
+              direction="row"
+              spacing={1}
+              useFlexGap
+              flexWrap="wrap"
+              sx={{ mt: 2 }}
+            >
               <Chip icon={<ReportsIcon />} label={t("apps.discord.reports")} />
-              <Chip icon={<SecurityIcon />} label={t("apps.discord.permissions")} />
+              <Chip
+                icon={<SecurityIcon />}
+                label={t("apps.discord.permissions")}
+              />
               <Chip icon={<AiIcon />} label={t("apps.discord.ai")} />
             </Stack>
           </Box>
@@ -71,6 +89,7 @@ const DiscordReportBotPage = () => {
       </Box>
 
       <DiscordReportBotCard />
+      <LeadershipVotes />
     </Box>
   );
 };

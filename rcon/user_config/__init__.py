@@ -30,6 +30,7 @@ if not any(
         gtx_server_name,
         log_line_webhooks,
         log_stream,
+        leadership_vote,
         name_kicks,
         rcon_connection_settings,
         rcon_server_settings,

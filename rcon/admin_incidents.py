@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import re
 import unicodedata
 from datetime import date, datetime, timedelta, timezone
@@ -36,6 +37,7 @@ SQUAD_LEADER_ROLES = get_squad_leader_roles(GameEnum.HLL_WW2) | get_squad_leader
 )
 COMMANDER_ROLES = {"armycommander", "commander"}
 COMMANDER_ALIASES = ("commander", "kommandant", "kommandeur")
+logger = logging.getLogger(__name__)
 
 
 def _mobile_context_fuzzy_threshold() -> float:
@@ -893,6 +895,7 @@ def create_incident(
     raw_message: str | None = None,
     dedupe_seconds: int = 60,
     idempotency_key: str | None = None,
+    leadership_context: dict | None = None,
 ) -> tuple[dict, bool]:
     if source not in {"chat", "manual", "ai_chat", "ai_player_name"}:
         raise ValueError("Unsupported incident source")
@@ -916,6 +919,9 @@ def create_incident(
         )
 
     with enter_session() as sess:
+        if leadership_context is not None:
+            from rcon.leadership_vote.storage import lock
+            lock(sess, server_number)
         if idempotency_key:
             existing_event = sess.execute(
                 select(AdminIncidentEvent).where(
@@ -978,6 +984,13 @@ def create_incident(
         _sync_primary_target(incident)
         sess.add(incident)
         sess.flush()
+        if leadership_context is not None:
+            from rcon.leadership_vote.storage import enqueue
+            try:
+                with sess.begin_nested():
+                    enqueue(sess, incident, leadership_context, now.timestamp())
+            except Exception:
+                logger.exception("Leadership offer failed; ordinary admin report preserved")
         result = incident.to_dict(include_events=True)
     return result, True
 
@@ -989,6 +1002,7 @@ def create_incident_from_chat(
     recent_players: Sequence[dict] | None = None,
     current_squads: Sequence[dict] | None = None,
     trigger_words: Iterable[str] = DEFAULT_TRIGGER_WORDS,
+    leadership_context: dict | None = None,
 ) -> tuple[dict, bool] | None:
     players = [
         dict(player, online=player.get("online", True))
@@ -1009,7 +1023,7 @@ def create_incident_from_chat(
     )
     reporter_context = player_snapshot(reporter)
     reporter_context["online"] = reporter is not None
-    context_mode = incident_context_mode()
+    context_mode = "enabled" if leadership_context is not None else incident_context_mode()
     parsed = parse_chat_report(
         str(log.get("sub_content") or ""),
         trigger_words=trigger_words,
@@ -1033,6 +1047,7 @@ def create_incident_from_chat(
         target_name=parsed["target_name"],
         reporter_context=reporter_context if context_mode != "disabled" else {},
         subjects=parsed["subjects"] if context_mode != "disabled" else None,
+        leadership_context=leadership_context,
     )
 
 
@@ -1136,6 +1151,8 @@ def mutate_incident(
         raise ValueError("A valid Idempotency-Key header is required")
     now = _utcnow()
     with enter_session() as sess:
+        from rcon.leadership_vote.storage import lock_incident, cancel_linked
+        lock_incident(sess, incident_id)
         if idempotency_key:
             existing_event = sess.execute(
                 select(AdminIncidentEvent).where(
@@ -1169,6 +1186,10 @@ def mutate_incident(
                     f"Incident revision changed from {expected_revision} to {incident.revision}"
                 )
 
+        if operation in {"claim", "resolved", "dismissed", "reassign", "link_target", "cancel_leadership_vote"}:
+            cancel_linked(sess, incident, actor)
+        if operation == "cancel_leadership_vote":
+            return incident.to_dict(include_events=True)
         if operation == "claim":
             if incident.status not in {"new", "claimed"}:
                 raise InvalidIncidentTransition("Only open incidents can be claimed")
@@ -1279,6 +1300,8 @@ def mutate_incident_subject(
     if not idempotency_key or len(idempotency_key) > 64:
         raise ValueError("A valid Idempotency-Key header is required")
     with enter_session() as sess:
+        from rcon.leadership_vote.storage import lock_incident, cancel_linked
+        lock_incident(sess, incident_id)
         existing_event = sess.execute(
             select(AdminIncidentEvent).where(
                 AdminIncidentEvent.idempotency_key == idempotency_key
@@ -1301,6 +1324,7 @@ def mutate_incident_subject(
                 f"Incident revision changed from {expected_revision} to {incident.revision}"
             )
 
+        cancel_linked(sess, incident, actor)
         subject = None
         if operation == "add":
             manual_payload = {
@@ -1433,6 +1457,8 @@ def reserve_incident_action(
     if not idempotency_key or len(idempotency_key) > 64:
         raise ValueError("A valid Idempotency-Key header is required")
     with enter_session() as sess:
+        from rcon.leadership_vote.storage import lock_incident, cancel_linked
+        lock_incident(sess, incident_id)
         existing = sess.execute(
             select(AdminIncidentEvent).where(
                 AdminIncidentEvent.idempotency_key == idempotency_key
@@ -1459,6 +1485,8 @@ def reserve_incident_action(
             )
         if incident.assigned_to and incident.assigned_to != actor:
             raise IncidentConflict("Incident is already claimed by another admin")
+
+        cancel_linked(sess, incident, actor)
 
         player_id = str(arguments.get("player_id") or "").strip()
         subject_id = str(arguments.get("subject_id") or "").strip() or None

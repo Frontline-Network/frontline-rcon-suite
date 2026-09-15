@@ -197,6 +197,7 @@ class Command(BaseCommand):
                         )
                     incident_payload["ai_config"] = ai_config
                     incident_payload["discord_language"] = integration.language
+                    incident_payload["admin_notification_role_ids"] = integration.moderator_role_ids or []
                     incident_payload["allowed_actions"] = (
                         integration.allowed_actions or []
                     )

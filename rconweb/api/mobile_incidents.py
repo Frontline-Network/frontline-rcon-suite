@@ -407,7 +407,7 @@ def incident_detail(request, incident_id):
     try:
         data = _json_body(request)
         operation = str(data["operation"])
-        if operation in {"claim", "unclaim"} and not request.user.has_perm(
+        if operation in {"claim", "unclaim", "cancel_leadership_vote"} and not request.user.has_perm(
             "api.can_claim_admin_incidents"
         ):
             return _error(command, "Missing incident claim permission", 403)

@@ -29,6 +29,19 @@ WARFARE_GRID_SIZE_CM_BY_MAP = {
 GRID_CELLS_PER_OBJECTIVE = 2
 MAP_GRID_CELLS = 10
 
+# Backport only the map-side data fix from hllrcon >= 2.0.0.3:
+# https://github.com/timraay/hllrcon/commit/35d428a0686bf21e759e18a6f27a4b949528c40c
+# Our pinned 2.0.0.0 mirrors these five HLL maps, causing own-HQ punishments.
+# Explicit corrected values (not a blanket reversal) also remain correct after
+# a future dependency upgrade. Do not mutate shared catalog objects or HLLV.
+HLL_ALLIES_DIRECTION_CORRECTIONS = {
+    "elsenbornridge": CardinalDirection.TOP_TO_BOTTOM,
+    "kharkov": CardinalDirection.TOP_TO_BOTTOM,
+    "kursk": CardinalDirection.TOP_TO_BOTTOM,
+    "purpleheartlane": CardinalDirection.TOP_TO_BOTTOM,
+    "stmariedumont": CardinalDirection.TOP_TO_BOTTOM,
+}
+
 
 def normalize_world_position(raw: Any) -> WorldPosition | None:
     """Return a numeric XYZ tuple, or ``None`` for an unusable payload."""
@@ -55,7 +68,12 @@ def _map_direction(map_id: str, team: TeamName) -> CardinalDirection | None:
         except ValueError:
             continue
 
-        return map_.allies_direction if team == "allies" else map_.axis_direction
+        allied_direction = map_.allies_direction
+        if map_catalog is hllrcon.HLLMap:
+            allied_direction = HLL_ALLIES_DIRECTION_CORRECTIONS.get(
+                map_.id, allied_direction
+            )
+        return allied_direction if team == "allies" else allied_direction.get_opposite()
 
     return None
 

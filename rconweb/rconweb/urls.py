@@ -37,6 +37,7 @@ if not os.getenv("HLL_MAINTENANCE_CONTAINER") and not os.getenv(
         path("api/", include("api.urls")),
         path("api/v1/", include("api.capability_urls")),
         path("api/live-map/v1/", include("api.live_map")),
+        path("api/leadership-vote/v1/", include("api.leadership_vote")),
         path("api/mobile/v1/", include("api.mobile_urls")),
         path("api/discord/v1/", include("api.discord_urls")),
         path("api/eventador/v1/", include("api.eventador_control_urls")),

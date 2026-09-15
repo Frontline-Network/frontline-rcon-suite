@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 
 from rcon.logs.loop import (
     on_chat,
@@ -13,6 +14,7 @@ from rcon.logs.loop import (
 )
 from rcon.user_config.autobalancer import AutobalancerUserConfig
 
+from .feedback import closed_command_message, fresh_command, send_private
 from .store import AutobalancerStore
 
 logger = logging.getLogger(__name__)
@@ -49,23 +51,50 @@ def _publish(event_type: str, struct_log, **payload) -> None:
 
 @on_chat
 def autobalancer_volunteer(rcon, struct_log):
-    store = _store()
-    if store is None or not store.is_active():
-        return
-    state = store.load_state()
-    if state.get("phase") != "volunteer":
+    message = str(
+        struct_log.get("sub_content") or struct_log.get("message") or ""
+    ).strip()
+    if not message.startswith("!") or len(message.split()) != 1:
         return
     config = AutobalancerUserConfig.load_from_db()
-    message = str(struct_log.get("sub_content") or struct_log.get("message") or "")
-    if message.strip().casefold() != config.volunteer_command.casefold():
+    if message.casefold() != config.volunteer_command.casefold():
         return
-    _publish(
-        "volunteer",
-        struct_log,
-        player_id=struct_log.get("player_id_1"),
-        player_name=struct_log.get("player_name_1"),
-        incident_id=state.get("incident_id"),
+    player_id = struct_log.get("player_id_1")
+    if not player_id or not fresh_command(struct_log, time.time()):
+        return
+    unavailable = (
+        "Der Autobalancer ist gerade nicht erreichbar. Bitte versuche es später erneut."
     )
+    store = _store()
+    if store is None:
+        send_private(rcon, player_id, unavailable)
+        return
+    event_id = str(struct_log.get("raw") or f"{player_id}:{struct_log['timestamp_ms']}")
+    try:
+        if not store.claim_volunteer_command(player_id, event_id):
+            return
+        if config.mode in {"disabled", "shadow"}:
+            send_private(rcon, player_id, closed_command_message(config.mode, {}))
+            return
+        if not store.is_active():
+            send_private(rcon, player_id, unavailable)
+            return
+        state = store.load_state()
+        # Always dispatch explicit commands, including outside the invitation.
+        # The worker decides against its current state and replies privately.
+        store.publish_event(
+            "volunteer",
+            {
+                "event_id": event_id,
+                "timestamp_ms": struct_log.get("timestamp_ms"),
+                "player_id": player_id,
+                "player_name": struct_log.get("player_name_1"),
+                "incident_id": state.get("incident_id"),
+            },
+        )
+    except Exception:
+        logger.exception("Unable to dispatch autobalancer volunteer command")
+        send_private(rcon, player_id, unavailable)
 
 
 def _death(struct_log) -> None:

@@ -123,6 +123,13 @@ class MobileDevice(models.Model):
         )
 
 
+class LeadershipVoteAccess(models.Model):
+    class Meta:
+        managed = False
+        default_permissions = ()
+        permissions = (("can_manage_leadership_votes", "Can configure leadership votes"),)
+
+
 class TacticalAccess(models.Model):
     """Permission carrier; tactical data is managed by SQLAlchemy/Alembic."""
     class Meta:

@@ -244,6 +244,8 @@ def set_user_config(key: str, object_: dict[str, Any] | BaseUserConfig):
     _invalidate_user_config_cache(key)
     try:
         with enter_session() as sess:
+            from rcon.leadership_vote.storage import guard_command_config
+            guard_command_config(sess, key, object_)
             conf = _get_conf(sess, key)
             if conf is None:
                 _add_conf(sess, key, object_)

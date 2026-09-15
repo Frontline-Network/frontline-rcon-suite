@@ -331,9 +331,7 @@ def test_unknown_live_roles_do_not_abort_automod_cycle(team_view):
         )
     )
 
-    punitions = mod.punitions_to_apply(
-        team_view, "able", "allies", able, game_state
-    )
+    punitions = mod.punitions_to_apply(team_view, "able", "allies", able, game_state)
 
     assert punitions == PunitionsToApply()
 
@@ -356,9 +354,7 @@ def test_vietnam_squadleader_uses_officer_role_rules(team_view):
         )
     )
 
-    punitions = mod.punitions_to_apply(
-        team_view, "able", "allies", able, game_state
-    )
+    punitions = mod.punitions_to_apply(team_view, "able", "allies", able, game_state)
 
     assert ["WilliePeter"] == [player.name for player in punitions.warning]
 
@@ -597,6 +593,95 @@ def position_cap_fight_mod(team_view):
     )
 
 
+@pytest.mark.parametrize("squad_name", [None, "", "unassigned", " Unassigned "])
+@pytest.mark.parametrize("team", ["allies", "axis"])
+@pytest.mark.parametrize("signal", ["position", "offense", "role"])
+def test_no_seeding_actions_before_joining_squad(team_view, squad_name, team, signal):
+    squad = team_view[team]["squads"]["able"]
+    squad["players"] = [squad["players"][0]]
+    player = squad["players"][0]
+    player["unit_name"] = squad_name
+    mod = position_cap_fight_mod(team_view)
+    if signal == "role":
+        mod.config.disallowed_roles = DisallowedRoles(
+            roles={Roles.tank_commander: "Tanks"}, max_players=100
+        )
+        player["role"] = "tankcommander"
+    snapshot = {**game_state, "allied_score": 3, "axis_score": 3}
+    # Unassigned HLL1 players were reported at the OTHER team's Carentan HQ.
+    # A changing join sample or delayed offense counter is not a violation.
+    x = 97_986 if team == "allies" else -96_470
+    for offset in (0, 10, 20):
+        if signal == "position":
+            player["world_position"] = {"x": x + offset, "y": 0, "z": 450}
+        player["offense"] += 10
+        result = mod.punitions_to_apply(team_view, squad_name, team, squad, snapshot)
+        assert not result.warning and not result.punish and not result.kick
+    assert not state  # No warning/escalation history from the join screen.
+
+
+@pytest.mark.parametrize("team", ["allies", "axis"])
+@pytest.mark.parametrize(
+    "current_map", [None, {}, {"map": {}}, game_state["current_map"]]
+)
+def test_unspawned_player_never_uses_offense_fallback(team_view, team, current_map):
+    squad = team_view[team]["squads"]["able"]
+    squad["players"] = [squad["players"][0]]
+    player = squad["players"][0]
+    player["world_position"] = {"x": 0, "y": 0, "z": 0}
+    mod = position_cap_fight_mod(team_view)
+    snapshot = {
+        **game_state,
+        "allied_score": 3,
+        "axis_score": 3,
+        "current_map": current_map,
+    }
+    for _ in range(3):
+        player["offense"] += 10
+        result = mod.punitions_to_apply(team_view, "able", team, squad, snapshot)
+        assert not result.warning and not result.punish and not result.kick
+
+
+@pytest.mark.parametrize("team", ["allies", "axis"])
+def test_carentan_join_hq_and_boundary_are_distinct(team_view, team):
+    squad = team_view[team]["squads"]["able"]
+    squad["players"] = [squad["players"][0]]
+    player = squad["players"][0]
+    mod = position_cap_fight_mod(team_view)
+    sign = 1 if team == "allies" else -1
+    snapshot = {**game_state, "allied_score": 3, "axis_score": 3}
+    player["unit_name"] = "unassigned"
+    # Rounded real HLL1 join-screen positions, 2026-09-15, Carentan Night.
+    for x in ((97_980, 97_987) if team == "allies" else (-96_460, -96_470)):
+        player["world_position"] = {"x": x, "y": 0, "z": 450}
+        assert not mod.punitions_to_apply(
+            team_view, "unassigned", team, squad, snapshot
+        )
+    player["unit_name"] = "able"
+    # First sample after joining can still be a bogus HQ. Wait for movement.
+    assert not mod.punitions_to_apply(team_view, "able", team, squad, snapshot)
+    for x in (-sign * 96_000, -sign * 50_000, 0):
+        player["world_position"]["x"] = x
+        assert not mod.punitions_to_apply(team_view, "able", team, squad, snapshot)
+    player["world_position"]["x"] = sign * 20_161
+    result = mod.punitions_to_apply(team_view, "able", team, squad, snapshot)
+    assert [p.player_id for p in result.warning] == [player["player_id"]]
+    assert not result.punish and not result.kick
+
+
+@pytest.mark.parametrize("map_id,sign", [("carentan", 1), ("WDEV_A", -1)])
+def test_commander_without_regular_squad_is_still_checked(team_view, map_id, sign):
+    player = team_view["allies"]["commander"]
+    squad = {"players": [player]}
+    mod = position_cap_fight_mod(team_view)
+    snapshot = {**game_state, "current_map": {"map": {"id": map_id}}}
+    player["world_position"] = {"x": 0, "y": 0, "z": 0}
+    assert not mod.punitions_to_apply(team_view, "Commander", "allies", squad, snapshot)
+    player["world_position"] = {"x": sign * 30_000, "y": 0, "z": 100}
+    result = mod.punitions_to_apply(team_view, "Commander", "allies", squad, snapshot)
+    assert [p.player_id for p in result.warning] == [player["player_id"]]
+
+
 def test_position_detection_warns_before_offense_score_changes(team_view):
     squad = team_view["allies"]["squads"]["able"]
     squad["players"] = [squad["players"][0]]
@@ -609,11 +694,44 @@ def test_position_detection_warns_before_offense_score_changes(team_view):
     )
 
     player["world_position"] = {"x": 20_160, "y": 0, "z": 1}
-    punitions = mod.punitions_to_apply(
-        team_view, "able", "allies", squad, game_state
-    )
+    punitions = mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
 
     assert [expected_warned_players[0]] == punitions.warning
+
+
+@pytest.mark.parametrize(
+    "map_id", ["stmariedumont", "purpleheartlane", "kursk", "kharkov", "elsenbornridge"]
+)
+@pytest.mark.parametrize("team", ["allies", "axis"])
+@pytest.mark.parametrize("score", [2, 3])
+def test_corrected_map_allows_own_spawn_and_still_punishes_enemy_excursion(
+    team_view, map_id, team, score
+):
+    squad = team_view[team]["squads"]["able"]
+    squad["players"] = [squad["players"][0]]
+    player = squad["players"][0]
+    mod = position_cap_fight_mod(team_view)
+    mod.config.kick_after_max_punish = False
+    mod.config.number_of_warnings = 0
+    # Stale offense counters must not override a valid own-side position.
+    snapshot = {
+        **game_state,
+        "allied_score": score,
+        "axis_score": 5 - score,
+        "current_map": {"map": {"id": map_id}},
+    }
+    sign = 1 if team == "allies" else -1
+    for y in (0, -sign * 96_000, -sign * 90_000, -sign * 50_000, 0):
+        player["world_position"] = {"x": 0, "y": y, "z": 0 if y == 0 else 100}
+        player["offense"] += 10
+        result = mod.punitions_to_apply(team_view, "able", team, squad, snapshot)
+        assert not result.warning and not result.punish and not result.kick
+    player["world_position"] = {"x": 0, "y": sign * 25_000, "z": 100}
+    result = mod.punitions_to_apply(team_view, "able", team, squad, snapshot)
+    assert [p.player_id for p in result.punish] == [player["player_id"]]
+    assert not result.warning and not result.kick
+    player["world_position"]["y"] = -sign * 90_000
+    assert not mod.punitions_to_apply(team_view, "able", team, squad, snapshot)
 
 
 @pytest.mark.parametrize("team", ["allies", "axis"])
@@ -689,8 +807,12 @@ def test_offense_fallback_keeps_score_guard_for_both_teams(
 
 
 @pytest.mark.parametrize("guard", ["disabled", "min_players", "max_players", "mode"])
-@pytest.mark.parametrize("map_id,outside_x", [("carentan", -20_161), ("WDEV_A", 19_840)])
-def test_position_detection_still_respects_seeding_guards(team_view, guard, map_id, outside_x):
+@pytest.mark.parametrize(
+    "map_id,outside_x", [("carentan", -20_161), ("WDEV_A", 19_840)]
+)
+def test_position_detection_still_respects_seeding_guards(
+    team_view, guard, map_id, outside_x
+):
     squad = team_view["axis"]["squads"]["able"]
     player = squad["players"][0]
     player["world_position"] = {"x": 0, "y": 0, "z": 0}
@@ -743,9 +865,7 @@ def test_position_detection_filters_random_initial_hq_sample(team_view):
     )
 
     player["world_position"] = {"x": 50_001, "y": 0, "z": 1}
-    punitions = mod.punitions_to_apply(
-        team_view, "able", "allies", squad, game_state
-    )
+    punitions = mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
 
     assert [expected_warned_players[0]] == punitions.warning
 
@@ -762,9 +882,7 @@ def test_position_detection_checks_first_spawn_after_zero_sample(team_view):
     )
 
     player["world_position"] = {"x": 20_160, "y": 0, "z": 1}
-    punitions = mod.punitions_to_apply(
-        team_view, "able", "allies", squad, game_state
-    )
+    punitions = mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
 
     assert [expected_warned_players[0]] == punitions.warning
 
@@ -820,9 +938,7 @@ def test_position_progress_resets_after_returning_inside(team_view):
     mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
 
     player["world_position"] = {"x": 20_160, "y": 0, "z": 1}
-    first = mod.punitions_to_apply(
-        team_view, "able", "allies", squad, game_state
-    )
+    first = mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
     assert [player["player_id"]] == [target.player_id for target in first.punish]
 
     player["world_position"] = {"x": 100, "y": 0, "z": 1}
@@ -835,9 +951,7 @@ def test_position_progress_resets_after_returning_inside(team_view):
     assert player["player_id"] not in watch_status.combat_area_outside_player_ids
 
     player["world_position"] = {"x": 20_160, "y": 0, "z": 1}
-    second = mod.punitions_to_apply(
-        team_view, "able", "allies", squad, game_state
-    )
+    second = mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
     assert [player["player_id"]] == [target.player_id for target in second.punish]
 
 
@@ -850,22 +964,16 @@ def test_position_repeats_punishment_when_kick_is_disabled(team_view):
     mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
 
     player["world_position"] = {"x": 20_160, "y": 0, "z": 1}
-    first = mod.punitions_to_apply(
-        team_view, "able", "allies", squad, game_state
-    )
+    first = mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
     assert [player["player_id"]] == [target.player_id for target in first.punish]
 
     watch_status = state["alliesable"]
     watch_status.punished[player["name"]][-1] -= timedelta(seconds=61)
-    second = mod.punitions_to_apply(
-        team_view, "able", "allies", squad, game_state
-    )
+    second = mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
     assert [player["player_id"]] == [target.player_id for target in second.punish]
 
     watch_status.punished[player["name"]][-1] -= timedelta(seconds=61)
-    repeated = mod.punitions_to_apply(
-        team_view, "able", "allies", squad, game_state
-    )
+    repeated = mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
     assert [player["player_id"]] == [target.player_id for target in repeated.punish]
     assert len(watch_status.punished[player["name"]]) == 2
 

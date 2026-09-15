@@ -23,7 +23,8 @@ def _enabled(name: str, fallback: str | None = None) -> bool:
 def incident_capture_enabled() -> bool:
     """Capture incidents whenever any incident consumer is enabled."""
 
-    return any(
+    from rcon.user_config.leadership_vote import LeadershipVoteUserConfig
+    return LeadershipVoteUserConfig.load_from_db().enabled or any(
         (
             _enabled("INCIDENT_CAPTURE_ENABLED", "MOBILE_INTEGRATION_ENABLED"),
             _enabled("DISCORD_REPORTS_ENABLED"),
