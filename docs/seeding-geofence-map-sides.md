@@ -1,8 +1,10 @@
 # Seeding: Kartenseiten und Beitrittszustand
 
 Stand: 15. September 2026. Codefix auf `codex/seeding-map-sides`, Basis `v0.8.4`.
-Die Untersuchung auf HLL1 war lesend. Keine Ausrollung, Reaktivierung oder
-Änderung der Produktionskonfiguration ist Bestandteil dieses Fixes.
+Die ursprüngliche Untersuchung auf HLL1 war lesend. Nach gesonderter Freigabe
+wurde der Fix am selben Tag als gezielter Hotfix ausgerollt; siehe
+[Ausrollungsprotokoll](releases/hll1-seeding-hotfix-20260915.md).
+Die Seeding-Aktivierung und sämtliche Benutzereinstellungen blieben unverändert.
 
 ## Ursachen und Korrekturen
 
