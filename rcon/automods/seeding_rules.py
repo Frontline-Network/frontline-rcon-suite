@@ -328,11 +328,11 @@ class SeedingRulesAutomod:
             return None
 
         current_map = game_state.get("current_map")
-        if not isinstance(current_map, dict):
-            return None
-        map_data = current_map.get("map")
+        map_data = current_map.get("map") if isinstance(current_map, dict) else None
         if not isinstance(map_data, dict) or not map_data.get("id"):
-            return None
+            # A known spawn-screen position is not a fallback candidate, even
+            # while map metadata is unavailable (e.g. during a round change).
+            return None if is_spawned(position) else False
         map_id = str(map_data["id"])
 
         tracked_map_id = getattr(watch_status, "world_position_map_id", None)
@@ -432,10 +432,11 @@ class SeedingRulesAutomod:
             self.logger.debug("Server below min player count : disabling")
             return punitions_to_apply
 
-        if not squad_name:
-            self.logger.debug(
-                "Skipping None or empty squad - (%s) %s", team, squad_name
-            )
+        if not squad_name or squad_name.strip().lower() in ("", "unassigned"):
+            # HLL can report an arbitrary (even enemy) HQ before squad/spawn
+            # selection. Neither that coordinate nor delayed offense points
+            # establish a violation. Commander is a separate, valid group.
+            self.logger.debug("Skipping unassigned players - (%s) %s", team, squad_name)
             return punitions_to_apply
 
         with self.watch_state(team, squad_name) as watch_status:
@@ -511,17 +512,13 @@ class SeedingRulesAutomod:
                 )
                 combat_area_violation = False
                 position_violation = (
-                    self._position_cap_violation(
-                        watch_status, player, team, game_state
-                    )
+                    self._position_cap_violation(watch_status, player, team, game_state)
                     if cap_rule_active
                     else None
                 )
                 team_reached_cap_limit = (
                     team == "axis" and game_state["axis_score"] >= ecf.max_caps
-                ) or (
-                    team == "allies" and game_state["allied_score"] >= ecf.max_caps
-                )
+                ) or (team == "allies" and game_state["allied_score"] >= ecf.max_caps)
 
                 # A known position enforces the same boundary for both teams,
                 # including the team that does not currently hold the middle.
