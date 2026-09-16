@@ -18,7 +18,7 @@ import emojiData from "@emoji-mart/data/sets/15/twitter.json";
 import Emoji from "@/components/shared/Emoji";
 import { CountryFlag } from "@/components/shared/CountryFlag";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import LocalizationProvider from "@/components/shared/LocalizedDateProvider";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";

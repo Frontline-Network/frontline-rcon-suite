@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Button,
   Dialog,
@@ -19,6 +20,7 @@ export default function ArchiveDialog({
   mutation,
   t,
 }) {
+  const { i18n } = useTranslation();
   const [retentionDays, setRetentionDays] = useState(30);
   const [reason, setReason] = useState("");
   useEffect(() => {
@@ -57,7 +59,7 @@ export default function ArchiveDialog({
       <DialogContent>
         <Stack gap={2} sx={{ pt: 1 }}>
           <Typography variant="body2">
-            {round ? new Date(round.start * 1000).toLocaleString() : "–"} ·{" "}
+            {round ? new Date(round.start * 1000).toLocaleString(i18n.resolvedLanguage) : "–"} ·{" "}
             {t("fullRound")}
           </Typography>
           <TextField

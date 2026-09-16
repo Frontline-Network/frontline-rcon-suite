@@ -156,6 +156,7 @@ function DurationSlider({
   disabled,
   onChange,
 }) {
+  const { t } = useTranslation();
   const sliderMax = Math.max(max, Math.ceil((Number(value) || 0) / 15) * 15);
   return (
     <Stack spacing={1.25}>
@@ -184,7 +185,9 @@ function DurationSlider({
           step={5}
           disabled={disabled}
           valueLabelDisplay="auto"
-          valueLabelFormat={(next) => `${next} Min.`}
+          valueLabelFormat={(next) =>
+            t("settingsPanels.game.minutes", { count: next })
+          }
           onChange={(_, next) => onChange(next)}
           aria-label={title}
           sx={{
@@ -200,7 +203,7 @@ function DurationSlider({
           fontWeight={850}
           sx={{ minWidth: 82, textAlign: "right", color: "primary.main" }}
         >
-          {value} Min.
+          {t("settingsPanels.game.minutes", { count: value })}
         </Typography>
       </Stack>
     </Stack>
@@ -1069,3 +1072,4 @@ export default function SeedVipConfigForm({
     </Stack>
   );
 }
+import "@/i18n/register-settings-panels";

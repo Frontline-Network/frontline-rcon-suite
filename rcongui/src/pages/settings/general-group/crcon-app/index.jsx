@@ -35,7 +35,7 @@ function CrconAppSettings({
   showUtilities = true,
   frontlinePresentation = false,
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [password, setPassword] = useState("");
   const [desktopPassword, setDesktopPassword] = useState("");
   const [desktopCode, setDesktopCode] = useState("");
@@ -193,9 +193,9 @@ function CrconAppSettings({
     bgcolor: "background.default",
   };
   const sections = [
-    { key: "pairing", label: "Geräte koppeln" },
-    { key: "devices", label: "Meine Geräte" },
-    { key: "utilities", label: "CRCON-Werkzeuge" },
+    { key: "pairing", label: t("settingsPanels.mobile.pairing") },
+    { key: "devices", label: t("settingsPanels.mobile.devices") },
+    { key: "utilities", label: t("settingsPanels.mobile.utilities") },
   ];
   const selectSection = (key) => {
     setActiveSection(key);
@@ -480,7 +480,7 @@ function CrconAppSettings({
                                       "settings.mobile.lastSeen"
                                     )} ${new Date(
                                       device.last_seen_at
-                                    ).toLocaleString()}`
+                                    ).toLocaleString(i18n.resolvedLanguage)}`
                                   : t("settings.mobile.neverUsed")
                               }${
                                 device.revoked_at
@@ -581,3 +581,4 @@ function CrconAppSettings({
 }
 
 export default CrconAppSettings;
+import "@/i18n/register-settings-panels";

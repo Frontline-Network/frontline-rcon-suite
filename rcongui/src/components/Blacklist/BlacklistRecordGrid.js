@@ -118,7 +118,6 @@ const formatDateTime = (date, language) =>
 
 const getRecordView = (record, t, language) => {
   const momentLocale = language?.toLowerCase().startsWith("de") ? "de" : "en";
-  moment.locale(momentLocale);
   const player = record.get("player");
   const names = player.get("names", List());
   const name = names.getIn([0, "name"], t("common.unknown"));

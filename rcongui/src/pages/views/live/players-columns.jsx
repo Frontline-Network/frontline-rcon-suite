@@ -33,7 +33,7 @@ import {
 } from "@/constants/platforms";
 import { getTeamkillRisk } from "@/utils/teamkill-risk.mjs";
 import { getFactionIconSrc } from "@/utils/factionIcons";
-import { formatSquadLabel } from "./player-display-labels";
+import { formatRoleLabel, formatSquadLabel } from "./player-display-labels";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 
 export const Square = styled(Box)(({ theme }) => ({
@@ -441,8 +441,8 @@ export const getColumns = (t, factionByTeam = {}) => [
               src={themedImg.getRoleIconSrc(row.original.role)}
               width={16}
               height={16}
-              alt={row.original.role}
-              title={row.original.role}
+              alt={formatRoleLabel(t, row.original.role)}
+              title={formatRoleLabel(t, row.original.role)}
             />
           </Square>
         </Center>

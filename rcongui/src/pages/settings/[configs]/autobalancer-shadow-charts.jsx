@@ -1,3 +1,6 @@
+import i18n from "@/i18n";
+import { translateOperatorMessage } from "@/i18n/operator-messages";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   Box,
@@ -13,16 +16,16 @@ import { ChartsReferenceLine } from "@mui/x-charts/ChartsReferenceLine";
 import { LineChart } from "@mui/x-charts/LineChart";
 import TeamBalanceBar from "@/components/shared/TeamBalanceBar";
 
-const PHASE_LABELS = {
-  idle: "Kein Eingriff nötig",
-  observing: "Ungleichgewicht wird beobachtet",
-  volunteer: "Freiwillige werden gesucht",
-  proposed: "Shadow-Vorschlag erstellt",
-  armed: "Kandidat vorgemerkt",
-  verifying: "Wechsel wird bestätigt",
-  cooldown: "Neue Stabilitätsprüfung läuft",
-  blocked: "Sicherheitsbedingung blockiert",
-};
+const PHASE_LABELS = () => ({
+  idle: i18n.t("settingsPanels.autobalancer.idle"),
+  observing: i18n.t("settingsPanels.autobalancer.observing"),
+  volunteer: i18n.t("settingsPanels.autobalancer.volunteer"),
+  proposed: i18n.t("settingsPanels.autobalancer.shadowProposed"),
+  armed: i18n.t("settingsPanels.autobalancer.candidateQueued"),
+  verifying: i18n.t("settingsPanels.autobalancer.verifying"),
+  cooldown: i18n.t("settingsPanels.autobalancer.newStabilityCheck"),
+  blocked: i18n.t("settingsPanels.autobalancer.blocked"),
+});
 
 const UNRELIABLE_REASONS = [
   "Spielerdaten sind unvollständig",
@@ -31,21 +34,21 @@ const UNRELIABLE_REASONS = [
   "Autobalancer-Dienst liefert keinen aktuellen Status",
 ];
 
-const REJECTION_LABELS = {
-  squad_should_stay: "Squad zusammenhalten",
-  critical_role: "Kritische Rolle",
-  recent_join_or_move: "Join-/Squadzeit",
-  better_candidate: "Besserer Kandidat",
-  skill_balance: "Stärkeausgleich",
-  wrong_team_counts: "Teamzählung",
-  other: "Anderer Grund",
-};
+const REJECTION_LABELS = () => ({
+  squad_should_stay: i18n.t("settingsPanels.autobalancer.keepSquad"),
+  critical_role: i18n.t("settingsPanels.autobalancer.criticalRole"),
+  recent_join_or_move: i18n.t("settingsPanels.autobalancer.joinSquadTime"),
+  better_candidate: i18n.t("settingsPanels.autobalancer.betterCandidate"),
+  skill_balance: i18n.t("settingsPanels.autobalancer.skillBalance"),
+  wrong_team_counts: i18n.t("settingsPanels.autobalancer.teamCounting"),
+  other: i18n.t("settingsPanels.autobalancer.otherReason"),
+});
 
-const STRATEGY_LABELS = {
-  "squad-first": "Squad zuerst",
-  "balanced-v2": "Ausgewogen V2",
-  "skill-first": "Stärke zuerst (Diagnose)",
-};
+const STRATEGY_LABELS = () => ({
+  "squad-first": i18n.t("settingsPanels.autobalancer.squadFirst"),
+  "balanced-v2": i18n.t("settingsPanels.autobalancer.balancedV2"),
+  "skill-first": i18n.t("settingsPanels.autobalancer.skillFirstDiagnostic"),
+});
 
 const ChartShell = ({ title, subtitle, children }) => (
   <Card variant="outlined" sx={{ minWidth: 0 }}>
@@ -88,21 +91,21 @@ const LiveBalance = ({ status, targetDifference, minimumPlayers }) => {
   const state = unreliable
     ? {
         label: stale
-          ? "KEINE AKTUELLEN LIVE-DATEN"
-          : "NICHT VERLÄSSLICH MESSBAR",
+          ? i18n.t("settingsPanels.autobalancer.noCurrentLiveData")
+          : i18n.t("settingsPanels.autobalancer.notReliable"),
         color: "warning",
         border: theme.palette.warning.main,
         background: theme.palette.warning.main + "12",
       }
     : balanced
     ? {
-        label: "AUSGEGLICHEN",
+        label: i18n.t("settingsPanels.autobalancer.balanced"),
         color: "success",
         border: theme.palette.success.main,
         background: theme.palette.success.main + "12",
       }
     : {
-        label: "UNAUSGEGLICHEN",
+        label: i18n.t("settingsPanels.autobalancer.unbalanced"),
         color: "error",
         border: theme.palette.error.main,
         background: theme.palette.error.main + "12",
@@ -135,33 +138,38 @@ const LiveBalance = ({ status, targetDifference, minimumPlayers }) => {
             <Chip
               size="small"
               variant="outlined"
-              label="LIVE · alle 5 Sekunden"
+              label={i18n.t("settingsPanels.autobalancer.liveEveryFive")}
             />
             {updatedAt && !Number.isNaN(updatedAt.getTime()) && (
               <Typography variant="caption" color="text.secondary">
-                Stand {updatedAt.toLocaleTimeString("de-DE")}
+                {i18n.t("settingsPanels.autobalancer.updated")}{" "}
+                {updatedAt.toLocaleTimeString(i18n.resolvedLanguage)}
               </Typography>
             )}
           </Stack>
           {unreliable && (
             <Typography variant="body1" sx={{ mt: 1 }}>
-              Der Snapshot ist unvollständig. Aus diesen Zahlen wird keine
-              Balanceentscheidung abgeleitet.
+              {i18n.t("settingsPanels.autobalancer.incompleteSnapshotHelp")}
             </Typography>
           )}
         </Box>
         <Stack alignItems={{ md: "flex-end" }} spacing={0.5}>
           <Typography variant="h5" sx={{ fontWeight: 700 }}>
             {unreliable
-              ? "Keine Entscheidung"
-              : `${status?.required_switches ?? 0} Wechsel nötig`}
+              ? i18n.t("settingsPanels.autobalancer.noDecision")
+              : i18n.t("settingsPanels.autobalancer.switchesNeeded", {
+                  v0: status?.required_switches ?? 0,
+                })}
           </Typography>
           <Typography color="text.secondary">
-            {PHASE_LABELS[status?.phase] || status?.phase || "Kein Live-Status"}
+            {PHASE_LABELS()[status?.phase] ||
+              status?.phase ||
+              i18n.t("settingsPanels.autobalancer.noLiveStatus")}
           </Typography>
           {inactive && (
             <Typography variant="caption" color="text.secondary">
-              Unter {minimumPlayers} Spielern bleibt der Balancer inaktiv.
+              {i18n.t("settingsPanels.autobalancer.below")} {minimumPlayers}{" "}
+              {i18n.t("settingsPanels.autobalancer.inactivePlayersSuffix")}
             </Typography>
           )}
         </Stack>
@@ -180,35 +188,40 @@ const LiveBalance = ({ status, targetDifference, minimumPlayers }) => {
           <Chip
             size="small"
             variant="outlined"
-            label={`Teamrating ${teamLabels.allies} ${
-              status.team_ratings.allies ?? "–"
-            } · ${teamLabels.axis} ${status.team_ratings.axis ?? "–"}`}
+            label={i18n.t("settingsPanels.autobalancer.teamRatingValue", {
+              v0: teamLabels.allies,
+              v1: status.team_ratings.allies ?? "–",
+              v2: teamLabels.axis,
+              v3: status.team_ratings.axis ?? "–",
+            })}
           />
           <Chip
             size="small"
             variant="outlined"
-            label={`Datenvertrauen ${Math.round(
-              (status.data_confidence || 0) * 100
-            )} %`}
+            label={i18n.t("settingsPanels.autobalancer.dataConfidenceValue", {
+              v0: Math.round((status.data_confidence || 0) * 100),
+            })}
           />
           <Chip
             size="small"
             variant="outlined"
-            label={`Strategie ${
-              STRATEGY_LABELS[status.strategy] || status.strategy || "–"
-            }`}
+            label={i18n.t("settingsPanels.autobalancer.strategyValue", {
+              v0: STRATEGY_LABELS()[status.strategy] || status.strategy || "–",
+            })}
           />
           <Chip
             size="small"
             variant="outlined"
-            label={`Ratingmodell ${status.rating_model_version || "legacy"}`}
+            label={i18n.t("settingsPanels.autobalancer.ratingModelValue", {
+              v0: status.rating_model_version || "legacy",
+            })}
           />
         </Stack>
       )}
 
       {(status?.warnings || []).map((warning) => (
         <Alert key={warning} severity="warning" sx={{ mt: 1 }}>
-          {warning}
+          {translateOperatorMessage(warning, i18n.t)}
         </Alert>
       ))}
 
@@ -218,13 +231,18 @@ const LiveBalance = ({ status, targetDifference, minimumPlayers }) => {
             <Chip
               size="small"
               color="warning"
-              label="Der letzte Messwert ist älter als 20 Sekunden"
+              label={i18n.t("settingsPanels.autobalancer.staleMeasurement")}
             />
           )}
           {reasons
             .filter((reason) => UNRELIABLE_REASONS.includes(reason))
             .map((reason) => (
-              <Chip key={reason} size="small" color="warning" label={reason} />
+              <Chip
+                key={reason}
+                size="small"
+                color="warning"
+                label={translateOperatorMessage(reason, i18n.t)}
+              />
             ))}
         </Stack>
       )}
@@ -248,8 +266,9 @@ const DifferenceTimeline = ({ timeline, targetDifference, teamLabels }) => {
   if (points.length < 8) {
     return (
       <Alert severity="info">
-        Zeitverlauf sammelt Daten: {points.length}/8 Messpunkte. Alle 30
-        Sekunden kommt ein Punkt hinzu; danach erscheint der Graph.
+        {i18n.t("settingsPanels.autobalancer.collectingTimeline")}{" "}
+        {points.length}
+        {i18n.t("settingsPanels.autobalancer.timelineProgress")}
       </Alert>
     );
   }
@@ -267,7 +286,7 @@ const DifferenceTimeline = ({ timeline, targetDifference, teamLabels }) => {
           data: points.map((point) => point.time),
           scaleType: "time",
           valueFormatter: (value) =>
-            new Intl.DateTimeFormat("de-DE", {
+            new Intl.DateTimeFormat(i18n.resolvedLanguage, {
               hour: "2-digit",
               minute: "2-digit",
             }).format(value),
@@ -283,7 +302,7 @@ const DifferenceTimeline = ({ timeline, targetDifference, teamLabels }) => {
       ]}
       series={[
         {
-          label: "Teamdifferenz",
+          label: i18n.t("settingsPanels.autobalancer.teamDifference"),
           data: points.map((point) => point.difference),
           color: theme.palette.info.main,
           showMark: points.length < 40,
@@ -293,14 +312,16 @@ const DifferenceTimeline = ({ timeline, targetDifference, teamLabels }) => {
               ? `${teamLabels.allies} +${value}`
               : value < 0
               ? `${teamLabels.axis} +${Math.abs(value)}`
-              : "Gleichstand",
+              : i18n.t("settingsPanels.autobalancer.tie"),
         },
       ]}
       grid={{ horizontal: true }}
     >
       <ChartsReferenceLine
         y={targetDifference}
-        label={`Grenze +${targetDifference}`}
+        label={i18n.t("settingsPanels.autobalancer.positiveLimit", {
+          v0: targetDifference,
+        })}
         lineStyle={{
           stroke: theme.palette.warning.main,
           strokeDasharray: "6 4",
@@ -308,7 +329,9 @@ const DifferenceTimeline = ({ timeline, targetDifference, teamLabels }) => {
       />
       <ChartsReferenceLine
         y={-targetDifference}
-        label={`Grenze -${targetDifference}`}
+        label={i18n.t("settingsPanels.autobalancer.negativeLimit", {
+          v0: targetDifference,
+        })}
         lineStyle={{
           stroke: theme.palette.warning.main,
           strokeDasharray: "6 4",
@@ -326,9 +349,18 @@ const DistributionCharts = ({ summary }) => {
   const theme = useTheme();
   const tiers = Object.entries(summary?.protection_tiers || {});
   const reviews = [
-    { label: "Akzeptabel", value: summary?.accepted || 0 },
-    { label: "Abgelehnt", value: summary?.rejected || 0 },
-    { label: "Offen", value: summary?.pending_review || 0 },
+    {
+      label: i18n.t("settingsPanels.autobalancer.acceptable"),
+      value: summary?.accepted || 0,
+    },
+    {
+      label: i18n.t("settingsPanels.autobalancer.rejected"),
+      value: summary?.rejected || 0,
+    },
+    {
+      label: i18n.t("settingsPanels.autobalancer.open"),
+      value: summary?.pending_review || 0,
+    },
   ];
   const rejectionReasons = Object.entries(summary?.rejection_categories || {});
 
@@ -342,8 +374,8 @@ const DistributionCharts = ({ summary }) => {
       }}
     >
       <ChartShell
-        title="Ausgewählte Schutzstufen"
-        subtitle="Anzahl Shadow-Vorschläge je Stufe; 0 ist der geringste Eingriff, 5 der stärkste Schutz."
+        title={i18n.t("settingsPanels.autobalancer.selectedTiers")}
+        subtitle={i18n.t("settingsPanels.autobalancer.selectedTiersHelp")}
       >
         {tiers.length ? (
           <BarChart
@@ -351,28 +383,35 @@ const DistributionCharts = ({ summary }) => {
             xAxis={[
               {
                 scaleType: "band",
-                data: tiers.map(([tier]) => `Stufe ${tier}`),
+                data: tiers.map(([tier]) =>
+                  i18n.t("settingsPanels.autobalancer.tierValue", { v0: tier })
+                ),
               },
             ]}
             yAxis={[{ min: 0, tickMinStep: 1 }]}
             series={[
               {
                 data: tiers.map(([, count]) => count),
-                label: "Vorschläge",
+                label: i18n.t("settingsPanels.autobalancer.proposals"),
                 color: theme.palette.info.main,
-                valueFormatter: (value) => `${value} Vorschläge`,
+                valueFormatter: (value) =>
+                  i18n.t("settingsPanels.autobalancer.proposalCount", {
+                    v0: value,
+                  }),
               },
             ]}
             grid={{ horizontal: true }}
           />
         ) : (
-          <Alert severity="info">Noch keine Shadow-Vorschläge vorhanden.</Alert>
+          <Alert severity="info">
+            {i18n.t("settingsPanels.autobalancer.noShadowProposals")}
+          </Alert>
         )}
       </ChartShell>
 
       <ChartShell
-        title="Bewertungen"
-        subtitle="Wie viele Kandidaten wurden akzeptiert, abgelehnt oder noch nicht geprüft?"
+        title={i18n.t("settingsPanels.autobalancer.reviews")}
+        subtitle={i18n.t("settingsPanels.autobalancer.reviewsHelp")}
       >
         {summary?.proposals ? (
           <BarChart
@@ -384,23 +423,30 @@ const DistributionCharts = ({ summary }) => {
             series={[
               {
                 data: reviews.map((item) => item.value),
-                label: "Vorschläge",
+                label: i18n.t("settingsPanels.autobalancer.proposals"),
                 color: theme.palette.success.main,
-                valueFormatter: (value) => `${value} Vorschläge`,
+                valueFormatter: (value) =>
+                  i18n.t("settingsPanels.autobalancer.proposalCount", {
+                    v0: value,
+                  }),
               },
             ]}
             grid={{ horizontal: true }}
           />
         ) : (
-          <Alert severity="info">Noch keine Bewertungen vorhanden.</Alert>
+          <Alert severity="info">
+            {i18n.t("settingsPanels.autobalancer.noReviews")}
+          </Alert>
         )}
       </ChartShell>
 
       {rejectionReasons.length > 0 && (
         <Box sx={{ gridColumn: { lg: "1 / -1" } }}>
           <ChartShell
-            title="Ablehnungsgründe"
-            subtitle="Häufigkeit des wichtigsten von einem Admin gewählten Grundes."
+            title={i18n.t("settingsPanels.autobalancer.rejectionReasons")}
+            subtitle={i18n.t(
+              "settingsPanels.autobalancer.rejectionReasonsHelp"
+            )}
           >
             <BarChart
               layout="horizontal"
@@ -409,7 +455,7 @@ const DistributionCharts = ({ summary }) => {
                 {
                   scaleType: "band",
                   data: rejectionReasons.map(
-                    ([reason]) => REJECTION_LABELS[reason] || reason
+                    ([reason]) => REJECTION_LABELS()[reason] || reason
                   ),
                 },
               ]}
@@ -417,9 +463,12 @@ const DistributionCharts = ({ summary }) => {
               series={[
                 {
                   data: rejectionReasons.map(([, count]) => count),
-                  label: "Ablehnungen",
+                  label: i18n.t("settingsPanels.autobalancer.rejections"),
                   color: theme.palette.warning.main,
-                  valueFormatter: (value) => `${value} Ablehnungen`,
+                  valueFormatter: (value) =>
+                    i18n.t("settingsPanels.autobalancer.rejectionCount", {
+                      v0: value,
+                    }),
                 },
               ]}
               grid={{ vertical: true }}
@@ -432,6 +481,7 @@ const DistributionCharts = ({ summary }) => {
 };
 
 const AutobalancerShadowCharts = ({ status, timeline, summary, config }) => {
+  useTranslation();
   const targetDifference = config?.target_difference ?? 2;
   const teamLabels = status?.team_labels || {
     allies: "Allies",
@@ -446,8 +496,11 @@ const AutobalancerShadowCharts = ({ status, timeline, summary, config }) => {
       />
       <Box sx={{ mt: 2 }}>
         <ChartShell
-          title="Teamdifferenz im Zeitverlauf"
-          subtitle={`Letzte sechs Stunden, Messung alle 30 Sekunden. Positive Werte: ${teamLabels.allies} größer; negative Werte: ${teamLabels.axis} größer. Orange Linien markieren die erlaubte Differenz.`}
+          title={i18n.t("settingsPanels.autobalancer.differenceTimeline")}
+          subtitle={i18n.t(
+            "settingsPanels.autobalancer.differenceTimelineHelp",
+            { v0: teamLabels.allies, v1: teamLabels.axis }
+          )}
         >
           <DifferenceTimeline
             timeline={timeline}
@@ -462,3 +515,4 @@ const AutobalancerShadowCharts = ({ status, timeline, summary, config }) => {
 };
 
 export default AutobalancerShadowCharts;
+import "@/i18n/register-settings-panels";

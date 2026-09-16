@@ -23,7 +23,15 @@ import { getMaxValue, getMinValue, getStep } from "../utils";
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
-function TimerControl({ settingKey, value, disabled, onChange, onUseDefault }) {
+function TimerControl({
+  settingKey,
+  label,
+  value,
+  disabled,
+  onChange,
+  onUseDefault,
+}) {
+  const { t } = useTranslation();
   return (
     <Stack direction="row" spacing={1} alignItems="center">
       <Slider
@@ -33,7 +41,7 @@ function TimerControl({ settingKey, value, disabled, onChange, onUseDefault }) {
         step={getStep(settingKey)}
         disabled={disabled}
         onChange={(_, next) => onChange(next)}
-        aria-label={settingKey}
+        aria-label={label}
         size="small"
         sx={{ flex: 1, minWidth: 120 }}
       />
@@ -46,7 +54,7 @@ function TimerControl({ settingKey, value, disabled, onChange, onUseDefault }) {
           min: getMinValue(settingKey),
           max: getMaxValue(settingKey),
           step: getStep(settingKey),
-          "aria-label": settingKey,
+          "aria-label": label,
         }}
         onChange={(event) => {
           const next = Number(event.target.value);
@@ -62,13 +70,14 @@ function TimerControl({ settingKey, value, disabled, onChange, onUseDefault }) {
         onClick={onUseDefault}
         sx={{ borderRadius: 0, whiteSpace: "nowrap" }}
       >
-        Standard
+        {t("settingsPanels.game.default")}
       </Button>
     </Stack>
   );
 }
 
 function ToggleButtons({ value, onChange, disabled }) {
+  const { t } = useTranslation();
   return (
     <ButtonGroup
       size="small"
@@ -80,13 +89,13 @@ function ToggleButtons({ value, onChange, disabled }) {
         color={!value ? "inherit" : "primary"}
         onClick={() => onChange(false)}
       >
-        Inaktiv
+        {t("settingsPanels.camera.inactive")}
       </Button>
       <Button
         variant={value ? "contained" : "outlined"}
         onClick={() => onChange(true)}
       >
-        Aktiv
+        {t("settingsPanels.camera.active")}
       </Button>
     </ButtonGroup>
   );
@@ -213,9 +222,9 @@ export default function GameControlMatrix({ loaderData }) {
     setErrors(failed);
     setSaving(false);
     if (Object.keys(failed).length) {
-      toast.error("Einige Spielwerte konnten nicht gespeichert werden.");
+      toast.error(t("settingsPanels.game.saveFailed"));
     } else {
-      toast.success("Spiel- und Rundenwerte wurden gespeichert.");
+      toast.success(t("settingsPanels.game.saved"));
     }
   };
 
@@ -234,7 +243,7 @@ export default function GameControlMatrix({ loaderData }) {
             />
             <ControlRow
               title={t("maps.current")}
-              description="Wähle die Karte, für die dynamisches Wetter geändert werden soll."
+              description={t("settingsPanels.game.mapHelp")}
               value={
                 <MapAutocomplete
                   options={loaderData.maps}
@@ -245,7 +254,7 @@ export default function GameControlMatrix({ loaderData }) {
                   label={t("maps.current")}
                 />
               }
-              meta="Kartenspezifisch"
+              meta={t("settingsPanels.game.mapSpecific")}
               status={<RowStatus dirty={weatherDirty} error={errors.weather} />}
             />
             <ControlRow
@@ -260,7 +269,11 @@ export default function GameControlMatrix({ loaderData }) {
                   disabled={saving}
                 />
               }
-              meta={weatherDraft.enabled ? "Dynamisch" : "Statisch"}
+              meta={t(
+                weatherDraft.enabled
+                  ? "settingsPanels.game.dynamic"
+                  : "settingsPanels.game.static"
+              )}
               status={<RowStatus dirty={weatherDirty} error={errors.weather} />}
             />
           </>
@@ -270,8 +283,8 @@ export default function GameControlMatrix({ loaderData }) {
               title={sections.find((section) => section.key === active)?.label}
               description={
                 active === "match"
-                  ? "Lege die Dauer der jeweiligen Spielmodi fest."
-                  : "Lege die Vorbereitungszeit vor dem Rundenstart fest."
+                  ? t("settingsPanels.game.matchHelp")
+                  : t("settingsPanels.game.warmupHelp")
               }
             />
             {timerRows[active].map((row) => {
@@ -286,6 +299,7 @@ export default function GameControlMatrix({ loaderData }) {
                   value={
                     <TimerControl
                       settingKey={row.key}
+                      label={row.title}
                       value={draft[row.key]}
                       disabled={saving}
                       onChange={(value) => updateTimer(row.key, value)}
@@ -299,8 +313,10 @@ export default function GameControlMatrix({ loaderData }) {
                   }
                   meta={
                     timerActions[row.key] === "remove"
-                      ? "Serverstandard wird verwendet"
-                      : `${draft[row.key]} Minuten`
+                      ? t("settingsPanels.game.serverDefault")
+                      : t("settingsPanels.game.minutes", {
+                          count: draft[row.key],
+                        })
                   }
                   status={<RowStatus dirty={dirty} error={errors[row.key]} />}
                 />
@@ -330,3 +346,4 @@ export default function GameControlMatrix({ loaderData }) {
     </>
   );
 }
+import "@/i18n/register-settings-panels";

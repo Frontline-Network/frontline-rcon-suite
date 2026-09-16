@@ -10,7 +10,7 @@ import {
 
 import { DesktopDateTimePicker } from '@mui/x-date-pickers/DesktopDateTimePicker';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import LocalizationProvider from '@/components/shared/LocalizedDateProvider';
 import { PlayerVipSummary } from "./PlayerVipSummary";
 import { ForwardCheckBox } from "../commonComponent";
 import { TimePickerButtons } from "@/components/shared/TimePickerButtons";

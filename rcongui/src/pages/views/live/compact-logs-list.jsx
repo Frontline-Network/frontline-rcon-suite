@@ -365,7 +365,8 @@ function LogMessageStack({
         </Typography>
         <Box sx={{ minWidth: 0, flex: 1 }}>
           <Typography variant="caption" color="primary.light">
-            <FontAwesomeIcon icon={faCircleExclamation} fixedWidth /> MESSAGE
+            <FontAwesomeIcon icon={faCircleExclamation} fixedWidth />{" "}
+            {t("actions.types.MESSAGE")}
           </Typography>
           <Typography
             variant="body2"

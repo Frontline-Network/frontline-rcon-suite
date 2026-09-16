@@ -1,6 +1,7 @@
 import { json } from "react-router-dom";
 import { toast } from "react-toastify";
 import { createHttpErrorToastBudget } from "./httpErrorToastBudget";
+import i18n from "@/i18n";
 
 // Vite does not define the legacy CRA environment variable in fake mode.
 // Keep legacy loader calls rooted at the local Mirage API instead of creating
@@ -28,7 +29,10 @@ const showBoundedHttpErrorToast = ({ signature, message, level = "error" }) => {
   if (result.kind === "repeat") {
     if (toast.isActive(toastId)) {
       toast.update(toastId, {
-        render: `${message} (wiederholt: ${result.count}×)`,
+        render: i18n.t("sharedOperations.http.repeatedError", {
+          message,
+          count: result.count,
+        }),
         type: toastType,
       });
     }
@@ -40,7 +44,9 @@ const showBoundedHttpErrorToast = ({ signature, message, level = "error" }) => {
     return;
   }
 
-  const summary = `Weitere technische Fehler werden gesammelt (${result.suppressed}). Öffne die Diagnoseansicht für Details.`;
+  const summary = i18n.t("sharedOperations.http.suppressedErrors", {
+    count: result.suppressed,
+  });
   if (toast.isActive(HTTP_ERROR_TOAST_SUMMARY_ID)) {
     toast.update(HTTP_ERROR_TOAST_SUMMARY_ID, {
       render: summary,
@@ -151,7 +157,7 @@ async function requestFactory({
   headers = { "Content-Type": "application/json" },
 } = {}) {
   if (sessionExpired && !isSessionRecoveryCommand(cmd)) {
-    throw new AuthError("Your session has expired. Please sign in again.", cmd);
+    throw new AuthError(i18n.t("sharedOperations.http.sessionExpired"), cmd);
   }
 
   // Construct the full URL using the URL API
@@ -191,7 +197,7 @@ async function requestFactory({
   } catch (error) {
     if (throwRouteError) {
       const message =
-        error?.message || error?.text || "The request could not be completed.";
+        error?.message || error?.text || i18n.t("sharedOperations.http.requestFailed");
       const status =
         Number.isInteger(error?.status) &&
         error.status >= 400 &&
@@ -226,7 +232,7 @@ async function handleFetchResponse(req, res, cmd) {
   // HTTP 200. Never let that HTML become a seemingly valid form value.
   if (isHTML) {
     throw new NotJSONResponseError(
-      `The API command "${cmd}" returned an HTML document instead of data.`
+      i18n.t("sharedOperations.http.htmlResponse", { command: cmd })
     );
   }
 
@@ -247,12 +253,12 @@ async function handleFetchResponse(req, res, cmd) {
     switch (res.status) {
       case 401:
         markSessionExpired(cmd);
-        throw new AuthError("You are not authenticated.", cmd);
+        throw new AuthError(i18n.t("sharedOperations.http.notAuthenticated"), cmd);
       case 403:
-        throw new PermissionError("You are not authorized.", cmd);
+        throw new PermissionError(i18n.t("sharedOperations.http.notAuthorized"), cmd);
       case 504:
         throw new CRCONServerDownError(
-          "There was a problem connecting to your CRCON server."
+          i18n.t("sharedOperations.http.connectionProblem")
         );
       default:
         throw new APIError(error, cmd, res.status);
@@ -269,7 +275,7 @@ async function parseJsonResponse(response) {
   try {
     return await response.json();
   } catch {
-    throw new NotJSONResponseError("The server did not return valid JSON.");
+    throw new NotJSONResponseError(i18n.t("sharedOperations.http.invalidJson"));
   }
 }
 
@@ -829,7 +835,7 @@ export async function mobileRequest(path, { method = "GET", payload } = {}) {
   const envelope = await parseJsonResponse(response);
   if (!response.ok || envelope.failed) {
     throw new APIError(
-      envelope.error || "Mobile API request failed",
+      envelope.error || i18n.t("sharedOperations.http.mobileRequestFailed"),
       path,
       response.status
     );
@@ -855,7 +861,7 @@ export async function discordRequest(path, { method = "GET", payload } = {}) {
   const envelope = await parseJsonResponse(response);
   if (!response.ok || envelope.failed) {
     throw new APIError(
-      envelope.error || "Discord integration request failed",
+      envelope.error || i18n.t("sharedOperations.http.discordRequestFailed"),
       path,
       response.status
     );
@@ -874,7 +880,7 @@ export function handleHttpError(error) {
   switch (error.name) {
     case "PermissionError":
       errorObject = {
-        message: "You don't have permissions to do that!",
+        message: i18n.t("sharedOperations.http.notAuthorized"),
         error: error?.name,
         command: error?.command,
       };
@@ -882,7 +888,7 @@ export function handleHttpError(error) {
       break;
     case "AuthError":
       errorObject = {
-        message: "You are not authenticated!",
+        message: i18n.t("sharedOperations.http.notAuthenticated"),
         error: error?.name,
         command: error?.command,
       };
@@ -906,7 +912,7 @@ export function handleHttpError(error) {
       break;
     default:
       errorObject = {
-        message: error?.message ?? "Something went wrong",
+        message: error?.message ?? i18n.t("sharedOperations.http.unexpectedError"),
         error: error?.name,
         command: error?.command,
       };
@@ -919,7 +925,7 @@ export function handleHttpError(error) {
 
 class AuthError extends Error {
   constructor(message, command) {
-    super(message ?? "You are not authenticated.");
+    super(message ?? i18n.t("sharedOperations.http.notAuthenticated"));
     this.name = "AuthError";
     this.status = 401;
     this.text = message;
@@ -929,7 +935,7 @@ class AuthError extends Error {
 
 class PermissionError extends Error {
   constructor(message, command) {
-    super(message ?? "You are not authorized.");
+    super(message ?? i18n.t("sharedOperations.http.notAuthorized"));
     this.command = command;
     this.name = "PermissionError";
     this.status = 403;
@@ -986,19 +992,19 @@ class APIError extends Error {
 
 async function handle_response_status(response) {
   if (response.status === 401) {
-    throw new AuthError("You must be logged in!");
+    throw new AuthError(i18n.t("sharedOperations.http.signInRequired"));
   }
 
   if (response.status === 403) {
     throw new PermissionError(
-      "You are not authorized to do this!",
+      i18n.t("sharedOperations.http.notAuthorized"),
       response.url.slice(response.url.indexOf("/api/") + "/api/".length)
     );
   }
 
   if (response.status === 504) {
     throw new CRCONServerDownError(
-      response.statusText + ". Your server is not responding."
+      `${response.statusText}. ${i18n.t("sharedOperations.http.serverNotResponding")}`
     );
   }
 
@@ -1016,32 +1022,34 @@ async function handle_http_errors(error) {
   if (name === "AuthError") {
     showBoundedHttpErrorToast({
       signature: "auth",
-      message: "Please login!",
+      message: i18n.t("sharedOperations.http.signInRequired"),
       level: "warn",
     });
   } else if (name === "PermissionError") {
     showBoundedHttpErrorToast({
       signature: `permission:${command || "unknown"}`,
-      message: `You are not allowed to use ${command || "this action"}`,
+      message: i18n.t("sharedOperations.http.actionNotAllowed", {
+        command: command || i18n.t("sharedOperations.http.thisAction"),
+      }),
       level: "warn",
     });
   } else if (name === "InvalidLogin") {
     showBoundedHttpErrorToast({
       signature: "invalid-login",
-      message: "Login failed. Please check your credentials.",
+      message: i18n.t("sharedOperations.http.invalidLogin"),
       level: "warn",
     });
   } else if (name === "TypeError" || name === "SyntaxError") {
     showBoundedHttpErrorToast({
       signature: "api-unreachable",
       message:
-        "Your RCON API is not reachable. Check your configuration and start it again.",
+        i18n.t("sharedOperations.http.apiUnreachable"),
     });
   } else {
     showBoundedHttpErrorToast({
       signature: `${name}:${status}:${command || "none"}`,
       message:
-        "Unable to complete the API request. Open the diagnostics view for details.",
+        i18n.t("sharedOperations.http.diagnosticsHint"),
     });
   }
 }
@@ -1079,28 +1087,30 @@ async function postData(url = "", data = {}) {
 
 async function showResponse(response, command, showSuccess) {
   if (!response.ok) {
-    toast.error(`Game server failed to return for ${command}`, {
+    toast.error(i18n.t("sharedOperations.http.gameServerFailed", { command }), {
       toastId: "connectionError",
     });
   } else {
     const res = await response.json();
     if (res.failed === true) {
       toast.warning(
-        `Last command failed: ${command} -> ${JSON.stringify(
-          res.result
-        )}\n\nError: ${res.error}`
+        i18n.t("sharedOperations.http.commandFailed", {
+          command,
+          result: JSON.stringify(res.result),
+          error: res.error,
+        })
       );
       return res;
     } else if (showSuccess === true) {
-      toast.success(`Done: ${command}`);
+      toast.success(i18n.t("sharedOperations.http.done", { command }));
     }
     try {
       if (res.forward_results) {
         res.forward_results.forEach((r) => {
           if (r.response.failed === true) {
-            toast.warning(`${r.host} Last command failed: ${command}`);
+            toast.warning(i18n.t("sharedOperations.http.forwardedFailure", { host: r.host, command }));
           } else if (r.response.failed === false && showSuccess === true) {
-            toast.success(`${r.host} Done: ${command}`);
+            toast.success(i18n.t("sharedOperations.http.forwardedSuccess", { host: r.host, command }));
           }
         });
       }
@@ -1146,7 +1156,7 @@ async function addPlayerToWatchList(player_id, reason, playerName) {
     player_name: playerName,
   })
     .then((response) =>
-      showResponse(response, `Player ID ${player_id} watched`, true)
+      showResponse(response, i18n.t("sharedOperations.http.playerWatched", { playerId: player_id }), true)
     )
     .catch(handle_http_errors);
 }
@@ -1170,7 +1180,7 @@ async function addPlayerToBlacklist({
 
     return showResponse(
       response,
-      `Player ID ${playerId} was blacklisted`,
+      i18n.t("sharedOperations.http.playerBlacklisted", { playerId }),
       true
     );
   } catch (error) {
@@ -1301,7 +1311,7 @@ async function getVotemapConfig() {
 async function changeMap(mapId) {
   try {
     const response = await execute("set_map", { map_name: mapId });
-    const data = await showResponse(response, `Map changed to ${mapId}`, true);
+    const data = await showResponse(response, i18n.t("sharedOperations.http.mapChanged", { mapId }), true);
     if (data.result) {
       return data.result;
     }

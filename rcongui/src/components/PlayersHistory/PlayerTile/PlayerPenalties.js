@@ -1,7 +1,9 @@
 import Grid from "@mui/material/Grid2";
 import { WithPopver } from "../../commonComponent";
 import moment from "moment";
+import "moment/locale/de";
 import { List } from "immutable";
+import { useTranslation } from "react-i18next";
 
 function truncateString(str, num) {
   // If the length of str is less than or equal to num
@@ -13,18 +15,19 @@ function truncateString(str, num) {
   return str.slice(0, num) + "...";
 }
 
-export const Penalites = ({ player }) => (
+export const Penalites = ({ player }) => {
+  const { t, i18n } = useTranslation();
+  return (
   <div>
-    {player.get("received_actions", new List()).size < 1 ? "Clean record" : ""}
+    {player.get("received_actions", new List()).size < 1 ? t("sharedOperations.cleanRecord") : ""}
     {player.get("received_actions", new List()).map((action) => (
-      <p>{`${action.get("action_type")} ${moment.utc(action.get("time")).local().format(
-        "ddd Do MMM HH:mm:ss"
-      )}: ${truncateString(action.get("reason"), 50)} by ${action.get(
-        "by"
-      )}`}</p>
+      <p>{`${action.get("action_type")} ${moment.utc(action.get("time")).local().locale(i18n.resolvedLanguage).format(
+        t("common.logDateTimeFormat")
+      )}: ${truncateString(action.get("reason"), 50)} ${t("sharedOperations.by", { name: action.get("by") })}`}</p>
     ))}
   </div>
-);
+  );
+};
 
 export const PlayerPenalties = ({ player }) => (
   <Grid container>

@@ -148,14 +148,10 @@ export const ActionDialog = () => {
           {confirmationStep ? (
             <Alert severity={isCritical ? "error" : "warning"} sx={{ mb: 1.5 }}>
               <AlertTitle>
-                {t("actions.secondConfirmationTitle", {
-                  defaultValue: "Aktion nochmals prüfen",
-                })}
+                {t("actions.secondConfirmationTitle")}
               </AlertTitle>
               {t("actions.secondConfirmationBody", {
                 count: recipientCount,
-                defaultValue:
-                  "Diese Aktion wirkt unmittelbar. Prüfe Ziel und Angaben, bevor du sie endgültig ausführst.",
               })}
             </Alert>
           ) : null}
@@ -222,7 +218,7 @@ export const ActionDialog = () => {
             sx={{ flex: { xs: "1 1 100%", sm: "0 0 auto" }, minHeight: 44 }}
           >
             {confirmationStep
-              ? t("common.back", { defaultValue: "Zurück" })
+              ? t("common.back")
               : t("common.cancel")}
           </Button>
           <Button
@@ -235,11 +231,9 @@ export const ActionDialog = () => {
             {loading
               ? t("common.processing")
               : confirmationStep
-              ? t("actions.executeFinally", {
-                  defaultValue: "Endgültig ausführen",
-                })
+              ? t("actions.executeFinally")
               : needsSecondConfirmation
-              ? t("common.continue", { defaultValue: "Weiter" })
+              ? t("common.continue")
               : action.submitLabelKey
               ? t(action.submitLabelKey)
               : t("common.confirm")}

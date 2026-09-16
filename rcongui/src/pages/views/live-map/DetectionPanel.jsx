@@ -1,4 +1,6 @@
 import { Box, Button, Chip, Stack, Typography } from "@mui/material";
+import { useTranslation } from "react-i18next";
+import { translateOperatorMessage } from "@/i18n/operator-messages";
 
 const signalText = (signal, t) => {
   if (signal.kind === "kill_rate")
@@ -34,6 +36,7 @@ export default function DetectionPanel({
   onArchive,
   t,
 }) {
+  const { t: operatorT, i18n } = useTranslation();
   const visible = (detections || []).filter(
     (item) => !selected || item.player_id === selected
   );
@@ -179,7 +182,7 @@ export default function DetectionPanel({
                     color="text.secondary"
                     display="block"
                   >
-                    {line}
+                    {translateOperatorMessage(line, operatorT)}
                   </Typography>
                 ))}
                 <Typography
@@ -197,7 +200,7 @@ export default function DetectionPanel({
                       variant="caption"
                       display="block"
                     >
-                      {new Date(previous.last_at * 1000).toLocaleString()} ·{" "}
+                      {new Date(previous.last_at * 1000).toLocaleString(i18n.resolvedLanguage)} ·{" "}
                       {t(previous.severity)}
                     </Typography>
                   ))

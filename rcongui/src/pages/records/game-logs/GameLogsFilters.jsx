@@ -26,7 +26,7 @@ import FilterAltOffIcon from "@mui/icons-material/FilterAltOff";
 import CloseIcon from "@mui/icons-material/Close";
 import { DesktopDateTimePicker } from "@mui/x-date-pickers/DesktopDateTimePicker";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import LocalizationProvider from "@/components/shared/LocalizedDateProvider";
 import { Form, useNavigation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";

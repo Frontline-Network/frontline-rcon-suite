@@ -142,7 +142,6 @@ const PlayersTable = ({
         id={`live-player-details-${row.id}`}
         role="region"
         aria-label={t("views.live.playerDetails", {
-          defaultValue: `Details zu ${row.original.name}`,
           name: row.original.name,
         })}
         onKeyDown={(event) => {

@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relativePath) =>
-  fs.readFileSync(path.join(root, relativePath), "utf8");
+  fs.readFileSync(path.join(root, relativePath), "utf8").replaceAll("\r\n", "\n");
 
 const list = read("src/pages/stats/games/game-list-table.jsx");
 const dialog = read("src/pages/stats/games/saved-views-dialog.jsx");

@@ -1,5 +1,7 @@
 import { fetchWithCsrf, SESSION_EXPIRY_EVENT } from "@/utils/fetchUtils";
 import { isFakeMode } from "@/mirage/demo-data";
+import i18n from "@/i18n";
+import { translateOperatorMessage } from "@/i18n/operator-messages";
 
 export async function liveMapRequest(
   path,
@@ -20,7 +22,9 @@ export async function liveMapRequest(
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || payload.failed) {
     const error = new Error(
-      payload.error || `Anfrage fehlgeschlagen (${response.status})`
+      payload.error
+        ? translateOperatorMessage(payload.error, i18n.t.bind(i18n))
+        : i18n.t("liveViews.requestFailed", { status: response.status })
     );
     error.status = response.status;
     throw error;

@@ -23,7 +23,7 @@ import {
 } from "@/mirage/demo-data";
 
 const ServerSettingsCard = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const {
     data: settings,
     isPending,
@@ -190,7 +190,7 @@ const ServerSettingsCard = () => {
               sx={{ display: "block", mt: 2 }}
             >
               {t("serverSettings.lastRead", {
-                time: new Date(dataUpdatedAt).toLocaleString(),
+                time: new Date(dataUpdatedAt).toLocaleString(i18n.resolvedLanguage),
               })}
             </Typography>
           </>

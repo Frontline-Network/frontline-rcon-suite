@@ -1,30 +1,32 @@
+import i18n from "@/i18n";
+import { useTranslation } from "react-i18next";
 import { Alert, Box, Chip, Stack, Typography } from "@mui/material";
 import BalanceOutlinedIcon from "@mui/icons-material/BalanceOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 
-const MODE_INFO = {
+const MODE_INFO = () => ({
   disabled: {
-    label: "Aus",
+    label: i18n.t("settingsPanels.autobalancer.off"),
     severity: "info",
-    text: "Der Dienst beobachtet und plant keine Teamwechsel.",
+    text: i18n.t("settingsPanels.autobalancer.offHelp"),
   },
   shadow: {
-    label: "Beobachten",
+    label: i18n.t("settingsPanels.autobalancer.observe"),
     severity: "info",
-    text: "Vorschläge werden nur berechnet und protokolliert. Spieler merken nichts davon.",
+    text: i18n.t("settingsPanels.autobalancer.observeHelp"),
   },
   manual: {
-    label: "Manuell",
+    label: i18n.t("settingsPanels.autobalancer.manual"),
     severity: "warning",
-    text: "Der Dienst bereitet Vorschläge vor; ein Administrator gibt jeden Eingriff frei.",
+    text: i18n.t("settingsPanels.autobalancer.manualHelp"),
   },
   auto: {
-    label: "Automatisch",
+    label: i18n.t("settingsPanels.autobalancer.automatic"),
     severity: "warning",
-    text: "Zulässige Einzelwechsel werden nach der Freiwilligenphase automatisch vorgemerkt.",
+    text: i18n.t("settingsPanels.autobalancer.automaticHelp"),
   },
-};
+});
 
 const SummaryItem = ({ icon, label, value, detail }) => (
   <Box sx={{ p: 1.5, minWidth: 0 }}>
@@ -44,7 +46,8 @@ const SummaryItem = ({ icon, label, value, detail }) => (
 );
 
 const AutobalancerHelp = ({ config = {} }) => {
-  const mode = MODE_INFO[config.mode] || MODE_INFO.disabled;
+  useTranslation();
+  const mode = MODE_INFO()[config.mode] || MODE_INFO().disabled;
   const targetDifference = config.target_difference ?? 2;
   const stableSeconds = config.stable_difference_seconds ?? 45;
   const squadSwitches = config.coordinated_squad_switches_enabled === true;
@@ -53,7 +56,10 @@ const AutobalancerHelp = ({ config = {} }) => {
   return (
     <Stack spacing={1.5} sx={{ mt: 2, mb: 2 }}>
       <Alert severity={mode.severity} variant="outlined">
-        <strong>Betriebsmodus: {mode.label}.</strong> {mode.text}
+        <strong>
+          {i18n.t("settingsPanels.autobalancer.operatingMode")} {mode.label}.
+        </strong>{" "}
+        {mode.text}
       </Alert>
 
       <Box
@@ -72,18 +78,26 @@ const AutobalancerHelp = ({ config = {} }) => {
       >
         <SummaryItem
           icon={<BalanceOutlinedIcon fontSize="small" color="primary" />}
-          label="Eingriff"
-          value={`Mehr als ${targetDifference} Spieler`}
-          detail={`Das Ungleichgewicht muss mindestens ${stableSeconds} Sekunden bestehen.`}
+          label={i18n.t("settingsPanels.autobalancer.intervention")}
+          value={i18n.t("settingsPanels.autobalancer.playerThreshold", {
+            v0: targetDifference,
+          })}
+          detail={i18n.t("settingsPanels.autobalancer.stabilityThreshold", {
+            v0: stableSeconds,
+          })}
         />
         <SummaryItem
           icon={<GroupsOutlinedIcon fontSize="small" color="primary" />}
           label="Squads"
-          value={squadSwitches ? "Gemeinsam wechselbar" : "Nur Vorschlag"}
+          value={
+            squadSwitches
+              ? i18n.t("settingsPanels.autobalancer.squadSwitchAllowed")
+              : i18n.t("settingsPanels.autobalancer.proposalOnly")
+          }
           detail={
             squadSwitches
-              ? "Moderatoren können vollständige Infanterie-Squads nach erneuter Live-Prüfung wechseln."
-              : "Squad-Vorschläge bleiben sichtbar, die gemeinsame Ausführung ist aber gesperrt."
+              ? i18n.t("settingsPanels.autobalancer.squadSwitchHelp")
+              : i18n.t("settingsPanels.autobalancer.squadProposalHelp")
           }
         />
         <SummaryItem
@@ -91,18 +105,26 @@ const AutobalancerHelp = ({ config = {} }) => {
           label="Fallback"
           value={
             individualFallback
-              ? "Einzelspieler erlaubt"
-              : "Squads bleiben zusammen"
+              ? i18n.t("settingsPanels.autobalancer.individualsAllowed")
+              : i18n.t("settingsPanels.autobalancer.squadsTogether")
           }
-          detail="Führungs- und Spezialtrupps bleiben in beiden Fällen geschützt."
+          detail={i18n.t("settingsPanels.autobalancer.protectedSquads")}
         />
       </Box>
 
       <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-        <Chip label="Live-Daten" size="small" color="info" />
-        <Chip label="Aktueller Server" size="small" variant="outlined" />
         <Chip
-          label="Squad-Mitglieder werden vorab informiert"
+          label={i18n.t("settingsPanels.autobalancer.liveData")}
+          size="small"
+          color="info"
+        />
+        <Chip
+          label={i18n.t("settingsPanels.autobalancer.currentServer")}
+          size="small"
+          variant="outlined"
+        />
+        <Chip
+          label={i18n.t("settingsPanels.autobalancer.squadNotice")}
           size="small"
           variant="outlined"
         />
@@ -110,10 +132,7 @@ const AutobalancerHelp = ({ config = {} }) => {
 
       {squadSwitches && (
         <Alert severity="warning" variant="outlined">
-          Hell Let Loose verschiebt Spieler, nicht die Squad-Struktur. Nach
-          einem Gruppenwechsel müssen die Mitglieder den Squad im Zielteam neu
-          bilden. Deshalb prüft die Aktion alle Mitglieder erneut, informiert
-          sie zuerst und verlangt eine zweite Bestätigung.
+          {i18n.t("settingsPanels.autobalancer.squadRecreation")}
         </Alert>
       )}
     </Stack>
@@ -121,3 +140,4 @@ const AutobalancerHelp = ({ config = {} }) => {
 };
 
 export default AutobalancerHelp;
+import "@/i18n/register-settings-panels";

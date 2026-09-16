@@ -1,9 +1,12 @@
 import {Box, Chip} from "@mui/material";
 import Typography from "@mui/material/Typography";
 import moment from "moment";
+import "moment/locale/de";
 import Grid from "@mui/material/Grid2";
+import { useTranslation } from "react-i18next";
 
 const MessageHistory = ({data}) => {
+  const { t, i18n } = useTranslation();
   return (<Box paddingLeft={2}>
     <Grid
       container
@@ -43,8 +46,9 @@ const MessageHistory = ({data}) => {
                   {moment
                     .utc(message.time)
                     .local()
-                    .format("ddd Do MMM HH:mm:ss")}{" "}
-                  by {message.by}
+                    .locale(i18n.resolvedLanguage)
+                    .format(t("common.logDateTimeFormat"))}{" "}
+                  {t("sharedOperations.by", { name: message.by })}
                 </Typography>
               </Grid>
             </Grid>

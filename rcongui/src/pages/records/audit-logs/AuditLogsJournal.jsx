@@ -50,7 +50,7 @@ const formatGroupDate = (value, t) => {
     : date.isSame(dayjs().subtract(1, "day"), "day")
     ? t("records.auditLogs.yesterday")
     : null;
-  const formatted = date.format("DD. MMMM YYYY");
+  const formatted = date.format("LL");
   return prefix ? `${prefix} · ${formatted}` : formatted;
 };
 

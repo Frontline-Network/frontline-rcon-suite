@@ -201,14 +201,14 @@ function TimelineRow({ log, selected, onSelect }) {
         }}
       >
         {getEventLabel(log.type, t)} ·{" "}
-        {formatEventTime(log.event_time, "DD.MM.YYYY · HH:mm:ss")}
+        {formatEventTime(log.event_time, t("common.logDateTimeFormat"))}
       </Typography>
     </Box>
   );
 }
 
 function RoundOverview({ logs, category, onCategoryChange, selectedLog }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const gameState = useGlobalStore((state) => state.gameState);
   const server = useGlobalStore((state) => state.serverState);
   const counts = useMemo(() => getCategoryCounts(logs), [logs]);
@@ -253,13 +253,13 @@ function RoundOverview({ logs, category, onCategoryChange, selectedLog }) {
             [
               t("records.gameLogs.timeline.roundStart"),
               roundWindow.start
-                ? roundWindow.start.format("DD.MM.YYYY HH:mm:ss")
+                ? roundWindow.start.locale(i18n.resolvedLanguage).format(t("common.logDateTimeFormat"))
                 : "–",
             ],
             [
               t("records.gameLogs.timeline.roundEnd"),
               roundWindow.end
-                ? roundWindow.end.format("DD.MM.YYYY HH:mm:ss")
+                ? roundWindow.end.locale(i18n.resolvedLanguage).format(t("common.logDateTimeFormat"))
                 : "–",
             ],
             [
@@ -478,7 +478,7 @@ function EventDetails({ log }) {
           {[
             [
               t("records.gameLogs.timeline.timestamp"),
-              formatEventTime(log.event_time, "DD.MM.YYYY HH:mm:ss.SSS"),
+              formatEventTime(log.event_time, `${t("common.logDateTimeFormat")}.SSS`),
             ],
             [t("records.gameLogs.timeline.attacker"), log.player1_name || "–"],
             [t("records.gameLogs.timeline.target"), log.player2_name || "–"],

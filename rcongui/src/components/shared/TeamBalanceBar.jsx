@@ -1,15 +1,19 @@
 import { Box, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { getThemeTeamColors } from "@/themes/teamColors";
+import { useTranslation } from "react-i18next";
 
 const TeamBalanceBar = ({
   allies,
   axis,
   targetDifference,
   compact = false,
-  alliesLabel = "Allies",
-  axisLabel = "Axis",
+  alliesLabel,
+  axisLabel,
 }) => {
+  const { t } = useTranslation();
+  const resolvedAlliesLabel = alliesLabel ?? t("views.team.allies");
+  const resolvedAxisLabel = axisLabel ?? t("views.team.axis");
   const theme = useTheme();
   const teamColors = getThemeTeamColors(theme);
   const hasCounts = Number.isFinite(allies) && Number.isFinite(axis);
@@ -21,10 +25,13 @@ const TeamBalanceBar = ({
     (targetDifference === undefined || difference <= targetDifference);
   const differenceLabel =
     difference === null
-      ? "Keine Live-Daten"
+      ? t("sharedOperations.teamBalance.noLiveData")
       : targetDifference === undefined
-      ? `Differenz ${difference}`
-      : `Differenz ${difference} · erlaubt ${targetDifference}`;
+      ? t("sharedOperations.teamBalance.difference", { difference })
+      : t("sharedOperations.teamBalance.differenceWithLimit", {
+          difference,
+          limit: targetDifference,
+        });
 
   const teamSummary = (label, count, share, color, align) => (
     <Box
@@ -77,21 +84,26 @@ const TeamBalanceBar = ({
     <Box
       aria-label={
         hasCounts
-          ? `Teamverteilung: ${allies} ${alliesLabel} und ${axis} ${axisLabel}`
-          : "Teamverteilung ist nicht verfügbar"
+          ? t("sharedOperations.teamBalance.distribution", {
+              allies,
+              axis,
+              alliesLabel: resolvedAlliesLabel,
+              axisLabel: resolvedAxisLabel,
+            })
+          : t("sharedOperations.teamBalance.unavailable")
       }
       sx={{ mt: compact ? 1 : 1.5 }}
     >
       <Stack direction="row" spacing={compact ? 0.75 : 1}>
         {teamSummary(
-          alliesLabel,
+          resolvedAlliesLabel,
           allies,
           alliesShare,
           teamColors.allies,
           "left"
         )}
         {teamSummary(
-          axisLabel,
+          resolvedAxisLabel,
           axis,
           100 - alliesShare,
           teamColors.axis,

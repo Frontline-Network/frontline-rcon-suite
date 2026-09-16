@@ -1,37 +1,40 @@
+import { liveViewsDe } from "../../../i18n/locales/live-views.js";
+
 export const RECOMMENDATION_HOLD_MS = 60_000;
 
 // Being kept on screen is not a promise that a move remains safe to execute.
-export function recommendationNotice({ valid, blocked, balanced, reviewing }) {
+export function recommendationNotice(
+  { valid, blocked, balanced, reviewing },
+  t
+) {
+  const text = (key) =>
+    t ? t(`liveViews.balance.${key}`) : liveViewsDe.balance[key];
   if (valid) {
     return {
       severity: "info",
-      title: "Vorschlag zur Prüfung vorgemerkt",
-      description: reviewing
-        ? "Deine Auswahl bleibt sichtbar, solange die Prüfung geöffnet ist. Ob der Wechsel noch passt, wird mit jedem Live-Update geprüft."
-        : "Die Auswahl bleibt bis zu 60 Sekunden sichtbar. Ob der Wechsel noch passt, wird mit jedem Live-Update geprüft.",
+      title: text("noticeHeld"),
+      description: reviewing ? text("noticeReviewing") : text("noticeWaiting"),
     };
   }
-  const nextStep = reviewing
-    ? "Schließe die Prüfung und wähle „Neu bewerten“."
-    : "Mit „Neu bewerten“ prüfst du die aktuelle Empfehlung.";
+  const nextStep = reviewing ? text("nextReviewing") : text("nextWaiting");
   if (blocked) {
     return {
       severity: "warning",
-      title: "Live-Daten gerade unvollständig",
-      description: `Dieser Vorschlag kann erst mit vollständigen Live-Daten erneut geprüft werden. ${nextStep}`,
+      title: text("noticeIncomplete"),
+      description: `${text("noticeIncompleteDescription")} ${nextStep}`,
     };
   }
   if (balanced) {
     return {
       severity: "info",
-      title: "Aktuell kein Wechsel nötig",
-      description: `Die Teams liegen jetzt innerhalb der eingestellten Grenzwerte. Der bisherige Vorschlag wird nicht mehr benötigt. ${nextStep}`,
+      title: text("noticeBalanced"),
+      description: `${text("noticeBalancedDescription")} ${nextStep}`,
     };
   }
   return {
     severity: "info",
-    title: "Vorschlag bitte aktualisieren",
-    description: `Dieser vorgemerkte Wechsel passt nicht mehr zur aktuellen Spielsituation. ${nextStep}`,
+    title: text("noticeRefresh"),
+    description: `${text("noticeRefreshDescription")} ${nextStep}`,
   };
 }
 
