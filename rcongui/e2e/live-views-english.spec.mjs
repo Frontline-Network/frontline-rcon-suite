@@ -7,6 +7,15 @@ import {
 
 test.use({ viewport: VIEWPORTS.desktop });
 
+test("English player disclosure labels preserve the target identity", async ({ page }) => {
+  await openDemoPage(page, "/views/live", { language: "en", query: { demo_warning_sources: 1 } });
+  const panel = page.getByTestId("live-players-panel");
+  await panel.getByRole("button", { name: "Show details for FLN_Raven", exact: true }).click();
+  await expect(panel.getByRole("region", { name: "Details for FLN_Raven", exact: true })).toBeVisible();
+  await panel.getByRole("button", { name: "Hide details for FLN_Raven", exact: true }).click();
+  await expect(panel.getByRole("region", { name: "Details for FLN_Raven", exact: true })).toHaveCount(0);
+});
+
 test("English live balance includes the review, explanations, notices and actions", async ({
   page,
 }) => {

@@ -88,11 +88,9 @@ const Live = () => {
         const isExpanded = row.getIsExpanded();
         const label = isExpanded
           ? t("views.live.hidePlayerDetails", {
-              defaultValue: `Details zu ${row.original.name} schließen`,
               name: row.original.name,
             })
           : t("views.live.showPlayerDetails", {
-              defaultValue: `Details zu ${row.original.name} anzeigen`,
               name: row.original.name,
             });
 

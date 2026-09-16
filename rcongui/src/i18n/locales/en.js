@@ -282,9 +282,9 @@ const en = {
   },
   views: {
     live: {
-      hidePlayerDetails: "Hide player details",
-      showPlayerDetails: "Show player details",
-      playerDetails: "Player details",
+      hidePlayerDetails: "Hide details for {{name}}",
+      showPlayerDetails: "Show details for {{name}}",
+      playerDetails: "Details for {{name}}",
       title: "Live operations",
       eyebrow: "Server operations",
       subtitle: "Monitor players, battle state and server events in real time.",

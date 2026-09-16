@@ -282,9 +282,9 @@ const de = {
   },
   views: {
     live: {
-      hidePlayerDetails: "Spielerdetails ausblenden",
-      showPlayerDetails: "Spielerdetails anzeigen",
-      playerDetails: "Spielerdetails",
+      hidePlayerDetails: "Details zu {{name}} schließen",
+      showPlayerDetails: "Details zu {{name}} anzeigen",
+      playerDetails: "Details zu {{name}}",
       title: "Live-Einsatz",
       eyebrow: "Serverbetrieb",
       subtitle: "Spieler, Gefechtslage und Serverereignisse in Echtzeit überwachen.",
