@@ -177,7 +177,7 @@ export default function LiveTeamTable({
         />
         <MetricHeader label={t("stats.liveGame.player")} title={t("stats.liveGame.player")} align="left" />
         <MetricHeader label="K" title={t("stats.gameDetails.metrics.kills")} />
-        <MetricHeader label="T" title={t("stats.gameDetails.deaths")} />
+        <MetricHeader label={t("liveViews.deathsShort")} title={t("stats.gameDetails.deaths")} />
         <MetricHeader label="K/D" title={t("stats.liveGame.kdr")} />
         <MetricHeader label="TK" title={t("stats.gameDetails.teamKills")} />
         <MetricHeader label={t("stats.liveGame.timeShort")} title={t("stats.gameDetails.duration")} />

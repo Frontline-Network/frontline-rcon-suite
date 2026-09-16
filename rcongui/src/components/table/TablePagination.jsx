@@ -13,7 +13,7 @@ import KeyboardDoubleArrowRightIcon from "@mui/icons-material/KeyboardDoubleArro
 import { useTranslation } from "react-i18next";
 
 export const TablePagination = ({ table }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   return (
   <Stack
@@ -43,7 +43,7 @@ export const TablePagination = ({ table }) => {
     <Box sx={{ textWrap: "nowrap", alignSelf: "center", mx: 0.5 }}>
       {t("common.pagination.page", {
         current: table.getState().pagination.pageIndex + 1,
-        total: table.getPageCount().toLocaleString(),
+        total: table.getPageCount().toLocaleString(i18n.resolvedLanguage),
       })}
     </Box>
     <IconButton

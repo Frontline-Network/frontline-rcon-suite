@@ -5,9 +5,12 @@ import {Box, Button, Chip, Drawer, TextField,} from "@mui/material";
 import IconButton from "@mui/material/IconButton";
 import Typography from "@mui/material/Typography";
 import moment from "moment";
+import "moment/locale/de";
 import Grid from "@mui/material/Grid2";
+import { useTranslation } from "react-i18next";
 
 const ChatContent = ({data, handleMessageSend}) => {
+  const { t, i18n } = useTranslation();
   const [comment, setComment] = useState("");
 
   return (<Box paddingLeft={2}>
@@ -49,8 +52,9 @@ const ChatContent = ({data, handleMessageSend}) => {
                     {moment
                       .utc(message.creation_time)
                       .local()
-                      .format("ddd Do MMM HH:mm:ss")}{" "}
-                    by {message.by}
+                      .locale(i18n.resolvedLanguage)
+                      .format(t("common.logDateTimeFormat"))}{" "}
+                    {t("sharedOperations.by", { name: message.by })}
                   </Typography>
                 </Grid>
               </Grid>
@@ -68,7 +72,7 @@ const ChatContent = ({data, handleMessageSend}) => {
         <Grid size={10}>
           <TextField
             id="message"
-            label="Add comment"
+            label={t("sharedOperations.addComment")}
             multiline
             fullWidth
             value={comment}
@@ -81,6 +85,7 @@ const ChatContent = ({data, handleMessageSend}) => {
               variant="contained"
               fullWidth
               color="secondary"
+              aria-label={t("sharedOperations.sendComment")}
               onClick={(e) => {
                 handleMessageSend(comment);
                 setComment("");
@@ -96,6 +101,7 @@ const ChatContent = ({data, handleMessageSend}) => {
 };
 
 const ChatWidget = ({data, handleMessageSend}) => {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
   const handleChange = (reason) => {
@@ -109,7 +115,7 @@ const ChatWidget = ({data, handleMessageSend}) => {
     (<div>
       <Badge color="secondary" overlap="circular" badgeContent={data?.length}>
         <Grid container>
-          <IconButton onClick={handleChange} size="large">
+          <IconButton onClick={handleChange} size="large" aria-label={t("sharedOperations.openComments")}>
             <Comment style={{color: "white"}}/>
           </IconButton>
         </Grid>

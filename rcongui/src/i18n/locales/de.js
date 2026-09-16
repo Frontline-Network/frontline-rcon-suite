@@ -1,4 +1,11 @@
+import { liveViewsDe } from "./live-views.js";
+import { sharedOperationsDe } from "./shared-operations.js";
+import { operatorMessagesDe } from "./operator-messages.js";
+
 const de = {
+  liveViews: liveViewsDe,
+  sharedOperations: sharedOperationsDe,
+  operatorMessages: operatorMessagesDe,
   brand: { product: "CRCON Administration" },
   playerIdentity: {
     linkedAccounts: "Verbundene Spielkonten",
@@ -9,6 +16,11 @@ const de = {
     gameCodes: { hll: "HLL", hllv: "HLLV", hll_vietnam: "HLLV" },
   },
   common: {
+    back: "Zurück",
+    continue: "Weiter",
+    yes: "Ja",
+    no: "Nein",
+    none: "Keine",
     actions: "Aktionen",
     all: "Alle",
     active: "Aktiv",
@@ -150,6 +162,7 @@ const de = {
     comfortable: "Großzügig",
   },
   errors: {
+    configSaveFailed: "Die Konfiguration konnte nicht gespeichert werden.",
     title: "Das hat nicht funktioniert",
     unexpected: "Ein unerwarteter Fehler ist aufgetreten.",
     configUnknown: "Diese Konfiguration ist nicht bekannt.",
@@ -269,6 +282,9 @@ const de = {
   },
   views: {
     live: {
+      hidePlayerDetails: "Spielerdetails ausblenden",
+      showPlayerDetails: "Spielerdetails anzeigen",
+      playerDetails: "Spielerdetails",
       title: "Live-Einsatz",
       eyebrow: "Serverbetrieb",
       subtitle: "Spieler, Gefechtslage und Serverereignisse in Echtzeit überwachen.",

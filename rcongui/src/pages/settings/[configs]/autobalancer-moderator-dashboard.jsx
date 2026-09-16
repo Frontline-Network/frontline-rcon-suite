@@ -1,3 +1,6 @@
+import i18n from "@/i18n";
+import { translateOperatorMessage } from "@/i18n/operator-messages";
+import { useTranslation } from "react-i18next";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import BalanceIcon from "@mui/icons-material/Balance";
@@ -39,54 +42,56 @@ import AutobalancerHistoryDashboard from "@/pages/settings/[configs]/autobalance
 import AutobalancerRoundHistory from "@/pages/settings/[configs]/autobalancer-round-history";
 import AutobalancerShadowCharts from "@/pages/settings/[configs]/autobalancer-shadow-charts";
 
-const MODE_LABELS = {
-  disabled: "Ausgeschaltet",
-  shadow: "Shadow-Modus",
-  manual: "Manueller Betrieb",
-  auto: "Automatischer Betrieb",
-};
+const MODE_LABELS = () => ({
+  disabled: i18n.t("settingsPanels.autobalancer.disabled"),
+  shadow: i18n.t("settingsPanels.autobalancer.shadowMode"),
+  manual: i18n.t("settingsPanels.autobalancer.manualMode"),
+  auto: i18n.t("settingsPanels.autobalancer.automaticMode"),
+});
 
-const PHASE_LABELS = {
-  idle: "Kein Eingriff nötig",
-  observing: "Ungleichgewicht wird beobachtet",
-  volunteer: "Freiwillige werden gesucht",
-  proposed: "Vorschlag liegt vor",
-  armed: "Kandidat ist vorgemerkt",
-  verifying: "Wechsel wird bestätigt",
-  cooldown: "Stabilitätsprüfung läuft",
-  blocked: "Sicherheitsbedingung blockiert",
-};
+const PHASE_LABELS = () => ({
+  idle: i18n.t("settingsPanels.autobalancer.idle"),
+  observing: i18n.t("settingsPanels.autobalancer.observing"),
+  volunteer: i18n.t("settingsPanels.autobalancer.volunteer"),
+  proposed: i18n.t("settingsPanels.autobalancer.proposed"),
+  armed: i18n.t("settingsPanels.autobalancer.armed"),
+  verifying: i18n.t("settingsPanels.autobalancer.verifying"),
+  cooldown: i18n.t("settingsPanels.autobalancer.cooldown"),
+  blocked: i18n.t("settingsPanels.autobalancer.blocked"),
+});
 
-const STRATEGY_LABELS = {
-  "squad-first": "Squad zuerst",
-  "balanced-v2": "Ausgewogen V2",
-  "skill-first": "Stärke zuerst",
-};
+const STRATEGY_LABELS = () => ({
+  "squad-first": i18n.t("settingsPanels.autobalancer.squadFirst"),
+  "balanced-v2": i18n.t("settingsPanels.autobalancer.balancedV2"),
+  "skill-first": i18n.t("settingsPanels.autobalancer.skillFirst"),
+});
 
-const ROLE_FAMILY_LABELS = {
+const ROLE_FAMILY_LABELS = () => ({
   combat_infantry: "Combat Infantry",
   support: "Support / Engineer / Medic",
   commander: "Commander",
   leader: "Squad Leader",
   specialist: "Armor / Recon / Artillery / Mortar / Helicopter",
-};
+});
 
-const REVIEW_CATEGORY_LABELS = {
-  squad_should_stay: "Squad sollte zusammenbleiben",
-  critical_role: "Rolle ist spielerisch zu wichtig",
-  recent_join_or_move: "Verbindungs- oder Squadzeit wirkt falsch",
-  better_candidate: "Ein anderer Kandidat wäre fairer",
-  skill_balance: "Stärkeausgleich ist nicht überzeugend",
-  wrong_team_counts: "Teamzählung oder Wechselzahl ist falsch",
-  other: "Anderer Grund",
-};
+const REVIEW_CATEGORY_LABELS = () => ({
+  squad_should_stay: i18n.t("settingsPanels.autobalancer.squadShouldStay"),
+  critical_role: i18n.t("settingsPanels.autobalancer.criticalRoleReason"),
+  recent_join_or_move: i18n.t("settingsPanels.autobalancer.recentJoinReason"),
+  better_candidate: i18n.t("settingsPanels.autobalancer.betterCandidateReason"),
+  skill_balance: i18n.t("settingsPanels.autobalancer.skillBalanceReason"),
+  wrong_team_counts: i18n.t("settingsPanels.autobalancer.wrongCountsReason"),
+  other: i18n.t("settingsPanels.autobalancer.otherReason"),
+});
 
 const formatPercent = (value) =>
-  Number.isFinite(value) ? `${Math.round(value * 100)} %` : "Noch keine Daten";
+  Number.isFinite(value)
+    ? `${Math.round(value * 100)} %`
+    : i18n.t("settingsPanels.autobalancer.noData");
 
 const formatNumber = (value, digits = 1) =>
   Number.isFinite(value)
-    ? new Intl.NumberFormat("de-DE", {
+    ? new Intl.NumberFormat(i18n.resolvedLanguage, {
         minimumFractionDigits: digits,
         maximumFractionDigits: digits,
       }).format(value)
@@ -94,14 +99,18 @@ const formatNumber = (value, digits = 1) =>
 
 const formatDate = (value) =>
   value
-    ? new Intl.DateTimeFormat("de-DE", {
+    ? new Intl.DateTimeFormat(i18n.resolvedLanguage, {
         dateStyle: "short",
         timeStyle: "short",
       }).format(new Date(value))
     : "–";
 
 const formatMinutes = (seconds) =>
-  Number.isFinite(seconds) ? `${Math.floor(seconds / 60)} Min.` : "unbekannt";
+  Number.isFinite(seconds)
+    ? i18n.t("settingsPanels.autobalancer.minutesValue", {
+        v0: Math.floor(seconds / 60),
+      })
+    : i18n.t("settingsPanels.autobalancer.unknownLower");
 
 const getTeamLabels = (value) => {
   const labels = value?.team_labels || {};
@@ -109,39 +118,39 @@ const getTeamLabels = (value) => {
   const axis = String(labels.axis || "").trim();
   return {
     allies: /^(allies|allied)$/i.test(allies)
-      ? "Alliierte"
-      : allies || "Alliierte",
+      ? i18n.t("settingsPanels.autobalancer.allies")
+      : allies || i18n.t("settingsPanels.autobalancer.allies"),
     axis: /^(axis|axis powers)$/i.test(axis)
-      ? "Achsenmächte"
-      : axis || "Achsenmächte",
+      ? i18n.t("settingsPanels.autobalancer.axis")
+      : axis || i18n.t("settingsPanels.autobalancer.axis"),
   };
 };
 
 const getModeStatus = (mode) => {
   if (mode === "shadow") {
     return {
-      title: "Sicherer Testbetrieb",
-      detail: "Keine Nachrichten und keine automatischen Spielerwechsel",
+      title: i18n.t("settingsPanels.autobalancer.safeTesting"),
+      detail: i18n.t("settingsPanels.autobalancer.safeTestingHelp"),
       color: "info",
     };
   }
   if (mode === "manual") {
     return {
-      title: "Manueller Betrieb",
-      detail: "Jeder Vorschlag benötigt eine Freigabe",
+      title: i18n.t("settingsPanels.autobalancer.manualMode"),
+      detail: i18n.t("settingsPanels.autobalancer.approvalRequired"),
       color: "warning",
     };
   }
   if (mode === "auto") {
     return {
-      title: "Automatischer Betrieb",
-      detail: "Freigaben erfolgen nach den konfigurierten Regeln",
+      title: i18n.t("settingsPanels.autobalancer.automaticMode"),
+      detail: i18n.t("settingsPanels.autobalancer.automaticApprovalHelp"),
       color: "success",
     };
   }
   return {
-    title: "Autobalancer ausgeschaltet",
-    detail: "Es werden keine neuen Balancevorfälle bearbeitet",
+    title: i18n.t("settingsPanels.autobalancer.balancerDisabled"),
+    detail: i18n.t("settingsPanels.autobalancer.balancerDisabledHelp"),
     color: "default",
   };
 };
@@ -183,12 +192,12 @@ const getDecisionAssessment = (decision) => {
   );
   const tier = Number(decision?.protection_tier);
   const squadImpact = !Number.isFinite(tier)
-    ? "Unbekannt"
+    ? "unknown"
     : tier <= 1
-    ? "Gering"
+    ? "low"
     : tier <= 2
-    ? "Mittel"
-    : "Hoch";
+    ? "medium"
+    : "high";
   const countImproves = projection
     ? projection.after.difference < projection.before.difference
     : null;
@@ -196,11 +205,10 @@ const getDecisionAssessment = (decision) => {
 
   if (hasWarnings || countImproves === null) {
     return {
-      label: "Nicht bewerten",
+      label: i18n.t("settingsPanels.autobalancer.doNotReview"),
       color: "error",
-      title: "Daten zuerst prüfen",
-      explanation:
-        "Der Sicherheitsnachweis enthält Warnungen oder die Teamzählung ist unvollständig. Dieser Vorschlag sollte nicht als faire Referenz bewertet werden.",
+      title: i18n.t("settingsPanels.autobalancer.checkDataFirst"),
+      explanation: i18n.t("settingsPanels.autobalancer.unsafeReference"),
       projection,
       gapBefore,
       gapAfter,
@@ -212,13 +220,14 @@ const getDecisionAssessment = (decision) => {
     };
   }
 
-  if (protectedRole || squadImpact === "Hoch") {
+  if (protectedRole || squadImpact === "high") {
     return {
-      label: "Eher ablehnen",
+      label: i18n.t("settingsPanels.autobalancer.leanReject"),
       color: "warning",
-      title: "Der Eingriff in Rolle oder Squad ist zu groß",
-      explanation:
-        "Die Spielerzahl kann sich verbessern, aber der Kandidat ist spielerisch stark gebunden. Prüfe zuerst eine weniger geschützte Alternative.",
+      title: i18n.t("settingsPanels.autobalancer.excessiveDisruption"),
+      explanation: i18n.t(
+        "settingsPanels.autobalancer.excessiveDisruptionHelp"
+      ),
       projection,
       gapBefore,
       gapAfter,
@@ -232,11 +241,10 @@ const getDecisionAssessment = (decision) => {
 
   if (countImproves && ratingImproves === true && ratingReliable) {
     return {
-      label: "Akzeptabel",
+      label: i18n.t("settingsPanels.autobalancer.acceptable"),
       color: "success",
-      title: "Der Vorschlag verbessert beide Balanceziele",
-      explanation:
-        "Spielerzahl und geschätzte Teamstärke werden besser, ohne eine geschützte Rolle oder einen stark gebundenen Squad zu treffen.",
+      title: i18n.t("settingsPanels.autobalancer.bothGoalsImprove"),
+      explanation: i18n.t("settingsPanels.autobalancer.bothGoalsImproveHelp"),
       projection,
       gapBefore,
       gapAfter,
@@ -249,11 +257,10 @@ const getDecisionAssessment = (decision) => {
   }
 
   return {
-    label: "Genauer prüfen",
+    label: i18n.t("settingsPanels.autobalancer.reviewCloser"),
     color: "warning",
-    title: "Spielerzahl und Teamstärke müssen abgewogen werden",
-    explanation:
-      "Der Wechsel reduziert die Spielerzahldifferenz. Die Ratingaussage ist jedoch unsicher oder entwickelt sich nicht in dieselbe Richtung.",
+    title: i18n.t("settingsPanels.autobalancer.weighGoals"),
+    explanation: i18n.t("settingsPanels.autobalancer.weighGoalsHelp"),
     projection,
     gapBefore,
     gapAfter,
@@ -300,7 +307,7 @@ const OperationsTimeline = ({ steps }) => (
       variant="overline"
       color="text.secondary"
     >
-      Einsatz-Timeline
+      {i18n.t("settingsPanels.autobalancer.operationsTimeline")}
     </Typography>
     <Box
       sx={{
@@ -452,7 +459,7 @@ const TeamBalance = ({ projection, gapBefore, gapAfter, teamLabels }) => {
   if (!projection) {
     return (
       <Alert severity="warning">
-        Für diesen Vorschlag liegt keine vollständige Teamzählung vor.
+        {i18n.t("settingsPanels.autobalancer.incompleteProposalCounts")}
       </Alert>
     );
   }
@@ -460,12 +467,17 @@ const TeamBalance = ({ projection, gapBefore, gapAfter, teamLabels }) => {
   const totalAfter = projection.after.allies + projection.after.axis;
   const states = [
     {
-      label: "Vorher",
+      label: i18n.t("settingsPanels.autobalancer.before"),
       ...projection.before,
       total: totalBefore,
       gap: gapBefore,
     },
-    { label: "Nachher", ...projection.after, total: totalAfter, gap: gapAfter },
+    {
+      label: i18n.t("settingsPanels.autobalancer.after"),
+      ...projection.after,
+      total: totalAfter,
+      gap: gapAfter,
+    },
   ];
   return (
     <Box
@@ -529,7 +541,7 @@ const TeamBalance = ({ projection, gapBefore, gapAfter, teamLabels }) => {
               sx={{ mt: 1 }}
             >
               <Typography variant="caption" color="text.secondary">
-                Ratingdifferenz
+                {i18n.t("settingsPanels.autobalancer.ratingGap")}
               </Typography>
               <Typography variant="body2" sx={{ fontWeight: 700 }}>
                 {formatNumber(state.gap)}
@@ -572,7 +584,7 @@ const ProposalDetail = ({
         onClick={onBack}
         sx={{ mb: 1 }}
       >
-        Zurück zu offenen Vorschlägen
+        {i18n.t("settingsPanels.autobalancer.backToProposals")}
       </Button>
       <Stack
         direction={{ xs: "column", md: "row" }}
@@ -582,14 +594,18 @@ const ProposalDetail = ({
       >
         <Box>
           <Typography variant="overline" color="text.secondary">
-            Vorschlag vom {formatDate(decision.created_at)}
+            {i18n.t("settingsPanels.autobalancer.proposalDate")}{" "}
+            {formatDate(decision.created_at)}
           </Typography>
           <Typography component="h1" variant="h4" sx={{ fontWeight: 700 }}>
-            {decision.player_name || "Unbekannter Kandidat"} prüfen
+            {i18n.t("settingsPanels.autobalancer.reviewCandidate", {
+              name: decision.player_name || i18n.t("settingsPanels.autobalancer.unknownCandidate"),
+            })}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            {decision.map_name || "Unbekannte Karte"} ·{" "}
-            {teamLabels[decision.source_team]} →{" "}
+            {decision.map_name ||
+              i18n.t("settingsPanels.autobalancer.unknownMap")}{" "}
+            · {teamLabels[decision.source_team]} →{" "}
             {teamLabels[decision.target_team]}
           </Typography>
         </Box>
@@ -609,22 +625,33 @@ const ProposalDetail = ({
         >
           <strong>
             {decision.review_verdict === "accepted"
-              ? "Als akzeptabel bewertet."
-              : "Als nicht akzeptabel bewertet."}
+              ? i18n.t("settingsPanels.autobalancer.acceptedReview")
+              : i18n.t("settingsPanels.autobalancer.rejectedReview")}
           </strong>{" "}
-          {decision.reviewed_by && `Von ${decision.reviewed_by}`}
-          {decision.reviewed_at && ` am ${formatDate(decision.reviewed_at)}`}.
+          {decision.reviewed_by &&
+            i18n.t("settingsPanels.autobalancer.reviewedBy", {
+              v0: decision.reviewed_by,
+            })}
+          {decision.reviewed_at &&
+            i18n.t("settingsPanels.autobalancer.reviewedAt", {
+              v0: formatDate(decision.reviewed_at),
+            })}
+          .
           {decision.review_category && (
             <>
               {" "}
-              Grund:{" "}
-              {REVIEW_CATEGORY_LABELS[decision.review_category] ||
+              {i18n.t("settingsPanels.autobalancer.reasonLabel")}{" "}
+              {REVIEW_CATEGORY_LABELS()[decision.review_category] ||
                 decision.review_category}
               .
             </>
           )}
           {decision.review_comment && (
-            <> Kommentar: {decision.review_comment}</>
+            <>
+              {" "}
+              {i18n.t("settingsPanels.autobalancer.commentLabel")}{" "}
+              {decision.review_comment}
+            </>
           )}
         </Alert>
       )}
@@ -655,7 +682,7 @@ const ProposalDetail = ({
               })}
             >
               <Typography variant="overline" color="text.secondary">
-                Empfehlung
+                {i18n.t("settingsPanels.autobalancer.recommendation")}
               </Typography>
               <Typography variant="h5" sx={{ fontWeight: 700 }}>
                 {assessment.title}
@@ -671,27 +698,38 @@ const ProposalDetail = ({
             <Stack divider={<Divider flexItem />}>
               <ChecklistRow
                 state={assessment.protectedRole ? "bad" : "good"}
-                title="Geschützte Rolle?"
-                explanation="Commander, Squad Lead und wichtige Spezialrollen werden besonders geschützt."
+                title={i18n.t(
+                  "settingsPanels.autobalancer.protectedRoleQuestion"
+                )}
+                explanation={i18n.t(
+                  "settingsPanels.autobalancer.protectedRoleHelp"
+                )}
                 result={
                   assessment.protectedRole
-                    ? "Ja · Eingriff vermeiden"
-                    : "Nein · gut"
+                    ? i18n.t("settingsPanels.autobalancer.yesAvoid")
+                    : i18n.t("settingsPanels.autobalancer.noGood")
                 }
               />
               <ChecklistRow
                 state={
-                  assessment.squadImpact === "Gering"
+                  assessment.squadImpact === "low"
                     ? "good"
-                    : assessment.squadImpact === "Hoch"
+                    : assessment.squadImpact === "high"
                     ? "bad"
                     : "uncertain"
                 }
-                title="Wie stark wird der Squad beeinträchtigt?"
-                explanation="Bewertet Rolle, Squadgröße und bisherige Squad-Bindung."
-                result={`${assessment.squadImpact} · Schutzstufe ${
-                  decision.protection_tier ?? "–"
-                }`}
+                title={i18n.t(
+                  "settingsPanels.autobalancer.squadImpactQuestion"
+                )}
+                explanation={i18n.t(
+                  "settingsPanels.autobalancer.squadImpactHelp"
+                )}
+                result={i18n.t("settingsPanels.autobalancer.impactTier", {
+                  v0: i18n.t(
+                    `settingsPanels.autobalancer.${assessment.squadImpact}`
+                  ),
+                  v1: decision.protection_tier ?? "–",
+                })}
               />
               <ChecklistRow
                 state={
@@ -701,12 +739,19 @@ const ProposalDetail = ({
                     ? "bad"
                     : "uncertain"
                 }
-                title="Spielerzahl verbessert sich?"
-                explanation="Vergleicht die Teamdifferenz vor und nach genau diesem Wechsel."
+                title={i18n.t(
+                  "settingsPanels.autobalancer.countsImproveQuestion"
+                )}
+                explanation={i18n.t(
+                  "settingsPanels.autobalancer.countsImproveHelp"
+                )}
                 result={
                   assessment.projection
-                    ? `${assessment.projection.before.difference} → ${assessment.projection.after.difference} Spieler`
-                    : "Nicht messbar"
+                    ? i18n.t("settingsPanels.autobalancer.playersProjection", {
+                        v0: assessment.projection.before.difference,
+                        v1: assessment.projection.after.difference,
+                      })
+                    : i18n.t("settingsPanels.autobalancer.notMeasurable")
                 }
               />
               <ChecklistRow
@@ -717,17 +762,27 @@ const ProposalDetail = ({
                     ? "bad"
                     : "uncertain"
                 }
-                title="Geschätzte Stärke verbessert sich?"
-                explanation="Niedrigere Ratingdifferenz bedeutet statistisch ähnlichere Teams."
+                title={i18n.t(
+                  "settingsPanels.autobalancer.skillImproveQuestion"
+                )}
+                explanation={i18n.t(
+                  "settingsPanels.autobalancer.skillImproveHelp"
+                )}
                 result={`${formatNumber(assessment.gapBefore)} → ${formatNumber(
                   assessment.gapAfter
                 )}`}
               />
               <ChecklistRow
                 state={assessment.ratingReliable ? "good" : "uncertain"}
-                title="Ratingdaten verlässlich?"
-                explanation="Unter 60 % nur als Hinweis verwenden, nicht als alleinigen Grund."
-                result={`${formatPercent(confidence)} Vertrauen`}
+                title={i18n.t(
+                  "settingsPanels.autobalancer.reliableRatingQuestion"
+                )}
+                explanation={i18n.t(
+                  "settingsPanels.autobalancer.reliableRatingHelp"
+                )}
+                result={i18n.t("settingsPanels.autobalancer.confidenceValue", {
+                  v0: formatPercent(confidence),
+                })}
               />
             </Stack>
           </Card>
@@ -735,7 +790,7 @@ const ProposalDetail = ({
           <Card variant="outlined">
             <CardContent>
               <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5 }}>
-                Was verändert dieser Wechsel?
+                {i18n.t("settingsPanels.autobalancer.switchEffect")}
               </Typography>
               <TeamBalance
                 projection={assessment.projection}
@@ -748,23 +803,22 @@ const ProposalDetail = ({
                 color="text.secondary"
                 sx={{ display: "block", mt: 1.5 }}
               >
-                Die Werte gelten für diesen Kandidaten im gespeicherten
-                Snapshot. Strategie-Gesamtwerte stehen separat in den
-                technischen Details.
+                {i18n.t("settingsPanels.autobalancer.candidateSnapshotHelp")}
               </Typography>
             </CardContent>
           </Card>
 
           {(decision.audit_warnings || []).map((warning) => (
             <Alert key={warning} severity="error">
-              Automatische Regelwarnung: {warning}
+              {i18n.t("settingsPanels.autobalancer.automaticRuleWarning")}{" "}
+              {translateOperatorMessage(warning, i18n.t)}
             </Alert>
           ))}
 
           <Accordion variant="outlined" disableGutters>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                Technische Details anzeigen
+                {i18n.t("settingsPanels.autobalancer.showTechnical")}
               </Typography>
             </AccordionSummary>
             <AccordionDetails>
@@ -779,37 +833,42 @@ const ProposalDetail = ({
                 }}
               >
                 <Typography variant="caption" color="text.secondary">
-                  Strategie:{" "}
-                  {STRATEGY_LABELS[decision.strategy_version] ||
+                  {i18n.t("settingsPanels.autobalancer.strategyLabel")}{" "}
+                  {STRATEGY_LABELS()[decision.strategy_version] ||
                     decision.strategy_version ||
                     "Legacy"}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Ratingmodell: {decision.rating_model_version || "Legacy"}
+                  {i18n.t("settingsPanels.autobalancer.ratingModelLabel")}{" "}
+                  {decision.rating_model_version || "Legacy"}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Effektives Rating: {Math.round(decision.rating ?? 50)}/100
+                  {i18n.t("settingsPanels.autobalancer.effectiveRatingLabel")}{" "}
+                  {Math.round(decision.rating ?? 50)}/100
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Rohwert:{" "}
+                  {i18n.t("settingsPanels.autobalancer.rawValueLabel")}{" "}
                   {decision.rating_raw == null
                     ? "–"
                     : `${Math.round(decision.rating_raw)}/100`}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Rollenfamilie:{" "}
-                  {ROLE_FAMILY_LABELS[decision.rating_role_family] ||
+                  {i18n.t("settingsPanels.autobalancer.roleFamilyLabel")}{" "}
+                  {ROLE_FAMILY_LABELS()[decision.rating_role_family] ||
                     decision.rating_role_family ||
                     "Legacy"}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Historie: {decision.rating_history_source || "Legacy"}
+                  {i18n.t("settingsPanels.autobalancer.historyLabel")}{" "}
+                  {decision.rating_history_source || "Legacy"}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Verbunden: {formatMinutes(decision.connected_seconds)}
+                  {i18n.t("settingsPanels.autobalancer.connectedLabel")}{" "}
+                  {formatMinutes(decision.connected_seconds)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Im Squad: {formatMinutes(decision.squad_seconds)}
+                  {i18n.t("settingsPanels.autobalancer.inSquadLabel")}{" "}
+                  {formatMinutes(decision.squad_seconds)}
                 </Typography>
               </Box>
             </AccordionDetails>
@@ -825,11 +884,10 @@ const ProposalDetail = ({
               >
                 <Box>
                   <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                    Wie bewertest du diesen Vorschlag?
+                    {i18n.t("settingsPanels.autobalancer.reviewQuestion")}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    Im Shadow-Modus wird nur die Bewertung gespeichert. Es wird
-                    kein Spieler verschoben.
+                    {i18n.t("settingsPanels.autobalancer.shadowReviewHelp")}
                   </Typography>
                 </Box>
                 {canReview ? (
@@ -845,10 +903,10 @@ const ProposalDetail = ({
                       disabled={reviewPending}
                       onClick={() => onReject(decision)}
                     >
-                      Nicht akzeptabel
+                      {i18n.t("settingsPanels.autobalancer.unacceptable")}
                     </Button>
                     <Button color="inherit" variant="outlined" onClick={onBack}>
-                      Später prüfen
+                      {i18n.t("settingsPanels.autobalancer.reviewLater")}
                     </Button>
                     <Button
                       color="success"
@@ -856,13 +914,14 @@ const ProposalDetail = ({
                       disabled={reviewPending || assessment.color === "error"}
                       onClick={() => onAccept(decision)}
                     >
-                      Kandidat akzeptabel
+                      {i18n.t(
+                        "settingsPanels.autobalancer.candidateAcceptable"
+                      )}
                     </Button>
                   </Stack>
                 ) : (
                   <Alert severity="info">
-                    Zum Bewerten ist die Berechtigung „Autobalancer ausführen“
-                    erforderlich.
+                    {i18n.t("settingsPanels.autobalancer.reviewPermission")}
                   </Alert>
                 )}
               </Stack>
@@ -874,11 +933,11 @@ const ProposalDetail = ({
           <Card variant="outlined">
             <CardContent>
               <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                Warum dieser Spieler?
+                {i18n.t("settingsPanels.autobalancer.whyPlayer")}
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                {decision.selection_reason ||
-                  "Für diesen Vorschlag wurde kein Auswahlgrund gespeichert."}
+                {translateOperatorMessage(decision.selection_reason, i18n.t) ||
+                  i18n.t("settingsPanels.autobalancer.noSelectionReason")}
               </Typography>
               <Stack spacing={1} sx={{ mt: 2 }}>
                 <Stack direction="row" justifyContent="space-between" gap={1}>
@@ -889,26 +948,30 @@ const ProposalDetail = ({
                     variant="body2"
                     sx={{ fontWeight: 700, textAlign: "right" }}
                   >
-                    {decision.unit_name || "Nicht zugewiesen"}
+                    {decision.unit_name ||
+                      i18n.t("settingsPanels.autobalancer.unassigned")}
                   </Typography>
                 </Stack>
                 <Stack direction="row" justifyContent="space-between" gap={1}>
                   <Typography variant="body2" color="text.secondary">
-                    Rolle
+                    {i18n.t("settingsPanels.autobalancer.role")}
                   </Typography>
                   <Typography
                     variant="body2"
                     sx={{ fontWeight: 700, textAlign: "right" }}
                   >
-                    {decision.role || "Unbekannt"}
+                    {decision.role ||
+                      i18n.t("settingsPanels.autobalancer.unknown")}
                   </Typography>
                 </Stack>
                 <Stack direction="row" justifyContent="space-between" gap={1}>
                   <Typography variant="body2" color="text.secondary">
-                    Squad-Eingriff
+                    {i18n.t("settingsPanels.autobalancer.squadImpact")}
                   </Typography>
                   <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                    {assessment.squadImpact}
+                    {i18n.t(
+                      `settingsPanels.autobalancer.${assessment.squadImpact}`
+                    )}
                   </Typography>
                 </Stack>
               </Stack>
@@ -918,7 +981,7 @@ const ProposalDetail = ({
           <Card variant="outlined">
             <CardContent>
               <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                Alternative
+                {i18n.t("settingsPanels.autobalancer.alternative")}
               </Typography>
               {alternative ? (
                 <>
@@ -930,9 +993,9 @@ const ProposalDetail = ({
                     <strong>
                       {alternative[1].player_name || alternative[1].player_id}
                     </strong>{" "}
-                    wird von „
-                    {STRATEGY_LABELS[alternative[0]] || alternative[0]}“ zuerst
-                    gewählt.
+                    {i18n.t("settingsPanels.autobalancer.selectedByPrefix")}
+                    {STRATEGY_LABELS()[alternative[0]] || alternative[0]}
+                    {i18n.t("settingsPanels.autobalancer.selectedBySuffix")}
                   </Typography>
                   <Stack spacing={1} sx={{ mt: 2 }}>
                     <Stack
@@ -941,7 +1004,7 @@ const ProposalDetail = ({
                       gap={1}
                     >
                       <Typography variant="body2" color="text.secondary">
-                        Gesamtplan danach
+                        {i18n.t("settingsPanels.autobalancer.planAfter")}
                       </Typography>
                       <Typography variant="body2" sx={{ fontWeight: 700 }}>
                         {formatNumber(alternative[1].projected_rating_gap)}
@@ -953,7 +1016,7 @@ const ProposalDetail = ({
                       gap={1}
                     >
                       <Typography variant="body2" color="text.secondary">
-                        Schutzstufe
+                        {i18n.t("settingsPanels.autobalancer.protectionTier")}
                       </Typography>
                       <Typography variant="body2" sx={{ fontWeight: 700 }}>
                         {alternative[1].effective_tier ?? "–"}
@@ -967,7 +1030,7 @@ const ProposalDetail = ({
                   color="text.secondary"
                   sx={{ mt: 1 }}
                 >
-                  Die Strategien nennen keinen anderen ersten Kandidaten.
+                  {i18n.t("settingsPanels.autobalancer.noAlternative")}
                 </Typography>
               )}
             </CardContent>
@@ -976,7 +1039,7 @@ const ProposalDetail = ({
           <Card variant="outlined">
             <CardContent>
               <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                Datenqualität
+                {i18n.t("settingsPanels.autobalancer.dataQuality")}
               </Typography>
               <Stack direction="row" gap={1} flexWrap="wrap" sx={{ mt: 1.5 }}>
                 <Chip
@@ -984,8 +1047,8 @@ const ProposalDetail = ({
                   color={decision.audit_warnings?.length ? "error" : "success"}
                   label={
                     decision.audit_warnings?.length
-                      ? "Snapshot prüfen"
-                      : "Snapshot vollständig"
+                      ? i18n.t("settingsPanels.autobalancer.checkSnapshot")
+                      : i18n.t("settingsPanels.autobalancer.completeSnapshot")
                   }
                 />
                 <Chip
@@ -993,8 +1056,8 @@ const ProposalDetail = ({
                   color={assessment.ratingReliable ? "success" : "warning"}
                   label={
                     assessment.ratingReliable
-                      ? "Rating ausreichend"
-                      : "Rating unsicher"
+                      ? i18n.t("settingsPanels.autobalancer.sufficientRating")
+                      : i18n.t("settingsPanels.autobalancer.uncertainRating")
                   }
                 />
               </Stack>
@@ -1003,7 +1066,7 @@ const ProposalDetail = ({
                 color="text.secondary"
                 sx={{ display: "block", mt: 1.5 }}
               >
-                Jede Kennzeichnung gilt nur für den genannten Datenblock.
+                {i18n.t("settingsPanels.autobalancer.qualityScope")}
               </Typography>
             </CardContent>
           </Card>
@@ -1016,7 +1079,7 @@ const ProposalDetail = ({
 const ProposalQueue = ({
   decisions,
   onOpen,
-  emptyMessage = "Noch keine Shadow-Vorschläge vorhanden.",
+  emptyMessage = i18n.t("settingsPanels.autobalancer.noShadowProposals"),
   emptySeverity = "info",
 }) => {
   if (!decisions.length) {
@@ -1047,7 +1110,8 @@ const ProposalQueue = ({
                     sx={{ fontWeight: 700 }}
                     noWrap
                   >
-                    {decision.player_name || "Unbekannter Kandidat"}
+                    {decision.player_name ||
+                      i18n.t("settingsPanels.autobalancer.unknownCandidate")}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
                     {getTeamLabels(decision)[decision.source_team]} →{" "}
@@ -1058,13 +1122,15 @@ const ProposalQueue = ({
                 <Box>
                   <Typography variant="body2" sx={{ fontWeight: 700 }}>
                     {assessment.countImproves
-                      ? "Spielerzahl wird besser"
-                      : "Teamzählung prüfen"}
+                      ? i18n.t("settingsPanels.autobalancer.countsImprove")
+                      : i18n.t("settingsPanels.autobalancer.checkCounts")}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
                     {assessment.projection
                       ? `${assessment.projection.before.allies}:${assessment.projection.before.axis} → ${assessment.projection.after.allies}:${assessment.projection.after.axis}`
-                      : "Keine vollständige Projektion"}
+                      : i18n.t(
+                          "settingsPanels.autobalancer.incompleteProjection"
+                        )}
                   </Typography>
                 </Box>
                 <Chip
@@ -1078,20 +1144,32 @@ const ProposalQueue = ({
                   }
                   label={
                     decision.review_verdict === "accepted"
-                      ? "Akzeptabel"
+                      ? i18n.t("settingsPanels.autobalancer.acceptable")
                       : decision.review_verdict === "rejected"
-                      ? "Nicht akzeptabel"
+                      ? i18n.t("settingsPanels.autobalancer.unacceptable")
                       : assessment.label
                   }
                 />
                 <Button
                   variant="outlined"
                   onClick={() => onOpen(decision)}
-                  aria-label={`Vorschlag für ${
-                    decision.player_name || "unbekannten Kandidaten"
-                  } ${isReviewed ? "ansehen" : "prüfen"}`}
+                  aria-label={i18n.t(
+                    "settingsPanels.autobalancer.proposalAction",
+                    {
+                      v0:
+                        decision.player_name ||
+                        i18n.t(
+                          "settingsPanels.autobalancer.unknownCandidateLower"
+                        ),
+                      v1: isReviewed
+                        ? i18n.t("settingsPanels.autobalancer.viewLower")
+                        : i18n.t("settingsPanels.autobalancer.reviewLower"),
+                    }
+                  )}
                 >
-                  {isReviewed ? "Ansehen" : "Prüfen"}
+                  {isReviewed
+                    ? i18n.t("settingsPanels.autobalancer.view")
+                    : i18n.t("settingsPanels.autobalancer.review")}
                 </Button>
               </Box>
             </CardContent>
@@ -1114,6 +1192,7 @@ const AutobalancerModeratorDashboard = ({
   onReject,
   onOpenSettings,
 }) => {
+  useTranslation();
   const [section, setSection] = useState("live");
   const [selectedDecisionId, setSelectedDecisionId] = useState(null);
   const summary = data.summary || {};
@@ -1142,25 +1221,32 @@ const AutobalancerModeratorDashboard = ({
       ? `${teamLabels[sourceTeam] || sourceTeam} → ${
           teamLabels[targetTeam] || targetTeam
         }`
-      : "Kandidat aus dem neuesten Vorschlag"
-    : "Wird angelegt, sobald ein Eingriff nötig ist";
+      : i18n.t("settingsPanels.autobalancer.newestCandidate")
+    : i18n.t("settingsPanels.autobalancer.proposalWhenNeeded");
   const timelineSteps = [
     {
-      label: "Live-Zustand",
-      value: PHASE_LABELS[status.phase] || modeStatus.title,
+      label: i18n.t("settingsPanels.autobalancer.liveState"),
+      value: PHASE_LABELS()[status.phase] || modeStatus.title,
       caption: modeStatus.detail,
       color: status.phase === "blocked" ? "warning.main" : "info.main",
       icon: <InsightsIcon aria-hidden />,
     },
     {
-      label: "Balance-Delta",
-      value: difference == null ? "Nicht messbar" : `${difference} Spieler`,
+      label: i18n.t("settingsPanels.autobalancer.balanceDelta"),
+      value:
+        difference == null
+          ? i18n.t("settingsPanels.autobalancer.notMeasurable")
+          : i18n.t("settingsPanels.autobalancer.playerCount", {
+              v0: difference,
+            }),
       caption:
         status.required_switches > 0
-          ? `${status.required_switches} Wechsel nötig`
+          ? i18n.t("settingsPanels.autobalancer.switchesNeeded", {
+              v0: status.required_switches,
+            })
           : hasCounts
-          ? "Im erlaubten Bereich"
-          : "Live-Snapshot unvollständig",
+          ? i18n.t("settingsPanels.autobalancer.withinRange")
+          : i18n.t("settingsPanels.autobalancer.incompleteLiveSnapshot"),
       color:
         difference > (config?.target_difference ?? 2)
           ? "warning.main"
@@ -1168,42 +1254,50 @@ const AutobalancerModeratorDashboard = ({
       icon: <BalanceIcon aria-hidden />,
     },
     {
-      label: "Geplante Verschiebung",
+      label: i18n.t("settingsPanels.autobalancer.plannedSwitch"),
       value:
-        plannedMove?.player_name || plannedMove?.name || "Noch kein Kandidat",
+        plannedMove?.player_name ||
+        plannedMove?.name ||
+        i18n.t("settingsPanels.autobalancer.noCandidateYet"),
       caption: plannedMoveCaption,
       color: plannedMove ? "primary.main" : "text.secondary",
       icon: <PlaylistAddCheckIcon aria-hidden />,
     },
     {
-      label: "Letzter Eingriff",
+      label: i18n.t("settingsPanels.autobalancer.lastIntervention"),
       value:
-        config?.mode === "shadow" ? "Kein Live-Eingriff" : "Nicht gemeldet",
+        config?.mode === "shadow"
+          ? i18n.t("settingsPanels.autobalancer.noLiveIntervention")
+          : i18n.t("settingsPanels.autobalancer.notReported"),
       caption:
         config?.mode === "shadow"
-          ? "Shadow-Modus führt keine Spielerwechsel aus"
-          : "Der aktuelle Status liefert noch keine Eingriffshistorie",
+          ? i18n.t("settingsPanels.autobalancer.noShadowSwitches")
+          : i18n.t("settingsPanels.autobalancer.noInterventionHistory"),
       icon: <HistoryIcon aria-hidden />,
     },
     {
       label: "Cooldown",
       value:
         status.phase === "cooldown"
-          ? "Stabilitätsprüfung läuft"
-          : `${config?.cooldown_maps ?? 3} Karten Schutz`,
+          ? i18n.t("settingsPanels.autobalancer.cooldown")
+          : i18n.t("settingsPanels.autobalancer.mapProtection", {
+              v0: config?.cooldown_maps ?? 3,
+            }),
       caption:
         status.phase === "cooldown"
-          ? "Nach dem letzten Wechsel wird die Lage neu geprüft"
-          : "Schutz nach einem bestätigten Wechsel",
+          ? i18n.t("settingsPanels.autobalancer.recheckingAfterSwitch")
+          : i18n.t("settingsPanels.autobalancer.protectionAfterSwitch"),
       color: status.phase === "cooldown" ? "warning.main" : "text.primary",
       icon: <ShieldOutlinedIcon aria-hidden />,
     },
   ];
   const nextTask = pending.length
     ? pending.length === 1
-      ? "1 Vorschlag wartet auf eine Bewertung"
-      : `${pending.length} Vorschläge warten auf eine Bewertung`
-    : "Aktuell wartet kein Vorschlag auf eine Bewertung";
+      ? i18n.t("settingsPanels.autobalancer.onePending")
+      : i18n.t("settingsPanels.autobalancer.pendingCount", {
+          v0: pending.length,
+        })
+    : i18n.t("settingsPanels.autobalancer.nonePending");
 
   const openDecision = (decision) => {
     setSelectedDecisionId(decision.decision_id);
@@ -1246,7 +1340,7 @@ const AutobalancerModeratorDashboard = ({
             Autobalancer
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            Live-Zustand, Vorschlagsprüfung und Pilotfreigabe für Moderatoren
+            {i18n.t("settingsPanels.autobalancer.moderatorIntro")}
           </Typography>
         </Box>
         <Stack direction="row" gap={1} flexWrap="wrap">
@@ -1254,7 +1348,9 @@ const AutobalancerModeratorDashboard = ({
             icon={config?.mode === "shadow" ? <ScienceIcon /> : <BalanceIcon />}
             color={modeStatus.color}
             label={
-              MODE_LABELS[config?.mode] || config?.mode || "Unbekannter Modus"
+              MODE_LABELS()[config?.mode] ||
+              config?.mode ||
+              i18n.t("settingsPanels.autobalancer.unknownMode")
             }
           />
           <Button
@@ -1263,7 +1359,7 @@ const AutobalancerModeratorDashboard = ({
             disabled={isFetching}
             onClick={onRefresh}
           >
-            Aktualisieren
+            {i18n.t("settingsPanels.autobalancer.refresh")}
           </Button>
         </Stack>
       </Stack>
@@ -1273,20 +1369,31 @@ const AutobalancerModeratorDashboard = ({
         size="small"
         sx={{ mt: 2, display: { xs: "flex", md: "none" } }}
       >
-        <InputLabel id="autobalancer-section-label">Bereich</InputLabel>
+        <InputLabel id="autobalancer-section-label">
+          {i18n.t("settingsPanels.autobalancer.section")}
+        </InputLabel>
         <Select
           labelId="autobalancer-section-label"
           value={section}
-          label="Bereich"
+          label={i18n.t("settingsPanels.autobalancer.section")}
           onChange={(event) => selectSection(event.target.value)}
         >
-          <MenuItem value="live">Live-Übersicht</MenuItem>
-          <MenuItem value="proposals">
-            Vorschläge prüfen ({pending.length})
+          <MenuItem value="live">
+            {i18n.t("settingsPanels.autobalancer.liveOverview")}
           </MenuItem>
-          <MenuItem value="pilot">Pilotfreigabe</MenuItem>
-          <MenuItem value="history">Historie</MenuItem>
-          <MenuItem value="settings">Einstellungen</MenuItem>
+          <MenuItem value="proposals">
+            {i18n.t("settingsPanels.autobalancer.reviewProposalsPrefix")}
+            {pending.length})
+          </MenuItem>
+          <MenuItem value="pilot">
+            {i18n.t("settingsPanels.autobalancer.pilotApproval")}
+          </MenuItem>
+          <MenuItem value="history">
+            {i18n.t("settingsPanels.autobalancer.history")}
+          </MenuItem>
+          <MenuItem value="settings">
+            {i18n.t("settingsPanels.autobalancer.settings")}
+          </MenuItem>
         </Select>
       </FormControl>
 
@@ -1312,32 +1419,33 @@ const AutobalancerModeratorDashboard = ({
           value="proposals"
           icon={<PlaylistAddCheckIcon />}
           iconPosition="start"
-          label={`Vorschläge prüfen (${pending.length})`}
+          label={i18n.t("settingsPanels.autobalancer.reviewProposalsCount", {
+            v0: pending.length,
+          })}
         />
         <Tab
           value="pilot"
           icon={<ShieldOutlinedIcon />}
           iconPosition="start"
-          label="Pilotfreigabe"
+          label={i18n.t("settingsPanels.autobalancer.pilotApproval")}
         />
         <Tab
           value="history"
           icon={<HistoryIcon />}
           iconPosition="start"
-          label="Historie"
+          label={i18n.t("settingsPanels.autobalancer.history")}
         />
         <Tab
           value="settings"
           icon={<SettingsIcon />}
           iconPosition="start"
-          label="Einstellungen"
+          label={i18n.t("settingsPanels.autobalancer.settings")}
         />
       </Tabs>
 
       {section === "settings" && (
         <Alert severity="info" sx={{ mt: 2 }}>
-          Die Einstellungen wurden unterhalb des Dashboards geöffnet. Dieser
-          Bereich ist für Administratoren vorgesehen.
+          {i18n.t("settingsPanels.autobalancer.settingsOpened")}
         </Alert>
       )}
 
@@ -1363,7 +1471,7 @@ const AutobalancerModeratorDashboard = ({
               >
                 <Box>
                   <Typography variant="overline" color="text.secondary">
-                    Was ist jetzt zu tun?
+                    {i18n.t("settingsPanels.autobalancer.whatNext")}
                   </Typography>
                   <Typography variant="h5" sx={{ fontWeight: 700 }}>
                     {nextTask}
@@ -1374,11 +1482,10 @@ const AutobalancerModeratorDashboard = ({
                     sx={{ mt: 0.75 }}
                   >
                     {pending.length
-                      ? `Prüfe als Nächstes ${Math.min(
-                          5,
-                          pending.length
-                        )} Vorschläge. So wird die Pilotfreigabe belastbarer.`
-                      : "Der Live-Zustand wird weiter beobachtet. Es ist aktuell keine Moderationsaufgabe offen."}
+                      ? i18n.t("settingsPanels.autobalancer.reviewNextCount", {
+                          v0: Math.min(5, pending.length),
+                        })
+                      : i18n.t("settingsPanels.autobalancer.noTask")}
                   </Typography>
                 </Box>
                 {pending.length > 0 && (
@@ -1387,7 +1494,7 @@ const AutobalancerModeratorDashboard = ({
                     endIcon={<ArrowForwardIcon />}
                     onClick={() => openDecision(pending[0])}
                   >
-                    Nächsten Vorschlag prüfen
+                    {i18n.t("settingsPanels.autobalancer.reviewNext")}
                   </Button>
                 )}
               </Stack>
@@ -1408,24 +1515,25 @@ const AutobalancerModeratorDashboard = ({
             }}
           >
             <MetricCard
-              label="Teamstand"
+              label={i18n.t("settingsPanels.autobalancer.teamCounts")}
               value={
                 hasCounts
                   ? `${teamLabels.allies} ${counts.allies} · ${teamLabels.axis} ${counts.axis}`
-                  : "Nicht verfügbar"
+                  : i18n.t("settingsPanels.autobalancer.unavailable")
               }
-              caption="Aktueller Live-Snapshot beider Teams"
+              caption={i18n.t("settingsPanels.autobalancer.bothTeamsSnapshot")}
             />
             <MetricCard
-              label="Pilotstatus"
+              label={i18n.t("settingsPanels.autobalancer.pilotStatus")}
               value={
                 goals.ready_for_manual
-                  ? "Bereit zur Prüfung"
-                  : "Noch nicht bereit"
+                  ? i18n.t("settingsPanels.autobalancer.readyReview")
+                  : i18n.t("settingsPanels.autobalancer.notReady")
               }
-              caption={`${
-                summary.reviewed ?? 0
-              } von ${totalReviewsTarget} Bewertungen abgeschlossen`}
+              caption={i18n.t("settingsPanels.autobalancer.reviewProgress", {
+                v0: summary.reviewed ?? 0,
+                v1: totalReviewsTarget,
+              })}
               color={goals.ready_for_manual ? "success.main" : "text.primary"}
             />
           </Box>
@@ -1439,14 +1547,14 @@ const AutobalancerModeratorDashboard = ({
           >
             <Box>
               <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                Offene Vorschläge
+                {i18n.t("settingsPanels.autobalancer.openProposals")}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Nur unbewertete Vorschläge, neueste zuerst
+                {i18n.t("settingsPanels.autobalancer.openProposalsHelp")}
               </Typography>
             </Box>
             <Button color="inherit" onClick={() => switchSection("proposals")}>
-              Alle {pending.length} anzeigen
+              {i18n.t("settingsPanels.autobalancer.showAll", { count: pending.length })}
             </Button>
           </Stack>
           <ProposalQueue
@@ -1454,19 +1562,18 @@ const AutobalancerModeratorDashboard = ({
             onOpen={openDecision}
             emptyMessage={
               decisions.length
-                ? "Alle vorhandenen Shadow-Vorschläge wurden bewertet. Neue Einträge erscheinen automatisch."
-                : "Noch kein Shadow-Vorschlag vorhanden. Ein Eintrag erscheint, sobald ein Balancevorfall erkannt wird."
+                ? i18n.t("settingsPanels.autobalancer.allReviewed")
+                : i18n.t("settingsPanels.autobalancer.noIncidentYet")
             }
             emptySeverity={decisions.length ? "success" : "info"}
           />
 
           <Box sx={{ mt: 3, mb: 1.5 }}>
             <Typography variant="h5" sx={{ fontWeight: 700 }}>
-              Kann ich den Daten vertrauen?
+              {i18n.t("settingsPanels.autobalancer.trustData")}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Jede Kennzahl nennt ihren Bezug und die Folge für die
-              Entscheidung.
+              {i18n.t("settingsPanels.autobalancer.metricScope")}
             </Typography>
           </Box>
           <Box
@@ -1480,24 +1587,28 @@ const AutobalancerModeratorDashboard = ({
             }}
           >
             <QualityCard
-              title="Live-Snapshot vollständig"
+              title={i18n.t("settingsPanels.autobalancer.liveSnapshotComplete")}
               value={
                 status.data_confidence >= 0.95
-                  ? "Ja"
+                  ? i18n.t("settingsPanels.autobalancer.yes")
                   : formatPercent(status.data_confidence)
               }
               color={status.data_confidence >= 0.95 ? "success" : "warning"}
               progress={(status.data_confidence || 0) * 100}
-              explanation="Gilt für die aktuelle Teamzählung. Bei unvollständigen Daten darf daraus keine Wechselentscheidung entstehen."
+              explanation={i18n.t(
+                "settingsPanels.autobalancer.liveSnapshotCompleteHelp"
+              )}
             />
             <QualityCard
-              title="Rating ausreichend sicher"
+              title={i18n.t("settingsPanels.autobalancer.ratingReliable")}
               value={formatPercent(summary.median_rating_confidence)}
               color={
                 summary.median_rating_confidence >= 0.6 ? "success" : "warning"
               }
               progress={(summary.median_rating_confidence || 0) * 100}
-              explanation="Gilt für die bewerteten Shadow-Vorschläge. Unter 60 % ist das Rating nur ein Hinweis."
+              explanation={i18n.t(
+                "settingsPanels.autobalancer.ratingReliableHelp"
+              )}
             />
           </Box>
 
@@ -1505,11 +1616,10 @@ const AutobalancerModeratorDashboard = ({
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
               <Box>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                  Live-Diagnose und Diagramme
+                  {i18n.t("settingsPanels.autobalancer.liveDiagnostics")}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Technische Zeitreihen für Ursachenanalyse und
-                  Betriebskontrolle
+                  {i18n.t("settingsPanels.autobalancer.liveDiagnosticsHelp")}
                 </Typography>
               </Box>
             </AccordionSummary>
@@ -1536,16 +1646,17 @@ const AutobalancerModeratorDashboard = ({
           >
             <Box>
               <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                Vorschläge prüfen
+                {i18n.t("settingsPanels.autobalancer.reviewProposals")}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Bewerte einen Kandidaten anhand derselben fünf Fairnessfragen.
+                {i18n.t("settingsPanels.autobalancer.reviewFairness")}
               </Typography>
             </Box>
             <Chip
-              label={`${pending.length} offen · ${
-                summary.reviewed ?? 0
-              } bewertet`}
+              label={i18n.t("settingsPanels.autobalancer.openReviewedCount", {
+                v0: pending.length,
+                v1: summary.reviewed ?? 0,
+              })}
             />
           </Stack>
           <ProposalQueue
@@ -1553,8 +1664,8 @@ const AutobalancerModeratorDashboard = ({
             onOpen={openDecision}
             emptyMessage={
               decisions.length
-                ? "Keine offenen Vorschläge. Alle vorhandenen Bewertungen sind abgeschlossen."
-                : "Noch kein Shadow-Vorschlag vorhanden."
+                ? i18n.t("settingsPanels.autobalancer.noOpenProposals")
+                : i18n.t("settingsPanels.autobalancer.noShadowProposal")
             }
             emptySeverity={decisions.length ? "success" : "info"}
           />
@@ -1562,15 +1673,14 @@ const AutobalancerModeratorDashboard = ({
           {reviewed.length > 0 && (
             <Box sx={{ mt: 3 }}>
               <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
-                Bereits bewertet
+                {i18n.t("settingsPanels.autobalancer.alreadyReviewed")}
               </Typography>
               <Typography
                 variant="body2"
                 color="text.secondary"
                 sx={{ mb: 1.5 }}
               >
-                Diese Entscheidungen bleiben für Kontrolle und Korrekturen
-                einsehbar.
+                {i18n.t("settingsPanels.autobalancer.reviewHistoryHelp")}
               </Typography>
               <ProposalQueue decisions={reviewed} onOpen={openDecision} />
             </Box>
@@ -1586,11 +1696,10 @@ const AutobalancerModeratorDashboard = ({
           >
             <strong>
               {goals.ready_for_manual
-                ? "Bereit zur gemeinsamen Prüfung."
-                : "Noch nicht für den manuellen Betrieb bereit."}
+                ? i18n.t("settingsPanels.autobalancer.readyJointReview")
+                : i18n.t("settingsPanels.autobalancer.notReadyManual")}
             </strong>{" "}
-            Die Freigabe erfolgt immer bewusst durch Administratoren; es gibt
-            keine automatische Umschaltung.
+            {i18n.t("settingsPanels.autobalancer.approvalAlwaysManual")}
           </Alert>
           <AutobalancerHistoryDashboard
             config={config}
@@ -1610,3 +1719,4 @@ const AutobalancerModeratorDashboard = ({
 };
 
 export default AutobalancerModeratorDashboard;
+import "@/i18n/register-settings-panels";

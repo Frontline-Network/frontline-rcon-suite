@@ -178,6 +178,7 @@ export function ControlActionBar({
   saving,
   saveDisabled,
 }) {
+  const { t } = useTranslation();
   return (
     <Stack
       direction={{ xs: "column", sm: "row" }}
@@ -208,10 +209,8 @@ export function ControlActionBar({
         )}
         <Typography variant="body2" fontWeight={800}>
           {dirtyCount
-            ? `${dirtyCount} ungespeicherte ${
-                dirtyCount === 1 ? "Änderung" : "Änderungen"
-              }`
-            : "Keine ungespeicherten Änderungen"}
+            ? t("settingsPanels.controls.unsaved", { count: dirtyCount })
+            : t("settingsPanels.controls.noChanges")}
         </Typography>
       </Stack>
       <Button
@@ -220,7 +219,7 @@ export function ControlActionBar({
         onClick={onReset}
         sx={{ borderRadius: 0 }}
       >
-        Werte zurücksetzen
+        {t("settingsPanels.controls.reset")}
       </Button>
       <Button
         variant="contained"
@@ -228,13 +227,18 @@ export function ControlActionBar({
         onClick={onSave}
         sx={{ borderRadius: 0, minWidth: 210 }}
       >
-        {saving ? "Wird gespeichert …" : "Änderungen speichern"}
+        {t(
+          saving
+            ? "settingsPanels.controls.saving"
+            : "settingsPanels.controls.save"
+        )}
       </Button>
     </Stack>
   );
 }
 
 export function RowStatus({ dirty, error }) {
+  const { t } = useTranslation();
   return (
     <Stack
       direction="row"
@@ -248,8 +252,15 @@ export function RowStatus({ dirty, error }) {
         <CheckCircleOutlineRoundedIcon fontSize="small" />
       )}
       <Typography variant="body2" fontWeight={700} color="inherit">
-        {error ? "Fehlgeschlagen" : dirty ? "Geändert" : "Gespeichert"}
+        {t(
+          error
+            ? "settingsPanels.controls.failed"
+            : dirty
+            ? "settingsPanels.controls.changed"
+            : "settingsPanels.controls.saved"
+        )}
       </Typography>
     </Stack>
   );
 }
+import "@/i18n/register-settings-panels";

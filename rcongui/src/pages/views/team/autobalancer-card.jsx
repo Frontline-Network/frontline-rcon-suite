@@ -26,6 +26,7 @@ import { ActionButton } from "@/features/player-action/ActionMenu";
 import { Actions } from "@/features/player-action/actions";
 import { cmd } from "@/utils/fetchUtils";
 import { getThemeTeamColors } from "@/themes/teamColors";
+import { formatRoleLabel } from "../live/player-display-labels";
 import {
   buildLiveBalanceStatus,
   validateLiveRecommendation,
@@ -63,16 +64,18 @@ const settingsFromConfig = (config) => ({
 const clamp = (value, minimum, maximum) =>
   Math.min(maximum, Math.max(minimum, value));
 
-const formatRating = (value) =>
+const ratingFormatter = (language) => (value) =>
   Number.isFinite(value)
-    ? new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(value)
+    ? new Intl.NumberFormat(language, { maximumFractionDigits: 1 }).format(
+        value
+      )
     : "–";
 
-const qualityLabel = (confidence) => {
-  if (!Number.isFinite(confidence)) return "Nicht messbar";
-  if (confidence >= 0.8) return "Hohe Aussagekraft";
-  if (confidence >= 0.6) return "Mittlere Aussagekraft";
-  return "Niedrige Aussagekraft";
+const qualityLabel = (t, confidence) => {
+  if (!Number.isFinite(confidence)) return t("liveViews.balance.notMeasurable");
+  if (confidence >= 0.8) return t("liveViews.balance.confidenceHigh");
+  if (confidence >= 0.6) return t("liveViews.balance.confidenceMedium");
+  return t("liveViews.balance.confidenceLow");
 };
 
 const qualityColor = (confidence) => {
@@ -106,6 +109,8 @@ const Metric = ({ label, children, divider = true }) => (
 );
 
 const StrengthBar = ({ allies, axis, label }) => {
+  const { t, i18n } = useTranslation();
+  const formatRating = ratingFormatter(i18n.resolvedLanguage);
   const theme = useTheme();
   const teamColors = getThemeTeamColors(theme);
   const hasRatings = Number.isFinite(allies) && Number.isFinite(axis);
@@ -124,9 +129,11 @@ const StrengthBar = ({ allies, axis, label }) => {
       </Stack>
       <Box
         role="img"
-        aria-label={`${label}: Alliierte ${formatRating(
-          allies
-        )}, Achsenmächte ${formatRating(axis)}`}
+        aria-label={t("liveViews.balance.barDescription", {
+          label,
+          allies: formatRating(allies),
+          axis: formatRating(axis),
+        })}
         sx={{
           position: "relative",
           display: "flex",
@@ -162,7 +169,8 @@ const AutobalancerCard = ({
   detailsDisabled = false,
   detailsFeedback,
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const formatRating = ratingFormatter(i18n.resolvedLanguage);
   const detailsId = useId();
   const theme = useTheme();
   const teamColors = getThemeTeamColors(theme);
@@ -251,8 +259,8 @@ const AutobalancerCard = ({
     const counts = status.team_counts || {};
     const ratings = status.team_ratings || {};
     const teamLabels = status.team_labels || {
-      allies: "Alliierte",
-      axis: "Achsenmächte",
+      allies: t("views.team.allies"),
+      axis: t("views.team.axis"),
     };
     const countDifference =
       Number.isFinite(counts.allies) && Number.isFinite(counts.axis)
@@ -307,19 +315,19 @@ const AutobalancerCard = ({
       ? Math.min(dataConfidence, pairConfidence)
       : dataConfidence;
 
-    let headline = "Teams ausgeglichen";
+    let headline = t("liveViews.balance.balancedTeams");
     let tone = "success";
     if (blocked) {
-      headline = "Ausgleich derzeit blockiert";
+      headline = t("liveViews.balance.blocked");
       tone = "warning";
     } else if (countUnbalanced) {
-      headline = "Spielerzahl unausgeglichen";
+      headline = t("liveViews.balance.unevenCounts");
       tone = "error";
     } else if (strengthUnbalanced) {
-      headline = "Geschätzte Teamstärke unausgeglichen";
+      headline = t("liveViews.balance.unevenStrength");
       tone = "error";
     } else if (warning) {
-      headline = "Balance weiter beobachten";
+      headline = t("liveViews.balance.keepWatching");
       tone = "warning";
     }
 
@@ -328,32 +336,36 @@ const AutobalancerCard = ({
           kind: squadRecommendation.kind,
           title:
             squadRecommendation.kind === "squad_swap"
-              ? "Koordinierter Squad-Tausch"
-              : "Squad gemeinsam wechseln",
-          detail: `${squadRecommendation.member_count} Spieler bleiben als Gruppe zusammen`,
+              ? t("liveViews.balance.squadSwap")
+              : t("liveViews.balance.squadMove"),
+          detail: t("liveViews.balance.groupTogether", {
+            count: squadRecommendation.member_count,
+          }),
         }
       : strengthSwap
       ? {
           kind: "swap",
-          title: "Kontrollierter 1:1-Tausch",
-          detail: "Spielerzahl bleibt unverändert",
+          title: t("liveViews.balance.controlledSwap"),
+          detail: t("liveViews.balance.countUnchanged"),
         }
       : proposal
       ? {
           kind: "move",
-          title: "Kontrollierter Teamwechsel",
-          detail: `${status.required_switches || 1} Wechsel vorgesehen`,
+          title: t("liveViews.balance.controlledMove"),
+          detail: t("liveViews.balance.plannedSwitches", {
+            count: status.required_switches || 1,
+          }),
         }
       : {
           kind: "observe",
           title:
             countUnbalanced || strengthUnbalanced
-              ? "Analyse läuft"
-              : "Kein Eingriff",
+              ? t("liveViews.balance.analysing")
+              : t("liveViews.balance.noIntervention"),
           detail:
             countUnbalanced || strengthUnbalanced
-              ? "Noch kein sicherer Kandidat"
-              : "Innerhalb der Grenzwerte",
+              ? t("liveViews.balance.noCandidate")
+              : t("liveViews.balance.withinLimits"),
         };
 
     const projectedRatings =
@@ -393,7 +405,7 @@ const AutobalancerCard = ({
         Boolean(squadRecommendation) ||
         Boolean(proposal),
     };
-  }, [status, liveStatus]);
+  }, [status, liveStatus, t]);
 
   const highlights = useMemo(() => {
     if (!insight || !validated[0]) return {};
@@ -409,9 +421,10 @@ const AutobalancerCard = ({
             player.player_id,
             {
               targetTeam: move.target_team,
-              label: `${move.squad_name} gemeinsam nach ${
-                insight.teamLabels[move.target_team]
-              }`,
+              label: t("liveViews.balance.squadDestination", {
+                squad: move.squad_name,
+                team: insight.teamLabels[move.target_team],
+              }),
             },
           ]);
         })
@@ -423,15 +436,15 @@ const AutobalancerCard = ({
       return {
         [stronger?.player_id]: {
           targetTeam: insight.strengthSwap.weaker_team,
-          label: `Empfohlen nach ${
-            insight.teamLabels[insight.strengthSwap.weaker_team]
-          }`,
+          label: t("liveViews.balance.recommendedDestination", {
+            team: insight.teamLabels[insight.strengthSwap.weaker_team],
+          }),
         },
         [weaker?.player_id]: {
           targetTeam: insight.strengthSwap.stronger_team,
-          label: `Empfohlen nach ${
-            insight.teamLabels[insight.strengthSwap.stronger_team]
-          }`,
+          label: t("liveViews.balance.recommendedDestination", {
+            team: insight.teamLabels[insight.strengthSwap.stronger_team],
+          }),
         },
       };
     }
@@ -439,14 +452,16 @@ const AutobalancerCard = ({
       return {
         [insight.proposal.player_id]: {
           targetTeam: insight.targetTeam,
-          label: `Empfohlen nach ${
-            insight.teamLabels[insight.targetTeam] || "Gegenteam"
-          }`,
+          label: t("liveViews.balance.recommendedDestination", {
+            team:
+              insight.teamLabels[insight.targetTeam] ||
+              t("liveViews.balance.otherTeam"),
+          }),
         },
       };
     }
     return {};
-  }, [insight, validated]);
+  }, [insight, validated, t]);
 
   useEffect(() => {
     onHighlightPlayers?.(highlights);
@@ -492,15 +507,21 @@ const AutobalancerCard = ({
       !insight.warning,
     reviewing: reviewOpen,
   };
-  const notice = recommendationNotice({
-    ...noticeContext,
-    valid: Boolean(validated[0]),
-  });
-  const reviewNotice = recommendationNotice({
-    ...noticeContext,
-    valid: activeValid,
-    reviewing: true,
-  });
+  const notice = recommendationNotice(
+    {
+      ...noticeContext,
+      valid: Boolean(validated[0]),
+    },
+    t
+  );
+  const reviewNotice = recommendationNotice(
+    {
+      ...noticeContext,
+      valid: activeValid,
+      reviewing: true,
+    },
+    t
+  );
   const hasProjection =
     Number.isFinite(insight.projectedRatings?.allies) &&
     Number.isFinite(insight.projectedRatings?.axis);
@@ -551,6 +572,7 @@ const AutobalancerCard = ({
     ? {
         ...baseAction,
         preflight: balanceActionPreflight({
+          t,
           recommendation: activeRecommendation,
           recipientIds: actionRecipients.map((player) => player.player_id),
           readTeams: () => cmd.GET_LIVE_TEAMS({ throwRouteError: false }),
@@ -565,7 +587,7 @@ const AutobalancerCard = ({
   return (
     <Box
       component="section"
-      aria-label="Live-Balance-Assistent"
+      aria-label={t("liveViews.balance.assistant")}
       sx={(theme) => ({
         mb: 1.5,
         border: "1px solid",
@@ -597,7 +619,7 @@ const AutobalancerCard = ({
               color="primary.main"
               sx={{ display: "block", lineHeight: 1.1 }}
             >
-              Live-Balance
+              {t("liveViews.balance.title")}
             </Typography>
             <Typography
               variant="subtitle1"
@@ -616,7 +638,7 @@ const AutobalancerCard = ({
           {expanded && (
             <Chip
               size="small"
-              label="Direkte Live-Daten"
+              label={t("liveViews.balance.directData")}
               color="info"
               sx={{ borderRadius: 0 }}
             />
@@ -625,7 +647,7 @@ const AutobalancerCard = ({
             <Chip
               size="small"
               variant="outlined"
-              label="Keine Historie nötig"
+              label={t("liveViews.balance.noHistory")}
               sx={{ borderRadius: 0 }}
             />
           )}
@@ -639,7 +661,7 @@ const AutobalancerCard = ({
               setExplanationOpen((value) => !value);
             }}
           >
-            Warum?
+            {t("liveViews.balance.why")}
           </Button>
           {controlled ? (
             <FormControlLabel
@@ -665,7 +687,7 @@ const AutobalancerCard = ({
           ) : (
             !expanded && (
               <Button size="small" onClick={() => setExpanded(true)}>
-                Öffnen
+                {t("liveViews.balance.open")}
               </Button>
             )
           )}
@@ -685,7 +707,7 @@ const AutobalancerCard = ({
               onClick={refreshRecommendations}
               disabled={reviewOpen}
             >
-              Neu bewerten
+              {t("liveViews.balance.refresh")}
             </Button>
           }
         >
@@ -710,7 +732,7 @@ const AutobalancerCard = ({
               "& > :last-child": { borderBottom: 0 },
             }}
           >
-            <Metric label="Spielerzahl">
+            <Metric label={t("liveViews.balance.playerCount")}>
               <Typography
                 variant="h6"
                 sx={{ fontWeight: 800, fontVariantNumeric: "tabular-nums" }}
@@ -727,11 +749,13 @@ const AutobalancerCard = ({
                 }}
               >
                 {insight.countUnbalanced
-                  ? `${status.required_switches} Wechsel nötig`
-                  : "Ausgeglichen"}
+                  ? t("liveViews.balance.switchesRequired", {
+                      count: status.required_switches,
+                    })
+                  : t("liveViews.balance.balanced")}
               </Typography>
             </Metric>
-            <Metric label="Geschätzte Teamstärke">
+            <Metric label={t("liveViews.balance.teamStrength")}>
               <Typography
                 variant="body2"
                 sx={{
@@ -740,8 +764,10 @@ const AutobalancerCard = ({
                 }}
               >
                 {insight.weakerTeam
-                  ? `${insight.teamLabels[insight.weakerTeam]} schwächer`
-                  : "Nicht messbar"}
+                  ? t("liveViews.balance.weaker", {
+                      team: insight.teamLabels[insight.weakerTeam],
+                    })
+                  : t("liveViews.balance.notMeasurable")}
               </Typography>
               <Typography
                 variant="body2"
@@ -751,16 +777,20 @@ const AutobalancerCard = ({
                 }}
               >
                 {insight.strongerTeam
-                  ? `${insight.teamLabels[insight.strongerTeam]} stärker`
+                  ? t("liveViews.balance.stronger", {
+                      team: insight.teamLabels[insight.strongerTeam],
+                    })
                   : ""}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Stärke-Index {formatRating(insight.ratings.allies)} :{" "}
-                {formatRating(insight.ratings.axis)} · Abstand{" "}
-                {formatRating(insight.ratingDifference)}
+                {t("liveViews.balance.strengthSummary", {
+                  allies: formatRating(insight.ratings.allies),
+                  axis: formatRating(insight.ratings.axis),
+                  gap: formatRating(insight.ratingDifference),
+                })}
               </Typography>
             </Metric>
-            <Metric label="Aussagekraft">
+            <Metric label={t("liveViews.balance.confidence")}>
               <Typography
                 variant="body2"
                 sx={{
@@ -768,16 +798,16 @@ const AutobalancerCard = ({
                   fontWeight: 800,
                 }}
               >
-                {qualityLabel(insight.effectiveConfidence)}
+                {qualityLabel(t, insight.effectiveConfidence)}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Aktueller Snapshot ·{" "}
+                {t("liveViews.balance.currentSnapshot")} ·{" "}
                 {Number.isFinite(insight.effectiveConfidence)
                   ? `${Math.round(insight.effectiveConfidence * 100)} %`
-                  : "unvollständig"}
+                  : t("liveViews.balance.incomplete")}
               </Typography>
             </Metric>
-            <Metric label="Empfehlung">
+            <Metric label={t("liveViews.balance.recommendation")}>
               <Stack direction="row" alignItems="center" spacing={0.75}>
                 {["swap", "squad_move", "squad_swap"].includes(
                   insight.recommendation.kind
@@ -793,10 +823,10 @@ const AutobalancerCard = ({
             <Metric
               label={
                 squad
-                  ? "Vorgeschlagener Squad"
+                  ? t("liveViews.balance.suggestedSquad")
                   : swap
-                  ? "Vorgeschlagene Spieler"
-                  : "Vorgeschlagener Spieler"
+                  ? t("liveViews.balance.suggestedPlayers")
+                  : t("liveViews.balance.suggestedPlayer")
               }
             >
               {squad ? (
@@ -815,7 +845,7 @@ const AutobalancerCard = ({
                     );
                   })}
                   <Typography variant="caption" color="text.secondary">
-                    Vor dem Wechsel werden alle Mitglieder informiert.
+                    {t("liveViews.balance.membersNotified")}
                   </Typography>
                 </>
               ) : swap ? (
@@ -859,16 +889,20 @@ const AutobalancerCard = ({
                     {proposalName}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    nach {insight.teamLabels[insight.targetTeam] || "Gegenteam"}
+                    {t("liveViews.balance.destination", {
+                      team:
+                        insight.teamLabels[insight.targetTeam] ||
+                        t("liveViews.balance.otherTeam"),
+                    })}
                   </Typography>
                 </>
               ) : (
                 <Typography variant="body2" color="text.secondary">
-                  Noch kein sicherer Vorschlag
+                  {t("liveViews.balance.noSuggestion")}
                 </Typography>
               )}
             </Metric>
-            <Metric label="Prognose" divider={false}>
+            <Metric label={t("liveViews.balance.forecast")} divider={false}>
               <Typography
                 variant="body2"
                 sx={{
@@ -884,14 +918,18 @@ const AutobalancerCard = ({
                 {Number.isFinite(insight.projectedGap)
                   ? insight.projectedGap <=
                     (status.strength_thresholds?.soft_limit ?? 8)
-                    ? "Nahezu ausgeglichen"
-                    : `${formatRating(insight.projectedGap)} Punkte Abstand`
-                  : "Keine Prognose verfügbar"}
+                    ? t("liveViews.balance.nearlyBalanced")
+                    : t("liveViews.balance.gapPoints", {
+                        gap: formatRating(insight.projectedGap),
+                      })
+                  : t("liveViews.balance.noForecast")}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 {Number.isFinite(insight.projectedGap)
-                  ? `vorher ${formatRating(insight.beforeGap)}`
-                  : "Noch keine belastbare Projektion"}
+                  ? t("liveViews.balance.beforeGap", {
+                      gap: formatRating(insight.beforeGap),
+                    })
+                  : t("liveViews.balance.noProjection")}
               </Typography>
             </Metric>
           </Box>
@@ -907,13 +945,10 @@ const AutobalancerCard = ({
               }}
             >
               <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                Die Bewertung entsteht sofort aus dem aktuellen Server-Snapshot.
+                {t("liveViews.balance.snapshotTitle")}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Spielerzahl, Level und bereits vorhandene Werte der laufenden
-                Runde werden direkt ausgewertet. Frühere Runden oder eine
-                Lernphase sind nicht erforderlich. Führungsrollen und
-                Spezialtrupps bleiben von Vorschlägen ausgeschlossen.
+                {t("liveViews.balance.snapshotExplanation")}
               </Typography>
             </Box>
           </Collapse>
@@ -933,7 +968,7 @@ const AutobalancerCard = ({
           sx={{ minWidth: 0, flex: 1 }}
         >
           <StrengthBar
-            label="Stärke-Index Live"
+            label={t("liveViews.balance.indexLive")}
             allies={insight.ratings.allies}
             axis={insight.ratings.axis}
           />
@@ -944,14 +979,14 @@ const AutobalancerCard = ({
                 aria-hidden
               />
               <StrengthBar
-                label="Stärke-Index-Prognose"
+                label={t("liveViews.balance.indexForecast")}
                 allies={insight.projectedRatings.allies}
                 axis={insight.projectedRatings.axis}
               />
             </>
           ) : (
             <Typography variant="caption" color="text.secondary">
-              Keine Prognose verfügbar
+              {t("liveViews.balance.noForecast")}
             </Typography>
           )}
         </Stack>
@@ -965,12 +1000,12 @@ const AutobalancerCard = ({
             }}
           >
             {squad
-              ? "Squad-Wechsel prüfen"
+              ? t("liveViews.balance.reviewSquad")
               : swap
-              ? "Tausch prüfen"
+              ? t("liveViews.balance.reviewSwap")
               : proposalName
-              ? "Wechsel prüfen"
-              : "Kein Eingriff nötig"}
+              ? t("liveViews.balance.reviewMove")
+              : t("liveViews.balance.noAction")}
           </Button>
           {alternativesAvailable && (
             <Button
@@ -982,7 +1017,7 @@ const AutobalancerCard = ({
                 setReviewOpen(true);
               }}
             >
-              Alternativen
+              {t("liveViews.balance.alternatives")}
             </Button>
           )}
           <Button
@@ -990,7 +1025,7 @@ const AutobalancerCard = ({
             disabled={detailsDisabled || !expanded}
             onClick={() => setExpanded(false)}
           >
-            Beobachten
+            {t("liveViews.balance.observe")}
           </Button>
         </Stack>
       </Stack>
@@ -1004,17 +1039,15 @@ const AutobalancerCard = ({
       >
         <DialogTitle id="live-balance-review-title">
           {squad
-            ? "Koordinierten Squad-Wechsel prüfen"
+            ? t("liveViews.balance.reviewSquadTitle")
             : swap
-            ? "Live-Tausch prüfen"
-            : "Live-Teamwechsel prüfen"}
+            ? t("liveViews.balance.reviewSwapTitle")
+            : t("liveViews.balance.reviewMoveTitle")}
         </DialogTitle>
         <DialogContent dividers>
           <Stack spacing={1.5}>
             <Alert severity="info" variant="outlined">
-              Grundlage ist ausschließlich der aktuelle Server-Snapshot. Es muss
-              keine Historie gesammelt werden. Ausgeführt wird erst nach der
-              regulären Sicherheitsbestätigung.
+              {t("liveViews.balance.reviewExplanation")}
             </Alert>
             <Alert severity={reviewNotice.severity} role="status">
               <Typography variant="body2" sx={{ fontWeight: 700 }}>
@@ -1030,7 +1063,7 @@ const AutobalancerCard = ({
                   color="text.secondary"
                   sx={{ display: "block", mb: 0.75 }}
                 >
-                  Vorschlag auswählen
+                  {t("liveViews.balance.selectSuggestion")}
                 </Typography>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                   {recommendations.map((recommendation, index) => (
@@ -1052,8 +1085,8 @@ const AutobalancerCard = ({
                       sx={{ borderRadius: 0, justifyContent: "flex-start" }}
                     >
                       {index === 0
-                        ? "Festgehaltener Vorschlag"
-                        : `Alternative ${index}`}
+                        ? t("liveViews.balance.heldSuggestion")
+                        : t("liveViews.balance.alternative", { number: index })}
                     </Button>
                   ))}
                 </Stack>
@@ -1102,7 +1135,10 @@ const AutobalancerCard = ({
                         Squad {item.squad_name}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {item.member_count} Mitglieder ·{" "}
+                        {t("liveViews.balance.members", {
+                          count: item.member_count,
+                        })}{" "}
+                        ·{" "}
                         {item.members
                           .map((member) => member.player_name)
                           .join(", ")}
@@ -1150,13 +1186,18 @@ const AutobalancerCard = ({
                       {player.player_name}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {player.unit_name || "Kein Trupp"} ·{" "}
-                      {player.role || "Rolle unbekannt"}
+                      {player.unit_name || t("liveViews.balance.noSquad")} ·{" "}
+                      {player.role
+                        ? formatRoleLabel(t, player.role)
+                        : t("liveViews.balance.unknownRole")}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      Stärke-Index {formatRating(player.rating)} / 100 ·
-                      Aussagekraft{" "}
-                      {Math.round((player.rating_confidence || 0) * 100)} %
+                      {t("liveViews.balance.playerStrength", {
+                        rating: formatRating(player.rating),
+                        confidence: Math.round(
+                          (player.rating_confidence || 0) * 100
+                        ),
+                      })}
                     </Typography>
                   </Box>
                 ))}
@@ -1171,8 +1212,12 @@ const AutobalancerCard = ({
                   {activeRecommendation.player.player_name}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {activeRecommendation.player.unit_name || "Kein Trupp"} ·{" "}
-                  {activeRecommendation.player.role || "Rolle unbekannt"}
+                  {activeRecommendation.player.unit_name ||
+                    t("liveViews.balance.noSquad")}{" "}
+                  ·{" "}
+                  {activeRecommendation.player.role
+                    ? formatRoleLabel(t, activeRecommendation.player.role)
+                    : t("liveViews.balance.unknownRole")}
                 </Typography>
               </Box>
             ) : null}
@@ -1186,12 +1231,10 @@ const AutobalancerCard = ({
             >
               <Box sx={{ p: 1.25 }}>
                 <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                  Was bedeutet der Stärke-Index?
+                  {t("liveViews.balance.indexMeaning")}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Er vergleicht ausschließlich die Spieler, die jetzt auf diesem
-                  Server verbunden sind. Der Wert ist kein offizieller Rang und
-                  keine dauerhafte Bewertung eines Spielers.
+                  {t("liveViews.balance.indexExplanation")}
                 </Typography>
               </Box>
               <Box
@@ -1221,13 +1264,10 @@ const AutobalancerCard = ({
                     color="text.secondary"
                     sx={{ display: "block" }}
                   >
-                    So liest du den Wert
+                    {t("liveViews.balance.readingTitle")}
                   </Typography>
                   <Typography variant="caption">
-                    0 steht für das untere, 100 für das obere Ende des aktuellen
-                    Spielerfeldes. 50 ist die Mitte dieses Feldes. Der Index
-                    lässt sich deshalb nur innerhalb des gerade laufenden
-                    Servers vergleichen.
+                    {t("liveViews.balance.readingExplanation")}
                   </Typography>
                 </Box>
                 <Box>
@@ -1236,13 +1276,10 @@ const AutobalancerCard = ({
                     color="text.secondary"
                     sx={{ display: "block" }}
                   >
-                    So wird er berechnet
+                    {t("liveViews.balance.calculationTitle")}
                   </Typography>
                   <Typography variant="caption">
-                    Sobald Rundenwerte vorliegen, zählen das Spielerlevel zu 45
-                    % und die aktuelle Rundenleistung zu 55 %. Dafür werden
-                    Kills, Kampfwert sowie Offensive, Defensive und Support pro
-                    Minute miteinander verglichen.
+                    {t("liveViews.balance.calculationExplanation")}
                   </Typography>
                 </Box>
                 <Box>
@@ -1251,13 +1288,10 @@ const AutobalancerCard = ({
                     color="text.secondary"
                     sx={{ display: "block" }}
                   >
-                    So entsteht die Teamstärke
+                    {t("liveViews.balance.teamCalculationTitle")}
                   </Typography>
                   <Typography variant="caption">
-                    Die Indizes aller Spieler eines Teams werden gemittelt.
-                    Stehen die Teams beispielsweise bei 53 zu 47, beträgt der
-                    Team-Abstand 6 Indexpunkte. Je näher der Abstand an 0 liegt,
-                    desto ähnlicher ist die geschätzte Teamstärke.
+                    {t("liveViews.balance.teamCalculationExplanation")}
                   </Typography>
                 </Box>
                 <Box>
@@ -1266,16 +1300,10 @@ const AutobalancerCard = ({
                     color="text.secondary"
                     sx={{ display: "block" }}
                   >
-                    Was bedeutet Aussagekraft?
+                    {t("liveViews.balance.confidenceTitle")}
                   </Typography>
                   <Typography variant="caption">
-                    Ohne verwertbare Rundenwerte dient das Level sofort als
-                    vorläufige Schätzung. Ist ein Level vorhanden, startet die
-                    Aussagekraft bei 65 % und steigt mit Live-Werten während der
-                    ersten 15 Spielminuten auf bis zu 100 %. Fehlt auch das
-                    Level, wird die Aussagekraft entsprechend niedriger
-                    ausgewiesen. Früh in der Runde sollte der Vorschlag daher
-                    vorsichtiger bewertet werden.
+                    {t("liveViews.balance.confidenceExplanation")}
                   </Typography>
                 </Box>
               </Box>
@@ -1289,10 +1317,7 @@ const AutobalancerCard = ({
                   borderColor: "divider",
                 }}
               >
-                Nicht einbezogen werden frühere Runden, Siege,
-                Clan-Zugehörigkeit, VIP-Status oder Moderationsmaßnahmen.
-                Führungsrollen und Spezialtrupps zählen zur Teamstärke, werden
-                aber nicht als Tausch-Kandidaten vorgeschlagen.
+                {t("liveViews.balance.excludedData")}
               </Typography>
             </Box>
 
@@ -1312,7 +1337,7 @@ const AutobalancerCard = ({
             >
               <Box>
                 <Typography variant="caption" color="text.secondary">
-                  Spielerzahl
+                  {t("liveViews.balance.playerCount")}
                 </Typography>
                 <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
                   {insight.counts.allies} : {insight.counts.axis}
@@ -1320,46 +1345,40 @@ const AutobalancerCard = ({
               </Box>
               <Box>
                 <Typography variant="caption" color="text.secondary">
-                  Team-Abstand vorher
+                  {t("liveViews.balance.gapBefore")}
                 </Typography>
                 <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
                   {formatRating(activeRecommendation?.rating_gap_before)}{" "}
-                  Indexpunkte
+                  {t("liveViews.balance.indexPoints")}
                 </Typography>
               </Box>
               <Box>
                 <Typography variant="caption" color="text.secondary">
-                  Team-Abstand danach
+                  {t("liveViews.balance.gapAfter")}
                 </Typography>
                 <Typography
                   variant="subtitle1"
                   sx={{ color: "success.main", fontWeight: 800 }}
                 >
                   {formatRating(activeRecommendation?.projected_rating_gap)}{" "}
-                  Indexpunkte
+                  {t("liveViews.balance.indexPoints")}
                 </Typography>
               </Box>
             </Box>
 
             <Typography variant="caption" color="text.secondary">
-              Der Live-Assistent führt keinen automatischen Wechsel aus. Vor
-              einer Squad-Aktion werden Live-Mitglieder, Teamzuordnung und
-              Berechtigungen nochmals geprüft. Alle Mitglieder erhalten zuerst
-              eine Nachricht; danach müssen sie ihren Squad im Zielteam neu
-              bilden.
+              {t("liveViews.balance.executionExplanation")}
             </Typography>
             {squad && !status.coordinated_squad_switches_enabled && (
               <Alert severity="warning" variant="outlined">
-                Koordinierte Squad-Wechsel sind in den
-                Autobalancer-Einstellungen noch deaktiviert. Aktiviere sie dort,
-                bevor diese Moderationsaktion ausgeführt werden kann.
+                {t("liveViews.balance.squadDisabled")}
               </Alert>
             )}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ p: 1.5 }}>
           <Button color="inherit" onClick={() => setReviewOpen(false)}>
-            Schließen
+            {t("liveViews.balance.close")}
           </Button>
           {activeRecommendation && (
             <ActionButton
@@ -1369,10 +1388,10 @@ const AutobalancerCard = ({
               label={
                 activeRecommendation.kind === "squad_move" ||
                 activeRecommendation.kind === "squad_swap"
-                  ? "Squad(s) informieren und wechseln"
+                  ? t("liveViews.balance.executeSquads")
                   : activeRecommendation.kind === "strength_swap"
-                  ? "Beide Teams wechseln"
-                  : "Spieler jetzt wechseln"
+                  ? t("liveViews.balance.executeSwap")
+                  : t("liveViews.balance.executeMove")
               }
               {...(!activeValid ||
               insight.blocked ||

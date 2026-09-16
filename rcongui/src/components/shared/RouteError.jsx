@@ -7,6 +7,7 @@ import { faDiscord } from "@fortawesome/free-brands-svg-icons/faDiscord";
 import siteConfig from "@/config/siteConfig";
 import { useTranslation } from "react-i18next";
 import { useEffect } from "react";
+import { translateOperatorMessage } from "@/i18n/operator-messages";
 
 const staleBundleErrorPattern =
   /failed to fetch dynamically imported module|importing a module script failed|chunkloaderror|\(\s*0\s*,\s*[\w$]+\.isFunction\s*\)\s*is not a function/i;
@@ -77,7 +78,7 @@ export default function RouteError() {
     return (
       <Stack spacing={2} alignItems={"center"} justifyContent={"center"}>
         <Typography variant="h3">{error.status}</Typography>
-        <Typography variant="h4">{String(errorMessage ?? "")}</Typography>
+        <Typography variant="h4">{String(translateOperatorMessage(errorMessage, t) ?? "")}</Typography>
         {errorCommand ? <Typography>{String(errorCommand)}</Typography> : null}
         {errorName ? <Typography>{String(errorName)}</Typography> : null}
         <Button variant="contained" LinkComponent={Link} to={location.pathname}>
@@ -110,7 +111,7 @@ export default function RouteError() {
           {error.name ?? t("errors.unknown")}
         </Typography>
         <Typography variant="body1">
-          <i>{errorDetail}</i>
+          <i>{translateOperatorMessage(errorDetail, t)}</i>
         </Typography>
       </Paper>
       <Stack direction={"row"} spacing={2}>

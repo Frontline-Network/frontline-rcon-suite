@@ -41,10 +41,14 @@ i18n
     },
   });
 
-dayjs.locale(i18n.resolvedLanguage === "en" ? "en" : "de");
-i18n.on("languageChanged", (language) => {
-  document.documentElement.lang = language;
-  dayjs.locale(language === "en" ? "en" : "de");
-});
+const applyDocumentLanguage = (language) => {
+  const locale = language?.split("-")[0] === "en" ? "en" : "de";
+  if (typeof document !== "undefined") document.documentElement.lang = locale;
+  dayjs.locale(locale);
+};
+// The initial language is resolved before the event listener is registered.
+// Keep assistive technology and date formatting correct on an English reload.
+applyDocumentLanguage(i18n.resolvedLanguage || initialLanguage);
+i18n.on("languageChanged", applyDocumentLanguage);
 
 export default i18n;

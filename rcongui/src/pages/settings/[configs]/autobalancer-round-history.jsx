@@ -1,3 +1,6 @@
+import i18n from "@/i18n";
+import { translateOperatorMessage } from "@/i18n/operator-messages";
+import { useTranslation } from "react-i18next";
 import {
   Accordion,
   AccordionDetails,
@@ -26,13 +29,13 @@ import { useTheme } from "@mui/material/styles";
 import { cmd } from "@/utils/fetchUtils";
 
 const formatMap = (name) =>
-  (name || "Unbekannte Karte")
+  (name || i18n.t("settingsPanels.autobalancer.unknownMap"))
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 
 const formatDate = (value) =>
   value
-    ? new Intl.DateTimeFormat("de-DE", {
+    ? new Intl.DateTimeFormat(i18n.resolvedLanguage, {
         dateStyle: "short",
         timeStyle: "short",
       }).format(new Date(value))
@@ -46,39 +49,38 @@ const formatDuration = (seconds) => {
   )} h`;
 };
 
-const STRATEGY_LABELS = {
-  "squad-first": "Squad zuerst",
-  "balanced-v2": "Ausgewogen V2",
-  "skill-first": "Stärke zuerst (Diagnose)",
-};
+const STRATEGY_LABELS = () => ({
+  "squad-first": i18n.t("settingsPanels.autobalancer.squadFirst"),
+  "balanced-v2": i18n.t("settingsPanels.autobalancer.balancedV2"),
+  "skill-first": i18n.t("settingsPanels.autobalancer.skillFirstDiagnostic"),
+});
 
 const CandidateWhatIf = ({ analysis, teamLabels }) => {
   const whatIf = analysis?.candidate_what_if;
   if (analysis?.quality?.source !== "live_snapshots") {
     return (
       <Alert severity="info" sx={{ mt: 1 }}>
-        Keine Kandidaten-Rückrechnung: Alte Logrunden enthalten keine exakten
-        Rollen-, Squad- und Rating-Snapshots. Teamgrößen und Zeitfenster bleiben
-        trotzdem auswertbar.
+        {i18n.t("settingsPanels.autobalancer.noHistoricalCandidates")}
       </Alert>
     );
   }
   if (!whatIf) {
     return (
       <Alert severity="success" sx={{ mt: 1 }}>
-        In den vollständigen sicheren Snapshots dieser Runde gab es keinen
-        auswertbaren Balance-Vorfall für einen Kandidatenvergleich.
+        {i18n.t("settingsPanels.autobalancer.noHistoricalIncident")}
       </Alert>
     );
   }
   return (
     <Box sx={{ mt: 2 }}>
       <Typography variant="h6" sx={{ fontWeight: 700 }}>
-        Kandidaten-What-if aus exaktem Snapshot
+        {i18n.t("settingsPanels.autobalancer.candidateWhatIf")}
       </Typography>
       <Typography variant="body2" color="text.secondary">
-        Stand {formatDate(whatIf.captured_at)} · {teamLabels.allies}{" "}
-        {whatIf.allies_count}:{whatIf.axis_count} {teamLabels.axis} · Modell{" "}
+        {i18n.t("settingsPanels.autobalancer.updated")}{" "}
+        {formatDate(whatIf.captured_at)} · {teamLabels.allies}{" "}
+        {whatIf.allies_count}:{whatIf.axis_count} {teamLabels.axis}{" "}
+        {i18n.t("settingsPanels.autobalancer.modelFragment")}{" "}
         {whatIf.rating_model_version}
       </Typography>
       <Box
@@ -102,15 +104,17 @@ const CandidateWhatIf = ({ analysis, teamLabels }) => {
               }}
             >
               <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                {STRATEGY_LABELS[strategy] || strategy}
+                {STRATEGY_LABELS()[strategy] || strategy}
               </Typography>
               <Typography variant="body1" sx={{ mt: 0.5 }}>
                 {candidate?.player_name ||
                   candidate?.player_id ||
-                  "Kein Kandidat"}
+                  i18n.t("settingsPanels.autobalancer.noCandidate")}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Schutzstufe {candidate?.effective_tier ?? "–"} · Ratingdifferenz{" "}
+                {i18n.t("settingsPanels.autobalancer.protectionTier")}{" "}
+                {candidate?.effective_tier ?? "–"}{" "}
+                {i18n.t("settingsPanels.autobalancer.gapFragment")}{" "}
                 {plan?.rating_gap_before ?? "–"} →{" "}
                 {plan?.projected_rating_gap ?? "–"}
               </Typography>
@@ -119,7 +123,7 @@ const CandidateWhatIf = ({ analysis, teamLabels }) => {
         })}
       </Box>
       <Typography variant="caption" color="text.secondary">
-        {whatIf.limitations}
+        {translateOperatorMessage(whatIf.limitations, i18n.t)}
       </Typography>
     </Box>
   );
@@ -137,7 +141,11 @@ const HistoricalChart = ({ analysis, targetDifference, teamLabels }) => {
         !Number.isNaN(point.time.getTime()) && Number.isFinite(point.difference)
     );
   if (points.length < 2) {
-    return <Alert severity="info">Für diese Runde gibt es keine Kurve.</Alert>;
+    return (
+      <Alert severity="info">
+        {i18n.t("settingsPanels.autobalancer.noRoundChart")}
+      </Alert>
+    );
   }
   const maximum = Math.max(
     targetDifference + 2,
@@ -152,7 +160,7 @@ const HistoricalChart = ({ analysis, targetDifference, teamLabels }) => {
           data: points.map((point) => point.time),
           scaleType: "time",
           valueFormatter: (value) =>
-            new Intl.DateTimeFormat("de-DE", {
+            new Intl.DateTimeFormat(i18n.resolvedLanguage, {
               hour: "2-digit",
               minute: "2-digit",
             }).format(value),
@@ -168,7 +176,7 @@ const HistoricalChart = ({ analysis, targetDifference, teamLabels }) => {
       ]}
       series={[
         {
-          label: "Historische Teamdifferenz",
+          label: i18n.t("settingsPanels.autobalancer.historicalDifference"),
           data: points.map((point) => point.difference),
           color: theme.palette.info.main,
           showMark: false,
@@ -178,14 +186,16 @@ const HistoricalChart = ({ analysis, targetDifference, teamLabels }) => {
               ? `${teamLabels.allies} +${value}`
               : value < 0
               ? `${teamLabels.axis} +${Math.abs(value)}`
-              : "Gleichstand",
+              : i18n.t("settingsPanels.autobalancer.tie"),
         },
       ]}
       grid={{ horizontal: true }}
     >
       <ChartsReferenceLine
         y={targetDifference}
-        label={`Grenze +${targetDifference}`}
+        label={i18n.t("settingsPanels.autobalancer.positiveLimit", {
+          v0: targetDifference,
+        })}
         lineStyle={{
           stroke: theme.palette.warning.main,
           strokeDasharray: "6 4",
@@ -193,7 +203,9 @@ const HistoricalChart = ({ analysis, targetDifference, teamLabels }) => {
       />
       <ChartsReferenceLine
         y={-targetDifference}
-        label={`Grenze -${targetDifference}`}
+        label={i18n.t("settingsPanels.autobalancer.negativeLimit", {
+          v0: targetDifference,
+        })}
         lineStyle={{
           stroke: theme.palette.warning.main,
           strokeDasharray: "6 4",
@@ -213,15 +225,24 @@ const HistoricalAnalysis = ({ analysis, targetDifference, teamLabels }) => {
   const quality = analysis.quality || {};
   const state =
     analysis.status === "balanced"
-      ? { label: "IN DEN SICHEREN ZEITFENSTERN AUSGEGLICHEN", color: "success" }
+      ? {
+          label: i18n.t("settingsPanels.autobalancer.historicallyBalanced"),
+          color: "success",
+        }
       : analysis.status === "unbalanced"
-      ? { label: "ZEITWEISE UNAUSGEGLICHEN", color: "error" }
+      ? {
+          label: i18n.t("settingsPanels.autobalancer.historicallyUnbalanced"),
+          color: "error",
+        }
       : analysis.status === "transient"
       ? {
-          label: "KURZ ÜBER DER GRENZE · KEIN BALANCE-VORFALL",
+          label: i18n.t("settingsPanels.autobalancer.transientImbalance"),
           color: "warning",
         }
-      : { label: "NICHT ZUVERLÄSSIG REKONSTRUIERBAR", color: "warning" };
+      : {
+          label: i18n.t("settingsPanels.autobalancer.unreliableHistory"),
+          color: "warning",
+        };
 
   return (
     <Box
@@ -242,7 +263,8 @@ const HistoricalAnalysis = ({ analysis, targetDifference, teamLabels }) => {
             {formatMap(analysis.round?.map_name)}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {formatDate(analysis.round?.start)} bis{" "}
+            {formatDate(analysis.round?.start)}{" "}
+            {i18n.t("settingsPanels.autobalancer.toLower")}{" "}
             {formatDate(analysis.round?.end)}
           </Typography>
         </Box>
@@ -254,32 +276,37 @@ const HistoricalAnalysis = ({ analysis, targetDifference, teamLabels }) => {
         >
           <Chip
             variant="outlined"
-            label={`Im Zielbereich: ${
-              metrics.balanced_ratio == null
-                ? "–"
-                : `${Math.round(metrics.balanced_ratio * 100)} %`
-            }`}
+            label={i18n.t("settingsPanels.autobalancer.inRangeValue", {
+              v0:
+                metrics.balanced_ratio == null
+                  ? "–"
+                  : `${Math.round(metrics.balanced_ratio * 100)} %`,
+            })}
           />
           <Chip
             variant="outlined"
-            label={`Größte Differenz: ${metrics.maximum_difference ?? "–"}`}
+            label={i18n.t(
+              "settingsPanels.autobalancer.largestDifferenceValue",
+              { v0: metrics.maximum_difference ?? "–" }
+            )}
           />
           <Chip
             variant="outlined"
-            label={`Längste Überzahl: ${Math.round(
-              (metrics.longest_unbalanced_seconds || 0) / 60
-            )} min`}
+            label={i18n.t("settingsPanels.autobalancer.longestAdvantageValue", {
+              v0: Math.round((metrics.longest_unbalanced_seconds || 0) / 60),
+            })}
           />
           <Chip
             variant="outlined"
-            label={`Balance-Vorfälle: ${metrics.incident_count ?? "–"}`}
+            label={i18n.t("settingsPanels.autobalancer.incidentCount", {
+              v0: metrics.incident_count ?? "–",
+            })}
           />
         </Stack>
       </Stack>
       {!quality.reliable && (
         <Alert severity="warning" sx={{ mt: 2 }}>
-          Zu wenige eindeutige Teamhinweise oder zu viele Widersprüche für eine
-          belastbare Bewertung. Der Graph bleibt zur Fehlersuche sichtbar.
+          {i18n.t("settingsPanels.autobalancer.unreliableHistoryHelp")}
         </Alert>
       )}
       <HistoricalChart
@@ -289,22 +316,25 @@ const HistoricalAnalysis = ({ analysis, targetDifference, teamLabels }) => {
       />
       <CandidateWhatIf analysis={analysis} teamLabels={teamLabels} />
       <Typography variant="caption" color="text.secondary">
-        Datenquelle:{" "}
+        {i18n.t("settingsPanels.autobalancer.dataSource")}{" "}
         {quality.source === "live_snapshots"
-          ? "exakte Live-Snapshots"
-          : "historische Logs"}
-        {` · Qualität ${quality.level || "niedrig"} (${Math.round(
-          (quality.score || 0) * 100
-        )} %)`}
-        {` · ${quality.valid_events || 0} verwertbare Messungen/Ereignisse.`}
-        Rekonstruierte Logs werden rückwirkend niemals zur Kandidatenauswahl
-        verwendet.
+          ? i18n.t("settingsPanels.autobalancer.exactSnapshots")
+          : i18n.t("settingsPanels.autobalancer.historicalLogs")}
+        {i18n.t("settingsPanels.autobalancer.qualityValue", {
+          v0: translateOperatorMessage(quality.level || "niedrig", i18n.t),
+          v1: Math.round((quality.score || 0) * 100),
+        })}
+        {i18n.t("settingsPanels.autobalancer.validMeasurements", {
+          v0: quality.valid_events || 0,
+        })}
+        {i18n.t("settingsPanels.autobalancer.noRetrospectiveCandidates")}
       </Typography>
     </Box>
   );
 };
 
 const AutobalancerRoundHistory = ({ config, teamLabels }) => {
+  useTranslation();
   const [draft, setDraft] = useState({ search: "", dateFrom: "", dateTo: "" });
   const [filters, setFilters] = useState(draft);
   const [page, setPage] = useState(1);
@@ -359,17 +389,21 @@ const AutobalancerRoundHistory = ({ config, teamLabels }) => {
           alignItems={{ sm: "center" }}
         >
           <Typography sx={{ fontWeight: 700 }}>
-            Vergangene Runden durchsuchen
+            {i18n.t("settingsPanels.autobalancer.browseRounds")}
           </Typography>
           {data && (
-            <Chip size="small" label={`${data.total} Runden gefunden`} />
+            <Chip
+              size="small"
+              label={i18n.t("settingsPanels.autobalancer.roundsFound", {
+                v0: data.total,
+              })}
+            />
           )}
         </Stack>
       </AccordionSummary>
       <AccordionDetails>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Karte oder Zeitraum wählen und anschließend eine Runde als Teamverlauf
-          öffnen.
+          {i18n.t("settingsPanels.autobalancer.browseRoundsHelp")}
         </Typography>
         <Stack
           direction={{ xs: "column", md: "row" }}
@@ -378,8 +412,8 @@ const AutobalancerRoundHistory = ({ config, teamLabels }) => {
         >
           <TextField
             size="small"
-            label="Karte suchen"
-            placeholder="z. B. Carentan"
+            label={i18n.t("settingsPanels.autobalancer.searchMap")}
+            placeholder={i18n.t("settingsPanels.autobalancer.mapExample")}
             value={draft.search}
             onChange={(event) =>
               setDraft({ ...draft, search: event.target.value })
@@ -389,7 +423,7 @@ const AutobalancerRoundHistory = ({ config, teamLabels }) => {
           <TextField
             size="small"
             type="date"
-            label="Von"
+            label={i18n.t("settingsPanels.autobalancer.from")}
             value={draft.dateFrom}
             onChange={(event) =>
               setDraft({ ...draft, dateFrom: event.target.value })
@@ -399,7 +433,7 @@ const AutobalancerRoundHistory = ({ config, teamLabels }) => {
           <TextField
             size="small"
             type="date"
-            label="Bis einschließlich"
+            label={i18n.t("settingsPanels.autobalancer.through")}
             value={draft.dateTo}
             onChange={(event) =>
               setDraft({ ...draft, dateTo: event.target.value })
@@ -407,9 +441,11 @@ const AutobalancerRoundHistory = ({ config, teamLabels }) => {
             InputLabelProps={{ shrink: true }}
           />
           <Button variant="contained" onClick={runSearch}>
-            Suchen
+            {i18n.t("settingsPanels.autobalancer.search")}
           </Button>
-          <Button onClick={clearSearch}>Zurücksetzen</Button>
+          <Button onClick={clearSearch}>
+            {i18n.t("settingsPanels.autobalancer.reset")}
+          </Button>
         </Stack>
 
         {isLoading && (
@@ -419,7 +455,7 @@ const AutobalancerRoundHistory = ({ config, teamLabels }) => {
         )}
         {isError && (
           <Alert severity="error" sx={{ mt: 2 }}>
-            Die Rundenhistorie konnte nicht geladen werden.
+            {i18n.t("settingsPanels.autobalancer.roundHistoryLoadError")}
           </Alert>
         )}
         {!isLoading && !isError && data && (
@@ -434,11 +470,19 @@ const AutobalancerRoundHistory = ({ config, teamLabels }) => {
                 <TableHead>
                   <TableRow>
                     <TableCell>Start</TableCell>
-                    <TableCell>Karte</TableCell>
-                    <TableCell>Dauer</TableCell>
-                    <TableCell>Ergebnis</TableCell>
+                    <TableCell>
+                      {i18n.t("settingsPanels.autobalancer.map")}
+                    </TableCell>
+                    <TableCell>
+                      {i18n.t("settingsPanels.autobalancer.duration")}
+                    </TableCell>
+                    <TableCell>
+                      {i18n.t("settingsPanels.autobalancer.result")}
+                    </TableCell>
                     <TableCell>Shadow</TableCell>
-                    <TableCell align="right">Teamverlauf</TableCell>
+                    <TableCell align="right">
+                      {i18n.t("settingsPanels.autobalancer.teamHistory")}
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -463,7 +507,7 @@ const AutobalancerRoundHistory = ({ config, teamLabels }) => {
                           size="small"
                           onClick={() => setMapId(round.map_id)}
                         >
-                          Anzeigen
+                          {i18n.t("settingsPanels.autobalancer.show")}
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -471,7 +515,7 @@ const AutobalancerRoundHistory = ({ config, teamLabels }) => {
                   {!data.rounds?.length && (
                     <TableRow>
                       <TableCell colSpan={6}>
-                        Keine passende Runde gefunden.
+                        {i18n.t("settingsPanels.autobalancer.noMatchingRound")}
                       </TableCell>
                     </TableRow>
                   )}
@@ -491,10 +535,11 @@ const AutobalancerRoundHistory = ({ config, teamLabels }) => {
                   setMapId(null);
                 }}
               >
-                Zurück
+                {i18n.t("settingsPanels.autobalancer.back")}
               </Button>
               <Typography variant="body2">
-                Seite {page} von {totalPages}
+                {i18n.t("settingsPanels.autobalancer.page")} {page}{" "}
+                {i18n.t("settingsPanels.autobalancer.ofLower")} {totalPages}
               </Typography>
               <Button
                 disabled={page >= totalPages}
@@ -503,7 +548,7 @@ const AutobalancerRoundHistory = ({ config, teamLabels }) => {
                   setMapId(null);
                 }}
               >
-                Weiter
+                {i18n.t("settingsPanels.autobalancer.next")}
               </Button>
             </Stack>
           </>
@@ -514,3 +559,4 @@ const AutobalancerRoundHistory = ({ config, teamLabels }) => {
 };
 
 export default AutobalancerRoundHistory;
+import "@/i18n/register-settings-panels";

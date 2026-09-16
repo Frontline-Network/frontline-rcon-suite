@@ -30,8 +30,9 @@ import relativeTimePlugin from "dayjs/plugin/relativeTime";
 import localizedFormatPlugin from "dayjs/plugin/localizedFormat";
 import {
   DesktopDateTimePicker,
-  LocalizationProvider,
 } from "@mui/x-date-pickers";
+import LocalizationProvider from "@/components/shared/LocalizedDateProvider";
+import { useTranslation } from "react-i18next";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import {
   getVipExpirationStatus,
@@ -89,6 +90,7 @@ const initialAddFormData = {
 };
 
 const VipPage = () => {
+  const { t } = useTranslation();
   const { items: serverItems } = useLoaderData();
   const [clientItems, setClientItems] = useState(serverItems);
   const [checked, setChecked] = useState(new Set());
@@ -266,7 +268,7 @@ const VipPage = () => {
         gap={1}
       >
         <InputFileUpload
-          text={"Upload"}
+          text={t("records.vips.uploadTitle")}
           color={"secondary"}
           onChange={handleFileUpload}
           accept={".txt"}
@@ -276,13 +278,13 @@ const VipPage = () => {
           variant="contained"
           color="secondary"
         >
-          Download
+          {t("records.vips.downloadTitle")}
         </Button>
         <SplitButton
           disabled={!hasChanges}
           options={[
             {
-              name: "Apply",
+              name: t("sharedOperations.applyChanges"),
               buttonProps: {
                 onClick: submitChanges(INTENT.APPLY_SINGLE),
                 disabled: !hasChanges,
@@ -290,7 +292,7 @@ const VipPage = () => {
               },
             },
             {
-              name: "Apply all servers",
+              name: t("fields.applyAllServers"),
               buttonProps: {
                 onClick: submitChanges(INTENT.APPLY_ALL),
                 disabled: !hasChanges,
@@ -321,14 +323,14 @@ const VipPage = () => {
               onChange={handleInputChange}
               name={"player_id"}
               fullWidth
-              label={"ID"}
+              label={t("records.vips.playerId")}
             />
           </Stack>
           <Stack direction={{ xs: "column", md: "row" }} gap={1}>
             <LocalizationProvider dateAdapter={AdapterDayjs}>
               <DesktopDateTimePicker
                 name={"vip_expiration"}
-                label={"Expiration"}
+                label={t("records.vips.expiration")}
                 format="LLL"
                 value={dayjs(addFormData.vip_expiration)}
                 maxDate={dayjs("3000-01-01T00:00:00+00:00")}
@@ -352,7 +354,7 @@ const VipPage = () => {
               color="secondary"
               sx={{ minWidth: "fit-content" }}
             >
-              Never Expires
+              {t("records.vips.neverExpires")}
             </Button>
           </Stack>
           <Button
@@ -360,7 +362,7 @@ const VipPage = () => {
             disabled={!isValidAddFormInput}
             variant="contained"
           >
-            Add
+            {t("records.vips.addVip")}
           </Button>
         </Stack>
         <Stack
@@ -372,7 +374,7 @@ const VipPage = () => {
         >
           <FormControlLabel
             sx={{ px: 0.25 }}
-            label="Select"
+            label={t("common.selectAll")}
             control={
               <Checkbox
                 sx={{ mr: 1, "& .MuiSvgIcon-root": { fontSize: 16 } }}
@@ -388,7 +390,7 @@ const VipPage = () => {
             }
           />
           <Divider orientation="vertical" flexItem />
-          <SearchInput onChange={onSearchedChange} placeholder="Search VIP" />
+          <SearchInput onChange={onSearchedChange} placeholder={t("records.vips.search")} />
           <Divider orientation="vertical" flexItem />
           <Button
             onClick={handleDeleteSelectedItems}
@@ -397,7 +399,7 @@ const VipPage = () => {
             disabled={!checked.size}
             sx={{ minWidth: "fit-content" }}
           >
-            Delete selected
+            {t("records.vips.removeSelected")}
           </Button>
         </Stack>
         <Divider orientation="horizontal" />
@@ -422,11 +424,13 @@ const VipPage = () => {
                   <Stack direction={"row"} gap={1}>
                     <IconButton
                       onClick={() => handleOpenProfile(vip.player_id)}
+                      aria-label={t("actions.viewProfile")}
                     >
                       <AccountCircleIcon />
                     </IconButton>
                     <IconButton
                       onClick={() => handleDeleteSingleItem(vip.player_id)}
+                      aria-label={t("records.vips.remove")}
                     >
                       <DeleteIcon />
                     </IconButton>
@@ -450,7 +454,7 @@ const VipPage = () => {
                   <ListItemText
                     id={labelId}
                     primary={vip.name}
-                    secondary={status[0].toUpperCase() + status.slice(1)}
+                    secondary={t(status === "none" ? "common.none" : `records.vips.${status}`)}
                     secondaryTypographyProps={{
                       sx: { color },
                     }}

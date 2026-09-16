@@ -20,6 +20,7 @@ const ADMIN_CAM_KEY = {
 };
 
 function ToggleButtons({ value, onChange, disabled, label }) {
+  const { t } = useTranslation();
   return (
     <ButtonGroup
       size="small"
@@ -32,13 +33,13 @@ function ToggleButtons({ value, onChange, disabled, label }) {
         color={!value ? "inherit" : "primary"}
         onClick={() => onChange(false)}
       >
-        Inaktiv
+        {t("settingsPanels.camera.inactive")}
       </Button>
       <Button
         variant={value ? "contained" : "outlined"}
         onClick={() => onChange(true)}
       >
-        Aktiv
+        {t("settingsPanels.camera.active")}
       </Button>
     </ButtonGroup>
   );
@@ -108,8 +109,8 @@ function AdminCamSettings() {
   };
 
   const sections = [
-    { key: "notifications", label: "Benachrichtigungen" },
-    { key: "behavior", label: "Wirkung & Hinweise" },
+    { key: "notifications", label: t("settingsPanels.camera.notifications") },
+    { key: "behavior", label: t("settingsPanels.camera.behavior") },
   ];
 
   return (
@@ -127,7 +128,7 @@ function AdminCamSettings() {
             />
             <ControlRow
               title={t("settings.adminCam.broadcast")}
-              description="Sendet beim Betreten der Admin-Kamera eine Servermeldung."
+              description={t("settingsPanels.camera.broadcastHelp")}
               value={
                 <ToggleButtons
                   label={t("settings.adminCam.broadcast")}
@@ -138,8 +139,8 @@ function AdminCamSettings() {
               }
               meta={
                 form.watch(ADMIN_CAM_KEY.broadcast)
-                  ? "Meldung aktiv"
-                  : "Keine Meldung"
+                  ? t("settingsPanels.camera.broadcastActive")
+                  : t("settingsPanels.camera.broadcastInactive")
               }
               status={
                 <RowStatus dirty={form.formState.isDirty} error={error} />
@@ -147,7 +148,7 @@ function AdminCamSettings() {
             />
             <ControlRow
               title={t("settings.adminCam.welcome")}
-              description="Zeigt Administratoren beim Einstieg einen persönlichen Hinweis."
+              description={t("settingsPanels.camera.welcomeHelp")}
               value={
                 <ToggleButtons
                   label={t("settings.adminCam.welcome")}
@@ -158,8 +159,8 @@ function AdminCamSettings() {
               }
               meta={
                 form.watch(ADMIN_CAM_KEY.welcome)
-                  ? "Hinweis aktiv"
-                  : "Kein Hinweis"
+                  ? t("settingsPanels.camera.welcomeActive")
+                  : t("settingsPanels.camera.welcomeInactive")
               }
               status={
                 <RowStatus dirty={form.formState.isDirty} error={error} />
@@ -169,18 +170,15 @@ function AdminCamSettings() {
         ) : (
           <>
             <ControlSectionHeader
-              title="Wirkung & Hinweise"
-              description="Was die beiden Optionen für Administratoren und Spieler bewirken."
+              title={t("settingsPanels.camera.behavior")}
+              description={t("settingsPanels.camera.behaviorHelp")}
             />
             <Stack spacing={1.25} sx={{ p: 2 }}>
               <Alert severity="info" sx={{ borderRadius: 0 }}>
-                Die Einstellungen betreffen nur den Eintritt in die
-                Admin-Kamera. Andere Moderationsmeldungen bleiben unverändert.
+                {t("settingsPanels.camera.cameraOnly")}
               </Alert>
               <Typography variant="body2" color="text.secondary">
-                Servermeldung und persönlicher Hinweis können unabhängig
-                voneinander aktiviert werden. Änderungen gelten nach dem
-                Speichern für den nächsten Eintritt in die Kamera.
+                {t("settingsPanels.camera.independent")}
               </Typography>
             </Stack>
           </>
@@ -207,3 +205,4 @@ function AdminCamSettings() {
 }
 
 export default AdminCamSettings;
+import "@/i18n/register-settings-panels";

@@ -140,9 +140,10 @@ export const switchAction = {
 
 export const coordinatedSquadSwitchAction = {
   safety: getAdminActionContract("execute_autobalancer_squad_switch"),
-  name: "Koordinierter Squad-Wechsel",
+  translationKey: "sharedOperations.coordinatedSquadSwitch",
+  name: "Coordinated squad switch",
   description:
-    "Informiert zuerst alle Mitglieder, prüft den aktuellen Squad erneut und wechselt die bestätigte Gruppe gemeinsam ins Gegenteam.",
+    "First notifies all members, checks the current squad again and switches the confirmed group to the opposing team together.",
   component: ConfirmationOnly,
   icon: SyncIcon,
   execute: executeAction("execute_autobalancer_squad_switch"),

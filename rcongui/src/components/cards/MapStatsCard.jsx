@@ -29,7 +29,8 @@ const isValidGame = (game) => {
 }
 
 const MapStatsCard = ({ games }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage;
   const mapStats = useMemo(() => {
     const invalidGames = [];
     const validGames = games.filter((game) => {
@@ -66,7 +67,7 @@ const MapStatsCard = ({ games }) => {
     const dailyStats = Object.entries(gamesPerDay)
       .map(([date, count]) => ({
         date,
-        dayOfWeek: dayjs(date).format('ddd'),
+        dayOfWeek: dayjs(date).locale(language).format('ddd'),
         formattedDate: dayjs(date).format('DD/MM'),
         count
       }))
@@ -120,7 +121,7 @@ const MapStatsCard = ({ games }) => {
         }))
         .sort((a, b) => b.totalGames - a.totalGames)
     };
-  }, [games]);
+  }, [games, language]);
 
   // Helper function to calculate color intensity based on win rate
   const getWinRateColor = (winRate, baseColor) => {

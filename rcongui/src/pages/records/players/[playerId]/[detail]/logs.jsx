@@ -15,7 +15,7 @@ import Select from "@mui/material/Select";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import Switch from "@mui/material/Switch";
 import { DesktopDateTimePicker } from "@mui/x-date-pickers/DesktopDateTimePicker";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import LocalizationProvider from "@/components/shared/LocalizedDateProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { useOutletContext, useSearchParams, useLoaderData, useSubmit, Form } from "react-router-dom";
 import dayjs from "dayjs";

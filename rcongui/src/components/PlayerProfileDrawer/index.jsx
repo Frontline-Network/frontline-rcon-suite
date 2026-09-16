@@ -76,7 +76,7 @@ const ReceivedActions = ({ actions }) => {
             <Box sx={{ display: "flex", flexDirection: "column" }}>
               <Typography variant="subtitle2">{action.action_type}</Typography>
               <Typography component={"span"} sx={{ fontSize: "0.7rem" }}>
-                {action.by} | {dayjs(action.time).format("HH:MM DD.MM.YY")}
+                {action.by} | {dayjs(action.time).format(t("common.logDateTimeFormat"))}
               </Typography>
             </Box>
           </AccordionSummary>
@@ -115,7 +115,7 @@ const Messages = ({ messages }) => {
           {messages.map((message, index) => (
             <Message key={message.time}>
               <Typography component={"span"} sx={{ fontSize: "0.7rem" }}>
-                {message.by} | {dayjs(message.time).format("HH:MM DD.MM.YY")}
+                {message.by} | {dayjs(message.time).format(t("common.logDateTimeFormat"))}
               </Typography>
               <Typography>{message.reason}</Typography>
             </Message>
@@ -392,12 +392,13 @@ const Comments = ({ comments }) => {
 };
 
 const Comment = ({ comment }) => {
+  const { t } = useTranslation();
   return (
     <Box component={Paper} sx={{ p: 1 }}>
       <Typography>{comment.content}</Typography>
       <Divider sx={{ my: 1 }} />
       <Typography sx={{ fontSize: "0.7rem" }} variant="subtitle2">
-        {comment.by} | {dayjs(comment.creation_time).format("HH:MM DD.MM.YY")}
+        {comment.by} | {dayjs(comment.creation_time).format(t("common.logDateTimeFormat"))}
       </Typography>
     </Box>
   );
@@ -420,13 +421,14 @@ const Bans = ({ bans }) => {
 };
 
 const Ban = ({ ban }) => {
+  const { t } = useTranslation();
   return (
     <Box component={Paper} sx={{ p: 1 }}>
       <Typography variant="subtitle">{ban.type}</Typography>
       <Typography>{ban.reason}</Typography>
       <Divider sx={{ my: 1 }} />
       <Typography sx={{ fontSize: "0.7rem" }} variant="subtitle2">
-        {ban.by} | {dayjs(ban.ban_time).format("HH:MM DD.MM.YY")}
+        {ban.by} | {dayjs(ban.ban_time).format(t("common.logDateTimeFormat"))}
       </Typography>
     </Box>
   );

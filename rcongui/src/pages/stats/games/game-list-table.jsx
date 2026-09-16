@@ -84,8 +84,9 @@ function GameMapThumbnail({ game }) {
 }
 
 function LoadingJournal() {
+  const { t } = useTranslation();
   return (
-    <Stack aria-label="loading games">
+    <Stack aria-label={t("liveViews.loadingGames")}>
       {Array.from({ length: 6 }, (_, index) => (
         <Stack
           key={index}
@@ -141,7 +142,7 @@ export function GameListTable({
   error,
   onRetry,
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const theme = useTheme();
   const compact = useMediaQuery(theme.breakpoints.down("md"));
   const [searchParams, setSearchParams] = useSearchParams();
@@ -232,7 +233,7 @@ export function GameListTable({
       : groupDay.isSame(today.subtract(1, "day"))
       ? t("stats.games.yesterday")
       : null;
-    const date = group.date.format("DD. MMMM YYYY");
+    const date = group.date.locale(i18n.resolvedLanguage).format("LL");
     return prefix ? `${prefix} · ${date}` : date;
   };
 

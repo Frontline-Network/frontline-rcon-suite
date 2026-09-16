@@ -1,6 +1,6 @@
 import { DesktopDateTimePicker } from '@mui/x-date-pickers/DesktopDateTimePicker';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import LocalizationProvider from '@/components/shared/LocalizedDateProvider';
 import { Controller } from 'react-hook-form';
 
 export const ControlledDesktopDateTimePicker = ({

@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { Alert, Box, Button, Chip, Stack, Typography } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import { copy } from "./copy";
+import { translateLeadershipResult } from "./result-copy";
 
 export default function VotePanel({ vote, canCancel, onCancel, pending }) {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const c = copy[i18n.language?.startsWith("de") ? "de" : "en"];
   const [now, setNow] = useState(Date.now());
   const running = ["confirming", "warning", "active", "inviting"].includes(
@@ -51,7 +52,10 @@ export default function VotePanel({ vote, canCancel, onCancel, pending }) {
         />
       </Stack>
       <Typography>
-        {c.target}: {vote.target_name} · {vote.team}
+        {c.target}: {vote.target_name} ·{" "}
+        {vote.team === "allies" || vote.team === "axis"
+          ? t(`settingsPanels.autobalancer.${vote.team}`)
+          : vote.team}
       </Typography>
       <Typography sx={{ overflowWrap: "anywhere" }}>
         {c.reason}: „{vote.reason || c.none}“
@@ -64,7 +68,8 @@ export default function VotePanel({ vote, canCancel, onCancel, pending }) {
       <Typography>{running ? `${left} ${c.remaining}` : ""}</Typography>
       {vote.result && (
         <Alert severity={tone}>
-          {c.result}: {vote.result}
+          {c.result}:{" "}
+          {translateLeadershipResult(vote.result, i18n.resolvedLanguage)}
         </Alert>
       )}
       {Object.keys(vote.electorate || {}).length > 0 && (
@@ -106,3 +111,4 @@ export default function VotePanel({ vote, canCancel, onCancel, pending }) {
     </Stack>
   );
 }
+import "@/i18n/register-settings-panels";

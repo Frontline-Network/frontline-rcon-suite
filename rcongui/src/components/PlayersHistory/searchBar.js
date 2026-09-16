@@ -15,7 +15,7 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import {DesktopDateTimePicker} from '@mui/x-date-pickers/DesktopDateTimePicker';
 import {AdapterDayjs} from '@mui/x-date-pickers/AdapterDayjs';
-import {LocalizationProvider} from '@mui/x-date-pickers/LocalizationProvider';
+import LocalizationProvider from '@/components/shared/LocalizedDateProvider';
 import Grid from "@mui/material/Grid2";
 import {lazy, Suspense, useEffect, useState} from "react";
 

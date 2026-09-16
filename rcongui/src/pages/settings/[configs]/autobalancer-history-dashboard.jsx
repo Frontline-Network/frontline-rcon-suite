@@ -1,3 +1,6 @@
+import i18n from "@/i18n";
+import { translateOperatorMessage } from "@/i18n/operator-messages";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   Box,
@@ -23,23 +26,23 @@ const percent = (value) =>
   value == null ? "–" : `${Math.round(value * 100)} %`;
 
 const formatMap = (value) =>
-  (value || "Unbekannte Karte")
+  (value || i18n.t("settingsPanels.autobalancer.unknownMap"))
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 
-const ROLE_LABELS = {
+const ROLE_LABELS = () => ({
   combat_infantry: "Combat Infantry",
   support: "Support / Engineer / Medic",
   leader: "Squad Leader",
   specialist: "Armor / Recon / Artillery / Mortar / Helicopter",
-  legacy: "Legacy ohne Rollenbezug",
-};
+  legacy: i18n.t("settingsPanels.autobalancer.legacyNoRole"),
+});
 
-const STRATEGY_LABELS = {
-  "squad-first": "Squad zuerst",
-  "balanced-v2": "Ausgewogen V2",
-  "skill-first": "Stärke zuerst (Diagnose)",
-};
+const STRATEGY_LABELS = () => ({
+  "squad-first": i18n.t("settingsPanels.autobalancer.squadFirst"),
+  "balanced-v2": i18n.t("settingsPanels.autobalancer.balancedV2"),
+  "skill-first": i18n.t("settingsPanels.autobalancer.skillFirstDiagnostic"),
+});
 
 const Metric = ({ label, value, caption, color = "text.primary" }) => (
   <Card variant="outlined">
@@ -75,7 +78,11 @@ const WeeklyBalanceChart = ({ weekly }) => {
   const theme = useTheme();
   const rows = (weekly || []).filter((row) => row.balanced_ratio != null);
   if (rows.length < 2) {
-    return <Alert severity="info">Noch zu wenige messbare Wochen.</Alert>;
+    return (
+      <Alert severity="info">
+        {i18n.t("settingsPanels.autobalancer.tooFewWeeks")}
+      </Alert>
+    );
   }
   return (
     <LineChart
@@ -85,7 +92,7 @@ const WeeklyBalanceChart = ({ weekly }) => {
           scaleType: "time",
           data: rows.map((row) => new Date(row.week)),
           valueFormatter: (value) =>
-            new Intl.DateTimeFormat("de-DE", {
+            new Intl.DateTimeFormat(i18n.resolvedLanguage, {
               day: "2-digit",
               month: "2-digit",
             }).format(value),
@@ -100,7 +107,7 @@ const WeeklyBalanceChart = ({ weekly }) => {
       ]}
       series={[
         {
-          label: "Zeit im Zielbereich",
+          label: i18n.t("settingsPanels.autobalancer.timeInRange"),
           data: rows.map((row) => Math.round(row.balanced_ratio * 100)),
           color: theme.palette.success.main,
           showMark: rows.length < 16,
@@ -115,7 +122,7 @@ const WeeklyBalanceChart = ({ weekly }) => {
 const WhatIfCharts = ({ rows }) => {
   const theme = useTheme();
   if (!rows?.length) return null;
-  const labels = rows.map((row) => row.label);
+  const labels = rows.map((row) => translateOperatorMessage(row.label, i18n.t));
   return (
     <Box
       sx={{
@@ -125,8 +132,8 @@ const WhatIfCharts = ({ rows }) => {
       }}
     >
       <ChartShell
-        title="Was wäre ausgeglichen gewesen?"
-        subtitle="Anteil der messbaren Spielzeit innerhalb der jeweiligen Zieldifferenz."
+        title={i18n.t("settingsPanels.autobalancer.whatIfBalanced")}
+        subtitle={i18n.t("settingsPanels.autobalancer.whatIfHelp")}
       >
         <BarChart
           height={280}
@@ -136,7 +143,7 @@ const WhatIfCharts = ({ rows }) => {
           ]}
           series={[
             {
-              label: "Balancezeit",
+              label: i18n.t("settingsPanels.autobalancer.balancedTime"),
               data: rows.map((row) =>
                 row.balanced_time_ratio == null
                   ? null
@@ -144,15 +151,17 @@ const WhatIfCharts = ({ rows }) => {
               ),
               color: theme.palette.success.main,
               valueFormatter: (value) =>
-                value == null ? "nicht messbar" : `${value} %`,
+                value == null
+                  ? i18n.t("settingsPanels.autobalancer.notMeasurableLower")
+                  : `${value} %`,
             },
           ]}
           grid={{ horizontal: true }}
         />
       </ChartShell>
       <ChartShell
-        title="Kosten der Varianten"
-        subtitle="Geschätzte notwendige Teamwechsel pro messbarer Runde; weniger ist ruhiger."
+        title={i18n.t("settingsPanels.autobalancer.variantCost")}
+        subtitle={i18n.t("settingsPanels.autobalancer.variantCostHelp")}
       >
         <BarChart
           height={280}
@@ -160,11 +169,16 @@ const WhatIfCharts = ({ rows }) => {
           yAxis={[{ min: 0 }]}
           series={[
             {
-              label: "Wechsel je Runde",
+              label: i18n.t("settingsPanels.autobalancer.switchesPerRound"),
               data: rows.map((row) => row.switches_per_round),
               color: theme.palette.warning.main,
               valueFormatter: (value) =>
-                value == null ? "nicht messbar" : `${value} Wechsel/Runde`,
+                value == null
+                  ? i18n.t("settingsPanels.autobalancer.notMeasurableLower")
+                  : i18n.t(
+                      "settingsPanels.autobalancer.switchesPerRoundValue",
+                      { v0: value }
+                    ),
             },
           ]}
           grid={{ horizontal: true }}
@@ -190,27 +204,35 @@ const BreakdownCharts = ({ summary }) => {
       }}
     >
       <ChartShell
-        title="Datenqualität"
-        subtitle="Exakt stammt aus neuen Live-Snapshots; hoch/mittel/niedrig aus rekonstruierten Logs."
+        title={i18n.t("settingsPanels.autobalancer.dataQuality")}
+        subtitle={i18n.t("settingsPanels.autobalancer.dataQualityHelp")}
       >
         <BarChart
           height={250}
-          xAxis={[{ scaleType: "band", data: quality.map(([level]) => level) }]}
+          xAxis={[
+            {
+              scaleType: "band",
+              data: quality.map(([level]) =>
+                translateOperatorMessage(level, i18n.t)
+              ),
+            },
+          ]}
           yAxis={[{ min: 0, tickMinStep: 1 }]}
           series={[
             {
-              label: "Runden",
+              label: i18n.t("settingsPanels.autobalancer.rounds"),
               data: quality.map(([, count]) => count),
               color: theme.palette.info.main,
-              valueFormatter: (value) => `${value} Runden`,
+              valueFormatter: (value) =>
+                i18n.t("settingsPanels.autobalancer.roundCount", { v0: value }),
             },
           ]}
           grid={{ horizontal: true }}
         />
       </ChartShell>
       <ChartShell
-        title="Größte Teamdifferenz je Runde"
-        subtitle="Nur messbare Zeitfenster mit mindestens der konfigurierten Spielerzahl."
+        title={i18n.t("settingsPanels.autobalancer.maximumTeamDifference")}
+        subtitle={i18n.t("settingsPanels.autobalancer.measurableWindows")}
       >
         <BarChart
           height={250}
@@ -223,10 +245,11 @@ const BreakdownCharts = ({ summary }) => {
           yAxis={[{ min: 0, tickMinStep: 1 }]}
           series={[
             {
-              label: "Runden",
+              label: i18n.t("settingsPanels.autobalancer.rounds"),
               data: differences.map((row) => row.rounds),
               color: theme.palette.warning.main,
-              valueFormatter: (value) => `${value} Runden`,
+              valueFormatter: (value) =>
+                i18n.t("settingsPanels.autobalancer.roundCount", { v0: value }),
             },
           ]}
           grid={{ horizontal: true }}
@@ -235,8 +258,8 @@ const BreakdownCharts = ({ summary }) => {
       {maps.length > 0 && (
         <Box sx={{ gridColumn: { lg: "1 / -1" } }}>
           <ChartShell
-            title="Balancezeit nach Karte"
-            subtitle="Die meistgespielten Karten im gewählten Zeitraum; nur messbare Runden."
+            title={i18n.t("settingsPanels.autobalancer.balanceByMap")}
+            subtitle={i18n.t("settingsPanels.autobalancer.balanceByMapHelp")}
           >
             <BarChart
               layout="horizontal"
@@ -252,7 +275,7 @@ const BreakdownCharts = ({ summary }) => {
               ]}
               series={[
                 {
-                  label: "Zeit im Zielbereich",
+                  label: i18n.t("settingsPanels.autobalancer.timeInRange"),
                   data: maps.map((row) => Math.round(row.balanced_ratio * 100)),
                   color: theme.palette.success.main,
                   valueFormatter: (value) => `${value} %`,
@@ -275,9 +298,7 @@ const CalibrationCharts = ({ quality }) => {
   if (!roles.length && !strategies.length) {
     return (
       <Alert severity="info">
-        Rollenrating und Strategievergleich sammeln erst mit den neuen exakten
-        30-Sekunden-Snapshots belastbare Daten. Rekonstruierte Altrunden werden
-        hierfür bewusst nicht verwendet.
+        {i18n.t("settingsPanels.autobalancer.roleSnapshotHelp")}
       </Alert>
     );
   }
@@ -290,8 +311,8 @@ const CalibrationCharts = ({ quality }) => {
       }}
     >
       <ChartShell
-        title="Ratingvertrauen nach Rollenfamilie"
-        subtitle="Median je Rollenfamilie. 60 % ist das Pilot-Mindestziel; mehr Beobachtungen machen das Rating stabiler."
+        title={i18n.t("settingsPanels.autobalancer.confidenceByRole")}
+        subtitle={i18n.t("settingsPanels.autobalancer.confidenceByRoleHelp")}
       >
         {roles.length ? (
           <BarChart
@@ -300,7 +321,7 @@ const CalibrationCharts = ({ quality }) => {
               {
                 scaleType: "band",
                 data: roles.map(
-                  (row) => ROLE_LABELS[row.role_family] || row.role_family
+                  (row) => ROLE_LABELS()[row.role_family] || row.role_family
                 ),
               },
             ]}
@@ -309,7 +330,7 @@ const CalibrationCharts = ({ quality }) => {
             ]}
             series={[
               {
-                label: "Medianes Vertrauen",
+                label: i18n.t("settingsPanels.autobalancer.medianConfidence"),
                 data: roles.map((row) =>
                   Math.round((row.median_confidence || 0) * 100)
                 ),
@@ -320,12 +341,16 @@ const CalibrationCharts = ({ quality }) => {
             grid={{ horizontal: true }}
           />
         ) : (
-          <Alert severity="info">Noch keine exakten Rollendaten.</Alert>
+          <Alert severity="info">
+            {i18n.t("settingsPanels.autobalancer.noRoleData")}
+          </Alert>
         )}
       </ChartShell>
       <ChartShell
-        title="Verteilung der Ratingkonfidenz"
-        subtitle="Anzahl Spielerbeobachtungen je Vertrauensbereich; Ziel ist eine Verschiebung in die Bereiche ab 60 %."
+        title={i18n.t("settingsPanels.autobalancer.confidenceDistribution")}
+        subtitle={i18n.t(
+          "settingsPanels.autobalancer.confidenceDistributionHelp"
+        )}
       >
         {confidence.some((row) => row.observations) ? (
           <BarChart
@@ -339,22 +364,29 @@ const CalibrationCharts = ({ quality }) => {
             yAxis={[{ min: 0, tickMinStep: 1 }]}
             series={[
               {
-                label: "Beobachtungen",
+                label: i18n.t("settingsPanels.autobalancer.observations"),
                 data: confidence.map((row) => row.observations),
                 color: theme.palette.warning.main,
-                valueFormatter: (value) => `${value} Beobachtungen`,
+                valueFormatter: (value) =>
+                  i18n.t("settingsPanels.autobalancer.observationCount", {
+                    v0: value,
+                  }),
               },
             ]}
             grid={{ horizontal: true }}
           />
         ) : (
-          <Alert severity="info">Noch keine Konfidenzdaten.</Alert>
+          <Alert severity="info">
+            {i18n.t("settingsPanels.autobalancer.noConfidenceData")}
+          </Alert>
         )}
       </ChartShell>
       <Box sx={{ gridColumn: { lg: "1 / -1" } }}>
         <ChartShell
-          title="Shadow-Strategien im direkten Vergleich"
-          subtitle="Durchschnittliche projizierte Ratingdifferenz nach dem ersten Kandidaten. Niedriger ist statistisch ausgeglichener; Squad-Schutz bleibt bei Ausgewogen V2 vorrangig."
+          title={i18n.t("settingsPanels.autobalancer.strategyComparison")}
+          subtitle={i18n.t(
+            "settingsPanels.autobalancer.strategyComparisonHelp"
+          )}
         >
           {strategies.length ? (
             <BarChart
@@ -363,24 +395,30 @@ const CalibrationCharts = ({ quality }) => {
                 {
                   scaleType: "band",
                   data: strategies.map(
-                    (row) => STRATEGY_LABELS[row.strategy] || row.strategy
+                    (row) => STRATEGY_LABELS()[row.strategy] || row.strategy
                   ),
                 },
               ]}
               yAxis={[{ min: 0 }]}
               series={[
                 {
-                  label: "Ø projizierte Ratingdifferenz",
+                  label: i18n.t(
+                    "settingsPanels.autobalancer.averageProjectedGap"
+                  ),
                   data: strategies.map((row) => row.average_projected_gap),
                   color: theme.palette.success.main,
                   valueFormatter: (value) =>
-                    value == null ? "noch keine Daten" : value.toFixed(1),
+                    value == null
+                      ? i18n.t("settingsPanels.autobalancer.noDataLower")
+                      : value.toFixed(1),
                 },
               ]}
               grid={{ horizontal: true }}
             />
           ) : (
-            <Alert severity="info">Noch kein V2-Strategievergleich.</Alert>
+            <Alert severity="info">
+              {i18n.t("settingsPanels.autobalancer.noStrategyComparison")}
+            </Alert>
           )}
         </ChartShell>
       </Box>
@@ -393,6 +431,7 @@ const AutobalancerHistoryDashboard = ({
   shadowSummary = {},
   pilotGoals = {},
 }) => {
+  useTranslation();
   const initial = {
     days: 90,
     search: "",
@@ -430,39 +469,55 @@ const AutobalancerHistoryDashboard = ({
     quality.median_rating_confidence ?? shadowSummary.median_rating_confidence;
   const criteria = [
     {
-      label: `${quality.fully_captured_rounds || 0}/10 vollständige Runden`,
+      label: i18n.t("settingsPanels.autobalancer.fullRounds", {
+        v0: quality.fully_captured_rounds || 0,
+      }),
       met: (quality.fully_captured_rounds || 0) >= 10,
     },
     {
-      label: `${percent(quality.snapshot_coverage)} exakte Abdeckung`,
+      label: i18n.t("settingsPanels.autobalancer.exactCoverage", {
+        v0: percent(quality.snapshot_coverage),
+      }),
       met: quality.snapshot_coverage >= 0.95,
     },
     {
-      label: `${shadowSummary.reviewed || 0}/20 Bewertungen`,
+      label: i18n.t("settingsPanels.autobalancer.reviewTarget", {
+        v0: shadowSummary.reviewed || 0,
+      }),
       met: (shadowSummary.reviewed || 0) >= 20,
     },
     {
-      label: `${percent(shadowSummary.acceptance_rate)} akzeptiert`,
+      label: i18n.t("settingsPanels.autobalancer.acceptedRatio", {
+        v0: percent(shadowSummary.acceptance_rate),
+      }),
       met: shadowSummary.acceptance_rate >= 0.9,
     },
     {
-      label: `${percent(ratingConfidence)} Ratingvertrauen`,
+      label: i18n.t("settingsPanels.autobalancer.ratingConfidenceValue", {
+        v0: percent(ratingConfidence),
+      }),
       met: ratingConfidence >= 0.6,
     },
     {
-      label: `${percent(
-        shadowSummary.gap_guardrail_rate ?? quality.gap_guardrail_rate
-      )} Rating-Guardrail`,
+      label: i18n.t("settingsPanels.autobalancer.ratingGuardrail", {
+        v0: percent(
+          shadowSummary.gap_guardrail_rate ?? quality.gap_guardrail_rate
+        ),
+      }),
       met:
         (shadowSummary.gap_guardrail_rate ?? quality.gap_guardrail_rate) >=
         0.95,
     },
     {
-      label: `${shadowSummary.rule_warning_proposals || 0} harte Verletzungen`,
+      label: i18n.t("settingsPanels.autobalancer.hardViolations", {
+        v0: shadowSummary.rule_warning_proposals || 0,
+      }),
       met: (shadowSummary.rule_warning_proposals || 0) === 0,
     },
     {
-      label: `${shadowSummary.size_overshoot_proposals || 0} Überschwinger`,
+      label: i18n.t("settingsPanels.autobalancer.overshoots", {
+        v0: shadowSummary.size_overshoot_proposals || 0,
+      }),
       met: (shadowSummary.size_overshoot_proposals || 0) === 0,
     },
   ];
@@ -477,27 +532,33 @@ const AutobalancerHistoryDashboard = ({
       >
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 800 }}>
-            Historische Balance-Auswertung
+            {i18n.t("settingsPanels.autobalancer.historyTitle")}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Vergleicht echte FLN-Runden mit den aktuellen und alternativen
-            Balancer-Einstellungen.
+            {i18n.t("settingsPanels.autobalancer.historyIntro")}
           </Typography>
         </Box>
         <Stack direction="row" gap={1} flexWrap="wrap" alignItems="center">
           <Chip
             size="small"
             variant="outlined"
-            label={`${sources.live_snapshots || 0} exakt`}
+            label={i18n.t("settingsPanels.autobalancer.exactCount", {
+              v0: sources.live_snapshots || 0,
+            })}
           />
           <Chip
             size="small"
             variant="outlined"
-            label={`${sources.historical_logs || 0} rekonstruiert`}
+            label={i18n.t("settingsPanels.autobalancer.reconstructedCount", {
+              v0: sources.historical_logs || 0,
+            })}
           />
           {data?.generated_at && (
             <Typography variant="caption" color="text.secondary">
-              Stand {new Date(data.generated_at).toLocaleString("de-DE")}
+              {i18n.t("settingsPanels.autobalancer.updated")}{" "}
+              {new Date(data.generated_at).toLocaleString(
+                i18n.resolvedLanguage
+              )}
             </Typography>
           )}
         </Stack>
@@ -516,22 +577,24 @@ const AutobalancerHistoryDashboard = ({
         }}
       >
         <Metric
-          label="Exakte Datenabdeckung"
+          label={i18n.t("settingsPanels.autobalancer.exactDataCoverage")}
           value={percent(quality.snapshot_coverage)}
-          caption={`Ziel ${percent(0.95)} · nur gültige 30-Sekunden-Snapshots`}
+          caption={i18n.t("settingsPanels.autobalancer.validSnapshotTarget", {
+            v0: percent(0.95),
+          })}
           color={
             quality.snapshot_coverage >= 0.95 ? "success.main" : "warning.main"
           }
         />
         <Metric
-          label="Mediane Ratingkonfidenz"
+          label={i18n.t("settingsPanels.autobalancer.medianRatingConfidence")}
           value={percent(
             quality.median_rating_confidence ??
               shadowSummary.median_rating_confidence
           )}
-          caption={`Ziel ${percent(
-            pilotGoals.rating_confidence_target ?? 0.6
-          )} · role-aware-v2`}
+          caption={i18n.t("settingsPanels.autobalancer.roleAwareTarget", {
+            v0: percent(pilotGoals.rating_confidence_target ?? 0.6),
+          })}
           color={
             (quality.median_rating_confidence ??
               shadowSummary.median_rating_confidence) >= 0.6
@@ -540,11 +603,11 @@ const AutobalancerHistoryDashboard = ({
           }
         />
         <Metric
-          label="Bewertete Vorschläge"
+          label={i18n.t("settingsPanels.autobalancer.reviewedProposals")}
           value={shadowSummary.reviewed ?? 0}
-          caption={`Ziel ${
-            pilotGoals.reviewed_proposals_target ?? 20
-          } · Adminbewertungen`}
+          caption={i18n.t("settingsPanels.autobalancer.adminReviewTarget", {
+            v0: pilotGoals.reviewed_proposals_target ?? 20,
+          })}
           color={
             (shadowSummary.reviewed ?? 0) >=
             (pilotGoals.reviewed_proposals_target ?? 20)
@@ -553,11 +616,11 @@ const AutobalancerHistoryDashboard = ({
           }
         />
         <Metric
-          label="Admin-Akzeptanzrate"
+          label={i18n.t("settingsPanels.autobalancer.acceptanceRate")}
           value={percent(shadowSummary.acceptance_rate)}
-          caption={`Ziel ${percent(
-            pilotGoals.acceptance_rate_target ?? 0.9
-          )} · nur bewertete Vorschläge`}
+          caption={i18n.t("settingsPanels.autobalancer.reviewedTarget", {
+            v0: percent(pilotGoals.acceptance_rate_target ?? 0.9),
+          })}
           color={
             shadowSummary.acceptance_rate >=
             (pilotGoals.acceptance_rate_target ?? 0.9)
@@ -566,9 +629,9 @@ const AutobalancerHistoryDashboard = ({
           }
         />
         <Metric
-          label="Harte Regelverletzungen"
+          label={i18n.t("settingsPanels.autobalancer.hardRuleViolations")}
           value={shadowSummary.rule_warning_proposals ?? 0}
-          caption="Ziel 0 · Commander, Cooldown, Snapshot und Teamrichtung"
+          caption={i18n.t("settingsPanels.autobalancer.hardRuleTarget")}
           color={
             (shadowSummary.rule_warning_proposals ?? 0) === 0
               ? "success.main"
@@ -580,8 +643,8 @@ const AutobalancerHistoryDashboard = ({
       <Alert severity={calibrationReady ? "success" : "info"} sx={{ mt: 1.5 }}>
         <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.75 }}>
           {calibrationReady
-            ? "Alle messbaren V2-Freigabekriterien sind erfüllt"
-            : "Shadow-Kalibrierung läuft – manual bleibt gesperrt"}
+            ? i18n.t("settingsPanels.autobalancer.criteriaMet")
+            : i18n.t("settingsPanels.autobalancer.calibrating")}
         </Typography>
         <Stack direction="row" gap={0.75} flexWrap="wrap">
           {criteria.map((criterion) => (
@@ -595,8 +658,7 @@ const AutobalancerHistoryDashboard = ({
           ))}
         </Stack>
         <Typography variant="caption" sx={{ display: "block", mt: 0.75 }}>
-          Auch bei erfüllten Kriterien erfolgt kein automatischer Moduswechsel;
-          der Kalibrierungsbericht wird gemeinsam geprüft.
+          {i18n.t("settingsPanels.autobalancer.manualApproval")}
         </Typography>
       </Alert>
 
@@ -610,22 +672,30 @@ const AutobalancerHistoryDashboard = ({
             <TextField
               select
               size="small"
-              label="Zeitraum"
+              label={i18n.t("settingsPanels.autobalancer.period")}
               value={draft.days}
               onChange={(event) =>
                 setDraft({ ...draft, days: Number(event.target.value) })
               }
               sx={{ minWidth: 150 }}
             >
-              <MenuItem value={30}>30 Tage</MenuItem>
-              <MenuItem value={90}>90 Tage</MenuItem>
-              <MenuItem value={180}>180 Tage</MenuItem>
-              <MenuItem value={365}>1 Jahr</MenuItem>
+              <MenuItem value={30}>
+                {i18n.t("settingsPanels.autobalancer.days30")}
+              </MenuItem>
+              <MenuItem value={90}>
+                {i18n.t("settingsPanels.autobalancer.days90")}
+              </MenuItem>
+              <MenuItem value={180}>
+                {i18n.t("settingsPanels.autobalancer.days180")}
+              </MenuItem>
+              <MenuItem value={365}>
+                {i18n.t("settingsPanels.autobalancer.year1")}
+              </MenuItem>
             </TextField>
             <TextField
               size="small"
-              label="Karte optional"
-              placeholder="z. B. Carentan"
+              label={i18n.t("settingsPanels.autobalancer.optionalMap")}
+              placeholder={i18n.t("settingsPanels.autobalancer.mapExample")}
               value={draft.search}
               onChange={(event) =>
                 setDraft({ ...draft, search: event.target.value })
@@ -634,7 +704,7 @@ const AutobalancerHistoryDashboard = ({
             <TextField
               select
               size="small"
-              label="Erlaubte Differenz"
+              label={i18n.t("settingsPanels.autobalancer.allowedDifference")}
               value={draft.targetDifference}
               onChange={(event) =>
                 setDraft({
@@ -646,14 +716,14 @@ const AutobalancerHistoryDashboard = ({
             >
               {[1, 2, 3].map((value) => (
                 <MenuItem key={value} value={value}>
-                  {value} Spieler
+                  {value} {i18n.t("settingsPanels.autobalancer.players")}
                 </MenuItem>
               ))}
             </TextField>
             <TextField
               select
               size="small"
-              label="Muss stabil sein"
+              label={i18n.t("settingsPanels.autobalancer.stableFor")}
               value={draft.stableSeconds}
               onChange={(event) =>
                 setDraft({
@@ -665,7 +735,7 @@ const AutobalancerHistoryDashboard = ({
             >
               {[30, 45, 60, 90].map((value) => (
                 <MenuItem key={value} value={value}>
-                  {value} Sekunden
+                  {value} {i18n.t("settingsPanels.autobalancer.seconds")}
                 </MenuItem>
               ))}
             </TextField>
@@ -674,7 +744,7 @@ const AutobalancerHistoryDashboard = ({
               disabled={isFetching}
               onClick={() => setFilters({ ...draft })}
             >
-              Auswerten
+              {i18n.t("settingsPanels.autobalancer.analyse")}
             </Button>
           </Stack>
           {isFetching && <LinearProgress sx={{ mt: 1.5 }} />}
@@ -685,23 +755,23 @@ const AutobalancerHistoryDashboard = ({
         <Stack alignItems="center" sx={{ py: 6 }}>
           <CircularProgress />
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Historische Runden werden ausgewertet …
+            {i18n.t("settingsPanels.autobalancer.analysingHistory")}
           </Typography>
         </Stack>
       )}
       {isError && (
         <Alert severity="error" sx={{ mt: 2 }}>
-          Die historische Sammelauswertung konnte nicht geladen werden.
+          {i18n.t("settingsPanels.autobalancer.historyLoadError")}
         </Alert>
       )}
       {!isLoading && !isError && summary && (
         <Stack spacing={2} sx={{ mt: 2 }}>
           {!data.backfill?.complete && (
             <Alert severity="info">
-              Historische Auswertung wird im Hintergrund aufgebaut:{" "}
+              {i18n.t("settingsPanels.autobalancer.historyBuilding")}{" "}
               {data.backfill?.analyzed_rounds || 0}/
-              {data.backfill?.requested_rounds || 0} Runden fertig. Die Seite
-              aktualisiert sich automatisch.
+              {data.backfill?.requested_rounds || 0}{" "}
+              {i18n.t("settingsPanels.autobalancer.historyBuildingProgress")}
             </Alert>
           )}
           <Box
@@ -716,41 +786,47 @@ const AutobalancerHistoryDashboard = ({
             }}
           >
             <Metric
-              label="Messbare Runden"
+              label={i18n.t("settingsPanels.autobalancer.measurableRounds")}
               value={`${summary.measurable_rounds}/${summary.rounds_analyzed}`}
-              caption={`${percent(summary.coverage_ratio)} Datenabdeckung`}
+              caption={i18n.t("settingsPanels.autobalancer.dataCoverageValue", {
+                v0: percent(summary.coverage_ratio),
+              })}
               color={
                 summary.coverage_ratio >= 0.7 ? "success.main" : "warning.main"
               }
             />
             <Metric
-              label="Zeit im Zielbereich"
+              label={i18n.t("settingsPanels.autobalancer.timeInRange")}
               value={percent(summary.balanced_time_ratio)}
-              caption={`Differenz höchstens ${filters.targetDifference}`}
+              caption={i18n.t(
+                "settingsPanels.autobalancer.maximumDifferenceValue",
+                { v0: filters.targetDifference }
+              )}
             />
             <Metric
-              label="Balance-Vorfälle"
+              label={i18n.t("settingsPanels.autobalancer.balanceIncidents")}
               value={summary.incidents_per_10_rounds ?? "–"}
-              caption="pro 10 messbare Runden"
+              caption={i18n.t("settingsPanels.autobalancer.perTenRounds")}
             />
             <Metric
-              label="Geschätzte Eingriffe"
+              label={i18n.t(
+                "settingsPanels.autobalancer.estimatedInterventions"
+              )}
               value={summary.switches_per_round ?? "–"}
-              caption="notwendige Wechsel je messbarer Runde"
+              caption={i18n.t(
+                "settingsPanels.autobalancer.requiredSwitchesPerRound"
+              )}
             />
           </Box>
           {summary.coverage_ratio < 0.5 && (
             <Alert severity="warning">
-              Weniger als die Hälfte der gewählten Runden ist zuverlässig
-              messbar. Die Ergebnisgraphen verwenden ausschließlich belastbare
-              Zeitfenster; nicht messbare Runden bleiben in der
-              Datenqualitätsanzeige sichtbar.
+              {i18n.t("settingsPanels.autobalancer.lowCoverageWarning")}
             </Alert>
           )}
           <CalibrationCharts quality={quality} />
           <ChartShell
-            title="Balancezeit im Wochenverlauf"
-            subtitle="Anteil der messbaren Zeit innerhalb der gewählten Teamdifferenz."
+            title={i18n.t("settingsPanels.autobalancer.weeklyBalance")}
+            subtitle={i18n.t("settingsPanels.autobalancer.weeklyBalanceHelp")}
           >
             <WeeklyBalanceChart weekly={summary.weekly} />
           </ChartShell>
@@ -763,3 +839,4 @@ const AutobalancerHistoryDashboard = ({
 };
 
 export default AutobalancerHistoryDashboard;
+import "@/i18n/register-settings-panels";

@@ -1,3 +1,5 @@
+import i18n from "@/i18n";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   Button,
@@ -20,21 +22,21 @@ import { cmd } from "@/utils/fetchUtils";
 import AutobalancerModeratorDashboard from "@/pages/settings/[configs]/autobalancer-moderator-dashboard";
 import PageState from "@/components/shared/PageState";
 
-const REJECTION_LABELS = {
-  squad_should_stay: "Squad sollte zusammenbleiben",
-  critical_role: "Rolle ist spielerisch zu wichtig",
-  recent_join_or_move: "Verbindungs- oder Squadzeit wirkt falsch",
-  better_candidate: "Ein anderer Kandidat wäre fairer",
-  skill_balance: "Stärkeausgleich ist nicht überzeugend",
-  wrong_team_counts: "Teamzählung oder Wechselzahl ist falsch",
-  other: "Anderer Grund",
-};
+const REJECTION_LABELS = () => ({
+  squad_should_stay: i18n.t("settingsPanels.autobalancer.squadShouldStay"),
+  critical_role: i18n.t("settingsPanels.autobalancer.criticalRoleReason"),
+  recent_join_or_move: i18n.t("settingsPanels.autobalancer.recentJoinReason"),
+  better_candidate: i18n.t("settingsPanels.autobalancer.betterCandidateReason"),
+  skill_balance: i18n.t("settingsPanels.autobalancer.skillBalanceReason"),
+  wrong_team_counts: i18n.t("settingsPanels.autobalancer.wrongCountsReason"),
+  other: i18n.t("settingsPanels.autobalancer.otherReason"),
+});
 
-const STRATEGY_LABELS = {
-  "squad-first": "Squad zuerst",
-  "balanced-v2": "Ausgewogen V2 (empfohlen)",
-  "skill-first": "Stärke zuerst (nur Diagnose)",
-};
+const STRATEGY_LABELS = () => ({
+  "squad-first": i18n.t("settingsPanels.autobalancer.squadFirst"),
+  "balanced-v2": i18n.t("settingsPanels.autobalancer.balancedV2Recommended"),
+  "skill-first": i18n.t("settingsPanels.autobalancer.skillFirstOnlyDiagnostic"),
+});
 
 const permissionGranted = (permissions, permission) =>
   Boolean(
@@ -43,6 +45,7 @@ const permissionGranted = (permissions, permission) =>
   );
 
 const AutobalancerShadowOverview = ({ config, onOpenSettings }) => {
+  useTranslation();
   const queryClient = useQueryClient();
   const { permissions } = useAuth();
   const canReview = permissionGranted(permissions, "can_execute_autobalancer");
@@ -93,7 +96,7 @@ const AutobalancerShadowOverview = ({ config, onOpenSettings }) => {
       return response?.result;
     },
     onSuccess: () => {
-      toast.success("Shadow-Vorschlag wurde bewertet.");
+      toast.success(i18n.t("settingsPanels.autobalancer.reviewSaved"));
       setReviewTarget(null);
       setCategory("");
       setComment("");
@@ -103,7 +106,7 @@ const AutobalancerShadowOverview = ({ config, onOpenSettings }) => {
     },
     onError: (error) =>
       toast.error(
-        error?.message || "Bewertung konnte nicht gespeichert werden."
+        error?.message || i18n.t("settingsPanels.autobalancer.reviewSaveError")
       ),
   });
 
@@ -129,7 +132,7 @@ const AutobalancerShadowOverview = ({ config, onOpenSettings }) => {
     return (
       <PageState
         kind="loading"
-        title="Autobalancer-Dashboard wird geladen …"
+        title={i18n.t("settingsPanels.autobalancer.dashboardLoading")}
         titleComponent="h1"
       />
     );
@@ -139,10 +142,15 @@ const AutobalancerShadowOverview = ({ config, onOpenSettings }) => {
     return (
       <PageState
         kind="error"
-        title="Autobalancer-Dashboard konnte nicht geladen werden"
-        description="Bitte Berechtigung und Autobalancer-Dienst prüfen."
+        title={i18n.t("settingsPanels.autobalancer.dashboardLoadError")}
+        description={i18n.t(
+          "settingsPanels.autobalancer.checkPermissionService"
+        )}
         titleComponent="h1"
-        action={{ label: "Erneut versuchen", onClick: refetch }}
+        action={{
+          label: i18n.t("settingsPanels.autobalancer.retry"),
+          onClick: refetch,
+        }}
       />
     );
   }
@@ -168,21 +176,24 @@ const AutobalancerShadowOverview = ({ config, onOpenSettings }) => {
         fullWidth
         maxWidth="sm"
       >
-        <DialogTitle>Warum ist der Kandidat nicht akzeptabel?</DialogTitle>
+        <DialogTitle>
+          {i18n.t("settingsPanels.autobalancer.rejectionQuestion")}
+        </DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ mb: 2 }}>
-            Wähle den wichtigsten Grund. Diese Kategorien zeigen später, welche
-            Regel oder Gewichtung gezielt verbessert werden muss.
+            {i18n.t("settingsPanels.autobalancer.rejectionHelp")}
           </DialogContentText>
           <FormControl fullWidth required sx={{ mb: 2 }}>
-            <InputLabel id="shadow-rejection-label">Hauptgrund</InputLabel>
+            <InputLabel id="shadow-rejection-label">
+              {i18n.t("settingsPanels.autobalancer.mainReason")}
+            </InputLabel>
             <Select
               labelId="shadow-rejection-label"
-              label="Hauptgrund"
+              label={i18n.t("settingsPanels.autobalancer.mainReason")}
               value={category}
               onChange={(event) => setCategory(event.target.value)}
             >
-              {Object.entries(REJECTION_LABELS).map(([value, label]) => (
+              {Object.entries(REJECTION_LABELS()).map(([value, label]) => (
                 <MenuItem key={value} value={value}>
                   {label}
                 </MenuItem>
@@ -191,11 +202,13 @@ const AutobalancerShadowOverview = ({ config, onOpenSettings }) => {
           </FormControl>
           <FormControl fullWidth sx={{ mb: 2 }}>
             <InputLabel id="shadow-preferred-strategy-label">
-              Welche Strategie wäre besser? (optional)
+              {i18n.t("settingsPanels.autobalancer.betterStrategyQuestion")}
             </InputLabel>
             <Select
               labelId="shadow-preferred-strategy-label"
-              label="Welche Strategie wäre besser? (optional)"
+              label={i18n.t(
+                "settingsPanels.autobalancer.betterStrategyQuestion"
+              )}
               value={preferredStrategy}
               onChange={(event) => {
                 const value = event.target.value;
@@ -205,25 +218,31 @@ const AutobalancerShadowOverview = ({ config, onOpenSettings }) => {
                 );
               }}
             >
-              <MenuItem value="">Keine Angabe</MenuItem>
+              <MenuItem value="">
+                {i18n.t("settingsPanels.autobalancer.notSpecified")}
+              </MenuItem>
               {Object.keys(reviewTarget?.strategy_plans || {}).map((value) => (
                 <MenuItem key={value} value={value}>
-                  {STRATEGY_LABELS[value] || value}
+                  {STRATEGY_LABELS()[value] || value}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
           <FormControl fullWidth sx={{ mb: 2 }}>
             <InputLabel id="shadow-preferred-player-label">
-              Besserer Kandidat (optional)
+              {i18n.t("settingsPanels.autobalancer.betterCandidateOptional")}
             </InputLabel>
             <Select
               labelId="shadow-preferred-player-label"
-              label="Besserer Kandidat (optional)"
+              label={i18n.t(
+                "settingsPanels.autobalancer.betterCandidateOptional"
+              )}
               value={preferredPlayerId}
               onChange={(event) => setPreferredPlayerId(event.target.value)}
             >
-              <MenuItem value="">Keine Angabe</MenuItem>
+              <MenuItem value="">
+                {i18n.t("settingsPanels.autobalancer.notSpecified")}
+              </MenuItem>
               {Array.from(
                 new Map(
                   Object.entries(reviewTarget?.strategy_plans || {})
@@ -236,7 +255,7 @@ const AutobalancerShadowOverview = ({ config, onOpenSettings }) => {
               ).map((plan) => (
                 <MenuItem key={plan.player_id} value={plan.player_id}>
                   {plan.player_name || plan.player_id} ·{" "}
-                  {STRATEGY_LABELS[plan.strategy] || plan.strategy}
+                  {STRATEGY_LABELS()[plan.strategy] || plan.strategy}
                 </MenuItem>
               ))}
             </Select>
@@ -245,10 +264,12 @@ const AutobalancerShadowOverview = ({ config, onOpenSettings }) => {
             fullWidth
             multiline
             minRows={3}
-            label="Kommentar (optional)"
+            label={i18n.t("settingsPanels.autobalancer.commentOptional")}
             value={comment}
             inputProps={{ maxLength: 1000 }}
-            helperText={`${comment.length}/1000 Zeichen – zum Beispiel: Welcher andere Spieler wäre fairer gewesen?`}
+            helperText={i18n.t("settingsPanels.autobalancer.commentHelp", {
+              v0: comment.length,
+            })}
             onChange={(event) => setComment(event.target.value)}
           />
         </DialogContent>
@@ -258,7 +279,7 @@ const AutobalancerShadowOverview = ({ config, onOpenSettings }) => {
             disabled={review.isPending}
             onClick={() => setReviewTarget(null)}
           >
-            Abbrechen
+            {i18n.t("settingsPanels.autobalancer.cancel")}
           </Button>
           <Button
             color="warning"
@@ -275,7 +296,7 @@ const AutobalancerShadowOverview = ({ config, onOpenSettings }) => {
               })
             }
           >
-            Ablehnung speichern
+            {i18n.t("settingsPanels.autobalancer.saveRejection")}
           </Button>
         </DialogActions>
       </Dialog>
@@ -284,3 +305,4 @@ const AutobalancerShadowOverview = ({ config, onOpenSettings }) => {
 };
 
 export default AutobalancerShadowOverview;
+import "@/i18n/register-settings-panels";

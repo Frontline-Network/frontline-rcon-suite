@@ -23,6 +23,8 @@ import { Link as RouterLink } from "react-router-dom";
 import { Avatar, Badge, Checkbox, Chip, ListItemAvatar } from "@mui/material";
 import makePlayerProfileUrl from "../../utils/makePlayerProfileUrl";
 import moment from "moment";
+import "moment/locale/de";
+import { useTranslation } from "react-i18next";
 import Grid from "@mui/material/Grid2";
 import { useTheme } from "@mui/material/styles";
 import { getRoleIconKey } from "@/constants/roles";
@@ -135,15 +137,15 @@ const Flag = ({ data, onDeleteFlag }) => {
   );
 };
 
-const formatPunitions = (profile) => {
+const formatPunitions = (profile, t, language) => {
   const formatTime = (item) =>
-    moment.utc(item.get("time")).local().format("ddd Do MMM HH:mm:ss");
+    moment.utc(item.get("time")).local().locale(language).format(t("common.logDateTimeFormat"));
   return profile
     .get("received_actions", [])
     .map((item) => (
       <Typography display="block" variant="caption" key={item}>{`${formatTime(
         item
-      )} ${item.get("action_type")} by ${item.get("by")}: ${item.get(
+      )} ${item.get("action_type")} ${t("sharedOperations.by", { name: item.get("by") })}: ${item.get(
         "reason"
       )}`}</Typography>
     ));
@@ -277,6 +279,7 @@ const PlayerItem = ({
   onBlacklist,
   onVipDialogOpen,
 }) => {
+  const { t, i18n } = useTranslation();
   const theme = useTheme();
   const mode = theme.palette.mode;
   const profile = player.get("profile") ? player.get("profile") : new Map();
@@ -309,7 +312,7 @@ const PlayerItem = ({
         id={`checkbox-list-label-${player_id}`}
         primary={
           <Fragment>
-            <WithPopOver content={formatPunitions(profile)}>{name}</WithPopOver>
+            <WithPopOver content={formatPunitions(profile, t, i18n.resolvedLanguage)}>{name}</WithPopOver>
             {" - "}
             {getCountry(player)}
             {" - "}

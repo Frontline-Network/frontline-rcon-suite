@@ -21,6 +21,7 @@
     "test:e2e:update": "playwright test --update-snapshots",
     "test:e2e:headed": "playwright test --headed",
     "check:bundle": "node scripts/check-initial-bundle-budget.mjs",
+    "check:i18n": "node scripts/check-i18n-contract.mjs && node --test src/i18n/operator-messages.test.mjs src/pages/settings/settings-english.test.mjs src/pages/views/team/live-views-localization.test.mjs",
     "check:game-capabilities": "node scripts/check-game-timer-capabilities.mjs",
     "check:admin-actions": "node scripts/check-admin-action-contract.mjs",
     "check:csrf": "node scripts/check-csrf-request-contract.mjs",
@@ -99,6 +100,7 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@babel/parser": "7.29.7",
     "@axe-core/playwright": "^4.13.0",
     "@faker-js/faker": "^9.4.0",
     "@playwright/test": "^1.62.1",
