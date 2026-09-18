@@ -328,9 +328,10 @@ def test_target_only_report_requires_communication_confirmation(db, commander, d
     api.message_player.assert_called_once()
     assert api.message_player.call_args.args[0] == "v0"
     prompt = api.message_player.call_args.args[1]
-    assert "Geht es um fehlende Kommunikation?" in prompt
-    assert "Is this about missing communication?" in prompt
-    assert "Anderer Grund / Other reason: !no" in prompt
+    assert "Redet nicht? / Not communicating?" in prompt
+    assert "!yes: Warnung, dann Kick-Abstimmung" in prompt
+    assert "Warn first, then server-kick vote" in prompt
+    assert "!no: Abbrechen / Cancel" in prompt
     assert "kein automatischer Kick / no automatic kick" in prompt
     assert "Person-target" in prompt
     assert vote(db, vid)["status"] == "confirming"
@@ -351,6 +352,44 @@ def test_target_only_report_requires_communication_confirmation(db, commander, d
             for item in sess.scalars(select(LeadershipMessage))
         )
     api.kick.assert_not_called()
+
+
+@pytest.mark.parametrize("target_role", ["squadleader", "commander"])
+@pytest.mark.parametrize("mode", ["active", "dry_run"])
+@pytest.mark.parametrize("seconds", [60, 90])
+def test_confirmation_is_concise_bilingual_and_keeps_safety_details(
+    target_role, mode, seconds
+):
+    pending = SimpleNamespace(
+        payload={
+            "target_name": "Test-Leader",
+            "target_role": target_role,
+            "squad": "Easy",
+            "rules": {"mode": mode, "confirmation_seconds": seconds},
+        }
+    )
+    prompt = domain.message(pending, "confirm")
+    prefix = (
+        "PROBELAUF / DRY RUN – kein automatischer Kick / no automatic kick\n"
+        if mode == "dry_run"
+        else ""
+    )
+    target = (
+        "Commander Test-Leader"
+        if target_role == "commander"
+        else "Squad Easy – Squadleader Test-Leader"
+    )
+    assert prompt == (
+        f"{prefix}{target}\n"
+        "Redet nicht? / Not communicating?\n"
+        "!yes: Warnung, dann Kick-Abstimmung / Warn first, then server-kick vote.\n"
+        "!no: Abbrechen / Cancel.\n"
+        f"{seconds} Sekunden / seconds.\n"
+        "Nur Team-/Squadchat / Team or squad chat only."
+    )
+    # Keep the instructions short independently of names and the dry-run warning.
+    assert len(prompt) - len(prefix) - len(target) < 220
+    assert len(prompt.splitlines()) <= (7 if mode == "dry_run" else 6)
 
 
 @pytest.mark.parametrize("role", sorted(incidents.SQUAD_LEADER_ROLES))

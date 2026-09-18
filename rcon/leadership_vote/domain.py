@@ -150,7 +150,13 @@ def message(vote, purpose, value=None):
     )
     channel = "\nNur Team-/Squadchat / Team or squad chat only."
     if purpose == "confirm":
-        text = f"{target}\nGeht es um fehlende Kommunikation? Mit !yes bestätigen: erst Warnung, dann Abstimmung über Server-Kick.\nIs this about missing communication? Confirm with !yes: warning first, then a server-kick vote.\nFalsches Ziel / Wrong target: !no. Anderer Grund / Other reason: !no.\nAdmin-Report bleibt offen / Admin report stays open.\n{p['rules']['confirmation_seconds']} Sekunden / seconds. Bestätigung ist keine Stimme / Confirmation is not a ballot."
+        text = (
+            f"{target}\n"
+            "Redet nicht? / Not communicating?\n"
+            "!yes: Warnung, dann Kick-Abstimmung / Warn first, then server-kick vote.\n"
+            "!no: Abbrechen / Cancel.\n"
+            f"{p['rules']['confirmation_seconds']} Sekunden / seconds."
+        )
     elif purpose == "target":
         text = f"{target}\nDu wurdest als nicht erreichbar gemeldet. Melde dich im Führungskanal oder gib die Rolle ab.\nYou were reported as unresponsive. Speak in leadership voice chat or give up the role.\n{p['rules']['warning_seconds']} Sekunden / seconds; danach Vote über Server-Kick / then server-kick vote."
     elif purpose == "warning":

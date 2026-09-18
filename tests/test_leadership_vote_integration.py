@@ -63,7 +63,7 @@ def test_real_alias_report_stays_bound_through_complete_dry_run(
     api = deliver(db, players)
     confirmation = api.message_player.call_args.args[1]
     assert "Person-target" in confirmation
-    assert "Wrong target: !no" in confirmation
+    assert "!no: Abbrechen / Cancel" in confirmation
     assert "DRY RUN" in confirmation
     assert confirm(db, players, incident) == vid
     assert vote(db, vid)["yes"] == 0
