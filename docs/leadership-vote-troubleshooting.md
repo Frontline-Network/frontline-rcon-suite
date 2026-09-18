@@ -27,8 +27,18 @@ message goes to the reporter, not to the named target. Only the reporter's
 still-eligible leaders in the frozen electorate after that warning expires.
 `!no`, an expired confirmation, or an admin takeover stops this before invitations.
 The target and the opposing team never receive ballot invitations.
-Ballot invitations use the approved English-only `LEADERSHIP VOTE` text, including
-the English dry-run notice when applicable. Other player notices remain bilingual.
+Each eligible leader receives two separate invitations: German (`invite_de`),
+then the approved English `LEADERSHIP VOTE` text (`invite`). Each has its own
+durable receipt and language-specific dry-run notice. English is enqueued only
+after the German attempt, so it cannot overtake it; after dismissing the English
+message, the German message remains below it in the game UI. Other player notices
+remain bilingual in one message.
+
+Successful delivery in either language counts as one invited person, never two.
+The first successful delivery allows a response; the voting deadline gives the
+full voting duration after the final successful invitation delivery. Failed or
+uncertain attempts are not retried, and both languages retain the same identity,
+team, phase and manual-takeover checks.
 
 Check the durable message purposes and recipients (`confirm`, `target`, `invite`)
 alongside the chat event timestamps, rather than assuming a report is an active

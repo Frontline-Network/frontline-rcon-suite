@@ -6,6 +6,7 @@ from rcon.admin_incidents import _is_commander, _is_squad_leader, _normalize_tea
 
 OPEN = frozenset({"confirming", "warning", "inviting", "active", "executing"})
 LIVE = OPEN
+INVITATIONS = frozenset({"invite_de", "invite"})
 MAX_EVENT_AGE = 30
 MAX_OBSERVATION_GAP = 15
 
@@ -126,6 +127,7 @@ def electorate(players, target, presence, now, tenure):
             "identity": ident,
             "token": observation["token"],
             "invited_at": None,
+            "last_invited_at": None,
             "valid": True,
         }
     return result
@@ -161,6 +163,22 @@ def message(vote, purpose, value=None):
         text = f"{target}\nDu wurdest als nicht erreichbar gemeldet. Melde dich im Führungskanal oder gib die Rolle ab.\nYou were reported as unresponsive. Speak in leadership voice chat or give up the role.\n{p['rules']['warning_seconds']} Sekunden / seconds; danach Vote über Server-Kick / then server-kick vote."
     elif purpose == "warning":
         text = f"{target}\nWarnung zugestellt. Bei Klärung mit !no zurückziehen.\nWarning delivered. If resolved, withdraw with !no.\n{p['rules']['warning_seconds']} Sekunden / seconds."
+    elif purpose == "invite_de":
+        prefix = (
+            "PROBELAUF — kein automatischer Kick\n\n"
+            if p["rules"]["mode"] == "dry_run"
+            else ""
+        )
+        text = (
+            f"FÜHRUNGSABSTIMMUNG\n{target}\n\n"
+            "Diesen Spieler wegen fehlender Kommunikation vom Server kicken?\n\n"
+            "!yes = Für den Kick\n"
+            "!no = Gegen den Kick\n\n"
+            f"Du hast {p['rules']['duration_seconds']} Sekunden zum Antworten.\n"
+            f"Benötigt: {p['required']} Ja-Stimmen bei "
+            f"{p['participant_count']} stimmberechtigten Führungskräften."
+        )
+        channel = "\n\nAntworte nur im TEAM- oder SQUADCHAT."
     elif purpose == "invite":
         target = (
             f"Commander {who}"
@@ -189,5 +207,5 @@ def message(vote, purpose, value=None):
     else:
         raise ValueError("Unknown message purpose")
     return (
-        prefix + text + (channel if purpose in {"confirm", "warning", "invite"} else "")
+        prefix + text + (channel if purpose in {"confirm", "warning"} | INVITATIONS else "")
     )

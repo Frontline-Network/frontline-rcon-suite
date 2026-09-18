@@ -11,6 +11,7 @@ from tests.test_leadership_vote import (
     confirm,
     context,
     db,
+    deliver,
     elapse,
     observe_for,
     report,
@@ -80,6 +81,29 @@ def run_campaign_once(monkeypatch, ctl):
     with pytest.raises(StopIteration):
         campaign_delivery.run()
     return finished
+
+
+@pytest.mark.parametrize("commander", [False, True], ids=["squadleader", "commander"])
+def test_separate_language_invitations_use_real_hll_and_hllv_message_wrapper(
+    db, controller, commander
+):
+    players = roster(commander=commander)
+    observe_for(db, players)
+    incident = report(players, "!admin commander" if commander else "!admin able")
+    vid = confirm(db, players, incident)
+    elapse(db, players, 60)
+    storage.advance(1, context(players))
+    deliver(db, players, controller.api)
+    calls = controller.sent.call_args_list
+    assert len(calls) == 12
+    for i in range(6):
+        bodies = [c.args[1] for c in calls if c.args[0] == f"v{i}"]
+        assert len(bodies) == 2
+        assert "FÜHRUNGSABSTIMMUNG" in bodies[0]
+        assert "LEADERSHIP VOTE" in bodies[1]
+    storage.advance(1, context(players))
+    assert vote(db, vid)["status"] == "active"
+    assert vote(db, vid)["required"] == 4
 
 
 @pytest.mark.parametrize("commander", [False, True], ids=["squadleader", "commander"])

@@ -10,7 +10,7 @@ from rcon.user_config.leadership_vote import LeadershipVoteUserConfig as Config
 from rcon.utils import MapsHistory, get_server_number, parse_raw_player_info
 from . import storage
 from .storage import enter_session
-from .domain import answer, event_time, private_chat, message, _normalize_team
+from .domain import INVITATIONS, answer, event_time, private_chat, message, _normalize_team
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +122,7 @@ def dispatch_one(api, server, context=None):
             "target": {"warning"},
             "warning": {"warning"},
             "invite": {"inviting", "active"},
+            "invite_de": {"inviting", "active"},
             "ballot": {"inviting", "active"},
         }.get(item.purpose)
         if (
@@ -137,7 +138,7 @@ def dispatch_one(api, server, context=None):
         ):
             item.status = "cancelled"
             return True
-        if item.purpose in {"invite", "ballot"}:
+        if item.purpose in INVITATIONS | {"ballot"}:
             storage.validate_participants(
                 vote, context["players"], storage.presence(sess, server), now
             )
@@ -157,8 +158,11 @@ def dispatch_one(api, server, context=None):
             if item.purpose == "confirm":
                 p["confirm_invited_at"] = item.sent_at
                 p["ends_at"] = item.sent_at + p["rules"]["confirmation_seconds"]
-            elif item.purpose == "invite":
-                p["electorate"][item.player_id]["invited_at"] = item.sent_at
+            elif item.purpose in INVITATIONS:
+                member = p["electorate"][item.player_id]
+                if member.get("invited_at") is None:
+                    member["invited_at"] = item.sent_at
+                member["last_invited_at"] = item.sent_at
             elif item.purpose == "target":
                 p["target_notified"] = True
                 p["ends_at"] = item.sent_at + p["rules"]["warning_seconds"]
@@ -175,6 +179,14 @@ def dispatch_one(api, server, context=None):
                 )
             if item.purpose in {"target", "confirm"}:
                 storage.publish(sess, vote, "delivery")
+        if item.purpose == "invite_de":
+            # Commit the English follow-up with the German attempt's receipt.
+            # It cannot overtake German or be enqueued twice. A failed language
+            # is not retried; the other language still gets its single attempt.
+            storage.notify(
+                sess, server, item.player_id, message(vote, "invite"),
+                time.time(), vote, "invite",
+            )
     return True
 
 

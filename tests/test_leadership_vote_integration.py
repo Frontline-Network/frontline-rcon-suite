@@ -159,7 +159,7 @@ def test_120_second_confirmation_expires_without_inviting_or_kicking(db):
             sess.scalars(
                 select(LeadershipMessage).where(
                     LeadershipMessage.vote_id == vid,
-                    LeadershipMessage.purpose.in_({"target", "invite"}),
+                    LeadershipMessage.purpose.in_({"target", "invite_de", "invite"}),
                 )
             )
         )

@@ -27,6 +27,7 @@ from rcon.user_config.leadership_vote import LeadershipVoteUserConfig as Config
 from rcon.user_config.utils import _invalidate_user_config_cache
 from .domain import (
     OPEN,
+    INVITATIONS,
     MAX_OBSERVATION_GAP,
     electorate,
     identity,
@@ -960,7 +961,7 @@ def advance(server, context=None, now=None):
                 for pid, member in p["electorate"].items():
                     if member["valid"]:
                         notify(
-                            sess, server, pid, message(v, "invite"), now, v, "invite"
+                            sess, server, pid, message(v, "invite_de"), now, v, "invite_de"
                         )
                 publish(sess, v, "inviting")
                 continue
@@ -969,7 +970,7 @@ def advance(server, context=None, now=None):
                     select(LeadershipMessage.id)
                     .where(
                         LeadershipMessage.vote_id == v.id,
-                        LeadershipMessage.purpose == "invite",
+                        LeadershipMessage.purpose.in_(INVITATIONS),
                         LeadershipMessage.status.in_({"pending", "sending"}),
                     )
                     .limit(1)
@@ -994,7 +995,7 @@ def advance(server, context=None, now=None):
                     # Every invitee gets a full voting period after delivery.
                     p["ends_at"] = (
                         max(
-                            m["invited_at"]
+                            m.get("last_invited_at") or m["invited_at"]
                             for m in p["electorate"].values()
                             if m.get("invited_at") is not None
                         )

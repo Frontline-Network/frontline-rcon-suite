@@ -349,7 +349,7 @@ def test_target_only_report_requires_communication_confirmation(db, commander, d
         assert saved.raw_message == text
         assert saved.reason == incident["reason"]
         assert all(
-            item.purpose not in {"target", "invite"}
+            item.purpose not in {"target", "invite_de", "invite"}
             for item in sess.scalars(select(LeadershipMessage))
         )
     api.kick.assert_not_called()
@@ -760,15 +760,18 @@ def test_db_enqueue_fault_preserves_ordinary_report(db, monkeypatch):
     assert incident["status"] == "new" and not incident["leadership_vote"]
 
 
-def test_messages_are_named_and_explicitly_dry_with_english_invitations(db):
+def test_messages_are_named_and_explicitly_dry_in_each_language(db):
     vid, players = activate(db)
     with db() as sess:
         items = list(sess.scalars(select(LeadershipMessage)))
     assert items
     assert all(
         "Person-target" in m.body
-        and "DRY RUN" in m.body
-        and "no automatic kick" in m.body
+        and (
+            ("PROBELAUF" in m.body and "kein automatischer Kick" in m.body)
+            if m.purpose == "invite_de"
+            else ("DRY RUN" in m.body and "no automatic kick" in m.body)
+        )
         for m in items
     )
     assert all("kein automatischer Kick" in m.body for m in items if m.purpose != "invite")
