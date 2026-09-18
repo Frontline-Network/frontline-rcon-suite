@@ -146,6 +146,13 @@ class AutobalancerStore:
             self.red.set(self.key(f"command_reply:{player_id}"), "1", nx=True, ex=5)
         )
 
+    def claim_volunteer_invitation(self, player_id: str, ttl: int = 300) -> bool:
+        """One invitation attempt per player/server per five minutes, across restarts."""
+        digest = hashlib.sha256(player_id.encode("utf-8")).hexdigest()
+        return bool(
+            self.red.set(self.key(f"invitation:{digest}"), "1", nx=True, ex=ttl)
+        )
+
     def arm_player(self, player_id: str | None) -> None:
         if player_id:
             self.red.set(self.key("armed_player"), player_id, ex=15 * 60)

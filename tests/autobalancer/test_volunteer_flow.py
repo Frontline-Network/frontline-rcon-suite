@@ -208,12 +208,15 @@ def test_transient_count_pause_preserves_invitation_and_pending_reply(instance):
 
 @pytest.mark.parametrize("recovered", [True, False])
 def test_long_count_pause_ends_invitation_and_notifies_once(instance, recovered):
+    instance.store.state["volunteers"] = ["a0"]
     tick(instance, 3000, counts_match=False)
     status = tick(instance, 3015, counts_match=recovered)
     assert status["phase"] == Phase.BLOCKED
     assert "incident_id" not in instance.store.state
-    assert {p for p, _ in instance.rcon.messages} == {"a0", "a1"}
-    assert all("Aufruf ist beendet" in m for _, m in instance.rcon.messages)
+    assert {p for p, _ in instance.rcon.messages} == {"a0"}
+    assert all(
+        "Teamausgleich wurde abgebrochen" in m for _, m in instance.rcon.messages
+    )
     message_count = len(instance.rcon.messages)
     tick(instance, 3020, counts_match=False)
     assert len(instance.rcon.messages) == message_count
@@ -258,10 +261,11 @@ def test_invitation_survives_short_balanced_counts_without_switching(instance):
 
 
 def test_balanced_teams_at_deadline_end_invitation_privately(instance):
+    instance.store.state["volunteers"] = ["a0"]
     status = tick(instance, 3030, allies=44, axis=44)
     assert status["phase"] == Phase.IDLE
-    assert len(instance.rcon.messages) == 2
-    assert all("bereits ausgeglichen" in text for _, text in instance.rcon.messages)
+    assert len(instance.rcon.messages) == 1
+    assert "Du bleibst in deinem Team" in instance.rcon.messages[0][1]
     assert instance.repository.created == []
 
 
@@ -510,6 +514,7 @@ def test_pending_command_does_not_rewind_durable_stream_cursor(instance, monkeyp
 
 
 def test_technical_abort_details_are_not_sent_to_players(instance):
+    instance.store.state["volunteers"] = ["a0"]
     instance._abort_state(
         instance.store.state, "Interner Fehler: secret-database-connection"
     )

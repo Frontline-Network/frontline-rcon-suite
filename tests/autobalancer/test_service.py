@@ -29,6 +29,13 @@ class FakeStore:
         self.status = {}
         self.events = []
         self.armed = None
+        self.invitation_claims = set()
+
+    def claim_volunteer_invitation(self, player_id):
+        if player_id in self.invitation_claims:
+            return False
+        self.invitation_claims.add(player_id)
+        return True
 
     def arm_player(self, player_id):
         self.armed = player_id

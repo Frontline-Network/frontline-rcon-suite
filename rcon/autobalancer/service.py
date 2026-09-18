@@ -473,6 +473,9 @@ class AutobalancerService:
             message = f"{message}\n{MANUAL_NOTICE}"
         state["volunteer_notified"] = []
         for player in recipients:
+            # Reserve before delivery: uncertain/failed sends must not spam retries.
+            if not self.store.claim_volunteer_invitation(player.player_id):
+                continue
             if send_private(self.rcon, player.player_id, message):
                 state["volunteer_notified"].append(player.player_id)
 
@@ -956,6 +959,13 @@ class AutobalancerService:
         send_private(self.rcon, player_id, message)
 
     def _abort_state(self, state: dict[str, Any], reason: str) -> None:
+        if state.get("incident_id"):
+            logger.info(
+                "Autobalancer incident %s ended in %s: %s",
+                state["incident_id"],
+                state.get("phase"),
+                reason,
+            )
         if state.get("decision_id"):
             self.repository.update(
                 state["decision_id"],
@@ -971,10 +981,8 @@ class AutobalancerService:
 
     def _notify_ended(self, state: dict[str, Any], reason: str) -> None:
         if state.get("mode") != "shadow" and not state.get("abort_notified"):
-            recipients = (
-                set(state.get("volunteer_notified") or [])
-                | set(state.get("volunteers") or [])
-                | set(state.get("pending_volunteers") or {})
+            recipients = set(state.get("volunteers") or []) | set(
+                state.get("pending_volunteers") or {}
             )
             if state.get("phase") in {Phase.ARMED, Phase.VERIFYING} and (
                 state.get("candidate") or {}
@@ -982,7 +990,13 @@ class AutobalancerService:
                 recipients.add(state["candidate"]["player_id"])
             state["abort_notified"] = True
             for player_id in sorted(recipients):
-                send_private(self.rcon, player_id, ended_message(reason))
+                send_private(
+                    self.rcon,
+                    player_id,
+                    ended_message(
+                        reason, switch_uncertain=state.get("phase") == Phase.VERIFYING
+                    ),
+                )
 
     def _status(
         self,

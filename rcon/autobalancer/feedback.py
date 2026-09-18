@@ -31,13 +31,17 @@ PUBLIC_ABORT_REASONS = {
 }
 
 
-def ended_message(reason: str) -> str:
-    public_reason = PUBLIC_ABORT_REASONS.get(
-        reason, "Die Voraussetzungen für einen sicheren Wechsel sind nicht mehr erfüllt"
-    )
+def ended_message(reason: str, *, switch_uncertain: bool = False) -> str:
+    # Technical details belong in the admin audit, not a popup to every invitee.
+    # Never promise an unchanged team after a switch may already have been sent.
+    if switch_uncertain or reason == "Teamwechsel wurde nicht bestätigt":
+        return (
+            "Der Teamausgleich ist beendet. Bitte lass deinen Teamwechsel von einem Admin prüfen.\n"
+            "Team balancing has ended. Please ask an admin to check your team switch."
+        )
     return (
-        f"Der Balance-Aufruf ist beendet: {public_reason}. "
-        "Deine Vormerkung gilt nicht für spätere Aufrufe."
+        "Der Teamausgleich wurde abgebrochen. Du bleibst in deinem Team.\n"
+        "Team balancing was cancelled. You stay on your current team."
     )
 
 
