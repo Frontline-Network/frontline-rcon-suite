@@ -19,6 +19,25 @@ An expired confirmation is a separate result: the reporter must first send
 RCON acceptance, not proof that the player read it. Claiming the Discord report
 intentionally stops the vote, including during its warning phase.
 
+## Other leaders have not received invitations
+
+Distinguish a `confirming` request from an `active` vote. The first private
+message goes to the reporter, not to the named target. Only the reporter's
+`!yes` in team/squad chat starts the target's warning; invitations go to all
+still-eligible leaders in the frozen electorate after that warning expires.
+`!no`, an expired confirmation, or an admin takeover stops this before invitations.
+The target and the opposing team never receive ballot invitations.
+
+Check the durable message purposes and recipients (`confirm`, `target`, `invite`)
+alongside the chat event timestamps, rather than assuming a report is an active
+vote. RCON acceptance of a message still does not prove that a player read it.
+The short confirmation explicitly identifies the reporter's own report and the
+required `!yes` response. For a server-local pilot, `confirmation_seconds=120`
+gives the reporter two minutes without changing the warning, ballot duration,
+quorum, or manual takeover rules. Existing votes keep their snapshotted rules;
+change configuration only when no vote is open, because configuration changes
+cancel open procedures. Do not replay historical reports or fabricate ballots.
+
 ## Votes never start on busy servers
 
 Inspect leadership presence age/tenure and the routines log before changing any

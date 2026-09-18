@@ -329,9 +329,10 @@ def test_target_only_report_requires_communication_confirmation(db, commander, d
     assert api.message_player.call_args.args[0] == "v0"
     prompt = api.message_player.call_args.args[1]
     assert "Redet nicht? / Not communicating?" in prompt
-    assert "!yes: Warnung, dann Kick-Abstimmung" in prompt
-    assert "Warn first, then server-kick vote" in prompt
-    assert "!no: Abbrechen / Cancel" in prompt
+    assert "Dein Report / Your report:" in prompt
+    assert "!yes = Start: Warnung, dann Kick-Vote" in prompt
+    assert "Warning, then server-kick vote" in prompt
+    assert "!no = Abbrechen / Cancel" in prompt
     assert "kein automatischer Kick / no automatic kick" in prompt
     assert "Person-target" in prompt
     assert vote(db, vid)["status"] == "confirming"
@@ -356,7 +357,7 @@ def test_target_only_report_requires_communication_confirmation(db, commander, d
 
 @pytest.mark.parametrize("target_role", ["squadleader", "commander"])
 @pytest.mark.parametrize("mode", ["active", "dry_run"])
-@pytest.mark.parametrize("seconds", [60, 90])
+@pytest.mark.parametrize("seconds", [60, 120])
 def test_confirmation_is_concise_bilingual_and_keeps_safety_details(
     target_role, mode, seconds
 ):
@@ -380,15 +381,15 @@ def test_confirmation_is_concise_bilingual_and_keeps_safety_details(
         else "Squad Easy – Squadleader Test-Leader"
     )
     assert prompt == (
-        f"{prefix}{target}\n"
+        f"{prefix}Dein Report / Your report: {target}\n"
         "Redet nicht? / Not communicating?\n"
-        "!yes: Warnung, dann Kick-Abstimmung / Warn first, then server-kick vote.\n"
-        "!no: Abbrechen / Cancel.\n"
-        f"{seconds} Sekunden / seconds.\n"
+        "!yes = Start: Warnung, dann Kick-Vote / Warning, then server-kick vote.\n"
+        "!no = Abbrechen / Cancel.\n"
+        f"Antworte in / Reply within {seconds} s.\n"
         "Nur Team-/Squadchat / Team or squad chat only."
     )
     # Keep the instructions short independently of names and the dry-run warning.
-    assert len(prompt) - len(prefix) - len(target) < 220
+    assert len(prompt) - len(prefix) - len(target) < 250
     assert len(prompt.splitlines()) <= (7 if mode == "dry_run" else 6)
 
 

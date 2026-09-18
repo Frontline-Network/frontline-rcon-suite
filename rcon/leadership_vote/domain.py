@@ -151,11 +151,11 @@ def message(vote, purpose, value=None):
     channel = "\nNur Team-/Squadchat / Team or squad chat only."
     if purpose == "confirm":
         text = (
-            f"{target}\n"
+            f"Dein Report / Your report: {target}\n"
             "Redet nicht? / Not communicating?\n"
-            "!yes: Warnung, dann Kick-Abstimmung / Warn first, then server-kick vote.\n"
-            "!no: Abbrechen / Cancel.\n"
-            f"{p['rules']['confirmation_seconds']} Sekunden / seconds."
+            "!yes = Start: Warnung, dann Kick-Vote / Warning, then server-kick vote.\n"
+            "!no = Abbrechen / Cancel.\n"
+            f"Antworte in / Reply within {p['rules']['confirmation_seconds']} s."
         )
     elif purpose == "target":
         text = f"{target}\nDu wurdest als nicht erreichbar gemeldet. Melde dich im Führungskanal oder gib die Rolle ab.\nYou were reported as unresponsive. Speak in leadership voice chat or give up the role.\n{p['rules']['warning_seconds']} Sekunden / seconds; danach Vote über Server-Kick / then server-kick vote."
