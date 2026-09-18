@@ -90,8 +90,7 @@ def test_separate_language_invitations_use_real_hll_and_hllv_message_wrapper(
     players = roster(commander=commander)
     observe_for(db, players)
     incident = report(players, "!admin commander" if commander else "!admin able")
-    vid = confirm(db, players, incident)
-    elapse(db, players, 60)
+    vid = confirm(db, players, incident, deliver_invitations=False)
     storage.advance(1, context(players))
     deliver(db, players, controller.api)
     calls = controller.sent.call_args_list
@@ -107,7 +106,7 @@ def test_separate_language_invitations_use_real_hll_and_hllv_message_wrapper(
 
 
 @pytest.mark.parametrize("commander", [False, True], ids=["squadleader", "commander"])
-@pytest.mark.parametrize("phase", ["confirming", "warning", "active", "executing"])
+@pytest.mark.parametrize("phase", ["confirming", "inviting", "active", "executing"])
 def test_campaign_preserves_vote_and_message_audit(
     db, monkeypatch, controller, commander, phase
 ):
@@ -126,7 +125,7 @@ def test_campaign_preserves_vote_and_message_audit(
             players, text="!admin commander" if commander else "!admin able"
         )
         vid = incident["leadership_vote"]["id"]
-        if phase == "warning":
+        if phase == "inviting":
             confirm(db, players, incident)
     before = vote(db, vid)
     assert before["status"] == phase

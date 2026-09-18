@@ -208,13 +208,14 @@ def deliver(db, players, api=None):
     return api
 
 
-def confirm(db, players, incident):
+def confirm(db, players, incident, deliver_invitations=True):
     vid = incident["leadership_vote"]["id"]
     deliver(db, players)
     db.clock.now += 1
     assert storage.ballot(1, "v0", True, db.clock.now, players, "round-1")
-    assert vote(db, vid)["status"] == "warning"
-    deliver(db, players)
+    assert vote(db, vid)["status"] == "inviting"
+    if deliver_invitations:
+        deliver(db, players)
     return vid
 
 
@@ -231,7 +232,6 @@ def activate(db, n=6, commander=False, mode="dry_run"):
         ),
     )
     vid = confirm(db, players, incident)
-    elapse(db, players, 60)
     storage.advance(1, context(players))
     deliver(db, players)
     storage.advance(1, context(players))
@@ -330,8 +330,8 @@ def test_target_only_report_requires_communication_confirmation(db, commander, d
     prompt = api.message_player.call_args.args[1]
     assert "Redet nicht? / Not communicating?" in prompt
     assert "Dein Report / Your report:" in prompt
-    assert "!yes = Start: Warnung, dann Kick-Vote" in prompt
-    assert "Warning, then server-kick vote" in prompt
+    assert "!yes = Kick-Abstimmung starten / Start server-kick vote" in prompt
+    assert "Warnung" not in prompt and "Warning" not in prompt
     assert "!no = Abbrechen / Cancel" in prompt
     assert "kein automatischer Kick / no automatic kick" in prompt
     assert "Person-target" in prompt
@@ -383,7 +383,7 @@ def test_confirmation_is_concise_bilingual_and_keeps_safety_details(
     assert prompt == (
         f"{prefix}Dein Report / Your report: {target}\n"
         "Redet nicht? / Not communicating?\n"
-        "!yes = Start: Warnung, dann Kick-Vote / Warning, then server-kick vote.\n"
+        "!yes = Kick-Abstimmung starten / Start server-kick vote.\n"
         "!no = Abbrechen / Cancel.\n"
         f"Antworte in / Reply within {seconds} s.\n"
         "Nur Team-/Squadchat / Team or squad chat only."
@@ -514,13 +514,16 @@ def test_one_flow_per_team_server_scope_and_opposition_excluded(db):
     assert "enemy" not in vote(db, vid)["electorate"]
 
 
-def test_confirmation_not_ballot_warning_withdraw_and_cooldown(db):
+def test_confirmation_not_ballot_reporter_no_is_ballot_and_cooldown_survives(db):
     players = roster()
     observe_for(db, players)
     vid = confirm(db, players, report(players))
     assert vote(db, vid)["yes"] == 0
     assert not cast(db, players, "target")
     assert cast(db, players, yes=False)
+    assert vote(db, vid)["status"] == "inviting"
+    assert vote(db, vid)["yes"] == 0 and vote(db, vid)["no"] == 1
+    storage.cancel(1, vid, "admin")
     assert vote(db, vid)["status"] == "cancelled"
     assert not report(players)["leadership_vote"]
 

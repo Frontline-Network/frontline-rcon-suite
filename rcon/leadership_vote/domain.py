@@ -155,14 +155,10 @@ def message(vote, purpose, value=None):
         text = (
             f"Dein Report / Your report: {target}\n"
             "Redet nicht? / Not communicating?\n"
-            "!yes = Start: Warnung, dann Kick-Vote / Warning, then server-kick vote.\n"
+            "!yes = Kick-Abstimmung starten / Start server-kick vote.\n"
             "!no = Abbrechen / Cancel.\n"
             f"Antworte in / Reply within {p['rules']['confirmation_seconds']} s."
         )
-    elif purpose == "target":
-        text = f"{target}\nDu wurdest als nicht erreichbar gemeldet. Melde dich im Führungskanal oder gib die Rolle ab.\nYou were reported as unresponsive. Speak in leadership voice chat or give up the role.\n{p['rules']['warning_seconds']} Sekunden / seconds; danach Vote über Server-Kick / then server-kick vote."
-    elif purpose == "warning":
-        text = f"{target}\nWarnung zugestellt. Bei Klärung mit !no zurückziehen.\nWarning delivered. If resolved, withdraw with !no.\n{p['rules']['warning_seconds']} Sekunden / seconds."
     elif purpose == "invite_de":
         prefix = (
             "PROBELAUF — kein automatischer Kick\n\n"
@@ -186,9 +182,7 @@ def message(vote, purpose, value=None):
             else f"Squad {clean_text(p['squad'])} — Squad Leader {who}"
         )
         prefix = (
-            "DRY RUN — no automatic kick\n\n"
-            if p["rules"]["mode"] == "dry_run"
-            else ""
+            "DRY RUN — no automatic kick\n\n" if p["rules"]["mode"] == "dry_run" else ""
         )
         text = (
             f"LEADERSHIP VOTE\n{target}\n\n"
@@ -206,6 +200,4 @@ def message(vote, purpose, value=None):
         text = f"{target}\n{p['result']}\nJa / Yes: {p['yes']}; Nein / No: {p['no']}; nötig / required: {p.get('required', '–')}."
     else:
         raise ValueError("Unknown message purpose")
-    return (
-        prefix + text + (channel if purpose in {"confirm", "warning"} | INVITATIONS else "")
-    )
+    return prefix + text + (channel if purpose in {"confirm"} | INVITATIONS else "")

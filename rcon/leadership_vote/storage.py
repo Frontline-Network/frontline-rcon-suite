@@ -229,6 +229,7 @@ def summary(v):
                 "reason",
                 "rules",
                 "started_at",
+                "confirmed_at",
                 "ends_at",
                 "required",
                 "yes",
@@ -261,6 +262,11 @@ def publish(sess, v, kind, actor="system:leadership-vote"):
 
 
 def notify(sess, server, player_id, body, now, vote=None, purpose="feedback"):
+    # No private vote notices to the reported player, including legacy results.
+    if vote and str(player_id) == str(vote.target_id):
+        return
+    if purpose in {"target", "warning"}:
+        return
     if player_id:
         sess.add(
             LeadershipMessage(
@@ -303,14 +309,12 @@ def finish(sess, v, status, result, now, actor="system:leadership-vote"):
     ):
         item.status = "cancelled"
     recipients = {v.reporter_id}
-    if p.get("target_notified"):
-        recipients.add(v.target_id)
     recipients |= {
         pid
         for pid, data in p.get("electorate", {}).items()
         if data.get("invited_at") is not None
     }
-    for pid in recipients:
+    for pid in recipients - {v.target_id}:
         notify(sess, v.server_number, pid, message(v, "result"), now, v, "result")
     if status == "kicked":
         for incident in sess.scalars(
@@ -424,7 +428,10 @@ def enqueue(sess, incident, context, now):
         return
     if any(
         v.ended_at is not None
-        and v.payload.get("warning_started_at") is not None
+        and (
+            v.payload.get("confirmed_at") is not None
+            or v.payload.get("warning_started_at") is not None
+        )
         and (
             (
                 v.team == target["team"]
@@ -533,12 +540,14 @@ def start(sess, v, players, now):
         electorate=roster,
         participant_count=len(roster),
         required=cfg.required(len(roster)),
-        warning_started_at=now,
-        ends_at=now + cfg.warning_seconds + 30,
+        confirmed_at=now,
+        started_at=now,
+        ends_at=now + cfg.duration_seconds,
     )
-    v.payload, v.status = p, "warning"
-    notify(sess, v.server_number, v.target_id, message(v, "target"), now, v, "target")
-    publish(sess, v, "warning")
+    v.payload, v.status = p, "inviting"
+    for pid in roster:
+        notify(sess, v.server_number, pid, message(v, "invite_de"), now, v, "invite_de")
+    publish(sess, v, "inviting")
     return True
 
 
@@ -581,20 +590,6 @@ def ballot(server, player_id, yes, stamp, players, round_id, now=None):
                         "Berechtigung geändert / Eligibility changed",
                         now,
                     )
-                return True
-            if v.status == "warning" and player_id == v.reporter_id and not yes:
-                if stamp < p["warning_started_at"]:
-                    continue
-                validate_participants(v, players, observations, now)
-                if not v.payload["electorate"].get(player_id, {}).get("valid"):
-                    continue
-                finish(
-                    sess,
-                    v,
-                    "cancelled",
-                    "Vom Melder zurückgezogen / Withdrawn by reporter",
-                    now,
-                )
                 return True
             if v.status not in {"inviting", "active"}:
                 continue
@@ -944,26 +939,14 @@ def advance(server, context=None, now=None):
                 )
                 continue
             if v.status == "warning":
-                if not p.get("target_notified"):
-                    if now >= p["warning_started_at"] + 30:
-                        finish(
-                            sess,
-                            v,
-                            "cancelled",
-                            "Warnung nicht zugestellt / Warning not delivered",
-                            now,
-                        )
-                    continue
-                if now < p["ends_at"]:
-                    continue
-                p.update(started_at=now, ends_at=now + p["rules"]["duration_seconds"])
-                v.payload, v.status = p, "inviting"
-                for pid, member in p["electorate"].items():
-                    if member["valid"]:
-                        notify(
-                            sess, server, pid, message(v, "invite_de"), now, v, "invite_de"
-                        )
-                publish(sess, v, "inviting")
+                # Do not resume a procedure created under the old warning rules.
+                finish(
+                    sess,
+                    v,
+                    "cancelled",
+                    "Ablauf aktualisiert; Admin-Prüfung nötig / Workflow updated; admin review required",
+                    now,
+                )
                 continue
             if v.status == "inviting":
                 pending = sess.scalar(

@@ -26,9 +26,7 @@ def queued(db, commander=False):
     players = roster(commander=commander)
     observe_for(db, players)
     incident = report(players, "!admin commander" if commander else "!admin able")
-    vid = confirm(db, players, incident)
-    elapse(db, players, 60)
-    storage.advance(1, context(players))
+    vid = confirm(db, players, incident, deliver_invitations=False)
     assert vote(db, vid)["status"] == "inviting"
     # German-only pending rows must keep the delivery phase open.
     storage.advance(1, context(players))

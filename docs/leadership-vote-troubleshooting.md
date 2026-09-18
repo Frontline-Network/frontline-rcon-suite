@@ -17,15 +17,19 @@ Punishments, kicks, bans and explicit Discord takeovers remain guarded.
 An expired confirmation is a separate result: the reporter must first send
 `!yes` in team/squad chat within the confirmation window. A sent message records
 RCON acceptance, not proof that the player read it. Claiming the Discord report
-intentionally stops the vote, including during its warning phase.
+intentionally stops the vote, including during invitation delivery.
 
 ## Other leaders have not received invitations
 
 Distinguish a `confirming` request from an `active` vote. The first private
 message goes to the reporter, not to the named target. Only the reporter's
-`!yes` in team/squad chat starts the target's warning; invitations go to all
-still-eligible leaders in the frozen electorate after that warning expires.
-`!no`, an expired confirmation, or an admin takeover stops this before invitations.
+`!yes` in team/squad chat immediately queues invitations to all eligible leaders
+in the frozen electorate. There is no target warning or extra waiting phase.
+Before confirmation, `!no` or an expired confirmation stops this before invitations.
+After confirmation, the reporter's `!no` counts as a negative ballot instead of
+cancelling everyone's vote. Admin takeover still cancels an unexecuted vote.
+The target receives neither private warnings nor private results; legacy queued
+target notices are rejected at dispatch as well as at enqueue time.
 The target and the opposing team never receive ballot invitations.
 Each eligible leader receives two separate invitations: German (`invite_de`),
 then the approved English `LEADERSHIP VOTE` text (`invite`). Each has its own

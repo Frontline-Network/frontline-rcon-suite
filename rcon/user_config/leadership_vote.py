@@ -12,6 +12,7 @@ class LeadershipVoteUserConfig(BaseUserConfig):
     enabled: bool = False
     mode: Literal["dry_run", "active"] = "dry_run"
     confirmation_seconds: int = Field(default=60, ge=30, le=180)
+    # Accepted for stored-config/older-client compatibility only. No warning or wait.
     warning_seconds: int = Field(default=60, ge=30, le=180)
     duration_seconds: int = Field(default=120, ge=60, le=300)
     minimum_participants: int = Field(default=3, ge=3, le=50)
