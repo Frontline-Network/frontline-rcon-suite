@@ -133,7 +133,9 @@ def test_late_confirmation_with_120_seconds_invites_every_eligible_leader(
         )
     assert {item.player_id for item in invitations} == {f"v{i}" for i in range(6)}
     assert all(item.status == "sent" for item in invitations)
-    assert all("!yes = Ja / Yes; !no = Nein / No" in item.body for item in invitations)
+    assert all("!yes = Vote to kick\n!no = Vote against kicking" in item.body for item in invitations)
+    assert all("Reply in TEAM or SQUAD chat only." in item.body for item in invitations)
+    assert all("Nur Team-/Squadchat" not in item.body for item in invitations)
     assert all(member["invited_at"] is not None for member in current["electorate"].values())
     api.kick.assert_not_called()
 

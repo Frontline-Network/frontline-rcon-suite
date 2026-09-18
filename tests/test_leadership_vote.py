@@ -401,6 +401,39 @@ def test_all_hll_and_vietnam_leadership_roles(role):
     )
 
 
+@pytest.mark.parametrize("target_role", ["squadleader", "commander"])
+@pytest.mark.parametrize("mode", ["active", "dry_run"])
+@pytest.mark.parametrize("duration,required,participants", [(120, 6, 10), (180, 2, 3)])
+def test_invitation_uses_approved_english_text(
+    target_role, mode, duration, required, participants
+):
+    pending = SimpleNamespace(
+        payload={
+            "target_name": "Test-Leader",
+            "target_role": target_role,
+            "squad": "Easy",
+            "rules": {"mode": mode, "duration_seconds": duration},
+            "required": required,
+            "participant_count": participants,
+        }
+    )
+    target = (
+        "Commander Test-Leader"
+        if target_role == "commander"
+        else "Squad Easy — Squad Leader Test-Leader"
+    )
+    prefix = "DRY RUN — no automatic kick\n\n" if mode == "dry_run" else ""
+    assert domain.message(pending, "invite") == (
+        f"{prefix}LEADERSHIP VOTE\n{target}\n\n"
+        "Kick this player from the server for not communicating?\n\n"
+        "!yes = Vote to kick\n"
+        "!no = Vote against kicking\n\n"
+        f"You have {duration} seconds to respond.\n"
+        f"Required: {required} YES votes out of {participants} eligible leaders.\n\n"
+        "Reply in TEAM or SQUAD chat only."
+    )
+
+
 @pytest.mark.parametrize("role", ["Commander", "ArmyCommander"])
 def test_commander_roles(role):
     assert domain.identity(player("p", role=role))["kind"] == "commander"
@@ -727,7 +760,7 @@ def test_db_enqueue_fault_preserves_ordinary_report(db, monkeypatch):
     assert incident["status"] == "new" and not incident["leadership_vote"]
 
 
-def test_messages_are_bilingual_named_and_explicitly_dry(db):
+def test_messages_are_named_and_explicitly_dry_with_english_invitations(db):
     vid, players = activate(db)
     with db() as sess:
         items = list(sess.scalars(select(LeadershipMessage)))
@@ -735,9 +768,10 @@ def test_messages_are_bilingual_named_and_explicitly_dry(db):
     assert all(
         "Person-target" in m.body
         and "DRY RUN" in m.body
-        and "kein automatischer Kick" in m.body
+        and "no automatic kick" in m.body
         for m in items
     )
+    assert all("kein automatischer Kick" in m.body for m in items if m.purpose != "invite")
     invites = [m for m in items if m.purpose == "invite"]
     assert {m.player_id for m in invites} == {f"v{i}" for i in range(6)}
     assert all(

@@ -162,7 +162,26 @@ def message(vote, purpose, value=None):
     elif purpose == "warning":
         text = f"{target}\nWarnung zugestellt. Bei Klärung mit !no zurückziehen.\nWarning delivered. If resolved, withdraw with !no.\n{p['rules']['warning_seconds']} Sekunden / seconds."
     elif purpose == "invite":
-        text = f"{target}\nWegen fehlender Kommunikation vom Server kicken?\nKick from server for not communicating?\n!yes = Ja / Yes; !no = Nein / No\n{p['rules']['duration_seconds']} Sekunden / seconds. Nötig / required: {p['required']} Ja / yes von / out of {p['participant_count']}."
+        target = (
+            f"Commander {who}"
+            if p["target_role"] == "commander"
+            else f"Squad {clean_text(p['squad'])} — Squad Leader {who}"
+        )
+        prefix = (
+            "DRY RUN — no automatic kick\n\n"
+            if p["rules"]["mode"] == "dry_run"
+            else ""
+        )
+        text = (
+            f"LEADERSHIP VOTE\n{target}\n\n"
+            "Kick this player from the server for not communicating?\n\n"
+            "!yes = Vote to kick\n"
+            "!no = Vote against kicking\n\n"
+            f"You have {p['rules']['duration_seconds']} seconds to respond.\n"
+            f"Required: {p['required']} YES votes out of "
+            f"{p['participant_count']} eligible leaders."
+        )
+        channel = "\n\nReply in TEAM or SQUAD chat only."
     elif purpose == "ballot":
         text = f"{target}\nStimme gespeichert / vote recorded: {'Ja / Yes' if value else 'Nein / No'}."
     elif purpose == "result":

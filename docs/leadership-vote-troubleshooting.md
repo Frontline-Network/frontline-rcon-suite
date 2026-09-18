@@ -27,6 +27,8 @@ message goes to the reporter, not to the named target. Only the reporter's
 still-eligible leaders in the frozen electorate after that warning expires.
 `!no`, an expired confirmation, or an admin takeover stops this before invitations.
 The target and the opposing team never receive ballot invitations.
+Ballot invitations use the approved English-only `LEADERSHIP VOTE` text, including
+the English dry-run notice when applicable. Other player notices remain bilingual.
 
 Check the durable message purposes and recipients (`confirm`, `target`, `invite`)
 alongside the chat event timestamps, rather than assuming a report is an active
