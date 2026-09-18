@@ -574,11 +574,10 @@ def run() -> None:
                             "player_name": delivery["player_name"],
                         },
                     )
-                    success = ctl.message_player(
+                    success = ctl.message_player_info(
                         delivery["player_id"],
                         formatted,
                         by=f"Campaign: {delivery['campaign_title'] or delivery['campaign_id']}",
-                        save_message=True,
                         player_name=delivery["player_name"],
                     )
                     if not success:

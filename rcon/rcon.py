@@ -834,7 +834,32 @@ class Rcon(ServerCtl):
     ) -> bool:
         if save_message:
             from rcon.leadership_vote.storage import before_manual_action
+
             before_manual_action(player_id, by)
+        return self._send_player_message(player_id, message, by, save_message, player_name)
+
+    def message_player_info(
+        self,
+        player_id: str,
+        message: str,
+        by: str,
+        player_name: str | None = None,
+    ) -> bool:
+        """Internal information delivery: keep the audit, not an admin takeover.
+
+        Deliberately separate from the exposed message_player endpoint so clients
+        cannot reclassify manual warnings using a new request parameter or actor.
+        """
+        return self._send_player_message(player_id, message, by, True, player_name)
+
+    def _send_player_message(
+        self,
+        player_id: str,
+        message: str,
+        by: str,
+        save_message: bool,
+        player_name: str | None,
+    ) -> bool:
         config = RconServerSettingsUserConfig.load_from_db()
         if config.message_enhancements.enabled:
             message_header: str = config.message_enhancements.message_header

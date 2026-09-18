@@ -1,5 +1,24 @@
 # Leadership votes and Discord action diagnostics
 
+## A campaign message cancels a leadership vote
+
+If a vote ends with `Manual action`, check the incident event actor and the
+target's action history at the same time. A `Campaign:` or `VIP lifecycle:`
+informational message is not an admin takeover. Previously, saving any message
+in that history also invoked the manual-action guard, unintentionally cancelling
+the target's vote before or during voting.
+
+Information senders now use the internal `message_player_info` delivery path.
+Delivery and its existing audit record remain unchanged. The public
+`message_player` endpoint gains no new parameter or bypass: saved manual messages
+still invoke the moderation guard, regardless of actor names or message text.
+Punishments, kicks, bans and explicit Discord takeovers remain guarded.
+
+An expired confirmation is a separate result: the reporter must first send
+`!yes` in team/squad chat within the confirmation window. A sent message records
+RCON acceptance, not proof that the player read it. Claiming the Discord report
+intentionally stops the vote, including during its warning phase.
+
 ## Votes never start on busy servers
 
 Inspect leadership presence age/tenure and the routines log before changing any
