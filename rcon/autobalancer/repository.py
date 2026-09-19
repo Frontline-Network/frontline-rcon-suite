@@ -12,7 +12,6 @@ from rcon.models import AutobalanceDecision, Maps, enter_session
 from rcon.types import GameEnum, Roles
 from rcon.utils import get_role_unit_type, get_squad_leader_roles
 
-
 HLL_ROLE_NAMES = frozenset(role.value for role in Roles)
 
 
@@ -127,6 +126,9 @@ def _shadow_decision_summary(decision: dict[str, Any]) -> dict[str, Any]:
         "incident_id": decision.get("incident_id"),
         "round_id": decision.get("round_id"),
         "created_at": decision.get("created_at"),
+        "status": decision.get("status"),
+        "executed_at": decision.get("executed_at"),
+        "abort_reason": reason.get("abort_reason"),
         "map_name": snapshot.get("map_name"),
         "allies_count": allies,
         "axis_count": axis,

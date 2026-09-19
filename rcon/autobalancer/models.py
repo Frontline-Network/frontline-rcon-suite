@@ -87,6 +87,7 @@ class BalanceSnapshot:
     fail_count: int = 0
     counts_match: bool = True
     stable_map: bool = True
+    seeding_active: bool | None = False
     native_autobalance_enabled: bool | None = None
     native_autobalance_threshold: int | None = None
     team_labels: dict[str, str] = field(
@@ -130,6 +131,7 @@ class BalanceSnapshot:
             "fail_count": self.fail_count,
             "counts_match": self.counts_match,
             "stable_map": self.stable_map,
+            "seeding_active": self.seeding_active,
             "team_labels": dict(self.team_labels),
         }
 

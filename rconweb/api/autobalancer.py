@@ -7,6 +7,7 @@ from django.views.decorators.csrf import csrf_exempt
 from rcon.api_commands import get_rcon_api
 from rcon.autobalancer.history import RoundHistoryRepository
 from rcon.autobalancer.models import Phase
+from rcon.autobalancer.messages import send as send_message
 from rcon.autobalancer.repository import DecisionRepository
 from rcon.autobalancer.review import validate_shadow_review
 from rcon.autobalancer.squad_switch import validate_squad_switch_moves
@@ -145,12 +146,16 @@ def execute_autobalancer_squad_switch(request):
     notified: list[dict] = []
     notification_failures: list[dict] = []
     for move in moves:
-        message = config.messages.squad_switch_selected.format(
-            squad_name=move["squad_name"], target_team=move["target_label"]
-        )
         for player in move["players"]:
             try:
-                success = rcon_api.message_player(player["player_id"], message=message)
+                success = send_message(
+                    rcon_api,
+                    player["player_id"],
+                    config,
+                    "squad_switch_selected",
+                    squad_name=move["squad_name"],
+                    target_team=move["target_label"],
+                )
             except Exception as error:
                 success = False
                 player = {**player, "error": str(error)}
@@ -158,12 +163,15 @@ def execute_autobalancer_squad_switch(request):
 
     if notification_failures:
         for move in moves:
-            abort_message = config.messages.squad_switch_aborted.format(
-                squad_name=move["squad_name"]
-            )
             for player in move["players"]:
                 try:
-                    rcon_api.message_player(player["player_id"], message=abort_message)
+                    send_message(
+                        rcon_api,
+                        player["player_id"],
+                        config,
+                        "squad_switch_aborted",
+                        squad_name=move["squad_name"],
+                    )
                 except Exception:
                     pass
         return api_response(
@@ -191,12 +199,15 @@ def execute_autobalancer_squad_switch(request):
 
     if switch_failures:
         for move in moves:
-            abort_message = config.messages.squad_switch_aborted.format(
-                squad_name=move["squad_name"]
-            )
             for player in move["players"]:
                 try:
-                    rcon_api.message_player(player["player_id"], message=abort_message)
+                    send_message(
+                        rcon_api,
+                        player["player_id"],
+                        config,
+                        "squad_switch_aborted",
+                        squad_name=move["squad_name"],
+                    )
                 except Exception:
                     pass
         return api_response(
@@ -215,12 +226,16 @@ def execute_autobalancer_squad_switch(request):
         )
 
     for move in moves:
-        message = config.messages.squad_switch_completed.format(
-            squad_name=move["squad_name"], target_team=move["target_label"]
-        )
         for player in move["players"]:
             try:
-                rcon_api.message_player(player["player_id"], message=message)
+                send_message(
+                    rcon_api,
+                    player["player_id"],
+                    config,
+                    "squad_switch_completed",
+                    squad_name=move["squad_name"],
+                    target_team=move["target_label"],
+                )
             except Exception:
                 pass
     return api_response(

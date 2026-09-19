@@ -16,6 +16,7 @@ from rcon.utils import (
 
 from .models import BalanceSnapshot, PlayerSnapshot
 from .store import AutobalancerStore
+from .seeding import read_seeding_active
 
 
 def _as_int(value: Any, default: int = 0) -> int:
@@ -226,6 +227,7 @@ def build_snapshot(
             and len(players) == allies_count + axis_count
         ),
         stable_map=stable_map,
+        seeding_active=read_seeding_active(allies_count + axis_count),
         native_autobalance_enabled=native_enabled,
         native_autobalance_threshold=native_threshold,
         team_labels=get_team_labels(

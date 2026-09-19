@@ -5,6 +5,8 @@ export const operatorMessageEntries = [
   ["wasDisabled", "Autobalancer wurde deaktiviert", "Autobalancer was disabled"],
   ["noStatus", "Autobalancer-Dienst liefert keinen aktuellen Status", "The Autobalancer service is not providing a current status"],
   ["countsMismatch", "Teamzählungen stimmen nicht überein", "Team counts do not match"],
+  ["seedingActive", "Seeding ist aktiv: kein automatischer Teamausgleich", "Seeding is active: automatic team balancing is paused"],
+  ["seedingUnknown", "Seeding-Status konnte nicht sicher gelesen werden", "Seeding status could not be read safely"],
   ["countsTimeout", "Teamzählungen waren zu lange nicht verlässlich", "Team counts remained unreliable for too long"],
   ["incompletePlayers", "Spielerdaten sind unvollständig", "Player data is incomplete"],
   ["unstableMap", "Kartendaten sind nicht stabil", "Map data is not stable"],

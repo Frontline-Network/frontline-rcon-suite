@@ -391,7 +391,7 @@ const configFormProfiles = {
           "max_switches_per_incident",
         ],
       ],
-      ["messages", ["volunteer_command", "messages"]],
+      ["messages", ["volunteer_command", "message_language", "messages", "messages_en"]],
       [
         "advanced",
         [

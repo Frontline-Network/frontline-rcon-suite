@@ -17,11 +17,19 @@ muss erreicht sein und die Runde muss außerhalb der Schutzzeit am Kartenanfang 
 Kartenende liegen. Ein einzelner Wechsel verändert die Teamdifferenz um zwei Spieler.
 
 Sicherheitsregeln
+- Während des aktivierten Seedings keine automatischen Aufrufe oder Wechsel.
+  Die größte Grenze einer aktivierten, konfigurierten Seeding-Regel hat Vorrang
+  vor der Mindestspielerzahl. Unbekannter Seeding-Status blockiert ebenfalls.
 - Niemals Commander automatisch verschieben.
 - Neu verbundene und kürzlich verschobene Spieler schützen.
 - Pro Vorfall nur die konfigurierte Höchstzahl an Wechseln.
 - Nach jedem Wechsel Teamzahlen und Kandidaten vollständig neu berechnen.
 - Der native HLL-Autobalancer bleibt unverändert und sollte eingeschaltet bleiben.
+
+Nachrichten
+Deutsch, Englisch oder beide Sprachpakete auswählen. Bei beiden Paketen werden
+zwei getrennte Nachrichten gesendet: zuerst Deutsch, dann Englisch. Vorhandene
+deutsche Vorlagen bleiben erhalten; die englischen Vorlagen sind separat editierbar.
 
 FLN-Pilot
 Empfohlen ist zunächst mode = "shadow". history_server_numbers sollte [1, 2] enthalten.

@@ -429,7 +429,7 @@ def test_unapproved_manual_proposal_survives_pause_without_switching(instance):
     assert instance.repository.updated == []
 
 
-def test_armed_candidate_aborts_on_mismatch_and_does_not_replay_death(instance):
+def test_armed_candidate_pauses_on_mismatch_and_does_not_replay_death(instance):
     instance.store.state = {
         **proposed(),
         "phase": Phase.ARMED,
@@ -440,10 +440,11 @@ def test_armed_candidate_aborts_on_mismatch_and_does_not_replay_death(instance):
         {"type": "death", "player_id": "a0", "timestamp_ms": 2999000}
     ]
     tick(instance, 3000, counts_match=False)
-    tick(instance, 3005)
     assert instance.store.armed is None
+    tick(instance, 3005)
+    assert instance.store.armed == "a0"
     assert instance.rcon.switches == []
-    assert instance.repository.updated[0][1]["status"] == "aborted"
+    assert instance.repository.updated == []
 
 
 @pytest.mark.parametrize("change", ["map", "mode", "cancel", "disable", "direction"])
