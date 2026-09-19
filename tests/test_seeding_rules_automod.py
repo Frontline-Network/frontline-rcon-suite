@@ -14,7 +14,7 @@ from rcon.automods.models import (
     PunitionsToApply,
     WatchStatus,
 )
-from rcon.automods.seeding_rules import SeedingRulesAutomod
+from rcon.automods.seeding_rules import SeedingRulesAutomod, connection_key
 from rcon.maps import GameMode
 from rcon.types import GameStateType, StructuredLogLineWithMetaData
 from rcon.user_config.auto_mod_seeding import (
@@ -885,6 +885,122 @@ def test_position_detection_checks_first_spawn_after_zero_sample(team_view):
     punitions = mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
 
     assert [expected_warned_players[0]] == punitions.warning
+
+
+@pytest.mark.parametrize("reconnect_signal", ["profile", "hook", "both"])
+@pytest.mark.parametrize("group", ["able", "Commander"])
+@pytest.mark.parametrize("team", ["allies", "axis"])
+@pytest.mark.parametrize("map_id", ["stmariedumont", "WDEV_A"])
+def test_reconnect_rearms_spawn_guard_and_still_enforces_boundary(
+    team_view, reconnect_signal, group, team, map_id
+):
+    player = team_view[team]["squads"]["able"]["players"][0]
+    player["profile"] = {"sessions_count": 5, "flags": []}
+    player["role"] = "armycommander" if group == "Commander" else "officer"
+    squad = {"players": [player]}
+    mod = position_cap_fight_mod(team_view)
+    mod.config.announcement_enabled = False
+    snapshot = {**game_state, "current_map": {"map": {"id": map_id}}}
+    axis = "y" if map_id == "stmariedumont" else "x"
+    sign = (1 if team == "allies" else -1) * (1 if axis == "y" else -1)
+
+    def sample(coordinate):
+        player["world_position"] = {"x": 0, "y": 0, "z": 100}
+        player["world_position"][axis] = sign * coordinate
+        return mod.punitions_to_apply(team_view, group, team, squad, snapshot)
+
+    assert not sample(-96_000)
+    assert not sample(-95_000)  # Original connection has confirmed movement.
+    if reconnect_signal in ("profile", "both"):
+        player["profile"]["sessions_count"] += 1
+    if reconnect_signal in ("hook", "both"):
+        assert not mod.on_connected(player["name"], player["player_id"])
+    # Rejoin in the same squad inside its 120-second watch lifetime: the game
+    # initially reports an enemy HQ, even with an assigned commander role.
+    assert not sample(94_000)
+    assert not sample(94_000)
+    assert not sample(-97_000)  # Actual spawn in own HQ.
+    assert not sample(-50_000)
+    result = sample(30_000)
+    assert [p.player_id for p in result.warning] == [player["player_id"]]
+    assert not result.punish and not result.kick
+
+
+def test_hll1_recorded_reconnect_positions_do_not_warn(team_view):
+    player = team_view["allies"]["commander"]
+    player["profile"] = {"sessions_count": 10, "flags": []}
+    mod = position_cap_fight_mod(team_view)
+    snapshot = {**game_state, "current_map": {"map": {"id": "stmariedumont"}}}
+    # HLL1, 2026-09-19 11:24–11:25 UTC. New connection initially reports
+    # the enemy HQ, then the real Allied spawn. No actual boundary crossing.
+    for count, position in [
+        (10, (39488.68359375, -96258.2265625, 169.6443328857422)),
+        (10, (40091.0078125, -96382.34375, 155.8644256591797)),
+        (11, (-48477.5, 93779.0390625, 167.74635314941406)),
+        (11, (-48477.5, 93779.0390625, 167.74635314941406)),
+        (11, (2094.5400390625, -97370.3515625, 312.76263427734375)),
+        (11, (237.60140991210938, -96763.375, 417.2548828125)),
+    ]:
+        player["profile"]["sessions_count"] = count
+        player["world_position"] = dict(zip(("x", "y", "z"), position))
+        assert not mod.punitions_to_apply(
+            team_view, "Commander", "allies", {"players": [player]}, snapshot
+        )
+
+
+def test_connection_marker_expiry_does_not_reset_confirmed_movement(team_view):
+    mod = position_cap_fight_mod(team_view)
+    player = team_view["allies"]["commander"]
+    player["profile"] = {"sessions_count": 2, "flags": []}
+    key = connection_key(player["player_id"])
+    redis_store[key] = b"connection-a"
+    watch = WatchStatus()
+    player["world_position"] = {"x": 0, "y": 0, "z": 1}
+    assert mod._position_cap_violation(watch, player, "allies", game_state) is False
+    player["world_position"]["x"] = 100
+    assert mod._position_cap_violation(watch, player, "allies", game_state) is False
+    del redis_store[key]
+    player["world_position"]["x"] = 30_000
+    assert mod._position_cap_violation(watch, player, "allies", game_state) is True
+
+
+@pytest.mark.parametrize("legacy_pickle", [False, True])
+def test_reconnect_clears_only_target_players_old_progress(team_view, legacy_pickle):
+    mod = position_cap_fight_mod(team_view)
+    player = team_view["allies"]["commander"]
+    player["profile"] = {"sessions_count": 7, "flags": []}
+    pid, name = player["player_id"], player["name"]
+    watch = WatchStatus(
+        world_position_map_id="carentan",
+        initial_world_positions={pid: None, "other": None},
+        combat_area_outside_player_ids={pid, "other"},
+        position_tracking_context={pid: (6, None)},
+        offensive_points={name: 500, "other": 500},
+        warned={name: [datetime.now()], "other": [datetime.now()]},
+        punished={name: [datetime.now()], "other": [datetime.now()]},
+        noted={name: [datetime.now()], "other": [datetime.now()]},
+    )
+    if legacy_pickle:
+        del watch.position_tracking_context
+    player["world_position"] = {"x": 94_000, "y": 0, "z": 1}
+    assert mod._position_cap_violation(watch, player, "allies", game_state) is False
+    assert watch.initial_world_positions[pid] == (94_000, 0, 1)
+    assert watch.combat_area_outside_player_ids == {"other"}
+    for entries in (watch.noted, watch.warned, watch.punished, watch.offensive_points):
+        assert name not in entries and "other" in entries
+
+
+def test_reconnect_without_position_does_not_use_old_offense_points(team_view):
+    mod = position_cap_fight_mod(team_view)
+    player = team_view["allies"]["commander"]
+    player["profile"] = {"sessions_count": 2, "flags": []}
+    player["world_position"] = None
+    watch = WatchStatus(
+        position_tracking_context={player["player_id"]: (1, None)},
+        offensive_points={player["name"]: 100},
+    )
+    assert mod._position_cap_violation(watch, player, "allies", game_state) is False
+    assert player["name"] not in watch.offensive_points
 
 
 def position_cap_fight_skip_warning_mod(team_view, *, punishments=2):

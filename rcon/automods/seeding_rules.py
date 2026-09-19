@@ -10,6 +10,7 @@ import pickle
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Literal
+from uuid import uuid4
 
 import redis
 
@@ -40,6 +41,10 @@ from rcon.user_config.auto_mod_seeding import AutoModSeedingUserConfig
 SEEDING_RULES_RESET_SECS = 120
 AUTOMOD_USERNAME = "AutoMod_SeedingRules"
 SEEDING_RULE_NAMES = ["disallowed_roles", "disallowed_weapons", "enforce_cap_fight"]
+
+
+def connection_key(player_id: str) -> str:
+    return f"seeding_rules_automod_connection_{player_id}"
 
 
 def disabled_rule_key(rule: str) -> str:
@@ -97,6 +102,9 @@ class SeedingRulesAutomod:
         """
         Sends a one-time seeding rules reminder message to players on connect
         """
+        # Independent of announcements: an old squad watch can survive a short
+        # disconnect. Invalidate its spawn proof even while profiles are cached.
+        self.red.setex(connection_key(player_id), SEEDING_RULES_RESET_SECS, uuid4().hex)
         p: PunitionsToApply = PunitionsToApply()
 
         disallowed_roles = (
@@ -309,6 +317,50 @@ class SeedingRulesAutomod:
             except Exception:
                 self.logger.exception("tried to cleanup punished time but failed")
 
+    def _refresh_position_context(
+        self, watch_status: WatchStatus, player: dict
+    ) -> bool:
+        """Re-arm join protection when this player's connection changes.
+
+        The existing compact profile's session count also catches reconnects if
+        the log hook was missed. The connection token catches them before that
+        cached profile updates. Neither changes another player's watch state.
+        """
+        player_id = player["player_id"]
+        contexts = getattr(watch_status, "position_tracking_context", None)
+        if contexts is None:
+            contexts = {}
+            watch_status.position_tracking_context = contexts
+        previous = contexts.get(player_id)
+        count = (player.get("profile") or {}).get("sessions_count")
+        if type(count) is not int or count <= 0:
+            count = None
+        token = self.red.get(connection_key(player_id))
+        if isinstance(token, bytes):
+            token = token.decode()
+        # Expiry of the short-lived hook marker is not another connection.
+        if token is None and previous is not None:
+            token = previous[1]
+        current = (count, token)
+        contexts[player_id] = current
+        initial_positions = getattr(watch_status, "initial_world_positions", {})
+        changed = previous != current and (
+            previous is not None or player_id in initial_positions
+        )
+        if changed:
+            initial_positions.pop(player_id, None)
+            getattr(watch_status, "combat_area_outside_player_ids", set()).discard(
+                player_id
+            )
+            name = player.get("name", player_id)
+            self._clear_player_progress(watch_status, name)
+            watch_status.offensive_points.pop(name, None)
+            self.logger.info(
+                "Re-armed seeding spawn protection for %s after connection context changed",
+                player_id,
+            )
+        return changed
+
     def _position_cap_violation(
         self,
         watch_status: WatchStatus,
@@ -323,9 +375,11 @@ class SeedingRulesAutomod:
         until the player moves. Players first observed as unspawned can be
         evaluated immediately after they spawn.
         """
+        connection_changed = self._refresh_position_context(watch_status, player)
         position = normalize_world_position(player.get("world_position"))
         if position is None:
-            return None
+            # Do not use stale offense counters on the reconnect sample either.
+            return False if connection_changed else None
 
         current_map = game_state.get("current_map")
         map_data = current_map.get("map") if isinstance(current_map, dict) else None
