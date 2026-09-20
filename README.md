@@ -818,3 +818,74 @@ CONNECT-Logverarbeitung darf nicht abbrechen.
 ## 83. Dokumentationsregel
 
 Die Root-README dokumentiert den Frontline-Fork als Gesamtplattform. Upstream-Anleitungen, einzelne API-Endpunkte und Release-Details können in Spezialdokumenten bleiben. Neue Moderationsmodelle, Mobile-Auth-Änderungen, HLLV-Workarounds, Campaign-Zustände oder neue externe Dienste müssen hier als Architekturänderung aufgenommen werden.
+
+## Ergänzter Quellstand: Releases und Operator-Verträge
+
+Dokumentationsabgleich vom **20. September 2026** gegen `master`-Commit
+`9621633eda3b178911b827230dd57fd6a6656f22`.
+Die bisherigen Abschnitte bleiben vollständig erhalten. Sie sind eine
+Architekturübersicht und kein Nachweis für den heute aktiven Stand einzelner
+Produktionsserver.
+
+### Tatsächliche Web-Verzeichnisse
+
+Die Weboberflächen liegen im aktuellen Dateibaum unter
+[`rcongui/`](rcongui/) und [`rcongui_public/`](rcongui_public/), nicht unter dem
+oben historisch genannten `frontend/`. Der optionale Mobile-Client liegt unter
+[`mobile_app/`](mobile_app/). Python-Abhängigkeiten besitzen eigene Lockdateien;
+das Verfahren ist in [dependency-locking.md](docs/dependency-locking.md)
+beschrieben. Komponenten müssen mit ihren eigenen Build-/Testverträgen
+bearbeitet werden, nicht über einen erfundenen gemeinsamen Root-npm-Befehl.
+
+### Führungsabstimmung, Seeding und Autobalancer
+
+Die [Releasebeschreibung v0.8.5](docs/releases/v0.8.5.md) ergänzt die bestehende
+Incident-/Moderationsarchitektur um teaminterne Führungsabstimmungen über den
+`!admin`-Pfad und `!yes`/`!no`. Der Ablauf besitzt Probelauf und gesonderten
+Aktivmodus; unkonfigurierte Server bleiben deaktiviert. Unklare Ziele bleiben
+normale Admin-Meldungen. Eine KI- oder Spracherkennung ist dafür keine
+Voraussetzung und wird nicht als RCON-Nachweis behauptet.
+
+Dasselbe Release dokumentiert korrigierte Seeding-Seitenzuordnung,
+Beitritts-/Nullpositionsschutz und verlässlichere freiwillige Balance-Einladungen.
+Unsichere Daten berechtigen weiterhin nicht zum Teamwechsel. Vorhandene
+Konfigurationen werden nicht durch den Releasehinweis automatisch aktiviert.
+Gegenüber v0.8.4 gehören die Alembic-Migration `e3a8b1c5d209` und Django `0038`
+zum beschriebenen Schemaumfang; daraus folgt kein Auftrag, sie auszuführen.
+
+### Englische Operator-Oberfläche
+
+[v0.8.6](docs/releases/v0.8.6.md) schließt Lücken in der englischen Admin- und
+öffentlichen Stats-Oberfläche: unter anderem Balance-Prüfung, Live-Kartenhinweise,
+Einstellungen, Discord-Anbindung, Datums-/Zahlenformatierung und Sprachwechsel.
+Bekannte Systemtexte werden an der Darstellungsgrenze übersetzt, während
+Spielernamen, Chat, individuelle Nachrichten, Fallnotizen und unbekannte
+technische Details unverändert bleiben. Moderationsregeln und gespeicherte
+Servereinstellungen werden dadurch nicht geändert; gegenüber v0.8.5 ist keine
+zusätzliche Datenbankmigration beschrieben.
+
+Der Release-Commit enthält `npm run check:i18n` im Admin-UI-Paket sowie
+Struktur- und Browserregressionen. Diese Prüfungen wurden bei diesem
+Dokumentationsreview nicht ausgeführt. Historische Testzahlen sind keine neue
+Vollständigkeits- oder Produktionsabnahme.
+
+### Themenbezogener Dokumentationseinstieg
+
+| Thema | Vorhandene Detaildokumentation |
+| --- | --- |
+| Führungsabstimmungen und Diagnose | [leadership-votes.md](docs/leadership-votes.md), [Troubleshooting](docs/leadership-vote-troubleshooting.md) |
+| Freiwillige Balance-Wechsel | [autobalancer-volunteer-reliability.md](docs/autobalancer-volunteer-reliability.md) |
+| Seeding-Geofences | [seeding-geofence-map-sides.md](docs/seeding-geofence-map-sides.md) |
+| Lokalisierung | [frontline-localization.md](docs/frontline-localization.md) |
+| Vorbereitete Adminaktionen | [prepared-admin-action-contract.md](docs/prepared-admin-action-contract.md) |
+| Einstellungswirkung und Vorschau | [general-setting-effect-contract.md](docs/general-setting-effect-contract.md), [auto-settings-preview-contract.md](docs/auto-settings-preview-contract.md) |
+| Integrationsfähigkeiten und Spielprofile | [integration-capabilities-v1.md](docs/integration-capabilities-v1.md), [game-profile-status-contract.md](docs/game-profile-status-contract.md) |
+| Live-Karte und Spielerschutz | [live-map-player-protection.md](docs/live-map-player-protection.md) |
+| Login-/Proxy-Grenzen | [login-trust-contract.md](docs/login-trust-contract.md), [proxy-security-baseline.md](docs/proxy-security-baseline.md) |
+| Stilllegung und Releasehistorie | [retiring-a-server.md](docs/retiring-a-server.md), [releases/](docs/releases/) |
+
+Dieser Index macht vorhandene Verträge auffindbar, ersetzt aber nicht deren
+konkrete Freigabe- und Sicherheitsbedingungen. Es wurden keine GitHub Actions,
+Tests, Migrationen, Builds, Spieleraktionen oder Deployments gestartet und
+keine lokale Homelab-Arbeitskopie verändert. Nachverfolgung:
+[frontline-github-ops#3](https://github.com/Frontline-Network/frontline-github-ops/issues/3).
