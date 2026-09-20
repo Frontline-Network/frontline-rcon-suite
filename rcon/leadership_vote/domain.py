@@ -6,6 +6,7 @@ from rcon.admin_incidents import _is_commander, _is_squad_leader, _normalize_tea
 
 OPEN = frozenset({"confirming", "warning", "inviting", "active", "executing"})
 LIVE = OPEN
+INVITATIONS = frozenset({"invite_de", "invite"})
 MAX_EVENT_AGE = 30
 MAX_OBSERVATION_GAP = 15
 
@@ -126,6 +127,7 @@ def electorate(players, target, presence, now, tenure):
             "identity": ident,
             "token": observation["token"],
             "invited_at": None,
+            "last_invited_at": None,
             "valid": True,
         }
     return result
@@ -150,19 +152,52 @@ def message(vote, purpose, value=None):
     )
     channel = "\nNur Team-/Squadchat / Team or squad chat only."
     if purpose == "confirm":
-        text = f"{target}\nGeht es um fehlende Kommunikation? Mit !yes bestätigen: erst Warnung, dann Abstimmung über Server-Kick.\nIs this about missing communication? Confirm with !yes: warning first, then a server-kick vote.\nFalsches Ziel / Wrong target: !no. Anderer Grund / Other reason: !no.\nAdmin-Report bleibt offen / Admin report stays open.\n{p['rules']['confirmation_seconds']} Sekunden / seconds. Bestätigung ist keine Stimme / Confirmation is not a ballot."
-    elif purpose == "target":
-        text = f"{target}\nDu wurdest als nicht erreichbar gemeldet. Melde dich im Führungskanal oder gib die Rolle ab.\nYou were reported as unresponsive. Speak in leadership voice chat or give up the role.\n{p['rules']['warning_seconds']} Sekunden / seconds; danach Vote über Server-Kick / then server-kick vote."
-    elif purpose == "warning":
-        text = f"{target}\nWarnung zugestellt. Bei Klärung mit !no zurückziehen.\nWarning delivered. If resolved, withdraw with !no.\n{p['rules']['warning_seconds']} Sekunden / seconds."
+        text = (
+            f"Dein Report / Your report: {target}\n"
+            "Redet nicht? / Not communicating?\n"
+            "!yes = Kick-Abstimmung starten / Start server-kick vote.\n"
+            "!no = Abbrechen / Cancel.\n"
+            f"Antworte in / Reply within {p['rules']['confirmation_seconds']} s."
+        )
+    elif purpose == "invite_de":
+        prefix = (
+            "PROBELAUF — kein automatischer Kick\n\n"
+            if p["rules"]["mode"] == "dry_run"
+            else ""
+        )
+        text = (
+            f"FÜHRUNGSABSTIMMUNG\n{target}\n\n"
+            "Diesen Spieler wegen fehlender Kommunikation vom Server kicken?\n\n"
+            "!yes = Für den Kick\n"
+            "!no = Gegen den Kick\n\n"
+            f"Du hast {p['rules']['duration_seconds']} Sekunden zum Antworten.\n"
+            f"Benötigt: {p['required']} Ja-Stimmen bei "
+            f"{p['participant_count']} stimmberechtigten Führungskräften."
+        )
+        channel = "\n\nAntworte nur im TEAM- oder SQUADCHAT."
     elif purpose == "invite":
-        text = f"{target}\nWegen fehlender Kommunikation vom Server kicken?\nKick from server for not communicating?\n!yes = Ja / Yes; !no = Nein / No\n{p['rules']['duration_seconds']} Sekunden / seconds. Nötig / required: {p['required']} Ja / yes von / out of {p['participant_count']}."
+        target = (
+            f"Commander {who}"
+            if p["target_role"] == "commander"
+            else f"Squad {clean_text(p['squad'])} — Squad Leader {who}"
+        )
+        prefix = (
+            "DRY RUN — no automatic kick\n\n" if p["rules"]["mode"] == "dry_run" else ""
+        )
+        text = (
+            f"LEADERSHIP VOTE\n{target}\n\n"
+            "Kick this player from the server for not communicating?\n\n"
+            "!yes = Vote to kick\n"
+            "!no = Vote against kicking\n\n"
+            f"You have {p['rules']['duration_seconds']} seconds to respond.\n"
+            f"Required: {p['required']} YES votes out of "
+            f"{p['participant_count']} eligible leaders."
+        )
+        channel = "\n\nReply in TEAM or SQUAD chat only."
     elif purpose == "ballot":
         text = f"{target}\nStimme gespeichert / vote recorded: {'Ja / Yes' if value else 'Nein / No'}."
     elif purpose == "result":
         text = f"{target}\n{p['result']}\nJa / Yes: {p['yes']}; Nein / No: {p['no']}; nötig / required: {p.get('required', '–')}."
     else:
         raise ValueError("Unknown message purpose")
-    return (
-        prefix + text + (channel if purpose in {"confirm", "warning", "invite"} else "")
-    )
+    return prefix + text + (channel if purpose in {"confirm"} | INVITATIONS else "")

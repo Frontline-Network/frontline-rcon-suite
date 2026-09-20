@@ -633,11 +633,10 @@ def process_once(
                 player_id=player_id,
                 context={"player_id": player_id, "player_name": players[player_id]},
             )
-            accepted = ctl.message_player(
+            accepted = ctl.message_player_info(
                 player_id,
                 formatted,
                 by=f"VIP lifecycle: {decision.rule}",
-                save_message=True,
                 player_name=players[player_id],
             )
             if not accepted:
@@ -806,11 +805,10 @@ def send_test_message(
         player_id=player_id,
         context={"player_id": player_id, "player_name": players[player_id]},
     )
-    accepted = ctl.message_player(
+    accepted = ctl.message_player_info(
         player_id,
         formatted,
         by=f"VIP lifecycle test: {rule}",
-        save_message=True,
         player_name=players[player_id],
     )
     if not accepted:

@@ -23,6 +23,23 @@ export const autobalancerConfig = {
   skill_gap_min_improvement: 2.5,
   history_half_life_days: 30,
   volunteer_command: "!balance",
+  message_language: "de+en",
+  messages_en: {
+    volunteer_request:
+      "The teams are uneven. Volunteer to join {target_team}: type !balance within {seconds} seconds.",
+    volunteer_registered:
+      "Thank you! You have volunteered for this balance call.",
+    candidate_selected:
+      "You have been selected to join {target_team}. You will switch after your next death, then be protected for {cooldown_maps} maps.",
+    switch_completed:
+      "Thank you for helping! You have joined {target_team} and are protected from another automatic switch for {cooldown_maps} maps.",
+    squad_switch_selected:
+      "Your squad {squad_name} will now move together to {target_team}. Please recreate the squad there afterwards.",
+    squad_switch_completed:
+      "The move to {target_team} is complete. Please recreate squad {squad_name} on that team.",
+    squad_switch_aborted:
+      "Squad {squad_name} could not be moved completely. Please wait for instructions from an admin.",
+  },
   messages: {
     volunteer_request:
       "Die Teams sind unausgeglichen. Freiwilliger Wechsel zu {target_team}: Schreibe innerhalb von {seconds} Sekunden !balance.",
@@ -446,6 +463,20 @@ export const autobalancerRoundArchive = {
 };
 
 export const autobalancerSchema = {
+  $defs: {
+    AutobalancerMessages: {
+      type: "object",
+      properties: {
+        volunteer_request: { type: "string" },
+        volunteer_registered: { type: "string" },
+        candidate_selected: { type: "string" },
+        switch_completed: { type: "string" },
+        squad_switch_selected: { type: "string" },
+        squad_switch_completed: { type: "string" },
+        squad_switch_aborted: { type: "string" },
+      },
+    },
+  },
   type: "object",
   properties: {
     mode: {
@@ -486,17 +517,12 @@ export const autobalancerSchema = {
     skill_gap_min_improvement: { type: "number", minimum: 0, maximum: 100 },
     history_half_life_days: { type: "integer", minimum: 1, maximum: 365 },
     volunteer_command: { type: "string", minLength: 2, maxLength: 32 },
-    messages: {
-      type: "object",
-      properties: {
-        volunteer_request: { type: "string" },
-        volunteer_registered: { type: "string" },
-        candidate_selected: { type: "string" },
-        switch_completed: { type: "string" },
-        squad_switch_selected: { type: "string" },
-        squad_switch_completed: { type: "string" },
-        squad_switch_aborted: { type: "string" },
-      },
+    message_language: {
+      type: "string",
+      enum: ["de", "en", "de+en"],
+      default: "de",
     },
+    messages_en: { $ref: "#/$defs/AutobalancerMessages" },
+    messages: { $ref: "#/$defs/AutobalancerMessages" },
   },
 };

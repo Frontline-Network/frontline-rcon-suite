@@ -63,11 +63,10 @@ def test_real_alias_report_stays_bound_through_complete_dry_run(
     api = deliver(db, players)
     confirmation = api.message_player.call_args.args[1]
     assert "Person-target" in confirmation
-    assert "Wrong target: !no" in confirmation
+    assert "!no = Abbrechen / Cancel" in confirmation
     assert "DRY RUN" in confirmation
     assert confirm(db, players, incident) == vid
     assert vote(db, vid)["yes"] == 0
-    elapse(db, players, 60)
     storage.advance(1, context(players))
     deliver(db, players, api)
     storage.advance(1, context(players))
@@ -81,6 +80,92 @@ def test_real_alias_report_stays_bound_through_complete_dry_run(
     assert result["status"] == "new" and result["target_id"] == "target"
     monkeypatch.setattr(service, "read_context", lambda _: context(players))
     service.execute(api, 1, vote(db, vid))
+    api.kick.assert_not_called()
+
+
+@pytest.mark.parametrize("commander", [False, True])
+def test_late_confirmation_with_120_seconds_invites_every_eligible_leader(
+    db, monkeypatch, commander
+):
+    storage.configure(1, Config(enabled=True, confirmation_seconds=120), "tester")
+    players = roster(commander=commander)
+    players += [player("opponent", squad="Other", team="axis")]
+    observe_for(db, players)
+    incident = report(players, "!admin commander" if commander else "!admin able")
+    vid = incident["leadership_vote"]["id"]
+    api = deliver(db, players)
+    assert "Reply within 120 s" in api.message_player.call_args.args[1]
+
+    elapse(db, players, 110)
+    storage.advance(1, context(players))
+    assert vote(db, vid)["status"] == "confirming"
+    monkeypatch.setattr(service, "read_context", lambda _: context(players))
+    assert service.handle_answer(
+        api,
+        dict(
+            action="CHAT[Allies][Team]",
+            player_id_1="v0",
+            sub_content=" !YeS ",
+            timestamp_ms=db.clock.now * 1000,
+        ),
+    )
+    assert vote(db, vid)["status"] == "inviting"
+    assert vote(db, vid)["yes"] == 0
+    deliver(db, players, api)
+    storage.advance(1, context(players))
+    deliver(db, players, api)
+    storage.advance(1, context(players))
+
+    current = vote(db, vid)
+    assert current["status"] == "active"
+    assert current["ends_at"] - db.clock.now == 120
+    assert current["required"] == 4
+    with db() as sess:
+        invitations = list(
+            sess.scalars(
+                select(LeadershipMessage).where(
+                    LeadershipMessage.vote_id == vid,
+                    LeadershipMessage.purpose == "invite",
+                )
+            )
+        )
+    assert {item.player_id for item in invitations} == {f"v{i}" for i in range(6)}
+    assert all(item.status == "sent" for item in invitations)
+    assert all(
+        "!yes = Vote to kick\n!no = Vote against kicking" in item.body
+        for item in invitations
+    )
+    assert all("Reply in TEAM or SQUAD chat only." in item.body for item in invitations)
+    assert all("Nur Team-/Squadchat" not in item.body for item in invitations)
+    assert all(
+        member["invited_at"] is not None for member in current["electorate"].values()
+    )
+    api.kick.assert_not_called()
+
+
+def test_120_second_confirmation_expires_without_inviting_or_kicking(db):
+    storage.configure(1, Config(enabled=True, confirmation_seconds=120), "tester")
+    players = roster()
+    observe_for(db, players)
+    incident = report(players)
+    vid = incident["leadership_vote"]["id"]
+    api = deliver(db, players)
+    elapse(db, players, 119)
+    assert storage.advance(1, context(players)) == []
+    assert vote(db, vid)["status"] == "confirming"
+    elapse(db, players, 1)
+    assert storage.advance(1, context(players)) == []
+    assert vote(db, vid)["status"] == "cancelled"
+    assert "Confirmation expired" in vote(db, vid)["result"]
+    with db() as sess:
+        assert not list(
+            sess.scalars(
+                select(LeadershipMessage).where(
+                    LeadershipMessage.vote_id == vid,
+                    LeadershipMessage.purpose.in_({"target", "invite_de", "invite"}),
+                )
+            )
+        )
     api.kick.assert_not_called()
 
 

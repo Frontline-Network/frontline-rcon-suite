@@ -2577,7 +2577,7 @@ const de = {
           },
           minimum_players: {
             label: "Mindestanzahl Spieler",
-            help: "Unterhalb dieser Gesamtzahl greift der Autobalancer nicht ein.",
+            help: "Unterhalb dieser Gesamtzahl greift der Autobalancer nicht ein. Zusätzlich pausiert er unterhalb der aktiven Seeding-Grenzen; diese haben Vorrang.",
           },
           stable_difference_seconds: {
             label: "Ungleichgewicht bestätigen nach",
@@ -2598,7 +2598,9 @@ const de = {
           cooldown_maps: { label: "Wechsel-Cooldown" },
           max_switches_per_incident: { label: "Maximale Wechsel pro Vorfall" },
           volunteer_command: { label: "Befehl für Freiwillige" },
-          messages: { label: "Spielernachrichten" },
+          messages: { label: "Spielernachrichten – Deutsch" },
+          messages_en: { label: "Spielernachrichten – Englisch", help: "Eigenständige englische Vorlagen. Vorhandene deutsche Texte bleiben erhalten." },
+          message_language: { label: "Nachrichtensprache", help: "de: Deutsch, en: Englisch, de+en: zwei getrennte Nachrichten, zuerst Deutsch, dann Englisch." },
           poll_interval_seconds: { label: "Prüfintervall" },
           candidate_timeout_seconds: { label: "Kandidaten-Zeitlimit" },
           manual_proposal_timeout_seconds: { label: "Zeitlimit für Freigaben" },

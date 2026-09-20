@@ -14,7 +14,8 @@ from rcon.logs.loop import (
 )
 from rcon.user_config.autobalancer import AutobalancerUserConfig
 
-from .feedback import closed_command_message, fresh_command, send_private
+from .feedback import fresh_command
+from .messages import closed_key, send as send_message
 from .store import AutobalancerStore
 
 logger = logging.getLogger(__name__)
@@ -62,22 +63,19 @@ def autobalancer_volunteer(rcon, struct_log):
     player_id = struct_log.get("player_id_1")
     if not player_id or not fresh_command(struct_log, time.time()):
         return
-    unavailable = (
-        "Der Autobalancer ist gerade nicht erreichbar. Bitte versuche es später erneut."
-    )
     store = _store()
     if store is None:
-        send_private(rcon, player_id, unavailable)
+        send_message(rcon, player_id, config, "unavailable")
         return
     event_id = str(struct_log.get("raw") or f"{player_id}:{struct_log['timestamp_ms']}")
     try:
         if not store.claim_volunteer_command(player_id, event_id):
             return
         if config.mode in {"disabled", "shadow"}:
-            send_private(rcon, player_id, closed_command_message(config.mode, {}))
+            send_message(rcon, player_id, config, closed_key(config.mode, {}))
             return
         if not store.is_active():
-            send_private(rcon, player_id, unavailable)
+            send_message(rcon, player_id, config, "unavailable")
             return
         state = store.load_state()
         # Always dispatch explicit commands, including outside the invitation.
@@ -94,7 +92,7 @@ def autobalancer_volunteer(rcon, struct_log):
         )
     except Exception:
         logger.exception("Unable to dispatch autobalancer volunteer command")
-        send_private(rcon, player_id, unavailable)
+        send_message(rcon, player_id, config, "unavailable")
 
 
 def _death(struct_log) -> None:

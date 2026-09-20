@@ -208,13 +208,14 @@ def deliver(db, players, api=None):
     return api
 
 
-def confirm(db, players, incident):
+def confirm(db, players, incident, deliver_invitations=True):
     vid = incident["leadership_vote"]["id"]
     deliver(db, players)
     db.clock.now += 1
     assert storage.ballot(1, "v0", True, db.clock.now, players, "round-1")
-    assert vote(db, vid)["status"] == "warning"
-    deliver(db, players)
+    assert vote(db, vid)["status"] == "inviting"
+    if deliver_invitations:
+        deliver(db, players)
     return vid
 
 
@@ -231,7 +232,6 @@ def activate(db, n=6, commander=False, mode="dry_run"):
         ),
     )
     vid = confirm(db, players, incident)
-    elapse(db, players, 60)
     storage.advance(1, context(players))
     deliver(db, players)
     storage.advance(1, context(players))
@@ -328,9 +328,11 @@ def test_target_only_report_requires_communication_confirmation(db, commander, d
     api.message_player.assert_called_once()
     assert api.message_player.call_args.args[0] == "v0"
     prompt = api.message_player.call_args.args[1]
-    assert "Geht es um fehlende Kommunikation?" in prompt
-    assert "Is this about missing communication?" in prompt
-    assert "Anderer Grund / Other reason: !no" in prompt
+    assert "Redet nicht? / Not communicating?" in prompt
+    assert "Dein Report / Your report:" in prompt
+    assert "!yes = Kick-Abstimmung starten / Start server-kick vote" in prompt
+    assert "Warnung" not in prompt and "Warning" not in prompt
+    assert "!no = Abbrechen / Cancel" in prompt
     assert "kein automatischer Kick / no automatic kick" in prompt
     assert "Person-target" in prompt
     assert vote(db, vid)["status"] == "confirming"
@@ -347,10 +349,48 @@ def test_target_only_report_requires_communication_confirmation(db, commander, d
         assert saved.raw_message == text
         assert saved.reason == incident["reason"]
         assert all(
-            item.purpose not in {"target", "invite"}
+            item.purpose not in {"target", "invite_de", "invite"}
             for item in sess.scalars(select(LeadershipMessage))
         )
     api.kick.assert_not_called()
+
+
+@pytest.mark.parametrize("target_role", ["squadleader", "commander"])
+@pytest.mark.parametrize("mode", ["active", "dry_run"])
+@pytest.mark.parametrize("seconds", [60, 120])
+def test_confirmation_is_concise_bilingual_and_keeps_safety_details(
+    target_role, mode, seconds
+):
+    pending = SimpleNamespace(
+        payload={
+            "target_name": "Test-Leader",
+            "target_role": target_role,
+            "squad": "Easy",
+            "rules": {"mode": mode, "confirmation_seconds": seconds},
+        }
+    )
+    prompt = domain.message(pending, "confirm")
+    prefix = (
+        "PROBELAUF / DRY RUN – kein automatischer Kick / no automatic kick\n"
+        if mode == "dry_run"
+        else ""
+    )
+    target = (
+        "Commander Test-Leader"
+        if target_role == "commander"
+        else "Squad Easy – Squadleader Test-Leader"
+    )
+    assert prompt == (
+        f"{prefix}Dein Report / Your report: {target}\n"
+        "Redet nicht? / Not communicating?\n"
+        "!yes = Kick-Abstimmung starten / Start server-kick vote.\n"
+        "!no = Abbrechen / Cancel.\n"
+        f"Antworte in / Reply within {seconds} s.\n"
+        "Nur Team-/Squadchat / Team or squad chat only."
+    )
+    # Keep the instructions short independently of names and the dry-run warning.
+    assert len(prompt) - len(prefix) - len(target) < 250
+    assert len(prompt.splitlines()) <= (7 if mode == "dry_run" else 6)
 
 
 @pytest.mark.parametrize("role", sorted(incidents.SQUAD_LEADER_ROLES))
@@ -358,6 +398,39 @@ def test_all_hll_and_vietnam_leadership_roles(role):
     p = player("p", role=role)
     assert domain.identity(p)["kind"] == (
         "commander" if role in incidents.COMMANDER_ROLES else "squadleader"
+    )
+
+
+@pytest.mark.parametrize("target_role", ["squadleader", "commander"])
+@pytest.mark.parametrize("mode", ["active", "dry_run"])
+@pytest.mark.parametrize("duration,required,participants", [(120, 6, 10), (180, 2, 3)])
+def test_invitation_uses_approved_english_text(
+    target_role, mode, duration, required, participants
+):
+    pending = SimpleNamespace(
+        payload={
+            "target_name": "Test-Leader",
+            "target_role": target_role,
+            "squad": "Easy",
+            "rules": {"mode": mode, "duration_seconds": duration},
+            "required": required,
+            "participant_count": participants,
+        }
+    )
+    target = (
+        "Commander Test-Leader"
+        if target_role == "commander"
+        else "Squad Easy — Squad Leader Test-Leader"
+    )
+    prefix = "DRY RUN — no automatic kick\n\n" if mode == "dry_run" else ""
+    assert domain.message(pending, "invite") == (
+        f"{prefix}LEADERSHIP VOTE\n{target}\n\n"
+        "Kick this player from the server for not communicating?\n\n"
+        "!yes = Vote to kick\n"
+        "!no = Vote against kicking\n\n"
+        f"You have {duration} seconds to respond.\n"
+        f"Required: {required} YES votes out of {participants} eligible leaders.\n\n"
+        "Reply in TEAM or SQUAD chat only."
     )
 
 
@@ -441,13 +514,16 @@ def test_one_flow_per_team_server_scope_and_opposition_excluded(db):
     assert "enemy" not in vote(db, vid)["electorate"]
 
 
-def test_confirmation_not_ballot_warning_withdraw_and_cooldown(db):
+def test_confirmation_not_ballot_reporter_no_is_ballot_and_cooldown_survives(db):
     players = roster()
     observe_for(db, players)
     vid = confirm(db, players, report(players))
     assert vote(db, vid)["yes"] == 0
     assert not cast(db, players, "target")
     assert cast(db, players, yes=False)
+    assert vote(db, vid)["status"] == "inviting"
+    assert vote(db, vid)["yes"] == 0 and vote(db, vid)["no"] == 1
+    storage.cancel(1, vid, "admin")
     assert vote(db, vid)["status"] == "cancelled"
     assert not report(players)["leadership_vote"]
 
@@ -687,17 +763,21 @@ def test_db_enqueue_fault_preserves_ordinary_report(db, monkeypatch):
     assert incident["status"] == "new" and not incident["leadership_vote"]
 
 
-def test_messages_are_bilingual_named_and_explicitly_dry(db):
+def test_messages_are_named_and_explicitly_dry_in_each_language(db):
     vid, players = activate(db)
     with db() as sess:
         items = list(sess.scalars(select(LeadershipMessage)))
     assert items
     assert all(
         "Person-target" in m.body
-        and "DRY RUN" in m.body
-        and "kein automatischer Kick" in m.body
+        and (
+            ("PROBELAUF" in m.body and "kein automatischer Kick" in m.body)
+            if m.purpose == "invite_de"
+            else ("DRY RUN" in m.body and "no automatic kick" in m.body)
+        )
         for m in items
     )
+    assert all("kein automatischer Kick" in m.body for m in items if m.purpose != "invite")
     invites = [m for m in items if m.purpose == "invite"]
     assert {m.player_id for m in invites} == {f"v{i}" for i in range(6)}
     assert all(

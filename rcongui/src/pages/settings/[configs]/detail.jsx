@@ -689,6 +689,9 @@ const ConfigPage = () => {
 
   const handleSchemaSectionChange = (sectionData) => {
     const nextData = mergeConfigWithSchema(jsonData, sectionData, schema);
+    // JsonForms also emits initialization/validation echoes. Feeding an
+    // identical, newly cloned object back can race the next real user edit.
+    if (JSON.stringify(nextData) === JSON.stringify(jsonData)) return;
     setJsonData(nextData);
     setEditorContent(JSON.stringify(nextData, null, 2));
     setValidationErrors(null);

@@ -92,16 +92,34 @@ class AutobalancerMessages(BaseModel):
             self.volunteer_registered.format()
             self.candidate_selected.format(target_team="Axis", cooldown_maps=3)
             self.switch_completed.format(target_team="Axis", cooldown_maps=3)
-            self.squad_switch_selected.format(
-                squad_name="Able", target_team="Axis"
-            )
-            self.squad_switch_completed.format(
-                squad_name="Able", target_team="Axis"
-            )
+            self.squad_switch_selected.format(squad_name="Able", target_team="Axis")
+            self.squad_switch_completed.format(squad_name="Able", target_team="Axis")
             self.squad_switch_aborted.format(squad_name="Able")
         except (KeyError, IndexError, ValueError) as exc:
             raise ValueError(f"Ungültiger Platzhalter in Nachrichtenvorlage: {exc}")
         return self
+
+
+class AutobalancerEnglishMessages(AutobalancerMessages):
+    volunteer_request: str = (
+        "The teams are uneven. Volunteer to join {target_team}: type !balance within {seconds} seconds."
+    )
+    volunteer_registered: str = "Thank you! You have volunteered for this balance call."
+    candidate_selected: str = (
+        "You have been selected to join {target_team}. You will switch after your next death, then be protected for {cooldown_maps} maps."
+    )
+    switch_completed: str = (
+        "Thank you for helping! You have joined {target_team} and are protected from another automatic switch for {cooldown_maps} maps."
+    )
+    squad_switch_selected: str = (
+        "Your squad {squad_name} will now move together to {target_team}. Please recreate the squad there afterwards."
+    )
+    squad_switch_completed: str = (
+        "The move to {target_team} is complete. Please recreate squad {squad_name} on that team."
+    )
+    squad_switch_aborted: str = (
+        "Squad {squad_name} could not be moved completely. Please wait for instructions from an admin."
+    )
 
 
 class AutobalancerUserConfig(BaseUserConfig):
@@ -139,7 +157,7 @@ class AutobalancerUserConfig(BaseUserConfig):
         title="Mindestanzahl Spieler",
         description=(
             "Unterhalb dieser Gesamtspielerzahl beginnt kein Balance-Vorfall. "
-            "So bleibt Seeding unberührt."
+            "Zusätzlich sperren aktive Seeding-Grenzen automatische Wechsel."
         ),
     )
     stable_difference_seconds: int = Field(
@@ -331,11 +349,21 @@ class AutobalancerUserConfig(BaseUserConfig):
     )
     messages: AutobalancerMessages = Field(
         default_factory=AutobalancerMessages,
-        title="Spielernachrichten",
+        title="Spielernachrichten – Deutsch",
         description=(
             "Nachrichten für Freiwillige, Auswahl und bestätigten Wechsel. Im "
             "Shadow-Modus werden keine Nachrichten gesendet."
         ),
+    )
+    message_language: Literal["de", "en", "de+en"] = Field(
+        default="de",
+        title="Nachrichtensprache",
+        description="de = Deutsch; en = Englisch; de+en = zwei getrennte Nachrichten, zuerst Deutsch, dann Englisch. Bestehende deutsche Vorlagen bleiben erhalten.",
+    )
+    messages_en: AutobalancerEnglishMessages = Field(
+        default_factory=AutobalancerEnglishMessages,
+        title="Spielernachrichten – Englisch",
+        description="Eigenständige englische Vorlagen mit denselben Platzhaltern. Die Nachrichtensprache bestimmt, welche Pakete gesendet werden.",
     )
 
     @field_validator("volunteer_command")

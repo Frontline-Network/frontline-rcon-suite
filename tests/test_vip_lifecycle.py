@@ -4,8 +4,9 @@ import json
 import os
 import re
 from datetime import datetime, timedelta, timezone
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
+import pytest
 import requests
 
 os.environ.setdefault("SERVER_NUMBER", "1")
@@ -328,10 +329,12 @@ def test_status_api_failure_is_fail_closed(monkeypatch):
     )
 
 
-def test_process_test_mode_never_sends_a_real_message(monkeypatch):
+@pytest.mark.parametrize("test_mode", [False, True])
+def test_process_delivers_information_only_outside_test_mode(monkeypatch, test_mode):
     monkeypatch.setenv("FRONTLINE_VIP_LIFECYCLE_ENABLED", "true")
-    config = VipLifecycleConfig(enabled=True, test_mode=True)
+    config = VipLifecycleConfig(enabled=True, test_mode=test_mode)
     ctl = Mock()
+    ctl.message_player_info.return_value = True
     finished = Mock()
     monkeypatch.setattr(
         "rcon.vip_lifecycle._local_server_family", lambda: "hll_vietnam"
@@ -356,12 +359,27 @@ def test_process_test_mode_never_sends_a_real_message(monkeypatch):
     )
     monkeypatch.setattr("rcon.vip_lifecycle._prepare_delivery", lambda **_: 17)
     monkeypatch.setattr("rcon.vip_lifecycle._finish_delivery", finished)
+    monkeypatch.setattr("rcon.vip_lifecycle.utc_now", lambda: NOW)
+    monkeypatch.setattr(
+        "rcon.vip_lifecycle.format_message", lambda *_args, **_kwargs: "VIP information"
+    )
 
     result = process_once(ctl, config, now=NOW)
 
-    assert result["simulated"] == 1
     ctl.message_player.assert_not_called()
-    finished.assert_called_once_with(17, status="simulated", now=NOW)
+    if test_mode:
+        assert result["simulated"] == 1
+        ctl.message_player_info.assert_not_called()
+        finished.assert_called_once_with(17, status="simulated", now=NOW)
+    else:
+        assert result["sent"] == 1
+        ctl.message_player_info.assert_called_once_with(
+            "player-1",
+            "VIP information",
+            by="VIP lifecycle: trial_active",
+            player_name="Alice",
+        )
+        finished.assert_called_once_with(17, status="sent", now=NOW)
 
 
 def test_process_skips_delivery_when_status_api_is_unavailable(monkeypatch):
@@ -395,6 +413,45 @@ def test_process_skips_delivery_when_status_api_is_unavailable(monkeypatch):
 
     prepare.assert_not_called()
     ctl.message_player.assert_not_called()
+    ctl.message_player_info.assert_not_called()
+
+
+def test_manual_lifecycle_preview_is_information_not_moderation(monkeypatch):
+    from rcon import vip_lifecycle
+
+    monkeypatch.setenv("FRONTLINE_VIP_LIFECYCLE_ENABLED", "true")
+    monkeypatch.setattr(
+        vip_lifecycle, "_online_players", lambda _: {"player-1": "Alice"}
+    )
+    monkeypatch.setattr(vip_lifecycle, "_blocked_player_ids", lambda *_: set())
+    monkeypatch.setattr(
+        vip_lifecycle, "format_message", lambda *_args, **_kwargs: "VIP information"
+    )
+    session_context = MagicMock()
+    session = session_context.__enter__.return_value
+    session.query.return_value.filter.return_value.one.return_value.id = 7
+    monkeypatch.setattr(vip_lifecycle, "enter_session", lambda: session_context)
+    ctl = Mock()
+    ctl.message_player_info.return_value = True
+
+    assert (
+        vip_lifecycle.send_test_message(
+            ctl,
+            VipLifecycleConfig(enabled=True),
+            player_id="player-1",
+            rule=RULE_TRIAL_ACTIVE,
+        )
+        == "VIP information"
+    )
+
+    ctl.message_player.assert_not_called()
+    ctl.message_player_info.assert_called_once_with(
+        "player-1",
+        "VIP information",
+        by="VIP lifecycle test: trial_active",
+        player_name="Alice",
+    )
+    assert session.add.call_args.args[0].status == "test"
 
 
 def test_process_is_inert_when_private_feature_is_not_enabled(monkeypatch):

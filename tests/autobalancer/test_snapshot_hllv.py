@@ -1,4 +1,5 @@
 import os
+import hllrcon
 from datetime import datetime, timedelta, timezone
 
 os.environ.setdefault("HLL_MAINTENANCE_CONTAINER", "1")
@@ -28,37 +29,29 @@ class HLLVRcon:
             "time_remaining": timedelta(hours=1),
         }
 
-    def get_team_view(self, compact=False):
-        self.compact_team_view_requested = compact
-        players = [
-            {
-                "player_id": "hllv-squad-leader",
-                "name": "Leader",
-                "role": "squadleader",
-                "unit_id": 1,
-                "unit_name": "able",
-                "profile": {"current_playtime_seconds": 900},
-            },
-            {
-                "player_id": "hllv-mortar-gunner",
-                "name": "Gunner",
-                "role": "mortargunner",
-                "unit_id": 2,
-                "unit_name": "baker",
-                "profile": {"current_playtime_seconds": 900},
-            },
-        ]
+    def get_raw_player_snapshot(self):
         return {
-            "allies": {
-                "count": 2,
-                "squads": {
-                    "able": {"type": "infantry", "players": [players[0]]},
-                    "baker": {"type": "mortar", "players": [players[1]]},
+            "captured_at": datetime(2026, 8, 16, tzinfo=timezone.utc).timestamp(),
+            "players": [
+                {
+                    "iD": "hllv-squad-leader",
+                    "name": "Leader",
+                    "team": 1,
+                    "role": hllrcon.HLLVRole.SQUAD_LEADER.id,
+                    "platoon": "Able",
                 },
-            },
-            "axis": {"count": 0, "squads": {}},
-            "fail_count": 0,
+                {
+                    "iD": "hllv-mortar-gunner",
+                    "name": "Gunner",
+                    "team": 1,
+                    "role": 15,
+                    "platoon": "Baker",
+                },
+            ],
         }
+
+    def get_team_view(self, compact=False):
+        raise AssertionError("The cached UI roster must not drive automatic balancing")
 
     def get_autobalance_enabled(self):
         return True
@@ -68,6 +61,16 @@ class HLLVRcon:
 
 
 def test_hllv_snapshot_uses_game_roles_and_faction_labels(monkeypatch):
+    monkeypatch.setattr(
+        "rcon.autobalancer.snapshot.time.time",
+        lambda: datetime(2026, 8, 16, tzinfo=timezone.utc).timestamp(),
+    )
+    monkeypatch.setattr(
+        "rcon.autobalancer.snapshot.get_live_profiles",
+        lambda ids: [
+            {"player_id": pid, "current_playtime_seconds": 900} for pid in ids
+        ],
+    )
     monkeypatch.setattr(
         "rcon.autobalancer.snapshot._current_round",
         lambda map_name, now: ("1000:wdevc_warfare_day", 900, True),
@@ -80,7 +83,7 @@ def test_hllv_snapshot_uses_game_roles_and_faction_labels(monkeypatch):
         now=datetime(2026, 8, 16, tzinfo=timezone.utc),
     )
 
-    assert rcon.compact_team_view_requested is True
+    assert rcon.compact_team_view_requested is False
     assert snapshot.team_labels == {"allies": "US", "axis": "NVA"}
     assert snapshot.game == "hllv"
     assert snapshot.counts_match is True

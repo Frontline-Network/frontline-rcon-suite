@@ -19,13 +19,12 @@ export const copy = {
       "Für diese Einstellungen fehlt dir das Recht für Führungsabstimmungen.",
     kickPermission: "Zum Aktivieren wird zusätzlich das Kick-Recht benötigt.",
     confirmation_seconds: "Bestätigung durch Melder (Sekunden)",
-    warning_seconds: "Warnzeit für Betroffenen (Sekunden)",
     duration_seconds: "Abstimmungsdauer (Sekunden)",
     minimum_participants: "Mindestanzahl Stimmberechtigter",
     leadership_seconds: "Mindestdauer in Führungsrolle (Sekunden)",
     team_gap_seconds: "Team-Pause nach Abschluss (Sekunden)",
     target_cooldown_seconds: "Schutz für denselben Zielspieler (Sekunden)",
-    flow: "!admin able oder !admin commander reicht: !admin zuerst, Squadname oder Commander an beliebiger Stelle danach. Der Grund ist frei formulierbar und darf fehlen. Die berechtigte Führungskraft bestätigt in der privaten Rückfrage mit !yes, dass es um fehlende Kommunikation geht. Bei anderem Grund: !no; der Admin-Report bleibt offen. Erst nach !yes erhält das Ziel eine Warnung. Danach stimmen die übrigen berechtigten Führungskräfte mit !yes / !no im Team- oder Squadchat ab. Das Ziel und dessen Squad sind ausgeschlossen. Ein Commander hat keine Sonderstimme.",
+    flow: "!admin able oder !admin commander reicht: !admin zuerst, Squadname oder Commander an beliebiger Stelle danach. Der Grund ist frei formulierbar und darf fehlen. Die berechtigte Führungskraft bestätigt in der privaten Rückfrage mit !yes, dass es um fehlende Kommunikation geht. Bei anderem Grund: !no; der Admin-Report bleibt offen. Nach !yes werden die übrigen berechtigten Führungskräfte sofort privat zur Abstimmung eingeladen, erst auf Deutsch, dann auf Englisch. Sie stimmen mit !yes / !no im Team- oder Squadchat ab. Das Ziel erhält keine privaten Hinweise oder Ergebnisse. Es gibt keine Warn- oder Wartephase. Das Ziel und dessen Squad sind ausgeschlossen. Ein Commander hat keine Sonderstimme.",
     references:
       "Auch NATO-Namen wie Bravo (Baker), Echo (Easy) und Kilo (King), Angaben wie SL B sowie bekannte Schreibfehler wie Eays werden erkannt. Squad und Spielername dürfen gemeinsam genannt werden, wenn sie denselben Squadleader meinen. Prüfe in der privaten Rückfrage den genannten Squad und Spielernamen. Falsches Ziel: !no. Mehrdeutige Meldungen bleiben normale Admin-Fälle.",
     frozen:
@@ -79,13 +78,12 @@ export const copy = {
       "You need leadership-vote management permission to view these settings.",
     kickPermission: "Enabling also requires kick permission.",
     confirmation_seconds: "Reporter confirmation (seconds)",
-    warning_seconds: "Target warning (seconds)",
     duration_seconds: "Voting period (seconds)",
     minimum_participants: "Minimum eligible voters",
     leadership_seconds: "Minimum continuous leadership (seconds)",
     team_gap_seconds: "Team cooldown after completion (seconds)",
     target_cooldown_seconds: "Same-player protection (seconds)",
-    flow: "!admin able or !admin commander is enough: !admin first, squad name or commander anywhere afterwards. The reason can be freely worded or omitted. The eligible leader privately confirms with !yes that this is about missing communication. For another reason: !no; the admin report stays open. Only after !yes does the target receive a warning. Then the other eligible leaders vote with !yes / !no in team or squad chat. The target and their squad are excluded. Commanders have no extra voting powers.",
+    flow: "!admin able or !admin commander is enough: !admin first, squad name or commander anywhere afterwards. The reason can be freely worded or omitted. The eligible leader privately confirms with !yes that this is about missing communication. For another reason: !no; the admin report stays open. After !yes, the other eligible leaders are immediately invited privately, first in German, then in English. They vote with !yes / !no in team or squad chat. The target receives no private notices or results. There is no warning or waiting phase. The target and their squad are excluded. Commanders have no extra voting powers.",
     references:
       "NATO names such as Bravo (Baker), Echo (Easy) and Kilo (King), references such as SL B, and reviewed typos such as Eays are also recognized. Squad and player name may be combined when they identify the same squad leader. Check the squad and player name in the private confirmation. Wrong target: !no. Ambiguous reports remain normal admin cases.",
     frozen:

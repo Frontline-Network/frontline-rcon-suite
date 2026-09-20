@@ -2551,7 +2551,7 @@ const en = {
           },
           minimum_players: {
             label: "Minimum players",
-            help: "The autobalancer does not intervene below this total player count.",
+            help: "The autobalancer does not intervene below this total player count. Active seeding limits also pause automatic balancing and take priority.",
           },
           stable_difference_seconds: {
             label: "Confirm imbalance after",
@@ -2572,7 +2572,9 @@ const en = {
           cooldown_maps: { label: "Move cooldown" },
           max_switches_per_incident: { label: "Maximum moves per incident" },
           volunteer_command: { label: "Volunteer command" },
-          messages: { label: "Player messages" },
+          messages: { label: "Player messages – German" },
+          messages_en: { label: "Player messages – English", help: "Separate English templates. Existing German messages are preserved." },
+          message_language: { label: "Message language", help: "de: German, en: English, de+en: two separate messages, German first, then English." },
           poll_interval_seconds: { label: "Check interval" },
           candidate_timeout_seconds: { label: "Candidate timeout" },
           manual_proposal_timeout_seconds: { label: "Approval timeout" },

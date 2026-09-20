@@ -20,20 +20,23 @@ Aktivmodus und weitere Server benötigen eine separate Freigabe.
    Admin-Kanäle zugestellt. Ein eindeutig erkanntes Führungsziel kann zusätzlich
    eine private Rückfrage mit Zielrolle, Squad und Spielernamen auslösen.
    Der ausgeschriebene Grund ist dafür keine Voraussetzung.
-3. Der Melder bestätigt innerhalb von **60 Sekunden** mit `!yes`, dass es um
+3. Der Melder bestätigt innerhalb der konfigurierten Frist (Standard **60 Sekunden**,
+   auf RCON3/4 **120 Sekunden**) mit `!yes`, dass es um
    fehlende Kommunikation geht und er das Verfahren starten möchte.
    Bei einem anderen Anliegen antwortet er mit `!no` zur normalen Admin-Bearbeitung.
    `!no` oder Ablauf beendet das Angebot, nicht den Admin-Fall.
-   Bestätigung ist **keine Ja-Stimme**. Bevor die Warnung beginnt, muss die
+   Bestätigung ist **keine Ja-Stimme**. Bevor die Abstimmung beginnt, muss die
    ursprüngliche Meldung nachweislich beim Discord-Bot zugestellt worden sein.
-4. Das Ziel wird privat aufgefordert, innerhalb von **60 Sekunden** im
-   Führungskanal zu sprechen oder seine Rolle abzugeben. In dieser Phase kann
-   der weiterhin berechtigte Melder mit `!no` zurückziehen.
-   Eine Antwort des Ziels alleine beendet das Verfahren nicht.
-5. Die berechtigten Führungskräfte erhalten direkte private Einladungen:
+4. Direkt nach `!yes` werden die privaten Einladungen an die berechtigten
+   Führungskräfte eingereiht: Deutsch zuerst, danach Englisch als eigene Nachricht.
+   Der Versand erfolgt im nächsten regulären Verarbeitungsschritt. Es gibt keine
+   Warnung oder zusätzliche Wartefrist; das Ziel erhält keine privaten Hinweise
+   oder Ergebnisse. Alte gespeicherte Zielnachrichten werden ebenfalls blockiert.
+5. Die berechtigten Führungskräfte stimmen ab:
    `!yes` / `!no`, **120 Sekunden**. Groß-/Kleinschreibung und äußere
    Leerzeichen sind erlaubt, zusätzliche Argumente nicht. Die letzte gültige
-   Antwort gilt. Keine vorzeitige Auswertung.
+   Antwort gilt. Keine vorzeitige Auswertung. Nach Bestätigung ist auch `!no`
+   des Melders eine Gegenstimme, kein Rückzug des gesamten Votes.
 6. Nach Ablauf wird nochmals geprüft. Im Probelauf bleibt es bei einem Ergebnis;
    im Aktivmodus kann eine erfolgreiche Abstimmung einen **Server-Kick, keinen
    Bann**, auslösen. Nur ein eindeutig bestätigter echter Kick schließt den
@@ -43,6 +46,12 @@ Alle Workflow-Nachrichten sind Deutsch und Englisch. Es gibt keine globale
 Einladung oder Ergebnisnachricht. Nicht zuordenbare Ziele,
 fehlende Berechtigungen oder unbekannter/globaler Chat bleiben normale
 Admin-Meldungen.
+
+Das alte Konfigurationsfeld `warning_seconds` wird für ältere Clients weiterhin
+akzeptiert, aber nicht mehr verwendet. Der reine Backend-Hotfix ändert bestehende
+Frontend-Dateien nicht; die Entfernung des Felds und aktualisierte Hilfetexte
+werden mit dem nächsten Frontend-Update sichtbar. Spielseitige Kick-Anzeigen
+bleiben davon unberührt.
 
 ### Formulierung der Meldung
 
@@ -65,7 +74,7 @@ lediglich dieses Angebot gemacht, keine Behauptung über fehlende Kommunikation
 aufgestellt. Bei `!no` oder ohne Antwort bleibt ausschließlich die normale
 Admin-Bearbeitung. Die ursprüngliche Meldung bleibt unverändert erhalten.
 Die üblichen Berechtigungen und Schutzregeln gelten weiterhin; die Meldung allein
-startet weder eine Warnung noch eine Abstimmung.
+startet noch keine Abstimmung.
 
 ### Erweiterte Zielerkennung
 
@@ -212,9 +221,9 @@ konkurrierende Maßnahmen erhalten dann einen Konflikt bis zum Ergebnis.
 
 ## Sicherheit und Laufzeit
 
-- Ein offener Vorgang je Server und Team, einschließlich Bestätigung und Warnung.
+- Ein offener Vorgang je Server und Team, einschließlich Bestätigung und Einladungsversand.
   Kein globaler spielinterner Votekick, keine Warteschlange.
-- Nach Beginn der Warnphase gelten ab Abschluss mindestens **zehn Minuten
+- Nach Bestätigung durch den Melder gelten ab Abschluss mindestens **zehn Minuten
   Team-Pause** und **30 Minuten Zielspieler-Schutz**. Admin-Reports bleiben möglich.
 - Abgeschaltete Funktion oder geänderte Regeln beenden offene Verfahren.
   Ein bereits begonnener Kick muss zuerst sein Ergebnis erhalten.

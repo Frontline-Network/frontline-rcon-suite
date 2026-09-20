@@ -100,6 +100,18 @@ def decision(
     }
 
 
+@pytest.mark.parametrize("status", ["executed", "aborted", "armed"])
+def test_dashboard_exposes_execution_status_independently_of_reviews(status):
+    item = decision(1, "accepted")
+    executed = datetime(2026, 9, 19, 8, 30) if status == "executed" else None
+    item.update(status=status, executed_at=executed)
+    item["reason"]["abort_reason"] = "Seeding" if status == "aborted" else None
+    result = summarize_shadow_decisions([item])["decisions"][0]
+    assert result["status"] == status
+    assert result["executed_at"] == executed
+    assert result["abort_reason"] == item["reason"]["abort_reason"]
+
+
 def test_shadow_summary_reports_reviews_and_rejection_reasons():
     result = summarize_shadow_decisions(
         [

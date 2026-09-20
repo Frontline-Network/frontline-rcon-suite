@@ -1,5 +1,8 @@
 // Shared keys keep the audited settings panels complete in both supported languages.
 const autobalancerCopy = [
+  ["operatorIntro", "Aktueller Ablauf, Schutzgründe und bestätigte Teamwechsel. Alte Bewertungen sind keine offenen Wechselaufträge.", "Current operation, safety blocks and confirmed team switches. Historical reviews are not pending switch requests."],
+  ["noConfirmedSwitch", "Kein bestätigter Wechsel im geladenen Verlauf", "No confirmed switch in the loaded history"],
+  ["confirmedSwitchScope", "Nur tatsächlich bestätigte Wechsel im geladenen Verlauf; keine Vorschläge oder Bewertungen.", "Only confirmed switches in the loaded history; not proposals or reviews."],
   ["off", "Aus", "Off"],
   [
     "offHelp",
@@ -752,8 +755,8 @@ const autobalancerCopy = [
   ],
   [
     "ratingReliableHelp",
-    "Gilt für die bewerteten Shadow-Vorschläge. Unter 60 % ist das Rating nur ein Hinweis.",
-    "Applies to reviewed shadow proposals. Below 60%, the rating is only a guide.",
+    "Aktuelle Aussagekraft beider Teams; angezeigt wird der niedrigere Wert. Unter 60 % ist das Rating nur ein Hinweis.",
+    "Current confidence for both teams; the lower value is shown. Below 60%, the rating is only a guide.",
   ],
   [
     "liveDiagnostics",

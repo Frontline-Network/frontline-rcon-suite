@@ -37,7 +37,7 @@ import {
   Typography,
   alpha,
 } from "@mui/material";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import AutobalancerHistoryDashboard from "@/pages/settings/[configs]/autobalancer-history-dashboard";
 import AutobalancerRoundHistory from "@/pages/settings/[configs]/autobalancer-round-history";
 import AutobalancerShadowCharts from "@/pages/settings/[configs]/autobalancer-shadow-charts";
@@ -599,7 +599,9 @@ const ProposalDetail = ({
           </Typography>
           <Typography component="h1" variant="h4" sx={{ fontWeight: 700 }}>
             {i18n.t("settingsPanels.autobalancer.reviewCandidate", {
-              name: decision.player_name || i18n.t("settingsPanels.autobalancer.unknownCandidate"),
+              name:
+                decision.player_name ||
+                i18n.t("settingsPanels.autobalancer.unknownCandidate"),
             })}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
@@ -1199,6 +1201,13 @@ const AutobalancerModeratorDashboard = ({
   const goals = data.pilot_goals || {};
   const decisions = data.decisions || [];
   const status = liveStatus || data.live_status || {};
+  const isPilot = config?.mode === "shadow";
+  useEffect(() => {
+    if (!isPilot && (section === "pilot" || section === "proposals")) {
+      setSection("live");
+      setSelectedDecisionId(null);
+    }
+  }, [isPilot, section]);
   const pending = decisions.filter((decision) => !decision.review_verdict);
   const reviewed = decisions.filter((decision) => decision.review_verdict);
   const selectedDecision = useMemo(
@@ -1213,9 +1222,21 @@ const AutobalancerModeratorDashboard = ({
     Number.isFinite(counts.allies) && Number.isFinite(counts.axis);
   const difference = hasCounts ? Math.abs(counts.allies - counts.axis) : null;
   const totalReviewsTarget = goals.reviewed_proposals_target ?? 20;
-  const plannedMove = status.proposal || status.plan?.candidate || pending[0];
-  const sourceTeam = plannedMove?.source_team;
-  const targetTeam = plannedMove?.target_team;
+  // Historical review backlog is never a currently executable proposal.
+  const plannedMove = status.proposal || status.plan?.candidate;
+  const lastExecuted = decisions
+    .filter(
+      (decision) => decision.status === "executed" && decision.executed_at
+    )
+    .sort((a, b) => new Date(b.executed_at) - new Date(a.executed_at))[0];
+  const liveConfidence = Object.values(
+    status.team_rating_confidence || {}
+  ).filter(Number.isFinite);
+  const ratingConfidence = liveConfidence.length
+    ? Math.min(...liveConfidence)
+    : null;
+  const sourceTeam = plannedMove?.source_team || status.plan?.source_team;
+  const targetTeam = plannedMove?.target_team || status.plan?.target_team;
   const plannedMoveCaption = plannedMove
     ? sourceTeam && targetTeam
       ? `${teamLabels[sourceTeam] || sourceTeam} → ${
@@ -1268,11 +1289,13 @@ const AutobalancerModeratorDashboard = ({
       value:
         config?.mode === "shadow"
           ? i18n.t("settingsPanels.autobalancer.noLiveIntervention")
-          : i18n.t("settingsPanels.autobalancer.notReported"),
+          : lastExecuted
+          ? formatDate(lastExecuted.executed_at)
+          : i18n.t("settingsPanels.autobalancer.noConfirmedSwitch"),
       caption:
         config?.mode === "shadow"
           ? i18n.t("settingsPanels.autobalancer.noShadowSwitches")
-          : i18n.t("settingsPanels.autobalancer.noInterventionHistory"),
+          : i18n.t("settingsPanels.autobalancer.confirmedSwitchScope"),
       icon: <HistoryIcon aria-hidden />,
     },
     {
@@ -1291,7 +1314,9 @@ const AutobalancerModeratorDashboard = ({
       icon: <ShieldOutlinedIcon aria-hidden />,
     },
   ];
-  const nextTask = pending.length
+  const nextTask = !isPilot
+    ? PHASE_LABELS()[status.phase] || modeStatus.title
+    : pending.length
     ? pending.length === 1
       ? i18n.t("settingsPanels.autobalancer.onePending")
       : i18n.t("settingsPanels.autobalancer.pendingCount", {
@@ -1314,7 +1339,7 @@ const AutobalancerModeratorDashboard = ({
     if (value === "settings") onOpenSettings();
   };
 
-  if (section === "proposals" && selectedDecision) {
+  if (isPilot && section === "proposals" && selectedDecision) {
     return (
       <ProposalDetail
         decision={selectedDecision}
@@ -1340,7 +1365,11 @@ const AutobalancerModeratorDashboard = ({
             Autobalancer
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            {i18n.t("settingsPanels.autobalancer.moderatorIntro")}
+            {i18n.t(
+              `settingsPanels.autobalancer.${
+                isPilot ? "moderatorIntro" : "operatorIntro"
+              }`
+            )}
           </Typography>
         </Box>
         <Stack direction="row" gap={1} flexWrap="wrap">
@@ -1381,13 +1410,17 @@ const AutobalancerModeratorDashboard = ({
           <MenuItem value="live">
             {i18n.t("settingsPanels.autobalancer.liveOverview")}
           </MenuItem>
-          <MenuItem value="proposals">
-            {i18n.t("settingsPanels.autobalancer.reviewProposalsPrefix")}
-            {pending.length})
-          </MenuItem>
-          <MenuItem value="pilot">
-            {i18n.t("settingsPanels.autobalancer.pilotApproval")}
-          </MenuItem>
+          {isPilot && (
+            <MenuItem value="proposals">
+              {i18n.t("settingsPanels.autobalancer.reviewProposalsPrefix")}
+              {pending.length})
+            </MenuItem>
+          )}
+          {isPilot && (
+            <MenuItem value="pilot">
+              {i18n.t("settingsPanels.autobalancer.pilotApproval")}
+            </MenuItem>
+          )}
           <MenuItem value="history">
             {i18n.t("settingsPanels.autobalancer.history")}
           </MenuItem>
@@ -1415,20 +1448,24 @@ const AutobalancerModeratorDashboard = ({
           iconPosition="start"
           label="Live"
         />
-        <Tab
-          value="proposals"
-          icon={<PlaylistAddCheckIcon />}
-          iconPosition="start"
-          label={i18n.t("settingsPanels.autobalancer.reviewProposalsCount", {
-            v0: pending.length,
-          })}
-        />
-        <Tab
-          value="pilot"
-          icon={<ShieldOutlinedIcon />}
-          iconPosition="start"
-          label={i18n.t("settingsPanels.autobalancer.pilotApproval")}
-        />
+        {isPilot && (
+          <Tab
+            value="proposals"
+            icon={<PlaylistAddCheckIcon />}
+            iconPosition="start"
+            label={i18n.t("settingsPanels.autobalancer.reviewProposalsCount", {
+              v0: pending.length,
+            })}
+          />
+        )}
+        {isPilot && (
+          <Tab
+            value="pilot"
+            icon={<ShieldOutlinedIcon />}
+            iconPosition="start"
+            label={i18n.t("settingsPanels.autobalancer.pilotApproval")}
+          />
+        )}
         <Tab
           value="history"
           icon={<HistoryIcon />}
@@ -1471,7 +1508,11 @@ const AutobalancerModeratorDashboard = ({
               >
                 <Box>
                   <Typography variant="overline" color="text.secondary">
-                    {i18n.t("settingsPanels.autobalancer.whatNext")}
+                    {i18n.t(
+                      `settingsPanels.autobalancer.${
+                        isPilot ? "whatNext" : "liveState"
+                      }`
+                    )}
                   </Typography>
                   <Typography variant="h5" sx={{ fontWeight: 700 }}>
                     {nextTask}
@@ -1481,14 +1522,20 @@ const AutobalancerModeratorDashboard = ({
                     color="text.secondary"
                     sx={{ mt: 0.75 }}
                   >
-                    {pending.length
+                    {!isPilot
+                      ? (status.block_reasons || [])
+                          .map((reason) =>
+                            translateOperatorMessage(reason, i18n.t)
+                          )
+                          .join(" · ") || modeStatus.detail
+                      : pending.length
                       ? i18n.t("settingsPanels.autobalancer.reviewNextCount", {
                           v0: Math.min(5, pending.length),
                         })
                       : i18n.t("settingsPanels.autobalancer.noTask")}
                   </Typography>
                 </Box>
-                {pending.length > 0 && (
+                {isPilot && pending.length > 0 && (
                   <Button
                     variant="contained"
                     endIcon={<ArrowForwardIcon />}
@@ -1523,50 +1570,71 @@ const AutobalancerModeratorDashboard = ({
               }
               caption={i18n.t("settingsPanels.autobalancer.bothTeamsSnapshot")}
             />
-            <MetricCard
-              label={i18n.t("settingsPanels.autobalancer.pilotStatus")}
-              value={
-                goals.ready_for_manual
-                  ? i18n.t("settingsPanels.autobalancer.readyReview")
-                  : i18n.t("settingsPanels.autobalancer.notReady")
-              }
-              caption={i18n.t("settingsPanels.autobalancer.reviewProgress", {
-                v0: summary.reviewed ?? 0,
-                v1: totalReviewsTarget,
-              })}
-              color={goals.ready_for_manual ? "success.main" : "text.primary"}
-            />
+            {isPilot ? (
+              <MetricCard
+                label={i18n.t("settingsPanels.autobalancer.pilotStatus")}
+                value={
+                  goals.ready_for_manual
+                    ? i18n.t("settingsPanels.autobalancer.readyReview")
+                    : i18n.t("settingsPanels.autobalancer.notReady")
+                }
+                caption={i18n.t("settingsPanels.autobalancer.reviewProgress", {
+                  v0: summary.reviewed ?? 0,
+                  v1: totalReviewsTarget,
+                })}
+                color={goals.ready_for_manual ? "success.main" : "text.primary"}
+              />
+            ) : (
+              <MetricCard
+                label={i18n.t("settingsPanels.autobalancer.plannedSwitch")}
+                value={
+                  plannedMove?.player_name ||
+                  plannedMove?.name ||
+                  i18n.t("settingsPanels.autobalancer.noCandidateYet")
+                }
+                caption={plannedMoveCaption}
+              />
+            )}
           </Box>
 
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            justifyContent="space-between"
-            alignItems={{ sm: "flex-end" }}
-            gap={1}
-            sx={{ mt: 3, mb: 1.5 }}
-          >
-            <Box>
-              <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                {i18n.t("settingsPanels.autobalancer.openProposals")}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {i18n.t("settingsPanels.autobalancer.openProposalsHelp")}
-              </Typography>
-            </Box>
-            <Button color="inherit" onClick={() => switchSection("proposals")}>
-              {i18n.t("settingsPanels.autobalancer.showAll", { count: pending.length })}
-            </Button>
-          </Stack>
-          <ProposalQueue
-            decisions={pending.slice(0, 3)}
-            onOpen={openDecision}
-            emptyMessage={
-              decisions.length
-                ? i18n.t("settingsPanels.autobalancer.allReviewed")
-                : i18n.t("settingsPanels.autobalancer.noIncidentYet")
-            }
-            emptySeverity={decisions.length ? "success" : "info"}
-          />
+          {isPilot && (
+            <>
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                justifyContent="space-between"
+                alignItems={{ sm: "flex-end" }}
+                gap={1}
+                sx={{ mt: 3, mb: 1.5 }}
+              >
+                <Box>
+                  <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                    {i18n.t("settingsPanels.autobalancer.openProposals")}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {i18n.t("settingsPanels.autobalancer.openProposalsHelp")}
+                  </Typography>
+                </Box>
+                <Button
+                  color="inherit"
+                  onClick={() => switchSection("proposals")}
+                >
+                  {i18n.t("settingsPanels.autobalancer.showAll", {
+                    count: pending.length,
+                  })}
+                </Button>
+              </Stack>
+              <ProposalQueue
+                decisions={pending.slice(0, 3)}
+                onOpen={openDecision}
+                emptyMessage={
+                  decisions.length
+                    ? i18n.t("settingsPanels.autobalancer.allReviewed")
+                    : i18n.t("settingsPanels.autobalancer.noIncidentYet")
+                }
+                emptySeverity={decisions.length ? "success" : "info"}
+              />
+            </>
+          )}
 
           <Box sx={{ mt: 3, mb: 1.5 }}>
             <Typography variant="h5" sx={{ fontWeight: 700 }}>
@@ -1601,11 +1669,9 @@ const AutobalancerModeratorDashboard = ({
             />
             <QualityCard
               title={i18n.t("settingsPanels.autobalancer.ratingReliable")}
-              value={formatPercent(summary.median_rating_confidence)}
-              color={
-                summary.median_rating_confidence >= 0.6 ? "success" : "warning"
-              }
-              progress={(summary.median_rating_confidence || 0) * 100}
+              value={formatPercent(ratingConfidence)}
+              color={ratingConfidence >= 0.6 ? "success" : "warning"}
+              progress={(ratingConfidence || 0) * 100}
               explanation={i18n.t(
                 "settingsPanels.autobalancer.ratingReliableHelp"
               )}
@@ -1635,7 +1701,7 @@ const AutobalancerModeratorDashboard = ({
         </>
       )}
 
-      {section === "proposals" && (
+      {isPilot && section === "proposals" && (
         <Box sx={{ mt: 2 }}>
           <Stack
             direction={{ xs: "column", sm: "row" }}
@@ -1688,7 +1754,7 @@ const AutobalancerModeratorDashboard = ({
         </Box>
       )}
 
-      {section === "pilot" && (
+      {isPilot && section === "pilot" && (
         <Box sx={{ mt: 2 }}>
           <Alert
             severity={goals.ready_for_manual ? "success" : "warning"}

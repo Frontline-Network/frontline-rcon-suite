@@ -1,5 +1,59 @@
 # Leadership votes and Discord action diagnostics
 
+## A campaign message cancels a leadership vote
+
+If a vote ends with `Manual action`, check the incident event actor and the
+target's action history at the same time. A `Campaign:` or `VIP lifecycle:`
+informational message is not an admin takeover. Previously, saving any message
+in that history also invoked the manual-action guard, unintentionally cancelling
+the target's vote before or during voting.
+
+Information senders now use the internal `message_player_info` delivery path.
+Delivery and its existing audit record remain unchanged. The public
+`message_player` endpoint gains no new parameter or bypass: saved manual messages
+still invoke the moderation guard, regardless of actor names or message text.
+Punishments, kicks, bans and explicit Discord takeovers remain guarded.
+
+An expired confirmation is a separate result: the reporter must first send
+`!yes` in team/squad chat within the confirmation window. A sent message records
+RCON acceptance, not proof that the player read it. Claiming the Discord report
+intentionally stops the vote, including during invitation delivery.
+
+## Other leaders have not received invitations
+
+Distinguish a `confirming` request from an `active` vote. The first private
+message goes to the reporter, not to the named target. Only the reporter's
+`!yes` in team/squad chat immediately queues invitations to all eligible leaders
+in the frozen electorate. There is no target warning or extra waiting phase.
+Before confirmation, `!no` or an expired confirmation stops this before invitations.
+After confirmation, the reporter's `!no` counts as a negative ballot instead of
+cancelling everyone's vote. Admin takeover still cancels an unexecuted vote.
+The target receives neither private warnings nor private results; legacy queued
+target notices are rejected at dispatch as well as at enqueue time.
+The target and the opposing team never receive ballot invitations.
+Each eligible leader receives two separate invitations: German (`invite_de`),
+then the approved English `LEADERSHIP VOTE` text (`invite`). Each has its own
+durable receipt and language-specific dry-run notice. English is enqueued only
+after the German attempt, so it cannot overtake it; after dismissing the English
+message, the German message remains below it in the game UI. Other player notices
+remain bilingual in one message.
+
+Successful delivery in either language counts as one invited person, never two.
+The first successful delivery allows a response; the voting deadline gives the
+full voting duration after the final successful invitation delivery. Failed or
+uncertain attempts are not retried, and both languages retain the same identity,
+team, phase and manual-takeover checks.
+
+Check the durable message purposes and recipients (`confirm`, `target`, `invite`)
+alongside the chat event timestamps, rather than assuming a report is an active
+vote. RCON acceptance of a message still does not prove that a player read it.
+The short confirmation explicitly identifies the reporter's own report and the
+required `!yes` response. For a server-local pilot, `confirmation_seconds=120`
+gives the reporter two minutes without changing the warning, ballot duration,
+quorum, or manual takeover rules. Existing votes keep their snapshotted rules;
+change configuration only when no vote is open, because configuration changes
+cancel open procedures. Do not replay historical reports or fabricate ballots.
+
 ## Votes never start on busy servers
 
 Inspect leadership presence age/tenure and the routines log before changing any

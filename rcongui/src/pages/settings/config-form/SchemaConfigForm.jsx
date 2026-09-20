@@ -111,6 +111,16 @@ const localizeProperty = (name, propertySchema, t, i18n, translationRoot) => {
 
 const localizeSchema = (activeSchema, t, i18n, translationRoot) => ({
   ...activeSchema,
+  ...(activeSchema.$defs
+    ? {
+        $defs: Object.fromEntries(
+          Object.entries(activeSchema.$defs).map(([name, definition]) => [
+            name,
+            localizeProperty(name, definition, t, i18n, translationRoot),
+          ])
+        ),
+      }
+    : {}),
   properties: Object.fromEntries(
     Object.entries(activeSchema?.properties || {}).map(
       ([name, propertySchema]) => [
@@ -146,6 +156,24 @@ export default function SchemaConfigForm({
     () => localizeSchema(activeSchema, t, i18n, profile.translationRoot),
     [activeSchema, i18n, profile.translationRoot, t]
   );
+  // A newly generated UI schema reinitializes JsonForms while its debounced
+  // change event is still pending, potentially restoring an old selection.
+  const uiSchema = useMemo(() => {
+    const generated = Generate.uiSchema(localizedActiveSchema);
+    // Resolving a $ref discards the field-specific title (e.g. two
+    // language packs using one definition). Keep it on the UI control.
+    return {
+      ...generated,
+      elements: generated.elements.map((element) => {
+        const field = element.scope
+          ?.replace("#/properties/", "")
+          .replace(/~1/g, "/")
+          .replace(/~0/g, "~");
+        const title = localizedActiveSchema.properties[field]?.title;
+        return title ? { ...element, label: title } : element;
+      }),
+    };
+  }, [localizedActiveSchema]);
 
   if (!section) return null;
 
@@ -227,7 +255,7 @@ export default function SchemaConfigForm({
                 onChange?.(nextSectionData || {})
               }
               schema={localizedActiveSchema}
-              uischema={Generate.uiSchema(localizedActiveSchema)}
+              uischema={uiSchema}
               renderers={[...schemaFormCustomRenderers, ...materialRenderers]}
               cells={materialCells}
             />

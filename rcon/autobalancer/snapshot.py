@@ -1,12 +1,22 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import math
+import time
 from typing import Any
 
-from rcon.utils import MapsHistory, get_squad_leader_roles, get_team_labels
+from rcon.player_history import get_live_profiles
+from rcon.utils import (
+    MapsHistory,
+    get_squad_leader_roles,
+    get_team_labels,
+    get_role_unit_type,
+    parse_raw_player_info,
+)
 
 from .models import BalanceSnapshot, PlayerSnapshot
 from .store import AutobalancerStore
+from .seeding import read_seeding_active
 
 
 def _as_int(value: Any, default: int = 0) -> int:
@@ -40,18 +50,92 @@ def _current_round(map_name: str, now: datetime) -> tuple[str, int, bool]:
     return f"{int(started_at)}:{recorded_name}", elapsed, stable
 
 
+def _read_roster(rcon):
+    """Keep the entire bulk roster; profiles enrich it but never filter its IDs.
+
+    The UI team view intersects differently cached player-ID and bulk lists. A
+    normal join/leave could therefore silently drop players with fail_count=0.
+    Keep an independent, exact game-state count check and one bounded refresh.
+    """
+    for attempt in range(2):
+        if attempt:
+            for getter in (rcon.get_gamestate, rcon.get_raw_player_snapshot):
+                clear = getattr(getter, "clear_for", None)
+                if clear is not None:
+                    clear()
+        state = rcon.get_gamestate()
+        sample = rcon.get_raw_player_snapshot()
+        captured = sample.get("captured_at")
+        if not isinstance(captured, (int, float)) or not math.isfinite(captured):
+            raise ValueError("Invalid autobalancer roster timestamp")
+        if not 0 <= time.time() - captured <= 10:
+            raise ValueError("Stale autobalancer roster")
+        rows = sample.get("players")
+        if not isinstance(rows, list):
+            raise ValueError("Incomplete autobalancer roster")
+        players = [
+            parse_raw_player_info(
+                rcon.game_profile.player_adapter.adapt(row), rcon.game_profile.game
+            )
+            for row in rows
+        ]
+        ids = [p["player_id"] for p in players]
+        if not all(ids) or len(ids) != len(set(ids)):
+            raise ValueError("Invalid or duplicate autobalancer player identity")
+        if any(not p.get("role") for p in players):
+            raise ValueError("Unknown role in autobalancer roster")
+        counts = {
+            team: sum(p["team"] == team for p in players) for team in ("allies", "axis")
+        }
+        if counts["allies"] == state.get("num_allied_players") and counts[
+            "axis"
+        ] == state.get("num_axis_players"):
+            break
+    return state, players, captured
+
+
+def _team_view_from_roster(rcon, players, elapsed):
+    profiles = {
+        p["player_id"]: p for p in get_live_profiles([p["player_id"] for p in players])
+    }
+    teams = {t: {"count": 0, "squads": {}} for t in ("allies", "axis")}
+    for player in players:
+        if player["team"] not in teams:
+            continue
+        player["profile"] = profiles.get(player["player_id"]) or {}
+        playtime = _as_int(player["profile"].get("current_playtime_seconds"))
+        player["map_playtime_seconds"] = min(elapsed, playtime)
+        player["teamkills"] = player.get("team_kills", 0)
+        team = teams[player["team"]]
+        team["count"] += 1
+        unit_type = get_role_unit_type(rcon.game_profile.game, player["role"])
+        if unit_type == "commander":
+            # Multiple commanders are unsafe, never silently omit the extra row.
+            if team.get("commander"):
+                raise ValueError("Ambiguous commander in autobalancer roster")
+            team["commander"] = player
+            continue
+        squad = team["squads"].setdefault(
+            player["unit_name"], {"type": "infantry", "players": []}
+        )
+        if unit_type != "infantry":
+            squad["type"] = unit_type
+        squad["players"].append(player)
+    return teams
+
+
 def build_snapshot(
     rcon,
     store: AutobalancerStore,
     now: datetime | None = None,
 ) -> BalanceSnapshot:
     now = now or datetime.now(timezone.utc)
-    game_state = rcon.get_gamestate()
-    team_view = rcon.get_team_view(compact=True)
+    game_state, roster, captured = _read_roster(rcon)
     game = rcon.game_profile.game
     leader_roles = get_squad_leader_roles(game)
     map_name = _map_name(game_state)
     round_id, elapsed, stable_map = _current_round(map_name, now)
+    team_view = _team_view_from_roster(rcon, roster, elapsed)
     raw_players: list[tuple[str, dict[str, Any], str | None, dict[str, Any]]] = []
 
     for team in ("allies", "axis"):
@@ -137,11 +221,13 @@ def build_snapshot(
         game=game.value,
         fail_count=_as_int(team_view.get("fail_count")),
         counts_match=(
-            allies_view_count == allies_count
+            0 <= time.time() - captured <= 10
+            and allies_view_count == allies_count
             and axis_view_count == axis_count
             and len(players) == allies_count + axis_count
         ),
         stable_map=stable_map,
+        seeding_active=read_seeding_active(allies_count + axis_count),
         native_autobalance_enabled=native_enabled,
         native_autobalance_threshold=native_threshold,
         team_labels=get_team_labels(

@@ -91,7 +91,7 @@ def test_approval_permission_is_still_required(web):
 
 def test_api_cancel_disarms_immediately_worker_notifies_once(web):
     store, repository, call = web
-    store.save_state(invitation(data_pause_started_at=3000))
+    store.save_state(invitation(data_pause_started_at=3000, volunteers=["a0"]))
     store.arm_player("a0")
     result = call(
         "cancel_autobalancer_incident",
@@ -103,9 +103,9 @@ def test_api_cancel_disarms_immediately_worker_notifies_once(web):
     instance.store = store
     instance.repository = repository
     instance.tick(config(), make_snapshot(at(3006)), at(3006))
-    assert {player_id for player_id, _ in instance.rcon.messages} == {"a0", "a1"}
+    assert {player_id for player_id, _ in instance.rcon.messages} == {"a0"}
     assert all(
-        "Ein Admin" in message and "Internal admin" not in message
+        "Teamausgleich wurde abgebrochen" in message and "Internal admin" not in message
         for _, message in instance.rcon.messages
     )
     count = len(instance.rcon.messages)
