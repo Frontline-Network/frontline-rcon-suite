@@ -999,6 +999,14 @@ class Rcon(ServerCtl):
 
     def set_queue_length(self, value: int) -> bool:
         with invalidates_for(Rcon.get_queue_length):
+            # Read the game server, not the ten-minute UI cache. Reapplying an
+            # unchanged reservation/queue setting needlessly touches admission.
+            current = super().get_queue_length()
+            if type(current) is not int or current < 0:
+                raise HLLCommandFailedError("Invalid live queue capacity; not changing it")
+            if current == value:
+                logger.debug("Queue length already %s; skipping write", value)
+                return True
             return super().set_queue_length(value)
 
     @ttl_cache(ttl=60 * 10)
@@ -1007,6 +1015,12 @@ class Rcon(ServerCtl):
 
     def set_vip_slots_num(self, value: int) -> bool:
         with invalidates_for(Rcon.get_vip_slots_num):
+            current = super().get_vip_slots_num()
+            if type(current) is not int or current < 0:
+                raise HLLCommandFailedError("Invalid live VIP reservation; not changing it")
+            if current == value:
+                logger.debug("VIP slots already %s; skipping write", value)
+                return True
             return super().set_vip_slots_num(value)
 
     def get_welcome_message(self):
