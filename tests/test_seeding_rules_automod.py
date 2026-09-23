@@ -15,7 +15,7 @@ from rcon.automods.models import (
     WatchStatus,
 )
 from rcon.automods.seeding_rules import SeedingRulesAutomod, connection_key
-from rcon.maps import GameMode
+from rcon.maps import GameMode, parse_layer
 from rcon.types import GameStateType, StructuredLogLineWithMetaData
 from rcon.user_config.auto_mod_seeding import (
     AutoModSeedingUserConfig,
@@ -848,6 +848,67 @@ def test_position_detection_ignores_offense_increase_inside_boundary(team_view):
     assert PunitionsToApply() == mod.punitions_to_apply(
         team_view, "able", "allies", squad, game_state
     )
+
+
+@pytest.mark.parametrize(
+    "layer_id",
+    [
+        "CAR_L_1944_Conquest_Day",
+        "junobeach_conquest_day",
+        "OMA_L_1944_Conquest_Day",
+        "SMDM_L_1944_Conquest_Day",
+        "SME_L_1944_Conquest_Day",
+    ],
+)
+@pytest.mark.parametrize("team", ["allies", "axis"])
+@pytest.mark.parametrize("mode_as_string", [False, True])
+@pytest.mark.parametrize("position_available", [False, True])
+@pytest.mark.parametrize("stage", ["warning", "punish", "kick"])
+def test_conquest_never_enforces_geofence_or_offense_fallback(
+    team_view, layer_id, team, mode_as_string, position_available, stage
+):
+    squad = team_view[team]["squads"]["able"]
+    squad["players"] = [squad["players"][0]]
+    player = squad["players"][0]
+    mod = position_cap_fight_mod(team_view)
+    mod.config.number_of_warnings = 1 if stage == "warning" else 0
+    mod.config.number_of_punishments = 0 if stage == "kick" else 1
+    mod.config.kick_after_max_punish = True
+    # A Conquest round must not enter geometry/spawn detection at all.
+    mod._position_cap_violation = Mock(
+        side_effect=AssertionError("Conquest must not invoke position detection")
+    )
+    layer = parse_layer(layer_id)
+    assert layer.game_mode is GameMode.CONQUEST
+    snapshot = {
+        **game_state,
+        "current_map": layer.model_dump(),
+        "game_mode": layer.game_mode.value if mode_as_string else layer.game_mode,
+        "allied_score": 3,
+        "axis_score": 3,
+    }
+    # Simulate progress left over from Warfare when the next round starts.
+    previous = state.setdefault(team + "able", WatchStatus())
+    previous.offensive_points[player["name"]] = 0
+    previous.warned[player["name"]] = [datetime.now() - timedelta(minutes=5)]
+    previous.punished[player["name"]] = [datetime.now() - timedelta(minutes=5)]
+    previous.combat_area_outside_player_ids.add(player["player_id"])
+
+    for offset in (0, 10, 20):
+        player["world_position"] = (
+            {"x": 90_000 + offset, "y": 90_000 + offset, "z": 100}
+            if position_available else None
+        )
+        player["offense"] += 100  # Would trigger the Warfare fallback.
+        result = mod.punitions_to_apply(team_view, "able", team, squad, snapshot)
+        assert not result.warning and not result.punish and not result.kick
+        assert mod._is_seeding_rule_disabled("enforce_cap_fight")
+
+    mod._position_cap_violation.assert_not_called()
+    assert not previous.offensive_points
+    assert player["name"] not in previous.warned
+    assert player["name"] not in previous.punished
+    assert player["player_id"] not in previous.combat_area_outside_player_ids
 
 
 def test_position_detection_filters_random_initial_hq_sample(team_view):
