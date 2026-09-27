@@ -8,8 +8,10 @@ os.environ.setdefault("HLL_MAINTENANCE_CONTAINER", "1")
 os.environ.setdefault("SERVER_NUMBER", "1")
 
 from rcon.logs.loop import LogLoop
+from rcon.game.hll.profile import HLL_PROFILE
+from rcon.game.hllv.profile import HLLV_PROFILE
 from rcon.maps import GameMode
-
+from rcon.utils import guess_map_from_log
 
 OFFENSIVE_MAP = "carentan_offensive_us"
 
@@ -40,12 +42,13 @@ def make_gamestate(
     }
 
 
-def make_loop(gamestate):
+def make_loop(gamestate, profile=HLL_PROFILE):
     loop = object.__new__(LogLoop)
     loop.ACTIVE_MAP_INDEX = 0
     loop.CURR_MAP_END = 0
     loop.now = 1_002
     loop.rcon = Mock()
+    loop.rcon.game_profile = profile
     loop.rcon.get_gamestate.return_value = gamestate
     loop.get_detailed_players = Mock(return_value={"players": {}, "fail_count": 0})
     loop.record_player_stats = Mock()
@@ -62,9 +65,7 @@ def test_ended_match_is_not_mutated_by_next_match_score(maps_history_cls):
     elapsed = loop.update_maps_history(prev_map_time_elapsed=98)
 
     assert elapsed == 2
-    assert current_map["cap_flips"] == [
-        {"allied_score": 0, "axis_score": 5, "ts": 0}
-    ]
+    assert current_map["cap_flips"] == [{"allied_score": 0, "axis_score": 5, "ts": 0}]
     loop.get_detailed_players.assert_called_once()
     history.update.assert_called_once_with(0, current_map)
 
@@ -109,6 +110,8 @@ def test_offensive_match_time_normalizes_broken_server_default(maps_history_cls)
     (
         ("carentan_offensive_us", (0, 5), (1, 4)),
         ("carentan_offensive_ger", (5, 0), (4, 1)),
+        ("wdeva_offensiveus_day", (0, 5), (1, 4)),
+        ("wdeva_offensivenva_day", (5, 0), (4, 1)),
     ),
 )
 def test_offensive_initial_score_cannot_be_recorded_again(
@@ -117,7 +120,7 @@ def test_offensive_initial_score_cannot_be_recorded_again(
     current_map = make_map_info()
     current_map["name"] = map_name
     current_map["cap_flips"] = []
-    loop = object.__new__(LogLoop)
+    loop = make_loop({}, HLLV_PROFILE if map_name.startswith("wdeva") else HLL_PROFILE)
 
     gs = make_gamestate(
         map_id=map_name,
@@ -144,3 +147,26 @@ def test_offensive_initial_score_cannot_be_recorded_again(
             "ts": 300,
         },
     ]
+
+
+@pytest.mark.parametrize("attacker", ["US", "NVA"])
+@patch("rcon.logs.loop.MapsHistory")
+def test_hllv_offensive_log_identity_allows_live_stats(maps_history_cls, attacker):
+    layer = guess_map_from_log(
+        {"raw": f"MATCH START VẠN TƯỜNG {attacker} Offensive"}, HLLV_PROFILE.layers
+    )
+    current_map = make_map_info()
+    current_map["name"] = layer.id
+    history = maps_history_cls.return_value
+    history.get_current_map.return_value = current_map
+    loop = make_loop(
+        make_gamestate(map_id=f"wdeva_offensive{attacker.lower()}_day"), HLLV_PROFILE
+    )
+
+    assert loop.update_maps_history(prev_map_time_elapsed=1) == 2
+
+    loop.get_detailed_players.assert_called_once()
+    loop.record_player_stats.assert_called_once_with(
+        current_map, 2, {"players": {}, "fail_count": 0}
+    )
+    history.update.assert_called_once_with(0, current_map)

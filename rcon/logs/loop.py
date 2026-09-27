@@ -14,7 +14,7 @@ from hllrcon.data import HLLRole, HLLVRole
 from rcon.cache_utils import get_redis_client, ttl_cache
 from rcon.connection import HLLServerError
 from rcon.discord import make_hook
-from rcon.maps import GameMode, Team as MapTeam, get_theoretical_match_time, parse_layer
+from rcon.maps import GameMode, Team as MapTeam, get_theoretical_match_time
 from rcon.rcon import get_rcon
 from rcon.types import AllLogTypes, GameEnum, GameStateType, GetDetailedPlayers, MapInfo, MapScore, UnitHistoryEntry, StructuredLogLineWithMetaData, PlayerStat, WorldPositionType
 from rcon.user_config.log_line_webhooks import LogLineWebhookUserConfig
@@ -316,7 +316,7 @@ class LogLoop:
             )
             return 0
 
-        cached_game_mode = parse_layer(current_map["name"]).game_mode
+        cached_game_mode = self.rcon.game_profile.parse_layer(current_map["name"]).game_mode
         if cached_game_mode != gs["game_mode"]:
             logger.info(
                 "[MATCH IDLE] - Live and cached game modes differ, skipping stats "
@@ -381,7 +381,7 @@ class LogLoop:
 
     def record_cap_flips(self, current_map: MapInfo, sec_from_start: int, gs: GameStateType):
         cap_flips = current_map.setdefault("cap_flips", [])
-        layer = parse_layer(current_map["name"])
+        layer = self.rcon.game_profile.parse_layer(current_map["name"])
 
         if (
             layer.game_mode == GameMode.WARFARE

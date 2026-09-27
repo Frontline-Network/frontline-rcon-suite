@@ -213,7 +213,8 @@ def format_map_vote(format_type="line"):
     if not selection:
         return ""
 
-    selection = [maps.parse_layer(map) for map in selection]
+    # VoteMap already resolves layers with the server's game profile. Re-parsing
+    # these through the HLL-only catalogue loses HLLV names and attacking sides.
     # 0: map 1, 1: map 2, etc.
     vote_dict = numbered_maps(selection)
     # map 1: 0, map 2: 1, etc.

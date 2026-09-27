@@ -17,7 +17,7 @@ from rcon.cache_utils import get_redis_pool
 from rcon.game.registry import game_switch
 from rcon.models import GameLayout
 from rcon.types import GameEnum, GetDetailedPlayer, MapInfo, PlayerInfoType, PlayerStat, PlayerStatsType, StructuredLogLineWithMetaData
-from rcon.maps import Layer, parse_map_string, LAYERS, Environment, UNKNOWN_MAP_NAME
+from rcon.maps import Layer, parse_map_string, LAYERS, Environment, GameMode, UNKNOWN_MAP_NAME
 
 logger = logging.getLogger("rcon")
 
@@ -1081,13 +1081,21 @@ def guess_map_from_log(
     guessed_map: Layer
     try:
         name, env, game_mode = parse_map_string(log["raw"])
-        maps = [
-            layer
-            for layer in layers.values()
-            if layer.map.name.lower() == name.lower()
-            and layer.game_mode == game_mode
-        ]
-        # ignoring attackers for offensives
+        maps = []
+        for layer in layers.values():
+            if layer.game_mode != game_mode:
+                continue
+            names = {layer.map.name.casefold()}
+            if game_mode == GameMode.OFFENSIVE:
+                # HLLV logs include the attacking faction before "Offensive",
+                # e.g. "VẠN TƯỜNG US Offensive". Match against the catalogue
+                # instead of treating US/NVA as part of the map name or losing
+                # the attacking side. Legacy logs without a faction still work.
+                for faction in (layer.map.allies, layer.map.axis):
+                    if faction.team == layer.attackers:
+                        names.add(f"{layer.map.name} {faction.name}".casefold())
+            if name.casefold() in names:
+                maps.append(layer)
         env_to_maps = {l.environment: l for l in maps}
         if not env:
             # in most cases when env not provided the env is day
