@@ -167,7 +167,8 @@ def message(vote, purpose, value=None):
         )
         text = (
             f"FÜHRUNGSABSTIMMUNG\n{target}\n\n"
-            "Diesen Spieler wegen fehlender Kommunikation vom Server kicken?\n\n"
+            f"Meldung: {clean_text(p.get('reason'), 160)}\n"
+            "Diesen Spieler vom Server kicken?\n\n"
             "!yes = Für den Kick\n"
             "!no = Gegen den Kick\n\n"
             f"Du hast {p['rules']['duration_seconds']} Sekunden zum Antworten.\n"
@@ -186,7 +187,8 @@ def message(vote, purpose, value=None):
         )
         text = (
             f"LEADERSHIP VOTE\n{target}\n\n"
-            "Kick this player from the server for not communicating?\n\n"
+            f"Report: {clean_text(p.get('reason'), 160)}\n"
+            "Kick this player from the server?\n\n"
             "!yes = Vote to kick\n"
             "!no = Vote against kicking\n\n"
             f"You have {p['rules']['duration_seconds']} seconds to respond.\n"

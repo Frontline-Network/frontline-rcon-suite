@@ -209,10 +209,8 @@ def deliver(db, players, api=None):
 
 
 def confirm(db, players, incident, deliver_invitations=True):
+    """Compatibility helper: the report queues invitations without a reply."""
     vid = incident["leadership_vote"]["id"]
-    deliver(db, players)
-    db.clock.now += 1
-    assert storage.ballot(1, "v0", True, db.clock.now, players, "round-1")
     assert vote(db, vid)["status"] == "inviting"
     if deliver_invitations:
         deliver(db, players)
@@ -269,7 +267,7 @@ def test_unique_target_offered_regardless_of_reason(db, text):
     observe_for(db, players)
     result = report(players, text)
     assert result["leadership_vote"]["target_id"] == "target"
-    assert result["leadership_vote"]["phase"] == "confirming"
+    assert result["leadership_vote"]["phase"] == "inviting"
     assert result["status"] == "new"
 
 
@@ -318,38 +316,41 @@ def test_missing_or_ambiguous_target_and_misplaced_command_stay_ordinary(db, tex
 
 @pytest.mark.parametrize("commander", [False, True])
 @pytest.mark.parametrize("decline", [False, True])
-def test_target_only_report_requires_communication_confirmation(db, commander, decline):
+def test_target_only_report_invites_without_confirmation(db, commander, decline):
     players = roster(commander=commander)
     observe_for(db, players)
     text = "!admin commander" if commander else "!admin able"
     incident = report(players, text)
     vid = incident["leadership_vote"]["id"]
     api = deliver(db, players)
-    api.message_player.assert_called_once()
-    assert api.message_player.call_args.args[0] == "v0"
+    assert api.message_player.call_count == 12
+    assert {c.args[0] for c in api.message_player.call_args_list} == {
+        f"v{i}" for i in range(6)
+    }
     prompt = api.message_player.call_args.args[1]
-    assert "Redet nicht? / Not communicating?" in prompt
-    assert "Dein Report / Your report:" in prompt
-    assert "!yes = Kick-Abstimmung starten / Start server-kick vote" in prompt
+    assert "LEADERSHIP VOTE" in prompt
+    assert "Report:" in prompt
+    assert "!yes = Vote to kick" in prompt
     assert "Warnung" not in prompt and "Warning" not in prompt
-    assert "!no = Abbrechen / Cancel" in prompt
-    assert "kein automatischer Kick / no automatic kick" in prompt
+    assert "!no = Vote against kicking" in prompt
+    assert "DRY RUN" in prompt
     assert "Person-target" in prompt
-    assert vote(db, vid)["status"] == "confirming"
+    storage.advance(1, context(players))
+    assert vote(db, vid)["status"] == "active"
     assert vote(db, vid)["yes"] == 0
     if decline:
         assert cast(db, players, yes=False)
-    elapse(db, players, 61)
+    elapse(db, players, 120)
     assert storage.advance(1, context(players)) == []
     deliver(db, players, api)
-    assert vote(db, vid)["status"] == "cancelled"
+    assert vote(db, vid)["status"] == "rejected"
     with db() as sess:
         saved = sess.scalar(select(AdminIncident))
         assert saved.status == "new"
         assert saved.raw_message == text
         assert saved.reason == incident["reason"]
         assert all(
-            item.purpose not in {"target", "invite_de", "invite"}
+            item.purpose not in {"target", "confirm"}
             for item in sess.scalars(select(LeadershipMessage))
         )
     api.kick.assert_not_called()
@@ -425,7 +426,7 @@ def test_invitation_uses_approved_english_text(
     prefix = "DRY RUN — no automatic kick\n\n" if mode == "dry_run" else ""
     assert domain.message(pending, "invite") == (
         f"{prefix}LEADERSHIP VOTE\n{target}\n\n"
-        "Kick this player from the server for not communicating?\n\n"
+        "Report: \nKick this player from the server?\n\n"
         "!yes = Vote to kick\n"
         "!no = Vote against kicking\n\n"
         f"You have {duration} seconds to respond.\n"
@@ -528,17 +529,18 @@ def test_confirmation_not_ballot_reporter_no_is_ballot_and_cooldown_survives(db)
     assert not report(players)["leadership_vote"]
 
 
-def test_confirmation_timeout_or_decline_does_not_trigger_cooldown(db):
+def test_reporter_no_is_a_ballot_and_report_start_applies_cooldown(db):
     players = roster()
     observe_for(db, players)
     first = report(players)
     deliver(db, players)
     assert cast(db, players, yes=False)
-    assert report(players)["leadership_vote"]
-    elapse(db, players, 60)
+    assert not report(players)["leadership_vote"]
     storage.advance(1, context(players))
-    assert report(players)["leadership_vote"]
-    assert vote(db, first["leadership_vote"]["id"])["status"] == "cancelled"
+    elapse(db, players, 120)
+    storage.advance(1, context(players))
+    assert not report(players)["leadership_vote"]
+    assert vote(db, first["leadership_vote"]["id"])["status"] == "rejected"
 
 
 @pytest.mark.parametrize("n,required", [(3, 2), (4, 3), (6, 4), (8, 5)])
@@ -733,13 +735,13 @@ def test_delivery_failure_never_retries_or_discloses_to_enemy(db):
     api.message_player.return_value = None
     deliver(db, players, api)
     deliver(db, players, api)
-    assert api.message_player.call_count == 1
+    assert api.message_player.call_count == 12
     assert not cast(db, players)
     elapse(db, players, 60)
     storage.advance(1, context(players))
     next(p for p in players if p["player_id"] == "v0")["team"] = "axis"
     deliver(db, players, api)
-    assert api.message_player.call_count == 1
+    assert api.message_player.call_count == 12
 
 
 def test_command_conflicts_reject_activation(db):
@@ -777,7 +779,9 @@ def test_messages_are_named_and_explicitly_dry_in_each_language(db):
         )
         for m in items
     )
-    assert all("kein automatischer Kick" in m.body for m in items if m.purpose != "invite")
+    assert all(
+        "kein automatischer Kick" in m.body for m in items if m.purpose != "invite"
+    )
     invites = [m for m in items if m.purpose == "invite"]
     assert {m.player_id for m in invites} == {f"v{i}" for i in range(6)}
     assert all(
@@ -785,15 +789,19 @@ def test_messages_are_named_and_explicitly_dry_in_each_language(db):
     )
 
 
-def test_no_warning_before_initial_discord_delivery(db, monkeypatch):
+def test_no_invitations_before_initial_discord_delivery(db, monkeypatch):
     players = roster()
     observe_for(db, players)
     incident = report(players)
     vid = incident["leadership_vote"]["id"]
-    deliver(db, players)
     monkeypatch.setattr(storage, "report_delivered", lambda sess, v: False)
-    assert cast(db, players)
+    api = deliver(db, players)
+    api.message_player.assert_not_called()
+    assert not cast(db, players)
+    elapse(db, players, 120)
+    storage.advance(1, context(players))
     assert vote(db, vid)["status"] == "cancelled"
+    assert "Admin report not delivered" in vote(db, vid)["result"]
     with db() as sess:
         assert not sess.scalar(
             select(LeadershipMessage.id).where(LeadershipMessage.purpose == "target")
@@ -885,15 +893,19 @@ def test_ambiguous_commander_or_duplicate_leadership_seat(db):
     assert not report(players, "!admin commander redet nicht")["leadership_vote"]
 
 
-def test_ineligible_reporter_role_changed_during_confirmation(db):
+def test_reporter_role_change_invalidates_their_vote_without_lowering_threshold(db):
     players = roster()
     observe_for(db, players)
     incident = report(players)
     deliver(db, players)
     next(p for p in players if p["player_id"] == "v0")["unit_name"] = "New"
     storage.observe(1, context(players))
-    assert cast(db, players)
-    assert vote(db, incident["leadership_vote"]["id"])["status"] == "cancelled"
+    assert not cast(db, players)
+    storage.advance(1, context(players))
+    current = vote(db, incident["leadership_vote"]["id"])
+    assert current["status"] == "active"
+    assert current["required"] == 4
+    assert not current["electorate"]["v0"]["valid"]
 
 
 def test_ambiguous_target_after_confirmation_cancels(db):

@@ -96,15 +96,32 @@ def dispatch_one(api, server, context=None):
     """Durably mark every attempt before sending; ambiguous delivery is not retried."""
     with enter_session() as sess:
         storage.lock(sess, server)
-        item = sess.scalar(
+        pending = sess.scalars(
             select(LeadershipMessage)
             .where(
                 LeadershipMessage.server_number == server,
                 LeadershipMessage.status == "pending",
             )
             .order_by(LeadershipMessage.created_at, LeadershipMessage.id)
-            .limit(1)
         )
+        item = None
+        for candidate in pending:
+            vote = (
+                sess.get(LeadershipVote, candidate.vote_id)
+                if candidate.vote_id
+                else None
+            )
+            if (
+                vote
+                and candidate.purpose in INVITATIONS
+                and vote.status in {"inviting", "active"}
+                and time.time() < vote.payload["ends_at"]
+                and not storage.report_delivered(sess, vote)
+            ):
+                # No send attempt yet; do not block the other team's outbox.
+                continue
+            item = candidate
+            break
         if not item:
             return False
         item.status = "sending"

@@ -230,6 +230,7 @@ def summary(v):
                 "rules",
                 "started_at",
                 "confirmed_at",
+                "start_trigger",
                 "ends_at",
                 "required",
                 "yes",
@@ -404,11 +405,17 @@ def enqueue(sess, incident, context, now):
     )
     if not target:
         return
-    observations = presence(sess, server)
+    observations = {
+        pid: record
+        for pid, record in presence(sess, server).items()
+        if record.get("round_id") == context["round_id"]
+    }
     target_obs = observations.get(target["player_id"])
     if not target_obs or target_obs["identity"] != {
         k: target[k] for k in ("team", "role", "kind", "squad", "squad_id")
     }:
+        return
+    if not 0 <= now - target_obs.get("seen_at", 0) <= MAX_OBSERVATION_GAP:
         return
     roster = electorate(
         context["players"], target, observations, now, cfg.leadership_seconds
@@ -450,7 +457,7 @@ def enqueue(sess, incident, context, now):
         for v in recent
     ):
         return
-    # Link the canonical current target only for an eligible offer, after all
+    # Link the canonical current target only for an eligible vote, after all
     # gates. Preserve the original text and existing suggestions for admins.
     # This also keeps manual takeover/target-change guards and Discord actions
     # bound to the same player as the vote, including newly recognized aliases.
@@ -496,7 +503,7 @@ def enqueue(sess, incident, context, now):
         target_id=target["player_id"],
         reporter_id=incident.reporter_id,
         round_id=context["round_id"],
-        status="confirming",
+        status="inviting",
         slot=f"{server}:{target['team']}",
         created_at=now,
         payload={
@@ -511,8 +518,13 @@ def enqueue(sess, incident, context, now):
             "yes": 0,
             "no": 0,
             "ballots": {},
-            "electorate": {},
-            "ends_at": now + cfg.confirmation_seconds,
+            "electorate": roster,
+            # Historical cooldown marker retained for older clients. Starting
+            # from a report does not cast a ballot on behalf of its reporter.
+            "confirmed_at": now,
+            "started_at": now,
+            "start_trigger": "report",
+            "ends_at": now + cfg.duration_seconds,
             "participant_count": len(roster),
             "required": cfg.required(len(roster)),
         },
@@ -520,8 +532,9 @@ def enqueue(sess, incident, context, now):
     sess.add(v)
     sess.flush()
     incident.leadership_vote_id = v.id
-    notify(sess, server, v.reporter_id, message(v, "confirm"), now, v, "confirm")
-    publish(sess, v, "confirming")
+    for pid in roster:
+        notify(sess, server, pid, message(v, "invite_de"), now, v, "invite_de")
+    publish(sess, v, "inviting")
 
 
 def start(sess, v, players, now):
@@ -949,6 +962,17 @@ def advance(server, context=None, now=None):
                 )
                 continue
             if v.status == "inviting":
+                # Admins must receive the original report before invitations.
+                if not report_delivered(sess, v):
+                    if now >= p["ends_at"]:
+                        finish(
+                            sess,
+                            v,
+                            "cancelled",
+                            "Admin-Report nicht zugestellt / Admin report not delivered",
+                            now,
+                        )
+                    continue
                 pending = sess.scalar(
                     select(LeadershipMessage.id)
                     .where(

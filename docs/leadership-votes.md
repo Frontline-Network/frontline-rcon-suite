@@ -18,16 +18,14 @@ Aktivmodus und weitere Server benötigen eine separate Freigabe.
    `!admin commander`. Auch `kommandant` und `kommandeur` sind Ziele.
 2. Die normale Admin-Meldung wird sofort gespeichert und über die bestehenden
    Admin-Kanäle zugestellt. Ein eindeutig erkanntes Führungsziel kann zusätzlich
-   eine private Rückfrage mit Zielrolle, Squad und Spielernamen auslösen.
+   direkt eine Führungsabstimmung mit Zielrolle, Squad und Spielernamen auslösen.
    Der ausgeschriebene Grund ist dafür keine Voraussetzung.
-3. Der Melder bestätigt innerhalb der konfigurierten Frist (Standard **60 Sekunden**,
-   auf RCON3/4 **120 Sekunden**) mit `!yes`, dass es um
-   fehlende Kommunikation geht und er das Verfahren starten möchte.
-   Bei einem anderen Anliegen antwortet er mit `!no` zur normalen Admin-Bearbeitung.
-   `!no` oder Ablauf beendet das Angebot, nicht den Admin-Fall.
-   Bestätigung ist **keine Ja-Stimme**. Bevor die Abstimmung beginnt, muss die
-   ursprüngliche Meldung nachweislich beim Discord-Bot zugestellt worden sein.
-4. Direkt nach `!yes` werden die privaten Einladungen an die berechtigten
+3. **Keine zusätzliche Startbestätigung:** Der eindeutige Report einer berechtigten
+   Führungskraft friert den Teilnehmerkreis ein und reiht die Einladungen ein.
+   Der Report ist **keine Ja-Stimme**. Vor dem Versand muss die ursprüngliche
+   Meldung nachweislich beim Discord-Bot zugestellt worden sein. Fehlt diese
+   Zustellung bis zum Ablauf der Versandfrist, wird ohne Kick abgebrochen.
+4. Ohne weitere Antwort des Melders werden die privaten Einladungen an die berechtigten
    Führungskräfte eingereiht: Deutsch zuerst, danach Englisch als eigene Nachricht.
    Der Versand erfolgt im nächsten regulären Verarbeitungsschritt. Es gibt keine
    Warnung oder zusätzliche Wartefrist; das Ziel erhält keine privaten Hinweise
@@ -35,7 +33,7 @@ Aktivmodus und weitere Server benötigen eine separate Freigabe.
 5. Die berechtigten Führungskräfte stimmen ab:
    `!yes` / `!no`, **120 Sekunden**. Groß-/Kleinschreibung und äußere
    Leerzeichen sind erlaubt, zusätzliche Argumente nicht. Die letzte gültige
-   Antwort gilt. Keine vorzeitige Auswertung. Nach Bestätigung ist auch `!no`
+   Antwort gilt. Keine vorzeitige Auswertung. Auch `!no`
    des Melders eine Gegenstimme, kein Rückzug des gesamten Votes.
 6. Nach Ablauf wird nochmals geprüft. Im Probelauf bleibt es bei einem Ergebnis;
    im Aktivmodus kann eine erfolgreiche Abstimmung einen **Server-Kick, keinen
@@ -47,10 +45,11 @@ Einladung oder Ergebnisnachricht. Nicht zuordenbare Ziele,
 fehlende Berechtigungen oder unbekannter/globaler Chat bleiben normale
 Admin-Meldungen.
 
-Das alte Konfigurationsfeld `warning_seconds` wird für ältere Clients weiterhin
-akzeptiert, aber nicht mehr verwendet. Der reine Backend-Hotfix ändert bestehende
-Frontend-Dateien nicht; die Entfernung des Felds und aktualisierte Hilfetexte
-werden mit dem nächsten Frontend-Update sichtbar. Spielseitige Kick-Anzeigen
+Die alten Konfigurationsfelder `confirmation_seconds` und `warning_seconds`
+werden für ältere Clients weiterhin akzeptiert, aber für neue Verfahren nicht
+mehr verwendet. Der Backend-Hotfix ändert bestehende Frontend-Dateien nicht;
+alte Oberflächen können die Bestätigung deshalb noch beschreiben. Neue Verfahren
+beginnen direkt in `inviting`, nicht `confirming`. Spielseitige Kick-Anzeigen
 bleiben davon unberührt.
 
 ### Formulierung der Meldung
@@ -68,13 +67,10 @@ danach vorkommen. Ein fester Satzbau ist nicht erforderlich. Zum Beispiel:
 
 Es reicht ein eindeutig erkanntes Ziel im eigenen Team; der Grund darf fehlen
 oder frei formuliert sein. Die Automatik beurteilt den Grund nicht und benötigt
-keine KI. Ob es tatsächlich um fehlende Kommunikation geht, bestätigt der Melder
-erst in der privaten Rückfrage. Auch bei einem anders begründeten Report wird
-lediglich dieses Angebot gemacht, keine Behauptung über fehlende Kommunikation
-aufgestellt. Bei `!no` oder ohne Antwort bleibt ausschließlich die normale
-Admin-Bearbeitung. Die ursprüngliche Meldung bleibt unverändert erhalten.
-Die üblichen Berechtigungen und Schutzregeln gelten weiterhin; die Meldung allein
-startet noch keine Abstimmung.
+keine KI. Die Einladungen zeigen den gemeldeten Grund als Spielerangabe, ohne
+pauschal fehlende Kommunikation zu behaupten. Die ursprüngliche Meldung bleibt
+unverändert erhalten. Bei erfüllten Berechtigungs- und Schutzregeln startet die
+Meldung allein die Abstimmung, ohne eine Stimme automatisch abzugeben.
 
 ### Erweiterte Zielerkennung
 
@@ -105,12 +101,11 @@ ein bloß ähnlicher Spielername wird nicht automatisch zum Abstimmungsziel.
   Hinweise auf bereits ausgeschiedene Spieler führen zu keinem Angebot.
   Ein gemeldeter Amtsvorgänger wird nicht durch seinen Nachfolger ersetzt.
 
-Vor der Warnung nennt die private Rückfrage immer den tatsächlich erkannten
-Squad und Spielernamen beziehungsweise den Commander. Bei falscher Zuordnung
-antwortet der Melder mit `!no`. Erst sein `!yes` bestätigt Ziel und
-Kommunikationsanliegen. Worterkennung ist kein Beweis für die Bedeutung eines
-Satzes: Ein Wort wie „love“ kann auch beiläufig vorkommen. Die Rückfrage und alle
-Berechtigungsprüfungen bleiben deshalb notwendig.
+Jede Einladung nennt den tatsächlich erkannten Squad und Spielernamen bzw.
+Commander. Bei falschem Ziel können die Führungskräfte mit `!no` gegen den Kick
+stimmen; Admins können den Vorgang übernehmen/abbrechen. Worterkennung ist kein
+Beweis für die Bedeutung eines Satzes: Ein Wort wie „love“ kann auch beiläufig
+vorkommen. Deshalb bleiben Ziel-, Berechtigungs- und Mehrheitsprüfungen notwendig.
 
 Nur wenn sämtliche Angebotsvoraussetzungen erfüllt sind, wird der kanonische
 Zielspieler als primäres Ziel mit dem bestehenden Admin-Fall verknüpft. Text,
@@ -145,7 +140,7 @@ Beispiele aus den geprüften Meldungen:
 | `!admin sl B hat kein mic` | Baker über Squad-Buchstaben |
 | `!admin echosquad not communicating` | Easy trotz Zusammenschreibung |
 | `!admin Kommander spricht nicht` | Aktueller eigener Commander |
-| `!admin item` | Rückfrage auch ohne ausgeschriebenen Grund |
+| `!admin item` | Führungsabstimmung auch ohne ausgeschriebenen Grund |
 | `!admin how fox redet nicht` | Kein Angebot: zwei Squad-Ziele |
 | `!ADMIN BEIDE AUFKLÄRER sprechen nicht` | Normaler Admin-Fall: kein einzelnes Ziel |
 
@@ -178,7 +173,7 @@ umfasst die neuen Hinweise auf Deutsch/Englisch und auf Desktop/Mobilgeräten.
 - Mindestens **drei Stimmberechtigte**. Erforderlich sind
   `floor(ursprünglich Stimmberechtigte / 2) + 1` Ja-Stimmen.
   Bei drei also zwei, bei sechs vier. Enthaltung ist keine Zustimmung.
-- Der Teilnehmerkreis wird bei Bestätigung eingefroren. Neue Führungskräfte
+- Der Teilnehmerkreis wird beim Report-Start eingefroren. Neue Führungskräfte
   werden nicht nachträglich aufgenommen.
 - Rollen-, Squad-, Team- oder Sitzungswechsel entfernen die Berechtigung und
   bereits abgegebene Stimmen dauerhaft. Die Mehrheitsschwelle sinkt nicht.
@@ -221,9 +216,9 @@ konkurrierende Maßnahmen erhalten dann einen Konflikt bis zum Ergebnis.
 
 ## Sicherheit und Laufzeit
 
-- Ein offener Vorgang je Server und Team, einschließlich Bestätigung und Einladungsversand.
+- Ein offener Vorgang je Server und Team, einschließlich Einladungsversand.
   Kein globaler spielinterner Votekick, keine Warteschlange.
-- Nach Bestätigung durch den Melder gelten ab Abschluss mindestens **zehn Minuten
+- Nach dem Report-Start gelten ab Abschluss mindestens **zehn Minuten
   Team-Pause** und **30 Minuten Zielspieler-Schutz**. Admin-Reports bleiben möglich.
 - Abgeschaltete Funktion oder geänderte Regeln beenden offene Verfahren.
   Ein bereits begonnener Kick muss zuerst sein Ergebnis erhalten.

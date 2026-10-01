@@ -14,19 +14,19 @@ Delivery and its existing audit record remain unchanged. The public
 still invoke the moderation guard, regardless of actor names or message text.
 Punishments, kicks, bans and explicit Discord takeovers remain guarded.
 
-An expired confirmation is a separate result: the reporter must first send
-`!yes` in team/squad chat within the confirmation window. A sent message records
+Expired confirmations belong to the old workflow. Since the report-start hotfix,
+eligible reports queue invitations without a second response. A sent message records
 RCON acceptance, not proof that the player read it. Claiming the Discord report
 intentionally stops the vote, including during invitation delivery.
 
 ## Other leaders have not received invitations
 
-Distinguish a `confirming` request from an `active` vote. The first private
-message goes to the reporter, not to the named target. Only the reporter's
-`!yes` in team/squad chat immediately queues invitations to all eligible leaders
-in the frozen electorate. There is no target warning or extra waiting phase.
-Before confirmation, `!no` or an expired confirmation stops this before invitations.
-After confirmation, the reporter's `!no` counts as a negative ballot instead of
+New procedures start as `inviting`, never `confirming`. The report immediately
+queues invitations to all eligible leaders, including its reporter, and freezes
+the electorate. Dispatch waits for durable delivery of the original Discord
+report; a missing acknowledgement expires safely without a kick. It does not
+block invitations belonging to the other team. There is no target warning or
+additional player-confirmation phase. The reporter's `!no` is a negative ballot, not
 cancelling everyone's vote. Admin takeover still cancels an unexecuted vote.
 The target receives neither private warnings nor private results; legacy queued
 target notices are rejected at dispatch as well as at enqueue time.
@@ -44,13 +44,11 @@ full voting duration after the final successful invitation delivery. Failed or
 uncertain attempts are not retried, and both languages retain the same identity,
 team, phase and manual-takeover checks.
 
-Check the durable message purposes and recipients (`confirm`, `target`, `invite`)
+Check the durable message purposes and recipients (`invite_de`, `invite`)
 alongside the chat event timestamps, rather than assuming a report is an active
 vote. RCON acceptance of a message still does not prove that a player read it.
-The short confirmation explicitly identifies the reporter's own report and the
-required `!yes` response. For a server-local pilot, `confirmation_seconds=120`
-gives the reporter two minutes without changing the warning, ballot duration,
-quorum, or manual takeover rules. Existing votes keep their snapshotted rules;
+The legacy `confirmation_seconds` setting no longer gates new procedures.
+The report itself is not a YES vote. Existing votes keep their snapshotted rules;
 change configuration only when no vote is open, because configuration changes
 cancel open procedures. Do not replay historical reports or fabricate ballots.
 
