@@ -6,6 +6,7 @@ from sqlalchemy import engine_from_config, pool
 
 from rcon.models import *
 from rcon.live_map.models import TacticalBlock, TacticalReview, TacticalSettings
+from rcon.population_models import PopulationSample, SeedingSession
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

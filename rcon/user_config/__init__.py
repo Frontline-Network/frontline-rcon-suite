@@ -32,6 +32,7 @@ if not any(
         log_stream,
         leadership_vote,
         name_kicks,
+        population_history,
         rcon_connection_settings,
         rcon_server_settings,
         real_vip,

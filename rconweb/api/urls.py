@@ -15,6 +15,7 @@ from . import (
     legacy_stats,
     live_view,
     multi_servers,
+    population,
     scoreboards,
     services,
     setting_effects,
@@ -104,6 +105,9 @@ def get_api_documentation(request):
 
 # Each explicitly exposed API endpoint and auto-exposed Rcon endpoints
 endpoints: list[tuple[str, Callable]] = [
+    ("get_player_count_history", population.get_player_count_history),
+    ("get_seeding_sessions", population.get_seeding_sessions),
+    ("mark_seeding_session", population.mark_seeding_session),
     ("login", auth.do_login),
     ("logout", auth.do_logout),
     ("get_historical_logs_csv", history.get_historical_logs_csv),

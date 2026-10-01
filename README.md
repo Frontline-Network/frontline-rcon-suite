@@ -12,6 +12,9 @@ Das Projekt basiert auf dem ursprünglichen CRCON von Julien Marechal und behäl
 
 Die Plattform verbindet RCON, Spieler-/Rundeninformationen, Moderation und Verwaltungsoberflächen. Frontline betreibt damit mehrere CRCON-Instanzen beziehungsweise Serverprofile.
 
+Für externe Belegungs- und Seeding-Analysen gibt es eine geschützte
+[Spielerzahl-Historie mit API und Einrichtungsanleitung](docs/population-history-api.md).
+
 ## Moderation und Spielerakten
 
 Administratoren können Spielerinformationen, Livekontext, historische Daten, VIP-/Adminzustände und Moderationsaktionen über die CRCON-Funktionen verwalten.
