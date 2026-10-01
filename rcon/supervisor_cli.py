@@ -32,6 +32,13 @@ def run_stats_loop():
         sys.exit(1)
 
 
+@cli.command(name="population_history")
+def run_population_history():
+    from rcon.population import run
+
+    run()
+
+
 @cli.command(name="autobalancer")
 def run_autobalancer():
     from rcon.autobalancer import service

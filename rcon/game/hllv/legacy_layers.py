@@ -9,6 +9,7 @@ and extend it whenever the game changes an identifier.
 
 from __future__ import annotations
 
+import unicodedata
 from dataclasses import dataclass
 from functools import lru_cache
 from logging import getLogger
@@ -18,7 +19,7 @@ from rcon.maps import Environment, Faction, GameMode, Layer, Map, Orientation, T
 logger = getLogger(__name__)
 
 # Bump this whenever a new game build changes or removes an HLLV identifier.
-HLLV_LEGACY_CATALOG_VERSION = "2026.08.21.1"
+HLLV_LEGACY_CATALOG_VERSION = "2026.09.27.1"
 
 
 @dataclass(frozen=True)
@@ -97,7 +98,13 @@ def _human_map_aliases(definition: _MapDefinition) -> tuple[str, ...]:
         .replace("ò", "o")
         .replace(" ", "_")
     )
-    return (definition.layer_prefix, normalized)
+    # Keep the original aliases for compatibility, but also fully normalize
+    # Vietnamese diacritics. Partial replacements missed e.g. van_tuong and
+    # dak_to_airfield, so readable historical IDs resolved as unknown maps.
+    ascii_name = unicodedata.normalize("NFKD", definition.name.lower().replace("đ", "d"))
+    ascii_name = "".join(char for char in ascii_name if not unicodedata.combining(char))
+    ascii_name = ascii_name.replace(" ", "_")
+    return tuple(dict.fromkeys((definition.layer_prefix, normalized, ascii_name)))
 
 
 # Aliases cover IDs observed before the explicit ``_day`` suffix as well as

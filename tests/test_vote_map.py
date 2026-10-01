@@ -120,6 +120,40 @@ def test_votemap_selects_conquest_and_domination_options():
     assert set(selection) == {CAR_CONQUEST, CAR_DOMINATION}
 
 
+def test_votemap_selects_registered_hll_conquest_layers():
+    layer_ids = {
+        "car_l_1944_conquest_day",
+        "junobeach_conquest_day",
+        "oma_l_1944_conquest_day",
+        "smdm_l_1944_conquest_day",
+        "sme_l_1944_conquest_day",
+    }
+    layers = {HLL_PROFILE.layers[layer_id] for layer_id in layer_ids}
+    criteria = MapSelectionCriteria(
+        maps_history=[],
+        current_map=HUR_WARFARE_DAY,
+        allowed_maps=layers,
+        number_last_played_to_exclude=0,
+        num_warfare_options=0,
+        num_offensive_options=0,
+        num_conquest_options=5,
+        num_domination_options=0,
+        num_skirmish_control_options=0,
+        consider_offensive_same_map=False,
+        consider_skirmishes_as_same_map=False,
+        consider_environment_as_same_map=False,
+        allow_multiple_maps_with_same_environment=False,
+        allow_consecutive_offensives=True,
+        allow_consecutive_offensives_opposite_sides=True,
+        allow_consecutive_skirmishes=True,
+    )
+
+    selection = MapSelectionBuilder().build(criteria)
+
+    assert {layer.id for layer in selection} == layer_ids
+    assert {layer.id for layer in maps.numbered_maps(selection).values()} == layer_ids
+
+
 def test_votemap_sorting_preserves_conquest_and_domination():
     selection = maps.sort_maps_by_gamemode(
         [CAR_DOMINATION, CAR_CONQUEST, CAR_OFF_ALLIES, CAR_WARFARE_DAY]

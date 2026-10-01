@@ -390,6 +390,35 @@ def test_server_ctl_parses_game_state_with_selected_profile(
     assert game_state["game_mode"] is GameMode(game_mode.lower())
 
 
+@pytest.mark.parametrize(
+    "layer_id, map_id",
+    [
+        ("car_l_1944_conquest_day", "carentan"),
+        ("junobeach_conquest_day", "junobeach"),
+        ("oma_l_1944_conquest_day", "omahabeach"),
+        ("smdm_l_1944_conquest_day", "stmariedumont"),
+        ("sme_l_1944_conquest_day", "stmereeglise"),
+    ],
+)
+@pytest.mark.parametrize("raw_mode", ["Conquest", ""])
+def test_hll_gamestate_recognizes_conquest_layers(layer_id, map_id, raw_mode):
+    ctl = HLLServerCtl(ServerInfo(game=GameEnum.HLL_WW2), Mock())
+    ctl.exchange = Mock(
+        side_effect=[
+            _response(_session(layer_id, raw_mode)),
+            _response({"mAPS": [{"iD": layer_id}], "currentIndex": 0}),
+        ]
+    )
+
+    game_state = ctl.get_gamestate()
+
+    assert game_state["game_mode"] is GameMode.CONQUEST
+    for key in ("current_map", "next_map"):
+        assert game_state[key]["id"] == layer_id
+        assert game_state[key]["map"]["id"] == map_id
+        assert game_state[key]["game_mode"] is GameMode.CONQUEST
+
+
 def test_hllv_gamestate_uses_layer_mode_during_map_transition():
     ctl = HLLVServerCtl(ServerInfo(game=GameEnum.HLL_VIETNAM), Mock())
     ctl.exchange = Mock(

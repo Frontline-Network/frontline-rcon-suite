@@ -14,6 +14,7 @@ from rcon.seed_vip.models import (
     ServerPopulation,
     VipPlayer,
 )
+from rcon.seed_vip.notifications import NotificationOutbox
 from rcon.types import GameStateType, GetPlayersType, VipIdType
 from rcon.user_config.seed_vip import SeedVIPUserConfig
 from rcon.utils import INDEFINITE_VIP_DATE
@@ -172,29 +173,35 @@ def message_players(
     message: str,
     steam_ids: Iterable[str],
     expiration_timestamps: defaultdict[str, datetime] | None,
+    outbox: NotificationOutbox | None = None,
 ):
-    player_ids = list(steam_ids)
-    messages = [
-        format_player_message(
-            message=message,
-            vip_reward=config.reward.timeframe.as_timedelta,
-            vip_expiration=expiration_timestamps[player_id],
-            nice_time_delta=config.nice_time_delta,
-            nice_expiration_date=config.nice_expiration_date,
-        )
-        if expiration_timestamps
-        else message
-        for player_id in player_ids
-    ]
+    if not message.strip():
+        return
+    messages = {}
+    for player_id in set(steam_ids):
+        try:
+            messages[player_id] = (
+                format_player_message(
+                    message=message,
+                    vip_reward=config.reward.timeframe.as_timedelta,
+                    vip_expiration=expiration_timestamps[player_id],
+                    nice_time_delta=config.nice_time_delta,
+                    nice_expiration_date=config.nice_expiration_date,
+                )
+                if expiration_timestamps is not None
+                else message
+            )
+        except (KeyError, ValueError, IndexError, AttributeError, TypeError) as exc:
+            logger.error("Invalid Seed VIP message template (%s)", type(exc).__name__)
 
     if config.dry_run:
-        for player_id, formatted_message in zip(player_ids, messages):
+        for player_id, formatted_message in messages.items():
             logger.info(f"{config.dry_run=} messaging {player_id}: {formatted_message}")
     else:
-        rcon.bulk_message_players(
-            player_ids=player_ids,
-            messages=messages,
-        )
+        queue = outbox if outbox is not None else NotificationOutbox()
+        queue.enqueue(messages, rcon)
+        if outbox is None:
+            queue.flush(rcon)
 
 
 def reward_players(

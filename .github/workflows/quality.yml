@@ -159,7 +159,9 @@ jobs:
           export HLL_DB_URL=postgresql://${HLL_DB_USER}:${HLL_DB_PASSWORD}@${HLL_DB_HOST}:${HLL_DB_HOST_PORT}/${HLL_DB_NAME}
           export HLL_REDIS_URL=redis://${HLL_REDIS_HOST}:${HLL_REDIS_PORT}/${HLL_REDIS_DB}
           export LEADERSHIP_VOTE_TEST_DB_URL="$HLL_DB_URL"
+          export POPULATION_TEST_DB_URL="$HLL_DB_URL"
           PYTHONPATH=. pytest tests/
+          PYTHONPATH=. python -m django test api.test_population --settings=rconweb.rconweb.test_settings --verbosity=1
           PYTHONPATH=. python -m django test api.test_live_view --settings=rconweb.rconweb.test_settings --verbosity=1
           PYTHONPATH=. python -m django test api.test_leadership_vote --settings=rconweb.rconweb.test_settings --verbosity=1
           PYTHONPATH=. python ./rconweb/manage.py test api.test_eventador_control --settings=rconweb.eventador_test_settings --verbosity=1

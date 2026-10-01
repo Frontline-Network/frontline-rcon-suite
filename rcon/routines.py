@@ -4,6 +4,7 @@ import time
 
 from rcon.audit import ingame_mods, online_mods
 from rcon.perf_statistics import PerformanceStatistics
+from rcon.queue_watchdog import POLL_SECONDS, QueueWatchdog
 from rcon.rcon import HLLCommandFailedError, Rcon, get_rcon
 from rcon.user_config.auto_kick import AutoVoteKickUserConfig
 from rcon.vote_map import VoteMap
@@ -69,6 +70,8 @@ def run(stop_event: threading.Event | None = None):
     performance_interval = float(rcon.performance_stats_interval())
     next_performance_dump = time.monotonic() if performance_interval > 0 else None
     next_routines_run = time.monotonic()
+    queue_watchdog = QueueWatchdog()
+    next_queue_step = time.monotonic()
 
     from rcon.leadership_vote.service import Runtime
 
@@ -92,6 +95,14 @@ def run(stop_event: threading.Event | None = None):
                     logger.exception("Unable to dump RCON performance statistics")
                 next_performance_dump = _next_deadline(performance_interval)
 
+            if now >= next_queue_step:
+                try:
+                    queue_watchdog.step(rcon)
+                except Exception:
+                    queue_watchdog.detector.reset()
+                    logger.exception("Queue diagnostics must not stop other routines")
+                next_queue_step = _next_deadline(POLL_SECONDS)
+
             if now >= next_routines_run:
                 try:
                     toggle_votekick(rcon)
@@ -109,6 +120,7 @@ def run(stop_event: threading.Event | None = None):
                     next_leadership_step,
                     next_routines_run,
                     next_performance_dump,
+                    next_queue_step,
                 )
             )
     finally:

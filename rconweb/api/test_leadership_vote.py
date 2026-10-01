@@ -21,7 +21,7 @@ class LeadershipMigrationTests(TestCase):
     def test_single_head_and_safe_defaults(self):
         self.assertEqual(
             MigrationLoader(connection).graph.leaf_nodes("api"),
-            [("api", "0038_leadership_vote_permission")],
+            [("api", "0039_population_history_permissions")],
         )
         self.assertFalse(LeadershipVoteUserConfig().enabled)
         self.assertEqual(LeadershipVoteUserConfig().mode, "dry_run")

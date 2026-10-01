@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pytest
 
+from rcon.game.hll.profile import HLL_PROFILE
+from rcon.game.hllv.profile import HLLV_PROFILE
 from rcon.maps import (
     LAYERS,
     MAPS,
@@ -13,6 +15,7 @@ from rcon.maps import (
     GameMode,
     Layer,
     Team,
+    get_all_layers_by_map,
     get_opposite_side,
     get_theoretical_match_time,
     is_server_loading_map,
@@ -166,6 +169,48 @@ def test_numbered_maps(maps, expected):
 )
 def test_parse_layer(layer_name, expected):
     assert parse_layer(layer_name=layer_name) == expected
+
+
+@pytest.mark.parametrize(
+    "layer_id, map_id, warfare_id",
+    [
+        ("car_l_1944_conquest_day", "carentan", "carentan_warfare"),
+        ("junobeach_conquest_day", "junobeach", "junobeach_warfare_day"),
+        ("oma_l_1944_conquest_day", "omahabeach", "omahabeach_warfare"),
+        ("smdm_l_1944_conquest_day", "stmariedumont", "stmariedumont_warfare"),
+        ("sme_l_1944_conquest_day", "stmereeglise", "stmereeglise_warfare"),
+    ],
+)
+@pytest.mark.parametrize("uppercase", [False, True])
+def test_hll_conquest_layers_preserve_map_metadata_and_legacy_layers(
+    layer_id, map_id, warfare_id, uppercase, caplog
+):
+    incoming_id = layer_id.upper() if uppercase else layer_id
+    layer = HLL_PROFILE.parse_layer(incoming_id)
+
+    assert layer is LAYERS[layer_id]
+    assert layer.id == layer_id
+    # Compare all metadata, including orientation and factions, not just map ID.
+    assert layer.map.model_dump() == MAPS[map_id].model_dump()
+    assert layer.game_mode is GameMode.CONQUEST
+    assert layer.environment is Environment.DAY
+    assert layer.attackers is None
+    assert "Unknown layer" not in caplog.text
+    assert layer in get_all_layers_by_map(MAPS[map_id], GameMode.CONQUEST)
+    assert layer_id not in HLLV_PROFILE.layers
+
+    payload = layer.model_dump(mode="json")
+    assert payload["id"] == layer_id
+    assert payload["game_mode"] == "conquest"
+    assert payload["pretty_name"] == f"{MAPS[map_id].pretty_name} Conquest"
+    assert payload["image_name"] == f"{map_id}-day.webp"
+
+    legacy = parse_layer(warfare_id)
+    assert legacy.id == warfare_id
+    assert legacy.map.model_dump() == layer.map.model_dump()
+    assert legacy.game_mode is GameMode.WARFARE
+    assert legacy.image_name == layer.image_name
+
 
 @pytest.mark.parametrize(
     "layer_name, expected",

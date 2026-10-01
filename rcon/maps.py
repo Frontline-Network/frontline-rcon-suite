@@ -1614,6 +1614,38 @@ LAYERS = {
             environment=Environment.NIGHT,
             attackers=Team.AXIS,
         ),
+        # Keep the server's Conquest IDs while reusing canonical map metadata.
+        # In particular, SMDM does not match St. Marie Du Mont's legacy BRC tag.
+        Layer(
+            id="car_l_1944_conquest_day",
+            map=MAPS["carentan"],
+            game_mode=GameMode.CONQUEST,
+            environment=Environment.DAY,
+        ),
+        Layer(
+            id="junobeach_conquest_day",
+            map=MAPS["junobeach"],
+            game_mode=GameMode.CONQUEST,
+            environment=Environment.DAY,
+        ),
+        Layer(
+            id="oma_l_1944_conquest_day",
+            map=MAPS["omahabeach"],
+            game_mode=GameMode.CONQUEST,
+            environment=Environment.DAY,
+        ),
+        Layer(
+            id="smdm_l_1944_conquest_day",
+            map=MAPS["stmariedumont"],
+            game_mode=GameMode.CONQUEST,
+            environment=Environment.DAY,
+        ),
+        Layer(
+            id="sme_l_1944_conquest_day",
+            map=MAPS["stmereeglise"],
+            game_mode=GameMode.CONQUEST,
+            environment=Environment.DAY,
+        ),
     )
 }
 

@@ -123,6 +123,16 @@ class MobileDevice(models.Model):
         )
 
 
+class PopulationHistoryAccess(models.Model):
+    class Meta:
+        managed = False
+        default_permissions = ()
+        permissions = (
+            ("can_view_population_history", "Can read population history and seeding attempts"),
+            ("can_mark_seeding_sessions", "Can start and end manual seeding attempts"),
+        )
+
+
 class LeadershipVoteAccess(models.Model):
     class Meta:
         managed = False

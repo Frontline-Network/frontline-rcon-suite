@@ -8,6 +8,7 @@ import humanize
 
 import discord
 from rcon.api_commands import get_rcon_api
+from rcon.seed_vip.notifications import RETRY_SECONDS, NotificationOutbox
 from rcon.seed_vip.utils import (
     calc_vip_expiration_timestamp,
     collect_steam_ids,
@@ -50,6 +51,7 @@ def run():
     current_lang = config.language
 
     rcon_api = get_rcon_api()
+    outbox = NotificationOutbox()
 
     to_add_vip_steam_ids: set[str] = set()
     no_reward_steam_ids: set[str] = set()
@@ -71,8 +73,15 @@ def run():
             config = SeedVIPUserConfig.load_from_db()
 
             if not config.enabled:
+                outbox.clear()
                 logger.info("Seed VIP is not enabled")
                 break
+
+            if config.dry_run:
+                outbox.clear()
+                pending_notices = False
+            else:
+                pending_notices = outbox.flush(rcon_api)
 
             try:
                 if current_lang != config.language:
@@ -159,6 +168,9 @@ def run():
                     expiration_timestamps=expiration_timestamps,
                 )
 
+                # Rewards are complete; notification retries never grant VIP.
+                is_seeding = False
+
                 # Message those who earned VIP
                 message_players(
                     rcon=rcon_api,
@@ -166,6 +178,7 @@ def run():
                     message=config.player_messages.reward_player_message,
                     steam_ids=to_add_vip_steam_ids,
                     expiration_timestamps=expiration_timestamps,
+                    outbox=outbox,
                 )
 
                 # Message those who did not earn
@@ -175,7 +188,10 @@ def run():
                     message=config.player_messages.reward_player_message_no_vip,
                     steam_ids=no_reward_steam_ids,
                     expiration_timestamps=None,
+                    outbox=outbox,
                 )
+                if not config.dry_run:
+                    pending_notices = outbox.flush(rcon_api)
 
                 # Post seeding complete Discord message
                 if config.hooks:
@@ -271,6 +287,8 @@ def run():
             else:
                 sleep_time = config.poll_time_seeded
 
+            if pending_notices:
+                sleep_time = min(sleep_time, RETRY_SECONDS)
             logger.info(f"sleeping {sleep_time=}")
             sleep(sleep_time)
     except* Exception as eg:

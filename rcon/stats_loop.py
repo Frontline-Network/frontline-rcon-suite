@@ -231,16 +231,11 @@ class PlayerCount(Series):
 
 
 def run():
-    rcon = get_rcon()
-    red = get_redis_client()
-    registered_series = [PlayerCount(red)]
-    for series in registered_series:
-        series.migrate()
+    # Keep the legacy Series/PlayerCount readers intact, including existing
+    # RedisTimeSeries data, but use durable PostgreSQL collection going forward.
+    from rcon.population import run as record_population
 
-    while True:
-        for series in registered_series:
-            series.run_on_time(rcon)
-        time.sleep(LOOP_FREQUENCY_SEC)
+    record_population()
 
 
 if __name__ == "__main__":
