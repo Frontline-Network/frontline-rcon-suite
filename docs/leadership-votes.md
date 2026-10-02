@@ -13,15 +13,16 @@ Aktivmodus und weitere Server benötigen eine separate Freigabe.
 
 ## Spielerablauf
 
-1. Eine berechtigte Führungskraft meldet im **Team- oder Squadchat**:
+1. Ein Squadmitglied oder der Commander meldet im **Team- oder Squadchat**
+   eine Führungskraft des eigenen Teams:
    `!admin able`, `!admin bitte mal prüfen able redet nicht` oder
    `!admin commander`. Auch `kommandant` und `kommandeur` sind Ziele.
 2. Die normale Admin-Meldung wird sofort gespeichert und über die bestehenden
    Admin-Kanäle zugestellt. Ein eindeutig erkanntes Führungsziel kann zusätzlich
    direkt eine Führungsabstimmung mit Zielrolle, Squad und Spielernamen auslösen.
    Der ausgeschriebene Grund ist dafür keine Voraussetzung.
-3. **Keine zusätzliche Startbestätigung:** Der eindeutige Report einer berechtigten
-   Führungskraft friert den Teilnehmerkreis ein und reiht die Einladungen ein.
+3. **Keine zusätzliche Startbestätigung:** Der eindeutige Report eines berechtigten
+   Melders friert den Teilnehmerkreis ein und reiht die Einladungen ein.
    Der Report ist **keine Ja-Stimme**. Vor dem Versand muss die ursprüngliche
    Meldung nachweislich beim Discord-Bot zugestellt worden sein. Fehlt diese
    Zustellung bis zum Ablauf der Versandfrist, wird ohne Kick abgebrochen.
@@ -33,8 +34,10 @@ Aktivmodus und weitere Server benötigen eine separate Freigabe.
 5. Die berechtigten Führungskräfte stimmen ab:
    `!yes` / `!no`, **120 Sekunden**. Groß-/Kleinschreibung und äußere
    Leerzeichen sind erlaubt, zusätzliche Argumente nicht. Die letzte gültige
-   Antwort gilt. Keine vorzeitige Auswertung. Auch `!no`
-   des Melders eine Gegenstimme, kein Rückzug des gesamten Votes.
+   Antwort gilt. Keine vorzeitige Auswertung. Ist der Melder selbst eine
+   stimmberechtigte Führungskraft, zählt auch sein `!no` als Gegenstimme, nicht
+   als Rückzug des gesamten Votes. Normale Squadmitglieder können weder
+   abstimmen noch den Vote mit `!no` abbrechen.
 6. Nach Ablauf wird nochmals geprüft. Im Probelauf bleibt es bei einem Ergebnis;
    im Aktivmodus kann eine erfolgreiche Abstimmung einen **Server-Kick, keinen
    Bann**, auslösen. Nur ein eindeutig bestätigter echter Kick schließt den
@@ -47,10 +50,10 @@ Admin-Meldungen.
 
 Die alten Konfigurationsfelder `confirmation_seconds` und `warning_seconds`
 werden für ältere Clients weiterhin akzeptiert, aber für neue Verfahren nicht
-mehr verwendet. Der Backend-Hotfix ändert bestehende Frontend-Dateien nicht;
-alte Oberflächen können die Bestätigung deshalb noch beschreiben. Neue Verfahren
-beginnen direkt in `inviting`, nicht `confirming`. Spielseitige Kick-Anzeigen
-bleiben davon unberührt.
+mehr verwendet. Die aktuelle Oberfläche zeigt keine Bestätigungsfrist mehr;
+ältere, noch nicht aktualisierte Oberflächen können die Bestätigung weiterhin
+beschreiben. Neue Verfahren beginnen direkt in `inviting`, nicht `confirming`.
+Spielseitige Kick-Anzeigen bleiben davon unberührt.
 
 ### Formulierung der Meldung
 
@@ -161,15 +164,24 @@ Prüfstand dieser Erweiterung: 477 ausgewählte Backend-/Regressionstests und
 vier Browser-Tests bestanden; keine Produktionsaktionen. Die Browser-Prüfung
 umfasst die neuen Hinweise auf Deutsch/Englisch und auf Desktop/Mobilgeräten.
 
-## Wer darf teilnehmen?
+## Wer darf melden, wer darf abstimmen?
 
-- Ausschließlich Commander und Squadleader des betroffenen Teams.
-- Dieselbe Führungsposition muss **mindestens fünf Minuten** durchgehend
-  beobachtet worden sein. Ohne Verlauf beginnt die Beobachtung bei null.
-- Gegen einen Squadleader sind **er und sein gesamter Squad ausgeschlossen**.
+- **Melden:** Alle aktuell verbundenen Squadmitglieder und der Commander des
+  betroffenen Teams. Auch Mitglieder des gemeldeten Squads dürfen ihren eigenen
+  Squadleader melden. Selbstmeldungen und Meldungen gegen die Gegenseite starten
+  keinen Vote. Spieler ohne Squad dürfen nur als Commander einen Vote starten.
+- Zum Melden ist keine Führungsrolle oder fünfminütige Führungsdauer nötig.
+  Ein frisch ernannter Squadleader oder Commander kann daher ebenfalls melden.
+- **Abstimmen:** Ausschließlich berechtigte Commander und Squadleader des
+  betroffenen Teams. Dieselbe Führungsposition muss **mindestens fünf Minuten**
+  durchgehend beobachtet worden sein. Ohne Verlauf beginnt die Beobachtung bei null.
+- Gegen einen Squadleader sind **er und sein gesamter Squad vom Abstimmen ausgeschlossen**.
   Andere Squadleader und der Commander haben je eine Stimme.
-- Gegen einen Commander dürfen nur die anderen berechtigten Squadleader starten
-  und abstimmen. Der Commander selbst ist ausgeschlossen.
+- Gegen einen Commander dürfen nur die berechtigten Squadleader abstimmen.
+  Der betroffene Commander selbst ist ausgeschlossen.
+- Normale Squadmitglieder erhalten keine Stimme und zählen nicht zur Mindestzahl.
+  Ein als Führungskraft stimmberechtigter Melder behält seine Stimme. Der Report
+  selbst zählt niemals als Zustimmung; auch der Melder muss separat abstimmen.
 - Mindestens **drei Stimmberechtigte**. Erforderlich sind
   `floor(ursprünglich Stimmberechtigte / 2) + 1` Ja-Stimmen.
   Bei drei also zwei, bei sechs vier. Enthaltung ist keine Zustimmung.

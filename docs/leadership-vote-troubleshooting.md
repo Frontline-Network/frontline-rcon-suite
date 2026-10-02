@@ -22,12 +22,13 @@ intentionally stops the vote, including during invitation delivery.
 ## Other leaders have not received invitations
 
 New procedures start as `inviting`, never `confirming`. The report immediately
-queues invitations to all eligible leaders, including its reporter, and freezes
-the electorate. Dispatch waits for durable delivery of the original Discord
+queues invitations to all eligible leaders, including its reporter if eligible,
+and freezes the electorate. Dispatch waits for durable delivery of the original Discord
 report; a missing acknowledgement expires safely without a kick. It does not
 block invitations belonging to the other team. There is no target warning or
-additional player-confirmation phase. The reporter's `!no` is a negative ballot, not
-cancelling everyone's vote. Admin takeover still cancels an unexecuted vote.
+additional player-confirmation phase. An eligible reporting leader's `!no` is a
+negative ballot, not cancelling everyone's vote. An ordinary member's reply is
+not a ballot or a veto. Admin takeover still cancels an unexecuted vote.
 The target receives neither private warnings nor private results; legacy queued
 target notices are rejected at dispatch as well as at enqueue time.
 The target and the opposing team never receive ballot invitations.
@@ -51,6 +52,26 @@ The legacy `confirmation_seconds` setting no longer gates new procedures.
 The report itself is not a YES vote. Existing votes keep their snapshotted rules;
 change configuration only when no vote is open, because configuration changes
 cancel open procedures. Do not replay historical reports or fabricate ballots.
+
+## A squad member's report does not start a vote
+
+Reporting and voting have separate eligibility checks. Any currently connected
+squad member in the target's team may report, including someone from the target's
+own squad. A commander may also report without a squad. Self-reports, missing or
+ambiguous live identities, and unassigned non-commanders cannot start a vote.
+These reports still go through the normal admin workflow.
+
+The five-minute leadership tenure applies to voters, not reporters. Ordinary
+members and recently appointed leaders do not count toward the minimum of three
+eligible voters. An eligible reporting leader retains their ballot. The reported
+leader and, for squad-leader targets, their squad remain excluded from voting.
+The report itself never supplies a YES ballot.
+
+Check the electorate at the report's timestamp: a later promotion does not admit
+the reporter to an existing vote, and a report that failed the minimum electorate
+does not automatically start later. After a round change or restart, the voters
+still need five minutes of fresh observation. Team locks, cooldowns, Discord
+delivery, private-chat and freshness checks still apply to every reporter.
 
 ## Votes never start on busy servers
 

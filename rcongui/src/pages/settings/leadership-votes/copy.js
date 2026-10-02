@@ -18,17 +18,20 @@ export const copy = {
     permission:
       "Für diese Einstellungen fehlt dir das Recht für Führungsabstimmungen.",
     kickPermission: "Zum Aktivieren wird zusätzlich das Kick-Recht benötigt.",
-    confirmation_seconds: "Bestätigung durch Melder (Sekunden)",
     duration_seconds: "Abstimmungsdauer (Sekunden)",
     minimum_participants: "Mindestanzahl Stimmberechtigter",
-    leadership_seconds: "Mindestdauer in Führungsrolle (Sekunden)",
+    leadership_seconds: "Führungsdauer für das Stimmrecht (Sekunden)",
     team_gap_seconds: "Team-Pause nach Abschluss (Sekunden)",
     target_cooldown_seconds: "Schutz für denselben Zielspieler (Sekunden)",
-    flow: "!admin able oder !admin commander reicht: !admin zuerst, Squadname oder Commander an beliebiger Stelle danach. Der Grund ist frei formulierbar und darf fehlen. Die berechtigte Führungskraft bestätigt in der privaten Rückfrage mit !yes, dass es um fehlende Kommunikation geht. Bei anderem Grund: !no; der Admin-Report bleibt offen. Nach !yes werden die übrigen berechtigten Führungskräfte sofort privat zur Abstimmung eingeladen, erst auf Deutsch, dann auf Englisch. Sie stimmen mit !yes / !no im Team- oder Squadchat ab. Das Ziel erhält keine privaten Hinweise oder Ergebnisse. Es gibt keine Warn- oder Wartephase. Das Ziel und dessen Squad sind ausgeschlossen. Ein Commander hat keine Sonderstimme.",
+    flow: "!admin able oder !admin commander reicht: !admin zuerst, Squadname oder Commander an beliebiger Stelle danach. Der Grund ist frei formulierbar und darf fehlen. Bei erfüllten Voraussetzungen startet die Abstimmung direkt mit dem Report, ohne zusätzliche Bestätigung. Die Stimmberechtigten werden privat eingeladen, erst auf Deutsch, dann auf Englisch. Antworten: !yes / !no. Meldung und Antworten sind nur im Team- oder Squadchat zulässig. Das Ziel erhält keine privaten Hinweise oder Ergebnisse.",
+    reporters:
+      "Melden dürfen alle Squadmitglieder und der Commander desselben Teams, auch gegen den eigenen Squadleader. Selbstmeldungen sind ausgeschlossen. Zum Melden ist keine fünfminütige Führungsdauer nötig.",
+    voters:
+      "Abstimmen dürfen nur berechtigte Squadleader und Commander mit mindestens fünf Minuten durchgehender Führungsdauer. Normale Squadmitglieder haben keine Stimme und zählen nicht zur Mindestanzahl. Ein berechtigter Melder darf weiterhin mitstimmen; der Report selbst zählt nicht als Stimme. Das Ziel und bei Squadleadern dessen Squad sind von der Abstimmung ausgeschlossen. Ein Commander hat keine Sonderstimme.",
     references:
-      "Auch NATO-Namen wie Bravo (Baker), Echo (Easy) und Kilo (King), Angaben wie SL B sowie bekannte Schreibfehler wie Eays werden erkannt. Squad und Spielername dürfen gemeinsam genannt werden, wenn sie denselben Squadleader meinen. Prüfe in der privaten Rückfrage den genannten Squad und Spielernamen. Falsches Ziel: !no. Mehrdeutige Meldungen bleiben normale Admin-Fälle.",
+      "Auch NATO-Namen wie Bravo (Baker), Echo (Easy) und Kilo (King), Angaben wie SL B sowie bekannte Schreibfehler wie Eays werden erkannt. Squad und Spielername dürfen gemeinsam genannt werden, wenn sie denselben Squadleader meinen. Stimmberechtigte prüfen das Ziel in der Einladung und können mit !no dagegen stimmen. Admins können den Vote abbrechen. Mehrdeutige Meldungen bleiben normale Admin-Fälle.",
     frozen:
-      "Der Teilnehmerkreis wird bei Bestätigung festgehalten. Rollenwechsel entfernen Stimmen, senken aber nicht die Mehrheit. Änderungen an diesen Einstellungen beenden offene Verfahren. Ein bereits gesendeter Kick kann nicht zurückgenommen werden.",
+      "Der Teilnehmerkreis wird beim Report-Start festgehalten. Rollenwechsel entfernen Stimmen, senken aber nicht die Mehrheit. Änderungen an diesen Einstellungen beenden offene Verfahren. Ein bereits gesendeter Kick kann nicht zurückgenommen werden.",
     quorum:
       "Mehr als die Hälfte aller ursprünglich Stimmberechtigten muss zustimmen: bei 3 sind 2 Ja-Stimmen nötig, bei 6 sind es 4. Enthaltungen sind keine Zustimmung. Auswertung erst am Ende der vollständigen Abstimmungszeit.",
     statusTitle: "Abstimmungen und Ergebnisse",
@@ -77,17 +80,20 @@ export const copy = {
     permission:
       "You need leadership-vote management permission to view these settings.",
     kickPermission: "Enabling also requires kick permission.",
-    confirmation_seconds: "Reporter confirmation (seconds)",
     duration_seconds: "Voting period (seconds)",
     minimum_participants: "Minimum eligible voters",
-    leadership_seconds: "Minimum continuous leadership (seconds)",
+    leadership_seconds: "Leadership tenure required to vote (seconds)",
     team_gap_seconds: "Team cooldown after completion (seconds)",
     target_cooldown_seconds: "Same-player protection (seconds)",
-    flow: "!admin able or !admin commander is enough: !admin first, squad name or commander anywhere afterwards. The reason can be freely worded or omitted. The eligible leader privately confirms with !yes that this is about missing communication. For another reason: !no; the admin report stays open. After !yes, the other eligible leaders are immediately invited privately, first in German, then in English. They vote with !yes / !no in team or squad chat. The target receives no private notices or results. There is no warning or waiting phase. The target and their squad are excluded. Commanders have no extra voting powers.",
+    flow: "!admin able or !admin commander is enough: !admin first, squad name or commander anywhere afterwards. The reason can be freely worded or omitted. If the requirements are met, the report starts the vote directly, without extra confirmation. Eligible voters receive private invitations, first in German, then in English. Reply with !yes / !no. Reports and replies are accepted only in team or squad chat. The target receives no private notices or results.",
+    reporters:
+      "All squad members and the commander of the same team may report, including a member reporting their own squad leader. Self-reports are excluded. Reporting does not require five minutes of leadership tenure.",
+    voters:
+      "Only eligible squad leaders and commanders with at least five minutes of continuous leadership may vote. Ordinary squad members have no ballot and do not count toward the minimum electorate. An eligible reporting leader keeps their vote; the report itself is not a ballot. The target and, for squad-leader votes, their squad are excluded from voting. Commanders have no extra voting powers.",
     references:
-      "NATO names such as Bravo (Baker), Echo (Easy) and Kilo (King), references such as SL B, and reviewed typos such as Eays are also recognized. Squad and player name may be combined when they identify the same squad leader. Check the squad and player name in the private confirmation. Wrong target: !no. Ambiguous reports remain normal admin cases.",
+      "NATO names such as Bravo (Baker), Echo (Easy) and Kilo (King), references such as SL B, and reviewed typos such as Eays are also recognized. Squad and player name may be combined when they identify the same squad leader. Eligible voters check the target in the invitation and can vote against kicking with !no. Admins can cancel the vote. Ambiguous reports remain normal admin cases.",
     frozen:
-      "The electorate is frozen at confirmation. Role changes invalidate votes but never lower the threshold. Changing these settings cancels open proceedings. A kick already sent cannot be undone.",
+      "The electorate is frozen when the report starts the vote. Role changes invalidate votes but never lower the threshold. Changing these settings cancels open proceedings. A kick already sent cannot be undone.",
     quorum:
       "More than half of the original electorate must approve: 2 yes votes out of 3, or 4 out of 6. Abstentions are not approval. Evaluation only after the full voting period.",
     statusTitle: "Votes and results",

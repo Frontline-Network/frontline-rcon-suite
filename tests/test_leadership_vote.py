@@ -483,10 +483,9 @@ def test_no_history_no_offer_and_gap_resets_tenure(db):
     assert not report(players)["leadership_vote"]
 
 
-@pytest.mark.parametrize("reporter", ["target", "member"])
-def test_target_and_target_squad_cannot_start(db, reporter):
+def test_target_cannot_start_against_self(db):
     observe_for(db, roster())
-    assert not report(reporter=reporter)["leadership_vote"]
+    assert not report(reporter="target")["leadership_vote"]
 
 
 def test_commander_may_start_against_squadleader_but_not_self(db):

@@ -185,13 +185,14 @@ def test_new_alias_offer_keeps_admin_and_identity_guards(db, change):
     assert vote(db, vid)["status"] == "cancelled"
 
 
-@pytest.mark.parametrize("gate", ["disabled", "nonleader", "no_history", "global"])
+@pytest.mark.parametrize("gate", ["disabled", "unassigned", "no_history", "global"])
 def test_ordinary_reports_not_rewritten_when_alias_offer_ineligible(db, gate):
     players = roster()
     if gate == "disabled":
         storage.configure(1, Config(), "admin")
-    if gate == "nonleader":
+    if gate == "unassigned":
         players[2]["role"] = "Rifleman"
+        players[2]["unit_name"] = "unassigned"
     if gate != "no_history":
         observe_for(db, players)
     text = "!admin alpha"
@@ -213,21 +214,26 @@ def test_ordinary_reports_not_rewritten_when_alias_offer_ineligible(db, gate):
 
 
 @pytest.mark.parametrize("unavailable", [False, True])
+@pytest.mark.parametrize("reporter", ["v0", "member"])
 @pytest.mark.parametrize(
-    "text,commander",
+    "text,commander,squad",
     [
-        ("!admin able redet nicht", False),
-        ("!admin bitte mal prüfen able redet nicht", False),
-        ("!admin der commander redet nicht", True),
-        ("!admin able", False),
-        ("!admin bitte mal prüfen able", False),
-        ("!admin commander", True),
+        ("!admin able redet nicht", False, "Able"),
+        ("!admin bitte mal prüfen able redet nicht", False, "Able"),
+        ("!admin der commander redet nicht", True, ""),
+        ("!admin able", False, "Able"),
+        ("!admin bitte mal prüfen able", False, "Able"),
+        ("!admin commander", True, ""),
+        ("!Admin Able squad keine Komms", False, "Able"),
+        ("!admin squad lead how  redet nicht", False, "How"),
     ],
 )
 def test_report_survives_discord_outage_and_disabled_optional_context(
-    db, monkeypatch, unavailable, text, commander
+    db, monkeypatch, unavailable, text, commander, squad, reporter
 ):
     players = roster(commander=commander)
+    players[0]["unit_name"] = squad
+    players[1]["unit_name"] = squad or "Able"
     observe_for(db, players)
     monkeypatch.setattr(incident_settings, "incident_capture_enabled", lambda: True)
     monkeypatch.setattr(incident_settings, "incident_context_mode", lambda: "disabled")
@@ -250,8 +256,8 @@ def test_report_survives_discord_outage_and_disabled_optional_context(
         monkeypatch.setattr(service, "read_context", lambda _: context(players))
     log = dict(
         action="CHAT[Allies][Team]",
-        player_id_1="v0",
-        player_name_1="Person-v0",
+        player_id_1=reporter,
+        player_name_1="Person-" + reporter,
         sub_content=text,
         timestamp_ms=NOW * 1000,
     )

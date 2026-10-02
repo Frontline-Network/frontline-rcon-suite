@@ -31,6 +31,7 @@ from .domain import (
     MAX_OBSERVATION_GAP,
     electorate,
     identity,
+    may_report,
     message,
     report_command,
     squad_target,
@@ -403,7 +404,7 @@ def enqueue(sess, incident, context, now):
         context["players"],
         incident.raw_message,
     )
-    if not target:
+    if not target or not may_report(context["players"], incident.reporter_id, target):
         return
     observations = {
         pid: record
@@ -420,7 +421,7 @@ def enqueue(sess, incident, context, now):
     roster = electorate(
         context["players"], target, observations, now, cfg.leadership_seconds
     )
-    if incident.reporter_id not in roster or len(roster) < cfg.minimum_participants:
+    if len(roster) < cfg.minimum_participants:
         return
     recent = list(
         sess.scalars(
@@ -546,7 +547,10 @@ def start(sess, v, players, now):
         return False
     target = dict(v.payload["target_identity"], player_id=v.target_id)
     roster = electorate(players, target, observations, now, cfg.leadership_seconds)
-    if v.reporter_id not in roster or len(roster) < cfg.minimum_participants:
+    if (
+        not may_report(players, v.reporter_id, target)
+        or len(roster) < cfg.minimum_participants
+    ):
         return False
     p = deepcopy(v.payload)
     p.update(

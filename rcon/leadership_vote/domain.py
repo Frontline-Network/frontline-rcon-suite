@@ -78,6 +78,29 @@ def leader(player, team):
     return bool(ident and ident["team"] == team)
 
 
+def may_report(players, reporter_id, target):
+    """Squad membership permits reporting, not voting or quorum participation.
+
+    Check the current roster, not a report's possibly stale role/team. Members
+    may report their own squad leader, but never themselves. Commanders may
+    also report despite not belonging to a squad. Tenure applies only to voters.
+    """
+    reporter_id = str(reporter_id or "")
+    if not reporter_id or reporter_id == target["player_id"]:
+        return False
+    matches = [p for p in players if str(p.get("player_id") or "") == reporter_id]
+    if len(matches) != 1:
+        return False
+    player = matches[0]
+    if (
+        player.get("online") is False
+        or _normalize_team(player.get("team")) != target["team"]
+    ):
+        return False
+    squad = str(player.get("unit_name") or "").strip().casefold()
+    return _is_commander(player) or squad not in {"", "unassigned", "command"}
+
+
 def squad_target(subjects, reporter, players, message):
     from .targets import resolve
 
