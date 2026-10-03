@@ -1,14 +1,14 @@
 {% extends "admin/base.html" %}
 {% load i18n static admin_presentation %}
 
-{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | {% if crcon_admin_wardogs %}Frontline · Administration{% else %}{{ site_title|default:_("Django site admin") }}{% endif %}{% endblock %}
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | Frontline · Administration{% endblock %}
 
 {% block extrahead %}
 {{ block.super }}
 {{ crcon_admin_appearance|json_script:"crcon-admin-appearance" }}
 {% admin_navigation available_apps as crcon_admin_navigation %}
 {{ crcon_admin_navigation|json_script:"crcon-admin-navigation" }}
-<script src="{% static 'api/js/admin-theme.js' %}?v=2"></script>
+<script src="{% static 'api/js/admin-theme.js' %}?v=3"></script>
 <script src="{% static 'api/js/admin-integration.js' %}?v=2" defer></script>
 {% endblock %}
 
@@ -16,8 +16,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="{% static 'admin/css/responsive.css' %}">
 {% if LANGUAGE_BIDI %}<link rel="stylesheet" href="{% static 'admin/css/responsive_rtl.css' %}">{% endif %}
-<link rel="stylesheet" href="{% static 'api/css/admin-wardogs.css' %}">
+<link rel="stylesheet" href="{% static 'api/css/admin-layout.css' %}?v=3">
+<link rel="stylesheet" href="{% static 'api/css/admin-wardogs.css' %}?v=3">
 <link rel="stylesheet" href="{% static 'api/css/admin-wardogs-colors.css' %}">
+<link rel="stylesheet" href="{% static 'api/css/admin-frontline.css' %}?v=3">
 {% endblock %}
 
 {% block branding %}
@@ -32,17 +34,15 @@
 {% endblock %}
 
 {% block welcome-msg %}
-{% if crcon_admin_wardogs %}<span>{% translate 'Welcome,' %} <strong>{% firstof user.get_short_name user.get_username %}</strong></span>{% else %}{{ block.super }}{% endif %}
+<span>{% translate 'Welcome,' %} <strong>{% firstof user.get_short_name user.get_username %}</strong></span>
 {% endblock %}
 
 {% block userlinks %}
-{% if crcon_admin_wardogs %}
   <a class="crcon-return-link" href="{{ site_url|default:'/' }}">← {{ crcon_admin_text.back }}</a>
   {% if user.has_usable_password %}<a href="{% url 'admin:password_change' %}">{% translate 'Change password' %}</a>{% endif %}
   <form id="logout-form" method="post" action="{% url 'admin:logout' %}">{% csrf_token %}<button type="submit">{% translate 'Log out' %}</button></form>
-{% else %}{{ block.super }}{% endif %}
 {% endblock %}
 
 {% block footer %}
-{% if crcon_admin_wardogs %}<footer class="crcon-admin-footer"><span>FRONTLINE / CRCON</span><span>Wardogs</span></footer>{% else %}{{ block.super }}{% endif %}
+<footer class="crcon-admin-footer"><span>FRONTLINE / CRCON</span><span>{% if crcon_admin_wardogs %}Wardogs{% else %}Frontline{% endif %}</span></footer>
 {% endblock %}

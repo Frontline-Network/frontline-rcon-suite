@@ -50,11 +50,16 @@ class AdminThemeTests(TestCase):
         self.client.force_login(user)
         self.assertEqual(self.client.get(reverse("admin:index")).status_code, 302)
 
-    def test_frontline_retains_original_dashboard(self):
+    def test_frontline_uses_integrated_dashboard_and_grouped_user_form(self):
         UserAppearancePreference.objects.filter(user=self.owner).update(preferences={"preset": "frontline-gold"})
         response = self.client.get(reverse("admin:index"))
-        self.assertNotContains(response, 'class="crcon-admin-card"')
-        self.assertContains(response, "Django")
+        self.assertContains(response, 'class="crcon-admin-card"', count=4)
+        self.assertContains(response, "api/css/admin-layout.css")
+        self.assertContains(response, "api/css/admin-frontline.css")
+        response = self.client.get(reverse("admin:auth_user_change", args=[self.owner.pk]))
+        self.assertContains(response, 'class="crcon-form-sections"')
+        self.assertContains(response, "crcon-status-panel")
+        self.assertContains(response, 'name="user_permissions"')
 
     def test_missing_or_malformed_preferences_do_not_break_admin(self):
         for preferences in (None, [], {"preset": "wardogs", "mode": "invalid"}):

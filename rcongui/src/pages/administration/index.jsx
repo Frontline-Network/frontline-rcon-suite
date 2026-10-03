@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Box, Button, LinearProgress, Stack, Tab, Tabs, Typography } from "@mui/material";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useColorScheme, useTheme } from "@mui/material/styles";
 import PageHeader from "@/components/shared/PageHeader";
 import { useAppStore } from "@/stores/app-state";
 
@@ -18,6 +19,10 @@ export default function Administration() {
   const location = useLocation();
   const navigate = useNavigate();
   const { i18n } = useTranslation();
+  const theme = useTheme();
+  const { mode, systemMode } = useColorScheme();
+  const resolvedMode = (mode === "system" ? systemMode : mode) || theme.palette.mode;
+  const palette = theme.colorSchemes?.[resolvedMode]?.palette || theme.palette;
   const german = i18n.resolvedLanguage?.startsWith("de");
   const language = german ? "de" : "en";
   const frameLanguage = useRef(language);
@@ -32,7 +37,16 @@ export default function Administration() {
   const initialSource = useRef(frameSource(location.pathname + location.search, language));
 
   const sendAppearance = () => frame.current?.contentWindow?.postMessage({
-    type: "crcon-admin-appearance", preset: appearance.preset, mode: appearance.mode, wardogsStyle: appearance.wardogsStyle,
+    type: "crcon-admin-appearance", preset: appearance.preset, mode: resolvedMode,
+    wardogsStyle: appearance.wardogsStyle, customAccent: appearance.customAccent,
+    colors: {
+      background: palette.background.default, panel: palette.background.paper,
+      text: palette.text.primary, loud: palette.text.primary, muted: palette.text.secondary,
+      accent: palette.primary.main, contrast: palette.primary.contrastText,
+      link: resolvedMode === "light" ? palette.primary.dark : palette.primary.light,
+      border: palette.divider, hover: palette.action.hover, selected: palette.action.selected,
+      error: palette.error.main,
+    },
   }, window.location.origin);
 
   useEffect(() => {
@@ -55,7 +69,7 @@ export default function Administration() {
     };
     window.addEventListener("message", receive);
     return () => window.removeEventListener("message", receive);
-  }, [location.pathname, location.search, navigate, appearance]);
+  }, [location.pathname, location.search, navigate, appearance, palette, resolvedMode]);
 
   useEffect(() => {
     const path = location.pathname + location.search;
@@ -67,7 +81,7 @@ export default function Administration() {
     }
   }, [location.pathname, location.search, language]);
 
-  useEffect(() => { sendAppearance(); }, [appearance]);
+  useEffect(() => { sendAppearance(); }, [appearance, palette, resolvedMode]);
   useEffect(() => {
     if (ready) return undefined;
     const timeout = window.setTimeout(() => setFailed(true), 15000);
@@ -92,6 +106,6 @@ export default function Administration() {
         pendingNavigation.current = false;
         frame.current?.contentWindow?.postMessage({ type: "crcon-admin-request-page" }, window.location.origin);
       }}
-      sx={{ display: failed ? "none" : "block", width: "100%", height, border: 0, colorScheme: appearance.mode === "light" ? "light" : "dark" }} />
+      sx={{ display: failed ? "none" : "block", width: "100%", height, border: 0, colorScheme: resolvedMode }} />
   </Box>;
 }

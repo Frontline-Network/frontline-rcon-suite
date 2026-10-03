@@ -153,6 +153,8 @@ static/
 !rconweb/static/api/
 !rconweb/static/api/css/
 !rconweb/static/api/css/admin-wardogs.css
+!rconweb/static/api/css/admin-layout.css
+!rconweb/static/api/css/admin-frontline.css
 !rconweb/static/api/js/
 !rconweb/static/api/js/admin-theme.js
 !rconweb/static/api/js/admin-integration.js

@@ -140,3 +140,16 @@ Prüfung:
 - Nach ausdrücklicher Freigabe SMTP-Anmeldung als `noreply@fln.gg` an `mail.fln.gg:587` erfolgreich (235), TLS 1.3 und gültiges Zertifikat. Keine E-Mail verschickt. Der zuerst genannte Host `smtp.fln.gg` war nicht auflösbar; `mail.fln.gg` wurde anhand der Postfix-Konfiguration des genannten Servers ermittelt. Keine produktiven Servereinstellungen geändert.
 - Die Nginx-Admin-Route wurde auf `/admin` und dessen Unterpfade begrenzt, damit `/administration` auch im Produktionsbetrieb im React-Router bleibt. Die bestehenden `/accounts`-Endpunkte bleiben beim Django-Backend.
 - Screenshots: `../output/wardogs-theme/admin/41-password-change-desktop.png`, `42-password-change-mobile.png`, `43-password-recovery-mobile.png`, `44-password-reset-invalid-mobile.png`.
+
+## Ergänzung: Administration im Frontline-Theme (04.10.2026)
+
+Die Verwaltungsübersicht und die gegliederten Benutzerformulare stehen jetzt in beiden Themes zur Verfügung. Das gemeinsame Layout übernimmt Abstände, responsive Spalten, Tabellen, Filter und Rechteauswahl. Frontline erhält seine eigenen kantigen Flächen, verdichteten Überschriften und Akzentfarben; Wardogs behält die runden Karten. Die eingebettete Verwaltung übernimmt die tatsächlich aufgelöste React-Palette einschließlich Hell/Dunkel, eigener Akzentfarbe und Farbsicht-Einstellungen. Beim Theme-Wechsel werden vorherige Inline-Farben entfernt. Die eigenständige Verwaltung hat passende Frontline-Fallbacks und führt angemeldete Nutzer beider Themes in die integrierte Ansicht.
+
+Prüfung:
+- 43 isolierte Django-Tests bestanden, einschließlich der aktualisierten Prüfung für Frontline-Übersicht und gegliedertes Benutzerformular. Berechtigungs-, CSRF- und Passworttests bleiben erfolgreich.
+- Produktionsbuild, JavaScript-Syntaxprüfung und Diff-Prüfung erfolgreich. Die bekannte Build-Warnung zu großen Chunks besteht weiterhin.
+- Browser bei 1440 × 1000: Übersicht, Benutzerliste/-formular, Gruppenliste/-formular, API-Schlüsselliste und Geräteliste geprüft. Suchleisten, Sammelaktionen, Filter und Formulare verwenden die Frontline-Palette.
+- Frontline-Hell sowie Wardogs-Hell/Dunkel per ungespeicherter Vorschau geprüft: helle Frontline-Flächen und dunkler Text; Wardogs-Karten wieder mit 12 px Radius und ohne zurückbleibende Frontline-Inline-Farbe. Danach Vorschau verworfen.
+- Mobil bei 390 × 844: Übersicht und Benutzer-/Rechteformular geprüft. Eingebetteter Inhalt 356 px breit, Scrollbreite ebenfalls 356 px. Kategorieauswahl behält ihre 44 × 46 px Klickfläche. Temporäre Viewport-Einstellung zurückgesetzt.
+- Keine Benutzer, Gruppen, Rechte, Zugangsdaten oder produktiven Einstellungen gespeichert. Die bereits akzeptierte native Passwortseite wurde nicht verändert.
+- Screenshots: `../output/wardogs-theme/admin/45-frontline-administration-desktop.png`, `46-frontline-user-desktop.png`, `47-frontline-permissions-mobile.png`, `48-frontline-administration-mobile.png`.

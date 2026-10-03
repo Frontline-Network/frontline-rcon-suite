@@ -29,6 +29,7 @@ def admin_appearance(request):
             "authenticated": authenticated,
             "preset": preferences.get("preset", "frontline-gold"),
             "mode": mode,
+            "customAccent": preferences.get("customAccent", "#c59a4a"),
             "wardogsStyle": color_style,
             "wardogsStyles": WARDOGS_STYLES,
         },

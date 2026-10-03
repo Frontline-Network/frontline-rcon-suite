@@ -11,7 +11,6 @@ from django.utils.translation import get_language
 
 from .models import DjangoAPIKey, MobileDevice, SteamPlayer
 from .permission_widgets import ExplainedPermissionsAdminMixin
-from .admin_theme import admin_appearance
 
 
 # Define an inline admin descriptor for Employee model
@@ -60,7 +59,7 @@ class UserAdmin(ExplainedPermissionsAdminMixin, BaseUserAdmin):
 
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
-        if admin_appearance(request)["crcon_admin_wardogs"] and (get_language() or "en").startswith("de"):
+        if (get_language() or "en").startswith("de"):
             explanations = {
                 "is_active": ("Konto aktiv", "Erlaubt die Anmeldung. Deaktivieren sperrt den Zugang, ohne das Konto zu löschen."),
                 "is_staff": ("Administrationszugang", "Erlaubt den Zugang zu dieser Verwaltung. Welche Daten bearbeitet werden dürfen, bestimmen die Gruppen und Einzelrechte."),
@@ -74,7 +73,7 @@ class UserAdmin(ExplainedPermissionsAdminMixin, BaseUserAdmin):
 
     def get_inline_instances(self, request, obj=None):
         inlines = super().get_inline_instances(request, obj)
-        if admin_appearance(request)["crcon_admin_wardogs"] and (get_language() or "en").startswith("de"):
+        if (get_language() or "en").startswith("de"):
             for inline in inlines:
                 if isinstance(inline, SteamPlayerInline):
                     inline.verbose_name = "Spielkonto"
@@ -85,7 +84,7 @@ class UserAdmin(ExplainedPermissionsAdminMixin, BaseUserAdmin):
         return inlines
 
     def get_fieldsets(self, request, obj=None):
-        if obj is None or not admin_appearance(request)["crcon_admin_wardogs"]:
+        if obj is None:
             return super().get_fieldsets(request, obj)
         de = (get_language() or "en").startswith("de")
         return (
@@ -104,10 +103,9 @@ class GroupAdmin(ExplainedPermissionsAdminMixin, BaseGroupAdmin):
 
 class IntegrationAdminPresentation:
     def changelist_view(self, request, extra_context=None):
-        if admin_appearance(request)["crcon_admin_wardogs"]:
-            de = (get_language() or "en").startswith("de")
-            title = ("API-Schlüssel" if de else "API keys") if self.model is DjangoAPIKey else ("Mobile Geräte" if de else "Mobile devices")
-            extra_context = {**(extra_context or {}), "title": title}
+        de = (get_language() or "en").startswith("de")
+        title = ("API-Schlüssel" if de else "API keys") if self.model is DjangoAPIKey else ("Mobile Geräte" if de else "Mobile devices")
+        extra_context = {**(extra_context or {}), "title": title}
         return super().changelist_view(request, extra_context)
 
 
