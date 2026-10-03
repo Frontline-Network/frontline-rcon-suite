@@ -1,0 +1,31 @@
+/* Scope all accents to Wardogs; semantic warning/error colors stay independent. */
+html[data-crcon-theme="wardogs"] {
+  --wd-style-accent: var(--wd-accent-dark, #e45b80);
+  --wd-accent-contrast: #080b08;
+}
+html[data-crcon-theme="wardogs"][data-crcon-mode="light"] {
+  --wd-style-accent: var(--wd-accent-light, #b72d58);
+  --wd-accent-contrast: #fff;
+}
+@media (prefers-color-scheme: light) {
+  html[data-crcon-theme="wardogs"][data-crcon-mode="system"] {
+    --wd-style-accent: var(--wd-accent-light, #b72d58);
+    --wd-accent-contrast: #fff;
+  }
+}
+html[data-crcon-theme="wardogs"][data-crcon-mode] {
+  --primary: var(--wd-style-accent);
+  --accent: var(--wd-style-accent);
+  --primary-fg: var(--wd-accent-contrast);
+  --link-fg: var(--wd-style-accent);
+  --link-hover-color: color-mix(in srgb, var(--wd-style-accent), var(--body-fg) 20%);
+  --link-selected-fg: var(--wd-style-accent);
+  --default-button-bg: var(--wd-style-accent);
+  --default-button-hover-bg: var(--link-hover-color);
+  --wd-tint: color-mix(in srgb, var(--wd-style-accent) 14%, var(--wd-panel));
+  --wd-hover: color-mix(in srgb, var(--wd-style-accent) 5%, var(--wd-panel));
+  --selected-row: var(--wd-tint);
+}
+html[data-crcon-theme="wardogs"] .login input[type="submit"] { color: var(--wd-accent-contrast); }
+html[data-crcon-theme="wardogs"] .button.default,
+html[data-crcon-theme="wardogs"] .submit-row input.default { color: var(--wd-accent-contrast); }

@@ -21,7 +21,7 @@ function SummarySegment({ icon, eyebrow, value, detail, tone, last = false }) {
       }}
     >
       <Stack direction="row" spacing={1.35} alignItems="flex-start">
-        <Box
+        <Box data-theme-surface="control"
           aria-hidden="true"
           sx={{
             display: "grid",
@@ -86,7 +86,7 @@ export default function NameKickSummaryPanel({ data = {} }) {
   );
 
   return (
-    <Box
+    <Box data-theme-surface="panel"
       component="aside"
       aria-label={t(`${ROOT}.title`)}
       sx={{

@@ -31,6 +31,7 @@ import {
 function SummaryMetric({ label, value, detail, icon }) {
   return (
     <Stack
+      className="wardogs-map-summary-metric"
       direction="row"
       spacing={1}
       alignItems="center"
@@ -160,7 +161,7 @@ function MapRotationSettings() {
     <>
       <Box sx={{ p: { xs: 1.5, md: 2.5 }, pb: 0 }}>
         <Stack spacing={1.5}>
-          <Box
+          <Box data-theme-surface="panel"
             component="section"
             sx={{ border: "1px solid", borderColor: "divider" }}
           >
@@ -249,7 +250,7 @@ function MapRotationSettings() {
             </Box>
           </Box>
 
-          <Box
+          <Box data-theme-surface="panel"
             component="section"
             sx={{ border: "1px solid", borderColor: "divider" }}
           >

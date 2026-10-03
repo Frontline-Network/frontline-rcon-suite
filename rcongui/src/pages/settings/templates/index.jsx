@@ -68,6 +68,7 @@ const MessagesRoot = () => {
       {compact ? (
         <Stack
           component="nav"
+          className="wardogs-page-tabs"
           aria-label={t("settings.templates.categories")}
           direction="row"
           gap={1}
@@ -83,7 +84,7 @@ const MessagesRoot = () => {
           {categories.map((category) => {
             const selected = category.href === activeCategory.href;
             return (
-              <ButtonBase
+              <ButtonBase data-theme-surface="control"
                 key={category.href}
                 component={Link}
                 to={category.href}
@@ -109,8 +110,9 @@ const MessagesRoot = () => {
           })}
         </Stack>
       ) : (
-        <Box
+        <Box data-theme-surface="panel"
           component="nav"
+          className="wardogs-page-tabs"
           aria-label={t("settings.templates.categories")}
           sx={{
             display: "grid",

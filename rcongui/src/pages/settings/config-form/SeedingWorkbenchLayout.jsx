@@ -1,4 +1,12 @@
-import { Box, ButtonBase, Chip, Stack, Typography } from "@mui/material";
+import {
+  Box,
+  ButtonBase,
+  Chip,
+  Stack,
+  Typography,
+  useTheme,
+} from "@mui/material";
+import ConfigSectionNavigation from "./ConfigSectionNavigation";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import CampaignOutlinedIcon from "@mui/icons-material/CampaignOutlined";
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
@@ -59,6 +67,7 @@ function SeedingSectionNavigation({
   label,
   mobileLabel,
 }) {
+  const isWardogs = useTheme().frontline?.appearance?.preset === "wardogs";
   const selectedSection = sections.some(
     (section) => section.id === activeSection && !section.disabled
   )
@@ -66,6 +75,16 @@ function SeedingSectionNavigation({
     : sections.find((section) => !section.disabled)?.id;
 
   if (!sections.length) return null;
+  if (isWardogs)
+    return (
+      <ConfigSectionNavigation
+        sections={sections}
+        activeSection={activeSection}
+        onSectionChange={onSectionChange}
+        label={label}
+        mobileLabel={mobileLabel}
+      />
+    );
 
   return (
     <Box component="nav" aria-label={label} sx={{ minWidth: 0 }}>
@@ -197,6 +216,7 @@ export default function SeedingWorkbenchLayout({
   return (
     <Box
       data-testid={testId}
+      className="wardogs-workbench"
       sx={{
         width: "100%",
         maxWidth: embedded ? "none" : 1460,
@@ -223,48 +243,48 @@ export default function SeedingWorkbenchLayout({
       >
         {!embedded && (
           <Box sx={{ minWidth: 0 }}>
-          {eyebrow && (
-            <Typography
-              variant="overline"
-              color="primary.main"
-              sx={{ display: "block", mb: 0.25, letterSpacing: "0.08em" }}
-            >
-              {eyebrow}
-            </Typography>
-          )}
-          <Stack
-            direction="row"
-            spacing={1.25}
-            alignItems="center"
-            useFlexGap
-            flexWrap="wrap"
-          >
-            <Typography
-              component="h1"
-              variant="h4"
-              fontWeight={850}
-              sx={{ letterSpacing: "-0.02em" }}
-            >
-              {title}
-            </Typography>
-            {status && (
-              <Chip
-                label={status}
-                color={statusColor}
-                size="small"
-                sx={{ borderRadius: 0, fontWeight: 800 }}
-              />
+            {eyebrow && (
+              <Typography
+                variant="overline"
+                color="primary.main"
+                sx={{ display: "block", mb: 0.25, letterSpacing: "0.08em" }}
+              >
+                {eyebrow}
+              </Typography>
             )}
-          </Stack>
-          {description && (
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{ mt: 0.65, maxWidth: 880, lineHeight: 1.55 }}
+            <Stack
+              direction="row"
+              spacing={1.25}
+              alignItems="center"
+              useFlexGap
+              flexWrap="wrap"
             >
-              {description}
-            </Typography>
-          )}
+              <Typography
+                component="h1"
+                variant="h4"
+                fontWeight={850}
+                sx={{ letterSpacing: "-0.02em" }}
+              >
+                {title}
+              </Typography>
+              {status && (
+                <Chip
+                  label={status}
+                  color={statusColor}
+                  size="small"
+                  sx={{ borderRadius: 0, fontWeight: 800 }}
+                />
+              )}
+            </Stack>
+            {description && (
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mt: 0.65, maxWidth: 880, lineHeight: 1.55 }}
+              >
+                {description}
+              </Typography>
+            )}
           </Box>
         )}
 
@@ -290,7 +310,8 @@ export default function SeedingWorkbenchLayout({
         )}
       </Box>
 
-      <Box
+      <Box data-theme-surface="panel"
+        className="wardogs-panel"
         sx={{
           border: "1px solid",
           borderTopColor: embedded ? "divider" : undefined,

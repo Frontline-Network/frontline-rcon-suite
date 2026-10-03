@@ -112,7 +112,7 @@ const getStateLabel = (service, t) => {
 
 function StatusMetric({ label, value, hint, tone = "text.primary" }) {
   return (
-    <Box
+    <Box data-theme-surface="panel"
       sx={{
         minWidth: 0,
         p: 1.25,
@@ -149,7 +149,7 @@ function ServiceDependencyFlow({ services }) {
   const { t } = useTranslation();
 
   return (
-    <Box
+    <Box data-theme-surface="panel"
       component="section"
       aria-labelledby="service-dependency-title"
       sx={{
@@ -191,7 +191,7 @@ function ServiceDependencyFlow({ services }) {
           const running = isRunning(service);
           return (
             <Box key={role.id} sx={{ display: "contents" }}>
-              <Stack
+              <Stack data-theme-surface="panel"
                 direction="row"
                 alignItems="center"
                 spacing={1}
@@ -204,7 +204,7 @@ function ServiceDependencyFlow({ services }) {
                     service && !running ? "action.hover" : "background.default",
                 }}
               >
-                <Box
+                <Box data-theme-surface="control"
                   sx={{
                     width: 36,
                     height: 36,
@@ -284,7 +284,7 @@ function ServiceControl({ service }) {
           minWidth={0}
           width="100%"
         >
-          <Box
+          <Box data-theme-surface="control"
             sx={{
               width: 36,
               height: 36,
@@ -330,7 +330,7 @@ function ServiceControl({ service }) {
             </Alert>
           )}
 
-          <Box
+          <Box data-theme-surface="panel"
             sx={{
               display: "grid",
               gridTemplateColumns: {

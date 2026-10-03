@@ -9,14 +9,12 @@ import ListItemIcon, { listItemIconClasses } from '@mui/material/ListItemIcon';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import MoreVertRoundedIcon from '@mui/icons-material/MoreVertRounded';
 import PaletteOutlinedIcon from '@mui/icons-material/PaletteOutlined';
+import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
 import MenuButton from './MenuButton';
-import {useSubmit} from 'react-router-dom';
-import {Fragment, lazy, Suspense, useState} from "react";
+import {Link, useSubmit} from 'react-router-dom';
+import {Fragment, useState} from "react";
 import { useTranslation } from "react-i18next";
-
-const AppearanceSettingsDialog = lazy(() =>
-  import("./AppearanceSettingsDialog")
-);
+import { useAppStore } from "@/stores/app-state";
 
 const MenuItem = styled(MuiMenuItem)({
   margin: '2px 0',
@@ -25,7 +23,7 @@ const MenuItem = styled(MuiMenuItem)({
 export default function OptionsMenu({ renderTrigger }) {
   const { t } = useTranslation();
   const [anchorEl, setAnchorEl] = useState(null);
-  const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const setAppearanceOpen = useAppStore((state) => state.setAppearanceDialogOpen);
   const submit = useSubmit();
   const open = Boolean(anchorEl);
   const handleClick = (event) => {
@@ -86,6 +84,12 @@ export default function OptionsMenu({ renderTrigger }) {
             <PaletteOutlinedIcon fontSize="small" />
           </ListItemIcon>
         </MenuItem>
+        <MenuItem component={Link} to="/documentation">
+          <ListItemText>{t("documentation.title")}</ListItemText>
+          <ListItemIcon sx={{ ml: 'auto', minWidth: 0 }}>
+            <MenuBookOutlinedIcon fontSize="small" />
+          </ListItemIcon>
+        </MenuItem>
         <MenuItem
           onClick={handleChangePassword}
           sx={{
@@ -112,14 +116,6 @@ export default function OptionsMenu({ renderTrigger }) {
           </ListItemIcon>
         </MenuItem>
       </Menu>
-      {appearanceOpen ? (
-        <Suspense fallback={null}>
-          <AppearanceSettingsDialog
-            open
-            onClose={() => setAppearanceOpen(false)}
-          />
-        </Suspense>
-      ) : null}
     </Fragment>
   );
 }

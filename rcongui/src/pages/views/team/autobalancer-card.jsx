@@ -127,7 +127,7 @@ const StrengthBar = ({ allies, axis, label }) => {
           {formatRating(allies)} : {formatRating(axis)}
         </Typography>
       </Stack>
-      <Box
+      <Box data-theme-surface="control"
         role="img"
         aria-label={t("liveViews.balance.barDescription", {
           label,
@@ -585,8 +585,9 @@ const AutobalancerCard = ({
     : null;
 
   return (
-    <Box
+    <Box data-theme-surface="panel"
       component="section"
+      data-testid="live-balance-card"
       aria-label={t("liveViews.balance.assistant")}
       sx={(theme) => ({
         mb: 1.5,
@@ -1095,7 +1096,7 @@ const AutobalancerCard = ({
 
             {activeRecommendation?.kind === "squad_move" ||
             activeRecommendation?.kind === "squad_swap" ? (
-              <Box
+              <Box data-theme-surface="panel"
                 sx={{
                   display: "grid",
                   gridTemplateColumns: {
@@ -1148,7 +1149,7 @@ const AutobalancerCard = ({
                 })}
               </Box>
             ) : activeRecommendation?.kind === "strength_swap" ? (
-              <Box
+              <Box data-theme-surface="panel"
                 sx={{
                   display: "grid",
                   gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
@@ -1203,7 +1204,7 @@ const AutobalancerCard = ({
                 ))}
               </Box>
             ) : activeRecommendation ? (
-              <Box sx={{ p: 1.5, border: "1px solid", borderColor: "divider" }}>
+              <Box data-theme-surface="panel" sx={{ p: 1.5, border: "1px solid", borderColor: "divider" }}>
                 <Typography variant="caption" color="text.secondary">
                   {insight.teamLabels[activeRecommendation.player.team]} →{" "}
                   {insight.teamLabels[activeRecommendation.target_team]}
@@ -1321,7 +1322,7 @@ const AutobalancerCard = ({
               </Typography>
             </Box>
 
-            <Box
+            <Box data-theme-surface="panel"
               sx={{
                 display: "grid",
                 gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" },

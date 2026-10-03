@@ -73,7 +73,7 @@ const BlacklistListTile = ({
         })}
       >
         <Stack direction="row" alignItems="flex-start" spacing={1.25}>
-          <Box
+          <Box data-theme-surface="control"
             sx={{
               width: 34,
               height: 34,

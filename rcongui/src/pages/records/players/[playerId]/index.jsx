@@ -97,7 +97,7 @@ export default function PlayerProfilePage() {
   };
 
   return (
-    <ProfileContainer>
+    <ProfileContainer className="wardogs-player-profile">
       <SummaryCard
         component="section"
         elevation={0}
@@ -128,7 +128,7 @@ export default function PlayerProfilePage() {
         </CardContent>
       </SummaryCard>
 
-      <MainContent>
+      <MainContent className="wardogs-profile-grid">
         <SummaryCard
           component="section"
           elevation={0}

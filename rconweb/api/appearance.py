@@ -6,11 +6,13 @@ from django.views.decorators.csrf import csrf_exempt
 from .auth import api_response, login_required
 from .decorators import require_content_type, require_http_methods
 from .models import UserAppearancePreference, default_user_appearance
+from .wardogs_styles import normalize_wardogs_style
 
 APPEARANCE_VERSION = 1
 MODES = {"light", "dark", "system"}
 PRESETS = {
     "frontline-gold",
+    "wardogs",
     "tactical-blue",
     "signal-green",
     "command-red",
@@ -19,6 +21,20 @@ PRESETS = {
 }
 COLOR_VISION_MODES = {"standard", "deuteranopia", "protanopia", "tritanopia"}
 HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
+INTERNAL_ROUTE = re.compile(r"^/[a-z0-9_-]+(?:/[a-z0-9_-]+)*$")
+
+
+def normalize_wardogs_shortcuts(value):
+    if not isinstance(value, list) or len(value) > 64:
+        raise ValueError("wardogsShortcuts must be a list of up to 64 routes.")
+    if any(
+        not isinstance(route, str)
+        or len(route) > 200
+        or not INTERNAL_ROUTE.fullmatch(route)
+        for route in value
+    ):
+        raise ValueError("Shortcuts must be internal navigation routes.")
+    return list(dict.fromkeys(value))
 
 
 def normalize_appearance(value):
@@ -46,6 +62,10 @@ def normalize_appearance(value):
         "preset": preset,
         "customAccent": custom_accent.lower(),
         "colorVision": color_vision,
+        "wardogsStyle": normalize_wardogs_style(value.get("wardogsStyle", defaults["wardogsStyle"])),
+        "wardogsShortcuts": normalize_wardogs_shortcuts(
+            value.get("wardogsShortcuts", defaults["wardogsShortcuts"])
+        ),
     }
 
 
@@ -80,6 +100,27 @@ def set_own_user_appearance(request):
             failed=True,
             status_code=400,
         )
+
+    # Older clients omit newer fields. Preserve those while still accepting
+    # any shortcut/style update explicitly included in this request.
+    if "wardogsShortcuts" not in payload or "wardogsStyle" not in payload:
+        current = (
+            UserAppearancePreference.objects.filter(user=request.user)
+            .values_list("preferences", flat=True)
+            .first()
+        )
+        if "wardogsShortcuts" not in payload and isinstance(current, dict) and "wardogsShortcuts" in current:
+            try:
+                preferences["wardogsShortcuts"] = normalize_wardogs_shortcuts(
+                    current["wardogsShortcuts"]
+                )
+            except ValueError:
+                pass
+        if "wardogsStyle" not in payload and isinstance(current, dict) and "wardogsStyle" in current:
+            try:
+                preferences["wardogsStyle"] = normalize_wardogs_style(current["wardogsStyle"])
+            except ValueError:
+                pass
 
     UserAppearancePreference.objects.update_or_create(
         user=request.user, defaults={"preferences": preferences}

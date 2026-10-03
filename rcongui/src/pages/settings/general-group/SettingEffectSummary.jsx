@@ -49,7 +49,7 @@ export default function SettingEffectSummary({
     : t("settingEffect.notAvailable");
 
   return (
-    <Stack
+    <Stack data-theme-surface="panel"
       spacing={1.25}
       data-testid={`setting-effect-${settingKey}`}
       sx={{

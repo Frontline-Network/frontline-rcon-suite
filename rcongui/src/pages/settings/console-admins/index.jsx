@@ -162,7 +162,7 @@ function RoleBadge({ role, label }) {
   const color = getRoleColor(role);
 
   return (
-    <Stack
+    <Stack data-theme-surface="control"
       direction="row"
       alignItems="center"
       spacing={0.75}
@@ -905,7 +905,7 @@ export default function ConsoleAdminsPage() {
             spacing={1}
             sx={{ p: 1, borderBottom: "1px solid", borderColor: "divider" }}
           >
-            <Box
+            <Box data-theme-surface="panel"
               sx={{
                 flex: { xs: "0 0 auto", md: "1 1 320px" },
                 minWidth: 0,
@@ -992,7 +992,7 @@ export default function ConsoleAdminsPage() {
             </Menu>
           </Stack>
 
-          <TableContainer sx={{ display: { xs: "none", md: "block" } }}>
+          <TableContainer data-theme-surface="table-body" sx={{ display: { xs: "none", md: "block" } }}>
             <Table aria-label={t("settings.consoleAdmins.tableLabel")}>
               <TableHead>
                 <TableRow>

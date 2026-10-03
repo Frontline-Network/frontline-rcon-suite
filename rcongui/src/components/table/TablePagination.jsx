@@ -17,6 +17,7 @@ export const TablePagination = ({ table }) => {
 
   return (
   <Stack
+    className="wardogs-table-pagination"
     direction={"row"}
     justifyContent={"end"}
     alignItems={"center"}

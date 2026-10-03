@@ -1,4 +1,5 @@
 import HomeIcon from "@mui/icons-material/Home";
+import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
 import SportsEsportsIcon from "@mui/icons-material/SportsEsports";
 import BoltIcon from "@mui/icons-material/Bolt";
 import GroupsIcon from "@mui/icons-material/Groups";
@@ -294,6 +295,17 @@ const rawNavMenus = [
     icon: <MiscellaneousServicesIcon />,
     links: [
       {
+        name: "Administration",
+        to: "/administration",
+        icon: <AdminPanelSettingsIcon />,
+        requiredStaff: true,
+      },
+      {
+        name: "Documentation",
+        to: "/documentation",
+        icon: <MenuBookOutlinedIcon />,
+      },
+      {
         name: "Seeder VIP Reward",
         to: "/settings/others/seed-vip",
         icon: <MilitaryTechIcon />,
@@ -374,6 +386,7 @@ const rawNavMenus = [
 ];
 
 const linkTranslationKeys = {
+  "/documentation": "documentation.title",
   "/": "navigation.links.home",
   "/apps": "navigation.links.frontlineApp",
   "/apps/discord-report-bot": "navigation.links.discordReportBot",
@@ -515,7 +528,7 @@ const taskGroupDefinitions = [
     id: "server-configuration",
     translationKey: "navigation.groups.serverConfiguration",
     icon: <SettingsIcon />,
-    routes: ["/settings/general"],
+    routes: ["/settings/general", "/administration"],
   },
   {
     id: "logs-analytics",
@@ -532,7 +545,7 @@ const taskGroupDefinitions = [
     id: "system-diagnostics",
     translationKey: "navigation.groups.systemDiagnostics",
     icon: <MiscellaneousServicesIcon />,
-    routes: ["/settings/services"],
+    routes: ["/settings/services", "/documentation"],
   },
 ];
 
@@ -629,6 +642,7 @@ const withPermissions = (link) => ({
 });
 
 export const canAccessNavLink = (link, permissions) => {
+  if (link?.requiredStaff && !permissions?.is_staff) return false;
   if (permissions?.is_superuser) return true;
   if (!link?.requiredPermissions?.length) return true;
 

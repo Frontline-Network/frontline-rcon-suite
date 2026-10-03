@@ -189,7 +189,7 @@ const Stat = ({ label, value, tone = "text.primary" }) => (
 );
 
 const StatusFact = ({ label, value, tone = "text.primary", icon }) => (
-  <Stack
+  <Stack data-theme-surface="control"
     className="player-detail-status"
     direction="row"
     alignItems="center"
@@ -420,6 +420,7 @@ export default function PlayerDetailPanel({
     <Box
       component="section"
       data-testid="live-player-detail-panel"
+      data-theme-surface="flush"
       aria-label={`${t("views.table.playerSummary")}: ${detail.name}`}
       sx={(theme) => ({
         bgcolor: alpha(theme.palette.background.paper, 0.98),

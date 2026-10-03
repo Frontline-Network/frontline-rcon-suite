@@ -339,7 +339,7 @@ export default function GameLogsFilters({
 
   return (
     <Form id={formId} onSubmit={onSubmit}>
-      <Box sx={filterShellSx}>
+      <Box data-theme-surface="panel" className="wardogs-filter-panel" sx={filterShellSx}>
         <Box
           sx={{
             display: "grid",

@@ -24,6 +24,7 @@ from . import (
     vips,
 )
 from .auth import api_response
+from .api_descriptions import describe_api_endpoints
 from .decorators import ENDPOINT_HTTP_METHODS, ENDPOINT_PERMISSIONS_LOOKUP
 
 logger = getLogger("rconweb")
@@ -39,7 +40,7 @@ def _get_empty(value):
 
 @csrf_exempt
 def get_api_documentation(request):
-    """Auto-generate minimal API documentation through introspection"""
+    """Combine endpoint introspection with reviewed operator descriptions."""
     api_docs = []
     for name, func in endpoints:
         item = {}
@@ -97,7 +98,7 @@ def get_api_documentation(request):
         )
 
     return api_response(
-        result=sorted(api_docs, key=lambda x: x["endpoint"]),
+        result=describe_api_endpoints(sorted(api_docs, key=lambda x: x["endpoint"])),
         command="get_api_documentation",
         failed=False,
     )

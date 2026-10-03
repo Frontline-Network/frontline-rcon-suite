@@ -86,7 +86,7 @@ function SectionHeading({ number, title, description, summary }) {
       gap={1}
     >
       <Stack direction="row" spacing={1.25} alignItems="flex-start">
-        <Box
+        <Box data-theme-surface="control"
           aria-hidden="true"
           sx={{
             display: "grid",
@@ -807,7 +807,7 @@ function VotemapSettingsPage() {
           pb: 1.5,
         }}
       >
-        <Box
+        <Box data-theme-surface="panel"
           component="section"
           aria-labelledby="votemap-effect-summary-title"
           sx={{

@@ -1,4 +1,5 @@
 import { Box, Stack, Typography } from "@mui/material";
+import ThemedBrandMark from "./ThemedBrandMark";
 
 export default function FrontlineBrand({ compact = false, textOnly = false }) {
   return (
@@ -15,8 +16,7 @@ export default function FrontlineBrand({ compact = false, textOnly = false }) {
       }}
     >
       {!textOnly && (
-        <Box
-          component="img"
+        <ThemedBrandMark
           src="/frontline-logo.png"
           alt=""
           sx={{

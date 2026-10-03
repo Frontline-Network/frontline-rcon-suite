@@ -185,9 +185,9 @@ export default function Login() {
 
   return (
     <>
-      <HeroImage src="/frontline-ops-night.png" alt="" />
-      <Wrapper>
-        <HeroImageWrapper>
+      <HeroImage className="wardogs-login-image" src="/frontline-ops-night.png" alt="" />
+      <Wrapper className="wardogs-login">
+        <HeroImageWrapper className="wardogs-login-hero">
           <Stack
             sx={{
               display: { xs: "none", md: "flex" },
@@ -214,7 +214,7 @@ export default function Login() {
             </Typography>
           </Stack>
         </HeroImageWrapper>
-        <MainWrapper>
+        <MainWrapper className="wardogs-login-card">
           <Stack
             direction="row"
             justifyContent="space-between"

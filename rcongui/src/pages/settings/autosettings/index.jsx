@@ -203,7 +203,11 @@ const Autosettings = () => {
   );
 
   return (
-    <Stack gap={compact ? 1.25 : 2} sx={{ minWidth: 0, pb: { xs: 2, md: 0 } }}>
+    <Stack
+      className="wardogs-autosettings"
+      gap={compact ? 1.25 : 2}
+      sx={{ minWidth: 0, pb: { xs: 2, md: 0 } }}
+    >
       <PageHeader
         eyebrow={t("settings.autosettings.eyebrow")}
         title={t("settings.autosettings.title")}
@@ -262,10 +266,18 @@ const Autosettings = () => {
       </Stack>
       {error && <Alert severity="error">{error}</Alert>}
       {compact ? templatePicker : null}
-      <Box component="section" aria-labelledby="autosettings-editor-title" sx={{ minWidth: 0 }}>
+      <Box
+        component="section"
+        aria-labelledby="autosettings-editor-title"
+        sx={{ minWidth: 0 }}
+      >
         {compact ? (
           <Stack spacing={0.25} sx={{ mb: 0.75 }}>
-            <Typography id="autosettings-editor-title" component="h2" variant="subtitle1">
+            <Typography
+              id="autosettings-editor-title"
+              component="h2"
+              variant="subtitle1"
+            >
               {t("settings.autosettings.editorTitle")}
             </Typography>
             <Typography color="text.secondary" variant="caption">
@@ -273,7 +285,7 @@ const Autosettings = () => {
             </Typography>
           </Stack>
         ) : null}
-        <Box
+        <Box data-theme-surface="panel"
           sx={{
             border: (themeValue) => `1px solid ${themeValue.palette.divider}`,
             minWidth: 0,
@@ -301,7 +313,7 @@ const Autosettings = () => {
       </Box>
       {!compact ? templatePicker : null}
       {compact ? (
-        <Stack
+        <Stack data-theme-surface="panel"
           component={Paper}
           elevation={6}
           spacing={1}

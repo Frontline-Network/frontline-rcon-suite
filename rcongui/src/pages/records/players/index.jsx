@@ -9,6 +9,7 @@ import {
   ToggleButtonGroup,
   Tooltip,
   useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import ViewListIcon from "@mui/icons-material/ViewList";
 import ViewModuleIcon from "@mui/icons-material/ViewModule";
@@ -136,6 +137,7 @@ export const loader = async ({ request }) => {
 
 export default function PlayersRecords() {
   const { t } = useTranslation();
+  const isWardogs = useTheme().frontline?.appearance?.preset === "wardogs";
   const {
     players: playersData,
     fields,
@@ -153,8 +155,8 @@ export default function PlayersRecords() {
   // Cache player data by player_id to support multi-page selection
   const [playerCache, setPlayerCache] = useState(new Map());
   const [storedViewMode, setStoredViewMode] = useStorageState(
-    "playerRecords.viewMode",
-    "cards"
+    isWardogs ? "wardogs.playerRecords.viewMode" : "playerRecords.viewMode",
+    isWardogs ? "list" : "cards"
   );
   const viewMode = isCompactViewport ? "list" : storedViewMode;
   const onlinePlayersById = useMemo(
@@ -295,7 +297,7 @@ export default function PlayersRecords() {
         subtitle={t("records.players.subtitle")}
       />
       {selectedPlayerIds.size > 0 ? (
-        <Stack
+        <Stack data-theme-surface="panel"
           component="section"
           aria-label={t("records.players.selectionActions")}
           direction={{ xs: "column", md: "row" }}
@@ -350,7 +352,7 @@ export default function PlayersRecords() {
         spacing={1}
         sx={{ width: "100%" }}
       >
-        <Stack
+        <Stack data-theme-surface="flush"
           direction={{ xs: "column", md: "row" }}
           spacing={1}
           alignItems={{ xs: "stretch", md: "center" }}

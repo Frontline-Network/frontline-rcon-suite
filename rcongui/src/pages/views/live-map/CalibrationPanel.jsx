@@ -51,7 +51,7 @@ export default function CalibrationPanel({ frame, mutation, t }) {
     setConfirmed(false);
   };
   return (
-    <Box
+    <Box data-theme-surface="panel"
       component="details"
       sx={{
         border: 1,

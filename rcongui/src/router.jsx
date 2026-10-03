@@ -12,6 +12,11 @@ const ViewsCrumb = () => {
   return <span>{t("navigation.groups.views")}</span>;
 };
 
+const DocumentationCrumb = () => {
+  const { t } = useTranslation();
+  return <span>{t("documentation.title")}</span>;
+};
+
 const CampaignsCrumb = () => {
   const { t } = useTranslation();
   return <span>{t("navigation.links.broadcastMessage")}</span>;
@@ -81,6 +86,18 @@ const router = createBrowserRouter([
     action: rootAction,
     loader: rootLoader,
     children: [
+      {
+        path: "documentation",
+        handle: { crumb: () => <DocumentationCrumb /> },
+        lazy: lazyPage(() => import("./pages/documentation")),
+        errorElement: <RouteError />,
+      },
+      {
+        path: "administration/*",
+        handle: { crumb: () => <span>Administration</span> },
+        lazy: lazyPage(() => import("./pages/administration")),
+        errorElement: <RouteError />,
+      },
       {
         path: "",
         index: true,

@@ -51,7 +51,7 @@ const VipRecordDetail = ({
 }) => {
   const { t } = useTranslation();
   return (
-    <Box
+    <Box data-theme-surface="panel"
       sx={{
         m: { xs: 0, md: 0.75 },
         border: "1px solid",
@@ -292,7 +292,7 @@ const VipTable = memo(function VipTable({
   const visibleRows = table.getRowModel().rows;
 
   return (
-    <Stack
+    <Stack data-theme-surface="panel"
       component="section"
       aria-label={t("records.vips.register")}
       sx={{ minWidth: 0, border: "1px solid", borderColor: "divider" }}

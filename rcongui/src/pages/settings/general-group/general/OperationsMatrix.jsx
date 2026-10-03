@@ -653,7 +653,7 @@ export default function OperationsMatrix({ settings, autokickSettings }) {
 
   return (
     <Stack spacing={1.5} data-testid="general-settings-operations-matrix">
-      <Stack
+      <Stack data-theme-surface="panel"
         direction={{ xs: "column", lg: "row" }}
         spacing={1}
         alignItems={{ lg: "center" }}
@@ -720,7 +720,8 @@ export default function OperationsMatrix({ settings, autokickSettings }) {
         <Alert severity="warning">{copy.blocked}</Alert>
       )}
 
-      <Box
+      <Box data-theme-surface="panel"
+        className="wardogs-control-layout"
         sx={{
           display: { xs: "block", md: "grid" },
           gridTemplateColumns: "176px minmax(0, 1fr)",
@@ -755,7 +756,10 @@ export default function OperationsMatrix({ settings, autokickSettings }) {
             </Select>
           </FormControl>
         ) : (
-          <Stack sx={{ borderRight: "1px solid", borderColor: "divider" }}>
+          <Stack
+            className="wardogs-control-navigation"
+            sx={{ borderRight: "1px solid", borderColor: "divider" }}
+          >
             {copy.sections.map((label, index) => {
               const key = copy.sectionKeys[index];
               const active = activeSection === key;
@@ -1020,7 +1024,8 @@ export default function OperationsMatrix({ settings, autokickSettings }) {
         </Box>
       </Box>
 
-      <Stack
+      <Stack data-theme-surface="panel"
+        className="wardogs-action-bar"
         direction={{ xs: "column", sm: "row" }}
         spacing={1}
         alignItems={{ sm: "center" }}
@@ -1040,6 +1045,7 @@ export default function OperationsMatrix({ settings, autokickSettings }) {
           spacing={0.75}
           alignItems="center"
           sx={{ mr: "auto" }}
+          className="wardogs-control-action-status"
         >
           {dirtyKeys.length ? (
             <WarningAmberRoundedIcon color="warning" />

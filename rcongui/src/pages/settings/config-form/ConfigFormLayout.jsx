@@ -25,6 +25,8 @@ export default function ConfigFormLayout({
   return (
     <Box
       data-testid={testId}
+      className="wardogs-config-layout"
+      data-embedded={embedded || undefined}
       sx={{
         width: "100%",
         maxWidth: embedded ? "none" : hasNavigation ? 1304 : undefined,
@@ -35,49 +37,51 @@ export default function ConfigFormLayout({
       <Stack spacing={1.5} sx={{ mb: 1 }}>
         {!embedded && (
           <Box>
-          {eyebrow && (
-            <Typography
-              variant="overline"
-              color="primary.main"
-              sx={{ display: "block", mb: 0.35 }}
-            >
-              {eyebrow}
-            </Typography>
-          )}
-          <Stack
-            direction="row"
-            spacing={1.25}
-            alignItems="center"
-            useFlexGap
-            flexWrap="wrap"
-          >
-            <Typography component="h1" variant="h4" fontWeight={800}>
-              {title}
-            </Typography>
-            {status && (
-              <Chip
-                label={status}
-                color={statusColor}
-                size="small"
-                sx={{ borderRadius: 0.75, fontWeight: 800 }}
-              />
+            {eyebrow && (
+              <Typography
+                variant="overline"
+                color="primary.main"
+                sx={{ display: "block", mb: 0.35 }}
+              >
+                {eyebrow}
+              </Typography>
             )}
-          </Stack>
-          {description && (
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{ mt: 0.75, maxWidth: 820 }}
+            <Stack
+              direction="row"
+              spacing={1.25}
+              alignItems="center"
+              useFlexGap
+              flexWrap="wrap"
             >
-              {description}
-            </Typography>
-          )}
+              <Typography component="h1" variant="h4" fontWeight={800}>
+                {title}
+              </Typography>
+              {status && (
+                <Chip
+                  label={status}
+                  color={statusColor}
+                  size="small"
+                  sx={{ borderRadius: 0.75, fontWeight: 800 }}
+                />
+              )}
+            </Stack>
+            {description && (
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mt: 0.75, maxWidth: 820 }}
+              >
+                {description}
+              </Typography>
+            )}
           </Box>
         )}
         {headerActions && <Box>{headerActions}</Box>}
       </Stack>
 
       <Box
+        className="wardogs-config-grid"
+        data-has-summary={hasSummary}
         sx={{
           display: "grid",
           gridTemplateColumns:
@@ -118,6 +122,7 @@ export default function ConfigFormLayout({
       >
         {hasNavigation && (
           <Box
+            className="wardogs-config-nav"
             sx={{
               gridArea: "navigation",
               minWidth: 0,
@@ -137,6 +142,7 @@ export default function ConfigFormLayout({
         )}
 
         <Stack
+          className="wardogs-config-fields"
           sx={{
             gridArea: "content",
             minWidth: 0,
@@ -152,6 +158,7 @@ export default function ConfigFormLayout({
 
         {hasSummary && (
           <Box
+            className="wardogs-config-summary"
             sx={{
               gridArea: "summary",
               minWidth: 0,

@@ -86,7 +86,7 @@ export function PlayerTableSettings({ value, onChange, disabled }) {
           ["comfortable", t("tableConfig.comfortable")],
         ])}
       </Box>
-      <Box
+      <Box data-theme-surface="panel"
         component="figure"
         aria-label={t("views.live.tablePreview")}
         sx={{
@@ -151,7 +151,7 @@ export function PlayerTableSettings({ value, onChange, disabled }) {
         fullWidth
       />
       {groups.map(([group, columns]) => (
-        <Box
+        <Box data-theme-surface="panel"
           component="fieldset"
           key={group}
           sx={{

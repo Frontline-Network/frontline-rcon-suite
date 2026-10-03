@@ -10,6 +10,7 @@ import {
   DialogTitle,
   Stack,
   Typography,
+  useTheme,
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import HistoryToggleOffOutlinedIcon from "@mui/icons-material/HistoryToggleOffOutlined";
@@ -32,17 +33,101 @@ import { MapList } from "../MapList";
 import { MapChangeListItem } from "../MapListItem";
 import { mapsManagerMutationOptions, mapsManagerQueryKeys } from "../queries";
 
-function MapStateCard({ eyebrow, mapLayer, actionLabel, actionIcon, onAction }) {
+function MapStateCard({
+  eyebrow,
+  mapLayer,
+  actionLabel,
+  actionIcon,
+  onAction,
+}) {
   const { t } = useTranslation();
+  const isWardogs = useTheme().frontline?.appearance?.preset === "wardogs";
   if (!mapLayer) return null;
   const mode = unifiedGamemodeName(mapLayer.game_mode);
 
+  if (isWardogs)
+    return (
+      <Box
+        component="article"
+        sx={{
+          containerType: "inline-size",
+          containerName: "wardogs-map-card",
+          minWidth: 0,
+          p: { xs: 2, md: 3 },
+          border: "1px solid",
+          borderColor: "divider",
+          borderRadius: "12px",
+          bgcolor: "background.paper",
+        }}
+      >
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: "80px minmax(0, 1fr)",
+            columnGap: 2,
+            rowGap: 2,
+            alignItems: "center",
+            height: "100%",
+            "@container wardogs-map-card (min-width: 480px)": {
+              gridTemplateColumns: "80px minmax(0, 1fr) 212px",
+              "& > .MuiButton-root": { gridColumn: "auto" },
+            },
+          }}
+        >
+          <Box
+            component="img"
+            src={getMapLayerImageSrc(mapLayer)}
+            alt=""
+            sx={{
+              width: 80,
+              height: 80,
+              objectFit: "cover",
+              borderRadius: "8px",
+              flexShrink: 0,
+            }}
+          />
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="overline" color="text.secondary">
+              {eyebrow}
+            </Typography>
+            <Typography
+              component="h2"
+              sx={{ fontSize: 24, fontWeight: 500, my: 0.5 }}
+            >
+              {mapLayer.map.pretty_name}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {getMapModeLabel(t, mode)} ·{" "}
+              {getMapEnvironmentLabel(t, mapLayer.environment)}
+            </Typography>
+          </Box>
+          <Button
+            variant="outlined"
+            color="inherit"
+            onClick={() => onAction(mapLayer)}
+            startIcon={actionIcon}
+            sx={{
+              gridColumn: "1 / -1",
+              justifySelf: "center",
+              width: 212,
+              maxWidth: "100%",
+            }}
+          >
+            {actionLabel}
+          </Button>
+        </Box>
+      </Box>
+    );
+
   return (
-    <Box
+    <Box data-theme-surface="panel"
       component="article"
       sx={{
         display: "grid",
-        gridTemplateColumns: { xs: "104px minmax(0, 1fr)", sm: "150px minmax(0, 1fr) auto" },
+        gridTemplateColumns: {
+          xs: "104px minmax(0, 1fr)",
+          sm: "150px minmax(0, 1fr) auto",
+        },
         minHeight: { xs: 104, sm: 118 },
         border: "1px solid",
         borderColor: "divider",
@@ -60,7 +145,10 @@ function MapStateCard({ eyebrow, mapLayer, actionLabel, actionIcon, onAction }) 
           objectFit: "cover",
         }}
       />
-      <Stack justifyContent="center" sx={{ px: { xs: 1.5, sm: 2 }, minWidth: 0 }}>
+      <Stack
+        justifyContent="center"
+        sx={{ px: { xs: 1.5, sm: 2 }, minWidth: 0 }}
+      >
         <Typography variant="overline" color="primary.main">
           {eyebrow}
         </Typography>
@@ -98,7 +186,9 @@ function MapStateCard({ eyebrow, mapLayer, actionLabel, actionIcon, onAction }) 
 function ImpactMetric({ icon, label, value }) {
   return (
     <Stack direction="row" spacing={1} alignItems="center">
-      <Box sx={{ color: "primary.main", display: "grid", placeItems: "center" }}>
+      <Box
+        sx={{ color: "primary.main", display: "grid", placeItems: "center" }}
+      >
         {icon}
       </Box>
       <Box>
@@ -115,6 +205,7 @@ function ImpactMetric({ icon, label, value }) {
 
 const MapListPage = () => {
   const { t } = useTranslation();
+  const isWardogs = useTheme().frontline?.appearance?.preset === "wardogs";
   const { maps } = useRouteLoaderData("maps");
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [mapToConfirm, setMapToConfirm] = useState(null);
@@ -214,9 +305,11 @@ const MapListPage = () => {
           aria-label={t("maps.changeWorkbench.liveState")}
           sx={{
             display: "grid",
-            gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" },
-            gap: 1.5,
-            mb: 1.5,
+            gridTemplateColumns: isWardogs
+              ? "repeat(auto-fit, minmax(min(100%, 360px), 1fr))"
+              : { xs: "1fr", lg: "1fr 1fr" },
+            gap: isWardogs ? 2 : 1.5,
+            mb: isWardogs ? 3 : 1.5,
           }}
         >
           <MapStateCard
@@ -236,8 +329,9 @@ const MapListPage = () => {
         </Box>
       )}
 
-      <Box
+      <Box data-theme-surface="panel"
         component="section"
+        className="wardogs-map-catalog"
         sx={{
           border: "1px solid",
           borderColor: "divider",
@@ -328,7 +422,7 @@ const MapListPage = () => {
           </Typography>
 
           {mapToConfirm && (
-            <Box
+            <Box data-theme-surface="panel"
               sx={{
                 mt: 2,
                 display: "grid",
@@ -341,7 +435,12 @@ const MapListPage = () => {
                 component="img"
                 src={getMapLayerImageSrc(mapToConfirm)}
                 alt=""
-                sx={{ width: "100%", height: "100%", minHeight: 96, objectFit: "cover" }}
+                sx={{
+                  width: "100%",
+                  height: "100%",
+                  minHeight: 96,
+                  objectFit: "cover",
+                }}
               />
               <Stack justifyContent="center" sx={{ px: 2 }}>
                 <Typography variant="h6" fontWeight={850}>
@@ -358,7 +457,7 @@ const MapListPage = () => {
             </Box>
           )}
 
-          <Box
+          <Box data-theme-surface="panel"
             sx={{
               mt: 2,
               display: "grid",
@@ -387,8 +486,14 @@ const MapListPage = () => {
             />
           </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 2, borderTop: "1px solid", borderColor: "divider" }}>
-          <Button onClick={closeConfirmation} color="inherit" disabled={isPending}>
+        <DialogActions
+          sx={{ p: 2, borderTop: "1px solid", borderColor: "divider" }}
+        >
+          <Button
+            onClick={closeConfirmation}
+            color="inherit"
+            disabled={isPending}
+          >
             {t("common.cancel")}
           </Button>
           <Button

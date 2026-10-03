@@ -38,6 +38,12 @@ export default defineConfig(({ command, mode }) => {
   const VITE_CRCON_SERVER_URL = env.VITE_CRCON_SERVER_URL ?? DEFAULT_CRCON_SERVER_URL;
   const VITE_CRCON_API_ENDPOINT = env.VITE_CRCON_API_ENDPOINT ?? DEFAULT_CRCON_API_ENDPOINT;
   const DEBUG = env.DEBUG;
+  const adminTarget = env.VITE_CRCON_ADMIN_URL || VITE_CRCON_SERVER_URL;
+  const adminProxy = {
+    // Keep the browser's Host so Django's same-origin CSRF check remains valid.
+    "^/admin(?:/|$)": { target: adminTarget, changeOrigin: false },
+    "/djangostatic/": { target: adminTarget, changeOrigin: true },
+  };
 
   if (mode === "development") {
     if (!env.VITE_CRCON_SERVER_URL) {
@@ -87,6 +93,7 @@ export default defineConfig(({ command, mode }) => {
     server: {
       port: 3000,
       proxy: {
+        ...adminProxy,
         [VITE_CRCON_API_ENDPOINT]: {
           target: VITE_CRCON_SERVER_URL,
           changeOrigin: true,
@@ -96,6 +103,7 @@ export default defineConfig(({ command, mode }) => {
     preview: {
       port: 3000,
       proxy: {
+        ...adminProxy,
         [VITE_CRCON_API_ENDPOINT]: {
           target: VITE_CRCON_SERVER_URL,
           changeOrigin: true,

@@ -149,6 +149,15 @@ redis_data/
 
 # Auto generated Django admin panel stuff
 static/
+!rconweb/static/
+!rconweb/static/api/
+!rconweb/static/api/css/
+!rconweb/static/api/css/admin-wardogs.css
+!rconweb/static/api/js/
+!rconweb/static/api/js/admin-theme.js
+!rconweb/static/api/js/admin-integration.js
+!rconweb/static/api/js/permission-picker.js
+!rconweb/static/api/css/permission-picker.css
 
 certs/
 

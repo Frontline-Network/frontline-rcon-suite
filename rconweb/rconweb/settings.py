@@ -227,6 +227,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "api.tactical_privacy.TacticalPrivacyMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "api.admin_embedding.AdminEmbeddingMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
@@ -243,6 +244,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "api.admin_theme.admin_appearance",
             ],
         },
     },

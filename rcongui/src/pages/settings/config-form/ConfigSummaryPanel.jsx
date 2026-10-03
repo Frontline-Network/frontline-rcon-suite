@@ -50,7 +50,7 @@ export default function ConfigSummaryPanel({
       <CardContent>
         <Stack spacing={1.5}>
           {items.map((item) => (
-            <Box
+            <Box data-theme-surface="panel"
               key={item.id || item.label}
               sx={{
                 p: 1.25,

@@ -20,6 +20,7 @@ import { PlayerDrawerLink } from "@/components/shared/PlayerDrawerLink";
 function MapListItemBase({ mapLayer, renderActions, sx, ...props }) {
   return (
     <Box
+      className="wardogs-map-list-row"
       sx={{
         display: "flex",
         alignItems: "center",

@@ -111,7 +111,7 @@ const SummaryItem = ({
     }}
   >
     <Stack direction="row" alignItems="center" gap={1.25} minWidth={0}>
-      <Box
+      <Box data-theme-surface="control"
         sx={{
           display: "grid",
           placeItems: "center",
@@ -397,7 +397,7 @@ const VipPageContent = () => {
   );
 
   const filterRail = (
-    <Stack
+    <Stack data-theme-surface="panel"
       component="aside"
       aria-label={t("records.vips.filters")}
       sx={{
@@ -617,7 +617,7 @@ const VipPageContent = () => {
         actions={headerActions}
       />
 
-      <Box
+      <Box data-theme-surface="panel"
         sx={{
           display: "grid",
           gridTemplateColumns: {
@@ -628,6 +628,7 @@ const VipPageContent = () => {
           borderColor: "divider",
           mb: 1.5,
         }}
+        className="wardogs-summary-strip"
       >
         <SummaryItem
           icon={<PeopleAltOutlinedIcon sx={{ fontSize: 20 }} />}
@@ -695,6 +696,7 @@ const VipPageContent = () => {
           gap: 1.5,
           alignItems: "start",
         }}
+        className="wardogs-vip-workspace"
       >
         <Box sx={{ display: { xs: "none", md: "block" } }}>{filterRail}</Box>
         <VipTable

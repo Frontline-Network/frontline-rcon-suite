@@ -1,4 +1,8 @@
 import { createServer, Response } from "miragejs";
+// Snapshot of get_api_documentation from this source tree (2026-10-03).
+// Used only by the fake preview; production always requests its own backend.
+import apiDocumentation from "./data/api-documentation.json";
+import { normalizeAppearance } from "../themes/appearance";
 import { normalizeLiveViewPreferences } from "../pages/views/live/live-view-preferences.mjs";
 import { handleTeamView } from "./routes/team-view";
 import { createGameState } from "./state/game";
@@ -279,28 +283,34 @@ export function makeServer({ environment = "development" } = {}) {
           return ok({
             user_name: isViewer ? "Frontline Viewer" : "Frontline Admin",
             is_superuser: !isViewer,
+            is_staff: !isViewer,
             permissions: [],
           });
         })
       );
-      let demoAppearance = {
-        version: 1,
-        mode: "dark",
-        preset: "frontline-gold",
-        customAccent: "#c59a4a",
-        colorVision: "standard",
-      };
+      const demoAppearances = new Map();
+      const appearanceStorageKey = () => `crcon.demo.appearance.${getDemoRole()}`;
       this.get(
         "/get_own_user_appearance",
-        trackProtectedRequest("/api/get_own_user_appearance", () =>
-          ok(demoAppearance)
-        )
+        trackProtectedRequest("/api/get_own_user_appearance", () => {
+          const key = appearanceStorageKey();
+          let saved = demoAppearances.get(key);
+          try {
+            saved = JSON.parse(localStorage.getItem(key)) || saved;
+          } catch { /* use the in-memory fallback when storage is unavailable */ }
+          return ok(normalizeAppearance(saved));
+        })
       );
       this.put(
         "/set_own_user_appearance",
         trackProtectedRequest("/api/set_own_user_appearance", (_schema, request) => {
-          demoAppearance = JSON.parse(request.requestBody || "{}");
-          return ok(demoAppearance);
+          const appearance = normalizeAppearance(JSON.parse(request.requestBody || "{}"));
+          const key = appearanceStorageKey();
+          demoAppearances.set(key, appearance);
+          try {
+            localStorage.setItem(key, JSON.stringify(appearance));
+          } catch { /* keep the in-memory fallback */ }
+          return ok(appearance);
         })
       );
       this.get("/logout", () => ok(true));
@@ -373,6 +383,7 @@ export function makeServer({ environment = "development" } = {}) {
       );
       this.get("/get_system_usage", () => ok(getDemoSystemUsage()));
       this.get("/get_version", () => ok("11.2.0"));
+      this.get("/get_api_documentation", () => ok(apiDocumentation));
       this.get(
         "/get_name",
         trackProtectedRequest("/api/get_name", () => ok(demoServerName))
@@ -856,8 +867,11 @@ export function makeServer({ environment = "development" } = {}) {
         return ok(decision);
       });
 
-      this.get("/api/mobile/v1/incidents", () => ok(demoIncidents));
-      this.patch("/api/mobile/v1/incidents/:incidentId", (schema, request) => {
+      // The mobile client uses an origin-rooted URL, independent of the legacy
+      // API prefix. Register the same absolute URL to avoid a doubled /api.
+      const incidentsUrl = new URL("/api/mobile/v1/incidents", window.location.origin).href;
+      this.get(incidentsUrl, () => ok(demoIncidents));
+      this.patch(`${incidentsUrl}/:incidentId`, (schema, request) => {
         const payload = request.requestBody
           ? JSON.parse(request.requestBody)
           : {};

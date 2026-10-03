@@ -194,6 +194,7 @@ export default function BlacklistListCreateDialog({
         </Stack>
 
         <FormGroup
+          data-theme-surface="group"
           sx={{
             mt: 1.25,
             display: "grid",

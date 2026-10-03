@@ -344,7 +344,7 @@ export default function PlayerLogs() {
         </Form>
 
         <DetailCard elevation={0} variant="outlined" sx={{ flexGrow: 1 }}>
-          <TableToolbar>
+          <TableToolbar position="top">
             <DebouncedSearchInput
               placeholder={t("records.gameLogs.searchLogs")}
               onChange={(value) => {
@@ -373,7 +373,7 @@ export default function PlayerLogs() {
               density: "dense",
             }}
           />
-          <TableToolbar>
+          <TableToolbar position="bottom">
             <Box sx={{ flexGrow: 1 }} />
             <TablePagination table={table} />
           </TableToolbar>

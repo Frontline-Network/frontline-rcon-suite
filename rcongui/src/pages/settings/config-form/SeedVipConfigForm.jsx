@@ -79,7 +79,7 @@ function ValueStepper({ label, value, min = 0, max, disabled, onChange }) {
       <Typography variant="caption" color="text.secondary">
         {label}
       </Typography>
-      <Stack
+      <Stack data-theme-surface="control"
         direction="row"
         alignItems="stretch"
         sx={{ border: "1px solid", borderColor: "divider", minHeight: 42 }}
@@ -241,7 +241,7 @@ function OutcomeBrief({ data }) {
   const online = Boolean(data?.requirements?.online_when_seeded);
   const equalTeamTargets = allies === axis;
   return (
-    <Box sx={{ ...surfaceSx, overflow: "hidden" }}>
+    <Box data-theme-surface="panel" sx={{ ...surfaceSx, overflow: "hidden" }}>
       <Box sx={{ px: { xs: 1.5, md: 2 }, py: 1.5 }}>
         <Typography variant="subtitle1" color="primary.main" fontWeight={850}>
           {t(`${ROOT}.brief.title`)}
@@ -328,7 +328,7 @@ function OperationSection({ data, disabled, patch }) {
 
   return (
     <Stack spacing={2}>
-      <Box sx={{ ...surfaceSx, p: { xs: 1.5, md: 2 } }}>
+      <Box data-theme-surface="panel" sx={{ ...surfaceSx, p: { xs: 1.5, md: 2 } }}>
         <TextField
           select
           fullWidth
@@ -351,7 +351,7 @@ function OperationSection({ data, disabled, patch }) {
         </TextField>
       </Box>
       {pollingFields.map((field) => (
-        <Box key={field.name} sx={{ ...surfaceSx, p: { xs: 1.5, md: 2 } }}>
+        <Box data-theme-surface="panel" key={field.name} sx={{ ...surfaceSx, p: { xs: 1.5, md: 2 } }}>
           <Stack spacing={1.25}>
             <Box>
               <Typography variant="subtitle2" fontWeight={850}>
@@ -477,7 +477,7 @@ function RequirementsSection({ data, disabled, patch }) {
   return (
     <Stack spacing={2}>
       <OutcomeBrief data={data} />
-      <Box sx={{ ...surfaceSx, overflow: "hidden" }}>
+      <Box data-theme-surface="panel" sx={{ ...surfaceSx, overflow: "hidden" }}>
         <Box
           sx={{
             display: "grid",
@@ -639,7 +639,7 @@ function RequirementsSection({ data, disabled, patch }) {
         </Box>
       </Box>
 
-      <Box sx={surfaceSx}>
+      <Box data-theme-surface="panel" sx={surfaceSx}>
         <Button
           fullWidth
           color="inherit"
@@ -721,7 +721,7 @@ function RewardSection({ data, disabled, patch }) {
 
   return (
     <Stack spacing={2}>
-      <Box sx={{ ...surfaceSx, p: { xs: 1.5, md: 2 } }}>
+      <Box data-theme-surface="panel" sx={{ ...surfaceSx, p: { xs: 1.5, md: 2 } }}>
         <Typography variant="overline" color="text.secondary">
           {t(`${ROOT}.reward.duration`)}
         </Typography>
@@ -760,7 +760,7 @@ function RewardSection({ data, disabled, patch }) {
         </Stack>
       </Box>
 
-      <Box sx={{ ...surfaceSx, p: { xs: 1.5, md: 2 } }}>
+      <Box data-theme-surface="panel" sx={{ ...surfaceSx, p: { xs: 1.5, md: 2 } }}>
         <Typography variant="subtitle2" fontWeight={850} sx={{ mb: 1 }}>
           {t(`${ROOT}.reward.existingVip`)}
         </Typography>
@@ -789,7 +789,7 @@ function RewardSection({ data, disabled, patch }) {
         </Alert>
       </Box>
 
-      <Box sx={surfaceSx}>
+      <Box data-theme-surface="panel" sx={surfaceSx}>
         <Button
           fullWidth
           color="inherit"
@@ -880,7 +880,7 @@ function MessagesSection({ data, disabled, patch }) {
     patch({ player_messages: { ...messages, ...next } });
 
   return (
-    <Box sx={{ ...surfaceSx, overflow: "hidden" }}>
+    <Box data-theme-surface="panel" sx={{ ...surfaceSx, overflow: "hidden" }}>
       {messageDefinitions.map(([key, placeholders], index) => {
         const open = openKey === key;
         const value = messages[key] || "";
@@ -972,7 +972,7 @@ function WebhooksSection({ data, disabled, patch }) {
   return (
     <Stack spacing={1.5}>
       {hooks.length === 0 && (
-        <Box sx={{ ...surfaceSx, p: 3, textAlign: "center" }}>
+        <Box data-theme-surface="panel" sx={{ ...surfaceSx, p: 3, textAlign: "center" }}>
           <NotificationsNoneOutlinedIcon
             color="primary"
             sx={{ fontSize: 34 }}
@@ -986,7 +986,7 @@ function WebhooksSection({ data, disabled, patch }) {
         </Box>
       )}
       {hooks.map((hook, index) => (
-        <Stack
+        <Stack data-theme-surface="panel"
           key={index}
           direction={{ xs: "column", sm: "row" }}
           spacing={1}

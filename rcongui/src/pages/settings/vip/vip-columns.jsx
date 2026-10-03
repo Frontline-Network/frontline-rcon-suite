@@ -90,7 +90,7 @@ const getVipColumns = ({
     header: SortableHeader(t("records.vips.player")),
     cell: ({ row }) => (
       <Stack direction="row" alignItems="center" gap={1} minWidth={0}>
-        <Box
+        <Box data-theme-surface="control"
           aria-hidden="true"
           sx={{
             display: "grid",

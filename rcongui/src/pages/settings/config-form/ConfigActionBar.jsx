@@ -54,8 +54,9 @@ export default function ConfigActionBar({
   metaItems = [],
 }) {
   return (
-    <Box
+    <Box data-theme-surface="panel"
       component="footer"
+      className="wardogs-action-bar"
       sx={{
         position: sticky
           ? { xs: mobileSticky ? "sticky" : "static", md: "sticky" }
@@ -92,6 +93,7 @@ export default function ConfigActionBar({
     >
       <ActionResult result={result} compact />
       <Stack
+        className="wardogs-action-content"
         direction={{ xs: "column", md: "row" }}
         justifyContent="space-between"
         alignItems={{ xs: "stretch", md: "center" }}
@@ -99,6 +101,7 @@ export default function ConfigActionBar({
         sx={{ mt: result ? 1.25 : 0 }}
       >
         <Stack
+          className="wardogs-action-status"
           direction="row"
           spacing={1}
           alignItems="center"
@@ -156,10 +159,7 @@ export default function ConfigActionBar({
                     alignItems="baseline"
                     sx={{ minWidth: 0 }}
                   >
-                    <Typography
-                      variant="overline"
-                      color="text.secondary"
-                    >
+                    <Typography variant="overline" color="text.secondary">
                       {item.label}
                     </Typography>
                     <Typography
@@ -178,6 +178,7 @@ export default function ConfigActionBar({
         </Stack>
 
         <Box
+          className="wardogs-action-buttons"
           sx={{
             display: { xs: "grid", md: "flex" },
             gridTemplateColumns:

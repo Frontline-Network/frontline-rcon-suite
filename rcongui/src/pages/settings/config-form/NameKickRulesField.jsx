@@ -130,7 +130,7 @@ export default function NameKickRulesField({
           {NAME_KICK_PRESETS.map((preset) => {
             const active = patterns.includes(preset.pattern);
             return (
-              <Box
+              <Box data-theme-surface="panel"
                 key={preset.id}
                 sx={{
                   p: 1.5,
@@ -326,7 +326,7 @@ export default function NameKickRulesField({
         </Stack>
       </Box>
 
-      <Box
+      <Box data-theme-surface="panel"
         sx={{
           p: 1.5,
           border: "1px solid",

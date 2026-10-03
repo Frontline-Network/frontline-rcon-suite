@@ -243,13 +243,13 @@ export default function AuditLogsPage() {
           minWidth: 0,
         }}
       >
-        <Box sx={{ minWidth: 0 }}>
+        <Box className="wardogs-joined-table" sx={{ minWidth: 0 }}>
           <AuditLogsJournal
             entries={visibleEntries}
             selectedKey={selectedKey}
             onSelect={handleSelect}
           />
-          <Stack
+          <Stack data-theme-surface="control"
             direction={{ xs: "column", sm: "row" }}
             alignItems={{ xs: "stretch", sm: "center" }}
             gap={1}

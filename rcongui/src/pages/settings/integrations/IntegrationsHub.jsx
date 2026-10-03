@@ -283,7 +283,10 @@ export default function IntegrationsHub({
               >
                 {t(group.labelKey, { count: modules.length })}
               </Typography>
-              <Box sx={{ border: "1px solid", borderColor: "divider" }}>
+              <Box
+                data-theme-surface="group"
+                sx={{ border: "1px solid", borderColor: "divider" }}
+              >
                 {modules.map((module, moduleIndex) => {
                   const active = module.command === activeCommand;
                   const status = knownStatuses[module.command] || "available";
@@ -339,7 +342,7 @@ export default function IntegrationsHub({
                           alignItems="center"
                           minWidth={0}
                         >
-                          <Box
+                          <Box data-theme-surface="control"
                             sx={{
                               display: "grid",
                               placeItems: "center",
@@ -429,7 +432,7 @@ export default function IntegrationsHub({
       </Stack>
 
       {filteredModules.length === 0 && (
-        <Box
+        <Box data-theme-surface="panel"
           sx={{
             border: "1px solid",
             borderColor: "divider",

@@ -96,7 +96,7 @@ const statusForFilter = (filter) => {
 };
 
 const MetricCard = ({ icon: Icon, label, value }) => (
-  <Box
+  <Box data-theme-surface="panel"
     sx={{
       alignItems: "center",
       bgcolor: "background.paper",
@@ -129,7 +129,7 @@ const IncidentCard = ({ incident, isSelected, onOpen }) => {
   const reporter = incident.reporter_name || t("incidents.unknownReporter");
 
   return (
-    <Box
+    <Box data-theme-surface="panel"
       component="article"
       sx={(theme) => ({
         bgcolor: isSelected ? "action.selected" : "background.paper",
@@ -244,7 +244,7 @@ const IncidentDetail = ({
 
   if (!incident) {
     return (
-      <Stack
+      <Stack data-theme-surface="panel"
         alignItems="center"
         justifyContent="center"
         spacing={1.5}
@@ -275,7 +275,7 @@ const IncidentDetail = ({
       : t("incidents.nextStep.review");
 
   return (
-    <Box
+    <Box data-theme-surface="panel"
       component="section"
       aria-labelledby="incident-detail-title"
       sx={{
@@ -354,7 +354,7 @@ const IncidentDetail = ({
           </Typography>
         </Box>
 
-        <Box
+        <Box data-theme-surface="panel"
           sx={{
             bgcolor: "background.default",
             border: "1px solid",
@@ -385,6 +385,7 @@ const IncidentDetail = ({
               {t("incidents.detail.original")}
             </Typography>
             <Typography
+              data-theme-surface="panel"
               component="pre"
               variant="body2"
               sx={{
@@ -762,10 +763,8 @@ export default function IncidentsPage() {
             <PageState
               kind="error"
               title={t("incidents.loadFailed")}
-              action={{
-                label: t("common.retry"),
-                onClick: () => query.refetch(),
-              }}
+              actionLabel={t("common.retry")}
+              onAction={() => query.refetch()}
             />
           ) : filtered.length === 0 ? (
             <PageState

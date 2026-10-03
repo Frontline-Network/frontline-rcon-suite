@@ -1,0 +1,53 @@
+{% extends "admin/index.html" %}
+{% load i18n log admin_presentation %}
+
+{% block content_title %}
+{% if crcon_admin_wardogs %}
+<div class="crcon-admin-intro"><span class="crcon-eyebrow">CRCON / {{ crcon_admin_text.overview }}</span><h1>{{ crcon_admin_text.title }}</h1><p>{{ crcon_admin_text.subtitle }}</p></div>
+{% else %}{{ block.super }}{% endif %}
+{% endblock %}
+
+{% block content %}
+{% if crcon_admin_wardogs %}
+<div id="content-main" class="crcon-admin-sections">
+  {% for app in app_list|admin_app_order %}
+  <section class="crcon-admin-section" aria-labelledby="crcon-app-{{ app.app_label }}">
+    <h2 id="crcon-app-{{ app.app_label }}">{% if app.app_label == 'auth' %}{{ crcon_admin_text.accounts }}{% elif app.app_label == 'api' %}{{ crcon_admin_text.connections }}{% else %}{{ app.name }}{% endif %}</h2>
+    <div class="crcon-admin-cards">
+      {% for model in app.models %}{% admin_model_presentation model as presentation %}
+      <article class="crcon-admin-card">
+        <div class="crcon-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          {% if presentation.icon == 'users' %}<circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6M21 21v-3a6 6 0 0 0-4-5"/>
+          {% elif presentation.icon == 'key' %}<circle cx="8" cy="8" r="5"/><path d="m12 12 9 9M16 16l3-3M19 19l3-3"/>
+          {% elif presentation.icon == 'device' %}<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M10 18h4"/>
+          {% else %}<path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6zM8 12l3 3 5-6"/>{% endif %}
+          </svg>
+        </div>
+        <h3>{% if model.admin_url %}<a href="{{ model.admin_url }}">{{ presentation.title }}</a>{% else %}{{ presentation.title }}{% endif %}</h3>
+        <p>{{ presentation.description }}</p>
+        <div class="crcon-card-actions">
+          {% if model.admin_url %}<a class="crcon-manage" href="{{ model.admin_url }}">{{ crcon_admin_text.open }} <span aria-hidden="true">→</span></a>{% endif %}
+          {% if model.add_url %}<a class="crcon-add" href="{{ model.add_url }}"><span aria-hidden="true">＋</span> {{ crcon_admin_text.add }}</a>{% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% empty %}<p>{{ crcon_admin_text.empty }}</p>{% endfor %}
+</div>
+{% else %}{{ block.super }}{% endif %}
+{% endblock %}
+
+{% block sidebar %}
+{% if crcon_admin_wardogs %}
+<aside id="content-related" class="crcon-admin-recent" aria-labelledby="crcon-recent-title">
+  <div class="module" id="recent-actions-module"><h2 id="crcon-recent-title">{{ crcon_admin_text.recent }}</h2>
+    {% get_admin_log 8 as admin_log for_user user %}
+    {% if admin_log %}<ul class="actionlist">{% for entry in admin_log %}
+      <li>{% if entry.is_deletion or not entry.get_admin_url %}{{ entry.object_repr }}{% else %}<a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>{% endif %}<span class="crcon-log-meta">{{ entry.content_type.name|capfirst }} · {{ entry.action_time|date:"SHORT_DATETIME_FORMAT" }}</span></li>
+    {% endfor %}</ul>{% else %}<p class="crcon-empty-recent">{{ crcon_admin_text.no_recent }}</p>{% endif %}
+  </div>
+</aside>
+{% else %}{{ block.super }}{% endif %}
+{% endblock %}

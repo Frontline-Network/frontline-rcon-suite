@@ -188,7 +188,7 @@ function VoteRow({
       }}
     >
       <Box sx={{ px: 1.25 }}>
-        <Box
+        <Box data-theme-surface="control"
           sx={{
             display: "grid",
             placeItems: "center",
@@ -329,7 +329,7 @@ function CurrentVote({ status, onRemove, canRemove }) {
         </Typography>
       </Stack>
 
-      <Box sx={{ border: "1px solid", borderColor: "divider" }}>
+      <Box data-theme-surface="table-body" sx={{ border: "1px solid", borderColor: "divider" }}>
         <Box
           sx={{
             display: { xs: "none", sm: "grid" },
@@ -436,7 +436,7 @@ function History({ results, page, onPageChange }) {
         )}
       </Stack>
 
-      <Box sx={{ border: "1px solid", borderColor: "divider" }}>
+      <Box data-theme-surface="table-body" sx={{ border: "1px solid", borderColor: "divider" }}>
         {current ? (
           <>
             <Stack
@@ -741,7 +741,7 @@ export default function VotemapStatusPage() {
       >
         {statusLabel}
       </Box>
-      <Box
+      <Box data-theme-surface="panel"
         component="aside"
         aria-label={t("maps.votemapWorkbench.summary")}
         sx={{
@@ -827,7 +827,7 @@ export default function VotemapStatusPage() {
             canRemove={can("can_remove_map_from_votemap") && active}
           />
         </Box>
-        <Box
+        <Box data-theme-surface="panel"
           component="aside"
           aria-labelledby="vote-actions-heading"
           sx={{
