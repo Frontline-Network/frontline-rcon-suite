@@ -17,6 +17,7 @@ const en = {
     openProfile: "Open Steam profile",
     profileByName: "Open platform profile using in-game name {{name}}. Not verified by account ID; sign-in or privacy restrictions may apply.",
     nameLinkHint: "Profile link uses the in-game name, not the account ID.",
+    nameLinkShort: "Profile by name",
     linkedAccounts: "Connected game accounts",
     currentAccount: "Current",
     restrictedTitle: "Security warning: linked account is banned",

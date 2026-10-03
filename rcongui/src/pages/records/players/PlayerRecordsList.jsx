@@ -93,7 +93,7 @@ const PlayerRecordsListRow = memo(function PlayerRecordsListRow({
               {name[0]}
             </Avatar>
           </OnlineStatusBadge>
-          <Box minWidth={0}>
+          <Box minWidth={0} sx={{ flex: 1 }}>
             <Typography fontWeight={600} noWrap>
               <Link
                 style={{ color: "inherit" }}
@@ -102,7 +102,7 @@ const PlayerRecordsListRow = memo(function PlayerRecordsListRow({
                 {name}
               </Link>
             </Typography>
-            <PlayerIdentifiers player={player} />
+            <PlayerIdentifiers player={player} variant="compact" />
           </Box>
         </Stack>
       </TableCell>

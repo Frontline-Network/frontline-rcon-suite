@@ -17,6 +17,7 @@ const de = {
     openProfile: "Steam-Profil öffnen",
     profileByName: "Plattformprofil über Spielnamen {{name}} öffnen. Nicht anhand der Konto-ID bestätigt; Anmeldung oder Datenschutzeinstellungen können den Zugriff einschränken.",
     nameLinkHint: "Profil-Link über den Spielnamen, nicht über die Konto-ID.",
+    nameLinkShort: "Profil über Namen",
     linkedAccounts: "Verbundene Spielkonten",
     currentAccount: "Aktuell",
     restrictedTitle: "Sicherheitswarnung: verknüpftes Konto gesperrt",

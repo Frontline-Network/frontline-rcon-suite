@@ -43,13 +43,12 @@ export const ResponsiveDrawer = styled(Drawer)(({ theme }) => ({
 
 export const ProfileWrapper = styled(Box)(({ theme }) => ({
   width: "100%",
-  height: "100%",
+  maxWidth: "100%",
+  minHeight: "100%",
+  flexShrink: 0,
+  boxSizing: "border-box",
   overflowX: "hidden",
-  paddingTop: theme.spacing(1),
   paddingBottom: theme.spacing(2),
-  [theme.breakpoints.up("sm")]: {
-    width: "30rem",
-  },
 }));
 
 export const ProfileHeader = styled(Stack)(({ theme }) => ({

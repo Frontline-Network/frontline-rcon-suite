@@ -432,7 +432,7 @@ export default function PlayerDetailPanel({
             label=""
             value={detail.platform}
           />
-          <PlayerIdentifiers player={player} />
+          <PlayerIdentifiers player={player} variant="compact" />
         </Stack>
         <Stack className="player-detail-group" direction="row">
           <InlineFact

@@ -119,7 +119,8 @@ for (const viewport of [VIEWPORTS.mobile, VIEWPORTS.desktop]) {
       query,
       language: "en",
     });
-    const identities = page.getByTestId("player-identifiers").first();
+    const identities = page.getByTestId("player-identifiers");
+    await expect(identities).toHaveCount(1);
     await expect(
       identities.getByText(cases[1].id, { exact: true })
     ).toBeVisible();
@@ -129,13 +130,25 @@ for (const viewport of [VIEWPORTS.mobile, VIEWPORTS.desktop]) {
     await expect(
       identities.locator('[data-identity-kind="eosId"] a')
     ).toHaveCount(0);
-    await expect(identities).toContainText(
-      "Profile link uses the in-game name"
-    );
+    await expect(identities).toContainText("Profile by name");
     const overflow = await identities.evaluate(
       (element) => element.scrollWidth - element.clientWidth
     );
     expect(overflow).toBeLessThanOrEqual(1);
+    const identityRows = identities.locator("[data-identity-kind]");
+    const firstRow = await identityRows.nth(0).boundingBox();
+    const secondRow = await identityRows.nth(1).boundingBox();
+    if (viewport.width >= 1440) {
+      expect(Math.abs(firstRow.y - secondRow.y)).toBeLessThanOrEqual(1);
+      expect(secondRow.x).toBeGreaterThan(firstRow.x);
+    } else {
+      expect(secondRow.y).toBeGreaterThan(firstRow.y);
+      const copyButtons = identities.getByRole("button");
+      const firstCopy = await copyButtons.nth(0).boundingBox();
+      const secondCopy = await copyButtons.nth(1).boundingBox();
+      expect(Math.abs(firstCopy.x - secondCopy.x)).toBeLessThanOrEqual(1);
+      expect(firstCopy.width).toBeGreaterThanOrEqual(44);
+    }
     await expectNoHorizontalPageOverflow(page);
   });
 }
@@ -175,3 +188,50 @@ test("soldier editor displays the friendly platform without replacing the raw AP
     "EPlatformFamily::PS5"
   );
 });
+
+for (const viewport of [VIEWPORTS.mobile, VIEWPORTS.desktop]) {
+  test(`sidecard aligns IDs and keeps actions usable at ${viewport.width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(VIEWPORTS.desktop);
+    await openDemoPage(page, "/views/live", { query, language: "en" });
+    await page.getByRole("button", { name: "FLN_Wolf", exact: true }).click();
+    await page.setViewportSize(viewport);
+    const drawer = page.getByTestId("player-profile-drawer");
+    await expect(
+      drawer.getByRole("heading", { name: /FLN_Wolf/ })
+    ).toBeVisible();
+    const identities = drawer.getByTestId("player-identifiers");
+    await expect(identities).toHaveCount(1);
+    await expect(identities).toContainText(cases[1].id);
+    await expect(identities).toContainText(cases[1].eos);
+    const alignment = await drawer.evaluate((element) => {
+      const drawerBox = element.getBoundingClientRect();
+      const idBox = element
+        .querySelector('[data-testid="player-identifiers"]')
+        .getBoundingClientRect();
+      return {
+        left: idBox.left - drawerBox.left,
+        right: drawerBox.right - idBox.right,
+        overflow: element.scrollWidth - element.clientWidth,
+        panelOverflow:
+          element.closest(".MuiDrawer-paper").scrollWidth -
+          element.closest(".MuiDrawer-paper").clientWidth,
+      };
+    });
+    expect(Math.abs(alignment.left - alignment.right)).toBeLessThanOrEqual(1);
+    expect(alignment.left).toBeGreaterThanOrEqual(16);
+    expect(alignment.overflow).toBeLessThanOrEqual(1);
+    expect(alignment.panelOverflow).toBeLessThanOrEqual(1);
+    await drawer.getByRole("tab", { name: "Game", exact: true }).click();
+    await expect(
+      drawer.getByRole("tab", { name: "Game", exact: true })
+    ).toHaveAttribute("aria-selected", "true");
+    await drawer.getByRole("tab", { name: "Profile", exact: true }).click();
+    await expect(
+      drawer.getByRole("tab", { name: "Profile", exact: true })
+    ).toHaveAttribute("aria-selected", "true");
+    await drawer.getByRole("button", { name: "Close", exact: true }).click();
+    await expect(drawer).not.toBeVisible();
+  });
+}

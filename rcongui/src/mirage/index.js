@@ -673,7 +673,8 @@ export function makeServer({ environment = "development" } = {}) {
 
       this.post("/get_players_history", () => ({ result: { players: playerRecords(), total: playerRecords().length } }));
       this.get("/get_player_profile", (schema, request) => {
-        const records = new URLSearchParams(window.location.search).get("demo_warning_sources") === "1"
+        const demoQuery = new URLSearchParams(window.location.search);
+        const records = demoQuery.get("demo_warning_sources") === "1" || demoQuery.get("demo_platform_identities") === "1"
           ? demoPlayerRecords
           : playerRecords();
         const player = records.find(
