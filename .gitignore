@@ -182,6 +182,7 @@ CRCON-Mobile-Admin-*-test.apk
 # Production deploy state is host-specific and may contain database backups.
 .deploy-backups/
 .deploy-state/
+/release_version
 
 # The upstream Python rule ignores every directory named `lib`; keep Flutter sources.
 !mobile_app/lib/

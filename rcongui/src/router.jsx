@@ -12,6 +12,11 @@ const ViewsCrumb = () => {
   return <span>{t("navigation.groups.views")}</span>;
 };
 
+const UpdatesCrumb = () => {
+  const { t } = useTranslation();
+  return <span>{t("updates.title")}</span>;
+};
+
 const DocumentationCrumb = () => {
   const { t } = useTranslation();
   return <span>{t("documentation.title")}</span>;
@@ -91,6 +96,12 @@ const router = createBrowserRouter([
     action: rootAction,
     loader: rootLoader,
     children: [
+      {
+        path: "updates",
+        handle: { crumb: () => <UpdatesCrumb /> },
+        lazy: lazyPage(() => import("./pages/updates")),
+        errorElement: <RouteError />,
+      },
       {
         path: "account/password",
         handle: { crumb: () => <PasswordCrumb /> },

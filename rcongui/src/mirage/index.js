@@ -2,6 +2,7 @@ import { createServer, Response } from "miragejs";
 // Snapshot of get_api_documentation from this source tree (2026-10-03).
 // Used only by the fake preview; production always requests its own backend.
 import apiDocumentation from "./data/api-documentation.json";
+import { updateChannelPreview } from "./data/update-channel";
 import { normalizeAppearance } from "../themes/appearance";
 import { normalizeLiveViewPreferences } from "../pages/views/live/live-view-preferences.mjs";
 import { handleTeamView } from "./routes/team-view";
@@ -382,8 +383,9 @@ export function makeServer({ environment = "development" } = {}) {
         trackProtectedRequest("/api/get_online_mods", () => ok([]))
       );
       this.get("/get_system_usage", () => ok(getDemoSystemUsage()));
-      this.get("/get_version", () => ok("11.2.0"));
+      this.get("/get_version", () => ok(updateChannelPreview.installed_version));
       this.get("/get_api_documentation", () => ok(apiDocumentation));
+      this.get("/get_update_channel", () => ok(updateChannelPreview));
       this.get(
         "/get_name",
         trackProtectedRequest("/api/get_name", () => ok(demoServerName))

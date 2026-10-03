@@ -7,6 +7,8 @@ x-frontline-backend: &frontline-backend
   build:
     context: .
     dockerfile: Dockerfile
+    args:
+      CRCON_VERSION: ${CRCON_VERSION:-development}
 
 x-mobile-environment: &mobile-environment
   CRCON_VERSION: ${CRCON_VERSION:-development}

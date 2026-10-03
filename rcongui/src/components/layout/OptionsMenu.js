@@ -1,3 +1,4 @@
+import NewReleasesOutlinedIcon from "@mui/icons-material/NewReleasesOutlined";
 import { styled } from '@mui/material/styles';
 import { dividerClasses } from '@mui/material/Divider';
 import Menu from '@mui/material/Menu';
@@ -15,6 +16,8 @@ import {Link, useSubmit} from 'react-router-dom';
 import {Fragment, useState} from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "@/stores/app-state";
+import Badge from "@mui/material/Badge";
+import { useUpdateChannel } from "@/hooks/useUpdateChannel";
 
 const MenuItem = styled(MuiMenuItem)({
   margin: '2px 0',
@@ -22,6 +25,7 @@ const MenuItem = styled(MuiMenuItem)({
 
 export default function OptionsMenu({ renderTrigger }) {
   const { t } = useTranslation();
+  const { unreadCount } = useUpdateChannel({ poll: true });
   const [anchorEl, setAnchorEl] = useState(null);
   const setAppearanceOpen = useAppStore((state) => state.setAppearanceDialogOpen);
   const submit = useSubmit();
@@ -80,6 +84,10 @@ export default function OptionsMenu({ renderTrigger }) {
           <ListItemIcon sx={{ ml: 'auto', minWidth: 0 }}>
             <PaletteOutlinedIcon fontSize="small" />
           </ListItemIcon>
+        </MenuItem>
+        <MenuItem component={Link} to="/updates">
+          <ListItemText>{t("updates.title")}</ListItemText>
+          <ListItemIcon sx={{ ml: "auto", minWidth: 0 }}><Badge color="primary" variant="dot" invisible={!unreadCount}><NewReleasesOutlinedIcon fontSize="small" /></Badge></ListItemIcon>
         </MenuItem>
         <MenuItem component={Link} to="/documentation">
           <ListItemText>{t("documentation.title")}</ListItemText>

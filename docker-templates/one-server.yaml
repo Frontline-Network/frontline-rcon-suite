@@ -108,6 +108,8 @@ x-frontend: &frontend
   build:
     context: .
     dockerfile: Dockerfile-frontend
+    args:
+      CRCON_VERSION: ${TAGGED_VERSION:-unknown}
   image: ${FRONTEND_DOCKER_REPOSITORY}:${TAGGED_VERSION}
   environment:
     RCONWEB_EXTERNAL_ADDRESS: ${RCONWEB_EXTERNAL_ADDRESS}

@@ -1,3 +1,4 @@
+import NewReleasesOutlinedIcon from "@mui/icons-material/NewReleasesOutlined";
 import {
   createElement,
   isValidElement,
@@ -9,6 +10,7 @@ import {
 } from "react";
 import {
   Box,
+  Badge,
   Collapse,
   Divider,
   Drawer,
@@ -35,6 +37,7 @@ import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
 import { NavLink, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/useAuth";
+import { useUpdateChannel } from "@/hooks/useUpdateChannel";
 import { useAppStore } from "@/stores/app-state";
 import { COMMAND_RAIL_WIDTH } from "./CommandRail";
 import { buildCommandRailWorkspaces } from "./command-rail-navigation";
@@ -53,6 +56,7 @@ const icon = (value) =>
 // navigation tree. Frontline keeps its contextual workspace navigation.
 export default function WardogsNavigation() {
   const { t } = useTranslation();
+  const { unreadCount } = useUpdateChannel();
   const { permissions } = useAuth();
   const { pathname } = useLocation();
   const railVisible = useMediaQuery((theme) => theme.breakpoints.up("md"));
@@ -235,7 +239,7 @@ export default function WardogsNavigation() {
                             {t(section.labelTranslationKey)}
                           </Typography>
                         )}
-                        {section.links.filter((link) => link.to !== "/documentation").map((link) => (
+                        {section.links.filter((link) => !["/documentation", "/updates"].includes(link.to)).map((link) => (
                           <Tooltip
                             key={link.to}
                             title={
@@ -304,6 +308,10 @@ export default function WardogsNavigation() {
           borderColor: "divider",
         }}
       >
+        <ListItemButton component={NavLink} to="/updates" selected={pathname === "/updates"} onClick={() => !desktop && setOpen(false)}>
+          <ListItemIcon sx={{ minWidth: 30 }}><Badge color="primary" variant="dot" invisible={!unreadCount}><NewReleasesOutlinedIcon fontSize="small" /></Badge></ListItemIcon>
+          <ListItemText primary={t("updates.title")} />
+        </ListItemButton>
         <ListItemButton component={NavLink} to="/documentation" selected={pathname === "/documentation"} onClick={() => !desktop && setOpen(false)}>
           <ListItemIcon sx={{ minWidth: 30 }}><MenuBookOutlinedIcon fontSize="small" /></ListItemIcon>
           <ListItemText primary={t("documentation.title")} />

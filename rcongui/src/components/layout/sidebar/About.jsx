@@ -12,8 +12,6 @@ import {
   Divider,
   Stack,
   Typography,
-  IconButton,
-  Skeleton,
   useTheme,
   useMediaQuery,
 } from "@mui/material";
@@ -25,30 +23,12 @@ import { faCircleQuestion } from "@fortawesome/free-solid-svg-icons/faCircleQues
 import siteConfig from "@/config/siteConfig";
 import { cmd } from "@/utils/fetchUtils";
 import { useQuery } from "@tanstack/react-query";
-import dayjs from "dayjs";
-import { useGithubReleases } from "@/hooks/useGithubReleases";
-import RefreshIcon from "@mui/icons-material/Refresh";
-import { Suspense } from "react";
-import { HIGHLIGHT } from "./utils";
+import { Link as RouterLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-
-const ReleaseNotes = React.lazy(() =>
-  import("./ReleaseNotes").then((module) => ({
-    default: module.ReleaseNotes,
-  }))
-);
-
-const isNewerVersion = (a, b) => {
-  const [aMajor, aMinor, aPatch] = a.split(".");
-  const [bMajor, bMinor, bPatch] = b.split(".");
-  return aMajor >= bMajor && aMinor >= bMinor && aPatch >= bPatch;
-};
 
 export default function AboutDialog() {
   const { t } = useTranslation();
   const [open, setOpen] = React.useState(false);
-  const { releases, lastUpdate, unreadCount, markAsRead, forceUpdate } =
-    useGithubReleases();
   const theme = useTheme();
   const isSmallScreen = useMediaQuery(theme.breakpoints.down("md"));
 
@@ -59,7 +39,6 @@ export default function AboutDialog() {
   });
 
   const handleClickOpen = () => {
-    markAsRead();
     setOpen(true);
   };
 
@@ -76,13 +55,6 @@ export default function AboutDialog() {
       }
     }
   }, [open]);
-
-  const latestReleaseVersion =
-    (releases?.[0]?.tag_name || releases?.[0]?.name) ?? "";
-  const isUpToDate = isNewerVersion(
-    apiVersion.trim(),
-    latestReleaseVersion.trim()
-  );
 
   return (
     <React.Fragment>
@@ -105,10 +77,7 @@ export default function AboutDialog() {
                 alignItems={"center"}
               >
                 <Stack alignItems={"center"} direction={"row"} gap={0.5}>
-                  <FontAwesomeIcon
-                    icon={faCircleQuestion}
-                    color={unreadCount > 0 ? HIGHLIGHT.danger : ""}
-                  />
+                  <FontAwesomeIcon icon={faCircleQuestion} />
                   Version: {apiVersion}
                 </Stack>
               </Stack>
@@ -175,39 +144,7 @@ export default function AboutDialog() {
               {t("about.apiVersion")}:{" "}
               {isLoading ? t("common.loading") : apiVersion}
             </Typography>
-            <Typography variant="subtitle2">
-              {isUpToDate ? t("about.upToDate") : t("about.updateAvailable")}
-            </Typography>
-            <Typography variant="subtitle2">
-              {t("about.lastChecked")}: {dayjs(lastUpdate).format("LLL")}{" "}
-              <IconButton
-                variant="text"
-                size="small"
-                aria-label={t("about.lastChecked")}
-                onClick={() => {
-                  forceUpdate();
-                }}
-              >
-                <RefreshIcon />
-              </IconButton>
-            </Typography>
-
-            {open && releases.length > 0 && (
-              <>
-                <Suspense
-                  fallback={<Skeleton variant="rectangular" height={200} />}
-                >
-                  <Divider sx={{ my: 2 }} />
-                  <Typography variant="h6">
-                    {t("about.latestRelease")} {releases[0].name}
-                  </Typography>
-                  <Typography variant="subtitle2" sx={{ mb: 2 }}>
-                    {dayjs(releases[0].published_at).format("LLL")}
-                  </Typography>
-                  <ReleaseNotes release={releases[0]} />
-                </Suspense>
-              </>
-            )}
+            <Button component={RouterLink} to="/updates" onClick={handleClose} sx={{ mt: 2 }}>{t("updates.title")}</Button>
           </DialogContentText>
         </DialogContent>
 

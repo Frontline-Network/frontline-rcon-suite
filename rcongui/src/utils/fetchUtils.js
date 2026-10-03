@@ -282,6 +282,8 @@ async function parseJsonResponse(response) {
 export const cmd = {
   GET_API_DOCUMENTATION: (params) =>
     requestFactory({ method: "GET", cmd: "get_api_documentation", ...params }),
+  GET_UPDATE_CHANNEL: (params) =>
+    requestFactory({ method: "GET", cmd: "get_update_channel", ...params }),
   APPLY_QUEUE_LENGTH: (params) =>
     requestFactory({ method: "POST", cmd: "apply_queue_length", ...params }),
   APPLY_VIP_SLOTS_NUM: (params) =>

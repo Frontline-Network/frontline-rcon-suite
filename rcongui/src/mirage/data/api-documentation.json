@@ -3705,6 +3705,21 @@
     }
   },
   {
+    "endpoint": "get_update_channel",
+    "arguments": {},
+    "return_type": null,
+    "doc_string": "Read private release notes up to the matching deployed frontend/backend version.",
+    "auto_settings_capable": false,
+    "permissions_required": [],
+    "allowed_http_methods": [
+      "GET"
+    ],
+    "description_translations": {
+      "de": "Liefert Changelogs bis zur installierten Version. Der Query-Parameter frontend_version muss die installierte Frontend-Version nennen und mit der Backend-Version übereinstimmen. Die private Quelle wird ausschließlich serverseitig gelesen; benötigt eine Anmeldung.",
+      "en": "Returns changelogs up to the installed version. The frontend_version query parameter must identify the installed frontend and match the backend version. The private source is read exclusively by the backend; sign-in is required."
+    }
+  },
+  {
     "endpoint": "get_vac_game_bans_config",
     "arguments": {},
     "return_type": "<class 'rcon.user_config.vac_game_bans.VacGameBansUserConfig'>",

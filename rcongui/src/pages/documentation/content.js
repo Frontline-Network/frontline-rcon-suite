@@ -2,6 +2,43 @@
 // with rconweb/api/permission_presets.py; endpoint contracts come from the API.
 export const helpArticles = [
   {
+    id: "updates",
+    title: { de: "Updates & Changelogs", en: "Updates & changelogs" },
+    summary: { de: "Änderungen der installierten Version direkt im RCON lesen.", en: "Read changes for the installed version directly in RCON." },
+    body: {
+      de: `### Der Update-Kanal
+
+Über **Update-Kanal** im Benutzermenü oder in der Navigation findest du die Changelogs dieser RCON-Installation. Im Wardogs-Theme befindet sich der Einstieg zusätzlich unten in der Hauptnavigation. Die aktuelle Version ist gekennzeichnet; der Versionsverlauf enthält ältere stabile Releases. Die Suche durchsucht Titel, Versionen und Texte.
+
+### Erst nach dem Aufspielen
+
+Ein neues Release auf GitHub wird hier erst sichtbar, wenn **Frontend und Backend dieselbe veröffentlichte Version** verwenden. Bei einem laufenden Versionswechsel, einer Entwicklungsfassung oder unbekannter Version erscheint ein Hinweis. Ein direkter Link auf eine neuere Versionsnummer umgeht diese Prüfung nicht. Der Versionsverlauf ist kein Protokoll darüber, wann frühere Versionen tatsächlich installiert waren.
+
+### Gelesen und ungelesen
+
+**Neu für dich** kennzeichnet die aktuelle Version, solange du sie noch nicht als gelesen markiert hast. Der Lesestand wird in diesem Browser für dein Konto und diese RCON-Adresse gespeichert. Das Lesen verändert keine Einstellungen und installiert keine Updates.
+
+### Ohne GitHub-Zugang
+
+Die Changelogs werden aus unserem privaten Repository übernommen und direkt im RCON angezeigt. Dafür brauchst du nur deine normale RCON-Anmeldung. Es werden keine Repository-Links, externen Bilder oder Zugangsdaten geladen. Die Texte bleiben in der Sprache des veröffentlichten Releases.`,
+      en: `### The update channel
+
+Open **Update channel** in the account menu or navigation to read this RCON installation's changelogs. Wardogs also provides a link at the bottom of its main navigation. The current version is labelled; the history contains earlier stable releases. Search covers titles, versions and notes.
+
+### After deployment
+
+A new GitHub release only appears when **frontend and backend run the same published version**. An incomplete rollout, development build or unknown version shows an explanation instead. A direct link to a newer version cannot bypass this check. The history is not a log of when earlier versions were actually installed.
+
+### Read status
+
+**New for you** identifies the current version until you mark it as read. This browser remembers that status for your account and RCON address. Reading notes changes no settings and installs no updates.
+
+### No GitHub account required
+
+Notes are copied from our private repository and displayed inside RCON. Only your normal RCON sign-in is required. Repository links, external images and credentials are not loaded. Notes retain the language of the published release.`,
+    },
+  },
+  {
     id: "start",
     title: { de: "Einstieg & Navigation", en: "Getting started & navigation" },
     summary: {

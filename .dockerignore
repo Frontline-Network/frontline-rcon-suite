@@ -6,6 +6,7 @@ redis_data/
 .deploy-state/
 backups/
 .env
+.git
 certs/
 static/
 supervisor_data/

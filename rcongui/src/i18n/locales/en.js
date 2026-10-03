@@ -6580,4 +6580,35 @@ en.accountPassword = {
   "requestNew": "Request a new link"
 };
 
+en.updates = {
+  "title": "Update channel",
+  "subtitle": "News and changelogs for this RCON installation.",
+  "markRead": "Mark as read",
+  "refresh": "Reload",
+  "installed": "Installed on this RCON",
+  "scope": "Only published changes up to the deployed version appear here. New releases become visible after this RCON is updated.",
+  "unread": "New for you",
+  "loading": "Loading updates",
+  "history": "Version history",
+  "version": "Version",
+  "current": "Currently installed",
+  "published": "Published on {{date}}",
+  "prerelease": "Pre-release",
+  "noNotes": "No changelog was provided for this version.",
+  "search": "Search changelogs",
+  "clear": "Clear search",
+  "noResults": "No matching changelogs found.",
+  "notAvailable": "The requested entry is not available for this installation.",
+  "preview": "Local preview with sample data. These entries do not confirm an actual deployment.",
+  "stale": "The source is temporarily unavailable. Showing the last verified notes for this version.",
+  "versions": "Frontend: {{frontend}} · Backend: {{backend}}",
+  "status": {
+    "unverified": "The installed release version cannot be confirmed yet. No update announcements are shown.",
+    "version_mismatch": "Frontend and backend report different versions. The matching changelogs will appear after the update is fully deployed and the page is reloaded.",
+    "no_release": "No published changelog for the installed version was bundled yet. Newer versions are not shown in advance.",
+    "not_configured": "Changelogs have not been connected for this installation yet.",
+    "unavailable": "Changelogs could not be loaded. Please try again later."
+  }
+};
+
 export default mergeMissingTranslations(en, enMasterFallback);

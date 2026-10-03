@@ -1,3 +1,4 @@
+import NewReleasesOutlinedIcon from "@mui/icons-material/NewReleasesOutlined";
 import HomeIcon from "@mui/icons-material/Home";
 import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
 import SportsEsportsIcon from "@mui/icons-material/SportsEsports";
@@ -301,6 +302,11 @@ const rawNavMenus = [
         requiredStaff: true,
       },
       {
+        name: "Updates",
+        to: "/updates",
+        icon: <NewReleasesOutlinedIcon />,
+      },
+      {
         name: "Documentation",
         to: "/documentation",
         icon: <MenuBookOutlinedIcon />,
@@ -387,6 +393,7 @@ const rawNavMenus = [
 
 const linkTranslationKeys = {
   "/documentation": "documentation.title",
+  "/updates": "updates.title",
   "/": "navigation.links.home",
   "/apps": "navigation.links.frontlineApp",
   "/apps/discord-report-bot": "navigation.links.discordReportBot",
@@ -545,7 +552,7 @@ const taskGroupDefinitions = [
     id: "system-diagnostics",
     translationKey: "navigation.groups.systemDiagnostics",
     icon: <MiscellaneousServicesIcon />,
-    routes: ["/settings/services", "/documentation"],
+    routes: ["/settings/services", "/documentation", "/updates"],
   },
 ];
 

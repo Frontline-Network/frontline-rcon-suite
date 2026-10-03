@@ -6627,4 +6627,35 @@ de.accountPassword = {
   "requestNew": "Neuen Link anfordern"
 };
 
+de.updates = {
+  "title": "Update-Kanal",
+  "subtitle": "Neuigkeiten und Changelogs für diese RCON-Installation.",
+  "markRead": "Als gelesen markieren",
+  "refresh": "Neu laden",
+  "installed": "Auf diesem RCON installiert",
+  "scope": "Hier erscheinen nur veröffentlichte Änderungen bis zur aufgespielten Version. Neue Releases werden erst nach dem Update dieses RCON sichtbar.",
+  "unread": "Neu für dich",
+  "loading": "Updates werden geladen",
+  "history": "Versionsverlauf",
+  "version": "Version",
+  "current": "Aktuell installiert",
+  "published": "Veröffentlicht am {{date}}",
+  "prerelease": "Vorabversion",
+  "noNotes": "Für diese Version wurde kein Changelog hinterlegt.",
+  "search": "Changelogs durchsuchen",
+  "clear": "Suche zurücksetzen",
+  "noResults": "Keine passenden Changelogs gefunden.",
+  "notAvailable": "Der angeforderte Eintrag ist für diese Installation nicht verfügbar.",
+  "preview": "Lokale Vorschau mit Beispieldaten. Diese Einträge bestätigen keinen echten Rollout.",
+  "stale": "Die Quelle ist momentan nicht erreichbar. Angezeigt wird der zuletzt bestätigte Stand dieser Version.",
+  "versions": "Oberfläche: {{frontend}} · Backend: {{backend}}",
+  "status": {
+    "unverified": "Die installierte Release-Version ist noch nicht eindeutig bekannt. Deshalb werden keine Update-Meldungen angezeigt.",
+    "version_mismatch": "Oberfläche und Backend melden unterschiedliche Versionen. Sobald das Update vollständig aufgespielt und die Seite neu geladen ist, erscheinen die passenden Changelogs.",
+    "no_release": "Für die installierte Version ist noch kein veröffentlichtes Changelog mitgeliefert. Neuere Versionen werden hier nicht vorweggenommen.",
+    "not_configured": "Die Changelogs sind für diese Installation noch nicht angebunden.",
+    "unavailable": "Die Changelogs konnten nicht geladen werden. Bitte versuche es später erneut."
+  }
+};
+
 export default mergeMissingTranslations(de, deMasterFallback);
