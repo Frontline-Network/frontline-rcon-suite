@@ -38,9 +38,6 @@ export default function OptionsMenu({ renderTrigger }) {
     formData.append('intent', 'logout');
     submit(formData, { action: '/', method: 'POST' })
   }
-  const handleChangePassword = () => {
-    location.href = '/accounts/password_change';
-  }
   const triggerProps = {
     "aria-label": t("common.actions"),
     "aria-controls": open ? "user-options-menu-popover" : undefined,
@@ -91,7 +88,8 @@ export default function OptionsMenu({ renderTrigger }) {
           </ListItemIcon>
         </MenuItem>
         <MenuItem
-          onClick={handleChangePassword}
+          component={Link}
+          to="/account/password"
           sx={{
             [`& .${listItemIconClasses.root}`]: {
               ml: 'auto',

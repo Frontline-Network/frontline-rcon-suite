@@ -42,6 +42,7 @@ export default defineConfig(({ command, mode }) => {
   const adminProxy = {
     // Keep the browser's Host so Django's same-origin CSRF check remains valid.
     "^/admin(?:/|$)": { target: adminTarget, changeOrigin: false },
+    "^/accounts(?:/|$)": { target: adminTarget, changeOrigin: false },
     "/djangostatic/": { target: adminTarget, changeOrigin: true },
   };
 

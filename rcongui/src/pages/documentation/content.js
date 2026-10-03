@@ -212,6 +212,13 @@ Die wirksamen Rechte eines Kontos setzen sich aus **allen Gruppen und zusätzlic
 - **Zugang zur Administration (Staff):** erlaubt den grundsätzlichen Zugang zur Verwaltung; die nötigen Modellrechte kommen hinzu. Dies vergibt nicht automatisch alle RCON-Rechte.
 - **Superuser:** besitzt sämtliche Berechtigungen. Für normale Moderatoren ist dieses Kennzeichen nicht erforderlich.
 
+### Eigenes Passwort und Wiederherstellung
+Unter **Benutzermenü → Passwort ändern** änderst du dein eigenes Passwort direkt im RCON. Die geltenden Passwortregeln stehen am Formular. Du bleibst in diesem Browser angemeldet; andere Browsersitzungen werden ungültig.
+
+Über **Passwort vergessen?** auf der Anmeldung kannst du einen Link anfordern. Er gilt 30 Minuten und ist nach erfolgreicher Verwendung ungültig. Ein aktives Konto mit lokalem Passwort und einer erreichbaren E-Mail-Adresse ist Voraussetzung. Falls keine Nachricht ankommt, prüfe den Spamordner und kontaktiere die Administration. Die Antwort verrät nicht, ob eine Adresse registriert ist.
+
+Für Administratoren: Der Mailversand muss über SMTP eingerichtet und mit **CRCON_PASSWORD_RESET_ENABLED** aktiviert werden. **CRCON_PUBLIC_URL** legt die feste HTTPS-Adresse für E-Mail-Links fest. Die SMTP-Felder stehen in **default.env**; Zugangsdaten gehören in die private **.env**. Bei Port 587 wird üblicherweise TLS, bei Port 465 SSL verwendet. Anschließend Backend-Container mit der aktualisierten Compose-Konfiguration neu erstellen. Solange die Einrichtung fehlt, zeigt die Oberfläche die Wiederherstellung als nicht verfügbar an.
+
 ### Eine Aktion ist trotzdem gesperrt
 Prüfe zuerst die Rechtebeschreibung und gegebenenfalls die API-Referenz: Einige Aktionen benötigen mehrere Rechte gleichzeitig. Kontrolliere alle zugewiesenen Gruppen, speichere die Änderung und lade die Ansicht des betroffenen Nutzers neu.`,
       en: `### Create a role
@@ -242,6 +249,13 @@ An account's effective permissions are the union of **all its groups and directl
 - **Active account:** permits sign-in. An inactive account cannot sign in.
 - **Administration access (Staff):** permits entry to administration; relevant model permissions are also needed. This does not automatically grant all RCON permissions.
 - **Superuser:** has every permission. Regular moderators do not need this flag.
+
+### Your password and account recovery
+Use **User menu → Change password** to update your own password within CRCON. The form shows the active password rules. You remain signed in in this browser; other browser sessions become invalid.
+
+Use **Forgot password?** on the sign-in page to request a link. It expires after 30 minutes and becomes invalid after successful use. An active account with a local password and a reachable email address is required. Check your spam folder and contact an administrator if no message arrives. The response does not reveal whether an address is registered.
+
+For administrators: Configure SMTP and enable **CRCON_PASSWORD_RESET_ENABLED**. **CRCON_PUBLIC_URL** fixes the HTTPS origin for email links. SMTP fields are listed in **default.env**; put credentials in your private **.env**. Port 587 typically uses TLS; port 465 uses SSL. Then recreate the backend containers with the updated Compose configuration. Until configuration is complete, the interface shows recovery as unavailable.
 
 ### An action is still unavailable
 Check the permission description and the API reference: some actions require multiple permissions at once. Review all assigned groups, save the change and reload the affected user's view.`,

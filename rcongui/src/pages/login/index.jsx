@@ -7,9 +7,11 @@ import Container from "@mui/material/Container";
 import { Alert, Stack } from "@mui/material";
 import {
   Form,
+  Link,
   useSubmit,
   useActionData,
   useLoaderData,
+  useSearchParams,
 } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
 import { styled } from "@mui/material/styles";
@@ -153,6 +155,7 @@ const MainWrapper = styled(Stack)(({ theme }) => ({
 
 export default function Login() {
   const { t } = useTranslation();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
 
   const {
@@ -245,6 +248,11 @@ export default function Login() {
               >
                 {t("login.title")}
               </Typography>
+              {searchParams.get("password_reset") === "1" && (
+                <Alert severity="success" sx={{ my: 2 }}>
+                  {t("accountPassword.resetSuccess")}
+                </Alert>
+              )}
               {data.error ? (
                 <Box sx={{ py: 2, width: "100%" }}>
                   <Alert severity="error">
@@ -313,6 +321,9 @@ export default function Login() {
                   {loading ? t("login.submitting") : t("login.submit")}
                 </Button>
               </Form>
+              <Button component={Link} to="/forgot-password" sx={{ mb: 2 }}>
+                {t("accountPassword.forgotTitle")}
+              </Button>
             </Box>
           </Container>
           <Stack justifyContent={"end"} sx={{ px: 3, pb: 2 }}>

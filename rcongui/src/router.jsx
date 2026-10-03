@@ -17,6 +17,11 @@ const DocumentationCrumb = () => {
   return <span>{t("documentation.title")}</span>;
 };
 
+const PasswordCrumb = () => {
+  const { t } = useTranslation();
+  return <span>{t("sidebar.changePassword")}</span>;
+};
+
 const CampaignsCrumb = () => {
   const { t } = useTranslation();
   return <span>{t("navigation.links.broadcastMessage")}</span>;
@@ -86,6 +91,12 @@ const router = createBrowserRouter([
     action: rootAction,
     loader: rootLoader,
     children: [
+      {
+        path: "account/password",
+        handle: { crumb: () => <PasswordCrumb /> },
+        lazy: lazyPage(() => import("./pages/account/password")),
+        errorElement: <RouteError />,
+      },
       {
         path: "documentation",
         handle: { crumb: () => <DocumentationCrumb /> },
@@ -551,6 +562,16 @@ const router = createBrowserRouter([
         ],
       },
     ],
+  },
+  {
+    path: "/forgot-password",
+    lazy: lazyPage(() => import("./pages/account/forgot-password")),
+    errorElement: <RouteError />,
+  },
+  {
+    path: "/reset-password/:uid",
+    lazy: lazyPage(() => import("./pages/account/reset-password")),
+    errorElement: <RouteError />,
   },
   {
     path: "/login",

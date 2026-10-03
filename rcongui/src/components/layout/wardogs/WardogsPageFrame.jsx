@@ -42,7 +42,7 @@ export default function WardogsPageFrame({ children, active = true }) {
           <Box sx={{ minWidth: 0 }}>
             <NavbarBreadcrumbs />
           </Box>
-          {!pathname.startsWith("/administration") && !pathname.startsWith("/documentation") && <Box
+          {!pathname.startsWith("/administration") && !pathname.startsWith("/documentation") && !pathname.startsWith("/account/") && <Box
             sx={{
               width: { xs: "100%", sm: 248 },
               flexShrink: 0,

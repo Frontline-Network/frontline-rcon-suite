@@ -56,6 +56,10 @@ def configure():
         LANGUAGE_CODE="de",
         USE_I18N=True,
         USE_TZ=True,
+        AUTH_PASSWORD_VALIDATORS=[
+            {"NAME": f"django.contrib.auth.password_validation.{name}"}
+            for name in ("UserAttributeSimilarityValidator", "MinimumLengthValidator", "CommonPasswordValidator", "NumericPasswordValidator")
+        ],
         TIME_ZONE="Europe/Berlin",
         STATIC_URL="/djangostatic/",
         STATICFILES_DIRS=[WEB / "static"],
@@ -79,8 +83,11 @@ def configure():
     import django
     django.setup()
     from django.contrib import admin
-    from django.urls import path
-    globals()["urlpatterns"] = [path("admin/", admin.site.urls)]
+    from django.urls import include, path
+    globals()["urlpatterns"] = [
+        path("admin/", admin.site.urls),
+        path("accounts/", include("api.account_urls")),
+    ]
 
 
 def seed_demo():
@@ -121,7 +128,7 @@ if __name__ == "__main__":
     configure()
     from django.core.management import call_command
     if args.test:
-        call_command("test", "api.test_admin_theme", verbosity=1)
+        call_command("test", "api.test_admin_theme", "api.test_account_password", verbosity=1)
     else:
         seed_demo()
         call_command("runserver", f"127.0.0.1:{args.port}", use_reloader=False)
