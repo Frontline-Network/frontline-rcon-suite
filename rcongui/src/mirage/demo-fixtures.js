@@ -142,6 +142,26 @@ const demoWarningActions = (index) => {
   );
 };
 
+// Opt-in, synthetic cross-platform accounts for UI regression tests only.
+const demoPlatformIdentity = (index) => {
+  if (typeof window === "undefined" || new URLSearchParams(window.location.search).get("demo_platform_identities") !== "1") return {};
+  const entries = [
+    ["Steam", "76561198000000001"],
+    ["PS5", "1234567890123456789"],
+    ["XboxSeries", "2533274800000001"],
+    ["EGS", `${"a".repeat(32)}|${"b".repeat(32)}`],
+  ];
+  const entry = entries[index];
+  if (!entry) return {};
+  return {
+    player_id: `0000000000000000000000000000000${index + 1}`,
+    steam_id: entry[1],
+    platform: `EPlatformFamily::${entry[0]}`,
+    eos_id: `0000000000000000000000000000000${index + 1}`,
+    game: "hll_vietnam",
+  };
+};
+
 export const demoPlayerRecords = demoNames.map((name, index) => ({
   id: index + 1,
   player_id:
@@ -157,7 +177,7 @@ export const demoPlayerRecords = demoNames.map((name, index) => ({
       last_seen: new Date(now - index * 1800000).toISOString(),
     },
   ],
-  soldier: { name, level: 80 + index * 17, clan_tag: "FLN", platform: "steam" },
+  soldier: { name, level: 80 + index * 17, clan_tag: "FLN", platform: "steam", ...demoPlatformIdentity(index) },
   account: { name, country: index % 2 ? "AT" : "DE" },
   country: index % 2 ? "AT" : "DE",
   first_seen_timestamp_ms: now - (index + 20) * 86400000,
@@ -250,6 +270,7 @@ export const demoPlayerRecords = demoNames.map((name, index) => ({
       : [],
   blacklist: null,
   steaminfo: null,
+  ...demoPlatformIdentity(index),
 }));
 
 const demoLogTypes = [
@@ -550,6 +571,9 @@ export const demoServices = [
 const livePlayer = (record, index, team, unitName, role = "rifleman") => ({
   name: record.names[0].name,
   player_id: record.player_id,
+  platform: record.platform ?? record.soldier.platform,
+  steam_id: record.steam_id,
+  eos_id: record.eos_id,
   country: record.country,
   profile: record,
   is_vip: record.vips.length > 0,

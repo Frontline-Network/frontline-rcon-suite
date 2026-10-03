@@ -13,18 +13,10 @@ import CheckIcon from "@mui/icons-material/Check";
 import ErrorIcon from "@mui/icons-material/Error";
 import { ControlledTextInput } from "@/components/form/core/ControlledTextInput";
 import { ControlledSelect } from "@/components/form/core/ControlledSelect";
-
-// Platform options based on Platform.jsx cases
-const platformOptions = [
-  { value: "steam", label: "Steam" },
-  { value: "epic", label: "Epic" },
-  { value: "xbl", label: "Xbox Live" },
-  { value: "xsx", label: "Xbox Series X/S" },
-  { value: "psn", label: "PlayStation Network" },
-  { value: "ps5", label: "PlayStation 5" },
-];
+import { getPlatformOptions } from "@/constants/platforms";
 
 export function useEditSoldierModal(playerId, currentSoldierData) {
+  const platformOptions = getPlatformOptions(currentSoldierData?.platform);
   const [open, setOpen] = useState(false);
   const [submitStatus, setSubmitStatus] = useState(null); // null, 'success', 'error'
   const [errorMessage, setErrorMessage] = useState("");
@@ -199,10 +191,7 @@ export function useEditSoldierModal(playerId, currentSoldierData) {
             disabled={isPending || isPlatformDisabled}
             options={platformOptions}
             rules={{
-              pattern: {
-                value: /^[a-zA-Z0-9]+$/,
-                message: "Please select a valid platform"
-              }
+              validate: (value) => !value || platformOptions.some((option) => option.value === value) || "Please select a valid platform",
             }}
             helperText={
               isPlatformDisabled ? "This field already has a value and cannot be modified" : "Select the player's gaming platform"

@@ -21,6 +21,7 @@ import { CountryFlag } from "@/components/shared/CountryFlag";
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import PlatformChip from "@/components/player/profile/Platform";
+import PlayerIdentifiers from "@/components/player/profile/Identifiers";
 import LevelChip from "@/components/player/profile/Level";
 import { useTranslation } from "react-i18next";
 
@@ -98,19 +99,10 @@ const SoldierCard = ({ profile }) => {
               <Box sx={{ color: (theme) => theme.palette.text.secondary }}>
                 {t("records.playerDetails.platform")}:
               </Box>
-              <Box><PlatformChip platform={soldier["platform"]} playerId={profile.player_id} /></Box>
+              <Box><PlatformChip platform={soldier["platform"]} player={profile} playerId={profile.player_id} /></Box>
             </ListItem>
-            <ListItem sx={{ display: "flex", justifyContent: "space-between" }}>
-              <Box sx={{ color: (theme) => theme.palette.text.secondary }}>
-                EOS ID:
-              </Box>
-              <Box>
-                <CopyableText
-                  text={soldier["eos_id"]}
-                  label={soldier["eos_id"]}
-                  position="start"
-                />
-              </Box>
+            <ListItem sx={{ minWidth: 0 }}>
+              <PlayerIdentifiers player={profile} />
             </ListItem>
           </List>
         </CardContent>

@@ -1,7 +1,7 @@
 import { OnlineStatusBadge, ProfileHeader } from "./styled";
 import { Avatar, Box, Typography, Stack } from "@mui/material";
 import { Link } from "react-router-dom";
-import CopyableText from "@/components/shared/CopyableText";
+import PlayerIdentifiers from "./Identifiers";
 import PlatformChip from "./Platform";
 import CountryChip from "./Country";
 import LevelChip from "./Level";
@@ -40,8 +40,9 @@ const PlayerProfileHeader = ({
             direction={"row"}
             justifyContent={"space-between"}
             flexGrow={1}
+            minWidth={0}
           >
-            <Stack>
+            <Stack sx={{ minWidth: 0 }}>
               <Typography
                 component={headingComponent}
                 textOverflow={"ellipsis"}
@@ -70,13 +71,10 @@ const PlayerProfileHeader = ({
                   display: "flex",
                   alignItems: "center",
                   marginBottom: 0.75,
+                  minWidth: 0,
                 }}
               >
-                <CopyableText
-                  text={playerId}
-                  size="0.75rem"
-                  sx={{ color: (theme) => theme.palette.text.secondary }}
-                />
+                <PlayerIdentifiers player={player} platform={platform} />
               </Box>
             </Stack>
           </Stack>
@@ -87,9 +85,10 @@ const PlayerProfileHeader = ({
           gap={1}
           alignItems={"center"}
           justifyContent={"start"}
+          flexWrap="wrap"
         >
           <LevelChip level={level} playerId={playerId} currentSoldierData={currentSoldierData} />
-          <PlatformChip platform={platform} playerId={playerId} currentSoldierData={currentSoldierData} />
+          <PlatformChip platform={platform} player={player} playerId={playerId} currentSoldierData={currentSoldierData} />
           <CountryChip country={country} playerId={playerId} currentAccountData={currentAccountData} />
           <LinksChip playerId={playerId} />
         </Stack>

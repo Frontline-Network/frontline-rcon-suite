@@ -106,7 +106,7 @@ export default function PlayerProfilePage() {
       >
         <CardContent sx={{ "&:last-child": { pb: 2 } }}>
           <PlayerProfileHeader
-            player={profile}
+            player={thisOnlinePlayer ? { ...thisOnlinePlayer, profile } : profile}
             isOnline={!!thisOnlinePlayer}
             ActionList={() => (
               <ProfileActions player={profile} actions={actionList} />
