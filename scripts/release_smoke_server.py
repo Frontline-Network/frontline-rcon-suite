@@ -89,7 +89,7 @@ def main():
         with redirect_stdout(io.StringIO()):
             call_command("migrate", verbosity=0, interactive=False)
         call_command("makemigrations", check=True, dry_run=True, verbosity=0)
-        for username in ("vanguard", "aurora", "busy", "dialog", "separate"):
+        for username in ("vanguard", "aurora", "busy", "dialog", "separate", "csrf"):
             user = User.objects.create_user(username=username, password="isolated-test-only")
             UserAppearancePreference.objects.create(user=user, preferences={
                 "preset": "wardogs" if username == "aurora" else "frontline-gold", "mode": "dark"
@@ -120,7 +120,15 @@ def main():
             return serve(request, route if asset.is_file() else "index.html", document_root=args.frontend)
 
         globals()["urlpatterns"] = [
+            # Browser security tests load the production transport unchanged.
+            # These routes exist ONLY in this isolated, opt-in test server.
+            path("__test__/blank", lambda request: HttpResponse("<!doctype html><title>CSRF test</title>")),
+            path("__test__/csrf-transport.mjs", lambda request: HttpResponse(
+                (ROOT / "rcongui/src/utils/csrfTransport.mjs").read_text(encoding="utf-8"),
+                content_type="application/javascript",
+            )),
             path("api/login", auth.do_login),
+            path("api/logout", auth.do_logout),
             path("api/is_logged_in", auth.is_logged_in),
             path("api/get_own_user_permissions", auth.get_own_user_permissions),
             path("api/get_own_user_appearance", appearance.get_own_user_appearance),

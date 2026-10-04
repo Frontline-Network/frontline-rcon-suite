@@ -175,7 +175,9 @@ except ValueError as exc:
     raise ImproperlyConfigured(str(exc)) from exc
 CORS_ALLOWED_ORIGINS = list(dict.fromkeys(configured_cors_origins))
 CORS_ALLOW_CREDENTIALS = bool(CORS_ALLOWED_ORIGINS)
-CORS_EXPOSE_HEADERS = ["X-CRCON-CSRF-Recovery", "X-CRCON-CSRF-Token"]
+CORS_EXPOSE_HEADERS = [
+    "X-CRCON-CSRF-Recovery", "X-CRCON-CSRF-Token", "X-CRCON-CSRF-Error",
+]
 
 CORS_ORIGIN_ALLOW_ALL = False
 # Application definition

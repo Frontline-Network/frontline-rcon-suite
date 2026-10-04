@@ -9,7 +9,7 @@ function sourceFiles(path) {
   return readdirSync(path).flatMap((name) => {
     const entry = join(path, name);
     if (statSync(entry).isDirectory()) return sourceFiles(entry);
-    return /\.(js|jsx|ts|tsx)$/.test(name) ? [entry] : [];
+    return /\.(js|jsx|mjs|ts|tsx)$/.test(name) ? [entry] : [];
   });
 }
 
@@ -55,17 +55,12 @@ const requiredTransports = [
   ["Discord integration transport", /discordRequest[\s\S]*fetchWithCsrf\(url,/],
 ];
 
+// Recovery concurrency/exactly-once behavior is covered by executable transport
+// tests in check:csrf. This guard checks that every UI caller reaches that code.
 const requiredRecoveryContracts = [
-  ["recovery marker", /X-CRCON-CSRF-Recovery/],
-  ["server-derived recovery token", /X-CRCON-CSRF-Token/],
-  [
-    "server-confirmed token reuse",
-    /serverConfirmedCsrfToken[\s\S]*requestHeadersWithCsrf[\s\S]*serverConfirmedCsrfToken/,
-  ],
-  [
-    "recovery token handoff",
-    /response\.headers\.get\(CSRF_TOKEN_HEADER\)[\s\S]*send\(recoveryToken\)/,
-  ],
+  ["shared token coordinator", /createCsrfTransport\(\{/],
+  ["coordinated transport handoff", /csrfTransport\.fetchWithCsrf\(input, options\)/],
+  ["explicit CSRF error classification", /csrfFailureKind\(response\)/],
 ];
 
 for (const [name, pattern] of requiredTransports) {
