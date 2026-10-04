@@ -6336,7 +6336,7 @@ const deMasterFallback = {
     "presets": {
       "title": "Farbkombination",
       "description": "Wähle ein geprüftes Preset oder lege darunter eine eigene Akzentfarbe fest.",
-      "frontline-gold": "Frontline Gold",
+      "frontline-gold": "Vanguard Gold",
       "wardogs": "Aurora",
       "tactical-blue": "Tactical Blue",
       "signal-green": "Signal Green",
@@ -6377,7 +6377,7 @@ const deMasterFallback = {
     "accessibilityHint": "Farben vermitteln niemals allein den Zustand. Die Oberfläche nutzt zusätzlich Symbole, Beschriftungen und sichtbare Fokusrahmen.",
     "unsaved": "Nicht gespeicherte Änderungen",
     "restoreSaved": "Gespeicherte Werte",
-    "restoreDefault": "Frontline-Standard",
+    "restoreDefault": "Vanguard-Standard",
     "apply": "Änderungen übernehmen",
     "saved": "Darstellung wurde für deinen Benutzer gespeichert.",
     "savedLocally": "Der Server war nicht erreichbar. Die Darstellung wurde vorübergehend in diesem Browser gespeichert."

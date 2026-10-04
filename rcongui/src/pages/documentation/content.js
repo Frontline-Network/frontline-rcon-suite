@@ -311,7 +311,7 @@ Check the permission description and the API reference: some actions require mul
     body: {
       de: `### Theme und Farbe ändern
 1. Öffne **Darstellung** über die Navigation oder das Benutzermenü.
-2. Wähle **Aurora** oder eines der vorhandenen Frontline-Themes.
+2. Wähle **Aurora** oder **Vanguard** und anschließend deinen Farbstil.
 3. Im Aurora-Theme stehen sechs Farbstile zur Verfügung: Rose, Eisblau, Smaragd, Bernstein, Amethyst und Schiefer.
 4. Wähle einen hellen, dunklen oder vom System gesteuerten Modus. Bei Bedarf kannst du außerdem die Farbdarstellung für Farbsehschwächen anpassen.
 5. Prüfe die unmittelbare Vorschau und speichere. **Abbrechen** stellt deine vorherige Darstellung wieder her.
@@ -327,7 +327,7 @@ QuickIcons zeigen nur Ziele an, auf die du Zugriff hast. Verliert ein Konto ein 
 Die Navigation lässt sich über das Menü-Symbol öffnen. Nicht jede Desktop-Leiste wird auf dem Smartphone dauerhaft eingeblendet. Die Dokumentation erreichst du auch über das Benutzermenü.`,
       en: `### Change theme and colour
 1. Open **Appearance** from navigation or the user menu.
-2. Choose **Aurora** or one of the existing Frontline themes.
+2. Choose **Aurora** or **Vanguard**, then select your colour style.
 3. Aurora offers six colour styles: Rose, Ice blue, Emerald, Amber, Amethyst and Slate.
 4. Select light, dark or system mode. You can also adjust colours for colour vision differences.
 5. Review the immediate preview and save. **Cancel** restores your previous appearance.

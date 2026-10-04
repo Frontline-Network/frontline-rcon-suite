@@ -6290,7 +6290,7 @@ const enMasterFallback = {
     "presets": {
       "title": "Color combination",
       "description": "Choose a tested preset or define your own accent color below.",
-      "frontline-gold": "Frontline Gold",
+      "frontline-gold": "Vanguard Gold",
       "wardogs": "Aurora",
       "tactical-blue": "Tactical Blue",
       "signal-green": "Signal Green",
@@ -6331,7 +6331,7 @@ const enMasterFallback = {
     "accessibilityHint": "Color never communicates state on its own. The interface also uses icons, labels and visible focus outlines.",
     "unsaved": "Unsaved changes",
     "restoreSaved": "Saved values",
-    "restoreDefault": "Frontline default",
+    "restoreDefault": "Vanguard default",
     "apply": "Apply changes",
     "saved": "Appearance was saved for your account.",
     "savedLocally": "The server was unavailable. Appearance was temporarily saved in this browser."
