@@ -207,7 +207,8 @@ class PermissionPresetWorkflowTests(TestCase):
         cls.roles = {}
         cls.groups = {}
         for preset in permission_presets(permissions):
-            group = Group.objects.create(name=preset["id"])
+            # Real migrations already seed some of these named groups.
+            group, _ = Group.objects.get_or_create(name=preset["id"])
             group.permissions.set(preset["permissions"])
             user = User.objects.create_user(preset["id"])
             user.groups.add(group)

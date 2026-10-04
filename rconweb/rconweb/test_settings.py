@@ -29,6 +29,13 @@ DATABASES = {
 }
 ROOT_URLCONF = "rconweb.rconweb.test_urls"
 CSRF_FAILURE_VIEW = "rconweb.rconweb.csrf.csrf_failure"
+# Keep every production middleware, but resolve project-owned middleware using
+# the repository-root package layout used by this test settings module.
+MIDDLEWARE = [
+    entry.replace("rconweb.", "rconweb.rconweb.", 1)
+    if entry.startswith("rconweb.") else entry
+    for entry in MIDDLEWARE
+]
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 LOGGING = {
     "version": 1,
