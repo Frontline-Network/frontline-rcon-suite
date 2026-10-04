@@ -15,8 +15,10 @@ import { useTranslation } from "react-i18next";
 import TitleManager from "@/features/title-manager/TitleManager";
 import { SystemUsageProvider } from "@/features/system-usage/SystemUsageProvider";
 import AppearanceSettingsHost from "@/components/layout/AppearanceSettingsHost";
+import ReleaseHighlightsHost from "@/features/updates/ReleaseHighlightsHost";
 import WardogsToolbar from "@/components/layout/wardogs/WardogsToolbar";
 import WardogsPageFrame from "@/components/layout/wardogs/WardogsPageFrame";
+import { themeBackground } from "@/themes/background";
 
 export const loader = async () => {
   return null;
@@ -43,6 +45,7 @@ export default function Root() {
     <SystemUsageProvider>
       <TitleManager />
       <AppearanceSettingsHost />
+      <ReleaseHighlightsHost />
       <NavigationProgress />
       <Box
         component="a"
@@ -94,6 +97,7 @@ export default function Root() {
           sx={(theme) => ({
             flexGrow: 1,
             backgroundColor: theme.palette.background.default,
+            ...themeBackground(theme),
             overflow: "auto",
             height: "100dvh",
             scrollPaddingTop: "var(--app-header-height)",

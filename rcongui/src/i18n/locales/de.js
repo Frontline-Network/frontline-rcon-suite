@@ -6334,7 +6334,7 @@ const deMasterFallback = {
       "wardogs": "Ruhig und klar · mit gruppierter Navigation und wählbarem Farbstil"
     },
     "wardogsStyles": {
-      "title": "Wardogs-Farbstil",
+      "title": "Aurora-Farbstil",
       "description": "Akzente und Hintergrundschimmer gemeinsam wählen. Jeder Stil unterstützt Hell und Dunkel; Statusfarben bleiben eindeutig erkennbar.",
       "rose": "Original · Rosé",
       "blue": "Eisblau",
@@ -6346,8 +6346,8 @@ const deMasterFallback = {
     "presets": {
       "title": "Farbkombination",
       "description": "Wähle ein geprüftes Preset oder lege darunter eine eigene Akzentfarbe fest.",
-      "frontline-gold": "Frontline Gold",
-      "wardogs": "Wardogs",
+      "frontline-gold": "Vanguard Gold",
+      "wardogs": "Aurora",
       "tactical-blue": "Tactical Blue",
       "signal-green": "Signal Green",
       "command-red": "Command Red",
@@ -6387,7 +6387,7 @@ const deMasterFallback = {
     "accessibilityHint": "Farben vermitteln niemals allein den Zustand. Die Oberfläche nutzt zusätzlich Symbole, Beschriftungen und sichtbare Fokusrahmen.",
     "unsaved": "Nicht gespeicherte Änderungen",
     "restoreSaved": "Gespeicherte Werte",
-    "restoreDefault": "Frontline-Standard",
+    "restoreDefault": "Vanguard-Standard",
     "apply": "Änderungen übernehmen",
     "saved": "Darstellung wurde für deinen Benutzer gespeichert.",
     "savedLocally": "Der Server war nicht erreichbar. Die Darstellung wurde vorübergehend in diesem Browser gespeichert."
@@ -6666,6 +6666,13 @@ de.updates = {
     "not_configured": "Die Changelogs sind für diese Installation noch nicht angebunden.",
     "unavailable": "Die Changelogs konnten nicht geladen werden. Bitte versuche es später erneut."
   }
+};
+
+de.releaseHighlights = {
+  title: "Was ist neu?", eyebrow: "Neu auf diesem RCON", preview: "Vorschau · Beispieldaten",
+  language: "Sprache der Neuigkeiten", close: "Neuigkeiten schließen", done: "Alles klar",
+  later: "Später", saving: "Wird gespeichert …", allChanges: "Alle Änderungen",
+  saveFailed: "Die Erinnerung konnte nicht verschoben werden. Bitte versuche es erneut.",
 };
 
 export default mergeMissingTranslations(de, deMasterFallback);

@@ -6288,7 +6288,7 @@ const enMasterFallback = {
       "wardogs": "Calm and clear · with grouped navigation and selectable colors"
     },
     "wardogsStyles": {
-      "title": "Wardogs color style",
+      "title": "Aurora color style",
       "description": "Choose matching accents and background glow. Every style supports light and dark mode; status colors remain distinct.",
       "rose": "Original · Rose",
       "blue": "Ice blue",
@@ -6300,8 +6300,8 @@ const enMasterFallback = {
     "presets": {
       "title": "Color combination",
       "description": "Choose a tested preset or define your own accent color below.",
-      "frontline-gold": "Frontline Gold",
-      "wardogs": "Wardogs",
+      "frontline-gold": "Vanguard Gold",
+      "wardogs": "Aurora",
       "tactical-blue": "Tactical Blue",
       "signal-green": "Signal Green",
       "command-red": "Command Red",
@@ -6341,7 +6341,7 @@ const enMasterFallback = {
     "accessibilityHint": "Color never communicates state on its own. The interface also uses icons, labels and visible focus outlines.",
     "unsaved": "Unsaved changes",
     "restoreSaved": "Saved values",
-    "restoreDefault": "Frontline default",
+    "restoreDefault": "Vanguard default",
     "apply": "Apply changes",
     "saved": "Appearance was saved for your account.",
     "savedLocally": "The server was unavailable. Appearance was temporarily saved in this browser."
@@ -6619,6 +6619,13 @@ en.updates = {
     "not_configured": "Changelogs have not been connected for this installation yet.",
     "unavailable": "Changelogs could not be loaded. Please try again later."
   }
+};
+
+en.releaseHighlights = {
+  title: "What's new?", eyebrow: "New on this RCON", preview: "Preview · Sample content",
+  language: "News language", close: "Close what's new", done: "Got it",
+  later: "Later", saving: "Saving …", allChanges: "All changes",
+  saveFailed: "The reminder could not be postponed. Please try again.",
 };
 
 export default mergeMissingTranslations(en, enMasterFallback);

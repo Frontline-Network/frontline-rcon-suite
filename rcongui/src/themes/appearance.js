@@ -7,6 +7,8 @@ import {
 
 export const APPEARANCE_VERSION = 1;
 
+// Aurora and Vanguard retain their original preset identifiers ("wardogs",
+// "frontline-gold", etc.) for saved preferences and older backend compatibility.
 export const APPEARANCE_PRESETS = Object.freeze({
   "frontline-gold": {
     accent: "#c59a4a",

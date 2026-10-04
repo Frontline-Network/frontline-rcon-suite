@@ -284,6 +284,8 @@ export const cmd = {
     requestFactory({ method: "GET", cmd: "get_api_documentation", ...params }),
   GET_UPDATE_CHANNEL: (params) =>
     requestFactory({ method: "GET", cmd: "get_update_channel", ...params }),
+  SET_OWN_RELEASE_HIGHLIGHT_STATE: (payload) =>
+    requestFactory({ method: "POST", cmd: "set_own_release_highlight_state", payload, throwRouteError: false }),
   APPLY_QUEUE_LENGTH: (params) =>
     requestFactory({ method: "POST", cmd: "apply_queue_length", ...params }),
   APPLY_VIP_SLOTS_NUM: (params) =>

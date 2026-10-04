@@ -16,8 +16,68 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 REPOSITORY = "Frontline-Network/frontline-rcon-suite"
 API_ROOT = f"https://api.github.com/repos/{REPOSITORY}/releases"
 VERSION = re.compile(r"v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:alpha|beta|rc)\.(?:0|[1-9]\d*)))?\Z")
-CACHE_KEY = "crcon:release-channel:v1:"
+CACHE_KEY = "crcon:release-channel:v2:"
 SNAPSHOT_PATH = Path(__file__).with_name("release_notes.json")
+HIGHLIGHT_BLOCK = re.compile(r"<!--\s*crcon-highlights\s*\n(.*?)-->", re.DOTALL)
+
+
+def normalize_highlights(value):
+    """Accept reviewed DE/EN copy and known UI actions/assets, never remote markup."""
+    if not isinstance(value, dict) or value.get("schema_version") != 1:
+        return None
+
+    def translated(text, limit):
+        if not isinstance(text, dict):
+            raise ValueError("Both translations are required")
+        result = {}
+        for lang in ("de", "en"):
+            entry = text.get(lang)
+            if not isinstance(entry, str) or not entry.strip() or len(entry) > limit:
+                raise ValueError("Invalid highlight text")
+            result[lang] = entry.strip()
+        return result
+
+    try:
+        result = {
+            "schema_version": 1,
+            "title": translated(value.get("title"), 100),
+            "description": translated(value.get("description"), 320),
+            "items": [],
+        }
+        image = value.get("image")
+        if image not in (None, "theme-collection"):
+            return None
+        if image:
+            result.update(image=image, image_alt=translated(value.get("image_alt"), 180))
+        action = value.get("action")
+        if action is not None:
+            if not isinstance(action, dict) or action.get("id") not in ("appearance", "documentation", "overview"):
+                return None
+            result["action"] = {"id": action["id"], "label": translated(action.get("label"), 60)}
+        items = value.get("items", [])
+        if not isinstance(items, list) or len(items) > 2:
+            return None
+        for item in items:
+            if not isinstance(item, dict) or item.get("icon") not in ("shortcuts", "book", "palette", "overview"):
+                return None
+            result["items"].append({
+                "icon": item["icon"], "title": translated(item.get("title"), 100),
+                "description": translated(item.get("description"), 240),
+            })
+        return result
+    except (ValueError, TypeError):
+        return None
+
+
+def extract_highlights(body):
+    blocks = HIGHLIGHT_BLOCK.findall(body)
+    notes = HIGHLIGHT_BLOCK.sub("", body).strip()
+    if len(blocks) != 1 or len(blocks[0]) > 16000:
+        return notes, None
+    try:
+        return notes, normalize_highlights(json.loads(blocks[0]))
+    except (ValueError, TypeError):
+        return notes, None
 
 
 def parse_version(value):
@@ -84,10 +144,15 @@ def select_releases(catalog, installed):
         if normalized in seen:
             continue
         seen.add(normalized)
+        body, highlights = extract_highlights(str(item.get("body") or "")[:100_000])
+        # Cached releases already have their editorial block removed.
+        if highlights is None and not HIGHLIGHT_BLOCK.search(str(item.get("body") or "")):
+            highlights = normalize_highlights(item.get("highlights"))
         result.append({
             "tag_name": item["tag_name"],
             "name": str(item.get("name") or item["tag_name"])[:300],
-            "body": str(item.get("body") or "")[:100_000],
+            "body": body,
+            "highlights": highlights,
             "published_at": item["published_at"],
             "prerelease": bool(item.get("prerelease") or normalized[1]),
             "current": normalized == version,

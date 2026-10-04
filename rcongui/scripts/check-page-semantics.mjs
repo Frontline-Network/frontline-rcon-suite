@@ -77,8 +77,9 @@ assert.match(
 );
 assert.match(pageState, /aria-live=/);
 
+// The shared PageHeader is checked above to render the actual H1.
+assert.match(dashboard, /<PageHeader[\s\S]*?title=\{t\("dashboard\.title"\)\}/);
 for (const [name, source] of [
-  ["dashboard", dashboard],
   ["apps", apps],
   ["discord app", discordApp],
 ]) {

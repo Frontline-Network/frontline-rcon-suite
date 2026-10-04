@@ -66,7 +66,7 @@ export default function WardogsPageFrame({ children, active = true }) {
           sx={{ py: 4, mt: 1, color: "text.disabled" }}
         >
           <Typography variant="caption">FRONTLINE / CRCON</Typography>
-          <Typography variant="caption">Wardogs</Typography>
+          <Typography variant="caption">Aurora</Typography>
         </Stack>
       )}
     </Box>

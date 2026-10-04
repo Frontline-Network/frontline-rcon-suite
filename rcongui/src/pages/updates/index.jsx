@@ -23,6 +23,8 @@ import remarkGfm from "remark-gfm";
 import PageHeader from "@/components/shared/PageHeader";
 import SectionSurface from "@/components/shared/SectionSurface";
 import { useUpdateChannel } from "@/hooks/useUpdateChannel";
+import { useHighlightUI } from "@/features/updates/highlight-state";
+import NewReleasesOutlinedIcon from "@mui/icons-material/NewReleasesOutlined";
 
 // Release text comes from a private repository. No raw HTML, external images,
 // embedded resources, or repository links are activated in the RCON reader.
@@ -91,6 +93,7 @@ function ReleaseText({ text }) {
 export default function Updates() {
   const { t, i18n } = useTranslation();
   const channel = useUpdateChannel();
+  const openHighlights = useHighlightUI((state) => state.requestOpen);
   const [params, setParams] = useSearchParams();
   const [search, setSearch] = useState("");
   const words = search.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
@@ -124,6 +127,7 @@ export default function Updates() {
         subtitle={t("updates.subtitle")}
         actions={
           <Stack direction="row" gap={1} flexWrap="wrap">
+            {channel.currentRelease?.highlights && channel.data?.highlight_state && <Button variant="outlined" startIcon={<NewReleasesOutlinedIcon />} onClick={openHighlights}>{t("releaseHighlights.title")}</Button>}
             <Button
               startIcon={<DoneAllIcon />}
               onClick={channel.markAsRead}

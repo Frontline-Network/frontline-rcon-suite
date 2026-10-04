@@ -8,11 +8,17 @@ export const helpArticles = [
     body: {
       de: `### Der Update-Kanal
 
-Über **Update-Kanal** im Benutzermenü oder in der Navigation findest du die Changelogs dieser RCON-Installation. Im Wardogs-Theme befindet sich der Einstieg zusätzlich unten in der Hauptnavigation. Die aktuelle Version ist gekennzeichnet; der Versionsverlauf enthält ältere stabile Releases. Die Suche durchsucht Titel, Versionen und Texte.
+Über **Update-Kanal** im Benutzermenü oder in der Navigation findest du die Changelogs dieser RCON-Installation. Im Aurora-Theme befindet sich der Einstieg zusätzlich unten in der Hauptnavigation. Die aktuelle Version ist gekennzeichnet; der Versionsverlauf enthält ältere stabile Releases. Die Suche durchsucht Titel, Versionen und Texte.
 
 ### Erst nach dem Aufspielen
 
 Ein neues Release auf GitHub wird hier erst sichtbar, wenn **Frontend und Backend dieselbe veröffentlichte Version** verwenden. Bei einem laufenden Versionswechsel, einer Entwicklungsfassung oder unbekannter Version erscheint ein Hinweis. Ein direkter Link auf eine neuere Versionsnummer umgeht diese Prüfung nicht. Der Versionsverlauf ist kein Protokoll darüber, wann frühere Versionen tatsächlich installiert waren.
+
+### Was ist neu?
+
+Für ausgewählte Releases erscheint auf der Übersicht eine kurze Einblendung mit einem Hauptthema und bis zu zwei weiteren Verbesserungen. Sie übernimmt dein Theme und deine Sprache; **DE / EN** wechselt die Anwendungssprache. Während du Formulare oder andere Dialoge bedienst, wird keine Einblendung darübergelegt.
+
+Die Einblendung erscheint einmal pro Konto und Version. Dieser Status wird auf dem Server gespeichert und gilt auch auf anderen Geräten. **Später** erinnert nach 24 Stunden erneut, sobald du die Übersicht besuchst. Über **Was ist neu?** im Benutzermenü oder Update-Kanal kannst du sie jederzeit wieder öffnen. Dieser Status ist unabhängig vom Lesestand des Changelogs. Fehlen vollständig gepflegte deutsche und englische Highlights, bleibt der normale Changelog verfügbar.
 
 ### Gelesen und ungelesen
 
@@ -23,11 +29,17 @@ Ein neues Release auf GitHub wird hier erst sichtbar, wenn **Frontend und Backen
 Die Changelogs werden aus unserem privaten Repository übernommen und direkt im RCON angezeigt. Dafür brauchst du nur deine normale RCON-Anmeldung. Es werden keine Repository-Links, externen Bilder oder Zugangsdaten geladen. Die Texte bleiben in der Sprache des veröffentlichten Releases.`,
       en: `### The update channel
 
-Open **Update channel** in the account menu or navigation to read this RCON installation's changelogs. Wardogs also provides a link at the bottom of its main navigation. The current version is labelled; the history contains earlier stable releases. Search covers titles, versions and notes.
+Open **Update channel** in the account menu or navigation to read this RCON installation's changelogs. Aurora also provides a link at the bottom of its main navigation. The current version is labelled; the history contains earlier stable releases. Search covers titles, versions and notes.
 
 ### After deployment
 
 A new GitHub release only appears when **frontend and backend run the same published version**. An incomplete rollout, development build or unknown version shows an explanation instead. A direct link to a newer version cannot bypass this check. The history is not a log of when earlier versions were actually installed.
+
+### What's new?
+
+Selected releases include a short overview spotlight with one main feature and up to two further improvements. It uses your theme and language; **DE / EN** changes the application language. It never opens over a form or another dialog you are using.
+
+The spotlight appears once per account and version. This status is stored on the server and shared across devices. **Later** postpones the reminder for 24 hours until you visit the overview again. Reopen it at any time using **What's new?** in the account menu or update channel. Its status is independent of the changelog's read status. If complete German and English highlights have not been provided, the normal changelog remains available.
 
 ### Read status
 
@@ -56,7 +68,7 @@ Prüfe vor einer Aktion den ausgewählten Server und den Verbindungsstatus. Live
 - **Automatisierung:** Automods und Regeln konfigurieren. Der Autobalancer besitzt außerdem eine eigene Betriebsansicht.
 - **Historie:** Spielprotokolle, ausgeführte Aktionen und abgeschlossene Runden nachvollziehen.
 
-Nutze die Suche in der Kopfzeile, um Seiten zu finden. Im Wardogs-Theme öffnet das Menü-Symbol links die Hauptnavigation; darunter liegen deine persönlichen QuickIcons.
+Nutze die Suche in der Kopfzeile, um Seiten zu finden. Im Aurora-Theme öffnet das Menü-Symbol links die Hauptnavigation; darunter liegen deine persönlichen QuickIcons.
 
 ### Änderungen übernehmen
 Formulare übernehmen Änderungen erst über ihre jeweilige Speichern- oder Anwenden-Aktion. Lies vor einer Bestätigung den angezeigten Umfang, insbesondere bei Kartenwechseln, Spieleraktionen und Sammelaktionen. Eine Erfolgsmeldung bestätigt die Übernahme; ein geänderter Eingabewert allein tut dies nicht.
@@ -73,7 +85,7 @@ Check the selected server and connection status before an action. Live data and 
 - **Automation:** Configure automods and rules. The autobalancer also has a dedicated operations view.
 - **History:** Review game logs, administrative actions and completed rounds.
 
-Use the search in the header to find pages. In Wardogs, the menu icon on the left opens the main navigation; your personal QuickIcons appear below it.
+Use the search in the header to find pages. In Aurora, the menu icon on the left opens the main navigation; your personal QuickIcons appear below it.
 
 ### Apply changes
 Forms apply edits through their save or apply action. Check the displayed scope before confirming, especially for map changes, player actions and bulk operations. A success message confirms the change; editing an input alone does not.
@@ -311,15 +323,17 @@ Check the permission description and the API reference: some actions require mul
     body: {
       de: `### Theme und Farbe ändern
 1. Öffne **Darstellung** über die Navigation oder das Benutzermenü.
-2. Wähle **Wardogs** oder eines der vorhandenen Frontline-Themes.
-3. Im Wardogs-Theme stehen sechs Farbstile zur Verfügung: Rose, Eisblau, Smaragd, Bernstein, Amethyst und Schiefer.
+2. Wähle **Aurora** oder **Vanguard** und anschließend deinen Farbstil.
+3. Im Aurora-Theme stehen sechs Farbstile zur Verfügung: Rose, Eisblau, Smaragd, Bernstein, Amethyst und Schiefer.
 4. Wähle einen hellen, dunklen oder vom System gesteuerten Modus. Bei Bedarf kannst du außerdem die Farbdarstellung für Farbsehschwächen anpassen.
 5. Prüfe die unmittelbare Vorschau und speichere. **Abbrechen** stellt deine vorherige Darstellung wieder her.
 
 Die Darstellung gehört zu deinem Benutzerkonto. Falls ein älteres Backend diese Einstellungen noch nicht speichern kann, weist der Dialog auf die lokale Speicherung im Browser hin.
 
+Im dunklen Modus wechselt das statische Hintergrundbild passend zum Farbstil. Es enthält keine Animationen. Im hellen Modus bleibt die helle Hintergrundfläche erhalten.
+
 ### QuickIcons anpassen
-Im Wardogs-Theme befindet sich unter den Schnellzugriffen eine gestrichelte **Anpassen**-Schaltfläche. Öffne sie, suche die gewünschten Seiten und wähle deine Favoriten. Ordne sie mit den Pfeilen nach oben oder unten und speichere die Auswahl.
+Im Aurora-Theme befindet sich unter den Schnellzugriffen eine gestrichelte **Anpassen**-Schaltfläche. Öffne sie, suche die gewünschten Seiten und wähle deine Favoriten. Ordne sie mit den Pfeilen nach oben oder unten und speichere die Auswahl.
 
 QuickIcons zeigen nur Ziele an, auf die du Zugriff hast. Verliert ein Konto ein Recht, wird der betreffende Schnellzugriff ausgeblendet. Das Menü-Symbol oberhalb der Trennlinie bleibt der Zugang zur vollständigen Navigation.
 
@@ -327,15 +341,17 @@ QuickIcons zeigen nur Ziele an, auf die du Zugriff hast. Verliert ein Konto ein 
 Die Navigation lässt sich über das Menü-Symbol öffnen. Nicht jede Desktop-Leiste wird auf dem Smartphone dauerhaft eingeblendet. Die Dokumentation erreichst du auch über das Benutzermenü.`,
       en: `### Change theme and colour
 1. Open **Appearance** from navigation or the user menu.
-2. Choose **Wardogs** or one of the existing Frontline themes.
-3. Wardogs offers six colour styles: Rose, Ice blue, Emerald, Amber, Amethyst and Slate.
+2. Choose **Aurora** or **Vanguard**, then select your colour style.
+3. Aurora offers six colour styles: Rose, Ice blue, Emerald, Amber, Amethyst and Slate.
 4. Select light, dark or system mode. You can also adjust colours for colour vision differences.
 5. Review the immediate preview and save. **Cancel** restores your previous appearance.
 
 Appearance belongs to your user account. If an older backend cannot save these preferences, the dialog explains that they will be stored locally in the browser.
 
+In dark mode, the static background image follows the selected colour style. It contains no animation. Light mode retains its light background surface.
+
 ### Customise QuickIcons
-In Wardogs, use the dashed **Customise** button below the shortcuts. Search for pages and select your favourites. Move them up or down using the arrows and save the selection.
+In Aurora, use the dashed **Customise** button below the shortcuts. Search for pages and select your favourites. Move them up or down using the arrows and save the selection.
 
 QuickIcons show only destinations you can access. If an account loses a permission, its corresponding shortcut is hidden. The menu icon above the divider remains the entry point to the full navigation.
 

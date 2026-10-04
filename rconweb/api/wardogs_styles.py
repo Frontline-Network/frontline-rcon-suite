@@ -1,4 +1,4 @@
-"""Wardogs accents shared by saved preferences and the standalone admin.
+"""Aurora accents shared by saved preferences and the standalone admin.
 
 Pairs match the frontend colorStyles.js; covered by the color contract check.
 """
@@ -16,5 +16,5 @@ WARDOGS_STYLES = {
 
 def normalize_wardogs_style(value):
     if not isinstance(value, str) or value not in WARDOGS_STYLES:
-        raise ValueError("Unsupported Wardogs color style.")
+        raise ValueError("Unsupported Aurora color style.")
     return value

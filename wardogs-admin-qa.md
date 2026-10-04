@@ -172,3 +172,31 @@ Prüfung:
 - Browser: Frontline und Wardogs bei Desktop-Breite sowie beide Themes bei 390 × 844, Suche und leere Trefferliste, Versionsauswahl und Direktlink, Lesestatus nach Reload sowie keine Links/Bilder im Artikel geprüft. Mobil sind Viewport und Scrollbreite 390 px.
 - Keine Releases veröffentlicht, Images ausgerollt, Serverkonfigurationen oder Benutzerrechte verändert. GitHub-Builds und echte Docker-Rollouts wurden lokal nicht ausgeführt.
 - Screenshots: `../output/wardogs-theme/admin/49-update-channel-frontline.png`, `50-update-channel-wardogs.png`, `51-update-channel-mobile.png`, `52-update-channel-frontline-mobile.png`.
+
+## Ergänzung: Übersicht und dezente Funken (04.10.2026)
+
+Die Übersicht bündelt Karte, Server, Spielerbelegung, Restzeit und nächste Karte in einer gemeinsamen Rundenkarte. Die Schichtlage steht als kompakter Hinweis darunter. Aufgaben und Teamvergleich erhalten mehr nutzbaren Platz; Aktionsbuttons bleiben innerhalb ihrer Zeilen. Die bisher doppelte Rundenkarte entfällt. Vanguard und Aurora behalten ihre jeweilige Formensprache. Die vorhandene mobile Einsatzübersicht bleibt erhalten.
+
+Der gemeinsame Hintergrund der angemeldeten Oberfläche zeigt einen ruhigen Lichtschein und neun kleine Funken in der jeweiligen Theme-Farbe. Die Funken steigen über 52–74 Sekunden langsam nach oben, driften geringfügig seitlich und verblassen. Es gibt keine zusätzlichen Bilddownloads, Timer oder Serverabfragen. „Hintergrund pausieren“ ist auf der Übersicht sowie im Benutzermenü verfügbar; die Entscheidung bleibt lokal im Browser gespeichert. Verborgene Tabs pausieren automatisch. Die Systemeinstellung für reduzierte Bewegung deaktiviert die Animation, auch über eine zusätzliche CSS-Regel.
+
+Prüfung:
+- Produktionsbuild, Übersetzungen (5.340 Schlüssel), Semantik, Design-Grundlagen, Navigation, Polling-Budget und Aurora-Farbprüfung erfolgreich. Die Semantikprüfung erkennt den gemeinsamen PageHeader der Übersicht; dessen H1-Vertrag wird weiterhin geprüft.
+- Das bereits zuvor überschrittene globale Bundle-Budget bleibt nicht bestanden: 1.607,58 kB raw / 511,91 kB gzip statt 1.525 / 500 kB. Vorheriger Stand: 1.603,24 / 510,33 kB. Grenzwerte unverändert.
+- Browser: Vanguard und Aurora bei 1440 × 1000, Aurora zusätzlich bei 1024 × 900 und 390 × 844 geprüft. Kein horizontaler Überlauf; Aufgabenaktionen bleiben innerhalb ihrer Zeilen. Der Link zur Live-Ansicht funktioniert. Auf Mobil bleibt der bestehende Operations Hub bedienbar.
+- Aufwärtsbewegung, unterschiedliche Laufzeiten und sanftes Verblassen anhand der gerenderten Animationen geprüft. Pause hält alle neun Funken an; Neuladen erhält die Pause. Auch die Bedienung über das mobile Benutzermenü geprüft. Animation anschließend wieder aktiviert und Aurora/Dunkel wiederhergestellt.
+- Reduzierte Bewegung und Pausierung verborgener Tabs im Code geprüft; die Systemeinstellung wurde nicht im Browser emuliert. Keine vollständige Accessibility-Prüfung und keine produktiven Spielaktionen ausgeführt.
+- Screenshots: `../output/wardogs-theme/admin/55-overview-before-aurora.png`, `56-overview-before-vanguard.png`, `57-overview-vanguard-after.png`, `58-overview-aurora-after.png`, `59-overview-mobile-after.png`.
+
+## Finaler Hintergrund: Statische Bilder je Farbstil (04.10.2026)
+
+Auf ausdrücklichen Nutzerwunsch ersetzt das bereitgestellte Hintergrundbild die zuvor erprobten Animationen vollständig. Funken-Komponente, Bewegungseinstellung, Pause-Schalter und zugehörige Hilfetexte wurden entfernt. Die überarbeitete Übersicht bleibt erhalten. Der folgende Stand ersetzt die Beschreibung des animierten Hintergrunds im vorigen Abschnitt.
+
+Das rote Original liegt unverändert unter `assets/rcongui/backgrounds/aurora-rose.png`. Fünf eigenständige Farbvarianten wurden mit dem eingebauten `image_gen` erstellt: `aurora-blue.png`, `aurora-emerald.png`, `aurora-amber.png`, `aurora-violet.png` und `aurora-slate.png` im selben Verzeichnis. Die konkreten Bearbeitungs-Prompts sind in `docs/theme-backgrounds.prompts.json` dokumentiert. Vorgabe war ausschließlich die Umfärbung des dunklen Scheins und vorhandener Lichtpunkte bei beibehaltenem Aufbau; alle Ergebnisse wurden visuell geprüft. Die Dateien werden über den vorhandenen Asset-Kopiervorgang in Entwicklung und Produktionsbuild übernommen. Es wird nur das jeweils gewählte Bild geladen.
+
+Aurora ordnet jedem seiner sechs Farbstile das passende Bild zu. Die festen Vanguard-Farben nutzen die entsprechenden Varianten; neutrale und individuelle Vanguard-Farben verwenden Schiefer. Der dunkle Bildrand geht über eine statische Farbüberblendung in die Theme-Fläche über. Die Darstellung ist an den Hauptinhalt gebunden und überlagert die Navigation nicht. Der Hellmodus behält seine helle Fläche.
+
+Prüfung:
+- Originaldatei und Projektkopie haben denselben SHA-256-Hash. Alle sechs Bilder sind im endgültigen Produktionsbuild enthalten.
+- Browser: alle sechs Aurora-Farbstile nacheinander in der ungespeicherten Vorschau geprüft; jeder wählt seine eigene Bild-URL. Hellmodus ohne dunkles Bild geprüft. Vorschau anschließend verworfen; vorheriger Bernstein-Stil wiederhergestellt. Keine Hintergrund-Animationskomponente und keine Pause-Schaltfläche mehr vorhanden.
+- Produktionsbuild, Aurora-Farbvertrag, Übersetzungen (5.337 Schlüssel), Navigation und Seitensemantik erfolgreich. Das bereits bekannte globale JavaScript-Budget bleibt überschritten: 1.603,96 kB raw / 510,55 kB gzip statt 1.525 / 500 kB. Keine Grenzwerte erhöht.
+- Finaler Screenshot: `../output/wardogs-theme/admin/63-overview-static-amber.png`.

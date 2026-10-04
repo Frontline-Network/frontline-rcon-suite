@@ -2,7 +2,6 @@ import { alpha } from "@mui/material/styles";
 import { fontFamily, geometry } from "./tokens";
 import { pageLayouts } from "./pageLayouts";
 import { surfaceHierarchy } from "./surfaceHierarchy";
-import { wardogsBackground } from "./background";
 
 // Older pages define their presentation with sx/styled instead of theme
 // tokens. Keep the compatibility layer here and scoped to Wardogs, including
@@ -13,7 +12,7 @@ export function legacySurfaces(theme) {
   return {
     'html[data-theme-preset="wardogs"]': {
       "& body": { fontFamily },
-      "& #main-content": { minWidth: 0, ...wardogsBackground(p.mode, theme.frontline?.appearance?.wardogsStyle) },
+      "& #main-content": { minWidth: 0 },
       "& [data-testid='desktop-header']": {
         "@media (max-width: 1499px)": {
           flexWrap: "wrap",

@@ -67,6 +67,20 @@ class UserAppearancePreference(models.Model):
         default_permissions = ()
 
 
+class UserReleaseHighlightState(models.Model):
+    """Per-account acknowledgement of an installed release's highlights."""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="release_highlight_states")
+    release_version = models.CharField(max_length=64)
+    seen = models.BooleanField(default=False)
+    snoozed_until = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        default_permissions = ()
+        constraints = [models.UniqueConstraint(fields=("user", "release_version"), name="unique_user_release_highlights")]
+
+
 class UserLiveViewPreference(models.Model):
     """Personal status-card visibility, independent from server automation."""
 
