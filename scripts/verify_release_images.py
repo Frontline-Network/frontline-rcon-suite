@@ -44,7 +44,7 @@ def main():
                 result = docker("run", "--rm", "--platform", platform, "--entrypoint", "sh", child, "-ec",
                                 'test "$(cat /code/tag_version)" = "$1"; test "$(cat /var/www/tag_version)" = "$1"; '
                                 'grep -lF "$1" /var/www/assets/*.js >/dev/null; '
-                                '! grep -lE "Mirage:|Pretender intercepted|demo_release_highlights=1" /var/www/assets/*.js; '
+                                'if grep -lE "Mirage:|Pretender intercepted|demo_release_highlights=1" /var/www/assets/*.js; then exit 1; fi; '
                                 'sha256sum /var/www/updates/theme-collection.png', "verify", args.version)
                 assert result.split()[0] == expected_image_hash, result
                 checks[platform] = {"version": args.version, "image_sha256": expected_image_hash, "production_bundle": True}
