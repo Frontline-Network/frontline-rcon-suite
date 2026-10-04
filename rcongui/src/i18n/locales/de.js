@@ -6658,4 +6658,11 @@ de.updates = {
   }
 };
 
+de.releaseHighlights = {
+  title: "Was ist neu?", eyebrow: "Neu auf diesem RCON", preview: "Vorschau · Beispieldaten",
+  language: "Sprache der Neuigkeiten", close: "Neuigkeiten schließen", done: "Alles klar",
+  later: "Später", saving: "Wird gespeichert …", allChanges: "Alle Änderungen",
+  saveFailed: "Die Erinnerung konnte nicht verschoben werden. Bitte versuche es erneut.",
+};
+
 export default mergeMissingTranslations(de, deMasterFallback);

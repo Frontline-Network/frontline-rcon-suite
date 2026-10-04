@@ -66,7 +66,7 @@ class ReleaseChannelTests(TestCase):
 
     def test_response_contains_no_github_metadata_urls_or_credentials(self):
         result = channel.select_releases([release("v0.8.8", html_url="https://private", author={"login": "owner"}, assets=[{}], token="secret")], "v0.8.8")[0]
-        self.assertEqual(set(result), {"tag_name", "name", "body", "published_at", "prerelease", "current"})
+        self.assertEqual(set(result), {"tag_name", "name", "body", "highlights", "published_at", "prerelease", "current"})
 
     def test_incomplete_rollout_and_unknown_frontend_never_fetch_source(self):
         with patch.object(channel, "release_token", side_effect=AssertionError("must not read source")):
@@ -115,3 +115,57 @@ class ReleaseChannelTests(TestCase):
 
     def test_redirects_cannot_forward_github_credential(self):
         self.assertIsNone(channel.NoRedirect().redirect_request(None, None, 302, "", {}, "https://other.example"))
+
+
+def highlights(**extra):
+    return {"schema_version": 1, "title": {"de": "Neuer Look", "en": "New look"},
+            "description": {"de": "Dein Arbeitsbereich.", "en": "Your workspace."},
+            "items": [], **extra}
+
+
+def highlight_body(value):
+    return "## Changes\nNotes\n<!-- crcon-highlights\n" + json.dumps(value) + "\n-->"
+
+
+class ReleaseHighlightContentTests(TestCase):
+    def test_editorial_metadata_is_removed_from_notes_and_survives_cache(self):
+        value = highlights(action={"id": "appearance", "label": {"de": "Öffnen", "en": "Open"}})
+        cache = MemoryCache()
+        with patch.object(channel, "release_token", return_value="test-only"), patch.object(channel, "github_json", return_value=[release("v0.8.8", body=highlight_body(value))]) as fetch:
+            first = channel.get_channel("v0.8.8", "v0.8.8", cache)
+            second = channel.get_channel("v0.8.8", "v0.8.8", cache)
+        self.assertEqual(fetch.call_count, 1)
+        self.assertEqual(first["releases"], second["releases"])
+        self.assertEqual(first["releases"][0]["highlights"], value)
+        self.assertEqual(first["releases"][0]["body"], "## Changes\nNotes")
+
+    def test_missing_translation_and_unknown_assets_actions_are_not_announced(self):
+        for value in [highlights(title={"de": "Nur Deutsch"}),
+                      highlights(image="https://example.org/tracker.png"),
+                      highlights(image="theme-collection"),
+                      highlights(action={"id": "https://github.com/private"}),
+                      highlights(items=[{}]), highlights(schema_version=2),
+                      highlights(description={"de": "x" * 321, "en": "Text"})]:
+            with self.subTest(value=value):
+                body, result = channel.extract_highlights(highlight_body(value))
+                self.assertIsNone(result)
+                self.assertEqual(body, "## Changes\nNotes")
+
+    def test_duplicate_malformed_and_oversized_blocks_fail_closed(self):
+        for body in [highlight_body(highlights()) * 2,
+                     "<!-- crcon-highlights\ninvalid-json -->",
+                     highlight_body(highlights(extra="x" * 16000))]:
+            self.assertIsNone(channel.extract_highlights(body)[1])
+
+    def test_only_the_installed_release_has_current_highlights(self):
+        catalog = [release(version, body=highlight_body(highlights()))
+                   for version in ("v0.8.9", "v0.8.8", "v0.8.7")]
+        selected = channel.select_releases(catalog, "v0.8.8")
+        self.assertEqual([item["tag_name"] for item in selected if item["current"]], ["v0.8.8"])
+        self.assertNotIn("v0.8.9", json.dumps(selected))
+
+    def test_unknown_fields_are_not_exposed_and_both_image_translations_are_kept(self):
+        value = highlights(image="theme-collection", image_alt={"de": "Themen", "en": "Themes"}, token="secret")
+        normalized = channel.normalize_highlights(value)
+        self.assertNotIn("token", normalized)
+        self.assertEqual(normalized["image_alt"], value["image_alt"])

@@ -14,6 +14,12 @@ export const helpArticles = [
 
 Ein neues Release auf GitHub wird hier erst sichtbar, wenn **Frontend und Backend dieselbe veröffentlichte Version** verwenden. Bei einem laufenden Versionswechsel, einer Entwicklungsfassung oder unbekannter Version erscheint ein Hinweis. Ein direkter Link auf eine neuere Versionsnummer umgeht diese Prüfung nicht. Der Versionsverlauf ist kein Protokoll darüber, wann frühere Versionen tatsächlich installiert waren.
 
+### Was ist neu?
+
+Für ausgewählte Releases erscheint auf der Übersicht eine kurze Einblendung mit einem Hauptthema und bis zu zwei weiteren Verbesserungen. Sie übernimmt dein Theme und deine Sprache; **DE / EN** wechselt die Anwendungssprache. Während du Formulare oder andere Dialoge bedienst, wird keine Einblendung darübergelegt.
+
+Die Einblendung erscheint einmal pro Konto und Version. Dieser Status wird auf dem Server gespeichert und gilt auch auf anderen Geräten. **Später** erinnert nach 24 Stunden erneut, sobald du die Übersicht besuchst. Über **Was ist neu?** im Benutzermenü oder Update-Kanal kannst du sie jederzeit wieder öffnen. Dieser Status ist unabhängig vom Lesestand des Changelogs. Fehlen vollständig gepflegte deutsche und englische Highlights, bleibt der normale Changelog verfügbar.
+
 ### Gelesen und ungelesen
 
 **Neu für dich** kennzeichnet die aktuelle Version, solange du sie noch nicht als gelesen markiert hast. Der Lesestand wird in diesem Browser für dein Konto und diese RCON-Adresse gespeichert. Das Lesen verändert keine Einstellungen und installiert keine Updates.
@@ -28,6 +34,12 @@ Open **Update channel** in the account menu or navigation to read this RCON inst
 ### After deployment
 
 A new GitHub release only appears when **frontend and backend run the same published version**. An incomplete rollout, development build or unknown version shows an explanation instead. A direct link to a newer version cannot bypass this check. The history is not a log of when earlier versions were actually installed.
+
+### What's new?
+
+Selected releases include a short overview spotlight with one main feature and up to two further improvements. It uses your theme and language; **DE / EN** changes the application language. It never opens over a form or another dialog you are using.
+
+The spotlight appears once per account and version. This status is stored on the server and shared across devices. **Later** postpones the reminder for 24 hours until you visit the overview again. Reopen it at any time using **What's new?** in the account menu or update channel. Its status is independent of the changelog's read status. If complete German and English highlights have not been provided, the normal changelog remains available.
 
 ### Read status
 

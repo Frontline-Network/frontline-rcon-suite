@@ -3,6 +3,7 @@ import { createServer, Response } from "miragejs";
 // Used only by the fake preview; production always requests its own backend.
 import apiDocumentation from "./data/api-documentation.json";
 import { updateChannelPreview } from "./data/update-channel";
+import { previewHighlightState, updatePreviewHighlightState } from "./data/highlight-state";
 import { normalizeAppearance } from "../themes/appearance";
 import { normalizeLiveViewPreferences } from "../pages/views/live/live-view-preferences.mjs";
 import { handleTeamView } from "./routes/team-view";
@@ -385,7 +386,14 @@ export function makeServer({ environment = "development" } = {}) {
       this.get("/get_system_usage", () => ok(getDemoSystemUsage()));
       this.get("/get_version", () => ok(updateChannelPreview.installed_version));
       this.get("/get_api_documentation", () => ok(apiDocumentation));
-      this.get("/get_update_channel", () => ok(updateChannelPreview));
+      this.get("/get_update_channel", () => ok({ ...updateChannelPreview, highlight_state: previewHighlightState() }));
+      this.post("/set_own_release_highlight_state", (_, request) => {
+        const payload = JSON.parse(request.requestBody);
+        if (payload.frontend_version !== process.env.REACT_APP_VERSION || payload.release_version !== "v0.8.8" || !["claim", "seen", "later"].includes(payload.action)) {
+          return new Response(409, {}, { failed: true });
+        }
+        return ok(updatePreviewHighlightState(payload.action));
+      });
       this.get(
         "/get_name",
         trackProtectedRequest("/api/get_name", () => ok(demoServerName))

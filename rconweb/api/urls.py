@@ -108,6 +108,7 @@ def get_api_documentation(request):
 # Each explicitly exposed API endpoint and auto-exposed Rcon endpoints
 endpoints: list[tuple[str, Callable]] = [
     ("get_update_channel", release_updates.get_update_channel),
+    ("set_own_release_highlight_state", release_updates.set_own_release_highlight_state),
     ("get_player_count_history", population.get_player_count_history),
     ("get_seeding_sessions", population.get_seeding_sessions),
     ("mark_seeding_session", population.mark_seeding_session),

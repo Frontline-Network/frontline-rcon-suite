@@ -3715,8 +3715,8 @@
       "GET"
     ],
     "description_translations": {
-      "de": "Liefert Changelogs bis zur installierten Version. Der Query-Parameter frontend_version muss die installierte Frontend-Version nennen und mit der Backend-Version übereinstimmen. Die private Quelle wird ausschließlich serverseitig gelesen; benötigt eine Anmeldung.",
-      "en": "Returns changelogs up to the installed version. The frontend_version query parameter must identify the installed frontend and match the backend version. The private source is read exclusively by the backend; sign-in is required."
+      "de": "Liefert Changelogs bis zur installierten Version sowie geprüfte deutsche und englische Highlights. highlight_state enthält den persönlichen Anzeigestatus für das aktuelle Release, sofern Highlights vorliegen. Der Query-Parameter frontend_version muss die installierte Frontend-Version nennen und mit der Backend-Version übereinstimmen. Die private Quelle wird ausschließlich serverseitig gelesen; benötigt eine Anmeldung.",
+      "en": "Returns changelogs up to the installed version and reviewed German and English highlights. highlight_state contains the personal display state for the current release when highlights are available. The frontend_version query parameter must identify the installed frontend and match the backend version. The private source is read exclusively by the backend; sign-in is required."
     }
   },
   {
@@ -6237,6 +6237,21 @@
     "description_translations": {
       "de": "Prüft und speichert die Konfiguration für automatische Kicks anhand von Spielernamen. Aktivierte Regeln können anschließend den Betrieb beeinflussen; für eine reine Prüfung dient der validate-Endpunkt.",
       "en": "Validates and saves configuration for automatic kicks based on player names. Enabled rules may subsequently affect operation; use the validate endpoint for a check only."
+    }
+  },
+  {
+    "endpoint": "set_own_release_highlight_state",
+    "arguments": {},
+    "return_type": null,
+    "doc_string": "Claim, acknowledge or defer installed DE/EN highlights for the signed-in account.\n\nJSON: frontend_version, release_version, action (claim, seen or later).\nClaim atomically reserves the one-time display; later postpones it by 24 hours.\nNo other user's ID is accepted. Frontend/backend versions must match.",
+    "auto_settings_capable": false,
+    "permissions_required": [],
+    "allowed_http_methods": [
+      "POST"
+    ],
+    "description_translations": {
+      "de": "Speichert den persönlichen Anzeigestatus der Neuigkeiten für die installierte Version. JSON: frontend_version, release_version und action. claim reserviert die einmalige Einblendung, seen bestätigt sie und later verschiebt sie um 24 Stunden. Frontend und Backend müssen dieselbe veröffentlichte Version mit deutschen und englischen Highlights verwenden. Benötigt eine Anmeldung und bei Browsersitzungen einen CSRF-Token; verändert keine fremden Konten.",
+      "en": "Stores the signed-in account's highlight display state for the installed version. JSON: frontend_version, release_version and action. claim reserves the one-time display, seen acknowledges it and later defers it by 24 hours. Frontend and backend must run the same published version with German and English highlights. Requires sign-in and, for browser sessions, a CSRF token; other accounts are not changed."
     }
   },
   {

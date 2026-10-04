@@ -6611,4 +6611,11 @@ en.updates = {
   }
 };
 
+en.releaseHighlights = {
+  title: "What's new?", eyebrow: "New on this RCON", preview: "Preview · Sample content",
+  language: "News language", close: "Close what's new", done: "Got it",
+  later: "Later", saving: "Saving …", allChanges: "All changes",
+  saveFailed: "The reminder could not be postponed. Please try again.",
+};
+
 export default mergeMissingTranslations(en, enMasterFallback);

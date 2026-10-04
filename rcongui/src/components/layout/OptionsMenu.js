@@ -18,6 +18,7 @@ import { useTranslation } from "react-i18next";
 import { useAppStore } from "@/stores/app-state";
 import Badge from "@mui/material/Badge";
 import { useUpdateChannel } from "@/hooks/useUpdateChannel";
+import { useHighlightUI } from "@/features/updates/highlight-state";
 
 const MenuItem = styled(MuiMenuItem)({
   margin: '2px 0',
@@ -25,7 +26,8 @@ const MenuItem = styled(MuiMenuItem)({
 
 export default function OptionsMenu({ renderTrigger }) {
   const { t } = useTranslation();
-  const { unreadCount } = useUpdateChannel({ poll: true });
+  const { unreadCount, currentRelease, data } = useUpdateChannel({ poll: true });
+  const openHighlights = useHighlightUI((state) => state.requestOpen);
   const [anchorEl, setAnchorEl] = useState(null);
   const setAppearanceOpen = useAppStore((state) => state.setAppearanceDialogOpen);
   const submit = useSubmit();
@@ -89,6 +91,10 @@ export default function OptionsMenu({ renderTrigger }) {
           <ListItemText>{t("updates.title")}</ListItemText>
           <ListItemIcon sx={{ ml: "auto", minWidth: 0 }}><Badge color="primary" variant="dot" invisible={!unreadCount}><NewReleasesOutlinedIcon fontSize="small" /></Badge></ListItemIcon>
         </MenuItem>
+        {currentRelease?.highlights && data?.highlight_state && <MenuItem onClick={openHighlights}>
+          <ListItemText>{t("releaseHighlights.title")}</ListItemText>
+          <ListItemIcon sx={{ ml: "auto", minWidth: 0 }}><NewReleasesOutlinedIcon fontSize="small" /></ListItemIcon>
+        </MenuItem>}
         <MenuItem component={Link} to="/documentation">
           <ListItemText>{t("documentation.title")}</ListItemText>
           <ListItemIcon sx={{ ml: 'auto', minWidth: 0 }}>
