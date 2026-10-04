@@ -70,6 +70,6 @@ test("appearance settings stay usable as a mobile full-screen flow", async ({
   const dialog = page.getByRole("dialog", { name: "Darstellung & Farben" });
   await expect(dialog).toBeVisible();
   await expect(dialog).toHaveCSS("height", "844px");
-  await expect(dialog.getByRole("button", { name: "Frontline Gold" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Vanguard Gold" })).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Änderungen übernehmen" })).toBeVisible();
 });

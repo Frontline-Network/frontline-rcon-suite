@@ -170,7 +170,7 @@ test("vote panel follows theme presets and every color-vision mode", async ({
     ["Signal Green", "signal-green", "protanopia", "dark"],
     ["Command Red", "command-red", "tritanopia", "light"],
     ["Neutral", "neutral", "standard", "dark"],
-    ["Frontline Gold", "frontline-gold", "standard", "dark"],
+    ["Vanguard Gold", "frontline-gold", "standard", "dark"],
   ];
   for (const [label, preset, colorVision, mode] of variants) {
     await page.locator('[data-testid="user-options-menu"]:visible').click();
