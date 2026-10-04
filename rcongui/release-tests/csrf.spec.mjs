@@ -3,6 +3,20 @@ import { test, expect } from "@playwright/test";
 // Real browser cookies + the production CSRF transport + real Django auth/views.
 // Only the opt-in isolated smoke server is used; no game commands exist there.
 async function start(page, context) {
+  if (process.env.RELEASE_SMOKE_BACKEND_URL) {
+    // nginx deliberately proxies only /api/. Forward ONLY the two opt-in
+    // fixture resources to the isolated backend, leaving every real auth/API
+    // request, cookie and Origin check on the production frontend proxy.
+    for (const path of ["/__test__/blank", "/__test__/csrf-transport.mjs"]) {
+      await page.route((url) => url.pathname === path, async (route) => {
+        const response = await context.request.get(
+          new URL(path, process.env.RELEASE_SMOKE_BACKEND_URL).href
+        );
+        expect(response.ok()).toBe(true);
+        await route.fulfill({ response });
+      });
+    }
+  }
   const login = await context.request.post("/api/login", {
     data: { username: "csrf", password: "isolated-test-only" },
   });
