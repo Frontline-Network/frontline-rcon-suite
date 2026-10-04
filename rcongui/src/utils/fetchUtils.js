@@ -1,6 +1,7 @@
 import { json } from "react-router-dom";
 import { toast } from "react-toastify";
 import { createHttpErrorToastBudget } from "./httpErrorToastBudget";
+import { createCsrfTransport, csrfFailureKind, isUnsafeMethod } from "./csrfTransport.mjs";
 import i18n from "@/i18n";
 
 // Vite does not define the legacy CRA environment variable in fake mode.
@@ -70,6 +71,7 @@ const markSessionExpired = (command) => {
   if (sessionExpired || isSessionRecoveryCommand(command)) return;
 
   sessionExpired = true;
+  csrfTransport?.reset();
   if (typeof window !== "undefined") {
     // Let the mounted auth boundary subscribe before the first fast API
     // response from a local/fake backend asks it to redirect.
@@ -82,70 +84,25 @@ const markSessionExpired = (command) => {
 
 export { SESSION_EXPIRY_EVENT };
 
-function getCookie(name) {
-  const prefix = `${name}=`;
-  return document.cookie
-    .split(";")
-    .map((entry) => entry.trim())
-    .find((entry) => entry.startsWith(prefix))
-    ?.slice(prefix.length);
-}
-
-const SAFE_HTTP_METHODS = new Set(["GET", "HEAD", "OPTIONS", "TRACE"]);
-const CSRF_RECOVERY_HEADER = "X-CRCON-CSRF-Recovery";
-const CSRF_TOKEN_HEADER = "X-CRCON-CSRF-Token";
-let serverConfirmedCsrfToken = null;
-
-function isUnsafeMethod(method) {
-  return !SAFE_HTTP_METHODS.has(String(method || "GET").toUpperCase());
-}
-
-function requestHeadersWithCsrf(method, headers, tokenOverride) {
-  const requestHeaders = new Headers(headers || {});
-  if (isUnsafeMethod(method)) {
-    // Prefer a token that the server already accepted over document.cookie.
-    // Browsers may retain duplicate cookies with different paths, while
-    // document.cookie does not tell us which one will be sent to /api.
-    const csrfToken =
-      tokenOverride || serverConfirmedCsrfToken || getCookie("csrftoken");
-    if (csrfToken) {
-      requestHeaders.set("X-CSRFToken", decodeURIComponent(csrfToken));
-    }
-  }
-  return requestHeaders;
-}
-
-/**
- * Send a browser request with the session CSRF token.
- *
- * A CSRF-rejected request has not executed on the backend. The dedicated
- * response marker therefore allows exactly one safe retry with the fresh
- * cookie issued by Django. Normal permission-related 403 responses are never
- * retried.
- */
+let csrfTransport;
 export async function fetchWithCsrf(input, options = {}) {
-  const method = String(options.method || "GET").toUpperCase();
-  const send = (tokenOverride) =>
-    fetch(input, {
-      ...options,
-      method,
-      credentials: options.credentials || "include",
-      headers: requestHeadersWithCsrf(method, options.headers, tokenOverride),
-    });
-
-  let response = await send();
-  if (
-    isUnsafeMethod(method) &&
-    response.status === 403 &&
-    response.headers.get(CSRF_RECOVERY_HEADER) === "1"
-  ) {
-    const recoveryToken = response.headers.get(CSRF_TOKEN_HEADER);
-    if (recoveryToken) {
-      serverConfirmedCsrfToken = recoveryToken;
-      response = await send(recoveryToken);
+  csrfTransport ??= createCsrfTransport({
+    apiBase: CRCON_API,
+    pageOrigin: document.location.origin,
+    readCookie: () => document.cookie,
+    fetcher: (...args) => fetch(...args),
+  });
+  try {
+    const response = await csrfTransport.fetchWithCsrf(input, options);
+    const failure = csrfFailureKind(response);
+    if (failure) throw new CsrfError(failure);
+    return response;
+  } catch (error) {
+    if (error.name === "CsrfTransportError") {
+      throw new CsrfError(error.code);
     }
+    throw error;
   }
-  return response;
 }
 
 async function requestFactory({
@@ -884,6 +841,10 @@ export function handleHttpError(error) {
   let errorObject, init;
 
   switch (error.name) {
+    case "CsrfError":
+      errorObject = { message: error.message, error: error.name };
+      init = { status: 403 };
+      break;
     case "PermissionError":
       errorObject = {
         message: i18n.t("sharedOperations.http.notAuthorized"),
@@ -927,6 +888,16 @@ export function handleHttpError(error) {
   }
 
   throw json(errorObject, init);
+}
+
+class CsrfError extends Error {
+  constructor(kind) {
+    const key = kind === "request" ? "csrfRequestRejected" : "csrfSessionChanged";
+    super(i18n.t(`sharedOperations.http.${key}`));
+    this.name = "CsrfError";
+    this.status = 403;
+    this.text = this.message;
+  }
 }
 
 class AuthError extends Error {
@@ -1025,7 +996,13 @@ async function handle_http_errors(error) {
     ""
   );
 
-  if (name === "AuthError") {
+  if (name === "CsrfError") {
+    showBoundedHttpErrorToast({
+      signature: "csrf",
+      message: error.message,
+      level: "warn",
+    });
+  } else if (name === "AuthError") {
     showBoundedHttpErrorToast({
       signature: "auth",
       message: i18n.t("sharedOperations.http.signInRequired"),

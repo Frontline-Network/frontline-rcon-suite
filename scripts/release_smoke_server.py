@@ -30,6 +30,7 @@ def main():
     parser.add_argument("--frontend", type=Path)
     parser.add_argument("--notes-file", type=Path)
     args = parser.parse_args()
+    expected_version = os.environ.get("RELEASE_VERSION", "v0.9.0")
     # Never inherit access to a production database or a private release token.
     for name in ("HLL_DB_URL", "HLL_REDIS_URL", "CRCON_RELEASES_GITHUB_TOKEN", "CRCON_RELEASES_GITHUB_TOKEN_FILE", "GITHUB_TOKEN", "GH_TOKEN"):
         os.environ.pop(name, None)
@@ -89,7 +90,7 @@ def main():
         with redirect_stdout(io.StringIO()):
             call_command("migrate", verbosity=0, interactive=False)
         call_command("makemigrations", check=True, dry_run=True, verbosity=0)
-        for username in ("vanguard", "aurora", "busy", "dialog", "separate"):
+        for username in ("vanguard", "aurora", "busy", "dialog", "separate", "csrf"):
             user = User.objects.create_user(username=username, password="isolated-test-only")
             UserAppearancePreference.objects.create(user=user, preferences={
                 "preset": "wardogs" if username == "aurora" else "frontline-gold", "mode": "dark"
@@ -97,15 +98,18 @@ def main():
         if args.notes_file:
             snapshot = Path(directory) / "prepublication-notes.json"
             snapshot.write_text(json.dumps({"checked_at": "2020-01-01T00:00:00Z", "releases": [{
-                "tag_name": "v0.9.0", "name": "Frontline RCON Suite v0.9.0",
+                "tag_name": expected_version, "name": f"Frontline RCON Suite {expected_version}",
                 "draft": False, "prerelease": False, "published_at": "2020-01-01T00:00:00Z",
                 "body": args.notes_file.read_text(encoding="utf-8")
             }]}), encoding="utf-8")
             release_channel.SNAPSHOT_PATH = snapshot
-        assert settings.TAG_VERSION == "v0.9.0", settings.TAG_VERSION
-        channel = release_channel.get_channel(settings.TAG_VERSION, "v0.9.0", None)
+        assert settings.TAG_VERSION == expected_version, settings.TAG_VERSION
+        channel = release_channel.get_channel(settings.TAG_VERSION, expected_version, None)
         assert channel["status"] == "ready", channel
-        assert channel["releases"][0]["highlights"], "Missing real published highlights"
+        current = next(entry for entry in channel["releases"] if entry["current"])
+        assert current["tag_name"] == expected_version
+        if expected_version == "v0.9.0":
+            assert current["highlights"], "Missing real published highlights"
 
         def unavailable(request, endpoint):
             # No accidental access to a game server is possible through this URLconf.
@@ -120,7 +124,15 @@ def main():
             return serve(request, route if asset.is_file() else "index.html", document_root=args.frontend)
 
         globals()["urlpatterns"] = [
+            # Browser security tests load the production transport unchanged.
+            # These routes exist ONLY in this isolated, opt-in test server.
+            path("__test__/blank", lambda request: HttpResponse("<!doctype html><title>CSRF test</title>")),
+            path("__test__/csrf-transport.mjs", lambda request: HttpResponse(
+                (ROOT / "rcongui/src/utils/csrfTransport.mjs").read_text(encoding="utf-8"),
+                content_type="application/javascript",
+            )),
             path("api/login", auth.do_login),
+            path("api/logout", auth.do_logout),
             path("api/is_logged_in", auth.is_logged_in),
             path("api/get_own_user_permissions", auth.get_own_user_permissions),
             path("api/get_own_user_appearance", appearance.get_own_user_appearance),

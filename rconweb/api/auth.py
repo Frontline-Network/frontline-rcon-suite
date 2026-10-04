@@ -19,6 +19,7 @@ from django.db.models.signals import post_delete, post_save
 from django.http import HttpResponse, QueryDict, parse_cookie
 from django.middleware.csrf import get_token
 from django.utils import timezone
+from django.utils.cache import add_never_cache_headers, patch_vary_headers
 from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import ratelimit
 
@@ -261,19 +262,31 @@ def do_login(request):
         user = authenticate(request, username=name, password=password)
         if user is not None:
             login(request, user)
-            # The frontend uses this token for subsequent session-authenticated
-            # writes. get_token() marks the CSRF cookie for the response.
-            get_token(request)
             logger.info("Successful login: %s", name)
-            return api_response(
-                result=True, command="login", arguments=name, failed=False
+            return _browser_session_response(
+                request,
+                api_response(result=True, command="login", arguments=name, failed=False),
             )
         else:
             logger.warning("Failed login attempt %s", name)
             raise PermissionDenied("Invalid login")
     except PermissionDenied:
         logger.warning("Failed login attempt %s", name)
-        return api_response(command="login", arguments=name, status_code=401)
+        return _browser_session_response(
+            request,
+            api_response(command="login", arguments=name, status_code=401),
+            issue_token=False,
+        )
+
+
+def _browser_session_response(request, response, *, issue_token=True):
+    # Return the token for the cookie Django actually received (not the first
+    # duplicate in document.cookie). login() must run first: it rotates the secret.
+    if issue_token:
+        response["X-CRCON-CSRF-Token"] = get_token(request)
+    add_never_cache_headers(response)
+    patch_vary_headers(response, ("Cookie",))
+    return response
 
 
 @ttl_cache(60 * 60, cache_falsy=False)
@@ -292,11 +305,6 @@ def get_moderators_accounts() -> list[tuple[str, str]]:
 def is_logged_in(request):
     is_auth = request.user.is_authenticated
     if is_auth:
-        # Existing browser sessions can predate a CSRF-cookie rotation or a
-        # deployment that enabled session CSRF enforcement.  This endpoint is
-        # called during application startup, so issue a fresh readable token
-        # before the frontend performs its first session-authenticated POST.
-        get_token(request)
         try:
             player_id = None
             try:
@@ -311,7 +319,11 @@ def is_logged_in(request):
             logger.exception("Can't record heartbeat")
 
     res = dict(authenticated=is_auth)
-    return api_response(result=res, command="is_logged_in", failed=False)
+    # Also bootstrap anonymous browsers before login. All parallel writes use
+    # this read-only check instead of racing to create different CSRF cookies.
+    return _browser_session_response(
+        request, api_response(result=res, command="is_logged_in", failed=False)
+    )
 
 
 @csrf_exempt
@@ -319,7 +331,10 @@ def is_logged_in(request):
 @ratelimit(key=request_rate_limit_key, rate="30/m", block=True)
 def do_logout(request):
     logout(request)
-    return api_response(result=True, command="logout", failed=False)
+    return _browser_session_response(
+        request, api_response(result=True, command="logout", failed=False),
+        issue_token=False,
+    )
 
 
 def check_api_key(request):

@@ -15,14 +15,14 @@ def verify(version, require_highlights=False, image=False):
     selected = channel.select_releases(snapshot["releases"], version)
     current = next((entry for entry in selected if entry["current"]), None)
     assert current and current["tag_name"] == version, "Published release missing from image snapshot"
+    source = next(entry for entry in snapshot["releases"] if entry["tag_name"] == version)
+    reviewed = (ROOT / "docs/releases" / f"{version}.md").read_text(encoding="utf-8")
+    assert source["body"].replace("\r\n", "\n").strip() == reviewed.strip(), "Image notes differ from reviewed release notes"
     if require_highlights:
         assert current["highlights"], "Published release has no valid DE/EN highlights"
         assert current["highlights"]["image"] == "theme-collection"
         assert current["highlights"]["action"]["id"] == "appearance"
-        source = next(entry for entry in snapshot["releases"] if entry["tag_name"] == version)
         assert len(channel.HIGHLIGHT_BLOCK.findall(source["body"])) == 1
-        reviewed = (ROOT / "docs/releases" / f"{version}.md").read_text(encoding="utf-8")
-        assert source["body"].replace("\r\n", "\n").strip() == reviewed.strip(), "Image notes differ from reviewed release notes"
     # An old installation cannot announce this release, even with the new snapshot.
     assert all(entry["tag_name"] != version for entry in channel.select_releases(snapshot["releases"], "v0.8.8"))
     if image:

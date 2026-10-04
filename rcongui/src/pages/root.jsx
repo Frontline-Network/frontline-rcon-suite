@@ -77,8 +77,8 @@ export default function Root() {
       <Box
         sx={{
           "--app-header-height": {
-            xs: isWardogs ? "64px" : "108px",
-            sm: isWardogs ? "64px" : "108px",
+            xs: isWardogs ? "112px" : "108px",
+            sm: isWardogs ? "112px" : "108px",
             md: "0px",
           },
           "--wardogs-gutter": "clamp(24px, 3.2vw, 72px)",

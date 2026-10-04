@@ -16,6 +16,7 @@ def main():
     parser.add_argument("--revision", required=True)
     parser.add_argument("--backend-digest", required=True)
     parser.add_argument("--frontend-digest", required=True)
+    parser.add_argument("--require-highlights", action="store_true")
     args = parser.parse_args()
     evidence = {"version": args.version, "revision": args.revision, "images": {}}
     expected_image_hash = hashlib.sha256(Path("assets/rcongui/updates/theme-collection.png").read_bytes()).hexdigest()
@@ -38,7 +39,8 @@ def main():
             assert not any("GITHUB_TOKEN=" in value or "GH_TOKEN=" in value or "CRCON_RELEASES_GITHUB_TOKEN=" in value for value in config["Env"])
             if kind == "backend":
                 result = docker("run", "--rm", "--platform", platform, "--entrypoint", "python", child,
-                                "scripts/verify_bundled_release.py", args.version, "--require-highlights", "--image")
+                                "scripts/verify_bundled_release.py", args.version, "--image",
+                                *(["--require-highlights"] if args.require_highlights else []))
                 checks[platform] = json.loads(result)
             else:
                 result = docker("run", "--rm", "--platform", platform, "--entrypoint", "sh", child, "-ec",

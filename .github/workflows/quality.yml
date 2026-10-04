@@ -7,6 +7,10 @@ jobs:
   test-release-integration:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        version: [v0.9.0, v0.9.1]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -23,7 +27,7 @@ jobs:
       - working-directory: rcongui
         env:
           REACT_APP_API_URL: /api/
-          REACT_APP_VERSION: v0.9.0
+          REACT_APP_VERSION: ${{ matrix.version }}
         run: |
           npm ci
           npm run copy-assets
@@ -33,9 +37,10 @@ jobs:
       - name: Real authenticated backend and production frontend
         env:
           RELEASE_SMOKE_TEST: '1'
-          CRCON_VERSION: v0.9.0
+          CRCON_VERSION: ${{ matrix.version }}
+          RELEASE_VERSION: ${{ matrix.version }}
         run: |
-          python scripts/release_smoke_server.py --frontend rcongui/dist --notes-file docs/releases/v0.9.0.md > "$RUNNER_TEMP/release-smoke.log" 2>&1 &
+          python scripts/release_smoke_server.py --frontend rcongui/dist --notes-file "docs/releases/$RELEASE_VERSION.md" > "$RUNNER_TEMP/release-smoke.log" 2>&1 &
           smoke_pid=$!
           trap 'kill "$smoke_pid" 2>/dev/null || true; cat "$RUNNER_TEMP/release-smoke.log"' EXIT
           for attempt in {1..30}; do
@@ -48,7 +53,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: release-integration-results
+          name: release-integration-results-${{ matrix.version }}
           path: rcongui/release-tests/release-test-results
 
   test-discord-service:
@@ -84,6 +89,7 @@ jobs:
       - run: npm run check:operator-copy
       - run: npm run check:i18n
       - run: npm run check:admin-actions
+      - run: npm run check:csrf
       - run: npm run check:game-capabilities
       - run: npm run check:polling
       - run: npm run check:log-stacks
