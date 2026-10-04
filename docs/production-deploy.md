@@ -38,6 +38,58 @@ The deployed commit tag is stored as `CRCON_IMAGE_TAG` in the ignored `.env`.
 Backups and deployment metadata are written below `.deploy-backups/` and
 `.deploy-state/` with owner-only permissions.
 
+## Preserve password recovery on every rollout
+
+SMTP credentials belong only in the installation's ignored `.env` (owner-only
+permissions), never in Git, release notes, image layers, or command output.
+Back up this file before changing it and preserve it when updating or regenerating
+Compose. Do not replace it with `default.env`.
+
+Multi-server installations support `CRCON_PASSWORD_RESET_ENABLED_<n>` and
+`CRCON_PUBLIC_URL_<n>` for instances 1–10. An unset or empty override falls back
+to the unsuffixed value. Give each enabled instance its **own public HTTPS origin**
+so reset links return to the correct server. Keep the global enable flag `false`
+when shared workers have no public origin. Existing single-server configurations
+using the unsuffixed values continue to work.
+
+For Frontline installations, retain the SMTP settings on every authorized rollout.
+The instance-specific flags/origins below apply to RCON3/4; other deployment targets
+need their own verified origins and are not activated by this example:
+
+```dotenv
+EMAIL_HOST=mail.fln.gg
+EMAIL_PORT=587
+EMAIL_HOST_USER=noreply@fln.gg
+DEFAULT_FROM_EMAIL=noreply@fln.gg
+EMAIL_USE_TLS=true
+EMAIL_USE_SSL=false
+CRCON_PASSWORD_RESET_ENABLED=false
+CRCON_PASSWORD_RESET_ENABLED_3=true
+CRCON_PUBLIC_URL_3=https://rcon3.fln.gg
+CRCON_PASSWORD_RESET_ENABLED_4=true
+CRCON_PUBLIC_URL_4=https://rcon4.fln.gg
+```
+
+Preserve the separately stored `EMAIL_HOST_PASSWORD`; it is intentionally absent
+from this example. Do not activate retired instances 1/2.
+
+For pinned-image deployments, derive each service from its actual running
+container's `com.docker.compose.project.config_files`, not an older release's
+snapshot. The RCON3/4 configuration-only activation on 2026-10-04 is recorded in
+`.deploy-state/password-recovery-20261004/`. When regenerating from an older
+template, append its private `compose.smtp-overlay.json` last. This overlay
+requires the private variables and can also be used with newer templates.
+The host's `.deploy-state/SMTP-ROLLOUT.md` contains the configuration rollback
+instructions. Never print resolved Compose files: they contain credentials.
+
+Before rollout, validate the Compose model without printing it. Afterwards,
+verify the actual Django SMTP configuration, TLS/authentication, the per-instance
+public origin, and `GET /accounts/password_reset/` with `Accept: application/json`
+(`available: true`). Do not log the returned CSRF token. SMTP authentication alone
+does not prove mailbox delivery; only send a test email to an agreed recipient.
+Users also need a reachable email address on their account in Administration.
+Do not invent or overwrite account addresses during deployment.
+
 ## Rollback
 
 Do not automatically downgrade database migrations. If application health fails,
