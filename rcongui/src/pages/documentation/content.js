@@ -318,6 +318,9 @@ Check the permission description and the API reference: some actions require mul
 
 Die Darstellung gehört zu deinem Benutzerkonto. Falls ein älteres Backend diese Einstellungen noch nicht speichern kann, weist der Dialog auf die lokale Speicherung im Browser hin.
 
+### Hintergrundanimation
+Ein dezenter Lichtschimmer und wenige langsam aufsteigende, ausblendende Funken greifen die gewählte Theme-Farbe auf. Über **Hintergrund pausieren** auf der Übersicht oder im Benutzermenü kannst du die Bewegung anhalten und wieder einschalten. Diese Wahl wird in diesem Browser gespeichert. Die Systemeinstellung **Bewegung reduzieren** hat Vorrang; in ausgeblendeten Tabs pausiert die Animation automatisch.
+
 ### QuickIcons anpassen
 Im Aurora-Theme befindet sich unter den Schnellzugriffen eine gestrichelte **Anpassen**-Schaltfläche. Öffne sie, suche die gewünschten Seiten und wähle deine Favoriten. Ordne sie mit den Pfeilen nach oben oder unten und speichere die Auswahl.
 
@@ -333,6 +336,9 @@ Die Navigation lässt sich über das Menü-Symbol öffnen. Nicht jede Desktop-Le
 5. Review the immediate preview and save. **Cancel** restores your previous appearance.
 
 Appearance belongs to your user account. If an older backend cannot save these preferences, the dialog explains that they will be stored locally in the browser.
+
+### Background animation
+A subtle glow and a few slowly rising, fading sparks follow the selected theme colour. Use **Pause background** on the overview or in the account menu to stop or resume the movement. Your choice is saved in this browser. The system's **reduced motion** preference takes priority, and animation pauses automatically in hidden tabs.
 
 ### Customise QuickIcons
 In Aurora, use the dashed **Customise** button below the shortcuts. Search for pages and select your favourites. Move them up or down using the arrows and save the selection.

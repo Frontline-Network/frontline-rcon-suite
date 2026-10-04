@@ -6314,6 +6314,11 @@ const deMasterFallback = {
     }
   },
   "appearance": {
+    "motion": {
+      "pause": "Hintergrund pausieren",
+      "play": "Hintergrund animieren",
+      "reduced": "Bewegung vom System reduziert"
+    },
     "menuLabel": "Darstellung & Farben",
     "title": "Darstellung & Farben",
     "subtitle": "Passe die Oberfläche an deine Arbeitsweise und Wahrnehmung an.",

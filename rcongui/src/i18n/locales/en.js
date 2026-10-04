@@ -6268,6 +6268,11 @@ const enMasterFallback = {
     }
   },
   "appearance": {
+    "motion": {
+      "pause": "Pause background",
+      "play": "Animate background",
+      "reduced": "Motion reduced by system"
+    },
     "menuLabel": "Appearance & colors",
     "title": "Appearance & colors",
     "subtitle": "Adapt the interface to your workflow and visual needs.",

@@ -172,3 +172,17 @@ Prüfung:
 - Browser: Frontline und Wardogs bei Desktop-Breite sowie beide Themes bei 390 × 844, Suche und leere Trefferliste, Versionsauswahl und Direktlink, Lesestatus nach Reload sowie keine Links/Bilder im Artikel geprüft. Mobil sind Viewport und Scrollbreite 390 px.
 - Keine Releases veröffentlicht, Images ausgerollt, Serverkonfigurationen oder Benutzerrechte verändert. GitHub-Builds und echte Docker-Rollouts wurden lokal nicht ausgeführt.
 - Screenshots: `../output/wardogs-theme/admin/49-update-channel-frontline.png`, `50-update-channel-wardogs.png`, `51-update-channel-mobile.png`, `52-update-channel-frontline-mobile.png`.
+
+## Ergänzung: Übersicht und dezente Funken (04.10.2026)
+
+Die Übersicht bündelt Karte, Server, Spielerbelegung, Restzeit und nächste Karte in einer gemeinsamen Rundenkarte. Die Schichtlage steht als kompakter Hinweis darunter. Aufgaben und Teamvergleich erhalten mehr nutzbaren Platz; Aktionsbuttons bleiben innerhalb ihrer Zeilen. Die bisher doppelte Rundenkarte entfällt. Vanguard und Aurora behalten ihre jeweilige Formensprache. Die vorhandene mobile Einsatzübersicht bleibt erhalten.
+
+Der gemeinsame Hintergrund der angemeldeten Oberfläche zeigt einen ruhigen Lichtschein und neun kleine Funken in der jeweiligen Theme-Farbe. Die Funken steigen über 52–74 Sekunden langsam nach oben, driften geringfügig seitlich und verblassen. Es gibt keine zusätzlichen Bilddownloads, Timer oder Serverabfragen. „Hintergrund pausieren“ ist auf der Übersicht sowie im Benutzermenü verfügbar; die Entscheidung bleibt lokal im Browser gespeichert. Verborgene Tabs pausieren automatisch. Die Systemeinstellung für reduzierte Bewegung deaktiviert die Animation, auch über eine zusätzliche CSS-Regel.
+
+Prüfung:
+- Produktionsbuild, Übersetzungen (5.340 Schlüssel), Semantik, Design-Grundlagen, Navigation, Polling-Budget und Aurora-Farbprüfung erfolgreich. Die Semantikprüfung erkennt den gemeinsamen PageHeader der Übersicht; dessen H1-Vertrag wird weiterhin geprüft.
+- Das bereits zuvor überschrittene globale Bundle-Budget bleibt nicht bestanden: 1.607,58 kB raw / 511,91 kB gzip statt 1.525 / 500 kB. Vorheriger Stand: 1.603,24 / 510,33 kB. Grenzwerte unverändert.
+- Browser: Vanguard und Aurora bei 1440 × 1000, Aurora zusätzlich bei 1024 × 900 und 390 × 844 geprüft. Kein horizontaler Überlauf; Aufgabenaktionen bleiben innerhalb ihrer Zeilen. Der Link zur Live-Ansicht funktioniert. Auf Mobil bleibt der bestehende Operations Hub bedienbar.
+- Aufwärtsbewegung, unterschiedliche Laufzeiten und sanftes Verblassen anhand der gerenderten Animationen geprüft. Pause hält alle neun Funken an; Neuladen erhält die Pause. Auch die Bedienung über das mobile Benutzermenü geprüft. Animation anschließend wieder aktiviert und Aurora/Dunkel wiederhergestellt.
+- Reduzierte Bewegung und Pausierung verborgener Tabs im Code geprüft; die Systemeinstellung wurde nicht im Browser emuliert. Keine vollständige Accessibility-Prüfung und keine produktiven Spielaktionen ausgeführt.
+- Screenshots: `../output/wardogs-theme/admin/55-overview-before-aurora.png`, `56-overview-before-vanguard.png`, `57-overview-vanguard-after.png`, `58-overview-aurora-after.png`, `59-overview-mobile-after.png`.

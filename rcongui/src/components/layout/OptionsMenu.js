@@ -18,6 +18,9 @@ import { useTranslation } from "react-i18next";
 import { useAppStore } from "@/stores/app-state";
 import Badge from "@mui/material/Badge";
 import { useUpdateChannel } from "@/hooks/useUpdateChannel";
+import { useBackgroundMotion } from "@/hooks/useBackgroundMotion";
+import PauseRoundedIcon from "@mui/icons-material/PauseRounded";
+import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 
 const MenuItem = styled(MuiMenuItem)({
   margin: '2px 0',
@@ -25,6 +28,7 @@ const MenuItem = styled(MuiMenuItem)({
 
 export default function OptionsMenu({ renderTrigger }) {
   const { t } = useTranslation();
+  const motion = useBackgroundMotion();
   const { unreadCount } = useUpdateChannel({ poll: true });
   const [anchorEl, setAnchorEl] = useState(null);
   const setAppearanceOpen = useAppStore((state) => state.setAppearanceDialogOpen);
@@ -83,6 +87,12 @@ export default function OptionsMenu({ renderTrigger }) {
           <ListItemText>{t("appearance.menuLabel")}</ListItemText>
           <ListItemIcon sx={{ ml: 'auto', minWidth: 0 }}>
             <PaletteOutlinedIcon fontSize="small" />
+          </ListItemIcon>
+        </MenuItem>
+        <MenuItem disabled={motion.reduced} onClick={motion.toggle}>
+          <ListItemText>{t(motion.reduced ? "appearance.motion.reduced" : motion.playing ? "appearance.motion.pause" : "appearance.motion.play")}</ListItemText>
+          <ListItemIcon sx={{ ml: 'auto', minWidth: 0 }}>
+            {motion.playing ? <PauseRoundedIcon fontSize="small" /> : <PlayArrowRoundedIcon fontSize="small" />}
           </ListItemIcon>
         </MenuItem>
         <MenuItem component={Link} to="/updates">

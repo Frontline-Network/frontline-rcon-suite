@@ -9,6 +9,7 @@ import { useGlobalStore } from "@/stores/global-state";
 import { cmd } from "@/utils/fetchUtils";
 import { useTheme } from "@mui/material/styles";
 import PageHeader from "@/components/shared/PageHeader";
+import { BackgroundMotionButton } from "@/components/layout/AmbientBackground";
 
 const normalizeDashboardLogs = (rawLogs) => {
   const groups = (rawLogs?.result?.groups ?? []).map(({ group, logs }) => ({
@@ -57,45 +58,20 @@ const Dashboard = () => {
 
   return (
     <Box sx={{ py: isWardogs ? 0 : { xs: 2, md: 2.5 } }}>
-      {isWardogs ? (
-        <PageHeader
-          title={t("dashboard.title")}
-          subtitle={t("dashboard.operations.subtitle")}
-        />
-      ) : (
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          justifyContent="space-between"
-          alignItems={{ sm: "end" }}
-          sx={{ mb: 2 }}
-        >
-          <Box>
-            <Typography
-              component="h1"
-              variant="h3"
-              sx={{ textTransform: "uppercase" }}
-            >
-              {t("dashboard.title")}
+      <PageHeader
+        title={t("dashboard.title")}
+        subtitle={t("dashboard.operations.subtitle")}
+        actions={
+          <Stack alignItems={{ xs: "start", sm: "end" }} gap={0.5}>
+            <Typography variant="caption" color="text.secondary">
+              {dayjs()
+                .locale(i18n.resolvedLanguage || "de")
+                .format("dddd, D. MMMM YYYY")}
             </Typography>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ textTransform: "uppercase" }}
-            >
-              {t("dashboard.operations.subtitle")}
-            </Typography>
-          </Box>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ textTransform: "uppercase", mt: { xs: 1, sm: 0 } }}
-          >
-            {dayjs()
-              .locale(i18n.resolvedLanguage || "de")
-              .format("dddd, D. MMMM YYYY · HH:mm")}
-          </Typography>
-        </Stack>
-      )}
+            <BackgroundMotionButton />
+          </Stack>
+        }
+      />
 
       <OperationsOverview logs={logs} logsLoading={logsLoading} />
     </Box>

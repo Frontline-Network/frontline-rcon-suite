@@ -388,35 +388,8 @@ export function pageLayouts(theme) {
       ...panel,
       marginBottom: 24,
     },
-    "& [data-testid='operations-overview']": { gap: 24 },
-    "& [data-testid='operations-overview'] > .MuiBox-root": {
-      marginTop: 0,
-      gap: 24,
-    },
     "& [data-testid='operations-overview'] section": panel,
-    "& [data-testid='operations-overview'] section > .MuiStack-root:has(> .MuiStack-root > h2)":
-      panelHeader,
-    "& [data-testid='operations-overview'] .wardogs-dashboard-top": {
-      display: "grid",
-      gridTemplateColumns: "minmax(0, 1.25fr) minmax(0, 1fr)",
-      "@media (max-width: 1199px)": { gridTemplateColumns: "minmax(0, 1fr)" },
-    },
-    "& [data-testid='operations-overview'] .wardogs-dashboard-top > [data-testid='battle-overview']":
-      { order: -1 },
-    "& [data-testid='operations-overview'] .wardogs-dashboard-top > section": {
-      minHeight: 240,
-    },
-    "& [data-testid='operations-overview'] .wardogs-dashboard-detail": {
-      alignItems: "start",
-      gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-      "@media (max-width: 1399px)": { gridTemplateColumns: "minmax(0, 1fr)" },
-    },
-    "& [data-testid='operations-overview'] .wardogs-dashboard-detail > .MuiStack-root":
-      { gap: 24, "& > *": { marginTop: 0 } },
-    "& [data-testid='operations-overview'] #shift-situation-title + .MuiTypography-root":
-      { fontSize: 24 },
-    "& [data-testid='operations-overview'] section[aria-labelledby='shift-situation-title']":
-      { padding: 28 },
+    "& [data-testid='operations-overview'] section > .MuiStack-root:has(> .MuiStack-root > h2)": panelHeader,
     "& .wardogs-campaign-workspace": {
       ...panel,
       gridTemplateColumns: "minmax(0, 1fr)",
