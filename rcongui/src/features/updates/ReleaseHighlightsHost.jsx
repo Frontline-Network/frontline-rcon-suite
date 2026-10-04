@@ -26,12 +26,12 @@ export default function ReleaseHighlightsHost() {
   const [openFor, setOpenFor] = useState(null);
   const [pendingFor, setPendingFor] = useState(null);
   const attempted = useRef(new Set());
-  const release = channel.currentRelease;
+  const release = channel.highlightRelease;
   const available = Boolean(
     release?.highlights && channel.data?.highlight_state
   );
   const identity = available
-    ? `${channel.data.reader_id}:${release.tag_name}`
+    ? `${channel.data.reader_id}:${channel.data.highlight_state.release_version}`
     : null;
   const safePage =
     pathname === "/" &&

@@ -48,17 +48,28 @@ x-mobile-environment: &mobile-environment
   AI_MODERATION_MODEL: ${AI_MODERATION_MODEL:-gpt-5.6-luna}
   AI_PLAYER_NAME_MODEL: ${AI_PLAYER_NAME_MODEL:-gpt-5.4-nano}
 
+x-mobile-environment-server-1: &mobile-environment-server-1
+  <<: *mobile-environment
+  CRCON_PASSWORD_RESET_ENABLED: ${CRCON_PASSWORD_RESET_ENABLED_1:-${CRCON_PASSWORD_RESET_ENABLED:-false}}
+  CRCON_PUBLIC_URL: ${CRCON_PUBLIC_URL_1:-${CRCON_PUBLIC_URL:-}}
+
 x-mobile-environment-server-2: &mobile-environment-server-2
   <<: *mobile-environment
   HLL_GAME: ${HLL_GAME_2:-hll}
+  CRCON_PASSWORD_RESET_ENABLED: ${CRCON_PASSWORD_RESET_ENABLED_2:-${CRCON_PASSWORD_RESET_ENABLED:-false}}
+  CRCON_PUBLIC_URL: ${CRCON_PUBLIC_URL_2:-${CRCON_PUBLIC_URL:-}}
 
 x-mobile-environment-server-3: &mobile-environment-server-3
   <<: *mobile-environment
   HLL_GAME: ${HLL_GAME_3:-hll}
+  CRCON_PASSWORD_RESET_ENABLED: ${CRCON_PASSWORD_RESET_ENABLED_3:-${CRCON_PASSWORD_RESET_ENABLED:-false}}
+  CRCON_PUBLIC_URL: ${CRCON_PUBLIC_URL_3:-${CRCON_PUBLIC_URL:-}}
 
 x-mobile-environment-server-4: &mobile-environment-server-4
   <<: *mobile-environment
   HLL_GAME: ${HLL_GAME_4:-hll}
+  CRCON_PASSWORD_RESET_ENABLED: ${CRCON_PASSWORD_RESET_ENABLED_4:-${CRCON_PASSWORD_RESET_ENABLED:-false}}
+  CRCON_PUBLIC_URL: ${CRCON_PUBLIC_URL_4:-${CRCON_PUBLIC_URL:-}}
 
 x-frontline-frontend: &frontline-frontend
   image: frontline/hll_rcon_tool_frontend:${CRCON_IMAGE_TAG:-mobile-admin-autobalancer-v11.11.1}
@@ -213,13 +224,13 @@ services:
     <<: *frontline-backend
     restart: on-failure:5
     deploy: *backend-deploy
-    environment: *mobile-environment
+    environment: *mobile-environment-server-1
 
   supervisor_1:
     <<: *frontline-backend
     restart: on-failure:5
     deploy: *supervisor-deploy
-    environment: *mobile-environment
+    environment: *mobile-environment-server-1
 
   backend_2:
     <<: *frontline-backend

@@ -127,7 +127,7 @@ export default function Updates() {
         subtitle={t("updates.subtitle")}
         actions={
           <Stack direction="row" gap={1} flexWrap="wrap">
-            {channel.currentRelease?.highlights && channel.data?.highlight_state && <Button variant="outlined" startIcon={<NewReleasesOutlinedIcon />} onClick={openHighlights}>{t("releaseHighlights.title")}</Button>}
+            {channel.highlightRelease && channel.data?.highlight_state && <Button variant="outlined" startIcon={<NewReleasesOutlinedIcon />} onClick={openHighlights}>{t("releaseHighlights.title")}</Button>}
             <Button
               startIcon={<DoneAllIcon />}
               onClick={channel.markAsRead}

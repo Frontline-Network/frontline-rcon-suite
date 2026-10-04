@@ -26,7 +26,7 @@ const MenuItem = styled(MuiMenuItem)({
 
 export default function OptionsMenu({ renderTrigger }) {
   const { t } = useTranslation();
-  const { unreadCount, currentRelease, data } = useUpdateChannel({ poll: true });
+  const { unreadCount, highlightRelease, data } = useUpdateChannel({ poll: true });
   const openHighlights = useHighlightUI((state) => state.requestOpen);
   const [anchorEl, setAnchorEl] = useState(null);
   const setAppearanceOpen = useAppStore((state) => state.setAppearanceDialogOpen);
@@ -91,7 +91,7 @@ export default function OptionsMenu({ renderTrigger }) {
           <ListItemText>{t("updates.title")}</ListItemText>
           <ListItemIcon sx={{ ml: "auto", minWidth: 0 }}><Badge color="primary" variant="dot" invisible={!unreadCount}><NewReleasesOutlinedIcon fontSize="small" /></Badge></ListItemIcon>
         </MenuItem>
-        {currentRelease?.highlights && data?.highlight_state && <MenuItem onClick={openHighlights}>
+        {highlightRelease && data?.highlight_state && <MenuItem onClick={openHighlights}>
           <ListItemText>{t("releaseHighlights.title")}</ListItemText>
           <ListItemIcon sx={{ ml: "auto", minWidth: 0 }}><NewReleasesOutlinedIcon fontSize="small" /></ListItemIcon>
         </MenuItem>}
