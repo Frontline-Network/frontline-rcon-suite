@@ -58,9 +58,15 @@ credential or separate announcement service is required. Include the block befor
 syncing the release notes for the final image. Backend migration
 `0040_user_release_highlight_state` is required with this implementation.
 
-Both frontend and backend must report the same exact published version. Only that
-release can trigger a spotlight; drafts, future versions, development versions,
-incomplete rollouts and older history entries cannot trigger one. Publish and
+Both frontend and backend must report the same exact published version. The
+installed release's spotlight takes priority. A stable hotfix without its own
+spotlight inherits the newest published spotlight in the same major/minor line
+(for example, v0.9.1 retains v0.9.0). It keeps the original release tag and
+per-account acknowledgement/snooze; users who already saw it are not notified
+again. Once a newer spotlight exists, older unseen ones are not replayed.
+There is no fallback across major/minor lines or from/to historical prereleases.
+Drafts, future versions, development versions and incomplete rollouts cannot
+trigger a spotlight. Publish and
 sync release content through the existing release process. Do not bypass version
 verification for a demo or local development build.
 
@@ -78,7 +84,8 @@ keeps it seen. `later` clears seen and snoozes for 24 hours. Manual reopening ma
 it seen again and cancels a snooze. Changelog read status remains separate.
 
 `GET /api/get_update_channel?frontend_version=…` includes `highlights` in eligible
-release entries and `highlight_state` for the current release. The latter contains
+release entries and `highlight_state` for the selected spotlight (which can be
+older than the installed hotfix). The latter contains
 `release_version`, `seen`, `snoozed_until`, and `auto_show` (or is null).
 
 `POST /api/set_own_release_highlight_state` takes exactly `frontend_version`,
@@ -87,3 +94,8 @@ account, requires normal session CSRF protection and returns a private, uncached
 response. `show` is true only for a successful eligible claim. Errors: 400 invalid
 payload, 401 unauthenticated, 403 failed session CSRF, 405 wrong method, 409 version
 or content not eligible. There is no game-server mutation or new permission grant.
+
+The frontend resolves the spotlight from `highlight_state.release_version` in
+the verified release list, not from `current`. The account menu and update page
+use the same selection. The installed changelog and its unread indicator remain
+separate. No migration or bulk reset of existing seen states is needed.

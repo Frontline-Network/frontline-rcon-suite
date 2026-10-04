@@ -1,10 +1,10 @@
 import { test, expect } from "@playwright/test";
 
-// Keep the original curated v0.9.0 spotlight contract; hotfix releases do not
-// announce the old feature spotlight again and have their own metadata tests.
-test.skip(Boolean(process.env.RELEASE_VERSION && process.env.RELEASE_VERSION !== "v0.9.0"), "v0.9.0 spotlight contract (also run by the quality matrix)");
+// The original v0.9.0 spotlight survives a v0.9.1 hotfix with the same account key.
+const installed = process.env.RELEASE_VERSION || "v0.9.0";
+test.skip(!["v0.9.0", "v0.9.1"].includes(installed), "v0.9.0 spotlight and hotfix inheritance contract");
 
-const current = "/api/get_update_channel?frontend_version=v0.9.0";
+const current = `/api/get_update_channel?frontend_version=${installed}`;
 const spotlight = (page) => page.getByRole("dialog").filter({ has: page.locator("#release-spotlight-title") });
 async function login(context, username) {
   const response = await context.request.post("/api/login", {
@@ -30,20 +30,22 @@ test("published metadata, matching versions, authenticated sessions and CSRF", a
   const result = await state(context);
   expect(result.status).toBe("ready");
   expect(result.source).toBe("bundled");
-  const release = result.releases.find((item) => item.current);
+  expect(result.releases.find((item) => item.current).tag_name).toBe(installed);
+  const release = result.releases.find((item) => item.tag_name === "v0.9.0");
   expect(release.tag_name).toBe("v0.9.0");
   expect(release.highlights.title).toEqual({ de: "Dein RCON. Dein Look.", en: "Your RCON. Your style." });
   expect(release.highlights.action.id).toBe("appearance");
   expect(release.body).not.toContain("crcon-highlights");
   expect(result.preview).toBeUndefined();
   expect(result.highlight_state.auto_show).toBe(true);
-  for (const version of ["v0.8.8", "v0.8.9", "unknown", "v0.10.0"]) {
+  expect(result.highlight_state.release_version).toBe("v0.9.0");
+  for (const version of ["v0.8.8", "v0.8.9", "v0.9.0", "v0.9.1", "unknown", "v0.10.0"].filter((value) => value !== installed)) {
     const data = (await (await context.request.get(`/api/get_update_channel?frontend_version=${version}`)).json()).result;
     expect(data.releases).toEqual([]);
     expect(data.highlight_state).toBeNull();
   }
   const rejected = await context.request.post("/api/set_own_release_highlight_state", {
-    data: { frontend_version: "v0.9.0", release_version: "v0.9.0", action: "claim" },
+    data: { frontend_version: installed, release_version: "v0.9.0", action: "claim" },
   });
   expect(rejected.status()).toBe(403);
   expect((await state(context)).highlight_state.auto_show).toBe(true);
@@ -52,7 +54,7 @@ test("published metadata, matching versions, authenticated sessions and CSRF", a
   const csrf = (await context.cookies()).find((cookie) => cookie.name === "csrftoken").value;
   const viaProxy = await context.request.post("/api/set_own_release_highlight_state", {
     headers: { Host: "backend:8000", Origin: "http://127.0.0.1:8049", "X-CSRFToken": csrf },
-    data: { frontend_version: "v0.9.0", release_version: "v0.9.0", action: "claim" },
+    data: { frontend_version: installed, release_version: "v0.9.0", action: "claim" },
   });
   expect(viaProxy.status()).toBe(200);
   expect((await viaProxy.json()).result.show).toBe(true);

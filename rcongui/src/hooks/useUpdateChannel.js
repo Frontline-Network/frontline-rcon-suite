@@ -3,6 +3,7 @@ import { useCallback } from "react";
 import { create } from "zustand";
 import { useAuth } from "./useAuth";
 import { cmd } from "@/utils/fetchUtils";
+import { highlightReleaseForChannel } from "@/features/updates/highlight-release.mjs";
 
 const useReadUpdates = create((set) => ({
   values: {},
@@ -57,6 +58,7 @@ export function useUpdateChannel({ poll = false } = {}) {
       ? data.releases
       : [];
   const currentRelease = releases.find((release) => release.current);
+  const highlightRelease = highlightReleaseForChannel(data);
   const readerId = data?.reader_id;
   const releaseVersion = data?.highlight_state?.release_version;
   const channelStatus = data?.status;
@@ -111,6 +113,7 @@ export function useUpdateChannel({ poll = false } = {}) {
     data,
     releases,
     currentRelease,
+    highlightRelease,
     setHighlightState,
     unreadCount,
     markAsRead,

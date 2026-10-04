@@ -29,7 +29,10 @@ def main():
     parser.add_argument("--bind", default="127.0.0.1")
     parser.add_argument("--frontend", type=Path)
     parser.add_argument("--notes-file", type=Path)
+    parser.add_argument("--history-notes-file", type=Path, action="append", default=[])
     args = parser.parse_args()
+    if args.history_notes_file and not args.notes_file:
+        parser.error("History fixtures require --notes-file; final image snapshots stay unmodified")
     expected_version = os.environ.get("RELEASE_VERSION", "v0.9.0")
     # Never inherit access to a production database or a private release token.
     for name in ("HLL_DB_URL", "HLL_REDIS_URL", "CRCON_RELEASES_GITHUB_TOKEN", "CRCON_RELEASES_GITHUB_TOKEN_FILE", "GITHUB_TOKEN", "GH_TOKEN"):
@@ -81,7 +84,9 @@ def main():
         from django.urls import path, re_path
         from django.views.static import serve
         from api import auth, appearance, release_updates
-        from api.models import UserAppearancePreference
+        from api.models import UserAppearancePreference, UserReleaseHighlightState
+        from django.utils import timezone
+        from datetime import timedelta
         from rcon import release_channel
 
         # Explicitly stub ONLY the game's audit side effects, not auth/state/API.
@@ -90,18 +95,31 @@ def main():
         with redirect_stdout(io.StringIO()):
             call_command("migrate", verbosity=0, interactive=False)
         call_command("makemigrations", check=True, dry_run=True, verbosity=0)
-        for username in ("vanguard", "aurora", "busy", "dialog", "separate", "csrf"):
+        for username in ("vanguard", "aurora", "busy", "dialog", "separate", "csrf", "hotfix", "upgrade-seen", "upgrade-later"):
             user = User.objects.create_user(username=username, password="isolated-test-only")
             UserAppearancePreference.objects.create(user=user, preferences={
-                "preset": "wardogs" if username == "aurora" else "frontline-gold", "mode": "dark"
+                "preset": "wardogs" if username in ("aurora", "hotfix") else "frontline-gold", "mode": "dark"
             })
+            if username in ("upgrade-seen", "upgrade-later"):
+                UserReleaseHighlightState.objects.create(
+                    user=user, release_version="v0.9.0", seen=username == "upgrade-seen",
+                    snoozed_until=timezone.now() + timedelta(hours=12) if username == "upgrade-later" else None,
+                )
         if args.notes_file:
             snapshot = Path(directory) / "prepublication-notes.json"
-            snapshot.write_text(json.dumps({"checked_at": "2020-01-01T00:00:00Z", "releases": [{
+            catalog = [{
                 "tag_name": expected_version, "name": f"Frontline RCON Suite {expected_version}",
                 "draft": False, "prerelease": False, "published_at": "2020-01-01T00:00:00Z",
                 "body": args.notes_file.read_text(encoding="utf-8")
-            }]}), encoding="utf-8")
+            }]
+            for notes_file in args.history_notes_file:
+                assert release_channel.parse_version(notes_file.stem), "History fixture needs a version filename"
+                catalog.append({
+                    "tag_name": notes_file.stem, "name": f"Frontline RCON Suite {notes_file.stem}",
+                    "draft": False, "prerelease": False, "published_at": "2020-01-01T00:00:00Z",
+                    "body": notes_file.read_text(encoding="utf-8"),
+                })
+            snapshot.write_text(json.dumps({"checked_at": "2020-01-01T00:00:00Z", "releases": catalog}), encoding="utf-8")
             release_channel.SNAPSHOT_PATH = snapshot
         assert settings.TAG_VERSION == expected_version, settings.TAG_VERSION
         channel = release_channel.get_channel(settings.TAG_VERSION, expected_version, None)

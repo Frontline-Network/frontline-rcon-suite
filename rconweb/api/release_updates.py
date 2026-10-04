@@ -13,10 +13,31 @@ from .models import UserReleaseHighlightState
 
 
 def current_highlight_release(channel):
+    """Keep the latest spotlight across stable hotfixes in the same release line.
+
+    The channel already enforces matching installed/frontend versions and
+    published history. Keep the original tag as the acknowledgement identity;
+    never replay older spotlights after the newest eligible one was seen.
+    """
     if channel.get("status") != "ready":
         return None
-    return next((release for release in channel.get("releases", [])
-                 if release.get("current") and release.get("highlights")), None)
+    releases = channel.get("releases", [])
+    current = next((release for release in releases if release.get("current")), None)
+    installed = parse_version(current.get("tag_name")) if current else None
+    if not installed:
+        return None
+    if current.get("highlights"):
+        return current
+    if installed[1] or current.get("prerelease"):
+        return None
+    eligible = []
+    for release in releases:
+        version = parse_version(release.get("tag_name"))
+        if (version and not version[1] and not release.get("prerelease")
+                and version[0][:2] == installed[0][:2]
+                and version[0] < installed[0] and release.get("highlights")):
+            eligible.append((version[0], release))
+    return max(eligible, key=lambda item: item[0])[1] if eligible else None
 
 
 def release_key(tag):
