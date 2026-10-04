@@ -48,6 +48,9 @@ def main():
             SECRET_KEY="isolated-release-smoke-only-never-for-production",
             TAG_VERSION=resolve_version(), DEBUG=False,
             ALLOWED_HOSTS=["localhost", "127.0.0.1", "backend"],
+            # The shipped nginx forwards Host=backend:8000. As in a real
+            # installation, trust only the explicitly configured public origin.
+            CSRF_TRUSTED_ORIGINS=["http://127.0.0.1:8049"],
             ROOT_URLCONF=__name__, USE_TZ=True, TIME_ZONE="UTC",
             INSTALLED_APPS=["django.contrib.auth", "django.contrib.contenttypes", "django.contrib.sessions", IsolatedApi("api", importlib.import_module("api"))],
             DATABASES={"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": str(Path(directory) / "state.sqlite3")}},
