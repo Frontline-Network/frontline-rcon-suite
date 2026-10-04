@@ -1,3 +1,4 @@
+import NewReleasesOutlinedIcon from "@mui/icons-material/NewReleasesOutlined";
 import { styled } from '@mui/material/styles';
 import { dividerClasses } from '@mui/material/Divider';
 import Menu from '@mui/material/Menu';
@@ -9,14 +10,14 @@ import ListItemIcon, { listItemIconClasses } from '@mui/material/ListItemIcon';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import MoreVertRoundedIcon from '@mui/icons-material/MoreVertRounded';
 import PaletteOutlinedIcon from '@mui/icons-material/PaletteOutlined';
+import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
 import MenuButton from './MenuButton';
-import {useSubmit} from 'react-router-dom';
-import {Fragment, lazy, Suspense, useState} from "react";
+import {Link, useSubmit} from 'react-router-dom';
+import {Fragment, useState} from "react";
 import { useTranslation } from "react-i18next";
-
-const AppearanceSettingsDialog = lazy(() =>
-  import("./AppearanceSettingsDialog")
-);
+import { useAppStore } from "@/stores/app-state";
+import Badge from "@mui/material/Badge";
+import { useUpdateChannel } from "@/hooks/useUpdateChannel";
 
 const MenuItem = styled(MuiMenuItem)({
   margin: '2px 0',
@@ -24,8 +25,9 @@ const MenuItem = styled(MuiMenuItem)({
 
 export default function OptionsMenu({ renderTrigger }) {
   const { t } = useTranslation();
+  const { unreadCount } = useUpdateChannel({ poll: true });
   const [anchorEl, setAnchorEl] = useState(null);
-  const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const setAppearanceOpen = useAppStore((state) => state.setAppearanceDialogOpen);
   const submit = useSubmit();
   const open = Boolean(anchorEl);
   const handleClick = (event) => {
@@ -39,9 +41,6 @@ export default function OptionsMenu({ renderTrigger }) {
     const formData = new FormData();
     formData.append('intent', 'logout');
     submit(formData, { action: '/', method: 'POST' })
-  }
-  const handleChangePassword = () => {
-    location.href = '/accounts/password_change';
   }
   const triggerProps = {
     "aria-label": t("common.actions"),
@@ -86,8 +85,19 @@ export default function OptionsMenu({ renderTrigger }) {
             <PaletteOutlinedIcon fontSize="small" />
           </ListItemIcon>
         </MenuItem>
+        <MenuItem component={Link} to="/updates">
+          <ListItemText>{t("updates.title")}</ListItemText>
+          <ListItemIcon sx={{ ml: "auto", minWidth: 0 }}><Badge color="primary" variant="dot" invisible={!unreadCount}><NewReleasesOutlinedIcon fontSize="small" /></Badge></ListItemIcon>
+        </MenuItem>
+        <MenuItem component={Link} to="/documentation">
+          <ListItemText>{t("documentation.title")}</ListItemText>
+          <ListItemIcon sx={{ ml: 'auto', minWidth: 0 }}>
+            <MenuBookOutlinedIcon fontSize="small" />
+          </ListItemIcon>
+        </MenuItem>
         <MenuItem
-          onClick={handleChangePassword}
+          component={Link}
+          to="/account/password"
           sx={{
             [`& .${listItemIconClasses.root}`]: {
               ml: 'auto',
@@ -112,14 +122,6 @@ export default function OptionsMenu({ renderTrigger }) {
           </ListItemIcon>
         </MenuItem>
       </Menu>
-      {appearanceOpen ? (
-        <Suspense fallback={null}>
-          <AppearanceSettingsDialog
-            open
-            onClose={() => setAppearanceOpen(false)}
-          />
-        </Suspense>
-      ) : null}
     </Fragment>
   );
 }

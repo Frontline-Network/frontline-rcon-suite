@@ -103,7 +103,7 @@ const panelSx = {
   border: "1px solid",
   borderColor: "divider",
   bgcolor: "background.paper",
-  borderRadius: 0,
+  borderRadius: (theme) => `${theme.frontline.geometry.radius.structure}px`,
   minWidth: 0,
 };
 
@@ -135,7 +135,17 @@ function PanelHeader({ title, helper, action, id }) {
       }}
     >
       <Stack direction="row" alignItems="baseline" spacing={1.5} minWidth={0}>
-        <Typography id={id} component="h2" variant="h6" color="primary.main">
+        <Typography
+          id={id}
+          component="h2"
+          variant="h6"
+          sx={(theme) => ({
+            color:
+              theme.frontline.appearance.preset === "wardogs"
+                ? "text.primary"
+                : "primary.main",
+          })}
+        >
           {title}
         </Typography>
         {helper ? (
@@ -638,6 +648,7 @@ export default function OperationsOverview({ logs, logsLoading }) {
   return (
     <Stack spacing={1.5} data-testid="operations-overview">
       <Box
+        className="wardogs-dashboard-top"
         sx={{
           display: "grid",
           gridTemplateColumns: {
@@ -843,6 +854,7 @@ export default function OperationsOverview({ logs, logsLoading }) {
       </Box>
 
       <Box
+        className="wardogs-dashboard-detail"
         sx={{
           display: "grid",
           gridTemplateColumns: {

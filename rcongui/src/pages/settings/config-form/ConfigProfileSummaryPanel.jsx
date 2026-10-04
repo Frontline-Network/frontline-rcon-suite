@@ -225,7 +225,7 @@ function SummaryItem({ icon: Icon, label, value }) {
         "&:last-of-type": { borderRight: 0, borderBottom: 0 },
       }}
     >
-      <Box
+      <Box data-theme-surface="control"
         sx={{
           display: "grid",
           placeItems: "center",
@@ -262,7 +262,7 @@ export default function ConfigProfileSummaryPanel({ profile, data }) {
 
   return (
     <Box component="aside">
-      <Stack
+      <Stack data-theme-surface="panel"
         direction={{ xs: "column", sm: "row" }}
         sx={{
           display: { xs: "flex", sm: "grid" },

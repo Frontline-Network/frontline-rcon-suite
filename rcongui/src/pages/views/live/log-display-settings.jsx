@@ -57,7 +57,7 @@ export function LogDisplaySettings({ value, onChange, disabled }) {
           ["comfortable", t("tableConfig.comfortable")],
         ])}
       </Box>
-      <Box
+      <Box data-theme-surface="panel"
         component="figure"
         aria-label={t("views.live.logPreview")}
         sx={{

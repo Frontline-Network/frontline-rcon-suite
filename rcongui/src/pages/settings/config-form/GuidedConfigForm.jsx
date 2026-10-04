@@ -49,7 +49,7 @@ function SectionHeader({ section, translationRoot }) {
   const { t } = useTranslation();
   return (
     <Stack direction="row" spacing={1.25} alignItems="flex-start">
-      <Box
+      <Box data-theme-surface="control"
         sx={{
           display: "grid",
           placeItems: "center",
@@ -113,7 +113,7 @@ function NumberStepper({
 
   return (
     <Box>
-      <Stack
+      <Stack data-theme-surface="control"
         direction="row"
         alignItems="center"
         sx={{
@@ -317,7 +317,7 @@ export const validateProfiledConfig = (schema, data, profile, t) => {
 function ToggleField({ name, value, metadata, disabled, onChange }) {
   const { t } = useTranslation();
   return (
-    <Box
+    <Box data-theme-surface="panel"
       sx={{
         p: 1.5,
         border: "1px solid",
@@ -543,7 +543,7 @@ function MessageField({ name, value, metadata, disabled, onChange, data }) {
         >
           {t("settings.configForms.workbench.messagePreview")}
         </Typography>
-        <Box
+        <Box data-theme-surface="panel"
           sx={{
             p: 1.5,
             minHeight: name === "warning_message" ? 93 : undefined,
@@ -918,7 +918,7 @@ export function NoLeaderOperationModeControl({
 
 function StageCard({ number, title, description, status, disabled, children }) {
   return (
-    <Box
+    <Box data-theme-surface="panel"
       sx={{
         ...cardSx,
         p: { xs: 1.5, md: 2 },
@@ -927,7 +927,7 @@ function StageCard({ number, title, description, status, disabled, children }) {
       }}
     >
       <Stack direction="row" spacing={1.25} alignItems="flex-start">
-        <Box
+        <Box data-theme-surface="control"
           aria-hidden="true"
           sx={{
             display: "grid",
@@ -994,7 +994,7 @@ function OperationSection({
   const { t } = useTranslation();
   return (
     <Stack spacing={2}>
-      <Box sx={{ ...cardSx, p: { xs: 1.5, md: 2 } }}>
+      <Box data-theme-surface="panel" sx={{ ...cardSx, p: { xs: 1.5, md: 2 } }}>
         <Box sx={{ maxWidth: 620 }}>
           <FieldRenderer
             name="dont_do_anything_below_this_number_of_players"
@@ -1026,7 +1026,7 @@ function DetectionSection({
   const interval = Math.max(0, Number(data.notes_interval_seconds) || 0);
   return (
     <Stack spacing={2}>
-      <Box sx={{ ...cardSx, p: { xs: 1.5, md: 2 } }}>
+      <Box data-theme-surface="panel" sx={{ ...cardSx, p: { xs: 1.5, md: 2 } }}>
         <Box
           sx={{
             display: "grid",
@@ -1047,7 +1047,7 @@ function DetectionSection({
           ))}
         </Box>
       </Box>
-      <Box
+      <Box data-theme-surface="panel"
         sx={{
           ...cardSx,
           display: "grid",
@@ -1084,7 +1084,7 @@ function ExemptionsSection({ profile, schema, data, disabled, onChange }) {
   return (
     <Stack spacing={2}>
       {hasRoleExemptions && (
-        <Box sx={{ ...cardSx, p: { xs: 1.5, md: 2 } }}>
+        <Box data-theme-surface="panel" sx={{ ...cardSx, p: { xs: 1.5, md: 2 } }}>
           <FieldRenderer
             name="immune_roles"
             profile={profile}
@@ -1103,7 +1103,7 @@ function ExemptionsSection({ profile, schema, data, disabled, onChange }) {
         }}
       >
         {hasFlagExemptions && (
-          <Box sx={{ ...cardSx, p: { xs: 1.5, md: 2 } }}>
+          <Box data-theme-surface="panel" sx={{ ...cardSx, p: { xs: 1.5, md: 2 } }}>
             <PlayerFlagPicker
               value={data.whitelist_flags || []}
               disabled={disabled}
@@ -1112,7 +1112,7 @@ function ExemptionsSection({ profile, schema, data, disabled, onChange }) {
           </Box>
         )}
         {hasLevelExemption && (
-          <Box sx={{ ...cardSx, p: { xs: 1.5, md: 2 } }}>
+          <Box data-theme-surface="panel" sx={{ ...cardSx, p: { xs: 1.5, md: 2 } }}>
             <FieldRenderer
               name="immune_player_level"
               profile={profile}
@@ -1298,7 +1298,7 @@ function NotificationsSection({
   const { t } = useTranslation();
   return (
     <Stack spacing={2}>
-      <Box sx={{ ...cardSx, p: { xs: 1.5, md: 2 } }}>
+      <Box data-theme-surface="panel" sx={{ ...cardSx, p: { xs: 1.5, md: 2 } }}>
         <FieldRenderer
           name="discord_webhook_url"
           profile={profile}

@@ -15,6 +15,8 @@ from . import (
     legacy_stats,
     live_view,
     multi_servers,
+    population,
+    release_updates,
     scoreboards,
     services,
     setting_effects,
@@ -23,6 +25,7 @@ from . import (
     vips,
 )
 from .auth import api_response
+from .api_descriptions import describe_api_endpoints
 from .decorators import ENDPOINT_HTTP_METHODS, ENDPOINT_PERMISSIONS_LOOKUP
 
 logger = getLogger("rconweb")
@@ -38,7 +41,7 @@ def _get_empty(value):
 
 @csrf_exempt
 def get_api_documentation(request):
-    """Auto-generate minimal API documentation through introspection"""
+    """Combine endpoint introspection with reviewed operator descriptions."""
     api_docs = []
     for name, func in endpoints:
         item = {}
@@ -96,7 +99,7 @@ def get_api_documentation(request):
         )
 
     return api_response(
-        result=sorted(api_docs, key=lambda x: x["endpoint"]),
+        result=describe_api_endpoints(sorted(api_docs, key=lambda x: x["endpoint"])),
         command="get_api_documentation",
         failed=False,
     )
@@ -104,6 +107,10 @@ def get_api_documentation(request):
 
 # Each explicitly exposed API endpoint and auto-exposed Rcon endpoints
 endpoints: list[tuple[str, Callable]] = [
+    ("get_update_channel", release_updates.get_update_channel),
+    ("get_player_count_history", population.get_player_count_history),
+    ("get_seeding_sessions", population.get_seeding_sessions),
+    ("mark_seeding_session", population.mark_seeding_session),
     ("login", auth.do_login),
     ("logout", auth.do_logout),
     ("get_historical_logs_csv", history.get_historical_logs_csv),

@@ -158,7 +158,7 @@ const ComparisonRail = ({ alliedPlayers, axisPlayers, score, t }) => {
   const delta = allies.kills - axis.kills;
 
   return (
-    <Box component="aside" aria-label={t("stats.liveGame.comparison")} sx={{ minWidth: 0, border: "1px solid", borderColor: "divider", bgcolor: "background.paper" }}>
+    <Box data-theme-surface="panel" component="aside" aria-label={t("stats.liveGame.comparison")} sx={{ minWidth: 0, border: "1px solid", borderColor: "divider", bgcolor: "background.paper" }}>
       <Box sx={{ px: 0.9, py: 1.15, textAlign: "center", borderBottom: "1px solid", borderColor: "divider" }}>
         <Typography sx={{ color: "text.secondary", fontSize: "0.59rem", fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase" }}>
           {t("stats.liveGame.score")}
@@ -292,7 +292,7 @@ export default function LiveGamePage() {
       : t("stats.liveGame.liveUpdated");
 
   return (
-    <Stack spacing={1.25} sx={{ width: "100%", maxWidth: "none", minWidth: 0, pb: 2 }}>
+    <Stack className="wardogs-live-statistics" spacing={1.25} sx={{ width: "100%", maxWidth: "none", minWidth: 0, pb: 2 }}>
       <PageHeader
         eyebrow={t("stats.liveGame.eyebrow")}
         title={t("stats.liveGame.title")}
@@ -305,7 +305,7 @@ export default function LiveGamePage() {
         }
       />
 
-      <Box sx={{ position: "relative", border: "1px solid", borderColor: "divider", bgcolor: "background.paper" }}>
+      <Box data-theme-surface="panel" sx={{ position: "relative", border: "1px solid", borderColor: "divider", bgcolor: "background.paper" }}>
         {(statsQuery.isFetching || gameQuery.isFetching) && <LinearProgress sx={{ position: "absolute", zIndex: 2, inset: "0 0 auto", height: 2 }} />}
         <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", md: "1.35fr .8fr .72fr .8fr 1.35fr" } }}>
           <MatchItem label={t("stats.liveGame.currentMap")} value={getLayerLabel(game.current_map)} icon={<MapOutlinedIcon sx={{ color: "info.main", fontSize: 18 }} />} />
@@ -316,7 +316,7 @@ export default function LiveGamePage() {
         </Box>
       </Box>
 
-      <Box
+      <Box data-theme-surface="panel"
         sx={{
           display: "grid",
           gridTemplateColumns: { xs: "1fr", lg: "minmax(220px, 1fr) auto auto auto" },

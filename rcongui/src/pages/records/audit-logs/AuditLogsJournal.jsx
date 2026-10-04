@@ -107,7 +107,7 @@ function AuditRow({ entry, selected, onSelect }) {
         </Typography>
 
         <Stack direction="row" alignItems="center" gap={1} minWidth={0}>
-          <Box
+          <Box data-theme-surface="control"
             sx={{
               width: 28,
               height: 28,
@@ -222,7 +222,7 @@ export default function AuditLogsJournal({ entries, selectedKey, onSelect }) {
 
   if (!entries.length) {
     return (
-      <Box
+      <Box data-theme-surface="panel"
         sx={{
           display: "grid",
           placeItems: "center",
@@ -247,7 +247,8 @@ export default function AuditLogsJournal({ entries, selectedKey, onSelect }) {
   }
 
   return (
-    <Box
+    <Box data-theme-surface="panel"
+      className="wardogs-journal"
       sx={{
         border: "1px solid",
         borderColor: "divider",

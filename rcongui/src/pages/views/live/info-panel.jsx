@@ -119,7 +119,7 @@ const AlertItem = ({ item, onFilter, isActive }) => {
   });
 
   return interactive ? (
-    <ButtonBase
+    <ButtonBase data-theme-surface="panel"
       aria-pressed={isActive}
       onClick={() => onFilter(item.filter)}
       sx={sx}
@@ -127,7 +127,7 @@ const AlertItem = ({ item, onFilter, isActive }) => {
       {content}
     </ButtonBase>
   ) : (
-    <Box sx={sx}>{content}</Box>
+    <Box data-theme-surface="panel" sx={sx}>{content}</Box>
   );
 };
 
@@ -256,6 +256,7 @@ const InfoPanel = ({
   return (
     <Box
       component="section"
+      data-testid="live-status-cards"
       aria-label={t("views.live.actionableStatus")}
       sx={{ mb: 1 }}
     >

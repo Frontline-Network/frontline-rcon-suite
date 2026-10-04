@@ -231,7 +231,7 @@ export default function AuditLogsFilters({
 
   return (
     <Form id={formId} method="GET" onSubmit={onSubmit}>
-      <Box sx={shellSx}>
+      <Box data-theme-surface="panel" className="wardogs-filter-panel" sx={shellSx}>
         <Box
           sx={{
             display: "grid",

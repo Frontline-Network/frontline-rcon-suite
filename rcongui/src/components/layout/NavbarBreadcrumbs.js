@@ -149,6 +149,9 @@ export default function NavbarBreadcrumbs({ mobileCompact = false }) {
 
   const current = useMemo(() => {
     if (location.pathname === "/") return {};
+    if (location.pathname === "/account/password") {
+      return { link: { to: location.pathname, translationKey: "sidebar.changePassword" } };
+    }
     const links = navMenus.flatMap((menu) =>
       menu.links.map((link) => ({
         menu,

@@ -1,0 +1,194 @@
+/* Shared administration layout. Django continues to own form behaviour,
+   permissions, CSRF, related-object popups and destructive-action confirmation. */
+.crcon-admin-brand { display: none; }
+/* The surrounding React workspace supplies navigation, toolbar and footer. */
+html[data-crcon-embedded="true"], html[data-crcon-embedded="true"] body { height: auto; min-height: 0; overflow: hidden; }
+/* Continue the RCON backdrop through the spaces between the admin cards. */
+html[data-crcon-embedded="true"][data-crcon-theme="wardogs"],
+html[data-crcon-embedded="true"][data-crcon-theme="wardogs"] body { background: transparent; }
+html[data-crcon-embedded="true"] :is(#header, #nav-sidebar, #toggle-nav-sidebar, .toggle-nav-sidebar, .crcon-admin-footer, #footer, .crcon-admin-intro, .breadcrumbs) { display: none !important; }
+html[data-crcon-embedded="true"] #container { min-height: 0; width: 100%; }
+html[data-crcon-embedded="true"] #main { display: block; }
+html[data-crcon-embedded="true"] #main > .content { width: 100%; min-width: 0; max-width: none !important; margin: 0 !important; }
+html[data-crcon-embedded="true"] #content { padding: 12px 0 0 !important; max-width: none !important; }
+html[data-crcon-embedded="true"] .breadcrumbs { padding: 0 0 20px !important; border: 0 !important; }
+html[data-crcon-embedded="true"] .login #container { margin: 0; width: 100%; }
+html[data-crcon-embedded="true"] .login #content { padding: 24px !important; }
+
+html[data-crcon-theme] body { font: 14px/1.55 var(--font-family-primary); }
+html[data-crcon-theme] :is(input, select, textarea, button) { font-family: inherit; }
+html[data-crcon-theme] :is(a, button, input, select, textarea):focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+html[data-crcon-theme] #header { min-height: 76px; padding: 16px 36px; box-sizing: border-box; border-bottom: 1px solid var(--hairline-color); gap: 24px; }
+html[data-crcon-theme] #site-name, html[data-crcon-theme] .theme-toggle { display: none; }
+html[data-crcon-theme] .crcon-admin-brand { display: block; }
+.crcon-admin-brand a { display: flex; gap: 14px; align-items: center; }
+.crcon-brand-mark { width: 30px; height: 34px; color: var(--primary); flex-shrink: 0; }
+.crcon-admin-brand strong { display: block; font-size: 11px; letter-spacing: 1.6px; color: var(--primary); }
+.crcon-admin-brand small { display: block; font-size: 15px; color: var(--body-fg); }
+html[data-crcon-theme] #user-tools { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 10px 18px; font-size: 12px; letter-spacing: 0; text-transform: none; }
+html[data-crcon-theme] #user-tools :is(a, button) { border: 0; text-decoration: none; font-size: 12px; text-transform: none; }
+html[data-crcon-theme] #user-tools .crcon-return-link { padding: 7px 12px; border: 1px solid var(--border-color); border-radius: var(--admin-control-radius, 6px); }
+html[data-crcon-theme] #logout-form { margin: 0; }
+html[data-crcon-theme] .breadcrumbs { padding: 16px 36px; font-size: 12px; border-bottom: 1px solid var(--hairline-color); }
+html[data-crcon-theme] #content { padding: 32px 36px; min-width: 0; }
+html[data-crcon-theme] h1 { font-size: 26px; line-height: 1.25; font-weight: 700; margin: 0 0 28px; color: var(--body-loud-color); }
+html[data-crcon-theme] h2 { font-size: 15px; font-weight: 600; }
+html[data-crcon-theme] .crcon-admin-intro { margin-bottom: 32px; grid-column: 1 / -1; }
+.crcon-eyebrow { display: block; color: var(--body-quiet-color); font-size: 11px; margin-bottom: 14px; }
+html[data-crcon-theme] .crcon-admin-intro h1 { margin: 0 0 8px; font-size: 30px; }
+.crcon-admin-intro p { margin: 0; color: var(--body-quiet-color); font-size: 14px; }
+html[data-crcon-theme] .dashboard #content { width: auto; max-width: 1500px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) 300px; column-gap: 28px; }
+html[data-crcon-theme] .dashboard #content-main { float: none; width: auto; }
+.crcon-admin-sections { display: flex; flex-direction: column; gap: 28px; }
+html[data-crcon-theme] .crcon-admin-section h2 { margin: 0 0 12px; font-size: 14px; color: var(--body-fg); }
+.crcon-admin-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.crcon-admin-card { display: flex; flex-direction: column; padding: 24px; background: var(--wd-panel); border: 1px solid var(--hairline-color); border-radius: var(--admin-panel-radius, 12px); min-width: 0; }
+.crcon-card-icon { display: grid; place-items: center; width: 42px; height: 42px; background: var(--wd-tint); border-radius: var(--admin-control-radius, 9px); color: var(--primary); margin-bottom: 20px; }
+.crcon-card-icon svg { width: 23px; height: 23px; }
+.crcon-admin-card h3 { font-size: 18px; font-weight: 600; margin: 0 0 6px; }
+html[data-crcon-theme] .crcon-admin-card h3 a { color: var(--body-loud-color); }
+.crcon-admin-card p { color: var(--body-quiet-color); font-size: 13px; margin: 0 0 24px; }
+.crcon-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; margin-top: auto; padding-top: 16px; border-top: 1px solid var(--hairline-color); }
+.crcon-card-actions a { font-size: 12px; font-weight: 600; }
+.crcon-manage { display: flex; align-items: center; gap: 12px; }
+html[data-crcon-theme] .crcon-add { color: var(--body-quiet-color); margin-left: auto; }
+html[data-crcon-theme] .dashboard #content-related { float: none; width: auto; margin: 0; background: transparent; }
+html[data-crcon-theme] #recent-actions-module { background: var(--wd-panel); border: 1px solid var(--hairline-color); border-radius: var(--admin-panel-radius, 12px); overflow: hidden; }
+html[data-crcon-theme] #recent-actions-module h2 { padding: 17px 20px; margin: 0; background: var(--wd-header); border-bottom: 1px solid var(--hairline-color); color: var(--body-fg); }
+html[data-crcon-theme] #recent-actions-module .crcon-empty-recent { padding: 22px 20px; margin: 0; color: var(--body-quiet-color); font-size: 13px; line-height: 1.7; }
+html[data-crcon-theme] #recent-actions-module .actionlist { margin: 0; padding: 0; }
+html[data-crcon-theme] #recent-actions-module li { padding: 16px 20px; margin: 0; border-bottom: 1px solid var(--hairline-color); }
+html[data-crcon-theme] #recent-actions-module li:last-child { border-bottom: 0; }
+.crcon-log-meta { display: block; color: var(--body-quiet-color); font-size: 11px; margin-top: 4px; }
+.crcon-admin-footer { display: flex; justify-content: space-between; gap: 16px; padding: 12px 36px 32px; font-size: 10px; color: var(--body-quiet-color); }
+
+/* A single outside contour per module. Headers and rows stay flush inside it. */
+html[data-crcon-theme] .module { background: var(--wd-panel); border: 1px solid var(--hairline-color); border-radius: var(--admin-panel-radius, 12px); }
+html[data-crcon-theme] .module :is(h2, caption), html[data-crcon-theme] .inline-group h2 { background: var(--wd-header); color: var(--body-fg); padding: 14px 18px; border-radius: var(--admin-panel-inner-radius, 11px) var(--admin-panel-inner-radius, 11px) 0 0; font-size: 13px; font-weight: 600; text-transform: none; }
+html[data-crcon-theme] .module table { border-radius: 0; }
+html[data-crcon-theme] :is(th, td) { border-color: var(--hairline-color); padding: 13px 14px; line-height: 1.5; }
+html[data-crcon-theme] thead th { background: var(--wd-header); text-transform: none; font-size: 12px; font-weight: 600; }
+html[data-crcon-theme] tbody tr { background: var(--wd-panel); }
+html[data-crcon-theme] tbody tr:hover { background: var(--wd-hover); }
+html[data-crcon-theme] tbody tr.selected { background: var(--selected-row); }
+html[data-crcon-theme] :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { border: 1px solid var(--border-color); border-radius: var(--admin-control-radius, 6px); padding: 9px 11px; min-height: 38px; box-sizing: border-box; }
+html[data-crcon-theme] input[type="search"] { background: var(--body-bg); color: var(--body-fg); }
+html[data-crcon-theme] :is(input[type="checkbox"], input[type="radio"]) { accent-color: var(--primary); width: 16px; height: 16px; }
+html[data-crcon-theme] :is(.button, input[type="submit"], input[type="button"], .submit-row a, .object-tools a) { border: 1px solid var(--border-color); border-radius: var(--admin-control-radius, 6px); padding: 10px 16px; line-height: 1.4; min-height: 38px; box-sizing: border-box; text-transform: none; font-weight: 600; }
+html[data-crcon-theme] :is(.button.default, input[type="submit"].default) { color: #151015; border-color: transparent; }
+html[data-crcon-theme] .object-tools { margin-bottom: 20px; }
+html[data-crcon-theme] .object-tools a { background-image: none; }
+html[data-crcon-theme] #changelist { background: transparent; border: 0; gap: 20px; align-items: flex-start; }
+html[data-crcon-theme] .changelist-form-container { min-width: 0; background: var(--wd-panel); border: 1px solid var(--hairline-color); border-radius: var(--admin-panel-radius, 12px); overflow: hidden; }
+html[data-crcon-theme] #changelist #toolbar { padding: 16px; background: var(--wd-header); border: 0; border-bottom: 1px solid var(--hairline-color); margin: 0; }
+html[data-crcon-theme] #changelist .actions { padding: 12px 16px; background: var(--wd-panel); border-bottom: 1px solid var(--hairline-color); }
+html[data-crcon-theme] #changelist .actions .button { min-height: 36px; height: auto; padding: 7px 12px; }
+html[data-crcon-theme] #changelist .actions select { height: auto; }
+html[data-crcon-theme] #changelist .paginator { padding: 16px; background: var(--wd-panel); border-top: 1px solid var(--hairline-color); }
+html[data-crcon-theme] #changelist-filter { flex-basis: 230px; margin: 0; border: 1px solid var(--hairline-color); border-radius: var(--admin-panel-radius, 12px); background: var(--wd-panel); overflow: hidden; }
+html[data-crcon-theme] #changelist-filter h2 { background: var(--wd-header); color: var(--body-fg); padding: 14px 18px; font-size: 13px; text-transform: none; }
+html[data-crcon-theme] #changelist-filter details { padding: 10px 18px; border-bottom: 1px solid var(--hairline-color); }
+html[data-crcon-theme] #changelist-filter details:last-child { border-bottom: 0; }
+html[data-crcon-theme] #changelist-filter summary { font-size: 12px; line-height: 1.5; }
+html[data-crcon-theme] #changelist-filter ul { padding: 4px 0; margin: 0; }
+html[data-crcon-theme] #changelist-filter li.selected { border-left-color: var(--primary); }
+html[data-crcon-theme] #nav-sidebar { background: var(--darkened-bg); border-right: 1px solid var(--hairline-color); padding: 20px 12px; box-sizing: border-box; }
+html[data-crcon-theme] #nav-sidebar .module { border: 0; background: transparent; margin: 14px 0 24px; }
+html[data-crcon-theme] #nav-sidebar :is(caption, th, td) { background: transparent; border: 0; padding: 10px 8px; font-size: 12px; }
+html[data-crcon-theme] #nav-sidebar caption { text-transform: uppercase; font-size: 10px; line-height: 1.7; letter-spacing: .4px; }
+html[data-crcon-theme] #nav-sidebar .current-model { background: var(--wd-tint); }
+html[data-crcon-theme] #nav-sidebar a { color: var(--body-fg); }
+html[data-crcon-theme] #nav-sidebar caption a { color: var(--body-quiet-color); }
+html[data-crcon-theme] #nav-filter { width: 100%; margin: 0; }
+html[data-crcon-theme] .toggle-nav-sidebar { background: var(--darkened-bg); color: var(--body-quiet-color); border-color: var(--hairline-color); }
+html[data-crcon-theme] .form-row { padding: 20px; border-bottom: 1px solid var(--hairline-color); }
+html[data-crcon-theme] .form-row:last-child { border-bottom: 0; }
+/* Group related tasks instead of stretching narrow Django fields across a page. */
+html[data-crcon-theme] .crcon-form-sections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-bottom: 24px; }
+html[data-crcon-theme] .crcon-form-sections > fieldset { min-width: 0; grid-column: 1 / -1; margin: 0; }
+html[data-crcon-theme] .crcon-form-sections > :is(.crcon-account-panel, .crcon-profile-panel) { grid-column: auto; }
+html[data-crcon-theme] .crcon-form-sections .form-row { padding: 22px 24px; }
+html[data-crcon-theme] .crcon-form-sections .form-row > div { width: 100%; min-width: 0; }
+html[data-crcon-theme] .crcon-form-sections .fieldBox { float: none; margin: 0; }
+html[data-crcon-theme] .crcon-form-sections label.inline { margin: 0; }
+html[data-crcon-theme] .crcon-form-sections .form-row .flex-container:not(.checkbox-row) { display: block; }
+html[data-crcon-theme] .crcon-form-sections .form-row > .flex-container.form-multiline { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+html[data-crcon-theme] .crcon-form-sections .form-multiline > div { min-width: 0; padding: 0; }
+html[data-crcon-theme] .crcon-form-sections .aligned label:not(.vCheckboxLabel):not(.permission-row):not(.permission-assigned-label):not(.permission-technical-label):not(.permission-category-toggle):not(.crcon-group-option) { display: block; float: none; width: auto; padding: 0 0 9px; font-weight: 600; }
+html[data-crcon-theme] .crcon-form-sections .aligned :is(.vTextField, .vLargeTextField, input[type="email"], input[type="password"]) { width: 100%; max-width: 100%; }
+html[data-crcon-theme] .crcon-form-sections .help { margin: 10px 0 0; padding: 0; overflow-wrap: anywhere; }
+html[data-crcon-theme] .crcon-form-sections .readonly { padding: 0; overflow-wrap: anywhere; }
+html[data-crcon-theme] .crcon-status-panel { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+html[data-crcon-theme] .crcon-status-panel > h2 { grid-column: 1 / -1; margin: 0; }
+html[data-crcon-theme] .crcon-status-panel .form-row { border-bottom: 0; border-right: 1px solid var(--hairline-color); }
+html[data-crcon-theme] .crcon-status-panel .form-row:last-child { border-right: 0; }
+html[data-crcon-theme] .crcon-status-panel .checkbox-row { display: flex; align-items: center; gap: 10px; }
+html[data-crcon-theme] .crcon-status-panel label.vCheckboxLabel { font-weight: 600; padding: 0; }
+html[data-crcon-theme] .crcon-form-sections .field-groups .related-widget-wrapper { width: 100%; float: none; display: block; }
+html[data-crcon-theme] .crcon-form-sections .field-groups label[for="id_groups"],
+html[data-crcon-theme] .crcon-form-sections label[for="id_user_permissions"] { display: none !important; }
+html[data-crcon-theme] .crcon-form-sections .crcon-dates-panel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+html[data-crcon-theme] .crcon-dates-panel > h2 { grid-column: 1 / -1; margin: 0; }
+html[data-crcon-theme] .crcon-dates-panel .form-row { border-bottom: 0; }
+html[data-crcon-theme] .crcon-dates-panel .datetime { margin: 0; padding: 0; line-height: 2.6; }
+@media (max-width: 900px) {
+  html[data-crcon-theme] .crcon-form-sections { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  html[data-crcon-theme] .crcon-status-panel, html[data-crcon-theme] .crcon-form-sections .crcon-dates-panel { grid-template-columns: minmax(0, 1fr); }
+  html[data-crcon-theme] .crcon-status-panel .form-row { border-right: 0; border-bottom: 1px solid var(--hairline-color); }
+}
+html[data-crcon-theme] .aligned label { line-height: 1.6; padding-top: 9px; }
+html[data-crcon-theme] .help { color: var(--body-quiet-color); font-size: 12px; line-height: 1.6; }
+html[data-crcon-theme] .inline-group { border: 1px solid var(--hairline-color); border-radius: var(--admin-panel-radius, 12px); background: var(--wd-panel); }
+html[data-crcon-theme] .inline-group .inline-related :is(h3, .module) { border-radius: 0; border-width: 0 0 1px; }
+html[data-crcon-theme] .inline-group .inline-related h3 { background: var(--wd-header); padding: 12px 20px; }
+html[data-crcon-theme] .inline-group .tabular :is(th, td) { padding: 12px; }
+html[data-crcon-theme] .submit-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 18px; margin-top: 24px; border-radius: var(--admin-panel-radius, 12px); background: var(--wd-panel); border-color: var(--hairline-color); }
+html[data-crcon-theme] .submit-row :is(input, a, p) { margin: 0; float: none; }
+html[data-crcon-theme] .submit-row .deletelink-box { margin-left: auto; }
+html[data-crcon-theme] .submit-row > a.deletelink { margin-left: auto; }
+html[data-crcon-theme] .selector { max-width: 100%; }
+html[data-crcon-theme] .selector :is(.selector-available, .selector-chosen) { max-width: 100%; }
+html[data-crcon-theme] .selector h2 { border-radius: var(--admin-control-radius, 6px) var(--admin-control-radius, 6px) 0 0; }
+html[data-crcon-theme] .selector select { border-radius: 0 0 var(--admin-control-radius, 6px) var(--admin-control-radius, 6px); }
+html[data-crcon-theme] .selector .selector-filter { padding: 10px; }
+html[data-crcon-theme] .selector .selector-filter input { width: calc(100% - 30px); }
+html[data-crcon-theme] .calendarbox { border-radius: var(--admin-overlay-radius, 10px); overflow: hidden; }
+html[data-crcon-theme] .messagelist li { border-radius: var(--admin-control-radius, 8px); margin: 12px 36px; }
+html[data-crcon-theme] .login #container { width: min(440px, calc(100% - 32px)); margin: 10vh auto; border: 1px solid var(--hairline-color); border-radius: var(--admin-panel-radius, 14px); overflow: hidden; background: var(--wd-panel); min-width: 0; }
+html[data-crcon-theme] .login #header { padding: 26px 30px; justify-content: flex-start; background: var(--wd-header); }
+html[data-crcon-theme] .login #content { padding: 30px; }
+html[data-crcon-theme] .login .form-row { padding: 0 0 20px; border: 0; }
+html[data-crcon-theme] .login .form-row input { width: 100%; }
+html[data-crcon-theme] .login .submit-row { padding: 0; margin: 4px 0 0; border: 0; }
+html[data-crcon-theme] .login input[type="submit"] { width: 100%; background: var(--primary); color: #151015; }
+
+@media (max-width: 1100px) {
+  html[data-crcon-theme] .dashboard #content { grid-template-columns: minmax(0, 1fr); row-gap: 24px; }
+  html[data-crcon-theme] #changelist { flex-wrap: wrap; }
+  html[data-crcon-theme] :is(.changelist-form-container, #changelist-filter) { flex: 1 1 100%; width: 100%; max-width: 100%; box-sizing: border-box; }
+}
+@media (max-width: 767px) {
+  html[data-crcon-theme] #header { padding: 18px 20px; gap: 20px; align-items: flex-start; }
+  html[data-crcon-theme] #user-tools { justify-content: flex-start; width: 100%; margin: 0; line-height: 1.7; }
+  html[data-crcon-theme] #content { padding: 24px 16px; }
+  html[data-crcon-theme] h1 { font-size: 23px; }
+  html[data-crcon-theme] .breadcrumbs { padding: 14px 16px; overflow-wrap: anywhere; }
+  .crcon-admin-cards { grid-template-columns: minmax(0, 1fr); }
+  .crcon-admin-card { padding: 20px; }
+  html[data-crcon-theme] #changelist #toolbar form div { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  html[data-crcon-theme] #changelist #toolbar #searchbar { width: auto; min-width: 0; flex: 1; }
+  html[data-crcon-theme] #changelist .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  html[data-crcon-theme] #changelist .actions label { display: flex; flex: 1 1 100%; flex-wrap: wrap; align-items: center; gap: 8px; }
+  html[data-crcon-theme] #changelist .actions select { flex: 1; min-width: 0; max-width: 100%; }
+  html[data-crcon-theme] .form-row { padding: 16px; }
+  html[data-crcon-theme] .crcon-form-sections .form-row { padding: 20px; }
+  html[data-crcon-theme] .crcon-form-sections .form-row > .flex-container.form-multiline { grid-template-columns: minmax(0, 1fr); }
+  html[data-crcon-theme] .aligned label { padding-top: 0; }
+  html[data-crcon-theme] .aligned :is(input:not([type="checkbox"]), textarea, select) { max-width: 100%; }
+  html[data-crcon-theme] .aligned .related-widget-wrapper { float: none; max-width: 100%; }
+  html[data-crcon-theme] .submit-row { flex-direction: column; align-items: stretch; }
+  html[data-crcon-theme] .submit-row :is(input, a) { width: 100%; }
+  html[data-crcon-theme] .submit-row .deletelink-box { margin: 0; }
+  html[data-crcon-theme] .submit-row > a.deletelink { margin-left: 0; }
+  html[data-crcon-theme] .crcon-admin-footer { padding: 12px 16px 24px; }
+}

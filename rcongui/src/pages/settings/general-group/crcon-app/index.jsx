@@ -248,7 +248,7 @@ function CrconAppSettings({
                   </Alert>
                   {!pairing ||
                   ["consumed", "denied"].includes(pairing.state) ? (
-                    <Stack
+                    <Stack data-theme-surface="panel"
                       direction={{ xs: "column", sm: "row" }}
                       spacing={2}
                       sx={frontlineSectionSx}
@@ -271,7 +271,7 @@ function CrconAppSettings({
                       </Button>
                     </Stack>
                   ) : (
-                    <Stack
+                    <Stack data-theme-surface="panel"
                       direction={{ xs: "column", md: "row" }}
                       spacing={3}
                       alignItems="center"
@@ -338,7 +338,7 @@ function CrconAppSettings({
                   )}
 
                   <Divider />
-                  <Stack
+                  <Stack data-theme-surface="panel"
                     id="crcon-devices"
                     spacing={2}
                     sx={{ ...frontlineSectionSx, scrollMarginTop: 96 }}
@@ -392,7 +392,7 @@ function CrconAppSettings({
                   </Stack>
 
                   <Divider />
-                  <Stack spacing={2} sx={frontlineSectionSx}>
+                  <Stack data-theme-surface="panel" spacing={2} sx={frontlineSectionSx}>
                     {bootstrap?.user?.permissions?.includes(
                       "api.can_manage_all_mobile_devices"
                     ) && (

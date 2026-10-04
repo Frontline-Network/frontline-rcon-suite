@@ -6,7 +6,7 @@ export default function SectionSurface({ children, sx, ...props }) {
       variant="outlined"
       {...props}
       sx={{
-        borderRadius: 0,
+        borderRadius: (theme) => `${theme.frontline.geometry.radius.structure}px`,
         borderColor: "divider",
         backgroundColor: "background.paper",
         backgroundImage: "none",

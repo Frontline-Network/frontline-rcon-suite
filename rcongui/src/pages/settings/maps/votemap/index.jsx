@@ -89,8 +89,9 @@ function VotemapPage() {
         subtitle={t("maps.votemapWorkbench.subtitle")}
       />
 
-      <Box
+      <Box data-theme-surface="panel"
         component="nav"
+        className="wardogs-page-tabs"
         aria-label={t("maps.votemapWorkbench.navigation")}
         sx={{
           border: "1px solid",
@@ -167,7 +168,8 @@ function VotemapPage() {
         </Tabs>
       </Box>
 
-      <Box
+      <Box data-theme-surface="panel"
+        className="wardogs-map-workspace"
         sx={{
           mt: 1.25,
           border: "1px solid",

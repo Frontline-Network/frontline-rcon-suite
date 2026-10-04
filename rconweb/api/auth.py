@@ -450,6 +450,7 @@ def get_own_user_permissions(request):
 
     result: DjangoUserPermissions = {
         "is_superuser": request.user.is_superuser,
+        "is_staff": request.user.is_staff,
         "user_name": request.user.get_username(),
         "player_id": player_id,
         "permissions": trimmed_permissions,

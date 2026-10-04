@@ -66,7 +66,7 @@ function SectionHeader({ section }) {
   const { t } = useTranslation();
   return (
     <Stack direction="row" spacing={1.25} alignItems="flex-start">
-      <Box
+      <Box data-theme-surface="control"
         sx={{
           display: "grid",
           placeItems: "center",
@@ -132,7 +132,7 @@ function LabeledNumber({
 
 function SwitchCard({ checked, disabled, title, description, onChange, icon }) {
   return (
-    <Box sx={{ ...cardSx, p: 1.5 }}>
+    <Box data-theme-surface="panel" sx={{ ...cardSx, p: 1.5 }}>
       <FormControlLabel
         sx={{ m: 0, width: "100%", alignItems: "flex-start", gap: 0.75 }}
         control={
@@ -312,7 +312,7 @@ function RuleShell({
   const { t } = useTranslation();
   const status = !enabled ? "inactive" : active ? "active" : "incomplete";
   return (
-    <Box
+    <Box data-theme-surface="panel"
       sx={{
         overflow: "hidden",
         border: "1px solid",
@@ -329,7 +329,7 @@ function RuleShell({
         sx={{ p: 1.75 }}
       >
         <Stack direction="row" spacing={1.1} alignItems="flex-start">
-          <Box
+          <Box data-theme-surface="control"
             sx={{
               display: "grid",
               placeItems: "center",
@@ -434,7 +434,7 @@ function RuleOverviewCard({
 }) {
   const { t } = useTranslation();
   return (
-    <Box
+    <Box data-theme-surface="panel"
       sx={{
         position: "relative",
         minHeight: 104,
@@ -830,7 +830,7 @@ function WeaponsEditor({ value, options = [], disabled, onChange }) {
             alignItems: "start",
           }}
         >
-          <Box
+          <Box data-theme-surface="control"
             sx={{
               minHeight: 40,
               px: 1.5,
@@ -1066,7 +1066,7 @@ function RulesSection({ data, weaponOptions, disabled, patch }) {
         ))}
       </Box>
 
-      <Box
+      <Box data-theme-surface="panel"
         sx={{
           display: "grid",
           gridTemplateColumns: {
@@ -1176,14 +1176,14 @@ function CountControl({ value, disabled, onChange, allowUnlimited = true }) {
 
 function StageCard({ number, title, description, status, children }) {
   return (
-    <Box sx={{ ...cardSx, p: 1.75 }}>
+    <Box data-theme-surface="panel" sx={{ ...cardSx, p: 1.75 }}>
       <Stack
         direction="row"
         spacing={1.25}
         alignItems="flex-start"
         sx={{ mb: 1.75 }}
       >
-        <Box
+        <Box data-theme-surface="control"
           sx={{
             display: "grid",
             placeItems: "center",

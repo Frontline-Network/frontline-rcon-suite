@@ -245,10 +245,14 @@ const CampaignCard = ({
         boxShadow: "none",
       }}
     >
-      <CardContent sx={{ p: { xs: 2, md: 2.5 }, "&:last-child": { pb: 2.5 } }}>
+      <CardContent
+        className="wardogs-campaign-editor"
+        sx={{ p: { xs: 2, md: 2.5 }, "&:last-child": { pb: 2.5 } }}
+      >
         <Stack spacing={2}>
           <Stack
             direction={{ xs: "column", sm: "row" }}
+            className="wardogs-campaign-header"
             justifyContent="space-between"
             alignItems={{ xs: "stretch", sm: "center" }}
             gap={1}
@@ -326,14 +330,19 @@ const CampaignCard = ({
               messageInvalid
                 ? t("settings.campaigns.messageRequired")
                 : t(
-              isPlayerMessage
-                ? "settings.campaigns.playerMessageHelp"
-                : "settings.campaigns.messageHelp"
+                    isPlayerMessage
+                      ? "settings.campaigns.playerMessageHelp"
+                      : "settings.campaigns.messageHelp"
                   )
             }
           />
 
-          <Stack direction={{ xs: "column", md: "row" }} gap={1.5}>
+          <Stack
+            className="wardogs-campaign-fields"
+            data-delivery-mode={campaign.delivery_mode}
+            direction={{ xs: "column", md: "row" }}
+            gap={1.5}
+          >
             <TextField
               select
               label={t("settings.campaigns.deliveryMode")}
@@ -649,20 +658,20 @@ const BroadcastCampaignPage = () => {
 
   const handleDuplicate = (index) => {
     const source = config.messages[index];
-      const duplicate = {
-        ...source,
-        id: `campaign-${Date.now()}-${index}`,
-        title: source.title
-          ? t("settings.campaigns.copyName", { name: source.title })
-          : "",
-      };
+    const duplicate = {
+      ...source,
+      id: `campaign-${Date.now()}-${index}`,
+      title: source.title
+        ? t("settings.campaigns.copyName", { name: source.title })
+        : "",
+    };
     setConfig((previous) => ({
-        ...previous,
-        messages: [
-          ...previous.messages.slice(0, index + 1),
-          duplicate,
-          ...previous.messages.slice(index + 1),
-        ],
+      ...previous,
+      messages: [
+        ...previous.messages.slice(0, index + 1),
+        duplicate,
+        ...previous.messages.slice(index + 1),
+      ],
     }));
     setSelectedCampaignId(duplicate.id);
   };
@@ -688,8 +697,8 @@ const BroadcastCampaignPage = () => {
     const templateMessages = unpackBroadcastMessage(template.content);
     const importedCampaigns = templateMessages.map((message, index) => ({
       ...createCampaign(config.messages.length + index),
-          title: template.title,
-          ...message,
+      title: template.title,
+      ...message,
     }));
     setConfig((previous) => ({
       ...previous,
@@ -782,8 +791,8 @@ const BroadcastCampaignPage = () => {
   };
 
   const handleModeChange = (mode) => {
-              setConfig((previous) => ({
-                ...previous,
+    setConfig((previous) => ({
+      ...previous,
       enabled: mode !== "off",
       randomize: mode === "random",
     }));
@@ -811,55 +820,55 @@ const BroadcastCampaignPage = () => {
     : null;
 
   const templatePicker = (
-      <Suspense fallback={<TemplateSkeleton />}>
-        <Await
-          resolve={data.templates}
-          errorElement={
-            <AsyncClientError title={t("settings.broadcast.templates")} />
-          }
-        >
-          {(templates) =>
-            templates.length > 0 ? (
-              <Autocomplete
-                options={templates}
-                onChange={handleTemplateChange}
-                getOptionLabel={(option) => option.title}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label={t("settings.campaigns.importTemplate")}
-                  />
-                )}
-              />
-            ) : null
-          }
-        </Await>
-      </Suspense>
+    <Suspense fallback={<TemplateSkeleton />}>
+      <Await
+        resolve={data.templates}
+        errorElement={
+          <AsyncClientError title={t("settings.broadcast.templates")} />
+        }
+      >
+        {(templates) =>
+          templates.length > 0 ? (
+            <Autocomplete
+              options={templates}
+              onChange={handleTemplateChange}
+              getOptionLabel={(option) => option.title}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label={t("settings.campaigns.importTemplate")}
+                />
+              )}
+            />
+          ) : null
+        }
+      </Await>
+    </Suspense>
   );
 
   const campaignEditor = selectedCampaign ? (
-          <CampaignCard
+    <CampaignCard
       key={selectedCampaign.id}
       campaign={selectedCampaign}
       index={selectedCampaignIndex}
-            onChange={handleCampaignChange}
-            onDuplicate={handleDuplicate}
-            onDelete={handleDelete}
-            onTest={handleTest}
+      onChange={handleCampaignChange}
+      onDuplicate={handleDuplicate}
+      onDelete={handleDelete}
+      onTest={handleTest}
       testing={testingId === selectedCampaign.id}
       deliveryStatus={selectedDeliveryStatus}
       testResult={testResult}
-          />
+    />
   ) : (
     <Stack alignItems="center" spacing={1.5} sx={{ p: { xs: 3, md: 6 } }}>
       <CampaignIcon sx={{ fontSize: 44, color: "text.disabled" }} />
       <Typography variant="h6">{t("settings.campaigns.emptyTitle")}</Typography>
       <Typography color="text.secondary" textAlign="center">
-            {t("settings.campaigns.emptyText")}
-          </Typography>
+        {t("settings.campaigns.emptyText")}
+      </Typography>
       <Button variant="contained" startIcon={<AddIcon />} onClick={handleAdd}>
-            {t("settings.campaigns.addFirst")}
-          </Button>
+        {t("settings.campaigns.addFirst")}
+      </Button>
     </Stack>
   );
 

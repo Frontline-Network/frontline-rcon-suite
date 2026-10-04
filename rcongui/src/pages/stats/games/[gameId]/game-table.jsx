@@ -322,7 +322,7 @@ const PlayersTable = ({ table, selectedPlayers, onColumnVisibilityChange }) => {
   };
 
   return (
-    <Box
+    <Box data-theme-surface="panel"
       component="section"
       aria-labelledby="completed-game-players-heading"
       sx={{

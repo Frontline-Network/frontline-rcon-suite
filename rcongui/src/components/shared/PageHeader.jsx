@@ -41,13 +41,16 @@ export default function PageHeader({
           id={titleId}
           component="h1"
           variant="h4"
-          sx={{
+          sx={(theme) => ({
             fontFamily: '"Bahnschrift Condensed", "Arial Narrow", sans-serif',
             fontWeight: 800,
             letterSpacing: "0.045em",
             textTransform: "uppercase",
             lineHeight: 1,
-          }}
+            ...(theme.frontline.appearance.preset === "wardogs" && {
+              ...theme.typography.h4,
+            }),
+          })}
         >
           {title}
         </Typography>

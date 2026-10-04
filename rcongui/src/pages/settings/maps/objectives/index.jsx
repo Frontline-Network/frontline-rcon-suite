@@ -317,7 +317,7 @@ function MapObjectivesPage() {
         }}
       >
         {(!mobile || mobileView === "map") && (
-          <Box
+          <Box data-theme-surface="panel"
             component="section"
             sx={{ minWidth: 0, border: "1px solid", borderColor: "divider" }}
           >
@@ -354,7 +354,7 @@ function MapObjectivesPage() {
         )}
 
         {(!mobile || mobileView === "selection") && (
-          <Box
+          <Box data-theme-surface="panel"
             component="section"
             sx={{ minWidth: 0, border: "1px solid", borderColor: "divider" }}
           >
@@ -427,7 +427,7 @@ function MapObjectivesPage() {
                 </FormGroup>
               </FormControl>
 
-              <Box
+              <Box data-theme-surface="panel"
                 sx={{
                   border: "1px solid",
                   borderColor: "warning.dark",
@@ -481,7 +481,7 @@ function MapObjectivesPage() {
         )}
       </Box>
 
-      <Stack
+      <Stack data-theme-surface="panel"
         direction={{ xs: "column-reverse", sm: "row" }}
         justifyContent="flex-end"
         gap={1}
@@ -528,7 +528,7 @@ function MapObjectivesPage() {
           <DialogContentText id="alert-dialog-description">
             {t("maps.objectiveRestart")}
           </DialogContentText>
-          <Box sx={{ mt: 2, border: "1px solid", borderColor: "divider" }}>
+          <Box data-theme-surface="panel" sx={{ mt: 2, border: "1px solid", borderColor: "divider" }}>
             <ImpactMetric
               label={t("maps.objectivesWorkbench.currentServer")}
               value={serverState?.name || t("common.unknown")}

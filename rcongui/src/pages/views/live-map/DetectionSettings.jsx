@@ -34,7 +34,7 @@ export default function DetectionSettings({ settings, mutation, t }) {
       detection_profile: { ...current.detection_profile, [key]: Number(value) },
     }));
   return (
-    <Box
+    <Box data-theme-surface="panel"
       component="details"
       sx={{
         border: 1,

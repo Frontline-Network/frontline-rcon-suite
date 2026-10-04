@@ -27,7 +27,8 @@ export function ControlPageLayout({
   const compact = useMediaQuery(theme.breakpoints.down("md"));
 
   return (
-    <Box
+    <Box data-theme-surface="panel"
+      className="wardogs-control-layout"
       sx={{
         display: { xs: "block", md: "grid" },
         gridTemplateColumns: `${navigationWidth} minmax(0, 1fr)`,
@@ -61,7 +62,10 @@ export function ControlPageLayout({
           </Select>
         </FormControl>
       ) : (
-        <Stack sx={{ borderRight: "1px solid", borderColor: "divider" }}>
+        <Stack
+          className="wardogs-control-navigation"
+          sx={{ borderRight: "1px solid", borderColor: "divider" }}
+        >
           {sections.map((section) => {
             const selected = section.key === active;
             return (
@@ -102,6 +106,7 @@ export function ControlPageLayout({
 export function ControlSectionHeader({ title, description, action }) {
   return (
     <Stack
+      className="wardogs-control-header"
       direction={{ xs: "column", sm: "row" }}
       spacing={1.5}
       justifyContent="space-between"
@@ -133,6 +138,7 @@ export function ControlRow({
 }) {
   return (
     <Box
+      className="wardogs-control-row"
       sx={{
         display: { xs: "flex", lg: "grid" },
         flexDirection: "column",
@@ -180,7 +186,8 @@ export function ControlActionBar({
 }) {
   const { t } = useTranslation();
   return (
-    <Stack
+    <Stack data-theme-surface="panel"
+      className="wardogs-action-bar"
       direction={{ xs: "column", sm: "row" }}
       spacing={1}
       alignItems={{ sm: "center" }}
@@ -201,6 +208,7 @@ export function ControlActionBar({
         spacing={0.75}
         alignItems="center"
         sx={{ mr: "auto" }}
+        className="wardogs-control-action-status"
       >
         {dirtyCount ? (
           <WarningAmberRoundedIcon color="warning" />

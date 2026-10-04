@@ -30,8 +30,9 @@ const sameOrder = (left = [], right = []) =>
 
 function BuilderPanel({ title, description, count, children, testId }) {
   return (
-    <Box
+    <Box data-theme-surface="panel"
       component="section"
+      className="wardogs-builder-panel"
       data-testid={testId}
       sx={{
         border: "1px solid",
@@ -263,7 +264,7 @@ export function MapListBuilder({
         </Box>
 
         {mapSelection.length === 0 && (
-          <Stack
+          <Stack data-theme-surface="panel"
             direction="row"
             spacing={1}
             alignItems="center"

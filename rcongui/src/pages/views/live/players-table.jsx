@@ -165,7 +165,7 @@ const PlayersTable = ({
   );
 
   return (
-    <Box
+    <Box data-theme-surface="panel"
       component="section"
       data-testid="live-players-panel"
       sx={(theme) => ({

@@ -53,7 +53,7 @@ function WelcomeSummary({ message }) {
   const lines = message ? message.split(/\r?\n/).length : 0;
 
   return (
-    <Box
+    <Box data-theme-surface="panel"
       component="aside"
       aria-label={t(`${ROOT}.summaryTitle`)}
       sx={{
@@ -126,8 +126,9 @@ function MessageEditor({ message, onMessageChange }) {
           slotProps={{ htmlInput: { "data-testid": "welcome-message-input" } }}
         />
 
-        <Stack
+        <Stack data-theme-surface="panel"
           spacing={1.5}
+          className="wardogs-writing-guide"
           sx={{
             p: 2,
             border: "1px solid",
@@ -176,7 +177,7 @@ function Preview({ message }) {
       description={t(`${ROOT}.previewDescription`)}
       icon={<VisibilityOutlinedIcon />}
     >
-      <Box
+      <Box data-theme-surface="panel"
         sx={{
           border: "1px solid",
           borderColor: active ? "primary.dark" : "divider",

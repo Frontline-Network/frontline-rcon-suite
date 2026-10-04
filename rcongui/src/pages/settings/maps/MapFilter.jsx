@@ -74,6 +74,8 @@ export const MapFilter = ({ maps = [], onFilterChange, compact = false }) => {
   return (
     <Box
       component="section"
+      className="wardogs-map-filter"
+      data-theme-surface="flush"
       aria-label={t("maps.rotationWorkbench.filters")}
       sx={{
         p: compact ? 1.25 : 1.5,

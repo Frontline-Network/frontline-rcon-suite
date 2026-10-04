@@ -91,7 +91,7 @@ function MapPoolRow({ mapLayer, action, selected = false }) {
 
 function PoolPanel({ title, subtitle, count, children, testId }) {
   return (
-    <Box
+    <Box data-theme-surface="panel"
       component="section"
       data-testid={testId}
       sx={{ border: "1px solid", borderColor: "divider", minWidth: 0 }}
@@ -612,7 +612,7 @@ export default function VotemapBuilderPage() {
         </Box>
 
         {emptyPool && (
-          <Stack
+          <Stack data-theme-surface="panel"
             direction="row"
             spacing={1}
             alignItems="center"

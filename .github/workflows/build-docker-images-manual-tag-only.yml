@@ -35,10 +35,16 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Bundle private release notes
+        env:
+          CRCON_RELEASES_GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/sync_release_notes.py
       - name: Build and push backend
         uses: docker/build-push-action@v5
         with:
           context: .
+          build-args: |
+            CRCON_VERSION=${{ github.event.inputs.tag }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ github.event.inputs.tag }}

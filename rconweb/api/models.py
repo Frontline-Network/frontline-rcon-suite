@@ -1,11 +1,12 @@
 import uuid
 
+from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.db import models
 
-from rconweb.settings import SECRET_KEY
 from .live_view_preferences import default_user_live_view
+from .wardogs_styles import DEFAULT_WARDOGS_STYLE
 
 
 def default_user_appearance():
@@ -15,6 +16,8 @@ def default_user_appearance():
         "preset": "frontline-gold",
         "customAccent": "#c59a4a",
         "colorVision": "standard",
+        "wardogsStyle": DEFAULT_WARDOGS_STYLE,
+        "wardogsShortcuts": ["/settings/broadcast-message", "/records/players"],
     }
 
 
@@ -33,7 +36,7 @@ class DjangoAPIKey(models.Model):
     def save(self, *args, **kwargs):
         """Hash the API key"""
         # If we don't include the salt, the hasher generates its own
-        self.api_key = make_password(self.api_key, salt=SECRET_KEY.replace("$", ""))
+        self.api_key = make_password(self.api_key, salt=settings.SECRET_KEY.replace("$", ""))
         super().save()
 
     class Meta:
@@ -120,6 +123,16 @@ class MobileDevice(models.Model):
                 "can_reassign_admin_incidents",
                 "Can reassign mobile admin incidents",
             ),
+        )
+
+
+class PopulationHistoryAccess(models.Model):
+    class Meta:
+        managed = False
+        default_permissions = ()
+        permissions = (
+            ("can_view_population_history", "Can read population history and seeding attempts"),
+            ("can_mark_seeding_sessions", "Can start and end manual seeding attempts"),
         )
 
 

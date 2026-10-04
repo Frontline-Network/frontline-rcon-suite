@@ -176,7 +176,7 @@ export default function SeedingSummaryPanel({ data = {} }) {
     : t(`${ROOT}.summary.inactiveNotice`);
 
   return (
-    <Box
+    <Box data-theme-surface="panel"
       component="aside"
       aria-label={t(`${ROOT}.summary.title`)}
       sx={{

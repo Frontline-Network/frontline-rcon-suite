@@ -188,6 +188,7 @@ const BlacklistRecords = () => {
       />
 
       <Box
+        className="wardogs-blacklist-layout"
         sx={{
           display: "grid",
           gridTemplateColumns: {

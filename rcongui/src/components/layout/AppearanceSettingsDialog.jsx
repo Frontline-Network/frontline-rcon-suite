@@ -50,6 +50,7 @@ import {
   normalizeAppearance,
 } from "@/themes/appearance";
 import { cmd } from "@/utils/fetchUtils";
+import { WARDOGS_COLOR_STYLES } from "@/themes/wardogs/colorStyles";
 
 const presetIds = [
   "frontline-gold",
@@ -192,89 +193,238 @@ export default function AppearanceSettingsDialog({ open, onClose }) {
 
       <DialogContent sx={{ p: { xs: 2, sm: 3 } }}>
         <Stack spacing={3}>
-          <Box component="section" aria-labelledby="appearance-presets-title">
-            <Typography id="appearance-presets-title" variant="subtitle1">
-              {t("appearance.presets.title")}
+          <Box component="section" aria-labelledby="appearance-theme-title">
+            <Typography id="appearance-theme-title" variant="subtitle1">
+              {t("appearance.theme.title")}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-              {t("appearance.presets.description")}
+              {t("appearance.theme.description")}
             </Typography>
             <Box
               sx={{
                 display: "grid",
-                gridTemplateColumns: {
-                  xs: "repeat(2, minmax(0, 1fr))",
-                  sm: "repeat(5, minmax(0, 1fr))",
-                },
-                gap: 1,
+                gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                gap: 1.5,
               }}
             >
-              {presetIds.map((id) => {
-                const preset = APPEARANCE_PRESETS[id];
-                const selected = draft.preset === id;
+              {["frontline", "wardogs"].map((id) => {
+                const wardogs = id === "wardogs";
+                const selected = wardogs
+                  ? draft.preset === "wardogs"
+                  : draft.preset !== "wardogs";
+                const preset = wardogs
+                  ? { ...APPEARANCE_PRESETS.wardogs, ...WARDOGS_COLOR_STYLES[draft.wardogsStyle] }
+                  : APPEARANCE_PRESETS["frontline-gold"];
                 return (
                   <ButtonBase
                     key={id}
-                    onClick={() => updateDraft({ preset: id })}
                     aria-pressed={selected}
-                    sx={(muiTheme) => ({
-                      position: "relative",
-                      minHeight: 82,
-                      p: 1.25,
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "flex-start",
-                      justifyContent: "space-between",
+                    aria-label={wardogs ? "Wardogs" : "Frontline"}
+                    onClick={() =>
+                      updateDraft({
+                        preset: wardogs ? "wardogs" : "frontline-gold",
+                      })
+                    }
+                    sx={{
+                      display: "block",
+                      textAlign: "left",
+                      p: 1.5,
                       border: "1px solid",
-                      borderColor: selected
-                        ? muiTheme.palette.primary.main
-                        : muiTheme.palette.divider,
+                      borderColor: selected ? "primary.main" : "divider",
+                      borderRadius: "8px",
                       bgcolor: selected
-                        ? alpha(muiTheme.palette.primary.main, 0.1)
-                        : muiTheme.palette.background.paper,
-                      boxShadow: selected
-                        ? `inset 0 0 0 1px ${muiTheme.palette.primary.main}`
-                        : "none",
-                      "&:focus-visible": {
-                        outline: `3px solid ${alpha(
-                          muiTheme.palette.primary.main,
-                          0.5
-                        )}`,
-                        outlineOffset: 2,
-                      },
-                    })}
+                        ? "action.selected"
+                        : "background.paper",
+                    }}
                   >
-                    <Stack direction="row" spacing={0.5}>
-                      {[preset.accent, preset.dark.paper, preset.light.background].map(
-                        (color) => (
+                    <Box
+                      aria-hidden
+                      sx={{
+                        display: "flex",
+                        height: 68,
+                        mb: 1.5,
+                        bgcolor: preset.dark.background,
+                        border: "1px solid",
+                        borderColor: preset.accent + "40",
+                        borderRadius: wardogs ? "6px" : 0,
+                        overflow: "hidden",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: 16,
+                          borderRight: "1px solid",
+                          borderColor: preset.accent + "30",
+                          p: 0.5,
+                        }}
+                      >
+                        {[0, 1, 2].map((index) => (
                           <Box
-                            key={color}
+                            key={index}
                             sx={{
-                              width: 18,
-                              height: 18,
-                              bgcolor: color,
-                              border: "1px solid",
-                              borderColor: "divider",
+                              height: 5,
+                              mb: 0.75,
+                              bgcolor:
+                                index === 0
+                                  ? preset.accent
+                                  : preset.accent + "40",
+                              borderRadius: wardogs ? "2px" : 0,
                             }}
                           />
-                        )
+                        ))}
+                      </Box>
+                      <Box sx={{ width: 54, p: 1, bgcolor: preset.dark.paper }}>
+                        {[0, 1, 2, 3].map((index) => (
+                          <Box
+                            key={index}
+                            sx={{
+                              height: 4,
+                              mb: 0.75,
+                              bgcolor: index === 0 ? preset.accent : "#62616e",
+                              opacity: index === 0 ? 1 : 0.45,
+                              borderRadius: wardogs ? "2px" : 0,
+                            }}
+                          />
+                        ))}
+                      </Box>
+                      <Box sx={{ p: 1.25, flex: 1 }}>
+                        <Box
+                          sx={{
+                            width: "38%",
+                            height: 5,
+                            mb: 1,
+                            bgcolor: preset.accent,
+                          }}
+                        />
+                        <Stack direction="row" spacing={0.75}>
+                          {[0, 1].map((index) => (
+                            <Box
+                              key={index}
+                              sx={{
+                                height: 29,
+                                flex: 1,
+                                bgcolor: preset.dark.paper,
+                                border: "1px solid",
+                                borderColor: preset.accent + "30",
+                                borderRadius: wardogs ? "4px" : 0,
+                              }}
+                            />
+                          ))}
+                        </Stack>
+                      </Box>
+                    </Box>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Typography variant="subtitle2" sx={{ flex: 1 }}>
+                        {wardogs ? "Wardogs" : "Frontline"}
+                      </Typography>
+                      {selected && (
+                        <CheckRoundedIcon color="primary" fontSize="small" />
                       )}
                     </Stack>
-                    <Typography variant="caption" sx={{ textAlign: "left" }}>
-                      {t(`appearance.presets.${id}`)}
+                    <Typography variant="caption" color="text.secondary">
+                      {t(`appearance.theme.${id}`)}
                     </Typography>
-                    {selected ? (
-                      <CheckRoundedIcon
-                        color="primary"
-                        fontSize="small"
-                        sx={{ position: "absolute", right: 6, top: 6 }}
-                      />
-                    ) : null}
                   </ButtonBase>
                 );
               })}
             </Box>
           </Box>
+
+            <Box component="section" aria-labelledby="appearance-presets-title">
+              <Typography id="appearance-presets-title" variant="subtitle1">
+                {t(draft.preset === "wardogs" ? "appearance.wardogsStyles.title" : "appearance.presets.title")}
+              </Typography>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mb: 1.5 }}
+              >
+                {t(draft.preset === "wardogs" ? "appearance.wardogsStyles.description" : "appearance.presets.description")}
+              </Typography>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: {
+                    xs: "repeat(2, minmax(0, 1fr))",
+                    sm: "repeat(3, minmax(0, 1fr))",
+                    md: draft.preset === "wardogs" ? "repeat(3, minmax(0, 1fr))" : "repeat(5, minmax(0, 1fr))",
+                  },
+                  gap: 1,
+                }}
+              >
+                {(draft.preset === "wardogs" ? Object.keys(WARDOGS_COLOR_STYLES) : presetIds).map((id) => {
+                  const wardogs = draft.preset === "wardogs";
+                  const preset = wardogs
+                    ? { ...APPEARANCE_PRESETS.wardogs, ...WARDOGS_COLOR_STYLES[id] }
+                    : APPEARANCE_PRESETS[id];
+                  const selected = wardogs ? draft.wardogsStyle === id : draft.preset === id;
+                  return (
+                    <ButtonBase
+                      key={id}
+                      onClick={() => updateDraft(wardogs ? { wardogsStyle: id } : { preset: id })}
+                      aria-pressed={selected}
+                      sx={(muiTheme) => ({
+                        position: "relative",
+                        borderRadius: wardogs ? "8px" : 0,
+                        minHeight: 82,
+                        p: 1.25,
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "flex-start",
+                        justifyContent: "space-between",
+                        border: "1px solid",
+                        borderColor: selected
+                          ? muiTheme.palette.primary.main
+                          : muiTheme.palette.divider,
+                        bgcolor: selected
+                          ? alpha(muiTheme.palette.primary.main, 0.1)
+                          : muiTheme.palette.background.paper,
+                        boxShadow: selected
+                          ? `inset 0 0 0 1px ${muiTheme.palette.primary.main}`
+                          : "none",
+                        "&:focus-visible": {
+                          outline: `3px solid ${alpha(
+                            muiTheme.palette.primary.main,
+                            0.5
+                          )}`,
+                          outlineOffset: 2,
+                        },
+                      })}
+                    >
+                      <Stack direction="row" spacing={0.5}>
+                        {(wardogs ? [preset.accent, preset.lightAccent, preset.glow] : [
+                          preset.accent,
+                          preset.dark.paper,
+                          preset.light.background,
+                        ]).map((color) => (
+                          <Box
+                            key={color}
+                            sx={{
+                              width: 18,
+                              height: 18,
+                              borderRadius: wardogs ? "4px" : 0,
+                              bgcolor: color,
+                              border: "1px solid",
+                              borderColor: "divider",
+                            }}
+                          />
+                        ))}
+                      </Stack>
+                      <Typography variant="caption" sx={{ textAlign: "left" }}>
+                        {t(`appearance.${wardogs ? "wardogsStyles" : "presets"}.${id}`)}
+                      </Typography>
+                      {selected ? (
+                        <CheckRoundedIcon
+                          color="primary"
+                          fontSize="small"
+                          sx={{ position: "absolute", right: 6, top: 6 }}
+                        />
+                      ) : null}
+                    </ButtonBase>
+                  );
+                })}
+              </Box>
+            </Box>
 
           <Divider />
 
@@ -287,7 +437,9 @@ export default function AppearanceSettingsDialog({ open, onClose }) {
           >
             <Stack spacing={2.5}>
               <FormControl component="fieldset">
-                <FormLabel component="legend">{t("appearance.mode.title")}</FormLabel>
+                <FormLabel component="legend">
+                  {t("appearance.mode.title")}
+                </FormLabel>
                 <ToggleButtonGroup
                   exclusive
                   fullWidth
@@ -306,7 +458,10 @@ export default function AppearanceSettingsDialog({ open, onClose }) {
                     {t("appearance.mode.dark")}
                   </ToggleButton>
                   <ToggleButton value="system">
-                    <DesktopWindowsRoundedIcon fontSize="small" sx={{ mr: 0.75 }} />
+                    <DesktopWindowsRoundedIcon
+                      fontSize="small"
+                      sx={{ mr: 0.75 }}
+                    />
                     {t("appearance.mode.system")}
                   </ToggleButton>
                 </ToggleButtonGroup>
@@ -341,75 +496,91 @@ export default function AppearanceSettingsDialog({ open, onClose }) {
             </Stack>
 
             <Stack spacing={2.5}>
-              <Box>
-                <Typography variant="subtitle2">
-                  {t("appearance.custom.title")}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                  {t("appearance.custom.description")}
-                </Typography>
-                <Stack direction="row" spacing={1} alignItems="flex-start">
-                  <Tooltip title={t("appearance.custom.picker")}>
-                    <Box
-                      component="label"
-                      sx={{
-                        width: 48,
-                        height: 40,
-                        p: 0.5,
-                        border: "1px solid",
-                        borderColor: "divider",
-                        bgcolor: "background.paper",
-                        cursor: "pointer",
-                      }}
-                    >
+              {draft.preset !== "wardogs" && (
+                <Box>
+                  <Typography variant="subtitle2">
+                    {t("appearance.custom.title")}
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mb: 1 }}
+                  >
+                    {t("appearance.custom.description")}
+                  </Typography>
+                  <Stack direction="row" spacing={1} alignItems="flex-start">
+                    <Tooltip title={t("appearance.custom.picker")}>
                       <Box
-                        component="input"
-                        type="color"
-                        value={
-                          customColorValid
-                            ? draft.customAccent
-                            : DEFAULT_APPEARANCE.customAccent
-                        }
-                        aria-label={t("appearance.custom.picker")}
-                        onChange={(event) =>
-                          updateDraft({
-                            preset: "custom",
-                            customAccent: event.target.value,
-                          })
-                        }
-                        sx={{ width: "100%", height: "100%", p: 0, border: 0 }}
-                      />
-                    </Box>
-                  </Tooltip>
-                  <TextField
-                    size="small"
-                    fullWidth
-                    label={t("appearance.custom.hex")}
-                    value={draft.customAccent}
-                    error={!customColorValid}
-                    helperText={
-                      customColorValid
-                        ? t("appearance.custom.contrastHint")
-                        : t("appearance.custom.invalid")
-                    }
-                    inputProps={{ maxLength: 7, spellCheck: false }}
-                    onChange={(event) =>
-                      setDraft((current) => ({
-                        ...current,
-                        preset: "custom",
-                        customAccent: event.target.value,
-                      }))
-                    }
-                    onBlur={() =>
-                      customColorValid &&
-                      setDraft((current) => normalizeAppearance(current))
-                    }
-                  />
-                </Stack>
-              </Box>
+                        component="label"
+                        sx={{
+                          width: 48,
+                          height: 40,
+                          p: 0.5,
+                          border: "1px solid",
+                          borderColor: "divider",
+                          bgcolor: "background.paper",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <Box
+                          component="input"
+                          type="color"
+                          value={
+                            customColorValid
+                              ? draft.customAccent
+                              : DEFAULT_APPEARANCE.customAccent
+                          }
+                          aria-label={t("appearance.custom.picker")}
+                          onChange={(event) =>
+                            updateDraft({
+                              preset: "custom",
+                              customAccent: event.target.value,
+                            })
+                          }
+                          sx={{
+                            width: "100%",
+                            height: "100%",
+                            p: 0,
+                            border: 0,
+                          }}
+                        />
+                      </Box>
+                    </Tooltip>
+                    <TextField
+                      size="small"
+                      fullWidth
+                      label={t("appearance.custom.hex")}
+                      value={draft.customAccent}
+                      error={!customColorValid}
+                      helperText={
+                        customColorValid
+                          ? t("appearance.custom.contrastHint")
+                          : t("appearance.custom.invalid")
+                      }
+                      inputProps={{ maxLength: 7, spellCheck: false }}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          preset: "custom",
+                          customAccent: event.target.value,
+                        }))
+                      }
+                      onBlur={() =>
+                        customColorValid &&
+                        setDraft((current) => normalizeAppearance(current))
+                      }
+                    />
+                  </Stack>
+                </Box>
+              )}
 
               <Box aria-labelledby="appearance-preview-title">
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  alignItems="center"
+                  sx={{ mb: 1 }}
+                >
                   <VisibilityRoundedIcon fontSize="small" />
                   <Typography id="appearance-preview-title" variant="subtitle2">
                     {t("appearance.preview.title")}
@@ -430,7 +601,7 @@ export default function AppearanceSettingsDialog({ open, onClose }) {
                     variant="outlined"
                     label={t("appearance.preview.selected")}
                     icon={<CheckRoundedIcon />}
-                    sx={{ borderRadius: 0, justifyContent: "flex-start" }}
+                    sx={{ borderRadius: draft.preset === "wardogs" ? "6px" : 0, justifyContent: "flex-start" }}
                   />
                   <PreviewState
                     color="info"
@@ -486,7 +657,14 @@ export default function AppearanceSettingsDialog({ open, onClose }) {
           <Button
             size="small"
             color="inherit"
-            onClick={() => setDraft(normalizeAppearance(DEFAULT_APPEARANCE))}
+            onClick={() =>
+              setDraft(
+                normalizeAppearance({
+                  ...DEFAULT_APPEARANCE,
+                  wardogsShortcuts: draft.wardogsShortcuts,
+                })
+              )
+            }
           >
             {t("appearance.restoreDefault")}
           </Button>

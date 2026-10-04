@@ -17,7 +17,7 @@ import VipDownload from "./VipDownload";
 import VipUpload from "./VipUpload";
 
 const TransferSection = ({ icon, title, description, children }) => (
-  <Stack
+  <Stack data-theme-surface="panel"
     gap={1.5}
     sx={{
       border: "1px solid",

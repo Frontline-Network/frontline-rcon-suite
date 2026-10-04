@@ -328,7 +328,7 @@ export default function PlayerRecordsList({ players, selectedIds, onSelect }) {
 
   if (compact) {
     return (
-      <Box
+      <Box data-theme-surface="table-body"
         component="ul"
         aria-label={t("records.players.listLabel")}
         sx={{
@@ -353,6 +353,7 @@ export default function PlayerRecordsList({ players, selectedIds, onSelect }) {
 
   return (
     <TableContainer
+      data-theme-surface="table-body"
       sx={{
         border: (theme) => `1px solid ${theme.palette.divider}`,
         borderRadius: 0,

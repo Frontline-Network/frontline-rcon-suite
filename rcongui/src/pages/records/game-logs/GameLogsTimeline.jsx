@@ -70,10 +70,10 @@ const eventColor = (category) => {
 };
 
 const sectionSx = {
+  borderRadius: (theme) => theme.frontline?.appearance?.preset === "wardogs" ? "12px" : 0,
   border: "1px solid",
   borderColor: "divider",
   bgcolor: "background.paper",
-  borderRadius: 0,
 };
 
 const formatMode = (mode, t) => {
@@ -541,7 +541,7 @@ function EventDetails({ log }) {
           <Typography variant="caption" color="text.secondary">
             {t("records.gameLogs.timeline.rawLog")}
           </Typography>
-          <Typography
+          <Typography data-theme-surface="panel"
             component="pre"
             variant="caption"
             sx={{

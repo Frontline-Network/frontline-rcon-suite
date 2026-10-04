@@ -41,7 +41,7 @@ export default function DetectionPanel({
     (item) => !selected || item.player_id === selected
   );
   return (
-    <Box
+    <Box data-theme-surface="panel"
       sx={{
         border: 1,
         borderColor: "divider",
@@ -153,7 +153,7 @@ export default function DetectionPanel({
               <Typography variant="caption">{t("loadingDetails")}</Typography>
             )}
             {expanded && (
-              <Box sx={{ mt: 1, p: 1, border: 1, borderColor: "divider" }}>
+              <Box data-theme-surface="panel" sx={{ mt: 1, p: 1, border: 1, borderColor: "divider" }}>
                 {metrics && (
                   <Typography variant="caption" display="block">
                     {t("detectionMetrics")

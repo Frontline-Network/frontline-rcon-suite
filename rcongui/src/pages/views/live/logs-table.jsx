@@ -136,7 +136,7 @@ function LogsTable({
   }, [table, selectedTeams]);
 
   return (
-    <Box
+    <Box data-theme-surface="panel"
       component="section"
       data-testid="live-logs-panel"
       sx={(theme) => ({
@@ -323,6 +323,7 @@ function LogsTable({
           }
         />
         <TableToolbar
+          position="bottom"
           sx={{
             borderBottomWidth: "1px",
             borderBottomStyle: "solid",

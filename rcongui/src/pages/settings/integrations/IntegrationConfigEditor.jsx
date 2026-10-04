@@ -341,7 +341,7 @@ function KeyValueObjectField({
           const complex =
             entryValue !== null && typeof entryValue === "object";
           return (
-            <Box
+            <Box data-theme-surface="panel"
               key={key}
               sx={{
                 display: "grid",
@@ -365,7 +365,7 @@ function KeyValueObjectField({
                 sx={{ gridColumn: { xs: "1 / -1", sm: "auto" } }}
               />
               {complex ? (
-                <Box
+                <Box data-theme-surface="panel"
                   sx={{
                     minWidth: 0,
                     p: 1,
@@ -411,7 +411,7 @@ function KeyValueObjectField({
         })}
 
         {entries.length === 0 && (
-          <Box
+          <Box data-theme-surface="panel"
             sx={{
               border: "1px dashed",
               borderColor: "divider",
@@ -503,7 +503,7 @@ function ConfigField({
         </Stack>
         <Stack spacing={1}>
           {items.map((item, index) => (
-            <Box
+            <Box data-theme-surface="panel"
               key={`${fieldKey}-${index}`}
               sx={{
                 display: "grid",
@@ -594,7 +594,7 @@ function ConfigField({
             </Box>
           ))}
           {items.length === 0 && (
-            <Box
+            <Box data-theme-surface="panel"
               sx={{
                 border: "1px dashed",
                 borderColor: "divider",
@@ -646,7 +646,7 @@ function ConfigField({
       )
     );
     return (
-      <Box
+      <Box data-theme-surface="panel"
         sx={{
           gridColumn: "1 / -1",
           border: "1px solid",
@@ -777,7 +777,7 @@ export default function IntegrationConfigEditor({
   }, [command, properties]);
 
   return (
-    <Box
+    <Box data-theme-surface="panel"
       data-testid="integration-config-editor"
       sx={{
         display: "grid",
@@ -825,7 +825,7 @@ export default function IntegrationConfigEditor({
             alignItems="flex-start"
             sx={{ mb: 1.75 }}
           >
-            <Box
+            <Box data-theme-surface="control"
               sx={{
                 display: "grid",
                 placeItems: "center",

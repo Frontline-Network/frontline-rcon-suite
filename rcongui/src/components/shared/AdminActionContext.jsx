@@ -46,7 +46,7 @@ export default function AdminActionContext({ context }) {
     : t("actions.context.noLiveData");
 
   return (
-    <Stack
+    <Stack data-theme-surface="panel"
       spacing={1.25}
       data-testid="admin-action-context"
       sx={{

@@ -1,5 +1,16 @@
+// Match the normal operator view by default. Pilot reviews remain available
+// explicitly via ?demo_autobalancer_mode=shadow for design and language checks.
+const requestedMode = new URLSearchParams(
+  typeof window === "undefined" ? "" : window.location.search
+).get("demo_autobalancer_mode");
+const demoMode = ["disabled", "shadow", "manual", "auto"].includes(
+  requestedMode
+)
+  ? requestedMode
+  : "auto";
+
 export const autobalancerConfig = {
-  mode: "shadow",
+  mode: demoMode,
   poll_interval_seconds: 5,
   minimum_players: 40,
   target_difference: 2,
@@ -58,8 +69,8 @@ export const autobalancerConfig = {
 };
 
 export const autobalancerStatus = {
-  mode: "shadow",
-  phase: "observing",
+  mode: demoMode,
+  phase: demoMode === "shadow" ? "observing" : "idle",
   updated_at: new Date().toISOString(),
   team_counts: { allies: 49, axis: 49 },
   target_difference: 2,

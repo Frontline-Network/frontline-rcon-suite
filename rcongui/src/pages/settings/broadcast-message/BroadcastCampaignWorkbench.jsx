@@ -103,7 +103,7 @@ function BroadcastSummary({ config, activeCount }) {
     : t(`${ROOT}.noActiveChannels`);
 
   return (
-    <Box
+    <Box data-theme-surface="panel"
       component="aside"
       aria-label={t(`${ROOT}.summaryTitle`)}
       sx={{
@@ -375,7 +375,7 @@ function ActivityPanel({ deliveryStatus }) {
       description={t(`${ROOT}.activityDescription`)}
       icon={<QueryStatsOutlinedIcon />}
     >
-      <Box
+      <Box data-theme-surface="panel"
         sx={{
           display: "grid",
           gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" },
@@ -412,7 +412,7 @@ function ActivityPanel({ deliveryStatus }) {
         ))}
       </Box>
 
-      <Box sx={{ mt: 2, border: "1px solid", borderColor: "divider" }}>
+      <Box data-theme-surface="panel" sx={{ mt: 2, border: "1px solid", borderColor: "divider" }}>
         <Box
           sx={{
             px: 2,
@@ -570,9 +570,7 @@ export default function BroadcastCampaignWorkbench({
           dirty={hasChanges}
           dirtyLabel={t(`${ROOT}.unsavedChanges`)}
           result={
-            actionSaved
-              ? { kind: "success", title: t(`${ROOT}.saved`) }
-              : null
+            actionSaved ? { kind: "success", title: t(`${ROOT}.saved`) } : null
           }
           stateIcon={
             hasChanges ? (
@@ -647,7 +645,8 @@ export default function BroadcastCampaignWorkbench({
       )}
 
       {activeSection === "campaigns" && (
-        <Box
+        <Box data-theme-surface="panel"
+          className="wardogs-campaign-workspace"
           sx={{
             display: "grid",
             gridTemplateColumns: {

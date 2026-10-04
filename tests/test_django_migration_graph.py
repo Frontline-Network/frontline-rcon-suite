@@ -36,7 +36,7 @@ class DjangoMigrationGraphTests(TestCase):
                     if app == "api":
                         dependencies.add(name)
         self.assertFalse(dependencies - names, "Missing API migration dependency")
-        self.assertEqual(names - dependencies, {"0038_leadership_vote_permission"})
+        self.assertEqual(names - dependencies, {"0039_population_history_permissions"})
 
     def test_merge_preserves_both_existing_migrations_without_data_operations(self):
         values = migration_assignments(

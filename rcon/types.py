@@ -1129,6 +1129,7 @@ class DjangoGroup(TypedDict):
 
 
 class DjangoUserPermissions(TypedDict):
+    is_staff: bool
     permissions: list[DjangoPermission]
     groups: list[DjangoGroup]
     is_superuser: bool

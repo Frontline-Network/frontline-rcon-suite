@@ -17,7 +17,7 @@ const FrontlineAppsPage = () => {
   const companionUrl = "https://webapp.fln.gg";
 
   return (
-    <Box sx={{ py: { xs: 2, md: 2.5 } }}>
+    <Box className="wardogs-app-page" sx={{ py: { xs: 2, md: 2.5 } }}>
       <Typography variant="overline" color="primary.main" sx={{ fontWeight: 700 }}>
         {t("apps.eyebrow")}
       </Typography>
@@ -28,7 +28,7 @@ const FrontlineAppsPage = () => {
         {t("apps.subtitle")}
       </Typography>
 
-      <Grid container spacing={2} sx={{ mt: 2.5 }}>
+      <Grid className="wardogs-app-catalog" container spacing={2} sx={{ mt: 2.5 }}>
         <Grid size={{ xs: 12, lg: 6 }}>
           <Card
             sx={(theme) => ({

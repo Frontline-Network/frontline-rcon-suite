@@ -151,7 +151,7 @@ export function MapObjectivesPicker({
                 aria-pressed={state === null ? undefined : state}
               >
                 {state === true && (
-                  <Box
+                  <Box data-theme-surface="panel"
                     aria-hidden="true"
                     sx={{
                       display: "flex",

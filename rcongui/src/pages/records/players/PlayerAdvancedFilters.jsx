@@ -118,7 +118,7 @@ export default function PlayerAdvancedFilters({
           {!compact ? (
             <Box sx={{ flex: "0 1 220px" }}>{countryField}</Box>
           ) : null}
-          <Stack
+          <Stack data-theme-surface="control"
             direction="row"
             spacing={1}
             alignItems="center"

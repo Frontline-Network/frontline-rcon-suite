@@ -9,6 +9,9 @@ COPY requirements.lock requirements-vcs.txt ./
 RUN pip install --no-deps -r requirements-vcs.txt --no-compile --no-cache-dir \
     && pip install --require-hashes --no-deps -r requirements.lock --no-compile --no-cache-dir
 COPY . .
+ARG CRCON_VERSION=unknown
+# Immutable image metadata wins over stale compose environment variables.
+RUN printf '%s\n' "$CRCON_VERSION" > /code/release_version
 ENV PYTHONPATH=/code/
 RUN chmod +x entrypoint.sh
 RUN chmod +x manage.py

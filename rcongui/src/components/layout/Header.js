@@ -8,17 +8,20 @@ import MenuOpenIcon from "@mui/icons-material/MenuOpen";
 import { useAppStore } from "@/stores/app-state";
 import ServerStatus from "../Header/server-status";
 import { useTranslation } from "react-i18next";
+import { useTheme } from "@mui/material/styles";
 
 export default function Header() {
   const { t } = useTranslation();
-  const openDrawer = useAppStore((state) => state.openDrawer);
-  const toggleDrawer = useAppStore((state) => state.toggleDrawer);
+  const isWardogs = useTheme().frontline?.appearance?.preset === "wardogs";
+  const openDrawer = useAppStore((state) => isWardogs ? state.wardogsDrawerOpen : state.openDrawer);
+  const toggleDrawer = useAppStore((state) => isWardogs ? state.toggleWardogsDrawer : state.toggleDrawer);
   const isDesktop = useMediaQuery((theme) => theme.breakpoints.up("md"));
 
   if (!isDesktop) return null;
 
   return (
     <Stack
+      data-testid="desktop-header"
       direction="row"
       sx={{
         display: { xs: "none", md: "flex" },

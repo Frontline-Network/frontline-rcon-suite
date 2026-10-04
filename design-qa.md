@@ -1081,3 +1081,7 @@ Ein zusätzlicher Ausschnitt war nicht erforderlich. Suche, Filterauslöser, Aus
 - [x] Keine offenen P0-, P1- oder P2-Findings.
 
 final result: passed
+
+## 2026-10-03: Zusätzliches Wardogs-Theme
+
+Die seitenweise Prüfung und die Änderungen am auswählbaren Wardogs-Theme sind in [wardogs-theme-qa.md](wardogs-theme-qa.md) dokumentiert. Die bisherigen Projektprüfungen oben bleiben erhalten.

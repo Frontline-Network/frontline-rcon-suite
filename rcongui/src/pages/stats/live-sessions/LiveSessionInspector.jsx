@@ -113,7 +113,7 @@ export default function LiveSessionInspector({ player, t }) {
 
   if (!player) {
     return (
-      <Box sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
+      <Box data-theme-surface="panel" sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
         <Typography color="text.secondary">
           {t("stats.liveSessions.selectPlayerHint")}
         </Typography>
@@ -131,7 +131,7 @@ export default function LiveSessionInspector({ player, t }) {
   ];
 
   return (
-    <Box
+    <Box data-theme-surface="panel"
       sx={{
         minWidth: 0,
         border: "1px solid",
@@ -259,7 +259,7 @@ export default function LiveSessionInspector({ player, t }) {
           {t("stats.liveSessions.currentPerformance")}
         </Typography>
       </Box>
-      <Box
+      <Box data-theme-surface="panel"
         sx={{
           display: "grid",
           gridTemplateColumns: "repeat(3, minmax(0, 1fr))",

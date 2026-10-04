@@ -13,6 +13,7 @@ import {
   useTheme,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
+import PageHeader from "@/components/shared/PageHeader";
 
 export const LiveCommandBar = ({
   layoutMode,
@@ -22,48 +23,58 @@ export const LiveCommandBar = ({
 }) => {
   const { t } = useTranslation();
   const theme = useTheme();
+  const isWardogs = theme.frontline?.appearance?.preset === "wardogs";
   const isCompact = useMediaQuery(theme.breakpoints.down("md"));
 
   return (
-    <Box
+    <Box data-theme-surface="panel"
       component="section"
       aria-labelledby="live-operations-title"
       sx={(theme) => ({
-        border: `1px solid ${theme.palette.divider}`,
-        bgcolor: "background.paper",
-        mb: 1,
+        border: isWardogs ? 0 : `1px solid ${theme.palette.divider}`,
+        bgcolor: isWardogs ? "transparent" : "background.paper",
+        mb: isWardogs ? 3 : 1,
       })}
     >
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          borderBottom: "1px solid",
-          borderColor: "divider",
-        }}
-      >
-        <Typography
-          id="live-operations-title"
-          component="h1"
-          variant="subtitle1"
+      {isWardogs ? (
+        <PageHeader
+          titleId="live-operations-title"
+          title={t("views.live.title")}
+          subtitle={t("views.live.subtitle")}
+          actions={settingsControl}
+        />
+      ) : (
+        <Box
           sx={{
-            minWidth: 0,
-            color: "text.primary",
-            fontFamily: '"Bahnschrift Condensed", "Arial Narrow", sans-serif',
-            fontWeight: 800,
-            letterSpacing: "0.08em",
-            lineHeight: 1,
-            m: 0,
-            px: 1.5,
-            py: 1,
-            textTransform: "uppercase",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderBottom: "1px solid",
+            borderColor: "divider",
           }}
         >
-          {t("views.live.title")}
-        </Typography>
-        {settingsControl}
-      </Box>
+          <Typography
+            id="live-operations-title"
+            component="h1"
+            variant="subtitle1"
+            sx={{
+              minWidth: 0,
+              color: "text.primary",
+              fontFamily: '"Bahnschrift Condensed", "Arial Narrow", sans-serif',
+              fontWeight: 800,
+              letterSpacing: "0.08em",
+              lineHeight: 1,
+              m: 0,
+              px: 1.5,
+              py: 1,
+              textTransform: "uppercase",
+            }}
+          >
+            {t("views.live.title")}
+          </Typography>
+          {settingsControl}
+        </Box>
+      )}
       {isCompact ? (
         <Box
           role="tablist"
@@ -169,10 +180,10 @@ export const LiveCommandBar = ({
           id="live-split-unavailable"
           sx={{
             position: "absolute",
-            width: 1,
-            height: 1,
+            width: "1px",
+            height: "1px",
             p: 0,
-            m: -1,
+            m: "-1px",
             overflow: "hidden",
             clip: "rect(0 0 0 0)",
             whiteSpace: "nowrap",

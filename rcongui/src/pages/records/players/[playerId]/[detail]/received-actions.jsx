@@ -33,7 +33,7 @@ const ReceivedActions = () => {
 
   return (
     <div>
-      <FilterSection>
+      <FilterSection className="wardogs-profile-filters">
         <TextField
           label={t("records.playerDetails.searchActions")}
           value={filters.actions.search}
@@ -59,7 +59,7 @@ const ReceivedActions = () => {
           <MenuItem value="MESSAGE">{t("actions.types.MESSAGE")}</MenuItem>
         </TextField>
       </FilterSection>
-      <ScrollableContent>
+      <ScrollableContent className="wardogs-profile-scroll">
         {filteredActions.map(
           (action, index) => (
             <ListItem key={index}>
