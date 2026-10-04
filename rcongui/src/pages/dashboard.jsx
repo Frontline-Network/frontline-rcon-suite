@@ -1,4 +1,4 @@
-import { Box, Stack, Typography, useMediaQuery } from "@mui/material";
+import { Box, Typography, useMediaQuery } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
@@ -9,7 +9,6 @@ import { useGlobalStore } from "@/stores/global-state";
 import { cmd } from "@/utils/fetchUtils";
 import { useTheme } from "@mui/material/styles";
 import PageHeader from "@/components/shared/PageHeader";
-import { BackgroundMotionButton } from "@/components/layout/AmbientBackground";
 
 const normalizeDashboardLogs = (rawLogs) => {
   const groups = (rawLogs?.result?.groups ?? []).map(({ group, logs }) => ({
@@ -62,14 +61,11 @@ const Dashboard = () => {
         title={t("dashboard.title")}
         subtitle={t("dashboard.operations.subtitle")}
         actions={
-          <Stack alignItems={{ xs: "start", sm: "end" }} gap={0.5}>
-            <Typography variant="caption" color="text.secondary">
-              {dayjs()
-                .locale(i18n.resolvedLanguage || "de")
-                .format("dddd, D. MMMM YYYY")}
-            </Typography>
-            <BackgroundMotionButton />
-          </Stack>
+          <Typography variant="caption" color="text.secondary">
+            {dayjs()
+              .locale(i18n.resolvedLanguage || "de")
+              .format("dddd, D. MMMM YYYY")}
+          </Typography>
         }
       />
 

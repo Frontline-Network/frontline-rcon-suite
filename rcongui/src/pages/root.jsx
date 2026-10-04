@@ -17,7 +17,7 @@ import { SystemUsageProvider } from "@/features/system-usage/SystemUsageProvider
 import AppearanceSettingsHost from "@/components/layout/AppearanceSettingsHost";
 import WardogsToolbar from "@/components/layout/wardogs/WardogsToolbar";
 import WardogsPageFrame from "@/components/layout/wardogs/WardogsPageFrame";
-import AmbientBackground from "@/components/layout/AmbientBackground";
+import { themeBackground } from "@/themes/background";
 
 export const loader = async () => {
   return null;
@@ -95,14 +95,12 @@ export default function Root() {
           sx={(theme) => ({
             flexGrow: 1,
             backgroundColor: theme.palette.background.default,
-            position: "relative",
-            isolation: "isolate",
+            ...themeBackground(theme),
             overflow: "auto",
             height: "100dvh",
             scrollPaddingTop: "var(--app-header-height)",
           })}
         >
-          <AmbientBackground />
           <Stack
             sx={{
               alignItems: "center",

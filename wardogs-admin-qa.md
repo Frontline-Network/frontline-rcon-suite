@@ -186,3 +186,17 @@ Prüfung:
 - Aufwärtsbewegung, unterschiedliche Laufzeiten und sanftes Verblassen anhand der gerenderten Animationen geprüft. Pause hält alle neun Funken an; Neuladen erhält die Pause. Auch die Bedienung über das mobile Benutzermenü geprüft. Animation anschließend wieder aktiviert und Aurora/Dunkel wiederhergestellt.
 - Reduzierte Bewegung und Pausierung verborgener Tabs im Code geprüft; die Systemeinstellung wurde nicht im Browser emuliert. Keine vollständige Accessibility-Prüfung und keine produktiven Spielaktionen ausgeführt.
 - Screenshots: `../output/wardogs-theme/admin/55-overview-before-aurora.png`, `56-overview-before-vanguard.png`, `57-overview-vanguard-after.png`, `58-overview-aurora-after.png`, `59-overview-mobile-after.png`.
+
+## Finaler Hintergrund: Statische Bilder je Farbstil (04.10.2026)
+
+Auf ausdrücklichen Nutzerwunsch ersetzt das bereitgestellte Hintergrundbild die zuvor erprobten Animationen vollständig. Funken-Komponente, Bewegungseinstellung, Pause-Schalter und zugehörige Hilfetexte wurden entfernt. Die überarbeitete Übersicht bleibt erhalten. Der folgende Stand ersetzt die Beschreibung des animierten Hintergrunds im vorigen Abschnitt.
+
+Das rote Original liegt unverändert unter `assets/rcongui/backgrounds/aurora-rose.png`. Fünf eigenständige Farbvarianten wurden mit dem eingebauten `image_gen` erstellt: `aurora-blue.png`, `aurora-emerald.png`, `aurora-amber.png`, `aurora-violet.png` und `aurora-slate.png` im selben Verzeichnis. Die konkreten Bearbeitungs-Prompts sind in `docs/theme-backgrounds.prompts.json` dokumentiert. Vorgabe war ausschließlich die Umfärbung des dunklen Scheins und vorhandener Lichtpunkte bei beibehaltenem Aufbau; alle Ergebnisse wurden visuell geprüft. Die Dateien werden über den vorhandenen Asset-Kopiervorgang in Entwicklung und Produktionsbuild übernommen. Es wird nur das jeweils gewählte Bild geladen.
+
+Aurora ordnet jedem seiner sechs Farbstile das passende Bild zu. Die festen Vanguard-Farben nutzen die entsprechenden Varianten; neutrale und individuelle Vanguard-Farben verwenden Schiefer. Der dunkle Bildrand geht über eine statische Farbüberblendung in die Theme-Fläche über. Die Darstellung ist an den Hauptinhalt gebunden und überlagert die Navigation nicht. Der Hellmodus behält seine helle Fläche.
+
+Prüfung:
+- Originaldatei und Projektkopie haben denselben SHA-256-Hash. Alle sechs Bilder sind im endgültigen Produktionsbuild enthalten.
+- Browser: alle sechs Aurora-Farbstile nacheinander in der ungespeicherten Vorschau geprüft; jeder wählt seine eigene Bild-URL. Hellmodus ohne dunkles Bild geprüft. Vorschau anschließend verworfen; vorheriger Bernstein-Stil wiederhergestellt. Keine Hintergrund-Animationskomponente und keine Pause-Schaltfläche mehr vorhanden.
+- Produktionsbuild, Aurora-Farbvertrag, Übersetzungen (5.337 Schlüssel), Navigation und Seitensemantik erfolgreich. Das bereits bekannte globale JavaScript-Budget bleibt überschritten: 1.603,96 kB raw / 510,55 kB gzip statt 1.525 / 500 kB. Keine Grenzwerte erhöht.
+- Finaler Screenshot: `../output/wardogs-theme/admin/63-overview-static-amber.png`.
