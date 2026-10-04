@@ -26,6 +26,7 @@ import { useAppStore } from "@/stores/app-state";
 import { buildCommandRailWorkspaces } from "../navigation/command-rail-navigation";
 import LanguageSelector from "../LanguageSelector";
 import OptionsMenu from "../OptionsMenu";
+import ServerStatus from "@/components/Header/server-status";
 
 export default function WardogsToolbar() {
   const { t } = useTranslation();
@@ -62,15 +63,26 @@ export default function WardogsToolbar() {
   }, []);
   return (
     <>
-      <Stack
+      <Box
         data-testid="wardogs-toolbar"
-        direction="row"
-        alignItems="center"
-        gap={1.5}
         sx={{
+          display: "grid",
+          gridTemplateAreas: {
+            xs: '"search tools" "status status"',
+            md: '"search status tools"',
+          },
+          gridTemplateColumns: {
+            xs: "minmax(0, 1fr) auto",
+            md: "auto minmax(0, 1fr) auto",
+          },
+          gridTemplateRows: { xs: "56px 48px", md: "64px" },
+          alignItems: "center",
+          columnGap: { xs: 1, md: 2 },
           width: "100%",
-          minHeight: 64,
-          px: { xs: 2, md: "var(--wardogs-gutter)" },
+          minWidth: 0,
+          px: { xs: 1.5, md: "var(--wardogs-gutter)" },
+          pt: { xs: "env(safe-area-inset-top)", md: 0 },
+          pb: { xs: 1, md: 0 },
           position: { xs: "fixed", md: "relative" },
           top: 0,
           left: 0,
@@ -78,53 +90,69 @@ export default function WardogsToolbar() {
           bgcolor: { xs: "background.default", md: "transparent" },
         }}
       >
-        <IconButton
-          sx={{ display: { xs: "inline-flex", lg: "none" } }}
-          aria-label={t("navigation.toggleMenu")}
-          onClick={toggleDrawer}
-          size="small"
+        <Stack
+          direction="row"
+          alignItems="center"
+          gap={1}
+          sx={{ gridArea: "search", minWidth: 0 }}
         >
-          <MenuOutlinedIcon fontSize="small" />
-        </IconButton>
-        <ButtonBase
-          onClick={() => setSearchOpen(true)}
-          aria-label={t("common.search")}
-          sx={{ color: "text.secondary", gap: 1.25, py: 1, px: 0.5 }}
-        >
-          <SearchOutlinedIcon sx={{ fontSize: 19 }} />
-          <Typography variant="body2">{t("common.search")}</Typography>
-          <Typography
-            variant="caption"
-            sx={{
-              ml: 2,
-              display: { xs: "none", lg: "block" },
-              color: "text.disabled",
-            }}
+          <IconButton
+            sx={{ display: { xs: "inline-flex", lg: "none" } }}
+            aria-label={t("navigation.toggleMenu")}
+            onClick={toggleDrawer}
+            size="small"
           >
-            Ctrl K
-          </Typography>
-        </ButtonBase>
-        <Box sx={{ flex: 1 }} />
-        <LanguageSelector />
-        <OptionsMenu
-          renderTrigger={(props) => (
-            <ButtonBase {...props} sx={{ gap: 1, p: 0.75 }}>
-              <Avatar
-                sx={{
-                  width: 30,
-                  height: 30,
-                  bgcolor: "primary.dark",
-                  color: "primary.contrastText",
-                  fontSize: 12,
-                }}
-              >
-                {(permissions?.user_name || "?").slice(0, 1).toUpperCase()}
-              </Avatar>
-              <KeyboardArrowDownOutlinedIcon sx={{ fontSize: 16 }} />
-            </ButtonBase>
-          )}
-        />
-      </Stack>
+            <MenuOutlinedIcon fontSize="small" />
+          </IconButton>
+          <ButtonBase
+            onClick={() => setSearchOpen(true)}
+            aria-label={t("common.search")}
+            sx={{ color: "text.secondary", gap: 1.25, py: 1, px: 0.5 }}
+          >
+            <SearchOutlinedIcon sx={{ fontSize: 19 }} />
+            <Typography variant="body2">{t("common.search")}</Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                ml: 2,
+                display: { xs: "none", lg: "block" },
+                color: "text.disabled",
+              }}
+            >
+              Ctrl K
+            </Typography>
+          </ButtonBase>
+        </Stack>
+        <Box sx={{ gridArea: "status", minWidth: 0 }}>
+          <ServerStatus variant="toolbar" />
+        </Box>
+        <Stack
+          direction="row"
+          alignItems="center"
+          gap={1}
+          sx={{ gridArea: "tools" }}
+        >
+          <LanguageSelector />
+          <OptionsMenu
+            renderTrigger={(props) => (
+              <ButtonBase {...props} sx={{ gap: 1, p: 0.75 }}>
+                <Avatar
+                  sx={{
+                    width: 30,
+                    height: 30,
+                    bgcolor: "primary.dark",
+                    color: "primary.contrastText",
+                    fontSize: 12,
+                  }}
+                >
+                  {(permissions?.user_name || "?").slice(0, 1).toUpperCase()}
+                </Avatar>
+                <KeyboardArrowDownOutlinedIcon sx={{ fontSize: 16 }} />
+              </ButtonBase>
+            )}
+          />
+        </Stack>
+      </Box>
       <Dialog
         open={searchOpen}
         onClose={() => setSearchOpen(false)}
