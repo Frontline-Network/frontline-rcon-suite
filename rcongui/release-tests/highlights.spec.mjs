@@ -1,8 +1,8 @@
 import { test, expect } from "@playwright/test";
 
-// The original v0.9.0 spotlight survives a v0.9.1 hotfix with the same account key.
+// The original v0.9.0 spotlight survives hotfixes with the same account key.
 const installed = process.env.RELEASE_VERSION || "v0.9.0";
-test.skip(!["v0.9.0", "v0.9.1"].includes(installed), "v0.9.0 spotlight and hotfix inheritance contract");
+test.skip(!["v0.9.0", "v0.9.1", "v0.9.2"].includes(installed), "v0.9.0 spotlight and hotfix inheritance contract");
 
 const current = `/api/get_update_channel?frontend_version=${installed}`;
 const spotlight = (page) => page.getByRole("dialog").filter({ has: page.locator("#release-spotlight-title") });
@@ -39,7 +39,7 @@ test("published metadata, matching versions, authenticated sessions and CSRF", a
   expect(result.preview).toBeUndefined();
   expect(result.highlight_state.auto_show).toBe(true);
   expect(result.highlight_state.release_version).toBe("v0.9.0");
-  for (const version of ["v0.8.8", "v0.8.9", "v0.9.0", "v0.9.1", "unknown", "v0.10.0"].filter((value) => value !== installed)) {
+  for (const version of ["v0.8.8", "v0.8.9", "v0.9.0", "v0.9.1", "v0.9.2", "unknown", "v0.10.0"].filter((value) => value !== installed)) {
     const data = (await (await context.request.get(`/api/get_update_channel?frontend_version=${version}`)).json()).result;
     expect(data.releases).toEqual([]);
     expect(data.highlight_state).toBeNull();

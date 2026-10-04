@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
 
-test.skip(process.env.RELEASE_VERSION !== "v0.9.1", "v0.9.1 hotfix contract");
+const installed = process.env.RELEASE_VERSION;
+test.skip(!["v0.9.1", "v0.9.2"].includes(installed), "hotfix inheritance contract");
+const current = `/api/get_update_channel?frontend_version=${installed}`;
 
 test("hotfix preserves unseen feature highlights while keeping the installed changelog", async ({ page, context }) => {
   const login = await context.request.post("/api/login", {
@@ -8,15 +10,15 @@ test("hotfix preserves unseen feature highlights while keeping the installed cha
   });
   expect(login.status()).toBe(200);
   expect((await login.json()).result).toBe(true);
-  expect((await (await context.request.get("/tag_version")).text()).trim()).toBe("v0.9.1");
-  const response = await context.request.get("/api/get_update_channel?frontend_version=v0.9.1");
+  expect((await (await context.request.get("/tag_version")).text()).trim()).toBe(installed);
+  const response = await context.request.get(current);
   expect(response.status()).toBe(200);
   const result = (await response.json()).result;
   expect(result.status).toBe("ready");
   expect(result.source).toBe("bundled");
   const release = result.releases.find((item) => item.current);
-  expect(release.tag_name).toBe("v0.9.1");
-  expect(release.body).toContain("CSRF");
+  expect(release.tag_name).toBe(installed);
+  expect(release.body).toContain(installed === "v0.9.1" ? "CSRF" : "SMTP");
   expect(release.body).toContain("Aurora");
   expect(release.body).toContain("## Deutsch");
   expect(release.body).toContain("## English");
@@ -51,7 +53,7 @@ for (const username of ["upgrade-seen", "upgrade-later"]) {
     expect((await context.request.post("/api/login", {
       data: { username, password: "isolated-test-only" },
     })).status()).toBe(200);
-    const read = async () => (await (await context.request.get("/api/get_update_channel?frontend_version=v0.9.1")).json()).result.highlight_state;
+    const read = async () => (await (await context.request.get(current)).json()).result.highlight_state;
     const before = await read();
     expect(before.release_version).toBe("v0.9.0");
     expect(before.seen).toBe(username === "upgrade-seen");

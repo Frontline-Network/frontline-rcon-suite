@@ -23,13 +23,25 @@ class HotfixReleaseNotesTests(TestCase):
             "published_at": "2026-10-04T00:00:00Z",
         }]}
 
-    def verify_snapshot(self, snapshot):
+    def verify_snapshot(self, snapshot, version="v0.9.1", require_highlights=False):
         with TemporaryDirectory() as directory:
             path = Path(directory) / "release_notes.json"
             path.write_text(json.dumps(snapshot), encoding="utf-8")
             with patch.object(verifier.channel, "SNAPSHOT_PATH", path):
                 with redirect_stdout(StringIO()):
-                    verifier.verify("v0.9.1")
+                    verifier.verify(version, require_highlights=require_highlights)
+
+    def test_v092_keeps_reviewed_feature_history_without_a_new_popup(self):
+        body = (ROOT / "docs/releases/v0.9.2.md").read_text(encoding="utf-8")
+        notes, highlights = verifier.channel.extract_highlights(body)
+        self.assertIsNone(highlights)
+        for text in ("## Deutsch", "## English", "v0.9.0", "SMTP", "Aurora"):
+            self.assertIn(text, notes)
+        snapshot = self.snapshot(body, "v0.9.2")
+        history = (ROOT / "docs/releases/v0.9.0.md").read_text(encoding="utf-8")
+        snapshot["releases"] += self.snapshot(history, "v0.9.0")["releases"]
+        self.verify_snapshot(snapshot, "v0.9.2")
+        self.verify_snapshot(snapshot, "v0.9.0", require_highlights=True)
 
     def test_bilingual_hotfix_has_no_automatic_feature_spotlight(self):
         body = (ROOT / "docs/releases/v0.9.1.md").read_text(encoding="utf-8")
