@@ -6278,7 +6278,7 @@ const enMasterFallback = {
       "wardogs": "Calm and clear · with grouped navigation and selectable colors"
     },
     "wardogsStyles": {
-      "title": "Wardogs color style",
+      "title": "Aurora color style",
       "description": "Choose matching accents and background glow. Every style supports light and dark mode; status colors remain distinct.",
       "rose": "Original · Rose",
       "blue": "Ice blue",
@@ -6291,7 +6291,7 @@ const enMasterFallback = {
       "title": "Color combination",
       "description": "Choose a tested preset or define your own accent color below.",
       "frontline-gold": "Frontline Gold",
-      "wardogs": "Wardogs",
+      "wardogs": "Aurora",
       "tactical-blue": "Tactical Blue",
       "signal-green": "Signal Green",
       "command-red": "Command Red",

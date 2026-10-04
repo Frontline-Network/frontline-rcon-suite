@@ -7,6 +7,8 @@ import {
 
 export const APPEARANCE_VERSION = 1;
 
+// Aurora keeps the original "wardogs" identifiers so saved preferences and
+// older backends remain compatible. Only its user-facing name has changed.
 export const APPEARANCE_PRESETS = Object.freeze({
   "frontline-gold": {
     accent: "#c59a4a",

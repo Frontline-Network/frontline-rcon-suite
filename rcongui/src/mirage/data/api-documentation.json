@@ -2763,8 +2763,8 @@
       "GET"
     ],
     "description_translations": {
-      "de": "Lädt die persönlichen Einstellungen für Theme, Farbstil, Hell/Dunkel, Farbsehmodus und Wardogs-Schnellzugriffe.",
-      "en": "Loads personal theme, colour style, light/dark mode, colour-vision mode and Wardogs shortcut preferences."
+      "de": "Lädt die persönlichen Einstellungen für Theme, Farbstil, Hell/Dunkel, Farbsehmodus und Aurora-Schnellzugriffe.",
+      "en": "Loads personal theme, colour style, light/dark mode, colour-vision mode and Aurora shortcut preferences."
     }
   },
   {

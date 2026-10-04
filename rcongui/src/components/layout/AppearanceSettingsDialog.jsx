@@ -219,7 +219,7 @@ export default function AppearanceSettingsDialog({ open, onClose }) {
                   <ButtonBase
                     key={id}
                     aria-pressed={selected}
-                    aria-label={wardogs ? "Wardogs" : "Frontline"}
+                    aria-label={wardogs ? "Aurora" : "Frontline"}
                     onClick={() =>
                       updateDraft({
                         preset: wardogs ? "wardogs" : "frontline-gold",
@@ -315,7 +315,7 @@ export default function AppearanceSettingsDialog({ open, onClose }) {
                     </Box>
                     <Stack direction="row" alignItems="center" spacing={1}>
                       <Typography variant="subtitle2" sx={{ flex: 1 }}>
-                        {wardogs ? "Wardogs" : "Frontline"}
+                        {wardogs ? "Aurora" : "Frontline"}
                       </Typography>
                       {selected && (
                         <CheckRoundedIcon color="primary" fontSize="small" />

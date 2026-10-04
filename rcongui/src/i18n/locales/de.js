@@ -6324,7 +6324,7 @@ const deMasterFallback = {
       "wardogs": "Ruhig und klar · mit gruppierter Navigation und wählbarem Farbstil"
     },
     "wardogsStyles": {
-      "title": "Wardogs-Farbstil",
+      "title": "Aurora-Farbstil",
       "description": "Akzente und Hintergrundschimmer gemeinsam wählen. Jeder Stil unterstützt Hell und Dunkel; Statusfarben bleiben eindeutig erkennbar.",
       "rose": "Original · Rosé",
       "blue": "Eisblau",
@@ -6337,7 +6337,7 @@ const deMasterFallback = {
       "title": "Farbkombination",
       "description": "Wähle ein geprüftes Preset oder lege darunter eine eigene Akzentfarbe fest.",
       "frontline-gold": "Frontline Gold",
-      "wardogs": "Wardogs",
+      "wardogs": "Aurora",
       "tactical-blue": "Tactical Blue",
       "signal-green": "Signal Green",
       "command-red": "Command Red",
