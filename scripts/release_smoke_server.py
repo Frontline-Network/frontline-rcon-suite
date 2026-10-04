@@ -31,7 +31,7 @@ def main():
     parser.add_argument("--notes-file", type=Path)
     args = parser.parse_args()
     # Never inherit access to a production database or a private release token.
-    for name in ("HLL_DB_URL", "HLL_REDIS_URL", "CRCON_RELEASES_GITHUB_TOKEN", "GITHUB_TOKEN", "GH_TOKEN"):
+    for name in ("HLL_DB_URL", "HLL_REDIS_URL", "CRCON_RELEASES_GITHUB_TOKEN", "CRCON_RELEASES_GITHUB_TOKEN_FILE", "GITHUB_TOKEN", "GH_TOKEN"):
         os.environ.pop(name, None)
     os.environ.update(HLL_MAINTENANCE_CONTAINER="1", RCONWEB_TEST_MODE="1", SERVER_NUMBER="1")
 

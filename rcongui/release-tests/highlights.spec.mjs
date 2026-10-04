@@ -43,6 +43,15 @@ test("published metadata, matching versions, authenticated sessions and CSRF", a
   });
   expect(rejected.status()).toBe(403);
   expect((await state(context)).highlight_state.auto_show).toBe(true);
+  // Exercise the same origin/Host split as the shipped nginx proxy, with a
+  // genuine session and CSRF cookie, not a CSRF exemption or mocked response.
+  const csrf = (await context.cookies()).find((cookie) => cookie.name === "csrftoken").value;
+  const viaProxy = await context.request.post("/api/set_own_release_highlight_state", {
+    headers: { Host: "backend:8000", Origin: "http://127.0.0.1:8049", "X-CSRFToken": csrf },
+    data: { frontend_version: "v0.9.0", release_version: "v0.9.0", action: "claim" },
+  });
+  expect(viaProxy.status()).toBe(200);
+  expect((await viaProxy.json()).result.show).toBe(true);
 });
 
 test("Vanguard: once per account across devices, German/English and manual reopen", async ({ page, context, browser, baseURL }, testInfo) => {
