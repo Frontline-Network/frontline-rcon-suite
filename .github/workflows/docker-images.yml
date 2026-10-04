@@ -45,6 +45,9 @@ jobs:
       - name: Require published v0.9.0 notes before building
         if: github.ref_name == 'v0.9.0'
         run: python3 scripts/verify_bundled_release.py v0.9.0 --require-highlights
+      - name: Require reviewed hotfix notes before building
+        if: github.ref_name == 'v0.9.1'
+        run: python3 scripts/verify_bundled_release.py v0.9.1
       - name: Build and push backend
         id: build
         uses: docker/build-push-action@v5
@@ -96,8 +99,8 @@ jobs:
 
   verify-published-images:
     needs: [backend, frontend]
-    # This acceptance suite validates the curated v0.9.0 release contract.
-    if: github.ref_name == 'v0.9.0'
+    # Verify both the curated feature release and its CSRF/Aurora hotfix.
+    if: contains(fromJSON('["v0.9.0", "v0.9.1"]'), github.ref_name)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -116,7 +119,9 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Verify immutable multi-architecture contents and latest
         run: |
-          python3 scripts/verify_release_images.py --version "$RELEASE_VERSION" --revision "$RELEASE_REVISION" --backend-digest "$BACKEND_DIGEST" --frontend-digest "$FRONTEND_DIGEST"
+          highlight_args=()
+          if [ "$RELEASE_VERSION" = v0.9.0 ]; then highlight_args+=(--require-highlights); fi
+          python3 scripts/verify_release_images.py --version "$RELEASE_VERSION" --revision "$RELEASE_REVISION" --backend-digest "$BACKEND_DIGEST" --frontend-digest "$FRONTEND_DIGEST" "${highlight_args[@]}"
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -138,7 +143,7 @@ jobs:
             docker network rm release-verification || true
           }
           trap cleanup EXIT
-          docker run -d --name release-backend --network release-verification --network-alias backend --platform linux/amd64 -e RELEASE_SMOKE_TEST=1 --entrypoint python "$REGISTRY/$BACKEND_IMAGE@$BACKEND_DIGEST" scripts/release_smoke_server.py --bind 0.0.0.0 --port 8000
+          docker run -d --name release-backend --network release-verification --network-alias backend --platform linux/amd64 -e RELEASE_SMOKE_TEST=1 -e RELEASE_VERSION="$RELEASE_VERSION" --entrypoint python "$REGISTRY/$BACKEND_IMAGE@$BACKEND_DIGEST" scripts/release_smoke_server.py --bind 0.0.0.0 --port 8000
           docker run -d --name release-frontend --network release-verification --platform linux/amd64 -p 127.0.0.1:8049:80 -e RCONWEB_EXTERNAL_ADDRESS=localhost "$REGISTRY/$FRONTEND_IMAGE@$FRONTEND_DIGEST"
           for attempt in {1..60}; do
             if curl -fsS http://127.0.0.1:8049/api/is_logged_in >/dev/null; then break; fi

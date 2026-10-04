@@ -1,5 +1,9 @@
 import { test, expect } from "@playwright/test";
 
+// Keep the original curated v0.9.0 spotlight contract; hotfix releases do not
+// announce the old feature spotlight again and have their own metadata tests.
+test.skip(Boolean(process.env.RELEASE_VERSION && process.env.RELEASE_VERSION !== "v0.9.0"), "v0.9.0 spotlight contract (also run by the quality matrix)");
+
 const current = "/api/get_update_channel?frontend_version=v0.9.0";
 const spotlight = (page) => page.getByRole("dialog").filter({ has: page.locator("#release-spotlight-title") });
 async function login(context, username) {
