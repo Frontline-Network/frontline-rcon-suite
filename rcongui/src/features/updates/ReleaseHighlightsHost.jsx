@@ -56,7 +56,7 @@ export default function ReleaseHighlightsHost() {
       !channel.data?.highlight_state?.auto_show
     )
       return;
-    const timer = setTimeout(async () => {
+    const timer = setInterval(async () => {
       if (!pageIsQuiet() || attempted.current.has(identity)) return;
       attempted.current.add(identity);
       try {
@@ -67,7 +67,7 @@ export default function ReleaseHighlightsHost() {
         // An unverified acknowledgement never interrupts the operator.
       }
     }, 1600);
-    return () => clearTimeout(timer);
+    return () => clearInterval(timer);
   }, [
     identity,
     safePage,
@@ -84,10 +84,10 @@ export default function ReleaseHighlightsHost() {
         setPendingFor(null);
       }
     };
-    const timer = setTimeout(showWhenQuiet, 200);
+    const timer = setInterval(showWhenQuiet, 200);
     document.addEventListener("visibilitychange", showWhenQuiet);
     return () => {
-      clearTimeout(timer);
+      clearInterval(timer);
       document.removeEventListener("visibilitychange", showWhenQuiet);
     };
   }, [pendingFor, identity, safePage]);

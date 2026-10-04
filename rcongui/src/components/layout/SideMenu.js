@@ -1,12 +1,17 @@
+import { lazy, Suspense } from "react";
 import { useTheme } from "@mui/material/styles";
-import CommandNavigationShell from "./navigation/CommandNavigationShell";
-import WardogsNavigation from "./navigation/WardogsNavigation";
+const CommandNavigationShell = lazy(() => import("./navigation/CommandNavigationShell"));
+const WardogsNavigation = lazy(() => import("./navigation/WardogsNavigation"));
 
 export default function SideMenu() {
   const theme = useTheme();
-  return theme.frontline?.appearance?.preset === "wardogs" ? (
-    <WardogsNavigation />
-  ) : (
-    <CommandNavigationShell />
+  return (
+    <Suspense fallback={null}>
+      {theme.frontline?.appearance?.preset === "wardogs" ? (
+        <WardogsNavigation />
+      ) : (
+        <CommandNavigationShell />
+      )}
+    </Suspense>
   );
 }

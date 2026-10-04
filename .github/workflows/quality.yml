@@ -4,6 +4,53 @@ on:
   workflow_call:
 
 jobs:
+  test-release-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: rcongui/package-lock.json
+      - run: |
+          pip install --no-deps -r requirements-vcs.txt --no-compile
+          pip install --require-hashes --no-deps -r requirements.lock --no-compile
+      - working-directory: rcongui
+        env:
+          REACT_APP_API_URL: /api/
+          REACT_APP_VERSION: v0.9.0
+        run: |
+          npm ci
+          npm run copy-assets
+          npm run build
+          npm run check:bundle
+          npx playwright install --with-deps chromium
+      - name: Real authenticated backend and production frontend
+        env:
+          RELEASE_SMOKE_TEST: '1'
+          CRCON_VERSION: v0.9.0
+        run: |
+          python scripts/release_smoke_server.py --frontend rcongui/dist --notes-file docs/releases/v0.9.0.md > "$RUNNER_TEMP/release-smoke.log" 2>&1 &
+          smoke_pid=$!
+          trap 'kill "$smoke_pid" 2>/dev/null || true; cat "$RUNNER_TEMP/release-smoke.log"' EXIT
+          for attempt in {1..30}; do
+            if curl -fsS http://127.0.0.1:8049/tag_version >/dev/null; then break; fi
+            kill -0 "$smoke_pid"
+            sleep 1
+          done
+          cd rcongui
+          npx playwright test --config release-tests/playwright.config.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-integration-results
+          path: rcongui/release-tests/release-test-results
+
   test-discord-service:
     runs-on: ubuntu-latest
     defaults:
@@ -157,6 +204,7 @@ jobs:
           PYTHONPATH=. alembic upgrade head
           PYTHONPATH=. python ./manage.py init_db
           PYTHONPATH=. python ./rconweb/manage.py migrate --noinput
+          PYTHONPATH=. python -m django makemigrations --check --dry-run --settings=rconweb.rconweb.test_settings
       - name: run tests
         run: |
           export HLL_DB_URL=postgresql://${HLL_DB_USER}:${HLL_DB_PASSWORD}@${HLL_DB_HOST}:${HLL_DB_HOST_PORT}/${HLL_DB_NAME}
@@ -165,6 +213,7 @@ jobs:
           export POPULATION_TEST_DB_URL="$HLL_DB_URL"
           PYTHONPATH=. pytest tests/
           PYTHONPATH=. python -m django test api.test_release_updates --settings=rconweb.rconweb.test_settings --verbosity=1
+          PYTHONPATH=. python -m django test api.test_release_migrations --settings=rconweb.rconweb.test_settings --verbosity=1
           PYTHONPATH=. python -m django test api.test_account_password api.test_admin_theme api.test_api_descriptions api.test_appearance --settings=rconweb.rconweb.test_settings --verbosity=1
           PYTHONPATH=. python -m django test api.test_population --settings=rconweb.rconweb.test_settings --verbosity=1
           PYTHONPATH=. python -m django test api.test_live_view --settings=rconweb.rconweb.test_settings --verbosity=1

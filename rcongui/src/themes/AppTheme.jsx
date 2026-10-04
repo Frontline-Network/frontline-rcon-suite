@@ -4,7 +4,6 @@ import {
   createTheme,
   useColorScheme,
 } from "@mui/material/styles";
-import getDefaultTheme from "./default/getDefaultTheme";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import {
   applyAppearanceToThemeOptions,
@@ -46,7 +45,7 @@ function AppTheme(props) {
       const getTheme =
         appearance.preset === "wardogs"
           ? (await import("./wardogs/getWardogsTheme")).default
-          : getDefaultTheme;
+          : (await import("./default/getDefaultTheme")).default;
       const defaultTheme = await getTheme(themeComponents);
       if (active) {
         setTheme(

@@ -57,6 +57,8 @@ class SteamPlayer(models.Model):
 class UserAppearancePreference(models.Model):
     """Versioned, account-bound visual preferences for the CRCON web UI."""
 
+    # Preserve the BigAutoField created by migration 0033.
+    id = models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name="appearance_preference"
     )

@@ -16,9 +16,9 @@ import TitleManager from "@/features/title-manager/TitleManager";
 import { SystemUsageProvider } from "@/features/system-usage/SystemUsageProvider";
 import AppearanceSettingsHost from "@/components/layout/AppearanceSettingsHost";
 import ReleaseHighlightsHost from "@/features/updates/ReleaseHighlightsHost";
-import WardogsToolbar from "@/components/layout/wardogs/WardogsToolbar";
-import WardogsPageFrame from "@/components/layout/wardogs/WardogsPageFrame";
 import { themeBackground } from "@/themes/background";
+const WardogsToolbar = React.lazy(() => import("@/components/layout/wardogs/WardogsToolbar"));
+const WardogsPageFrame = React.lazy(() => import("@/components/layout/wardogs/WardogsPageFrame"));
 
 export const loader = async () => {
   return null;
@@ -122,7 +122,7 @@ export default function Root() {
               minHeight: "100%",
             }}
           >
-            {isWardogs ? <WardogsToolbar /> : <Header />}
+            {isWardogs ? <React.Suspense fallback={null}><WardogsToolbar /></React.Suspense> : <Header />}
             <Container
               maxWidth={isWardogs ? false : widthMode}
               sx={{
@@ -138,9 +138,11 @@ export default function Root() {
             >
               <ActionDialogProvider>
                 <PlayerSidebarProvider>
-                  <WardogsPageFrame active={isWardogs}>
-                    <Outlet />
-                  </WardogsPageFrame>
+                  {isWardogs ? (
+                    <React.Suspense fallback={null}>
+                      <WardogsPageFrame><Outlet /></WardogsPageFrame>
+                    </React.Suspense>
+                  ) : <Outlet />}
                 </PlayerSidebarProvider>
               </ActionDialogProvider>
             </Container>

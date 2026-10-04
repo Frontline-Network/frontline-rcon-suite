@@ -1,6 +1,9 @@
-import { ActionDialog } from "@/features/player-action/ActionDialog";
 import { useQueryClient } from "@tanstack/react-query";
-import {createContext, useContext, useMemo, useReducer} from "react";
+import {createContext, lazy, Suspense, useContext, useMemo, useReducer} from "react";
+
+const ActionDialog = lazy(() => import("@/features/player-action/ActionDialog").then(
+  (module) => ({ default: module.ActionDialog })
+));
 
 export const DialogContext = createContext();
 
@@ -134,7 +137,7 @@ export const ActionDialogProvider = ({ children }) => {
   return (
     <DialogContext.Provider value={contextValue}>
       {children}
-      <ActionDialog />
+      {state.action && <Suspense fallback={null}><ActionDialog /></Suspense>}
     </DialogContext.Provider>
   );
 };

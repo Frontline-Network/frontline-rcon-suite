@@ -25,6 +25,10 @@ config/
 
 rcongui/dist/
 rcongui/node_modules/
+rcongui/playwright-report/
+rcongui/test-results/
+rcongui/release-tests/release-test-results/
+rcongui/release-tests/results.json
 
 rcongui_public/dist/
 rcongui_public/node_modules/

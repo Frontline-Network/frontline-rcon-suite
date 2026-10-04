@@ -55,6 +55,7 @@ pip-delete-this-directory.txt
 htmlcov/
 playwright-report/
 test-results/
+release-test-results/
 .tox/
 .nox/
 .coverage
