@@ -164,7 +164,7 @@ export const PerformanceMatrix = ({ playerStats }) => {
   const [mobileMetric, setMobileMetric] = useState(METRIC_KEYS[0]);
 
   return (
-    <Box
+    <Box data-theme-surface="panel"
       component="section"
       aria-labelledby="completed-game-performance-heading"
       sx={{ border: "1px solid", borderColor: DOSSIER_BORDER }}
@@ -330,7 +330,7 @@ export const MatchDossier = ({
           {t("stats.gameDetails.backToArchive")}
         </Typography>
       </Stack>
-      <Box
+      <Box data-theme-surface="panel"
         sx={{
           display: "grid",
           gridTemplateColumns: {
@@ -659,6 +659,7 @@ const CompletedGamePage = () => {
 
   return (
     <Box
+      className="wardogs-completed-game"
       sx={{
         p: { xs: 1, sm: 1.5, md: 2 },
         minHeight: "100%",

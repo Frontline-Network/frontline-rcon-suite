@@ -97,7 +97,7 @@ export default function PlayerProfilePage() {
   };
 
   return (
-    <ProfileContainer>
+    <ProfileContainer className="wardogs-player-profile">
       <SummaryCard
         component="section"
         elevation={0}
@@ -106,7 +106,7 @@ export default function PlayerProfilePage() {
       >
         <CardContent sx={{ "&:last-child": { pb: 2 } }}>
           <PlayerProfileHeader
-            player={profile}
+            player={thisOnlinePlayer ? { ...thisOnlinePlayer, profile } : profile}
             isOnline={!!thisOnlinePlayer}
             ActionList={() => (
               <ProfileActions player={profile} actions={actionList} />
@@ -128,7 +128,7 @@ export default function PlayerProfilePage() {
         </CardContent>
       </SummaryCard>
 
-      <MainContent>
+      <MainContent className="wardogs-profile-grid">
         <SummaryCard
           component="section"
           elevation={0}
@@ -159,7 +159,6 @@ export default function PlayerProfilePage() {
               )}
               names={profileNames}
               watchlist={profile.watchlist}
-              eosId={profileSoldier.eos_id}
             />
           </CardContent>
         </SummaryCard>

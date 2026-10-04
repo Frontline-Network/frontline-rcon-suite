@@ -87,5 +87,5 @@ class PopulationAuthenticationTests(TestCase):
     def test_permission_migration_is_single_head(self):
         self.assertEqual(
             MigrationLoader(connection).graph.leaf_nodes("api"),
-            [("api", "0039_population_history_permissions")],
+            [("api", "0041_user_appearance_default")],
         )

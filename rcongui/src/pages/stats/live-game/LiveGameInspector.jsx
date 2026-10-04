@@ -90,7 +90,7 @@ export default function LiveGameInspector({ player, playerNames, t, compact = fa
 
   if (!player) {
     return (
-      <Stack
+      <Stack data-theme-surface="panel"
         alignItems="center"
         justifyContent="center"
         sx={{ minHeight: compact ? 240 : 540, px: 3, border: "1px solid", borderColor: "divider", bgcolor: "background.paper" }}
@@ -112,7 +112,7 @@ export default function LiveGameInspector({ player, playerNames, t, compact = fa
   const country = player.steaminfo?.country;
 
   return (
-    <Box
+    <Box data-theme-surface="panel"
       sx={{
         minWidth: 0,
         height: compact ? "auto" : "100%",
@@ -167,7 +167,7 @@ export default function LiveGameInspector({ player, playerNames, t, compact = fa
 
       <Box sx={{ px: 1.25, py: 1.1 }}>
         <Label>{t("stats.liveGame.performance")}</Label>
-        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", mt: 0.75, border: "1px solid", borderColor: "divider", "& > :nth-of-type(4n)": { borderRight: 0 }, "& > *": { borderBottom: 0 } }}>
+        <Box data-theme-surface="panel" sx={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", mt: 0.75, border: "1px solid", borderColor: "divider", "& > :nth-of-type(4n)": { borderRight: 0 }, "& > *": { borderBottom: 0 } }}>
           <Metric label={t("stats.gameDetails.metrics.combat")} value={player.combat} />
           <Metric label={t("stats.gameDetails.metrics.offense")} value={player.offense} />
           <Metric label={t("stats.gameDetails.metrics.defense")} value={player.defense} />

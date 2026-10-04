@@ -153,7 +153,7 @@ export default function TacticalMap({
       onSelect(gesture.playerId);
   };
   return (
-    <Box
+    <Box data-theme-surface="panel"
       sx={{
         position: "relative",
         border: 1,

@@ -1,4 +1,4 @@
-import { Box, Stack, Typography, useMediaQuery } from "@mui/material";
+import { Box, Typography, useMediaQuery } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
@@ -7,6 +7,8 @@ import OperationsOverview from "@/components/dashboard/OperationsOverview";
 import MobileOperationsHub from "@/pages/mobile/operations";
 import { useGlobalStore } from "@/stores/global-state";
 import { cmd } from "@/utils/fetchUtils";
+import { useTheme } from "@mui/material/styles";
+import PageHeader from "@/components/shared/PageHeader";
 
 const normalizeDashboardLogs = (rawLogs) => {
   const groups = (rawLogs?.result?.groups ?? []).map(({ group, logs }) => ({
@@ -39,6 +41,7 @@ const normalizeDashboardLogs = (rawLogs) => {
 
 const Dashboard = () => {
   const { t, i18n } = useTranslation();
+  const isWardogs = useTheme().frontline?.appearance?.preset === "wardogs";
   const status = useGlobalStore((state) => state.status);
 
   const { data: logs = [], isLoading: logsLoading } = useQuery({
@@ -53,39 +56,18 @@ const Dashboard = () => {
   });
 
   return (
-    <Box sx={{ py: { xs: 2, md: 2.5 } }}>
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        justifyContent="space-between"
-        alignItems={{ sm: "end" }}
-        sx={{ mb: 2 }}
-      >
-        <Box>
-          <Typography
-            component="h1"
-            variant="h3"
-            sx={{ textTransform: "uppercase" }}
-          >
-            {t("dashboard.title")}
+    <Box sx={{ py: isWardogs ? 0 : { xs: 2, md: 2.5 } }}>
+      <PageHeader
+        title={t("dashboard.title")}
+        subtitle={t("dashboard.operations.subtitle")}
+        actions={
+          <Typography variant="caption" color="text.secondary">
+            {dayjs()
+              .locale(i18n.resolvedLanguage || "de")
+              .format("dddd, D. MMMM YYYY")}
           </Typography>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ textTransform: "uppercase" }}
-          >
-            {t("dashboard.operations.subtitle")}
-          </Typography>
-        </Box>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ textTransform: "uppercase", mt: { xs: 1, sm: 0 } }}
-        >
-          {dayjs()
-            .locale(i18n.resolvedLanguage || "de")
-            .format("dddd, D. MMMM YYYY · HH:mm")}
-        </Typography>
-      </Stack>
+        }
+      />
 
       <OperationsOverview logs={logs} logsLoading={logsLoading} />
     </Box>

@@ -99,7 +99,7 @@ export default function PageState({
     ) : null);
 
   return (
-    <Stack
+    <Stack data-theme-surface="panel"
       component="section"
       role={alertStates.has(kind) ? "alert" : "status"}
       aria-live={alertStates.has(kind) ? "assertive" : "polite"}

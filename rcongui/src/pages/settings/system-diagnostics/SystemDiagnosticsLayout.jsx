@@ -58,6 +58,7 @@ export default function SystemDiagnosticsLayout({ children }) {
         }
       />
       <Box
+        className="wardogs-system-diagnostics"
         sx={{
           "& .MuiButton-root, & .MuiPaper-root, & .MuiOutlinedInput-root, & .MuiChip-root, & .MuiAlert-root":
             { borderRadius: 0 },

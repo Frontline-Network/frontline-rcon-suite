@@ -46,7 +46,7 @@ function GameMapThumbnail({ game }) {
 
   if (!imageName || failed) {
     return (
-      <Box
+      <Box data-theme-surface="panel"
         aria-hidden="true"
         sx={{
           width: { xs: 68, sm: 88 },
@@ -66,7 +66,7 @@ function GameMapThumbnail({ game }) {
   }
 
   return (
-    <Box
+    <Box data-theme-surface="panel"
       component="img"
       src={getMapIconSrc(game?.map)}
       alt=""
@@ -270,7 +270,7 @@ export function GameListTable({
 
   return (
     <>
-      <Box
+      <Box data-theme-surface="panel"
         component="section"
         aria-label={t("stats.games.archive")}
         aria-busy={isFetching}

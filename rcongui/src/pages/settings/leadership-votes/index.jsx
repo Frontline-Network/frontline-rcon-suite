@@ -19,7 +19,6 @@ import { copy } from "./copy";
 import VotePanel from "./VotePanel";
 
 const fields = {
-  confirmation_seconds: [30, 180],
   duration_seconds: [60, 300],
   minimum_participants: [3, 50],
   leadership_seconds: [300, 1800],
@@ -121,6 +120,8 @@ export default function LeadershipVotes() {
               <Alert severity="info">{c.kickPermission}</Alert>
             )}
             <Typography>{c.flow}</Typography>
+            <Typography>{c.reporters}</Typography>
+            <Typography>{c.voters}</Typography>
             <Typography color="text.secondary">{c.references}</Typography>
             <Box
               sx={{

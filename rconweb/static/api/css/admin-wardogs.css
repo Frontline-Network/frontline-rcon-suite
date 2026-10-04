@@ -1,0 +1,66 @@
+/* Wardogs palette; shared form and list layout lives in admin-layout.css. */
+html[data-crcon-theme="wardogs"] {
+  color-scheme: dark;
+  --body-bg: #0d0d0f;
+  --body-fg: #e9e9ed;
+  --body-quiet-color: #a5a5b1;
+  --body-loud-color: #fafafa;
+  --primary: #e45b80;
+  --secondary: #19191d;
+  --accent: #e45b80;
+  --primary-fg: #0d0d0f;
+  --header-color: var(--body-fg);
+  --header-branding-color: var(--primary);
+  --header-bg: var(--body-bg);
+  --header-link-color: var(--body-fg);
+  --breadcrumbs-fg: var(--body-quiet-color);
+  --breadcrumbs-link-fg: var(--body-fg);
+  --breadcrumbs-bg: var(--body-bg);
+  --link-fg: #ee86a1;
+  --link-hover-color: #ffadc4;
+  --link-selected-fg: #f2a0b7;
+  --hairline-color: #2c2c32;
+  --border-color: #34343b;
+  --error-fg: #ed8581;
+  --message-success-bg: #17271e;
+  --message-warning-bg: #312919;
+  --message-error-bg: #311d21;
+  --darkened-bg: #111114;
+  --selected-bg: #242429;
+  --selected-row: #302027;
+  --button-fg: #fafafa;
+  --button-bg: #29292f;
+  --button-hover-bg: #38383f;
+  --default-button-bg: #e45b80;
+  --default-button-hover-bg: #f07898;
+  --close-button-bg: #29292f;
+  --delete-button-bg: #77343a;
+  --delete-button-hover-bg: #90404a;
+  --object-tools-fg: #fafafa;
+  --object-tools-bg: #29292f;
+  --object-tools-hover-bg: #38383f;
+  --wd-panel: #141416;
+  --wd-header: #1a1a1e;
+  --wd-hover: #1e1e24;
+  --wd-tint: #302027;
+  --font-family-primary: Arial, Helvetica, sans-serif;
+}
+
+html[data-crcon-theme="wardogs"][data-crcon-mode="light"] {
+  color-scheme: light;
+  --body-bg: #f5f5f7; --body-fg: #272730; --body-quiet-color: #646471; --body-loud-color: #17171e;
+  --wd-panel: #fff; --wd-header: #f0f0f4; --wd-hover: #f5f0f3; --wd-tint: #fbe8ef;
+  --primary: #b72d58; --accent: #b72d58; --link-fg: #b72d58; --link-hover-color: #8f2044; --link-selected-fg: #9f274d;
+  --hairline-color: #dedee5; --border-color: #ceced7; --darkened-bg: #f0f0f4; --selected-bg: #e6e6ec; --selected-row: #fbe8ef;
+  --message-success-bg: #e6f4e9; --message-warning-bg: #fff0cd; --message-error-bg: #fde6e8; --error-fg: #b32f39;
+}
+@media (prefers-color-scheme: light) {
+  html[data-crcon-theme="wardogs"][data-crcon-mode="system"] {
+    color-scheme: light;
+    --body-bg: #f5f5f7; --body-fg: #272730; --body-quiet-color: #646471; --body-loud-color: #17171e;
+    --wd-panel: #fff; --wd-header: #f0f0f4; --wd-hover: #f5f0f3; --wd-tint: #fbe8ef;
+    --primary: #b72d58; --accent: #b72d58; --link-fg: #b72d58; --link-hover-color: #8f2044; --link-selected-fg: #9f274d;
+    --hairline-color: #dedee5; --border-color: #ceced7; --darkened-bg: #f0f0f4; --selected-bg: #e6e6ec; --selected-row: #fbe8ef;
+    --message-success-bg: #e6f4e9; --message-warning-bg: #fff0cd; --message-error-bg: #fde6e8; --error-fg: #b32f39;
+  }
+}

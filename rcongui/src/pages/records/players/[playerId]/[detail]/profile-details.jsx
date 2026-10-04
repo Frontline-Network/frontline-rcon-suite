@@ -98,19 +98,7 @@ const SoldierCard = ({ profile }) => {
               <Box sx={{ color: (theme) => theme.palette.text.secondary }}>
                 {t("records.playerDetails.platform")}:
               </Box>
-              <Box><PlatformChip platform={soldier["platform"]} playerId={profile.player_id} /></Box>
-            </ListItem>
-            <ListItem sx={{ display: "flex", justifyContent: "space-between" }}>
-              <Box sx={{ color: (theme) => theme.palette.text.secondary }}>
-                EOS ID:
-              </Box>
-              <Box>
-                <CopyableText
-                  text={soldier["eos_id"]}
-                  label={soldier["eos_id"]}
-                  position="start"
-                />
-              </Box>
+              <Box><PlatformChip platform={soldier["platform"]} player={profile} playerId={profile.player_id} /></Box>
             </ListItem>
           </List>
         </CardContent>

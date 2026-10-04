@@ -24,7 +24,7 @@ export default function VotePanel({ vote, canCancel, onCancel, pending }) {
       ? "success"
       : "info";
   return (
-    <Stack
+    <Stack data-theme-surface="panel"
       spacing={1.5}
       sx={{
         p: 2,

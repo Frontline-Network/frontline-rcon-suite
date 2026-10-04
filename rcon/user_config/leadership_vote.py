@@ -11,6 +11,7 @@ class LeadershipVoteUserConfig(BaseUserConfig):
     model_config = ConfigDict(extra="forbid", strict=True)
     enabled: bool = False
     mode: Literal["dry_run", "active"] = "dry_run"
+    # Legacy stored/older-client field. Eligible reports now start directly.
     confirmation_seconds: int = Field(default=60, ge=30, le=180)
     # Accepted for stored-config/older-client compatibility only. No warning or wait.
     warning_seconds: int = Field(default=60, ge=30, le=180)

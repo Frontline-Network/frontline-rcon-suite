@@ -29,6 +29,8 @@ export default function ConfigFormSection({
   return (
     <Card
       component="section"
+      className="wardogs-config-section"
+      data-plain={plain || undefined}
       id={id}
       data-testid={testId}
       aria-labelledby={headingId}
@@ -53,7 +55,7 @@ export default function ConfigFormSection({
       >
         <Stack direction="row" spacing={1.25} sx={{ minWidth: 0 }}>
           {icon && !plain && (
-            <Box
+            <Box data-theme-surface="control"
               sx={{
                 display: "grid",
                 placeItems: "center",

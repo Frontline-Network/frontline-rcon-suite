@@ -10,6 +10,7 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { getCommandRailSurface } from "./navigation-surfaces";
+import ThemedBrandMark from "../ThemedBrandMark";
 
 export const COMMAND_RAIL_WIDTH = 64;
 
@@ -153,8 +154,7 @@ export default function CommandRail({
               flexShrink: 0,
             }}
           >
-            <Box
-              component="img"
+            <ThemedBrandMark
               src={logoSrc}
               alt={brandLabel}
               sx={{ width: 40, height: 34, objectFit: "contain" }}

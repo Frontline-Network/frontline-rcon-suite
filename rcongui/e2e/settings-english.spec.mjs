@@ -12,7 +12,10 @@ test("English autobalancer includes proposal details, dialogs and reactive langu
   page,
 }) => {
   const errors = collectRuntimeErrors(page);
-  await openDemoPage(page, "/settings/others/autobalancer", { language: "en" });
+  await openDemoPage(page, "/settings/others/autobalancer", {
+    language: "en",
+    query: { demo_autobalancer_mode: "shadow" },
+  });
   await expect(
     page.getByText(
       "Live state, proposal reviews and pilot approval for moderators"
@@ -55,7 +58,10 @@ test("English autobalancer includes proposal details, dialogs and reactive langu
 test("English autobalancer history and calibration remain localized", async ({
   page,
 }) => {
-  await openDemoPage(page, "/settings/others/autobalancer", { language: "en" });
+  await openDemoPage(page, "/settings/others/autobalancer", {
+    language: "en",
+    query: { demo_autobalancer_mode: "shadow" },
+  });
   await page.getByRole("tab", { name: "History", exact: true }).click();
   await page.getByRole("button", { name: /Browse past rounds/ }).click();
   await expect(

@@ -1353,7 +1353,7 @@ const AutobalancerModeratorDashboard = ({
   }
 
   return (
-    <Box>
+    <Box className="wardogs-autobalancer">
       <Stack
         direction={{ xs: "column", md: "row" }}
         justifyContent="space-between"

@@ -1,8 +1,8 @@
-import { faEdgeLegacy } from "@fortawesome/free-brands-svg-icons/faEdgeLegacy";
 import { faPlaystation } from "@fortawesome/free-brands-svg-icons/faPlaystation";
 import { faSteam } from "@fortawesome/free-brands-svg-icons/faSteam";
 import { faXbox } from "@fortawesome/free-brands-svg-icons/faXbox";
 import { faGamepad } from "@fortawesome/free-solid-svg-icons/faGamepad";
+import { normalizePlatform, PLATFORM_LABELS, platformLabel } from "@/utils/player-identity.mjs";
 
 export const PLATFORMS = {
   STEAM: "steam",
@@ -15,21 +15,14 @@ export const PLATFORMS = {
 
 export const PLATFORMS_TO_ICON = {
   [PLATFORMS.STEAM]: faSteam,
-  [PLATFORMS.EPIC]: faEdgeLegacy,
+  [PLATFORMS.EPIC]: faGamepad,
   [PLATFORMS.XBOX_LIVE]: faXbox,
   [PLATFORMS.XBOX_SERIES_X]: faXbox,
   [PLATFORMS.PLAYSTATION_NETWORK]: faPlaystation,
   [PLATFORMS.PLAYSTATION_5]: faPlaystation,
 };
 
-export const PLATFORMS_TO_LABELS = {
-  [PLATFORMS.STEAM]: "Steam",
-  [PLATFORMS.EPIC]: "Epic",
-  [PLATFORMS.XBOX_LIVE]: "Xbox Live",
-  [PLATFORMS.XBOX_SERIES_X]: "Xbox X",
-  [PLATFORMS.PLAYSTATION_NETWORK]: "PSN",
-  [PLATFORMS.PLAYSTATION_5]: "PS5",
-};
+export const PLATFORMS_TO_LABELS = PLATFORM_LABELS;
 
 export const getAllPlatforms = () => [
   {
@@ -64,10 +57,18 @@ export const getAllPlatforms = () => [
   },
 ];
 
-export const getPlatformLabel = (platformValue) => {
-  return PLATFORMS_TO_LABELS[platformValue] || platformValue;
-};
+export const getPlatformLabel = platformLabel;
 
 export const getPlatformIcon = (platformValue) => {
-  return PLATFORMS_TO_ICON[platformValue] || faGamepad;
+  return PLATFORMS_TO_ICON[normalizePlatform(platformValue)] || faGamepad;
+};
+
+// Preserve server-provided values when editing other soldier fields, but
+// render their friendly label rather than a blank/out-of-range select.
+export const getPlatformOptions = (currentValue) => {
+  const options = getAllPlatforms();
+  if (currentValue && !options.some(({ value }) => value === currentValue)) {
+    options.push({ value: currentValue, label: getPlatformLabel(currentValue) });
+  }
+  return options;
 };

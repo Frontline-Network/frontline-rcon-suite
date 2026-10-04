@@ -15,6 +15,7 @@ import ErrorIcon from "@mui/icons-material/Error";
 import { ControlledTextInput } from "@/components/form/core/ControlledTextInput";
 import { ControlledSelect } from "@/components/form/core/ControlledSelect";
 import { useTranslation } from "react-i18next";
+import { getPlatformOptions } from "@/constants/platforms";
 
 function EditSoldierButton({ Icon, playerId, currentSoldierData }) {
   const { t } = useTranslation();
@@ -23,15 +24,7 @@ function EditSoldierButton({ Icon, playerId, currentSoldierData }) {
   const [errorMessage, setErrorMessage] = React.useState("");
   const queryClient = useQueryClient();
 
-  // Platform options based on Platform.jsx cases
-  const platformOptions = [
-    { value: "steam", label: "Steam" },
-    { value: "epic", label: "Epic" },
-    { value: "xbl", label: "Xbox Live" },
-    { value: "xsx", label: "Xbox Series X/S" },
-    { value: "psn", label: "PlayStation Network" },
-    { value: "ps5", label: "PlayStation 5" },
-  ];
+  const platformOptions = getPlatformOptions(currentSoldierData?.platform);
 
   const {
     control,
@@ -209,10 +202,7 @@ function EditSoldierButton({ Icon, playerId, currentSoldierData }) {
               disabled={isPending || isPlatformDisabled}
               options={platformOptions}
               rules={{
-                pattern: {
-                  value: /^[a-zA-Z0-9]+$/,
-                  message: t("playerEditor.validation.platform")
-                }
+                validate: (value) => !value || platformOptions.some((option) => option.value === value) || t("playerEditor.validation.platform"),
               }}
               helperText={
                 isPlatformDisabled ? t("playerEditor.disabledField") : t("playerEditor.soldier.platformHelp")

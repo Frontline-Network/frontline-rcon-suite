@@ -65,7 +65,7 @@ export default function ConfigTestDrawer({
           alignItems="flex-start"
           sx={{ p: { xs: 2, sm: 2.5 } }}
         >
-          <Box
+          <Box data-theme-surface="control"
             sx={{
               display: "grid",
               placeItems: "center",
@@ -116,7 +116,7 @@ export default function ConfigTestDrawer({
           </Button>
 
           {result && (
-            <Box
+            <Box data-theme-surface="panel"
               ref={resultRef}
               aria-live="polite"
               sx={{
@@ -150,7 +150,7 @@ export default function ConfigTestDrawer({
                   sx={{ mt: 1.5 }}
                 >
                   {result.steps.map((step, index) => (
-                    <Box
+                    <Box data-theme-surface="panel"
                       key={`${step}-${index}`}
                       sx={{
                         px: 1,

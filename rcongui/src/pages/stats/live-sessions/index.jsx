@@ -295,7 +295,7 @@ export default function LiveSessionsPage() {
         }
       />
 
-      <Box
+      <Box data-theme-surface="panel"
         sx={{
           display: "grid",
           gridTemplateColumns: {
@@ -474,6 +474,7 @@ export default function LiveSessionsPage() {
         }}
       >
         <Box
+          className="wardogs-joined-table"
           sx={{
             minWidth: 0,
             "& table th, & table td": {
@@ -502,7 +503,7 @@ export default function LiveSessionsPage() {
             })}
           />
 
-          <Stack
+          <Stack data-theme-surface="control"
             direction={{ xs: "column", sm: "row" }}
             alignItems={{ xs: "stretch", sm: "center" }}
             justifyContent="space-between"

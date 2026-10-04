@@ -106,7 +106,7 @@ def test_separate_language_invitations_use_real_hll_and_hllv_message_wrapper(
 
 
 @pytest.mark.parametrize("commander", [False, True], ids=["squadleader", "commander"])
-@pytest.mark.parametrize("phase", ["confirming", "inviting", "active", "executing"])
+@pytest.mark.parametrize("phase", ["inviting", "active", "executing"])
 def test_campaign_preserves_vote_and_message_audit(
     db, monkeypatch, controller, commander, phase
 ):

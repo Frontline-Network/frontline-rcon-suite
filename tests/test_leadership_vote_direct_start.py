@@ -26,7 +26,7 @@ from rcon.user_config.leadership_vote import LeadershipVoteUserConfig as Config
 
 @pytest.mark.parametrize("commander", [False, True])
 @pytest.mark.parametrize("warning_seconds", [30, 60, 180])
-def test_confirmation_immediately_queues_leaders_without_target_or_wait(
+def test_report_immediately_queues_leaders_without_confirmation_target_or_wait(
     db, commander, warning_seconds
 ):
     storage.configure(
@@ -37,7 +37,7 @@ def test_confirmation_immediately_queues_leaders_without_target_or_wait(
     players = roster(commander=commander)
     observe_for(db, players)
     incident = report(players, "!admin commander" if commander else "!admin able")
-    vid = confirm(db, players, incident, deliver_invitations=False)
+    vid = incident["leadership_vote"]["id"]
     current = vote(db, vid)
     assert current["status"] == "inviting"
     assert current["confirmed_at"] == current["started_at"] == db.clock.now

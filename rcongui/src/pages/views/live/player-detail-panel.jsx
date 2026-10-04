@@ -1,16 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Box,
   Button,
-  IconButton,
   Stack,
-  Tooltip,
   Typography,
   alpha,
 } from "@mui/material";
-import CheckIcon from "@mui/icons-material/Check";
-import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import GavelIcon from "@mui/icons-material/Gavel";
 import PersonSearchOutlinedIcon from "@mui/icons-material/PersonSearchOutlined";
 import SportsEsportsOutlinedIcon from "@mui/icons-material/SportsEsportsOutlined";
@@ -26,6 +22,8 @@ import {
   punishAction,
 } from "@/features/player-action/actions";
 import { getPlatformLabel } from "@/constants/platforms";
+import { getPlayerIdentity } from "@/utils/player-identity.mjs";
+import PlayerIdentifiers from "@/components/player/profile/Identifiers";
 import { getTeamkillRisk } from "@/utils/teamkill-risk.mjs";
 import { countRecentWarnings } from "@/utils/player-warnings.mjs";
 import { formatRoleLabel, formatSquadLabel } from "./player-display-labels";
@@ -83,9 +81,7 @@ export const getPlayerDetailModel = (value = {}) => {
     name: player.name ?? profile.name ?? EMPTY_VALUE,
     playerId: player.player_id ?? profile.player_id ?? EMPTY_VALUE,
     platform:
-      getPlatformLabel(
-        player.platform ?? profile.platform ?? profile.soldier?.platform
-      ) ?? EMPTY_VALUE,
+      getPlatformLabel(getPlayerIdentity(player).platform) || EMPTY_VALUE,
     clan:
       player.clan_tag ??
       profile.clan_tag ??
@@ -189,7 +185,7 @@ const Stat = ({ label, value, tone = "text.primary" }) => (
 );
 
 const StatusFact = ({ label, value, tone = "text.primary", icon }) => (
-  <Stack
+  <Stack data-theme-surface="control"
     className="player-detail-status"
     direction="row"
     alignItems="center"
@@ -225,73 +221,6 @@ const StatusFact = ({ label, value, tone = "text.primary", icon }) => (
     </Box>
   </Stack>
 );
-
-const CopyPlayerId = ({ playerId }) => {
-  const { t } = useTranslation();
-  const [copied, setCopied] = useState(false);
-  const canCopy =
-    playerId !== EMPTY_VALUE &&
-    typeof navigator !== "undefined" &&
-    typeof navigator.clipboard?.writeText === "function";
-
-  useEffect(() => {
-    if (!copied) return undefined;
-    const timeout = window.setTimeout(() => setCopied(false), 2000);
-    return () => window.clearTimeout(timeout);
-  }, [copied]);
-
-  const handleCopy = async (event) => {
-    event.stopPropagation();
-    if (!canCopy) return;
-
-    try {
-      await navigator.clipboard.writeText(playerId);
-      setCopied(true);
-    } catch {
-      setCopied(false);
-    }
-  };
-
-  const copyLabel = `${t("common.copy")} ${t("views.table.playerId")}`;
-
-  return (
-    <Stack
-      className="player-id-copy-wrap"
-      direction="row"
-      alignItems="center"
-      spacing={0.25}
-      sx={{ flex: "1 1 12rem", maxWidth: "100%", minWidth: 0 }}
-    >
-      <Typography
-        component="code"
-        variant="caption"
-        noWrap
-        title={playerId}
-        sx={{ color: "text.secondary", maxWidth: "24ch" }}
-      >
-        {playerId}
-      </Typography>
-      <Tooltip title={copied ? t("common.copied") : copyLabel}>
-        <span>
-          <IconButton
-            className="player-id-copy"
-            aria-label={copyLabel}
-            disabled={!canCopy}
-            onClick={handleCopy}
-            size="small"
-            sx={{ width: 28, height: 28 }}
-          >
-            {copied ? (
-              <CheckIcon color="success" sx={{ fontSize: "0.9rem" }} />
-            ) : (
-              <ContentCopyOutlinedIcon sx={{ fontSize: "0.9rem" }} />
-            )}
-          </IconButton>
-        </span>
-      </Tooltip>
-    </Stack>
-  );
-};
 
 /**
  * Flat, container-responsive detail band for one expanded live-player row.
@@ -420,6 +349,7 @@ export default function PlayerDetailPanel({
     <Box
       component="section"
       data-testid="live-player-detail-panel"
+      data-theme-surface="flush"
       aria-label={`${t("views.table.playerSummary")}: ${detail.name}`}
       sx={(theme) => ({
         bgcolor: alpha(theme.palette.background.paper, 0.98),
@@ -489,12 +419,10 @@ export default function PlayerDetailPanel({
               minWidth: 0,
               whiteSpace: "normal",
             },
-            "& .player-id-copy-wrap": { flex: "1 1 100%" },
-            "& .player-id-copy-wrap code": { maxWidth: "100%" },
           },
         })}
       >
-        <Stack className="player-detail-group" direction="row">
+        <Stack className="player-detail-group" direction="row" sx={{ flexWrap: "wrap" }}>
           <InlineFact
             icon={
               <SportsEsportsOutlinedIcon
@@ -505,9 +433,7 @@ export default function PlayerDetailPanel({
             label=""
             value={detail.platform}
           />
-          <InlineFact label={`${t("views.table.playerId")}:`} grow>
-            <CopyPlayerId playerId={detail.playerId} />
-          </InlineFact>
+          <PlayerIdentifiers player={player} variant="compact" />
         </Stack>
         <Stack className="player-detail-group" direction="row">
           <InlineFact

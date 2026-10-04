@@ -33,6 +33,7 @@ if not os.getenv("HLL_MAINTENANCE_CONTAINER") and not os.getenv(
     urlpatterns = [
         path("healthz", healthz, name="healthz"),
         path("admin/", admin.site.urls),
+        path("accounts/", include("api.account_urls")),
         path("accounts/", include("django.contrib.auth.urls")),
         path("api/", include("api.urls")),
         path("api/v1/", include("api.capability_urls")),

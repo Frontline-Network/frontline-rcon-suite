@@ -127,7 +127,7 @@ export default function AuditLogInspector({
 
   if (!entry) {
     return (
-      <Box
+      <Box data-theme-surface="panel"
         sx={{
           border: "1px solid",
           borderColor: "divider",
@@ -163,7 +163,8 @@ export default function AuditLogInspector({
   const localTime = dayjs(entry.creation_time);
 
   return (
-    <Box
+    <Box data-theme-surface="panel"
+      className="wardogs-panel"
       sx={{
         border: "1px solid",
         borderColor: "divider",
@@ -279,7 +280,7 @@ export default function AuditLogInspector({
         >
           {t("records.auditLogs.submittedValues")}
         </Typography>
-        <Stack
+        <Stack data-theme-surface="panel"
           divider={<Divider flexItem />}
           sx={{ mt: 0.25, border: "1px solid", borderColor: "divider" }}
         >
@@ -330,7 +331,7 @@ export default function AuditLogInspector({
           {t("records.auditLogs.rawData")}
         </Button>
         <Collapse in={rawOpen}>
-          <Box
+          <Box data-theme-surface="panel"
             sx={{
               position: "relative",
               mt: 0.75,

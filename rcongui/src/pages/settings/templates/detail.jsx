@@ -56,7 +56,18 @@ const initialState = {
 export const loader = async ({ params }) => {
   const { category } = params;
   if (isFakeMode()) {
-    return { category, messages: [{ id: 1, title: "Frontline Standard", content: "Willkommen beim Frontline Network.", updated_at: new Date().toISOString(), updated_by: "Frontline Admin" }] };
+    return {
+      category,
+      messages: [
+        {
+          id: 1,
+          title: "Frontline Standard",
+          content: "Willkommen beim Frontline Network.",
+          updated_at: new Date().toISOString(),
+          updated_by: "Frontline Admin",
+        },
+      ],
+    };
   }
   const messages = await cmd.GET_MESSAGE_TEMPLATES({ params });
   messages.reverse(); // sort desc by updated_by
@@ -272,7 +283,7 @@ function EditorFields({ editor, category, setEditor, compact = false }) {
       <input name="category" value={category} hidden readOnly />
       {editor.mode === MODE.READ ? (
         editor.id ? (
-          <Box
+          <Box data-theme-surface="panel"
             component="section"
             aria-label={t("settings.templates.preview")}
             sx={{
@@ -351,7 +362,9 @@ function EditorFields({ editor, category, setEditor, compact = false }) {
               onChange={handleOnBroadcastChange}
             />
           ) : category === "auto_settings" ? (
-            <Suspense fallback={<Skeleton variant="rectangular" height="52vh" />}>
+            <Suspense
+              fallback={<Skeleton variant="rectangular" height="52vh" />}
+            >
               <Editor
                 height={compact ? "44vh" : "52vh"}
                 defaultLanguage="json"
@@ -439,7 +452,11 @@ function MessageList({ messages, onMessageClick, selected, compact = false }) {
                     minWidth: 0,
                   }}
                   primary={
-                    <Stack direction="row" gap={1} justifyContent="space-between">
+                    <Stack
+                      direction="row"
+                      gap={1}
+                      justifyContent="space-between"
+                    >
                       <Typography
                         variant="subtitle2"
                         sx={{ overflow: "hidden", textOverflow: "ellipsis" }}
@@ -527,7 +544,9 @@ const MessagesDetailPage = () => {
 
   useEffect(() => {
     const firstMessage = messages[0];
-    setEditor(firstMessage ? { mode: MODE.READ, ...firstMessage } : initialState);
+    setEditor(
+      firstMessage ? { mode: MODE.READ, ...firstMessage } : initialState
+    );
   }, [category, messages]);
 
   const handleMessageClick = (index) => {
@@ -545,7 +564,9 @@ const MessagesDetailPage = () => {
 
   const handleCancelCreate = () => {
     const firstMessage = messages[0];
-    setEditor(firstMessage ? { mode: MODE.READ, ...firstMessage } : initialState);
+    setEditor(
+      firstMessage ? { mode: MODE.READ, ...firstMessage } : initialState
+    );
   };
 
   const handleCancelUpdate = () => {
@@ -583,6 +604,7 @@ const MessagesDetailPage = () => {
     <Stack
       direction={compact ? "column" : "row"}
       alignItems="stretch"
+      className="wardogs-template-workspace"
       gap={1.5}
       sx={{ minWidth: 0 }}
     >
@@ -614,7 +636,9 @@ const MessagesDetailPage = () => {
               {t("settings.templates.library")}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              {t("settings.templates.templateCount", { count: messages.length })}
+              {t("settings.templates.templateCount", {
+                count: messages.length,
+              })}
             </Typography>
           </Box>
           <Button
@@ -654,7 +678,11 @@ const MessagesDetailPage = () => {
         />
       </Paper>
 
-      <Box component={Form} method="POST" sx={{ flex: "1 1 auto", minWidth: 0 }}>
+      <Box
+        component={Form}
+        method="POST"
+        sx={{ flex: "1 1 auto", minWidth: 0 }}
+      >
         <Paper variant="outlined" sx={{ borderRadius: 0, overflow: "hidden" }}>
           <Stack
             direction={{ xs: "column", sm: "row" }}
@@ -670,7 +698,11 @@ const MessagesDetailPage = () => {
           >
             <Box sx={{ minWidth: 0 }}>
               <Typography variant="overline" color="primary.main">
-                {t(`settings.templates.${category}`)}
+                {t(
+                  `settings.templates.${
+                    category === "auto_settings" ? "autosettings" : category
+                  }`
+                )}
               </Typography>
               <Typography
                 component="h2"

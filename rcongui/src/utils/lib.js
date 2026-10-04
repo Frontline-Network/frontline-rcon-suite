@@ -245,19 +245,6 @@ export function isLeader(role) {
   ].includes(role);
 }
 
-export function isSteamPlayer(player) {
-  const { player_id: id } = player;
-  return id.length === 17 && !Number.isNaN(Number(id));
-}
-
-export function getSteamProfileUrl(id) {
-  return `https://steamcommunity.com/profiles/${id}`;
-}
-
-export function getXboxProfileUrl(playerName) {
-  return `https://xboxgamertag.com/search/${playerName}`;
-}
-
 export function removeLogPlayerIds(message) {
   const regex = /\((?:(?:axis|allies)\/)?(?:[0-9]{17}|[a-z0-9]{32})\)/gi;
   return message.replace(regex, "");

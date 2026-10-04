@@ -1,13 +1,8 @@
-const makePlayerProfileUrl = (playerId, name = "") => {
-  if (playerId.length === 17) {
-    // valid steam id is 17 digits...
-    return `https://steamcommunity.com/profiles/${playerId}`;
-  } else if (name && name.length > 0) {
-    // xbox gamertags are unique and cost $$ to change...
-    // otherwise assume it's a T17 guid and return
-    // a url to https://xboxgamertag.com/search/ name
-    return `https://xboxgamertag.com/search/${name}`;
-  }
-};
+import { getPlayerIdentity } from "./player-identity.mjs";
+
+// A non-Steam/EOS ID does not identify an Xbox account. Without platform
+// metadata the legacy callers can only safely link a valid SteamID64.
+const makePlayerProfileUrl = (playerId, name = "", player = {}) =>
+  getPlayerIdentity({ ...player, player_id: playerId, name }).profileUrl || undefined;
 
 export default makePlayerProfileUrl;

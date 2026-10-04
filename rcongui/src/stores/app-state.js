@@ -11,6 +11,8 @@ export const useAppStore = create(
     (set, get) => ({
       appearance: DEFAULT_APPEARANCE,
       appearancePreview: null,
+      appearanceDialogOpen: false,
+      setAppearanceDialogOpen: (open) => set({ appearanceDialogOpen: Boolean(open) }),
       appearanceByUser: {},
       activeAppearanceUser: null,
       selectAppearanceUser: (userKey) =>
@@ -68,6 +70,9 @@ export const useAppStore = create(
       openDrawer: true,
       setDrawerOpen: (open) => set({ openDrawer: Boolean(open) }),
       toggleDrawer: () => set({ openDrawer: !get().openDrawer }),
+      wardogsDrawerOpen: true,
+      setWardogsDrawerOpen: (open) => set({ wardogsDrawerOpen: Boolean(open) }),
+      toggleWardogsDrawer: () => set({ wardogsDrawerOpen: !get().wardogsDrawerOpen }),
       // Persist which navigation groups are expanded.
       groupOpenState: {},
       toggleMenuGroupOpen: (groupName) =>
@@ -108,6 +113,7 @@ export const useAppStore = create(
         activeAppearanceUser: state.activeAppearanceUser,
         widthMode: state.widthMode,
         openDrawer: state.openDrawer,
+        wardogsDrawerOpen: state.wardogsDrawerOpen,
         groupOpenState: state.groupOpenState,
       }),
     }

@@ -574,7 +574,7 @@ const BlacklistRecordGrid = ({ blacklists, records, onRefresh }) => {
 
   if (!records.size) {
     return (
-      <Box
+      <Box data-theme-surface="panel"
         sx={{
           border: "1px solid",
           borderColor: "divider",
@@ -609,7 +609,7 @@ const BlacklistRecordGrid = ({ blacklists, records, onRefresh }) => {
             >
               {group.label}
             </Typography>
-            <Box
+            <Box data-theme-surface="group"
               sx={{
                 border: "1px solid",
                 borderColor: "divider",

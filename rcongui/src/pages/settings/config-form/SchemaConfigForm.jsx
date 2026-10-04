@@ -217,7 +217,7 @@ export default function SchemaConfigForm({
             }
           />
         ) : (
-          <Box
+          <Box data-theme-surface="field-group"
             sx={{
               border: "1px solid",
               borderColor: "divider",

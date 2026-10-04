@@ -94,7 +94,7 @@ export function SavedGameViewsDialog({
 
       <DialogContent sx={{ p: { xs: 2, sm: 2.5 } }}>
         <Stack spacing={2.5}>
-          <Box
+          <Box data-theme-surface="panel"
             component="section"
             aria-labelledby="save-current-game-view"
             sx={{ border: "1px solid", borderColor: "divider", p: 1.5 }}
@@ -140,7 +140,7 @@ export function SavedGameViewsDialog({
               {t("stats.games.savedViewsList")}
             </Typography>
             {savedViews.length ? (
-              <Stack
+              <Stack data-theme-surface="panel"
                 sx={{ mt: 1, border: "1px solid", borderColor: "divider" }}
               >
                 {savedViews.map((view) => {
@@ -202,7 +202,7 @@ export function SavedGameViewsDialog({
                 })}
               </Stack>
             ) : (
-              <Box
+              <Box data-theme-surface="panel"
                 sx={{
                   mt: 1,
                   border: "1px dashed",

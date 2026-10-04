@@ -50,7 +50,7 @@ export const action = async ({ request }) => {
 };
 
 const TemplateSkeleton = () => (
-  <Box sx={{ border: "1px solid", borderColor: "divider", p: 2 }}>
+  <Box data-theme-surface="panel" sx={{ border: "1px solid", borderColor: "divider", p: 2 }}>
     <Skeleton height={54} />
     <Skeleton width="54%" />
   </Box>

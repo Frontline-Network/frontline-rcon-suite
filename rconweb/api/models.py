@@ -1,11 +1,12 @@
 import uuid
 
+from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.db import models
 
-from rconweb.settings import SECRET_KEY
 from .live_view_preferences import default_user_live_view
+from .wardogs_styles import DEFAULT_WARDOGS_STYLE
 
 
 def default_user_appearance():
@@ -15,6 +16,8 @@ def default_user_appearance():
         "preset": "frontline-gold",
         "customAccent": "#c59a4a",
         "colorVision": "standard",
+        "wardogsStyle": DEFAULT_WARDOGS_STYLE,
+        "wardogsShortcuts": ["/settings/broadcast-message", "/records/players"],
     }
 
 
@@ -33,7 +36,7 @@ class DjangoAPIKey(models.Model):
     def save(self, *args, **kwargs):
         """Hash the API key"""
         # If we don't include the salt, the hasher generates its own
-        self.api_key = make_password(self.api_key, salt=SECRET_KEY.replace("$", ""))
+        self.api_key = make_password(self.api_key, salt=settings.SECRET_KEY.replace("$", ""))
         super().save()
 
     class Meta:
@@ -54,6 +57,8 @@ class SteamPlayer(models.Model):
 class UserAppearancePreference(models.Model):
     """Versioned, account-bound visual preferences for the CRCON web UI."""
 
+    # Preserve the BigAutoField created by migration 0033.
+    id = models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name="appearance_preference"
     )
@@ -62,6 +67,20 @@ class UserAppearancePreference(models.Model):
 
     class Meta:
         default_permissions = ()
+
+
+class UserReleaseHighlightState(models.Model):
+    """Per-account acknowledgement of an installed release's highlights."""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="release_highlight_states")
+    release_version = models.CharField(max_length=64)
+    seen = models.BooleanField(default=False)
+    snoozed_until = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        default_permissions = ()
+        constraints = [models.UniqueConstraint(fields=("user", "release_version"), name="unique_user_release_highlights")]
 
 
 class UserLiveViewPreference(models.Model):

@@ -106,7 +106,7 @@ export default function NoLeaderSummaryPanel({
     : t(`${root}.summary.inactiveNotice`);
 
   return (
-    <Box
+    <Box data-theme-surface="panel"
       component="aside"
       aria-label={t(`${root}.summary.title`)}
       sx={{

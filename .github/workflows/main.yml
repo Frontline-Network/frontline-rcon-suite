@@ -13,6 +13,9 @@ jobs:
 
   release:
     needs: quality
+    # Explicit releases publish their reviewed notes before the image build.
+    # Keep quality gates, but do not create an unrelated automatic patch tag.
+    if: "!contains(github.event.head_commit.message, '#release-manual')"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

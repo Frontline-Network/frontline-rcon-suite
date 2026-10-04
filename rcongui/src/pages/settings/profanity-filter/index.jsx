@@ -187,9 +187,10 @@ const ProfanityFilter = () => {
         subtitle={t("settings.profanity.subtitle")}
       />
 
-      <Box
+      <Box data-theme-surface="panel"
         component="section"
         aria-label={t("settings.profanity.summary")}
+        className="wardogs-summary-strip"
         sx={{
           display: "grid",
           gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
@@ -223,9 +224,10 @@ const ProfanityFilter = () => {
         />
       </Box>
 
-      <Box
+      <Box data-theme-surface="panel"
         component="section"
         aria-label={t("settings.profanity.workbench")}
+        className="wardogs-profanity-workspace"
         sx={{
           border: "1px solid",
           borderColor: "divider",

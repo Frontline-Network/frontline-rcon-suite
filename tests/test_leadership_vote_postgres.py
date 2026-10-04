@@ -93,7 +93,8 @@ def test_parallel_reports_ballots_and_deadlines_are_serialized(postgres):
     linked = [r for r in results if r["leadership_vote"]]
     assert len(linked) == 1
     storage.recover(1)
-    # No warning had started, so the next independent test vote has no cooldown.
+    # Report-start procedures already activate protection, even after recovery.
+    postgres.clock.now += 1801
     vid, players = activate(postgres, 6, mode="active")
     postgres.clock.now += 1
     with ThreadPoolExecutor(max_workers=6) as pool:

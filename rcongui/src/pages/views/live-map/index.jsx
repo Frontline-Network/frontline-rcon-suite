@@ -688,7 +688,7 @@ export default function LiveMapPage() {
           {notice.text}
         </Alert>
       )}
-      <Stack
+      <Stack data-theme-surface="panel"
         direction="row"
         useFlexGap
         flexWrap="wrap"
@@ -752,7 +752,7 @@ export default function LiveMapPage() {
           </Stack>
         )}
       </Stack>
-      <Box
+      <Box data-theme-surface="control"
         data-testid="live-map-status"
         role="status"
         aria-live="polite"
@@ -818,7 +818,7 @@ export default function LiveMapPage() {
         <Box
           sx={{ minWidth: 0, display: mobile && tab !== 0 ? "none" : "block" }}
         >
-          <Stack
+          <Stack data-theme-surface="panel"
             direction="row"
             useFlexGap
             flexWrap="wrap"
@@ -948,7 +948,7 @@ export default function LiveMapPage() {
               t={t}
             />
           )}
-          <Box sx={{ ...panel, mt: 1 }}>
+          <Box data-theme-surface="panel" sx={{ ...panel, mt: 1 }}>
             <ReplayControls
               t={t}
               language={i18n.language}
@@ -1015,7 +1015,7 @@ export default function LiveMapPage() {
           )}
         </Box>
         <Box sx={{ display: mobile && tab !== 1 ? "none" : "grid", gap: 1.5 }}>
-          <Box sx={{ ...panel, p: 1.5 }}>
+          <Box data-theme-surface="panel" sx={{ ...panel, p: 1.5 }}>
             <Typography variant="overline">{t("selected")}</Typography>
             {selectedPlayer ? (
               <>
@@ -1089,7 +1089,7 @@ export default function LiveMapPage() {
               </Typography>
             )}
           </Box>
-          <Box sx={panel}>
+          <Box data-theme-surface="panel" sx={panel}>
             <Typography sx={{ px: 1.5, py: 1 }} fontWeight={800}>
               {t("players")} · {visible.length} {t("shown")}
             </Typography>
@@ -1164,7 +1164,7 @@ export default function LiveMapPage() {
               ))}
             </Box>
           </Box>
-          <Box sx={{ ...panel, p: 1.5 }}>
+          <Box data-theme-surface="panel" sx={{ ...panel, p: 1.5 }}>
             <Typography fontWeight={800}>{t("protected")}</Typography>
             {(monitors.data || []).map((m) => (
               <Stack
@@ -1230,7 +1230,7 @@ export default function LiveMapPage() {
               t={t}
             />
           )}
-          <Box sx={{ ...panel, p: 1.5 }}>
+          <Box data-theme-surface="panel" sx={{ ...panel, p: 1.5 }}>
             <Stack direction="row" justifyContent="space-between">
               <Typography fontWeight={800}>{t("signals")}</Typography>
               {selected && (
@@ -1372,7 +1372,7 @@ export default function LiveMapPage() {
             ))}
           </Box>
           {canCases && (
-            <Box sx={{ ...panel, p: 1.5 }}>
+            <Box data-theme-surface="panel" sx={{ ...panel, p: 1.5 }}>
               <Typography fontWeight={800}>{t("evidence")}</Typography>
               {Object.entries(cases.data || {}).map(([id, c]) => (
                 <Stack
@@ -1399,7 +1399,7 @@ export default function LiveMapPage() {
             </Box>
           )}
           {canCases && (
-            <Box sx={{ ...panel, p: 1.5 }}>
+            <Box data-theme-surface="panel" sx={{ ...panel, p: 1.5 }}>
               <Typography fontWeight={800}>{t("archives")}</Typography>
               {!(archives.data?.archives || []).length && (
                 <Typography variant="body2" color="text.secondary">

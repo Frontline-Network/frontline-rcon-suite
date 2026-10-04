@@ -1,12 +1,14 @@
 {% extends "admin/change_form.html" %}
 {% load static %}
 
+{% block field_sets %}
+<div class="crcon-form-sections">
+{{ block.super }}
+</div>
+{% endblock %}
+
 {% block admin_change_form_document_ready %}
 {{ block.super }}
-<script type="module">
-    import {v4 as uuidv4} from 'https://jspm.dev/uuid';
-    window.uuidv4 = uuidv4;
-</script>
 <script src="{% static 'api/js/formset_handlers.js' %}"></script>
 
 {% endblock %}

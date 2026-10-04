@@ -62,7 +62,7 @@ const AutobalancerHelp = ({ config = {} }) => {
         {mode.text}
       </Alert>
 
-      <Box
+      <Box data-theme-surface="panel"
         sx={{
           display: "grid",
           gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" },

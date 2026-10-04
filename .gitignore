@@ -55,6 +55,7 @@ pip-delete-this-directory.txt
 htmlcov/
 playwright-report/
 test-results/
+release-test-results/
 .tox/
 .nox/
 .coverage
@@ -149,6 +150,17 @@ redis_data/
 
 # Auto generated Django admin panel stuff
 static/
+!rconweb/static/
+!rconweb/static/api/
+!rconweb/static/api/css/
+!rconweb/static/api/css/admin-wardogs.css
+!rconweb/static/api/css/admin-layout.css
+!rconweb/static/api/css/admin-frontline.css
+!rconweb/static/api/js/
+!rconweb/static/api/js/admin-theme.js
+!rconweb/static/api/js/admin-integration.js
+!rconweb/static/api/js/permission-picker.js
+!rconweb/static/api/css/permission-picker.css
 
 certs/
 
@@ -171,6 +183,7 @@ CRCON-Mobile-Admin-*-test.apk
 # Production deploy state is host-specific and may contain database backups.
 .deploy-backups/
 .deploy-state/
+/release_version
 
 # The upstream Python rule ignores every directory named `lib`; keep Flutter sources.
 !mobile_app/lib/

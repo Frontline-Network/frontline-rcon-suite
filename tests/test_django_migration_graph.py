@@ -36,7 +36,16 @@ class DjangoMigrationGraphTests(TestCase):
                     if app == "api":
                         dependencies.add(name)
         self.assertFalse(dependencies - names, "Missing API migration dependency")
-        self.assertEqual(names - dependencies, {"0039_population_history_permissions"})
+        self.assertEqual(names - dependencies, {"0041_user_appearance_default"})
+
+    def test_release_migrations_extend_existing_history(self):
+        for name, predecessor in (
+            ("0040_user_release_highlight_state", "0039_population_history_permissions"),
+            ("0041_user_appearance_default", "0040_user_release_highlight_state"),
+        ):
+            dependencies = migration_assignments(MIGRATIONS / f"{name}.py")["dependencies"]
+            api_dependencies = [ast.literal_eval(node) for node in dependencies.elts if isinstance(node, ast.Tuple)]
+            self.assertIn(("api", predecessor), api_dependencies)
 
     def test_merge_preserves_both_existing_migrations_without_data_operations(self):
         values = migration_assignments(

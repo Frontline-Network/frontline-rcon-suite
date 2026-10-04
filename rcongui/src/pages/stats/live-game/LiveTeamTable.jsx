@@ -86,8 +86,9 @@ export default function LiveTeamTable({
   const rangeEnd = Math.min((safePage + 1) * pageSize, players.length);
 
   return (
-    <Box
+    <Box data-theme-surface="panel"
       component="section"
+      className="wardogs-live-team-table"
       aria-label={label}
       sx={{
         minWidth: 0,

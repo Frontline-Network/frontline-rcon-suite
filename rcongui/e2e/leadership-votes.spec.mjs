@@ -58,6 +58,20 @@ test("leadership settings, fixed quorum, ballot details and cancellation", async
     main.getByText("Auch NATO-Namen wie Bravo", { exact: false })
   ).toBeVisible();
   await expect(
+    main.getByText("Melden dürfen alle Squadmitglieder", { exact: false })
+  ).toBeVisible();
+  await expect(
+    main.getByText("Ein berechtigter Melder darf weiterhin mitstimmen", {
+      exact: false,
+    })
+  ).toBeVisible();
+  await expect(
+    main.getByLabel("Führungsdauer für das Stimmrecht (Sekunden)")
+  ).toHaveValue("300");
+  await expect(
+    main.getByLabel("Bestätigung durch Melder (Sekunden)")
+  ).toHaveCount(0);
+  await expect(
     main.getByLabel("Führungsabstimmung aktivieren")
   ).not.toBeChecked();
   await expect(
@@ -105,6 +119,23 @@ test("English mobile layout and permission denial", async ({ page }) => {
   await expect(
     page.getByText("NATO names such as Bravo", { exact: false })
   ).toBeVisible();
+  await expect(
+    page.getByText(
+      "All squad members and the commander of the same team may report",
+      { exact: false }
+    )
+  ).toBeVisible();
+  await expect(
+    page.getByText("An eligible reporting leader keeps their vote", {
+      exact: false,
+    })
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("Leadership tenure required to vote (seconds)")
+  ).toHaveValue("300");
+  await expect(page.getByLabel("Reporter confirmation (seconds)")).toHaveCount(
+    0
+  );
   await expectNoHorizontalPageOverflow(page);
   await page
     .getByRole("region", { name: "Leadership vote", exact: true })
@@ -139,7 +170,7 @@ test("vote panel follows theme presets and every color-vision mode", async ({
     ["Signal Green", "signal-green", "protanopia", "dark"],
     ["Command Red", "command-red", "tritanopia", "light"],
     ["Neutral", "neutral", "standard", "dark"],
-    ["Frontline Gold", "frontline-gold", "standard", "dark"],
+    ["Vanguard Gold", "frontline-gold", "standard", "dark"],
   ];
   for (const [label, preset, colorVision, mode] of variants) {
     await page.locator('[data-testid="user-options-menu"]:visible').click();

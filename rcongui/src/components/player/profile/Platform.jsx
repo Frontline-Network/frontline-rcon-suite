@@ -2,14 +2,14 @@ import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import VideogameAssetIcon from "@mui/icons-material/VideogameAsset";
 import { Box, Chip } from "@mui/material";
-import { getSteamProfileUrl } from "@/utils/lib";
+import { getPlayerIdentity } from "@/utils/player-identity.mjs";
 import EditSoldierButton from "./EditSoldierButton";
 import {
   getPlatformIcon,
   getPlatformLabel,
 } from "@/constants/platforms";
 
-function PlatformChip({ platform, playerId, currentSoldierData }) {
+function PlatformChip({ platform, player, playerId, currentSoldierData }) {
   if (!platform)
     return (
       <EditSoldierButton
@@ -25,13 +25,14 @@ function PlatformChip({ platform, playerId, currentSoldierData }) {
     </Box>
   );
 
-  if (platform === "steam") {
+  const identity = getPlayerIdentity({ ...player, platform, player_id: playerId ?? player?.player_id });
+  if (identity.platform === "steam" && identity.profileUrl) {
     return (
       <Chip
         component={"a"}
-        href={getSteamProfileUrl(playerId)}
+        href={identity.profileUrl}
         target="_blank"
-        rel="noreferrer"
+        rel="noopener noreferrer"
         icon={icon}
         label={getPlatformLabel(platform)}
         sx={{ "&:hover": { cursor: "pointer" } }}

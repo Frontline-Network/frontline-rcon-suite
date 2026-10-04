@@ -136,7 +136,7 @@ export default function BattleOverview() {
   }, [imageName]);
 
   return (
-    <Box
+    <Box data-theme-surface="panel"
       data-testid="battle-overview"
       sx={{
         border: "1px solid",

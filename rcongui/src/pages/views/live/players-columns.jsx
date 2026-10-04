@@ -14,8 +14,6 @@ import dayjs from "dayjs";
 import { CountryFlag } from "@/components/shared/CountryFlag";
 import {
   getPlayerTier,
-  getSteamProfileUrl,
-  isSteamPlayer,
   getTierColors,
 } from "@/utils/lib";
 import { hasRecentWarnings } from "@/utils/player-warnings.mjs";
@@ -29,8 +27,8 @@ import { useThemedImages } from "@/hooks/useThemedImages";
 import {
   getPlatformIcon,
   getPlatformLabel,
-  PLATFORMS,
 } from "@/constants/platforms";
+import { getPlayerIdentity } from "@/utils/player-identity.mjs";
 import { getTeamkillRisk } from "@/utils/teamkill-risk.mjs";
 import { getFactionIconSrc } from "@/utils/factionIcons";
 import { formatRoleLabel, formatSquadLabel } from "./player-display-labels";
@@ -614,15 +612,11 @@ export const getColumns = (t, factionByTeam = {}) => [
   {
     id: "platform",
     header: SortableHeader("OS", t("views.table.platform")),
-    accessorFn: (row) =>
-      getPlatformLabel(
-        row.platform ||
-          (isSteamPlayer(row) ? PLATFORMS.STEAM : PLATFORMS.XBOX_LIVE)
-      ),
+    accessorFn: (row) => getPlatformLabel(getPlayerIdentity(row).platform) || t("common.unknown"),
     cell: ({ row }) => {
-      const platform = row.original.platform;
+      const { platform, profileUrl } = getPlayerIdentity(row.original);
 
-      if (platform === PLATFORMS.STEAM)
+      if (platform === "steam" && profileUrl)
         return (
           <Box
             component={"a"}
@@ -633,7 +627,7 @@ export const getColumns = (t, factionByTeam = {}) => [
               color: "inherit",
               "&:hover": { cursor: "pointer" },
             }}
-            href={getSteamProfileUrl(row.original.player_id)}
+            href={profileUrl}
             target="_blank"
             rel="noopener noreferrer"
             title={getPlatformLabel(platform)}
@@ -643,7 +637,7 @@ export const getColumns = (t, factionByTeam = {}) => [
         );
 
       return (
-        <Box sx={{ width: 14, height: 24 }} title={getPlatformLabel(platform)}>
+        <Box sx={{ width: 14, height: 24 }} title={getPlatformLabel(platform) || t("common.unknown")}>
           <FontAwesomeIcon icon={getPlatformIcon(platform)} size="sm" />
         </Box>
       );

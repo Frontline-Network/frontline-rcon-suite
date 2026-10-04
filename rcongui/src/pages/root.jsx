@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Container, Box, Stack } from "@mui/material";
+import { Container, Box, Stack, useTheme } from "@mui/material";
 import AppNavbar from "@/components/layout/AppNavbar";
 import Header from "@/components/layout/Header";
 import SideMenu from "@/components/layout/SideMenu";
@@ -14,6 +14,11 @@ import NavigationProgress from "@/components/layout/NavigationProgress";
 import { useTranslation } from "react-i18next";
 import TitleManager from "@/features/title-manager/TitleManager";
 import { SystemUsageProvider } from "@/features/system-usage/SystemUsageProvider";
+import AppearanceSettingsHost from "@/components/layout/AppearanceSettingsHost";
+import ReleaseHighlightsHost from "@/features/updates/ReleaseHighlightsHost";
+import { themeBackground } from "@/themes/background";
+const WardogsToolbar = React.lazy(() => import("@/components/layout/wardogs/WardogsToolbar"));
+const WardogsPageFrame = React.lazy(() => import("@/components/layout/wardogs/WardogsPageFrame"));
 
 export const loader = async () => {
   return null;
@@ -33,11 +38,14 @@ export const action = async ({ request }) => {
 
 export default function Root() {
   const widthMode = useAppStore((state) => state.widthMode);
+  const isWardogs = useTheme().frontline?.appearance?.preset === "wardogs";
   const { t } = useTranslation();
 
   return (
     <SystemUsageProvider>
       <TitleManager />
+      <AppearanceSettingsHost />
+      <ReleaseHighlightsHost />
       <NavigationProgress />
       <Box
         component="a"
@@ -68,14 +76,19 @@ export default function Root() {
       </Box>
       <Box
         sx={{
-          "--app-header-height": { xs: "108px", sm: "108px", md: "0px" },
-          "--mobile-bottom-nav-height": "64px",
+          "--app-header-height": {
+            xs: isWardogs ? "64px" : "108px",
+            sm: isWardogs ? "64px" : "108px",
+            md: "0px",
+          },
+          "--wardogs-gutter": "clamp(24px, 3.2vw, 72px)",
+          "--mobile-bottom-nav-height": isWardogs ? "0px" : "64px",
           display: "flex",
           minHeight: "100dvh",
         }}
       >
         <SideMenu />
-        <AppNavbar />
+        {!isWardogs && <AppNavbar />}
         {/* Main content */}
         <Box
           component="main"
@@ -84,6 +97,7 @@ export default function Root() {
           sx={(theme) => ({
             flexGrow: 1,
             backgroundColor: theme.palette.background.default,
+            ...themeBackground(theme),
             overflow: "auto",
             height: "100dvh",
             scrollPaddingTop: "var(--app-header-height)",
@@ -94,7 +108,9 @@ export default function Root() {
               alignItems: "center",
               mx: 0,
               pb: {
-                xs: "calc(var(--mobile-bottom-nav-height) + env(safe-area-inset-bottom) + 16px)",
+                xs: isWardogs
+                  ? "env(safe-area-inset-bottom)"
+                  : "calc(var(--mobile-bottom-nav-height) + env(safe-area-inset-bottom) + 16px)",
                 md: 4,
               },
               // The compact navbar has two rows (navigation + live server state).
@@ -106,9 +122,9 @@ export default function Root() {
               minHeight: "100%",
             }}
           >
-            <Header />
+            {isWardogs ? <React.Suspense fallback={null}><WardogsToolbar /></React.Suspense> : <Header />}
             <Container
-              maxWidth={widthMode}
+              maxWidth={isWardogs ? false : widthMode}
               sx={{
                 display: "flex",
                 flexDirection: "column",
@@ -122,7 +138,11 @@ export default function Root() {
             >
               <ActionDialogProvider>
                 <PlayerSidebarProvider>
-                  <Outlet />
+                  {isWardogs ? (
+                    <React.Suspense fallback={null}>
+                      <WardogsPageFrame><Outlet /></WardogsPageFrame>
+                    </React.Suspense>
+                  ) : <Outlet />}
                 </PlayerSidebarProvider>
               </ActionDialogProvider>
             </Container>

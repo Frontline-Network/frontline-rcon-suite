@@ -126,7 +126,7 @@ export default function PlayerDetailView() {
       case 'sessions':
         return (
           <div>
-            <FilterSection>
+            <FilterSection className="wardogs-profile-filters">
               <TextField
                 sx={{ maxWidth: '200px' }}
                 label={t("records.playerDetails.sessionCount")}
@@ -168,7 +168,7 @@ export default function PlayerDetailView() {
               </Typography>
             </Stack>
             <Divider />
-            <ScrollableContent>
+            <ScrollableContent className="wardogs-profile-scroll">
               {filterData(profile.sessions, 'sessions').map((session, index) => (
                 <ListItem sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', justifyContent: 'space-between' }} key={index}>
                   <Typography variant="body2">{t("records.playerDetails.start")}: {formatDate(session.start)}</Typography>
@@ -185,7 +185,7 @@ export default function PlayerDetailView() {
       case 'actions':
         return (
           <div>
-            <FilterSection>
+            <FilterSection className="wardogs-profile-filters">
               <TextField
                 label={t("records.playerDetails.searchActions")}
                 value={filters.actions.search}
@@ -207,7 +207,7 @@ export default function PlayerDetailView() {
                 <MenuItem value="MESSAGE">{t("actions.types.MESSAGE")}</MenuItem>
               </TextField>
             </FilterSection>
-            <ScrollableContent>
+            <ScrollableContent className="wardogs-profile-scroll">
               {filterData(profile.received_actions, 'actions').map((action, index) => (
                 <ListItem key={index}>
                   <Typography variant="subtitle1">
@@ -225,7 +225,7 @@ export default function PlayerDetailView() {
       case 'names':
         return (
           <div>
-            <FilterSection>
+            <FilterSection className="wardogs-profile-filters">
               <TextField
                 label={t("records.playerDetails.searchNames")}
                 value={filters.names.search}
@@ -234,7 +234,7 @@ export default function PlayerDetailView() {
                 fullWidth
               />
             </FilterSection>
-            <ScrollableContent>
+            <ScrollableContent className="wardogs-profile-scroll">
               {filterData(profile.names, 'names').map((name, index) => (
                 <ListItem key={index}>
                   <Typography variant="subtitle1">{name.name}</Typography>
@@ -249,7 +249,7 @@ export default function PlayerDetailView() {
         return (
           <div>
             <Form onSubmit={handleCommentSubmit}>
-              <FilterSection>
+              <FilterSection className="wardogs-profile-filters">
                 <TextField
                   label={t("records.playerDetails.newComment")}
                   value={newComment}
@@ -264,7 +264,7 @@ export default function PlayerDetailView() {
                 </Button>
               </FilterSection>
             </Form>
-            <FilterSection>
+            <FilterSection className="wardogs-profile-filters">
               <TextField
                 label={t("records.playerDetails.searchComments")}
                 value={filters.comments.search}
@@ -292,7 +292,7 @@ export default function PlayerDetailView() {
                 />
               </Box>
             </FilterSection>
-            <ScrollableContent>
+            <ScrollableContent className="wardogs-profile-scroll">
               {filterData(profile.comments, 'comments').map((comment, index) => (
                 <ListItem key={index}>
                   <Typography>{comment.content}</Typography>
@@ -313,7 +313,7 @@ export default function PlayerDetailView() {
   };
 
   return (
-    <DetailCard elevation={0} variant="outlined">
+    <DetailCard className="wardogs-profile-detail" elevation={0} variant="outlined">
       <CardContent>
         {renderContent()}
       </CardContent>

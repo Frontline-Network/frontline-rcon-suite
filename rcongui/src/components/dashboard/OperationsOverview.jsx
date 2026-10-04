@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { alpha } from "@mui/material/styles";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import {
   Box,
   Button,
   CircularProgress,
+  Chip,
+  LinearProgress,
   Divider,
   Stack,
   Typography,
@@ -40,7 +43,6 @@ import { canUse, liveMapRequest } from "@/pages/views/live-map/api";
 const TEAM_NAMES = ["allies", "axis"];
 const TEAM_TONES = { allies: "info.main", axis: "error.main" };
 const MAX_VISIBLE_TASKS = 5;
-const TASK_GRID_COLUMNS = "96px minmax(0, 1fr) 56px 132px";
 
 const EVENT_META = {
   ADMIN_REPORTS: {
@@ -103,21 +105,15 @@ const panelSx = {
   border: "1px solid",
   borderColor: "divider",
   bgcolor: "background.paper",
-  borderRadius: 0,
+  borderRadius: (theme) => `${theme.frontline.geometry.radius.structure}px`,
   minWidth: 0,
+  overflow: "hidden",
 };
 
 const formatDuration = (seconds, fallback) => {
   const value = Number(seconds);
   if (!Number.isFinite(value)) return fallback;
   return dayjs.duration(Math.max(0, value), "seconds").format("HH:mm:ss");
-};
-
-const environmentTranslationKey = (environment) => {
-  const known = new Set(["day", "night", "dusk", "dawn", "rain", "overcast"]);
-  return known.has(environment)
-    ? `dashboard.operations.environments.${environment}`
-    : null;
 };
 
 function PanelHeader({ title, helper, action, id }) {
@@ -135,7 +131,17 @@ function PanelHeader({ title, helper, action, id }) {
       }}
     >
       <Stack direction="row" alignItems="baseline" spacing={1.5} minWidth={0}>
-        <Typography id={id} component="h2" variant="h6" color="primary.main">
+        <Typography
+          id={id}
+          component="h2"
+          variant="h6"
+          sx={(theme) => ({
+            color:
+              theme.frontline.appearance.preset === "wardogs"
+                ? "text.primary"
+                : "primary.main",
+          })}
+        >
           {title}
         </Typography>
         {helper ? (
@@ -172,58 +178,70 @@ function TaskRow({ task, t }) {
       data-testid={`operations-task-${task.key}`}
       sx={{
         display: "grid",
-        gridTemplateColumns: TASK_GRID_COLUMNS,
-        minHeight: 66,
-        borderBottom: "1px solid",
+        gridTemplateColumns: "36px minmax(0, 1fr) auto",
+        alignItems: "center",
+        gap: 1.5,
+        p: 2,
+        borderBottom: 1,
         borderColor: "divider",
         "&:last-of-type": { borderBottom: 0 },
+        "&:hover": { bgcolor: "action.hover" },
       }}
     >
-      <Stack
-        direction="row"
-        alignItems="center"
-        spacing={0.75}
-        sx={{ px: 1.5, borderRight: "1px solid", borderColor: "divider" }}
+      <Box
+        sx={{
+          display: "grid",
+          placeItems: "center",
+          width: 36,
+          height: 36,
+          bgcolor: "action.hover",
+          borderRadius: "6px",
+        }}
       >
-        <Icon sx={{ color: task.tone, fontSize: 22 }} aria-hidden />
-        <Typography
-          variant="caption"
-          sx={{ color: task.tone, textTransform: "uppercase" }}
+        <Icon sx={{ color: task.tone, fontSize: 21 }} aria-hidden />
+      </Box>
+      <Box sx={{ minWidth: 0 }}>
+        <Stack
+          direction="row"
+          alignItems="center"
+          gap={1}
+          flexWrap="wrap"
+          sx={{ mb: 0.5 }}
         >
-          {t(task.priorityKey)}
-        </Typography>
-      </Stack>
-      <Stack justifyContent="center" sx={{ px: 1.5, minWidth: 0 }}>
+          <Typography
+            component="h3"
+            variant="subtitle2"
+            sx={{ overflowWrap: "anywhere" }}
+          >
+            {t(task.titleKey)}
+          </Typography>
+          <Typography variant="caption" sx={{ color: task.tone }}>
+            {t(task.priorityKey)}
+          </Typography>
+        </Stack>
         <Typography
-          variant="subtitle2"
-          sx={{ textTransform: "uppercase" }}
-          noWrap
+          variant="body2"
+          color="text.secondary"
+          sx={{
+            overflowWrap: "anywhere",
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}
+          title={task.context}
         >
-          {t(task.titleKey)}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" noWrap>
           {task.context}
         </Typography>
-      </Stack>
-      <Stack alignItems="center" justifyContent="center">
         <Typography variant="caption" color="text.secondary">
           {task.age}
         </Typography>
-      </Stack>
+      </Box>
       <Button
         component={Link}
         to={task.to}
-        color="primary"
         endIcon={<ChevronRightRoundedIcon />}
-        sx={{
-          borderLeft: "1px solid",
-          borderColor: "divider",
-          borderRadius: 0,
-          minWidth: 0,
-          px: 1,
-          whiteSpace: "nowrap",
-          "& .MuiButton-endIcon": { ml: 0.35, mr: -0.25 },
-        }}
+        sx={{ minWidth: 0, minHeight: 40, px: 1.25, whiteSpace: "nowrap" }}
       >
         {t(task.actionKey)}
       </Button>
@@ -237,11 +255,17 @@ function TeamStrength({ team, count, rating, noLeaderCount, t }) {
     <Stack alignItems="center" spacing={0.6} sx={{ minWidth: 0, px: 1 }}>
       <Stack direction="row" alignItems="center" spacing={0.75}>
         <ShieldRoundedIcon sx={{ color: TEAM_TONES[team] }} aria-hidden />
-        <Typography variant="h6" sx={{ color: TEAM_TONES[team] }}>
+        <Typography
+          component="h3"
+          variant="h6"
+          sx={{ color: TEAM_TONES[team] }}
+        >
           {t(teamKey)}
         </Typography>
       </Stack>
-      <Typography variant="h4">{count}</Typography>
+      <Typography component="p" variant="h4">
+        {count}
+      </Typography>
       <Typography
         variant="caption"
         color="text.secondary"
@@ -257,7 +281,7 @@ function TeamStrength({ team, count, rating, noLeaderCount, t }) {
       >
         {t("dashboard.operations.teamStatus.strengthIndex")}
       </Typography>
-      <Typography variant="h3" sx={{ color: TEAM_TONES[team] }}>
+      <Typography component="p" variant="h3" sx={{ color: TEAM_TONES[team] }}>
         {rating}
       </Typography>
       <Typography
@@ -298,10 +322,13 @@ function EventRow({ event, language, t }) {
     <Box
       sx={{
         display: "grid",
-        gridTemplateColumns: "58px 28px 190px minmax(0, 1fr) 72px",
+        gridTemplateColumns: "58px 28px 170px minmax(0, 1fr) 72px",
+        columnGap: 1,
         alignItems: "center",
-        minHeight: 38,
-        px: 1.5,
+        minHeight: 48,
+        px: 2,
+        py: 1,
+        "&:hover": { bgcolor: "action.hover" },
         borderBottom: "1px solid",
         borderColor: "divider",
         "&:last-of-type": { borderBottom: 0 },
@@ -312,13 +339,25 @@ function EventRow({ event, language, t }) {
       </Typography>
       <Icon sx={{ color: meta.tone, fontSize: 18 }} aria-hidden />
       <Typography
+        component="p"
         variant="subtitle2"
         sx={{ textTransform: "uppercase" }}
         noWrap
       >
         {t(meta.label)}
       </Typography>
-      <Typography variant="body2" color="text.secondary" noWrap>
+      <Typography
+        variant="body2"
+        color="text.secondary"
+        title={event.message || fallbackMessage}
+        sx={{
+          overflowWrap: "anywhere",
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
+        }}
+      >
         {event.message || fallbackMessage}
       </Typography>
       <Typography
@@ -563,11 +602,6 @@ export default function OperationsOverview({ logs, logsLoading }) {
     t("dashboard.unknownServer");
   const mapName = currentMap?.pretty_name || t("matchStatus.unknownMap");
   const nextMapName = nextMap?.pretty_name || t("common.unknown");
-  const mode = currentMap?.game_mode || t("common.unknown");
-  const environmentKey = environmentTranslationKey(currentMap?.environment);
-  const environment = environmentKey
-    ? t(environmentKey)
-    : currentMap?.environment || t("common.unknown");
   const remaining = formatDuration(
     gameState?.time_remaining,
     t("common.unknown")
@@ -635,223 +669,304 @@ export default function OperationsOverview({ logs, logsLoading }) {
         tone: "success.main",
       };
 
-  return (
-    <Stack spacing={1.5} data-testid="operations-overview">
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: {
-            md: "minmax(0, 1.05fr) minmax(360px, 0.95fr)",
-          },
-          gap: 1.5,
-        }}
-      >
-        <Stack
-          component="section"
-          aria-labelledby="shift-situation-title"
-          justifyContent="space-between"
-          sx={{ ...panelSx, p: 2.5, minHeight: 210 }}
-        >
-          <Box>
-            <Typography
-              id="shift-situation-title"
-              component="h2"
-              variant="h6"
-              color="primary.main"
-            >
-              {t("dashboard.operations.situation.title")}
-            </Typography>
-            <Typography
-              variant="h2"
-              sx={{
-                mt: 0.8,
-                color: attentionCount ? "error.main" : "success.main",
-                textTransform: "uppercase",
-              }}
-            >
-              {attentionCount
-                ? t("dashboard.operations.situation.attention", {
-                    count: attentionCount,
-                  })
-                : t("dashboard.operations.situation.clear")}
-            </Typography>
-            <Typography color="text.secondary" sx={{ mt: 1, maxWidth: 720 }}>
-              {attentionCount
-                ? t("dashboard.operations.situation.summary", {
-                    details: situationSummary,
-                  })
-                : t("dashboard.operations.situation.clearSummary")}
-            </Typography>
-          </Box>
-          {primaryTask ? (
-            <Button
-              component={Link}
-              to={primaryTask.to}
-              variant="contained"
-              startIcon={<ReportProblemRoundedIcon />}
-              endIcon={<ChevronRightRoundedIcon />}
-              sx={{ alignSelf: "flex-start", minWidth: 280, mt: 2 }}
-            >
-              {t(primaryTask.actionKey)}
-            </Button>
-          ) : (
-            <Stack
-              direction="row"
-              alignItems="center"
-              spacing={1}
-              sx={{ mt: 2 }}
-            >
-              <CheckCircleRoundedIcon color="success" />
-              <Typography variant="subtitle2" color="success.main">
-                {t("dashboard.operations.situation.noAction")}
-              </Typography>
-            </Stack>
-          )}
-        </Stack>
+  const statusTone = isOnline
+    ? "success"
+    : connectionHealth.gameServer.state === CONNECTION_STATE.OFFLINE
+    ? "error"
+    : "warning";
+  const situationTone = tasks.some((task) => task.priorityKey.endsWith(".high"))
+    ? "error"
+    : attentionCount
+    ? "warning"
+    : "success";
+  const playerFill =
+    Number(maxPlayers) > 0 && currentPlayers != null
+      ? Math.min(
+          100,
+          Math.max(0, (Number(currentPlayers) / Number(maxPlayers)) * 100)
+        )
+      : null;
 
+  return (
+    <Stack spacing={2.5} data-testid="operations-overview">
+      <Box
+        component="section"
+        aria-labelledby="current-match-title"
+        data-testid="battle-overview"
+        sx={panelSx}
+      >
         <Box
-          component="section"
-          aria-labelledby="current-match-title"
-          data-testid="battle-overview"
-          sx={panelSx}
+          sx={{
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "minmax(0, 1fr)",
+              md: "minmax(220px, .7fr) minmax(0, 2fr)",
+            },
+          }}
         >
-          <Stack direction="row" sx={{ minHeight: 210, height: "100%" }}>
+          <Box
+            sx={{
+              position: "relative",
+              minHeight: { xs: 180, md: 290 },
+              overflow: "hidden",
+              bgcolor: "background.default",
+            }}
+          >
             {imageName && !mapImageFailed ? (
               <Box
                 component="img"
                 src={`/maps/${imageName}`}
                 onError={() => setMapImageFailed(true)}
-                alt={`${mapName} · ${environment}`}
+                alt={mapName}
                 sx={{
-                  width: "48%",
-                  minWidth: 210,
+                  position: "absolute",
+                  inset: 0,
+                  width: "100%",
+                  height: "100%",
                   objectFit: "cover",
-                  filter: "saturate(0.75) contrast(1.08) brightness(0.72)",
-                  borderRight: "1px solid",
-                  borderColor: "divider",
+                  filter: "saturate(.85) brightness(.8)",
                 }}
               />
             ) : (
-              <Stack
-                alignItems="center"
-                justifyContent="center"
-                sx={{
-                  width: "48%",
-                  minWidth: 210,
-                  bgcolor: "background.default",
-                  color: "text.secondary",
-                  borderRight: "1px solid",
-                  borderColor: "divider",
-                }}
+              <Box
+                sx={{ display: "grid", placeItems: "center", height: "100%" }}
               >
-                <MapRoundedIcon sx={{ fontSize: 48 }} />
-              </Stack>
+                <MapRoundedIcon sx={{ fontSize: 56, color: "text.disabled" }} />
+              </Box>
             )}
-            <Stack
-              justifyContent="space-between"
-              sx={{ flex: 1, minWidth: 0, p: 2 }}
+            <Box
+              sx={{
+                position: "absolute",
+                inset: 0,
+                background:
+                  "linear-gradient(180deg, transparent 45%, rgba(0,0,0,.65))",
+              }}
+            />
+            <Typography
+              variant="overline"
+              sx={{
+                position: "absolute",
+                bottom: 20,
+                left: 24,
+                color: "#fff",
+                letterSpacing: ".12em",
+              }}
             >
-              <Box>
+              {t("dashboard.operations.round.title")}
+            </Typography>
+          </Box>
+          <Stack gap={2.5} sx={{ p: { xs: 2, md: 3 }, minWidth: 0 }}>
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="start"
+              gap={2}
+            >
+              <Box sx={{ minWidth: 0 }}>
                 <Typography
                   id="current-match-title"
                   component="h2"
-                  variant="overline"
-                  color="primary.main"
-                >
-                  {t("dashboard.operations.match.title")}
-                </Typography>
-                <Typography
-                  component="h2"
-                  variant="h6"
+                  variant="subtitle2"
                   color="text.secondary"
-                  noWrap
+                  sx={{ mb: 0.75 }}
                 >
                   {serverName}
                 </Typography>
                 <Typography
+                  component="p"
                   variant="h4"
-                  sx={{ textTransform: "uppercase" }}
-                  noWrap
+                  sx={{
+                    fontSize: { xs: 25, lg: 32 },
+                    lineHeight: 1.2,
+                    overflowWrap: "anywhere",
+                  }}
                 >
                   {mapName}
                 </Typography>
+              </Box>
+              <Chip
+                size="small"
+                label={statusLabel}
+                color={statusTone}
+                variant="outlined"
+                icon={<RadioButtonCheckedRoundedIcon />}
+              />
+            </Stack>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns:
+                  "minmax(0, .8fr) minmax(0, 1fr) minmax(0, 1.4fr)",
+                gap: 2,
+                py: 0.5,
+              }}
+            >
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="caption" color="text.secondary">
+                  {t("dashboard.players")}
+                </Typography>
                 <Typography
-                  variant="caption"
-                  color="primary.light"
-                  sx={{ textTransform: "uppercase" }}
+                  component="p"
+                  variant="h5"
+                  sx={{ mt: 0.5, fontVariantNumeric: "tabular-nums" }}
                 >
-                  {mode} · {environment}
+                  {players}
+                </Typography>
+                {playerFill !== null && (
+                  <LinearProgress
+                    aria-label={t("dashboard.players")}
+                    variant="determinate"
+                    value={playerFill}
+                    sx={{ mt: 1, maxWidth: 150, height: 3 }}
+                  />
+                )}
+              </Box>
+              <Box
+                sx={{
+                  minWidth: 0,
+                  pl: 2,
+                  borderLeft: 1,
+                  borderColor: "divider",
+                }}
+              >
+                <Typography variant="caption" color="text.secondary">
+                  {t("matchStatus.remaining")}
+                </Typography>
+                <Typography
+                  component="p"
+                  variant="h5"
+                  sx={{ mt: 0.5, fontVariantNumeric: "tabular-nums" }}
+                >
+                  {remaining}
                 </Typography>
               </Box>
-              <Divider sx={{ my: 1.5 }} />
-              <Stack
-                direction="row"
-                divider={<Divider orientation="vertical" flexItem />}
-                spacing={1.5}
+              <Box
+                sx={{
+                  minWidth: 0,
+                  pl: 2,
+                  borderLeft: 1,
+                  borderColor: "divider",
+                }}
               >
-                <Box sx={{ flex: 1 }}>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ textTransform: "uppercase" }}
-                  >
-                    {t("dashboard.players")}
-                  </Typography>
-                  <Typography variant="h5">{players}</Typography>
-                </Box>
-                <Box sx={{ flex: 1 }}>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ textTransform: "uppercase" }}
-                  >
-                    {t("matchStatus.remaining")}
-                  </Typography>
-                  <Typography variant="h5">{remaining}</Typography>
-                </Box>
-                <Box sx={{ flex: 1 }}>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ textTransform: "uppercase" }}
-                  >
-                    {t("dashboard.status")}
-                  </Typography>
-                  <Stack direction="row" alignItems="center" spacing={0.7}>
-                    <RadioButtonCheckedRoundedIcon
-                      sx={{
-                        color: isOnline ? "success.main" : "error.main",
-                        fontSize: 14,
-                      }}
-                    />
-                    <Stack spacing={0.15} sx={{ minWidth: 0 }}>
-                      <Typography variant="h6">{statusLabel}</Typography>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        noWrap
-                      >
-                        {statusHelper}
-                      </Typography>
-                    </Stack>
-                  </Stack>
-                </Box>
+                <Typography variant="caption" color="text.secondary">
+                  {t("dashboard.operations.round.nextMap")}
+                </Typography>
+                <Typography
+                  component="p"
+                  variant="subtitle1"
+                  sx={{ mt: 0.5, overflowWrap: "anywhere", lineHeight: 1.35 }}
+                >
+                  {nextMapName}
+                </Typography>
+              </Box>
+            </Box>
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+              gap={1.5}
+              flexWrap="wrap"
+              sx={{ mt: "auto" }}
+            >
+              <Stack direction="row" gap={1}>
+                <Button
+                  component={Link}
+                  to="/views/live"
+                  variant="contained"
+                  startIcon={<VisibilityRoundedIcon />}
+                >
+                  {t("dashboard.openLive")}
+                </Button>
+                <Button
+                  component={Link}
+                  to="/views/team"
+                  variant="outlined"
+                  startIcon={<GroupsRoundedIcon />}
+                >
+                  {t("dashboard.operations.round.teams")}
+                </Button>
               </Stack>
+              <Typography variant="caption" color="text.secondary">
+                {statusHelper}
+              </Typography>
             </Stack>
           </Stack>
         </Box>
       </Box>
 
+      <Stack
+        component="section"
+        aria-labelledby="shift-situation-title"
+        direction={{ xs: "column", sm: "row" }}
+        alignItems={{ sm: "center" }}
+        gap={2}
+        sx={(theme) => ({
+          ...panelSx,
+          p: 2.5,
+          borderLeft: `3px solid ${theme.palette[situationTone].main}`,
+          backgroundImage: `linear-gradient(100deg, ${alpha(
+            theme.palette[situationTone].main,
+            0.055
+          )}, transparent 70%)`,
+        })}
+      >
+        {attentionCount ? (
+          <ReportProblemRoundedIcon
+            color={situationTone}
+            sx={{ fontSize: 28 }}
+          />
+        ) : (
+          <CheckCircleRoundedIcon color="success" sx={{ fontSize: 28 }} />
+        )}
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography
+            id="shift-situation-title"
+            component="h2"
+            variant="caption"
+            color="text.secondary"
+          >
+            {t("dashboard.operations.situation.title")}
+          </Typography>
+          <Typography component="p" variant="h6" sx={{ mt: 0.25 }}>
+            {attentionCount
+              ? t("dashboard.operations.situation.attention", {
+                  count: attentionCount,
+                })
+              : t("dashboard.operations.situation.clear")}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            {attentionCount
+              ? t("dashboard.operations.situation.summary", {
+                  details: situationSummary,
+                })
+              : t("dashboard.operations.situation.clearSummary")}
+          </Typography>
+        </Box>
+        {primaryTask && (
+          <Button
+            component={Link}
+            to={primaryTask.to}
+            variant="outlined"
+            endIcon={<ChevronRightRoundedIcon />}
+            sx={{ flexShrink: 0, minHeight: 40 }}
+          >
+            {t(primaryTask.actionKey)}
+          </Button>
+        )}
+      </Stack>
+
       <Box
         sx={{
           display: "grid",
           gridTemplateColumns: {
-            md: "minmax(0, 1.05fr) minmax(360px, 0.95fr)",
+            xs: "minmax(0, 1fr)",
+            lg: "minmax(0, 1.1fr) minmax(0, 1fr)",
           },
-          gap: 1.5,
+          gap: 2.5,
+          alignItems: "stretch",
         }}
       >
-        <Box
+        <Stack
           component="section"
           aria-labelledby="open-tasks-title"
           sx={panelSx}
@@ -861,99 +976,65 @@ export default function OperationsOverview({ logs, logsLoading }) {
             title={t("dashboard.operations.tasks.title")}
             helper={t("dashboard.operations.tasks.sorted")}
           />
-          <Box
-            aria-hidden
-            sx={{
-              display: "grid",
-              gridTemplateColumns: TASK_GRID_COLUMNS,
-              minHeight: 30,
-              alignItems: "center",
-              borderBottom: "1px solid",
-              borderColor: "divider",
-            }}
-          >
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ px: 1.5 }}
-            >
-              {t("dashboard.operations.tasks.columns.priority")}
-            </Typography>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ px: 1.5 }}
-            >
-              {t("dashboard.operations.tasks.columns.context")}
-            </Typography>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              textAlign="center"
-            >
-              {t("dashboard.operations.tasks.columns.age")}
-            </Typography>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              textAlign="center"
-            >
-              {t("dashboard.operations.tasks.columns.action")}
-            </Typography>
+          <Box sx={{ flex: 1 }}>
+            {logsLoading || teamsLoading ? (
+              <Stack
+                alignItems="center"
+                justifyContent="center"
+                sx={{ minHeight: 200 }}
+              >
+                <CircularProgress size={26} />
+              </Stack>
+            ) : tasks.length ? (
+              tasks.map((task) => <TaskRow key={task.key} task={task} t={t} />)
+            ) : (
+              <EmptyState>{t("dashboard.operations.tasks.empty")}</EmptyState>
+            )}
           </Box>
-          {logsLoading || teamsLoading ? (
-            <Stack
-              alignItems="center"
-              justifyContent="center"
-              sx={{ minHeight: 200 }}
-            >
-              <CircularProgress size={26} />
-            </Stack>
-          ) : tasks.length ? (
-            tasks.map((task) => <TaskRow key={task.key} task={task} t={t} />)
-          ) : (
-            <EmptyState>{t("dashboard.operations.tasks.empty")}</EmptyState>
-          )}
           <Button
             component={Link}
             to="/records/game-logs"
             fullWidth
             endIcon={<ChevronRightRoundedIcon />}
             sx={{
-              borderTop: "1px solid",
+              borderTop: 1,
               borderColor: "divider",
               borderRadius: 0,
+              minHeight: 44,
             }}
           >
             {t("dashboard.operations.tasks.all")}
           </Button>
-        </Box>
-
-        <Stack spacing={1.5}>
-          <Box
-            component="section"
-            aria-labelledby="live-team-status-title"
-            sx={panelSx}
-          >
-            <PanelHeader
-              id="live-team-status-title"
-              title={t("dashboard.operations.teamStatus.title")}
-            />
-            {teamsLoading ? (
-              <Stack
-                alignItems="center"
-                justifyContent="center"
-                sx={{ minHeight: 210 }}
-              >
-                <CircularProgress size={26} />
-              </Stack>
-            ) : balance ? (
+        </Stack>
+        <Stack
+          component="section"
+          aria-labelledby="live-team-status-title"
+          sx={panelSx}
+        >
+          <PanelHeader
+            id="live-team-status-title"
+            title={t("dashboard.operations.teamStatus.title")}
+          />
+          {teamsLoading ? (
+            <Stack
+              alignItems="center"
+              justifyContent="center"
+              sx={{ minHeight: 210 }}
+            >
+              <CircularProgress size={26} />
+            </Stack>
+          ) : balance ? (
+            <>
               <Box
                 sx={{
                   display: "grid",
-                  gridTemplateColumns:
-                    "minmax(0, 1fr) minmax(0, 1fr) minmax(190px, 1.1fr)",
+                  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
                   py: 2,
+                  flex: 1,
+                  "& > :first-of-type": {
+                    borderRight: 1,
+                    borderColor: "divider",
+                  },
                 }}
               >
                 <TeamStrength
@@ -970,147 +1051,44 @@ export default function OperationsOverview({ logs, logsLoading }) {
                   noLeaderCount={noLeaderCounts.axis}
                   t={t}
                 />
-                <Stack
-                  alignItems="center"
-                  justifyContent="center"
-                  spacing={0.8}
-                  sx={{
-                    px: 2,
-                    borderLeft: "1px solid",
-                    borderColor: "divider",
-                    textAlign: "center",
-                  }}
-                >
+              </Box>
+              <Stack
+                direction="row"
+                alignItems="center"
+                gap={1.5}
+                sx={{
+                  p: 2,
+                  borderTop: 1,
+                  borderColor: "divider",
+                  bgcolor: "action.hover",
+                }}
+              >
+                <BalanceRoundedIcon
+                  sx={{ color: verdict.tone, fontSize: 26 }}
+                />
+                <Box sx={{ minWidth: 0 }}>
                   <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ textTransform: "uppercase" }}
+                    component="p"
+                    variant="subtitle2"
+                    sx={{ color: verdict.tone }}
                   >
-                    {t("dashboard.operations.teamStatus.verdict")}
-                  </Typography>
-                  <BalanceRoundedIcon
-                    sx={{ color: verdict.tone, fontSize: 34 }}
-                  />
-                  <Typography variant="h6" sx={{ color: verdict.tone }}>
                     {verdict.title}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 0.5 }}
+                  >
                     {verdict.description}
                   </Typography>
-                </Stack>
-              </Box>
-            ) : (
-              <EmptyState>
-                {t("dashboard.operations.teamStatus.noDataDescription")}
-              </EmptyState>
-            )}
-          </Box>
-
-          <Box
-            component="section"
-            aria-labelledby="current-round-title"
-            sx={panelSx}
-          >
-            <PanelHeader
-              id="current-round-title"
-              title={t("dashboard.operations.round.title")}
-            />
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns:
-                  "110px minmax(0, 1fr) 112px minmax(0, 1fr)",
-                alignItems: "stretch",
-                minHeight: 96,
-              }}
-            >
-              {imageName && !mapImageFailed ? (
-                <Box
-                  component="img"
-                  src={`/maps/${imageName}`}
-                  alt=""
-                  sx={{
-                    width: 110,
-                    height: "100%",
-                    objectFit: "cover",
-                    filter: "saturate(0.7) brightness(0.72)",
-                  }}
-                />
-              ) : (
-                <Stack
-                  alignItems="center"
-                  justifyContent="center"
-                  sx={{ bgcolor: "background.default" }}
-                >
-                  <MapRoundedIcon color="disabled" />
-                </Stack>
-              )}
-              <Stack
-                justifyContent="center"
-                sx={{
-                  px: 1.5,
-                  borderRight: "1px solid",
-                  borderColor: "divider",
-                }}
-              >
-                <Typography variant="caption" color="text.secondary">
-                  {t("dashboard.operations.round.map")}
-                </Typography>
-                <Typography variant="subtitle2" noWrap>
-                  {mapName}
-                </Typography>
-                <Typography variant="caption" color="primary.light">
-                  {mode} · {environment}
-                </Typography>
+                </Box>
               </Stack>
-              <Stack
-                justifyContent="center"
-                sx={{
-                  px: 1.5,
-                  borderRight: "1px solid",
-                  borderColor: "divider",
-                }}
-              >
-                <Typography variant="caption" color="text.secondary">
-                  {t("matchStatus.remaining")}
-                </Typography>
-                <Typography variant="h6">{remaining}</Typography>
-              </Stack>
-              <Stack justifyContent="center" sx={{ px: 1.5 }}>
-                <Typography variant="caption" color="text.secondary">
-                  {t("dashboard.operations.round.nextMap")}
-                </Typography>
-                <Typography variant="subtitle2" noWrap>
-                  {nextMapName}
-                </Typography>
-                <Typography variant="caption" color="text.secondary" noWrap>
-                  {serverName}
-                </Typography>
-              </Stack>
-            </Box>
-            <Stack
-              direction="row"
-              sx={{ borderTop: "1px solid", borderColor: "divider" }}
-            >
-              <Button
-                component={Link}
-                to="/views/live"
-                variant="contained"
-                startIcon={<VisibilityRoundedIcon />}
-                sx={{ flex: 1, borderRadius: 0 }}
-              >
-                {t("dashboard.openLive")}
-              </Button>
-              <Button
-                component={Link}
-                to="/views/team"
-                startIcon={<GroupsRoundedIcon />}
-                sx={{ flex: 1, borderRadius: 0 }}
-              >
-                {t("dashboard.operations.round.teams")}
-              </Button>
-            </Stack>
-          </Box>
+            </>
+          ) : (
+            <EmptyState>
+              {t("dashboard.operations.teamStatus.noDataDescription")}
+            </EmptyState>
+          )}
         </Stack>
       </Box>
 
@@ -1150,9 +1128,10 @@ export default function OperationsOverview({ logs, logsLoading }) {
           fullWidth
           endIcon={<ChevronRightRoundedIcon />}
           sx={{
-            borderTop: "1px solid",
+            borderTop: 1,
             borderColor: "divider",
             borderRadius: 0,
+            minHeight: 44,
           }}
         >
           {t("dashboard.operations.events.all")}

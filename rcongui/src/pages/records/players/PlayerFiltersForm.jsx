@@ -94,7 +94,8 @@ export default function PlayerFiltersForm({ fields }) {
 
   return (
     <Form id="player-records-filter-form" method="GET">
-      <Stack
+      <Stack data-theme-surface="panel"
+        className="wardogs-player-filters"
         spacing={1}
         sx={{
           width: "100%",

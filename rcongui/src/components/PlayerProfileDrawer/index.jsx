@@ -76,7 +76,8 @@ const ReceivedActions = ({ actions }) => {
             <Box sx={{ display: "flex", flexDirection: "column" }}>
               <Typography variant="subtitle2">{action.action_type}</Typography>
               <Typography component={"span"} sx={{ fontSize: "0.7rem" }}>
-                {action.by} | {dayjs(action.time).format(t("common.logDateTimeFormat"))}
+                {action.by} |{" "}
+                {dayjs(action.time).format(t("common.logDateTimeFormat"))}
               </Typography>
             </Box>
           </AccordionSummary>
@@ -115,7 +116,8 @@ const Messages = ({ messages }) => {
           {messages.map((message, index) => (
             <Message key={message.time}>
               <Typography component={"span"} sx={{ fontSize: "0.7rem" }}>
-                {message.by} | {dayjs(message.time).format(t("common.logDateTimeFormat"))}
+                {message.by} |{" "}
+                {dayjs(message.time).format(t("common.logDateTimeFormat"))}
               </Typography>
               <Typography>{message.reason}</Typography>
             </Message>
@@ -222,8 +224,8 @@ const PlayerDetails = ({ player, onClose }) => {
   const clanTag = player?.clan_tag ?? player?.profile?.soldier?.clan_tag;
 
   return (
-    <ProfileWrapper component={"article"}>
-      <Box sx={{ paddingTop: 2, paddingLeft: 8 }}>
+    <ProfileWrapper component="article" data-testid="player-profile-drawer">
+      <Box sx={{ p: 2, pb: 1 }}>
         <PlayerProfileHeader
           player={player}
           isOnline={isOnline}
@@ -233,43 +235,37 @@ const PlayerDetails = ({ player, onClose }) => {
           level={level}
           platform={platform}
           clanTag={clanTag}
+          headingComponent="h2"
+          headerActions={
+            <Stack direction="row" spacing={0.5}>
+              <ActionMenuButton
+                recipients={player}
+                actions={actionList}
+                sx={{ width: 40, height: 40 }}
+              />
+              {onClose && (
+                <IconButton
+                  aria-label={t("common.close")}
+                  onClick={onClose}
+                  sx={{ width: 40, height: 40 }}
+                >
+                  <CloseIcon />
+                </IconButton>
+              )}
+            </Stack>
+          }
         />
-      </Box>
-      <ActionMenuButton
-        recipients={player}
-        actions={actionList}
-        sx={{
-          position: "absolute",
-          top: (theme) => theme.spacing(0.5),
-          left: (theme) => theme.spacing(0.5),
-        }}
-      />
-      {onClose && (
-        <IconButton
-          sx={{
-            position: "absolute",
-            top: (theme) => theme.spacing(1),
-            right: (theme) => theme.spacing(0.5),
-          }}
-          size="small"
-          onClick={onClose}
-        >
-          <CloseIcon />
-        </IconButton>
-      )}
-      <Divider />
-      <PlayerProfileStatusTags
-        isVip={isVip}
-        isWatched={isWatched}
-        isBlacklisted={isBlacklisted}
-        isBanned={isBanned}
-      />
-      <Box sx={{ px: 2 }}>
+        <PlayerProfileStatusTags
+          isVip={isVip}
+          isWatched={isWatched}
+          isBlacklisted={isBlacklisted}
+          isBanned={isBanned}
+        />
         <LinkedAccounts player={profile} />
       </Box>
       <Divider />
       <TabContext value={openedTab}>
-        <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+        <Box sx={{ borderBottom: 1, borderColor: "divider", px: 2 }}>
           <Tabs
             value={openedTab}
             onChange={handleTabChange}
@@ -308,8 +304,9 @@ const PlayerDetails = ({ player, onClose }) => {
             />
           </Tabs>
         </Box>
-        <TabPanel value="profile">
+        <TabPanel value="profile" sx={{ p: 2 }}>
           <PlayerProfileSummary
+            compact
             player={profile}
             country={player.country}
             firstSeen={profile.created ?? player.created}
@@ -398,7 +395,8 @@ const Comment = ({ comment }) => {
       <Typography>{comment.content}</Typography>
       <Divider sx={{ my: 1 }} />
       <Typography sx={{ fontSize: "0.7rem" }} variant="subtitle2">
-        {comment.by} | {dayjs(comment.creation_time).format(t("common.logDateTimeFormat"))}
+        {comment.by} |{" "}
+        {dayjs(comment.creation_time).format(t("common.logDateTimeFormat"))}
       </Typography>
     </Box>
   );

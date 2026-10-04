@@ -1,0 +1,103 @@
+/* Frontline's angular surfaces and typography. Embedded colors are supplied by
+   the active React theme; these defaults also cover standalone administration. */
+html[data-crcon-theme="frontline"] {
+  color-scheme: dark;
+  --font-family-primary: Bahnschrift, "Segoe UI", system-ui, sans-serif;
+  --admin-panel-radius: 0px;
+  --admin-panel-inner-radius: 0px;
+  --admin-control-radius: 2px;
+  --admin-overlay-radius: 4px;
+  --body-bg: var(--fl-background, #050706);
+  --body-fg: #ede5d7;
+  --body-loud-color: #ede5d7;
+  --body-quiet-color: #aaa493;
+  --primary: var(--fl-accent, #c59a4a);
+  --primary-fg: #080b08;
+  --accent: var(--primary);
+  --wd-panel: var(--fl-panel, #0a0d0a);
+  --wd-header: color-mix(in srgb, var(--primary) 7%, var(--wd-panel));
+  --wd-tint: color-mix(in srgb, var(--primary) 16%, var(--wd-panel));
+  --wd-hover: color-mix(in srgb, var(--primary) 8%, var(--wd-panel));
+  --hairline-color: color-mix(in srgb, var(--primary) 20%, transparent);
+  --border-color: color-mix(in srgb, var(--primary) 32%, var(--wd-panel));
+  --link-fg: color-mix(in srgb, var(--primary) 82%, white);
+  --link-hover-color: color-mix(in srgb, var(--primary) 65%, white);
+  --link-selected-fg: var(--link-fg);
+  --darkened-bg: var(--wd-header);
+  --selected-bg: var(--wd-hover);
+  --selected-row: var(--wd-tint);
+  --error-fg: #e89487;
+  --message-success-bg: #102519;
+  --message-warning-bg: #302616;
+  --message-error-bg: #301915;
+  --secondary: var(--wd-header);
+  --header-bg: var(--wd-panel);
+  --header-color: var(--body-fg);
+  --header-branding-color: var(--primary);
+  --header-link-color: var(--body-fg);
+  --breadcrumbs-bg: var(--body-bg);
+  --breadcrumbs-fg: var(--body-quiet-color);
+  --breadcrumbs-link-fg: var(--body-fg);
+  --button-fg: var(--body-fg);
+  --button-bg: var(--wd-header);
+  --button-hover-bg: var(--wd-tint);
+  --default-button-bg: var(--primary);
+  --default-button-hover-bg: var(--link-hover-color);
+  --close-button-bg: var(--wd-header);
+  --delete-button-bg: #843c32;
+  --delete-button-hover-bg: #a04a3e;
+  --object-tools-fg: var(--body-fg);
+  --object-tools-bg: var(--wd-header);
+  --object-tools-hover-bg: var(--wd-tint);
+}
+html[data-crcon-theme="frontline"][data-crcon-mode="light"] {
+  color-scheme: light;
+  --body-bg: var(--fl-background-light, #f6f4ef);
+  --body-fg: #181b18;
+  --body-loud-color: #181b18;
+  --body-quiet-color: #565b56;
+  --wd-panel: #fff;
+  --primary: color-mix(in srgb, var(--fl-accent, #c59a4a) 74%, black);
+  --primary-fg: #fff;
+  --link-fg: var(--primary);
+  --link-hover-color: color-mix(in srgb, var(--primary) 80%, black);
+  --hairline-color: color-mix(in srgb, var(--primary) 24%, transparent);
+  --error-fg: #a13428;
+  --message-success-bg: #e8f2e9;
+  --message-warning-bg: #fff0ce;
+  --message-error-bg: #fbe7e3;
+}
+html[data-crcon-theme="frontline"] h1,
+html[data-crcon-theme="frontline"] .crcon-admin-card h3 {
+  font-family: "Bahnschrift Condensed", "Arial Narrow", Bahnschrift, sans-serif;
+  font-weight: 700;
+  letter-spacing: .035em;
+  text-transform: uppercase;
+}
+html[data-crcon-theme="frontline"] .crcon-admin-section h2 {
+  font-size: 12px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--body-quiet-color);
+  margin-bottom: 16px;
+}
+html[data-crcon-theme="frontline"] .crcon-admin-card {
+  border-top: 2px solid var(--primary);
+}
+html[data-crcon-theme="frontline"] .crcon-card-icon { margin-bottom: 16px; }
+html[data-crcon-theme="frontline"] .crcon-card-actions { gap: 12px; }
+html[data-crcon-theme="frontline"] .crcon-card-actions a {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+}
+html[data-crcon-theme="frontline"] .crcon-manage {
+  background: var(--wd-tint);
+  border: 1px solid var(--border-color);
+  border-radius: var(--admin-control-radius);
+  padding: 0 12px;
+}
+html[data-crcon-theme="frontline"] :is(.permission-category, .crcon-group-option, .permission-summary) { border-radius: 2px; }
+html[data-crcon-theme="frontline"] .aligned .crcon-group-picker label.crcon-group-option { border-radius: 2px; }
+html[data-crcon-theme="frontline"] :is(.permission-kind, .permission-sensitive) { border-radius: 0; }
+html[data-crcon-theme="frontline"] :is(.button.default, input[type="submit"].default, .login input[type="submit"]) { color: var(--primary-fg); }

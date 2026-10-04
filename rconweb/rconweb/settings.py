@@ -227,6 +227,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "api.tactical_privacy.TacticalPrivacyMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "api.admin_embedding.AdminEmbeddingMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
@@ -243,6 +244,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "api.admin_theme.admin_appearance",
             ],
         },
     },
@@ -294,6 +296,30 @@ AUTH_PASSWORD_VALIDATORS = [
         "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
+
+# Optional self-service recovery. Keep disabled until SMTP and the public origin
+# are configured. The origin is fixed to prevent Host-header reset-link poisoning.
+CRCON_PASSWORD_RESET_ENABLED = read_bool_env("CRCON_PASSWORD_RESET_ENABLED")
+CRCON_PUBLIC_URL = os.getenv("CRCON_PUBLIC_URL", "").strip().rstrip("/")
+PASSWORD_RESET_TIMEOUT = 1800
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = read_bool_env("EMAIL_USE_TLS", default=True)
+EMAIL_USE_SSL = read_bool_env("EMAIL_USE_SSL", default=False)
+EMAIL_TIMEOUT = 10
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "")
+if CRCON_PASSWORD_RESET_ENABLED:
+    from django.core.exceptions import ImproperlyConfigured
+    if not EMAIL_HOST or not DEFAULT_FROM_EMAIL:
+        raise ImproperlyConfigured("Password recovery requires EMAIL_HOST and DEFAULT_FROM_EMAIL.")
+    CRCON_PUBLIC_URL = normalize_cors_origin(CRCON_PUBLIC_URL, allow_insecure=False)
+    from urllib.parse import urlsplit
+    if urlsplit(CRCON_PUBLIC_URL).username or urlsplit(CRCON_PUBLIC_URL).password:
+        raise ImproperlyConfigured("CRCON_PUBLIC_URL must not contain credentials.")
+    if EMAIL_USE_TLS and EMAIL_USE_SSL:
+        raise ImproperlyConfigured("Choose EMAIL_USE_TLS or EMAIL_USE_SSL, not both.")
 
 
 # Internationalization

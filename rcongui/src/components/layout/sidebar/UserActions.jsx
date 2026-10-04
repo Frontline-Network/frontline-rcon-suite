@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   Avatar,
@@ -8,38 +7,13 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { useQuery } from "@tanstack/react-query";
-import { useAppStore } from "@/stores/app-state";
-import { cmd } from "@/utils/fetchUtils";
 import OptionsMenu from "../OptionsMenu";
 import { useTranslation } from "react-i18next";
 
 export const UserActions = ({ compact = false }) => {
   const { t } = useTranslation();
   const { permissions } = useAuth();
-  const userKey = permissions?.user_name;
   const userLabel = permissions?.user_name ?? "?????";
-  const selectAppearanceUser = useAppStore(
-    (state) => state.selectAppearanceUser
-  );
-  const hydrateAppearance = useAppStore((state) => state.hydrateAppearance);
-  const appearanceQuery = useQuery({
-    queryKey: ["user", "appearance", userKey],
-    queryFn: cmd.GET_OWN_APPEARANCE,
-    enabled: Boolean(userKey),
-    refetchOnWindowFocus: false,
-    retry: 1,
-  });
-
-  useEffect(() => {
-    if (userKey) selectAppearanceUser(userKey);
-  }, [selectAppearanceUser, userKey]);
-
-  useEffect(() => {
-    if (userKey && appearanceQuery.data) {
-      hydrateAppearance(appearanceQuery.data, userKey);
-    }
-  }, [appearanceQuery.data, hydrateAppearance, userKey]);
 
   return (
     <Stack

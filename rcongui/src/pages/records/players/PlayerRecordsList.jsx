@@ -18,13 +18,14 @@ import {
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
 import { generatePlayerActions } from "@/features/player-action/actions";
-import CopyableText from "@/components/shared/CopyableText";
+import PlayerIdentifiers from "@/components/player/profile/Identifiers";
 import ProfileActions from "@/components/player/profile/Actions";
 import PlatformChip from "@/components/player/profile/Platform";
 import CountryChip from "@/components/player/profile/Country";
 import LevelChip from "@/components/player/profile/Level";
 import { OnlineStatusBadge } from "@/components/player/profile/styled";
 import LinkedAccounts from "@/components/player/profile/LinkedAccounts";
+import { getPlatformLabel } from "@/constants/platforms";
 
 const PlayerRecordsListRow = memo(function PlayerRecordsListRow({
   player,
@@ -92,7 +93,7 @@ const PlayerRecordsListRow = memo(function PlayerRecordsListRow({
               {name[0]}
             </Avatar>
           </OnlineStatusBadge>
-          <Box minWidth={0}>
+          <Box minWidth={0} sx={{ flex: 1 }}>
             <Typography fontWeight={600} noWrap>
               <Link
                 style={{ color: "inherit" }}
@@ -101,11 +102,7 @@ const PlayerRecordsListRow = memo(function PlayerRecordsListRow({
                 {name}
               </Link>
             </Typography>
-            <CopyableText
-              text={player.player_id}
-              size="0.7rem"
-              sx={{ color: (theme) => theme.palette.text.secondary }}
-            />
+            <PlayerIdentifiers player={player} variant="compact" />
           </Box>
         </Stack>
       </TableCell>
@@ -124,6 +121,7 @@ const PlayerRecordsListRow = memo(function PlayerRecordsListRow({
           />
           <PlatformChip
             platform={platform}
+            player={player}
             playerId={player.player_id}
             currentSoldierData={player?.soldier}
           />
@@ -293,7 +291,7 @@ const MobilePlayerRecordsListRow = memo(function MobilePlayerRecordsListRow({
             {t("views.table.level")} {level ?? "–"}
           </Typography>
           <Typography variant="caption" color="text.secondary" noWrap>
-            {platform || t("common.unknown")}
+            {getPlatformLabel(platform) || t("common.unknown")}
           </Typography>
           <Typography
             variant="caption"
@@ -330,7 +328,7 @@ export default function PlayerRecordsList({ players, selectedIds, onSelect }) {
 
   if (compact) {
     return (
-      <Box
+      <Box data-theme-surface="table-body"
         component="ul"
         aria-label={t("records.players.listLabel")}
         sx={{
@@ -355,6 +353,7 @@ export default function PlayerRecordsList({ players, selectedIds, onSelect }) {
 
   return (
     <TableContainer
+      data-theme-surface="table-body"
       sx={{
         border: (theme) => `1px solid ${theme.palette.divider}`,
         borderRadius: 0,

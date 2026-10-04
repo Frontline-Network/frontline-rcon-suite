@@ -1081,3 +1081,96 @@ Ein zusätzlicher Ausschnitt war nicht erforderlich. Suche, Filterauslöser, Aus
 - [x] Keine offenen P0-, P1- oder P2-Findings.
 
 final result: passed
+
+## 2026-10-03: Zusätzliches Wardogs-Theme
+
+Die seitenweise Prüfung und die Änderungen am auswählbaren Wardogs-Theme sind in [wardogs-theme-qa.md](wardogs-theme-qa.md) dokumentiert. Die bisherigen Projektprüfungen oben bleiben erhalten.
+
+
+## 2026-10-04: Bilingual release spotlight (selected concept 1)
+
+**Scope:** Integrated, account-bound release highlights in Aurora and Vanguard.
+The user selected concept 1, then requested stronger visual presence and removal
+of a hard gradient edge. This section supersedes the initial spotlight styling.
+
+### Reference and evidence
+
+- Selected source: `C:/Users/chris/.codex/generated_images/01a10157-e40d-7a91-a6d2-cb4a07aa8e95/exec-7127b789-e49e-40ee-a3e3-cf4f649505d2.png`, 1487 × 1058.
+- Comparison state: centered modal over the existing RCON overview, Aurora amber,
+  dark mode, German. Both source and final screenshot inspected together at
+  1487 × 1058. The production shell keeps the current navigation preference.
+- Final screenshot: `C:/Users/chris/OneDrive/Dokumente/Autobalancer/output/wardogs-theme/admin/71-release-spotlight-final.png`, 1487 × 1058.
+- Additional captures in the same local evidence directory:
+  `65-release-spotlight-en-desktop.png`, `66-release-spotlight-de-desktop.png`
+  (1487 × 1058); `67-release-spotlight-de-mobile.png`,
+  `68-release-spotlight-en-mobile.png` (390 × 844);
+  `69-release-spotlight-vanguard-en.png`,
+  `70-release-spotlight-vanguard-light.png` (1487 × 1058).
+- Generated, language-neutral illustration: `assets/rcongui/updates/theme-collection.png`,
+  1840 × 855 RGBA. Real transparency, complete uncropped panel fan. Loaded only
+  with the lazy dialog. All headings, icons and controls remain native components.
+
+### Fidelity review
+
+1. **Typography:** Enlarged white hero heading, readable supporting copy, clear
+   eyebrow/version and two subordinate benefit headings. Uses existing theme
+   fonts; language switch changes all spotlight content and the app language.
+2. **Spacing/layout:** Centered 760 px dialog, consistent 32 px desktop / 20 px
+   mobile content inset, large illustration, two separated benefit rows and
+   fixed action footer. At 390 × 844 all actions remain inside the viewport;
+   content scrolls at shorter heights and has no horizontal overflow.
+3. **Colors:** Solid theme-accent primary action replaces Aurora's neutral
+   contained-button styling. Warm light sits on the whole dialog surface, avoiding
+   clipping beneath the heading. Secondary action, borders and text retain clear
+   hierarchy. Vanguard light mode was visually checked as well.
+4. **Assets:** Six complete overlapping dashboard panels, slightly brighter and
+   more saturated than the first implementation. Decorative color dots are not
+   fake interactive controls; customization opens the real appearance dialog.
+5. **Copy and controls:** Both DE/EN versions reviewed. The preview is visibly
+   labelled as sample content and makes no claim of a real rollout. Curated text
+   explains benefits, the Aurora-only shortcut feature is labelled accordingly.
+   MUI grid/book icons, accessible dialog names, image alternatives and controls.
+
+### Comparison history
+
+1. Initial implementation: [P2] neutral primary action and small heading/icons
+   made the spotlight noticeably paler than the chosen reference.
+2. Increased heading scale, filled theme-accent action, icon tiles, illustration
+   brightness, color-dot presence and a static warm light. User identified [P2]
+   a hard edge where the local illustration glow began under the heading.
+3. Moved the radial background to the entire paper surface; removed the local
+   pseudo-element. Final full-size comparison confirms a continuous transition
+   with no horizontal cut. No open spotlight P0/P1/P2 visual issues remain.
+
+### Behaviour and checks
+
+- DE/EN switched in the open dialog on desktop and mobile.
+- Reopened from Update channel and account menu; Open appearance opened the
+  existing customization dialog; All changes navigated internally to
+  `/updates?release=v0.8.8`. No private repository link.
+- Later closed the dialog; navigation/reload to the overview did not immediately
+  reopen it. Backend clock tests cover the 24-hour boundary and manual reopening.
+- Escape closed the dialog and restored focus to the What's new trigger.
+- Aurora amber/dark and German restored after testing Vanguard dark/light.
+- 22 release/parser/build-contract tests plus 13 subtests passed; 15 Django API
+  and documentation tests passed; 19 frontend localization/reference tests passed.
+- Production build passed. i18n, CSRF, polling, page semantics and navigation shell
+  checks passed. Atomic claim, account/device isolation, snooze, independent
+  release records, rollback, missing translations, invalid assets/actions,
+  uninstalled/mismatched versions and missing authentication/CSRF are covered.
+- Automatic first-presentation scheduling uses the quiet overview guard; other
+  routes, hidden documents, active menus/dialogs/inputs and mutations cannot
+  trigger it. Production rollout remains gated by the existing exact-version
+  backend checks; the browser preview is synthetic, not a real deployment test.
+- Console: existing Emotion `:first-child` SSR warning and React Router future
+  warning remain; no new spotlight runtime error observed.
+- Existing repository limits remain: initial JS budget already exceeded before
+  this change (1603.96 kB / 510.55 kB gzip). Current build approximately 1609 kB /
+  513 kB; limits remain unchanged at 1525 / 500. General migration drift remains
+  in `UserAppearancePreference` (id/default); the new highlight model/migration
+  agrees with Django's model state and applies successfully in the test database.
+
+**final result: passed** for spotlight design and functionality. The unrelated
+bundle budget and existing appearance migration drift are recorded above, not
+reported as passing checks. Release authors must add bilingual metadata to the
+actual release and ship migration 0040; see `docs/release-highlights.md`.

@@ -6,6 +6,7 @@ import {
   Tab,
   Tabs,
   Typography,
+  useTheme,
 } from "@mui/material";
 import CheckIcon from "@mui/icons-material/Check";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
@@ -28,6 +29,7 @@ export default function ConfigSectionNavigation({
   label,
   mobileLabel,
 }) {
+  const isWardogs = useTheme().frontline?.appearance?.preset === "wardogs";
   const selectedSection = sections.some(
     (section) => section.id === activeSection && !section.disabled
   )
@@ -39,6 +41,28 @@ export default function ConfigSectionNavigation({
   };
 
   if (!sections.length) return null;
+
+  if (isWardogs)
+    return (
+      <Tabs
+        className="wardogs-config-section-tabs"
+        value={selectedSection}
+        onChange={(_, value) => handleChange(value)}
+        variant="scrollable"
+        scrollButtons="auto"
+        allowScrollButtonsMobile
+        aria-label={label || mobileLabel}
+      >
+        {sections.map((section) => (
+          <Tab
+            key={section.id}
+            value={section.id}
+            label={getSectionLabel(section)}
+            disabled={section.disabled}
+          />
+        ))}
+      </Tabs>
+    );
 
   return (
     <Box component="nav" aria-label={label}>

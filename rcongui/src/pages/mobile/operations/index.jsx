@@ -54,7 +54,7 @@ export default function MobileOperationsHub() {
                     "&:last-child": { pb: 1.25 },
                   }}
                 >
-                  <Box
+                  <Box data-theme-surface="control"
                     aria-hidden="true"
                     sx={{
                       alignItems: "center",

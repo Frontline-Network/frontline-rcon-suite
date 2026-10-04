@@ -93,8 +93,9 @@ const BlacklistRecordsSearch = ({
   };
 
   return (
-    <Box
+    <Box data-theme-surface="panel"
       component="form"
+      className="wardogs-blacklist-filters"
       onSubmit={submitSearch}
       sx={{
         border: "1px solid",
@@ -118,7 +119,7 @@ const BlacklistRecordsSearch = ({
         {t("records.blacklists.filters")}
       </Typography>
 
-      <Stack gap={1}>
+      <Stack gap={1} className="wardogs-blacklist-filter-fields">
         <TextField
           fullWidth
           size="small"

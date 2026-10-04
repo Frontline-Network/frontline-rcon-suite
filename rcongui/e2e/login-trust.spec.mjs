@@ -31,6 +31,7 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
     });
 
     await expect(page.getByRole("heading", { name: "Anmelden" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Passwort vergessen?" })).toBeVisible();
     const languageSelector = page.getByRole("button", { name: "Sprache" });
     await expect(languageSelector).toBeVisible();
     await expect(languageSelector.locator("svg")).toBeVisible();

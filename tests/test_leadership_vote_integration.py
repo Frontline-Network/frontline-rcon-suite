@@ -61,10 +61,10 @@ def test_real_alias_report_stays_bound_through_complete_dry_run(
     assert incident["leadership_vote"]["target_resolution"]["matches"]
     assert sum(s["is_primary"] for s in incident["subjects"]) == 1
     api = deliver(db, players)
-    confirmation = api.message_player.call_args.args[1]
-    assert "Person-target" in confirmation
-    assert "!no = Abbrechen / Cancel" in confirmation
-    assert "DRY RUN" in confirmation
+    invitation = api.message_player.call_args.args[1]
+    assert "Person-target" in invitation
+    assert "!no = Vote against kicking" in invitation
+    assert "DRY RUN" in invitation
     assert confirm(db, players, incident) == vid
     assert vote(db, vid)["yes"] == 0
     storage.advance(1, context(players))
@@ -84,7 +84,7 @@ def test_real_alias_report_stays_bound_through_complete_dry_run(
 
 
 @pytest.mark.parametrize("commander", [False, True])
-def test_late_confirmation_with_120_seconds_invites_every_eligible_leader(
+def test_report_without_any_confirmation_invites_every_eligible_leader(
     db, monkeypatch, commander
 ):
     storage.configure(1, Config(enabled=True, confirmation_seconds=120), "tester")
@@ -94,21 +94,8 @@ def test_late_confirmation_with_120_seconds_invites_every_eligible_leader(
     incident = report(players, "!admin commander" if commander else "!admin able")
     vid = incident["leadership_vote"]["id"]
     api = deliver(db, players)
-    assert "Reply within 120 s" in api.message_player.call_args.args[1]
-
-    elapse(db, players, 110)
-    storage.advance(1, context(players))
-    assert vote(db, vid)["status"] == "confirming"
-    monkeypatch.setattr(service, "read_context", lambda _: context(players))
-    assert service.handle_answer(
-        api,
-        dict(
-            action="CHAT[Allies][Team]",
-            player_id_1="v0",
-            sub_content=" !YeS ",
-            timestamp_ms=db.clock.now * 1000,
-        ),
-    )
+    assert api.message_player.call_count == 12
+    assert "You have 120 seconds" in api.message_player.call_args.args[1]
     assert vote(db, vid)["status"] == "inviting"
     assert vote(db, vid)["yes"] == 0
     deliver(db, players, api)
@@ -143,26 +130,28 @@ def test_late_confirmation_with_120_seconds_invites_every_eligible_leader(
     api.kick.assert_not_called()
 
 
-def test_120_second_confirmation_expires_without_inviting_or_kicking(db):
+def test_no_ballots_rejects_vote_after_full_duration_without_kicking(db):
     storage.configure(1, Config(enabled=True, confirmation_seconds=120), "tester")
     players = roster()
     observe_for(db, players)
     incident = report(players)
     vid = incident["leadership_vote"]["id"]
     api = deliver(db, players)
+    assert api.message_player.call_count == 12
+    storage.advance(1, context(players))
     elapse(db, players, 119)
     assert storage.advance(1, context(players)) == []
-    assert vote(db, vid)["status"] == "confirming"
+    assert vote(db, vid)["status"] == "active"
     elapse(db, players, 1)
     assert storage.advance(1, context(players)) == []
-    assert vote(db, vid)["status"] == "cancelled"
-    assert "Confirmation expired" in vote(db, vid)["result"]
+    assert vote(db, vid)["status"] == "rejected"
+    assert "No majority" in vote(db, vid)["result"]
     with db() as sess:
         assert not list(
             sess.scalars(
                 select(LeadershipMessage).where(
                     LeadershipMessage.vote_id == vid,
-                    LeadershipMessage.purpose.in_({"target", "invite_de", "invite"}),
+                    LeadershipMessage.purpose.in_({"target", "confirm"}),
                 )
             )
         )
@@ -196,13 +185,14 @@ def test_new_alias_offer_keeps_admin_and_identity_guards(db, change):
     assert vote(db, vid)["status"] == "cancelled"
 
 
-@pytest.mark.parametrize("gate", ["disabled", "nonleader", "no_history", "global"])
+@pytest.mark.parametrize("gate", ["disabled", "unassigned", "no_history", "global"])
 def test_ordinary_reports_not_rewritten_when_alias_offer_ineligible(db, gate):
     players = roster()
     if gate == "disabled":
         storage.configure(1, Config(), "admin")
-    if gate == "nonleader":
+    if gate == "unassigned":
         players[2]["role"] = "Rifleman"
+        players[2]["unit_name"] = "unassigned"
     if gate != "no_history":
         observe_for(db, players)
     text = "!admin alpha"
@@ -224,21 +214,26 @@ def test_ordinary_reports_not_rewritten_when_alias_offer_ineligible(db, gate):
 
 
 @pytest.mark.parametrize("unavailable", [False, True])
+@pytest.mark.parametrize("reporter", ["v0", "member"])
 @pytest.mark.parametrize(
-    "text,commander",
+    "text,commander,squad",
     [
-        ("!admin able redet nicht", False),
-        ("!admin bitte mal prüfen able redet nicht", False),
-        ("!admin der commander redet nicht", True),
-        ("!admin able", False),
-        ("!admin bitte mal prüfen able", False),
-        ("!admin commander", True),
+        ("!admin able redet nicht", False, "Able"),
+        ("!admin bitte mal prüfen able redet nicht", False, "Able"),
+        ("!admin der commander redet nicht", True, ""),
+        ("!admin able", False, "Able"),
+        ("!admin bitte mal prüfen able", False, "Able"),
+        ("!admin commander", True, ""),
+        ("!Admin Able squad keine Komms", False, "Able"),
+        ("!admin squad lead how  redet nicht", False, "How"),
     ],
 )
 def test_report_survives_discord_outage_and_disabled_optional_context(
-    db, monkeypatch, unavailable, text, commander
+    db, monkeypatch, unavailable, text, commander, squad, reporter
 ):
     players = roster(commander=commander)
+    players[0]["unit_name"] = squad
+    players[1]["unit_name"] = squad or "Able"
     observe_for(db, players)
     monkeypatch.setattr(incident_settings, "incident_capture_enabled", lambda: True)
     monkeypatch.setattr(incident_settings, "incident_context_mode", lambda: "disabled")
@@ -261,8 +256,8 @@ def test_report_survives_discord_outage_and_disabled_optional_context(
         monkeypatch.setattr(service, "read_context", lambda _: context(players))
     log = dict(
         action="CHAT[Allies][Team]",
-        player_id_1="v0",
-        player_name_1="Person-v0",
+        player_id_1=reporter,
+        player_name_1="Person-" + reporter,
         sub_content=text,
         timestamp_ms=NOW * 1000,
     )
@@ -533,7 +528,10 @@ def test_duplicate_report_log_has_only_one_offer(db):
     b = report(dedupe_seconds=60)
     assert a["id"] == b["id"]
     with db() as sess:
-        assert len(list(sess.scalars(select(LeadershipMessage)))) == 1
+        queued = list(sess.scalars(select(LeadershipMessage)))
+        assert len(queued) == 6
+        assert {m.player_id for m in queued} == {f"v{i}" for i in range(6)}
+        assert all(m.purpose == "invite_de" for m in queued)
 
 
 def test_leadership_failure_does_not_stop_other_routines(monkeypatch):

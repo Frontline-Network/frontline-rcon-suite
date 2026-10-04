@@ -781,7 +781,7 @@ const ConfigPage = () => {
     const integrationForm = (
       <Form id="config-settings-form" method="post" onSubmit={handleSubmit}>
         <Stack spacing={1.5}>
-          <Box
+          <Box data-theme-surface="panel"
             sx={{
               border: "1px solid",
               borderColor: "divider",
@@ -1196,7 +1196,7 @@ const ConfigPage = () => {
                   />
                 )
               ) : (
-                <Box
+                <Box data-theme-surface="panel"
                   sx={{
                     p: { xs: 1.25, sm: 2 },
                     border: "1px solid",
