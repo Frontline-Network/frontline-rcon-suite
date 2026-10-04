@@ -8,7 +8,7 @@ test("published hotfix notes match the installed version without a new spotlight
   });
   expect(login.status()).toBe(200);
   expect((await login.json()).result).toBe(true);
-  expect(await (await context.request.get("/tag_version")).text()).toBe("v0.9.1");
+  expect((await (await context.request.get("/tag_version")).text()).trim()).toBe("v0.9.1");
   const response = await context.request.get("/api/get_update_channel?frontend_version=v0.9.1");
   expect(response.status()).toBe(200);
   const result = (await response.json()).result;
