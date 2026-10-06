@@ -1,0 +1,28 @@
+"""Opt-in, server-local report automation. No AI key or default activation."""
+
+import logging
+from typing import ClassVar, Literal
+
+from pydantic import ConfigDict, Field
+
+from rcon.user_config.utils import BaseUserConfig
+
+
+class ReportAdminUserConfig(BaseUserConfig):
+    MISSING_CONFIG_LOG_LEVEL: ClassVar[int] = logging.DEBUG
+    model_config = ConfigDict(extra="forbid", strict=True)
+    enabled: bool = False
+    mode: Literal["dry_run", "active"] = "dry_run"
+    communication: bool = True
+    teamkills: bool = True
+    communication_template_id: int | None = Field(default=None, gt=0)
+    teamkills_template_id: int | None = Field(default=None, gt=0)
+
+    @staticmethod
+    def save_to_db(values, dry_run=False):
+        config = ReportAdminUserConfig.model_validate(values)
+        if not dry_run:
+            from rcon.report_admin import configure
+            from rcon.utils import get_server_number
+
+            configure(int(get_server_number()), config)

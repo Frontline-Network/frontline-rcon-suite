@@ -60,6 +60,7 @@ def read_context(api):
         raise ValueError("Invalid or duplicate bulk player identity")
     return {
         "round_id": f"{get_server_number()}:{layer}:{start}",
+        "round_start": start,
         "players": players,
         "captured_at": captured,
     }

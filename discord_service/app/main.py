@@ -1049,17 +1049,21 @@ def receive_event(
         )
         # Ballots only edit the central case. A terminal failure/dry run needs a
         # new admin alert (editing a Discord card does not notify subscribers).
-        if envelope.event_type in {
+        report_admin_attention = (
+            envelope.event_type in {"report_admin_manual", "report_admin_unknown", "report_admin_dry_run"}
+        )
+        if (report_admin_attention or envelope.event_type in {
             "leadership_vote_cancelled", "leadership_vote_rejected",
             "leadership_vote_unknown", "leadership_vote_dry_run",
-        } and envelope.incident.get("status") not in {"resolved", "dismissed"}:
+        }) and envelope.incident.get("status") not in {"resolved", "dismissed"}:
             roles = [str(r) for r in envelope.incident.get("admin_notification_role_ids", [])
                      if str(r).isdigit()][:100]
             nonce = hashlib.sha256(idempotency_key.encode()).hexdigest()[:24]
             DiscordClient().upsert(integration.channel_id, {
                 "content": (" ".join(f"<@&{role}>" for role in roles)
-                    + " Führungsabstimmung beendet: Admin-Bearbeitung erforderlich. / "
-                      "Leadership vote ended: admin review required."),
+                    + (" Report-Admin: Manuelle Prüfung erforderlich. / Report admin: manual review required."
+                       if report_admin_attention else
+                       " Führungsabstimmung beendet: Admin-Bearbeitung erforderlich. / Leadership vote ended: admin review required.")),
                 "message_reference": {"message_id": message_id, "fail_if_not_exists": False},
                 "allowed_mentions": {"parse": [], "roles": roles, "replied_user": False},
                 "nonce": nonce, "enforce_nonce": True,

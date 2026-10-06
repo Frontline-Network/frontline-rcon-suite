@@ -770,6 +770,29 @@ def render_message(
             {"name": "KI / AI", "value": labels["unavailable"], "inline": False}
         )
     action_log = _action_log_field(incident, language)
+    report_admin = incident.get("report_admin")
+    if isinstance(report_admin, dict):
+        states = {
+            "queued": "Prüfung ausstehend / Awaiting checks",
+            "sending": "Kick wird ausgeführt / Kick in progress",
+            "kicked": "Kick bestätigt / Kick confirmed",
+            "dry_run": "Probelauf: kein Kick / Dry run: no kick",
+            "manual": "Admins übernehmen / Manual review required",
+            "unknown": "Ergebnis unklar, keine Wiederholung / Uncertain result, no retry",
+        }
+        evidence = (
+            f"{report_admin.get('teamkill_count', '–')} Teamkills / 5 min"
+            if report_admin.get("rule") == "teamkills" else
+            "Kommunikation gemeldet; kein Sprachnachweis / Communication reported; no voice evidence"
+        )
+        fields.append({
+            "name": "🤖 Report-Admin",
+            "value": _truncate(
+                f"{states.get(report_admin.get('status'), 'Manual review')}\n"
+                f"{report_admin.get('target_name') or '-'}\n{evidence}\n"
+                f"{report_admin.get('result') or ''}\n{report_admin.get('sent_reason') or ''}", 1024),
+            "inline": False,
+        })
     vote = incident.get("leadership_vote")
     if vote:
         deadline = f"<t:{int(vote['ends_at'])}:R>" if vote.get("ends_at") and vote.get("status") in {"confirming", "warning", "active", "inviting"} else "–"

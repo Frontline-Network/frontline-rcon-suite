@@ -149,6 +149,29 @@ def test_unknown_capability_is_indistinguishable_from_unknown_installation():
     assert response.status_code == 404
 
 
+@pytest.mark.parametrize("state,alerts", [("sending", 0), ("kicked", 0), ("manual", 1), ("unknown", 1), ("dry_run", 1)])
+def test_report_admin_updates_and_alerts(state, alerts):
+    capability = _seed()
+    data = _event()
+    data["event_type"] = "report_admin_" + state
+    data["incident"].update(admin_notification_role_ids=["456"],
+        status="resolved" if state == "kicked" else "new",
+        report_admin={"status": state, "rule": "teamkills", "target_name": "Example", "teamkill_count": 5})
+    with patch.object(DiscordClient, "upsert", return_value="123") as post:
+        response = TestClient(app).post("/v1/events", headers={"Authorization": f"Bearer {capability}", "Idempotency-Key": "report:test"}, json=data)
+        assert response.status_code == 202
+        assert post.call_count == 1 + alerts
+        assert "5 Teamkills / 5 min" in str(post.call_args_list[0])
+
+
+@pytest.mark.parametrize("language", ["de", "en"])
+def test_report_admin_communication_is_allegation_not_voice_evidence(language):
+    event = _event()
+    event["incident"].update(discord_language=language, report_admin={"status": "kicked", "rule": "communication", "target_name": "Example"})
+    result = render_message(IncidentEventEnvelope.model_validate(event), None)
+    assert "no voice evidence" in str(result)
+
+
 def test_out_of_order_revision_cannot_overwrite_newer_discord_state():
     capability = _seed()
     client = TestClient(app)
