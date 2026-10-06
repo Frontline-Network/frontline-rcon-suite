@@ -1,11 +1,15 @@
 export const copy = {
   de: {
-    title: "Report-Admin – Kommunikation & Teamkills",
-    info: "Serverbezogen. Verarbeitet neue !admin-Reports nach festen Regeln, ohne KI-Zugang. Andere Beschwerden bleiben manuell. Bei Aktivierung ersetzt dies die automatische Führungsvote-Zuordnung auf diesem Server.",
+    title: "Report-Admin – Kommunikation, Teamkills & Cheatprüfung",
+    info: "Serverbezogene Report-Automatik nach festen Regeln, ohne KI-Zugang. Hier separat speichern; die optionale KI für Chat und Namen folgt darunter. Andere Beschwerden bleiben manuell. Führungsabstimmungen wurden eingestellt.",
     warning:
       "Aktivmodus: Eine eindeutige Kommunikationsmeldung kann ohne Abstimmung oder Vorwarnung zum Kick führen. Ob jemand tatsächlich spricht, ist technisch nicht überprüfbar. Falschmeldungen können deshalb zum Missbrauch führen.",
     teamkills:
-      "Teamkills: Kick ab 5 protokollierten Teamkills in den 5 Minuten vor dem Report, nur im laufenden Match. Die Anzahl beweist keine Absicht.",
+      "Teamkills: Einzelfallprüfung mit bis zu 15 Minuten Kontext und 60 Sekunden stiller Wartezeit ab dem Teamkill. Melder und Beschuldigter werden geprüft. Automatischer Kick nur bei protokolliertem Teamkill mit zeitnaher, ausdrücklicher eigener Absichtserklärung. Keine Entschuldigung, hohe Anzahl oder weitere Teamkills nach einer Entschuldigung beweisen allein keine Absicht. Entschuldigungen, gegenseitige Teamkills und unklare Fälle gehen an Admins. Keine Aufforderung an den Beschuldigten.",
+    cheating:
+      "Cheatprüfung: Waffenbezogene Killverläufe über 1, 5 und 15 Minuten; Rollenverlauf, sofern verfügbar. Killraten sind nur Hinweise für die Admin-Prüfung, kein Cheatnachweis. Keine automatischen Cheat-Kicks oder Banns. Ein 24-Stunden-Tempbann erfordert zusätzliche Belege und eine manuelle Admin-Entscheidung in Discord. Nur der Melder erhält eine Eingangsbestätigung.",
+    cheatToggle:
+      "Cheatmeldungen für Admins auswerten (keine automatische Sanktion)",
     names:
       "Namen: nur ein eindeutiger Online-Treffer. Bis zu drei Tippfehler bei längeren Namen; kurze oder ähnlich gute Treffer werden manuell geprüft.",
     enabled: "Report-Admin aktivieren",
@@ -13,7 +17,7 @@ export const copy = {
     tk: "Teamkill-Meldungen bearbeiten",
     selfReports: "Selbstmeldungen für Tests zulassen",
     selfReportsWarning:
-      "Testausnahme aktiv: Neue Selbstmeldungen werden ebenfalls geprüft. Im Aktivmodus kann dies dich tatsächlich vom Server kicken. Die übrigen Regeln gelten weiterhin; beim Führungsvote bleiben Selbstmeldungen gesperrt. Nach dem Test wieder ausschalten und speichern.",
+      "Testausnahme aktiv: Neue Selbstmeldungen werden ebenfalls geprüft. Im Aktivmodus kann dies dich tatsächlich vom Server kicken. Die übrigen Regeln gelten weiterhin. Nach dem Test wieder ausschalten und speichern.",
     mode: "Betriebsart",
     dry: "Probelauf – keine Kicks",
     active: "Aktiv – automatische Kicks",
@@ -21,19 +25,22 @@ export const copy = {
     tkTemplate: "Kick-Grund für Teamkills",
     fallback: "Integrierter DE/EN-Standardtext",
     placeholders:
-      "Vorlagen aus der Kategorie Gründe. Platzhalter: {player_name}, {teamkills}, {minutes}. Ohne passende Vorlage gilt der Standardtext.",
-    save: "Speichern",
+      "Vorlagen aus der Kategorie Gründe. Platzhalter: {player_name}, {teamkills}, {minutes} (tatsächlicher Kontextzeitraum). Bestehende Teamkill-Vorlagen mit festen 5-in-5-Aussagen bitte überarbeiten. Ohne passende Vorlage gilt der Standardtext.",
+    save: "Report-Regeln speichern",
     saved: "Gespeichert",
     loading: "Laden …",
     permission: "Keine Berechtigung zur Konfiguration.",
   },
   en: {
-    title: "Report admin – communication & teamkills",
-    info: "Server-specific. Processes new !admin reports using fixed rules, without an AI account. Other complaints remain manual. Enabling this replaces automatic leadership-vote routing on this server.",
+    title: "Report admin – communication, teamkills & cheat review",
+    info: "Server-specific report automation using fixed rules, without an AI account. Save these settings separately here; optional AI for chat and names is below. Other complaints remain manual. Leadership voting has been retired.",
     warning:
       "Active mode: An unambiguous communication report can trigger a kick without a vote or warning. Voice activity cannot be verified. False reports can therefore be abused.",
     teamkills:
-      "Teamkills: kick at 5 recorded teamkills in the 5 minutes before the report, in the current match only. The count does not prove intent.",
+      "Teamkills: individual assessment with up to 15 minutes of context and a silent 60-second window starting at the teamkill. Both reporter and accused are reviewed. Automatic kick only for a recorded teamkill with a timely, explicit first-person admission of intent. No apology, high counts or further kills after an apology alone do not prove intent. Apologies, reciprocal teamkills and unclear cases go to admins. No prompt to the accused.",
+    cheating:
+      "Cheat review: weapon-based kill timelines over 1, 5 and 15 minutes, with role history where available. Kill rates are review hints, not cheating evidence. No automatic cheat kicks or bans. A 24-hour temporary ban requires additional evidence and a manual admin decision in Discord. Only the reporter receives an acknowledgement.",
+    cheatToggle: "Assess cheat reports for admins (no automatic sanction)",
     names:
       "Names: one unambiguous online match only. Up to three typos in longer names; short or similarly plausible matches require manual review.",
     enabled: "Enable report admin",
@@ -41,7 +48,7 @@ export const copy = {
     tk: "Process teamkill reports",
     selfReports: "Allow self-reports for testing",
     selfReportsWarning:
-      "Test exception enabled: New self-reports are also checked. In active mode this can actually kick you from the server. All other rules still apply; leadership votes still reject self-reports. Disable and save this option after testing.",
+      "Test exception enabled: New self-reports are also checked. In active mode this can actually kick you from the server. All other rules still apply. Disable and save this option after testing.",
     mode: "Mode",
     dry: "Dry run – no kicks",
     active: "Active – automatic kicks",
@@ -49,8 +56,8 @@ export const copy = {
     tkTemplate: "Teamkill kick reason",
     fallback: "Built-in DE/EN default",
     placeholders:
-      "Templates from the Reasons category. Placeholders: {player_name}, {teamkills}, {minutes}. Missing templates use the default text.",
-    save: "Save",
+      "Templates from the Reasons category. Placeholders: {player_name}, {teamkills}, {minutes} (actual context period). Review existing teamkill templates containing fixed 5-in-5 claims. Missing templates use the default text.",
+    save: "Save report rules",
     saved: "Saved",
     loading: "Loading …",
     permission: "You cannot manage this configuration.",

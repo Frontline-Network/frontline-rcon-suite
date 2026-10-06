@@ -29,7 +29,7 @@ async function request(data) {
   return body.result;
 }
 
-export default function ReportAdmin() {
+export default function ReportAdmin({ embedded = false }) {
   const { user, permissions } = useAuth();
   const { i18n } = useTranslation();
   const c = copy[i18n.language?.startsWith("de") ? "de" : "en"];
@@ -58,9 +58,9 @@ export default function ReportAdmin() {
       component="section"
       aria-label={c.title}
       sx={{
-        mt: 3,
-        p: { xs: 2, md: 3 },
-        border: "1px solid",
+        mt: embedded ? 0 : 3,
+        p: embedded ? 0 : { xs: 2, md: 3 },
+        border: embedded ? "none" : "1px solid",
         borderColor: "divider",
         borderRadius: 2,
       }}
@@ -72,6 +72,7 @@ export default function ReportAdmin() {
         <Typography color="text.secondary">{c.info}</Typography>
         <Alert severity="warning">{c.warning}</Alert>
         <Typography>{c.teamkills}</Typography>
+        <Typography>{c.cheating}</Typography>
         <Typography>{c.names}</Typography>
         {error && <Alert severity="error">{error.message}</Alert>}
         {save.isSuccess && <Alert severity="success">{c.saved}</Alert>}
@@ -90,6 +91,7 @@ export default function ReportAdmin() {
               ["enabled", c.enabled],
               ["communication", c.communication],
               ["teamkills", c.tk],
+              ["cheating", c.cheatToggle],
               ["allow_self_reports", c.selfReports],
             ].map(([name, label]) => (
               <FormControlLabel

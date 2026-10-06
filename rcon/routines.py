@@ -73,25 +73,18 @@ def run(stop_event: threading.Event | None = None):
     queue_watchdog = QueueWatchdog()
     next_queue_step = time.monotonic()
 
-    from rcon.leadership_vote.service import Runtime
-
-    leadership = Runtime()
     from rcon.report_admin import Runtime as ReportAdminRuntime
     report_admin = ReportAdminRuntime()
-    next_leadership_step = time.monotonic()
+    next_report_step = time.monotonic()
     try:
         while not stop_event.is_set():
             now = time.monotonic()
-            if now >= next_leadership_step:
+            if now >= next_report_step:
                 try:
                     report_admin.step(rcon)
                 except Exception:
                     logger.exception("Report admin must not stop other routines")
-                try:
-                    leadership.step(rcon)
-                except Exception:
-                    logger.exception("Leadership voting must not stop other routines")
-                next_leadership_step = _next_deadline(5.0)
+                next_report_step = _next_deadline(5.0)
             if next_performance_dump is not None and now >= next_performance_dump:
                 try:
                     dump_rcon_performance_stats()
@@ -123,7 +116,7 @@ def run(stop_event: threading.Event | None = None):
 
             stop_event.wait(
                 _sleep_until_next_deadline(
-                    next_leadership_step,
+                    next_report_step,
                     next_routines_run,
                     next_performance_dump,
                     next_queue_step,
@@ -131,7 +124,3 @@ def run(stop_event: threading.Event | None = None):
             )
     finally:
         report_admin.close()
-        try:
-            leadership.close()
-        except Exception:
-            logger.exception("Unable to close leadership runtime")

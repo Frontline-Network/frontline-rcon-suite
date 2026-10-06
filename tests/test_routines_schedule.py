@@ -18,7 +18,7 @@ def test_sleep_targets_earliest_deadline_and_is_bounded():
 def test_queue_failure_does_not_stop_other_routines(monkeypatch):
     from unittest.mock import Mock
     from rcon import routines
-    from rcon.leadership_vote import service
+    from rcon import report_admin as service
 
     stop = Mock()
     stop.is_set.side_effect = [False, True]

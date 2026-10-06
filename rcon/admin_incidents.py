@@ -985,12 +985,10 @@ def create_incident(
         sess.add(incident)
         sess.flush()
         if leadership_context is not None:
-            from rcon.leadership_vote.storage import enqueue
             from rcon.report_admin import enqueue as enqueue_report_admin
             try:
                 with sess.begin_nested():
-                    if not enqueue_report_admin(sess, incident, leadership_context, now.timestamp()):
-                        enqueue(sess, incident, leadership_context, now.timestamp())
+                    enqueue_report_admin(sess, incident, leadership_context, now.timestamp())
             except Exception:
                 logger.exception("Report automation failed; ordinary admin report preserved")
         result = incident.to_dict(include_events=True)

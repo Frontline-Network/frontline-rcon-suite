@@ -11,7 +11,7 @@ const steps = [
   { label: "Server erkennen", testId: "discord-wizard-step-guild" },
   { label: "Kanal & Rollen", testId: "discord-wizard-step-channelRoles" },
   { label: "Aktionen", testId: "discord-wizard-step-actions" },
-  { label: "Optionale KI", testId: "discord-wizard-step-ai" },
+  { label: "KI & Report-Admin", testId: "discord-wizard-step-ai" },
   { label: "Testen", testId: "discord-wizard-step-test" },
   { label: "Aktivieren", testId: "discord-wizard-step-activate" },
 ];
@@ -56,9 +56,37 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
             .click();
         }
         await expect(page.getByTestId(step.testId)).toBeVisible();
+        if (step.testId === "discord-wizard-step-ai") {
+          const report = page.getByRole("region", {
+            name: "Report-Admin – Kommunikation, Teamkills & Cheatprüfung",
+          });
+          await expect(report).toBeVisible();
+          await expect(
+            report.getByLabel("Report-Admin aktivieren", { exact: true })
+          ).not.toBeChecked();
+          const review = report.getByLabel(
+            "Cheatmeldungen für Admins auswerten (keine automatische Sanktion)"
+          );
+          await expect(review).not.toBeChecked();
+          await review.check();
+          await report
+            .getByRole("button", { name: "Report-Regeln speichern" })
+            .click();
+          await expect(
+            report.getByText("Gespeichert", { exact: true })
+          ).toBeVisible();
+          await expect(review).toBeChecked();
+          await expect(
+            report.getByText(/60 Sekunden stiller Wartezeit/)
+          ).toBeVisible();
+          await expectNoHorizontalPageOverflow(page);
+        }
       }
 
       await expectNoHorizontalPageOverflow(page);
+      await expect(
+        page.getByRole("heading", { name: "Führungsabstimmung", exact: true })
+      ).toHaveCount(0);
       expect(runtimeErrors, runtimeErrors.join("\n")).toEqual([]);
     });
   });

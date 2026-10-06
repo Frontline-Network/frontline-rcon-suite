@@ -11,7 +11,6 @@ def register_log_hooks() -> None:
 
     # These imports register decorated callbacks in rcon.logs.loop.HOOKS.
     from rcon import hooks  # noqa: F401
-    from rcon.leadership_vote import hooks as leadership_vote_hooks  # noqa: F401
     from rcon.autobalancer import hooks as autobalancer_hooks  # noqa: F401
     from rcon.auto_kick import auto_kick  # noqa: F401
     from rcon.automods.tk_autoban import (  # noqa: F401

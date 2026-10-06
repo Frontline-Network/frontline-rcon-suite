@@ -1,4 +1,4 @@
-"""Server-local leadership configuration/status; ballots only enter via game logs."""
+"""Retired leadership voting: historical status/cancellation, no activation."""
 
 import json
 from functools import wraps
@@ -74,18 +74,18 @@ def configuration(request, server):
         if request.content_type != "application/json" or len(request.body) > 4096:
             raise ValueError("Small JSON configuration required")
         cfg = Config.model_validate(json.loads(request.body))
-        if cfg.enabled and not request.user.has_perm(KICK):
-            raise PermissionError("Automatic kicks require kick permission")
+        if cfg.enabled:
+            raise ValueError("Leadership voting has been retired; configure Report Admin instead")
         storage.configure(server, cfg, request.user.username)
         audit(request, "configure", server, cfg.model_dump())
     with storage.enter_session() as sess:
-        result = storage.config(sess, server).model_dump()
-        conflicts = storage.command_conflicts(sess, server)
+        result = {**storage.config(sess, server).model_dump(), "enabled": False}
     audit(request, "config_read", server)
     return {
         "config": result,
-        "can_enable": request.user.has_perm(KICK),
-        "conflicts": conflicts,
+        "can_enable": False,
+        "conflicts": [],
+        "retired": True,
     }
 
 
@@ -99,7 +99,8 @@ def status(request, server):
             .limit(100)
         ).all()
         result = {
-            "enabled": storage.config(sess, server).enabled,
+            "enabled": False,
+            "retired": True,
             "votes": [storage.summary(v) for v in rows],
         }
     audit(request, "status", server)

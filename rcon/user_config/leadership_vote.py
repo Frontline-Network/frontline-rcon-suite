@@ -27,6 +27,8 @@ class LeadershipVoteUserConfig(BaseUserConfig):
     @staticmethod
     def save_to_db(values, dry_run=False):
         config = LeadershipVoteUserConfig.model_validate(values)
+        if config.enabled:
+            raise ValueError("Leadership voting has been retired; configure Report Admin instead")
         if not dry_run:
             from rcon.leadership_vote.storage import configure
             from rcon.utils import get_server_number

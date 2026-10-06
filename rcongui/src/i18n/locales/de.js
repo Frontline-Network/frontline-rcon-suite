@@ -1615,7 +1615,7 @@ const de = {
       step_guild: "Server erkennen",
       step_channelRoles: "Kanal & Rollen",
       step_actions: "Aktionen",
-      step_ai: "Optionale KI",
+      step_ai: "KI & Report-Admin",
       step_test: "Testen",
       step_activate: "Aktivieren",
       back: "Zurück",

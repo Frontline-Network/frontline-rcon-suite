@@ -1,4 +1,4 @@
-"""Two opt-in report rules, persisted in the existing incident event journal.
+"""Opt-in report rules, persisted in the existing incident event journal.
 
 No model, ban, warning, vote, or free-form game command. A durable send marker
 precedes the single kick attempt. Manual incident actions share the server lock.
@@ -9,7 +9,7 @@ import logging
 import time
 from datetime import datetime, timezone
 
-from sqlalchemy import select, text
+from sqlalchemy import or_, select, text
 
 from rcon.leadership_vote import storage as votes
 from rcon.leadership_vote.domain import identity
@@ -20,25 +20,26 @@ from rcon.models import (
     AdminIncidentDiscordDelivery,
     PlayerID,
     PlayerSession,
-    LogLine,
     UserConfig,
     MessageTemplate,
     LeadershipVote,
+    LeadershipMessage,
 )
 from rcon.report_admin_rules import (
     classify,
     target_for,
     unique_seat,
+    QUALIFIED,
     MAX_REPORT_AGE,
-    TEAMKILL_COUNT,
-    TEAMKILL_SECONDS,
 )
+from rcon import report_admin_evidence as evidence_rules
+from rcon.admin_incidents import _normalize_team, _normalize_message
 from rcon.user_config.report_admin import ReportAdminUserConfig as Config
 from rcon.user_config.utils import _invalidate_user_config_cache
 
 logger = logging.getLogger(__name__)
 ACTOR = "system:report-admin"
-OPEN = {"queued", "sending"}
+OPEN = {"queued", "waiting", "sending"}
 enter_session = votes.enter_session  # Commit errors must propagate.
 
 
@@ -55,7 +56,7 @@ def config(sess, server):
     return Config.model_validate(row.value) if row else Config()
 
 
-def pending(sess, server, limit=None):
+def pending(sess, server, limit=None, due_at=None):
     query = (
         select(AdminIncidentEvent)
         .join(AdminIncident)
@@ -66,6 +67,15 @@ def pending(sess, server, limit=None):
         )
         .order_by(AdminIncidentEvent.id)
     )
+    if due_at is not None:
+        query = query.where(
+            or_(
+                AdminIncidentEvent.payload["status"].as_string() != "waiting",
+                AdminIncidentEvent.payload["ready_at"].as_float() <= due_at,
+                AdminIncidentEvent.payload["report_time"].as_float()
+                <= due_at - evidence_rules.CASE_TTL,
+            )
+        )
     if limit is not None:
         query = query.limit(limit)
     return sess.scalars(query).all()
@@ -85,6 +95,8 @@ def summary(payload):
             "teamkill_log_ids",
             "window_seconds",
             "updated_at",
+            "assessment",
+            "ready_at",
         )
         if k in payload
     }
@@ -166,7 +178,7 @@ def kick_reason(sess, payload):
     default = (
         "Gemeldete fehlende Führungskommunikation / Reported lack of leadership communication"
         if payload["rule"] == "communication"
-        else f"{payload['teamkill_count']} Teamkills in 5 Minuten / teamkills in 5 minutes"
+        else "Belegter Teamkill mit ausdrücklicher eigener Absichtserklärung / Recorded teamkill with explicit first-person admission"
     )
     template_id = payload["config"].get(payload["rule"] + "_template_id")
     template = sess.get(MessageTemplate, template_id) if template_id else None
@@ -176,7 +188,7 @@ def kick_reason(sess, payload):
     for name, replacement in {
         "player_name": payload["target_name"],
         "teamkills": str(payload.get("teamkill_count", 0)),
-        "minutes": "5",
+        "minutes": str(round(payload.get("window_seconds", 0) / 60, 1)),
     }.items():
         value = value.replace("{" + name + "}", replacement)
     return " ".join(value.split())[:500] or default
@@ -278,7 +290,14 @@ def enqueue(sess, incident, context, now):
     # Require a configured Discord destination; no silent moderation when unpaired.
     if not votes.discord_ready(sess):
         return True
-    from rcon.admin_incidents import _subject_from_payload
+    from rcon.admin_incidents import _subject_from_payload, player_snapshot
+
+    # Validation must not replace the report's statistics with routing metadata.
+    # Use the very same fresh, uniquely identified roster row as the decision;
+    # never borrow a similarly named player's or a previous round's statistics.
+    target_snapshot = player_snapshot(
+        next(p for p in players if str(p.get("player_id")) == target["player_id"])
+    )
 
     for subject in incident.subjects:
         subject.is_primary = False
@@ -294,6 +313,7 @@ def enqueue(sess, incident, context, now):
                 "match_method": "report_admin_validated",
                 "parser_version": "report-admin-1",
                 "snapshot": {
+                    **target_snapshot,
                     "rule": rule,
                     "seat": target["seat"],
                     "candidates": [
@@ -325,6 +345,11 @@ def enqueue(sess, incident, context, now):
         "target": target,
         "session": token,
         "reporter_session": reporter_token,
+        "reporter_team": _normalize_team(
+            next(
+                p for p in players if str(p.get("player_id")) == incident.reporter_id
+            ).get("team")
+        ),
         "report_time": stamp,
         "round_id": context["round_id"],
         "round_start": context["round_start"],
@@ -350,30 +375,73 @@ def delivered(sess, incident_id):
     )
 
 
-def teamkill_evidence(sess, server, payload):
-    end = payload["report_time"]
-    start = max(payload["round_start"], end - TEAMKILL_SECONDS)
-    rows = sess.execute(
-        select(LogLine.id, LogLine.event_time, LogLine.raw)
-        .join(
-            PlayerID,
-            LogLine.player1_player_id == PlayerID.id,
+def role_history(payload):
+    """Optional observed history; never project the current role into the past."""
+    from rcon.utils import MapsHistory
+
+    try:
+        history = MapsHistory().get_current_map() or {}
+        if history.get("start") != payload["round_start"] or history.get("end"):
+            return []
+        rows = (
+            history.get("player_stats", {}).get(payload["target_id"], {}).get("units")
+            or []
         )
-        .where(
-            LogLine.server == str(server),
-            PlayerID.player_id == payload["target_id"],
-            LogLine.type == "TEAM KILL",
-            LogLine.player2_player_id.is_not(None),
-            LogLine.player2_player_id != LogLine.player1_player_id,
-            LogLine.event_time >= utc(start).replace(tzinfo=None),
-            LogLine.event_time <= utc(end).replace(tzinfo=None),
+        return [
+            {
+                "at": payload["round_start"] + row["ts"],
+                "role": row["role"],
+                "team": row["team"],
+                "squad": row["squad"],
+            }
+            for row in rows
+            if isinstance(row.get("ts"), (float, int))
+            and 0 <= row["ts"] <= time.time() - payload["round_start"]
+        ][-40:]
+    except Exception:
+        logger.warning("Report-admin role history unavailable")
+        return []
+
+
+def assess(sess, server, event, live, now):
+    p = event.payload
+    case = evidence_rules.collect(
+        sess, server, p, event.incident.reporter_id, now, live
+    )
+    if p["rule"] == "teamkills":
+        result = evidence_rules.assess_teamkills(
+            case, p["target_id"], event.incident.reporter_id, p["report_time"], now
         )
-        .order_by(LogLine.event_time.desc())
-        .limit(200)
-    ).all()
-    # Defensive dedupe in addition to the recorder's database unique constraint.
-    unique = {(row.event_time, row.raw): row.id for row in rows}
-    return list(unique.values())
+        if result[0] == "eligible" and QUALIFIED.search(
+            _normalize_message(event.incident.raw_message)
+        ):
+            return (
+                "manual",
+                "Eingeschränkte oder widersprüchliche Meldung / Qualified or conflicting report",
+                result[2],
+            )
+        return result
+    result = evidence_rules.assess_cheating(case, p["target_id"], role_history(p))
+    reporters = set(
+        sess.scalars(
+            select(AdminIncident.reporter_id)
+            .join(AdminIncidentEvent)
+            .where(
+                AdminIncident.server_number == server,
+                AdminIncident.target_id == p["target_id"],
+                AdminIncident.created_at >= utc(now - evidence_rules.LOOKBACK),
+                AdminIncidentEvent.event_type == "report_admin",
+                AdminIncidentEvent.payload["rule"].as_string() == "cheating",
+            )
+        )
+    ) - {None, ""}
+    result[2]["assessment"]["distinct_reporters"] = len(reporters)
+    if len(reporters) > 1:
+        result[2]["assessment"]["priority"] = "high"
+        result[2]["assessment"]["reasons"].append(
+            "Mehrere Melder: Priorität erhöht, kein zusätzlicher Cheatbeweis / Multiple reporters raise priority, not certainty"
+        )
+    return result
 
 
 def invalid_reason(sess, event, context, now):
@@ -388,7 +456,8 @@ def invalid_reason(sess, event, context, now):
         or i.revision != p["incident_revision"]
     ):
         return "Admin-Bearbeitung oder Ziel geändert / Admin handling or target changed"
-    if not 0 <= now - p["report_time"] <= MAX_REPORT_AGE:
+    max_age = evidence_rules.CASE_TTL if p["rule"] == "teamkills" else MAX_REPORT_AGE
+    if not 0 <= now - p["report_time"] <= max_age:
         return "Report abgelaufen / Report expired"
     if not valid_context(context, now) or context["round_id"] != p["round_id"]:
         return "Veraltete Daten oder Kartenwechsel / Stale data or map changed"
@@ -407,11 +476,11 @@ def invalid_reason(sess, event, context, now):
     if (
         not target
         or not reporter
-        or any(
-            q.get("online") is False
-            or _normalize_team(q.get("team")) != p["target"]["team"]
-            for q in (target, reporter)
-        )
+        or target.get("online") is False
+        or reporter.get("online") is False
+        or _normalize_team(target.get("team")) != p["target"]["team"]
+        or _normalize_team(reporter.get("team"))
+        != p.get("reporter_team", p["target"]["team"])
     ):
         return "Spieler offline oder Team geändert / Player offline or team changed"
     if p["rule"] == "communication" and (
@@ -453,6 +522,38 @@ def cancel_player(sess, server, pid=None):
 def recover(server):
     with enter_session() as sess:
         votes.lock(sess, server)
+        # Retire the old feature even when Report Admin itself is disabled.
+        # Keep historical records, cancel unsent messages, never resume a kick.
+        from rcon.leadership_vote.domain import OPEN as VOTE_OPEN
+
+        for vote in sess.scalars(
+            select(LeadershipVote).where(
+                LeadershipVote.server_number == server,
+                LeadershipVote.status.in_(VOTE_OPEN),
+            )
+        ):
+            uncertain = (
+                vote.payload.get("execution", {}).get("send_started_at") is not None
+            )
+            vote.status = "unknown" if uncertain else "cancelled"
+            vote.slot, vote.ended_at = None, time.time()
+            vote.payload = {
+                **vote.payload,
+                "result": "Führungsabstimmung eingestellt; Admins prüfen / Leadership voting retired; admins review",
+            }
+            votes.publish(sess, vote, vote.status, ACTOR)
+        for message in sess.scalars(
+            select(LeadershipMessage).where(
+                LeadershipMessage.server_number == server,
+                LeadershipMessage.status.in_({"pending", "sending"}),
+            )
+        ):
+            message.status = "unknown" if message.status == "sending" else "cancelled"
+        old_config = sess.scalar(
+            select(UserConfig).where(UserConfig.key == votes.config_key(server))
+        )
+        if old_config and old_config.value.get("enabled"):
+            old_config.value = {**old_config.value, "enabled": False}
         for event in pending(sess, server):
             publish(
                 sess,
@@ -460,37 +561,45 @@ def recover(server):
                 "unknown" if event.payload["status"] == "sending" else "manual",
                 "Dienst neu gestartet; keine Wiederholung / Service restarted; no retry",
             )
+    _invalidate_user_config_cache(votes.config_key(server))
 
 
-def notify_reporter(api, server, event_id):
+def notify_reporter(api, server, event_id, *, review=False):
     """One private receipt after a durably confirmed kick; never a warning.
 
     A committed send marker prevents replay. Notification failures cannot undo
     the kick receipt or schedule a second kick. Self-reporters are already gone.
     """
+    field = "review_notification" if review else "reporter_notification"
+    expected = "queued" if review else "kicked"
     with enter_session() as sess:
         votes.lock(sess, server)
         event = sess.get(AdminIncidentEvent, event_id)
         if (
             not event
             or event.incident.server_number != server
-            or event.payload.get("status") != "kicked"
-            or event.payload.get("reporter_notification")
+            or event.payload.get("status") != expected
+            or event.payload.get(field)
+            or (
+                review
+                and (
+                    event.payload.get("rule") != "cheating"
+                    or not delivered(sess, event.incident_id)
+                )
+            )
         ):
             return
         if event.incident.reporter_id == event.payload["target_id"]:
             event.payload = {
                 **event.payload,
-                "reporter_notification": {"status": "skipped", "reason": "self_report"},
+                field: {"status": "skipped", "reason": "self_report"},
             }
             return
     context = read_context(api)
     with enter_session() as sess:
         votes.lock(sess, server)
         event = sess.get(AdminIncidentEvent, event_id)
-        if event.payload.get("status") != "kicked" or event.payload.get(
-            "reporter_notification"
-        ):
+        if event.payload.get("status") != expected or event.payload.get(field):
             return
         i, p = event.incident, event.payload
         matches = [
@@ -505,13 +614,15 @@ def notify_reporter(api, server, event_id):
             or context["round_id"] != p["round_id"]
             or len(matches) != 1
             or matches[0].get("online") is False
-            or _normalize_team(matches[0].get("team")) != p["target"]["team"]
+            or _normalize_team(matches[0].get("team"))
+            != p.get("reporter_team", p["target"]["team"])
             or session_token(sess, server, i.reporter_id, time.time())
             != p["reporter_session"]
+            or (review and invalid_reason(sess, event, context, time.time()))
         ):
             event.payload = {
                 **p,
-                "reporter_notification": {
+                field: {
                     "status": "skipped",
                     "reason": "reporter_unavailable_or_context_changed",
                 },
@@ -523,9 +634,14 @@ def notify_reporter(api, server, event_id):
             f"Deine Meldung wurde bearbeitet: {target_name} wurde vom Server gekickt.\n"
             f"Your report was handled: {target_name} was kicked from the server."
         )
+        if review:
+            body = (
+                f"Deine Cheatmeldung zu {target_name} ist eingegangen. Die Daten werden geprüft; Admins entscheiden über Maßnahmen.\n"
+                f"Your cheat report about {target_name} was received. Evidence is being reviewed; admins decide on any action."
+            )
         event.payload = {
             **p,
-            "reporter_notification": {
+            field: {
                 "status": "sending",
                 "started_at": time.time(),
                 "message": body,
@@ -553,8 +669,8 @@ def notify_reporter(api, server, event_id):
         event = sess.get(AdminIncidentEvent, event_id)
         event.payload = {
             **event.payload,
-            "reporter_notification": {
-                **event.payload["reporter_notification"],
+            field: {
+                **event.payload[field],
                 "status": "sent" if sent else "unknown",
                 "finished_at": time.time(),
             },
@@ -564,15 +680,38 @@ def notify_reporter(api, server, event_id):
 def tick(api, server):
     with enter_session() as sess:
         cfg = config(sess, server)
-        tasks = [e.id for e in pending(sess, server, limit=100)]
+        tasks = [e.id for e in pending(sess, server, limit=4, due_at=time.time())]
     if not tasks:
         return
     context = read_context(api) if cfg.enabled else None
-    for event_id in tasks[:4]:
+    for event_id in tasks:
+        live = None
+        with enter_session() as sess:
+            event = sess.get(AdminIncidentEvent, event_id)
+            rule = event.payload.get("rule") if event else None
+            safe = (
+                event
+                and not invalid_reason(sess, event, context, time.time())
+                and delivered(sess, event.incident_id)
+            )
+        if safe and rule != "communication":
+            if rule == "cheating":
+                try:
+                    notify_reporter(api, server, event_id, review=True)
+                except Exception:
+                    logger.exception(
+                        "Report-admin review acknowledgement unavailable; no retry"
+                    )
+            try:
+                live = evidence_rules.fresh_logs(api)
+            except Exception:
+                logger.exception(
+                    "Report-admin live evidence unavailable; no automatic TK sanction"
+                )
         with enter_session() as sess:
             votes.lock(sess, server)
             event = sess.get(AdminIncidentEvent, event_id)
-            if not event or event.payload["status"] != "queued":
+            if not event or event.payload["status"] not in {"queued", "waiting"}:
                 continue
             if reason := invalid_reason(sess, event, context, time.time()):
                 publish(sess, event, "manual", reason)
@@ -581,21 +720,16 @@ def tick(api, server):
                 continue
             p = event.payload
             evidence = {}
-            if p["rule"] == "teamkills":
-                ids = teamkill_evidence(sess, server, p)
-                evidence = {
-                    "teamkill_count": len(ids),
-                    "teamkill_log_ids": ids[:20],
-                    "window_seconds": TEAMKILL_SECONDS,
-                }
-                if len(ids) < TEAMKILL_COUNT:
-                    publish(
-                        sess,
-                        event,
-                        "manual",
-                        "Unter 5 Teamkills in 5 Minuten / Fewer than 5 teamkills in 5 minutes",
-                        **evidence,
-                    )
+            if p["rule"] != "communication":
+                status, reason, evidence = assess(
+                    sess, server, event, live, time.time()
+                )
+                if status != "eligible":
+                    publish(sess, event, status, reason, **evidence)
+                    event.payload = {
+                        **event.payload,
+                        "incident_revision": event.incident.revision,
+                    }
                     continue
             if p["mode"] == "dry_run":
                 publish(
@@ -641,6 +775,14 @@ def tick(api, server):
             }
         # Re-read config, identity, round, and ownership after the durable commit.
         fresh = read_context(api)
+        if rule == "teamkills":
+            # Catch a last-moment apology, new TK or reporter retaliation before
+            # the one allowed action. Read errors leave the reserved case manual.
+            try:
+                live = evidence_rules.fresh_logs(api)
+            except Exception:
+                live = None
+                logger.exception("Report-admin final evidence refresh failed")
         with enter_session() as sess:
             votes.lock(sess, server)
             event = sess.get(AdminIncidentEvent, event_id)
@@ -650,6 +792,15 @@ def tick(api, server):
                 publish(sess, event, "manual", reason)
                 continue
             p = event.payload
+            if p["rule"] != "communication":
+                status, reason, evidence = assess(
+                    sess, server, event, live, time.time()
+                )
+                if status != "eligible" or p["rule"] != "teamkills":
+                    publish(sess, event, "manual", reason, **evidence)
+                    continue
+                event.payload = {**p, **evidence}
+                p = event.payload
             reason = kick_reason(sess, p)
             confirmed = False
             try:

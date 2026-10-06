@@ -31,6 +31,7 @@ from rcon import (
 from rcon.leadership_vote import domain, hooks, service, storage
 from rcon.models import AdminIncident, LeadershipMessage
 from rcon.user_config.leadership_vote import LeadershipVoteUserConfig as Config
+from rcon.user_config.report_admin import ReportAdminUserConfig as ReportConfig
 
 
 @pytest.mark.parametrize(
@@ -246,8 +247,10 @@ def test_report_survives_discord_outage_and_disabled_optional_context(
     monkeypatch.setattr(discord_chat, "get_handler", lambda: handler)
     api = Mock()
     api.get_team_view.return_value = {}
+    api.get_players.return_value = players
     monkeypatch.setattr(incidents, "flatten_team_view", lambda _: squads(players))
     if unavailable:
+        api.get_players.side_effect = OSError("Game unavailable")
         api.get_detailed_players.side_effect = OSError("Game unavailable")
         monkeypatch.setattr(
             service, "read_context", Mock(side_effect=OSError("No context"))
@@ -265,7 +268,7 @@ def test_report_survives_discord_outage_and_disabled_optional_context(
     with db() as sess:
         incident = sess.scalar(select(AdminIncident))
         assert incident is not None and incident.status == "new"
-        assert bool(incident.leadership_vote_id) is not unavailable
+        assert incident.leadership_vote_id is None  # Retired, even with stored enabled=True.
     api.message_player.assert_not_called()
     api.get_player_info.assert_not_called()
 
@@ -442,8 +445,8 @@ def test_last_validation_failure_prevents_kick(db, monkeypatch, failure):
 @pytest.mark.parametrize(
     "text,hidden",
     [
-        ("!yes", True),
-        (" !NO ", True),
+        ("!yes", False),
+        (" !NO ", False),
         ("!admin Able redet nicht", True),
         ("!admin commander is not talking", True),
         ("!admin der commander redet nicht", True),
@@ -458,7 +461,8 @@ def test_last_validation_failure_prevents_kick(db, monkeypatch, failure):
         ("!yes please", False),
     ],
 )
-def test_public_webhook_privacy_classification(db, text, hidden):
+def test_public_webhook_privacy_classification(db, monkeypatch, text, hidden):
+    monkeypatch.setattr(ReportConfig, "load_from_db", lambda: ReportConfig(enabled=True))
     assert bool(domain.suppress_public_chat({"sub_content": text})) is hidden
 
 
@@ -469,6 +473,7 @@ def test_public_webhook_privacy_classification(db, text, hidden):
 def test_private_admin_report_kept_but_general_chat_webhook_suppressed(
     db, monkeypatch, text
 ):
+    monkeypatch.setattr(ReportConfig, "load_from_db", lambda: ReportConfig(enabled=True))
     handler = object.__new__(discord_chat.DiscordWebhookHandler)
     handler.chat_webhooks = [Mock()]
     admin = Mock()
@@ -492,7 +497,7 @@ def test_public_report_privacy_disabled_and_config_failure(db, monkeypatch):
     log = {"sub_content": "!admin able"}
     assert not domain.suppress_public_chat(log)
     monkeypatch.setattr(
-        Config, "load_from_db", Mock(side_effect=OSError("DB unavailable"))
+        ReportConfig, "load_from_db", Mock(side_effect=OSError("DB unavailable"))
     )
     assert domain.suppress_public_chat(log)
     assert not domain.suppress_public_chat({"sub_content": "hello team"})
@@ -534,13 +539,13 @@ def test_duplicate_report_log_has_only_one_offer(db):
         assert all(m.purpose == "invite_de" for m in queued)
 
 
-def test_leadership_failure_does_not_stop_other_routines(monkeypatch):
-    from rcon import routines
+def test_retired_leadership_runtime_is_never_started(monkeypatch):
+    from rcon import routines, report_admin
 
     runtime = Mock()
-    runtime.step.side_effect = OSError("isolated vote failure")
-    runtime.close.side_effect = OSError("isolated cleanup failure")
-    monkeypatch.setattr(service, "Runtime", lambda: runtime)
+    legacy = Mock(side_effect=AssertionError("Retired runtime must not start"))
+    monkeypatch.setattr(service, "Runtime", legacy)
+    monkeypatch.setattr(report_admin, "Runtime", lambda: runtime)
     api = Mock()
     api.performance_stats_interval.return_value = 0
     monkeypatch.setattr(routines, "get_rcon", lambda: api)
@@ -554,3 +559,4 @@ def test_leadership_failure_does_not_stop_other_routines(monkeypatch):
     regular.assert_called_once_with(api)
     map_votes.send_reminder.assert_called_once()
     runtime.close.assert_called_once()
+    legacy.assert_not_called()

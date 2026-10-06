@@ -28,8 +28,11 @@ def configuration(request, server):
         return {
             "config": service.config(sess, server).model_dump(),
             "can_enable": request.user.has_perm(KICK),
-            "teamkill_count": 5,
-            "window_seconds": 300,
+            "teamkill_policy": "individual_case",
+            "teamkill_grace_seconds": 60,
+            "context_window_seconds": 900,
+            "cheat_sanctions": "manual_only",
+            "manual_cheat_ban_hours": 24,
             "templates": [
                 {"id": row.id, "title": row.title}
                 for row in sess.scalars(

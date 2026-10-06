@@ -15,6 +15,7 @@ class ReportAdminUserConfig(BaseUserConfig):
     mode: Literal["dry_run", "active"] = "dry_run"
     communication: bool = True
     teamkills: bool = True
+    cheating: bool = False  # Explicit opt-in for new review/receipt behavior.
     allow_self_reports: bool = False
     communication_template_id: int | None = Field(default=None, gt=0)
     teamkills_template_id: int | None = Field(default=None, gt=0)

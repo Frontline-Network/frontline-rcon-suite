@@ -466,6 +466,7 @@ def _action_modal(
     action: str,
     *,
     initial_text: str = "",
+    duration_hours: int = 2,
 ) -> dict:
     text_key = "message" if action in {"message", "message_reporter"} else "reason"
     inputs = [
@@ -496,7 +497,7 @@ def _action_modal(
                         "label": "Dauer in Stunden (1-720)",
                         "style": 1,
                         "required": True,
-                        "value": "2",
+                        "value": str(duration_hours),
                         "max_length": 3,
                     }
                 ],
@@ -1076,6 +1077,7 @@ def receive_event(
             status_code=503, detail="Discord delivery unavailable"
         ) from exc
     now = datetime.now(tz=timezone.utc)
+    cheat_review = (envelope.incident.get("report_admin") or {}).get("rule") == "cheating"
     if mapping is None:
         mapping = IncidentMessage(
             installation_id=envelope.installation_id,
@@ -1086,7 +1088,7 @@ def receive_event(
             analysis_id=str(envelope.incident.get("analysis_id") or "") or None,
             suggested_action=(analysis.suggested_action.value if analysis else None),
             suggested_duration_hours=(
-                analysis.suggested_duration_hours if analysis else None
+                24 if cheat_review else analysis.suggested_duration_hours if analysis else None
             ),
             primary_subject_id=(
                 None
@@ -1107,6 +1109,8 @@ def receive_event(
         if analysis:
             mapping.suggested_action = analysis.suggested_action.value
             mapping.suggested_duration_hours = analysis.suggested_duration_hours
+        if cheat_review:
+            mapping.suggested_duration_hours = 24
         if is_multi_squad_report:
             if mapping.primary_subject_id not in squad_subject_ids:
                 mapping.primary_subject_id = None
@@ -1818,8 +1822,11 @@ async def discord_interaction(
                 message = "CRCON hat die Übernahme nicht bestätigt."
             return {"type": 4, "data": {"content": message, "flags": 64}}
     if operation == "action" and payload.get("type") != 5:
+        # Prefill only; the admin must enter a reason and submit the action.
+        # No model/report-assessment result ever executes a cheat ban.
+        duration_hours = 24 if mapping and mapping.suggested_duration_hours == 24 else 2
         if selected_template_id == "custom":
-            return _action_modal(incident_id, revision, recommended_action)
+            return _action_modal(incident_id, revision, recommended_action, duration_hours=duration_hours)
         crcon_action = (
             "message"
             if recommended_action == "message_reporter"
@@ -1863,13 +1870,14 @@ async def discord_interaction(
                 revision,
                 recommended_action,
                 initial_text=str(selected_template.get("content") or ""),
+                duration_hours=duration_hours,
             )
         templates = template_result.get("templates") or []
         if templates:
             return _template_picker(
                 incident_id, revision, recommended_action, templates
             )
-        return _action_modal(incident_id, revision, recommended_action)
+        return _action_modal(incident_id, revision, recommended_action, duration_hours=duration_hours)
     if operation == "logs":
         try:
             claimed = _claim_from_first_button(

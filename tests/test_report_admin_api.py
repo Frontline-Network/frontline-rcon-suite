@@ -98,3 +98,13 @@ def test_csrf_protection(call):
             middleware.process_view(request, api.configuration, (), {}).status_code
             == 403
         )
+
+
+def test_individual_case_and_cheat_review_config_metadata(call):
+    response = call("PUT", {"enabled": True, "cheating": True}, [api.MANAGE, api.KICK])
+    assert response.status_code == 200
+    result = json.loads(response.content)["result"]
+    assert result["config"]["cheating"] is True
+    assert result["teamkill_grace_seconds"] == 60
+    assert result["cheat_sanctions"] == "manual_only"
+    assert "teamkill_count" not in result

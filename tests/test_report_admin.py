@@ -58,6 +58,36 @@ def setup(db, monkeypatch):
     service.configure(1, Config(enabled=True, mode="active"))
     ctx = {**context(players), "round_start": db.clock.now - 600}
     monkeypatch.setattr(service, "read_context", lambda _: deepcopy(ctx))
+
+    def live_logs(_):
+        with db() as sess:
+            rows = sess.scalars(select(LogLine).where(LogLine.server == "1")).all()
+            logs = [
+                {
+                    "timestamp_ms": row.event_time.replace(
+                        tzinfo=service.timezone.utc
+                    ).timestamp()
+                    * 1000,
+                    "action": row.type,
+                    "player_id_1": row.player_1.player_id if row.player_1 else None,
+                    "player_id_2": row.player_2.player_id if row.player_2 else None,
+                    "player_name_1": row.player1_name,
+                    "player_name_2": row.player2_name,
+                    "weapon": row.weapon,
+                    "sub_content": (
+                        service.evidence_rules.chat_body(
+                            row.content, row.player1_name, row.player_1.player_id
+                        )
+                        if row.player_1
+                        else None
+                    ),
+                }
+                for row in rows
+            ]
+        return {"logs": logs, "captured_at": db.clock.now, "game": 1}
+
+    monkeypatch.setattr(service.evidence_rules, "fresh_logs", live_logs)
+    monkeypatch.setattr(service, "role_history", lambda _: [])
     return db, players, ctx
 
 
@@ -91,6 +121,32 @@ def current(db, iid):
         return sess.get(AdminIncident, iid).to_dict(include_events=True)
 
 
+def test_confirmed_report_admin_target_retains_own_live_statistics(setup):
+    db, players, _ = setup
+    target = next(p for p in players if p["player_id"] == "target")
+    target.update(
+        kills=12,
+        deaths=4,
+        team_kills=0,
+        combat=190,
+        kills_streak=5,
+        map_playtime_seconds=600,
+    )
+    other = next(p for p in players if p["player_id"] == "v0")
+    other.update(kills=99, team_kills=99, combat=9999)
+    incident = report(setup)
+    snapshot = current(db, incident["id"])["primary_subject"]["snapshot"]
+    assert snapshot["player_id"] == "target"
+    assert snapshot["kills"] == 12
+    assert snapshot["deaths"] == 4
+    assert snapshot["combat"] == 190
+    assert snapshot["teamkills"] == 0
+    assert snapshot["kills_streak"] == 5
+    assert snapshot["map_playtime_seconds"] == 600
+    assert snapshot["rule"] == "communication"
+    assert "candidates" in snapshot
+
+
 def teamkills(setup, count, *, server="1", age=30, pid="target"):
     db, _, _ = setup
     with db() as sess:
@@ -111,6 +167,30 @@ def teamkills(setup, count, *, server="1", age=30, pid="target"):
             )
 
 
+def chat(setup, body, *, age=0, pid="target", server="1"):
+    db, players, _ = setup
+    name = next(p["name"] for p in players if p["player_id"] == pid)
+    with db() as sess:
+        actor = sess.scalar(select(PlayerID.id).where(PlayerID.player_id == pid))
+        sess.add(
+            LogLine(
+                event_time=service.utc(db.clock.now - age).replace(tzinfo=None),
+                type="CHAT[Allies][Team]",
+                player1_name=name,
+                player1_player_id=actor,
+                raw=f"chat-{pid}-{server}-{age}-{body}",
+                content=f"{name}: {body} ({pid})",
+                weapon="",
+                server=server,
+            )
+        )
+
+
+def admitted_teamkill(setup, count=1):
+    teamkills(setup, count, age=75)
+    chat(setup, "I teamkilled him on purpose", age=70)
+
+
 @pytest.mark.parametrize(
     "message,expected",
     [
@@ -123,10 +203,10 @@ def teamkills(setup, count, *, server="1", age=30, pid="target"):
         ("!admin Hero tk", "teamkills"),
         ("!admin Hero teamkillt", "teamkills"),
         ("!admin able", None),
-        ("!admin Hero cheater", None),
+        ("!admin Hero cheater", "cheating"),
         ("!admin able redet nicht mehr", None),
-        ("!admin Hero keine teamkills", None),
-        ("!admin Hero teamkills aus Versehen", None),
+        ("!admin Hero keine teamkills", "teamkills"),
+        ("!admin Hero teamkills aus Versehen", "teamkills"),
         ('!admin Hero sagt "able redet nicht"', None),
         ("!admin Hero not talking?", None),
         ("!admin Hero redet nicht und teamkillt", None),
@@ -160,7 +240,7 @@ def test_self_report_requires_explicit_server_option(setup, allowed, kind):
         players[0].update(role="ArmyCommander", unit_name="")
         message = "!admin commander is not talking"
     if kind == "teamkills":
-        teamkills(setup, 5)
+        admitted_teamkill(setup)
         message = "!admin BattlefieldHero teamkills"
     i = report(setup, message, reporter_id="target")
     api = transport()
@@ -211,7 +291,7 @@ def test_self_report_does_not_bypass_other_guards(setup, monkeypatch, change):
     )
 
 
-def test_self_report_teamkill_threshold_unchanged(setup):
+def test_self_report_never_bypasses_teamkill_intent_check(setup):
     service.configure(1, Config(enabled=True, mode="active", allow_self_reports=True))
     teamkills(setup, 4)
     i = report(setup, "!admin BattlefieldHero teamkills", reporter_id="target")
@@ -280,14 +360,14 @@ def test_direct_communication_kick_no_warning_or_vote(setup):
     assert final["status"] == "resolved" and final["report_admin"]["status"] == "kicked"
 
 
-@pytest.mark.parametrize("count,kicked", [(0, False), (4, False), (5, True), (6, True)])
-def test_teamkill_threshold(setup, count, kicked):
+@pytest.mark.parametrize("count", [0, 1, 4, 5, 6, 20])
+def test_teamkill_count_alone_never_kicks(setup, count):
     db, _, _ = setup
     teamkills(setup, count)
     i = report(setup, "!admin BattlefieldHero teamkills")
     api = transport()
     service.tick(api, 1)
-    assert api.kick.called is kicked
+    api.kick.assert_not_called()
     assert current(db, i["id"])["report_admin"]["teamkill_count"] == count
 
 
@@ -467,7 +547,7 @@ def test_reporter_receipt_uses_current_recipient_and_preserves_kick(
 
 
 def test_teamkill_kick_also_notifies_only_reporter(setup):
-    teamkills(setup, 5)
+    admitted_teamkill(setup)
     report(setup, "!admin BattlefieldHero teamkills")
     api = transport()
     service.tick(api, 1)
@@ -516,7 +596,7 @@ def test_other_complaints_no_vote_no_kick(setup):
     "fragment", ["BattlefielxHero", "BattlexielxHero", "BattlexielxHera"]
 )
 def test_long_unique_name_typos(setup, fragment):
-    teamkills(setup, 5)
+    admitted_teamkill(setup)
     i = report(setup, f"!admin {fragment} teamkills")
     api = transport()
     service.tick(api, 1)
@@ -556,11 +636,11 @@ def test_templates_and_fallback(setup):
         sess.flush()
         tid = template.id
     service.configure(1, Config(enabled=True, mode="active", teamkills_template_id=tid))
-    teamkills(setup, 5)
+    admitted_teamkill(setup, 5)
     report(setup, "!admin BattlefieldHero teamkills")
     api = transport()
     service.tick(api, 1)
-    assert api.kick.call_args.args[1] == "BattlefieldHero: 5 TK / 5 min"
+    assert api.kick.call_args.args[1] == "BattlefieldHero: 5 TK / 10.0 min"
 
 
 @pytest.mark.parametrize(

@@ -50,6 +50,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
 import { useGlobalStore } from "@/stores/global-state";
 import { discordRequest } from "@/utils/fetchUtils";
+import ReportAdmin from "@/pages/settings/report-admin";
 
 const ACTIONS = [
   "message",
@@ -520,9 +521,7 @@ export default function DiscordReportBotCard() {
               guild:
                 config.guild_name ||
                 t("settings.discordReports.guildNotDetected"),
-              channel: config.channel_name
-                ? `#${config.channel_name}`
-                : "–",
+              channel: config.channel_name ? `#${config.channel_name}` : "–",
             })}
           </Alert>
           <Button
@@ -580,7 +579,7 @@ export default function DiscordReportBotCard() {
               selected
                 .map(
                   (id) =>
-                  discordOptions.roles.find((role) => role.id === id)?.name ||
+                    discordOptions.roles.find((role) => role.id === id)?.name ||
                     "–"
                 )
                 .join(", "),
@@ -706,6 +705,8 @@ export default function DiscordReportBotCard() {
     const provider = config.ai_config?.provider || "api_key";
     return (
       <Stack spacing={2.5}>
+        <ReportAdmin embedded />
+        <Divider />
         <SectionTitle
           icon={<AiIcon />}
           title={t("settings.discordReports.step_ai")}
@@ -1122,9 +1123,7 @@ export default function DiscordReportBotCard() {
           label={t("settings.discordReports.discordServer")}
           state={config?.connected ? "online" : "offline"}
           detail={`${config?.guild_name || "–"} · ${
-            config?.channel_name
-              ? `#${config.channel_name}`
-              : "–"
+            config?.channel_name ? `#${config.channel_name}` : "–"
           }`}
           t={t}
         />

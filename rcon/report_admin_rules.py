@@ -1,6 +1,6 @@
 """Conservative report classification; text is data, never an instruction.
 
-Only two rules are supported. Unsupported wording is a manual report, not a
+Unsupported wording is a manual report, not a
 best-guess sanction. Communication is a reported allegation, not voice evidence.
 """
 
@@ -10,8 +10,6 @@ from rcon.admin_incidents import _normalize_message, _normalize_team
 from rcon.leadership_vote.domain import identity, may_report
 from rcon.leadership_vote.targets import resolve, LETTERS, COMMANDERS, SQUAD_TYPOS
 
-TEAMKILL_COUNT = 5
-TEAMKILL_SECONDS = 300
 MAX_REPORT_AGE = 60
 
 COMMUNICATION = re.compile(
@@ -22,6 +20,7 @@ COMMUNICATION = re.compile(
 TEAMKILLS = re.compile(
     r"\b(?:teamkills?|teamkillt|teamkilling|teamkiller|tk|tks|tk[st]|team killed|team killing)\b"
 )
+CHEATING = re.compile(r"\b(?:cheat\w*|hack\w*|aimbot|wallhack)\b")
 # A mixed/qualified complaint is deliberately not sufficient for direct action.
 QUALIFIED = re.compile(
     r"\b(?:nicht mehr|doch|wieder|aber|vielleicht|angeblich|sagt|sagte|behauptet|"
@@ -45,6 +44,18 @@ def classify(message, players=()):
         name = _normalize_message(str(p.get("name") or p.get("player_name") or ""))
         if name:
             text = re.sub(r"(?<!\w)" + re.escape(name) + r"(?!\w)", " ", text)
+    # Cheat reviews can accept suspicions, but never a mixed actionable rule.
+    # They are evidence summaries for humans, with no automatic sanction path.
+    if CHEATING.search(text):
+        return (
+            "cheating"
+            if not COMMUNICATION.search(text) and not TEAMKILLS.search(text)
+            else None
+        )
+    # Teamkill complaints are allegations. Even qualified/accidental cases may
+    # be reviewed; the complaint itself never supplies evidence of intent.
+    if TEAMKILLS.search(text) and not COMMUNICATION.search(text):
+        return "teamkills"
     if QUALIFIED.search(text) or any(c in text for c in ('"', "?", "“", "”")):
         return None
     comm, tk = bool(COMMUNICATION.search(text)), bool(TEAMKILLS.search(text))
@@ -131,7 +142,8 @@ def target_for(incident, players, rule, *, allow_self_reports=False):
     if (
         (pid == incident.get("reporter_id") and not allow_self_reports)
         or team not in {"allies", "axis"}
-        or team != _normalize_team(reporter.get("team"))
+        or _normalize_team(reporter.get("team")) not in {"allies", "axis"}
+        or (rule != "cheating" and team != _normalize_team(reporter.get("team")))
     ):
         return None
     return {
