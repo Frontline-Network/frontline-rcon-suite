@@ -28,8 +28,8 @@ ein Squadname allein genügt nicht.
 
 ## Spielerzuordnung
 
-Aktueller, eindeutiger Online-Spieler; Melder und Ziel im selben Team, keine
-Selbstmeldung. Für Kommunikation muss der Melder einem Squad angehören oder
+Aktueller, eindeutiger Online-Spieler; Melder und Ziel im selben Team,
+standardmäßig keine Selbstmeldung. Für Kommunikation muss der Melder einem Squad angehören oder
 Commander sein; das Ziel muss eine Führungsrolle haben. Squadbezeichnungen,
 Commander-Aliasse und die HLL/HLLV-Rollen stammen aus dem bestehenden Parser.
 
@@ -53,6 +53,14 @@ Apps → Discord-Report-Bot → **Report-Admin – Kommunikation & Teamkills**.
 Serverbezogene Aktivierung, Probelauf/Aktivmodus und beide Regeln einzeln.
 Konfiguration benötigt `can_manage_discord_report_bot`; Aktivierung zusätzlich
 `can_kick_players`. Session-Schreibzugriffe bleiben CSRF-geschützt.
+
+**Selbstmeldungen für Tests zulassen** (`allow_self_reports`, standardmäßig aus)
+hebt ausschließlich die Selbstmeldesperre des Report-Admins auf diesem Server auf.
+Im Aktivmodus sind das **echte Kicks**, kein zusätzlicher Probelauf. Online-Zuordnung,
+Führungsrolle, Sitzungsprüfung, Discord-Zustellung und Teamkill-Schwelle gelten
+unverändert. Beim Führungsvote bleiben Selbstmeldungen gesperrt. Nach dem Test
+wieder ausschalten und speichern; bereits manuell abgelegte Reports werden
+auch beim Einschalten nicht nachträglich ausgeführt.
 
 Pro Regel kann eine vorhandene Vorlage aus **Gründe / REASON** ausgewählt werden.
 Platzhalter: `{player_name}`, `{teamkills}`, `{minutes}`. Nur Textsubstitution,
@@ -90,6 +98,19 @@ nachträglich rückgängig zu machen.
 Discord bearbeitet dieselbe Report-Karte und zeigt Regel, Ziel, Prüfergebnis,
 Teamkill-Anzahl und Ergebnis. Handlungsbedarf/Probelauf erzeugt eine erneute
 Admin-Benachrichtigung. Einzelne Prüfschritte erzeugen keine zusätzlichen Pings.
+Ein bestätigter Kick wird zusätzlich prominent als **„Automatisch gekickt“**
+im Titel markiert, mit einer grünen Karte, einem vorangestellten Feld für
+Spieler/Aktion/Grund und dem Report-Admin als automatischem Bearbeiter.
+Probeläufe, unklare Ergebnisse und manuell geschlossene Reports tragen diese
+Erfolgskennzeichnung nicht. Die Anzeige folgt der Discord-Sprache DE/EN.
+Nach einem bestätigten und gespeicherten Kick erhält ausschließlich der Melder
+eine kurze private DE/EN-Erfolgsbestätigung mit dem Namen des gekickten Spielers.
+Keine Erfolgsmeldung im Probelauf oder bei unklarem/fehlgeschlagenem Kick.
+Ein Selbstmelder erhält keine Nachricht, da er selbst gekickt wurde. Offline-
+Melder, geänderte Sitzungen/Teams und veraltete Daten werden übersprungen.
+Die Nachricht ist eine Information, keine Verwarnung. Ihr Versand wird im
+Incident-Journal protokolliert, bei Fehlern nicht automatisch wiederholt und
+ändert niemals das bereits gespeicherte Kick-Ergebnis.
 Allgemeine Chat-Webhooks spiegeln bei aktivem Report-Admin keine `!admin`-Reports;
 der Admin-Report bleibt erhalten. Bereits global geschriebener Chat bleibt im
 Spiel öffentlich.

@@ -11,6 +11,9 @@ export const copy = {
     enabled: "Report-Admin aktivieren",
     communication: "Kommunikationsmeldungen bearbeiten",
     tk: "Teamkill-Meldungen bearbeiten",
+    selfReports: "Selbstmeldungen für Tests zulassen",
+    selfReportsWarning:
+      "Testausnahme aktiv: Neue Selbstmeldungen werden ebenfalls geprüft. Im Aktivmodus kann dies dich tatsächlich vom Server kicken. Die übrigen Regeln gelten weiterhin; beim Führungsvote bleiben Selbstmeldungen gesperrt. Nach dem Test wieder ausschalten und speichern.",
     mode: "Betriebsart",
     dry: "Probelauf – keine Kicks",
     active: "Aktiv – automatische Kicks",
@@ -36,6 +39,9 @@ export const copy = {
     enabled: "Enable report admin",
     communication: "Process communication reports",
     tk: "Process teamkill reports",
+    selfReports: "Allow self-reports for testing",
+    selfReportsWarning:
+      "Test exception enabled: New self-reports are also checked. In active mode this can actually kick you from the server. All other rules still apply; leadership votes still reject self-reports. Disable and save this option after testing.",
     mode: "Mode",
     dry: "Dry run – no kicks",
     active: "Active – automatic kicks",

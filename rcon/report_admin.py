@@ -223,7 +223,7 @@ def enqueue(sess, incident, context, now):
     if incident.source != "chat" or not rule or not getattr(cfg, rule):
         return True  # All other subjects remain strictly manual in this mode.
     resolution_subjects = data.get("subjects", [])
-    target = target_for(data, players, rule)
+    target = target_for(data, players, rule, allow_self_reports=cfg.allow_self_reports)
     if not target and not any(
         s.get("state") in {"confirmed", "rejected"} for s in data.get("subjects", [])
     ):
@@ -238,7 +238,12 @@ def enqueue(sess, incident, context, now):
             context_mode="enabled",
         )
         if parsed:
-            target = target_for({**data, "subjects": parsed["subjects"]}, players, rule)
+            target = target_for(
+                {**data, "subjects": parsed["subjects"]},
+                players,
+                rule,
+                allow_self_reports=cfg.allow_self_reports,
+            )
             if target:
                 resolution_subjects = parsed["subjects"]
     stamp = (context or {}).get("event_time")
@@ -457,6 +462,105 @@ def recover(server):
             )
 
 
+def notify_reporter(api, server, event_id):
+    """One private receipt after a durably confirmed kick; never a warning.
+
+    A committed send marker prevents replay. Notification failures cannot undo
+    the kick receipt or schedule a second kick. Self-reporters are already gone.
+    """
+    with enter_session() as sess:
+        votes.lock(sess, server)
+        event = sess.get(AdminIncidentEvent, event_id)
+        if (
+            not event
+            or event.incident.server_number != server
+            or event.payload.get("status") != "kicked"
+            or event.payload.get("reporter_notification")
+        ):
+            return
+        if event.incident.reporter_id == event.payload["target_id"]:
+            event.payload = {
+                **event.payload,
+                "reporter_notification": {"status": "skipped", "reason": "self_report"},
+            }
+            return
+    context = read_context(api)
+    with enter_session() as sess:
+        votes.lock(sess, server)
+        event = sess.get(AdminIncidentEvent, event_id)
+        if event.payload.get("status") != "kicked" or event.payload.get(
+            "reporter_notification"
+        ):
+            return
+        i, p = event.incident, event.payload
+        matches = [
+            q
+            for q in (context or {}).get("players", [])
+            if str(q.get("player_id")) == i.reporter_id
+        ]
+        from rcon.admin_incidents import _normalize_team
+
+        if (
+            not valid_context(context, time.time())
+            or context["round_id"] != p["round_id"]
+            or len(matches) != 1
+            or matches[0].get("online") is False
+            or _normalize_team(matches[0].get("team")) != p["target"]["team"]
+            or session_token(sess, server, i.reporter_id, time.time())
+            != p["reporter_session"]
+        ):
+            event.payload = {
+                **p,
+                "reporter_notification": {
+                    "status": "skipped",
+                    "reason": "reporter_unavailable_or_context_changed",
+                },
+            }
+            return
+        recipient, recipient_name = i.reporter_id, i.reporter_name
+        target_name = " ".join(str(p["target_name"]).split())[:100]
+        body = (
+            f"Deine Meldung wurde bearbeitet: {target_name} wurde vom Server gekickt.\n"
+            f"Your report was handled: {target_name} was kicked from the server."
+        )
+        event.payload = {
+            **p,
+            "reporter_notification": {
+                "status": "sending",
+                "started_at": time.time(),
+                "message": body,
+            },
+        }
+    sent = False
+    try:
+        with api.without_retries():
+            # The incident journal is the audit trail. Do not create a player
+            # warning/action record for this informational acknowledgement.
+            sent = (
+                api.message_player(
+                    recipient,
+                    body,
+                    by=ACTOR,
+                    save_message=False,
+                    player_name=recipient_name,
+                )
+                is True
+            )
+    except Exception:
+        logger.exception("Report-admin reporter receipt uncertain; no retry")
+    with enter_session() as sess:
+        votes.lock(sess, server)
+        event = sess.get(AdminIncidentEvent, event_id)
+        event.payload = {
+            **event.payload,
+            "reporter_notification": {
+                **event.payload["reporter_notification"],
+                "status": "sent" if sent else "unknown",
+                "finished_at": time.time(),
+            },
+        }
+
+
 def tick(api, server):
     with enter_session() as sess:
         cfg = config(sess, server)
@@ -576,6 +680,15 @@ def tick(api, server):
                 ),
                 sent_reason=reason,
             )
+        # This runs only AFTER the kick result transaction committed. Never
+        # infer success from a disconnect or a failed/unconfirmed kick response.
+        if confirmed:
+            try:
+                notify_reporter(api, server, event_id)
+            except Exception:
+                logger.exception(
+                    "Report-admin reporter receipt failed; kick result preserved"
+                )
 
 
 class Runtime:

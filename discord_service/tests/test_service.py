@@ -172,6 +172,46 @@ def test_report_admin_communication_is_allegation_not_voice_evidence(language):
     assert "no voice evidence" in str(result)
 
 
+@pytest.mark.parametrize("language", ["de", "en"])
+def test_confirmed_report_admin_kick_is_prominent_and_has_no_action_buttons(language):
+    event = _event()
+    event["incident"].update(
+        discord_language=language,
+        status="resolved",
+        assigned_to="system:report-admin",
+        report_admin={"status": "kicked", "mode": "active", "rule": "teamkills", "target_name": "Example", "teamkill_count": 5, "sent_reason": "5 TK / 5 min"},
+    )
+    result = render_message(IncidentEventEnvelope.model_validate(event), None)
+    embed = result["embeds"][0]
+    assert ("Automatisch gekickt" if language == "de" else "Automatically kicked") in embed["title"]
+    assert "Example" in embed["title"]
+    assert ("Automatischer Eingriff" if language == "de" else "Automatic action") in embed["fields"][0]["name"]
+    assert "5 TK / 5 min" in embed["fields"][0]["value"]
+    assert "Example" in embed["fields"][0]["value"]
+    assert embed["color"] == 0x2ECC71
+    assert ("Automatisch bearbeitet" if language == "de" else "Automatically handled") in embed["footer"]["text"]
+    assert not result["components"]
+    assert result["allowed_mentions"] == {"parse": []}
+
+
+@pytest.mark.parametrize("state", ["queued", "sending", "manual", "unknown", "dry_run"])
+def test_unconfirmed_automation_never_displays_automatic_kick_success(state):
+    event = _event()
+    event["incident"].update(status="new", report_admin={"status": state, "mode": "active", "rule": "communication"})
+    result = render_message(IncidentEventEnvelope.model_validate(event), None)
+    assert "Automatisch gekickt" not in str(result)
+    assert "Automatischer Eingriff" not in str(result)
+
+
+@pytest.mark.parametrize("overrides", [{"assigned_to": "human-admin"}, {"status": "claimed"}, {"report_admin": {"status": "kicked", "mode": "dry_run"}}])
+def test_manual_or_inconsistent_closure_not_labelled_automatic_kick(overrides):
+    event = _event()
+    event["incident"].update(status="resolved", assigned_to="system:report-admin", report_admin={"status": "kicked", "mode": "active"})
+    event["incident"].update(overrides)
+    result = render_message(IncidentEventEnvelope.model_validate(event), None)
+    assert "Automatisch gekickt" not in str(result)
+
+
 def test_out_of_order_revision_cannot_overwrite_newer_discord_state():
     capability = _seed()
     client = TestClient(app)

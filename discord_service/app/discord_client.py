@@ -771,6 +771,13 @@ def render_message(
         )
     action_log = _action_log_field(incident, language)
     report_admin = incident.get("report_admin")
+    automatic_kick = (
+        isinstance(report_admin, dict)
+        and report_admin.get("status") == "kicked"
+        and report_admin.get("mode") == "active"
+        and status == "resolved"
+        and incident.get("assigned_to") == "system:report-admin"
+    )
     if isinstance(report_admin, dict):
         states = {
             "queued": "Prüfung ausstehend / Awaiting checks",
@@ -785,14 +792,28 @@ def render_message(
             if report_admin.get("rule") == "teamkills" else
             "Kommunikation gemeldet; kein Sprachnachweis / Communication reported; no voice evidence"
         )
-        fields.append({
+        admin_field = {
             "name": "🤖 Report-Admin",
             "value": _truncate(
                 f"{states.get(report_admin.get('status'), 'Manual review')}\n"
                 f"{report_admin.get('target_name') or '-'}\n{evidence}\n"
                 f"{report_admin.get('result') or ''}\n{report_admin.get('sent_reason') or ''}", 1024),
             "inline": False,
-        })
+        }
+        if automatic_kick:
+            reason = report_admin.get("sent_reason") or report_admin.get("result") or "–"
+            kicked_name = report_admin.get("target_name") or target_name
+            admin_field.update(
+                name=("✅ Automatischer Eingriff – Report-Admin" if language == "de" else "✅ Automatic action – report admin"),
+                value=_truncate(
+                    (f"**Aktion:** Server-Kick bestätigt\n**Spieler:** {kicked_name}\n**Grund:** {reason}" if language == "de" else
+                     f"**Action:** Server kick confirmed\n**Player:** {kicked_name}\n**Reason:** {reason}")
+                    + "\n" + evidence, 1024),
+            )
+            fields.insert(0, admin_field)
+            color = 0x2ECC71
+        else:
+            fields.append(admin_field)
     vote = incident.get("leadership_vote")
     if vote:
         deadline = f"<t:{int(vote['ends_at'])}:R>" if vote.get("ends_at") and vote.get("status") in {"confirming", "warning", "active", "inviting"} else "–"
@@ -1055,8 +1076,13 @@ def render_message(
         )
     else:
         title = labels["report_title"].format(name=target_name)
+    if automatic_kick:
+        title = ("Automatisch gekickt – " if language == "de" else "Automatically kicked – ") + str(report_admin.get("target_name") or target_name)
+        team_emoji = "🤖"
     footer_parts = []
-    if assigned_name:
+    if automatic_kick:
+        footer_parts.append("Automatisch bearbeitet durch Report-Admin" if language == "de" else "Automatically handled by report admin")
+    elif assigned_name:
         footer_parts.append(
             ("Bearbeitet von " if language == "de" else "Handled by ") + assigned_name
         )

@@ -53,7 +53,7 @@ def classify(message, players=()):
     return "communication" if comm else "teamkills"
 
 
-def target_for(incident, players, rule):
+def target_for(incident, players, rule, *, allow_self_reports=False):
     """Accept exact references or independently validated, unique name typos."""
     ids = [str(p.get("player_id") or "") for p in players]
     if not all(ids) or len(ids) != len(set(ids)):
@@ -88,10 +88,16 @@ def target_for(incident, players, rule):
         if (
             not seat
             or not unique_seat(players, seat)
-            or not may_report(
-                players,
-                incident.get("reporter_id"),
-                dict(seat, player_id=str(p["player_id"])),
+            or not (
+                (
+                    allow_self_reports
+                    and str(p["player_id"]) == incident.get("reporter_id")
+                )
+                or may_report(
+                    players,
+                    incident.get("reporter_id"),
+                    dict(seat, player_id=str(p["player_id"])),
+                )
             )
         ):
             return None
@@ -123,7 +129,7 @@ def target_for(incident, players, rule):
     pid = str(p["player_id"])
     team = _normalize_team(p.get("team"))
     if (
-        pid == incident.get("reporter_id")
+        (pid == incident.get("reporter_id") and not allow_self_reports)
         or team not in {"allies", "axis"}
         or team != _normalize_team(reporter.get("team"))
     ):

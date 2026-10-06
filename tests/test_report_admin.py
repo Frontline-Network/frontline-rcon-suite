@@ -26,6 +26,7 @@ from rcon.models import (
 )
 from rcon.user_config.report_admin import ReportAdminUserConfig as Config
 from tests.test_leadership_vote import db, roster, player, squads, transport, context
+from tests.test_leadership_vote_notifications import controller
 
 
 @pytest.fixture
@@ -60,9 +61,9 @@ def setup(db, monkeypatch):
     return db, players, ctx
 
 
-def report(setup, message="!admin able redet nicht", server=1):
+def report(setup, message="!admin able redet nicht", server=1, reporter_id="v0"):
     db, players, ctx = setup
-    reporter = players[2]
+    reporter = next(p for p in players if p["player_id"] == reporter_id)
     parsed = incidents.parse_chat_report(
         message,
         current_players=players,
@@ -141,8 +142,122 @@ def test_name_is_not_a_complaint():
 
 def test_defaults_off_and_no_ban_setting():
     assert Config().enabled is False and Config().mode == "dry_run"
+    assert Config().allow_self_reports is False
     with pytest.raises(ValueError):
         Config(ban=True)
+
+
+@pytest.mark.parametrize("allowed", [False, True])
+@pytest.mark.parametrize("kind", ["squadleader", "commander", "teamkills"])
+def test_self_report_requires_explicit_server_option(setup, allowed, kind):
+    db, players, _ = setup
+    service.configure(
+        1, Config(enabled=True, mode="active", allow_self_reports=allowed)
+    )
+    message = "!admin able redet nicht"
+    if kind == "commander":
+        players[-1]["role"] = "Rifleman"
+        players[0].update(role="ArmyCommander", unit_name="")
+        message = "!admin commander is not talking"
+    if kind == "teamkills":
+        teamkills(setup, 5)
+        message = "!admin BattlefieldHero teamkills"
+    i = report(setup, message, reporter_id="target")
+    api = transport()
+    service.tick(api, 1)
+    service.tick(api, 1)
+    assert api.kick.call_count == int(allowed)
+    if allowed:
+        assert api.kick.call_args.args[0] == "target"
+    assert current(db, i["id"])["report_admin"]["status"] == (
+        "kicked" if allowed else "manual"
+    )
+    api.message_player.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "change", ["dry_run", "nonleader", "stale", "session", "disabled", "no_delivery"]
+)
+def test_self_report_does_not_bypass_other_guards(setup, monkeypatch, change):
+    db, players, ctx = setup
+    cfg = Config(enabled=True, mode="active", allow_self_reports=True)
+    if change == "dry_run":
+        cfg.mode = "dry_run"
+    service.configure(1, cfg)
+    if change == "nonleader":
+        players[0]["role"] = "Rifleman"
+    i = report(setup, "!admin BattlefieldHero redet nicht", reporter_id="target")
+    if change == "stale":
+        ctx["captured_at"] -= 20
+    if change == "session":
+        with db() as sess:
+            row = sess.scalar(
+                select(PlayerSession)
+                .join(PlayerID)
+                .where(PlayerID.player_id == "target")
+            )
+            row.end = service.utc(db.clock.now).replace(tzinfo=None)
+    if change == "disabled":
+        service.configure(1, Config(enabled=True, mode="active"))
+    if change == "no_delivery":
+        monkeypatch.setattr(service, "delivered", lambda *_: False)
+    api = transport()
+    service.tick(api, 1)
+    api.kick.assert_not_called()
+    assert current(db, i["id"])["report_admin"]["status"] == (
+        "dry_run"
+        if change == "dry_run"
+        else "queued" if change == "no_delivery" else "manual"
+    )
+
+
+def test_self_report_teamkill_threshold_unchanged(setup):
+    service.configure(1, Config(enabled=True, mode="active", allow_self_reports=True))
+    teamkills(setup, 4)
+    i = report(setup, "!admin BattlefieldHero teamkills", reporter_id="target")
+    api = transport()
+    service.tick(api, 1)
+    api.kick.assert_not_called()
+    assert current(setup[0], i["id"])["report_admin"]["teamkill_count"] == 4
+
+
+def test_single_hllv_squadleader_can_test_own_report(setup):
+    db, players, ctx = setup
+    players[:] = [players[0]]
+    players[0].update(name="Biene", role="squadleader", unit_id=0, unit_name="able")
+    service.configure(1, Config(enabled=True, mode="active", allow_self_reports=True))
+    i = report(setup, reporter_id="target")
+    assert i["leadership_vote"] is None
+    api = transport()
+    service.tick(api, 1)
+    api.kick.assert_called_once()
+    assert current(db, i["id"])["report_admin"]["status"] == "kicked"
+
+
+def test_enabling_self_reports_never_replays_old_report(setup):
+    db, _, _ = setup
+    i = report(setup, reporter_id="target")
+    assert i["report_admin"]["status"] == "manual"
+    service.configure(1, Config(enabled=True, mode="active", allow_self_reports=True))
+    api = transport()
+    service.tick(api, 1)
+    api.kick.assert_not_called()
+    assert current(db, i["id"])["report_admin"]["status"] == "manual"
+
+
+def test_self_report_exception_is_server_local_and_not_a_vote_permission(setup):
+    from rcon.leadership_vote.domain import identity, may_report
+
+    db, players, _ = setup
+    service.configure(2, Config(enabled=True, mode="active", allow_self_reports=True))
+    i = report(setup, reporter_id="target")
+    assert i["report_admin"]["status"] == "manual"
+    service.configure(1, Config(enabled=True, mode="active", allow_self_reports=True))
+    assert not may_report(
+        players, "target", dict(identity(players[0]), player_id="target")
+    )
+    with db() as sess:
+        assert service.config(sess, 3).allow_self_reports is False
 
 
 def test_direct_communication_kick_no_warning_or_vote(setup):
@@ -155,7 +270,12 @@ def test_direct_communication_kick_no_warning_or_vote(setup):
     service.tick(api, 1)
     api.kick.assert_called_once()
     assert api.kick.call_args.args[0] == "target"
-    api.message_player.assert_not_called()
+    api.message_player.assert_called_once()
+    receipt = api.message_player.call_args
+    assert receipt.args[0] == "v0"
+    assert "BattlefieldHero wurde vom Server gekickt" in receipt.args[1]
+    assert "BattlefieldHero was kicked from the server" in receipt.args[1]
+    assert receipt.kwargs["save_message"] is False
     final = current(db, i["id"])
     assert final["status"] == "resolved" and final["report_admin"]["status"] == "kicked"
 
@@ -261,6 +381,109 @@ def test_never_repeat_uncertain_kick(setup, mode):
     service.tick(api, 1)
     assert api.kick.call_count == (1 if mode in {"unknown", "exception"} else 0)
     assert current(db, i["id"])["status"] == "new"
+    api.message_player.assert_not_called()
+
+
+def notification(db, iid):
+    with db() as sess:
+        event = next(
+            e
+            for e in sess.get(AdminIncident, iid).events
+            if e.event_type == "report_admin"
+        )
+        return event.id, event.payload.get("reporter_notification")
+
+
+@pytest.mark.parametrize("result", [True, False, None, "exception"])
+def test_reporter_receipt_never_retries_or_changes_kick_result(setup, result):
+    db, _, _ = setup
+    i = report(setup)
+    api = transport()
+
+    def send(*args, **kwargs):
+        # The confirmed kick is already durable before the notification.
+        assert current(db, i["id"])["status"] == "resolved"
+        assert notification(db, i["id"])[1]["status"] == "sending"
+        if result == "exception":
+            raise RuntimeError("message timeout")
+        return result
+
+    api.message_player.side_effect = send
+    service.tick(api, 1)
+    event_id, receipt = notification(db, i["id"])
+    service.notify_reporter(api, 1, event_id)
+    service.tick(api, 1)
+    api.kick.assert_called_once()
+    api.message_player.assert_called_once()
+    assert receipt["status"] == ("sent" if result is True else "unknown")
+    assert current(db, i["id"])["report_admin"]["status"] == "kicked"
+
+
+@pytest.mark.parametrize(
+    "change", ["offline", "team", "reconnect", "stale", "round", "read_error"]
+)
+def test_reporter_receipt_uses_current_recipient_and_preserves_kick(
+    setup, monkeypatch, change
+):
+    db, players, ctx = setup
+    i = report(setup)
+    api = transport()
+    calls = []
+
+    def read(_):
+        calls.append(1)
+        fresh = deepcopy(ctx)
+        if len(calls) == 3:  # Receipt check, after the two kick preflights.
+            if change == "read_error":
+                raise RuntimeError("roster unavailable")
+            if change == "offline":
+                fresh["players"] = [
+                    p for p in fresh["players"] if p["player_id"] != "v0"
+                ]
+            if change == "team":
+                next(p for p in fresh["players"] if p["player_id"] == "v0")[
+                    "team"
+                ] = "axis"
+            if change == "stale":
+                fresh["captured_at"] -= 20
+            if change == "round":
+                fresh["round_id"] = "new-round"
+            if change == "reconnect":
+                with db() as sess:
+                    row = sess.scalar(
+                        select(PlayerSession)
+                        .join(PlayerID)
+                        .where(PlayerID.player_id == "v0")
+                    )
+                    row.end = service.utc(db.clock.now).replace(tzinfo=None)
+        return fresh
+
+    monkeypatch.setattr(service, "read_context", read)
+    service.tick(api, 1)
+    service.tick(api, 1)
+    api.kick.assert_called_once()
+    api.message_player.assert_not_called()
+    assert current(db, i["id"])["status"] == "resolved"
+
+
+def test_teamkill_kick_also_notifies_only_reporter(setup):
+    teamkills(setup, 5)
+    report(setup, "!admin BattlefieldHero teamkills")
+    api = transport()
+    service.tick(api, 1)
+    api.message_player.assert_called_once()
+    assert api.message_player.call_args.args[0] == "v0"
+
+
+def test_receipt_hll_and_hllv_delivery_does_not_record_a_warning(setup, controller):
+    report(setup)
+    api = transport()
+    api.message_player = controller.api.message_player
+    service.tick(api, 1)
+    api.kick.assert_called_once()
+    controller.sent.assert_called_once()
+    assert controller.sent.call_args.args[0] == "v0"
+    controller.audit.assert_not_called()
 
 
 def test_discord_delivery_required(setup, monkeypatch):

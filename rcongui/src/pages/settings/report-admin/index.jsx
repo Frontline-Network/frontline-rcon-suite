@@ -90,13 +90,14 @@ export default function ReportAdmin() {
               ["enabled", c.enabled],
               ["communication", c.communication],
               ["teamkills", c.tk],
+              ["allow_self_reports", c.selfReports],
             ].map(([name, label]) => (
               <FormControlLabel
                 key={name}
                 label={label}
                 control={
                   <Switch
-                    checked={draft[name]}
+                    checked={Boolean(draft[name])}
                     disabled={
                       save.isPending ||
                       (name === "enabled" &&
@@ -110,6 +111,9 @@ export default function ReportAdmin() {
                 }
               />
             ))}
+            {draft.allow_self_reports && (
+              <Alert severity="warning">{c.selfReportsWarning}</Alert>
+            )}
             <TextField
               select
               label={c.mode}

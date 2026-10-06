@@ -55,6 +55,7 @@ def test_permissions_and_boundaries(call):
         {"server_number": 2},
         {"mode": "ban"},
         {"enabled": "yes"},
+        {"allow_self_reports": "yes"},
         {"teamkill_count": 1},
         {"communication_template_id": 99999},
     ],
@@ -67,6 +68,14 @@ def test_disable_cancels_pending(call, setup):
     i = report(setup)
     assert call("PUT", {"enabled": False}, [api.MANAGE]).status_code == 200
     assert current(setup[0], i["id"])["report_admin"]["status"] == "manual"
+
+
+def test_self_report_option_requires_kick_permission_when_enabled(call):
+    payload = {"enabled": True, "mode": "active", "allow_self_reports": True}
+    assert call("PUT", payload, [api.MANAGE]).status_code == 403
+    assert call("PUT", payload, [api.MANAGE, api.KICK]).status_code == 200
+    result = json.loads(call(perms=[api.MANAGE]).content)["result"]
+    assert result["config"]["allow_self_reports"] is True
 
 
 def test_csrf_protection(call):
