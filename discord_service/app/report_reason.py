@@ -70,6 +70,7 @@ def analyze_report_reason(job):
             model=job.ai_model,
             prompt=PROMPT + "\nUNTRUSTED REPORT DATA:\n" + data,
             output_schema=ReportReasonDecision.model_json_schema(),
+            priority=True,
         )
         decision = ReportReasonDecision.model_validate(raw)
         input_tokens = output_tokens = 0

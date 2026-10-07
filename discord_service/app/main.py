@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 from .ai import CodexAnalyzer, ManagedAnalyzer, PlayerNameBatchInput
 from .codex_runtime import (
     CodexRuntimeError,
+    CodexRuntimeBusy,
 )
 from .codex_runtime import account_status as codex_account_status
 from .codex_runtime import logout as codex_logout
@@ -1221,6 +1222,19 @@ def report_reason_analysis(
         raise HTTPException(status_code=409, detail="Report reason already attempted")
     try:
         decision, incoming, outgoing = analyze_report_reason(job)
+    except CodexRuntimeBusy:
+        # This typed error can only originate before acquiring the account
+        # runtime, before credentials or inference are touched. No model call
+        # happened. Release only this admission receipt, not failed attempts.
+        session.execute(
+            delete(EventReceipt).where(EventReceipt.idempotency_key == receipt_key)
+        )
+        session.commit()
+        raise HTTPException(
+            status_code=429,
+            detail="report_reason_not_started_busy",
+            headers={"Retry-After": "2"},
+        )
     except Exception as exc:
         # Keep provider diagnosis useful without logging reports, credentials,
         # raw model responses or upstream error bodies.

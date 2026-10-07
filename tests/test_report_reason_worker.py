@@ -37,6 +37,7 @@ def connection(monkeypatch):
         lambda value: "mock-secret-value-long-enough-" + value,
     )
     response = Mock()
+    response.status_code = 200
     response.json.return_value = {
         "decision": decision(),
         "model": "configured-model",
@@ -127,3 +128,62 @@ def test_codex_uses_only_configured_installation_account(semantic, connection):
     worker.process_one(http)
     assert http.post.call_args.kwargs["json"]["api_key"] is None
     assert http.post.call_args.kwargs["json"]["ai_provider"] == "codex"
+
+
+def test_confirmed_not_started_busy_waits_then_analyzes_once(semantic, connection):
+    _, http = connection
+    i = report(semantic, "!admin BattlefieldHero never answers us in command chat")
+    response = http.post.return_value
+    response.status_code = 429
+    response.json.return_value = {"detail": "report_reason_not_started_busy"}
+    assert worker.process_one(http)
+    assert current(semantic[0], i["id"])["report_admin"]["status"] == "classifying"
+    assert not worker.process_one(http)  # backoff, no tight retry loop
+    assert http.post.call_count == 1
+    semantic[0].clock.now += 3
+    semantic[2]["captured_at"] = semantic[0].clock.now
+    response.status_code = 200
+    response.json.return_value = {
+        "decision": decision(),
+        "model": "configured-model",
+        "prompt_version": "test",
+    }
+    assert worker.process_one(http)
+    assert not worker.process_one(http)
+    api = transport()
+    service.tick(api, 1)
+    service.tick(api, 1)
+    service.tick(api, 1)
+    api.kick.assert_called_once()
+    assert http.post.call_count == 2  # admission refusal, then actual inference
+
+
+@pytest.mark.parametrize("change", ["expired", "takeover", "generic429", "generic503"])
+def test_busy_admission_is_bounded_and_not_generic_retry(semantic, connection, change):
+    _, http = connection
+    i = report(semantic, "!admin BattlefieldHero never answers us in command chat")
+    response = http.post.return_value
+    response.status_code = 429 if change != "generic503" else 503
+    response.json.return_value = {
+        "detail": (
+            "other"
+            if change.startswith("generic")
+            else "report_reason_not_started_busy"
+        )
+    }
+    if change.startswith("generic"):
+        response.raise_for_status.side_effect = RuntimeError("HTTP failure")
+    assert worker.process_one(http)
+    if change == "expired":
+        semantic[0].clock.now += 61
+    elif change == "takeover":
+        with semantic[0]() as sess:
+            service.cancel_player(sess, 1, "target")
+    semantic[0].clock.now += 3
+    semantic[2]["captured_at"] = semantic[0].clock.now
+    worker.process_one(http)
+    api = transport()
+    service.tick(api, 1)
+    api.kick.assert_not_called()
+    http.post.assert_called_once()
+    assert current(semantic[0], i["id"])["report_admin"]["status"] == "manual"

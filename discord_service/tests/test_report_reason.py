@@ -126,6 +126,7 @@ def test_codex_uses_existing_isolated_runtime_without_sending_key():
     assert run.call_args.args[0] == request.installation_id
     assert request.api_key not in run.call_args.kwargs["prompt"]
     assert request.message in run.call_args.kwargs["prompt"]
+    assert run.call_args.kwargs["priority"] is True
 
 
 @pytest.mark.parametrize("fail", [False, True])
@@ -155,3 +156,43 @@ def test_authenticated_one_attempt_endpoint_never_posts_to_discord_or_rcon(
     assert "private-response-must-not-leak" not in caplog.text
     if fail:
         assert "Report reason analysis unavailable: RuntimeError" in caplog.text
+
+
+def test_only_typed_pre_inference_busy_allows_later_admission():
+    from discord_service.app.codex_runtime import CodexRuntimeBusy, CodexRuntimeError
+
+    capability = _seed()
+    client = TestClient(app)
+    headers = {"Authorization": "Bearer " + capability}
+    payload = job().model_dump()
+    with patch(
+        "discord_service.app.main.analyze_report_reason",
+        side_effect=[CodexRuntimeBusy("codex_runtime_busy"), (decision(), 12, 9)],
+    ) as analyze:
+        busy = client.post("/v1/report-reason", headers=headers, json=payload)
+        assert busy.status_code == 429
+        assert busy.json()["detail"] == "report_reason_not_started_busy"
+        assert busy.headers["Retry-After"] == "2"
+        assert (
+            client.post("/v1/report-reason", headers=headers, json=payload).status_code
+            == 200
+        )
+        assert (
+            client.post("/v1/report-reason", headers=headers, json=payload).status_code
+            == 409
+        )
+        assert analyze.call_count == 2  # one refusal before inference, one analysis
+    payload["incident_id"] = "different-incident"
+    with patch(
+        "discord_service.app.main.analyze_report_reason",
+        side_effect=CodexRuntimeError("codex_runtime_busy"),
+    ) as analyze:
+        assert (
+            client.post("/v1/report-reason", headers=headers, json=payload).status_code
+            == 503
+        )
+        assert (
+            client.post("/v1/report-reason", headers=headers, json=payload).status_code
+            == 409
+        )
+        analyze.assert_called_once()  # a string match is not proof of no inference

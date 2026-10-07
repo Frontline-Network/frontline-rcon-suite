@@ -53,6 +53,16 @@ späte Antworten, Neustarts, manuelle Eingriffe und Konfigurationsänderungen
 dürfen den Fall nicht wiederbeleben. Die Einordnung wird im Incident-Journal
 und auf der Discord-Karte sichtbar, nicht als Sprachbeweis dargestellt.
 
+Bei einer belegten Codex-Verbindung warten Live-Reports mit Vorrang vor noch
+nicht gestarteten Chat-/Namensprüfungen (bis zu 15 Sekunden je Platzanfrage).
+Eine bereits laufende Prüfung wird nicht unterbrochen. Ausschließlich die
+eindeutige Bestätigung „noch keine Analyse gestartet, Verbindung belegt“ erlaubt
+eine erneute Platzanfrage nach zwei Sekunden. Dafür wird nur die Reservierung
+vor der Modell-Ausführung freigegeben. Timeouts, beliebige 429/503-Fehler und
+bereits begonnene Modellaufrufe werden nicht wiederholt. Die gesamte Einordnung
+verfällt weiterhin 60 Sekunden nach dem Report. Dauerhafte Überlastung führt
+also weiterhin zur manuellen Bearbeitung, nicht zu einem verspäteten Kick.
+
 Implementierung der strukturierten Ausgabe:
 [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs).
 Die Eingabe bleibt untrusted data; es werden keine Modell-Tools angeboten.
