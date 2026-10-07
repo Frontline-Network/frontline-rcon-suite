@@ -3,6 +3,7 @@ import hashlib
 
 import copy
 import ipaddress
+import logging
 import re
 import secrets
 import socket
@@ -1220,7 +1221,17 @@ def report_reason_analysis(
         raise HTTPException(status_code=409, detail="Report reason already attempted")
     try:
         decision, incoming, outgoing = analyze_report_reason(job)
-    except Exception:
+    except Exception as exc:
+        # Keep provider diagnosis useful without logging reports, credentials,
+        # raw model responses or upstream error bodies.
+        logging.getLogger(__name__).warning(
+            "Report reason analysis unavailable: %s %s",
+            type(exc).__name__,
+            str(exc)
+            if isinstance(exc, CodexRuntimeError)
+            and re.fullmatch(r"codex_[a-z0-9_:/-]{1,100}", str(exc))
+            else "",
+        )
         session.add(
             TechnicalUsageMetric(
                 installation_id=job.installation_id,

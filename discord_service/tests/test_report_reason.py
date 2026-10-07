@@ -129,7 +129,9 @@ def test_codex_uses_existing_isolated_runtime_without_sending_key():
 
 
 @pytest.mark.parametrize("fail", [False, True])
-def test_authenticated_one_attempt_endpoint_never_posts_to_discord_or_rcon(fail):
+def test_authenticated_one_attempt_endpoint_never_posts_to_discord_or_rcon(
+    fail, caplog
+):
     capability = _seed()
     client = TestClient(app)
     payload = job().model_dump()
@@ -150,3 +152,6 @@ def test_authenticated_one_attempt_endpoint_never_posts_to_discord_or_rcon(fail)
             == 409
         )
         run.assert_called_once()
+    assert "private-response-must-not-leak" not in caplog.text
+    if fail:
+        assert "Report reason analysis unavailable: RuntimeError" in caplog.text
