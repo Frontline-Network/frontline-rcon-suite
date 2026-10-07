@@ -69,6 +69,19 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
           );
           await expect(review).not.toBeChecked();
           await review.check();
+          const reasonMode = report.getByRole("combobox", {
+            name: "Einordnung des Meldegrunds",
+          });
+          await expect(reasonMode).toContainText("Bisherige Suchregeln");
+          await reasonMode.click();
+          await page
+            .getByRole("option", {
+              name: "KI – vollständigen Inhalt einordnen",
+            })
+            .click();
+          await expect(
+            report.getByText(/kein Suchwort-Fallback/)
+          ).toBeVisible();
           await report
             .getByRole("button", { name: "Report-Regeln speichern" })
             .click();
@@ -76,6 +89,9 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
             report.getByText("Gespeichert", { exact: true })
           ).toBeVisible();
           await expect(review).toBeChecked();
+          await expect(reasonMode).toContainText(
+            "KI – vollständigen Inhalt einordnen"
+          );
           await expect(
             report.getByText(/60 Sekunden stiller Wartezeit/)
           ).toBeVisible();

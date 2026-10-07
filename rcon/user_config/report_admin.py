@@ -1,4 +1,4 @@
-"""Opt-in, server-local report automation. No AI key or default activation."""
+"""Opt-in server-local rules, with separately selected semantic interpretation."""
 
 import logging
 from typing import ClassVar, Literal
@@ -13,6 +13,7 @@ class ReportAdminUserConfig(BaseUserConfig):
     model_config = ConfigDict(extra="forbid", strict=True)
     enabled: bool = False
     mode: Literal["dry_run", "active"] = "dry_run"
+    reason_mode: Literal["rules", "ai"] = "rules"
     communication: bool = True
     teamkills: bool = True
     cheating: bool = False  # Explicit opt-in for new review/receipt behavior.

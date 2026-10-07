@@ -1,7 +1,14 @@
 export const copy = {
   de: {
     title: "Report-Admin – Kommunikation, Teamkills & Cheatprüfung",
-    info: "Serverbezogene Report-Automatik nach festen Regeln, ohne KI-Zugang. Hier separat speichern; die optionale KI für Chat und Namen folgt darunter. Andere Beschwerden bleiben manuell. Führungsabstimmungen wurden eingestellt.",
+    info: "Serverbezogene Report-Automatik mit wählbarer KI-Einordnung des vollständigen Meldegrunds. Hier separat speichern; die KI-Anbindung wird darunter eingerichtet. Andere Beschwerden bleiben manuell. Führungsabstimmungen wurden eingestellt.",
+    reasonMode: "Einordnung des Meldegrunds",
+    aiReason: "KI – vollständigen Inhalt einordnen",
+    rulesReason: "Bisherige Suchregeln (ohne KI)",
+    aiReasonHelp:
+      "Nutzt den unten konfigurierten KI-Anbieter und das Report-Modell. Der vollständige Report und aktuelle Spielernamen/Rollen werden zur KI übertragen; API-Kosten bzw. Kontolimits können anfallen. Prüft Bedeutung, Verneinungen und Zusätze statt nur Suchwörter. Spielerzuordnung und Schutzregeln bleiben technisch geprüft. Unklare Antworten, fehlende Anbindung und Fehler bleiben manuell; kein Suchwort-Fallback. Der Report ist kein Beweis für tatsächliches Schweigen.",
+    rulesReasonHelp:
+      "Kompatibilitätsmodus: erkennt nur unterstützte Formulierungen. Kein allgemeines Sprachverständnis und keine KI-Abfrage.",
     warning:
       "Aktivmodus: Eine eindeutige Kommunikationsmeldung kann ohne Abstimmung oder Vorwarnung zum Kick führen. Ob jemand tatsächlich spricht, ist technisch nicht überprüfbar. Falschmeldungen können deshalb zum Missbrauch führen.",
     teamkills:
@@ -33,7 +40,14 @@ export const copy = {
   },
   en: {
     title: "Report admin – communication, teamkills & cheat review",
-    info: "Server-specific report automation using fixed rules, without an AI account. Save these settings separately here; optional AI for chat and names is below. Other complaints remain manual. Leadership voting has been retired.",
+    info: "Server-specific report automation with optional AI interpretation of the entire complaint. Save separately here; configure the AI provider below. Other complaints remain manual. Leadership voting has been retired.",
+    reasonMode: "Report reason interpretation",
+    aiReason: "AI – interpret the entire report",
+    rulesReason: "Existing keyword rules (no AI)",
+    aiReasonHelp:
+      "Uses the configured provider and report model below. The complete report and current player names/roles are sent to AI; API charges or account limits may apply. Evaluates meaning, negations and context rather than keywords alone. Player matching and safety checks remain independently enforced. Uncertain output, missing credentials and failures stay manual, with no keyword fallback. The report does not prove actual voice silence.",
+    rulesReasonHelp:
+      "Compatibility mode: recognizes supported wording only. No general language understanding or AI request.",
     warning:
       "Active mode: An unambiguous communication report can trigger a kick without a vote or warning. Voice activity cannot be verified. False reports can therefore be abused.",
     teamkills:

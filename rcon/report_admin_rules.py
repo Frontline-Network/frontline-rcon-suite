@@ -13,9 +13,17 @@ from rcon.leadership_vote.targets import resolve, LETTERS, COMMANDERS, SQUAD_TYP
 MAX_REPORT_AGE = 60
 
 COMMUNICATION = re.compile(
-    r"\b(?:redet nicht|spricht nicht|kommuniziert nicht|keine? (?:komms?|comms?|kommunikation)|"
+    r"\b(?:redet nicht|spricht nicht|kommuniziert nicht|keine? (?:komms?|com{1,2}s?|kommunikation|voip)|"
     r"not (?:talking|communicating|speaking)|does not (?:talk|communicate|speak)|"
-    r"no (?:comms?|communication)|doesn t (?:talk|communicate|speak))\b"
+    r"no (?:com{1,2}s?|communication|voip)|doesn t (?:talk|communicate|speak))\b"
+)
+# A return-to-server aside does not retract a communication complaint. Match
+# only this complete parenthetical statement; never discard arbitrary asides
+# (which may contain a correction, negation, different target or accusation).
+RETURN_TO_SERVER_ASIDE = re.compile(
+    r"\(\s*(?:ist (?:schon )?wieder auf dem server|"
+    r"is (?:already )?back on the server)\s*\)",
+    re.I,
 )
 TEAMKILLS = re.compile(
     r"\b(?:teamkills?|teamkillt|teamkilling|teamkiller|tk|tks|tk[st]|team killed|team killing)\b"
@@ -26,6 +34,8 @@ QUALIFIED = re.compile(
     r"\b(?:nicht mehr|doch|wieder|aber|vielleicht|angeblich|sagt|sagte|behauptet|"
     r"kein teamkill\w*|keine teamkills|nicht teamkill\w*|kein tk|keine tks|nicht kicken|"
     r"not anymore|anymore|but|maybe|says|said|claims|accident|accidental|"
+    r"stimmt nicht|nicht wahr|not true|false report|falschmeldung|"
+    r"nicht (?:stumm|sprachlos)|not (?:silent|mute)|"
     r"aus versehen|versehentlich|not teamkill\w*|no teamkill\w*|don t kick|"
     r"cheat\w*|hack\w*|sabot\w*|beleidig\w*)\b"
 )
@@ -38,7 +48,7 @@ def classify(message, players=()):
     raw = str(message)[match.end() : 4000]
     if any(c in raw for c in ('"', "?", "“", "”")):
         return None
-    text = _normalize_message(raw)
+    text = _normalize_message(RETURN_TO_SERVER_ASIDE.sub(" ", raw))
     # A player's name must not manufacture a complaint (e.g. "No Comms").
     for p in sorted(players, key=lambda p: len(str(p.get("name") or "")), reverse=True):
         name = _normalize_message(str(p.get("name") or p.get("player_name") or ""))

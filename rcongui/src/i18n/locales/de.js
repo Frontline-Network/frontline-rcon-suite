@@ -1698,7 +1698,7 @@ const de = {
       template_claimed: "Meldestatus: Übernahme",
       template_resolved: "Meldestatus: Abschluss",
       template_dismissed: "Meldestatus: Ablehnung",
-      aiSafety: "KI-Ergebnisse sind ausschließlich Vorschläge. Jede Spielaktion benötigt einen aktuell berechtigten Moderator; destruktive Aktionen zusätzlich Grund, Vorschau und zweite Bestätigung.",
+      aiSafety: "Die hier eingerichteten Chat-/Namensanalysen liefern Vorschläge für Moderatoren. Manuelle Spielaktionen benötigen passende Rechte und bei destruktiven Aktionen Grund, Vorschau und Bestätigung. Separat davon kann der oben aktivierte Report-Admin Kicks nach seinen freigegebenen Regeln ausführen.",
       save: "Speichern",
       saved: "Discord- und KI-Konfiguration gespeichert.",
       test: "Testmeldung",

@@ -1,0 +1,278 @@
+"""Semantic routing with stubbed model output, never real AI or game actions."""
+
+import pytest
+from sqlalchemy import select
+
+from tests.test_report_admin import setup, db, service, current, report, transport
+from rcon import report_reason
+from rcon.models import AdminIncidentEvent, PlayerSession, PlayerID
+from rcon.user_config.report_admin import ReportAdminUserConfig as Config
+
+
+@pytest.fixture
+def semantic(setup):
+    service.configure(1, Config(enabled=True, mode="active", reason_mode="ai"))
+    return setup
+
+
+def decision(
+    target="BattlefieldHero", excerpt="never answers us in command chat", **changes
+):
+    return {
+        "rule": "communication",
+        "target_kind": "player",
+        "target_text": target,
+        "allegation_excerpt": excerpt,
+        "unambiguous": True,
+        "uncertainties": [],
+        "rationale": "Current allegation of missing leadership communication.",
+        **changes,
+    }
+
+
+def complete(setup, iid, result, status="done"):
+    with setup[0]() as sess:
+        event = sess.scalar(
+            select(AdminIncidentEvent).where(
+                AdminIncidentEvent.incident_id == iid,
+                AdminIncidentEvent.event_type == "report_admin",
+            )
+        )
+        event.payload = {
+            **event.payload,
+            "reason_request": {
+                **event.payload["reason_request"],
+                "status": status,
+                "analysis": {
+                    "decision": result,
+                    "model": "configured-model",
+                    "prompt_version": "report-reason-1",
+                },
+            },
+        }
+
+
+def test_whole_reason_not_keyword_gate_and_no_action_during_analysis(semantic):
+    message = "!admin BattlefieldHero never answers us in command chat; he is back after reconnecting"
+    i = report(semantic, message)
+    assert i["report_admin"]["status"] == "classifying"
+    api = transport()
+    service.tick(api, 1)
+    api.kick.assert_not_called()
+    complete(semantic, i["id"], decision())
+    service.tick(api, 1)
+    api.kick.assert_not_called()
+    assert current(semantic[0], i["id"])["report_admin"]["status"] == "queued"
+    service.tick(api, 1)
+    service.tick(api, 1)
+    api.kick.assert_called_once()
+    assert api.kick.call_args.args[0] == "target"
+    assert current(semantic[0], i["id"])["report_admin"]["reason_analysis"]["decision"][
+        "rationale"
+    ]
+
+
+@pytest.mark.parametrize(
+    "fragment", ["BattlefielxHero", "BattlexielxHero", "BattlexielxHera"]
+)
+def test_model_preserves_typo_local_roster_resolves_it(semantic, fragment):
+    i = report(semantic, f"!admin {fragment} never answers us in command chat")
+    complete(semantic, i["id"], decision(target=fragment))
+    api = transport()
+    service.tick(api, 1)
+    service.tick(api, 1)
+    api.kick.assert_called_once()
+    assert api.kick.call_args.args[0] == "target"
+
+
+@pytest.mark.parametrize(
+    "result,status",
+    [
+        (
+            decision(rule="manual", unambiguous=False, uncertainties=["Retracted"]),
+            "done",
+        ),
+        (decision(unambiguous=False), "done"),
+        (decision(uncertainties=["Two possible targets"]), "done"),
+        (decision(target="invented-player"), "done"),
+        (decision(excerpt="invented evidence"), "done"),
+        (decision(target="!admin BattlefieldHero"), "done"),
+        (decision(excerpt="BattlefieldHero"), "done"),
+        (decision(action="kick"), "done"),
+        (decision(rule="ban"), "done"),
+        (decision(), "failed"),
+    ],
+)
+def test_unsafe_or_unavailable_interpretation_never_falls_back(
+    semantic, result, status
+):
+    i = report(
+        semantic, "!admin BattlefieldHero redet nicht; never answers us in command chat"
+    )
+    complete(semantic, i["id"], result, status)
+    api = transport()
+    service.tick(api, 1)
+    service.tick(api, 1)
+    api.kick.assert_not_called()
+    assert current(semantic[0], i["id"])["report_admin"]["status"] == "manual"
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "offline",
+        "opponent",
+        "nonleader",
+        "twin",
+        "team_switch",
+        "role_change",
+        "reconnect",
+        "map",
+        "stale",
+        "expired",
+        "config",
+        "takeover",
+        "recovery",
+        "player_action",
+        "reporter_reconnect",
+    ],
+)
+def test_model_never_overrides_live_guards(semantic, change):
+    database, players, ctx = semantic
+    if change == "offline":
+        players[0]["online"] = False
+    if change == "opponent":
+        players[0]["team"] = "axis"
+    if change == "nonleader":
+        players[0]["role"] = "Rifleman"
+    if change == "twin":
+        players[1]["name"] = "BattlefieldHero"
+    i = report(semantic, "!admin BattlefieldHero never answers us in command chat")
+    complete(semantic, i["id"], decision())
+    if change == "team_switch":
+        players[0]["team"] = "axis"
+    if change == "role_change":
+        players[0]["role"] = "Rifleman"
+    if change in {"reconnect", "reporter_reconnect"}:
+        pid = "target" if change == "reconnect" else "v0"
+        with database() as sess:
+            row = sess.scalar(
+                select(PlayerSession).join(PlayerID).where(PlayerID.player_id == pid)
+            )
+            row.start = service.utc(database.clock.now + 1).replace(tzinfo=None)
+        database.clock.now += 2
+    if change == "map":
+        ctx["round_id"] = "new-map"
+    if change == "stale":
+        ctx["captured_at"] -= 20
+    if change == "expired":
+        database.clock.now += 61
+        ctx["captured_at"] = database.clock.now
+    if change == "config":
+        service.configure(1, Config())
+    if change == "takeover":
+        with database() as sess:
+            event = sess.scalar(
+                select(AdminIncidentEvent).where(
+                    AdminIncidentEvent.event_type == "report_admin"
+                )
+            )
+            event.incident.assigned_to = "human-admin"
+    if change == "recovery":
+        service.recover(1)
+    if change == "player_action":
+        with database() as sess:
+            service.cancel_player(sess, 1, "target")
+    api = transport()
+    service.tick(api, 1)
+    service.tick(api, 1)
+    api.kick.assert_not_called()
+    assert current(database, i["id"])["report_admin"]["status"] == "manual"
+
+
+def test_ai_mode_is_server_local_and_does_not_replay_reports(setup):
+    i = report(setup, "!admin BattlefieldHero never answers us in command chat")
+    assert i["report_admin"] is None
+    service.configure(2, Config(enabled=True, reason_mode="ai"))
+    with setup[0]() as sess:
+        assert service.config(sess, 1).reason_mode == "rules"
+    service.configure(1, Config(enabled=True, reason_mode="ai"))
+    api = transport()
+    service.tick(api, 1)
+    api.kick.assert_not_called()
+
+
+def test_dry_run_never_kicks(semantic):
+    service.configure(1, Config(enabled=True, mode="dry_run", reason_mode="ai"))
+    i = report(semantic, "!admin BattlefieldHero never answers us in command chat")
+    complete(semantic, i["id"], decision())
+    api = transport()
+    service.tick(api, 1)
+    service.tick(api, 1)
+    api.kick.assert_not_called()
+    assert current(semantic[0], i["id"])["report_admin"]["status"] == "dry_run"
+
+
+def test_wire_contracts_match():
+    from rcon.report_reason_contract import ReportReasonDecision, ReportReasonRequest
+    from discord_service.app.report_reason_contract import (
+        ReportReasonDecision as RemoteDecision,
+        ReportReasonRequest as RemoteRequest,
+    )
+
+    assert (
+        ReportReasonDecision.model_json_schema() == RemoteDecision.model_json_schema()
+    )
+    assert ReportReasonRequest.model_json_schema() == RemoteRequest.model_json_schema()
+
+
+@pytest.mark.parametrize(
+    "reference,kind,pid",
+    [("able", "squad", "target"), ("commander", "commander", "v5")],
+)
+def test_semantic_squad_and_commander_references_remain_supported(
+    semantic, reference, kind, pid
+):
+    i = report(semantic, f"!admin {reference} never answers us in command chat")
+    complete(semantic, i["id"], decision(target=reference, target_kind=kind))
+    api = transport()
+    service.tick(api, 1)
+    service.tick(api, 1)
+    api.kick.assert_called_once()
+    assert api.kick.call_args.args[0] == pid
+
+
+def test_model_cannot_replace_missing_named_player_with_squadleader(semantic):
+    i = report(semantic, "!admin able never answers us in command chat")
+    complete(semantic, i["id"], decision(target="able", target_kind="player"))
+    api = transport()
+    service.tick(api, 1)
+    service.tick(api, 1)
+    api.kick.assert_not_called()
+
+
+@pytest.mark.parametrize("rule", ["teamkills", "cheating"])
+def test_semantic_accusation_is_not_evidence_for_sanctions(semantic, rule):
+    service.configure(
+        1, Config(enabled=True, mode="active", reason_mode="ai", cheating=True)
+    )
+    excerpt = (
+        "is shooting his own team" if rule == "teamkills" else "is using wallhacks"
+    )
+    i = report(semantic, f"!admin BattlefieldHero {excerpt}")
+    complete(semantic, i["id"], decision(rule=rule, excerpt=excerpt))
+    api = transport()
+    service.tick(api, 1)
+    service.tick(api, 1)
+    api.kick.assert_not_called()
+    assert current(semantic[0], i["id"])["report_admin"]["status"] == "manual"
+
+
+def test_similar_live_names_stay_manual_even_when_model_is_certain(semantic):
+    semantic[1][1]["name"] = "BattlefieldHera"
+    i = report(semantic, "!admin BattlefieldHere never answers us in command chat")
+    complete(semantic, i["id"], decision(target="BattlefieldHere"))
+    api = transport()
+    service.tick(api, 1)
+    service.tick(api, 1)
+    api.kick.assert_not_called()

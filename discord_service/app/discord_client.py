@@ -789,6 +789,7 @@ def render_message(
     )
     if isinstance(report_admin, dict):
         states = {
+            "classifying": "KI liest vollständigen Meldegrund / AI reading complete report",
             "queued": "Prüfung ausstehend / Awaiting checks",
             "waiting": "Stille Prüffrist läuft / Silent observation window",
             "sending": "Kick wird ausgeführt / Kick in progress",
@@ -803,6 +804,8 @@ def render_message(
             "Cheatmeldung: Prüfung, keine automatische Sanktion / Cheat report: review only, no automatic sanction"
             if report_admin.get("rule") == "cheating" else
             "Kommunikation gemeldet; kein Sprachnachweis / Communication reported; no voice evidence"
+            if report_admin.get("rule") == "communication" else
+            "Meldegrund noch keiner freigegebenen Regel zugeordnet / Report not yet assigned to an approved rule"
         )
         admin_field = {
             "name": "🤖 Report-Admin",

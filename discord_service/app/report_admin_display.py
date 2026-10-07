@@ -10,9 +10,30 @@ def safe(value, limit=160):
 
 
 def case_fields(report, language):
+    reason = report.get("reason_analysis") or {}
+    decision = reason.get("decision") or {}
+    interpretation = []
+    if decision:
+        interpretation = [
+            {
+                "name": (
+                    "🤖 KI-Einordnung der Meldung"
+                    if language == "de"
+                    else "🤖 AI report interpretation"
+                ),
+                "value": (
+                    safe(decision.get("rationale"), 500)
+                    + "\n"
+                    + safe(decision.get("allegation_excerpt"), 250)
+                    + "\n"
+                    + safe(", ".join(decision.get("uncertainties") or []), 150)
+                )[:1000],
+                "inline": False,
+            }
+        ]
     a = report.get("assessment") or {}
     if not a:
-        return []
+        return interpretation
     de = language == "de"
     lines = []
     if a.get("kind") == "cheat_review":
@@ -87,4 +108,4 @@ def case_fields(report, language):
                 "inline": False,
             }
         )
-    return result
+    return interpretation + result

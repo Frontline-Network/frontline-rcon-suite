@@ -52,6 +52,8 @@ from .models import (
     TechnicalUsageMetric,
 )
 from .security import decrypt, derive_capability, digest, encrypt, matches
+from .report_reason import analyze_report_reason, PROMPT_VERSION as REPORT_REASON_VERSION
+from .report_reason_contract import ReportReasonRequest
 
 Base.metadata.create_all(engine)
 app = FastAPI(title="Frontline CRCON Discord Service", version="1.0.0")
@@ -1188,6 +1190,65 @@ def ai_provider_logout(
     except CodexRuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return {"connected": False, "state": "disconnected"}
+
+
+@app.post("/v1/report-reason")
+def report_reason_analysis(
+    job: ReportReasonRequest,
+    authorization: str | None = Header(default=None),
+    session: Session = Depends(session_dependency),
+):
+    _integration_for_capability(session, job.installation_id, authorization)
+    _check_rate_limit(f"report-reason:{job.installation_id}")
+    # At most one model invocation per installation/server/incident, including
+    # concurrent requests, timeouts and failures. Never persist the API key.
+    receipt_key = (
+        f"report-reason:{job.installation_id}:{job.server_number}:{job.incident_id}"
+    )
+    session.add(
+        EventReceipt(
+            idempotency_key=receipt_key,
+            installation_id=job.installation_id,
+            event_id=0,
+            event_type="report_reason",
+        )
+    )
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(status_code=409, detail="Report reason already attempted")
+    try:
+        decision, incoming, outgoing = analyze_report_reason(job)
+    except Exception:
+        session.add(
+            TechnicalUsageMetric(
+                installation_id=job.installation_id,
+                kind="report_reason",
+                model=job.ai_model,
+                success=False,
+            )
+        )
+        session.commit()
+        raise HTTPException(
+            status_code=503, detail="Report reason analysis unavailable"
+        )
+    session.add(
+        TechnicalUsageMetric(
+            installation_id=job.installation_id,
+            kind="report_reason",
+            model=job.ai_model,
+            input_tokens=incoming,
+            output_tokens=outgoing,
+            success=True,
+        )
+    )
+    session.commit()
+    return {
+        "decision": decision.model_dump(),
+        "model": job.ai_model,
+        "prompt_version": REPORT_REASON_VERSION,
+    }
 
 
 @app.post("/v1/analysis-jobs", status_code=status.HTTP_202_ACCEPTED)

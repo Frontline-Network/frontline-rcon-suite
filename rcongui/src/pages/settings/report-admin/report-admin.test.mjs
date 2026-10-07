@@ -26,11 +26,21 @@ test("German and English explain real kicks separately from manual cheat assessm
   assert.match(copy.de.teamkills, /60 Sekunden/);
   assert.match(copy.en.cheating, /No automatic cheat kicks or bans/);
   assert.match(copy.de.cheating, /Keine automatischen Cheat-Kicks oder Banns/);
-  assert.match(copy.en.info, /without an AI account/);
+  assert.match(copy.en.info, /entire complaint/);
   assert.match(copy.en.save, /report rules/);
   for (const language of [copy.de, copy.en]) {
     for (const value of Object.values(language)) assert.ok(value.trim());
   }
+});
+
+test("AI reason mode is explicit and explains data sharing and safe failure", () => {
+  const page = source("./index.jsx");
+  assert.match(page, /draft.reason_mode \?\? "rules"/);
+  assert.match(page, /<MenuItem value="ai">/);
+  assert.match(copy.en.aiReasonHelp, /no keyword fallback/);
+  assert.match(copy.de.aiReasonHelp, /kein Suchwort-Fallback/);
+  assert.match(copy.en.aiReasonHelp, /sent to AI/);
+  assert.match(copy.en.rulesReasonHelp, /No general language understanding/);
 });
 
 test("new cheat review switch shares existing permission-gated, server-local save", () => {

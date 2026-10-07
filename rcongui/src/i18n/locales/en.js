@@ -1688,7 +1688,7 @@ const en = {
       template_claimed: "Report status: claimed",
       template_resolved: "Report status: resolved",
       template_dismissed: "Report status: dismissed",
-      aiSafety: "AI results are suggestions only. Every game action requires a currently authorized moderator; destructive actions also require a reason, preview, and second confirmation.",
+      aiSafety: "The chat/name analyses configured here provide suggestions for moderators. Manual game actions require appropriate permissions and, for destructive actions, a reason, preview and confirmation. Separately, the report admin enabled above can perform kicks under its approved rules.",
       save: "Save",
       saved: "Discord and AI configuration saved.",
       test: "Test message",

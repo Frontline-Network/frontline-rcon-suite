@@ -118,6 +118,21 @@ export default function ReportAdmin({ embedded = false }) {
             )}
             <TextField
               select
+              label={c.reasonMode}
+              value={draft.reason_mode ?? "rules"}
+              disabled={save.isPending}
+              onChange={(e) =>
+                setDraft({ ...draft, reason_mode: e.target.value })
+              }
+              helperText={
+                draft.reason_mode === "ai" ? c.aiReasonHelp : c.rulesReasonHelp
+              }
+            >
+              <MenuItem value="ai">{c.aiReason}</MenuItem>
+              <MenuItem value="rules">{c.rulesReason}</MenuItem>
+            </TextField>
+            <TextField
+              select
               label={c.mode}
               value={draft.mode}
               onChange={(e) => setDraft({ ...draft, mode: e.target.value })}

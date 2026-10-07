@@ -1,9 +1,61 @@
-# Report-Admin: erste, regelbasierte Version
+# Report-Admin: Meldegrund, Spielerzuordnung und geschützte Aktionen
 
 Diese Version verarbeitet neue `!admin`-Reports zu fehlender
-Führungskommunikation, Teamkills und optional Cheatverdacht. Sie benötigt keinen KI-Zugang und erzeugt
-keine Modellkosten. Freie KI-Textgenerierung und weitere Sanktionen sind nicht
-Teil dieser ersten Version. Standard: **deaktiviert**, Betriebsart **Probelauf**.
+Führungskommunikation, Teamkills und optional Cheatverdacht. Standard:
+**deaktiviert**, Betriebsart **Probelauf**. Die Einordnung ist serverbezogen
+wählbar: bisherige Suchregeln ohne KI oder echte KI-Einordnung des vollständigen
+Meldegrunds. Bestehende Installationen behalten zunächst den Regelmodus.
+Freie Spielbefehle, KI-generierte Kick-Gründe und zusätzliche Sanktionen sind
+nicht freigegeben.
+
+## Vollständigen Meldegrund mit KI einordnen
+
+Im Wizard unter **KI & Report-Admin → Einordnung des Meldegrunds** die Option
+**KI – vollständigen Inhalt einordnen** wählen und Report-Regeln speichern.
+Dieser Modus nutzt den darunter eingerichteten Kunden-Anbieter (API-Key oder
+Codex-Anmeldung) und dessen konfiguriertes Modell. Er aktiviert weder die
+separaten Chat-/Namensprüfungen noch eine Frontline-finanzierte Ersatzverbindung.
+Modellkosten bzw. Kontolimits können anfallen.
+
+Jeder neue `!admin`-Report wird vollständig eingeordnet, ohne vorherige
+Schlüsselwortauswahl. Nachricht sowie aktuelle Namen, Teams, Squads und Rollen
+gehen an den Anbieter; Plattform-IDs, Sitzungsverlauf und Zugangsdaten gehören
+nicht in den Modell-Prompt. Das Modell berücksichtigt Zusätze, Verneinungen,
+Zitate, Korrekturen, uneindeutige Aussagen und Schreibfehler. Die Beispiele sind
+Testfälle und keine abschließende Liste erlaubter Formulierungen.
+
+Die strukturierte Antwort enthält Kategorie, wörtliche Zielreferenz,
+wörtlichen Beschwerdeauszug, eine kurze Einordnung und Unsicherheiten – keine
+Spieler-ID, Sanktion oder ausführbaren Befehle. Beispielsweise kann fehlende
+Kommunikation zusammen mit fehlenden Spawns eine Kommunikationsmeldung sein;
+fehlende Spawns allein reichen nicht. Eine Rückkehr auf den Server widerruft
+keine Beschwerde. Eine Verneinung oder Rücknahme darf keinen Kick auslösen.
+
+Die Anwendung prüft Zielreferenz und Textbeleg gegen den Originalreport und
+ordnet den Spieler **unabhängig** anhand des vollständigen Live-Namens und des
+konservativen Tippfehlerabgleichs zu. Ziel muss in ursprünglicher und frischer
+Spielerliste identisch sein; Team, Rolle, Sitzung und alle übrigen Schutzregeln
+gelten weiterhin. Das Modell kann keine dieser Prüfungen umgehen.
+
+Die KI darf nur in eine freigegebene Regel einordnen: Teamkills benötigen
+weiterhin die protokollierten Einzelfallbelege; Cheatverdacht bleibt manuell.
+Unklare Einordnung, widersprüchliche Ausgabe, fremde Spieler-ID, fehlender
+Anbieter, Timeout oder ungültige Antwort bleiben manuell. **Kein stiller
+Suchwort-Fallback.** Auch strukturierte Modellantworten können inhaltlich falsch
+sein; eine Spielerbeschwerde beweist keine tatsächliche Sprachaktivität.
+
+Ein separater Thread im bestehenden Discord-Worker verarbeitet die KI-Anfrage;
+Chat, Discord-Zustellung und RCON-Routinen warten nicht auf den Modellaufruf.
+Die ursprüngliche Report-Karte muss bereits zugestellt sein. Anfragen werden
+vor dem Versand dauerhaft reserviert; sowohl RCON als auch der gemeinsame
+Dienst verhindern Wiederholungen. Die Einordnung verfällt nach 60 Sekunden;
+späte Antworten, Neustarts, manuelle Eingriffe und Konfigurationsänderungen
+dürfen den Fall nicht wiederbeleben. Die Einordnung wird im Incident-Journal
+und auf der Discord-Karte sichtbar, nicht als Sprachbeweis dargestellt.
+
+Implementierung der strukturierten Ausgabe:
+[OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs).
+Die Eingabe bleibt untrusted data; es werden keine Modell-Tools angeboten.
 
 ## Freigegebene Regeln
 
@@ -47,7 +99,7 @@ Teil dieser ersten Version. Standard: **deaktiviert**, Betriebsart **Probelauf**
   oder Namensverstöße. Keine Banns oder Nachrichten-Warnungen durch dieses Modul.
 
 Beispiele: `!Admin Able squad keine Komms`, `!admin commander is not talking`,
-`!admin BattlefieldHero teamkills`. Der kleine DE/EN-Erkenner ist bewusst kein
+`!admin BattlefieldHero teamkills`. Im **Regelmodus** ist der kleine DE/EN-Erkenner bewusst kein
 allgemeines Sprachmodell: nicht unterstützte, gemischte, zitierte oder unklare
 Formulierungen bleiben normale Reports. Auch die Beschwerde muss erkennbar sein;
 ein Squadname allein genügt nicht.
@@ -80,7 +132,7 @@ Apps → Discord-Report-Bot → oberer Einrichtungsassistent → **KI & Report-A
 Serverbezogene Aktivierung, Probelauf/Aktivmodus und die drei Regeln einzeln.
 Mit **Report-Regeln speichern** separat speichern; die optionale KI-Verbindung
 für Chat/Namen darunter wird dadurch nicht eingerichtet oder verändert.
-Konfiguration benötigt `can_manage_discord_report_bot`; Aktivierung zusätzlich
+Konfiguration einschließlich KI-Modus benötigt `can_manage_discord_report_bot`; Aktivierung zusätzlich
 `can_kick_players`. Session-Schreibzugriffe bleiben CSRF-geschützt.
 
 **Selbstmeldungen für Tests zulassen** (`allow_self_reports`, standardmäßig aus)
@@ -176,8 +228,20 @@ ausdrücklich freigeben. Insbesondere PostgreSQL-Sperren und echte Kick-Antworte
 von HLL/HLLV müssen im Pilotbetrieb überprüft werden. Kein Rollout oder Aktivieren
 ist Bestandteil des lokalen Entwicklungscommits.
 
-Keine neue Datenbankmigration: Die neuen Assessment-Felder liegen im bestehenden
-JSON-Journal. Alte Konfigurationen bleiben lesbar (`cheating` wird zu `false`).
+Keine neue Datenbankmigration: Assessment- und KI-Felder liegen im bestehenden
+JSON-Journal. Alte Konfigurationen bleiben lesbar (`cheating` wird zu `false`,
+`reason_mode` zu `rules`). Ohne KI-Modus findet keine neue Modellanfrage statt.
 Bei einem Rollback zu älterem Code mit strengem Konfigurationsschema zuerst die
-neue Konfiguration sichern und das Feld `cheating` entfernen oder das vorherige
+neue Konfiguration sichern und die dort noch unbekannten Felder `cheating` bzw.
+`reason_mode` entfernen oder das vorherige
 Konfigurationsbackup wiederherstellen; Journalbelege und Historie behalten.
+Offene `classifying`-Fälle vorher unter der gemeinsamen Ausführungssperre zur
+manuellen Bearbeitung beenden. Kein Zurückspielen der gesamten Live-Datenbank.
+
+Die automatisierten Tests verwenden synthetische Spieler und simulierte
+Modellantworten. Sie prüfen Transport, Berechtigungen, Antwortvalidierung,
+Spielerzuordnung, Nebenläufigkeit und Ausführungssperren, nicht die tatsächliche
+sprachliche Qualität eines konkreten Modells. Vor produktiver Aktivierung sind
+echte Modell-Evaluierungen mit positiven und negativen, unbekannten
+Formulierungen und anschließend ein Probelauf erforderlich. Dieser Commit
+aktiviert den KI-Modus nicht auf einem Live-Server.

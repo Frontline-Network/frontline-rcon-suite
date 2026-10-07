@@ -56,6 +56,7 @@ def test_permissions_and_boundaries(call):
         {"mode": "ban"},
         {"enabled": "yes"},
         {"allow_self_reports": "yes"},
+        {"reason_mode": "guess"},
         {"teamkill_count": 1},
         {"communication_template_id": 99999},
     ],
@@ -108,3 +109,11 @@ def test_individual_case_and_cheat_review_config_metadata(call):
     assert result["teamkill_grace_seconds"] == 60
     assert result["cheat_sanctions"] == "manual_only"
     assert "teamkill_count" not in result
+
+
+def test_semantic_mode_requires_existing_admin_and_kick_permissions(call):
+    payload = {"enabled": True, "reason_mode": "ai"}
+    assert call("PUT", payload, [api.MANAGE]).status_code == 403
+    response = call("PUT", payload, [api.MANAGE, api.KICK])
+    assert response.status_code == 200
+    assert json.loads(response.content)["result"]["config"]["reason_mode"] == "ai"

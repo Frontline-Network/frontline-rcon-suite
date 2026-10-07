@@ -1614,7 +1614,7 @@ class AdminIncident(Base):
                 {k: v for k, v in event.payload.items() if k in {
                     "status", "mode", "rule", "target_id", "target_name", "result",
                     "teamkill_count", "teamkill_log_ids", "window_seconds", "updated_at", "sent_reason",
-                    "assessment", "ready_at",
+                    "assessment", "ready_at", "reason_analysis",
                 }} for event in (self.events if include_events else ()) if event.event_type == "report_admin"
             ), None),
             "assigned_to": self.assigned_to,

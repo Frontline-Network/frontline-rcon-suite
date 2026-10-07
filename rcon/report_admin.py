@@ -1,6 +1,7 @@
 """Opt-in report rules, persisted in the existing incident event journal.
 
-No model, ban, warning, vote, or free-form game command. A durable send marker
+Optional semantic interpretation is isolated from execution; no model-selected
+ban, warning, vote, or free-form game command. A durable send marker
 precedes the single kick attempt. Manual incident actions share the server lock.
 The normal Discord outbox publishes every result; uncertain results stay open.
 """
@@ -39,7 +40,7 @@ from rcon.user_config.utils import _invalidate_user_config_cache
 
 logger = logging.getLogger(__name__)
 ACTOR = "system:report-admin"
-OPEN = {"queued", "waiting", "sending"}
+OPEN = {"classifying", "queued", "waiting", "sending"}
 enter_session = votes.enter_session  # Commit errors must propagate.
 
 
@@ -96,6 +97,7 @@ def summary(payload):
             "window_seconds",
             "updated_at",
             "assessment",
+            "reason_analysis",
             "ready_at",
         )
         if k in payload
@@ -224,18 +226,26 @@ def valid_context(context, now):
         return False
 
 
-def enqueue(sess, incident, context, now):
+def enqueue(sess, incident, context, now, *, interpreted=None, existing_event=None):
     """True means this server uses report-admin routing, not leadership votes."""
     cfg = config(sess, incident.server_number)
     if not cfg.enabled:
         return False
+    if cfg.reason_mode == "ai" and interpreted is None:
+        from rcon import report_reason
+
+        return report_reason.enqueue(sess, incident, context, now, cfg)
     data = incident.to_dict()
     players = (context or {}).get("players", [])
-    rule = classify(incident.raw_message, players)
+    rule = interpreted[0] if interpreted else classify(incident.raw_message, players)
     if incident.source != "chat" or not rule or not getattr(cfg, rule):
         return True  # All other subjects remain strictly manual in this mode.
     resolution_subjects = data.get("subjects", [])
-    target = target_for(data, players, rule, allow_self_reports=cfg.allow_self_reports)
+    target = (
+        interpreted[1]
+        if interpreted
+        else target_for(data, players, rule, allow_self_reports=cfg.allow_self_reports)
+    )
     if not target and not any(
         s.get("state") in {"confirmed", "rejected"} for s in data.get("subjects", [])
     ):
@@ -266,18 +276,21 @@ def enqueue(sess, incident, context, now):
         "result": "Nicht eindeutig prüfbar / Cannot validate safely",
         "updated_at": now,
     }
-    event = AdminIncidentEvent(
+    event = existing_event or AdminIncidentEvent(
         actor=ACTOR,
         event_type="report_admin",
         payload=payload,
         idempotency_key=f"report-admin:{incident.id}",
         created_at=utc(now),
     )
-    incident.events.append(event)
+    if existing_event is None:
+        incident.events.append(event)
+    else:
+        event.payload = payload
     if (
         not valid_context(context, now)
         or not isinstance(stamp, (int, float))
-        or not 0 <= now - stamp <= 30
+        or not 0 <= now - stamp <= (MAX_REPORT_AGE if interpreted else 30)
         or not target
     ):
         return True
@@ -515,7 +528,11 @@ def cancel_incident(sess, incident, actor):
 
 def cancel_player(sess, server, pid=None):
     for event in pending(sess, server):
-        if pid is None or event.payload.get("target_id") == str(pid):
+        if (
+            pid is None
+            or event.payload.get("target_id") == str(pid)
+            or event.payload.get("status") == "classifying"
+        ):
             cancel_incident(sess, event.incident, "admin")
 
 
@@ -686,6 +703,14 @@ def tick(api, server):
     context = read_context(api) if cfg.enabled else None
     for event_id in tasks:
         live = None
+        with enter_session() as sess:
+            votes.lock(sess, server)
+            event = sess.get(AdminIncidentEvent, event_id)
+            if event and event.payload.get("status") == "classifying":
+                from rcon import report_reason
+
+                report_reason.finish(sess, event, context, time.time())
+                continue  # Refresh context on the next tick before any action.
         with enter_session() as sess:
             event = sess.get(AdminIncidentEvent, event_id)
             rule = event.payload.get("rule") if event else None
