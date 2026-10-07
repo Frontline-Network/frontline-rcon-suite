@@ -466,7 +466,7 @@ def run_structured(
                 "model": model,
                 "cwd": str(client.home / "runtime"),
                 "approvalPolicy": "never",
-                "sandbox": "readOnly",
+                "sandbox": "read-only",
                 "personality": "none",
                 "serviceName": "frontline_crcon_moderation",
                 "ephemeral": True,
