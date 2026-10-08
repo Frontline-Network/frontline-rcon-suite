@@ -35,10 +35,16 @@ class ReportReasonRequest(BaseModel):
     @field_validator("roster")
     @classmethod
     def bounded_public_roster(cls, value):
-        allowed = {"name", "team", "role", "squad"}
+        allowed = {"name", "team", "role", "squad", "leadership_role"}
         if any(
             set(row) - allowed or any(len(v) > 255 for v in row.values())
             for row in value
         ):
             raise ValueError("Only bounded public roster fields are allowed")
+        if any(
+            row.get("leadership_role", "none")
+            not in {"none", "commander", "squadleader"}
+            for row in value
+        ):
+            raise ValueError("Invalid normalized leadership role")
         return value

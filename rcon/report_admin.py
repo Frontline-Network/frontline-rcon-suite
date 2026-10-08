@@ -237,6 +237,8 @@ def enqueue(sess, incident, context, now, *, interpreted=None, existing_event=No
         return report_reason.enqueue(sess, incident, context, now, cfg)
     data = incident.to_dict()
     players = (context or {}).get("players", [])
+    if not isinstance(players, list):
+        players = []
     rule = interpreted[0] if interpreted else classify(incident.raw_message, players)
     if incident.source != "chat" or not rule or not getattr(cfg, rule):
         return True  # All other subjects remain strictly manual in this mode.
@@ -523,17 +525,61 @@ def cancel_incident(sess, incident, actor):
             from rcon.admin_incidents import IncidentConflict
 
             raise IncidentConflict("Report-admin kick in progress; wait for its result")
-        publish(sess, event, "manual", "Admin übernimmt / Admin takeover")
+        publish(
+            sess,
+            event,
+            "manual",
+            "Admin übernimmt / Admin takeover",
+            intervention_actor=str(actor or "admin")[:150],
+        )
 
 
-def cancel_player(sess, server, pid=None):
+def cancel_player(sess, server, pid=None, actor="admin"):
     for event in pending(sess, server):
         if (
             pid is None
             or event.payload.get("target_id") == str(pid)
-            or event.payload.get("status") == "classifying"
+            or event.payload.get("original_target_id") == str(pid)
         ):
-            cancel_incident(sess, event.incident, "admin")
+            cancel_incident(sess, event.incident, actor)
+        elif event.payload.get("status") == "classifying":
+            # The final target may not be known until AI returns. Remember an
+            # intervention against an original roster member, but do not cancel
+            # unrelated reports (including another report's reporter receipt).
+            roster = event.payload.get("reason_request", {}).get("roster", [])
+            if any(str(p.get("player_id")) == str(pid) for p in roster):
+                event.payload = {
+                    **event.payload,
+                    "player_interventions": {
+                        **event.payload.get("player_interventions", {}),
+                        str(pid): {
+                            "actor": str(actor or "admin")[:150],
+                            "at": time.time(),
+                        },
+                    },
+                }
+
+
+def guard_diagnostics(event, context):
+    """Private bounded evidence for failed final role checks; never lowers guards."""
+    players = (context or {}).get("players", [])
+    if not isinstance(players, list):
+        players = []
+    target = next(
+        (
+            p
+            for p in players
+            if str(p.get("player_id")) == event.payload.get("target_id")
+        ),
+        None,
+    )
+    expected = event.payload.get("target", {}).get("seat")
+    return {
+        "expected_seat": expected,
+        "observed_seat": identity(target),
+        "seat_unique": unique_seat(players, expected) if expected else None,
+        "captured_at": (context or {}).get("captured_at"),
+    }
 
 
 def recover(server):
@@ -739,7 +785,13 @@ def tick(api, server):
             if not event or event.payload["status"] not in {"queued", "waiting"}:
                 continue
             if reason := invalid_reason(sess, event, context, time.time()):
-                publish(sess, event, "manual", reason)
+                publish(
+                    sess,
+                    event,
+                    "manual",
+                    reason,
+                    guard_diagnostics=guard_diagnostics(event, context),
+                )
                 continue
             if not delivered(sess, event.incident_id):
                 continue
@@ -814,7 +866,13 @@ def tick(api, server):
             if event.payload["status"] != "sending":
                 continue
             if reason := invalid_reason(sess, event, fresh, time.time()):
-                publish(sess, event, "manual", reason)
+                publish(
+                    sess,
+                    event,
+                    "manual",
+                    reason,
+                    guard_diagnostics=guard_diagnostics(event, fresh),
+                )
                 continue
             p = event.payload
             if p["rule"] != "communication":

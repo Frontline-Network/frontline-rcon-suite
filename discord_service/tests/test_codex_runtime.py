@@ -114,3 +114,37 @@ def test_typed_busy_error_is_before_credentials_or_runtime_start(monkeypatch):
     lock.acquire.assert_called_once_with(timeout=15, priority=True)
     prepare.assert_not_called()
     spawn.assert_not_called()
+
+
+def test_structured_budget_includes_startup_and_is_opt_in(monkeypatch):
+    client = Mock()
+    client.__enter__ = Mock(side_effect=runtime.CodexRuntimeError("stop-before-model"))
+    client.__exit__ = Mock()
+    constructor = Mock(return_value=client)
+    monkeypatch.setattr(runtime, "CodexAppServer", constructor)
+    monkeypatch.setattr(runtime, "monotonic", lambda: 100)
+    with pytest.raises(runtime.CodexRuntimeError):
+        runtime.run_structured(
+            "x",
+            model="m",
+            prompt="p",
+            output_schema={},
+            priority=True,
+            timeout_seconds=35,
+        )
+    constructor.assert_called_once_with("x", priority=True, deadline=135)
+
+
+def test_rpc_deadline_does_not_restart_budget_per_stage(monkeypatch):
+    client = object.__new__(runtime.CodexAppServer)
+    client.settings = SimpleNamespace(codex_request_timeout_seconds=90)
+    client._deadline = 135
+    monkeypatch.setattr(runtime, "monotonic", lambda: 110)
+    assert client._operation_deadline("account/read", 30) == 135
+    monkeypatch.setattr(runtime, "monotonic", lambda: 130)
+    assert client._operation_deadline("turn/completed", 90) == 135
+    monkeypatch.setattr(runtime, "monotonic", lambda: 136)
+    with pytest.raises(runtime.CodexRuntimeError, match="codex_timeout:turn/start"):
+        client._operation_deadline("turn/start", 30)
+    client._deadline = None
+    assert client._operation_deadline("normal-analysis", 90) == 226

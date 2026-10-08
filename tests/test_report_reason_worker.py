@@ -56,7 +56,10 @@ def test_worker_uses_complete_message_and_never_sends_player_ids(semantic, conne
     http.post.assert_called_once()
     payload = http.post.call_args.kwargs["json"]
     assert payload["message"] == raw
-    assert all(set(p) == {"name", "team", "role", "squad"} for p in payload["roster"])
+    assert all(
+        set(p) == {"name", "team", "role", "squad", "leadership_role"}
+        for p in payload["roster"]
+    )
     assert not worker.process_one(http)
     api = transport()
     service.tick(api, 1)
@@ -128,6 +131,51 @@ def test_codex_uses_only_configured_installation_account(semantic, connection):
     worker.process_one(http)
     assert http.post.call_args.kwargs["json"]["api_key"] is None
     assert http.post.call_args.kwargs["json"]["ai_provider"] == "codex"
+
+
+@pytest.mark.parametrize(
+    "role", ["helicopterlogisticsofficer", "spotter", "tankcommander", "squadleader"]
+)
+def test_worker_explains_actual_leadership_roles(semantic, connection, role):
+    semantic[1][0]["role"] = role
+    report(semantic, "!admin BattlefieldHero SL no VOIP")
+    worker.process_one(connection[1])
+    roster = connection[1].post.call_args.kwargs["json"]["roster"]
+    assert (
+        next(p for p in roster if p["name"] == "BattlefieldHero")["leadership_role"]
+        == "squadleader"
+    )
+
+
+def test_unrelated_action_during_model_call_does_not_discard_reply(
+    semantic, connection
+):
+    _, http = connection
+    report(semantic, "!admin BattlefieldHero never answers us in command chat")
+    response = http.post.return_value
+
+    def during_call(*args, **kwargs):
+        with semantic[0]() as sess:
+            service.cancel_player(sess, 1, "v1", actor="AutoMod_NoLeaderWatch")
+        return response
+
+    http.post.side_effect = during_call
+    assert worker.process_one(http)
+    api = transport()
+    service.tick(api, 1)
+    service.tick(api, 1)
+    api.kick.assert_called_once()
+
+
+def test_timeout_has_clear_persisted_reason_without_retry(semantic, connection):
+    _, http = connection
+    i = report(semantic, "!admin BattlefieldHero never answers us in command chat")
+    http.post.side_effect = TimeoutError("secret")
+    worker.process_one(http)
+    service.tick(transport(), 1)
+    assert "AI timed out" in current(semantic[0], i["id"])["report_admin"]["result"]
+    assert not worker.process_one(http)
+    http.post.assert_called_once()
 
 
 def test_confirmed_not_started_busy_waits_then_analyzes_once(semantic, connection):

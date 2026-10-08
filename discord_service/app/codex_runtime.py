@@ -160,14 +160,23 @@ def _persist_credentials(store: Path, home: Path, snapshot: str | None = None) -
 
 class CodexAppServer:
     def __init__(
-        self, installation_id: str, settings: Settings | None = None, *, priority=False
+        self,
+        installation_id: str,
+        settings: Settings | None = None,
+        *,
+        priority=False,
+        deadline: float | None = None,
     ):
         self.settings = settings or get_settings()
         if not self.settings.codex_enabled:
             raise CodexRuntimeError("codex_runtime_disabled")
         self.installation_id = installation_id
+        self._deadline = deadline
         self._lock = _home_lock(installation_id)
-        if not self._lock.acquire(timeout=15 if priority else 5, priority=priority):
+        admission_timeout = 15 if priority else 5
+        if deadline is not None:
+            admission_timeout = max(0, min(admission_timeout, deadline - monotonic()))
+        if not self._lock.acquire(timeout=admission_timeout, priority=priority):
             raise CodexRuntimeBusy("codex_runtime_busy")
         self._closed = False
         self._auth_snapshot: str | None = None
@@ -266,15 +275,13 @@ class CodexAppServer:
         *,
         timeout: int | None = None,
     ) -> dict[str, Any]:
+        deadline = self._operation_deadline(method, timeout)
         self._request_id += 1
         request_id = self._request_id
         payload: dict[str, Any] = {"id": request_id, "method": method}
         if params is not None:
             payload["params"] = params
         self._send(payload)
-        deadline = monotonic() + (
-            timeout or self.settings.codex_request_timeout_seconds
-        )
         while True:
             remaining = deadline - monotonic()
             if remaining <= 0:
@@ -298,9 +305,7 @@ class CodexAppServer:
     def wait_notification(
         self, method: str, *, timeout: int | None = None
     ) -> dict[str, Any]:
-        deadline = monotonic() + (
-            timeout or self.settings.codex_request_timeout_seconds
-        )
+        deadline = self._operation_deadline(method, timeout)
         while True:
             for index, message in enumerate(self._notifications):
                 if message.get("method") == method:
@@ -318,6 +323,15 @@ class CodexAppServer:
                 return message
             if "method" in message:
                 self._notifications.append(message)
+
+    def _operation_deadline(self, method, timeout):
+        now = monotonic()
+        deadline = now + (timeout or self.settings.codex_request_timeout_seconds)
+        if self._deadline is not None:
+            deadline = min(deadline, self._deadline)
+        if deadline <= now:
+            raise CodexRuntimeError(f"codex_timeout:{method}")
+        return deadline
 
     def close(self) -> None:
         if self._closed:
@@ -512,10 +526,14 @@ def run_structured(
     prompt: str,
     output_schema: dict[str, Any],
     priority: bool = False,
+    timeout_seconds: float | None = None,
 ) -> dict[str, Any]:
-    with CodexAppServer(
-        installation_id, **({"priority": True} if priority else {})
-    ) as client:
+    options = {"priority": True} if priority else {}
+    if timeout_seconds is not None:
+        if not 0 < timeout_seconds <= 300:
+            raise ValueError("Invalid structured-call budget")
+        options["deadline"] = monotonic() + timeout_seconds
+    with CodexAppServer(installation_id, **options) as client:
         account = client.request("account/read", {"refreshToken": True}, timeout=30)
         if not isinstance(account.get("account"), dict):
             raise CodexRuntimeError("codex_not_authenticated")

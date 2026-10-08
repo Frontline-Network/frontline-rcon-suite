@@ -89,6 +89,7 @@ def process_one(http):
                     "name": str(p.get("name") or p.get("player_name") or ""),
                     "team": admin._normalize_team(p.get("team")) or "",
                     "role": str(p.get("role") or ""),
+                    "leadership_role": (admin.identity(p) or {}).get("kind", "none"),
                     "squad": str(p.get("unit_name") or ""),
                 }
                 for p in request["roster"]
@@ -106,6 +107,7 @@ def process_one(http):
             "reason_request": {**request, "status": "sending"},
         }
     result = None
+    failure_code = None
     not_started_busy = False
     try:
         response = http.post(
@@ -135,6 +137,11 @@ def process_one(http):
     except Exception as exc:
         # Do not expose keys, responses, prompts or player data in diagnostics.
         logger.warning("Report reason unavailable: %s", type(exc).__name__)
+        failure_code = (
+            "timeout"
+            if isinstance(exc, (requests.Timeout, TimeoutError))
+            else "provider_or_response_error"
+        )
     with admin.enter_session() as sess:
         admin.votes.lock(sess, server)
         event = sess.get(AdminIncidentEvent, event_id)
@@ -167,6 +174,7 @@ def process_one(http):
                 **event.payload["reason_request"],
                 "status": "done" if result else "failed",
                 "analysis": result,
+                "failure_code": failure_code,
             },
         }
     return True

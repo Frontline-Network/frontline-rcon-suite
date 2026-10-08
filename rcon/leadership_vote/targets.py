@@ -70,6 +70,7 @@ COMMANDERS = frozenset(
         "comander",
         "kommandar",
         "kommandat",
+        "kommder",
     }
 )
 # Deliberately not "com": "keine com" means communication, not commander.

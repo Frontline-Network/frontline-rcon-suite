@@ -127,6 +127,33 @@ def test_codex_uses_existing_isolated_runtime_without_sending_key():
     assert request.api_key not in run.call_args.kwargs["prompt"]
     assert request.message in run.call_args.kwargs["prompt"]
     assert run.call_args.kwargs["priority"] is True
+    assert run.call_args.kwargs["timeout_seconds"] == 35
+
+
+def test_role_guidance_and_squad_semantics_are_sent_without_ids():
+    request = job().model_copy(
+        update={
+            "ai_provider": "codex",
+            "roster": [
+                {
+                    "name": "Example",
+                    "team": "allies",
+                    "role": "helicopterlogisticsofficer",
+                    "squad": "charlie",
+                    "leadership_role": "squadleader",
+                }
+            ],
+        }
+    )
+    with patch.object(
+        ai, "run_structured", return_value=decision().model_dump()
+    ) as run:
+        ai.analyze_report_reason(request)
+    prompt = run.call_args.kwargs["prompt"]
+    data = json.loads(prompt.split("UNTRUSTED REPORT DATA:\n", 1)[1])
+    assert data["roster"][0]["leadership_role"] == "squadleader"
+    assert "CHarlie no comms" in prompt and "kommder" in prompt
+    assert "Short partial names" in prompt
 
 
 @pytest.mark.parametrize("fail", [False, True])

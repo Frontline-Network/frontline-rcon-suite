@@ -276,3 +276,80 @@ def test_similar_live_names_stay_manual_even_when_model_is_certain(semantic):
     service.tick(api, 1)
     service.tick(api, 1)
     api.kick.assert_not_called()
+
+
+@pytest.mark.parametrize("pid", ["v0", "v1", "not-in-roster"])
+@pytest.mark.parametrize("stage", ["pending", "done", "queued"])
+def test_unrelated_player_action_never_cancels_report(semantic, pid, stage):
+    i = report(semantic, "!admin BattlefieldHero never answers us in command chat")
+    api = transport()
+    if stage != "pending":
+        complete(semantic, i["id"], decision())
+    if stage == "queued":
+        service.tick(api, 1)
+    with semantic[0]() as sess:
+        service.cancel_player(sess, 1, pid, actor="unrelated-action")
+    if stage == "pending":
+        complete(semantic, i["id"], decision())
+    service.tick(api, 1)
+    service.tick(api, 1)
+    api.kick.assert_called_once()
+
+
+def test_intervention_before_unknown_typo_target_is_bound_still_wins(semantic):
+    fragment = "BattlexielxHera"
+    i = report(semantic, f"!admin {fragment} never answers us in command chat")
+    assert not i["target_id"]
+    with semantic[0]() as sess:
+        service.cancel_player(sess, 1, "target", actor="moderator")
+    complete(semantic, i["id"], decision(target=fragment))
+    api = transport()
+    service.tick(api, 1)
+    service.tick(api, 1)
+    api.kick.assert_not_called()
+    assert (
+        "Target intervention" in current(semantic[0], i["id"])["report_admin"]["result"]
+    )
+
+
+@pytest.mark.parametrize(
+    "server,pid,kicked", [(2, "target", True), (1, None, False), (1, "target", False)]
+)
+def test_intervention_scope_and_server_wide_changes(semantic, server, pid, kicked):
+    i = report(semantic, "!admin BattlefieldHero never answers us in command chat")
+    with semantic[0]() as sess:
+        service.cancel_player(sess, server, pid)
+    complete(semantic, i["id"], decision())
+    api = transport()
+    service.tick(api, 1)
+    service.tick(api, 1)
+    assert api.kick.called is kicked
+
+
+def test_final_role_change_keeps_bounded_diagnostics(semantic):
+    i = report(semantic, "!admin BattlefieldHero never answers us in command chat")
+    complete(semantic, i["id"], decision())
+    api = transport()
+    service.tick(api, 1)
+    semantic[1][0]["role"] = "Rifleman"
+    service.tick(api, 1)
+    api.kick.assert_not_called()
+    with semantic[0]() as sess:
+        event = sess.scalar(
+            select(AdminIncidentEvent).where(
+                AdminIncidentEvent.event_type == "report_admin"
+            )
+        )
+        evidence = event.payload["guard_diagnostics"]
+        assert evidence["expected_seat"]["kind"] == "squadleader"
+        assert evidence["observed_seat"] is None
+
+
+def test_reviewed_commander_typo_is_resolved_without_correcting_model_excerpt(semantic):
+    i = report(semantic, "!admin kommder never answers us in command chat")
+    complete(semantic, i["id"], decision(target="kommder", target_kind="commander"))
+    api = transport()
+    service.tick(api, 1)
+    service.tick(api, 1)
+    api.kick.assert_called_once()
+    assert api.kick.call_args.args[0] == "v5"

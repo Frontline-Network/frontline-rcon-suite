@@ -208,7 +208,11 @@ def finish(sess, event, context, now):
             sess,
             event,
             "manual",
-            "KI nicht verfügbar; kein Regel-Fallback / AI unavailable; no keyword fallback",
+            (
+                "KI-Zeitlimit überschritten; manuelle Prüfung / AI timed out; manual review"
+                if request.get("failure_code") == "timeout"
+                else "KI nicht verfügbar; kein Regel-Fallback / AI unavailable; no keyword fallback"
+            ),
         )
         return
     cfg = admin.config(sess, i.server_number)
@@ -234,6 +238,16 @@ def finish(sess, event, context, now):
             event,
             "manual",
             "KI-Einordnung oder Spielerzuordnung nicht eindeutig / AI interpretation or player match unclear",
+        )
+        return
+    intervention = p.get("player_interventions", {}).get(after["player_id"])
+    if intervention:
+        admin.publish(
+            sess,
+            event,
+            "manual",
+            "Maßnahme gegen Zielspieler während KI-Prüfung / Target intervention during AI review",
+            intervention_actor=intervention["actor"],
         )
         return
     if (
