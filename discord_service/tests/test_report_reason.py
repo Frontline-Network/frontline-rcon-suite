@@ -154,6 +154,8 @@ def test_role_guidance_and_squad_semantics_are_sent_without_ids():
     assert data["roster"][0]["leadership_role"] == "squadleader"
     assert "CHarlie no comms" in prompt and "kommder" in prompt
     assert "Short partial names" in prompt
+    assert "still target_kind=player, including a misspelled full handle" in prompt
+    assert "never an unrecognized player handle" in prompt
 
 
 @pytest.mark.parametrize("fail", [False, True])

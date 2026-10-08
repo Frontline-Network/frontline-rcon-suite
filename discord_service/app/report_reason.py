@@ -56,7 +56,12 @@ still be flagged as uncertain. Never invent a missing player or a role assignmen
 Target_text must be an EXACT verbatim substring of the original report identifying
 the accused player, squad or commander, preserving spelling mistakes and spaces.
 Do NOT substitute a corrected roster name. Target_kind records the reference
-type, not a guessed role. Never choose between similarly plausible names or use
+type, not a guessed role. A player handle followed by 'SL', 'squadleader' or another
+role qualifier is still target_kind=player, including a misspelled full handle.
+The qualifier does not turn the handle into a squad name. Reserve target_kind=squad
+for a squad label or its alphabet alias, never an unrecognized player handle.
+If unsure whether a reference is a player or squad, use manual instead of guessing.
+Never choose between similarly plausible names or use
 the author's name as a fallback target. Include an exact allegation_excerpt
 from the original message which supports the interpretation (not just a handle).
 Give a short rationale summarizing the entire reason and relevant context, not
