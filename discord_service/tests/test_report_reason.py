@@ -156,6 +156,7 @@ def test_role_guidance_and_squad_semantics_are_sent_without_ids():
     assert "Short partial names" in prompt
     assert "still target_kind=player, including a misspelled full handle" in prompt
     assert "never an unrecognized player handle" in prompt
+    assert "SHORT contiguous allegation phrase copied literally" in prompt
 
 
 @pytest.mark.parametrize("fail", [False, True])
