@@ -157,6 +157,63 @@ def test_role_guidance_and_squad_semantics_are_sent_without_ids():
     assert "still target_kind=player, including a misspelled full handle" in prompt
     assert "never an unrecognized player handle" in prompt
     assert "SHORT contiguous allegation phrase copied literally" in prompt
+    assert "ALWAYS refers to that squad's LEADER" in prompt
+    assert "jig not talking" in prompt
+    assert data["own_team_leadership"]["squads"] == [
+        {
+            "squad": "charlie",
+            "members": 1,
+            "squadleaders": ["Example"],
+            "unknown_roles": 0,
+        }
+    ]
+
+
+def test_compact_leadership_index_keeps_own_team_duplicates_and_unknown_roles():
+    roster = [
+        {
+            "name": "Own",
+            "team": "allies",
+            "squad": "Jig",
+            "leadership_role": "squadleader",
+        },
+        {"name": "Member", "team": "allies", "squad": "jig", "leadership_role": "none"},
+        {
+            "name": "Opponent",
+            "team": "axis",
+            "squad": "jig",
+            "leadership_role": "squadleader",
+        },
+        {"name": "Legacy", "team": "allies", "squad": "Baker", "role": "Officer"},
+        {
+            "name": "Chief",
+            "team": "allies",
+            "squad": "Command",
+            "leadership_role": "commander",
+        },
+        {
+            "name": "Duplicate",
+            "team": "allies",
+            "squad": "Jig",
+            "leadership_role": "squadleader",
+        },
+    ]
+    index = ai.own_team_leadership(roster, "Allies")
+    assert index == {
+        "team": "allies",
+        "commanders": ["Chief"],
+        "squads": [
+            {"squad": "baker", "members": 1, "squadleaders": [], "unknown_roles": 1},
+            {
+                "squad": "jig",
+                "members": 3,
+                "squadleaders": ["Own", "Duplicate"],
+                "unknown_roles": 0,
+            },
+        ],
+    }
+    assert ai.own_team_leadership(roster, "unknown") is None
+    assert ai.own_team_leadership([], "allies")["squads"] == []
 
 
 @pytest.mark.parametrize("fail", [False, True])

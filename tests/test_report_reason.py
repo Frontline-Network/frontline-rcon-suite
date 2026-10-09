@@ -353,3 +353,47 @@ def test_reviewed_commander_typo_is_resolved_without_correcting_model_excerpt(se
     service.tick(api, 1)
     api.kick.assert_called_once()
     assert api.kick.call_args.args[0] == "v5"
+
+
+@pytest.mark.parametrize("squad", ["jig", "how", "baker", "juliett", "Eagles"])
+def test_bare_squad_communication_means_own_team_leader(semantic, squad):
+    leader = semantic[1][0]
+    leader.update(role="squadleader", unit_name=squad)
+    semantic[1].append({**leader, "player_id": "opponent", "team": "axis"})
+    i = report(semantic, f"!admin {squad} not talking")
+    complete(
+        semantic,
+        i["id"],
+        decision(target=squad, target_kind="squad", excerpt="not talking"),
+    )
+    api = transport()
+    service.tick(api, 1)
+    service.tick(api, 1)
+    api.kick.assert_called_once()
+    assert api.kick.call_args.args[0] == "target"
+
+
+@pytest.mark.parametrize("self_allowed", [True, False])
+def test_bare_jig_report_by_own_leader_keeps_self_report_setting(
+    semantic, self_allowed
+):
+    service.configure(
+        1,
+        Config(
+            enabled=True,
+            mode="active",
+            reason_mode="ai",
+            allow_self_reports=self_allowed,
+        ),
+    )
+    semantic[1][0].update(role="squadleader", unit_name="jig")
+    i = report(semantic, "!admin jig not talking", reporter_id="target")
+    complete(
+        semantic,
+        i["id"],
+        decision(target="jig", target_kind="squad", excerpt="not talking"),
+    )
+    api = transport()
+    service.tick(api, 1)
+    service.tick(api, 1)
+    assert api.kick.called is self_allowed
