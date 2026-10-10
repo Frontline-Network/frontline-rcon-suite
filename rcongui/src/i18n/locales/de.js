@@ -1632,6 +1632,8 @@ const de = {
       saveAndActivate: "Speichern & aktivieren",
       savePaused: "Pausiert speichern",
       actionFailed: "Die Aktion konnte nicht abgeschlossen werden. Die bestehende Konfiguration wurde nicht stillschweigend geändert.",
+      installFailed: "Discord-Verbindung konnte nicht gestartet werden",
+      installFailedHelp: "Die Installationsanfrage ist fehlgeschlagen. Versuche es erneut. Bleibt der Fehler bestehen, muss der Betreiber die Installations-ID und den Callback-Rückkanal prüfen. Technische Rückmeldung:",
       technicalDetails: "Technische Details",
       runDiagnostics: "Diagnose ausführen",
       diagnosticsComplete: "Discord-Diagnose abgeschlossen.",

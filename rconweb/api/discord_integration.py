@@ -7,6 +7,7 @@ import math
 import os
 import re
 import secrets
+import uuid
 from datetime import timedelta
 from datetime import timezone as datetime_timezone
 from urllib.parse import urlsplit
@@ -130,8 +131,16 @@ def _json_safe(value):
 
 def _integration() -> DiscordReportIntegration:
     service_url = os.getenv("DISCORD_SERVICE_URL", "").rstrip("/")
+    defaults = {"service_url": service_url}
+    # The hosting provisioner registers this UUID with the callback broker.
+    # Generate a separate ID only for installations without a provisioned route.
+    # Never rotate existing identities: their capabilities and reports are bound
+    # to the stored ID and require an explicit operator-led reconciliation.
+    provisioned_id = os.getenv("MOBILE_INSTALLATION_ID", "").strip()
+    if os.getenv("DISCORD_CALLBACK_BASE_URL", "").strip() and provisioned_id:
+        defaults["installation_id"] = lambda: uuid.UUID(provisioned_id)
     integration, _ = DiscordReportIntegration.objects.get_or_create(
-        pk=1, defaults={"service_url": service_url}
+        pk=1, defaults=defaults
     )
     if service_url and not integration.service_url:
         integration.service_url = service_url

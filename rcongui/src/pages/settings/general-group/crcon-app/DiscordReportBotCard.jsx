@@ -10,6 +10,7 @@ import {
   AccordionDetails,
   AccordionSummary,
   Alert,
+  AlertTitle,
   Box,
   Button,
   Card,
@@ -204,6 +205,7 @@ export default function DiscordReportBotCard() {
   const [config, setConfig] = useState(null);
   const [status, setStatus] = useState(null);
   const [error, setError] = useState("");
+  const [installError, setInstallError] = useState("");
   const [channelId, setChannelId] = useState("");
   const [roles, setRoles] = useState([]);
   const [discordOptions, setDiscordOptions] = useState({
@@ -315,9 +317,11 @@ export default function DiscordReportBotCard() {
   }, [aiStatus?.state, loadAiStatus]);
 
   const installDiscordApp = async () => {
-    const popup = window.open("about:blank", "_blank");
+    let popup;
+    setInstallError("");
     setBusyAction("install");
     try {
+      popup = window.open("about:blank", "_blank");
       const pairing = await discordRequest("pairings", { method: "POST" });
       if (popup) {
         popup.opener = null;
@@ -328,8 +332,14 @@ export default function DiscordReportBotCard() {
       setError("");
       setActiveStep(1);
     } catch (requestError) {
-      if (popup) popup.close();
+      setInstallError(requestError?.message || String(requestError));
       captureError(requestError);
+      // Closing a blocked or user-closed popup must not hide the API error.
+      try {
+        if (popup && !popup.closed) popup.close();
+      } catch {
+        // The persistent inline alert below remains available.
+      }
     } finally {
       setBusyAction("");
     }
@@ -968,6 +978,17 @@ export default function DiscordReportBotCard() {
       >
         {t("settings.discordReports.install")}
       </Button>
+      {installError && (
+        <Alert severity="error" data-testid="discord-install-error">
+          <AlertTitle>{t("settings.discordReports.installFailed")}</AlertTitle>
+          <Typography variant="body2">
+            {t("settings.discordReports.installFailedHelp")}
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 1, overflowWrap: "anywhere" }}>
+            {installError}
+          </Typography>
+        </Alert>
+      )}
     </Stack>,
     <Stack spacing={2.5} key="guild">
       <SectionTitle

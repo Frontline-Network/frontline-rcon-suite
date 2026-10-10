@@ -1622,6 +1622,8 @@ const en = {
       saveAndActivate: "Save & activate",
       savePaused: "Save paused",
       actionFailed: "The action could not be completed. The existing configuration was not changed silently.",
+      installFailed: "Could not start the Discord connection",
+      installFailedHelp: "The installation request failed. Try again. If the error persists, the operator needs to check the installation ID and callback connection. Technical response:",
       technicalDetails: "Technical details",
       runDiagnostics: "Run diagnostics",
       diagnosticsComplete: "Discord diagnostics completed.",

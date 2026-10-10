@@ -16,6 +16,47 @@ const steps = [
   { label: "Aktivieren", testId: "discord-wizard-step-activate" },
 ];
 
+for (const language of ["de", "en"]) {
+  for (const popupBlocked of [false, true]) {
+    test(`Discord installation error stays visible (${language}, popup blocked: ${popupBlocked})`, async ({ page, context }) => {
+      test.setTimeout(60_000);
+      await page.setViewportSize(popupBlocked ? VIEWPORTS.mobile : VIEWPORTS.desktop);
+      if (popupBlocked) {
+        await page.addInitScript(() => { window.open = () => null; });
+      }
+      await openDemoPage(page, "/apps/discord-report-bot", {
+        language,
+        query: { demo_discord_install_error: "1" },
+      });
+      const install = page.getByTestId("discord-wizard-step-install").getByRole("button");
+      const popupPromise = popupBlocked ? null : page.waitForEvent("popup");
+      await install.click();
+      const error = page.getByTestId("discord-install-error");
+      await expect(error).toBeVisible();
+      await expect(error).toContainText("CRCON pairing is invalid or expired");
+      await expect(error).toContainText(language === "de" ? "Installations-ID" : "installation ID");
+      await expect(install).toBeEnabled();
+      if (popupPromise) {
+        const popup = await popupPromise;
+        await expect.poll(() => popup.isClosed()).toBe(true);
+      }
+      await expectNoHorizontalPageOverflow(page);
+
+      // A retry replaces the failure with the next step; no real OAuth request.
+      await context.route("https://discord.com/**", (route) => route.fulfill({ body: "OAuth test destination" }));
+      await page.evaluate(() => {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("demo_discord_install_error");
+        window.history.replaceState(null, "", url);
+        window.open = () => ({ opener: null, location: "", closed: false });
+      });
+      await install.click();
+      await expect(page.getByTestId("discord-wizard-step-guild")).toBeVisible();
+      await expect(error).toHaveCount(0);
+    });
+  }
+}
+
 for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
   test.describe(`${viewportName} Discord wizard`, () => {
     test.use({ viewport });

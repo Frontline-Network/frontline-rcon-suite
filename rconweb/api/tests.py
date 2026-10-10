@@ -1590,6 +1590,80 @@ class MobileContextTests(TestCase):
 
 
 class DiscordActionTemplateTests(TestCase):
+
+    @patch.dict(
+        os.environ,
+        {
+            "MOBILE_INSTALLATION_ID": "11111111-2222-4333-8444-555555555555",
+            "DISCORD_CALLBACK_BASE_URL": "https://callback.example.org",
+        },
+    )
+    def test_new_hosted_discord_integration_uses_registered_callback_identity(self):
+        from api.discord_integration import _integration, _pairing_callback_url
+
+        integration = _integration()
+        self.assertEqual(
+            str(integration.installation_id), os.environ["MOBILE_INSTALLATION_ID"]
+        )
+        self.assertIn(
+            str(integration.installation_id),
+            _pairing_callback_url(None, integration.installation_id),
+        )
+        self.assertEqual(_integration().installation_id, integration.installation_id)
+
+    @patch.dict(
+        os.environ,
+        {
+            "MOBILE_INSTALLATION_ID": "11111111-2222-4333-8444-555555555555",
+            "DISCORD_CALLBACK_BASE_URL": "https://callback.example.org",
+        },
+    )
+    def test_existing_discord_identity_is_never_rotated_automatically(self):
+        from api.discord_integration import _integration
+        from api.models import DiscordReportIntegration
+
+        for enabled in (False, True):
+            with self.subTest(enabled=enabled):
+                DiscordReportIntegration.objects.all().delete()
+                original = DiscordReportIntegration.objects.create(
+                    pk=1, enabled=enabled
+                )
+                self.assertEqual(
+                    _integration().installation_id, original.installation_id
+                )
+                with patch.dict(os.environ, {"MOBILE_INSTALLATION_ID": "invalid"}):
+                    self.assertEqual(
+                        _integration().installation_id, original.installation_id
+                    )
+
+    @patch.dict(
+        os.environ,
+        {
+            "MOBILE_INSTALLATION_ID": "",
+            "DISCORD_CALLBACK_BASE_URL": "https://callback.example.org",
+        },
+    )
+    def test_unprovisioned_discord_integration_keeps_generated_identity(self):
+        from api.discord_integration import _integration
+
+        original = _integration()
+        self.assertIsNotNone(original.installation_id)
+        self.assertEqual(_integration().installation_id, original.installation_id)
+
+    @patch.dict(
+        os.environ,
+        {
+            "MOBILE_INSTALLATION_ID": "11111111-2222-4333-8444-555555555555",
+            "DISCORD_CALLBACK_BASE_URL": "",
+        },
+    )
+    def test_direct_discord_installation_is_not_tied_to_mobile_identity(self):
+        from api.discord_integration import _integration
+
+        self.assertNotEqual(
+            str(_integration().installation_id), os.environ["MOBILE_INSTALLATION_ID"]
+        )
+
     def _discord_manager(self):
         # User saves normally refresh the live moderator cache. These endpoint
         # tests do not exercise Redis and must stay deterministic without it.

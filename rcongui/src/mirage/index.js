@@ -483,6 +483,15 @@ export function makeServer({ environment = "development" } = {}) {
         };
       };
       this.get("/discord/v1/integration", () => ok(demoDiscordIntegration()));
+      this.post("/discord/v1/pairings", () => {
+        if (new URLSearchParams(window.location.search).get("demo_discord_install_error") === "1") {
+          return new Response(400, {}, {
+            failed: true,
+            error: "CRCON pairing is invalid or expired",
+          });
+        }
+        return ok({ install_url: "https://discord.com/oauth2/authorize?client_id=demo" });
+      });
       let demoReportAdmin = {
         enabled: false,
         mode: "dry_run",
