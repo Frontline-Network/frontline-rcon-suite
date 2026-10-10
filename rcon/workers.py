@@ -143,6 +143,7 @@ def unique_id(text: str, length: int = 16) -> str:
     """
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:length]
 
+
 def save_missing_match_logs(map_: MapInfo):
     """Attempts to fetch logs from the server for the given match and save any missing ones"""
     logger.info("[WORKER] - Started analyzing match logs")
@@ -158,33 +159,47 @@ def save_missing_match_logs(map_: MapInfo):
         match_end = datetime.datetime.fromtimestamp(raw_end, datetime.UTC)
 
         with enter_session() as sess:
-            if not _are_match_logs_available(sess, int(get_server_number()), match_start, match_end):
-                raise Exception("match logs are not yet available, skipping backtracking logs")
+            if not _are_match_logs_available(
+                sess, int(get_server_number()), match_start, match_end
+            ):
+                raise Exception(
+                    "match logs are not yet available, skipping backtracking logs"
+                )
 
         # Adding 1 more minute to the query just to be sure no logs are missed by a few seconds
-        minutes_from_now = 1 + ((datetime.datetime.now(tz=datetime.UTC) - match_start).seconds // 60)
+        minutes_from_now = 1 + int(
+            (datetime.datetime.now(tz=datetime.UTC) - match_start).total_seconds() // 60
+        )
 
         rcon_logs = get_rcon().get_structured_logs(since_min_ago=minutes_from_now)
-        rcon_match_logs = [log for log in rcon_logs["logs"] if match_start <= log["event_time"].replace(tzinfo=datetime.UTC) and log["event_time"].replace(tzinfo=datetime.UTC) <= match_end]
+        rcon_match_logs = [
+            log
+            for log in rcon_logs["logs"]
+            if match_start <= log["event_time"].replace(tzinfo=datetime.UTC)
+            and log["event_time"].replace(tzinfo=datetime.UTC) <= match_end
+        ]
         # 20_000 logs should be enough (90 min warfare full server results in approx 4000 logs)
-        match_redis_logs = [log for log in LogsHistory()[:20000] if match_start <= log["event_time"].replace(tzinfo=datetime.UTC) and log["event_time"].replace(tzinfo=datetime.UTC) <= match_end]
+        match_redis_logs = [
+            log
+            for log in LogsHistory()[:20000]
+            if match_start <= log["event_time"].replace(tzinfo=datetime.UTC)
+            and log["event_time"].replace(tzinfo=datetime.UTC) <= match_end
+        ]
 
         logger.info("Match start: %s | Match end: %s", match_start, match_end)
         logger.info("HLLSERVER logs count: %d", len(rcon_match_logs))
 
-        if len(rcon_match_logs) == 0:
-            logger.info("This match is probably too old and the HLLSERVER does not retain those logs any longer")
-            logger.info("[WORKER] - Done backtracking logs")
-            return
-
-        logger.info("First log: %s, Last log: %s", rcon_match_logs[-1]["raw"], rcon_match_logs[0]["raw"])
-
-        id_to_log = {unique_id(log["message"]): log for log in rcon_match_logs}
-
         logger.info("CACHE logs count: %d", len(match_redis_logs))
-        for log in match_redis_logs:
-            if not id_to_log.get(unique_id(log["message"])):
-                logger.warning("Missing log - CACHE: %s", log)
+
+        # The same message can occur more than once (kills, reconnects, etc.).
+        # Match the timestamp and content, not just a hash of message text.
+        def identity(event_time, message):
+            return (event_time.replace(tzinfo=datetime.UTC), message)
+
+        available = {
+            identity(log["event_time"], log["message"]): log
+            for log in rcon_match_logs + match_redis_logs
+        }
 
         with enter_session() as sess:
             # Get the logs from the database for the given match
@@ -197,11 +212,12 @@ def save_missing_match_logs(map_: MapInfo):
                 limit=99999999,
             )
             logger.info("DATABASE logs count: %d", len(db_match_logs))
-            logs_to_store = []
-            for log in db_match_logs:
-                if not id_to_log.get(unique_id(log.content)):
-                    logger.warning("Missing log - DATABASE: %s", log)
-                    logs_to_store.append(log)
+            recorded = {identity(log.event_time, log.content) for log in db_match_logs}
+            # Previously this difference was reversed and ORM LogLine objects
+            # were passed to _save_logs(), which expects structured dictionaries.
+            logs_to_store = [
+                log for key, log in available.items() if key not in recorded
+            ]
             if logs_to_store:
                 recorder = LogRecorder()
                 logger.info("Saving missing logs: %d", len(logs_to_store))
@@ -211,7 +227,6 @@ def save_missing_match_logs(map_: MapInfo):
     except Exception as e:
         logger.error("[WORKER] - Error while backtracking logs\n:%s", str(e))
         raise
-
 
 
 def record_stats_worker(map_info: MapInfo, depends_on: Job | None = None):
@@ -240,13 +255,7 @@ def clear_stats_cache(map: Maps, map_info: MapInfo | None):
     # ensure the map result and stats were saved
     if map_info is None or map.result is None:
         return
-    maps_history = MapsHistory()
-    map_index, map_to_update = next(((idx, m) for idx, m in enumerate(maps_history) if m["start"] == map_info["start"] and m["end"] == map_info["end"] and m["name"] == map_info["name"]), (None, None))
-    if not map_index or not map_to_update:
-        return
-    map_to_update["player_stats"] = {}
-    map_to_update["cap_flips"] = []
-    maps_history.update(map_index, map_to_update)
+    MapsHistory().clear_recorded_stats(map_info)
 
 def _record_stats(map_info: MapInfo):
     raw_start = map_info.get("start")

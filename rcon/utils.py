@@ -521,22 +521,64 @@ class MapsHistory(FixedLenList[MapInfo]):
         except IndexError:
             return None
 
-    def save_map_end(self, old_map: str | None = None, end_timestamp: int | None = None):
+    def save_map_end(
+        self,
+        old_map: str,
+        end_timestamp: int | None = None,
+        *,
+        start_timestamp: int | None = None,
+    ) -> MapInfo | None:
+        """Close only the expected, still-open round; never extend an old one."""
         ts = end_timestamp or int(datetime.now(tz=UTC).timestamp())
-        logger.info("Saving end of map %s at time %s", old_map, ts)
-        prev = self.lpop() or MapInfo(
-            name=old_map,
-            start=None,
-            end=None,
-            guessed=True,
-            player_stats=dict(),
-            game_layout={"requested": [], "set": []},
-            cap_flips=[],
-            match_time=0,
-        )
-        prev["end"] = ts
-        self.lpush(prev)
-        return prev
+        with self.red.pipeline() as pipe:
+            while True:
+                try:
+                    pipe.watch(self.key)
+                    raw = pipe.lindex(self.key, 0)
+                    prev = self.deserializer(raw) if raw else None
+                    if (
+                        not prev
+                        or prev["name"] != old_map
+                        or prev["start"] is None
+                        or ts <= prev["start"]
+                        or prev["end"] is not None
+                        or (
+                            start_timestamp is not None
+                            and prev["start"] != start_timestamp
+                        )
+                    ):
+                        return None
+                    prev["end"] = ts
+                    pipe.multi()
+                    pipe.lset(self.key, 0, self.serializer(prev))
+                    pipe.execute()
+                    logger.info("Saving end of map %s at time %s", old_map, ts)
+                    return prev
+                except redis.WatchError:
+                    continue
+
+    def clear_recorded_stats(self, recorded: MapInfo) -> None:
+        """Clear a saved round by identity, even if a new start shifts its index."""
+        with self.red.pipeline() as pipe:
+            while True:
+                try:
+                    pipe.watch(self.key)
+                    # Do not clear the active entry while the polling loop uses it.
+                    for index, raw in enumerate(pipe.lrange(self.key, 1, -1), start=1):
+                        item = self.deserializer(raw)
+                        if all(
+                            item.get(k) == recorded.get(k)
+                            for k in ("start", "end", "name")
+                        ):
+                            item["player_stats"] = {}
+                            item["cap_flips"] = []
+                            pipe.multi()
+                            pipe.lset(self.key, index, self.serializer(item))
+                            pipe.execute()
+                            return
+                    return
+                except redis.WatchError:
+                    continue
 
     def save_new_map(
         self,
@@ -545,9 +587,10 @@ class MapsHistory(FixedLenList[MapInfo]):
         start_timestamp: int | None = None,
         game_layout: GameLayout | None = None,
         match_time: int = 0,
-    ):
+        start_log: str | None = None,
+    ) -> MapInfo | None:
+        """Atomically close the previous round and start a newer one once."""
         ts = start_timestamp or int(datetime.now(tz=UTC).timestamp())
-        logger.info("Saving start of new map %s at time %s", new_map, ts)
         game_layout = game_layout or GameLayout(requested=[], set=[])
         new = MapInfo(
             name=new_map,
@@ -559,8 +602,50 @@ class MapsHistory(FixedLenList[MapInfo]):
             cap_flips=[],
             match_time=match_time,
         )
-        self.add(new)
-        return new
+        if start_log is not None:
+            new["start_log"] = start_log
+        with self.red.pipeline() as pipe:
+            while True:
+                try:
+                    pipe.watch(self.key)
+                    raw = pipe.lindex(self.key, 0)
+                    prev = self.deserializer(raw) if raw else None
+                    if prev and (
+                        (prev["start"] is not None and ts <= prev["start"])
+                        or (prev["end"] is not None and ts < prev["end"])
+                    ):
+                        return None
+                    pipe.multi()
+                    if prev and prev["end"] is None:
+                        prev["end"] = ts
+                        pipe.lset(self.key, 0, self.serializer(prev))
+                    pipe.lpush(self.key, self.serializer(new))
+                    pipe.ltrim(self.key, 0, self.max_len - 1)
+                    pipe.execute()
+                    logger.info("Saving start of new map %s at time %s", new_map, ts)
+                    return new
+                except redis.WatchError:
+                    continue
+
+
+def layer_matches_match_log(layer: Layer, raw: str) -> bool:
+    """Match what the log actually specifies, without guessing weather/attacker."""
+    if layer.id == UNKNOWN_MAP_NAME:
+        return False
+    try:
+        name, environment, mode = parse_map_string(raw)
+    except (TypeError, ValueError):
+        return False
+    if mode != layer.game_mode or (
+        environment is not None and environment != layer.environment
+    ):
+        return False
+    names = {layer.map.name.casefold()}
+    if mode == GameMode.OFFENSIVE:
+        for faction in (layer.map.allies, layer.map.axis):
+            if faction.team == layer.attackers:
+                names.add(f"{layer.map.name} {faction.name}".casefold())
+    return name.casefold() in names
 
 
 class ApiKey:

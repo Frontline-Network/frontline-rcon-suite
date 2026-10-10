@@ -659,6 +659,7 @@ class MapResult(TypedDict):
 
 class MapInfo(TypedDict):
     _schema_version: NotRequired[int]
+    start_log: NotRequired[str]
     name: str
     start: int | None
     end: int | None
