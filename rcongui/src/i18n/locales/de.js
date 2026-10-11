@@ -1631,7 +1631,7 @@ const de = {
       activateWithoutTest: "Es gibt noch keinen erfolgreichen Test. Die Integration kann gespeichert werden, sollte aber vor dem Live-Betrieb getestet werden.",
       saveAndActivate: "Speichern & aktivieren",
       savePaused: "Pausiert speichern",
-      actionFailed: "Die Aktion konnte nicht abgeschlossen werden. Die bestehende Konfiguration wurde nicht stillschweigend geändert.",
+      actionFailed: "Die Aktion ist fehlgeschlagen. Details zur Ursache findest du unter „Technische Details“.",
       installFailed: "Discord-Verbindung konnte nicht gestartet werden",
       installFailedHelp: "Die Installationsanfrage ist fehlgeschlagen. Versuche es erneut. Bleibt der Fehler bestehen, muss der Betreiber die Installations-ID und den Callback-Rückkanal prüfen. Technische Rückmeldung:",
       technicalDetails: "Technische Details",

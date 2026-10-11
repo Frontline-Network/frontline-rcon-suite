@@ -1621,7 +1621,7 @@ const en = {
       activateWithoutTest: "There is no successful test yet. You can save the integration, but should test it before live operation.",
       saveAndActivate: "Save & activate",
       savePaused: "Save paused",
-      actionFailed: "The action could not be completed. The existing configuration was not changed silently.",
+      actionFailed: "The action failed. See “Technical details” for the cause.",
       installFailed: "Could not start the Discord connection",
       installFailedHelp: "The installation request failed. Try again. If the error persists, the operator needs to check the installation ID and callback connection. Technical response:",
       technicalDetails: "Technical details",
