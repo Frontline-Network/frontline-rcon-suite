@@ -420,6 +420,16 @@
         syncSelection();
       });
     }
+    if (!data.direct && data.wizardSections?.length && window.CRCONPermissionWizard) {
+      intro.textContent = de ? "Die Rolle bestimmt, was ihre Mitglieder dürfen. Der Assistent führt dich durch die Auswahl. Einzelrechte und Vorlagen findest du bei Bedarf in der Expertenansicht." : "This role controls what its members may do. The wizard guides you through setup. Individual permissions and presets remain available in the expert view.";
+      const expert = element("details", "permission-expert");
+      expert.append(element("summary", "", de ? "Expertenansicht: einzelne Rechte & Vorlagen" : "Expert view: individual permissions & presets"));
+      Array.from(root.children).filter(node => ![intro, superuser, pending].includes(node)).forEach(node => expert.append(node));
+      const wizard = window.CRCONPermissionWizard.mount({data, permissions, available:options, getOwn:() => new Set(own), form:select.closest('form'), fieldId:select.id,
+        apply: next => { own.clear(); next.forEach(id => own.add(id)); resetPresetUndo(); syncSelection(); }
+      });
+      root.insertBefore(wizard, pending); root.append(expert);
+    }
     search.addEventListener("input", update);
     assigned.addEventListener("change", update);
     kindFilter.addEventListener("change", update);

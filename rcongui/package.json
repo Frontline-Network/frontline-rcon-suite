@@ -24,7 +24,7 @@
     "check:i18n": "node scripts/check-i18n-contract.mjs && node --test src/i18n/operator-messages.test.mjs src/pages/settings/settings-english.test.mjs src/pages/views/team/live-views-localization.test.mjs",
     "check:game-capabilities": "node scripts/check-game-timer-capabilities.mjs",
     "check:admin-actions": "node scripts/check-admin-action-contract.mjs",
-    "check:permissions": "node --check ../rconweb/static/api/js/permission-picker.js && node --test ../rconweb/static/api/js/permission-planner.test.cjs",
+    "check:permissions": "node --check ../rconweb/static/api/js/permission-picker.js && node --check ../rconweb/static/api/js/permission-wizard.js && node --test ../rconweb/static/api/js/permission-planner.test.cjs",
     "check:csrf": "node scripts/check-csrf-request-contract.mjs && node --test src/utils/csrfTransport.test.mjs src/pages/account/password-client.test.mjs",
     "check:operator-copy": "node scripts/check-operator-copy.mjs",
     "check:config-compatibility": "node scripts/check-config-form-compatibility.mjs",

@@ -8,6 +8,7 @@ from django.urls import reverse
 
 from .permission_help import permission_help
 from .permission_workflows import WORKFLOWS, permission_workflows
+from .permission_wizard import wizard_metadata
 
 
 class PermissionWorkflowTests(TestCase):
@@ -76,6 +77,18 @@ class PermissionWorkflowTests(TestCase):
                 self.assertEqual(left['permissions'], right['permissions'])
                 self.assertEqual(left['unavailable'], right['unavailable'])
 
+    def test_wizard_covers_each_workflow_once_with_localized_explanations(self):
+        for german in (True, False):
+            workflows = permission_workflows(self.permissions, german)
+            before = [(w['id'], w['bundles']) for w in workflows]
+            sections = wizard_metadata(workflows, german)
+            ids = [key for section in sections for key in section['workflows']]
+            self.assertEqual(len(ids), len(set(ids)))
+            self.assertEqual(set(ids), {w['id'] for w in workflows})
+            self.assertTrue(all(w['explanation'] for w in workflows))
+            self.assertEqual(before, [(w['id'], w['bundles']) for w in workflows])
+            self.assertTrue(all(section['description'] for section in sections))
+
     def test_internal_metadata_separated_and_console_aliases_searchable(self):
         for p in self.permissions:
             meta = permission_help(p)
@@ -109,6 +122,8 @@ class PermissionWorkflowTests(TestCase):
         url = reverse('admin:auth_group_change', args=[group.pk])
         response = self.client.get(url)
         self.assertContains(response, 'permission-planner.js')
+        self.assertContains(response, 'permission-wizard.js')
+        self.assertContains(response, '"wizardSections"')
         self.assertContains(response, '"workflows"')
         self.assertEqual(set(group.permissions.values_list('pk', flat=True)), {internal.pk})
         requested = [str(internal.pk), *self.workflows['console']['bundles'][0]['permissions']]

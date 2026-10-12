@@ -114,7 +114,7 @@ html[data-crcon-theme] .crcon-form-sections label.inline { margin: 0; }
 html[data-crcon-theme] .crcon-form-sections .form-row .flex-container:not(.checkbox-row) { display: block; }
 html[data-crcon-theme] .crcon-form-sections .form-row > .flex-container.form-multiline { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
 html[data-crcon-theme] .crcon-form-sections .form-multiline > div { min-width: 0; padding: 0; }
-html[data-crcon-theme] .crcon-form-sections .aligned label:not(.vCheckboxLabel):not(.permission-row):not(.permission-assigned-label):not(.permission-technical-label):not(.permission-category-toggle):not(.crcon-group-option) { display: block; float: none; width: auto; padding: 0 0 9px; font-weight: 600; }
+html[data-crcon-theme] .crcon-form-sections .aligned label:not(.vCheckboxLabel):not(.permission-row):not(.permission-assigned-label):not(.permission-technical-label):not(.permission-category-toggle):not(.crcon-group-option):not(.permission-wizard-option):not(.permission-wizard-confirm) { display: block; float: none; width: auto; padding: 0 0 9px; font-weight: 600; }
 html[data-crcon-theme] .crcon-form-sections .aligned :is(.vTextField, .vLargeTextField, input[type="email"], input[type="password"]) { width: 100%; max-width: 100%; }
 html[data-crcon-theme] .crcon-form-sections .help { margin: 10px 0 0; padding: 0; overflow-wrap: anywhere; }
 html[data-crcon-theme] .crcon-form-sections .readonly { padding: 0; overflow-wrap: anywhere; }
