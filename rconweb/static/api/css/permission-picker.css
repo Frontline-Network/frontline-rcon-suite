@@ -1,4 +1,23 @@
 .permission-picker { width: 100%; min-width: 0; color: var(--body-fg); }
+.permission-workflows { padding: 20px; margin: 0 0 24px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--darkened-bg); }
+.permission-workflows h3 { margin: 0 0 10px; color: var(--body-fg); font-size: 16px; }
+.permission-workflow-select { width: min(100%, 520px); min-height: 40px; }
+.permission-workflow-preview { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 14px; margin-top: 18px; }
+.permission-workflow-preview:empty { display: none; }
+.permission-bundle { padding: 16px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--body-bg); min-width: 0; }
+.permission-bundle h4 { margin: 0 0 8px; font-size: 14px; color: var(--body-fg); }
+.aligned .permission-picker .permission-bundle-state { padding: 0; margin: 8px 0; font-size: 13px; font-weight: 600; }
+.permission-bundle-state[data-complete="true"] { color: var(--link-fg); }
+.permission-bundle .permission-intro { font-size: 12px; margin: 10px 0; }
+.permission-picker :is(.permission-bundle, .permission-pending) button { min-height: 40px; white-space: normal; cursor: pointer; background: var(--button-bg); color: var(--button-fg); }
+.permission-bundle button:disabled { cursor: default; opacity: .6; }
+.permission-picker .permission-pending { padding: 14px 16px; margin: 12px 0 18px; border: 1px solid var(--primary); border-radius: 6px; }
+.permission-pending > summary { cursor: pointer; font-weight: 600; }
+.aligned .permission-pending ul { padding-left: 20px; margin: 12px 0; max-height: 220px; overflow: auto; }
+.permission-pending li { overflow-wrap: anywhere; padding: 4px 0; }
+.aligned .permission-picker .permission-internal-help { margin: 8px 0 16px; padding: 0; font-size: 12px; color: var(--body-quiet-color); max-width: 850px; }
+.permission-kind-filter { max-width: 100%; min-height: 38px; }
+.permission-picker :is(button, input, select, summary):focus-visible { outline: 2px solid var(--link-fg); outline-offset: 3px; }
 .permission-presets { border-bottom: 1px solid var(--hairline-color); padding-bottom: 24px; margin-bottom: 24px; }
 .permission-presets h3 { margin: 0 0 8px; color: var(--body-fg); font-size: 15px; }
 .aligned .permission-presets .permission-intro { margin: 0 0 16px; padding: 0; }

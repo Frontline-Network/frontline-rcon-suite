@@ -17,6 +17,7 @@ CATEGORIES = {
     "tactical": ("Taktische Daten", "Tactical data"),
     "mobile": ("Mobile Geräte & Meldungen", "Mobile devices & incidents"),
     "other": ("Weitere Rechte", "Other permissions"),
+    "internal": ("Interne Systemrechte · nur für Wartung", "Internal system permissions · maintenance only"),
 }
 
 # resource: readable title, the concrete object being read/changed, category
@@ -43,9 +44,9 @@ RESOURCES = {
     "votekick_threshold": ("Votekick: Stimmenzahl", "die erforderlichen Stimmen für einen Abstimmungskick", "maps"),
     "votemap_config": ("Kartenabstimmung: Regeln", "die Auswahl-, Abstimmungs- und Nachrichtenregeln von Votemap", "maps"),
     "welcome_message": ("Willkommensnachricht", "den beim Beitritt angezeigten Begrüßungs- oder Regeltext", "messages"),
-    "admin_groups": ("Spielserver-Adminrollen", "die verfügbaren Rollen für Konsolen-Admins des Spielservers", "accounts"),
-    "admin_ids": ("Spielserver-Admins: Kennungen", "Namen, Spieler-IDs und Rollen aller eingetragenen Spielserver-Admins", "accounts"),
-    "admins": ("Spielserver-Admins", "die im Spielserver eingetragenen Konsolen-Admins", "accounts"),
+    "admin_groups": ("Konsolen-Admins: verfügbare Rollen", "die verfügbaren Spielserver-Adminrollen. Zum Öffnen der Seite werden zusätzlich Menü-Zugriff und Adminliste benötigt", "accounts"),
+    "admin_ids": ("Konsolen-Admins: Liste und Spieler-IDs", "Namen, Spieler-IDs und Rollen eingetragener Konsolen-Admins. Dieses Recht wird zum Laden der Adminliste benötigt", "accounts"),
+    "admins": ("Konsolen-Admins: Menü-Zugriff", "den Konsolen-Adminbereich. Zum Laden der Seite werden zusätzlich die Rechte für die Adminliste und die verfügbaren Rollen benötigt", "accounts"),
     "all_maps": ("Verfügbare Karten", "die vollständige Auswahl spielbarer Karten", "maps"),
     "audit_logs": ("Admin-Aktionsprotokoll", "die protokollierten Verwaltungsaktionen und ihre Ergebnisse", "logs"),
     "audit_logs_autocomplete": ("Aktionsprotokoll: Suchvorschläge", "die Suchvorschläge zum Filtern des Admin-Aktionsprotokolls", "logs"),
@@ -137,8 +138,8 @@ ACTIONS = {
     "remove_match_timer": ("Rundenzeit zurücksetzen", "Entfernt die benutzerdefinierte Rundenzeit.", "maps"),
     "remove_warmup_timer": ("Aufwärmzeit zurücksetzen", "Entfernt die benutzerdefinierte Aufwärmzeit.", "maps"),
     "set_dynamic_weather_enabled": ("Dynamisches Wetter umschalten", "Aktiviert oder deaktiviert dynamisches Wetter im Spiel.", "maps"),
-    "add_admin_roles": ("Spielserver-Adminrolle vergeben", "Erteilt einem Spieler eine Konsolen-Adminrolle auf dem Spielserver. Dies ist keine CRCON-Benutzergruppe.", "accounts"),
-    "remove_admin_roles": ("Spielserver-Adminrolle entziehen", "Entfernt eine Konsolen-Adminrolle eines Spielers auf dem Spielserver.", "accounts"),
+    "add_admin_roles": ("Konsolen-Admins: Rolle vergeben", "Erteilt einem Spieler eine Adminrolle auf dem Spielserver. Dies ist keine RCON-Benutzergruppe.", "accounts"),
+    "remove_admin_roles": ("Konsolen-Admins: Rolle entziehen", "Entfernt die Adminrolle eines Spielers auf dem Spielserver. Dies ändert keine RCON-Benutzergruppe.", "accounts"),
     "add_map_to_rotation": ("Karte zur Rotation hinzufügen", "Ergänzt die Kartenrotation um eine Karte.", "maps"),
     "add_maps_to_rotation": ("Mehrere Karten zur Rotation hinzufügen", "Ergänzt die Kartenrotation um mehrere Karten in einem Vorgang.", "maps"),
     "remove_map_from_rotation": ("Karte aus Rotation entfernen", "Entfernt eine Karte aus der Kartenrotation.", "maps"),
@@ -250,6 +251,37 @@ def permission_help(permission, german=True):
         if kind == "read": description += " This permission alone does not allow changes."
         if code == "change_user": description += " Includes assigning roles and direct permissions to these accounts."
         if code == "change_group": description += " Group permissions affect all members."
+    internal = (permission.content_type.app_label, permission.content_type.model) in {
+        ("contenttypes", "contenttype"), ("auth", "permission"),
+        ("admin", "logentry"), ("sessions", "session"),
+    }
+    aliases = permission.name
+    if code in {"can_view_admins", "can_view_admin_ids", "can_view_admin_groups", "can_add_admin_roles", "can_remove_admin_roles", "can_view_online_console_admins"}:
+        aliases += " Konsolen Console Spielserver-Admins Spielserver-Adminrollen Kennungen Game server admins"
+    if german:
+        console_copy = {
+            "can_view_admins": ("Konsolen-Admins: Menü öffnen", "Zeigt den Menüpunkt für Konsolen-Admins. Zum Laden der Seite werden auch die Adminliste und die verfügbaren Rollen benötigt."),
+            "can_view_admin_ids": ("Konsolen-Admins: Liste und Spieler-IDs anzeigen", "Lädt Namen, Spieler-IDs und Rollen der Konsolen-Admins. Ohne dieses Recht kann die Adminliste nicht geladen werden. Erlaubt keine Änderungen."),
+            "can_view_admin_groups": ("Konsolen-Admins: verfügbare Rollen anzeigen", "Lädt die verfügbaren Adminrollen des Spielservers. Zum Öffnen der Seite werden auch Menü-Zugriff und Adminliste benötigt. Erlaubt keine Änderungen."),
+        }
+        title, description = console_copy.get(code, (title, description))
+    if not german:
+        console_copy = {
+            "can_view_admins": ("Console admins: menu access", "Shows the console-admin menu. The page also needs the admin-list and available-roles permissions."),
+            "can_view_admin_ids": ("Console admins: list and player IDs", "Reads names, player IDs and roles. Required to load the console-admin list; does not allow changes."),
+            "can_view_admin_groups": ("Console admins: available roles", "Reads the available in-game admin roles. The page also needs menu access and the admin-list permission."),
+            "can_add_admin_roles": ("Console admins: assign role", "Grants a player an in-game admin role, not an RCON user group."),
+            "can_remove_admin_roles": ("Console admins: remove role", "Removes a player's in-game admin role, not their RCON user groups."),
+        }
+        title, description = console_copy.get(code, (title, description))
+    if internal:
+        category = "internal"
+        sensitive = kind != "read"
+        description += (" Internes Systemrecht; für Support und Spielermoderation nicht erforderlich. Bestehende Zuweisungen nicht ungeprüft ändern."
+                        if german else " Internal system permission; not needed for support or player moderation. Review existing assignments before changing them.")
+        if permission.content_type.model == "contenttype":
+            description += (" Django pflegt diese Modellzuordnungen automatisch. Änderungen können Berechtigungszuordnungen beschädigen."
+                            if german else " Django maintains these model references automatically. Changes can break permission mappings.")
     return {"id": str(permission.pk), "code": f"{permission.content_type.app_label}.{code}", "title": title,
             "description": description, "category": CATEGORIES[category][0 if german else 1], "kind": kind,
-            "sensitive": sensitive, "documented": known}
+            "sensitive": sensitive, "documented": known, "internal": internal, "aliases": aliases}

@@ -91,6 +91,7 @@ jobs:
       - run: npm run check:operator-copy
       - run: npm run check:i18n
       - run: npm run check:admin-actions
+      - run: npm run check:permissions
       - run: npm run check:csrf
       - run: npm run check:game-capabilities
       - run: npm run check:polling
@@ -222,7 +223,7 @@ jobs:
           PYTHONPATH=. pytest tests/
           PYTHONPATH=. python -m django test api.test_release_updates --settings=rconweb.rconweb.test_settings --verbosity=1
           PYTHONPATH=. python -m django test api.test_release_migrations --settings=rconweb.rconweb.test_settings --verbosity=1
-          PYTHONPATH=. python -m django test api.test_account_password api.test_admin_theme api.test_api_descriptions api.test_appearance --settings=rconweb.rconweb.test_settings --verbosity=1
+          PYTHONPATH=. python -m django test api.test_account_password api.test_admin_theme api.test_permission_workflows api.test_api_descriptions api.test_appearance --settings=rconweb.rconweb.test_settings --verbosity=1
           PYTHONPATH=. python -m django test api.test_population --settings=rconweb.rconweb.test_settings --verbosity=1
           PYTHONPATH=. python -m django test api.test_live_view --settings=rconweb.rconweb.test_settings --verbosity=1
           PYTHONPATH=. python -m django test api.test_leadership_vote --settings=rconweb.rconweb.test_settings --verbosity=1
