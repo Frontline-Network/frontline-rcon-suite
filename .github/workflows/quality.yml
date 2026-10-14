@@ -92,6 +92,7 @@ jobs:
       - run: npm run check:i18n
       - run: npm run check:admin-actions
       - run: npm run check:permissions
+      - run: node --test ../rconweb/static/api/js/formset_handlers.test.cjs
       - run: npm run check:csrf
       - run: npm run check:game-capabilities
       - run: npm run check:polling
