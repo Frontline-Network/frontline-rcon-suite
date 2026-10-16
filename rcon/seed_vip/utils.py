@@ -3,7 +3,8 @@ from datetime import datetime, timedelta, timezone
 from logging import getLogger
 from typing import Iterable, Sequence
 
-from humanize import naturaldelta, naturaltime
+from humanize import precisedelta
+from humanize.i18n import get_translation
 
 import discord
 from rcon.api_commands import RconAPI
@@ -107,14 +108,34 @@ def format_player_message(
     vip_expiration: datetime,
     nice_time_delta: bool = True,
     nice_expiration_date: bool = True,
+    language: str | None = None,
 ) -> str:
     if nice_time_delta:
-        delta = naturaldelta(vip_reward)
+        # Keep the actual award visible: naturaldelta turns 36 hours into
+        # "a day" / "ein Tag". Hours also fit German sentence cases without
+        # having to guess whether a template needs "ein/einen/einem Tag".
+        delta = precisedelta(vip_reward, suppress=("years", "months", "days"))
     else:
         delta = vip_reward
 
     if nice_expiration_date:
-        date = naturaltime(vip_expiration)
+        remaining = vip_expiration - datetime.now(tz=vip_expiration.tzinfo)
+        seconds = remaining.total_seconds()
+        # Notices do not need a seconds countdown; round only to the nearest
+        # minute, not to whole days. Preserve the actual cumulative VIP expiry.
+        minutes = int((abs(seconds) + 30) // 60)
+        translations = get_translation()
+        if not minutes:
+            date = translations.gettext("now")
+        else:
+            duration = precisedelta(
+                timedelta(minutes=minutes), suppress=("years", "months", "days")
+            )
+            if (language or "").lower().replace("-", "_").split("_")[0] == "de":
+                date = f"{'in' if seconds > 0 else 'vor'} {duration}"
+            else:
+                pattern = "%s from now" if seconds > 0 else "%s ago"
+                date = translations.gettext(pattern) % duration
     else:
         date = vip_expiration.isoformat()
 
@@ -187,6 +208,7 @@ def message_players(
                     vip_expiration=expiration_timestamps[player_id],
                     nice_time_delta=config.nice_time_delta,
                     nice_expiration_date=config.nice_expiration_date,
+                    language=config.language,
                 )
                 if expiration_timestamps is not None
                 else message
