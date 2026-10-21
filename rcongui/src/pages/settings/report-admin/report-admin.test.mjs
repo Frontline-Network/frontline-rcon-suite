@@ -50,3 +50,9 @@ test("new cheat review switch shares existing permission-gated, server-local sav
   assert.match(page, /can_manage_discord_report_bot/);
   assert.match(page, /fetchWithCsrf/);
 });
+
+test("member extension is explicit, server local, and never targets the whole squad", () => {
+  assert.match(source("./index.jsx"), /\["communication_squad_members", c.members\]/);
+  assert.match(copy.en.memberHelp, /never the entire squad/);
+  assert.match(copy.de.memberHelp, /niemals den ganzen Squad/);
+});

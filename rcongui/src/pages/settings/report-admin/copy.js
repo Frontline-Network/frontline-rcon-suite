@@ -21,6 +21,8 @@ export const copy = {
       "Namen: nur ein eindeutiger Online-Treffer. Bis zu drei Tippfehler bei längeren Namen; kurze oder ähnlich gute Treffer werden manuell geprüft.",
     enabled: "Report-Admin aktivieren",
     communication: "Kommunikationsmeldungen bearbeiten",
+    members: "Kommunikationsmeldungen auch gegen namentlich gemeldete Squadmitglieder",
+    memberHelp: "Standardmäßig gelten Kommunikationsmeldungen nur für Squadleader und Commander. Mit der Erweiterung kann auch ein eindeutig benanntes Squadmitglied im selben Team gekickt werden. Ein Squadname meldet weiterhin nur den Squadleader, niemals den ganzen Squad. Unklare Namen bleiben manuell. Gilt nur für diesen Server.",
     tk: "Teamkill-Meldungen bearbeiten",
     selfReports: "Selbstmeldungen für Tests zulassen",
     selfReportsWarning:
@@ -59,6 +61,8 @@ export const copy = {
       "Names: one unambiguous online match only. Up to three typos in longer names; short or similarly plausible matches require manual review.",
     enabled: "Enable report admin",
     communication: "Process communication reports",
+    members: "Include explicitly named squad members in communication reports",
+    memberHelp: "By default, communication reports cover squadleaders and commanders only. With this extension, a uniquely named squad member on the same team can also be kicked. A squad name still reports only its leader, never the entire squad. Unclear names stay manual. Applies only to this server.",
     tk: "Process teamkill reports",
     selfReports: "Allow self-reports for testing",
     selfReportsWarning:

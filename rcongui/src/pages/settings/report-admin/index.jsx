@@ -74,6 +74,7 @@ export default function ReportAdmin({ embedded = false }) {
         <Typography>{c.teamkills}</Typography>
         <Typography>{c.cheating}</Typography>
         <Typography>{c.names}</Typography>
+        <Typography>{c.memberHelp}</Typography>
         {error && <Alert severity="error">{error.message}</Alert>}
         {save.isSuccess && <Alert severity="success">{c.saved}</Alert>}
         {!draft ? (
@@ -90,6 +91,7 @@ export default function ReportAdmin({ embedded = false }) {
             {[
               ["enabled", c.enabled],
               ["communication", c.communication],
+              ["communication_squad_members", c.members],
               ["teamkills", c.tk],
               ["cheating", c.cheatToggle],
               ["allow_self_reports", c.selfReports],

@@ -15,6 +15,7 @@ class ReportAdminUserConfig(BaseUserConfig):
     mode: Literal["dry_run", "active"] = "dry_run"
     reason_mode: Literal["rules", "ai"] = "rules"
     communication: bool = True
+    communication_squad_members: bool = False
     teamkills: bool = True
     cheating: bool = False  # Explicit opt-in for new review/receipt behavior.
     allow_self_reports: bool = False

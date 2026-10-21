@@ -56,6 +56,7 @@ def test_worker_uses_complete_message_and_never_sends_player_ids(semantic, conne
     http.post.assert_called_once()
     payload = http.post.call_args.kwargs["json"]
     assert payload["message"] == raw
+    assert payload["communication_squad_members"] is False
     assert all(
         set(p) == {"name", "team", "role", "squad", "leadership_role"}
         for p in payload["roster"]
@@ -66,6 +67,16 @@ def test_worker_uses_complete_message_and_never_sends_player_ids(semantic, conne
     service.tick(api, 1)
     api.kick.assert_called_once()
     assert "mock-secret" not in str(current(semantic[0], i["id"]))
+
+
+def test_member_scope_is_sent_from_server_config(semantic, connection):
+    from tests.test_report_admin_members import enable
+
+    enable(semantic)
+    _, http = connection
+    report(semantic, "!admin FriendlySoldier redet nicht")
+    assert worker.process_one(http)
+    assert http.post.call_args.kwargs["json"]["communication_squad_members"] is True
 
 
 @pytest.mark.parametrize(

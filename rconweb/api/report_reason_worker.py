@@ -96,6 +96,9 @@ def process_one(http):
             ],
             reporter_name=event.incident.reporter_name or "",
             reporter_team=event.payload["reporter_team"] or "",
+            communication_squad_members=event.payload["config"].get(
+                "communication_squad_members", False
+            ),
             ai_provider=provider,
             ai_model=model,
             api_key=api_key,

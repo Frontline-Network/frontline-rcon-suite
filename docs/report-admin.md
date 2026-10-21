@@ -1,5 +1,28 @@
 # Report-Admin: Meldegrund, Spielerzuordnung und geschützte Aktionen
 
+## Optionale Kommunikationsregel für Squadmitglieder
+
+Unter **Apps → Discord-Report-Bot → Optionale KI → Report-Admin** erlaubt
+`communication_squad_members` zusätzlich eindeutig namentlich gemeldete,
+aktuelle Squadmitglieder im Team des Melders. Die Option ist standardmäßig aus
+und gilt nur für den jeweiligen Server. Die bestehende Kommunikationsregel muss
+ebenfalls eingeschaltet sein. Ein Squadname bezeichnet weiterhin ausschließlich
+den Squadleader; es gibt keine Kicks gegen einen ganzen Squad.
+
+Die KI liest den vollständigen Meldegrund, während der Server Namen, Team,
+Squad, Rolle und Sitzung unabhängig prüft. Mehrdeutige Namen, fehlende Zuordnung,
+zwischenzeitliche Wechsel oder manuelle Eingriffe verhindern den automatischen
+Kick. RCON beweist weiterhin nicht, ob jemand gesprochen hat. Im Probelauf
+erfolgt kein Kick. Bestehende Nachrichtenvorlagen und Melder-Bestätigungen gelten
+auch für Mitglieder; ohne Vorlage lautet der Grund neutral „Gemeldete fehlende
+Kommunikation / Reported lack of communication“.
+
+Die optionale Schnittstelleneigenschaft hat den Standardwert `false`.
+Beim Hotfix zuerst den gemeinsamen Discord-Dienst und alle verarbeitenden
+Report-Worker aktualisieren, danach die ausgewählten Server und erst zuletzt
+deren Konfiguration. Keine Datenbankmigration nötig; offene Vorgänge werden
+bei Konfigurationsänderung nicht erneut ausgeführt.
+
 Diese Version verarbeitet neue `!admin`-Reports zu fehlender
 Führungskommunikation, Teamkills und optional Cheatverdacht. Standard:
 **deaktiviert**, Betriebsart **Probelauf**. Die Einordnung ist serverbezogen

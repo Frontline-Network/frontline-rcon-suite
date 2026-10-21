@@ -109,7 +109,9 @@ def invalid_request(sess, event, now):
     return None
 
 
-def target(incident, players, decision, allow_self_reports):
+def target(
+    incident, players, decision, allow_self_reports, communication_squad_members=False
+):
     from rcon.admin_incidents import parse_chat_report
     from rcon.report_admin_rules import (
         target_for,
@@ -162,6 +164,8 @@ def target(incident, players, decision, allow_self_reports):
         players,
         d.rule,
         allow_self_reports=allow_self_reports,
+        communication_squad_members=communication_squad_members
+        and d.target_kind == "player",
     )
     if not found or (
         named_player and found["player_id"] != str(named_player["player_id"])
@@ -225,10 +229,18 @@ def finish(sess, event, context, now):
     try:
         decision = ReportReasonDecision.model_validate(assessment.get("decision"))
         before = target(
-            i.to_dict(), request["roster"], decision, cfg.allow_self_reports
+            i.to_dict(),
+            request["roster"],
+            decision,
+            cfg.allow_self_reports,
+            cfg.communication_squad_members,
         )
         after = target(
-            i.to_dict(), context["players"], decision, cfg.allow_self_reports
+            i.to_dict(),
+            context["players"],
+            decision,
+            cfg.allow_self_reports,
+            cfg.communication_squad_members,
         )
     except (ValueError, TypeError, KeyError):
         decision = before = after = None

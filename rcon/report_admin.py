@@ -29,7 +29,8 @@ from rcon.models import (
 from rcon.report_admin_rules import (
     classify,
     target_for,
-    unique_seat,
+    communication_identity,
+    unique_communication_seat,
     QUALIFIED,
     MAX_REPORT_AGE,
 )
@@ -182,6 +183,8 @@ def kick_reason(sess, payload):
         if payload["rule"] == "communication"
         else "Belegter Teamkill mit ausdrücklicher eigener Absichtserklärung / Recorded teamkill with explicit first-person admission"
     )
+    if (payload.get("target", {}).get("seat") or {}).get("kind") == "squadmember":
+        default = "Gemeldete fehlende Kommunikation / Reported lack of communication"
     template_id = payload["config"].get(payload["rule"] + "_template_id")
     template = sess.get(MessageTemplate, template_id) if template_id else None
     if not template or str(template.category) != "REASON":
@@ -246,7 +249,13 @@ def enqueue(sess, incident, context, now, *, interpreted=None, existing_event=No
     target = (
         interpreted[1]
         if interpreted
-        else target_for(data, players, rule, allow_self_reports=cfg.allow_self_reports)
+        else target_for(
+            data,
+            players,
+            rule,
+            allow_self_reports=cfg.allow_self_reports,
+            communication_squad_members=cfg.communication_squad_members,
+        )
     )
     if not target and not any(
         s.get("state") in {"confirmed", "rejected"} for s in data.get("subjects", [])
@@ -267,6 +276,7 @@ def enqueue(sess, incident, context, now, *, interpreted=None, existing_event=No
                 players,
                 rule,
                 allow_self_reports=cfg.allow_self_reports,
+                communication_squad_members=cfg.communication_squad_members,
             )
             if target:
                 resolution_subjects = parsed["subjects"]
@@ -499,10 +509,11 @@ def invalid_reason(sess, event, context, now):
     ):
         return "Spieler offline oder Team geändert / Player offline or team changed"
     if p["rule"] == "communication" and (
-        identity(target) != p["target"]["seat"]
-        or not unique_seat(players, p["target"]["seat"])
+        communication_identity(target, cfg.communication_squad_members)
+        != p["target"]["seat"]
+        or not unique_communication_seat(players, p["target"]["seat"])
     ):
-        return "Führungsrolle geändert / Leadership seat changed"
+        return "Rolle oder Squad geändert / Role or squad changed"
     for pid, token in (
         (p["target_id"], p["session"]),
         (i.reporter_id, p["reporter_session"]),
@@ -576,8 +587,13 @@ def guard_diagnostics(event, context):
     expected = event.payload.get("target", {}).get("seat")
     return {
         "expected_seat": expected,
-        "observed_seat": identity(target),
-        "seat_unique": unique_seat(players, expected) if expected else None,
+        "observed_seat": communication_identity(
+            target,
+            event.payload.get("config", {}).get("communication_squad_members", False),
+        ),
+        "seat_unique": (
+            unique_communication_seat(players, expected) if expected else None
+        ),
         "captured_at": (context or {}).get("captured_at"),
     }
 

@@ -28,6 +28,7 @@ class ReportReasonRequest(BaseModel):
     roster: list[dict[str, str]] = Field(max_length=150)
     reporter_name: str = Field(max_length=255)
     reporter_team: str = Field(max_length=32)
+    communication_squad_members: bool = False
     ai_provider: Literal["api_key", "codex"]
     ai_model: str = Field(min_length=1, max_length=100, pattern=r"^[a-zA-Z0-9._:-]+$")
     api_key: str | None = Field(default=None, min_length=20, max_length=500, repr=False)

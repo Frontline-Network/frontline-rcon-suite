@@ -74,7 +74,48 @@ def classify(message, players=()):
     return "communication" if comm else "teamkills"
 
 
-def target_for(incident, players, rule, *, allow_self_reports=False):
+def communication_identity(player, allow_members=False):
+    """Bind named members to their own seat without changing leadership rules."""
+    if not player or player.get("online") is False:
+        return None
+    if seat := identity(player):
+        return seat
+    team = _normalize_team(player.get("team"))
+    squad = str(player.get("unit_name") or "").strip()
+    role = re.sub(r"[^a-z0-9]", "", str(player.get("role") or "").casefold())
+    if (
+        not allow_members
+        or not player.get("player_id")
+        or team not in {"allies", "axis"}
+        or squad.casefold() in {"", "unassigned", "command", "none", "unset"}
+        or role in {"", "unassigned", "unknown", "none", "unset"}
+    ):
+        return None
+    unit_id = player.get("unit_id")
+    return {
+        "team": team,
+        "role": role,
+        "kind": "squadmember",
+        "squad": squad,
+        "squad_id": str(unit_id if unit_id is not None else squad),
+        "player_id": str(player["player_id"]),
+    }
+
+
+def unique_communication_seat(players, seat):
+    if seat.get("kind") != "squadmember":
+        return unique_seat(players, seat)
+    return sum(communication_identity(p, True) == seat for p in players) == 1
+
+
+def target_for(
+    incident,
+    players,
+    rule,
+    *,
+    allow_self_reports=False,
+    communication_squad_members=False,
+):
     """Accept exact references or independently validated, unique name typos."""
     ids = [str(p.get("player_id") or "") for p in players]
     if not all(ids) or len(ids) != len(set(ids)):
@@ -109,10 +150,20 @@ def target_for(incident, players, rule, *, allow_self_reports=False):
             for s in incident.get("subjects", [])
         ):
             return None
-        seat = identity(p)
+        # A member is eligible only through an independently resolved player
+        # name, never by relaxing the squad/commander resolver.
+        seat = communication_identity(p, communication_squad_members and not found)
+        if seat and seat["kind"] == "squadmember":
+            fragment = _normalize_message(
+                str((incident.get("subjects") or [{}])[0].get("matched_text") or "")
+            )
+            if fragment in {
+                _normalize_message(str(q.get("unit_name") or "")) for q in players
+            } | set(LETTERS) | COMMANDERS | set(SQUAD_TYPOS):
+                return None  # A player/squad name collision is not a member report.
         if (
             not seat
-            or not unique_seat(players, seat)
+            or not unique_communication_seat(players, seat)
             or not (
                 (
                     allow_self_reports
