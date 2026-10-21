@@ -6,6 +6,7 @@ import pytest
 
 from rcon.admin_incidents import parse_chat_report
 from rcon.report_admin_rules import target_for
+from rcon.report_admin_rules import conservative_name_match
 from rcon.report_reason import target as reason_target
 
 
@@ -155,6 +156,33 @@ def test_ambiguous_or_unavailable_squad_remains_manual(change):
                 unambiguous=True,
                 uncertainties=[],
                 rationale="Test only",
+            ),
+            False,
+        )
+        is None
+    )
+
+
+@pytest.mark.parametrize("role", ["Rifleman", "SquadLeader"])
+def test_explicit_player_typo_is_never_redirected_to_another_squadleader(role):
+    players = roster()
+    players[2]["role"] = role
+    report = incident(players, "charlie")
+    assert (
+        conservative_name_match(report["subjects"], players)["player_id"] == "similar"
+    )
+    assert (
+        reason_target(
+            report,
+            players,
+            dict(
+                rule="communication",
+                target_kind="player",
+                target_text="charlie",
+                allegation_excerpt="not talking",
+                unambiguous=True,
+                uncertainties=[],
+                rationale="Named player, not the squad",
             ),
             False,
         )

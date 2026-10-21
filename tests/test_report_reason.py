@@ -424,3 +424,19 @@ def test_current_squad_names_with_fuzzy_noise_complete_once(
     api.kick.assert_called_once()
     assert api.kick.call_args.args[0] == "target"
     assert current(semantic[0], i["id"])["report_admin"]["status"] == "kicked"
+
+
+def test_explicit_named_player_is_not_replaced_by_matching_squad(semantic):
+    semantic[1][0].update(role="squadleader", unit_name="charlie")
+    semantic[1][2]["name"] = "Charli"
+    i = report(semantic, "!admin charlie not talking")
+    complete(
+        semantic,
+        i["id"],
+        decision(target="charlie", target_kind="player", excerpt="not talking"),
+    )
+    api = transport()
+    for _ in range(3):
+        service.tick(api, 1)
+    api.kick.assert_not_called()
+    assert current(semantic[0], i["id"])["report_admin"]["status"] == "manual"

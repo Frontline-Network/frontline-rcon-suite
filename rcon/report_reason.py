@@ -150,18 +150,24 @@ def target(incident, players, decision, allow_self_reports):
     )
     if not parsed:
         return None
-    if d.target_kind == "player" and not (
-        exact_player(parsed["subjects"], players)
-        or conservative_name_match(parsed["subjects"], players)
-    ):
-        return None  # A missing named player must not become a squad's leader.
+    named_player = None
+    if d.target_kind == "player":
+        named_player = exact_player(
+            parsed["subjects"], players
+        ) or conservative_name_match(parsed["subjects"], players)
+        if not named_player:
+            return None  # A missing named player must not become a squad's leader.
     found = target_for(
         {**incident, "raw_message": message, "subjects": parsed["subjects"]},
         players,
         d.rule,
         allow_self_reports=allow_self_reports,
     )
-    if not found:
+    if not found or (
+        named_player and found["player_id"] != str(named_player["player_id"])
+    ):
+        # A valid player-name typo must never be redirected to the leader of a
+        # similarly named squad. Squad precedence applies only to squad reports.
         return None
     seat_kind = (found.get("seat") or {}).get("kind")
     if (d.target_kind == "commander" and seat_kind != "commander") or (
