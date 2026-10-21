@@ -101,7 +101,11 @@ def target_for(incident, players, rule, *, allow_self_reports=False):
             p = found["player"]
         if any(
             s.get("state") == "rejected"
-            or (s.get("player_id") and str(s["player_id"]) != str(p["player_id"]))
+            or (
+                s.get("player_id")
+                and str(s["player_id"]) != str(p["player_id"])
+                and not (found and _same_squad_word_fuzzy_suggestion(s, found))
+            )
             for s in incident.get("subjects", [])
         ):
             return None
@@ -162,6 +166,28 @@ def target_for(incident, players, rule, *, allow_self_reports=False):
         "team": team,
         "seat": seat,
     }
+
+
+def _same_squad_word_fuzzy_suggestion(subject, resolved):
+    """Ignore only a fuzzy player guess for an independently resolved squad word.
+
+    The resolver has already rejected exact player-name collisions, absent or
+    ambiguous squads and competing leaders. Other fragments, confirmed targets,
+    recent-player references and explicit rejections remain authoritative.
+    """
+    if (
+        subject.get("kind") != "player"
+        or subject.get("state") != "suggested"
+        or subject.get("match_method") != "fuzzy"
+    ):
+        return False
+    fragment = _normalize_message(str(subject.get("matched_text") or ""))
+    return bool(fragment) and any(
+        match.get("method")
+        in {"squad_exact", "squad_alphabet", "squad_letter", "squad_typo"}
+        and fragment == _normalize_message(str(match.get("text") or ""))
+        for match in resolved["resolution"]["matches"]
+    )
 
 
 def unique_seat(players, seat):

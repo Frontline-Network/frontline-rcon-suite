@@ -397,3 +397,30 @@ def test_bare_jig_report_by_own_leader_keeps_self_report_setting(
     service.tick(api, 1)
     service.tick(api, 1)
     assert api.kick.called is self_allowed
+
+
+@pytest.mark.parametrize(
+    "squad,reference,similar",
+    [
+        ("charlie", "charlie", "Charli"),
+        ("papa", "peter", "Petr"),
+        ("JULIETTE", "jig", "Jigg"),
+    ],
+)
+def test_current_squad_names_with_fuzzy_noise_complete_once(
+    semantic, squad, reference, similar
+):
+    semantic[1][0].update(role="squadleader", unit_name=squad)
+    semantic[1][2]["name"] = similar
+    i = report(semantic, f"!admin {reference} not talking")
+    complete(
+        semantic,
+        i["id"],
+        decision(target=reference, target_kind="squad", excerpt="not talking"),
+    )
+    api = transport()
+    for _ in range(3):
+        service.tick(api, 1)
+    api.kick.assert_called_once()
+    assert api.kick.call_args.args[0] == "target"
+    assert current(semantic[0], i["id"])["report_admin"]["status"] == "kicked"

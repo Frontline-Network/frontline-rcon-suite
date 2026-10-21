@@ -30,7 +30,7 @@ ALPHABET = (
     ("george", "golf"),
     ("how", "hotel"),
     ("item", "india"),
-    ("jig", "juliett", "juliet"),
+    ("jig", "juliett", "juliet", "juliette"),
     ("king", "kilo"),
     ("love", "lima"),
     ("mike",),

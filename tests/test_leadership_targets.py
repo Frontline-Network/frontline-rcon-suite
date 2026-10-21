@@ -43,6 +43,8 @@ def test_full_alphabet_and_current_names_in_both_games(role, index, words):
     for word in words:
         result = resolve(f"!admin bitte mal {word.upper()} prüfen", players(role))
         assert result["player"]["player_id"] == f"p{index}"
+        # Aliases identify the squad; they never rename HLL's current labels.
+        assert result["player"]["unit_name"] == words[0]
         assert result["resolution"]["version"] == targets.VERSION
 
 
@@ -191,6 +193,26 @@ def test_aliases_work_with_nato_named_live_squads_too():
     roster = players()
     roster[1]["unit_name"] = "Bravo"
     assert resolve("!admin baker redet nicht", roster)["player"]["player_id"] == "p1"
+
+
+@pytest.mark.parametrize(
+    "reference", ["jig", "juliet", "juliett", "juliette", "Squad J"]
+)
+@pytest.mark.parametrize("role", ["Officer", "SquadLeader", "TankCommander"])
+def test_updated_hllv_juliette_preserves_legacy_references(reference, role):
+    roster = players(role)
+    roster[9]["unit_name"] = "JULIETTE"
+    assert (
+        resolve(f"!admin {reference} not talking", roster)["player"]["player_id"]
+        == "p9"
+    )
+
+
+def test_juliette_alias_collision_still_fails_closed():
+    roster = players()
+    roster[8]["unit_name"] = "JULIETTE"
+    for reference in ("jig", "juliett", "juliette", "squad j"):
+        assert resolve(f"!admin {reference} not talking", roster) is None
 
 
 def test_colliding_current_squad_names_never_pick_one():
