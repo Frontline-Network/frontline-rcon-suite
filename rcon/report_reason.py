@@ -226,6 +226,8 @@ def finish(sess, event, context, now):
         )
         return
     cfg = admin.config(sess, i.server_number)
+    decision = before = after = None
+    failure = None
     try:
         decision = ReportReasonDecision.model_validate(assessment.get("decision"))
         before = target(
@@ -243,19 +245,45 @@ def finish(sess, event, context, now):
             cfg.communication_squad_members,
         )
     except (ValueError, TypeError, KeyError):
-        decision = before = after = None
+        failure = "invalid_interpretation_or_roster"
     summary = {
         "decision": decision.model_dump() if decision else None,
         "model": str(assessment.get("model") or "")[:100],
         "prompt_version": str(assessment.get("prompt_version") or "")[:64],
     }
+    if not failure:
+        if not before:
+            failure = "original_target_unresolved"
+        elif not after:
+            failure = "live_target_unresolved"
+        elif before != after:
+            failure = "target_identity_changed"
+        elif not getattr(cfg, decision.rule, False):
+            failure = "rule_disabled"
+    if failure:
+        summary["target_check"] = target_check(
+            i,
+            request.get("roster"),
+            context["players"],
+            before,
+            after,
+            failure,
+            cfg.communication_squad_members,
+        )
     event.payload = {**p, "reason_analysis": summary}
-    if not before or before != after or not getattr(cfg, decision.rule, False):
+    if failure:
+        reasons = {
+            "invalid_interpretation_or_roster": "KI-Antwort oder Spielerdaten ungültig / Invalid AI response or player data",
+            "original_target_unresolved": "Ziel in der ursprünglichen Meldung nicht sicher zugeordnet / Target not safely identified in original report",
+            "live_target_unresolved": "Ziel anhand der aktuellen Spieler- und Teamdaten nicht mehr sicher bestätigt / Target no longer safely confirmed by current player and team data",
+            "target_identity_changed": "Spieleridentität, Team oder Position während der KI-Prüfung geändert / Player identity, team or position changed during AI review",
+            "rule_disabled": "Diese automatische Maßnahme ist deaktiviert / This automatic action is disabled",
+        }
         admin.publish(
             sess,
             event,
             "manual",
-            "KI-Einordnung oder Spielerzuordnung nicht eindeutig / AI interpretation or player match unclear",
+            reasons[failure],
         )
         return
     intervention = p.get("player_interventions", {}).get(after["player_id"])
@@ -303,3 +331,68 @@ def finish(sess, event, context, now):
     event.payload = {**event.payload, "reason_analysis": summary}
     admin.publish(sess, event, event.payload["status"], event.payload["result"])
     event.payload = {**event.payload, "incident_revision": i.revision}
+
+
+def target_check(incident, original, current, before, after, failure, allow_members):
+    """Bounded audit evidence, not authority to bypass a failed target check.
+
+    Retain only the relevant participants and seat counts, never a full second
+    roster, secrets, exception text or model-controlled identifiers. This also
+    distinguishes a valid AI classification from failed live identity checks.
+    """
+    from rcon.report_admin_rules import communication_identity
+    from rcon.admin_incidents import _normalize_team
+
+    pid = (before or after or {}).get("player_id") or incident.target_id
+
+    def snapshot(players):
+        if not isinstance(players, list):
+            return {"invalid_roster": True}
+        rows = [p for p in players if isinstance(p, dict)]
+        ids = [str(p.get("player_id") or "") for p in rows]
+
+        def participant(player_id):
+            matches = [p for p in rows if str(p.get("player_id")) == player_id]
+            if len(matches) != 1:
+                return {"matches": len(matches)}
+            p = matches[0]
+            seat = communication_identity(p, allow_members)
+            # All these fields come from the roster, never AI-generated IDs.
+            return {
+                "matches": 1,
+                "online": p.get("online") is not False,
+                "team": _normalize_team(p.get("team")),
+                "seat": seat,
+                "same_seat_count": (
+                    sum(
+                        all(
+                            other.get(k) == seat.get(k)
+                            for k in ("team", "kind", "squad_id")
+                        )
+                        for q in rows
+                        if seat and (other := communication_identity(q, allow_members))
+                    )
+                    if seat and seat["kind"] != "squadmember"
+                    else None
+                ),
+            }
+
+        return {
+            "missing_ids": sum(not value for value in ids),
+            "duplicate_ids": len(ids) - len(set(ids)),
+            "target": participant(pid) if pid else None,
+            "reporter": participant(incident.reporter_id),
+        }
+
+    return {
+        "code": failure,
+        "before_resolved": bool(before),
+        "after_resolved": bool(after),
+        "changed_fields": [
+            k
+            for k in ("player_id", "name", "team", "seat")
+            if before and after and before.get(k) != after.get(k)
+        ],
+        "original": snapshot(original),
+        "current": snapshot(current),
+    }

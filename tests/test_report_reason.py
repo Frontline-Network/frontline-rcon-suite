@@ -440,3 +440,84 @@ def test_explicit_named_player_is_not_replaced_by_matching_squad(semantic):
         service.tick(api, 1)
     api.kick.assert_not_called()
     assert current(semantic[0], i["id"])["report_admin"]["status"] == "manual"
+
+
+def test_realpb7_report_with_unchanged_roster_completes_once(semantic):
+    """Replay the recorded wording/roles, not an invented historical live roster."""
+    service.configure(
+        1,
+        Config(
+            enabled=True,
+            mode="active",
+            reason_mode="ai",
+            communication_squad_members=True,
+            allow_self_reports=True,
+        ),
+    )
+    semantic[1][0].update(
+        name="realpb7", role="squadleader", unit_name="golf", unit_id=6
+    )
+    reporter = next(p for p in semantic[1] if p["player_id"] == "v0")
+    reporter.update(name="Jolly Jumper", role="engineer", unit_name="golf", unit_id=6)
+    i = report(semantic, "!admin REALPB7 not communicating")
+    complete(
+        semantic,
+        i["id"],
+        decision(target="REALPB7", excerpt="REALPB7 not communicating"),
+    )
+    api = transport()
+    for _ in range(3):
+        service.tick(api, 1)
+    api.kick.assert_called_once()
+    assert api.kick.call_args.args[0] == "target"
+
+
+@pytest.mark.parametrize(
+    "change,code",
+    [
+        ("gone", "live_target_unresolved"),
+        ("duplicate", "live_target_unresolved"),
+        ("seat", "target_identity_changed"),
+        ("invalid", "invalid_interpretation_or_roster"),
+        ("invented", "original_target_unresolved"),
+    ],
+)
+def test_classification_failure_retains_specific_bounded_evidence(
+    semantic, change, code
+):
+    i = report(semantic, "!admin BattlefieldHero never answers us in command chat")
+    complete(
+        semantic,
+        i["id"],
+        decision(
+            **(
+                {"action": "kick"}
+                if change == "invalid"
+                else {"target": "invented"} if change == "invented" else {}
+            )
+        ),
+    )
+    if change == "gone":
+        semantic[1][0]["online"] = False
+    elif change == "duplicate":
+        semantic[1].append(dict(semantic[1][0]))
+    elif change == "seat":
+        semantic[1][0].update(unit_name="new-squad", unit_id=99)
+    api = transport()
+    for _ in range(3):
+        service.tick(api, 1)
+    api.kick.assert_not_called()
+    result = current(semantic[0], i["id"])["report_admin"]
+    audit = result["reason_analysis"]["target_check"]
+    assert result["status"] == "manual"
+    assert audit["code"] == code
+    assert "roster" not in audit
+    assert "BattlefieldHero" not in str(audit)
+    if change == "gone":
+        assert audit["original"]["target"]["online"] is True
+        assert audit["current"]["target"]["online"] is False
+    elif change == "duplicate":
+        assert audit["current"]["duplicate_ids"] == 1
+        assert audit["current"]["target"]["matches"] == 2
+    elif change == "seat":
+        assert audit["changed_fields"] == ["seat"]
