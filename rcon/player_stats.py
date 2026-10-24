@@ -673,8 +673,13 @@ class TimeWindowStats(BaseStats):
             for pair in zip(starts, ends):
                 start, end = pair
                 # logger.debug("\nstart: %s - %s\nend: %s - %s", start, type(start), end, type(end))
-                sess_time = end - start
-                times["total"] += int(sess_time.total_seconds())
+                # Warmup/cooldown estimates can cross a short session (e.g. a
+                # player joining 51 seconds before a 100-second cooldown).
+                # Clamp each session, not the sum: an empty adjusted session
+                # must never subtract time from a valid earlier connection.
+                start = max(start, from_)
+                end = min(end, until)
+                times["total"] += max(0, int((end - start).total_seconds()))
 
         self.times = players_times
 
