@@ -129,7 +129,7 @@ test("English camera settings include controls, dirty state and explanatory text
 });
 
 for (const viewportName of ["desktop", "mobile"]) {
-  test(`English Discord and leadership settings on ${viewportName}`, async ({
+  test(`English Discord and report-admin settings on ${viewportName}`, async ({
     page,
   }) => {
     await page.setViewportSize(VIEWPORTS[viewportName]);
@@ -138,6 +138,7 @@ for (const viewportName of ["desktop", "mobile"]) {
       language: "en",
       query: { demo_discord: "connected", demo_game: "hll_vietnam" },
     });
+    await expect(page.getByTestId("discord-wizard-step-test")).toBeVisible();
     const navigation = page.getByRole("navigation", {
       name: "Discord Report Bot setup progress",
     });
@@ -146,7 +147,7 @@ for (const viewportName of ["desktop", "mobile"]) {
       "Detect server",
       "Channel & roles",
       "Actions",
-      "Optional AI",
+      "AI & report admin",
       "Test",
       "Activate",
     ];
@@ -163,21 +164,22 @@ for (const viewportName of ["desktop", "mobile"]) {
           .getByRole("button", { name: label, exact: true })
           .click();
       }
+      if (label === "AI & report admin") {
+        const report = page.getByRole("region", {
+          name: "Report admin – communication, teamkills & cheat review",
+          exact: true,
+        });
+        await expect(report).toBeVisible();
+        await expect(report).toContainText("Leadership voting has been retired");
+        await expect(report).toContainText("Report reason interpretation");
+        await expect(report).toContainText("silent 60-second window");
+        await expect(report).toContainText("No automatic cheat kicks or bans");
+        await expect(report.getByLabel("Enable report admin", { exact: true })).not.toBeChecked();
+        await expect(report).not.toContainText("Führungsabstimmungen wurden eingestellt");
+        await expectNoHorizontalPageOverflow(page);
+      }
     }
-    const leadership = page.getByRole("region", {
-      name: "Leadership vote",
-      exact: true,
-    });
-    await expect(leadership).toContainText("Minimum eligible voters");
-    await expect(leadership).toContainText("No majority – admins needed");
-    await expect(leadership).toContainText("Demo: no majority – no kick");
-    // An allegation is player-owned content, not UI copy, and must be preserved.
-    await expect(leadership).toContainText(
-      "Squad gemeldet – Kommunikation prüfen"
-    );
-    await expect(leadership).not.toContainText(
-      "Demo: Zustimmung nicht erreicht"
-    );
+    await expect(page.getByRole("region", { name: "Leadership vote", exact: true })).toHaveCount(0);
     await expectNoHorizontalPageOverflow(page);
     expect(errors).toEqual([]);
   });
