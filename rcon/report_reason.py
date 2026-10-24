@@ -275,7 +275,7 @@ def finish(sess, event, context, now):
         reasons = {
             "invalid_interpretation_or_roster": "KI-Antwort oder Spielerdaten ungültig / Invalid AI response or player data",
             "original_target_unresolved": "Ziel in der ursprünglichen Meldung nicht sicher zugeordnet / Target not safely identified in original report",
-            "live_target_unresolved": "Ziel anhand der aktuellen Spieler- und Teamdaten nicht mehr sicher bestätigt / Target no longer safely confirmed by current player and team data",
+            "live_target_unresolved": "Ziel oder Melder erfüllt die aktuellen Spieler- und Teamprüfungen nicht / Target or reporter no longer passes current player and team checks",
             "target_identity_changed": "Spieleridentität, Team oder Position während der KI-Prüfung geändert / Player identity, team or position changed during AI review",
             "rule_disabled": "Diese automatische Maßnahme ist deaktiviert / This automatic action is disabled",
         }
@@ -362,6 +362,9 @@ def target_check(incident, original, current, before, after, failure, allow_memb
                 "matches": 1,
                 "online": p.get("online") is not False,
                 "team": _normalize_team(p.get("team")),
+                "role": str(p.get("role") or "")[:100],
+                "squad": str(p.get("unit_name") or "")[:100],
+                "squad_id": str(p.get("unit_id") or "")[:100],
                 "seat": seat,
                 "same_seat_count": (
                     sum(

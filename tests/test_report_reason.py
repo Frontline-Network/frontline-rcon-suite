@@ -521,3 +521,22 @@ def test_classification_failure_retains_specific_bounded_evidence(
         assert audit["current"]["target"]["matches"] == 2
     elif change == "seat":
         assert audit["changed_fields"] == ["seat"]
+
+
+def test_reporter_temporarily_without_squad_stops_and_records_cause(semantic):
+    i = report(semantic, "!admin BattlefieldHero never answers us in command chat")
+    complete(semantic, i["id"], decision())
+    reporter = next(p for p in semantic[1] if p["player_id"] == "v0")
+    reporter.update(role="rifleman", unit_name="unassigned", unit_id=0)
+    api = transport()
+    service.tick(api, 1)
+    result = current(semantic[0], i["id"])["report_admin"]
+    audit = result["reason_analysis"]["target_check"]
+    assert result["status"] == "manual"
+    assert "reporter" in result["result"]
+    assert audit["code"] == "live_target_unresolved"
+    assert audit["original"]["target"] == audit["current"]["target"]
+    assert audit["current"]["reporter"]["squad"] == "unassigned"
+    reporter.update(unit_name="november", unit_id=13)
+    service.tick(api, 1)
+    api.kick.assert_not_called()  # Never replay an already handed-off report.
