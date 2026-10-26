@@ -81,6 +81,57 @@ def decision():
     )
 
 
+@pytest.mark.parametrize("provider", ["codex", "api_key"])
+def test_spelling_note_is_not_a_blocking_uncertainty_or_new_wire_field(provider):
+    request = job().model_copy(
+        update={
+            "ai_provider": provider,
+            "message": "!admin Kommandant Grrey_Mentor spricht nicht",
+        }
+    )
+    raw = {
+        **decision().model_dump(),
+        "target_text": "Grrey_Mentor",
+        "allegation_excerpt": "Grrey_Mentor spricht nicht",
+        "name_spelling_note": "Recognizable full-name typo for Grey_Mentor.",
+    }
+    client = MagicMock()
+    client.responses.parse.return_value = SimpleNamespace(
+        status="completed",
+        output_parsed=ai.ReportReasonInterpretation(**raw),
+        usage=None,
+    )
+    with (
+        patch.object(ai, "run_structured", return_value=raw) as run,
+        patch.object(ai, "OpenAI") as constructor,
+    ):
+        constructor.return_value.__enter__.return_value = client
+        result, _, _ = ai.analyze_report_reason(request)
+    # All clients, including older RCONs sharing this service, see the same schema.
+    assert type(result) is ReportReasonDecision
+    assert "name_spelling_note" not in result.model_dump()
+    assert result.target_text == "Grrey_Mentor"
+    assert result.uncertainties == []
+    schema = (
+        run.call_args.kwargs["output_schema"]
+        if provider == "codex"
+        else client.responses.parse.call_args.kwargs["text_format"].model_json_schema()
+    )
+    assert "name_spelling_note" in schema["properties"]
+
+
+def test_new_prompt_defines_no_mic_and_distinguishes_speech_content():
+    with patch.object(
+        ai, "run_structured", return_value=decision().model_dump()
+    ) as run:
+        ai.analyze_report_reason(job().model_copy(update={"ai_provider": "codex"}))
+    policy = run.call_args.kwargs["prompt"].split("UNTRUSTED REPORT DATA:\n", 1)[0]
+    assert "'ABLE SL NO MIC' and 'GOLF SL NO MIC' have the SAME" in policy
+    assert "'NS' in this context means National Socialism, NOT 'not speaking'" in policy
+    assert "Use name_spelling_note for that observation, NOT uncertainties" in policy
+    assert "RCON cannot prove voice silence" in policy
+
+
 @pytest.mark.parametrize("enabled", [False, True])
 def test_member_scope_is_trusted_server_policy_not_report_text(enabled):
     request = job().model_copy(
@@ -112,7 +163,7 @@ def test_full_context_and_strict_model_schema_no_tools_or_credentials_in_prompt(
         answer, _, _ = ai.analyze_report_reason(job())
     assert answer.rule == "communication"
     sent = client.responses.parse.call_args.kwargs
-    assert sent["text_format"] is ReportReasonDecision
+    assert sent["text_format"] is ai.ReportReasonInterpretation
     assert sent["store"] is False and "tools" not in sent
     prompt = str(sent["input"])
     assert job().message in prompt

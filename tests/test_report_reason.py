@@ -479,7 +479,7 @@ def test_realpb7_report_with_unchanged_roster_completes_once(semantic):
         ("duplicate", "live_target_unresolved"),
         ("seat", "target_identity_changed"),
         ("invalid", "invalid_interpretation_or_roster"),
-        ("invented", "original_target_unresolved"),
+        ("invented", "ungrounded_interpretation"),
     ],
 )
 def test_classification_failure_retains_specific_bounded_evidence(
@@ -533,8 +533,8 @@ def test_reporter_temporarily_without_squad_stops_and_records_cause(semantic):
     result = current(semantic[0], i["id"])["report_admin"]
     audit = result["reason_analysis"]["target_check"]
     assert result["status"] == "manual"
-    assert "reporter" in result["result"]
-    assert audit["code"] == "live_target_unresolved"
+    assert "Reporter" in result["result"]
+    assert audit["code"] == "reporter_squad_unassigned"
     assert audit["original"]["target"] == audit["current"]["target"]
     assert audit["current"]["reporter"]["squad"] == "unassigned"
     reporter.update(unit_name="november", unit_id=13)

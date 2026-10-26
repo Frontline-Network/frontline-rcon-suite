@@ -3,6 +3,7 @@
 import re
 
 from rcon.report_reason_contract import ReportReasonDecision
+from rcon.report_reason_policy import interpretation_failure
 
 
 def enqueue(sess, incident, context, now, cfg):
@@ -120,21 +121,7 @@ def target(
     )
 
     d = ReportReasonDecision.model_validate(decision)
-    raw = str(incident.get("raw_message") or "")
-    body = re.sub(r"^\s*!admin\b", "", raw, count=1, flags=re.I)
-    if (
-        d.rule == "manual"
-        or not d.unambiguous
-        or d.uncertainties
-        or d.target_kind == "none"
-        or not d.target_text.strip()
-        or not d.allegation_excerpt.strip()
-        or d.target_text not in body
-        or d.allegation_excerpt not in body
-        or "!admin" in d.target_text.casefold()
-        or d.allegation_excerpt.strip() == d.target_text.strip()
-        or (d.rule != "communication" and d.target_kind != "player")
-    ):
+    if interpretation_failure(incident, d):
         return None
     # The model extracts a reference, never supplies an executable player ID.
     # Reuse the independent exact/typo/leadership resolver on that reference.
@@ -230,6 +217,7 @@ def finish(sess, event, context, now):
     failure = None
     try:
         decision = ReportReasonDecision.model_validate(assessment.get("decision"))
+        failure = interpretation_failure(i.to_dict(), decision)
         before = target(
             i.to_dict(),
             request["roster"],
@@ -270,9 +258,35 @@ def finish(sess, event, context, now):
             failure,
             cfg.communication_squad_members,
         )
+        # Identity guards remain unchanged; show the missing assignment instead
+        # of claiming that a correctly recognized name could not be matched.
+        if failure in {"original_target_unresolved", "live_target_unresolved"}:
+            snapshot = summary["target_check"][
+                "original" if failure == "original_target_unresolved" else "current"
+            ]
+            if not snapshot.get("missing_ids") and not snapshot.get("duplicate_ids"):
+                for participant in ("target", "reporter"):
+                    state = snapshot.get(participant) or {}
+                    if (
+                        state.get("matches") == 1
+                        and state.get("online")
+                        and state.get("team") in {"allies", "axis"}
+                        and not state.get("seat")
+                        and str(state.get("squad") or "").strip().casefold()
+                        in {"", "unassigned", "none", "unset"}
+                    ):
+                        failure = f"{participant}_squad_unassigned"
+                        summary["target_check"]["code"] = failure
+                        break
     event.payload = {**p, "reason_analysis": summary}
     if failure:
         reasons = {
+            "manual_review_required": "Diese Meldung benötigt eine manuelle Admin-Prüfung / This report requires human admin review",
+            "interpretation_uncertain": "Meldegrund oder gemeinter Spieler ist nicht eindeutig; manuell prüfen / Complaint or intended player is unclear; manual review",
+            "ungrounded_interpretation": "KI-Antwort passt nicht zum Originaltext; manuell prüfen / AI interpretation does not match the original text; manual review",
+            "communication_category_conflict": "Meldung enthält eine andere Beschwerde als fehlende Kommunikation; manuell prüfen / Report contains an allegation other than missing communication; manual review",
+            "target_squad_unassigned": "Gemeldeter Spieler ohne bestätigte Squad-Zuordnung; manuell prüfen / Reported player has no confirmed squad assignment; manual review",
+            "reporter_squad_unassigned": "Melder ohne bestätigte Squad-Zuordnung; manuell prüfen / Reporter has no confirmed squad assignment; manual review",
             "invalid_interpretation_or_roster": "KI-Antwort oder Spielerdaten ungültig / Invalid AI response or player data",
             "original_target_unresolved": "Ziel in der ursprünglichen Meldung nicht sicher zugeordnet / Target not safely identified in original report",
             "live_target_unresolved": "Ziel oder Melder erfüllt die aktuellen Spieler- und Teamprüfungen nicht / Target or reporter no longer passes current player and team checks",
@@ -364,7 +378,9 @@ def target_check(incident, original, current, before, after, failure, allow_memb
                 "team": _normalize_team(p.get("team")),
                 "role": str(p.get("role") or "")[:100],
                 "squad": str(p.get("unit_name") or "")[:100],
-                "squad_id": str(p.get("unit_id") or "")[:100],
+                "squad_id": str(p["unit_id"] if p.get("unit_id") is not None else "")[
+                    :100
+                ],
                 "seat": seat,
                 "same_seat_count": (
                     sum(
