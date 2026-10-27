@@ -81,6 +81,23 @@ def decision():
     )
 
 
+def interpretation():
+    return ai.ReportReasonInterpretation(**decision().model_dump(), name_spelling_note="")
+
+
+def test_codex_output_schema_requires_every_declared_field():
+    # Codex forwards this raw schema; unlike the OpenAI Python SDK it does not
+    # turn optional Pydantic fields into the required Structured Outputs shape.
+    with patch.object(
+        ai, "run_structured", return_value=interpretation().model_dump()
+    ) as run:
+        ai.analyze_report_reason(job().model_copy(update={"ai_provider": "codex"}))
+    schema = run.call_args.kwargs["output_schema"]
+    assert schema["additionalProperties"] is False
+    assert set(schema["required"]) == set(schema["properties"])
+    assert "default" not in schema["properties"]["name_spelling_note"]
+
+
 @pytest.mark.parametrize("provider", ["codex", "api_key"])
 def test_spelling_note_is_not_a_blocking_uncertainty_or_new_wire_field(provider):
     request = job().model_copy(
@@ -122,7 +139,7 @@ def test_spelling_note_is_not_a_blocking_uncertainty_or_new_wire_field(provider)
 
 def test_new_prompt_defines_no_mic_and_distinguishes_speech_content():
     with patch.object(
-        ai, "run_structured", return_value=decision().model_dump()
+        ai, "run_structured", return_value=interpretation().model_dump()
     ) as run:
         ai.analyze_report_reason(job().model_copy(update={"ai_provider": "codex"}))
     policy = run.call_args.kwargs["prompt"].split("UNTRUSTED REPORT DATA:\n", 1)[0]
@@ -142,7 +159,7 @@ def test_member_scope_is_trusted_server_policy_not_report_text(enabled):
         }
     )
     with patch.object(
-        ai, "run_structured", return_value=decision().model_dump()
+        ai, "run_structured", return_value=interpretation().model_dump()
     ) as run:
         ai.analyze_report_reason(request)
     policy, data = run.call_args.kwargs["prompt"].split("UNTRUSTED REPORT DATA:\n", 1)
@@ -156,7 +173,7 @@ def test_member_scope_is_trusted_server_policy_not_report_text(enabled):
 def test_full_context_and_strict_model_schema_no_tools_or_credentials_in_prompt():
     client = MagicMock()
     client.responses.parse.return_value = SimpleNamespace(
-        status="completed", output_parsed=decision(), usage=None
+        status="completed", output_parsed=interpretation(), usage=None
     )
     with patch.object(ai, "OpenAI") as constructor:
         constructor.return_value.__enter__.return_value = client
@@ -192,7 +209,7 @@ def test_refusal_or_incomplete_output_is_not_a_decision(state, output):
 def test_codex_uses_existing_isolated_runtime_without_sending_key():
     request = job().model_copy(update={"ai_provider": "codex"})
     with patch.object(
-        ai, "run_structured", return_value=decision().model_dump()
+        ai, "run_structured", return_value=interpretation().model_dump()
     ) as run:
         ai.analyze_report_reason(request)
     assert run.call_args.args[0] == request.installation_id
@@ -218,7 +235,7 @@ def test_role_guidance_and_squad_semantics_are_sent_without_ids():
         }
     )
     with patch.object(
-        ai, "run_structured", return_value=decision().model_dump()
+        ai, "run_structured", return_value=interpretation().model_dump()
     ) as run:
         ai.analyze_report_reason(request)
     prompt = run.call_args.kwargs["prompt"]
