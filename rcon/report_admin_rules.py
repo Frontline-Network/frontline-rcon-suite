@@ -307,6 +307,30 @@ def typo_distance(a, b):
     return table[-1][-1]
 
 
+def _name_match_score(fragment, name):
+    """Compare full names and distinctive prefixes ending at a separator.
+
+    Keep competing prefixes in the ranking even when they exceed their own
+    one-typo budget: they can still make another candidate ambiguous.
+    """
+    if max(len(fragment), len(name)) > 100:
+        return 101, 0
+    options = [
+        (typo_distance(fragment, name), min(3, min(len(fragment), len(name)) // 4))
+    ]
+    if sum(char.isalnum() for char in fragment) >= 6:
+        for end, char in enumerate(name):
+            if char not in {"_", " "}:
+                continue
+            prefix = name[:end]
+            if sum(char.isalnum() for char in prefix) >= 6 and any(
+                char.isalnum() for char in name[end + 1 :]
+            ):
+                options.append((typo_distance(fragment, prefix), 1))
+    # Prefer the full-name budget when both comparisons have the same distance.
+    return min(options, key=lambda option: (option[0], -option[1]))
+
+
 def conservative_name_match(subjects, players):
     if len(subjects) != 1:
         return None
@@ -318,29 +342,23 @@ def conservative_name_match(subjects, players):
     ):
         return None
     fragment = _normalize_message(str(s.get("matched_text") or ""))
-    # Short names and partial names never become an automatic target.
+    # Short references remain manual, including short fragments of long names.
     if len(fragment) < 6:
         return None
     # Include both teams and all plausible names in the collision check.
-    ranked = sorted(
-        (
-            typo_distance(
-                fragment,
-                _normalize_message(str(p.get("name") or p.get("player_name") or "")),
-            ),
-            str(p.get("player_id")),
-            p,
+    ranked = []
+    for player in players:
+        if player.get("online") is False:
+            continue
+        name = _normalize_message(
+            str(player.get("name") or player.get("player_name") or "")
         )
-        for p in players
-        if p.get("online") is not False
-    )
+        distance, allowed = _name_match_score(fragment, name)
+        ranked.append((distance, str(player.get("player_id")), player, allowed))
+    ranked.sort(key=lambda candidate: (candidate[0], candidate[1]))
     if not ranked:
         return None
-    distance, pid, player = ranked[0]
-    name_length = len(
-        _normalize_message(str(player.get("name") or player.get("player_name") or ""))
-    )
-    allowed = min(3, min(len(fragment), name_length) // 4)
+    distance, pid, player, allowed = ranked[0]
     if (
         distance > allowed
         or pid != str(s.get("player_id"))
