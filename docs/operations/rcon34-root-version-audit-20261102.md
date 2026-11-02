@@ -1,5 +1,7 @@
 # RCON3/4: alte Versionen unter /root – Prüfung vom 2. November 2026
 
+**Nachtrag:** Die anschließend ausdrücklich freigegebenen 52 Ordner und 34 Archive wurden am selben Tag entfernt. Durchführung und Nachkontrolle stehen im [Bereinigungsprotokoll](rcon34-root-version-cleanup-20261102.md). Die folgende Bestandsaufnahme beschreibt den Zustand vor der Löschung.
+
 Host: `87.106.112.21`. Inventur ab **01:16 Uhr Europe/Berlin**. Ausschließlich lesende Prüfung; keine Serverdateien gelöscht oder geändert, keine Dienste neu gestartet.
 
 ## Ergebnis
