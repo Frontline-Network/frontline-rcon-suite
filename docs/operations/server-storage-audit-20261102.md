@@ -2,6 +2,8 @@
 
 Host: `87.106.112.21`. Lesende Bestandsaufnahme ab **02:28 Uhr Europe/Berlin**. Die Dateisysteminventur erfasste die gesamte Root-Partition ohne Fehler. Es wurde in dieser Untersuchung nichts gelöscht, keine Konfiguration geändert und kein Dienst neu gestartet.
 
+**Nachtrag, 2. November 2026:** Die anschließend freigegebene Bereinigung entfernte 2.064 alte Build-Cache-Einträge und zwölf deaktivierte Snap-Revisionen einschließlich ihrer Download-Kopien. Nach der Abschlussprüfung waren **624,52 GB frei**, rund **182,32 GB mehr** als vor diesem Wartungsschritt. Nachweise und Schutzprüfungen stehen im [Bereinigungsprotokoll](cache-snap-cleanup-20261102.md). Die folgenden Zahlen beschreiben weiterhin den ursprünglichen Zustand vor dieser Bereinigung.
+
 ## Ergebnis und empfohlene Reihenfolge
 
 Größter kurzfristiger Ansatzpunkt: **130.79 GB** seit mindestens 30 Tagen ungenutzter Docker-Build-Cache, der laut Engine nicht mit Images geteilt wird (2,119 Einträge). Aktuelle Builds und die Nutzdaten laufender Anwendungen sind davon getrennt. Gelöschter Cache muss bei einem späteren Build gegebenenfalls neu aufgebaut werden.
