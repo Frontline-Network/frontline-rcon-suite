@@ -6,6 +6,7 @@ import logging
 import socket
 import struct
 import threading
+import time
 import uuid
 from contextlib import contextmanager
 from enum import IntEnum
@@ -15,6 +16,8 @@ from typing import Any, ClassVar, Self
 from cachetools import TTLCache
 
 TIMEOUT_SEC = 20
+BODY_TIMEOUT_SEC = 3
+MAX_RESPONSE_BYTES = 16 * 1024 * 1024
 HEADER_FORMAT = "<III"
 MAGIC_HEADER_VALUE = 0xDE450508
 
@@ -162,15 +165,20 @@ class Response:
 
     @classmethod
     def from_bytes(cls, request_id: int, body_encoded: bytes) -> Self:
-        body = json.loads(body_encoded)
-        return cls(
-            request_id=request_id,
-            command=str(body["name"]),
-            version=int(body["version"]),
-            status_code=ResponseStatus(int(body["statusCode"])),
-            status_message=str(body["statusMessage"]),
-            content=body["contentBody"],
-        )
+        try:
+            body = json.loads(body_encoded)
+            return cls(
+                request_id=request_id,
+                command=str(body["name"]),
+                version=int(body["version"]),
+                status_code=ResponseStatus(int(body["statusCode"])),
+                status_message=str(body["statusMessage"]),
+                content=body["contentBody"],
+            )
+        except (ValueError, TypeError, KeyError) as error:
+            # A malformed response is a transport failure, not invalid credentials.
+            # Do not include the body: login responses may contain auth tokens.
+            raise HLLBrokenConnectionError("Malformed RCON response") from error
 
     def raise_for_status(self) -> None:
         """Raises an exception if the response status is not OK.
@@ -202,27 +210,41 @@ class HLLConnection:
         self.sock.settimeout(TIMEOUT_SEC)
         self.id = f"{get_ident()}-{uuid.uuid4()}"
         self.auth_token = None
+        self.closed = False
         self.mu = threading.Lock()
         self._response_cache: TTLCache[int, Response] = TTLCache(maxsize=1024, ttl=60)
 
     def connect(self, host, port, password: str):
-        self.sock.connect((host, port))
+        try:
+            self.sock.connect((host, port))
+            server_hello = self.exchange("ServerConnect", 2, "")
+            server_hello.raise_for_status()
+            try:
+                if not isinstance(server_hello.content, str):
+                    raise ValueError("Expected a string")
+                self.xorkey = base64.b64decode(server_hello.content, validate=True)
+                if not self.xorkey:
+                    raise ValueError("Empty key")
+            except ValueError as error:
+                raise HLLBrokenConnectionError("Invalid RCON handshake key") from error
 
-        server_hello = self.exchange("ServerConnect", 2, "")
-        server_hello.raise_for_status()
-
-        if not isinstance(server_hello.content, str):
-            raise HLLBrokenConnectionError(
-                "ServerConnect response content is not a string"
-            )
-        self.xorkey = base64.b64decode(server_hello.content)
-
-        auth_token_resp = self.exchange("Login", 2, password)
-        auth_token_resp.raise_for_status()
-
-        self.auth_token = auth_token_resp.content
+            auth_token_resp = self.exchange("Login", 2, password)
+            auth_token_resp.raise_for_status()
+            if (
+                not isinstance(auth_token_resp.content, str)
+                or not auth_token_resp.content
+            ):
+                raise HLLBrokenConnectionError("Invalid RCON login response")
+            self.auth_token = auth_token_resp.content
+        except Exception:
+            self.close()
+            raise
 
     def close(self) -> None:
+        if self.closed:
+            return
+        self.closed = True
+        self._response_cache.clear()
         try:
             self.sock.shutdown(socket.SHUT_RDWR)
         except OSError:
@@ -241,43 +263,54 @@ class HLLConnection:
 
         req_header, req_body = request.to_bytes()
         message = req_header + self._xor(req_body)
-        self.sock.send(message)
+        try:
+            self.sock.sendall(message)
+        except OSError:
+            # The caller decides whether a retry is safe. Never resend here.
+            self.close()
+            raise
 
         return Handle(self, request)
 
+    def _read_exact(self, size: int, deadline: float) -> bytes:
+        data = bytearray()
+        while len(data) < size:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("RCON response deadline exceeded")
+            self.sock.settimeout(remaining)
+            chunk = self.sock.recv(size - len(data))
+            if not chunk:
+                raise HLLBrokenConnectionError("RCON connection closed during response")
+            data.extend(chunk)
+        return bytes(data)
+
     def receive(self, request_id: int) -> Response:
-        # Not sure if this lock is still necessary, but better safe than sorry
-        self.mu.acquire()
+        deadline = time.monotonic() + TIMEOUT_SEC
+        if not self.mu.acquire(timeout=TIMEOUT_SEC):
+            raise TimeoutError("RCON response lock deadline exceeded")
         try:
-            while request_id not in self._response_cache:
-                header_len = struct.calcsize(HEADER_FORMAT)
-                header_bytes = self.sock.recv(header_len)
-                try:
+            with set_timeout(self.sock, TIMEOUT_SEC):
+                while request_id not in self._response_cache:
+                    header_len = struct.calcsize(HEADER_FORMAT)
+                    header_bytes = self._read_exact(header_len, deadline)
                     magic, req_id, body_len = struct.unpack(HEADER_FORMAT, header_bytes)
-                except struct.error:
-                    raise HLLBrokenConnectionError(
-                        f"Failed to unpack response header: {header_bytes}"
+                    if magic != MAGIC_HEADER_VALUE:
+                        raise HLLBrokenConnectionError("Invalid RCON response header")
+                    if not 0 < body_len <= MAX_RESPONSE_BYTES:
+                        raise HLLBrokenConnectionError("Invalid RCON response size")
+                    raw = self._read_exact(
+                        body_len, min(deadline, time.monotonic() + BODY_TIMEOUT_SEC)
                     )
-
-                if magic != MAGIC_HEADER_VALUE:
-                    raise HLLBrokenConnectionError(
-                        f"Invalid magic value: {magic:#x} (expected {MAGIC_HEADER_VALUE:#x})"
-                    )
-
-                with set_timeout(self.sock, 3):
-                    raw = bytearray()
-                    while len(raw) < body_len:
-                        raw += self.sock.recv(body_len - len(raw))
-
-                msg = self._xor(raw)
-                response = Response.from_bytes(req_id, msg)
-
-                self._response_cache[response.request_id] = response
+                    response = Response.from_bytes(req_id, self._xor(raw))
+                    self._response_cache[response.request_id] = response
+                return self._response_cache.pop(request_id)
+        except (OSError, HLLBrokenConnectionError):
+            # A timed-out/partial frame cannot be reused for a later request.
+            self.close()
+            raise
         finally:
             self.mu.release()
-
-        response = self._response_cache.pop(request_id)
-        return response
 
     def exchange(self, command: str, version: int, body: dict[str, Any] | str = ""):
         handle = self.send(command, version, body)
