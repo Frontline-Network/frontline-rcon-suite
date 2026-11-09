@@ -1,7 +1,9 @@
 # Report target matching: abbreviated names
 
-Status: implemented and tested; not deployed. No moderation configuration or
-existing incident outcome has been changed.
+Original status (27 October): implemented and tested; not deployed. Subsequently
+included in stable v0.9.3 and deployed to RCON3/4 on 9 November; see the
+[deployment receipt](v0.9.3-rcon34-rollout.md). No moderation configuration or
+existing incident outcome was changed or replayed by that rollout.
 
 ## Observed case
 
