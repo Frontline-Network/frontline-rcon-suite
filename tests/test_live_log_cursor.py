@@ -100,3 +100,20 @@ def test_overlapping_pages_from_concurrent_prepends_are_deduplicated():
 def test_invalid_cursor_requests_are_rejected(kwargs):
     with pytest.raises(ValueError):
         get_live_log_page(log_history=[], **kwargs)
+
+
+def test_get_page_limit_is_parsed_without_accepting_fractional_values():
+    assert len(get_live_log_page(log_history=[line(1)], limit="1")["logs"]) == 1
+    with pytest.raises(ValueError):
+        get_live_log_page(log_history=[], limit="1.5")
+    with pytest.raises(ValueError):
+        get_live_log_page(log_history=[], after=123)
+
+
+@pytest.mark.parametrize("value", [False, "false", "0"])
+def test_disabled_cursor_mode_keeps_legacy_endpoint(monkeypatch, value):
+    from rcon import game_logs
+    from rcon.api_commands import RconAPI
+
+    monkeypatch.setattr(game_logs, "get_recent_logs", lambda **kwargs: "legacy")
+    assert RconAPI.get_recent_logs(object(), cursor_mode=value) == "legacy"

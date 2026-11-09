@@ -691,7 +691,7 @@ class RconAPI(Rcon):
         after: str | None = None,
         before: str | None = None,
     ) -> ParsedLogsType:
-        if cursor_mode:
+        if game_logs.strtobool(cursor_mode):
             from rcon.live_log_cursor import get_live_log_page
 
             return get_live_log_page(

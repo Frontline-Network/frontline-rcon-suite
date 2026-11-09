@@ -20,8 +20,13 @@ def get_live_log_page(
     if after and before:
         raise ValueError("Use either after or before")
     for cursor in (after, before):
-        if cursor is not None and not re.fullmatch(r"[0-9a-f]{64}", cursor):
+        if cursor is not None and (
+            not isinstance(cursor, str) or not re.fullmatch(r"[0-9a-f]{64}", cursor)
+        ):
             raise ValueError("Invalid live-log cursor")
+    # The existing endpoint accepts GET as well as JSON POST requests.
+    if isinstance(limit, str) and limit.isdecimal():
+        limit = int(limit)
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 2000:
         raise ValueError("Live-log page size must be between 1 and 2000")
 
