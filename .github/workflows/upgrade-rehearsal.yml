@@ -1,6 +1,12 @@
 name: Isolated backend upgrade rehearsal
 
 on:
+  workflow_call:
+    inputs:
+      source_image:
+        type: string
+        required: false
+        default: ghcr.io/frontline-network/frontline-rcon-suite@sha256:ead46c46c8213ae3be415bf020896158eb50726300d3e31a2c7c0f62df855653
   workflow_dispatch:
     inputs:
       source_image:
@@ -14,13 +20,18 @@ permissions:
 
 jobs:
   upgrade:
-    runs-on: ubuntu-latest
-    timeout-minutes: 35
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         game: [hll, hllv]
         api_mode: [split, unified]
+        runner: [ubuntu-latest]
+        include:
+          - game: hllv
+            api_mode: split
+            runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
       - uses: docker/login-action@v3
@@ -68,6 +79,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: upgrade-receipt-${{ matrix.game }}-${{ matrix.api_mode }}
+          name: upgrade-receipt-${{ matrix.game }}-${{ matrix.api_mode }}-${{ matrix.runner }}
           path: ${{ runner.temp }}/upgrade-state/verified.json
           if-no-files-found: ignore
