@@ -85,11 +85,18 @@ test("theme chunk failure shows a recoverable English error instead of a blank p
   page,
 }) => {
   await page.addInitScript(() => localStorage.setItem("crcon.language", "en"));
+  let blockedThemeRequests = 0;
   await page.route(
-    /\/themes\/(default\/getDefaultTheme|wardogs\/getWardogsTheme)/,
-    (route) => route.abort()
+    /\/themes\/(default\/getDefaultTheme|wardogs\/getWardogsTheme)|\/assets\/(getDefaultTheme|getWardogsTheme)-[^/]+\.js(?:\?|$)/,
+    (route) => {
+      blockedThemeRequests += 1;
+      return route.abort();
+    }
   );
   await page.goto("/views/live");
+  // CI runs the compiled preview; local development serves source modules.
+  // Assert the fault was actually injected in either mode.
+  await expect.poll(() => blockedThemeRequests).toBeGreaterThan(0);
   await expect(
     page.getByRole("heading", { name: "Appearance could not be loaded" })
   ).toBeVisible();
