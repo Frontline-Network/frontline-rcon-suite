@@ -5,6 +5,10 @@ Auftrag: alte RCON1/2-Protokolle archivieren, die Wiederherstellung prüfen und
 anschließend eine Löschliste vorlegen. **Produktiv gelöschte Zeilen: 0.**
 RCON3/4, geschützte Daten und vorhandene Sicherungen bleiben erhalten.
 
+Nachtrag: Die anschließend ausdrücklich freigegebene Löschung ist im
+[Bereinigungsbericht](rcon12-log-cleanup-20261109.md) dokumentiert. Die folgenden
+Angaben beschreiben den ursprünglichen Archiv- und Prüfstand vor der Löschung.
+
 ## Zur Prüfung vorgelegte Liste
 
 Der feste Stichtag aus der vorausgehenden Analyse wurde beibehalten:
