@@ -194,7 +194,14 @@ jobs:
             docker network rm release-verification || true
           }
           trap cleanup EXIT
-          docker run -d --name release-backend --network release-verification --network-alias backend --platform linux/amd64 -p 127.0.0.1:8048:8000 -e RELEASE_SMOKE_TEST=1 -e RELEASE_VERSION="$RELEASE_VERSION" --entrypoint python "$REGISTRY/$BACKEND_IMAGE@$BACKEND_DIGEST" scripts/release_smoke_server.py --bind 0.0.0.0 --port 8000
+          # The slim backend intentionally excludes frontend sources. Provide
+          # only the browser security fixture from the exact released commit;
+          # all authentication/API requests still exercise the published images.
+          [[ "$RELEASE_REVISION" =~ ^[0-9a-f]{40}$ ]]
+          git cat-file -e "$RELEASE_REVISION^{commit}" || git fetch --no-tags --depth=1 origin "$RELEASE_REVISION"
+          git show "$RELEASE_REVISION:rcongui/src/utils/csrfTransport.mjs" > "$RUNNER_TEMP/csrfTransport.mjs"
+          test -s "$RUNNER_TEMP/csrfTransport.mjs"
+          docker run -d --name release-backend --network release-verification --network-alias backend --platform linux/amd64 -p 127.0.0.1:8048:8000 -e RELEASE_SMOKE_TEST=1 -e RELEASE_VERSION="$RELEASE_VERSION" --mount "type=bind,src=$RUNNER_TEMP/csrfTransport.mjs,dst=/code/rcongui/src/utils/csrfTransport.mjs,readonly" --entrypoint python "$REGISTRY/$BACKEND_IMAGE@$BACKEND_DIGEST" scripts/release_smoke_server.py --bind 0.0.0.0 --port 8000
           docker run -d --name release-frontend --network release-verification --platform linux/amd64 -p 127.0.0.1:8049:80 -e RCONWEB_EXTERNAL_ADDRESS=localhost "$REGISTRY/$FRONTEND_IMAGE@$FRONTEND_DIGEST"
           for attempt in {1..60}; do
             if curl -fsS http://127.0.0.1:8049/api/is_logged_in >/dev/null; then break; fi
