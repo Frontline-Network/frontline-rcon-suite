@@ -46,6 +46,11 @@ class WatchStatus:
     position_tracking_context: Mapping[str, tuple[int | None, str | None]] = field(
         default_factory=dict
     )
+    # (position, observation time, death counter); primitive values also keep
+    # these pickles readable by older processes during a rollback.
+    position_observations: Mapping[
+        str, tuple[tuple[float, float, float], float, int | None]
+    ] = field(default_factory=dict)
 
     noted: Mapping[str, List[datetime]] = field(default_factory=dict)
     warned: Mapping[str, List[datetime]] = field(default_factory=dict)

@@ -172,7 +172,7 @@ def report(
     ctx.update(
         private_chat=private, event_time=storage.time.time() if stamp is None else stamp
     )
-    return incidents.create_incident(
+    result, created = incidents.create_incident(
         server_number=server,
         source="chat",
         actor="system:chat",
@@ -184,7 +184,16 @@ def report(
         reporter_context=reporter_data,
         subjects=parsed["subjects"],
         leadership_context=ctx,
-    )[0]
+    )
+    # Historical-state fixtures explicitly use the legacy storage engine. The
+    # production incident/chat path no longer creates leadership votes. Keep
+    # these fixtures to test cancellation, audit and old-state compatibility.
+    if created:
+        with storage.enter_session() as sess:
+            incident = sess.get(AdminIncident, result["id"])
+            storage.enqueue(sess, incident, ctx, storage.time.time())
+            result = incident.to_dict(include_events=True)
+    return result
 
 
 def vote(db, vote_id):
@@ -757,10 +766,12 @@ def test_command_conflicts_reject_activation(db):
 
 
 def test_db_enqueue_fault_preserves_ordinary_report(db, monkeypatch):
+    from rcon import report_admin
     monkeypatch.setattr(
-        storage, "enqueue", Mock(side_effect=RuntimeError("DB failure"))
+        report_admin, "enqueue", Mock(side_effect=RuntimeError("DB failure"))
     )
-    incident = report()
+    incident = incidents.create_incident(server_number=1, source="chat", reason="help", raw_message="!admin help",
+                                         actor="system:chat", leadership_context=context(roster()))[0]
     assert incident["status"] == "new" and not incident["leadership_vote"]
 
 

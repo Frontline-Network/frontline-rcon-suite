@@ -29,10 +29,6 @@ from rcon.logs.loop import (
     on_match_end,
     on_match_start,
 )
-from rcon.maps import (
-    UNKNOWN_MAP_NAME,
-    get_theoretical_match_time,
-)
 from rcon.message_variables import format_message_string, populate_message_variables
 from rcon.models import PlayerID, PlayerSoldier, enter_session, GameLayout
 from rcon.player_history import (
@@ -75,6 +71,7 @@ from rcon.utils import (
     MapsHistory,
     get_server_number,
     guess_map_from_log,
+    layer_matches_match_log,
 )
 from rcon.vote_map import VoteMap
 from rcon.workers import (
@@ -105,10 +102,6 @@ def frontline_vip_verification(rcon: Rcon, struct_log: StructuredLogLineWithMeta
 
 @on_chat
 def chat_commands(rcon: Rcon, struct_log: StructuredLogLineWithMetaData):
-    from rcon.leadership_vote.domain import answer
-    from rcon.user_config.leadership_vote import LeadershipVoteUserConfig
-    if answer(struct_log.get("sub_content")) is not None and LeadershipVoteUserConfig.load_from_db().enabled:
-        return
     chat_config = ChatCommandsUserConfig.load_from_db()
     rcon_config = RConChatCommandsUserConfig.load_from_db()
 
@@ -294,147 +287,116 @@ def reset_watch_killrate_cooldown(rcon: Rcon, struct_log: StructuredLogLineWithM
 
 @on_match_start
 def handle_new_match_start(rcon: Rcon, struct_log):
+    # The event is authoritative. GetServerInformation frequently times out
+    # while HLL loads a map; it must not gate persistence of the round boundary.
+    # The polling loop enriches the guessed layer/timer once live data agrees.
+    maps_history = MapsHistory()
+    start = int(struct_log["timestamp_ms"] / 1000)
+    current = maps_history.get_current_map()
+    if current and current["start"] is not None and start <= current["start"]:
+        logger.info("Ignoring duplicate or older match start at %s", start)
+        return
     log_map = guess_map_from_log(struct_log, rcon.game_profile.layers)
+    game_layout: GameLayout = {"requested": [], "set": []}
     try:
-        logger.info("New match started recording map %s", struct_log)
-        with invalidates(Rcon.get_map, Rcon.get_next_map, Rcon.get_gamestate):
-            try:
-                # Don't use the current_map property and clear the cache to pull the new map name
-                gamestate = rcon.get_gamestate()
-                current_map = rcon.game_profile.parse_layer(
-                    gamestate["current_map"]["id"]
-                )
-                if current_map.game_mode != gamestate["game_mode"]:
-                    # During a map transition the session fields are not updated
-                    # atomically. Do not combine a new layer with the old mode's
-                    # timer; the polling loop will fill this in once they agree.
-                    match_time = 0
-                    logger.warning(
-                        "Current map mode %s does not match session mode %s; "
-                        "deferring match-time recording",
-                        current_map.game_mode,
-                        gamestate["game_mode"],
-                    )
-                else:
-                    match_time = get_theoretical_match_time(
-                        gamestate["game_mode"], gamestate["match_time"]
-                    )
-            except HLLCommandFailedError:
-                current_map = rcon.game_profile.parse_layer(UNKNOWN_MAP_NAME)
-                match_time = 0
-                logger.error(
-                    "Unable to get current map, falling back to recording map as %s",
-                    UNKNOWN_MAP_NAME,
-                )
-
-        logger.debug("LOG MAP: %s\nCURRENT MAP: %s", log_map, current_map)
-        logger.debug("LOG TIME: %s\nNOW: %s", struct_log["event_time"].replace(tzinfo=UTC), datetime.now(tz=UTC))
-        guessed = True
-        # Check that the log is less than 5min old
-        if (datetime.now(tz=UTC) - struct_log["event_time"].replace(tzinfo=UTC)).total_seconds() < 5 * 60:
-            # then we use the current map to be more accurate
-            if current_map.map.name == log_map.map.name:
-                map_to_save = current_map
-                guessed = False
-            else:
-                map_to_save = log_map
-                logger.warning(
-                    "Got recent match start but map doesn't match %s != %s",
-                    log_map.map.name,
-                    current_map.map.name,
-                )
-        else:
-            map_to_save = str(current_map)
-
-        # TODO added guess - check if it's already in there - set prev end if None
-        maps_history = MapsHistory()
-        if len(maps_history) > 0:
-            if maps_history[0]["end"] is None and maps_history[0]["name"]:
-                maps_history.save_map_end(
-                    old_map=maps_history[0]["name"],
-                    end_timestamp=int(struct_log["timestamp_ms"] / 1000),
-                )
-
-        game_layout: GameLayout = {"requested": [], "set": []}
-        try:
-            red = get_redis_client()
-            raw = red.getdel('GAME_LAYOUT')
-            loaded = json.loads(raw) if raw is not None else {}
-            if isinstance(loaded, dict):
-                game_layout = {
-                    "requested": loaded.get("requested", []),
-                    "set": loaded.get("set", []),
-                }
-        except Exception as e:
-            logger.error("Could not fetch Game Layout: %s", e)
-            pass
-        maps_history.save_new_map(
-            new_map=str(map_to_save),
-            guessed=guessed,
-            start_timestamp=int(struct_log["timestamp_ms"] / 1000),
-            game_layout=game_layout,
-            match_time=match_time,
-        )
+        raw = get_redis_client().getdel("GAME_LAYOUT")
+        loaded = json.loads(raw) if raw is not None else {}
+        if isinstance(loaded, dict):
+            game_layout = {
+                "requested": loaded.get("requested", []),
+                "set": loaded.get("set", []),
+            }
     except Exception as e:
-        logger.exception(e)
-        raise
-    finally:
-        prev_map = MapsHistory()[1]
+        logger.error("Could not fetch Game Layout: %s", e)
+
+    if (
+        maps_history.save_new_map(
+            new_map=str(log_map),
+            guessed=True,
+            start_timestamp=start,
+            game_layout=game_layout,
+            match_time=0,
+            start_log=struct_log["raw"],
+        )
+        is None
+    ):
+        return
+
+    # A voting/webhook failure must not prevent round statistics from queuing.
+    prev_map = maps_history[1] if len(maps_history) > 1 else None
+    if (
+        prev_map
+        and prev_map.get("start") is not None
+        and prev_map.get("end") is not None
+    ):
+        first_job = None
+        try:
+            first_job = save_missing_match_logs_worker(prev_map)
+        except Exception:
+            logger.exception("Unable to enqueue match-log backfill")
+        try:
+            record_stats_worker(prev_map, first_job)
+        except Exception:
+            logger.exception("Unable to enqueue round statistics")
+
+    try:
+        # Clear the old round's cached layer/timer without querying the server.
+        # Otherwise a same-map day/night switch could refine against stale data.
+        with invalidates(Rcon.get_map, Rcon.get_next_map, Rcon.get_gamestate):
+            pass
+    except Exception:
+        logger.exception("Unable to invalidate previous round's live data")
+
+    try:
         vm = VoteMap()
         if vm.enabled:
             logger.info("MATCH START: Restarting votemap")
-            vm.record_result(prev_map)
-            send_to_discord_audit(
-                command_name="on_match_start",
-                message=vm.get_result_message(),
-                md_escape_message=False,
-                flatten=False,
-            )
+            if prev_map:
+                vm.record_result(prev_map)
+                send_to_discord_audit(
+                    command_name="on_match_start",
+                    message=vm.get_result_message(),
+                    md_escape_message=False,
+                    flatten=False,
+                )
             vm.restart()
             vm.send_reminder(force=vm.config.remind_on_match_start)
-        try:
-            first_job = save_missing_match_logs_worker(prev_map)
-            record_stats_worker(prev_map, first_job)
-        except Exception:
-            logger.exception("Unexpected error while running stats worker")
+    except Exception:
+        logger.exception("Unable to update map vote after recording match start")
 
 
 @on_match_end
 def record_map_end(rcon: Rcon, struct_log: StructuredLogLineWithMetaData):
     logger.info("Match ended recording map %s", struct_log)
     maps_history = MapsHistory()
-    with invalidates(Rcon.get_map, Rcon.get_next_map, Rcon.get_gamestate):
-        try:
-            gamestate = rcon.get_gamestate()
-            current_map = rcon.game_profile.parse_layer(
-                gamestate["current_map"]["id"]
-            )
-        except HLLCommandFailedError:
-            current_map = rcon.game_profile.parse_layer(UNKNOWN_MAP_NAME)
-            logger.error(
-                "Unable to get current map, falling back to recording map as %s",
-                UNKNOWN_MAP_NAME,
-            )
-
-    # Log map names are inconsistently formatted but should match the map name that each Layer has
-    log_map = guess_map_from_log(struct_log, rcon.game_profile.layers)
-    logger.debug("LOG MAP: %s\nCURRENT MAP: %s", log_map, current_map)
-    logger.debug("LOG TIME: %s\nNOW: %s", struct_log["event_time"].replace(tzinfo=UTC), datetime.now(tz=UTC))
-    # The log event loop can receive and process old log lines sometimes
-    # Check to make sure that if we're processing an old log line
-    if (datetime.now(tz=UTC) - struct_log["event_time"].replace(tzinfo=UTC)).total_seconds() < 60:
-        # then we use the current map to be more accurate
-        if current_map.map.name == log_map.map.name:
-            logger.info("Recording map end: %s - [recent match]", current_map)
-            maps_history.save_map_end(
-                str(current_map), end_timestamp=int(struct_log["timestamp_ms"] / 1000)
-            )
+    current = maps_history.get_current_map()
+    if not current:
         return
-
-    # If we're processing an old match
-    logger.info("Recording map end: %s - [old match]", log_map)
+    end = int(struct_log["timestamp_ms"] / 1000)
+    if (
+        current["start"] is None
+        or end <= current["start"]
+        or current["end"] is not None
+    ):
+        return
+    layer = rcon.game_profile.parse_layer(current["name"])
+    if current.get("guessed") and current.get("start_log"):
+        # With no successful live poll, the start may still have an unspecified
+        # weather/attacker. An end log can supply it, but cannot contradict start.
+        log_layer = guess_map_from_log(struct_log, rcon.game_profile.layers)
+        if layer_matches_match_log(log_layer, current["start_log"]):
+            current["name"] = log_layer.id
+            maps_history.update(0, current)
+            layer = log_layer
+    if not layer_matches_match_log(layer, struct_log["raw"]):
+        logger.warning(
+            "Ignoring match end that does not match cached round %s", current["name"]
+        )
+        return
     maps_history.save_map_end(
-        str(log_map), end_timestamp=int(struct_log["timestamp_ms"] / 1000)
+        current["name"],
+        end_timestamp=end,
+        start_timestamp=current["start"],
     )
 
 

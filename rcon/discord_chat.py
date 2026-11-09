@@ -277,15 +277,13 @@ def get_handler():
 
 @on_chat
 def handle_on_chat(rcon, log):
-    from rcon.leadership_vote.service import handle_answer, read_context
+    from rcon.leadership_vote.service import read_context
     from rcon.leadership_vote.domain import event_time, private_chat
-    from rcon.user_config.leadership_vote import LeadershipVoteUserConfig
+    from rcon.user_config.report_admin import ReportAdminUserConfig
     try:
         get_handler().send_chat_message(log)
     except Exception:
         logger.exception("Discord chat delivery failed; local report processing continues")
-    if handle_answer(rcon, log):
-        return
     captured_report = False
     from rcon.incident_settings import (
         incident_capture_enabled,
@@ -315,7 +313,7 @@ def handle_on_chat(rcon, log):
                 context_mode = incident_context_mode()
                 include_recent_context = context_mode in {"enabled", "shadow"}
                 leadership_context = None
-                if LeadershipVoteUserConfig.load_from_db().enabled:
+                if ReportAdminUserConfig.load_from_db().enabled:
                     context_mode = "enabled"
                     try:
                         leadership_context = read_context(rcon)

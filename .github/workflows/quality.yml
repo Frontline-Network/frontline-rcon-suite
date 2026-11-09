@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        version: [v0.9.0, v0.9.1, v0.9.2]
+        version: [v0.9.0, v0.9.1, v0.9.2, v0.9.3-rc.1, v0.9.3]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -91,6 +91,8 @@ jobs:
       - run: npm run check:operator-copy
       - run: npm run check:i18n
       - run: npm run check:admin-actions
+      - run: npm run check:permissions
+      - run: node --test ../rconweb/static/api/js/formset_handlers.test.cjs
       - run: npm run check:csrf
       - run: npm run check:game-capabilities
       - run: npm run check:polling
@@ -222,7 +224,7 @@ jobs:
           PYTHONPATH=. pytest tests/
           PYTHONPATH=. python -m django test api.test_release_updates --settings=rconweb.rconweb.test_settings --verbosity=1
           PYTHONPATH=. python -m django test api.test_release_migrations --settings=rconweb.rconweb.test_settings --verbosity=1
-          PYTHONPATH=. python -m django test api.test_account_password api.test_admin_theme api.test_api_descriptions api.test_appearance --settings=rconweb.rconweb.test_settings --verbosity=1
+          PYTHONPATH=. python -m django test api.test_account_password api.test_admin_theme api.test_permission_workflows api.test_api_descriptions api.test_appearance --settings=rconweb.rconweb.test_settings --verbosity=1
           PYTHONPATH=. python -m django test api.test_population --settings=rconweb.rconweb.test_settings --verbosity=1
           PYTHONPATH=. python -m django test api.test_live_view --settings=rconweb.rconweb.test_settings --verbosity=1
           PYTHONPATH=. python -m django test api.test_leadership_vote --settings=rconweb.rconweb.test_settings --verbosity=1

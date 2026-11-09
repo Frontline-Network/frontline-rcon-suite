@@ -190,6 +190,15 @@ print("RESULT:" + json.dumps({
         }:
             self.assertIn(isolated_service, sections)
 
+    def test_live_map_uses_the_existing_django_management_command(self):
+        config = (REPO_ROOT / "config" / "supervisord.conf").read_text(encoding="utf-8")
+        live_map = config.split("[program:live_map]", 1)[1].split("[program:", 1)[0]
+        self.assertIn("command=python /code/rconweb/manage.py live_map", live_map)
+        self.assertNotIn("command=/code/manage.py live_map", live_map)
+        self.assertTrue(
+            (REPO_ROOT / "rconweb" / "api" / "management" / "commands" / "live_map.py").is_file()
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

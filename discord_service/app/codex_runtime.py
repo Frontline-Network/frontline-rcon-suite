@@ -29,6 +29,45 @@ class CodexRuntimeError(RuntimeError):
     pass
 
 
+class CodexRuntimeBusy(CodexRuntimeError):
+    """No runtime/account/model call was started: admission may be retried."""
+
+
+class _PriorityLock:
+    """One account runtime at a time; waiting live reports go before batches."""
+
+    def __init__(self):
+        self.condition = threading.Condition()
+        self.held = False
+        self.priority_waiters = 0
+
+    def acquire(self, timeout: float, *, priority: bool = False) -> bool:
+        deadline = monotonic() + timeout
+        with self.condition:
+            if priority:
+                self.priority_waiters += 1
+                self.condition.notify_all()
+            try:
+                while self.held or (not priority and self.priority_waiters):
+                    remaining = deadline - monotonic()
+                    if remaining <= 0:
+                        return False
+                    self.condition.wait(remaining)
+                self.held = True
+                return True
+            finally:
+                if priority:
+                    self.priority_waiters -= 1
+                    self.condition.notify_all()
+
+    def release(self):
+        with self.condition:
+            if not self.held:
+                raise RuntimeError("release of unlocked runtime admission")
+            self.held = False
+            self.condition.notify_all()
+
+
 _INSTALLATION_RE = re.compile(r"^[A-Za-z0-9-]{1,64}$")
 
 
@@ -91,12 +130,12 @@ def _runtime_home(store: Path) -> Path:
 
 
 _home_locks_guard = threading.Lock()
-_home_locks: dict[str, threading.Lock] = {}
+_home_locks: dict[str, _PriorityLock] = {}
 
 
-def _home_lock(installation_id: str) -> threading.Lock:
+def _home_lock(installation_id: str) -> _PriorityLock:
     with _home_locks_guard:
-        return _home_locks.setdefault(installation_id, threading.Lock())
+        return _home_locks.setdefault(installation_id, _PriorityLock())
 
 
 def _persist_credentials(store: Path, home: Path, snapshot: str | None = None) -> None:
@@ -120,14 +159,25 @@ def _persist_credentials(store: Path, home: Path, snapshot: str | None = None) -
 
 
 class CodexAppServer:
-    def __init__(self, installation_id: str, settings: Settings | None = None):
+    def __init__(
+        self,
+        installation_id: str,
+        settings: Settings | None = None,
+        *,
+        priority=False,
+        deadline: float | None = None,
+    ):
         self.settings = settings or get_settings()
         if not self.settings.codex_enabled:
             raise CodexRuntimeError("codex_runtime_disabled")
         self.installation_id = installation_id
+        self._deadline = deadline
         self._lock = _home_lock(installation_id)
-        if not self._lock.acquire(timeout=5):
-            raise CodexRuntimeError("codex_runtime_busy")
+        admission_timeout = 15 if priority else 5
+        if deadline is not None:
+            admission_timeout = max(0, min(admission_timeout, deadline - monotonic()))
+        if not self._lock.acquire(timeout=admission_timeout, priority=priority):
+            raise CodexRuntimeBusy("codex_runtime_busy")
         self._closed = False
         self._auth_snapshot: str | None = None
         self.home: Path | None = None
@@ -219,15 +269,19 @@ class CodexAppServer:
         self._send(payload)
 
     def request(
-        self, method: str, params: dict[str, Any] | None = None, *, timeout: int | None = None
+        self,
+        method: str,
+        params: dict[str, Any] | None = None,
+        *,
+        timeout: int | None = None,
     ) -> dict[str, Any]:
+        deadline = self._operation_deadline(method, timeout)
         self._request_id += 1
         request_id = self._request_id
         payload: dict[str, Any] = {"id": request_id, "method": method}
         if params is not None:
             payload["params"] = params
         self._send(payload)
-        deadline = monotonic() + (timeout or self.settings.codex_request_timeout_seconds)
         while True:
             remaining = deadline - monotonic()
             if remaining <= 0:
@@ -248,8 +302,10 @@ class CodexAppServer:
             if "method" in message:
                 self._notifications.append(message)
 
-    def wait_notification(self, method: str, *, timeout: int | None = None) -> dict[str, Any]:
-        deadline = monotonic() + (timeout or self.settings.codex_request_timeout_seconds)
+    def wait_notification(
+        self, method: str, *, timeout: int | None = None
+    ) -> dict[str, Any]:
+        deadline = self._operation_deadline(method, timeout)
         while True:
             for index, message in enumerate(self._notifications):
                 if message.get("method") == method:
@@ -267,6 +323,15 @@ class CodexAppServer:
                 return message
             if "method" in message:
                 self._notifications.append(message)
+
+    def _operation_deadline(self, method, timeout):
+        now = monotonic()
+        deadline = now + (timeout or self.settings.codex_request_timeout_seconds)
+        if self._deadline is not None:
+            deadline = min(deadline, self._deadline)
+        if deadline <= now:
+            raise CodexRuntimeError(f"codex_timeout:{method}")
+        return deadline
 
     def close(self) -> None:
         if self._closed:
@@ -338,7 +403,9 @@ def start_device_login(installation_id: str) -> dict[str, Any]:
 
     def wait_for_login() -> None:
         try:
-            notification = client.wait_notification("account/login/completed", timeout=600)
+            notification = client.wait_notification(
+                "account/login/completed", timeout=600
+            )
             params = notification.get("params") or {}
             result = {
                 "state": "connected" if params.get("success") else "failed",
@@ -377,9 +444,9 @@ def _model_options(client: CodexAppServer) -> list[dict[str, Any]]:
         options.append(
             {
                 "id": model_id,
-                "name": str(
-                    row.get("displayName") or row.get("name") or model_id
-                )[:160],
+                "name": str(row.get("displayName") or row.get("name") or model_id)[
+                    :160
+                ],
                 "description": str(row.get("description") or "")[:500],
                 "default": bool(row.get("isDefault") or row.get("default")),
             }
@@ -390,7 +457,12 @@ def _model_options(client: CodexAppServer) -> list[dict[str, Any]]:
 def account_status(installation_id: str) -> dict[str, Any]:
     settings = get_settings()
     if not settings.codex_enabled:
-        return {"available": False, "connected": False, "state": "disabled", "models": []}
+        return {
+            "available": False,
+            "connected": False,
+            "state": "disabled",
+            "models": [],
+        }
     with _login_lock:
         pending = _login_results.get(installation_id, {})
         if pending.get("state") == "pending":
@@ -438,7 +510,9 @@ def logout(installation_id: str) -> None:
         pending[0].close()
     with CodexAppServer(installation_id) as client:
         client.request("account/logout", timeout=30)
-    encrypted_auth = _installation_store(installation_id, get_settings()) / "auth.json.enc"
+    encrypted_auth = (
+        _installation_store(installation_id, get_settings()) / "auth.json.enc"
+    )
     try:
         encrypted_auth.unlink()
     except FileNotFoundError:
@@ -451,8 +525,15 @@ def run_structured(
     model: str,
     prompt: str,
     output_schema: dict[str, Any],
+    priority: bool = False,
+    timeout_seconds: float | None = None,
 ) -> dict[str, Any]:
-    with CodexAppServer(installation_id) as client:
+    options = {"priority": True} if priority else {}
+    if timeout_seconds is not None:
+        if not 0 < timeout_seconds <= 300:
+            raise ValueError("Invalid structured-call budget")
+        options["deadline"] = monotonic() + timeout_seconds
+    with CodexAppServer(installation_id, **options) as client:
         account = client.request("account/read", {"refreshToken": True}, timeout=30)
         if not isinstance(account.get("account"), dict):
             raise CodexRuntimeError("codex_not_authenticated")
@@ -466,7 +547,7 @@ def run_structured(
                 "model": model,
                 "cwd": str(client.home / "runtime"),
                 "approvalPolicy": "never",
-                "sandbox": "readOnly",
+                "sandbox": "read-only",
                 "personality": "none",
                 "serviceName": "frontline_crcon_moderation",
                 "ephemeral": True,

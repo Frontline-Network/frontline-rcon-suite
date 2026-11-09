@@ -1610,6 +1610,13 @@ class AdminIncident(Base):
             "reason": self.reason,
             "raw_message": self.raw_message,
             "leadership_vote": self.leadership_vote,
+            "report_admin": next((
+                {k: v for k, v in event.payload.items() if k in {
+                    "status", "mode", "rule", "target_id", "target_name", "result",
+                    "teamkill_count", "teamkill_log_ids", "window_seconds", "updated_at", "sent_reason",
+                    "assessment", "ready_at", "reason_analysis",
+                }} for event in (self.events if include_events else ()) if event.event_type == "report_admin"
+            ), None),
             "assigned_to": self.assigned_to,
             "revision": self.revision,
             "created_at": self.created_at,

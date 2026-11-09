@@ -30,7 +30,7 @@ ALPHABET = (
     ("george", "golf"),
     ("how", "hotel"),
     ("item", "india"),
-    ("jig", "juliett", "juliet"),
+    ("jig", "juliett", "juliet", "juliette"),
     ("king", "kilo"),
     ("love", "lima"),
     ("mike",),
@@ -70,6 +70,7 @@ COMMANDERS = frozenset(
         "comander",
         "kommandar",
         "kommandat",
+        "kommder",
     }
 )
 # Deliberately not "com": "keine com" means communication, not commander.

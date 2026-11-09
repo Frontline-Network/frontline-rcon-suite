@@ -31,6 +31,7 @@ if not any(
         log_line_webhooks,
         log_stream,
         leadership_vote,
+        report_admin,
         name_kicks,
         population_history,
         rcon_connection_settings,

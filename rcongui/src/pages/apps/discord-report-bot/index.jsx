@@ -7,7 +7,6 @@ import {
 import { Box, Chip, Stack, Typography, useTheme } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import DiscordReportBotCard from "@/pages/settings/general-group/crcon-app/DiscordReportBotCard";
-import LeadershipVotes from "@/pages/settings/leadership-votes";
 import PageHeader from "@/components/shared/PageHeader";
 
 const DiscordReportBotPage = () => {
@@ -107,7 +106,6 @@ const DiscordReportBotPage = () => {
       )}
 
       <DiscordReportBotCard />
-      <LeadershipVotes />
     </Box>
   );
 };

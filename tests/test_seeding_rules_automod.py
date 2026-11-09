@@ -1,3 +1,4 @@
+import pickle
 import time
 from contextlib import contextmanager
 from datetime import datetime, timedelta
@@ -678,6 +679,8 @@ def test_commander_without_regular_squad_is_still_checked(team_view, map_id, sig
     player["world_position"] = {"x": 0, "y": 0, "z": 0}
     assert not mod.punitions_to_apply(team_view, "Commander", "allies", squad, snapshot)
     player["world_position"] = {"x": sign * 30_000, "y": 0, "z": 100}
+    assert not mod.punitions_to_apply(team_view, "Commander", "allies", squad, snapshot)
+    player["world_position"]["x"] += sign * 100
     result = mod.punitions_to_apply(team_view, "Commander", "allies", squad, snapshot)
     assert [p.player_id for p in result.warning] == [player["player_id"]]
 
@@ -721,8 +724,9 @@ def test_corrected_map_allows_own_spawn_and_still_punishes_enemy_excursion(
         "current_map": {"map": {"id": map_id}},
     }
     sign = 1 if team == "allies" else -1
-    for y in (0, -sign * 96_000, -sign * 90_000, -sign * 50_000, 0):
-        player["world_position"] = {"x": 0, "y": y, "z": 0 if y == 0 else 100}
+    for index, y in enumerate((0, -sign * 96_000, -sign * 90_000, -sign * 50_000, 0)):
+        # Only the first sample is a spawn screen, not the later map centre.
+        player["world_position"] = {"x": 0, "y": y, "z": 0 if index == 0 else 100}
         player["offense"] += 10
         result = mod.punitions_to_apply(team_view, "able", team, squad, snapshot)
         assert not result.warning and not result.punish and not result.kick
@@ -800,6 +804,8 @@ def test_offense_fallback_keeps_score_guard_for_both_teams(
     mod.punitions_to_apply(team_view, squad_name, team, squad, snapshot)
     if unknown_map:
         player["world_position"] = {"x": 50_000, "y": 0, "z": 1}
+        assert not mod.punitions_to_apply(team_view, squad_name, team, squad, snapshot)
+        player["world_position"]["x"] += 100
     player["offense"] += 1
     result = mod.punitions_to_apply(team_view, squad_name, team, squad, snapshot)
     assert len(result.warning) == (1 if score >= 3 else 0)
@@ -897,7 +903,8 @@ def test_conquest_never_enforces_geofence_or_offense_fallback(
     for offset in (0, 10, 20):
         player["world_position"] = (
             {"x": 90_000 + offset, "y": 90_000 + offset, "z": 100}
-            if position_available else None
+            if position_available
+            else None
         )
         player["offense"] += 100  # Would trigger the Warfare fallback.
         result = mod.punitions_to_apply(team_view, "able", team, squad, snapshot)
@@ -926,12 +933,15 @@ def test_position_detection_filters_random_initial_hq_sample(team_view):
     )
 
     player["world_position"] = {"x": 50_001, "y": 0, "z": 1}
+    # A centimetre of coordinate jitter is not proof of spawning.
+    assert not mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
+    player["world_position"]["x"] = 50_100
     punitions = mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
 
     assert [expected_warned_players[0]] == punitions.warning
 
 
-def test_position_detection_checks_first_spawn_after_zero_sample(team_view):
+def test_position_detection_waits_for_movement_after_zero_sample(team_view):
     squad = team_view["allies"]["squads"]["able"]
     squad["players"] = [squad["players"][0]]
     player = squad["players"][0]
@@ -943,6 +953,8 @@ def test_position_detection_checks_first_spawn_after_zero_sample(team_view):
     )
 
     player["world_position"] = {"x": 20_160, "y": 0, "z": 1}
+    assert not mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
+    player["world_position"]["x"] += 100
     punitions = mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
 
     assert [expected_warned_players[0]] == punitions.warning
@@ -982,6 +994,7 @@ def test_reconnect_rearms_spawn_guard_and_still_enforces_boundary(
     assert not sample(94_000)
     assert not sample(-97_000)  # Actual spawn in own HQ.
     assert not sample(-50_000)
+    assert not sample(0)  # Continuous travel, not an 800-metre teleport.
     result = sample(30_000)
     assert [p.player_id for p in result.warning] == [player["player_id"]]
     assert not result.punish and not result.kick
@@ -1062,6 +1075,262 @@ def test_reconnect_without_position_does_not_use_old_offense_points(team_view):
     )
     assert mod._position_cap_violation(watch, player, "allies", game_state) is False
     assert player["name"] not in watch.offensive_points
+
+
+@fixture
+def position_clock(monkeypatch):
+    clock = [1_800_000_000.0]
+    monkeypatch.setattr("rcon.automods.seeding_rules.position_time", lambda: clock[0])
+    return clock
+
+
+@pytest.mark.parametrize("reconnect_signal", ["profile", "hook", "both"])
+@pytest.mark.parametrize("death_counter_available", [False, True])
+def test_hll1_stale_then_stationary_hq_reconnect_never_escalates(
+    team_view, position_clock, reconnect_signal, death_counter_available
+):
+    """Replay HLL1's 2026-10-15 coordinates without sending any game actions."""
+    player = team_view["allies"]["squads"]["able"]["players"][0]
+    player.update(level=1, role="engineer", profile={"sessions_count": 10, "flags": []})
+    squad = {"players": [player]}
+    mod = position_cap_fight_mod(team_view)
+    mod.config.immune_player_level = 0  # Real level-one players are not exempt.
+    mod.config.number_of_warnings = 0
+    mod.config.kick_after_max_punish = True
+    mod.config.announcement_enabled = False
+    snapshot = {**game_state, "current_map": {"map": {"id": "stmereeglise"}}}
+    old = (17755.701171875, -27960.73046875, -667.7359619140625)
+    bogus_hq = (-93907.3125, -204.1451873779297, -1518.60595703125)
+    actual_spawn = (-2191.998046875, -39918.1015625, 61.180328369140625)
+
+    def sample(position, deaths):
+        position_clock[0] += 5
+        player["world_position"] = dict(zip(("x", "y", "z"), position))
+        player["offense"] += 10  # A stale counter must not bypass the guard.
+        if death_counter_available:
+            player["deaths"] = deaths
+        else:
+            player.pop("deaths", None)
+        return mod.punitions_to_apply(team_view, "able", "allies", squad, snapshot)
+
+    assert not sample(old, 4)
+    if reconnect_signal in ("profile", "both"):
+        player["profile"]["sessions_count"] += 1
+    if reconnect_signal in ("hook", "both"):
+        assert not mod.on_connected(player["name"], player["player_id"])
+    # The new connection initially retains the OLD position and role.
+    assert not sample(old, 4)
+    assert not sample(old, 4)
+    player["role"] = "rifleman"
+    for _ in range(16):
+        assert not sample(bogus_hq, 0)
+    assert not sample(actual_spawn, 1)
+    for _ in range(7):
+        assert not sample((0, 0, 0), 1)
+    assert not sample(actual_spawn, 1)
+    assert not sample((-2489.276611328125, -40111.078125, 88.00717163085938), 1)
+    watch = state["alliesable"]
+    assert not watch.warned and not watch.punished
+    assert player["player_id"] not in watch.combat_area_outside_player_ids
+    # Subsequent real movement across the boundary still enforces the rule.
+    result = sample((-20_000, -40_111, 88), 1)
+    assert [p.player_id for p in result.punish] == [player["player_id"]]
+    assert not result.kick
+
+
+@pytest.mark.parametrize(
+    "reset", ["jump", "gap", "clock_backwards", "death", "zero", "missing", "invalid"]
+)
+def test_position_discontinuity_clears_escalation_and_requires_new_movement(
+    team_view, position_clock, reset
+):
+    mod = position_cap_fight_mod(team_view)
+    player = team_view["allies"]["commander"]
+    watch = WatchStatus()
+
+    def sample(x):
+        player["world_position"] = {"x": x, "y": 0, "z": 1}
+        return mod._position_cap_violation(watch, player, "allies", game_state)
+
+    assert sample(25_000) is False
+    assert sample(25_100) is True
+    pid, name = player["player_id"], player["name"]
+    watch.combat_area_outside_player_ids = {pid, "other"}
+    for entries in (watch.noted, watch.warned, watch.punished):
+        entries.update({name: [datetime.now()], "other": [datetime.now()]})
+    watch.offensive_points = {name: 500, "other": 500}
+    if reset == "jump":
+        player["world_position"]["x"] = 94_000
+    elif reset == "gap":
+        position_clock[0] += 31
+    elif reset == "clock_backwards":
+        position_clock[0] -= 1
+    elif reset == "death":
+        player["deaths"] += 1
+    elif reset == "zero":
+        player["world_position"] = {"x": 0, "y": 0, "z": 0}
+    elif reset == "missing":
+        player["world_position"] = None
+    else:
+        player["world_position"]["x"] = float("nan")
+    assert mod._position_cap_violation(watch, player, "allies", game_state) is False
+    for entries in (watch.noted, watch.warned, watch.punished, watch.offensive_points):
+        assert name not in entries and "other" in entries
+    assert watch.combat_area_outside_player_ids == {"other"}
+    # A new outside baseline remains protected even after a long stationary wait.
+    assert sample(94_000) is False
+    for _ in range(20):
+        position_clock[0] += 5
+        assert sample(94_000) is False
+    assert sample(94_100) is True
+    assert sample(94_100) is True  # Stationary AFTER proof is still enforced.
+
+
+@pytest.mark.parametrize("missing_samples", [1, 5])
+def test_reconnect_missing_positions_cannot_reenable_offense_fallback(
+    team_view, missing_samples
+):
+    player = team_view["allies"]["commander"]
+    mod = position_cap_fight_mod(team_view)
+    squad = {"players": [player]}
+    player["profile"] = {"sessions_count": 1, "flags": []}
+    player["world_position"] = {"x": 0, "y": 0, "z": 1}
+    mod.punitions_to_apply(team_view, "Commander", "allies", squad, game_state)
+    player["profile"]["sessions_count"] += 1
+    player["world_position"] = None
+    for _ in range(missing_samples):
+        player["offense"] += 100
+        assert not mod.punitions_to_apply(
+            team_view, "Commander", "allies", squad, game_state
+        )
+
+
+def test_positionless_server_keeps_offense_fallback_after_reconnect(team_view):
+    mod = position_cap_fight_mod(team_view)
+    player = team_view["allies"]["commander"]
+    player["profile"] = {"sessions_count": 1, "flags": []}
+    squad = {"players": [player]}
+    assert not mod.punitions_to_apply(
+        team_view, "Commander", "allies", squad, game_state
+    )
+    player["profile"]["sessions_count"] += 1
+    player["offense"] += 100
+    # The reconnect counter change is not evidence of entering a sector.
+    assert not mod.punitions_to_apply(
+        team_view, "Commander", "allies", squad, game_state
+    )
+    player["offense"] += 1
+    result = mod.punitions_to_apply(team_view, "Commander", "allies", squad, game_state)
+    assert [p.player_id for p in result.warning] == [player["player_id"]]
+
+
+def test_delayed_initial_teleport_is_not_spawn_proof(team_view, position_clock):
+    mod = position_cap_fight_mod(team_view)
+    player = team_view["allies"]["commander"]
+    watch = WatchStatus()
+    player["world_position"] = {"x": 0, "y": 0, "z": 1}
+    assert mod._position_cap_violation(watch, player, "allies", game_state) is False
+    # A slow polling cycle must not make a stale -> HQ teleport valid proof.
+    position_clock[0] += 20
+    player["world_position"]["x"] = 94_000
+    assert mod._position_cap_violation(watch, player, "allies", game_state) is False
+    assert mod._position_cap_violation(watch, player, "allies", game_state) is False
+
+
+@pytest.mark.parametrize(
+    "current_map", [None, {}, {"map": {}}, {"map": {"id": "unknown-map"}}]
+)
+def test_unknown_map_does_not_bypass_pending_spawn_proof(team_view, current_map):
+    mod = position_cap_fight_mod(team_view)
+    player = team_view["allies"]["commander"]
+    snapshot = {**game_state, "current_map": current_map}
+    player["world_position"] = {"x": 94_000, "y": 0, "z": 100}
+    for _ in range(5):
+        player["offense"] += 10
+        assert not mod.punitions_to_apply(
+            team_view, "Commander", "allies", {"players": [player]}, snapshot
+        )
+    player["world_position"]["x"] += 100
+    player["offense"] += 10
+    result = mod.punitions_to_apply(
+        team_view, "Commander", "allies", {"players": [player]}, snapshot
+    )
+    assert [p.player_id for p in result.warning] == [player["player_id"]]
+
+
+@pytest.mark.parametrize("map_id,sign", [("carentan", 1), ("WDEV_A", -1)])
+def test_vehicle_movement_and_delayed_poll_keep_confirmed_spawn_proof(
+    team_view, position_clock, map_id, sign
+):
+    mod = position_cap_fight_mod(team_view)
+    player = team_view["allies"]["commander"]
+    watch = WatchStatus()
+    snapshot = {**game_state, "current_map": {"map": {"id": map_id}}}
+    for x, seconds, expected in [
+        (-50_000, 0, False),
+        (-10_000, 5, False),
+        (25_000, 5, True),
+        (90_000, 20, True),
+    ]:
+        position_clock[0] += seconds
+        player["world_position"] = {"x": x * sign, "y": 0, "z": 100}
+        assert (
+            mod._position_cap_violation(watch, player, "allies", snapshot) is expected
+        )
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+def test_position_observation_pickle_roundtrip_and_legacy_rearm(team_view, legacy):
+    mod = position_cap_fight_mod(team_view)
+    player = team_view["allies"]["commander"]
+    watch = WatchStatus()
+    player["world_position"] = {"x": 25_000, "y": 0, "z": 1}
+    assert mod._position_cap_violation(watch, player, "allies", game_state) is False
+    player["world_position"]["x"] += 100
+    assert mod._position_cap_violation(watch, player, "allies", game_state) is True
+    if legacy:
+        del watch.position_observations
+    restored = pickle.loads(pickle.dumps(watch))
+    assert mod._position_cap_violation(restored, player, "allies", game_state) is (
+        not legacy
+    )
+    player["world_position"]["x"] += 100
+    assert mod._position_cap_violation(restored, player, "allies", game_state) is True
+
+
+def test_map_change_requires_new_spawn_proof(team_view):
+    mod = position_cap_fight_mod(team_view)
+    player = team_view["allies"]["commander"]
+    watch = WatchStatus()
+    player["world_position"] = {"x": 25_000, "y": 0, "z": 1}
+    assert mod._position_cap_violation(watch, player, "allies", game_state) is False
+    player["world_position"]["x"] += 100
+    assert mod._position_cap_violation(watch, player, "allies", game_state) is True
+    snapshot = {**game_state, "current_map": {"map": {"id": "stmereeglise"}}}
+    player["world_position"]["x"] = -94_000
+    assert mod._position_cap_violation(watch, player, "allies", snapshot) is False
+    assert mod._position_cap_violation(watch, player, "allies", snapshot) is False
+
+
+@pytest.mark.parametrize("position_lost", [False, True])
+def test_pending_spawn_guard_does_not_repeatedly_reset_role_warnings(
+    team_view, position_lost
+):
+    player = team_view["allies"]["squads"]["able"]["players"][0]
+    squad = {"players": [player]}
+    mod = position_cap_fight_mod(team_view)
+    mod.config.disallowed_roles = DisallowedRoles(
+        roles={Roles.tank_commander: "Tanks"}, max_players=100
+    )
+    mod.config.warning_interval_seconds = 0
+    player["world_position"] = {"x": 0, "y": 0, "z": 0}
+    first = mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
+    assert [p.player_id for p in first.warning] == [player["player_id"]]
+    if position_lost:
+        player["world_position"] = None
+    second = mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
+    assert not second.warning
+    assert [p.player_id for p in second.punish] == [player["player_id"]]
 
 
 def position_cap_fight_skip_warning_mod(team_view, *, punishments=2):

@@ -9,6 +9,8 @@ import logging
 import pickle
 from contextlib import contextmanager
 from datetime import datetime, timedelta
+from math import dist
+from time import time as position_time
 from typing import Literal
 from uuid import uuid4
 
@@ -41,6 +43,14 @@ from rcon.user_config.auto_mod_seeding import AutoModSeedingUserConfig
 SEEDING_RULES_RESET_SECS = 120
 AUTOMOD_USERNAME = "AutoMod_SeedingRules"
 SEEDING_RULE_NAMES = ["disallowed_roles", "disallowed_weapons", "enforce_cap_fight"]
+
+# Positions are centimetres. These are conservative continuity checks, not
+# player speed enforcement: allow vehicles and the normal five-second poll.
+POSITION_POLL_SECONDS = 5
+POSITION_MAX_SPEED_CM_PER_SECOND = 10_000
+POSITION_MAX_SAMPLE_GAP_SECONDS = 30
+SPAWN_PROOF_MAX_DISTANCE_CM = 50_000
+SPAWN_PROOF_MIN_DISTANCE_CM = 100
 
 
 def connection_key(player_id: str) -> str:
@@ -348,7 +358,12 @@ class SeedingRulesAutomod:
             previous is not None or player_id in initial_positions
         )
         if changed:
-            initial_positions.pop(player_id, None)
+            # Keep a pending marker even if this reconnect has no coordinates.
+            # Subsequent missing samples must not enable the offense fallback.
+            if player_id in initial_positions:
+                initial_positions[player_id] = (0.0, 0.0, 0.0)
+            watch_status.initial_world_positions = initial_positions
+            getattr(watch_status, "position_observations", {}).pop(player_id, None)
             getattr(watch_status, "combat_area_outside_player_ids", set()).discard(
                 player_id
             )
@@ -370,28 +385,38 @@ class SeedingRulesAutomod:
     ) -> bool | None:
         """Return a position-based decision while filtering bogus join samples.
 
-        The game may initially report a random HQ for a newly connected player.
-        Mirroring hll-geofences, a first non-zero sample is therefore ignored
-        until the player moves. Players first observed as unspawned can be
-        evaluated immediately after they spawn.
+        Cached coordinates can survive a reconnect before a stationary bogus
+        HQ appears. Neither a teleport nor the first non-zero sample after a
+        spawn screen proves movement. Require nearby movement, and re-arm on
+        respawn, discontinuity or a gap in positional observations.
         """
         connection_changed = self._refresh_position_context(watch_status, player)
         position = normalize_world_position(player.get("world_position"))
         if position is None:
-            # Do not use stale offense counters on the reconnect sample either.
+            if player["player_id"] in getattr(
+                watch_status, "initial_world_positions", {}
+            ):
+                self._reset_position_proof(watch_status, player)
+                getattr(watch_status, "position_observations", {}).pop(
+                    player["player_id"], None
+                )
+                return False
+            # Preserve the fallback for servers which supply no positions.
+            # On reconnect, first establish a fresh offense-counter baseline.
             return False if connection_changed else None
 
         current_map = game_state.get("current_map")
         map_data = current_map.get("map") if isinstance(current_map, dict) else None
-        if not isinstance(map_data, dict) or not map_data.get("id"):
-            # A known spawn-screen position is not a fallback candidate, even
-            # while map metadata is unavailable (e.g. during a round change).
-            return None if is_spawned(position) else False
-        map_id = str(map_data["id"])
+        map_id = (
+            str(map_data["id"])
+            if isinstance(map_data, dict) and map_data.get("id")
+            else None
+        )
 
         tracked_map_id = getattr(watch_status, "world_position_map_id", None)
         if tracked_map_id != map_id:
             watch_status.initial_world_positions = {}
+            watch_status.position_observations = {}
             watch_status.combat_area_outside_player_ids = set()
             watch_status.world_position_map_id = map_id
 
@@ -402,27 +427,83 @@ class SeedingRulesAutomod:
             initial_positions = {}
             watch_status.initial_world_positions = initial_positions
 
+        observations = getattr(watch_status, "position_observations", None)
+        if observations is None:
+            # Old Redis pickles have no continuity evidence: re-arm once.
+            observations = {}
+            watch_status.position_observations = observations
         player_id = player["player_id"]
-        if not is_spawned(position):
-            initial_positions[player_id] = None
+        previous = observations.get(player_id)
+        deaths = player.get("deaths")
+        if type(deaths) is not int or deaths < 0:
+            deaths = None
+        now = position_time()
+        observations[player_id] = (position, now, deaths)
+        if not is_spawned(position) or previous is None or not is_spawned(previous[0]):
+            self._reset_position_proof(watch_status, player, position)
             return False
 
-        if player_id not in initial_positions:
-            initial_positions[player_id] = position
+        previous_position, observed_at, previous_deaths = previous
+        elapsed = now - observed_at
+        distance = dist(previous_position, position)
+        if (
+            elapsed < 0
+            or elapsed > POSITION_MAX_SAMPLE_GAP_SECONDS
+            or distance
+            > POSITION_MAX_SPEED_CM_PER_SECOND * max(elapsed, POSITION_POLL_SECONDS)
+            or (
+                deaths is not None
+                and previous_deaths is not None
+                and deaths != previous_deaths
+            )
+        ):
+            self.logger.debug(
+                "Re-armed seeding spawn protection for %s: discontinuous position data",
+                player_id,
+            )
+            self._reset_position_proof(watch_status, player, position)
             return False
 
-        initial_position = initial_positions[player_id]
+        initial_position = initial_positions.get(player_id, position)
         if initial_position is not None:
-            if position == initial_position:
+            distance_from_anchor = dist(initial_position, position)
+            if distance_from_anchor > SPAWN_PROOF_MAX_DISTANCE_CM:
+                self._reset_position_proof(watch_status, player, position)
+                return False
+            if distance_from_anchor < SPAWN_PROOF_MIN_DISTANCE_CM:
                 return False
             initial_positions[player_id] = None
 
+        if map_id is None:
+            # Unknown geometry can use offense points, but only after the same
+            # spawn checks. A pending HQ placeholder is not a fallback signal.
+            return None
         return is_outside_combat_area(
             position,
             map_id=map_id,
             team=team,
             max_caps=self.config.enforce_cap_fight.max_caps,
         )
+
+    def _reset_position_proof(
+        self,
+        watch_status: WatchStatus,
+        player: dict,
+        position: tuple[float, float, float] = (0.0, 0.0, 0.0),
+    ) -> None:
+        """Untrusted spawn data cannot carry an old escalation into a new life."""
+        player_id = player["player_id"]
+        outside_ids = getattr(watch_status, "combat_area_outside_player_ids", set())
+        had_proof = (
+            watch_status.initial_world_positions.get(player_id, position) is None
+        )
+        was_outside = player_id in outside_ids
+        watch_status.initial_world_positions[player_id] = position
+        outside_ids.discard(player_id)
+        name = player.get("name", player["player_id"])
+        if had_proof or was_outside:
+            self._clear_player_progress(watch_status, name)
+        watch_status.offensive_points.pop(name, None)
 
     @staticmethod
     def _clear_player_progress(watch_status: WatchStatus, player_name: str) -> None:

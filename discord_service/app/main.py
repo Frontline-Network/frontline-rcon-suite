@@ -3,6 +3,7 @@ import hashlib
 
 import copy
 import ipaddress
+import logging
 import re
 import secrets
 import socket
@@ -26,6 +27,7 @@ from sqlalchemy.orm import Session
 from .ai import CodexAnalyzer, ManagedAnalyzer, PlayerNameBatchInput
 from .codex_runtime import (
     CodexRuntimeError,
+    CodexRuntimeBusy,
 )
 from .codex_runtime import account_status as codex_account_status
 from .codex_runtime import logout as codex_logout
@@ -52,6 +54,8 @@ from .models import (
     TechnicalUsageMetric,
 )
 from .security import decrypt, derive_capability, digest, encrypt, matches
+from .report_reason import analyze_report_reason, PROMPT_VERSION as REPORT_REASON_VERSION
+from .report_reason_contract import ReportReasonRequest
 
 Base.metadata.create_all(engine)
 app = FastAPI(title="Frontline CRCON Discord Service", version="1.0.0")
@@ -466,6 +470,7 @@ def _action_modal(
     action: str,
     *,
     initial_text: str = "",
+    duration_hours: int = 2,
 ) -> dict:
     text_key = "message" if action in {"message", "message_reporter"} else "reason"
     inputs = [
@@ -496,7 +501,7 @@ def _action_modal(
                         "label": "Dauer in Stunden (1-720)",
                         "style": 1,
                         "required": True,
-                        "value": "2",
+                        "value": str(duration_hours),
                         "max_length": 3,
                     }
                 ],
@@ -1049,17 +1054,21 @@ def receive_event(
         )
         # Ballots only edit the central case. A terminal failure/dry run needs a
         # new admin alert (editing a Discord card does not notify subscribers).
-        if envelope.event_type in {
+        report_admin_attention = (
+            envelope.event_type in {"report_admin_manual", "report_admin_unknown", "report_admin_dry_run"}
+        )
+        if (report_admin_attention or envelope.event_type in {
             "leadership_vote_cancelled", "leadership_vote_rejected",
             "leadership_vote_unknown", "leadership_vote_dry_run",
-        } and envelope.incident.get("status") not in {"resolved", "dismissed"}:
+        }) and envelope.incident.get("status") not in {"resolved", "dismissed"}:
             roles = [str(r) for r in envelope.incident.get("admin_notification_role_ids", [])
                      if str(r).isdigit()][:100]
             nonce = hashlib.sha256(idempotency_key.encode()).hexdigest()[:24]
             DiscordClient().upsert(integration.channel_id, {
                 "content": (" ".join(f"<@&{role}>" for role in roles)
-                    + " Führungsabstimmung beendet: Admin-Bearbeitung erforderlich. / "
-                      "Leadership vote ended: admin review required."),
+                    + (" Report-Admin: Manuelle Prüfung erforderlich. / Report admin: manual review required."
+                       if report_admin_attention else
+                       " Führungsabstimmung beendet: Admin-Bearbeitung erforderlich. / Leadership vote ended: admin review required.")),
                 "message_reference": {"message_id": message_id, "fail_if_not_exists": False},
                 "allowed_mentions": {"parse": [], "roles": roles, "replied_user": False},
                 "nonce": nonce, "enforce_nonce": True,
@@ -1072,6 +1081,7 @@ def receive_event(
             status_code=503, detail="Discord delivery unavailable"
         ) from exc
     now = datetime.now(tz=timezone.utc)
+    cheat_review = (envelope.incident.get("report_admin") or {}).get("rule") == "cheating"
     if mapping is None:
         mapping = IncidentMessage(
             installation_id=envelope.installation_id,
@@ -1082,7 +1092,7 @@ def receive_event(
             analysis_id=str(envelope.incident.get("analysis_id") or "") or None,
             suggested_action=(analysis.suggested_action.value if analysis else None),
             suggested_duration_hours=(
-                analysis.suggested_duration_hours if analysis else None
+                24 if cheat_review else analysis.suggested_duration_hours if analysis else None
             ),
             primary_subject_id=(
                 None
@@ -1103,6 +1113,8 @@ def receive_event(
         if analysis:
             mapping.suggested_action = analysis.suggested_action.value
             mapping.suggested_duration_hours = analysis.suggested_duration_hours
+        if cheat_review:
+            mapping.suggested_duration_hours = 24
         if is_multi_squad_report:
             if mapping.primary_subject_id not in squad_subject_ids:
                 mapping.primary_subject_id = None
@@ -1180,6 +1192,88 @@ def ai_provider_logout(
     except CodexRuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return {"connected": False, "state": "disconnected"}
+
+
+@app.post("/v1/report-reason")
+def report_reason_analysis(
+    job: ReportReasonRequest,
+    authorization: str | None = Header(default=None),
+    session: Session = Depends(session_dependency),
+):
+    _integration_for_capability(session, job.installation_id, authorization)
+    _check_rate_limit(f"report-reason:{job.installation_id}")
+    # At most one model invocation per installation/server/incident, including
+    # concurrent requests, timeouts and failures. Never persist the API key.
+    receipt_key = (
+        f"report-reason:{job.installation_id}:{job.server_number}:{job.incident_id}"
+    )
+    session.add(
+        EventReceipt(
+            idempotency_key=receipt_key,
+            installation_id=job.installation_id,
+            event_id=0,
+            event_type="report_reason",
+        )
+    )
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(status_code=409, detail="Report reason already attempted")
+    try:
+        decision, incoming, outgoing = analyze_report_reason(job)
+    except CodexRuntimeBusy:
+        # This typed error can only originate before acquiring the account
+        # runtime, before credentials or inference are touched. No model call
+        # happened. Release only this admission receipt, not failed attempts.
+        session.execute(
+            delete(EventReceipt).where(EventReceipt.idempotency_key == receipt_key)
+        )
+        session.commit()
+        raise HTTPException(
+            status_code=429,
+            detail="report_reason_not_started_busy",
+            headers={"Retry-After": "2"},
+        )
+    except Exception as exc:
+        # Keep provider diagnosis useful without logging reports, credentials,
+        # raw model responses or upstream error bodies.
+        logging.getLogger(__name__).warning(
+            "Report reason analysis unavailable: %s %s",
+            type(exc).__name__,
+            str(exc)
+            if isinstance(exc, CodexRuntimeError)
+            and re.fullmatch(r"codex_[a-z0-9_:/-]{1,100}", str(exc))
+            else "",
+        )
+        session.add(
+            TechnicalUsageMetric(
+                installation_id=job.installation_id,
+                kind="report_reason",
+                model=job.ai_model,
+                success=False,
+            )
+        )
+        session.commit()
+        raise HTTPException(
+            status_code=503, detail="Report reason analysis unavailable"
+        )
+    session.add(
+        TechnicalUsageMetric(
+            installation_id=job.installation_id,
+            kind="report_reason",
+            model=job.ai_model,
+            input_tokens=incoming,
+            output_tokens=outgoing,
+            success=True,
+        )
+    )
+    session.commit()
+    return {
+        "decision": decision.model_dump(),
+        "model": job.ai_model,
+        "prompt_version": REPORT_REASON_VERSION,
+    }
 
 
 @app.post("/v1/analysis-jobs", status_code=status.HTTP_202_ACCEPTED)
@@ -1814,8 +1908,11 @@ async def discord_interaction(
                 message = "CRCON hat die Übernahme nicht bestätigt."
             return {"type": 4, "data": {"content": message, "flags": 64}}
     if operation == "action" and payload.get("type") != 5:
+        # Prefill only; the admin must enter a reason and submit the action.
+        # No model/report-assessment result ever executes a cheat ban.
+        duration_hours = 24 if mapping and mapping.suggested_duration_hours == 24 else 2
         if selected_template_id == "custom":
-            return _action_modal(incident_id, revision, recommended_action)
+            return _action_modal(incident_id, revision, recommended_action, duration_hours=duration_hours)
         crcon_action = (
             "message"
             if recommended_action == "message_reporter"
@@ -1859,13 +1956,14 @@ async def discord_interaction(
                 revision,
                 recommended_action,
                 initial_text=str(selected_template.get("content") or ""),
+                duration_hours=duration_hours,
             )
         templates = template_result.get("templates") or []
         if templates:
             return _template_picker(
                 incident_id, revision, recommended_action, templates
             )
-        return _action_modal(incident_id, revision, recommended_action)
+        return _action_modal(incident_id, revision, recommended_action, duration_hours=duration_hours)
     if operation == "logs":
         try:
             claimed = _claim_from_first_button(

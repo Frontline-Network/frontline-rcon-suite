@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import hashlib
+import math
 from datetime import datetime
 
 import httpx
 
 from .config import Settings, get_settings
 from .contracts import IncidentEventEnvelope, ModerationAnalysis
+from .report_admin_display import case_fields
 
 SQUAD_LEADER_ROLES = {
     "officer",
@@ -36,6 +38,114 @@ def _metric(label: str, value: object) -> str | None:
 
 def _field_block(*values: str | None) -> str:
     return "\n".join(value for value in values if value) or "-"
+
+
+def _player_stat_fields(snapshot: dict, language: str, *, leader=False) -> list[dict]:
+    """Same player statistics for player and squad reports, never squad totals.
+
+    Missing telemetry is not zero. Bulk rosters do not supply round playtime
+    (the adapter uses zero), so no KPM can be inferred from that placeholder.
+    """
+    def number(key):
+        value = snapshot.get(key)
+        return (
+            value
+            if type(value) in (int, float) and math.isfinite(value) and value >= 0
+            else None
+        )
+
+    def metric(label, value):
+        return _metric(label, value if value is not None else "–")
+
+    german = language == "de"
+    kills, deaths = number("kills"), number("deaths")
+    seconds = number("map_playtime_seconds")
+    elapsed = seconds is not None and seconds > 0
+    kd = (
+        f"{kills / max(deaths, 1):.2f}"
+        if kills is not None and deaths is not None
+        else None
+    )
+    kpm = f"{kills / (seconds / 60):.2f}" if kills is not None and elapsed else None
+    teamkills = number("teamkills")
+    if teamkills is None:
+        teamkills = number("team_kills")
+    suffix = " · SL" if leader else ""
+    return [
+        {
+            "name": ("⚔️ Kampf" if german else "⚔️ Combat") + suffix,
+            "value": _field_block(
+                metric("Kills", kills),
+                metric("Tode" if german else "Deaths", deaths),
+                metric("K/D", kd),
+                metric("Kampfpunkte" if german else "Combat score", number("combat")),
+            ),
+            "inline": True,
+        },
+        {
+            "name": ("⚡ Leistung" if german else "⚡ Performance") + suffix,
+            "value": _field_block(
+                metric("KPM", kpm),
+                metric("Killserie" if german else "Kill streak", number("kills_streak")),
+                metric(
+                    "Runden-Spielzeit" if german else "Round playtime",
+                    f"{seconds / 60:.1f} min" if elapsed else None,
+                ),
+            ),
+            "inline": True,
+        },
+        {
+            "name": "⚠️ Teamkills" + suffix,
+            "value": _field_block(
+                metric("Anzahl" if german else "Count", teamkills),
+                metric("Serie" if german else "Streak", number("teamkills_streak")),
+            ),
+            "inline": True,
+        },
+    ]
+
+
+def _bounded_report_embeds(embeds: list[dict], language: str) -> list[dict]:
+    """Discord's text limit is shared by ALL embeds, not per squad/field."""
+    def size(embed):
+        return (
+            len(embed.get("title", ""))
+            + len(embed.get("description", ""))
+            + len(embed.get("footer", {}).get("text", ""))
+            + sum(len(f["name"]) + len(f["value"]) for f in embed.get("fields", []))
+        )
+
+    if sum(size(embed) for embed in embeds) <= 5900:
+        return embeds
+    # Keep the actionable primary case first. The selector and full server-side
+    # evidence remain available even if a large multi-squad report is shortened.
+    note = (
+        "Details gekürzt; vollständigen Report in CRCON öffnen."
+        if language == "de"
+        else "Details shortened; open the full report in CRCON."
+    )
+    remaining, result = 5900 - len(note) - 3, []
+    for original in embeds:
+        embed = {
+            **original,
+            "description": _truncate(original.get("description"), 1200),
+            "footer": {"text": _truncate(original.get("footer", {}).get("text"), 512)},
+            "fields": [],
+        }
+        header = size(embed)
+        if header > remaining:
+            break
+        remaining -= header
+        for field in original.get("fields", []):
+            available = min(1024, remaining - len(field["name"]))
+            if available < 2:
+                break
+            bounded = {**field, "value": _truncate(field["value"], available)}
+            embed["fields"].append(bounded)
+            remaining -= len(bounded["name"]) + len(bounded["value"])
+        result.append(embed)
+    result[0]["footer"]["text"] += " | " + note
+    return result
 
 
 def _reporter_context_field(incident: dict, language: str) -> dict:
@@ -424,43 +534,21 @@ def _additional_squad_embed(
     if player_id:
         identity += f"\n🆔 `{_truncate(player_id, 100)}`"
 
-    kills = leader.get("kills")
-    deaths = leader.get("deaths")
-    playtime_seconds = leader.get("map_playtime_seconds")
-    playtime_hours = (
-        float(playtime_seconds) / 3600
-        if isinstance(playtime_seconds, (int, float))
-        else None
-    )
     fields = [
         {
             "name": "📣 Grund der Meldung" if language == "de" else "📣 Report reason",
             "value": _truncate(incident.get("reason"), 1024),
             "inline": False,
         },
-        {
-            "name": "⚔️ Kills",
-            "value": f"**{kills if _present(kills) else '-'}**",
-            "inline": True,
-        },
-        {
-            "name": "💀 Deaths",
-            "value": f"**{deaths if _present(deaths) else '-'}**",
-            "inline": True,
-        },
-        {
-            "name": "⏱️ Gesamtspielzeit" if language == "de" else "⏱️ Total playtime",
-            "value": f"{playtime_hours:.1f} h" if playtime_hours is not None else "-",
-            "inline": True,
-        },
+        *_player_stat_fields(leader, language, leader=True),
     ]
     members = snapshot.get("players") or []
     if members:
         member_lines = []
         for member in members:
             entry = (
-                f"{member.get('name') or '-'} (Lvl {member.get('level') or 0})"
-                f" • {member.get('kills') or 0}/{member.get('deaths') or 0}"
+                f"{member.get('name') or '-'} (Lvl {member.get('level') if member.get('level') is not None else '–'})"
+                f" • {member.get('kills') if member.get('kills') is not None else '–'}/{member.get('deaths') if member.get('deaths') is not None else '–'}"
                 f" • {member.get('role') or '-'}"
             )
             if str(member.get("player_id") or "") == str(player_id or ""):
@@ -579,23 +667,6 @@ def render_message(
         or stat_snapshot.get("player_id")
         or incident.get("target_id")
     )
-    kills = stat_snapshot.get("kills")
-    deaths = stat_snapshot.get("deaths")
-    kd = None
-    if isinstance(kills, (int, float)) and isinstance(deaths, (int, float)):
-        kd = f"{kills / max(deaths, 1):.2f}"
-    playtime_seconds = stat_snapshot.get("map_playtime_seconds")
-    playtime_hours = (
-        float(playtime_seconds) / 3600
-        if isinstance(playtime_seconds, (int, float))
-        else None
-    )
-    kpm = (
-        float(kills) / max(float(playtime_seconds) / 60, 1)
-        if isinstance(kills, (int, float))
-        and isinstance(playtime_seconds, (int, float))
-        else None
-    )
     game_label = "HLL Vietnam" if envelope.game == "hll_vietnam" else "Hell Let Loose"
     team_emoji, color = _team_style(team, analysis.risk_score if analysis else None)
     if source == "ai_player_name":
@@ -632,40 +703,14 @@ def render_message(
         if targetless_report:
             fields.append(_reporter_context_field(incident, language))
         elif is_squad_report:
-            fields.extend(
-                [
-                    {
-                        "name": "⚔️ Kills",
-                        "value": f"**{kills if _present(kills) else '-'}**",
-                        "inline": True,
-                    },
-                    {
-                        "name": "💀 Deaths",
-                        "value": f"**{deaths if _present(deaths) else '-'}**",
-                        "inline": True,
-                    },
-                    {
-                        "name": (
-                            "⏱️ Gesamtspielzeit"
-                            if language == "de"
-                            else "⏱️ Total playtime"
-                        ),
-                        "value": (
-                            f"{playtime_hours:.1f} h"
-                            if playtime_hours is not None
-                            else "-"
-                        ),
-                        "inline": True,
-                    },
-                ]
-            )
+            fields.extend(_player_stat_fields(stat_snapshot, language, leader=True))
             members = snapshot.get("players") or []
             if members:
                 member_lines = []
                 for member in members:
                     entry = (
-                        f"{member.get('name') or '-'} (Lvl {member.get('level') or 0})"
-                        f" • {member.get('kills') or 0}/{member.get('deaths') or 0}"
+                        f"{member.get('name') or '-'} (Lvl {member.get('level') if member.get('level') is not None else '–'})"
+                        f" • {member.get('kills') if member.get('kills') is not None else '–'}/{member.get('deaths') if member.get('deaths') is not None else '–'}"
                         f" • {member.get('role') or '-'}"
                     )
                     if str(member.get("player_id") or "") == str(player_id or ""):
@@ -679,43 +724,7 @@ def render_message(
                     }
                 )
         else:
-            fields.extend(
-                [
-                    {
-                        "name": "⚔️ Combat",
-                        "value": _field_block(
-                            _metric("Kills", kills),
-                            _metric("Deaths", deaths),
-                            _metric("K/D", kd),
-                        ),
-                        "inline": True,
-                    },
-                    {
-                        "name": "⚡ Performance",
-                        "value": _field_block(
-                            _metric("KPM", f"{kpm:.2f}" if kpm is not None else None),
-                            _metric("Streak", stat_snapshot.get("kills_streak")),
-                            _metric(
-                                "Time",
-                                (
-                                    f"{playtime_hours:.1f} h"
-                                    if playtime_hours is not None
-                                    else None
-                                ),
-                            ),
-                        ),
-                        "inline": True,
-                    },
-                    {
-                        "name": "⚠️ Teamkills",
-                        "value": _field_block(
-                            _metric("Count", stat_snapshot.get("teamkills")),
-                            _metric("Streak", stat_snapshot.get("teamkills_streak")),
-                        ),
-                        "inline": True,
-                    },
-                ]
-            )
+            fields.extend(_player_stat_fields(stat_snapshot, language))
             recent_teamkill = stat_snapshot.get("recent_teamkill")
             if isinstance(recent_teamkill, dict):
                 victim = recent_teamkill.get("victim_name") or "-"
@@ -770,6 +779,59 @@ def render_message(
             {"name": "KI / AI", "value": labels["unavailable"], "inline": False}
         )
     action_log = _action_log_field(incident, language)
+    report_admin = incident.get("report_admin")
+    automatic_kick = (
+        isinstance(report_admin, dict)
+        and report_admin.get("status") == "kicked"
+        and report_admin.get("mode") == "active"
+        and status == "resolved"
+        and incident.get("assigned_to") == "system:report-admin"
+    )
+    if isinstance(report_admin, dict):
+        states = {
+            "classifying": "KI liest vollständigen Meldegrund / AI reading complete report",
+            "queued": "Prüfung ausstehend / Awaiting checks",
+            "waiting": "Stille Prüffrist läuft / Silent observation window",
+            "sending": "Kick wird ausgeführt / Kick in progress",
+            "kicked": "Kick bestätigt / Kick confirmed",
+            "dry_run": "Probelauf: kein Kick / Dry run: no kick",
+            "manual": "Admins übernehmen / Manual review required",
+            "unknown": "Ergebnis unklar, keine Wiederholung / Uncertain result, no retry",
+        }
+        evidence = (
+            f"{report_admin.get('teamkill_count', '–')} Teamkills · {report_admin.get('window_seconds', 0)} s Kontext / context"
+            if report_admin.get("rule") == "teamkills" else
+            "Cheatmeldung: Prüfung, keine automatische Sanktion / Cheat report: review only, no automatic sanction"
+            if report_admin.get("rule") == "cheating" else
+            "Kommunikation gemeldet; kein Sprachnachweis / Communication reported; no voice evidence"
+            if report_admin.get("rule") == "communication" else
+            "Meldegrund noch keiner freigegebenen Regel zugeordnet / Report not yet assigned to an approved rule"
+        )
+        admin_field = {
+            "name": "🤖 Report-Admin",
+            "value": _truncate(
+                f"{states.get(report_admin.get('status'), 'Manual review')}\n"
+                f"{report_admin.get('target_name') or '-'}\n{evidence}\n"
+                f"{report_admin.get('result') or ''}\n{report_admin.get('sent_reason') or ''}", 1024),
+            "inline": False,
+        }
+        if automatic_kick:
+            reason = report_admin.get("sent_reason") or report_admin.get("result") or "–"
+            kicked_name = report_admin.get("target_name") or target_name
+            admin_field.update(
+                name=("✅ Automatischer Eingriff – Report-Admin" if language == "de" else "✅ Automatic action – report admin"),
+                value=_truncate(
+                    (f"**Aktion:** Server-Kick bestätigt\n**Spieler:** {kicked_name}\n**Grund:** {reason}" if language == "de" else
+                     f"**Action:** Server kick confirmed\n**Player:** {kicked_name}\n**Reason:** {reason}")
+                    + "\n" + evidence, 1024),
+            )
+            fields.insert(0, admin_field)
+            color = 0x2ECC71
+        else:
+            fields.append(admin_field)
+        if report_admin.get("status") == "waiting" and isinstance(report_admin.get("ready_at"), (int, float)):
+            admin_field["value"] = _truncate(admin_field["value"] + f"\n<t:{int(report_admin['ready_at'])}:R>", 1024)
+        fields.extend(case_fields(report_admin, language))
     vote = incident.get("leadership_vote")
     if vote:
         deadline = f"<t:{int(vote['ends_at'])}:R>" if vote.get("ends_at") and vote.get("status") in {"confirming", "warning", "active", "inviting"} else "–"
@@ -1032,8 +1094,13 @@ def render_message(
         )
     else:
         title = labels["report_title"].format(name=target_name)
+    if automatic_kick:
+        title = ("Automatisch gekickt – " if language == "de" else "Automatically kicked – ") + str(report_admin.get("target_name") or target_name)
+        team_emoji = "🤖"
     footer_parts = []
-    if assigned_name:
+    if automatic_kick:
+        footer_parts.append("Automatisch bearbeitet durch Report-Admin" if language == "de" else "Automatically handled by report admin")
+    elif assigned_name:
         footer_parts.append(
             ("Bearbeitet von " if language == "de" else "Handled by ") + assigned_name
         )
@@ -1071,7 +1138,7 @@ def render_message(
                 )
             )
     return {
-        "embeds": embeds,
+        "embeds": _bounded_report_embeds(embeds, language),
         "components": components,
         "allowed_mentions": {"parse": []},
     }

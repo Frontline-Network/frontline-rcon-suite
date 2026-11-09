@@ -3,11 +3,25 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 import subprocess
 
 
 def docker(*args):
     return subprocess.check_output(["docker", *args], text=True).strip()
+
+
+def verify_tags(repository, version, manifest):
+    """An RC must match its own tag, never replace the stable latest image."""
+    prerelease = re.fullmatch(r"v\d+\.\d+\.\d+-rc\.\d+", version) is not None
+    published = json.loads(docker("buildx", "imagetools", "inspect", repository + ":" + version, "--raw"))
+    assert published == manifest, f"{repository}:{version} does not match built digest"
+    latest = json.loads(docker("buildx", "imagetools", "inspect", repository + ":latest", "--raw"))
+    if prerelease:
+        assert latest != manifest, "Release candidate unexpectedly replaced stable latest"
+    else:
+        assert latest == manifest, f"{repository}:latest does not match built digest"
+    return {"prerelease": prerelease, "latest_matches": latest == manifest}
 
 
 def main():
@@ -25,8 +39,7 @@ def main():
         repository = "ghcr.io/frontline-network/frontline-rcon-suite" + suffix
         reference = repository + "@" + digest
         manifest = json.loads(docker("buildx", "imagetools", "inspect", reference, "--raw"))
-        for tag in (args.version, "latest"):
-            assert json.loads(docker("buildx", "imagetools", "inspect", repository + ":" + tag, "--raw")) == manifest, f"{kind}:{tag} does not match built digest"
+        tag_checks = verify_tags(repository, args.version, manifest)
         platforms = {f'{item["platform"]["os"]}/{item["platform"]["architecture"]}': item["digest"]
                      for item in manifest["manifests"] if item["platform"]["os"] != "unknown"}
         assert set(platforms) == {"linux/amd64", "linux/arm64"}, platforms
@@ -56,7 +69,7 @@ def main():
                                 'sha256sum /var/www/updates/theme-collection.png', "verify", args.version)
                 assert result.split()[0] == expected_image_hash, result
                 checks[platform] = {"version": args.version, "image_sha256": expected_image_hash, "production_bundle": True}
-        evidence["images"][kind] = {"tag": repository + ":" + args.version, "digest": digest, "platforms": platforms, "checks": checks, "latest_matches": True}
+        evidence["images"][kind] = {"tag": repository + ":" + args.version, "digest": digest, "platforms": platforms, "checks": checks, **tag_checks}
     Path("release-image-evidence.json").write_text(json.dumps(evidence, indent=2) + "\n")
     print(json.dumps(evidence, indent=2))
 

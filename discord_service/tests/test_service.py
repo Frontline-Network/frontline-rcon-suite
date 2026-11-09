@@ -149,6 +149,107 @@ def test_unknown_capability_is_indistinguishable_from_unknown_installation():
     assert response.status_code == 404
 
 
+@pytest.mark.parametrize("state,alerts", [("waiting", 0), ("sending", 0), ("kicked", 0), ("manual", 1), ("unknown", 1), ("dry_run", 1)])
+def test_report_admin_updates_and_alerts(state, alerts):
+    capability = _seed()
+    data = _event()
+    data["event_type"] = "report_admin_" + state
+    data["incident"].update(admin_notification_role_ids=["456"],
+        status="resolved" if state == "kicked" else "new",
+        report_admin={"status": state, "rule": "teamkills", "target_name": "Example", "teamkill_count": 5})
+    with patch.object(DiscordClient, "upsert", return_value="123") as post:
+        response = TestClient(app).post("/v1/events", headers={"Authorization": f"Bearer {capability}", "Idempotency-Key": "report:test"}, json=data)
+        assert response.status_code == 202
+        assert post.call_count == 1 + alerts
+        assert "5 Teamkills" in str(post.call_args_list[0])
+        assert "5 min" not in str(post.call_args_list[0])
+
+
+@pytest.mark.parametrize("language", ["de", "en"])
+def test_report_admin_communication_is_allegation_not_voice_evidence(language):
+    event = _event()
+    event["incident"].update(discord_language=language, report_admin={"status": "kicked", "rule": "communication", "target_name": "Example"})
+    result = render_message(IncidentEventEnvelope.model_validate(event), None)
+    assert "no voice evidence" in str(result)
+
+
+@pytest.mark.parametrize("language", ["de", "en"])
+def test_case_details_have_safe_bounded_chat_and_no_automatic_cheat_claim(language):
+    event = _event()
+    event["incident"].update(discord_language=language, report_admin={"status": "manual", "rule": "cheating", "assessment": {
+        "kind": "cheat_review", "state": "suspicious", "priority": "high", "reasons": ["review only"],
+        "windows": [{"seconds": 300, "observed_seconds": 300, "kills": 24, "deaths": 1, "categories": {"armor": 24}}],
+        "timeline": [{"at": 2000000000, "type": "CHAT[Allies][Team]", "name": "<@123>", "body": "@everyone **kick all** " * 80, "log_id": 23}] * 40,
+    }})
+    result = render_message(IncidentEventEnvelope.model_validate(event), None)
+    embed = result["embeds"][0]
+    assert "24" in str(embed) and "armor: 24" in str(embed)
+    assert "@everyone" not in str(embed) and "<@123>" not in str(embed)
+    assert "Automatisch gekickt" not in str(result)
+    assert len(embed["fields"]) <= 25
+    assert all(len(f["value"]) <= 1024 for f in embed["fields"])
+    assert sum(len(f["name"]) + len(f["value"]) for f in embed["fields"]) + len(embed["title"]) + len(embed["description"]) + len(embed["footer"]["text"]) <= 6000
+    assert result["allowed_mentions"] == {"parse": []}
+
+
+def test_cheat_review_persists_manual_24_hour_prefill_not_an_action():
+    capability = _seed()
+    event = _event()
+    event["incident"]["report_admin"] = {"rule": "cheating", "status": "manual"}
+    with patch.object(DiscordClient, "upsert", return_value="123"):
+        response = TestClient(app).post("/v1/events", headers={"Authorization": f"Bearer {capability}", "Idempotency-Key": "cheat:review"}, json=event)
+    assert response.status_code == 202
+    with SessionLocal() as session:
+        mapping = session.query(IncidentMessage).one()
+        assert mapping.suggested_duration_hours == 24
+        assert mapping.suggested_action is None
+        assert session.query(PreparedActionRelay).count() == 0
+    from discord_service.app.main import _action_modal
+    modal = _action_modal("case", "1", "temp_ban", duration_hours=24)
+    assert modal["type"] == 9
+    assert modal["data"]["components"][1]["components"][0]["value"] == "24"
+
+
+@pytest.mark.parametrize("language", ["de", "en"])
+def test_confirmed_report_admin_kick_is_prominent_and_has_no_action_buttons(language):
+    event = _event()
+    event["incident"].update(
+        discord_language=language,
+        status="resolved",
+        assigned_to="system:report-admin",
+        report_admin={"status": "kicked", "mode": "active", "rule": "teamkills", "target_name": "Example", "teamkill_count": 5, "sent_reason": "5 TK / 5 min"},
+    )
+    result = render_message(IncidentEventEnvelope.model_validate(event), None)
+    embed = result["embeds"][0]
+    assert ("Automatisch gekickt" if language == "de" else "Automatically kicked") in embed["title"]
+    assert "Example" in embed["title"]
+    assert ("Automatischer Eingriff" if language == "de" else "Automatic action") in embed["fields"][0]["name"]
+    assert "5 TK / 5 min" in embed["fields"][0]["value"]
+    assert "Example" in embed["fields"][0]["value"]
+    assert embed["color"] == 0x2ECC71
+    assert ("Automatisch bearbeitet" if language == "de" else "Automatically handled") in embed["footer"]["text"]
+    assert not result["components"]
+    assert result["allowed_mentions"] == {"parse": []}
+
+
+@pytest.mark.parametrize("state", ["queued", "sending", "manual", "unknown", "dry_run"])
+def test_unconfirmed_automation_never_displays_automatic_kick_success(state):
+    event = _event()
+    event["incident"].update(status="new", report_admin={"status": state, "mode": "active", "rule": "communication"})
+    result = render_message(IncidentEventEnvelope.model_validate(event), None)
+    assert "Automatisch gekickt" not in str(result)
+    assert "Automatischer Eingriff" not in str(result)
+
+
+@pytest.mark.parametrize("overrides", [{"assigned_to": "human-admin"}, {"status": "claimed"}, {"report_admin": {"status": "kicked", "mode": "dry_run"}}])
+def test_manual_or_inconsistent_closure_not_labelled_automatic_kick(overrides):
+    event = _event()
+    event["incident"].update(status="resolved", assigned_to="system:report-admin", report_admin={"status": "kicked", "mode": "active"})
+    event["incident"].update(overrides)
+    result = render_message(IncidentEventEnvelope.model_validate(event), None)
+    assert "Automatisch gekickt" not in str(result)
+
+
 def test_out_of_order_revision_cannot_overwrite_newer_discord_state():
     capability = _seed()
     client = TestClient(app)
@@ -1032,7 +1133,7 @@ def test_incident_transitions_are_visible_in_the_embed_logbook(
     assert expected in logbook["value"]
 
 
-def test_squad_report_uses_old_unit_report_layout():
+def test_squad_report_shows_leader_combat_performance_and_teamkills():
     event = _event()
     event["incident"].update(
         {
@@ -1052,6 +1153,8 @@ def test_squad_report_uses_old_unit_report_layout():
                         "level": 120,
                         "kills": 8,
                         "deaths": 3,
+                        "teamkills": 0,
+                        "combat": 123,
                         "map_playtime_seconds": 3600,
                     },
                     "players": [
@@ -1076,11 +1179,50 @@ def test_squad_report_uses_old_unit_report_layout():
     assert "👤 **Officer** (Lvl 120)" in embed["description"]
     assert [field["name"] for field in embed["fields"][:4]] == [
         "📣 Grund der Meldung",
-        "⚔️ Kills",
-        "💀 Deaths",
-        "⏱️ Gesamtspielzeit",
+        "⚔️ Kampf · SL",
+        "⚡ Leistung · SL",
+        "⚠️ Teamkills · SL",
     ]
+    assert "**Kampfpunkte:** 123" in embed["fields"][1]["value"]
+    assert "**Runden-Spielzeit:** 60.0 min" in embed["fields"][2]["value"]
+    assert "**Anzahl:** 0" in embed["fields"][3]["value"]
     assert "HLL Unit Report" in embed["footer"]["text"]
+
+
+@pytest.mark.parametrize("seconds", [None, 0, -1, float("nan"), float("inf"), "600"])
+def test_discord_does_not_invent_kpm_from_missing_or_invalid_time(seconds):
+    from discord_service.app.discord_client import _player_stat_fields
+    fields = _player_stat_fields({"kills": 30, "deaths": 5,
+                                 "map_playtime_seconds": seconds}, "en")
+    assert "**KPM:** –" in fields[1]["value"]
+    assert "**Count:** –" in fields[2]["value"]
+    assert "**Combat score:** –" in fields[0]["value"]
+
+
+def test_discord_player_stats_keep_zero_and_raw_teamkill_alias():
+    from discord_service.app.discord_client import _player_stat_fields
+    fields = _player_stat_fields({"kills": 0, "deaths": 0, "combat": 0,
+                                 "map_playtime_seconds": 600, "team_kills": 0}, "en")
+    assert "**KPM:** 0.00" in fields[1]["value"]
+    assert "**Count:** 0" in fields[2]["value"]
+    assert "**Combat score:** 0" in fields[0]["value"]
+
+
+def test_statistics_and_case_details_respect_shared_discord_embed_limit():
+    from discord_service.app.discord_client import _bounded_report_embeds
+    embeds = [
+        {"title": f"Squad {n}", "description": "Name " * 700,
+         "footer": {"text": "Server " * 200},
+         "fields": [{"name": "Combat", "value": "x" * 1024, "inline": True} for _ in range(8)]}
+        for n in range(10)
+    ]
+    bounded = _bounded_report_embeds(embeds, "en")
+    assert bounded[0]["title"] == "Squad 0"
+    assert "Details shortened" in bounded[0]["footer"]["text"]
+    assert sum(len(e["title"]) + len(e["description"]) + len(e["footer"]["text"])
+               + sum(len(f["name"]) + len(f["value"]) for f in e["fields"])
+               for e in bounded) <= 6000
+    assert all(len(f["value"]) <= 1024 for e in bounded for f in e["fields"])
 
 
 def _multi_squad_event() -> dict:
@@ -1131,6 +1273,9 @@ def test_multi_squad_report_renders_one_embed_per_squad_and_target_selector():
     rendered = render_message(IncidentEventEnvelope.model_validate(event), None)
 
     assert len(rendered["embeds"]) == 3
+    for embed in rendered["embeds"]:
+        assert {"⚔️ Kampf · SL", "⚡ Leistung · SL", "⚠️ Teamkills · SL"}.issubset(
+            {f["name"] for f in embed["fields"]})
     assert ["Able" in embed["title"] for embed in rendered["embeds"]] == [
         True,
         False,
@@ -1240,7 +1385,7 @@ def test_player_report_displays_zero_live_teamkills():
         for field in payload["embeds"][0]["fields"]
         if "Teamkills" in field["name"]
     )
-    assert "**Count:** 0" in teamkills["value"]
+    assert "**Anzahl:** 0" in teamkills["value"]
 
 
 def test_offline_report_target_shows_evidence_and_only_safe_actions():

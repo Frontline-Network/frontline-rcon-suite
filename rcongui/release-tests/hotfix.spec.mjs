@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 const installed = process.env.RELEASE_VERSION;
-test.skip(!["v0.9.1", "v0.9.2"].includes(installed), "hotfix inheritance contract");
+test.skip(!["v0.9.1", "v0.9.2", "v0.9.3"].includes(installed), "stable release inheritance contract");
 const current = `/api/get_update_channel?frontend_version=${installed}`;
 
 test("hotfix preserves unseen feature highlights while keeping the installed changelog", async ({ page, context }) => {
@@ -18,6 +18,7 @@ test("hotfix preserves unseen feature highlights while keeping the installed cha
   expect(result.source).toBe("bundled");
   const release = result.releases.find((item) => item.current);
   expect(release.tag_name).toBe(installed);
+  expect(release.prerelease).toBe(false);
   expect(release.body).toContain(installed === "v0.9.1" ? "CSRF" : "SMTP");
   expect(release.body).toContain("Aurora");
   expect(release.body).toContain("## Deutsch");

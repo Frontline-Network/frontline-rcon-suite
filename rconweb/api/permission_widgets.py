@@ -6,6 +6,8 @@ from django.utils.translation import get_language
 
 from .permission_help import permission_help
 from .permission_presets import permission_presets
+from .permission_workflows import permission_workflows
+from .permission_wizard import wizard_metadata
 from .admin_theme import admin_appearance
 
 
@@ -14,7 +16,7 @@ class ExplainedPermissionSelect(forms.SelectMultiple):
 
     class Media:
         css = {"all": ("api/css/permission-picker.css",)}
-        js = ("api/js/permission-picker.js",)
+        js = ("api/js/permission-planner.js", "api/js/permission-wizard.js", "api/js/permission-picker.js",)
 
     def __init__(self, *args, permissions, **kwargs):
         self.permissions = permissions
@@ -30,7 +32,9 @@ class ExplainedPermissionSelect(forms.SelectMultiple):
             groups = [{"id": str(group.pk), "name": group.name, "permissions": [str(p.pk) for p in group.permissions.all()]}
                       for group in Group.objects.prefetch_related("permissions")]
         data = {"permissions": catalog, "groups": groups, "german": german, "direct": name == "user_permissions",
-                "presets": permission_presets(permission_objects, german) if name == "permissions" else []}
+                "presets": permission_presets(permission_objects, german) if name == "permissions" else [],
+                "workflows": permission_workflows(permission_objects, german)}
+        data['wizardSections'] = wizard_metadata(data['workflows'], german)
         return mark_safe(super().render(name, value, attrs, renderer) + json_script(data, attrs["id"] + "_help"))
 
 

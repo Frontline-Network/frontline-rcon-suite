@@ -20,7 +20,7 @@ from rcon.types import AllLogTypes, GameEnum, GameStateType, GetDetailedPlayers,
 from rcon.user_config.log_line_webhooks import LogLineWebhookUserConfig
 from rcon.user_config.rcon_server_settings import RconServerSettingsUserConfig
 from rcon.user_config.webhooks import DiscordMentionWebhook
-from rcon.utils import LogsHistory, MapsHistory
+from rcon.utils import LogsHistory, MapsHistory, layer_matches_match_log
 
 logger = logging.getLogger(__name__)
 
@@ -300,6 +300,25 @@ class LogLoop:
         curr_map_time_elapsed = self.now - map_start
 
         map_has_ended = current_map["end"] is not None
+        if (
+            current_map.get("guessed")
+            and current_map.get("start_log")
+            and not map_has_ended
+        ):
+            # Refine an event-only start after the map-loading timeout clears.
+            # Logs often omit weather/attacking side. Do not poll a guessed day
+            # layer forever when the server is actually running its night variant.
+            live_layer = self.rcon.game_profile.parse_layer(gs["current_map"]["id"])
+            if live_layer.game_mode == gs["game_mode"] and layer_matches_match_log(
+                live_layer, current_map["start_log"]
+            ):
+                current_map["name"] = live_layer.id
+                current_map["guessed"] = False
+                current_map["match_time"] = get_theoretical_match_time(
+                    live_layer.game_mode, gs["match_time"]
+                )
+                maps_history.update(self.ACTIVE_MAP_INDEX, current_map)
+
         if map_has_ended:
             logger.info("[MATCH ENDED]")
             # Let it record stats one more time

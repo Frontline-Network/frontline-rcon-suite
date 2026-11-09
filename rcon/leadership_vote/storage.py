@@ -632,6 +632,9 @@ def ballot(server, player_id, yes, stamp, players, round_id, now=None):
 
 
 def cancel_linked(sess, incident, actor, now=None):
+    from rcon.report_admin import cancel_incident
+
+    cancel_incident(sess, incident, actor)
     if not incident.leadership_vote_id:
         return
     v = sess.get(LeadershipVote, incident.leadership_vote_id)
@@ -665,13 +668,22 @@ def lock_incident(sess, incident_id):
 
 def before_manual_action(player_id, actor="admin", *, all_targets=False):
     """Also protect direct web/RCON moderation, not only Discord report actions."""
-    if _automatic_action.get() or not Config.load_from_db().enabled:
+    if _automatic_action.get():
+        return
+    from rcon.user_config.report_admin import ReportAdminUserConfig
+
+    report_enabled = ReportAdminUserConfig.load_from_db().enabled
+    if not Config.load_from_db().enabled and not report_enabled:
         return
     from rcon.utils import get_server_number
 
     server = int(get_server_number())
     with enter_session() as sess:
         lock(sess, server)
+        if report_enabled:
+            from rcon.report_admin import cancel_player
+
+            cancel_player(sess, server, None if all_targets else player_id, actor=actor)
         for v in sess.scalars(
             select(LeadershipVote).where(
                 LeadershipVote.server_number == server,

@@ -58,12 +58,12 @@ def test_private_configuration_and_no_browser_ballots(request_api):
     )
 
 
-def test_activation_requires_kick_and_valid_mode_bounds(request_api):
+def test_retired_feature_cannot_be_activated_even_with_kick_permission(request_api):
     assert (
         request_api(
             api.configuration, "PUT", Config(enabled=True).model_dump(), [api.MANAGE]
         ).status_code
-        == 403
+        == 400
     )
     assert (
         request_api(
@@ -72,7 +72,7 @@ def test_activation_requires_kick_and_valid_mode_bounds(request_api):
             Config(enabled=True).model_dump(),
             [api.MANAGE, api.KICK],
         ).status_code
-        == 200
+        == 400
     )
     for invalid in (
         {"enabled": "true"},

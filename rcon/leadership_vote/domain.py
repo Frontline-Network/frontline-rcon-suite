@@ -37,17 +37,16 @@ def report_command(message):
 
 
 def suppress_public_chat(log):
-    from rcon.user_config.leadership_vote import LeadershipVoteUserConfig
+    from rcon.user_config.report_admin import ReportAdminUserConfig
 
     text = str(log.get("sub_content") or "").strip()
-    # Webhooks run before live target resolution. Any !admin report may now
-    # offer a private workflow, including reports without a written reason.
-    # Keep all such reports out of general chat mirrors; admin delivery stays.
-    candidate = answer(text) is not None or report_command(text)
+    # Webhooks run before live target resolution. Keep reports handled by
+    # Report Admin out of general chat mirrors; admin delivery stays intact.
+    candidate = report_command(text)
     if not candidate:
         return False
     try:
-        return LeadershipVoteUserConfig.load_from_db().enabled
+        return ReportAdminUserConfig.load_from_db().enabled
     except Exception:
         return True  # do not disclose possible team proceedings during an outage
 

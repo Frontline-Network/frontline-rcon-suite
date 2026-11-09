@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import os
 import time
+from threading import Thread
 from datetime import datetime, timedelta, timezone
 
 import requests
@@ -89,6 +90,12 @@ class Command(BaseCommand):
             raise CommandError(
                 "--events-only and --moderation-only cannot be used together"
             )
+        if not moderation_only and discord_reports_enabled():
+            # Both the combined deployment and the standalone Discord worker
+            # use this events loop. AI latency must never block report delivery.
+            from api.report_reason_worker import run as reason_loop
+
+            Thread(target=reason_loop, name="report-reason", daemon=True).start()
         active_sleep, maximum_idle_sleep = self._poll_intervals(
             moderation_only=moderation_only
         )

@@ -92,6 +92,14 @@ Spielaktion aus. Discord-Interaktionen sind signiert; CRCON prüft anschließend
 noch einmal Installation, Guild, Kanal, aktuelle Rollen aus der signierten
 Interaktion, Aktionsfreigabe, Incident-Revision und Idempotenz.
 
+Unabhängig von diesen KI-Empfehlungen kann der neue, serverbezogene
+[regelbasierte Report-Admin](report-admin.md) ausdrücklich aktiviert werden.
+Er verarbeitet ausschließlich Kommunikations- und Teamkill-Reports und darf
+im Aktivmodus nach seinen Prüfungen selbst kicken. Standardmäßig bleibt er
+deaktiviert; der Probelauf führt keine Spielaktion aus. Die Dokumentation dort
+beschreibt insbesondere die Grenzen der Namenszuordnung und fehlende
+Sprachnachweise sowie die nötige Pilotprüfung.
+
 Normale Reports verwenden das Bedienmodell des bisherigen Frontline-Reportbots:
 Spieleraktionen stehen in der ersten Reihe, Melder-, Squad- und Log-Funktionen in
 der zweiten und Ablehnen, Papierkorb sowie manuelle Bearbeitung in der dritten.

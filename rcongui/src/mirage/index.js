@@ -483,6 +483,40 @@ export function makeServer({ environment = "development" } = {}) {
         };
       };
       this.get("/discord/v1/integration", () => ok(demoDiscordIntegration()));
+      this.post("/discord/v1/pairings", () => {
+        if (new URLSearchParams(window.location.search).get("demo_discord_install_error") === "1") {
+          return new Response(400, {}, {
+            failed: true,
+            error: "CRCON pairing is invalid or expired",
+          });
+        }
+        return ok({ install_url: "https://discord.com/oauth2/authorize?client_id=demo" });
+      });
+      let demoReportAdmin = {
+        enabled: false,
+        mode: "dry_run",
+        communication: true,
+        teamkills: true,
+        cheating: false,
+        allow_self_reports: false,
+        communication_template_id: null,
+        teamkills_template_id: null,
+      };
+      const reportAdminResponse = () => ok({
+        config: demoReportAdmin,
+        can_enable: getDemoRole() !== "viewer",
+        teamkill_policy: "individual_case",
+        teamkill_grace_seconds: 60,
+        context_window_seconds: 900,
+        cheat_sanctions: "manual_only",
+        manual_cheat_ban_hours: 24,
+        templates: [],
+      });
+      this.get("/report-admin/v1/config", reportAdminResponse);
+      this.put("/report-admin/v1/config", (_schema, request) => {
+        demoReportAdmin = JSON.parse(request.requestBody);
+        return reportAdminResponse();
+      });
       this.put("/discord/v1/integration", (schema, request) => {
         const payload = JSON.parse(request.requestBody || "{}");
         demoDiscordEnabled = Boolean(payload.enabled);
