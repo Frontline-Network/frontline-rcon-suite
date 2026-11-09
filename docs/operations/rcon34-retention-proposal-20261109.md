@@ -1,5 +1,16 @@
 # Aufbewahrung auf RCON3/4: Vorschlag zur Entscheidung
 
+**Aktualisierung:** Die lesende Untersuchung ist abgeschlossen. Maßgeblich sind
+jetzt der [Prüfbericht mit Kandidaten](rcon34-retention-audit-20261109.md) und
+die zugehörigen CSV-Auswertungen. Die 72 alten RCON3-Spielprotokolle liegen
+vollständig im Kontext ungeklärter Spielzeiten und bleiben erhalten. Auf
+RCON4 gibt es keine Protokolle älter als 90 Tage. Als erste Wartung empfiehlt
+sich der Neuaufbau der acht Autobalancer-Rollenindizes: Die isolierte Kopie
+zeigt rund 1,68 GB Potenzial ohne Datenlöschung. Produktiv wurde nichts geändert.
+
+Der folgende Abschnitt dokumentiert den ursprünglichen Vorschlag vor dieser
+Untersuchung; er ist keine Freigabe für Löschungen.
+
 Stand: 9. November 2026. Es wurde keine Datenbereinigung aktiviert und nichts
 aus der Historie gelöscht. Die gemeinsame Datenbank ist laut heutiger Prüfung
 25,74 GB groß; 16,66 GB entfallen einschließlich Indizes auf Spielprotokolle.
