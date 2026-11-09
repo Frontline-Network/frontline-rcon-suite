@@ -1,0 +1,9 @@
+index,bytes_before,bytes_after_verification,saved_bytes,valid,ready
+autobalance_player_role_stats_pkey,13336576,6995968,6340608,True,True
+ix_autobalance_player_role_stats_last_seen,264511488,6995968,257515520,True,True
+ix_autobalance_player_role_stats_map_name,338001920,12656640,325345280,True,True
+ix_autobalance_player_role_stats_player_id,299491328,18104320,281387008,True,True
+ix_autobalance_player_role_stats_role_family,106340352,9043968,97296384,True,True
+ix_autobalance_player_role_stats_round_id,600309760,15532032,584777728,True,True
+ix_autobalance_player_role_stats_server_number,84385792,7004160,77381632,True,True
+unique_autobalance_player_role_stats,83951616,33906688,50044928,True,True

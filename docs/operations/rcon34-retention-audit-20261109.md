@@ -1,5 +1,11 @@
 # RCON3/4: Aufbewahrung und Speicherpotenzial geprüft
 
+**Nachtrag, 18:49 Uhr:** Die acht Rollenindizes wurden nach neuer geprüfter
+Sicherung und vollständiger Test-Wiederherstellung erfolgreich neu aufgebaut.
+Ergebnis: rund 1,68 GB weniger Indexspeicher, keine gelöschten Anwendungsdaten.
+Siehe [Wartungsnachweis](rcon34-index-maintenance-20261109.md).
+Der folgende Prüfbericht dokumentiert den Zustand vor dieser Wartung.
+
 Stand: 9. November 2026, 18:20 Uhr Europe/Berlin. Die Produktivdatenbank wurde
 nur lesend untersucht. Es wurden keine Datensätze gelöscht, keine Indizes im
 Produktivsystem neu aufgebaut und keine Aufbewahrungsfristen geändert.

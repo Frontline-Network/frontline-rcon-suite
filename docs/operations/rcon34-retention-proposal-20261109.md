@@ -1,5 +1,11 @@
 # Aufbewahrung auf RCON3/4: Vorschlag zur Entscheidung
 
+**Wartung abgeschlossen, 18:49 Uhr:** Die acht Rollenindizes sind nach geprüfter
+Sicherung neu aufgebaut; rund 1,68 GB Datenbankspeicher wurden eingespart.
+Historische Daten bleiben erhalten. Siehe den
+[Wartungsnachweis](rcon34-index-maintenance-20261109.md). Die nachfolgenden
+Abschnitte halten die vorausgehenden Entscheidungen fest.
+
 **Aktualisierung:** Die lesende Untersuchung ist abgeschlossen. Maßgeblich sind
 jetzt der [Prüfbericht mit Kandidaten](rcon34-retention-audit-20261109.md) und
 die zugehörigen CSV-Auswertungen. Die 72 alten RCON3-Spielprotokolle liegen
