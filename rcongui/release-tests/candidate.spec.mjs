@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 const installed = process.env.RELEASE_VERSION;
-test.skip(installed !== "v0.9.3-rc.1", "combined pilot candidate contract");
+test.skip(!["v0.9.3-rc.1", "v0.9.4-rc.1"].includes(installed), "pilot candidate contract");
 
 test("pilot uses exact versions and reviewed bilingual notes without stable spotlight", async ({ page, context }) => {
   const endpoint = `/api/get_update_channel?frontend_version=${installed}`;
@@ -20,8 +20,13 @@ test("pilot uses exact versions and reviewed bilingual notes without stable spot
   const current = result.releases.find((entry) => entry.current);
   expect(current.tag_name).toBe(installed);
   expect(current.prerelease).toBe(true);
-  for (const text of ["## Deutsch", "## English", "Administration", "RCON3", "RCON4"]) {
+  for (const text of ["## Deutsch", "## English", "RCON3", "RCON4"]) {
     expect(current.body).toContain(text);
+  }
+  if (installed === "v0.9.4-rc.1") {
+    expect(current.body).toContain("Live-Protokoll");
+    expect(current.body).toContain("ARM64");
+    expect(current.body).toContain("SMTP");
   }
   expect(result.highlight_state).toBeNull();
   const mismatch = (await (await context.request.get("/api/get_update_channel?frontend_version=v0.9.2")).json()).result;

@@ -109,7 +109,7 @@ def main():
             snapshot = Path(directory) / "prepublication-notes.json"
             catalog = [{
                 "tag_name": expected_version, "name": f"Frontline RCON Suite {expected_version}",
-                "draft": False, "prerelease": False, "published_at": "2020-01-01T00:00:00Z",
+                "draft": False, "prerelease": "-rc." in expected_version, "published_at": "2020-01-01T00:00:00Z",
                 "body": args.notes_file.read_text(encoding="utf-8")
             }]
             for notes_file in args.history_notes_file:
