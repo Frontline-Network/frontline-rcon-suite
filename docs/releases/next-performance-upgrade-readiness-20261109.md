@@ -112,6 +112,11 @@ und Aufbewahrung vorhandener Kundenlogs müssen deren Einstellungen beachten.
    einen Rundenwechsel. Danach Entscheidung über Veröffentlichung und weitere
    Kunden. Kein ungeprüfter Flottenwechsel auf einen beweglichen Image-Tag.
 
-Aktueller Status: portable Hotfixes mit dokumentierter RCON3/4-Abnahme vorhanden;
-neue Startabsicherung isoliert getestet. Vollständiges Bestandsupgrade,
-Rückweg und vergleichbare Lastmessung bleiben vor der Release-Freigabe offen.
+Fortschreibung vom selben Abend: Eine 30-minütige Ausgangsmessung, ein echtes
+Bestandsupgrade von v0.9.3 mit wiederhergestelltem PostgreSQL/Redis, Wiederholung,
+Code-Rollback und Neuinstallation sind inzwischen geprüft. Das Backend-Paket
+wurde bei identischen Python-Abhängigkeiten um 41,65 % verkleinert. Die Ergebnisse,
+Prüfgrenzen und verbleibende Release-Abnahme stehen im
+[Paket- und Update-Prüfbericht](../operations/release-efficiency-20261109.md).
+Ein Laufzeitgewinn der API oder des RAM-Verbrauchs wurde dadurch nicht belegt.
+Es fand noch kein Rollout dieses Kandidaten statt.
