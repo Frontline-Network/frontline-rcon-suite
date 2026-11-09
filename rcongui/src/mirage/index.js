@@ -975,12 +975,16 @@ export function makeServer({ environment = "development" } = {}) {
 
       this.post("/get_recent_logs", (schema, request) => {
         const params = request.requestBody ? JSON.parse(request.requestBody) : request.queryParams;
+        // Fake-mode diagnostics used by the incremental-feed browser tests.
+        window.__CRCON_DEMO_LOG_REQUESTS__ ??= [];
+        window.__CRCON_DEMO_LOG_REQUESTS__.push(params);
         const asArray = (value) => {
           if (Array.isArray(value)) return value;
           if (!value) return [];
           return JSON.parse(value);
         };
         return handleRecentLogs(gameState, {
+          ...params,
           end: parseInt(params.end) || 500,
           filter_action: asArray(params.filter_action),
           filter_player: asArray(params.filter_player),

@@ -3,6 +3,19 @@ import { sharedOperationsDe } from "./shared-operations.js";
 import { operatorMessagesDe } from "./operator-messages.js";
 
 const de = {
+  themeLoading: {
+    loading: "Darstellung wird geladen …",
+    failed: "Darstellung konnte nicht geladen werden",
+    help: "Bitte prüfe deine Verbindung und lade die Seite erneut. Deine gespeicherten Einstellungen bleiben erhalten.",
+    reload: "Seite erneut laden",
+  },
+  liveLogFeed: {
+    pause: "Pausieren", paused: "Pausiert", resume: "Live fortsetzen",
+    older: "Ältere Meldungen laden", limit: "Abruflimit erreicht – unter Filter erhöhen",
+    failed: "Das Live-Protokoll konnte nicht aktualisiert werden. Geladene Meldungen bleiben sichtbar.",
+    retry: "Erneut versuchen",
+    reset: "Die Verbindung zum bisherigen Verlauf ist abgerissen oder es kamen zu viele neue Meldungen hinzu. Die neuesten Meldungen werden angezeigt; ältere kannst du nachladen.",
+  },
   liveViews: liveViewsDe,
   sharedOperations: sharedOperationsDe,
   operatorMessages: operatorMessagesDe,
@@ -5459,7 +5472,7 @@ const deMasterFallback = {
       "logQueryFilterEnabled": "Abruffilter aktiv",
       "logIncludeSelected": "Ausgewählte Ereignisse einschließen",
       "logExcludeSelected": "Ausgewählte Ereignisse ausschließen",
-      "logQueryLimitHelp": "10 bis 100.000 Meldungen. Höhere Werte können länger laden.",
+      "logQueryLimitHelp": "Maximal 10 bis 100.000 geladene Meldungen. Der Abruf erfolgt in Schritten von bis zu 500; ältere Meldungen kannst du nachladen.",
       "logQueryLimitError": "Bitte eine ganze Zahl zwischen 10 und 100.000 eingeben.",
       "resetLogQueryFilters": "Datenabruf zurücksetzen",
       "applyLogFilters": "Übernehmen",

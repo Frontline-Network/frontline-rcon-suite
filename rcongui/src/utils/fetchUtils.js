@@ -111,6 +111,7 @@ async function requestFactory({
   params = {}, // For query parameters (GET)
   payload = {}, // For body data (POST)
   throwRouteError = true,
+  signal,
   headers = { "Content-Type": "application/json" },
 } = {}) {
   if (sessionExpired && !isSessionRecoveryCommand(cmd)) {
@@ -131,6 +132,7 @@ async function requestFactory({
   // Define request options shared by the original request and a possible
   // CSRF-only recovery retry.
   const requestOptions = {
+    signal,
     method,
     mode: "cors",
     cache: "default",
@@ -152,6 +154,7 @@ async function requestFactory({
     const res = await fetchWithCsrf(url.toString(), requestOptions);
     return await handleFetchResponse(req, res, cmd);
   } catch (error) {
+    if (signal?.aborted) throw error;
     if (throwRouteError) {
       const message =
         error?.message || error?.text || i18n.t("sharedOperations.http.requestFailed");

@@ -6,18 +6,14 @@ import {
   useRef,
   useState,
 } from "react";
-import { cmd } from "@/utils/fetchUtils";
+import { useLiveLogFeed } from "./use-live-log-feed";
 import { getColumns as getPlayersColumns } from "./players-columns";
 import { extractPlayers, extractTeamState } from "@/utils/extractPlayers";
-import { useLoaderData } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import PlayersTable from "./players-table";
 import LogsTable from "./logs-table";
 import { getLogsColumns } from "./logs-columns";
-import {
-  useLogsSearchStore,
-  useLogsTableStore,
-} from "@/stores/table-config";
+import { useLogsSearchStore, useLogsTableStore } from "@/stores/table-config";
 import { teamsLiveQueryOptions } from "@/queries/teams-live-query";
 import { normalizePlayerProfile } from "@/utils/lib";
 import {
@@ -44,7 +40,6 @@ import { LiveBalanceCard } from "./live-balance-card";
 import { LiveViewSettings, useLiveViewPreferences } from "./live-view-settings";
 import { getPlayerColumnVisibility } from "./player-table-preferences.mjs";
 
-const interval = 15 * 1000;
 const UNASSIGNED = "unassigned";
 const SPLIT_MIN_CONTENT_WIDTH = 1120;
 const ONLINE_PLAYER_ACTIONS = generatePlayerActions({
@@ -59,7 +54,6 @@ export const loader = () => ({ initialLogsView: undefined });
 
 const Live = () => {
   const { t } = useTranslation();
-  const { initialLogsView } = useLoaderData();
   const liveViewSettings = useLiveViewPreferences();
   const [displaySettingsOpen, setDisplaySettingsOpen] = useState(false);
   const [displaySection, setDisplaySection] = useState("status");
@@ -203,34 +197,8 @@ const Live = () => {
 
   const logsSearchParams = useLogsSearchStore();
 
-  const { data: logsView, isFetching: isLogsFetching } = useQuery({
-    queryKey: [
-      "logs",
-      "live",
-      {
-        end: logsSearchParams.limit,
-        filter_action: logsSearchParams.enabled ? logsSearchParams.actions : [],
-        filter_player: logsSearchParams.enabled ? logsSearchParams.players : [],
-        inclusive_filter: logsSearchParams.inclusive_filter,
-      },
-    ],
-    queryFn: () =>
-      cmd.GET_LIVE_LOGS({
-        payload: {
-          end: logsSearchParams.limit,
-          filter_action: logsSearchParams.enabled
-            ? logsSearchParams.actions
-            : [],
-          filter_player: logsSearchParams.enabled
-            ? logsSearchParams.players
-            : [],
-          inclusive_filter: logsSearchParams.inclusive_filter,
-        },
-      }),
-    select: (response) => response.result,
-    initialData: initialLogsView,
-    refetchInterval: interval,
-  });
+  const logFeed = useLiveLogFeed(logsSearchParams);
+  const { data: logsView, isFetching: isLogsFetching } = logFeed;
 
   const gameData = useMemo(() => {
     if (gameState && teamData) {
@@ -307,9 +275,13 @@ const Live = () => {
   const setLogsTableConfig = useLogsTableStore((state) => state.setConfig);
   const setPagination = useLogsTableStore((state) => state.setPagination);
   const logsColumnVisibility = logsTableConfig.columnVisibility;
+  useEffect(() => {
+    setPagination({ ...useLogsTableStore.getState().pagination, pageIndex: 0 });
+  }, [logFeed.filterKey, setPagination]);
 
   const logsTable = useReactTable({
     data: logsView?.logs ?? [],
+    getRowId: (row) => row.cursor_id,
     columns: logsColumns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -326,6 +298,7 @@ const Live = () => {
         typeof updater === "function"
           ? updater(logsTableConfig.pagination)
           : updater;
+      if (next.pageIndex > 0) logFeed.pause();
       setPagination(next);
     },
     autoResetPageIndex: false,
@@ -461,6 +434,7 @@ const Live = () => {
             <LogsTable
               table={logsTable}
               logsViewData={logsView}
+              feed={logFeed}
               isFetching={isLogsFetching}
               isExpanded={effectiveLayout === "logs"}
               onToggleExpanded={handleToggleLogsExpanded}

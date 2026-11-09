@@ -3,6 +3,19 @@ import { sharedOperationsEn } from "./shared-operations.js";
 import { operatorMessagesEn } from "./operator-messages.js";
 
 const en = {
+  themeLoading: {
+    loading: "Loading appearance …",
+    failed: "Appearance could not be loaded",
+    help: "Please check your connection and reload the page. Your saved settings will be kept.",
+    reload: "Reload page",
+  },
+  liveLogFeed: {
+    pause: "Pause", paused: "Paused", resume: "Resume live",
+    older: "Load older messages", limit: "Fetch limit reached – increase it in filters",
+    failed: "The live log could not be updated. Loaded messages remain visible.",
+    retry: "Try again",
+    reset: "The previous history is no longer available or too many new messages arrived. Showing the latest messages; you can load older messages below.",
+  },
   liveViews: liveViewsEn,
   sharedOperations: sharedOperationsEn,
   operatorMessages: operatorMessagesEn,
@@ -5413,7 +5426,7 @@ const enMasterFallback = {
       "logQueryFilterEnabled": "Retrieval filter enabled",
       "logIncludeSelected": "Include selected events",
       "logExcludeSelected": "Exclude selected events",
-      "logQueryLimitHelp": "10 to 100,000 messages. Higher limits may take longer to load.",
+      "logQueryLimitHelp": "Keep up to 10–100,000 loaded messages. Fetches use batches of up to 500; you can load older messages separately.",
       "logQueryLimitError": "Enter a whole number between 10 and 100,000.",
       "resetLogQueryFilters": "Reset data retrieval",
       "applyLogFilters": "Apply",

@@ -687,7 +687,23 @@ class RconAPI(Rcon):
         end: int = 500,
         exact_player_match: bool = True,
         exact_action: bool = False,
+        cursor_mode: bool = False,
+        after: str | None = None,
+        before: str | None = None,
     ) -> ParsedLogsType:
+        if cursor_mode:
+            from rcon.live_log_cursor import get_live_log_page
+
+            return get_live_log_page(
+                limit=end,
+                after=after,
+                before=before,
+                player_search=filter_player,
+                action_filter=filter_action,
+                exact_player_match=exact_player_match,
+                exact_action=exact_action,
+                inclusive_filter=inclusive_filter,
+            )
         return game_logs.get_recent_logs(
             start=start,
             end=end,
