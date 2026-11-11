@@ -1,3 +1,4 @@
+import vipRewardDefaults from "./state/vip-rewards.json";
 import { createServer, Response } from "miragejs";
 // Snapshot of get_api_documentation from this source tree (2026-10-03).
 // Used only by the fake preview; production always requests its own backend.
@@ -36,6 +37,7 @@ import {
 
 export function makeServer({ environment = "development" } = {}) {
   let gameState = createGameState();
+  let vipRewards = structuredClone(vipRewardDefaults);
   let demoServerName = "[GER] Frontline Network | #2";
   let demoServerNameConfig = { ip: "127.0.0.1", port: 10011 };
   const disbandAttempts = new Map();
@@ -862,6 +864,15 @@ export function makeServer({ environment = "development" } = {}) {
       this.get("/get_name_kick_config", () => ok(autoMod(true)));
       this.get("/get_vac_game_bans_config", () => ok(autoMod(true)));
       this.get("/get_seed_vip_config", () => ok(autoMod(true)));
+      this.get("/get_vip_rewards_config", () => ok(vipRewards));
+      this.post("/validate_vip_rewards_config", () => ok(true));
+      this.post("/set_vip_rewards_config", (schema, request) => {
+        vipRewards = JSON.parse(request.requestBody).config;
+        return ok(true);
+      });
+      this.get("/get_vip_rewards_status", () => ok({ status: vipRewards.enabled ? "seeding" : "disabled", preview: vipRewards.dry_run, counts: { allies: 14, axis: 18 }, thresholds: { allies: 20, axis: 20 } }));
+      this.get("/get_vip_rewards_journal", () => ok({ total: 0, offset: 0, results: [] }));
+      this.get("/get_vip_rewards_progress", () => ok({ total: 0, round: 0, days: {} }));
       this.get("/get_chat_commands_config", () => ok(autoMod(true, true)));
       this.get("/get_rcon_chat_commands_config", () => ok(autoMod(true)));
 

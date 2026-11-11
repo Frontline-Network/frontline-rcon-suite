@@ -153,6 +153,12 @@ def run_seed_vip():
         sys.exit(1)
 
 
+@cli.command(name="vip_rewards")
+def run_vip_rewards():
+    from rcon.vip_rewards.service import run
+    run()
+
+
 @cli.command(name="watch_killrate")
 def watch_killrate():
     try:

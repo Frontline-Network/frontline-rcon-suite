@@ -4932,6 +4932,7 @@ const en = {
       vacBans: "VAC / game bans",
       tkBans: "TK ban on connect",
       nameKicks: "Name kicks",
+      vipRewards: "VIP rewards",
       seedVip: "Seeder VIP reward",
       gameServer: "Game server connection",
       crcon: "CRCON settings",

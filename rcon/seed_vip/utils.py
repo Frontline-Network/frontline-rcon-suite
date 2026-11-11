@@ -1,13 +1,16 @@
+from __future__ import annotations
+
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from typing import Iterable, Sequence
+from typing import TYPE_CHECKING, Iterable, Sequence
 
 from humanize import precisedelta
 from humanize.i18n import get_translation
 
 import discord
-from rcon.api_commands import RconAPI
+if TYPE_CHECKING:
+    from rcon.api_commands import RconAPI
 from rcon.seed_vip.models import (
     BaseCondition,
     Player,
@@ -233,6 +236,7 @@ def reward_players(
     current_vips: dict[str, VipPlayer],
     players_lookup: dict[str, str],
     expiration_timestamps: defaultdict[str, datetime],
+    reward_time: datetime | None = None,
 ):
     logger.info(f"Rewarding players with VIP {config.dry_run=}")
     logger.info(f"Total={len(to_add_vip_steam_ids)} {to_add_vip_steam_ids=}")
@@ -260,11 +264,24 @@ def reward_players(
             logger.info(
                 f"{config.dry_run=} adding VIP to {player_id=} {player=} {vip_name=} {expiration_date=}",
             )
-            rcon.add_vip(
-                player_id=player_id,
-                description=vip_name,
-                expiration=expiration_date.isoformat(),
-            )
+            # Refresh and calculate inside the same lock used by other VIP writers.
+            from rcon.vip_rewards.locking import vip_lock
+            from rcon.vip_rewards.service import current_vip, expiration, permanent
+            with vip_lock(player_id):
+                current = current_vip(rcon, player_id)
+                if permanent(current):
+                    continue
+                current_expiration = expiration(current["vip_expiration"]) if current else None
+                expiration_date = calc_vip_expiration_timestamp(
+                    config, current_expiration,
+                    reward_time or datetime.now(timezone.utc),
+                )
+                expiration_timestamps[player_id] = expiration_date
+                rcon.add_vip(
+                    player_id=player_id,
+                    description=current["name"] if current else vip_name,
+                    expiration=expiration_date.isoformat(),
+                )
 
         else:
             logger.info(

@@ -169,6 +169,47 @@ class Base(DeclarativeBase):
     }
 
 
+class VipRewardState(Base):
+    __tablename__ = "vip_reward_state"
+    server_number: Mapped[int] = mapped_column(primary_key=True)
+    preview: Mapped[bool] = mapped_column(primary_key=True)
+    data: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+
+
+class VipRewardEvent(Base):
+    __tablename__ = "vip_reward_event"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    server_number: Mapped[int] = mapped_column(index=True)
+    key: Mapped[str] = mapped_column(String(64))
+    preview: Mapped[bool]
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    processed: Mapped[bool] = mapped_column(default=False, index=True)
+    __table_args__ = (UniqueConstraint("server_number", "preview", "key"),)
+
+
+class VipRewardGrant(Base):
+    __tablename__ = "vip_reward_grant"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    server_number: Mapped[int] = mapped_column(index=True)
+    preview: Mapped[bool]
+    player_id: Mapped[str] = mapped_column(String(100), index=True)
+    rule: Mapped[str] = mapped_column(String(100))
+    trigger: Mapped[str] = mapped_column(String(160))
+    occurred: Mapped[float]
+    requested_seconds: Mapped[float]
+    credited_seconds: Mapped[float] = mapped_column(default=0)
+    limit: Mapped[int] = mapped_column(default=0)
+    status: Mapped[str] = mapped_column(String(32), default="queued", index=True)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    target: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    written_at: Mapped[float | None] = mapped_column(nullable=True)
+    __table_args__ = (UniqueConstraint("server_number", "preview", "player_id", "rule", "trigger"),)
+
+    def to_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+
 class PlayerID(Base):
     __tablename__ = "steam_id_64"
     id: Mapped[int] = mapped_column(primary_key=True)

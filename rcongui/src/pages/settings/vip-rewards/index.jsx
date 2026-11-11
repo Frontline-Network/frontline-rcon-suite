@@ -1,0 +1,832 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  FormControlLabel,
+  MenuItem,
+  Stack,
+  Switch,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography,
+} from "@mui/material";
+import { get, execute } from "@/utils/fetchUtils";
+import { isFakeMode } from "@/mirage/demo-data";
+import { useAuth } from "@/hooks/useAuth";
+
+async function read(command) {
+  const response = await get(command);
+  const data = await response.json();
+  if (data.failed || data.error)
+    throw new Error(
+      typeof data.error === "string" ? data.error : JSON.stringify(data.error)
+    );
+  return data.result;
+}
+
+const labels = {
+  melee: "Nahkampf",
+  round: "Rundentreue",
+  weekly: "Wochenaktivität",
+  milestones: "Spielzeit-Meilensteine",
+  balance: "Freiwilliger Teamausgleich",
+};
+const notes = {
+  melee:
+    "Nur Gegnerkills mit Messer oder Spaten. Wiederholte Gegner werden gemeinsam mit Challenges begrenzt.",
+  round:
+    "Nur freigegebene Rundenabschnitte zählen. Der Spieler muss am Rundenende anwesend sein.",
+  weekly: "Unterschiedliche Spieltage pro Kalenderwoche, Montag bis Sonntag.",
+  milestones:
+    "Qualifizierende Spielzeit ab Aktivierung; jeder Meilenstein wird einmal verarbeitet.",
+  balance:
+    "Anmeldung mit !balancevip. Nur nachweisbare Wechsel ins kleinere Team; erzwungene Wechsel zählen nicht.",
+};
+const results = {
+  queued: "Vorgemerkt",
+  prepared: "Abgleich ausstehend",
+  awarded: "Gutgeschrieben",
+  preview: "Vorschau",
+  skipped: "Nicht vergeben",
+  review: "Prüfung erforderlich",
+  reviewed: "Manuell geprüft",
+};
+const reasons = {
+  daily_budget: "24-Stunden-Budget erreicht",
+  rule_limit: "Regellimit erreicht",
+  permanent_vip: "Dauerhaftes VIP",
+  disabled_or_paused: "Deaktiviert oder pausiert",
+  previous_write_needs_review: "Frühere Vergabe prüfen",
+  partial_budget: "Teilbetrag: Restbudget",
+  reconciled: "Nach Neustart bestätigt",
+  uncertain_write: "Schreibergebnis unklar",
+  readback_mismatch: "VIP-Ablauf nicht bestätigt",
+};
+
+function NumberField({ label, value, onChange, min = 1, max, step = 1 }) {
+  return (
+    <TextField
+      size="small"
+      label={label}
+      type="number"
+      value={value}
+      onChange={(e) =>
+        onChange(e.target.value === "" ? "" : Number(e.target.value))
+      }
+      inputProps={{ min, max, step }}
+      sx={{ minWidth: 170, flex: 1 }}
+    />
+  );
+}
+
+function localTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 16);
+}
+
+export default function VipRewards() {
+  const { permissions } = useAuth();
+  const has = (key) =>
+    permissions?.is_superuser ||
+    permissions?.permissions?.some((p) => p.permission === key);
+  const canEdit = has("can_change_seed_vip_config");
+  const canInspect = has("can_view_vip_ids");
+  const [config, setConfig] = useState(null);
+  const [saved, setSaved] = useState(null);
+  const [status, setStatus] = useState(null);
+  const [journal, setJournal] = useState({ results: [], total: 0 });
+  const [offset, setOffset] = useState(0);
+  const [filter, setFilter] = useState("");
+  const [mode, setMode] = useState("true");
+  const [progress, setProgress] = useState(null);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    read("get_vip_rewards_config")
+      .then((c) => {
+        if (mounted) {
+          setConfig(c);
+          setSaved(c);
+          setMode(String(c.dry_run));
+        }
+      })
+      .catch((e) => mounted && setError(e.message));
+    return () => {
+      mounted = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (!canInspect) return;
+    let mounted = true;
+    const refresh = () =>
+      Promise.all([
+        read("get_vip_rewards_status"),
+        read(
+          `get_vip_rewards_journal?${new URLSearchParams({
+            offset,
+            limit: 25,
+            preview: mode,
+            ...(filter ? { player_id: filter } : {}),
+          })}`
+        ),
+      ])
+        .then(([s, j]) => {
+          if (mounted) {
+            setStatus(s);
+            setJournal(j);
+          }
+        })
+        .catch((e) => mounted && setError(e.message));
+    refresh();
+    const timer = setInterval(refresh, 15000);
+    return () => {
+      mounted = false;
+      clearInterval(timer);
+    };
+  }, [offset, filter, mode, canInspect]);
+  const change = (key, value) => setConfig((c) => ({ ...c, [key]: value }));
+  const ruleChange = (key, field, value) =>
+    setConfig((c) => ({ ...c, [key]: { ...c[key], [field]: value } }));
+  const listChange = (key, index, field, value) =>
+    setConfig((c) => ({
+      ...c,
+      [key]: c[key].map((r, i) => (i === index ? { ...r, [field]: value } : r)),
+    }));
+  async function save() {
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      for (const command of [
+        "validate_vip_rewards_config",
+        "set_vip_rewards_config",
+      ]) {
+        const response = await execute(command, { config });
+        const data = await response.json();
+        if (data.failed || data.error || data.result !== true)
+          throw new Error(
+            typeof data.error === "string"
+              ? data.error
+              : JSON.stringify(data.error || "Speichern fehlgeschlagen")
+          );
+      }
+      const current = await read("get_vip_rewards_config");
+      setConfig(current);
+      setSaved(current);
+      setNotice(
+        "Einstellungen gespeichert. Der Dienst übernimmt sie bei der nächsten Prüfung."
+      );
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function acknowledge(row) {
+    if (
+      !window.confirm(
+        "VIP-Ablauf und zwischenzeitliche Änderungen geprüft? Die Bestätigung erlaubt zukünftige Belohnungen, zahlt diesen Eintrag aber nicht erneut aus."
+      )
+    )
+      return;
+    try {
+      const response = await execute("acknowledge_vip_reward_review", {
+        grant_id: row.id,
+      });
+      const data = await response.json();
+      if (data.failed || data.error || data.result !== true)
+        throw new Error(data.error || "Eintrag konnte nicht bestätigt werden");
+      setJournal((j) => ({
+        ...j,
+        results: j.results.map((r) =>
+          r.id === row.id
+            ? {
+                ...r,
+                status: "reviewed",
+                reason: "Manuell geprüft; keine erneute Auszahlung",
+              }
+            : r
+        ),
+      }));
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+  if (!config)
+    return (
+      <Alert severity={error ? "error" : "info"}>
+        {error || "VIP-Belohnungen werden geladen …"}
+      </Alert>
+    );
+  const changed = JSON.stringify(saved) !== JSON.stringify(config);
+  const toggle = (label, checked, onChange) => (
+    <FormControlLabel
+      label={label}
+      control={
+        <Switch
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+        />
+      }
+    />
+  );
+  const counts = status?.counts || {},
+    targets = status?.thresholds || {};
+  const statusText = !status
+    ? "Status wird geladen"
+    : status.status === "active"
+    ? "Aktiv"
+    : status.status === "disabled"
+    ? "Deaktiviert"
+    : status.status === "seeding"
+    ? `Pausiert: Seeding / Freigabeprüfung - Allies ${counts.allies ?? "?"}/${
+        targets.allies ?? "?"
+      }, Axis ${counts.axis ?? "?"}/${targets.axis ?? "?"}`
+    : "Pausiert: kein bestätigter Serverstatus";
+  return (
+    <Stack
+      spacing={3}
+      sx={{
+        width: "100%",
+        minWidth: 0,
+        boxSizing: "border-box",
+        maxWidth: 1200,
+        mx: "auto",
+        p: { xs: 1, md: 3 },
+      }}
+    >
+      {isFakeMode() && <Alert severity="info">Lokaler Formulartest mit simulierten Daten. Speichern verändert nur diese Vorschau. Es werden keine Spieler angeschrieben und keine VIP-Rechte vergeben. Nach dem Neuladen wird der Test zurückgesetzt.</Alert>}
+      <Box>
+        <Typography variant="h4">VIP-Belohnungen</Typography>
+        <Typography color="text.secondary">
+          Zusätzliche Belohnungen für Spielzeit, Teamhilfe und
+          Herausforderungen.
+        </Typography>
+      </Box>
+      <Button
+        component={Link}
+        to="/settings/others/seed-vip"
+        sx={{ alignSelf: "flex-start" }}
+      >
+        Seed-VIP-Einstellungen öffnen
+      </Button>
+      {error && (
+        <Alert severity="error" onClose={() => setError("")}>
+          {error}
+        </Alert>
+      )}
+      {notice && (
+        <Alert severity="success" onClose={() => setNotice("")}>
+          {notice}
+        </Alert>
+      )}
+      {canInspect && (
+        <Alert severity={status?.status === "active" ? "success" : "info"}>
+          {statusText}{" "}
+          {status?.preview && (
+            <Chip size="small" label="Vorschau" sx={{ ml: 1 }} />
+          )}
+        </Alert>
+      )}
+      <Alert severity="info">
+        Seed-VIP bleibt unabhängig. Während der Seeding-Sperre werden weder
+        Spielzeiten noch Kills gesammelt. Nicht gutgeschriebene Budgetanteile
+        verfallen; abgeschlossene Aufgaben werden nicht später erneut
+        ausgezahlt.
+      </Alert>
+      {!canEdit && (
+        <Alert severity="info">
+          Nur Lesezugriff. Änderungen erfordern die Berechtigung für
+          Seed-VIP-Einstellungen.
+        </Alert>
+      )}
+      <Box
+        component="fieldset"
+        disabled={!canEdit || busy}
+        sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}
+      >
+        <Stack spacing={2}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6">Gemeinsame Einstellungen</Typography>
+              <Stack>
+                {toggle(
+                  "Neue VIP-Belohnungen aktivieren",
+                  config.enabled,
+                  (v) => change("enabled", v)
+                )}
+                {toggle(
+                  "Vorschau: keine VIP-Vergabe und keine Spielernachrichten",
+                  config.dry_run,
+                  (v) => change("dry_run", v)
+                )}
+                {toggle(
+                  "Während des Seedens pausieren",
+                  config.pause_during_seeding,
+                  (v) => change("pause_during_seeding", v)
+                )}
+                {toggle(
+                  "Spieler nach erfolgreicher Vergabe benachrichtigen",
+                  config.notify_player,
+                  (v) => change("notify_player", v)
+                )}
+              </Stack>
+              <Typography variant="body2" sx={{ mb: 2 }}>
+                Seed-VIP-Zielzahlen müssen fünf Minuten gehalten werden. Prüfung
+                alle 30 Sekunden. Vorschau und Livebetrieb haben getrennte
+                Fortschritte und Budgets.
+              </Typography>
+              <Stack direction="row" gap={2} flexWrap="wrap">
+                <NumberField
+                  label="VIP-Stunden je rollierenden 24 h"
+                  value={config.daily_hours}
+                  step={0.5}
+                  onChange={(v) => change("daily_hours", v)}
+                />
+                <NumberField
+                  label="Gegner-Sperre (Minuten)"
+                  value={config.opponent_cooldown_minutes}
+                  onChange={(v) => change("opponent_cooldown_minutes", v)}
+                />
+                <TextField
+                  size="small"
+                  label="Zeitzone"
+                  value={config.timezone}
+                  onChange={(e) => change("timezone", e.target.value)}
+                />
+              </Stack>
+              <TextField
+                fullWidth
+                multiline
+                minRows={2}
+                sx={{ mt: 2 }}
+                label="Ausgeschlossene Spieler-IDs (eine pro Zeile)"
+                value={config.excluded_player_ids.join("\n")}
+                onChange={(e) =>
+                  change("excluded_player_ids", e.target.value.split("\n"))
+                }
+              />
+            </CardContent>
+          </Card>
+          {Object.entries(labels).map(([key, title]) => (
+            <Card key={key}>
+              <CardContent>
+                <Typography variant="h6">{title}</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {notes[key]}
+                </Typography>
+                {toggle("Regel aktivieren", config[key].enabled, (v) =>
+                  ruleChange(key, "enabled", v)
+                )}
+                <Stack direction="row" gap={2} flexWrap="wrap">
+                  {key !== "milestones" && (
+                    <NumberField
+                      label="VIP-Stunden"
+                      value={config[key].hours}
+                      step={0.5}
+                      onChange={(v) => ruleChange(key, "hours", v)}
+                    />
+                  )}
+                  {["melee", "round", "balance"].includes(key) && (
+                    <NumberField
+                      label="Max. Vergaben / 24 h"
+                      value={config[key].limit}
+                      onChange={(v) => ruleChange(key, "limit", v)}
+                    />
+                  )}
+                  {["round", "weekly", "balance"].includes(key) && (
+                    <NumberField
+                      label="Mindestspielzeit (Minuten)"
+                      value={config[key].minutes}
+                      onChange={(v) => ruleChange(key, "minutes", v)}
+                    />
+                  )}
+                  {key === "round" && (
+                    <NumberField
+                      label="Mindestanteil der Runde (%)"
+                      value={Math.round(config.round.fraction * 100)}
+                      max={100}
+                      onChange={(v) => ruleChange(key, "fraction", v / 100)}
+                    />
+                  )}
+                  {key === "weekly" && (
+                    <NumberField
+                      label="Unterschiedliche Tage"
+                      value={config.weekly.days}
+                      max={7}
+                      onChange={(v) => ruleChange(key, "days", v)}
+                    />
+                  )}
+                  {key === "balance" && (
+                    <>
+                      <NumberField
+                        label="Mindest-Teamdifferenz"
+                        value={config.balance.difference}
+                        min={2}
+                        onChange={(v) => ruleChange(key, "difference", v)}
+                      />
+                      <NumberField
+                        label="Anmeldung gültig (Minuten)"
+                        value={config.balance.signup_minutes}
+                        max={30}
+                        onChange={(v) => ruleChange(key, "signup_minutes", v)}
+                      />
+                    </>
+                  )}
+                </Stack>
+                {key === "milestones" && (
+                  <Stack gap={2}>
+                    {config.milestones.milestones.map((m, i) => (
+                      <Stack key={i} direction="row" gap={2} flexWrap="wrap">
+                        <NumberField
+                          label="Spielstunden"
+                          value={m.play_hours}
+                          onChange={(v) =>
+                            ruleChange(
+                              key,
+                              "milestones",
+                              config.milestones.milestones.map((x, j) =>
+                                j === i ? { ...x, play_hours: v } : x
+                              )
+                            )
+                          }
+                        />
+                        <NumberField
+                          label="VIP-Stunden"
+                          value={m.hours}
+                          step={0.5}
+                          onChange={(v) =>
+                            ruleChange(
+                              key,
+                              "milestones",
+                              config.milestones.milestones.map((x, j) =>
+                                j === i ? { ...x, hours: v } : x
+                              )
+                            )
+                          }
+                        />
+                        <Button
+                          onClick={() =>
+                            ruleChange(
+                              key,
+                              "milestones",
+                              config.milestones.milestones.filter(
+                                (_, j) => j !== i
+                              )
+                            )
+                          }
+                        >
+                          Entfernen
+                        </Button>
+                      </Stack>
+                    ))}
+                    <Button
+                      onClick={() =>
+                        ruleChange(key, "milestones", [
+                          ...config.milestones.milestones,
+                          { play_hours: 200, hours: 12 },
+                        ])
+                      }
+                    >
+                      Meilenstein hinzufügen
+                    </Button>
+                  </Stack>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+          {["events", "challenges"].map((key) => (
+            <Card key={key}>
+              <CardContent>
+                <Typography variant="h6">
+                  {key === "events" ? "Events" : "Waffen-Challenges"}
+                </Typography>
+                <Stack gap={3} sx={{ mt: 2 }}>
+                  {config[key].map((r, i) => (
+                    <Stack
+                      gap={2}
+                      key={r.id}
+                      sx={{ borderBottom: 1, borderColor: "divider", pb: 2 }}
+                    >
+                      <Stack
+                        direction="row"
+                        flexWrap="wrap"
+                        gap={2}
+                        alignItems="center"
+                      >
+                        <TextField
+                          size="small"
+                          label="Name"
+                          value={r.name}
+                          onChange={(e) =>
+                            listChange(key, i, "name", e.target.value)
+                          }
+                        />
+                        {toggle("Aktiviert", r.enabled, (v) =>
+                          listChange(key, i, "enabled", v)
+                        )}
+                        <NumberField
+                          label="VIP-Stunden"
+                          value={r.hours}
+                          step={0.5}
+                          onChange={(v) => listChange(key, i, "hours", v)}
+                        />
+                        <Button
+                          color="error"
+                          onClick={() =>
+                            change(
+                              key,
+                              config[key].filter((_, j) => j !== i)
+                            )
+                          }
+                        >
+                          Entfernen
+                        </Button>
+                      </Stack>
+                      {key === "events" ? (
+                        <NumberField
+                          label="Mindestspielzeit (Minuten)"
+                          value={r.minutes}
+                          onChange={(v) => listChange(key, i, "minutes", v)}
+                        />
+                      ) : (
+                        <>
+                          <TextField
+                            multiline
+                            label="Waffen (eine pro Zeile, wie im Kill-Log)"
+                            value={r.weapons.join("\n")}
+                            onChange={(e) =>
+                              listChange(
+                                key,
+                                i,
+                                "weapons",
+                                e.target.value.split("\n")
+                              )
+                            }
+                          />
+                          <Stack direction="row" gap={2} flexWrap="wrap">
+                            <NumberField
+                              label="Gegnerkills"
+                              value={r.kills}
+                              onChange={(v) => listChange(key, i, "kills", v)}
+                            />
+                            <TextField
+                              size="small"
+                              select
+                              label="Zeitraum"
+                              value={r.period}
+                              onChange={(e) =>
+                                listChange(key, i, "period", e.target.value)
+                              }
+                              sx={{ minWidth: 180 }}
+                            >
+                              {[
+                                ["day", "Täglich"],
+                                ["week", "Wöchentlich"],
+                                ["fixed", "Fester Zeitraum"],
+                              ].map(([v, l]) => (
+                                <MenuItem key={v} value={v}>
+                                  {l}
+                                </MenuItem>
+                              ))}
+                            </TextField>
+                          </Stack>
+                        </>
+                      )}
+                      {(key === "events" || r.period === "fixed") && (
+                        <Stack direction="row" gap={2} flexWrap="wrap">
+                          {["start", "end"].map((field) => (
+                            <TextField
+                              key={field}
+                              size="small"
+                              type="datetime-local"
+                              label={`${
+                                field === "start" ? "Beginn" : "Ende"
+                              } (${
+                                Intl.DateTimeFormat().resolvedOptions().timeZone
+                              })`}
+                              InputLabelProps={{ shrink: true }}
+                              value={localTime(r[field])}
+                              onChange={(e) =>
+                                listChange(
+                                  key,
+                                  i,
+                                  field,
+                                  e.target.value
+                                    ? new Date(e.target.value).toISOString()
+                                    : ""
+                                )
+                              }
+                              sx={{ flex: 1, minWidth: 250 }}
+                            />
+                          ))}
+                        </Stack>
+                      )}
+                    </Stack>
+                  ))}
+                </Stack>
+                <Button
+                  sx={{ mt: 2 }}
+                  onClick={() =>
+                    change(key, [
+                      ...config[key],
+                      key === "events"
+                        ? {
+                            id: crypto.randomUUID(),
+                            name: "Neues Event",
+                            enabled: false,
+                            hours: 4,
+                            limit: 1,
+                            minutes: 60,
+                            start: new Date().toISOString(),
+                            end: new Date(Date.now() + 86400000).toISOString(),
+                          }
+                        : {
+                            id: crypto.randomUUID(),
+                            name: "Neue Challenge",
+                            enabled: false,
+                            hours: 2,
+                            limit: 1,
+                            weapons: ["M3 KNIFE"],
+                            kills: 10,
+                            period: "day",
+                            start: null,
+                            end: null,
+                          },
+                    ])
+                  }
+                >
+                  Hinzufügen
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+          <Stack direction="row" gap={2} flexWrap="wrap">
+            <Button
+              variant="contained"
+              disabled={!changed || busy}
+              onClick={save}
+            >
+              {busy ? "Speichert …" : "Einstellungen speichern"}
+            </Button>
+            <Button
+              disabled={!changed || busy}
+              onClick={() => setConfig(saved)}
+            >
+              Änderungen verwerfen
+            </Button>
+          </Stack>
+        </Stack>
+      </Box>
+      {canInspect && (
+        <Card>
+          <CardContent>
+            <Typography variant="h6">
+              Vergabejournal und Spielerfortschritt
+            </Typography>
+            <Stack direction="row" gap={2} flexWrap="wrap" sx={{ my: 2 }}>
+              <TextField
+                size="small"
+                label="Spieler-ID filtern"
+                value={filter}
+                onChange={(e) => {
+                  setFilter(e.target.value.trim());
+                  setOffset(0);
+                  setProgress(null);
+                }}
+              />
+              <TextField
+                size="small"
+                select
+                label="Journal"
+                value={mode}
+                onChange={(e) => {
+                  setMode(e.target.value);
+                  setOffset(0);
+                }}
+              >
+                <MenuItem value="true">Vorschau</MenuItem>
+                <MenuItem value="false">Live</MenuItem>
+              </TextField>
+              <Button
+                disabled={!filter}
+                onClick={() =>
+                  read(
+                    `get_vip_rewards_progress?player_id=${encodeURIComponent(
+                      filter
+                    )}`
+                  )
+                    .then(setProgress)
+                    .catch((e) => setError(e.message))
+                }
+              >
+                Aktuellen Fortschritt anzeigen
+              </Button>
+            </Stack>
+            {progress && (
+              <Alert severity="info">
+                Aktueller Betriebsmodus: {status?.preview ? "Vorschau" : "Live"}
+                . Spielzeit-Meilensteine:{" "}
+                {((progress.total || 0) / 3600).toFixed(2)} h; Rundentreue:{" "}
+                {Math.floor((progress.round || 0) / 60)} min; erfasste
+                Spieltage: {Object.keys(progress.days || {}).length}.
+              </Alert>
+            )}
+            <Box sx={{ overflowX: "auto" }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    {[
+                      "Zeit",
+                      "Spieler",
+                      "Regel",
+                      "Beantragt / gutgeschrieben",
+                      "Ergebnis",
+                    ].map((h) => (
+                      <TableCell key={h}>{h}</TableCell>
+                    ))}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {journal.results.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell>
+                        {new Date(r.occurred * 1000).toLocaleString()}
+                      </TableCell>
+                      <TableCell>{r.player_id}</TableCell>
+                      <TableCell>{labels[r.rule] || r.rule}</TableCell>
+                      <TableCell>
+                        {r.requested_seconds / 3600} /{" "}
+                        {r.credited_seconds / 3600} h
+                        {["prepared", "review"].includes(r.status) && (
+                          <Typography variant="caption" display="block">
+                            Budget reserviert; Gutschrift unbestätigt
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Typography
+                          color={r.status === "review" ? "error" : "inherit"}
+                        >
+                          {results[r.status] || r.status}
+                        </Typography>
+                        {reasons[r.reason] || r.reason}
+                        {r.status === "review" && (
+                          <Typography variant="caption" display="block">
+                            Zielablauf: {r.target || "unbekannt"}
+                          </Typography>
+                        )}
+                        {r.status === "review" && has("can_add_vip") && (
+                          <Button size="small" onClick={() => acknowledge(r)}>
+                            Als geprüft markieren
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {!journal.results.length && (
+                    <TableRow>
+                      <TableCell colSpan={5}>
+                        Noch keine Vergaben für diese Auswahl.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </Box>
+            <Stack direction="row" alignItems="center" gap={2} sx={{ mt: 2 }}>
+              <Button
+                disabled={!offset}
+                onClick={() => setOffset(Math.max(0, offset - 25))}
+              >
+                Zurück
+              </Button>
+              <Typography>{journal.total} Einträge</Typography>
+              <Button
+                disabled={offset + 25 >= journal.total}
+                onClick={() => setOffset(offset + 25)}
+              >
+                Weiter
+              </Button>
+            </Stack>
+          </CardContent>
+        </Card>
+      )}
+    </Stack>
+  );
+}

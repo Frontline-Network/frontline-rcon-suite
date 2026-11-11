@@ -317,6 +317,11 @@ const rawNavMenus = [
         icon: <MilitaryTechIcon />,
       },
       {
+        name: "VIP-Belohnungen",
+        to: "/settings/others/vip-rewards",
+        icon: <MilitaryTechIcon />,
+      },
+      {
         name: "RCON Game Server Connection",
         to: "/settings/others/game-server",
         icon: <CableIcon />,
@@ -433,6 +438,7 @@ const linkTranslationKeys = {
   "/settings/others/tk-bans": "navigation.links.tkBans",
   "/settings/others/name-kicks": "navigation.links.nameKicks",
   "/settings/others/seed-vip": "navigation.links.seedVip",
+  "/settings/others/vip-rewards": "navigation.links.vipRewards",
   "/settings/others/game-server": "navigation.links.gameServer",
   "/settings/others/crcon": "navigation.links.crcon",
   "/settings/others/chat-commands": "navigation.links.chatCommands",
@@ -516,6 +522,7 @@ const taskGroupDefinitions = [
       "/settings/others/tk-bans",
       "/settings/others/name-kicks",
       "/settings/others/seed-vip",
+      "/settings/others/vip-rewards",
       "/settings/others/expired-vip",
     ],
   },

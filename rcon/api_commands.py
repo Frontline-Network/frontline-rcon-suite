@@ -72,6 +72,7 @@ from rcon.user_config.rcon_connection_settings import RconConnectionSettingsUser
 from rcon.user_config.rcon_server_settings import RconServerSettingsUserConfig
 from rcon.user_config.real_vip import RealVipUserConfig
 from rcon.user_config.seed_vip import SeedVIPUserConfig
+from rcon.user_config.vip_rewards import VipRewardsUserConfig
 from rcon.user_config.standard_messages import (
     StandardBroadcastMessagesUserConfig,
     StandardPunishmentMessagesUserConfig,
@@ -1286,6 +1287,37 @@ class RconAPI(Rcon):
             dry_run=False,
             reset_to_default=reset_to_default,
         )
+
+    def get_vip_rewards_config(self):
+        return VipRewardsUserConfig.load_from_db()
+
+    def validate_vip_rewards_config(self, by, config=None, reset_to_default=False, **kwargs):
+        VipRewardsUserConfig.model_validate({} if reset_to_default else (config or kwargs))
+        return True
+
+    def set_vip_rewards_config(self, by, config=None, reset_to_default=False, **kwargs):
+        old = VipRewardsUserConfig.load_from_db()
+        new = VipRewardsUserConfig.model_validate({} if reset_to_default else (config or kwargs))
+        VipRewardsUserConfig.save_to_db(new.model_dump(mode="json"))
+        audit_user_config_differences(old_model=old, new_model=new.model_dump(mode="json"),
+            command_name="set_vip_rewards_config", author=by)
+        return True
+
+    def get_vip_rewards_status(self):
+        from rcon.vip_rewards.service import status
+        return status()
+
+    def get_vip_rewards_progress(self, player_id: str):
+        from rcon.vip_rewards.service import progress
+        return progress(player_id)
+
+    def get_vip_rewards_journal(self, offset=0, limit=50, player_id=None, preview=None):
+        from rcon.vip_rewards.service import journal
+        return journal(offset, limit, player_id, preview)
+
+    def acknowledge_vip_reward_review(self, grant_id: int, by: str):
+        from rcon.vip_rewards.service import acknowledge_review
+        return acknowledge_review(grant_id, by)
 
     def get_seed_vip_config(
         self,

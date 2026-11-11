@@ -524,6 +524,11 @@ const router = createBrowserRouter([
         errorElement: <RouteError />,
       },
       {
+        path: "/settings/others/vip-rewards",
+        lazy: lazyPage(() => import("./pages/settings/vip-rewards")),
+        errorElement: <RouteError />,
+      },
+      {
         path: "/settings/:category/:type",
         lazy: lazyPage(() => import("./pages/settings/[configs]/detail")),
         errorElement: <RouteError />,

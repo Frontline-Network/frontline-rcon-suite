@@ -4978,6 +4978,7 @@ const de = {
       vacBans: "VAC-/Spielsperren",
       tkBans: "TK-Sperre beim Beitritt",
       nameKicks: "Namensfilter",
+      vipRewards: "VIP-Belohnungen",
       seedVip: "Seeder-VIP-Belohnung",
       gameServer: "Gameserver-Verbindung",
       crcon: "CRCON-Einstellungen",

@@ -166,6 +166,7 @@ def run():
                     current_vips=all_vips,
                     players_lookup=player_name_lookup,
                     expiration_timestamps=expiration_timestamps,
+                    reward_time=seeded_timestamp,
                 )
 
                 # Rewards are complete; notification retries never grant VIP.
