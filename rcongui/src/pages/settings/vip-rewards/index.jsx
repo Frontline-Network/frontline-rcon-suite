@@ -12,6 +12,7 @@ import {
   FormControlLabel,
   MenuItem,
   Stack,
+  Slider,
   Switch,
   Table,
   TableBody,
@@ -100,6 +101,74 @@ function NumberField({
       inputProps={{ min, max, step }}
       sx={{ minWidth: 170, flex: 1 }}
     />
+  );
+}
+
+function VipDurationSlider({
+  label = "VIP-Dauer (Tage)",
+  value,
+  onChange,
+  helperText,
+}) {
+  // Indexed stops make short rewards and longer memberships easy to select.
+  // Keep imported values as an exact stop; never round them just by opening/saving.
+  const [original] = useState(value);
+  const choices = [
+    ...new Set([
+      0.5,
+      1,
+      2,
+      4,
+      6,
+      12,
+      24,
+      48,
+      72,
+      120,
+      168,
+      336,
+      720,
+      1440,
+      2160,
+      4320,
+      8760,
+      original,
+      value,
+    ]),
+  ]
+    .filter((v) => Number.isFinite(v) && v > 0 && v <= 8760)
+    .sort((a, b) => a - b);
+  const format = (hours) =>
+    `${(hours / 24).toLocaleString("de-DE", {
+      maximumFractionDigits: 4,
+    })} Tage (${hours.toLocaleString("de-DE")} Stunden)`;
+  const marks = [24, 168, 720, 8760].map((hours) => ({
+    value: choices.indexOf(hours),
+    label: `${hours / 24} T.`,
+  }));
+  return (
+    <Box sx={{ minWidth: 0, width: "100%", flex: "1 1 280px", px: 1 }}>
+      <Typography variant="body2">{label}</Typography>
+      <Typography fontWeight={600} sx={{ mb: 1 }}>
+        {format(value)}
+      </Typography>
+      <Slider
+        aria-label={label}
+        value={choices.indexOf(value)}
+        min={0}
+        max={choices.length - 1}
+        step={1}
+        marks={marks}
+        valueLabelDisplay="auto"
+        valueLabelFormat={(index) => format(choices[index])}
+        getAriaValueText={(index) => format(choices[index])}
+        onChange={(_, index) => onChange(choices[index])}
+      />
+      <Typography variant="caption" color="text.secondary">
+        {helperText ||
+          "Wähle die VIP-Dauer. Ein Tag entspricht 24 Stunden; kürzere Belohnungen sind ebenfalls möglich."}
+      </Typography>
+    </Box>
   );
 }
 
@@ -397,8 +466,8 @@ export default function VipRewards() {
                 Fortschritte und Budgets.
               </Typography>
               <Stack direction="row" gap={2} flexWrap="wrap">
-                <NumberField
-                  label="Maximale VIP-Stunden pro Spieler"
+                <VipDurationSlider
+                  label="Maximale VIP-Tage pro Spieler je 24 Stunden"
                   helperText="Obergrenze für alle Regeln zusammen innerhalb der letzten 24 Stunden. Überschüsse werden nicht später nachgezahlt."
                   value={config.daily_hours}
                   step={0.5}
@@ -457,8 +526,8 @@ export default function VipRewards() {
                 <Collapse in={config[key].enabled} unmountOnExit>
                   <Stack direction="row" gap={2} flexWrap="wrap" sx={{ mt: 2 }}>
                     {key !== "milestones" && (
-                      <NumberField
-                        label="VIP-Stunden"
+                      <VipDurationSlider
+                        label="VIP-Dauer (Tage)"
                         value={config[key].hours}
                         step={0.5}
                         onChange={(v) => ruleChange(key, "hours", v)}
@@ -537,8 +606,8 @@ export default function VipRewards() {
                               )
                             }
                           />
-                          <NumberField
-                            label="VIP-Stunden"
+                          <VipDurationSlider
+                            label="VIP-Dauer (Tage)"
                             value={m.hours}
                             step={0.5}
                             onChange={(v) =>
@@ -631,8 +700,8 @@ export default function VipRewards() {
                       </Stack>
                       <Collapse in={r.enabled} unmountOnExit>
                         <Stack gap={2}>
-                          <NumberField
-                            label="VIP-Stunden"
+                          <VipDurationSlider
+                            label="VIP-Dauer (Tage)"
                             value={r.hours}
                             step={0.5}
                             onChange={(v) => listChange(key, i, "hours", v)}

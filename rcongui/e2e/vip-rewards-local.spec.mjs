@@ -111,7 +111,16 @@ test("weekly support settings reveal on activation and save a custom command", a
   );
   await page.getByLabel("Wöchentliche Team-Unterstützung aktivieren").check();
   await page.getByLabel("Unterstützungspunkte pro Woche").fill("8000");
-  await page.getByLabel("VIP-Stunden", { exact: true }).fill("12");
+  const duration = page.getByRole("slider", {
+    name: "VIP-Dauer (Tage)",
+    exact: true,
+  });
+  await expect(duration).toHaveAttribute(
+    "aria-valuetext",
+    "0,25 Tage (6 Stunden)"
+  );
+  await duration.focus();
+  await page.keyboard.press("ArrowRight");
   await page
     .getByLabel("Chatbefehl für den Wochenfortschritt")
     .fill("!teamvip");
@@ -122,9 +131,17 @@ test("weekly support settings reveal on activation and save a custom command", a
   await expect(page.getByLabel("Unterstützungspunkte pro Woche")).toHaveValue(
     "8000"
   );
-  await expect(page.getByLabel("VIP-Stunden", { exact: true })).toHaveValue(
-    "12"
+  await expect(duration).toHaveAttribute(
+    "aria-valuetext",
+    "0,5 Tage (12 Stunden)"
   );
+  const persisted = await page.evaluate(
+    async () =>
+      (
+        await (await fetch("/get_vip_rewards_config")).json()
+      ).result
+  );
+  expect(persisted.weekly_support.hours).toBe(12);
   await expect(
     page.getByLabel("Chatbefehl für den Wochenfortschritt")
   ).toHaveValue("!teamvip");

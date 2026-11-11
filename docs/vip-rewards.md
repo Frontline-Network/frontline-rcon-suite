@@ -113,3 +113,11 @@ other configuration pages suppress this handler rather than overriding commands.
 
 Local verification: 144 backend tests, 4 browser tests and production build passed.
 No live deployment, real VIP grants or player messages were performed.
+
+
+VIP durations now use day-labelled sliders with practical duration stops, including
+sub-day rewards. Existing nonstandard durations are retained as exact stops.
+The API continues storing hours, so saving does not migrate or round existing
+configuration. The shared daily award cap uses the same control. Four local
+browser tests (including day/hour conversion, save/discard and mobile overflow)
+and the production build passed. No rollout.
