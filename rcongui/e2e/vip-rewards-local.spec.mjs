@@ -1,5 +1,9 @@
 import { test, expect } from "@playwright/test";
-import { openDemoPage, expectNoHorizontalPageOverflow } from "./helpers.mjs";
+import {
+  openDemoPage,
+  expectNoHorizontalPageOverflow,
+  collectRuntimeErrors,
+} from "./helpers.mjs";
 const chooseRule = (page, name) =>
   page
     .getByRole("navigation", { name: "Belohnungsregeln" })
@@ -306,4 +310,98 @@ test("mobile rule selector and compact actions preserve unsaved values", async (
   await expect(
     page.getByRole("button", { name: "Einstellungen speichern", exact: true })
   ).toHaveCount(0);
+});
+
+test("weekly activity, balance, milestones and dated events persist together", async ({
+  page,
+}) => {
+  const errors = collectRuntimeErrors(page);
+  await openDemoPage(page, path);
+  await chooseRule(page, "Wochenaktivität");
+  await page.getByLabel("Wochenaktivität aktivieren").check();
+  await page
+    .getByRole("slider", { name: "Unterschiedliche Tage" })
+    .press("ArrowRight");
+  await chooseRule(page, "Freiwilliger Teamausgleich");
+  await page.getByLabel("Freiwilliger Teamausgleich aktivieren").check();
+  await expect(page.getByText(/!balance meldet Spieler/)).toBeVisible();
+  await page
+    .getByRole("slider", { name: "Mindest-Teamdifferenz" })
+    .press("ArrowRight");
+  await page.getByLabel("Zeitraum für maximale Vergaben").click();
+  await page.getByRole("option", { name: "Wöchentlich", exact: true }).click();
+  await chooseRule(page, "Spielzeit-Meilensteine");
+  await page.getByLabel("Spielzeit-Meilensteine aktivieren").check();
+  await page.getByRole("button", { name: "Meilenstein hinzufügen" }).click();
+  await page
+    .getByRole("slider", { name: "Spielstunden", exact: true })
+    .last()
+    .press("ArrowRight");
+  await chooseRule(page, "Events");
+  await page
+    .getByRole("button", { name: "Event hinzufügen", exact: true })
+    .click();
+  await page.getByLabel("Name", { exact: true }).fill("Community-Abend");
+  await page.getByLabel("Aktiviert", { exact: true }).check();
+  await page.getByLabel(/^Beginn/).fill("2026-11-15T19:00");
+  await page.getByLabel(/^Ende/).fill("2026-11-15T22:00");
+  await page
+    .getByRole("button", { name: "Einstellungen speichern", exact: true })
+    .click();
+  await expect(page.getByText(/Einstellungen gespeichert/)).toBeVisible();
+  const cfg = await page.evaluate(
+    async () => (await (await fetch("/get_vip_rewards_config")).json()).result
+  );
+  expect(cfg.weekly.days).toBe(4);
+  expect(cfg.balance.difference).toBe(5);
+  expect(cfg.balance.limit_period).toBe("week");
+  expect(cfg.milestones.milestones.at(-1)).toEqual({
+    play_hours: 210,
+    hours: 12,
+  });
+  expect(cfg.events[0].name).toBe("Community-Abend");
+  expect(Date.parse(cfg.events[0].end) - Date.parse(cfg.events[0].start)).toBe(
+    3 * 3600000
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectNoHorizontalPageOverflow(page);
+  await page.screenshot({
+    path: "../../outputs/next-release-local-20261111/final-check-event-mobile.png",
+    fullPage: true,
+  });
+  expect(errors).toEqual([]);
+});
+
+test("read-only users can navigate rules without editing configuration", async ({
+  page,
+}) => {
+  await openDemoPage(page, path, { query: { demo_role: "viewer" } });
+  await expect(page.getByText(/Nur Lesezugriff/)).toBeVisible();
+  await expect(
+    page.getByLabel("Wöchentliche Team-Unterstützung aktivieren")
+  ).toBeDisabled();
+  await chooseRule(page, "Events");
+  await expect(
+    page.getByRole("button", { name: "Event hinzufügen" })
+  ).toBeDisabled();
+  await general(page);
+  await expect(
+    page.getByLabel("Neue VIP-Belohnungen aktivieren")
+  ).toBeDisabled();
+  await expect(
+    page.getByLabel("Chatbefehl für den Wochenfortschritt")
+  ).toBeDisabled();
+  await rules(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("combobox", { name: /^Belohnungsregel/ }).click();
+  await page
+    .getByRole("option", { name: "Rundentreue · Aus", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Rundentreue", exact: true })
+  ).toBeVisible();
+  await expect(page.getByLabel("Rundentreue aktivieren")).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Einstellungen speichern", exact: true })
+  ).toBeDisabled();
 });
