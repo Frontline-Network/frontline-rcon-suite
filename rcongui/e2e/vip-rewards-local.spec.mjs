@@ -14,6 +14,49 @@ const general = (page) =>
 const rules = (page) =>
   page.getByRole("tab", { name: "Belohnungen", exact: true }).click();
 const path = "/settings/others/vip-rewards";
+
+test("English reward rules, settings and journal have complete readable copy", async ({
+  page,
+}) => {
+  const errors = collectRuntimeErrors(page);
+  await openDemoPage(page, path, { language: "en" });
+  await expect(
+    page.getByRole("heading", { name: "VIP rewards", exact: true })
+  ).toBeVisible();
+  const nav = page.getByRole("navigation", { name: "Reward rules" });
+  for (const name of [
+    "Melee",
+    "Round loyalty",
+    "Weekly activity",
+    "Weekly team support",
+    "Playtime milestones",
+    "Voluntary team balancing",
+    "Events",
+    "Weapon challenges",
+  ]) {
+    await nav.getByRole("button", { name: new RegExp(name) }).click();
+    const toggle = page.getByLabel(`Enable ${name}`, { exact: true });
+    if (await toggle.count()) await toggle.check();
+    await expect(page.locator("#main-content")).not.toContainText(
+      /Voraussetzungen|Belohnung|aktivieren|Speichern|Spieler|Stunden|Tage/
+    );
+  }
+  await page
+    .getByRole("tab", { name: "General settings", exact: true })
+    .click();
+  await expect(
+    page.getByLabel("Preview: no VIP awards or player messages")
+  ).toBeChecked();
+  await page
+    .getByRole("button", { name: "Save settings", exact: true })
+    .click();
+  await expect(page.getByText(/Settings saved/)).toBeVisible();
+  await page.getByRole("tab", { name: "Award journal", exact: true }).click();
+  await expect(
+    page.getByRole("table", { name: "VIP award journal" })
+  ).toBeVisible();
+  expect(errors).toEqual([]);
+});
 test("local rewards form saves and discards without live requests", async ({
   page,
   baseURL,

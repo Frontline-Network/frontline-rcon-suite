@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+import { tr, vipLocale } from "./copy";
 import ExcludedPlayers from "./ExcludedPlayers";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -42,70 +44,81 @@ async function read(command) {
   return data.result;
 }
 
-const labels = {
-  melee: "Nahkampf",
-  round: "Rundentreue",
-  weekly: "Wochenaktivität",
-  weekly_support: "Wöchentliche Team-Unterstützung",
-  milestones: "Spielzeit-Meilensteine",
-  balance: "Freiwilliger Teamausgleich",
-};
-const notes = {
-  weekly_support:
-    "Sammle Unterstützungspunkte über mehrere Runden: Montag bis Sonntag in der eingestellten Server-Zeitzone. Einmal pro Woche gibt es VIP beim Erreichen des Ziels. Nur neu erspielte Punkte zählen; die Seeding-Pause und das gemeinsame VIP-Limit gelten auch hier. Zielwerte gelten nur für diesen Server und können für HLL und HLLV unterschiedlich eingestellt werden.",
-  melee:
-    "Nur Gegnerkills mit Messer oder Spaten. Wiederholte Gegner werden gemeinsam mit Challenges begrenzt.",
-  round:
-    "Belohne Spieler, die bis zum Rundenende bleiben. Sowohl die Mindestspielzeit als auch der Mindestanteil an der Runde müssen erreicht sein.",
-  weekly:
-    "Belohne regelmäßiges Spielen: An der gewählten Anzahl von Tagen muss jeweils die Mindestspielzeit erreicht werden. Die Woche läuft von Montag bis Sonntag.",
-  milestones:
-    "Belohne insgesamt gesammelte Spielzeit ab Aktivierung. Jede Stufe kann ein Spieler einmal erreichen; frühere Spielzeit wird nicht nachgetragen.",
-  balance:
-    "Der bestehende Autobalancer-Befehl !balance meldet Spieler auch für diese Belohnung an. VIP gibt es erst nach dem freiwilligen Wechsel und der Mindestspielzeit im kleineren Team. Erzwungene Wechsel zählen nicht.",
-};
-const results = {
-  queued: "Vorgemerkt",
-  prepared: "Abgleich ausstehend",
-  awarded: "Gutgeschrieben",
-  preview: "Vorschau",
-  skipped: "Nicht vergeben",
-  review: "Prüfung erforderlich",
-  reviewed: "Manuell geprüft",
-};
-const reasons = {
-  daily_budget: "24-Stunden-Budget erreicht",
-  rule_limit: "Regellimit erreicht",
-  permanent_vip: "Dauerhaftes VIP",
-  disabled_or_paused: "Deaktiviert oder pausiert",
-  previous_write_needs_review: "Frühere Vergabe prüfen",
-  partial_budget: "Teilbetrag: Restbudget",
-  reconciled: "Nach Neustart bestätigt",
-  uncertain_write: "Schreibergebnis unklar",
-  readback_mismatch: "VIP-Ablauf nicht bestätigt",
-};
+function getCopy() {
+  const labels = {
+    melee: tr("Nahkampf"),
+    round: tr("Rundentreue"),
+    weekly: tr("Wochenaktivität"),
+    weekly_support: tr("Wöchentliche Team-Unterstützung"),
+    milestones: tr("Spielzeit-Meilensteine"),
+    balance: tr("Freiwilliger Teamausgleich"),
+  };
+  const notes = {
+    weekly_support: tr(
+      "Sammle Unterstützungspunkte über mehrere Runden: Montag bis Sonntag in der eingestellten Server-Zeitzone. Einmal pro Woche gibt es VIP beim Erreichen des Ziels. Nur neu erspielte Punkte zählen; die Seeding-Pause und das gemeinsame VIP-Limit gelten auch hier. Zielwerte gelten nur für diesen Server und können für HLL und HLLV unterschiedlich eingestellt werden."
+    ),
+    melee: tr(
+      "Nur Gegnerkills mit Messer oder Spaten. Wiederholte Gegner werden gemeinsam mit Challenges begrenzt."
+    ),
+    round: tr(
+      "Belohne Spieler, die bis zum Rundenende bleiben. Sowohl die Mindestspielzeit als auch der Mindestanteil an der Runde müssen erreicht sein."
+    ),
+    weekly: tr(
+      "Belohne regelmäßiges Spielen: An der gewählten Anzahl von Tagen muss jeweils die Mindestspielzeit erreicht werden. Die Woche läuft von Montag bis Sonntag."
+    ),
+    milestones: tr(
+      "Belohne insgesamt gesammelte Spielzeit ab Aktivierung. Jede Stufe kann ein Spieler einmal erreichen; frühere Spielzeit wird nicht nachgetragen."
+    ),
+    balance: tr(
+      "Der bestehende Autobalancer-Befehl !balance meldet Spieler auch für diese Belohnung an. VIP gibt es erst nach dem freiwilligen Wechsel und der Mindestspielzeit im kleineren Team. Erzwungene Wechsel zählen nicht."
+    ),
+  };
+  const results = {
+    queued: tr("Vorgemerkt"),
+    prepared: tr("Abgleich ausstehend"),
+    awarded: tr("Gutgeschrieben"),
+    preview: tr("Vorschau"),
+    skipped: tr("Nicht vergeben"),
+    review: tr("Prüfung erforderlich"),
+    reviewed: tr("Manuell geprüft"),
+  };
+  const reasons = {
+    daily_budget: tr("24-Stunden-Budget erreicht"),
+    rule_limit: tr("Regellimit erreicht"),
+    permanent_vip: tr("Dauerhaftes VIP"),
+    disabled_or_paused: tr("Deaktiviert oder pausiert"),
+    previous_write_needs_review: tr("Frühere Vergabe prüfen"),
+    partial_budget: tr("Teilbetrag: Restbudget"),
+    reconciled: tr("Nach Neustart bestätigt"),
+    uncertain_write: tr("Schreibergebnis unklar"),
+    readback_mismatch: tr("VIP-Ablauf nicht bestätigt"),
+  };
 
-const awardPeriods = {
-  rolling_day: "Letzte 24 Stunden",
-  day: "Täglich",
-  week: "Wöchentlich",
-  month: "Monatlich",
-};
-const ruleLabels = {
-  ...labels,
-  events: "Events",
-  challenges: "Waffen-Challenges",
-};
+  const awardPeriods = {
+    rolling_day: tr("Letzte 24 Stunden"),
+    day: tr("Täglich"),
+    week: tr("Wöchentlich"),
+    month: tr("Monatlich"),
+  };
+  const ruleLabels = {
+    ...labels,
+    events: tr("Events"),
+    challenges: tr("Waffen-Challenges"),
+  };
+  return { labels, notes, results, reasons, awardPeriods, ruleLabels };
+}
 const isRuleEnabled = (config, key) =>
   Array.isArray(config[key])
     ? config[key].some((rule) => rule.enabled)
     : config[key].enabled;
 const durationText = (hours) =>
   hours < 24
-    ? `${hours.toLocaleString("de-DE")} ${hours === 1 ? "Stunde" : "Stunden"}`
-    : `${(hours / 24).toLocaleString("de-DE", { maximumFractionDigits: 2 })} ${
-        hours === 24 ? "Tag" : "Tage"
-      }`;
+    ? `${hours.toLocaleString(vipLocale())} ${
+        hours === 1 ? tr("Stunde") : tr("Stunden")
+      }`
+    : `${(hours / 24).toLocaleString(vipLocale(), {
+        maximumFractionDigits: 2,
+      })} ${hours === 24 ? tr("Tag") : tr("Tage")}`;
 const sliderBoxSx = {
   minWidth: 0,
   width: "100%",
@@ -187,8 +200,8 @@ function ThresholdSlider({
     <Box sx={sliderBoxSx}>
       <SliderHeading
         label={label}
-        value={`${value.toLocaleString("de-DE")}${
-          label.includes("Minuten")
+        value={`${value.toLocaleString(vipLocale())}${
+          /Minuten|minutes/.test(label)
             ? " Min."
             : label.includes("(%)")
             ? " %"
@@ -242,15 +255,16 @@ function AwardLimitSlider({
   ]
     .filter((v) => Number.isInteger(v) && v >= 1 && v <= 1000)
     .sort((a, b) => a - b);
+  const { awardPeriods } = getCopy();
   const format = (count) =>
-    `${count} ${count === 1 ? "Vergabe" : "Vergaben"} / ${
+    `${count} ${count === 1 ? tr("Vergabe") : tr("Vergaben")} / ${
       awardPeriods[period]
     }`;
   return (
     <Box sx={sliderBoxSx}>
-      <SliderHeading label="Maximale Vergaben" value={value} />
+      <SliderHeading label={tr("Maximale Vergaben")} value={value} />
       <Slider
-        aria-label="Maximale Vergaben"
+        aria-label={tr("Maximale Vergaben")}
         value={choices.indexOf(value)}
         min={0}
         max={choices.length - 1}
@@ -271,19 +285,21 @@ function AwardLimitSlider({
         display="block"
         sx={{ lineHeight: 1.6 }}
       >
-        Pro Spieler. Das gemeinsame VIP-Zeitbudget gilt zusätzlich.
+        {tr("Pro Spieler. Das gemeinsame VIP-Zeitbudget gilt zusätzlich.")}
       </Typography>
       <TextField
         select
         fullWidth
-        label="Zeitraum für maximale Vergaben"
+        label={tr("Zeitraum für maximale Vergaben")}
         value={period}
         onChange={(e) => onPeriodChange(e.target.value)}
         size="small"
         helperText={
           period === "rolling_day"
-            ? "Rollend: die jeweils letzten 24 Stunden."
-            : "Kalenderzeitraum in der gewählten Zeitzone. Wochen beginnen montags, Monate am 1."
+            ? tr("Rollend: die jeweils letzten 24 Stunden.")
+            : tr(
+                "Kalenderzeitraum in der gewählten Zeitzone. Wochen beginnen montags, Monate am 1."
+              )
         }
         sx={{ mt: 2 }}
       >
@@ -298,7 +314,7 @@ function AwardLimitSlider({
 }
 
 function VipDurationSlider({
-  label = "VIP-Dauer (Tage)",
+  label = tr("VIP-Dauer (Tage)"),
   value,
   onChange,
   helperText,
@@ -332,12 +348,12 @@ function VipDurationSlider({
     .filter((v) => Number.isFinite(v) && v > 0 && v <= 8760)
     .sort((a, b) => a - b);
   const format = (hours) =>
-    `${(hours / 24).toLocaleString("de-DE", {
+    `${(hours / 24).toLocaleString(vipLocale(), {
       maximumFractionDigits: 4,
-    })} Tage (${hours.toLocaleString("de-DE")} Stunden)`;
+    })} ${tr("Tage")} (${hours.toLocaleString(vipLocale())} ${tr("Stunden")})`;
   const marks = [24, 168, 720, 8760].map((hours) => ({
     value: choices.indexOf(hours),
-    label: `${hours / 24} T.`,
+    label: `${hours / 24} ${vipLocale() === "de-DE" ? "T." : "d"}`,
   }));
   return (
     <Box sx={sliderBoxSx}>
@@ -362,7 +378,9 @@ function VipDurationSlider({
         sx={{ lineHeight: 1.6 }}
       >
         {helperText ||
-          "Wähle die VIP-Dauer. Ein Tag entspricht 24 Stunden; kürzere Belohnungen sind ebenfalls möglich."}
+          tr(
+            "Wähle die VIP-Dauer. Ein Tag entspricht 24 Stunden; kürzere Belohnungen sind ebenfalls möglich."
+          )}
       </Typography>
     </Box>
   );
@@ -378,6 +396,8 @@ function localTime(value) {
 }
 
 export default function VipRewards() {
+  useTranslation("vipRewards");
+  const { labels, notes, results, reasons, ruleLabels } = getCopy();
   const { permissions } = useAuth();
   const has = (key) =>
     permissions?.is_superuser ||
@@ -408,7 +428,9 @@ export default function VipRewards() {
       .catch(() => {
         if (mounted)
           setWeaponError(
-            "Die Waffenliste konnte nicht geladen werden. Vorhandene Auswahlen bleiben erhalten. Bitte lade die Seite erneut."
+            tr(
+              "Die Waffenliste konnte nicht geladen werden. Vorhandene Auswahlen bleiben erhalten. Bitte lade die Seite erneut."
+            )
           );
       });
     return () => {
@@ -476,7 +498,9 @@ export default function VipRewards() {
         config.challenges.some((rule) => rule.enabled && !rule.weapons.length)
       ) {
         throw new Error(
-          "Bitte wähle für jede aktive Waffen-Challenge mindestens eine Waffe aus."
+          tr(
+            "Bitte wähle für jede aktive Waffen-Challenge mindestens eine Waffe aus."
+          )
         );
       }
       for (const command of [
@@ -489,14 +513,16 @@ export default function VipRewards() {
           throw new Error(
             typeof data.error === "string"
               ? data.error
-              : JSON.stringify(data.error || "Speichern fehlgeschlagen")
+              : JSON.stringify(data.error || tr("Speichern fehlgeschlagen"))
           );
       }
       const current = await read("get_vip_rewards_config");
       setConfig(current);
       setSaved(current);
       setNotice(
-        "Einstellungen gespeichert. Der Dienst übernimmt sie bei der nächsten Prüfung."
+        tr(
+          "Einstellungen gespeichert. Der Dienst übernimmt sie bei der nächsten Prüfung."
+        )
       );
     } catch (e) {
       setError(e.message);
@@ -507,7 +533,9 @@ export default function VipRewards() {
   async function acknowledge(row) {
     if (
       !window.confirm(
-        "VIP-Ablauf und zwischenzeitliche Änderungen geprüft? Die Bestätigung erlaubt zukünftige Belohnungen, zahlt diesen Eintrag aber nicht erneut aus."
+        tr(
+          "VIP-Ablauf und zwischenzeitliche Änderungen geprüft? Die Bestätigung erlaubt zukünftige Belohnungen, zahlt diesen Eintrag aber nicht erneut aus."
+        )
       )
     )
       return;
@@ -517,7 +545,9 @@ export default function VipRewards() {
       });
       const data = await response.json();
       if (data.failed || data.error || data.result !== true)
-        throw new Error(data.error || "Eintrag konnte nicht bestätigt werden");
+        throw new Error(
+          data.error || tr("Eintrag konnte nicht bestätigt werden")
+        );
       setJournal((j) => ({
         ...j,
         results: j.results.map((r) =>
@@ -525,7 +555,7 @@ export default function VipRewards() {
             ? {
                 ...r,
                 status: "reviewed",
-                reason: "Manuell geprüft; keine erneute Auszahlung",
+                reason: tr("Manuell geprüft; keine erneute Auszahlung"),
               }
             : r
         ),
@@ -537,7 +567,7 @@ export default function VipRewards() {
   if (!config)
     return (
       <Alert severity={error ? "error" : "info"}>
-        {error || "VIP-Belohnungen werden geladen …"}
+        {error || tr("VIP-Belohnungen werden geladen …")}
       </Alert>
     );
   const changed = JSON.stringify(saved) !== JSON.stringify(config);
@@ -555,16 +585,18 @@ export default function VipRewards() {
   const counts = status?.counts || {},
     targets = status?.thresholds || {};
   const statusText = !status
-    ? "Status wird geladen"
+    ? tr("Status wird geladen")
     : status.status === "active"
-    ? "Aktiv"
+    ? tr("Aktiv")
     : status.status === "disabled"
-    ? "Deaktiviert"
+    ? tr("Deaktiviert")
     : status.status === "seeding"
-    ? `Pausiert: Seeding / Freigabeprüfung - Allies ${counts.allies ?? "?"}/${
-        targets.allies ?? "?"
-      }, Axis ${counts.axis ?? "?"}/${targets.axis ?? "?"}`
-    : "Pausiert: kein bestätigter Serverstatus";
+    ? `${tr("Pausiert: Seeding / Freigabeprüfung")} - Allies ${
+        counts.allies ?? "?"
+      }/${targets.allies ?? "?"}, Axis ${counts.axis ?? "?"}/${
+        targets.axis ?? "?"
+      }`
+    : tr("Pausiert: kein bestätigter Serverstatus");
   return (
     <Stack
       spacing={2}
@@ -587,8 +619,9 @@ export default function VipRewards() {
     >
       {isFakeMode() && (
         <Alert severity="info">
-          Lokaler Formulartest · Nur simulierte Daten. Keine VIP-Vergaben oder
-          Spielernachrichten.
+          {tr(
+            "Lokaler Formulartest · Nur simulierte Daten. Keine VIP-Vergaben oder Spielernachrichten."
+          )}
         </Alert>
       )}
       <Box>
@@ -603,19 +636,20 @@ export default function VipRewards() {
             variant="h4"
             sx={{ fontSize: { xs: 24, md: 28 }, fontWeight: 600 }}
           >
-            VIP-Belohnungen
+            {tr("VIP-Belohnungen")}
           </Typography>
           <Chip size="small" label={statusText} />
           <Chip
             size="small"
             color="primary"
             variant="outlined"
-            label={config.dry_run ? "Vorschau" : "Livebetrieb"}
+            label={config.dry_run ? tr("Vorschau") : tr("Livebetrieb")}
           />
         </Stack>
         <Typography color="text.secondary">
-          Zusätzliche Belohnungen für Spielzeit, Teamhilfe und
-          Herausforderungen.
+          {tr(
+            "Zusätzliche Belohnungen für Spielzeit, Teamhilfe und Herausforderungen."
+          )}
         </Typography>
       </Box>
       {error && (
@@ -633,16 +667,17 @@ export default function VipRewards() {
         onChange={(_, value) => setSection(value)}
         variant="scrollable"
         scrollButtons="auto"
-        aria-label="VIP-Bereiche"
+        aria-label={tr("VIP-Bereiche")}
       >
-        <Tab value="rules" label="Belohnungen" />
-        <Tab value="general" label="Grundeinstellungen" />
-        {canInspect && <Tab value="journal" label="Vergabejournal" />}
+        <Tab value="rules" label={tr("Belohnungen")} />
+        <Tab value="general" label={tr("Grundeinstellungen")} />
+        {canInspect && <Tab value="journal" label={tr("Vergabejournal")} />}
       </Tabs>
       {!canEdit && (
         <Alert severity="info">
-          Nur Lesezugriff. Änderungen erfordern die Berechtigung für
-          Seed-VIP-Einstellungen.
+          {tr(
+            "Nur Lesezugriff. Änderungen erfordern die Berechtigung für Seed-VIP-Einstellungen."
+          )}
         </Alert>
       )}
       <Box
@@ -654,41 +689,44 @@ export default function VipRewards() {
           {section === "general" && (
             <Box sx={{ maxWidth: 900 }}>
               <Typography variant="h6" sx={{ mb: 2 }}>
-                Betrieb und Grenzen
+                {tr("Betrieb und Grenzen")}
               </Typography>
               <Typography color="text.secondary" sx={{ mb: 2 }}>
-                Diese Einstellungen gelten für alle zusätzlichen
-                VIP-Belohnungen.{" "}
+                {tr(
+                  "Diese Einstellungen gelten für alle zusätzlichen VIP-Belohnungen."
+                )}{" "}
                 <Link to="/settings/others/seed-vip">
-                  Seed-VIP separat einstellen
+                  {tr("Seed-VIP separat einstellen")}
                 </Link>
               </Typography>
               <Stack>
                 {toggle(
-                  "Neue VIP-Belohnungen aktivieren",
+                  tr("Neue VIP-Belohnungen aktivieren"),
                   config.enabled,
                   (v) => change("enabled", v)
                 )}
                 {toggle(
-                  "Vorschau: keine VIP-Vergabe und keine Spielernachrichten",
+                  tr(
+                    "Vorschau: keine VIP-Vergabe und keine Spielernachrichten"
+                  ),
                   config.dry_run,
                   (v) => change("dry_run", v)
                 )}
                 {toggle(
-                  "Während des Seedens pausieren",
+                  tr("Während des Seedens pausieren"),
                   config.pause_during_seeding,
                   (v) => change("pause_during_seeding", v)
                 )}
                 {toggle(
-                  "Spieler nach erfolgreicher Vergabe benachrichtigen",
+                  tr("Spieler nach erfolgreicher Vergabe benachrichtigen"),
                   config.notify_player,
                   (v) => change("notify_player", v)
                 )}
               </Stack>
               <Typography variant="body2" sx={{ mb: 2 }}>
-                Seed-VIP-Zielzahlen müssen fünf Minuten gehalten werden. Prüfung
-                alle 30 Sekunden. Vorschau und Livebetrieb haben getrennte
-                Fortschritte und Budgets.
+                {tr(
+                  "Seed-VIP-Zielzahlen müssen fünf Minuten gehalten werden. Prüfung alle 30 Sekunden. Vorschau und Livebetrieb haben getrennte Fortschritte und Budgets."
+                )}
               </Typography>
               <Box
                 sx={{
@@ -702,15 +740,19 @@ export default function VipRewards() {
                 }}
               >
                 <VipDurationSlider
-                  label="Maximale VIP-Tage pro Spieler je 24 Stunden"
-                  helperText="Obergrenze für alle Regeln zusammen innerhalb der letzten 24 Stunden. Überschüsse werden nicht später nachgezahlt."
+                  label={tr("Maximale VIP-Tage pro Spieler je 24 Stunden")}
+                  helperText={tr(
+                    "Obergrenze für alle Regeln zusammen innerhalb der letzten 24 Stunden. Überschüsse werden nicht später nachgezahlt."
+                  )}
                   value={config.daily_hours}
                   step={0.5}
                   onChange={(v) => change("daily_hours", v)}
                 />
                 <ThresholdSlider
-                  label="Abstand beim selben Gegner (Minuten)"
-                  helperText="Weitere Kills desselben Gegners zählen erst nach diesem Abstand erneut für Nahkampf und Challenges."
+                  label={tr("Abstand beim selben Gegner (Minuten)")}
+                  helperText={tr(
+                    "Weitere Kills desselben Gegners zählen erst nach diesem Abstand erneut für Nahkampf und Challenges."
+                  )}
                   value={config.opponent_cooldown_minutes}
                   onChange={(v) => change("opponent_cooldown_minutes", v)}
                 />
@@ -736,8 +778,10 @@ export default function VipRewards() {
                     <TextField
                       {...params}
                       size="small"
-                      label="Zeitzone"
-                      helperText="Bestimmt Tages-, Wochen- und Monatsgrenzen. Sommerzeit wird automatisch berücksichtigt."
+                      label={tr("Zeitzone")}
+                      helperText={tr(
+                        "Bestimmt Tages-, Wochen- und Monatsgrenzen. Sommerzeit wird automatisch berücksichtigt."
+                      )}
                     />
                   )}
                 />
@@ -746,9 +790,11 @@ export default function VipRewards() {
                 fullWidth
                 size="small"
                 sx={{ mt: 3 }}
-                label="Chatbefehl für den Wochenfortschritt"
+                label={tr("Chatbefehl für den Wochenfortschritt")}
                 value={config.status_command}
-                helperText="Zum Beispiel !rewards oder !teamvip. Leer lassen zum Abschalten. Antwort nur privat, höchstens alle 30 Sekunden pro Spieler. Im Probelauf keine Nachrichten."
+                helperText={tr(
+                  "Zum Beispiel !rewards oder !teamvip. Leer lassen zum Abschalten. Antwort nur privat, höchstens alle 30 Sekunden pro Spieler. Im Probelauf keine Nachrichten."
+                )}
                 onChange={(e) => change("status_command", e.target.value)}
               />
               <ExcludedPlayers
@@ -771,7 +817,7 @@ export default function VipRewards() {
             >
               <Box
                 component="nav"
-                aria-label="Belohnungsregeln"
+                aria-label={tr("Belohnungsregeln")}
                 sx={{
                   borderRight: { md: 1 },
                   borderColor: { md: "divider" },
@@ -782,14 +828,15 @@ export default function VipRewards() {
                   select
                   fullWidth
                   size="small"
-                  label="Belohnungsregel"
+                  label={tr("Belohnungsregel")}
                   value={selectedRule}
                   onChange={(e) => setSelectedRule(e.target.value)}
                   sx={{ display: { xs: "block", md: "none" } }}
                 >
                   {Object.entries(ruleLabels).map(([key, title]) => (
                     <MenuItem key={key} value={key}>
-                      {title} · {isRuleEnabled(config, key) ? "Aktiv" : "Aus"}
+                      {title} ·{" "}
+                      {isRuleEnabled(config, key) ? tr("Aktiv") : tr("Aus")}
                     </MenuItem>
                   ))}
                 </TextField>
@@ -797,14 +844,14 @@ export default function VipRewards() {
                   variant="h6"
                   sx={{ display: { xs: "none", md: "block" } }}
                 >
-                  Regel auswählen
+                  {tr("Regel auswählen")}
                 </Typography>
                 <Typography
                   variant="body2"
                   color="text.secondary"
                   sx={{ mt: 0.5, mb: 2, display: { xs: "none", md: "block" } }}
                 >
-                  Belohnungen gezielt konfigurieren.
+                  {tr("Belohnungen gezielt konfigurieren.")}
                 </Typography>
                 <List
                   disablePadding
@@ -848,7 +895,7 @@ export default function VipRewards() {
                             color: active ? "primary.main" : "text.secondary",
                           }}
                         >
-                          {active ? "Aktiv" : "Aus"}
+                          {active ? tr("Aktiv") : tr("Aus")}
                         </Typography>
                       </ListItemButton>
                     );
@@ -885,11 +932,15 @@ export default function VipRewards() {
                           <Typography variant="h5">{title}</Typography>
                           <FormControlLabel
                             sx={{ m: 0, flexShrink: 0 }}
-                            label={config[key].enabled ? "Aktiv" : "Aus"}
+                            label={
+                              config[key].enabled ? tr("Aktiv") : tr("Aus")
+                            }
                             control={
                               <Switch
                                 inputProps={{
-                                  "aria-label": `${title} aktivieren`,
+                                  "aria-label": tr("Regel aktivieren", {
+                                    rule: title,
+                                  }),
                                 }}
                                 checked={config[key].enabled}
                                 onChange={(e) =>
@@ -901,32 +952,35 @@ export default function VipRewards() {
                         </Stack>
                         <Typography variant="body2" color="text.secondary">
                           {key === "weekly_support"
-                            ? "Unterstützungspunkte über mehrere Runden sammeln. Ein Wochenziel für hilfreiches Teamplay."
+                            ? tr(
+                                "Unterstützungspunkte über mehrere Runden sammeln. Ein Wochenziel für hilfreiches Teamplay."
+                              )
                             : notes[key]}
                         </Typography>
                         {!config[key].enabled && (
                           <Typography color="text.secondary" sx={{ mt: 3 }}>
-                            Aktiviere diese Regel, um Voraussetzungen und
-                            Belohnung einzustellen. Gespeicherte Werte bleiben
-                            beim Ausschalten erhalten.
+                            {tr(
+                              "Aktiviere diese Regel, um Voraussetzungen und Belohnung einzustellen. Gespeicherte Werte bleiben beim Ausschalten erhalten."
+                            )}
                           </Typography>
                         )}
                         <Collapse in={config[key].enabled} unmountOnExit>
                           <Stack gap={3} sx={{ mt: 3 }}>
                             <Typography variant="h6">
-                              Voraussetzungen
+                              {tr("Voraussetzungen")}
                             </Typography>
                             {key === "melee" && (
                               <Typography color="text.secondary">
-                                Ein gültiger Nahkampfkill gegen einen Gegner.
-                                Der eingestellte Abstand beim selben Gegner gilt
-                                zusätzlich.
+                                {tr(
+                                  "Ein gültiger Nahkampfkill gegen einen Gegner. Der eingestellte Abstand beim selben Gegner gilt zusätzlich."
+                                )}
                               </Typography>
                             )}
                             {key === "milestones" && (
                               <Typography color="text.secondary">
-                                Erreichte Spielstunden und die zugehörige
-                                Belohnung legst du unten je Stufe fest.
+                                {tr(
+                                  "Erreichte Spielstunden und die zugehörige Belohnung legst du unten je Stufe fest."
+                                )}
                               </Typography>
                             )}
                             {!["melee", "milestones"].includes(key) && (
@@ -939,7 +993,7 @@ export default function VipRewards() {
                                   key
                                 ) && (
                                   <ThresholdSlider
-                                    label="Mindestspielzeit (Minuten)"
+                                    label={tr("Mindestspielzeit (Minuten)")}
                                     max={240}
                                     value={config[key].minutes}
                                     onChange={(v) =>
@@ -949,7 +1003,7 @@ export default function VipRewards() {
                                 )}
                                 {key === "round" && (
                                   <ThresholdSlider
-                                    label="Mindestanteil der Runde (%)"
+                                    label={tr("Mindestanteil der Runde (%)")}
                                     value={Math.round(
                                       config.round.fraction * 100
                                     )}
@@ -961,10 +1015,12 @@ export default function VipRewards() {
                                 )}
                                 {key === "weekly_support" && (
                                   <ThresholdSlider
-                                    label="Unterstützungspunkte pro Woche"
+                                    label={tr("Unterstützungspunkte pro Woche")}
                                     value={config.weekly_support.points}
                                     max={100000000}
-                                    helperText="Beispielwert: 5.000 Punkte. Passe das Ziel an die Spielweise auf deinem Server an."
+                                    helperText={tr(
+                                      "Beispielwert: 5.000 Punkte. Passe das Ziel an die Spielweise auf deinem Server an."
+                                    )}
                                     onChange={(v) =>
                                       ruleChange(key, "points", v)
                                     }
@@ -972,7 +1028,7 @@ export default function VipRewards() {
                                 )}
                                 {key === "weekly" && (
                                   <ThresholdSlider
-                                    label="Unterschiedliche Tage"
+                                    label={tr("Unterschiedliche Tage")}
                                     value={config.weekly.days}
                                     max={7}
                                     onChange={(v) => ruleChange(key, "days", v)}
@@ -981,7 +1037,7 @@ export default function VipRewards() {
                                 {key === "balance" && (
                                   <>
                                     <ThresholdSlider
-                                      label="Mindest-Teamdifferenz"
+                                      label={tr("Mindest-Teamdifferenz")}
                                       max={50}
                                       value={config.balance.difference}
                                       min={2}
@@ -990,7 +1046,7 @@ export default function VipRewards() {
                                       }
                                     />
                                     <ThresholdSlider
-                                      label="Anmeldung gültig (Minuten)"
+                                      label={tr("Anmeldung gültig (Minuten)")}
                                       value={config.balance.signup_minutes}
                                       max={30}
                                       onChange={(v) =>
@@ -1009,7 +1065,7 @@ export default function VipRewards() {
                                 borderColor: "divider",
                               }}
                             >
-                              Belohnung
+                              {tr("Belohnung")}
                             </Typography>
                             {key !== "milestones" && (
                               <Box
@@ -1021,7 +1077,7 @@ export default function VipRewards() {
                               >
                                 {key !== "milestones" && (
                                   <VipDurationSlider
-                                    label="VIP-Dauer (Tage)"
+                                    label={tr("VIP-Dauer (Tage)")}
                                     value={config[key].hours}
                                     step={0.5}
                                     onChange={(v) =>
@@ -1048,14 +1104,16 @@ export default function VipRewards() {
                           </Stack>
                           {key === "weekly_support" && (
                             <Alert severity="info" sx={{ mt: 3 }}>
-                              Wer{" "}
-                              {config.weekly_support.points.toLocaleString(
-                                "de-DE"
-                              )}{" "}
-                              Unterstützungspunkte erreicht, erhält{" "}
-                              {durationText(config.weekly_support.hours)} VIP.
-                              Einmal pro Woche, Montag bis Sonntag ·{" "}
-                              {config.timezone}.
+                              {tr("Wochenziel-Zusammenfassung", {
+                                points:
+                                  config.weekly_support.points.toLocaleString(
+                                    vipLocale()
+                                  ),
+                                duration: durationText(
+                                  config.weekly_support.hours
+                                ),
+                                zone: config.timezone,
+                              })}
                             </Alert>
                           )}
                           {key === "milestones" && (
@@ -1071,7 +1129,7 @@ export default function VipRewards() {
                                   }}
                                 >
                                   <ThresholdSlider
-                                    label="Spielstunden"
+                                    label={tr("Spielstunden")}
                                     value={m.play_hours}
                                     onChange={(v) =>
                                       ruleChange(
@@ -1087,7 +1145,7 @@ export default function VipRewards() {
                                     }
                                   />
                                   <VipDurationSlider
-                                    label="VIP-Dauer (Tage)"
+                                    label={tr("VIP-Dauer (Tage)")}
                                     value={m.hours}
                                     step={0.5}
                                     onChange={(v) =>
@@ -1116,7 +1174,7 @@ export default function VipRewards() {
                                       )
                                     }
                                   >
-                                    Entfernen
+                                    {tr("Entfernen")}
                                   </Button>
                                 </Box>
                               ))}
@@ -1128,7 +1186,7 @@ export default function VipRewards() {
                                   ])
                                 }
                               >
-                                Meilenstein hinzufügen
+                                {tr("Meilenstein hinzufügen")}
                               </Button>
                             </Stack>
                           )}
@@ -1142,12 +1200,18 @@ export default function VipRewards() {
                     <Card key={key}>
                       <CardContent>
                         <Typography variant="h6">
-                          {key === "events" ? "Events" : "Waffen-Challenges"}
+                          {key === "events"
+                            ? tr("Events")
+                            : tr("Waffen-Challenges")}
                         </Typography>
                         <Typography color="text.secondary">
                           {key === "events"
-                            ? "Belohne die Teilnahme in einem festgelegten Zeitraum, zum Beispiel an einem Community-Abend."
-                            : "Wähle Waffen aus der Liste und lege fest, wie viele Gegnerkills damit nötig sind. Teamkills zählen nicht."}
+                            ? tr(
+                                "Belohne die Teilnahme in einem festgelegten Zeitraum, zum Beispiel an einem Community-Abend."
+                              )
+                            : tr(
+                                "Wähle Waffen aus der Liste und lege fest, wie viele Gegnerkills damit nötig sind. Teamkills zählen nicht."
+                              )}
                         </Typography>
                         <Stack gap={3} sx={{ mt: 2 }}>
                           {config[key].map((r, i) => (
@@ -1168,13 +1232,13 @@ export default function VipRewards() {
                               >
                                 <TextField
                                   size="small"
-                                  label="Name"
+                                  label={tr("Name")}
                                   value={r.name}
                                   onChange={(e) =>
                                     listChange(key, i, "name", e.target.value)
                                   }
                                 />
-                                {toggle("Aktiviert", r.enabled, (v) =>
+                                {toggle(tr("Aktiviert"), r.enabled, (v) =>
                                   listChange(key, i, "enabled", v)
                                 )}
                                 <Button
@@ -1186,13 +1250,13 @@ export default function VipRewards() {
                                     )
                                   }
                                 >
-                                  Entfernen
+                                  {tr("Entfernen")}
                                 </Button>
                               </Stack>
                               <Collapse in={r.enabled} unmountOnExit>
                                 <Stack gap={2}>
                                   <VipDurationSlider
-                                    label="VIP-Dauer (Tage)"
+                                    label={tr("VIP-Dauer (Tage)")}
                                     value={r.hours}
                                     step={0.5}
                                     onChange={(v) =>
@@ -1201,7 +1265,7 @@ export default function VipRewards() {
                                   />
                                   {key === "events" ? (
                                     <ThresholdSlider
-                                      label="Mindestspielzeit (Minuten)"
+                                      label={tr("Mindestspielzeit (Minuten)")}
                                       max={240}
                                       value={r.minutes}
                                       onChange={(v) =>
@@ -1228,12 +1292,16 @@ export default function VipRewards() {
                                           listChange(key, i, "weapons", value)
                                         }
                                         disableCloseOnSelect
-                                        noOptionsText="Keine passende Waffe gefunden"
+                                        noOptionsText={tr(
+                                          "Keine passende Waffe gefunden"
+                                        )}
                                         renderInput={(params) => (
                                           <TextField
                                             {...params}
-                                            label="Waffen auswählen"
-                                            helperText="Suchen und mehrere Waffen auswählen. Kills mit diesen Waffen werden gemeinsam gezählt."
+                                            label={tr("Waffen auswählen")}
+                                            helperText={tr(
+                                              "Suchen und mehrere Waffen auswählen. Kills mit diesen Waffen werden gemeinsam gezählt."
+                                            )}
                                           />
                                         )}
                                       />
@@ -1243,7 +1311,7 @@ export default function VipRewards() {
                                         flexWrap="wrap"
                                       >
                                         <ThresholdSlider
-                                          label="Gegnerkills"
+                                          label={tr("Gegnerkills")}
                                           value={r.kills}
                                           onChange={(v) =>
                                             listChange(key, i, "kills", v)
@@ -1252,7 +1320,7 @@ export default function VipRewards() {
                                         <TextField
                                           size="small"
                                           select
-                                          label="Zeitraum"
+                                          label={tr("Zeitraum")}
                                           value={r.period}
                                           onChange={(e) =>
                                             listChange(
@@ -1265,9 +1333,9 @@ export default function VipRewards() {
                                           sx={{ minWidth: 180 }}
                                         >
                                           {[
-                                            ["day", "Täglich"],
-                                            ["week", "Wöchentlich"],
-                                            ["fixed", "Fester Zeitraum"],
+                                            ["day", tr("Täglich")],
+                                            ["week", tr("Wöchentlich")],
+                                            ["fixed", tr("Fester Zeitraum")],
                                           ].map(([v, l]) => (
                                             <MenuItem key={v} value={v}>
                                               {l}
@@ -1291,8 +1359,8 @@ export default function VipRewards() {
                                           type="datetime-local"
                                           label={`${
                                             field === "start"
-                                              ? "Beginn"
-                                              : "Ende"
+                                              ? tr("Beginn")
+                                              : tr("Ende")
                                           } (${
                                             Intl.DateTimeFormat().resolvedOptions()
                                               .timeZone
@@ -1329,7 +1397,7 @@ export default function VipRewards() {
                               key === "events"
                                 ? {
                                     id: crypto.randomUUID(),
-                                    name: "Neues Event",
+                                    name: tr("Neues Event"),
                                     enabled: false,
                                     hours: 4,
                                     limit: 1,
@@ -1341,7 +1409,7 @@ export default function VipRewards() {
                                   }
                                 : {
                                     id: crypto.randomUUID(),
-                                    name: "Neue Challenge",
+                                    name: tr("Neue Challenge"),
                                     enabled: false,
                                     hours: 2,
                                     limit: 1,
@@ -1355,8 +1423,8 @@ export default function VipRewards() {
                           }
                         >
                           {key === "events"
-                            ? "Event hinzufügen"
-                            : "Challenge hinzufügen"}
+                            ? tr("Event hinzufügen")
+                            : tr("Challenge hinzufügen")}
                         </Button>
                       </CardContent>
                     </Card>
@@ -1389,19 +1457,19 @@ export default function VipRewards() {
                   sx={{ flex: 1 }}
                 >
                   {changed
-                    ? "Ungespeicherte Änderungen"
-                    : "Alle Änderungen gespeichert"}
+                    ? tr("Ungespeicherte Änderungen")
+                    : tr("Alle Änderungen gespeichert")}
                 </Typography>
                 <Stack direction="row" gap={1} justifyContent="flex-end">
                   <Button
-                    aria-label="Änderungen verwerfen"
+                    aria-label={tr("Änderungen verwerfen")}
                     disabled={!changed || busy}
                     onClick={() => setConfig(saved)}
                   >
-                    Verwerfen
+                    {tr("Verwerfen")}
                   </Button>
                   <Button
-                    aria-label="Einstellungen speichern"
+                    aria-label={tr("Einstellungen speichern")}
                     variant="contained"
                     sx={{
                       bgcolor: "primary.main",
@@ -1411,7 +1479,7 @@ export default function VipRewards() {
                     disabled={!changed || busy}
                     onClick={save}
                   >
-                    {busy ? "Speichert …" : "Speichern"}
+                    {busy ? tr("Speichert …") : tr("Speichern")}
                   </Button>
                 </Stack>
               </Stack>
@@ -1423,12 +1491,12 @@ export default function VipRewards() {
         <Card>
           <CardContent>
             <Typography variant="h6">
-              Vergabejournal und Spielerfortschritt
+              {tr("Vergabejournal und Spielerfortschritt")}
             </Typography>
             <Stack direction="row" gap={2} flexWrap="wrap" sx={{ my: 2 }}>
               <TextField
                 size="small"
-                label="Spieler-ID filtern"
+                label={tr("Spieler-ID filtern")}
                 value={filter}
                 onChange={(e) => {
                   setFilter(e.target.value.trim());
@@ -1439,15 +1507,15 @@ export default function VipRewards() {
               <TextField
                 size="small"
                 select
-                label="Journal"
+                label={tr("Journal")}
                 value={mode}
                 onChange={(e) => {
                   setMode(e.target.value);
                   setOffset(0);
                 }}
               >
-                <MenuItem value="true">Vorschau</MenuItem>
-                <MenuItem value="false">Live</MenuItem>
+                <MenuItem value="true">{tr("Vorschau")}</MenuItem>
+                <MenuItem value="false">{tr("Live")}</MenuItem>
               </TextField>
               <Button
                 disabled={!filter}
@@ -1461,23 +1529,26 @@ export default function VipRewards() {
                     .catch((e) => setError(e.message))
                 }
               >
-                Aktuellen Fortschritt anzeigen
+                {tr("Aktuellen Fortschritt anzeigen")}
               </Button>
             </Stack>
             {progress && (
               <Alert severity="info">
-                Aktueller Betriebsmodus: {status?.preview ? "Vorschau" : "Live"}
-                . Spielzeit-Meilensteine:{" "}
-                {((progress.total || 0) / 3600).toFixed(2)} h; Rundentreue:{" "}
-                {Math.floor((progress.round || 0) / 60)} min; erfasste
-                Spieltage: {Object.keys(progress.days || {}).length}.
+                {tr("Aktueller Betriebsmodus:")}
+                {status?.preview ? tr("Vorschau") : tr("Live")}
+                {tr(". Spielzeit-Meilensteine:")}{" "}
+                {((progress.total || 0) / 3600).toFixed(2)}
+                {tr("h; Rundentreue:")} {Math.floor((progress.round || 0) / 60)}
+                {tr("min; erfasste Spieltage:")}
+                {Object.keys(progress.days || {}).length}.
                 {progress.weekly_support && (
                   <>
                     {" "}
-                    Wochenziel Unterstützung (Woche ab{" "}
+                    {tr("Wochenziel Unterstützung (Woche ab")}{" "}
                     {progress.weekly_support.week}):{" "}
                     {progress.weekly_support.points} /{" "}
-                    {config.weekly_support.points} Punkte.
+                    {config.weekly_support.points}
+                    {tr("Punkte.")}
                   </>
                 )}
               </Alert>
@@ -1493,7 +1564,7 @@ export default function VipRewards() {
             >
               <Table
                 size="small"
-                aria-label="VIP-Vergabejournal"
+                aria-label={tr("VIP-Vergabejournal")}
                 sx={{
                   minWidth: 760,
                   "& th": {
@@ -1509,11 +1580,11 @@ export default function VipRewards() {
                 <TableHead>
                   <TableRow>
                     {[
-                      "Zeit",
-                      "Spieler",
-                      "Regel",
-                      "VIP-Gutschrift",
-                      "Ergebnis",
+                      tr("Zeit"),
+                      tr("Spieler"),
+                      tr("Regel"),
+                      tr("VIP-Gutschrift"),
+                      tr("Ergebnis"),
                     ].map((h) => (
                       <TableCell key={h}>{h}</TableCell>
                     ))}
@@ -1527,7 +1598,9 @@ export default function VipRewards() {
                           variant="body2"
                           sx={{ whiteSpace: "nowrap" }}
                         >
-                          {new Date(r.occurred * 1000).toLocaleDateString()}
+                          {new Date(r.occurred * 1000).toLocaleDateString(
+                            vipLocale()
+                          )}
                         </Typography>
                         <Typography
                           variant="caption"
@@ -1535,7 +1608,9 @@ export default function VipRewards() {
                           display="block"
                           sx={{ lineHeight: 1.6 }}
                         >
-                          {new Date(r.occurred * 1000).toLocaleTimeString()}
+                          {new Date(r.occurred * 1000).toLocaleTimeString(
+                            vipLocale()
+                          )}
                         </Typography>
                       </TableCell>
                       <TableCell sx={{ maxWidth: 230 }}>
@@ -1575,16 +1650,16 @@ export default function VipRewards() {
                           display="block"
                           sx={{ lineHeight: 1.6 }}
                         >
-                          von{" "}
+                          {tr("von")}{" "}
                           {(r.requested_seconds / 3600).toLocaleString(
                             undefined,
                             { maximumFractionDigits: 2 }
                           )}{" "}
-                          h beantragt
+                          {tr("h beantragt")}
                         </Typography>
                         {["prepared", "review"].includes(r.status) && (
                           <Typography variant="caption" display="block">
-                            Budget reserviert; Gutschrift unbestätigt
+                            {tr("Budget reserviert; Gutschrift unbestätigt")}
                           </Typography>
                         )}
                       </TableCell>
@@ -1613,12 +1688,13 @@ export default function VipRewards() {
                         </Typography>
                         {r.status === "review" && (
                           <Typography variant="caption" display="block">
-                            Zielablauf: {r.target || "unbekannt"}
+                            {tr("Zielablauf:")}
+                            {r.target || tr("unbekannt")}
                           </Typography>
                         )}
                         {r.status === "review" && has("can_add_vip") && (
                           <Button size="small" onClick={() => acknowledge(r)}>
-                            Als geprüft markieren
+                            {tr("Als geprüft markieren")}
                           </Button>
                         )}
                       </TableCell>
@@ -1634,7 +1710,7 @@ export default function VipRewards() {
                           height: 100,
                         }}
                       >
-                        Noch keine Vergaben für diese Auswahl.
+                        {tr("Noch keine Vergaben für diese Auswahl.")}
                       </TableCell>
                     </TableRow>
                   )}
@@ -1646,22 +1722,21 @@ export default function VipRewards() {
                 disabled={!offset}
                 onClick={() => setOffset(Math.max(0, offset - 25))}
               >
-                Zurück
+                {tr("Zurück")}
               </Button>
               <Typography variant="body2" color="text.secondary">
                 {journal.total
-                  ? `${offset + 1}–${Math.min(
-                      offset + 25,
-                      journal.total
-                    )} von ${journal.total}`
+                  ? `${offset + 1}–${Math.min(offset + 25, journal.total)} ${tr(
+                      "von"
+                    )} ${journal.total}`
                   : "0"}{" "}
-                Einträge
+                {tr("Einträge")}
               </Typography>
               <Button
                 disabled={offset + 25 >= journal.total}
                 onClick={() => setOffset(offset + 25)}
               >
-                Weiter
+                {tr("Weiter")}
               </Button>
             </Stack>
           </CardContent>

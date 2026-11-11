@@ -1,8 +1,10 @@
+import { useTranslation } from "react-i18next";
+import { tr } from "./copy";
 import { useEffect, useState } from "react";
 import { Autocomplete, Box, Chip, TextField, Typography } from "@mui/material";
 import { cmd } from "@/utils/fetchUtils";
 
-const nameOf = (p) => p.names?.[0]?.name || p.name || "Unbekannter Spieler";
+const nameOf = (p) => p.names?.[0]?.name || p.name || tr("Unbekannter Spieler");
 async function findPlayers(params) {
   const response = await cmd.GET_PLAYERS_RECORDS({
     payload: { page: 1, page_size: 15, ignore_accent: true, ...params },
@@ -12,10 +14,11 @@ async function findPlayers(params) {
     response?.result?.failed ||
     !Array.isArray(response?.result?.players)
   )
-    throw new Error("Spielersuche nicht verfügbar");
+    throw new Error(tr("Spielersuche nicht verfügbar"));
   return response.result.players;
 }
 export default function ExcludedPlayers({ value, onChange }) {
+  useTranslation("vipRewards");
   const [input, setInput] = useState("");
   const [options, setOptions] = useState([]);
   const [known, setKnown] = useState({});
@@ -70,7 +73,7 @@ export default function ExcludedPlayers({ value, onChange }) {
         }
       } catch {
         if (active)
-          setError("Spielersuche fehlgeschlagen. Bitte erneut versuchen.");
+          setError(tr("Spielersuche fehlgeschlagen. Bitte erneut versuchen."));
       } finally {
         if (active) setLoading(false);
       }
@@ -86,7 +89,7 @@ export default function ExcludedPlayers({ value, onChange }) {
       filterSelectedOptions
       options={options}
       loading={loading}
-      loadingText="Spieler werden gesucht …"
+      loadingText={tr("Spieler werden gesucht …")}
       inputValue={input}
       value={value.map((id) => known[id] || { player_id: id })}
       filterOptions={(rows) => rows}
@@ -101,8 +104,8 @@ export default function ExcludedPlayers({ value, onChange }) {
       }}
       noOptionsText={
         input.trim().length < 2
-          ? "Mindestens zwei Zeichen eingeben"
-          : "Keine Spieler gefunden"
+          ? tr("Mindestens zwei Zeichen eingeben")
+          : tr("Keine Spieler gefunden")
       }
       renderOption={({ key, ...props }, p) => (
         <Box component="li" key={p.player_id} {...props}>
@@ -135,11 +138,13 @@ export default function ExcludedPlayers({ value, onChange }) {
       renderInput={(params) => (
         <TextField
           {...params}
-          label="Ausgeschlossene Spieler"
+          label={tr("Ausgeschlossene Spieler")}
           error={!!error}
           helperText={
             error ||
-            "Nach Spielernamen oder ID suchen und auswählen. Ausgewählte Spieler erhalten keine dieser VIP-Belohnungen. Die Spielerakte bleibt unverändert."
+            tr(
+              "Nach Spielernamen oder ID suchen und auswählen. Ausgewählte Spieler erhalten keine dieser VIP-Belohnungen. Die Spielerakte bleibt unverändert."
+            )
           }
         />
       )}
