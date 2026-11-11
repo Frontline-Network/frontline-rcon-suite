@@ -1,7 +1,13 @@
+import ExcludedPlayers from "./ExcludedPlayers";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Alert,
+  Tabs,
+  Tab,
+  List,
+  ListItemButton,
+  ListItemText,
   Autocomplete,
   Collapse,
   Box,
@@ -116,7 +122,16 @@ function ThresholdSlider({
     .filter((n) => Number.isFinite(n) && n >= min)
     .sort((a, b) => a - b);
   return (
-    <Box sx={{ minWidth: 0, width: "100%", flex: "1 1 280px", px: 1 }}>
+    <Box
+      sx={{
+        minWidth: 0,
+        width: "100%",
+        flex: "1 1 auto",
+        px: 1,
+        "& > .MuiTypography-root:first-child": { display: "inline-block" },
+        "& > .MuiTypography-root:nth-child(2)": { float: "right" },
+      }}
+    >
       <Typography variant="body2">{label}</Typography>
       <Typography fontWeight={600}>{value.toLocaleString("de-DE")}</Typography>
       <Slider
@@ -166,7 +181,16 @@ function AwardLimitSlider({
       awardPeriods[period]
     }`;
   return (
-    <Box sx={{ minWidth: 0, width: "100%", flex: "1 1 280px", px: 1 }}>
+    <Box
+      sx={{
+        minWidth: 0,
+        width: "100%",
+        flex: "1 1 auto",
+        px: 1,
+        "& > .MuiTypography-root:first-child": { display: "inline-block" },
+        "& > .MuiTypography-root:nth-child(2)": { float: "right" },
+      }}
+    >
       <Typography variant="body2">Maximale Vergaben</Typography>
       <Typography fontWeight={600} sx={{ mb: 1 }}>
         {format(value)}
@@ -254,10 +278,23 @@ function VipDurationSlider({
     label: `${hours / 24} T.`,
   }));
   return (
-    <Box sx={{ minWidth: 0, width: "100%", flex: "1 1 280px", px: 1 }}>
+    <Box
+      sx={{
+        minWidth: 0,
+        width: "100%",
+        flex: "1 1 auto",
+        px: 1,
+        "& > .MuiTypography-root:first-child": { display: "inline-block" },
+        "& > .MuiTypography-root:nth-child(2)": { float: "right" },
+      }}
+    >
       <Typography variant="body2">{label}</Typography>
       <Typography fontWeight={600} sx={{ mb: 1 }}>
-        {format(value)}
+        {value < 24
+          ? `${value.toLocaleString("de-DE")} Stunden`
+          : `${(value / 24).toLocaleString("de-DE", {
+              maximumFractionDigits: 2,
+            })} ${value === 24 ? "Tag" : "Tage"}`}
       </Typography>
       <Slider
         aria-label={label}
@@ -295,6 +332,8 @@ export default function VipRewards() {
     permissions?.permissions?.some((p) => p.permission === key);
   const canEdit = has("can_change_seed_vip_config");
   const canInspect = has("can_view_vip_ids");
+  const [section, setSection] = useState("rules");
+  const [selectedRule, setSelectedRule] = useState("weekly_support");
   const [config, setConfig] = useState(null);
   const [saved, setSaved] = useState(null);
   const [status, setStatus] = useState(null);
@@ -481,7 +520,7 @@ export default function VipRewards() {
         width: "100%",
         minWidth: 0,
         boxSizing: "border-box",
-        maxWidth: 1200,
+        maxWidth: 1440,
         mx: "auto",
         p: { xs: 1, md: 3 },
       }}
@@ -500,13 +539,6 @@ export default function VipRewards() {
           Herausforderungen.
         </Typography>
       </Box>
-      <Button
-        component={Link}
-        to="/settings/others/seed-vip"
-        sx={{ alignSelf: "flex-start" }}
-      >
-        Seed-VIP-Einstellungen öffnen
-      </Button>
       {error && (
         <Alert severity="error" onClose={() => setError("")}>
           {error}
@@ -517,19 +549,26 @@ export default function VipRewards() {
           {notice}
         </Alert>
       )}
-      {canInspect && (
-        <Alert severity={status?.status === "active" ? "success" : "info"}>
-          {statusText}{" "}
-          {status?.preview && (
-            <Chip size="small" label="Vorschau" sx={{ ml: 1 }} />
-          )}
-        </Alert>
-      )}
-      <Alert severity="info">
-        Die Seeding-Belohnung bleibt separat eingestellt. Wähle hier, wofür
-        Spieler zusätzlich VIP-Zeit erhalten sollen. Bei aktivierter
-        Seeding-Pause zählen Spielzeit und Kills erst nach dem Seeding.
-      </Alert>
+      <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
+        <Chip size="small" label={statusText} />
+        <Chip
+          size="small"
+          color="primary"
+          variant="outlined"
+          label={config.dry_run ? "Vorschau" : "Livebetrieb"}
+        />
+      </Stack>
+      <Tabs
+        value={section}
+        onChange={(_, value) => setSection(value)}
+        variant="scrollable"
+        scrollButtons="auto"
+        aria-label="VIP-Bereiche"
+      >
+        <Tab value="rules" label="Belohnungen" />
+        <Tab value="general" label="Grundeinstellungen" />
+        {canInspect && <Tab value="journal" label="Vergabejournal" />}
+      </Tabs>
       {!canEdit && (
         <Alert severity="info">
           Nur Lesezugriff. Änderungen erfordern die Berechtigung für
@@ -542,9 +581,18 @@ export default function VipRewards() {
         sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}
       >
         <Stack spacing={2}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6">1. Betrieb und Grenzen</Typography>
+          {section === "general" && (
+            <Box sx={{ maxWidth: 900 }}>
+              <Typography variant="h6" sx={{ mb: 2 }}>
+                Betrieb und Grenzen
+              </Typography>
+              <Typography color="text.secondary" sx={{ mb: 2 }}>
+                Diese Einstellungen gelten für alle zusätzlichen
+                VIP-Belohnungen.{" "}
+                <Link to="/settings/others/seed-vip">
+                  Seed-VIP separat einstellen
+                </Link>
+              </Typography>
               <Stack>
                 {toggle(
                   "Neue VIP-Belohnungen aktivieren",
@@ -586,11 +634,32 @@ export default function VipRewards() {
                   value={config.opponent_cooldown_minutes}
                   onChange={(v) => change("opponent_cooldown_minutes", v)}
                 />
-                <TextField
-                  size="small"
-                  label="Zeitzone"
+                <Autocomplete
+                  sx={{ minWidth: 220, flex: 1 }}
+                  disableClearable
+                  options={[
+                    ...new Set([
+                      config.timezone,
+                      "UTC",
+                      ...(Intl.supportedValuesOf
+                        ? Intl.supportedValuesOf("timeZone")
+                        : [
+                            "Europe/Berlin",
+                            "Europe/London",
+                            "America/New_York",
+                          ]),
+                    ]),
+                  ].sort()}
                   value={config.timezone}
-                  onChange={(e) => change("timezone", e.target.value)}
+                  onChange={(_, value) => change("timezone", value)}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      size="small"
+                      label="Zeitzone"
+                      helperText="Bestimmt Tages-, Wochen- und Monatsgrenzen. Sommerzeit wird automatisch berücksichtigt."
+                    />
+                  )}
                 />
               </Stack>
               <TextField
@@ -602,360 +671,562 @@ export default function VipRewards() {
                 helperText="Zum Beispiel !rewards oder !teamvip. Leer lassen zum Abschalten. Antwort nur privat, höchstens alle 30 Sekunden pro Spieler. Im Probelauf keine Nachrichten."
                 onChange={(e) => change("status_command", e.target.value)}
               />
-              <TextField
-                fullWidth
-                multiline
-                minRows={2}
-                sx={{ mt: 2 }}
-                label="Ausgeschlossene Spieler-IDs (eine pro Zeile)"
-                value={config.excluded_player_ids.join("\n")}
-                onChange={(e) =>
-                  change("excluded_player_ids", e.target.value.split("\n"))
-                }
+              <ExcludedPlayers
+                value={config.excluded_player_ids}
+                onChange={(ids) => change("excluded_player_ids", ids)}
               />
-            </CardContent>
-          </Card>
-          <Typography variant="h6">2. Belohnungen auswählen</Typography>
-          <Typography color="text.secondary">
-            Aktiviere nur die gewünschten Regeln. Beim Ausschalten bleiben deine
-            Eingaben erhalten.
-          </Typography>
-          {Object.entries(labels).map(([key, title]) => (
-            <Card key={key}>
-              <CardContent>
-                <Typography variant="h6">{title}</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {notes[key]}
+            </Box>
+          )}
+          {section === "rules" && (
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "minmax(0, 1fr)",
+                  md: "280px minmax(0, 1fr)",
+                },
+                gap: { xs: 3, md: 4 },
+                minHeight: { md: 600 },
+              }}
+            >
+              <Box
+                component="nav"
+                aria-label="Belohnungsregeln"
+                sx={{
+                  borderRight: { md: 1 },
+                  borderColor: { md: "divider" },
+                  pr: { md: 2 },
+                }}
+              >
+                <Typography variant="h6">Regel auswählen</Typography>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mt: 0.5, mb: 2 }}
+                >
+                  Belohnungen gezielt konfigurieren.
                 </Typography>
-                {toggle(`${title} aktivieren`, config[key].enabled, (v) =>
-                  ruleChange(key, "enabled", v)
-                )}
-                <Collapse in={config[key].enabled} unmountOnExit>
-                  <Stack direction="row" gap={2} flexWrap="wrap" sx={{ mt: 2 }}>
-                    {key !== "milestones" && (
-                      <VipDurationSlider
-                        label="VIP-Dauer (Tage)"
-                        value={config[key].hours}
-                        step={0.5}
-                        onChange={(v) => ruleChange(key, "hours", v)}
-                      />
-                    )}
-                    {["melee", "round", "balance"].includes(key) && (
-                      <AwardLimitSlider
-                        value={config[key].limit}
-                        period={config[key].limit_period}
-                        onPeriodChange={(v) =>
-                          ruleChange(key, "limit_period", v)
-                        }
-                        onChange={(v) => ruleChange(key, "limit", v)}
-                      />
-                    )}
-                    {["round", "weekly", "balance"].includes(key) && (
-                      <ThresholdSlider
-                        label="Mindestspielzeit (Minuten)"
-                        max={240}
-                        value={config[key].minutes}
-                        onChange={(v) => ruleChange(key, "minutes", v)}
-                      />
-                    )}
-                    {key === "round" && (
-                      <ThresholdSlider
-                        label="Mindestanteil der Runde (%)"
-                        value={Math.round(config.round.fraction * 100)}
-                        max={100}
-                        onChange={(v) => ruleChange(key, "fraction", v / 100)}
-                      />
-                    )}
-                    {key === "weekly_support" && (
-                      <ThresholdSlider
-                        label="Unterstützungspunkte pro Woche"
-                        value={config.weekly_support.points}
-                        max={100000000}
-                        helperText="Beispielwert: 5.000 Punkte. Passe das Ziel an die Spielweise auf deinem Server an."
-                        onChange={(v) => ruleChange(key, "points", v)}
-                      />
-                    )}
-                    {key === "weekly" && (
-                      <ThresholdSlider
-                        label="Unterschiedliche Tage"
-                        value={config.weekly.days}
-                        max={7}
-                        onChange={(v) => ruleChange(key, "days", v)}
-                      />
-                    )}
-                    {key === "balance" && (
-                      <>
-                        <ThresholdSlider
-                          label="Mindest-Teamdifferenz"
-                          max={50}
-                          value={config.balance.difference}
-                          min={2}
-                          onChange={(v) => ruleChange(key, "difference", v)}
-                        />
-                        <ThresholdSlider
-                          label="Anmeldung gültig (Minuten)"
-                          value={config.balance.signup_minutes}
-                          max={30}
-                          onChange={(v) => ruleChange(key, "signup_minutes", v)}
-                        />
-                      </>
-                    )}
-                  </Stack>
-                  {key === "milestones" && (
-                    <Stack gap={2}>
-                      {config.milestones.milestones.map((m, i) => (
-                        <Stack key={i} direction="row" gap={2} flexWrap="wrap">
-                          <ThresholdSlider
-                            label="Spielstunden"
-                            value={m.play_hours}
-                            onChange={(v) =>
-                              ruleChange(
-                                key,
-                                "milestones",
-                                config.milestones.milestones.map((x, j) =>
-                                  j === i ? { ...x, play_hours: v } : x
-                                )
-                              )
-                            }
-                          />
-                          <VipDurationSlider
-                            label="VIP-Dauer (Tage)"
-                            value={m.hours}
-                            step={0.5}
-                            onChange={(v) =>
-                              ruleChange(
-                                key,
-                                "milestones",
-                                config.milestones.milestones.map((x, j) =>
-                                  j === i ? { ...x, hours: v } : x
-                                )
-                              )
-                            }
-                          />
-                          <Button
-                            onClick={() =>
-                              ruleChange(
-                                key,
-                                "milestones",
-                                config.milestones.milestones.filter(
-                                  (_, j) => j !== i
-                                )
-                              )
-                            }
-                          >
-                            Entfernen
-                          </Button>
-                        </Stack>
-                      ))}
-                      <Button
-                        onClick={() =>
-                          ruleChange(key, "milestones", [
-                            ...config.milestones.milestones,
-                            { play_hours: 200, hours: 12 },
-                          ])
-                        }
+                <List
+                  disablePadding
+                  sx={{
+                    display: { xs: "grid", md: "block" },
+                    gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                  }}
+                >
+                  {Object.entries({
+                    ...labels,
+                    events: "Events",
+                    challenges: "Waffen-Challenges",
+                  }).map(([key, title]) => {
+                    const active = Array.isArray(config[key])
+                      ? config[key].some((r) => r.enabled)
+                      : config[key].enabled;
+                    return (
+                      <ListItemButton
+                        key={key}
+                        selected={selectedRule === key}
+                        onClick={() => setSelectedRule(key)}
+                        sx={{ borderRadius: 1, mb: 0.5, py: 1.25 }}
                       >
-                        Meilenstein hinzufügen
-                      </Button>
-                    </Stack>
-                  )}
-                </Collapse>
-              </CardContent>
-            </Card>
-          ))}
-          {["events", "challenges"].map((key) => (
-            <Card key={key}>
-              <CardContent>
-                <Typography variant="h6">
-                  {key === "events" ? "Events" : "Waffen-Challenges"}
-                </Typography>
-                <Typography color="text.secondary">
-                  {key === "events"
-                    ? "Belohne die Teilnahme in einem festgelegten Zeitraum, zum Beispiel an einem Community-Abend."
-                    : "Wähle Waffen aus der Liste und lege fest, wie viele Gegnerkills damit nötig sind. Teamkills zählen nicht."}
-                </Typography>
-                <Stack gap={3} sx={{ mt: 2 }}>
-                  {config[key].map((r, i) => (
-                    <Stack
-                      gap={2}
-                      key={r.id}
-                      sx={{ borderBottom: 1, borderColor: "divider", pb: 2 }}
-                    >
-                      <Stack
-                        direction="row"
-                        flexWrap="wrap"
-                        gap={2}
-                        alignItems="center"
-                      >
-                        <TextField
-                          size="small"
-                          label="Name"
-                          value={r.name}
-                          onChange={(e) =>
-                            listChange(key, i, "name", e.target.value)
-                          }
+                        <ListItemText
+                          primary={title}
+                          secondary={active ? "Aktiv" : "Aus"}
+                          primaryTypographyProps={{
+                            fontWeight: selectedRule === key ? 600 : 400,
+                          }}
+                          secondaryTypographyProps={{
+                            color: active ? "primary.main" : "text.secondary",
+                          }}
                         />
-                        {toggle("Aktiviert", r.enabled, (v) =>
-                          listChange(key, i, "enabled", v)
+                      </ListItemButton>
+                    );
+                  })}
+                </List>
+              </Box>
+              <Box
+                sx={{
+                  minWidth: 0,
+                  "& > .MuiCard-root": {
+                    boxShadow: "none",
+                    background: "transparent",
+                    border: 0,
+                  },
+                  "& > .MuiCard-root > .MuiCardContent-root": {
+                    p: 0,
+                    maxWidth: 900,
+                  },
+                }}
+              >
+                {Object.entries(labels)
+                  .filter(([key]) => key === selectedRule)
+                  .map(([key, title]) => (
+                    <Card key={key}>
+                      <CardContent>
+                        <Typography variant="h5" sx={{ mb: 1 }}>
+                          {title}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {key === "weekly_support"
+                            ? "Unterstützungspunkte über mehrere Runden sammeln. Ein Wochenziel für hilfreiches Teamplay."
+                            : notes[key]}
+                        </Typography>
+                        {toggle(
+                          `${title} aktivieren`,
+                          config[key].enabled,
+                          (v) => ruleChange(key, "enabled", v)
                         )}
-                        <Button
-                          color="error"
-                          onClick={() =>
-                            change(
-                              key,
-                              config[key].filter((_, j) => j !== i)
-                            )
-                          }
-                        >
-                          Entfernen
-                        </Button>
-                      </Stack>
-                      <Collapse in={r.enabled} unmountOnExit>
-                        <Stack gap={2}>
-                          <VipDurationSlider
-                            label="VIP-Dauer (Tage)"
-                            value={r.hours}
-                            step={0.5}
-                            onChange={(v) => listChange(key, i, "hours", v)}
-                          />
-                          {key === "events" ? (
-                            <ThresholdSlider
-                              label="Mindestspielzeit (Minuten)"
-                              max={240}
-                              value={r.minutes}
-                              onChange={(v) => listChange(key, i, "minutes", v)}
-                            />
-                          ) : (
-                            <>
-                              {weaponError && (
-                                <Alert severity="warning">{weaponError}</Alert>
-                              )}
-                              <Autocomplete
-                                multiple
-                                options={[
-                                  ...new Set([...weapons, ...r.weapons]),
-                                ]}
-                                value={r.weapons}
-                                onChange={(_, value) =>
-                                  listChange(key, i, "weapons", value)
-                                }
-                                disableCloseOnSelect
-                                noOptionsText="Keine passende Waffe gefunden"
-                                renderInput={(params) => (
-                                  <TextField
-                                    {...params}
-                                    label="Waffen auswählen"
-                                    helperText="Suchen und mehrere Waffen auswählen. Kills mit diesen Waffen werden gemeinsam gezählt."
-                                  />
-                                )}
+                        {!config[key].enabled && (
+                          <Typography color="text.secondary" sx={{ mt: 3 }}>
+                            Aktiviere diese Regel, um Voraussetzungen und
+                            Belohnung einzustellen. Gespeicherte Werte bleiben
+                            beim Ausschalten erhalten.
+                          </Typography>
+                        )}
+                        <Collapse in={config[key].enabled} unmountOnExit>
+                          <Stack gap={3} sx={{ mt: 3 }}>
+                            <Typography variant="h6">
+                              Voraussetzungen
+                            </Typography>
+                            {key === "melee" && (
+                              <Typography color="text.secondary">
+                                Ein gültiger Nahkampfkill gegen einen Gegner.
+                                Der eingestellte Abstand beim selben Gegner gilt
+                                zusätzlich.
+                              </Typography>
+                            )}
+                            {key === "milestones" && (
+                              <Typography color="text.secondary">
+                                Erreichte Spielstunden und die zugehörige
+                                Belohnung legst du unten je Stufe fest.
+                              </Typography>
+                            )}
+                            {["round", "weekly", "balance"].includes(key) && (
+                              <ThresholdSlider
+                                label="Mindestspielzeit (Minuten)"
+                                max={240}
+                                value={config[key].minutes}
+                                onChange={(v) => ruleChange(key, "minutes", v)}
                               />
-                              <Stack direction="row" gap={2} flexWrap="wrap">
+                            )}
+                            {key === "round" && (
+                              <ThresholdSlider
+                                label="Mindestanteil der Runde (%)"
+                                value={Math.round(config.round.fraction * 100)}
+                                max={100}
+                                onChange={(v) =>
+                                  ruleChange(key, "fraction", v / 100)
+                                }
+                              />
+                            )}
+                            {key === "weekly_support" && (
+                              <ThresholdSlider
+                                label="Unterstützungspunkte pro Woche"
+                                value={config.weekly_support.points}
+                                max={100000000}
+                                helperText="Beispielwert: 5.000 Punkte. Passe das Ziel an die Spielweise auf deinem Server an."
+                                onChange={(v) => ruleChange(key, "points", v)}
+                              />
+                            )}
+                            {key === "weekly" && (
+                              <ThresholdSlider
+                                label="Unterschiedliche Tage"
+                                value={config.weekly.days}
+                                max={7}
+                                onChange={(v) => ruleChange(key, "days", v)}
+                              />
+                            )}
+                            {key === "balance" && (
+                              <>
                                 <ThresholdSlider
-                                  label="Gegnerkills"
-                                  value={r.kills}
+                                  label="Mindest-Teamdifferenz"
+                                  max={50}
+                                  value={config.balance.difference}
+                                  min={2}
                                   onChange={(v) =>
-                                    listChange(key, i, "kills", v)
+                                    ruleChange(key, "difference", v)
                                   }
                                 />
-                                <TextField
-                                  size="small"
-                                  select
-                                  label="Zeitraum"
-                                  value={r.period}
-                                  onChange={(e) =>
-                                    listChange(key, i, "period", e.target.value)
+                                <ThresholdSlider
+                                  label="Anmeldung gültig (Minuten)"
+                                  value={config.balance.signup_minutes}
+                                  max={30}
+                                  onChange={(v) =>
+                                    ruleChange(key, "signup_minutes", v)
                                   }
-                                  sx={{ minWidth: 180 }}
-                                >
-                                  {[
-                                    ["day", "Täglich"],
-                                    ["week", "Wöchentlich"],
-                                    ["fixed", "Fester Zeitraum"],
-                                  ].map(([v, l]) => (
-                                    <MenuItem key={v} value={v}>
-                                      {l}
-                                    </MenuItem>
-                                  ))}
-                                </TextField>
-                              </Stack>
-                            </>
+                                />
+                              </>
+                            )}
+                            <Typography
+                              variant="h6"
+                              sx={{
+                                pt: 2,
+                                borderTop: 1,
+                                borderColor: "divider",
+                              }}
+                            >
+                              Belohnung
+                            </Typography>
+                            {key !== "milestones" && (
+                              <VipDurationSlider
+                                label="VIP-Dauer (Tage)"
+                                value={config[key].hours}
+                                step={0.5}
+                                onChange={(v) => ruleChange(key, "hours", v)}
+                              />
+                            )}
+                            {["melee", "round", "balance"].includes(key) && (
+                              <AwardLimitSlider
+                                value={config[key].limit}
+                                period={config[key].limit_period}
+                                onPeriodChange={(v) =>
+                                  ruleChange(key, "limit_period", v)
+                                }
+                                onChange={(v) => ruleChange(key, "limit", v)}
+                              />
+                            )}
+                          </Stack>
+                          {key === "weekly_support" && (
+                            <Alert severity="info" sx={{ mt: 3 }}>
+                              Wer{" "}
+                              {config.weekly_support.points.toLocaleString(
+                                "de-DE"
+                              )}{" "}
+                              Unterstützungspunkte erreicht, erhält{" "}
+                              {config.weekly_support.hours < 24
+                                ? `${config.weekly_support.hours} Stunden`
+                                : `${
+                                    config.weekly_support.hours / 24
+                                  } Tage`}{" "}
+                              VIP. Einmal pro Woche, Montag bis Sonntag ·{" "}
+                              {config.timezone}.
+                            </Alert>
                           )}
-                          {(key === "events" || r.period === "fixed") && (
-                            <Stack direction="row" gap={2} flexWrap="wrap">
-                              {["start", "end"].map((field) => (
-                                <TextField
-                                  key={field}
-                                  size="small"
-                                  type="datetime-local"
-                                  label={`${
-                                    field === "start" ? "Beginn" : "Ende"
-                                  } (${
-                                    Intl.DateTimeFormat().resolvedOptions()
-                                      .timeZone
-                                  })`}
-                                  InputLabelProps={{ shrink: true }}
-                                  value={localTime(r[field])}
-                                  onChange={(e) =>
-                                    listChange(
-                                      key,
-                                      i,
-                                      field,
-                                      e.target.value
-                                        ? new Date(e.target.value).toISOString()
-                                        : ""
-                                    )
-                                  }
-                                  sx={{ flex: 1, minWidth: 250 }}
-                                />
+                          {key === "milestones" && (
+                            <Stack gap={2}>
+                              {config.milestones.milestones.map((m, i) => (
+                                <Stack
+                                  key={i}
+                                  direction="row"
+                                  gap={2}
+                                  flexWrap="wrap"
+                                >
+                                  <ThresholdSlider
+                                    label="Spielstunden"
+                                    value={m.play_hours}
+                                    onChange={(v) =>
+                                      ruleChange(
+                                        key,
+                                        "milestones",
+                                        config.milestones.milestones.map(
+                                          (x, j) =>
+                                            j === i
+                                              ? { ...x, play_hours: v }
+                                              : x
+                                        )
+                                      )
+                                    }
+                                  />
+                                  <VipDurationSlider
+                                    label="VIP-Dauer (Tage)"
+                                    value={m.hours}
+                                    step={0.5}
+                                    onChange={(v) =>
+                                      ruleChange(
+                                        key,
+                                        "milestones",
+                                        config.milestones.milestones.map(
+                                          (x, j) =>
+                                            j === i ? { ...x, hours: v } : x
+                                        )
+                                      )
+                                    }
+                                  />
+                                  <Button
+                                    onClick={() =>
+                                      ruleChange(
+                                        key,
+                                        "milestones",
+                                        config.milestones.milestones.filter(
+                                          (_, j) => j !== i
+                                        )
+                                      )
+                                    }
+                                  >
+                                    Entfernen
+                                  </Button>
+                                </Stack>
                               ))}
+                              <Button
+                                onClick={() =>
+                                  ruleChange(key, "milestones", [
+                                    ...config.milestones.milestones,
+                                    { play_hours: 200, hours: 12 },
+                                  ])
+                                }
+                              >
+                                Meilenstein hinzufügen
+                              </Button>
                             </Stack>
                           )}
-                        </Stack>
-                      </Collapse>
-                    </Stack>
+                        </Collapse>
+                      </CardContent>
+                    </Card>
                   ))}
-                </Stack>
-                <Button
-                  sx={{ mt: 2 }}
-                  onClick={() =>
-                    change(key, [
-                      ...config[key],
-                      key === "events"
-                        ? {
-                            id: crypto.randomUUID(),
-                            name: "Neues Event",
-                            enabled: false,
-                            hours: 4,
-                            limit: 1,
-                            minutes: 60,
-                            start: new Date().toISOString(),
-                            end: new Date(Date.now() + 86400000).toISOString(),
+                {["events", "challenges"]
+                  .filter((key) => key === selectedRule)
+                  .map((key) => (
+                    <Card key={key}>
+                      <CardContent>
+                        <Typography variant="h6">
+                          {key === "events" ? "Events" : "Waffen-Challenges"}
+                        </Typography>
+                        <Typography color="text.secondary">
+                          {key === "events"
+                            ? "Belohne die Teilnahme in einem festgelegten Zeitraum, zum Beispiel an einem Community-Abend."
+                            : "Wähle Waffen aus der Liste und lege fest, wie viele Gegnerkills damit nötig sind. Teamkills zählen nicht."}
+                        </Typography>
+                        <Stack gap={3} sx={{ mt: 2 }}>
+                          {config[key].map((r, i) => (
+                            <Stack
+                              gap={2}
+                              key={r.id}
+                              sx={{
+                                borderBottom: 1,
+                                borderColor: "divider",
+                                pb: 2,
+                              }}
+                            >
+                              <Stack
+                                direction="row"
+                                flexWrap="wrap"
+                                gap={2}
+                                alignItems="center"
+                              >
+                                <TextField
+                                  size="small"
+                                  label="Name"
+                                  value={r.name}
+                                  onChange={(e) =>
+                                    listChange(key, i, "name", e.target.value)
+                                  }
+                                />
+                                {toggle("Aktiviert", r.enabled, (v) =>
+                                  listChange(key, i, "enabled", v)
+                                )}
+                                <Button
+                                  color="error"
+                                  onClick={() =>
+                                    change(
+                                      key,
+                                      config[key].filter((_, j) => j !== i)
+                                    )
+                                  }
+                                >
+                                  Entfernen
+                                </Button>
+                              </Stack>
+                              <Collapse in={r.enabled} unmountOnExit>
+                                <Stack gap={2}>
+                                  <VipDurationSlider
+                                    label="VIP-Dauer (Tage)"
+                                    value={r.hours}
+                                    step={0.5}
+                                    onChange={(v) =>
+                                      listChange(key, i, "hours", v)
+                                    }
+                                  />
+                                  {key === "events" ? (
+                                    <ThresholdSlider
+                                      label="Mindestspielzeit (Minuten)"
+                                      max={240}
+                                      value={r.minutes}
+                                      onChange={(v) =>
+                                        listChange(key, i, "minutes", v)
+                                      }
+                                    />
+                                  ) : (
+                                    <>
+                                      {weaponError && (
+                                        <Alert severity="warning">
+                                          {weaponError}
+                                        </Alert>
+                                      )}
+                                      <Autocomplete
+                                        multiple
+                                        options={[
+                                          ...new Set([
+                                            ...weapons,
+                                            ...r.weapons,
+                                          ]),
+                                        ]}
+                                        value={r.weapons}
+                                        onChange={(_, value) =>
+                                          listChange(key, i, "weapons", value)
+                                        }
+                                        disableCloseOnSelect
+                                        noOptionsText="Keine passende Waffe gefunden"
+                                        renderInput={(params) => (
+                                          <TextField
+                                            {...params}
+                                            label="Waffen auswählen"
+                                            helperText="Suchen und mehrere Waffen auswählen. Kills mit diesen Waffen werden gemeinsam gezählt."
+                                          />
+                                        )}
+                                      />
+                                      <Stack
+                                        direction="row"
+                                        gap={2}
+                                        flexWrap="wrap"
+                                      >
+                                        <ThresholdSlider
+                                          label="Gegnerkills"
+                                          value={r.kills}
+                                          onChange={(v) =>
+                                            listChange(key, i, "kills", v)
+                                          }
+                                        />
+                                        <TextField
+                                          size="small"
+                                          select
+                                          label="Zeitraum"
+                                          value={r.period}
+                                          onChange={(e) =>
+                                            listChange(
+                                              key,
+                                              i,
+                                              "period",
+                                              e.target.value
+                                            )
+                                          }
+                                          sx={{ minWidth: 180 }}
+                                        >
+                                          {[
+                                            ["day", "Täglich"],
+                                            ["week", "Wöchentlich"],
+                                            ["fixed", "Fester Zeitraum"],
+                                          ].map(([v, l]) => (
+                                            <MenuItem key={v} value={v}>
+                                              {l}
+                                            </MenuItem>
+                                          ))}
+                                        </TextField>
+                                      </Stack>
+                                    </>
+                                  )}
+                                  {(key === "events" ||
+                                    r.period === "fixed") && (
+                                    <Stack
+                                      direction="row"
+                                      gap={2}
+                                      flexWrap="wrap"
+                                    >
+                                      {["start", "end"].map((field) => (
+                                        <TextField
+                                          key={field}
+                                          size="small"
+                                          type="datetime-local"
+                                          label={`${
+                                            field === "start"
+                                              ? "Beginn"
+                                              : "Ende"
+                                          } (${
+                                            Intl.DateTimeFormat().resolvedOptions()
+                                              .timeZone
+                                          })`}
+                                          InputLabelProps={{ shrink: true }}
+                                          value={localTime(r[field])}
+                                          onChange={(e) =>
+                                            listChange(
+                                              key,
+                                              i,
+                                              field,
+                                              e.target.value
+                                                ? new Date(
+                                                    e.target.value
+                                                  ).toISOString()
+                                                : ""
+                                            )
+                                          }
+                                          sx={{ flex: 1, minWidth: 250 }}
+                                        />
+                                      ))}
+                                    </Stack>
+                                  )}
+                                </Stack>
+                              </Collapse>
+                            </Stack>
+                          ))}
+                        </Stack>
+                        <Button
+                          sx={{ mt: 2 }}
+                          onClick={() =>
+                            change(key, [
+                              ...config[key],
+                              key === "events"
+                                ? {
+                                    id: crypto.randomUUID(),
+                                    name: "Neues Event",
+                                    enabled: false,
+                                    hours: 4,
+                                    limit: 1,
+                                    minutes: 60,
+                                    start: new Date().toISOString(),
+                                    end: new Date(
+                                      Date.now() + 86400000
+                                    ).toISOString(),
+                                  }
+                                : {
+                                    id: crypto.randomUUID(),
+                                    name: "Neue Challenge",
+                                    enabled: false,
+                                    hours: 2,
+                                    limit: 1,
+                                    weapons: [],
+                                    kills: 10,
+                                    period: "day",
+                                    start: null,
+                                    end: null,
+                                  },
+                            ])
                           }
-                        : {
-                            id: crypto.randomUUID(),
-                            name: "Neue Challenge",
-                            enabled: false,
-                            hours: 2,
-                            limit: 1,
-                            weapons: [],
-                            kills: 10,
-                            period: "day",
-                            start: null,
-                            end: null,
-                          },
-                    ])
-                  }
-                >
-                  {key === "events"
-                    ? "Event hinzufügen"
-                    : "Challenge hinzufügen"}
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-          <Stack direction="row" gap={2} flexWrap="wrap">
+                        >
+                          {key === "events"
+                            ? "Event hinzufügen"
+                            : "Challenge hinzufügen"}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+              </Box>
+            </Box>
+          )}
+          <Stack
+            direction="row"
+            gap={2}
+            flexWrap="wrap"
+            alignItems="center"
+            sx={{
+              position: "sticky",
+              bottom: 0,
+              zIndex: 5,
+              bgcolor: "background.paper",
+              borderTop: 1,
+              borderColor: "divider",
+              p: 2,
+            }}
+          >
+            <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
+              {changed
+                ? "Ungespeicherte Änderungen"
+                : "Alle Änderungen gespeichert"}
+            </Typography>
             <Button
               variant="contained"
+              sx={{
+                bgcolor: "primary.main",
+                color: "primary.contrastText",
+                "&:hover": { bgcolor: "primary.dark" },
+              }}
               disabled={!changed || busy}
               onClick={save}
             >
@@ -970,7 +1241,7 @@ export default function VipRewards() {
           </Stack>
         </Stack>
       </Box>
-      {canInspect && (
+      {canInspect && section === "journal" && (
         <Card>
           <CardContent>
             <Typography variant="h6">

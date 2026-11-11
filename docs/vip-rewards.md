@@ -137,3 +137,14 @@ abgestuft; bereits gespeicherte Zwischenwerte bleiben erhalten. Dropdowns sowie
 Text- und Datumsfelder bleiben unverändert. Das Vergabejournal nutzt getrennte
 Datums-/Zeitangaben, Status-Badges und eine hervorgehobene Gutschrift; schmale Ansichten
 scrollen nur innerhalb der Tabelle.
+
+### Regel-Navigation
+
+Die lokale VIP-Konfiguration trennt Belohnungen, Grundeinstellungen und Vergabejournal
+in eigene Reiter. Eine Regelliste zeigt den Aktivierungsstatus; das Detailpanel zeigt
+nur die ausgewählte Regel, gegliedert in Voraussetzungen und Belohnung. Auf kleinen
+Bildschirmen steht die Regelliste darüber. Entwürfe bleiben beim Wechsel erhalten;
+Speichern und Verwerfen gelten für die gesamte Konfiguration.
+Ausgeschlossene Spieler werden über die bestehende Spielersuche ausgewählt. Gespeichert
+werden weiterhin Spieler-IDs, auch wenn ein Datensatz nicht mehr gefunden werden kann.
+Die Zeitzone ist als durchsuchbare Auswahl verfügbar.
