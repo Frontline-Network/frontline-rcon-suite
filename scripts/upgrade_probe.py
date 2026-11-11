@@ -103,7 +103,7 @@ def snapshot():
         "admin_incident_event",
         "audit_log",
     }
-    result = {"hashes": {}, "counts": {}}
+    result = {"hashes": {}, "counts": {}, "configuration": {}, "safe_new_configs": []}
 
     class Sink:
         def __init__(self):
@@ -116,6 +116,28 @@ def snapshot():
         cursor.execute("SET LOCAL statement_timeout='180s'")
         cursor.execute("SELECT tablename FROM pg_tables WHERE schemaname='public'")
         tables = {row[0] for row in cursor.fetchall()}
+        cursor.execute("SELECT key, value FROM user_config ORDER BY key")
+        for key, value in cursor.fetchall():
+            result["configuration"][key] = hashlib.sha256(
+                json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+            ).hexdigest()
+            if (
+                key.endswith("_VipRewardsUserConfig")
+                and isinstance(value, dict)
+                and value.get("enabled") is False
+                and value.get("dry_run") is True
+                and value.get("pause_during_seeding") is True
+                and all(
+                    isinstance(value.get(rule), dict)
+                    and value[rule].get("enabled") is False
+                    for rule in ("melee", "round", "weekly", "weekly_support", "milestones", "balance")
+                )
+                and value.get("events") == []
+                and value.get("challenges") == []
+            ):
+                result["safe_new_configs"].append(key)
+        cursor.execute("SELECT version_num FROM alembic_version ORDER BY version_num")
+        result["schema_heads"] = [row[0] for row in cursor.fetchall()]
         for table in sorted(full_tables & tables):
             sink = Sink()
             # Login changes last_login only for our synthetic account. Customer
@@ -142,6 +164,12 @@ def snapshot():
             cursor.execute(query)
             result["counts"][table] = cursor.fetchone()[0]
     connection.close()
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    config = Config("/code/alembic.ini")
+    config.set_main_option("script_location", "/code/alembic")
+    result["image_schema_heads"] = sorted(ScriptDirectory.from_config(config).get_heads())
     print(json.dumps(result, sort_keys=True))
 
 

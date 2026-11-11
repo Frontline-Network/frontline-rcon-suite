@@ -1,6 +1,7 @@
 """Reject unsafe rehearsal targets before any Docker mutation or DB connection."""
 
 import importlib.util
+from copy import deepcopy
 import os
 import subprocess
 import sys
@@ -18,6 +19,53 @@ SPEC.loader.exec_module(rehearsal)
 
 
 class UpgradeRehearsalSafetyTests(unittest.TestCase):
+    def preservation(self):
+        return {
+            "hashes": {"auth_user": "users", "user_config": "old-config", "alembic_version": "old-schema"},
+            "counts": {"player_stats": 50},
+            "configuration": {"3_CampaignsUserConfig": "customer-value"},
+            "safe_new_configs": [],
+            "schema_heads": ["old"],
+        }
+
+    def test_additive_upgrade_preserves_existing_data_and_safe_defaults(self):
+        before = self.preservation()
+        after = deepcopy(before)
+        after["schema_heads"] = ["new"]
+        after["hashes"].update(user_config="new-config", alembic_version="new-schema")
+        after["configuration"]["3_VipRewardsUserConfig"] = "disabled-preview"
+        after["safe_new_configs"] = ["3_VipRewardsUserConfig"]
+        rehearsal.verify_preservation(before, after, ["new"])
+        # Old application code can run on the additive schema, without downgrade.
+        rehearsal.verify_preservation(before, after, ["new"])
+
+    def test_preservation_rejects_customer_changes_and_unexpected_defaults(self):
+        before = self.preservation()
+        cases = []
+        changed = deepcopy(before)
+        changed["hashes"]["auth_user"] = "changed"
+        cases.append(changed)
+        changed = deepcopy(before)
+        changed["counts"]["player_stats"] = 49
+        cases.append(changed)
+        for mutation in ("changed", None):
+            changed = deepcopy(before)
+            if mutation is None:
+                del changed["configuration"]["3_CampaignsUserConfig"]
+            else:
+                changed["configuration"]["3_CampaignsUserConfig"] = mutation
+            cases.append(changed)
+        for key in ("3_VipRewardsUserConfig", "3_UnknownConfig"):
+            changed = deepcopy(before)
+            changed["configuration"][key] = "unsafe"
+            cases.append(changed)
+        changed = deepcopy(before)
+        changed["schema_heads"] = ["wrong"]
+        cases.append(changed)
+        for after in cases:
+            with self.subTest(after=after), self.assertRaises(RuntimeError):
+                rehearsal.verify_preservation(before, after, ["old"])
+
     def test_existing_directory_is_never_used_as_a_new_rehearsal(self):
         with tempfile.TemporaryDirectory() as folder:
             runner = rehearsal.Rehearsal(Path(folder))

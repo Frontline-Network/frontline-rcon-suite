@@ -34,6 +34,25 @@ def now():
     return datetime.now(timezone.utc).isoformat()
 
 
+def verify_preservation(before, after, expected_heads):
+    """Allow additive schema/defaults while protecting every existing customer row."""
+    for table in set(before["hashes"]) | set(after["hashes"]):
+        if table in {"alembic_version", "user_config"}:
+            continue
+        if before["hashes"].get(table) != after["hashes"].get(table):
+            raise RuntimeError("Preserved customer table changed: " + table)
+    if before["counts"] != after["counts"]:
+        raise RuntimeError("Preserved customer row counts changed")
+    for key, value in before["configuration"].items():
+        if after["configuration"].get(key) != value:
+            raise RuntimeError("Preserved customer configuration changed: " + key)
+    additions = set(after["configuration"]) - set(before["configuration"])
+    if not additions.issubset(after["safe_new_configs"]):
+        raise RuntimeError("Unexpected or unsafe new customer configuration")
+    if after["schema_heads"] != expected_heads:
+        raise RuntimeError("Database schema does not match the candidate migrations")
+
+
 class Rehearsal:
     def __init__(self, directory):
         self.directory = directory.resolve()
@@ -392,13 +411,13 @@ class Rehearsal:
             result = self.web(candidate, stage)
             self.state["stages"][stage] = result
             self.save()
-            if result["preservation"] != baseline:
-                raise RuntimeError("Preserved customer data changed: " + stage)
+            verify_preservation(baseline, result["preservation"], result["preservation"]["image_schema_heads"])
+            if stage == "candidate_repeat" and result["preservation"] != self.state["stages"]["candidate"]["preservation"]:
+                raise RuntimeError("Repeated upgrade changed preserved customer data")
         # Code rollback only. Never run old migrations against a new schema.
         self.emit("rollback_started")
         rollback = self.web(self.state["images"]["source"], "rollback")
-        if rollback["preservation"] != baseline:
-            raise RuntimeError("Rollback changed preserved customer data")
+        verify_preservation(baseline, rollback["preservation"], self.state["stages"]["candidate"]["preservation"]["image_schema_heads"])
         self.state["stages"]["rollback"] = rollback
         self.state["verified_at"] = now()
         self.save()
