@@ -173,6 +173,14 @@ test.describe("live player density and details", () => {
     await expect(playersPanel).toBeVisible();
     await expect(logsPanel).toBeVisible();
 
+    // The panels mount before the independent log request has finished. The
+    // scroll contract needs populated logs, not the temporary empty state.
+    await expect
+      .poll(() =>
+        eventStream.evaluate((element) => element.scrollHeight - element.clientHeight)
+      )
+      .toBeGreaterThan(0);
+
     const playerScroll = await tableViewport.evaluate((element) => ({
       clientHeight: element.clientHeight,
       scrollHeight: element.scrollHeight,
