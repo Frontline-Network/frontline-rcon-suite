@@ -14,6 +14,17 @@ const general = (page) =>
 const rules = (page) =>
   page.getByRole("tab", { name: "Belohnungen", exact: true }).click();
 const path = "/settings/others/vip-rewards";
+// CI builds the fake server at /api/, while local fake mode defaults to /.
+// Read back through the same configured namespace as the application.
+const apiBase = process.env.REACT_APP_API_URL;
+const configEndpoint = `${apiBase && apiBase !== "undefined" ? apiBase.replace(/\/+$/, "") : ""}/get_vip_rewards_config`;
+const persistedConfig = (page) => page.evaluate(async (endpoint) => {
+  const response = await fetch(endpoint);
+  if (!response.ok) throw new Error(`Configuration readback failed: ${response.status}`);
+  const body = await response.json();
+  if (body.failed) throw new Error("Configuration readback was rejected");
+  return body.result;
+}, configEndpoint);
 
 test("English reward rules, settings and journal have complete readable copy", async ({
   page,
@@ -218,9 +229,7 @@ test("weekly support settings reveal on activation and save a custom command", a
     "aria-valuetext",
     "0,5 Tage (12 Stunden)"
   );
-  const persisted = await page.evaluate(
-    async () => (await (await fetch("/get_vip_rewards_config")).json()).result
-  );
+  const persisted = await persistedConfig(page);
   expect(persisted.weekly_support.hours).toBe(12);
   await general(page);
   await expect(
@@ -262,9 +271,7 @@ test("award period and threshold sliders persist", async ({ page }) => {
     .getByRole("button", { name: "Einstellungen speichern", exact: true })
     .click();
   await expect(page.getByText(/Einstellungen gespeichert/)).toBeVisible();
-  const cfg = await page.evaluate(
-    async () => (await (await fetch("/get_vip_rewards_config")).json()).result
-  );
+  const cfg = await persistedConfig(page);
   expect(cfg.round.limit_period).toBe("month");
   expect(cfg.round.minutes).toBe(31);
   expect(cfg.round.fraction).toBe(0.71);
@@ -297,9 +304,7 @@ test("excluded players and timezone are searchable selections", async ({
     .getByRole("button", { name: "Einstellungen speichern", exact: true })
     .click();
   await expect(page.getByText(/Einstellungen gespeichert/)).toBeVisible();
-  const cfg = await page.evaluate(
-    async () => (await (await fetch("/get_vip_rewards_config")).json()).result
-  );
+  const cfg = await persistedConfig(page);
   expect(cfg.excluded_player_ids).toEqual([
     "76561198000000001",
     "76561198000000002",
@@ -392,9 +397,7 @@ test("weekly activity, balance, milestones and dated events persist together", a
     .getByRole("button", { name: "Einstellungen speichern", exact: true })
     .click();
   await expect(page.getByText(/Einstellungen gespeichert/)).toBeVisible();
-  const cfg = await page.evaluate(
-    async () => (await (await fetch("/get_vip_rewards_config")).json()).result
-  );
+  const cfg = await persistedConfig(page);
   expect(cfg.weekly.days).toBe(4);
   expect(cfg.balance.difference).toBe(5);
   expect(cfg.balance.limit_period).toBe("week");
