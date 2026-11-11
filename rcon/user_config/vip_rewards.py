@@ -16,6 +16,7 @@ class RewardRule(BaseModel):
     enabled: bool = False
     hours: float = Field(default=2, gt=0, le=8760)
     limit: int = Field(default=1, ge=1, le=1000)
+    limit_period: Literal["rolling_day", "day", "week", "month"] = "rolling_day"
 
 
 class RoundRule(RewardRule):

@@ -121,3 +121,19 @@ The API continues storing hours, so saving does not migrate or round existing
 configuration. The shared daily award cap uses the same control. Four local
 browser tests (including day/hour conversion, save/discard and mobile overflow)
 and the production build passed. No rollout.
+
+
+### Vergabegrenzen und lokale Oberfläche
+
+Die wiederholbaren Regeln Nahkampf, Rundentreue und freiwilliger Teamwechsel
+begrenzen Vergaben pro Spieler wahlweise auf die letzten 24 Stunden (Bestandsstandard),
+einen Kalendertag, eine Kalenderwoche oder einen Kalendermonat. Kalendergrenzen
+richten sich nach der konfigurierten Zeitzone; Wochen beginnen montags. Die gemeinsame
+VIP-Stundenobergrenze bleibt zusätzlich ein rollendes 24-Stunden-Budget. Wochenziele,
+Meilensteine und zeitgebundene Challenges behalten ihre eigene Erfüllungslogik.
+
+Numerische Einstellungen verwenden Slider mit sichtbarem Wert. Große Bereiche sind
+abgestuft; bereits gespeicherte Zwischenwerte bleiben erhalten. Dropdowns sowie
+Text- und Datumsfelder bleiben unverändert. Das Vergabejournal nutzt getrennte
+Datums-/Zeitangaben, Status-Badges und eine hervorgehobene Gutschrift; schmale Ansichten
+scrollen nur innerhalb der Tabelle.

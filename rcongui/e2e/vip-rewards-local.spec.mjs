@@ -52,21 +52,37 @@ test("rules reveal details and weapon choices survive save and reload reset", as
   await openDemoPage(page, path);
   const melee = page.getByLabel("Nahkampf aktivieren");
   await expect(
-    page.getByLabel("Max. Vergaben / 24 h", { exact: true })
+    page.getByRole("slider", {
+      name: "Maximale Vergaben",
+      exact: true,
+    })
   ).toHaveCount(0);
   await melee.check();
   await expect(
-    page.getByLabel("Max. Vergaben / 24 h", { exact: true })
+    page.getByRole("slider", {
+      name: "Maximale Vergaben",
+      exact: true,
+    })
   ).toBeVisible();
-  await page.getByLabel("Max. Vergaben / 24 h", { exact: true }).fill("6");
+  await page
+    .getByRole("slider", { name: "Maximale Vergaben", exact: true })
+    .focus();
+  await page.keyboard.press("Home");
+  for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowRight");
   await melee.uncheck();
   await expect(
-    page.getByLabel("Max. Vergaben / 24 h", { exact: true })
+    page.getByRole("slider", {
+      name: "Maximale Vergaben",
+      exact: true,
+    })
   ).toHaveCount(0);
   await melee.check();
   await expect(
-    page.getByLabel("Max. Vergaben / 24 h", { exact: true })
-  ).toHaveValue("6");
+    page.getByRole("slider", {
+      name: "Maximale Vergaben",
+      exact: true,
+    })
+  ).toHaveAttribute("aria-valuetext", "6 Vergaben / Letzte 24 Stunden");
   await page
     .getByRole("button", { name: "Challenge hinzufügen", exact: true })
     .click();
@@ -110,7 +126,11 @@ test("weekly support settings reveal on activation and save a custom command", a
     0
   );
   await page.getByLabel("Wöchentliche Team-Unterstützung aktivieren").check();
-  await page.getByLabel("Unterstützungspunkte pro Woche").fill("8000");
+  const points = page.getByRole("slider", {
+    name: "Unterstützungspunkte pro Woche",
+  });
+  await points.focus();
+  for (let i = 0; i < 30; i++) await page.keyboard.press("ArrowRight");
   const duration = page.getByRole("slider", {
     name: "VIP-Dauer (Tage)",
     exact: true,
@@ -128,18 +148,15 @@ test("weekly support settings reveal on activation and save a custom command", a
     .getByRole("button", { name: "Einstellungen speichern", exact: true })
     .click();
   await expect(page.getByText(/Einstellungen gespeichert/)).toBeVisible();
-  await expect(page.getByLabel("Unterstützungspunkte pro Woche")).toHaveValue(
-    "8000"
-  );
+  await expect(
+    page.getByLabel("Unterstützungspunkte pro Woche")
+  ).toHaveAttribute("aria-valuetext", "8000");
   await expect(duration).toHaveAttribute(
     "aria-valuetext",
     "0,5 Tage (12 Stunden)"
   );
   const persisted = await page.evaluate(
-    async () =>
-      (
-        await (await fetch("/get_vip_rewards_config")).json()
-      ).result
+    async () => (await (await fetch("/get_vip_rewards_config")).json()).result
   );
   expect(persisted.weekly_support.hours).toBe(12);
   await expect(
@@ -150,9 +167,40 @@ test("weekly support settings reveal on activation and save a custom command", a
     0
   );
   await page.getByRole("button", { name: "Änderungen verwerfen" }).click();
-  await expect(page.getByLabel("Unterstützungspunkte pro Woche")).toHaveValue(
-    "8000"
+  await expect(
+    page.getByLabel("Unterstützungspunkte pro Woche")
+  ).toHaveAttribute("aria-valuetext", "8000");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectNoHorizontalPageOverflow(page);
+});
+
+test("award period and threshold sliders persist", async ({ page }) => {
+  await openDemoPage(page, path);
+  await page.getByLabel("Rundentreue aktivieren").check();
+  await page.getByLabel("Zeitraum für maximale Vergaben").click();
+  await page.getByRole("option", { name: "Monatlich", exact: true }).click();
+  const minutes = page.getByRole("slider", {
+    name: "Mindestspielzeit (Minuten)",
+    exact: true,
+  });
+  await minutes.focus();
+  await page.keyboard.press("ArrowRight");
+  const share = page.getByRole("slider", {
+    name: "Mindestanteil der Runde (%)",
+    exact: true,
+  });
+  await share.focus();
+  await page.keyboard.press("ArrowRight");
+  await page
+    .getByRole("button", { name: "Einstellungen speichern", exact: true })
+    .click();
+  await expect(page.getByText(/Einstellungen gespeichert/)).toBeVisible();
+  const cfg = await page.evaluate(
+    async () => (await (await fetch("/get_vip_rewards_config")).json()).result
   );
+  expect(cfg.round.limit_period).toBe("month");
+  expect(cfg.round.minutes).toBe(31);
+  expect(cfg.round.fraction).toBe(0.71);
   await page.setViewportSize({ width: 390, height: 844 });
   await expectNoHorizontalPageOverflow(page);
 });

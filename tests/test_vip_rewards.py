@@ -694,3 +694,23 @@ def test_volunteer_switch_does_not_mark_as_forced(monkeypatch):
     switch.assert_called_once_with('a')
     assert rcon.switch_player_now('b') is True
     forced.assert_called_once_with('b')
+
+@pytest.mark.parametrize("period, expected", [("day", "2026-11-09T23:00:00+00:00"), ("week", "2026-11-08T23:00:00+00:00"), ("month", "2026-10-31T23:00:00+00:00")])
+def test_award_calendar_boundaries(period, expected):
+    from rcon.vip_rewards.service import award_period_start
+    now = datetime(2026, 11, 10, 12, tzinfo=timezone.utc).timestamp()
+    assert award_period_start(now, period, "Europe/Berlin") == datetime.fromisoformat(expected).timestamp()
+
+@pytest.mark.parametrize("period", ["week", "month"])
+def test_award_limit_survives_daily_budget_reset(delivery, monkeypatch, period):
+    service, cfg, rcon, remote, add, read = delivery
+    cfg.melee.limit_period = period
+    service.read_gate_state(False)["config"] = cfg.model_dump_json()
+    for key in ("one", "two", "three"):
+        service.deliver(rcon, add(key))
+    monkeypatch.setattr(service.time, "time", lambda: NOW + 86401)
+    monkeypatch.setattr(service, "read_gate_state", lambda _: {"observed": NOW + 86401, "healthy": True})
+    fourth = add("four")
+    service.deliver(rcon, fourth)
+    assert read(fourth)["reason"] == "rule_limit"
+    assert rcon.add_vip.call_count == 3

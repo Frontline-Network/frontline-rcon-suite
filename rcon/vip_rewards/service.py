@@ -4,6 +4,7 @@ import copy
 import hashlib
 import logging
 import time
+from zoneinfo import ZoneInfo
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.dialects.postgresql import insert
@@ -346,6 +347,20 @@ def permanent(row):
     )
 
 
+def award_period_start(now, period, timezone_name):
+    if period == "rolling_day":
+        return now - 86400
+    local = datetime.fromtimestamp(now, ZoneInfo(timezone_name))
+    start = local.replace(hour=0, minute=0, second=0, microsecond=0)
+    if period == "week":
+        start -= timedelta(days=start.weekday())
+    elif period == "month":
+        start = start.replace(day=1)
+    elif period != "day":
+        raise ValueError("Unknown award limit period")
+    return start.timestamp()
+
+
 def deliver(rcon, grant_id):
     with enter_session() as session:
         row = session.get(VipRewardGrant, grant_id)
@@ -368,20 +383,23 @@ def deliver(rcon, grant_id):
                 ):
                     row.status, row.reason = "skipped", "disabled_or_paused"
                     return
+                rule_config = getattr(cfg, row.rule, None)
+                period = getattr(rule_config, "limit_period", "rolling_day")
+                period_start = award_period_start(now, period, cfg.timezone)
                 old = (
                     session.query(VipRewardGrant)
                     .filter(
                         VipRewardGrant.server_number == server(),
                         VipRewardGrant.preview == row.preview,
                         VipRewardGrant.player_id == pid,
-                        VipRewardGrant.written_at > now - 86400,
+                        VipRewardGrant.written_at >= min(now - 86400, period_start),
                         VipRewardGrant.credited_seconds > 0,
                     )
                     .all()
                 )
-                used = sum(g.credited_seconds for g in old)
+                used = sum(g.credited_seconds for g in old if g.written_at > now - 86400)
                 allowed = budget(row.requested_seconds, used, cfg.daily_hours * 3600)
-                if row.limit and sum(g.rule == row.rule for g in old) >= row.limit:
+                if row.limit and sum(g.rule == row.rule and g.written_at >= period_start for g in old) >= row.limit:
                     allowed = 0
                     row.reason = "rule_limit"
                 if not allowed:

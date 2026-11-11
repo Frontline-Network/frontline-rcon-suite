@@ -79,28 +79,135 @@ const reasons = {
   readback_mismatch: "VIP-Ablauf nicht bestätigt",
 };
 
-function NumberField({
+const awardPeriods = {
+  rolling_day: "Letzte 24 Stunden",
+  day: "Täglich",
+  week: "Wöchentlich",
+  month: "Monatlich",
+};
+function ThresholdSlider({
   label,
   value,
   onChange,
   min = 1,
-  max,
-  step = 1,
+  max = 10000,
   helperText,
 }) {
+  const [original] = useState(value);
+  const stops = [];
+  for (
+    let n = min;
+    n <= max;
+    n +=
+      n < 100
+        ? 1
+        : n < 1000
+        ? 10
+        : n < 10000
+        ? 100
+        : n < 100000
+        ? 1000
+        : n < 1000000
+        ? 10000
+        : 1000000
+  )
+    stops.push(n);
+  const choices = [...new Set([...stops, max, original, value])]
+    .filter((n) => Number.isFinite(n) && n >= min)
+    .sort((a, b) => a - b);
   return (
-    <TextField
-      size="small"
-      label={label}
-      helperText={helperText}
-      type="number"
-      value={value}
-      onChange={(e) =>
-        onChange(e.target.value === "" ? "" : Number(e.target.value))
-      }
-      inputProps={{ min, max, step }}
-      sx={{ minWidth: 170, flex: 1 }}
-    />
+    <Box sx={{ minWidth: 0, width: "100%", flex: "1 1 280px", px: 1 }}>
+      <Typography variant="body2">{label}</Typography>
+      <Typography fontWeight={600}>{value.toLocaleString("de-DE")}</Typography>
+      <Slider
+        aria-label={label}
+        value={choices.indexOf(value)}
+        min={0}
+        max={choices.length - 1}
+        step={1}
+        valueLabelDisplay="auto"
+        valueLabelFormat={(i) => choices[i]}
+        getAriaValueText={(i) => String(choices[i])}
+        onChange={(_, i) => onChange(choices[i])}
+      />
+      {helperText && (
+        <Typography variant="caption" color="text.secondary">
+          {helperText}
+        </Typography>
+      )}
+    </Box>
+  );
+}
+function AwardLimitSlider({
+  value,
+  onChange,
+  period = "rolling_day",
+  onPeriodChange,
+}) {
+  const [original] = useState(value);
+  const choices = [
+    ...new Set([
+      ...Array.from({ length: 20 }, (_, i) => i + 1),
+      25,
+      30,
+      50,
+      100,
+      250,
+      500,
+      1000,
+      original,
+      value,
+    ]),
+  ]
+    .filter((v) => Number.isInteger(v) && v >= 1 && v <= 1000)
+    .sort((a, b) => a - b);
+  const format = (count) =>
+    `${count} ${count === 1 ? "Vergabe" : "Vergaben"} / ${
+      awardPeriods[period]
+    }`;
+  return (
+    <Box sx={{ minWidth: 0, width: "100%", flex: "1 1 280px", px: 1 }}>
+      <Typography variant="body2">Maximale Vergaben</Typography>
+      <Typography fontWeight={600} sx={{ mb: 1 }}>
+        {format(value)}
+      </Typography>
+      <Slider
+        aria-label="Maximale Vergaben"
+        value={choices.indexOf(value)}
+        min={0}
+        max={choices.length - 1}
+        step={1}
+        marks={[1, 10, 20, 1000].map((count) => ({
+          value: choices.indexOf(count),
+          label: String(count),
+        }))}
+        valueLabelDisplay="auto"
+        valueLabelFormat={(index) => choices[index]}
+        getAriaValueText={(index) => format(choices[index])}
+        onChange={(_, index) => onChange(choices[index])}
+      />
+      <Typography variant="caption" color="text.secondary">
+        So oft darf ein Spieler diese Belohnung im gewählten Zeitraum erhalten.
+        Das gemeinsame VIP-Limit gilt zusätzlich. Kalenderzeiträume beginnen um
+        Mitternacht in der eingestellten Zeitzone, Wochen am Montag, Monate am
+        1.
+      </Typography>
+      <TextField
+        select
+        fullWidth
+        label="Zeitraum für maximale Vergaben"
+        value={period}
+        onChange={(e) => onPeriodChange(e.target.value)}
+        sx={{ mt: 1 }}
+      >
+        {Object.entries(awardPeriods).map(([key, text]) => (
+          <MenuItem key={key} value={key}>
+            {text}
+          </MenuItem>
+        ))}
+      </TextField>
+      <Typography variant="caption" color="text.secondary"></Typography>
+    </Box>
   );
 }
 
@@ -473,7 +580,7 @@ export default function VipRewards() {
                   step={0.5}
                   onChange={(v) => change("daily_hours", v)}
                 />
-                <NumberField
+                <ThresholdSlider
                   label="Abstand beim selben Gegner (Minuten)"
                   helperText="Weitere Kills desselben Gegners zählen erst nach diesem Abstand erneut für Nahkampf und Challenges."
                   value={config.opponent_cooldown_minutes}
@@ -534,21 +641,25 @@ export default function VipRewards() {
                       />
                     )}
                     {["melee", "round", "balance"].includes(key) && (
-                      <NumberField
-                        label="Max. Vergaben / 24 h"
+                      <AwardLimitSlider
                         value={config[key].limit}
+                        period={config[key].limit_period}
+                        onPeriodChange={(v) =>
+                          ruleChange(key, "limit_period", v)
+                        }
                         onChange={(v) => ruleChange(key, "limit", v)}
                       />
                     )}
                     {["round", "weekly", "balance"].includes(key) && (
-                      <NumberField
+                      <ThresholdSlider
                         label="Mindestspielzeit (Minuten)"
+                        max={240}
                         value={config[key].minutes}
                         onChange={(v) => ruleChange(key, "minutes", v)}
                       />
                     )}
                     {key === "round" && (
-                      <NumberField
+                      <ThresholdSlider
                         label="Mindestanteil der Runde (%)"
                         value={Math.round(config.round.fraction * 100)}
                         max={100}
@@ -556,7 +667,7 @@ export default function VipRewards() {
                       />
                     )}
                     {key === "weekly_support" && (
-                      <NumberField
+                      <ThresholdSlider
                         label="Unterstützungspunkte pro Woche"
                         value={config.weekly_support.points}
                         max={100000000}
@@ -565,7 +676,7 @@ export default function VipRewards() {
                       />
                     )}
                     {key === "weekly" && (
-                      <NumberField
+                      <ThresholdSlider
                         label="Unterschiedliche Tage"
                         value={config.weekly.days}
                         max={7}
@@ -574,13 +685,14 @@ export default function VipRewards() {
                     )}
                     {key === "balance" && (
                       <>
-                        <NumberField
+                        <ThresholdSlider
                           label="Mindest-Teamdifferenz"
+                          max={50}
                           value={config.balance.difference}
                           min={2}
                           onChange={(v) => ruleChange(key, "difference", v)}
                         />
-                        <NumberField
+                        <ThresholdSlider
                           label="Anmeldung gültig (Minuten)"
                           value={config.balance.signup_minutes}
                           max={30}
@@ -593,7 +705,7 @@ export default function VipRewards() {
                     <Stack gap={2}>
                       {config.milestones.milestones.map((m, i) => (
                         <Stack key={i} direction="row" gap={2} flexWrap="wrap">
-                          <NumberField
+                          <ThresholdSlider
                             label="Spielstunden"
                             value={m.play_hours}
                             onChange={(v) =>
@@ -707,8 +819,9 @@ export default function VipRewards() {
                             onChange={(v) => listChange(key, i, "hours", v)}
                           />
                           {key === "events" ? (
-                            <NumberField
+                            <ThresholdSlider
                               label="Mindestspielzeit (Minuten)"
+                              max={240}
                               value={r.minutes}
                               onChange={(v) => listChange(key, i, "minutes", v)}
                             />
@@ -737,7 +850,7 @@ export default function VipRewards() {
                                 )}
                               />
                               <Stack direction="row" gap={2} flexWrap="wrap">
-                                <NumberField
+                                <ThresholdSlider
                                   label="Gegnerkills"
                                   value={r.kills}
                                   onChange={(v) =>
@@ -920,15 +1033,37 @@ export default function VipRewards() {
                 )}
               </Alert>
             )}
-            <Box sx={{ overflowX: "auto" }}>
-              <Table size="small">
+            <Box
+              sx={{
+                overflowX: "auto",
+                border: 1,
+                borderColor: "divider",
+                borderRadius: 2,
+                mt: 2,
+              }}
+            >
+              <Table
+                size="small"
+                aria-label="VIP-Vergabejournal"
+                sx={{
+                  minWidth: 760,
+                  "& th": {
+                    bgcolor: "action.hover",
+                    py: 1.5,
+                    fontWeight: 600,
+                    whiteSpace: "nowrap",
+                  },
+                  "& td": { py: 2, verticalAlign: "top" },
+                  "& tbody tr:last-child td": { borderBottom: 0 },
+                }}
+              >
                 <TableHead>
                   <TableRow>
                     {[
                       "Zeit",
                       "Spieler",
                       "Regel",
-                      "Beantragt / gutgeschrieben",
+                      "VIP-Gutschrift",
                       "Ergebnis",
                     ].map((h) => (
                       <TableCell key={h}>{h}</TableCell>
@@ -937,15 +1072,57 @@ export default function VipRewards() {
                 </TableHead>
                 <TableBody>
                   {journal.results.map((r) => (
-                    <TableRow key={r.id}>
+                    <TableRow key={r.id} hover>
                       <TableCell>
-                        {new Date(r.occurred * 1000).toLocaleString()}
+                        <Typography
+                          variant="body2"
+                          sx={{ whiteSpace: "nowrap" }}
+                        >
+                          {new Date(r.occurred * 1000).toLocaleDateString()}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {new Date(r.occurred * 1000).toLocaleTimeString()}
+                        </Typography>
                       </TableCell>
-                      <TableCell>{r.player_id}</TableCell>
+                      <TableCell sx={{ maxWidth: 230 }}>
+                        <Typography
+                          component={Link}
+                          to={`/records/players/${encodeURIComponent(
+                            r.player_id
+                          )}`}
+                          variant="body2"
+                          sx={{
+                            fontFamily: "monospace",
+                            overflowWrap: "anywhere",
+                            color: "primary.main",
+                            textDecoration: "none",
+                            "&:hover": { textDecoration: "underline" },
+                          }}
+                        >
+                          {r.player_id}
+                        </Typography>
+                      </TableCell>
                       <TableCell>{labels[r.rule] || r.rule}</TableCell>
                       <TableCell>
-                        {r.requested_seconds / 3600} /{" "}
-                        {r.credited_seconds / 3600} h
+                        <Typography
+                          variant="body2"
+                          fontWeight={600}
+                          sx={{ fontVariantNumeric: "tabular-nums" }}
+                        >
+                          {(r.credited_seconds / 3600).toLocaleString(
+                            undefined,
+                            { maximumFractionDigits: 2 }
+                          )}{" "}
+                          h
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          von{" "}
+                          {(r.requested_seconds / 3600).toLocaleString(
+                            undefined,
+                            { maximumFractionDigits: 2 }
+                          )}{" "}
+                          h beantragt
+                        </Typography>
                         {["prepared", "review"].includes(r.status) && (
                           <Typography variant="caption" display="block">
                             Budget reserviert; Gutschrift unbestätigt
@@ -953,12 +1130,28 @@ export default function VipRewards() {
                         )}
                       </TableCell>
                       <TableCell>
+                        <Chip
+                          size="small"
+                          variant="outlined"
+                          label={results[r.status] || r.status}
+                          color={
+                            r.status === "review"
+                              ? "warning"
+                              : r.status === "awarded"
+                              ? "success"
+                              : r.status === "preview"
+                              ? "info"
+                              : "default"
+                          }
+                          sx={{ mb: 0.5 }}
+                        />
                         <Typography
-                          color={r.status === "review" ? "error" : "inherit"}
+                          variant="caption"
+                          display="block"
+                          color="text.secondary"
                         >
-                          {results[r.status] || r.status}
+                          {reasons[r.reason] || r.reason}
                         </Typography>
-                        {reasons[r.reason] || r.reason}
                         {r.status === "review" && (
                           <Typography variant="caption" display="block">
                             Zielablauf: {r.target || "unbekannt"}
@@ -974,7 +1167,14 @@ export default function VipRewards() {
                   ))}
                   {!journal.results.length && (
                     <TableRow>
-                      <TableCell colSpan={5}>
+                      <TableCell
+                        colSpan={5}
+                        sx={{
+                          textAlign: "center",
+                          color: "text.secondary",
+                          height: 100,
+                        }}
+                      >
                         Noch keine Vergaben für diese Auswahl.
                       </TableCell>
                     </TableRow>
@@ -989,7 +1189,15 @@ export default function VipRewards() {
               >
                 Zurück
               </Button>
-              <Typography>{journal.total} Einträge</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {journal.total
+                  ? `${offset + 1}–${Math.min(
+                      offset + 25,
+                      journal.total
+                    )} von ${journal.total}`
+                  : "0"}{" "}
+                Einträge
+              </Typography>
               <Button
                 disabled={offset + 25 >= journal.total}
                 onClick={() => setOffset(offset + 25)}
