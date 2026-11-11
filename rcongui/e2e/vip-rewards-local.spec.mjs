@@ -265,3 +265,45 @@ test("excluded players and timezone are searchable selections", async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await expectNoHorizontalPageOverflow(page);
 });
+
+test("mobile rule selector and compact actions preserve unsaved values", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openDemoPage(page, path);
+  await expect(
+    page
+      .getByRole("navigation", { name: "Belohnungsregeln" })
+      .getByRole("button")
+  ).toHaveCount(0);
+  await page.getByRole("combobox", { name: /^Belohnungsregel/ }).click();
+  await page
+    .getByRole("option", { name: "Rundentreue · Aus", exact: true })
+    .click();
+  await page.getByLabel("Rundentreue aktivieren", { exact: true }).check();
+  await expect(
+    page.getByRole("heading", { name: "Voraussetzungen", exact: true })
+  ).toBeVisible();
+  const minutes = page.getByRole("slider", {
+    name: "Mindestspielzeit (Minuten)",
+    exact: true,
+  });
+  await minutes.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(minutes).toHaveAttribute("aria-valuetext", "31");
+  await general(page);
+  await rules(page);
+  await expect(minutes).toHaveAttribute("aria-valuetext", "31");
+  await page
+    .getByRole("button", { name: "Einstellungen speichern", exact: true })
+    .click();
+  await expect(page.getByText(/Einstellungen gespeichert/)).toBeVisible();
+  await expectNoHorizontalPageOverflow(page);
+  await page.getByRole("tab", { name: "Vergabejournal", exact: true }).click();
+  await expect(
+    page.getByRole("table", { name: "VIP-Vergabejournal" })
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Einstellungen speichern", exact: true })
+  ).toHaveCount(0);
+});
