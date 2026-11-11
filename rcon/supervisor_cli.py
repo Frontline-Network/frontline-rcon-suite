@@ -147,6 +147,19 @@ def run_seed_vip():
         sys.exit(1)
 
 
+@cli.command(name="vip_rewards")
+def run_vip_rewards():
+    from rcon.vip_rewards import service
+
+    try:
+        service.run()
+    except KeyboardInterrupt:
+        sys.exit(0)
+    except Exception:
+        logger.exception("VIP rewards stopped")
+        sys.exit(1)
+
+
 @cli.command(name="watch_killrate")
 def watch_killrate():
     from rcon import watch_killrate as service
