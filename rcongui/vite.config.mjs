@@ -30,7 +30,10 @@ export default defineConfig(({ command, mode }) => {
     process.exit(1);
   }
 
-  const REACT_APP_API_URL = env.REACT_APP_API_URL;
+  // Legacy API callers append command names directly to this base.
+  const REACT_APP_API_URL = env.REACT_APP_API_URL
+    ? `${env.REACT_APP_API_URL.replace(/\/+$/, "")}/`
+    : env.REACT_APP_API_URL;
   const REACT_APP_VERSION =
     process.env.REACT_APP_VERSION || env.REACT_APP_VERSION || "unknown";
   const REACT_APP_PUBLIC_BUILD =
