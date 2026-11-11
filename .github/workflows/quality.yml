@@ -2,6 +2,9 @@ name: quality-gates
 
 on:
   workflow_call:
+  # Allow the same complete gates to run independently if a parent PR run is
+  # stuck finalizing an artifact upload. No tests are omitted in this path.
+  workflow_dispatch:
 
 jobs:
   test-release-integration:
@@ -156,6 +159,8 @@ jobs:
       - run: npm run check:bundle
       - name: upload admin UI test report
         if: failure()
+        timeout-minutes: 3
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: admin-ui-playwright-report
