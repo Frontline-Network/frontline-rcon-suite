@@ -518,7 +518,7 @@ def test_shared_lock_is_reentrant_and_always_released(monkeypatch):
             with lock("test"):
                 raise RuntimeError("failure")
     assert db.connect.call_count == 1
-    assert "pg_advisory_lock" in str(connection.execute.call_args_list[0].args[0])
+    assert "pg_try_advisory_lock" in str(connection.execute.call_args_list[0].args[0])
     assert "pg_advisory_unlock" in str(connection.execute.call_args_list[1].args[0])
 
 

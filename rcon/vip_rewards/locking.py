@@ -3,6 +3,7 @@
 from contextlib import contextmanager
 from contextvars import ContextVar
 import hashlib
+from time import monotonic, sleep
 from functools import wraps
 
 from sqlalchemy import text
@@ -23,7 +24,13 @@ def lock(key):
         return
     # A dedicated connection keeps the advisory lock across journal commits and RCON I/O.
     with get_engine().connect() as connection:
-        connection.execute(text("SELECT pg_advisory_lock(:key)"), {"key": number})
+        deadline = monotonic() + 15
+        while not connection.execute(
+            text("SELECT pg_try_advisory_lock(:key)"), {"key": number}
+        ).scalar():
+            if monotonic() >= deadline:
+                raise TimeoutError("VIP operation is busy; no action was attempted")
+            sleep(0.1)
         token = _held.set(held | {number})
         try:
             yield

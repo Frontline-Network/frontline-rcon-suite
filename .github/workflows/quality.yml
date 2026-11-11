@@ -221,6 +221,7 @@ jobs:
           export HLL_REDIS_URL=redis://${HLL_REDIS_HOST}:${HLL_REDIS_PORT}/${HLL_REDIS_DB}
           export LEADERSHIP_VOTE_TEST_DB_URL="$HLL_DB_URL"
           export POPULATION_TEST_DB_URL="$HLL_DB_URL"
+          export VIP_REWARDS_TEST_DB_URL="$HLL_DB_URL"
           PYTHONPATH=. pytest tests/
           PYTHONPATH=. python -m django test api.test_release_updates --settings=rconweb.rconweb.test_settings --verbosity=1
           PYTHONPATH=. python -m django test api.test_release_migrations --settings=rconweb.rconweb.test_settings --verbosity=1
