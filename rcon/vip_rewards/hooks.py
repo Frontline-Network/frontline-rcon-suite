@@ -11,6 +11,7 @@ from rcon.logs.loop import (
     on_match_end,
     on_match_start,
 )
+from rcon.user_config.autobalancer import AutobalancerUserConfig
 from rcon.user_config.vip_rewards import VipRewardsUserConfig
 from rcon.utils import get_server_number
 from rcon.vip_rewards.service import enqueue, read_state
@@ -51,7 +52,11 @@ def kill(rcon, log):
 
 @on_chat
 def signup(rcon, log):
-    if str(log.get("sub_content", "")).strip().lower() == "!balancevip":
+    message = str(log.get("sub_content") or log.get("message") or "").strip()
+    if not message.startswith("!") or len(message.split()) != 1:
+        return
+    command = AutobalancerUserConfig.load_from_db().volunteer_command
+    if message.casefold() == command.casefold():
         enqueue(payload("signup", log))
 
 

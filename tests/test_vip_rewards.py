@@ -655,3 +655,42 @@ def test_migration_matches_model_tables(delivery, monkeypatch):
         migration.downgrade()
         assert not inspect(connection).get_table_names()
     db.dispose()
+
+@pytest.mark.parametrize('message,command,accepted', [
+    (' !BALANCE ', '!balance', True), ('!balancevip', '!balance', False),
+    ('!balance extra', '!balance', False), ('!helfen', '!helfen', True),
+    ('!balance', '!helfen', False),
+])
+def test_rewards_share_balance_command(monkeypatch, message, command, accepted):
+    from rcon.vip_rewards import hooks
+    from types import SimpleNamespace
+    monkeypatch.setattr(hooks.AutobalancerUserConfig, 'load_from_db', lambda: SimpleNamespace(volunteer_command=command))
+    enqueue = Mock()
+    monkeypatch.setattr(hooks, 'enqueue', enqueue)
+    hooks.signup(None, dict(sub_content=message, player_id_1='a', timestamp_ms=1000, raw=message))
+    assert enqueue.call_count == int(accepted)
+    if accepted:
+        assert enqueue.call_args.args[0]['kind'] == 'signup'
+
+def test_disabled_challenge_can_be_saved_before_weapon_selection():
+    cfg = config(challenges=[dict(id='draft', name='Draft', weapons=[])])
+    assert cfg.challenges[0].weapons == []
+    with pytest.raises(ValidationError):
+        config(challenges=[dict(id='draft', name='Draft', enabled=True, weapons=[])])
+
+
+def test_volunteer_switch_does_not_mark_as_forced(monkeypatch):
+    from rcon.rcon import Rcon, ServerCtl
+    from rcon.vip_rewards import hooks
+    from rcon.leadership_vote import storage
+    forced = Mock()
+    switch = Mock(return_value=True)
+    monkeypatch.setattr(hooks, 'mark_forced', forced)
+    monkeypatch.setattr(storage, 'before_manual_action', Mock())
+    monkeypatch.setattr(ServerCtl, 'switch_player_now', switch)
+    rcon = object.__new__(Rcon)
+    assert rcon.switch_volunteer_now('a') is True
+    forced.assert_not_called()
+    switch.assert_called_once_with('a')
+    assert rcon.switch_player_now('b') is True
+    forced.assert_called_once_with('b')

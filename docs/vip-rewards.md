@@ -38,7 +38,7 @@ This is not an AFK detector. Round attendance is measured against observed,
 unpaused round time. Daily and weekly rules use the configured time zone (default
 Europe/Berlin, Monday week start). Event windows require explicit timezone offsets.
 
-`!balancevip` signs up a player on the larger team, with at least four players'
+`!balance` signs up a player on the larger team, with at least four players'
 difference by default. Signup lasts five minutes. A matching switch log and 15
 minutes of confirmed presence on the target team are required. Ambiguous names,
 unobserved transitions and RCON-triggered switches do not qualify. External admin

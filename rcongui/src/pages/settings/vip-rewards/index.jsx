@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Alert,
+  Autocomplete,
+  Collapse,
   Box,
   Button,
   Card,
@@ -44,12 +46,13 @@ const notes = {
   melee:
     "Nur Gegnerkills mit Messer oder Spaten. Wiederholte Gegner werden gemeinsam mit Challenges begrenzt.",
   round:
-    "Nur freigegebene Rundenabschnitte zählen. Der Spieler muss am Rundenende anwesend sein.",
-  weekly: "Unterschiedliche Spieltage pro Kalenderwoche, Montag bis Sonntag.",
+    "Belohne Spieler, die bis zum Rundenende bleiben. Sowohl die Mindestspielzeit als auch der Mindestanteil an der Runde müssen erreicht sein.",
+  weekly:
+    "Belohne regelmäßiges Spielen: An der gewählten Anzahl von Tagen muss jeweils die Mindestspielzeit erreicht werden. Die Woche läuft von Montag bis Sonntag.",
   milestones:
-    "Qualifizierende Spielzeit ab Aktivierung; jeder Meilenstein wird einmal verarbeitet.",
+    "Belohne insgesamt gesammelte Spielzeit ab Aktivierung. Jede Stufe kann ein Spieler einmal erreichen; frühere Spielzeit wird nicht nachgetragen.",
   balance:
-    "Anmeldung mit !balancevip. Nur nachweisbare Wechsel ins kleinere Team; erzwungene Wechsel zählen nicht.",
+    "Der bestehende Autobalancer-Befehl !balance meldet Spieler auch für diese Belohnung an. VIP gibt es erst nach dem freiwilligen Wechsel und der Mindestspielzeit im kleineren Team. Erzwungene Wechsel zählen nicht.",
 };
 const results = {
   queued: "Vorgemerkt",
@@ -72,11 +75,20 @@ const reasons = {
   readback_mismatch: "VIP-Ablauf nicht bestätigt",
 };
 
-function NumberField({ label, value, onChange, min = 1, max, step = 1 }) {
+function NumberField({
+  label,
+  value,
+  onChange,
+  min = 1,
+  max,
+  step = 1,
+  helperText,
+}) {
   return (
     <TextField
       size="small"
       label={label}
+      helperText={helperText}
       type="number"
       value={value}
       onChange={(e) =>
@@ -115,6 +127,24 @@ export default function VipRewards() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [weapons, setWeapons] = useState([]);
+  const [weaponError, setWeaponError] = useState("");
+  useEffect(() => {
+    let mounted = true;
+    read("get_vip_rewards_weapons")
+      .then((data) => {
+        if (mounted) setWeapons(data.weapons.map((w) => w.name));
+      })
+      .catch(() => {
+        if (mounted)
+          setWeaponError(
+            "Die Waffenliste konnte nicht geladen werden. Vorhandene Auswahlen bleiben erhalten. Bitte lade die Seite erneut."
+          );
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
   useEffect(() => {
     let mounted = true;
     read("get_vip_rewards_config")
@@ -172,6 +202,13 @@ export default function VipRewards() {
     setError("");
     setNotice("");
     try {
+      if (
+        config.challenges.some((rule) => rule.enabled && !rule.weapons.length)
+      ) {
+        throw new Error(
+          "Bitte wähle für jede aktive Waffen-Challenge mindestens eine Waffe aus."
+        );
+      }
       for (const command of [
         "validate_vip_rewards_config",
         "set_vip_rewards_config",
@@ -270,7 +307,13 @@ export default function VipRewards() {
         p: { xs: 1, md: 3 },
       }}
     >
-      {isFakeMode() && <Alert severity="info">Lokaler Formulartest mit simulierten Daten. Speichern verändert nur diese Vorschau. Es werden keine Spieler angeschrieben und keine VIP-Rechte vergeben. Nach dem Neuladen wird der Test zurückgesetzt.</Alert>}
+      {isFakeMode() && (
+        <Alert severity="info">
+          Lokaler Formulartest mit simulierten Daten. Speichern verändert nur
+          diese Vorschau. Es werden keine Spieler angeschrieben und keine
+          VIP-Rechte vergeben. Nach dem Neuladen wird der Test zurückgesetzt.
+        </Alert>
+      )}
       <Box>
         <Typography variant="h4">VIP-Belohnungen</Typography>
         <Typography color="text.secondary">
@@ -304,10 +347,9 @@ export default function VipRewards() {
         </Alert>
       )}
       <Alert severity="info">
-        Seed-VIP bleibt unabhängig. Während der Seeding-Sperre werden weder
-        Spielzeiten noch Kills gesammelt. Nicht gutgeschriebene Budgetanteile
-        verfallen; abgeschlossene Aufgaben werden nicht später erneut
-        ausgezahlt.
+        Die Seeding-Belohnung bleibt separat eingestellt. Wähle hier, wofür
+        Spieler zusätzlich VIP-Zeit erhalten sollen. Bei aktivierter
+        Seeding-Pause zählen Spielzeit und Kills erst nach dem Seeding.
       </Alert>
       {!canEdit && (
         <Alert severity="info">
@@ -323,7 +365,7 @@ export default function VipRewards() {
         <Stack spacing={2}>
           <Card>
             <CardContent>
-              <Typography variant="h6">Gemeinsame Einstellungen</Typography>
+              <Typography variant="h6">1. Betrieb und Grenzen</Typography>
               <Stack>
                 {toggle(
                   "Neue VIP-Belohnungen aktivieren",
@@ -353,13 +395,15 @@ export default function VipRewards() {
               </Typography>
               <Stack direction="row" gap={2} flexWrap="wrap">
                 <NumberField
-                  label="VIP-Stunden je rollierenden 24 h"
+                  label="Maximale VIP-Stunden pro Spieler"
+                  helperText="Obergrenze für alle Regeln zusammen innerhalb der letzten 24 Stunden. Überschüsse werden nicht später nachgezahlt."
                   value={config.daily_hours}
                   step={0.5}
                   onChange={(v) => change("daily_hours", v)}
                 />
                 <NumberField
-                  label="Gegner-Sperre (Minuten)"
+                  label="Abstand beim selben Gegner (Minuten)"
+                  helperText="Weitere Kills desselben Gegners zählen erst nach diesem Abstand erneut für Nahkampf und Challenges."
                   value={config.opponent_cooldown_minutes}
                   onChange={(v) => change("opponent_cooldown_minutes", v)}
                 />
@@ -383,6 +427,11 @@ export default function VipRewards() {
               />
             </CardContent>
           </Card>
+          <Typography variant="h6">2. Belohnungen auswählen</Typography>
+          <Typography color="text.secondary">
+            Aktiviere nur die gewünschten Regeln. Beim Ausschalten bleiben deine
+            Eingaben erhalten.
+          </Typography>
           {Object.entries(labels).map(([key, title]) => (
             <Card key={key}>
               <CardContent>
@@ -390,123 +439,125 @@ export default function VipRewards() {
                 <Typography variant="body2" color="text.secondary">
                   {notes[key]}
                 </Typography>
-                {toggle("Regel aktivieren", config[key].enabled, (v) =>
+                {toggle(`${title} aktivieren`, config[key].enabled, (v) =>
                   ruleChange(key, "enabled", v)
                 )}
-                <Stack direction="row" gap={2} flexWrap="wrap">
-                  {key !== "milestones" && (
-                    <NumberField
-                      label="VIP-Stunden"
-                      value={config[key].hours}
-                      step={0.5}
-                      onChange={(v) => ruleChange(key, "hours", v)}
-                    />
-                  )}
-                  {["melee", "round", "balance"].includes(key) && (
-                    <NumberField
-                      label="Max. Vergaben / 24 h"
-                      value={config[key].limit}
-                      onChange={(v) => ruleChange(key, "limit", v)}
-                    />
-                  )}
-                  {["round", "weekly", "balance"].includes(key) && (
-                    <NumberField
-                      label="Mindestspielzeit (Minuten)"
-                      value={config[key].minutes}
-                      onChange={(v) => ruleChange(key, "minutes", v)}
-                    />
-                  )}
-                  {key === "round" && (
-                    <NumberField
-                      label="Mindestanteil der Runde (%)"
-                      value={Math.round(config.round.fraction * 100)}
-                      max={100}
-                      onChange={(v) => ruleChange(key, "fraction", v / 100)}
-                    />
-                  )}
-                  {key === "weekly" && (
-                    <NumberField
-                      label="Unterschiedliche Tage"
-                      value={config.weekly.days}
-                      max={7}
-                      onChange={(v) => ruleChange(key, "days", v)}
-                    />
-                  )}
-                  {key === "balance" && (
-                    <>
+                <Collapse in={config[key].enabled} unmountOnExit>
+                  <Stack direction="row" gap={2} flexWrap="wrap" sx={{ mt: 2 }}>
+                    {key !== "milestones" && (
                       <NumberField
-                        label="Mindest-Teamdifferenz"
-                        value={config.balance.difference}
-                        min={2}
-                        onChange={(v) => ruleChange(key, "difference", v)}
+                        label="VIP-Stunden"
+                        value={config[key].hours}
+                        step={0.5}
+                        onChange={(v) => ruleChange(key, "hours", v)}
                       />
+                    )}
+                    {["melee", "round", "balance"].includes(key) && (
                       <NumberField
-                        label="Anmeldung gültig (Minuten)"
-                        value={config.balance.signup_minutes}
-                        max={30}
-                        onChange={(v) => ruleChange(key, "signup_minutes", v)}
+                        label="Max. Vergaben / 24 h"
+                        value={config[key].limit}
+                        onChange={(v) => ruleChange(key, "limit", v)}
                       />
-                    </>
-                  )}
-                </Stack>
-                {key === "milestones" && (
-                  <Stack gap={2}>
-                    {config.milestones.milestones.map((m, i) => (
-                      <Stack key={i} direction="row" gap={2} flexWrap="wrap">
+                    )}
+                    {["round", "weekly", "balance"].includes(key) && (
+                      <NumberField
+                        label="Mindestspielzeit (Minuten)"
+                        value={config[key].minutes}
+                        onChange={(v) => ruleChange(key, "minutes", v)}
+                      />
+                    )}
+                    {key === "round" && (
+                      <NumberField
+                        label="Mindestanteil der Runde (%)"
+                        value={Math.round(config.round.fraction * 100)}
+                        max={100}
+                        onChange={(v) => ruleChange(key, "fraction", v / 100)}
+                      />
+                    )}
+                    {key === "weekly" && (
+                      <NumberField
+                        label="Unterschiedliche Tage"
+                        value={config.weekly.days}
+                        max={7}
+                        onChange={(v) => ruleChange(key, "days", v)}
+                      />
+                    )}
+                    {key === "balance" && (
+                      <>
                         <NumberField
-                          label="Spielstunden"
-                          value={m.play_hours}
-                          onChange={(v) =>
-                            ruleChange(
-                              key,
-                              "milestones",
-                              config.milestones.milestones.map((x, j) =>
-                                j === i ? { ...x, play_hours: v } : x
-                              )
-                            )
-                          }
+                          label="Mindest-Teamdifferenz"
+                          value={config.balance.difference}
+                          min={2}
+                          onChange={(v) => ruleChange(key, "difference", v)}
                         />
                         <NumberField
-                          label="VIP-Stunden"
-                          value={m.hours}
-                          step={0.5}
-                          onChange={(v) =>
-                            ruleChange(
-                              key,
-                              "milestones",
-                              config.milestones.milestones.map((x, j) =>
-                                j === i ? { ...x, hours: v } : x
-                              )
-                            )
-                          }
+                          label="Anmeldung gültig (Minuten)"
+                          value={config.balance.signup_minutes}
+                          max={30}
+                          onChange={(v) => ruleChange(key, "signup_minutes", v)}
                         />
-                        <Button
-                          onClick={() =>
-                            ruleChange(
-                              key,
-                              "milestones",
-                              config.milestones.milestones.filter(
-                                (_, j) => j !== i
-                              )
-                            )
-                          }
-                        >
-                          Entfernen
-                        </Button>
-                      </Stack>
-                    ))}
-                    <Button
-                      onClick={() =>
-                        ruleChange(key, "milestones", [
-                          ...config.milestones.milestones,
-                          { play_hours: 200, hours: 12 },
-                        ])
-                      }
-                    >
-                      Meilenstein hinzufügen
-                    </Button>
+                      </>
+                    )}
                   </Stack>
-                )}
+                  {key === "milestones" && (
+                    <Stack gap={2}>
+                      {config.milestones.milestones.map((m, i) => (
+                        <Stack key={i} direction="row" gap={2} flexWrap="wrap">
+                          <NumberField
+                            label="Spielstunden"
+                            value={m.play_hours}
+                            onChange={(v) =>
+                              ruleChange(
+                                key,
+                                "milestones",
+                                config.milestones.milestones.map((x, j) =>
+                                  j === i ? { ...x, play_hours: v } : x
+                                )
+                              )
+                            }
+                          />
+                          <NumberField
+                            label="VIP-Stunden"
+                            value={m.hours}
+                            step={0.5}
+                            onChange={(v) =>
+                              ruleChange(
+                                key,
+                                "milestones",
+                                config.milestones.milestones.map((x, j) =>
+                                  j === i ? { ...x, hours: v } : x
+                                )
+                              )
+                            }
+                          />
+                          <Button
+                            onClick={() =>
+                              ruleChange(
+                                key,
+                                "milestones",
+                                config.milestones.milestones.filter(
+                                  (_, j) => j !== i
+                                )
+                              )
+                            }
+                          >
+                            Entfernen
+                          </Button>
+                        </Stack>
+                      ))}
+                      <Button
+                        onClick={() =>
+                          ruleChange(key, "milestones", [
+                            ...config.milestones.milestones,
+                            { play_hours: 200, hours: 12 },
+                          ])
+                        }
+                      >
+                        Meilenstein hinzufügen
+                      </Button>
+                    </Stack>
+                  )}
+                </Collapse>
               </CardContent>
             </Card>
           ))}
@@ -515,6 +566,11 @@ export default function VipRewards() {
               <CardContent>
                 <Typography variant="h6">
                   {key === "events" ? "Events" : "Waffen-Challenges"}
+                </Typography>
+                <Typography color="text.secondary">
+                  {key === "events"
+                    ? "Belohne die Teilnahme in einem festgelegten Zeitraum, zum Beispiel an einem Community-Abend."
+                    : "Wähle Waffen aus der Liste und lege fest, wie viele Gegnerkills damit nötig sind. Teamkills zählen nicht."}
                 </Typography>
                 <Stack gap={3} sx={{ mt: 2 }}>
                   {config[key].map((r, i) => (
@@ -540,12 +596,6 @@ export default function VipRewards() {
                         {toggle("Aktiviert", r.enabled, (v) =>
                           listChange(key, i, "enabled", v)
                         )}
-                        <NumberField
-                          label="VIP-Stunden"
-                          value={r.hours}
-                          step={0.5}
-                          onChange={(v) => listChange(key, i, "hours", v)}
-                        />
                         <Button
                           color="error"
                           onClick={() =>
@@ -558,85 +608,107 @@ export default function VipRewards() {
                           Entfernen
                         </Button>
                       </Stack>
-                      {key === "events" ? (
-                        <NumberField
-                          label="Mindestspielzeit (Minuten)"
-                          value={r.minutes}
-                          onChange={(v) => listChange(key, i, "minutes", v)}
-                        />
-                      ) : (
-                        <>
-                          <TextField
-                            multiline
-                            label="Waffen (eine pro Zeile, wie im Kill-Log)"
-                            value={r.weapons.join("\n")}
-                            onChange={(e) =>
-                              listChange(
-                                key,
-                                i,
-                                "weapons",
-                                e.target.value.split("\n")
-                              )
-                            }
+                      <Collapse in={r.enabled} unmountOnExit>
+                        <Stack gap={2}>
+                          <NumberField
+                            label="VIP-Stunden"
+                            value={r.hours}
+                            step={0.5}
+                            onChange={(v) => listChange(key, i, "hours", v)}
                           />
-                          <Stack direction="row" gap={2} flexWrap="wrap">
+                          {key === "events" ? (
                             <NumberField
-                              label="Gegnerkills"
-                              value={r.kills}
-                              onChange={(v) => listChange(key, i, "kills", v)}
+                              label="Mindestspielzeit (Minuten)"
+                              value={r.minutes}
+                              onChange={(v) => listChange(key, i, "minutes", v)}
                             />
-                            <TextField
-                              size="small"
-                              select
-                              label="Zeitraum"
-                              value={r.period}
-                              onChange={(e) =>
-                                listChange(key, i, "period", e.target.value)
-                              }
-                              sx={{ minWidth: 180 }}
-                            >
-                              {[
-                                ["day", "Täglich"],
-                                ["week", "Wöchentlich"],
-                                ["fixed", "Fester Zeitraum"],
-                              ].map(([v, l]) => (
-                                <MenuItem key={v} value={v}>
-                                  {l}
-                                </MenuItem>
+                          ) : (
+                            <>
+                              {weaponError && (
+                                <Alert severity="warning">{weaponError}</Alert>
+                              )}
+                              <Autocomplete
+                                multiple
+                                options={[
+                                  ...new Set([...weapons, ...r.weapons]),
+                                ]}
+                                value={r.weapons}
+                                onChange={(_, value) =>
+                                  listChange(key, i, "weapons", value)
+                                }
+                                disableCloseOnSelect
+                                noOptionsText="Keine passende Waffe gefunden"
+                                renderInput={(params) => (
+                                  <TextField
+                                    {...params}
+                                    label="Waffen auswählen"
+                                    helperText="Suchen und mehrere Waffen auswählen. Kills mit diesen Waffen werden gemeinsam gezählt."
+                                  />
+                                )}
+                              />
+                              <Stack direction="row" gap={2} flexWrap="wrap">
+                                <NumberField
+                                  label="Gegnerkills"
+                                  value={r.kills}
+                                  onChange={(v) =>
+                                    listChange(key, i, "kills", v)
+                                  }
+                                />
+                                <TextField
+                                  size="small"
+                                  select
+                                  label="Zeitraum"
+                                  value={r.period}
+                                  onChange={(e) =>
+                                    listChange(key, i, "period", e.target.value)
+                                  }
+                                  sx={{ minWidth: 180 }}
+                                >
+                                  {[
+                                    ["day", "Täglich"],
+                                    ["week", "Wöchentlich"],
+                                    ["fixed", "Fester Zeitraum"],
+                                  ].map(([v, l]) => (
+                                    <MenuItem key={v} value={v}>
+                                      {l}
+                                    </MenuItem>
+                                  ))}
+                                </TextField>
+                              </Stack>
+                            </>
+                          )}
+                          {(key === "events" || r.period === "fixed") && (
+                            <Stack direction="row" gap={2} flexWrap="wrap">
+                              {["start", "end"].map((field) => (
+                                <TextField
+                                  key={field}
+                                  size="small"
+                                  type="datetime-local"
+                                  label={`${
+                                    field === "start" ? "Beginn" : "Ende"
+                                  } (${
+                                    Intl.DateTimeFormat().resolvedOptions()
+                                      .timeZone
+                                  })`}
+                                  InputLabelProps={{ shrink: true }}
+                                  value={localTime(r[field])}
+                                  onChange={(e) =>
+                                    listChange(
+                                      key,
+                                      i,
+                                      field,
+                                      e.target.value
+                                        ? new Date(e.target.value).toISOString()
+                                        : ""
+                                    )
+                                  }
+                                  sx={{ flex: 1, minWidth: 250 }}
+                                />
                               ))}
-                            </TextField>
-                          </Stack>
-                        </>
-                      )}
-                      {(key === "events" || r.period === "fixed") && (
-                        <Stack direction="row" gap={2} flexWrap="wrap">
-                          {["start", "end"].map((field) => (
-                            <TextField
-                              key={field}
-                              size="small"
-                              type="datetime-local"
-                              label={`${
-                                field === "start" ? "Beginn" : "Ende"
-                              } (${
-                                Intl.DateTimeFormat().resolvedOptions().timeZone
-                              })`}
-                              InputLabelProps={{ shrink: true }}
-                              value={localTime(r[field])}
-                              onChange={(e) =>
-                                listChange(
-                                  key,
-                                  i,
-                                  field,
-                                  e.target.value
-                                    ? new Date(e.target.value).toISOString()
-                                    : ""
-                                )
-                              }
-                              sx={{ flex: 1, minWidth: 250 }}
-                            />
-                          ))}
+                            </Stack>
+                          )}
                         </Stack>
-                      )}
+                      </Collapse>
                     </Stack>
                   ))}
                 </Stack>
@@ -662,7 +734,7 @@ export default function VipRewards() {
                             enabled: false,
                             hours: 2,
                             limit: 1,
-                            weapons: ["M3 KNIFE"],
+                            weapons: [],
                             kills: 10,
                             period: "day",
                             start: null,
@@ -671,7 +743,9 @@ export default function VipRewards() {
                     ])
                   }
                 >
-                  Hinzufügen
+                  {key === "events"
+                    ? "Event hinzufügen"
+                    : "Challenge hinzufügen"}
                 </Button>
               </CardContent>
             </Card>

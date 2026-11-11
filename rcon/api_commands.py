@@ -183,6 +183,10 @@ class RconAPI(Rcon):
             ],
         }
 
+    def get_vip_rewards_weapons(self) -> dict[str, Any]:
+        """Weapon catalogue under the rewards configuration permission."""
+        return self.get_available_weapons()
+
     def get_available_player_flags(self) -> dict[str, Any]:
         """Return player markings already used by this CRCON instance."""
         return {"flags": player_history.get_available_player_flags()}

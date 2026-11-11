@@ -83,7 +83,7 @@ class EventRule(RewardRule):
 class ChallengeRule(RewardRule):
     id: str = Field(pattern=r"^[a-zA-Z0-9_-]{1,64}$")
     name: str = Field(min_length=1, max_length=120)
-    weapons: list[str] = Field(min_length=1)
+    weapons: list[str] = Field(default_factory=list)
     kills: int = Field(default=10, ge=1)
     period: Literal["day", "week", "fixed"] = "day"
     start: datetime | None = None
@@ -102,6 +102,8 @@ class ChallengeRule(RewardRule):
                 raise ValueError(
                     "Feste Challenge benötigt einen gültigen Zeitraum mit Zeitzone"
                 )
+        if self.enabled and not self.weapons:
+            raise ValueError("Bitte mindestens eine Waffe für die aktive Challenge auswählen")
         if any(not w.strip() for w in self.weapons):
             raise ValueError("Leere Waffennamen sind nicht erlaubt")
         return self

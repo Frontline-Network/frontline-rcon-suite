@@ -1240,6 +1240,12 @@ class Rcon(ServerCtl):
         before_manual_action(player_id)
         return super().switch_player_now(player_id)
 
+    def switch_volunteer_now(self, player_id: str) -> bool:
+        """Internal autobalancer path for an explicitly registered volunteer."""
+        from rcon.leadership_vote.storage import before_manual_action
+        before_manual_action(player_id)
+        return super().switch_player_now(player_id)
+
     def remove_player_from_squad(self, player_id: str, reason: str) -> bool:
         from rcon.leadership_vote.storage import before_manual_action
         before_manual_action(player_id)

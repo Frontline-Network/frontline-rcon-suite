@@ -36,3 +36,21 @@ real backend validation or database persistence.
   run the full combined worker/integration acceptance suite.
 - Review failure handling of shared VIP locks and forced-switch tracking.
 - No release, rollout or live feature activation was performed in this task.
+
+## Form usability revision
+
+- Rule details appear only while that rule is enabled; toggling retains values.
+- Added plain-language explanations for goals, qualification and shared limits.
+- Events and weapon challenges reveal their details after activation.
+- Searchable multiple weapon selection uses the active game profile catalogue.
+  A dedicated read endpoint uses the existing Seed-VIP read permission, without
+  requiring Seeding-Automod permissions. Existing unknown selections are kept.
+- Disabled challenge drafts may have no weapons; active ones require a selection
+  in both frontend and backend validation.
+- Rewards use the configured autobalancer volunteer command (normally !balance),
+  not a separate !balancevip command. An internal switch path distinguishes
+  registered volunteers from forced switches; observed switch/stay and seeding
+  safeguards remain required for rewards. This path is not exposed as an API action.
+- Validation: 123 backend tests (VIP rewards, autobalancer service and volunteer
+  flow), 3 browser tests and production build passed. Build still reports the
+  existing bundle-size advisory. No live deployment or game-server testing.
