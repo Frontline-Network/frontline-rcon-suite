@@ -42,6 +42,7 @@ from rcon.user_config.utils import _invalidate_user_config_cache
 logger = logging.getLogger(__name__)
 ACTOR = "system:report-admin"
 OPEN = {"classifying", "queued", "waiting", "sending"}
+CONTEXT_RETRY_SECONDS = 15
 enter_session = votes.enter_session  # Commit errors must propagate.
 
 
@@ -480,7 +481,9 @@ def invalid_reason(sess, event, context, now):
         or i.target_id != p["target_id"]
         or i.revision != p["incident_revision"]
     ):
-        return "Admin-Bearbeitung oder Ziel geändert / Admin handling or target changed"
+        return (
+            "Admin-Bearbeitung oder Ziel geändert / Admin handling or target changed"
+        )
     max_age = evidence_rules.CASE_TTL if p["rule"] == "teamkills" else MAX_REPORT_AGE
     if not 0 <= now - p["report_time"] <= max_age:
         return "Report abgelaufen / Report expired"
@@ -638,7 +641,7 @@ def recover(server):
                 sess,
                 event,
                 "unknown" if event.payload["status"] == "sending" else "manual",
-                "Dienst neu gestartet; keine Wiederholung / Service restarted; no retry",
+                "Verarbeitung neu übernommen; Admin-Prüfung erforderlich / Processing recovered; admin review required",
             )
     _invalidate_user_config_cache(votes.config_key(server))
 
@@ -756,18 +759,87 @@ def notify_reporter(api, server, event_id, *, review=False):
         }
 
 
+def defer_unavailable_context(server, tasks, now):
+    """Wait briefly BEFORE reserving an action, within the original report TTL.
+
+    A missing round/roster is not a lost runtime-owner connection. Keep that
+    ownership and the unsent report; never replay a durable sending marker.
+    """
+    with enter_session() as sess:
+        votes.lock(sess, server)
+        for event_id in tasks:
+            event = sess.get(AdminIncidentEvent, event_id)
+            if not event or event.payload.get("status") not in {
+                "classifying",
+                "queued",
+                "waiting",
+            }:
+                continue
+            p = event.payload
+            first = p.get("context_unavailable_since", now)
+            ttl = (
+                evidence_rules.CASE_TTL
+                if p.get("rule") == "teamkills"
+                else MAX_REPORT_AGE
+            )
+            if (
+                now - first >= CONTEXT_RETRY_SECONDS
+                or not 0 <= now - p["report_time"] <= ttl
+            ):
+                publish(
+                    sess,
+                    event,
+                    "manual",
+                    "Live-Daten nicht rechtzeitig bestätigt; Admins prüfen / Live data could not be confirmed in time; admins review",
+                )
+            elif "context_unavailable_since" not in p:
+                event.payload = {**p, "context_unavailable_since": first}
+                logger.warning(
+                    "Report-admin waiting for confirmed live context: event %s",
+                    event_id,
+                )
+
+
 def tick(api, server):
     with enter_session() as sess:
         cfg = config(sess, server)
         tasks = [e.id for e in pending(sess, server, limit=4, due_at=time.time())]
     if not tasks:
         return
-    context = read_context(api) if cfg.enabled else None
+    try:
+        context = read_context(api) if cfg.enabled else None
+    except Exception:
+        # This scope contains no action attempt. Errors after reservation still
+        # propagate to recovery and retain the existing no-retry guarantee.
+        defer_unavailable_context(server, tasks, time.time())
+        return
     for event_id in tasks:
         live = None
         with enter_session() as sess:
             votes.lock(sess, server)
             event = sess.get(AdminIncidentEvent, event_id)
+            if event and "context_unavailable_since" in event.payload:
+                if (
+                    time.time() - event.payload["context_unavailable_since"]
+                    >= CONTEXT_RETRY_SECONDS
+                ):
+                    if event.payload.get("status") in {
+                        "classifying",
+                        "queued",
+                        "waiting",
+                    }:
+                        publish(
+                            sess,
+                            event,
+                            "manual",
+                            "Live-Daten nicht rechtzeitig bestätigt; Admins prüfen / Live data could not be confirmed in time; admins review",
+                        )
+                    continue
+                event.payload = {
+                    k: v
+                    for k, v in event.payload.items()
+                    if k != "context_unavailable_since"
+                }
             if event and event.payload.get("status") == "classifying":
                 from rcon import report_reason
 

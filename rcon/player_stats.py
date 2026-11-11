@@ -512,16 +512,8 @@ class TimeWindowStats(BaseStats):
             r"MATCH ENDED `.+` ALLIED \((\d) - (\d)\) AXIS"
         )
 
-    def _set_start_end_times(
-        self,
-        player: str,
-        players_times: dict[str, PlayerSessions],
-        log: StructuredLogLineWithMetaData,
-        from_: datetime.datetime,
-        offset_warmup_time_seconds=180,
-    ):
-        if not player:
-            return
+    @staticmethod
+    def _session_event_time(log):
         event_time = log.get("event_time")
         if isinstance(event_time, str):
             try:
@@ -532,7 +524,7 @@ class TimeWindowStats(BaseStats):
             timestamp_ms = log.get("timestamp_ms")
             if timestamp_ms is None:
                 logger.debug("Unable to determine event time for log: %s", log)
-                return
+                return None
             event_time = datetime.datetime.fromtimestamp(
                 timestamp_ms / 1000, datetime.UTC
             )
@@ -540,6 +532,21 @@ class TimeWindowStats(BaseStats):
             event_time = event_time.replace(tzinfo=datetime.UTC)
         else:
             event_time = event_time.astimezone(datetime.UTC)
+        return event_time
+
+    def _set_start_end_times(
+        self,
+        player: str,
+        players_times: dict[str, PlayerSessions],
+        log: StructuredLogLineWithMetaData,
+        from_: datetime.datetime,
+        offset_warmup_time_seconds=180,
+    ):
+        if not player:
+            return
+        event_time = self._session_event_time(log)
+        if event_time is None:
+            return
         # A CONNECT means the begining of a session for the player
         if log["action"] == AllLogTypes.connected:
             return players_times.setdefault(
@@ -639,8 +646,35 @@ class TimeWindowStats(BaseStats):
                             log,
                         )
 
-                self._set_start_end_times(player_key, players_times, log, from_)
                 indexed_logs.setdefault(player_key, []).append(log)
+
+        # Session boundaries may be repeated by the live log cache. Process
+        # sessions chronologically, with CONNECT before same-second activity;
+        # leave combat logs and their ordering untouched.
+        for player_key, player_logs in indexed_logs.items():
+            session_logs = [
+                (event_time, log)
+                for log in player_logs
+                if (event_time := self._session_event_time(log)) is not None
+            ]
+            session_logs.sort(
+                key=lambda item: (
+                    item[0],
+                    (
+                        0
+                        if item[1]["action"] == AllLogTypes.connected
+                        else 2 if item[1]["action"] == AllLogTypes.disconnected else 1
+                    ),
+                )
+            )
+            seen_boundaries = set()
+            for event_time, log in session_logs:
+                if log["action"] in (AllLogTypes.connected, AllLogTypes.disconnected):
+                    boundary = (log["action"], event_time)
+                    if boundary in seen_boundaries:
+                        continue
+                    seen_boundaries.add(boundary)
+                self._set_start_end_times(player_key, players_times, log, from_)
 
         # Convert the unique set of players into a list of dict for compatibility with parent class
         players = [
@@ -777,9 +811,7 @@ def _next_live_stats_sleep(
     session_interval: float,
     game_interval: float,
 ) -> float:
-    session_remaining = session_interval - (
-        now - last_session_refresh
-    ).total_seconds()
+    session_remaining = session_interval - (now - last_session_refresh).total_seconds()
     game_remaining = game_interval - (now - last_game_refresh).total_seconds()
     return max(0.1, min(session_remaining, game_remaining))
 
