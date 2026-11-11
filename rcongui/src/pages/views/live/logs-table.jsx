@@ -276,8 +276,12 @@ function LogsTable({
         <DebouncedSearchInput
           placeholder={t("views.live.searchLogs")}
           onChange={(value) => {
+            const column = table.getColumn("message");
+            // The debounced input also emits its initial empty value. Only an
+            // actual filter change should rewind an operator's current page.
+            if (!column || (column.getFilterValue() ?? "") === value) return;
             table.setPageIndex(0);
-            table.getColumn("message")?.setFilterValue(value);
+            column.setFilterValue(value);
           }}
         />
       </Stack>
