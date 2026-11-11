@@ -67,6 +67,46 @@ def progress(player_id):
     return read_state(cfg.dry_run).get("players", {}).get(player_id, {})
 
 
+def status_command_conflict(command):
+    from rcon.user_config.autobalancer import AutobalancerUserConfig
+    from rcon.user_config.chat_commands import ChatCommandsUserConfig
+    from rcon.user_config.rcon_chat_commands import RConChatCommandsUserConfig
+    from rcon.user_config.vote_map import VoteMapUserConfig
+    if command == AutobalancerUserConfig.load_from_db().volunteer_command.casefold():
+        return True
+    for model in (ChatCommandsUserConfig, RConChatCommandsUserConfig, VoteMapUserConfig):
+        data = model.load_from_db().model_dump()
+        if not data.get("enabled", False):
+            continue
+        words = list(data.get("describe_words") or [])
+        words.append(data.get("command", ""))
+        for item in data.get("command_words", []):
+            if item.get("enabled", True):
+                words.extend(item.get("words", []))
+        if command in {str(w).strip().casefold() for w in words}:
+            return True
+    return False
+
+
+def status_message(cfg, state, pid, now):
+    from rcon.vip_rewards.engine import periods
+    if not cfg.weekly_support.enabled:
+        return "Wochenziel Unterstützung ist deaktiviert. / Weekly support reward is disabled."
+    week = periods(now, cfg.timezone)[1]
+    player = state.get("players", {}).get(pid, {})
+    progress = player.get("weekly_support", {})
+    points = progress.get("points", 0) if progress.get("week") == week else 0
+    reached = "weekly_support:" + week in player.get("completed", {})
+    result = (f"Wochenziel / Weekly support ({week}, {cfg.timezone}): "
+              f"{points} / {cfg.weekly_support.points} Punkte / points. "
+              f"Belohnung / Reward: {cfg.weekly_support.hours:g} h VIP. ")
+    if reached:
+        result += "Ziel erreicht; Gutschrift separat bestätigt. / Goal reached; credit confirmed separately. "
+    if gate(state, cfg, now) != "active":
+        result += "Erfassung pausiert / Tracking paused. "
+    return result + "Mo–So / Mon–Sun. VIP-Limit gilt / VIP cap applies."
+
+
 def journal(offset=0, limit=50, player_id=None, preview=None):
     offset, limit = max(0, int(offset)), min(100, max(1, int(limit)))
     cfg = VipRewardsUserConfig.load_from_db()
@@ -150,7 +190,8 @@ def observe(rcon, cfg):
             "axis": int(game["num_axis_players"]),
         }
         players = {
-            pid: {"name": p["name"], "team": str(p.get("team", "")).lower()}
+            pid: {"name": p["name"], "team": str(p.get("team", "")).lower(),
+                  "support": p.get("support")}
             for pid, p in details["players"].items()
         }
         healthy = not details.get("fail_count", 0)
@@ -182,7 +223,7 @@ def tick(rcon):
         players, counts, healthy = (
             observe(rcon, cfg) if cfg.enabled else ({}, {"allies": 0, "axis": 0}, False)
         )
-        round_id = current_round() if cfg.enabled and cfg.round.enabled else None
+        round_id = current_round() if cfg.enabled and (cfg.round.enabled or cfg.weekly_support.enabled) else None
         now = time.time()
         with enter_session() as session:
             row = session.get(VipRewardState, (server(), cfg.dry_run))
@@ -225,6 +266,7 @@ def tick(rcon):
                 data["baseline"] = None
                 for player in data["players"].values():
                     player["round"] = 0
+                    player.pop("support_highwater", None)
                     player.pop("balance", None)
             data["round_id"] = round_id
             data["round_known"] = round_id is not None

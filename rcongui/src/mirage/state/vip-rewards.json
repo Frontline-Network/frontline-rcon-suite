@@ -53,5 +53,11 @@
     "signup_minutes": 5
   },
   "events": [],
-  "challenges": []
+  "challenges": [],
+  "weekly_support": {
+    "enabled": false,
+    "points": 5000,
+    "hours": 6
+  },
+  "status_command": "!rewards"
 }

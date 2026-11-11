@@ -1,6 +1,7 @@
 """Log hooks only enqueue data; no VIP network operations in the log loop."""
 
 import time
+import logging
 
 from rcon.cache_utils import get_redis_client
 from rcon.logs.loop import (
@@ -58,6 +59,29 @@ def signup(rcon, log):
     command = AutobalancerUserConfig.load_from_db().volunteer_command
     if message.casefold() == command.casefold():
         enqueue(payload("signup", log))
+
+
+@on_chat
+def reward_status(rcon, log):
+    message = str(log.get("sub_content") or log.get("message") or "").strip().casefold()
+    if not message.startswith("!") or len(message.split()) != 1:
+        return
+    cfg = VipRewardsUserConfig.load_from_db()
+    if not cfg.enabled or cfg.dry_run or not cfg.status_command or message != cfg.status_command:
+        return
+    pid = log.get("player_id_1")
+    now = time.time()
+    if not pid or not 0 <= now - log.get("timestamp_ms", 0) / 1000 <= 60:
+        return
+    try:
+        from rcon.vip_rewards.service import status_message, status_command_conflict
+        if status_command_conflict(cfg.status_command):
+            return
+        if not get_redis_client().set(f"vip-rewards-status:{get_server_number()}:{pid}", "1", nx=True, ex=30):
+            return
+        rcon.message_player(player_id=pid, message=status_message(cfg, read_state(False), pid, now))
+    except Exception:
+        logging.getLogger(__name__).exception("VIP reward status reply failed")
 
 
 @on_disconnected

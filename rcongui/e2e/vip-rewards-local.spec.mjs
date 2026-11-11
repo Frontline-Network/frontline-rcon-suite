@@ -101,3 +101,41 @@ test("rules reveal details and weapon choices survive save and reload reset", as
     page.getByRole("combobox", { name: "Waffen auswählen" })
   ).toHaveCount(0);
 });
+
+test("weekly support settings reveal on activation and save a custom command", async ({
+  page,
+}) => {
+  await openDemoPage(page, path);
+  await expect(page.getByLabel("Unterstützungspunkte pro Woche")).toHaveCount(
+    0
+  );
+  await page.getByLabel("Wöchentliche Team-Unterstützung aktivieren").check();
+  await page.getByLabel("Unterstützungspunkte pro Woche").fill("8000");
+  await page.getByLabel("VIP-Stunden", { exact: true }).fill("12");
+  await page
+    .getByLabel("Chatbefehl für den Wochenfortschritt")
+    .fill("!teamvip");
+  await page
+    .getByRole("button", { name: "Einstellungen speichern", exact: true })
+    .click();
+  await expect(page.getByText(/Einstellungen gespeichert/)).toBeVisible();
+  await expect(page.getByLabel("Unterstützungspunkte pro Woche")).toHaveValue(
+    "8000"
+  );
+  await expect(page.getByLabel("VIP-Stunden", { exact: true })).toHaveValue(
+    "12"
+  );
+  await expect(
+    page.getByLabel("Chatbefehl für den Wochenfortschritt")
+  ).toHaveValue("!teamvip");
+  await page.getByLabel("Wöchentliche Team-Unterstützung aktivieren").uncheck();
+  await expect(page.getByLabel("Unterstützungspunkte pro Woche")).toHaveCount(
+    0
+  );
+  await page.getByRole("button", { name: "Änderungen verwerfen" }).click();
+  await expect(page.getByLabel("Unterstützungspunkte pro Woche")).toHaveValue(
+    "8000"
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectNoHorizontalPageOverflow(page);
+});

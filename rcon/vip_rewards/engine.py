@@ -74,7 +74,7 @@ class Engine:
     def rule_keys(self):
         keys = [
             k
-            for k in ("melee", "round", "weekly", "milestones", "balance")
+            for k in ("melee", "round", "weekly", "weekly_support", "milestones", "balance")
             if getattr(self.c, k).enabled
         ]
         return (
@@ -154,6 +154,7 @@ class Engine:
             }
             if not active or pid not in online or not self.eligible(pid):
                 p.pop("balance", None)
+        self.support_snapshot(now, online, previous_players, previous_time, valid_interval)
         if not active:
             return
         _, week = periods(now, c.timezone)
@@ -228,6 +229,42 @@ class Engine:
         cutoff = now - c.opponent_cooldown_minutes * 60
         s["opponents"] = {k: t for k, t in s["opponents"].items() if t > cutoff}
 
+    def support_snapshot(self, now, online, previous_players, previous_time, valid_interval):
+        """Count only observed positive gains, never an existing match total.
+
+        Keep a match high-water mark across reconnects and temporary score drops.
+        Paused observations advance it too. Round boundaries explicitly clear it.
+        Intervals crossing local Monday are discarded rather than guessed.
+        """
+        c = self.c
+        if not c.weekly_support.enabled:
+            return
+        _, week = periods(now, c.timezone)
+        for pid, info in online.items():
+            if not self.eligible(pid):
+                continue
+            p = self.player(pid)
+            progress = p.get("weekly_support", {})
+            if progress.get("week") != week:
+                progress = p["weekly_support"] = {"week": week, "points": 0}
+            score = info.get("support")
+            if type(score) is not int or score < 0:
+                continue
+            previous = previous_players.get(pid, {})
+            old = p.get("support_highwater")
+            p["support_highwater"] = max(score, old) if old is not None else score
+            if not (c.weekly_support.enabled and valid_interval
+                    and self.s.get("round_known", True)
+                    and previous.get("team") == info.get("team")
+                    and type(previous.get("support")) is int
+                    and previous["support"] >= 0 and old is not None
+                    and periods(previous_time, c.timezone)[1] == week):
+                continue
+            gained = max(0, score - old)
+            progress["points"] += gained
+            if gained and progress["points"] >= c.weekly_support.points:
+                self.claim(pid, "weekly_support", week, c.weekly_support.hours, now)
+
     def event(self, event, now):
         s, c = self.s, self.c
         kind, pid = event["kind"], event.get("player_id")
@@ -275,6 +312,7 @@ class Engine:
             s["baseline"] = None
             for p in s["players"].values():
                 p["round"] = 0
+                p.pop("support_highwater", None)
                 p.pop("balance", None)
             return
         if not active or not self.eligible(pid):

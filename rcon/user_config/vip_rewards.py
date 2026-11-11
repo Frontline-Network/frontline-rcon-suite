@@ -30,6 +30,13 @@ class WeeklyRule(RewardRule):
     minutes: int = Field(default=30, ge=1)
 
 
+class WeeklySupportRule(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = False
+    points: int = Field(default=5000, ge=1, le=100000000, strict=True)
+    hours: float = Field(default=6, gt=0, le=8760)
+
+
 class Milestone(BaseModel):
     model_config = ConfigDict(extra="forbid")
     play_hours: int = Field(gt=0)
@@ -120,15 +127,27 @@ class VipRewardsUserConfig(BaseUserConfig):
     daily_hours: float = Field(default=24, gt=0, le=8760)
     timezone: str = "Europe/Berlin"
     notify_player: bool = True
+    status_command: str = "!rewards"
     excluded_player_ids: list[str] = Field(default_factory=list)
     opponent_cooldown_minutes: int = Field(default=30, ge=1)
     melee: RewardRule = Field(default_factory=lambda: RewardRule(limit=3))
     round: RoundRule = Field(default_factory=RoundRule)
     weekly: WeeklyRule = Field(default_factory=WeeklyRule)
+    weekly_support: WeeklySupportRule = Field(default_factory=WeeklySupportRule)
     milestones: MilestoneRule = Field(default_factory=MilestoneRule)
     balance: BalanceRule = Field(default_factory=BalanceRule)
     events: list[EventRule] = Field(default_factory=list, max_length=100)
     challenges: list[ChallengeRule] = Field(default_factory=list, max_length=100)
+
+    @field_validator("status_command")
+    @classmethod
+    def valid_status_command(cls, value):
+        value = value.strip().casefold()
+        if value and not re.fullmatch(r"![a-z][a-z0-9_-]{0,31}", value):
+            raise ValueError("Statusbefehl: ein !Befehl ohne Leerzeichen oder leer zum Abschalten")
+        if value in {"!balance", "!admin", "!yes", "!no", "!vip"}:
+            raise ValueError("Dieser Befehl ist bereits für eine andere Funktion reserviert")
+        return value
 
     @field_validator("timezone")
     @classmethod
@@ -162,6 +181,10 @@ class VipRewardsUserConfig(BaseUserConfig):
     @staticmethod
     def save_to_db(values, dry_run=False):
         config = VipRewardsUserConfig.model_validate(values)
+        if config.status_command:
+            from rcon.vip_rewards.service import status_command_conflict
+            if status_command_conflict(config.status_command):
+                raise ValueError("Statusbefehl wird bereits von einer anderen Funktion verwendet")
         if not dry_run:
             config.revision = uuid4().hex
             set_user_config(VipRewardsUserConfig.KEY(), config.model_dump(mode="json"))

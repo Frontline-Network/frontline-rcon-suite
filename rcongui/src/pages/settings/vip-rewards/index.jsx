@@ -39,10 +39,13 @@ const labels = {
   melee: "Nahkampf",
   round: "Rundentreue",
   weekly: "Wochenaktivität",
+  weekly_support: "Wöchentliche Team-Unterstützung",
   milestones: "Spielzeit-Meilensteine",
   balance: "Freiwilliger Teamausgleich",
 };
 const notes = {
+  weekly_support:
+    "Sammle Unterstützungspunkte über mehrere Runden: Montag bis Sonntag in der eingestellten Server-Zeitzone. Einmal pro Woche gibt es VIP beim Erreichen des Ziels. Nur neu erspielte Punkte zählen; die Seeding-Pause und das gemeinsame VIP-Limit gelten auch hier. Zielwerte gelten nur für diesen Server und können für HLL und HLLV unterschiedlich eingestellt werden.",
   melee:
     "Nur Gegnerkills mit Messer oder Spaten. Wiederholte Gegner werden gemeinsam mit Challenges begrenzt.",
   round:
@@ -416,6 +419,15 @@ export default function VipRewards() {
               </Stack>
               <TextField
                 fullWidth
+                size="small"
+                sx={{ mt: 2 }}
+                label="Chatbefehl für den Wochenfortschritt"
+                value={config.status_command}
+                helperText="Zum Beispiel !rewards oder !teamvip. Leer lassen zum Abschalten. Antwort nur privat, höchstens alle 30 Sekunden pro Spieler. Im Probelauf keine Nachrichten."
+                onChange={(e) => change("status_command", e.target.value)}
+              />
+              <TextField
+                fullWidth
                 multiline
                 minRows={2}
                 sx={{ mt: 2 }}
@@ -472,6 +484,15 @@ export default function VipRewards() {
                         value={Math.round(config.round.fraction * 100)}
                         max={100}
                         onChange={(v) => ruleChange(key, "fraction", v / 100)}
+                      />
+                    )}
+                    {key === "weekly_support" && (
+                      <NumberField
+                        label="Unterstützungspunkte pro Woche"
+                        value={config.weekly_support.points}
+                        max={100000000}
+                        helperText="Beispielwert: 5.000 Punkte. Passe das Ziel an die Spielweise auf deinem Server an."
+                        onChange={(v) => ruleChange(key, "points", v)}
                       />
                     )}
                     {key === "weekly" && (
@@ -819,6 +840,15 @@ export default function VipRewards() {
                 {((progress.total || 0) / 3600).toFixed(2)} h; Rundentreue:{" "}
                 {Math.floor((progress.round || 0) / 60)} min; erfasste
                 Spieltage: {Object.keys(progress.days || {}).length}.
+                {progress.weekly_support && (
+                  <>
+                    {" "}
+                    Wochenziel Unterstützung (Woche ab{" "}
+                    {progress.weekly_support.week}):{" "}
+                    {progress.weekly_support.points} /{" "}
+                    {config.weekly_support.points} Punkte.
+                  </>
+                )}
               </Alert>
             )}
             <Box sx={{ overflowX: "auto" }}>

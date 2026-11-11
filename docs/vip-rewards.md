@@ -84,3 +84,32 @@ staging smoke test; offline tests are not a production readiness claim.
 
 Build the web application with `REACT_APP_API_URL=/api/` and `vite build`. The
 existing fake/demo mode includes the new settings page for offline UI checks.
+
+## Weekly support reward (local implementation)
+
+The optional weekly_support rule counts observed increases in support score across
+rounds, Monday–Sunday in the configured timezone. It is disabled by default;
+5,000 points and 6 VIP hours are editable example defaults, not calibrated targets.
+Settings and state are server-scoped, so HLL and HLLV may use different targets.
+The rule shares the existing daily budget, preview mode, seeding pause, exclusions
+and confirmed-delivery notification. One claim per player and local week.
+
+Existing match totals are baselines, never retrospective credits. Round identity
+is required in the worker. Round boundaries reset the score baseline but retain
+weekly totals. A match high-water mark prevents duplicate credit after score
+rebounds or reconnects. Unobserved gaps, configuration-change intervals, unknown
+rounds, unhealthy snapshots and intervals crossing Monday are not estimated;
+this conservatively can omit points. Weekly progress is stored in existing JSON
+state; no additional database migration is needed.
+
+The status_command setting defaults to !rewards, accepts a custom !command, and
+can be empty to disable replies. Exact matching is case-insensitive; arguments
+are not accepted. Replies are private, bilingual, limited to once per 30 seconds
+per player, and suppressed in preview/disabled mode. The reply shows current-week
+support progress and the configured reward, distinguishing goal completion from
+confirmed credit. Conflicts with configured chat, map-vote and balance commands
+are checked when saving and before replying. New conflicts introduced through
+other configuration pages suppress this handler rather than overriding commands.
+
+Local verification: 144 backend tests, 4 browser tests and production build passed.
+No live deployment, real VIP grants or player messages were performed.
