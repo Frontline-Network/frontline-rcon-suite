@@ -23,13 +23,17 @@ test("v0.9.4 has its own bilingual announcement instead of the old theme spotlig
   expect(release.highlights.title).toEqual({ de: "Neue Belohnungen für eure Community", en: "New rewards for your community" });
   expect(release.highlights.items).toHaveLength(2);
   expect(release.body).not.toContain("crcon-highlights");
+  expect(release.body).toContain("Bereits aus v0.9.3 enthalten");
+  expect(release.body).toContain("Included from v0.9.3");
   await page.addInitScript(() => localStorage.setItem("crcon.language", "de"));
   await page.goto("/");
   await expect(dialog(page)).toBeVisible();
   await expect(page.locator("#release-spotlight-title")).toHaveText(release.highlights.title.de);
+  await expect(dialog(page)).toContainText("Alle Neuerungen aus v0.9.3 sind enthalten");
   await dialog(page).getByRole("button", { name: "English", exact: true }).click();
   await expect(page.locator("#release-spotlight-title")).toHaveText(release.highlights.title.en);
   await expect(dialog(page)).toContainText("Preview mode grants no VIP");
+  await expect(dialog(page)).toContainText("All improvements from v0.9.3 are included");
   await page.keyboard.press("Escape");
   expect((await channel(context)).highlight_state.seen).toBe(true);
   await page.reload();
