@@ -26,6 +26,7 @@ from rcon.game.player_adapter import PlayerResponseAdapterError
 from rcon.maps import UNKNOWN_MAP_NAME, Layer, is_server_loading_map
 from rcon.models import GameLayout, PlayerID, PlayerVIP, enter_session
 from rcon.perf_statistics import PerformanceStatistics
+from rcon.vip_rewards.locking import serialized_vip
 from rcon.player_history import (
     get_live_profiles,
     get_player_profile,
@@ -701,8 +702,16 @@ class Rcon(ServerCtl):
 
         return sorted(player_dicts, key=lambda d: d[NAME])
 
-    def remove_vip(self, player_id) -> bool:
+    @serialized_vip
+    def remove_vip(self, player_id, expected_expiration=None) -> bool:
         """Removes VIP status on the game server and removes their PlayerVIP record."""
+
+        if expected_expiration is not None:
+            # Expiry cleanup must not remove a VIP extended after its initial query.
+            from rcon.vip_rewards.service import current_vip, expiration
+            current = current_vip(self, player_id)
+            if current is None or current["vip_expiration"] is None or expiration(current["vip_expiration"]) != expiration(expected_expiration):
+                return False
 
         # Remove VIP before anything else in case we have errors
         with invalidates(Rcon.get_vip_ids):
@@ -739,6 +748,7 @@ class Rcon(ServerCtl):
 
         return result
 
+    @serialized_vip
     def add_vip(
         self, player_id: str, description: str, expiration: str | None = None
     ) -> bool:
@@ -746,6 +756,9 @@ class Rcon(ServerCtl):
         with invalidates(Rcon.get_vip_ids):
             # Add VIP before anything else in case we have errors
             result = super().add_vip(player_id, description)
+
+        if result is not True:
+            return result
 
         expiration = expiration or ""
         # postgres and Python have different max date limits
@@ -1089,7 +1102,7 @@ class Rcon(ServerCtl):
             logger.exception("Can't save message in redis: %s", message)
 
         super().set_broadcast(formatted)
-        return prev.decode() if prev else ""
+        return prev.decode() if isinstance(prev, bytes) else (prev or "")
 
     @ttl_cache(ttl=5)
     def get_slots(self) -> SlotsType:
@@ -1221,6 +1234,14 @@ class Rcon(ServerCtl):
         return res
 
     def switch_player_now(self, player_id: str) -> bool:
+        from rcon.vip_rewards.hooks import mark_forced
+        mark_forced(player_id)
+        from rcon.leadership_vote.storage import before_manual_action
+        before_manual_action(player_id)
+        return super().switch_player_now(player_id)
+
+    def switch_volunteer_now(self, player_id: str) -> bool:
+        """Internal autobalancer path for an explicitly registered volunteer."""
         from rcon.leadership_vote.storage import before_manual_action
         before_manual_action(player_id)
         return super().switch_player_now(player_id)
@@ -1238,6 +1259,8 @@ class Rcon(ServerCtl):
         return super().disband_squad(team_index, squad_index, reason)
 
     def switch_player_on_death(self, player_id, by) -> bool:
+        from rcon.vip_rewards.hooks import mark_forced
+        mark_forced(player_id, on_death=True)
         from rcon.leadership_vote.storage import before_manual_action
         before_manual_action(player_id, by)
         return super().switch_player_on_death(player_id)

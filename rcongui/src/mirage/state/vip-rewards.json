@@ -1,0 +1,63 @@
+{
+  "enabled": false,
+  "revision": "",
+  "dry_run": true,
+  "pause_during_seeding": true,
+  "daily_hours": 24.0,
+  "timezone": "Europe/Berlin",
+  "notify_player": true,
+  "excluded_player_ids": [],
+  "opponent_cooldown_minutes": 30,
+  "melee": {
+    "enabled": false,
+    "hours": 2.0,
+    "limit": 3
+  },
+  "round": {
+    "enabled": false,
+    "hours": 2.0,
+    "limit": 2,
+    "minutes": 30,
+    "fraction": 0.7
+  },
+  "weekly": {
+    "enabled": false,
+    "hours": 6.0,
+    "limit": 1,
+    "days": 3,
+    "minutes": 30
+  },
+  "milestones": {
+    "enabled": false,
+    "milestones": [
+      {
+        "play_hours": 10,
+        "hours": 4.0
+      },
+      {
+        "play_hours": 50,
+        "hours": 8.0
+      },
+      {
+        "play_hours": 100,
+        "hours": 12.0
+      }
+    ]
+  },
+  "balance": {
+    "enabled": false,
+    "hours": 2.0,
+    "limit": 1,
+    "minutes": 15,
+    "difference": 4,
+    "signup_minutes": 5
+  },
+  "events": [],
+  "challenges": [],
+  "weekly_support": {
+    "enabled": false,
+    "points": 5000,
+    "hours": 6
+  },
+  "status_command": "!rewards"
+}

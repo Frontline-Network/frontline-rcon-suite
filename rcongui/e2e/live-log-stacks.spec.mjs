@@ -95,6 +95,7 @@ for (const viewport of ["desktop", "mobile"]) {
 test("live log filtering and pagination still operate on individual events", async ({
   page,
 }) => {
+  await page.clock.install();
   await page.setViewportSize(VIEWPORTS.desktop);
   await openLogDemo(page);
   const stream = page.getByTestId("live-event-stream");
@@ -107,6 +108,14 @@ test("live log filtering and pagination still operate on individual events", asy
   await expect(page.getByText("Seite 2 von 2", { exact: true })).toBeVisible();
   await expect(stream.locator(":scope > ol > li")).toHaveCount(10);
   await expect(page.getByTestId("live-log-stack")).toHaveCount(0);
+
+  // A search draft cancelled before its debounce changes no filter. Its delayed
+  // empty value must not rewind a page the operator has already opened.
+  await search.fill("cancelled draft");
+  await search.fill("");
+  await page.clock.fastForward(600);
+  await expect(page.getByText("Seite 2 von 2", { exact: true })).toBeVisible();
+  await expect(stream.locator(":scope > ol > li")).toHaveCount(10);
 
   // Search resets pagination and matches the original recipient-bearing text.
   await search.fill("Demo-Spieler 3(");

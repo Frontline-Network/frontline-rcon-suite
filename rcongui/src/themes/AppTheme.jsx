@@ -5,6 +5,8 @@ import {
   useColorScheme,
 } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
+import { useTranslation } from "react-i18next";
+import { loadThemeWithRetry } from "./load-theme.mjs";
 import {
   applyAppearanceToThemeOptions,
   normalizeAppearance,
@@ -18,12 +20,19 @@ function AppearanceModeSync({ appearance }) {
     document.documentElement.dataset.colorVision = appearance.colorVision;
     document.documentElement.dataset.themePreset = appearance.preset;
     document.documentElement.dataset.wardogsStyle = appearance.wardogsStyle;
-  }, [appearance.colorVision, appearance.mode, appearance.preset, appearance.wardogsStyle, setMode]);
+  }, [
+    appearance.colorVision,
+    appearance.mode,
+    appearance.preset,
+    appearance.wardogsStyle,
+    setMode,
+  ]);
 
   return null;
 }
 
 function AppTheme(props) {
+  const { t } = useTranslation();
   const {
     children,
     disableCustomTheme,
@@ -31,22 +40,29 @@ function AppTheme(props) {
     appearance: value,
   } = props;
   const [theme, setTheme] = React.useState(null);
+  const [loadFailed, setLoadFailed] = React.useState(false);
   const systemDark = useMediaQuery("(prefers-color-scheme: dark)");
   const appearance = React.useMemo(() => normalizeAppearance(value), [value]);
 
   React.useEffect(() => {
     let active = true;
+    setLoadFailed(false);
     async function initializeTheme() {
       if (disableCustomTheme) {
         if (active) setTheme({});
         return;
       }
 
-      const getTheme =
-        appearance.preset === "wardogs"
-          ? (await import("./wardogs/getWardogsTheme")).default
-          : (await import("./default/getDefaultTheme")).default;
-      const defaultTheme = await getTheme(themeComponents);
+      const defaultTheme = await loadThemeWithRetry(
+        async () => {
+          const module = await (appearance.preset === "wardogs"
+            ? import("./wardogs/getWardogsTheme")
+            : import("./default/getDefaultTheme"));
+          return module.default(themeComponents);
+        },
+        () => active
+      );
+      if (!active) return;
       if (active) {
         setTheme(
           createTheme(
@@ -60,7 +76,9 @@ function AppTheme(props) {
       }
     }
 
-    initializeTheme();
+    initializeTheme().catch(() => {
+      if (active) setLoadFailed(true);
+    });
     return () => {
       active = false;
     };
@@ -70,8 +88,51 @@ function AppTheme(props) {
     return <React.Fragment>{children}</React.Fragment>;
   }
 
-  if (!theme) {
-    return null; // Or a loading indicator
+  if (loadFailed || !theme) {
+    return (
+      <main
+        style={{
+          minHeight: "100dvh",
+          display: "grid",
+          placeItems: "center",
+          background: "#121820",
+          color: "#f4f6f8",
+          fontFamily: "system-ui, sans-serif",
+          padding: 24,
+          boxSizing: "border-box",
+        }}
+      >
+        <section
+          role={loadFailed ? "alert" : "status"}
+          style={{ maxWidth: 480 }}
+        >
+          <h1 style={{ fontSize: "1.35rem" }}>
+            {t(loadFailed ? "themeLoading.failed" : "themeLoading.loading")}
+          </h1>
+          {loadFailed && (
+            <>
+              <p>{t("themeLoading.help")}</p>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                style={{
+                  minHeight: 44,
+                  padding: "10px 20px",
+                  border: "1px solid #a4c9ff",
+                  borderRadius: 4,
+                  background: "#254a76",
+                  color: "#fff",
+                  cursor: "pointer",
+                  font: "inherit",
+                }}
+              >
+                {t("themeLoading.reload")}
+              </button>
+            </>
+          )}
+        </section>
+      </main>
+    );
   }
 
   return (

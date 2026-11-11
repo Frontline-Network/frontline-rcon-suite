@@ -8,6 +8,7 @@ from unittest.mock import Mock
 import pytest
 
 from rcon.commands import HLLServerCtl
+from rcon.connection import HLLBrokenConnectionError
 from rcon.types import ServerInfo
 
 
@@ -23,16 +24,19 @@ def controller(monkeypatch):
 
 
 @pytest.mark.parametrize("failure_at", ["send", "receive"])
-def test_kick_is_not_retransmitted_on_uncertain_transport(controller, failure_at):
+@pytest.mark.parametrize("error_type", [OSError, HLLBrokenConnectionError])
+def test_kick_is_not_retransmitted_on_uncertain_transport(
+    controller, failure_at, error_type
+):
     api, connection = controller
     handle = Mock()
     handle.request = SimpleNamespace(name="KickPlayer", version=2, content="")
     connection.send.return_value = handle
     if failure_at == "send":
-        connection.send.side_effect = OSError("socket lost after write")
+        connection.send.side_effect = error_type("socket lost after write")
     else:
-        handle.receive.side_effect = OSError("acknowledgement lost")
-    with api.without_retries(), pytest.raises(OSError):
+        handle.receive.side_effect = error_type("acknowledgement lost")
+    with api.without_retries(), pytest.raises(error_type):
         api.kick("synthetic-player", "Test only")
     assert connection.send.call_count == 1
     connection.exchange.assert_not_called()

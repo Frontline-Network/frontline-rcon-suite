@@ -1,0 +1,35 @@
+# Backend-only context. Do not narrow the shared .dockerignore: the frontend
+# Dockerfile needs its sources, package manifests and graphical assets.
+**
+!Dockerfile
+!requirements.lock
+!requirements-vcs.txt
+!alembic.ini
+!entrypoint.sh
+!manage.py
+!LICENSE
+!rcon/
+!rcon/**
+!rconweb/
+!rconweb/**
+!alembic/
+!alembic/**
+!scripts/
+!scripts/*.py
+!docs/
+!docs/releases/
+!docs/releases/v*.md
+
+# Never package local runtime state or Python caches inside an allowed tree.
+**/__pycache__/
+**/*.py[cod]
+**/*.log
+**/*.log.*
+**/.env
+**/.env.*
+**/local_settings.py
+**/*.sqlite3
+**/*.sqlite3-journal
+**/*.dump
+**/*.tar
+**/*.gz

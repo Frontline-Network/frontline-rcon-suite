@@ -758,7 +758,9 @@ class AutobalancerService:
                 return self._restart_observation(snapshot, now)
             self.repository.update(state["decision_id"], status="executing")
             try:
-                switched = self.rcon.switch_player_now(candidate["player_id"])
+                switch = (self.rcon.switch_volunteer_now if candidate.get("volunteer")
+                          else self.rcon.switch_player_now)
+                switched = switch(candidate["player_id"])
             except Exception as exc:
                 logger.exception("Autobalancer RCON team switch failed")
                 switched = False

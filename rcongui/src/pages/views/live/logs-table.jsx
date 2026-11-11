@@ -1,5 +1,6 @@
 import {
   Box,
+  Alert,
   Button,
   IconButton,
   LinearProgress,
@@ -53,6 +54,7 @@ function LogsTable({
   displaySettings,
   onConfigure,
   settingsBusy,
+  feed,
 }) {
   const { t } = useTranslation();
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
@@ -136,7 +138,8 @@ function LogsTable({
   }, [table, selectedTeams]);
 
   return (
-    <Box data-theme-surface="panel"
+    <Box
+      data-theme-surface="panel"
       component="section"
       data-testid="live-logs-panel"
       sx={(theme) => ({
@@ -202,11 +205,11 @@ function LogsTable({
               width: 7,
               height: 7,
               borderRadius: "50%",
-              bgcolor: "success.main",
+              bgcolor: feed?.paused ? "warning.main" : "success.main",
             }}
           />
           <Typography variant="caption" sx={{ color: "success.light" }}>
-            {t("views.live.liveNow")}
+            {t(feed?.paused ? "liveLogFeed.paused" : "views.live.liveNow")}
           </Typography>
         </Stack>
         <Stack direction="row" alignItems="center" spacing={0.5}>
@@ -273,13 +276,28 @@ function LogsTable({
         <DebouncedSearchInput
           placeholder={t("views.live.searchLogs")}
           onChange={(value) => {
+            const column = table.getColumn("message");
+            // The debounced input also emits its initial empty value. Only an
+            // actual filter change should rewind an operator's current page.
+            if (!column || (column.getFilterValue() ?? "") === value) return;
             table.setPageIndex(0);
-            table.getColumn("message")?.setFilterValue(value);
+            column.setFilterValue(value);
           }}
         />
       </Stack>
 
       <TableToolbar sx={{ borderLeft: 0, borderRight: 0, px: 0.5 }}>
+        <Button
+          size="small"
+          onClick={() => {
+            if (feed.paused) {
+              table.setPageIndex(0);
+              feed.resume();
+            } else feed.pause();
+          }}
+        >
+          {t(feed?.paused ? "liveLogFeed.resume" : "liveLogFeed.pause")}
+        </Button>
         <Button
           size="small"
           startIcon={<TuneOutlinedIcon />}
@@ -299,6 +317,24 @@ function LogsTable({
         </Button>
       </TableToolbar>
 
+      {feed?.error && (
+        <Alert
+          severity="error"
+          action={
+            <Button onClick={feed.retry}>
+              {t("liveLogFeed.retry")}
+            </Button>
+          }
+        >
+          {t("liveLogFeed.failed")}
+        </Alert>
+      )}
+      {logsViewData?.reset && (
+        <Alert severity="info" onClose={feed.clearNotice}>
+          {t("liveLogFeed.reset")}
+        </Alert>
+      )}
+
       <Stack
         className="live-log-content"
         direction="column"
@@ -317,6 +353,8 @@ function LogsTable({
           table={table}
           rows={table.getRowModel().rows}
           scrollable={viewportSticky}
+          onReadOlder={feed?.pause}
+          scrollReset={feed?.scrollReset}
           displaySettings={displaySettings}
           highlightedActions={
             tableConfig.highlighted ? tableConfig.actions : []
@@ -333,6 +371,22 @@ function LogsTable({
         >
           <TablePagination table={table} />
         </TableToolbar>
+        <Box sx={{ px: 1, pb: 1, flexShrink: 0 }}>
+          <Button
+            size="small"
+            fullWidth
+            onClick={feed?.loadOlder}
+            disabled={!feed?.canLoadOlder || feed?.isLoadingOlder}
+          >
+            {t(
+              feed?.isLoadingOlder
+                ? "common.loading"
+                : feed?.atLimit
+                ? "liveLogFeed.limit"
+                : "liveLogFeed.older"
+            )}
+          </Button>
+        </Box>
       </Stack>
       {advancedFiltersOpen ? (
         <LogFiltersDialog

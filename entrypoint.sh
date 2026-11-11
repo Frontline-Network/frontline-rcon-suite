@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 
 set -e
-set -x
+# Do not trace expanded environment values (including database credentials).
 
 # Only run the database migrations in the maintenance container
 if [ "$1" == 'maintenance' ]
 then
+  # A restarted maintenance container must not retain a previous success marker.
+  rm -f rconweb/maintenance-container-healthy
   alembic upgrade head
   # Convert old stye player IDs to new style (md5 hash)
   # TODO: we can eventually remove this in a few releases once old installs have updated their game servers and CRCON
@@ -25,7 +27,9 @@ then
   # installations are migrated in the same maintenance pass.
   SERVER_NUMBER=1 LOGGING_PATH=/logs/ LOGGING_FILENAME=startup.log python -m rcon.cache_migrations
   cd rconweb
-  ./manage.py makemigrations --no-input
+  # Customer upgrades apply only migrations shipped and tested with the image.
+  # Model drift must fail instead of generating installation-specific history.
+  ./manage.py makemigrations --check --dry-run --no-input
   ./manage.py migrate --noinput
   # Create this file after migrations which is how Docker determines the container is healthy
   touch maintenance-container-healthy

@@ -1174,3 +1174,63 @@ of a hard gradient edge. This section supersedes the initial spotlight styling.
 bundle budget and existing appearance migration drift are recorded above, not
 reported as passing checks. Release authors must add bilingual metadata to the
 actual release and ship migration 0040; see `docs/release-highlights.md`.
+
+---
+
+# VIP rewards form — local design QA, 2026-11-11
+
+## Scope and visual evidence
+
+- Source visual truth: `C:/Users/chris/.codex/generated_images/01a08815-0f20-7ce3-9976-01cd3b51c96b/exec-47264051-af0d-432a-b1d9-c16a23facfa4.png` (selected variant 3).
+- Implementation: `http://127.0.0.1:3062/settings/others/vip-rewards`, local Mirage demo only.
+- Evidence directory: `C:/Users/chris/OneDrive/Dokumente/Autobalancer/outputs/vip-design-polish-20261111/`.
+- Final desktop screenshots: `after-desktop.png`, `after-desktop-round.png`, `after-desktop-general.png`.
+- Final mobile screenshots: `after-mobile-top.png`, `after-mobile.png` (scrolled detail view).
+- Source image: 1487 × 1058 pixels; generated desktop mock, no declared CSS viewport or device density.
+- Desktop implementation: 1440 × 1024 CSS pixels and screenshot pixels, 1:1 capture.
+- Mobile implementation: 390 × 844 CSS pixels and screenshot pixels, 1:1 capture. Temporary viewport overrides were reset after inspection.
+- State: German, dark theme, preview mode, weekly support enabled in the unsaved demo form. Additional states: round reward enabled, general settings, disabled rule, journal. No production settings changed.
+
+The source and final desktop implementation were opened together in the same comparison input. This is a composition and usability comparison, not a pixel-identical clone: the real application's navigation, breadcrumb, server selector and local-demo notice remain in place. The generated source uses a different shell and a 1-day example reward; the real demo keeps its existing 6-hour reward. No density-induced discrepancies are classified as defects.
+
+All control text is readable in the desktop captures. The scrolled mobile capture provides a focused check of slider labels, scale markings, helper text, summary and save actions. No separate raster crops were needed.
+
+## Findings and iteration history
+
+1. **[P2, resolved] Navigation dominates the mobile form.** The previous full rule list pushed the editable rule far below the page header (`before-mobile.png`). Replaced it below the desktop breakpoint with a labelled rule select. The desktop retains the rule navigator. Verified in `after-mobile-top.png` and the mobile interaction test.
+2. **[P2, resolved] Desktop header and rule navigator consume too much space.** Reduced page/header spacing, moved status badges beside the title, narrowed the rule column from 280 to 240 px and put each rule's status on its row. Aligned the detail heading and activation switch. Final evidence: `after-desktop.png`.
+3. **[P2, resolved] Related desktop controls form an unnecessarily long single column.** Round, weekly and balance prerequisites, repeatable rewards and milestone controls now use two columns on wide screens. They stack on narrower screens. Final evidence: `after-desktop-round.png`; all round controls and period selection fit above the save bar at the tested desktop viewport.
+4. **[P2, resolved] Slider values and labels align inconsistently.** Replaced float-based value placement with a shared flex heading and stable numeric badge. Minutes and percentages include units. Helper text is block-level. Final evidence: desktop round and mobile detail screenshots.
+5. **[P2, resolved] Slider scale labels overlap helper text on mobile.** An intermediate mobile inspection caught the collision after the first spacing pass. Added explicit space below marked sliders and aligned the final scale label inside the track boundary. Recaptured and checked `after-mobile.png`: no overlap remains.
+6. **[P2, resolved] Save actions wrap awkwardly on mobile.** Introduced a deliberate two-row mobile footer with the status above the actions, compact button text and retained accessible names. Desktop keeps a single row. The journal has no unrelated save footer. Verified visually and by the new mobile navigation/save test.
+
+The final comparison found no remaining actionable P0/P1/P2 issue in the inspected scope. The original desktop-before capture was taken during a viewport transition and is not used for precise geometry comparisons.
+
+## Required fidelity surfaces
+
+- **Fonts and typography:** Existing application font retained. Page title 28 px desktop / 24 px mobile, rule headings 20 px, section headings 15 px, labels 14 px, helper text 12 px; consistent weights and line heights. Numeric values use tabular figures. Long rule names wrap without overlapping their status. The compact scale is an intentional adjustment to the original mock, not a substitute font asset.
+- **Spacing and layout rhythm:** Left navigation/right details from variant 3 preserved. Consistent 24 px control gaps, aligned title/switch, thin section dividers and a maximum form width. Desktop paired controls reduce unnecessary scrolling; mobile dropdown and stacked controls preserve usable widths.
+- **Colors and tokens:** Existing theme tokens retained for backgrounds, dividers, selected rule, primary actions, text and information notices. The source's rose accent is represented by the application's primary color; no independent palette or global theme override introduced.
+- **Image quality and assets:** Existing application logo and component-library icons retained. No generated image inserted into the product, no custom replacements for branded assets. Source-only illustrative shell details are intentionally outside this form change.
+- **Copy and content:** User-requested headings `Voraussetzungen` and `Belohnung` retained. Period helper text is placed with its dropdown; duration summary handles singular/plural consistently. Preview notice is shorter. Labels, underlying numeric values and award semantics are preserved.
+
+## Verification and limits
+
+- Seven local Playwright tests passed after the final layout changes (45.2 seconds).
+- Covered saving/discarding, mobile overflow, conditional fields, weapon selection and validation, weekly points/custom command, period/minimum sliders, player exclusion/timezone search, mobile rule switching with unsaved values, and journal navigation.
+- Production frontend build passed. Existing chunk-size advisory remains outside this form change.
+- Browser error-log inspection returned no errors in the inspected preview tab.
+- Git whitespace validation passed.
+- No backend changes, production deployment, real VIP grants or player notifications.
+- This is visual and interaction QA, not a full accessibility certification or a complete audit of every application theme.
+
+## Implementation checklist
+
+- [x] Preserve selected master/detail design and prerequisite/reward headings.
+- [x] Improve desktop density and related-control alignment.
+- [x] Verify mobile navigation, slider spacing and persistent actions.
+- [x] Preserve entered values while changing tabs/rules.
+- [x] Run browser tests and frontend build.
+- [x] Keep work local and commit the UI changes.
+
+final result: passed

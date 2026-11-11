@@ -1,3 +1,4 @@
+import vipRewardDefaults from "./state/vip-rewards.json";
 import { createServer, Response } from "miragejs";
 // Snapshot of get_api_documentation from this source tree (2026-10-03).
 // Used only by the fake preview; production always requests its own backend.
@@ -36,6 +37,7 @@ import {
 
 export function makeServer({ environment = "development" } = {}) {
   let gameState = createGameState();
+  let vipRewards = structuredClone(vipRewardDefaults);
   let demoServerName = "[GER] Frontline Network | #2";
   let demoServerNameConfig = { ip: "127.0.0.1", port: 10011 };
   const disbandAttempts = new Map();
@@ -671,6 +673,33 @@ export function makeServer({ environment = "development" } = {}) {
           ],
         })
       );
+      this.get("/get_vip_rewards_weapons", () =>
+        ok({
+          game: "hll",
+          weapons: [
+            { name: "155MM HOWITZER [M114]", type: "artillery" },
+            { name: "150MM HOWITZER [sFH 18]", type: "artillery" },
+            {
+              name: "122MM HOWITZER [M1938 (M-30)]",
+              type: "artillery",
+            },
+            {
+              name: "QF 25-POUNDER [QF 25-Pounder]",
+              type: "artillery",
+            },
+            { name: "BOMBING RUN", type: "commander" },
+            { name: "PRECISION STRIKE", type: "commander" },
+            { name: "STRAFING RUN", type: "commander" },
+            { name: "M1 GARAND", type: "infantry" },
+            { name: "KARABINER 98K", type: "infantry" },
+            { name: "MP40", type: "infantry" },
+            { name: "MG42", type: "machine_gun" },
+            { name: "57MM CANNON [M1 57mm]", type: "pak" },
+            { name: "75MM CANNON [PAK 40]", type: "pak" },
+            { name: "SATCHEL", type: "satchel" },
+          ],
+        })
+      );
       this.get("/get_available_player_flags", () =>
         ok({
           flags: [
@@ -862,6 +891,15 @@ export function makeServer({ environment = "development" } = {}) {
       this.get("/get_name_kick_config", () => ok(autoMod(true)));
       this.get("/get_vac_game_bans_config", () => ok(autoMod(true)));
       this.get("/get_seed_vip_config", () => ok(autoMod(true)));
+      this.get("/get_vip_rewards_config", () => ok(vipRewards));
+      this.post("/validate_vip_rewards_config", () => ok(true));
+      this.post("/set_vip_rewards_config", (schema, request) => {
+        vipRewards = JSON.parse(request.requestBody).config;
+        return ok(true);
+      });
+      this.get("/get_vip_rewards_status", () => ok({ status: vipRewards.enabled ? "seeding" : "disabled", preview: vipRewards.dry_run, counts: { allies: 14, axis: 18 }, thresholds: { allies: 20, axis: 20 } }));
+      this.get("/get_vip_rewards_journal", () => ok({ total: 0, offset: 0, results: [] }));
+      this.get("/get_vip_rewards_progress", () => ok({ total: 0, round: 0, days: {} }));
       this.get("/get_chat_commands_config", () => ok(autoMod(true, true)));
       this.get("/get_rcon_chat_commands_config", () => ok(autoMod(true)));
 
@@ -975,12 +1013,16 @@ export function makeServer({ environment = "development" } = {}) {
 
       this.post("/get_recent_logs", (schema, request) => {
         const params = request.requestBody ? JSON.parse(request.requestBody) : request.queryParams;
+        // Fake-mode diagnostics used by the incremental-feed browser tests.
+        window.__CRCON_DEMO_LOG_REQUESTS__ ??= [];
+        window.__CRCON_DEMO_LOG_REQUESTS__.push(params);
         const asArray = (value) => {
           if (Array.isArray(value)) return value;
           if (!value) return [];
           return JSON.parse(value);
         };
         return handleRecentLogs(gameState, {
+          ...params,
           end: parseInt(params.end) || 500,
           filter_action: asArray(params.filter_action),
           filter_player: asArray(params.filter_player),

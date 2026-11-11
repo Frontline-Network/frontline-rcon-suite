@@ -1,0 +1,7 @@
+index,rebuilt_concurrently,before_bytes,verified_after_bytes,saved_bytes,valid,ready
+ix_log_lines_event_time,True,581951488,455057408,126894080,True,True
+ix_log_lines_player1_steamid,True,633389056,455483392,177905664,True,True
+ix_log_lines_player2_steamid,True,610795520,455483392,155312128,True,True
+ix_log_lines_server_event_time,False,689922048,689930240,-8192,True,True
+log_lines_pkey,False,475996160,476004352,-8192,True,True
+unique_log_line,True,5912567808,4003266560,1909301248,True,True

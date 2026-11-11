@@ -3,6 +3,19 @@ import { sharedOperationsEn } from "./shared-operations.js";
 import { operatorMessagesEn } from "./operator-messages.js";
 
 const en = {
+  themeLoading: {
+    loading: "Loading appearance …",
+    failed: "Appearance could not be loaded",
+    help: "Please check your connection and reload the page. Your saved settings will be kept.",
+    reload: "Reload page",
+  },
+  liveLogFeed: {
+    pause: "Pause", paused: "Paused", resume: "Resume live",
+    older: "Load older messages", limit: "Fetch limit reached – increase it in filters",
+    failed: "The live log could not be updated. Loaded messages remain visible.",
+    retry: "Try again",
+    reset: "The previous history is no longer available or too many new messages arrived. Showing the latest messages; you can load older messages below.",
+  },
   liveViews: liveViewsEn,
   sharedOperations: sharedOperationsEn,
   operatorMessages: operatorMessagesEn,
@@ -2097,6 +2110,19 @@ const en = {
       chooseTemplate: "Choose a template",
     },
     campaigns: {
+      "broadcastActivity": "Broadcast activity",
+      "broadcastDisclaimer": "Automatic campaigns: last 20 attempts (up to 24 hours). Server acknowledgement does not prove visibility for every player. Manual messages are not counted here.",
+      "broadcastInterval": "Delay before the next message (seconds)",
+      "broadcastIntervalError": "Enter a whole number from 1 to 86400 seconds.",
+      "broadcastIntervalHelp": "The next campaign follows after this delay. Saved changes take effect within 20 seconds.",
+      "broadcastTiming": "Delay per campaign in seconds",
+      "broadcastSeconds": "{{seconds}} sec until the next message",
+      "broadcastNext": "Next send no earlier than",
+      "broadcastChecked": "Worker last checked",
+      "broadcastEmpty": "No recorded broadcast attempts yet. Earlier sends are not counted retrospectively.",
+      "broadcastPhases": {"waiting": "Waiting for the next interval", "sending": "Sending to the game server", "settings_changed": "Applying saved settings", "paused": "Campaigns disabled", "no_broadcasts": "No broadcast campaigns configured", "no_eligible_campaigns": "No eligible campaign at present", "player_count_unavailable": "Player count unavailable", "unknown": "No current broadcast worker heartbeat"},
+      "broadcastResult": {"accepted": "Acknowledged by game server", "unconfirmed": "Send not confirmed"},
+
       eyebrow: "Communication",
       eyebrowExtended: "Communication · Campaigns",
       title: "Campaigns",
@@ -4906,6 +4932,7 @@ const en = {
       vacBans: "VAC / game bans",
       tkBans: "TK ban on connect",
       nameKicks: "Name kicks",
+      vipRewards: "VIP rewards",
       seedVip: "Seeder VIP reward",
       gameServer: "Game server connection",
       crcon: "CRCON settings",
@@ -5413,7 +5440,7 @@ const enMasterFallback = {
       "logQueryFilterEnabled": "Retrieval filter enabled",
       "logIncludeSelected": "Include selected events",
       "logExcludeSelected": "Exclude selected events",
-      "logQueryLimitHelp": "10 to 100,000 messages. Higher limits may take longer to load.",
+      "logQueryLimitHelp": "Keep up to 10–100,000 loaded messages. Fetches use batches of up to 500; you can load older messages separately.",
       "logQueryLimitError": "Enter a whole number between 10 and 100,000.",
       "resetLogQueryFilters": "Reset data retrieval",
       "applyLogFilters": "Apply",

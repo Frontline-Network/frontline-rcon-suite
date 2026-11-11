@@ -2,6 +2,9 @@ import logging
 import random
 import re
 import threading
+import time
+
+from rcon.broadcast_activity import update_state, record_attempt
 
 from rcon.commands import HLLCommandFailedError
 from rcon.message_variables import format_message_string, populate_message_variables
@@ -120,6 +123,22 @@ def manual_broadcast_is_active(ctl, campaigns: list[AutoBroadcastMessage]) -> bo
     return current not in managed_messages
 
 
+def wait_for_campaign(stop_event, config, seconds):
+    """Recheck saved settings every 20 seconds, including during long intervals."""
+    deadline = time.time() + seconds
+    while not stop_event.is_set():
+        remaining = deadline - time.time()
+        if remaining <= 0:
+            return False
+        update_state("waiting", deadline)
+        if stop_event.wait(min(CHECK_INTERVAL, remaining)):
+            return True
+        if AutoBroadcastUserConfig.load_from_db() != config:
+            update_state("settings_changed")
+            return True
+    return True
+
+
 def run(stop_event: threading.Event | None = None):
     # avoid circular import
     from rcon.rcon import get_rcon
@@ -135,6 +154,7 @@ def run(stop_event: threading.Event | None = None):
             logger.debug(
                 "Auto broadcasts are disabled. Sleeping %s seconds", CHECK_INTERVAL
             )
+            update_state("paused")
             stop_event.wait(CHECK_INTERVAL)
             continue
 
@@ -144,7 +164,8 @@ def run(stop_event: threading.Event | None = None):
             if campaign.delivery_mode == "broadcast"
         ]
         if not campaigns:
-            time.sleep(CHECK_INTERVAL)
+            update_state("no_broadcasts")
+            stop_event.wait(CHECK_INTERVAL)
             continue
         if config.randomize:
             logger.debug("Auto broadcasts. Radomizing")
@@ -160,11 +181,7 @@ def run(stop_event: threading.Event | None = None):
             player_count = int(ctl.get_slots()["current_players"])
         except (HLLCommandFailedError, KeyError, TypeError, ValueError):
             logger.exception("Unable to determine player count for campaigns")
-            stop_event.wait(CHECK_INTERVAL)
-            continue
-
-        if manual_broadcast_is_active(ctl, campaigns):
-            logger.info("A manual broadcast is active; campaign cycle deferred")
+            update_state("player_count_unavailable")
             stop_event.wait(CHECK_INTERVAL)
             continue
 
@@ -188,14 +205,18 @@ def run(stop_event: threading.Event | None = None):
                 formatted,
             )
             try:
+                update_state("sending")
                 ctl.set_broadcast(formatted)
                 sent_campaign = True
-            except HLLCommandFailedError:
-                logger.exception("Unable to broadcast %s %s", msg.time_sec, msg.message)
-            if stop_event.wait(int(msg.time_sec)):
-                return
+                record_attempt(msg, formatted, True)
+            except Exception as exc:
+                record_attempt(msg, formatted, False, type(exc).__name__)
+                logger.exception("Unable to broadcast campaign %s", msg.id)
+            if wait_for_campaign(stop_event, config, int(msg.time_sec)):
+                break
 
         if not sent_campaign:
+            update_state("no_eligible_campaigns")
             stop_event.wait(CHECK_INTERVAL)
 
 

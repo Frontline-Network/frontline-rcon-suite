@@ -2,6 +2,9 @@ name: quality-gates
 
 on:
   workflow_call:
+  # Allow the same complete gates to run independently if a parent PR run is
+  # stuck finalizing an artifact upload. No tests are omitted in this path.
+  workflow_dispatch:
 
 jobs:
   test-release-integration:
@@ -10,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        version: [v0.9.0, v0.9.1, v0.9.2, v0.9.3-rc.1, v0.9.3]
+        version: [v0.9.0, v0.9.1, v0.9.2, v0.9.3-rc.1, v0.9.3, v0.9.4-rc.1, v0.9.4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -156,6 +159,8 @@ jobs:
       - run: npm run check:bundle
       - name: upload admin UI test report
         if: failure()
+        timeout-minutes: 3
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: admin-ui-playwright-report
@@ -221,6 +226,7 @@ jobs:
           export HLL_REDIS_URL=redis://${HLL_REDIS_HOST}:${HLL_REDIS_PORT}/${HLL_REDIS_DB}
           export LEADERSHIP_VOTE_TEST_DB_URL="$HLL_DB_URL"
           export POPULATION_TEST_DB_URL="$HLL_DB_URL"
+          export VIP_REWARDS_TEST_DB_URL="$HLL_DB_URL"
           PYTHONPATH=. pytest tests/
           PYTHONPATH=. python -m django test api.test_release_updates --settings=rconweb.rconweb.test_settings --verbosity=1
           PYTHONPATH=. python -m django test api.test_release_migrations --settings=rconweb.rconweb.test_settings --verbosity=1

@@ -4,6 +4,7 @@ import { createLogStackDemo } from '../data/live-log-stacks.mjs';
 
 // In-memory storage for logs
 let storedLogs = [];
+let nextCursor = 1;
 
 const initializeLogs = (gameState) => {
   if (storedLogs.length === 0) {
@@ -40,20 +41,31 @@ export const handleRecentLogs = (gameState, params = {}) => {
   if (stackDemo) {
     storedLogs = createLogStackDemo(
       new URLSearchParams(window.location.search).get("demo_log_stack_size")
-    ).slice(0, end);
+    ).map((line, index) => ({ ...line, cursor_id: (index + 1).toString(16).padStart(64, "0") }));
   } else {
     initializeLogs(gameState);
 
     // Add new logs, keep the requested limit and sort most recent first.
     storedLogs = [...generateNewLogs(gameState, 10), ...storedLogs]
-      .slice(0, end)
+      .slice(0, params.cursor_mode ? 10000 : end)
       .sort((a, b) => b.timestamp_ms - a.timestamp_ms);
   }
 
-  // Apply filters if they exist
-  let filteredLogs = storedLogs;
+  storedLogs = storedLogs.map((line) => line.cursor_id ? line : { ...line, cursor_id: (nextCursor++).toString(16).padStart(64, "0") });
+  let page = storedLogs.slice(0, end);
+  let cursor = {};
+  if (params.cursor_mode) {
+    const anchor = params.after || params.before;
+    const index = anchor ? storedLogs.findIndex((line) => line.cursor_id === anchor) : -1;
+    const reset = anchor && (index < 0 || (params.after && index > end)) ? "cursor_expired" : null;
+    const start = params.before && !reset ? index + 1 : 0;
+    page = params.after && !reset ? storedLogs.slice(0, index) : storedLogs.slice(start, start + end);
+    cursor = { newest: page[0]?.cursor_id ?? (params.after && !reset ? params.after : null), oldest: page.at(-1)?.cursor_id ?? null, has_older: start + page.length < storedLogs.length, reset };
+  }
+  // Apply filters after locating cursors, just like the server.
+  let filteredLogs = page;
   if (filter_action.length > 0 || filter_player.length > 0) {
-    filteredLogs = storedLogs.filter(log => {
+    filteredLogs = page.filter(log => {
       // The real API includes/excludes action prefixes, then narrows by player.
       const actionSelected = filter_action.some(action => String(log.action).toLowerCase().startsWith(action.toLowerCase()));
       const matchesAction = filter_action.length === 0 || (inclusive_filter ? actionSelected : !actionSelected);
@@ -74,6 +86,7 @@ export const handleRecentLogs = (gameState, params = {}) => {
 
   return {
     result: {
+      ...cursor,
       actions,
       players,
       logs: filteredLogs

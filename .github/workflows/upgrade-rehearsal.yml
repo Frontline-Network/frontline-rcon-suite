@@ -1,0 +1,84 @@
+name: Isolated backend upgrade rehearsal
+
+on:
+  workflow_call:
+    inputs:
+      source_image:
+        type: string
+        required: false
+        default: ghcr.io/frontline-network/frontline-rcon-suite@sha256:ead46c46c8213ae3be415bf020896158eb50726300d3e31a2c7c0f62df855653
+  workflow_dispatch:
+    inputs:
+      source_image:
+        description: "Existing released backend image (prefer an immutable digest)"
+        required: true
+        default: ghcr.io/frontline-network/frontline-rcon-suite@sha256:ead46c46c8213ae3be415bf020896158eb50726300d3e31a2c7c0f62df855653
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  upgrade:
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        game: [hll, hllv]
+        api_mode: [split, unified]
+        runner: [ubuntu-latest]
+        include:
+          - game: hllv
+            api_mode: split
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull released image and isolated data services
+        env:
+          SOURCE_IMAGE: ${{ inputs.source_image }}
+        run: |
+          docker pull "$SOURCE_IMAGE"
+          docker pull postgres:12-alpine
+          docker pull redis:alpine
+      - name: Prepare populated source-version fixture
+        env:
+          SOURCE_IMAGE: ${{ inputs.source_image }}
+          GAME_PROFILE: ${{ matrix.game }}
+          API_MODE: ${{ matrix.api_mode }}
+        run: |
+          python3 scripts/rehearse_upgrade.py --state-dir "$RUNNER_TEMP/upgrade-state" prepare \
+            --source-image "$SOURCE_IMAGE" --postgres-image postgres:12-alpine \
+            --redis-image redis:alpine --game "$GAME_PROFILE" --api-mode "$API_MODE"
+      - name: Build candidate without publishing
+        env:
+          SOURCE_IMAGE: ${{ inputs.source_image }}
+        run: |
+          # Rehearse offline release history too, without changing published notes.
+          docker run --rm --network none --entrypoint cat "$SOURCE_IMAGE" /code/rcon/release_notes.json > rcon/release_notes.json
+          docker build --build-arg CRCON_VERSION=upgrade-rehearsal -t local/rcon-upgrade:candidate .
+      - name: Check actual backend image contents and dependencies
+        run: |
+          docker run --rm --network none --entrypoint python local/rcon-upgrade:candidate scripts/check_backend_image.py --slim --version upgrade-rehearsal
+          docker run --rm --network none --entrypoint python local/rcon-upgrade:candidate -m pip check
+      - name: Apply twice and verify code rollback
+        run: |
+          python3 scripts/rehearse_upgrade.py --state-dir "$RUNNER_TEMP/upgrade-state" verify \
+            --candidate-image local/rcon-upgrade:candidate
+      - name: Remove only owned disposable containers
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/upgrade-state/state.private.json" ]; then
+            python3 scripts/rehearse_upgrade.py --state-dir "$RUNNER_TEMP/upgrade-state" cleanup
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: upgrade-receipt-${{ matrix.game }}-${{ matrix.api_mode }}-${{ matrix.runner }}
+          path: ${{ runner.temp }}/upgrade-state/verified.json
+          if-no-files-found: ignore

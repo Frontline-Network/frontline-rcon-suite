@@ -25,4 +25,6 @@ def register_log_hooks() -> None:
     from rcon.recent_actions import update_kills, update_tks  # noqa: F401
     from rcon.watchlist import watchdog  # noqa: F401
 
+    from rcon.vip_rewards import hooks as vip_reward_hooks  # noqa: F401
+
     _registered = True

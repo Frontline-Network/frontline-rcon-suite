@@ -43,4 +43,5 @@ if not any(
         vac_game_bans,
         vote_map,
         webhooks,
+        vip_rewards,
     )

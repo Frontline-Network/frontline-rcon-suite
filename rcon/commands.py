@@ -1,18 +1,20 @@
-from datetime import timedelta
 import logging
 import threading
 import time
 from contextlib import contextmanager, nullcontext
 from contextvars import ContextVar
+from datetime import timedelta
 from functools import wraps
-from typing import Generator, Literal, Sequence, Any, List
+from typing import Any, Generator, List, Literal, Sequence
 
 from rcon.connection import (
+    Handle,
     HLLBrokenConnectionError,
     HLLCommandError,
-    HLLCommandFailedError as ConnectionCommandFailedError,
+)
+from rcon.connection import HLLCommandFailedError as ConnectionCommandFailedError
+from rcon.connection import (
     HLLConnection,
-    Handle,
     Response,
 )
 from rcon.game import get_game_profile
@@ -20,19 +22,21 @@ from rcon.maps import GameMode
 from rcon.perf_statistics import PerformanceStatistics
 from rcon.transport import CommandRetryGate, classify_transport_failure
 from rcon.types import (
+    AdminType,
+    GameStateType,
     MapRotationResponse,
     MapSequenceResponse,
     PublicConfig,
     ServerInfo,
     SlotsType,
     VipId,
-    GameStateType,
-    AdminType,
 )
 from rcon.utils import exception_in_chain
 
 logger = logging.getLogger(__name__)
-_automatic_retries_disabled = ContextVar("rcon_automatic_retries_disabled", default=False)
+_automatic_retries_disabled = ContextVar(
+    "rcon_automatic_retries_disabled", default=False
+)
 
 
 def escape_string(s):
@@ -195,7 +199,13 @@ class ServerCtl:
         try:
             self._cleanup_dead_thread_connections_locked(current_thread)
             conn = self.conns.get(thread_id)
-            if conn is not None and self._connection_threads.get(thread_id) is not current_thread:
+            if conn is not None and getattr(conn, "closed", False) is True:
+                self._close_connection_locked(thread_id, reason="broken")
+                conn = None
+            if (
+                conn is not None
+                and self._connection_threads.get(thread_id) is not current_thread
+            ):
                 # Thread IDs are reusable, so do not let a replacement thread
                 # take ownership of a socket created by a former thread.
                 self._close_connection_locked(thread_id, reason="thread_id_reused")
@@ -205,6 +215,7 @@ class ServerCtl:
                 try:
                     self._connect(conn)
                 except Exception:
+                    conn.close()
                     raise
                 self.conns[thread_id] = conn
                 self._connection_threads[thread_id] = current_thread
@@ -256,8 +267,8 @@ class ServerCtl:
                 finally:
                     self.mu.release()
 
-                if e.__context__ is not None:
-                    raise e.__context__
+                # Preserve the normalized transport error. Its cause may be a
+                # JSON/UTF-8 decoding failure, not invalid connection settings.
                 raise
 
             else:
@@ -995,9 +1006,7 @@ class HLLVServerCtl(ServerCtl):
             for parameter in parameters
             if isinstance(parameter, dict)
         }
-        sectors = [
-            parameters_by_id.get(f"Sector_{index}") for index in range(1, 6)
-        ]
+        sectors = [parameters_by_id.get(f"Sector_{index}") for index in range(1, 6)]
         if any(
             not sector or not isinstance(sector.get("valueMember"), str)
             for sector in sectors

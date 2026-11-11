@@ -20,8 +20,9 @@ def verify(version, require_highlights=False, image=False):
     assert source["body"].replace("\r\n", "\n").strip() == reviewed.strip(), "Image notes differ from reviewed release notes"
     if require_highlights:
         assert current["highlights"], "Published release has no valid DE/EN highlights"
-        assert current["highlights"]["image"] == "theme-collection"
-        assert current["highlights"]["action"]["id"] == "appearance"
+        if version == "v0.9.0":
+            assert current["highlights"]["image"] == "theme-collection"
+            assert current["highlights"]["action"]["id"] == "appearance"
         assert len(channel.HIGHLIGHT_BLOCK.findall(source["body"])) == 1
     # An old installation cannot announce this release, even with the new snapshot.
     assert all(entry["tag_name"] != version for entry in channel.select_releases(snapshot["releases"], "v0.8.8"))

@@ -12,7 +12,7 @@ on:
         description: "Existing release to verify (no image builds or pushes)"
         required: true
         type: choice
-        options: [v0.9.0, v0.9.1, v0.9.2, v0.9.3-rc.1, v0.9.3]
+        options: [v0.9.0, v0.9.1, v0.9.2, v0.9.3-rc.1, v0.9.3, v0.9.4-rc.1, v0.9.4]
       revision:
         description: "Exact released commit SHA"
         required: true
@@ -88,10 +88,13 @@ jobs:
         if: github.ref_name == 'v0.9.0'
         run: python3 scripts/verify_bundled_release.py v0.9.0 --require-highlights
       - name: Require reviewed hotfix notes before building
-        if: contains(fromJSON('["v0.9.1", "v0.9.2", "v0.9.3-rc.1", "v0.9.3"]'), github.ref_name)
+        if: contains(fromJSON('["v0.9.1", "v0.9.2", "v0.9.3-rc.1", "v0.9.3", "v0.9.4-rc.1", "v0.9.4"]'), github.ref_name)
         run: python3 scripts/verify_bundled_release.py "${{ github.ref_name }}"
+      - name: Require the new v0.9.4 announcement
+        if: github.ref_name == 'v0.9.4'
+        run: python3 scripts/verify_bundled_release.py v0.9.4 --require-highlights
       - name: Require inherited feature announcement before building
-        if: contains(fromJSON('["v0.9.2", "v0.9.3"]'), github.ref_name)
+        if: contains(fromJSON('["v0.9.2", "v0.9.3", "v0.9.4-rc.1", "v0.9.4"]'), github.ref_name)
         run: python3 scripts/verify_bundled_release.py v0.9.0 --require-highlights
       - name: Build and push backend
         id: build
@@ -146,7 +149,7 @@ jobs:
   verify-published-images:
     needs: [backend, frontend]
     # RC verification checks that stable latest was NOT replaced.
-    if: always() && !inputs.restore_stable_latest && (github.event_name == 'workflow_dispatch' || (needs.backend.result == 'success' && needs.frontend.result == 'success' && contains(fromJSON('["v0.9.0", "v0.9.1", "v0.9.2", "v0.9.3-rc.1", "v0.9.3"]'), github.ref_name)))
+    if: always() && !inputs.restore_stable_latest && (github.event_name == 'workflow_dispatch' || (needs.backend.result == 'success' && needs.frontend.result == 'success' && contains(fromJSON('["v0.9.0", "v0.9.1", "v0.9.2", "v0.9.3-rc.1", "v0.9.3", "v0.9.4-rc.1", "v0.9.4"]'), github.ref_name)))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -169,8 +172,8 @@ jobs:
       - name: Verify immutable multi-architecture contents and latest
         run: |
           highlight_args=()
-          if [ "$RELEASE_VERSION" = v0.9.0 ]; then highlight_args+=(--require-highlights); fi
-          if [ "$RELEASE_VERSION" = v0.9.2 ] || [ "$RELEASE_VERSION" = v0.9.3 ]; then highlight_args+=(--require-history-version v0.9.0); fi
+          if [ "$RELEASE_VERSION" = v0.9.0 ] || [ "$RELEASE_VERSION" = v0.9.4 ]; then highlight_args+=(--require-highlights); fi
+          if [ "$RELEASE_VERSION" = v0.9.2 ] || [ "$RELEASE_VERSION" = v0.9.3 ] || [ "$RELEASE_VERSION" = v0.9.4-rc.1 ] || [ "$RELEASE_VERSION" = v0.9.4 ]; then highlight_args+=(--require-history-version v0.9.0); fi
           python3 scripts/verify_release_images.py --version "$RELEASE_VERSION" --revision "$RELEASE_REVISION" --backend-digest "$BACKEND_DIGEST" --frontend-digest "$FRONTEND_DIGEST" "${highlight_args[@]}"
       - uses: actions/setup-node@v4
         with:
@@ -194,7 +197,14 @@ jobs:
             docker network rm release-verification || true
           }
           trap cleanup EXIT
-          docker run -d --name release-backend --network release-verification --network-alias backend --platform linux/amd64 -p 127.0.0.1:8048:8000 -e RELEASE_SMOKE_TEST=1 -e RELEASE_VERSION="$RELEASE_VERSION" --entrypoint python "$REGISTRY/$BACKEND_IMAGE@$BACKEND_DIGEST" scripts/release_smoke_server.py --bind 0.0.0.0 --port 8000
+          # The slim backend intentionally excludes frontend sources. Provide
+          # only the browser security fixture from the exact released commit;
+          # all authentication/API requests still exercise the published images.
+          [[ "$RELEASE_REVISION" =~ ^[0-9a-f]{40}$ ]]
+          git cat-file -e "$RELEASE_REVISION^{commit}" || git fetch --no-tags --depth=1 origin "$RELEASE_REVISION"
+          git show "$RELEASE_REVISION:rcongui/src/utils/csrfTransport.mjs" > "$RUNNER_TEMP/csrfTransport.mjs"
+          test -s "$RUNNER_TEMP/csrfTransport.mjs"
+          docker run -d --name release-backend --network release-verification --network-alias backend --platform linux/amd64 -p 127.0.0.1:8048:8000 -e RELEASE_SMOKE_TEST=1 -e RELEASE_VERSION="$RELEASE_VERSION" --mount "type=bind,src=$RUNNER_TEMP/csrfTransport.mjs,dst=/code/rcongui/src/utils/csrfTransport.mjs,readonly" --entrypoint python "$REGISTRY/$BACKEND_IMAGE@$BACKEND_DIGEST" scripts/release_smoke_server.py --bind 0.0.0.0 --port 8000
           docker run -d --name release-frontend --network release-verification --platform linux/amd64 -p 127.0.0.1:8049:80 -e RCONWEB_EXTERNAL_ADDRESS=localhost "$REGISTRY/$FRONTEND_IMAGE@$FRONTEND_DIGEST"
           for attempt in {1..60}; do
             if curl -fsS http://127.0.0.1:8049/api/is_logged_in >/dev/null; then break; fi

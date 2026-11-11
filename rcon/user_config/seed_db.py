@@ -23,6 +23,7 @@ from rcon.user_config.rcon_server_settings import RconServerSettingsUserConfig
 from rcon.user_config.real_vip import RealVipUserConfig
 from rcon.user_config.scoreboard import ScoreboardUserConfig
 from rcon.user_config.seed_vip import SeedVIPUserConfig
+from rcon.user_config.vip_rewards import VipRewardsUserConfig
 from rcon.user_config.standard_messages import (
     StandardBroadcastMessagesUserConfig,
     StandardPunishmentMessagesUserConfig,
@@ -75,6 +76,7 @@ def seed_default_config():
             RealVipUserConfig.seed_db(sess)
             ScoreboardUserConfig.seed_db(sess)
             SeedVIPUserConfig.seed_db(sess)
+            VipRewardsUserConfig.seed_db(sess)
             StandardBroadcastMessagesUserConfig.seed_db(sess)
             StandardPunishmentMessagesUserConfig.seed_db(sess)
             StandardWelcomeMessagesUserConfig.seed_db(sess)

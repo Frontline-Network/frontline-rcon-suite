@@ -3,6 +3,19 @@ import { sharedOperationsDe } from "./shared-operations.js";
 import { operatorMessagesDe } from "./operator-messages.js";
 
 const de = {
+  themeLoading: {
+    loading: "Darstellung wird geladen …",
+    failed: "Darstellung konnte nicht geladen werden",
+    help: "Bitte prüfe deine Verbindung und lade die Seite erneut. Deine gespeicherten Einstellungen bleiben erhalten.",
+    reload: "Seite erneut laden",
+  },
+  liveLogFeed: {
+    pause: "Pausieren", paused: "Pausiert", resume: "Live fortsetzen",
+    older: "Ältere Meldungen laden", limit: "Abruflimit erreicht – unter Filter erhöhen",
+    failed: "Das Live-Protokoll konnte nicht aktualisiert werden. Geladene Meldungen bleiben sichtbar.",
+    retry: "Erneut versuchen",
+    reset: "Die Verbindung zum bisherigen Verlauf ist abgerissen oder es kamen zu viele neue Meldungen hinzu. Die neuesten Meldungen werden angezeigt; ältere kannst du nachladen.",
+  },
   liveViews: liveViewsDe,
   sharedOperations: sharedOperationsDe,
   operatorMessages: operatorMessagesDe,
@@ -2115,6 +2128,19 @@ const de = {
       chooseTemplate: "Vorlage auswählen",
     },
     campaigns: {
+      "broadcastActivity": "Broadcast-Aktivität",
+      "broadcastDisclaimer": "Automatische Kampagnen: letzte 20 Versandversuche (maximal 24 Stunden). Eine Serverbestätigung belegt nicht die Anzeige bei jedem Spieler. Manuelle Nachrichten werden hier nicht gezählt.",
+      "broadcastInterval": "Abstand zur nächsten Nachricht (Sekunden)",
+      "broadcastIntervalError": "Bitte eine ganze Zahl von 1 bis 86400 Sekunden angeben.",
+      "broadcastIntervalHelp": "Nach dem Versand folgt nach diesem Abstand die nächste Kampagne. Änderungen werden innerhalb von 20 Sekunden übernommen.",
+      "broadcastTiming": "Abstand je Kampagne in Sekunden",
+      "broadcastSeconds": "{{seconds}} Sek. bis zur nächsten Nachricht",
+      "broadcastNext": "Nächster Versand frühestens",
+      "broadcastChecked": "Worker zuletzt geprüft",
+      "broadcastEmpty": "Noch keine erfassten Broadcast-Versuche. Frühere Sendungen werden nicht nachträglich gezählt.",
+      "broadcastPhases": {"waiting": "Wartet auf das nächste Intervall", "sending": "Sendet an den Gameserver", "settings_changed": "Übernimmt geänderte Einstellungen", "paused": "Kampagnen deaktiviert", "no_broadcasts": "Keine Broadcast-Kampagnen eingerichtet", "no_eligible_campaigns": "Aktuell keine passende Kampagne", "player_count_unavailable": "Spielerzahl nicht verfügbar", "unknown": "Kein aktuelles Lebenszeichen des Broadcast-Workers"},
+      "broadcastResult": {"accepted": "Vom Gameserver bestätigt", "unconfirmed": "Versand nicht bestätigt"},
+
       eyebrow: "Kommunikation",
       eyebrowExtended: "Kommunikation · Kampagnen",
       title: "Kampagnen",
@@ -4952,6 +4978,7 @@ const de = {
       vacBans: "VAC-/Spielsperren",
       tkBans: "TK-Sperre beim Beitritt",
       nameKicks: "Namensfilter",
+      vipRewards: "VIP-Belohnungen",
       seedVip: "Seeder-VIP-Belohnung",
       gameServer: "Gameserver-Verbindung",
       crcon: "CRCON-Einstellungen",
@@ -5459,7 +5486,7 @@ const deMasterFallback = {
       "logQueryFilterEnabled": "Abruffilter aktiv",
       "logIncludeSelected": "Ausgewählte Ereignisse einschließen",
       "logExcludeSelected": "Ausgewählte Ereignisse ausschließen",
-      "logQueryLimitHelp": "10 bis 100.000 Meldungen. Höhere Werte können länger laden.",
+      "logQueryLimitHelp": "Maximal 10 bis 100.000 geladene Meldungen. Der Abruf erfolgt in Schritten von bis zu 500; ältere Meldungen kannst du nachladen.",
       "logQueryLimitError": "Bitte eine ganze Zahl zwischen 10 und 100.000 eingeben.",
       "resetLogQueryFilters": "Datenabruf zurücksetzen",
       "applyLogFilters": "Übernehmen",

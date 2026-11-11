@@ -43,6 +43,8 @@ WORKDIR /var/www
 RUN mkdir /var/www_public/
 COPY --from=publicbuild /www_public /var/www_public/
 COPY --from=adminbuild /www /var/www/
+# Static assets must remain readable by the unprivileged Nginx workers.
+RUN chmod -R a+rX /var/www /var/www_public
 COPY --from=adminbuild /code/tag_version /code/tag_version
 COPY --from=adminbuild /code/tag_version /var/www/tag_version
 

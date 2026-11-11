@@ -793,3 +793,79 @@ def test_maintenance_cancels_all_pending_reports(setup, operation):
             service.cancel_player(sess, 1, "target")
     with db() as sess:
         assert not service.pending(sess, 1)
+
+
+@pytest.mark.parametrize("recovered", [True, False])
+def test_initial_context_gap_preserves_runtime_owner(setup, monkeypatch, recovered):
+    from unittest.mock import Mock
+
+    db, _, ctx = setup
+    i = report(setup)
+    api = transport()
+    runtime = service.Runtime()
+    runtime.server = 1
+    runtime.owner = owner = Mock()
+    owner.dialect.name = "sqlite"
+    monkeypatch.setattr(
+        service,
+        "read_context",
+        Mock(side_effect=ValueError("No recorder-confirmed current round")),
+    )
+    runtime.step(api)
+    assert runtime.owner is owner
+    owner.close.assert_not_called()
+    assert current(db, i["id"])["report_admin"]["status"] == "queued"
+    api.kick.assert_not_called()
+    db.clock.now += 5 if recovered else service.CONTEXT_RETRY_SECONDS
+    ctx["captured_at"] = db.clock.now
+    if recovered:
+        monkeypatch.setattr(service, "read_context", lambda _: deepcopy(ctx))
+    runtime.step(api)
+    assert runtime.owner is owner
+    if recovered:
+        api.kick.assert_called_once()
+    else:
+        api.kick.assert_not_called()
+        assert current(db, i["id"])["report_admin"]["status"] == "manual"
+
+
+def test_context_recovery_rechecks_round(setup, monkeypatch):
+    from unittest.mock import Mock
+
+    db, _, ctx = setup
+    i = report(setup)
+    api = transport()
+    monkeypatch.setattr(
+        service, "read_context", Mock(side_effect=ValueError("round unavailable"))
+    )
+    service.tick(api, 1)
+    db.clock.now += 5
+    ctx.update(
+        captured_at=db.clock.now, round_start=db.clock.now, round_id="next-round"
+    )
+    monkeypatch.setattr(service, "read_context", lambda _: deepcopy(ctx))
+    service.tick(api, 1)
+    api.kick.assert_not_called()
+    assert current(db, i["id"])["report_admin"]["status"] == "manual"
+
+
+@pytest.mark.parametrize("initial_age,recovery_delay", [(58, 3), (0, 16)])
+def test_context_retry_does_not_extend_deadlines(
+    setup, monkeypatch, initial_age, recovery_delay
+):
+    from unittest.mock import Mock
+
+    db, _, ctx = setup
+    i = report(setup)
+    api = transport()
+    db.clock.now += initial_age
+    monkeypatch.setattr(
+        service, "read_context", Mock(side_effect=ValueError("round unavailable"))
+    )
+    service.tick(api, 1)
+    db.clock.now += recovery_delay
+    ctx["captured_at"] = db.clock.now
+    monkeypatch.setattr(service, "read_context", lambda _: deepcopy(ctx))
+    service.tick(api, 1)
+    api.kick.assert_not_called()
+    assert current(db, i["id"])["report_admin"]["status"] == "manual"

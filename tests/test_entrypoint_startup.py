@@ -71,6 +71,7 @@ exit 0
             )
 
             self.assertEqual(0, result.returncode, result.stderr)
+            self.assertNotIn(env["HLL_DB_PASSWORD"], result.stdout + result.stderr)
             self.assertIn("orphaned-map-id cleanup was deferred", result.stderr)
             commands = command_log.read_text(encoding="utf-8")
             self.assertIn("python -m rcon.cli remove_orphaned_map_ids", commands)

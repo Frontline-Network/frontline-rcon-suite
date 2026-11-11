@@ -3,6 +3,10 @@ name: pull-requests
 on:
   pull_request: {}
 
+permissions:
+  contents: read
+  packages: read
+
 concurrency:
   group: pr-${{ github.workflow }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
@@ -10,3 +14,5 @@ concurrency:
 jobs:
   quality:
     uses: ./.github/workflows/quality.yml
+  upgrade:
+    uses: ./.github/workflows/upgrade-rehearsal.yml

@@ -79,3 +79,31 @@ def test_short_round_with_inferred_start_is_zero(compute):
 
 def test_session_is_bounded_by_requested_window(compute):
     assert compute([(-20, CONNECTED), (4000, DISCONNECTED)]) == 3600
+
+
+@pytest.mark.parametrize(
+    "events",
+    [
+        [(3506, ACTIVITY), (3506, CONNECTED)],
+        [(3506, CONNECTED), (3506, ACTIVITY)],
+    ],
+)
+def test_same_second_activity_does_not_infer_an_extra_session(compute, events):
+    assert compute(events, cooldown=0) == 94
+    assert compute(events, cooldown=100) == 0
+
+
+def test_duplicate_disconnect_and_reconnect_reconstruct_207_seconds(compute):
+    events = [
+        (15, CONNECTED),
+        (212, DISCONNECTED),
+        (212, DISCONNECTED),
+        (339, CONNECTED),
+        (349, DISCONNECTED),
+    ]
+    assert compute(events) == 207
+    assert compute(list(reversed(events))) == 207
+
+
+def test_duplicate_connect_is_counted_once(compute):
+    assert compute([(200, CONNECTED), (200, CONNECTED), (800, DISCONNECTED)]) == 600

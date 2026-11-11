@@ -21,8 +21,10 @@ wenn Messung, Kompatibilität und Rückrollbarkeit belegt sind.
 > Pollingfrequenz, Threadzahl oder Aufbewahrung ohne zu prüfen, welche
 > Reaktionszeit oder Funktion davon abhängt.
 >
-> Behandle die vier Frontline-Instanzen als Produktions-Canary: RCON1 und
-> RCON2 prüfen Hell Let Loose, RCON3 und RCON4 Hell Let Loose Vietnam. Rolle
+> Nutze die aktiven Frontline-Instanzen RCON3 und RCON4 als Produktions-Canary
+> für Hell Let Loose Vietnam. RCON1/2 sind stillgelegt und bleiben ausgeschaltet.
+> Prüfe Hell Let Loose zunächst isoliert und live nur auf einer dafür separat
+> freigegebenen aktiven Instanz. Rolle
 > immer instanzweise aus. Warte auf echte HTTP- und WebSocket-Readiness, prüfe
 > anschließend öffentliche URL, API, relevante Logs und Ressourcenwerte und
 > breche bei Regressionen ab. Eine funktionierende PID allein gilt nicht als
@@ -60,7 +62,7 @@ wenn Messung, Kompatibilität und Rückrollbarkeit belegt sind.
 > Frequenz, Antwortgröße und Laufzeit sichtbar.
 >
 > Abschlusskriterien sind: alle vereinbarten Tests grün oder bekannte
-> Altfehler sauber abgegrenzt; RCON1–4 über einen repräsentativen Zeitraum
+> Altfehler sauber abgegrenzt; die aktiven Canary-Instanzen über einen repräsentativen Zeitraum
 > stabil; keine hängenden Transaktionen oder unkontrollierten Redis-SCANS;
 > messbar geringere CPU-/RAM-/I/O-Kosten; dokumentierter Rollback; keine
 > Geheimnisse im Repository; und ein sauberer, reviewbarer Branch. Merge,

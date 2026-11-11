@@ -15,7 +15,7 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Box, Button, Stack, Tooltip, Typography, alpha } from "@mui/material";
 import dayjs from "dayjs";
-import { memo, useId, useMemo, useState } from "react";
+import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
 import { LogMessage } from "@/components/shared/LogMessage";
 import { NoRowsOverlay } from "@/components/NoRowsOverlay";
 import { useTranslation } from "react-i18next";
@@ -461,8 +461,14 @@ function CompactLogsList({
   stackedDetail = false,
   displaySettings,
   highlightedActions = [],
+  onReadOlder,
+  scrollReset,
 }) {
   const { t } = useTranslation();
+  const scrollRef = useRef(null);
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [scrollReset]);
   const presentation = getLogPresentation(displaySettings);
   const groups = useMemo(
     () =>
@@ -510,6 +516,14 @@ function CompactLogsList({
   return (
     <Box
       component={stackedDetail ? "div" : "section"}
+      ref={scrollRef}
+      onScroll={(event) => {
+        if (
+          event.target === event.currentTarget &&
+          event.currentTarget.scrollTop > 48
+        )
+          onReadOlder?.();
+      }}
       role={stackedDetail ? undefined : "region"}
       aria-label={stackedDetail ? undefined : t("views.live.eventStream")}
       data-testid={
