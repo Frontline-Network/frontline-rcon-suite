@@ -1089,7 +1089,7 @@ class Rcon(ServerCtl):
             logger.exception("Can't save message in redis: %s", message)
 
         super().set_broadcast(formatted)
-        return prev.decode() if prev else ""
+        return prev.decode() if isinstance(prev, bytes) else (prev or "")
 
     @ttl_cache(ttl=5)
     def get_slots(self) -> SlotsType:

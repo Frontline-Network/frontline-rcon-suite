@@ -75,3 +75,20 @@ test("campaign mode and delivery sections expose the operational controls", asyn
   await expect(shell.getByLabel("Globaler Sendetakt")).toBeVisible();
   await expect(shell.getByLabel("Mindestabstand je Spieler")).toBeVisible();
 });
+
+test("broadcast intervals use seconds and activity distinguishes acknowledgements", async ({ page }) => {
+  const main = await openDemoPage(page, path);
+  const shell = main.getByTestId("campaign-workbench");
+  const navigation = shell.getByRole("navigation", { name: "Kampagnenbereiche" });
+  await navigation.getByRole("button", { name: /^Kampagnen/ }).click();
+  await shell.getByText("Neu", { exact: true }).click();
+  const interval = shell.getByLabel("Abstand zur nächsten Nachricht (Sekunden)");
+  await expect(interval).toHaveValue("900");
+  await interval.fill("30");
+  await expect(interval).toHaveValue("30");
+  await expect(shell.getByText("Bitte eine ganze Zahl von 1 bis 86400 Sekunden angeben.")).toHaveCount(0);
+  await navigation.getByRole("button", { name: /^Aktivität/ }).click();
+  await expect(shell.getByText("Broadcast-Aktivität", { exact: true })).toBeVisible();
+  await expect(shell.getByText(/Eine Serverbestätigung belegt nicht die Anzeige/)).toBeVisible();
+  await expectNoHorizontalPageOverflow(page);
+});

@@ -207,18 +207,9 @@ const CampaignCard = ({
   const update = (field, value) =>
     onChange(index, { ...campaign, [field]: value });
   const rawIntervalSeconds = Number(campaign.time_sec);
-  const intervalMinutes = Number.isFinite(rawIntervalSeconds)
-    ? Math.round(rawIntervalSeconds / 60)
-    : "";
   const isPlayerMessage = campaign.delivery_mode === "player_message";
   const messageInvalid = !campaign.message.trim();
-  const intervalInvalid =
-    !Number.isFinite(rawIntervalSeconds) ||
-    rawIntervalSeconds < 60 ||
-    rawIntervalSeconds > 86400 ||
-    !Number.isFinite(Number(intervalMinutes)) ||
-    intervalMinutes < 1 ||
-    intervalMinutes > 1440;
+  const intervalInvalid = !Number.isInteger(rawIntervalSeconds) || rawIntervalSeconds < 1 || rawIntervalSeconds > 86400;
   const sessionInvalid =
     !Number.isFinite(Number(campaign.min_session_minutes)) ||
     campaign.min_session_minutes < 1 ||
@@ -397,18 +388,18 @@ const CampaignCard = ({
               </>
             ) : (
               <TextField
-                label={t("settings.campaigns.interval")}
+                label={t("settings.campaigns.broadcastInterval")}
                 type="number"
-                value={intervalMinutes}
+                value={rawIntervalSeconds}
                 onChange={(event) =>
-                  update("time_sec", Number(event.target.value) * 60)
+                  update("time_sec", Number(event.target.value))
                 }
-                slotProps={{ htmlInput: { min: 1, max: 1440 } }}
+                slotProps={{ htmlInput: { min: 1, max: 86400, step: 1 } }}
                 error={intervalInvalid}
                 helperText={
                   intervalInvalid
-                    ? t("settings.campaigns.intervalRangeError")
-                    : t("settings.campaigns.intervalUnit")
+                    ? t("settings.campaigns.broadcastIntervalError")
+                    : t("settings.campaigns.broadcastIntervalHelp")
                 }
                 sx={{ minWidth: 190 }}
               />
@@ -609,7 +600,8 @@ const BroadcastCampaignPage = () => {
     config.messages.every(
       (campaign) =>
         campaign.message.trim() &&
-        Number(campaign.time_sec) > 0 &&
+        Number.isInteger(Number(campaign.time_sec)) &&
+        Number(campaign.time_sec) > 0 && Number(campaign.time_sec) <= 86400 &&
         campaign.min_players >= 0 &&
         campaign.max_players <= 100 &&
         campaign.min_players <= campaign.max_players &&

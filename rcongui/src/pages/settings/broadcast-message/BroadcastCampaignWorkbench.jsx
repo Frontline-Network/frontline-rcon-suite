@@ -140,12 +140,12 @@ function BroadcastSummary({ config, activeCount }) {
         <SummarySegment
           icon={<ScheduleOutlinedIcon fontSize="small" />}
           label={t(`${ROOT}.timingLabel`)}
-          value={t(`${ROOT}.globalTimingValue`, {
+          value={channels.has("player_message") ? t(`${ROOT}.globalTimingValue`, {
             seconds: config.player_message_interval_sec,
-          })}
-          detail={t(`${ROOT}.playerGapValue`, {
+          }) : t(`${ROOT}.broadcastTiming`)}
+          detail={channels.has("player_message") ? t(`${ROOT}.playerGapValue`, {
             minutes: Math.round(config.player_message_gap_sec / 60),
-          })}
+          }) : t(`${ROOT}.broadcastIntervalHelp`)}
           border={false}
         />
       </Box>
@@ -206,10 +206,6 @@ function CampaignList({ campaigns, selectedCampaignId, onSelect, onAdd }) {
       >
         {campaigns.map((campaign, index) => {
           const selected = campaign.id === selectedCampaignId;
-          const intervalMinutes = Math.max(
-            1,
-            Math.round(Number(campaign.time_sec) / 60)
-          );
           return (
             <ButtonBase
               key={campaign.id || index}
@@ -280,7 +276,7 @@ function CampaignList({ campaigns, selectedCampaignId, onSelect, onAdd }) {
                       ? t(`${ROOT}.afterSessionMinutes`, {
                           minutes: campaign.min_session_minutes,
                         })
-                      : t(`${ROOT}.everyMinutes`, { count: intervalMinutes })}
+                      : t(`${ROOT}.broadcastSeconds`, { seconds: campaign.time_sec })}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
                     {campaign.min_players}–{campaign.max_players}
@@ -341,6 +337,28 @@ function DeliverySettings({ config, onChange }) {
       </Alert>
     </ConfigFormSection>
   );
+}
+
+function BroadcastActivity({ status }) {
+  const { t } = useTranslation();
+  const formatDate = (value) => value ? new Date(value).toLocaleString() : "—";
+  const state = status?.state;
+  return <ConfigFormSection plain title={t(`${ROOT}.broadcastActivity`)} description={t(`${ROOT}.broadcastDisclaimer`)} icon={<CampaignOutlinedIcon />}>
+    <Alert severity={status?.available === false ? "warning" : "info"}>
+      {t(`${ROOT}.broadcastPhases.${state?.phase || "unknown"}`)}
+      {state?.next_at && <> · {t(`${ROOT}.broadcastNext`)}: {formatDate(state.next_at)}</>}
+      {state?.updated_at && <> · {t(`${ROOT}.broadcastChecked`)}: {formatDate(state.updated_at)}</>}
+    </Alert>
+    {(status?.recent ?? []).length === 0 && <Typography sx={{ mt: 2 }}>{t(`${ROOT}.broadcastEmpty`)}</Typography>}
+    {(status?.recent ?? []).map((row, index) => <Box key={`${row.at}-${index}`} sx={{ p: 2, borderBottom: "1px solid", borderColor: "divider" }}>
+      <Stack direction="row" gap={1} flexWrap="wrap" alignItems="center">
+        <Typography variant="body2">{formatDate(row.at)}</Typography>
+        <Chip size="small" color={row.status === "accepted" ? "success" : "warning"} label={t(`${ROOT}.broadcastResult.${row.status}`)} />
+        {row.error && <Typography variant="caption">{row.error}</Typography>}
+      </Stack>
+      <Typography sx={{ mt: 1, overflowWrap: "anywhere" }}>{row.message}</Typography>
+    </Box>)}
+  </ConfigFormSection>;
 }
 
 function ActivityPanel({ deliveryStatus }) {
@@ -675,7 +693,10 @@ export default function BroadcastCampaignWorkbench({
       {activeSection === "vip-lifecycle" && lifecyclePanel}
 
       {activeSection === "activity" && (
-        <ActivityPanel deliveryStatus={deliveryStatus} />
+        <Stack spacing={3}>
+          <BroadcastActivity status={deliveryStatus?.broadcast} />
+          {config.messages.some((item) => item.delivery_mode === "player_message") && <ActivityPanel deliveryStatus={deliveryStatus} />}
+        </Stack>
       )}
     </SeedingWorkbenchLayout>
   );

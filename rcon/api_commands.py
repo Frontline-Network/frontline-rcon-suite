@@ -868,7 +868,11 @@ class RconAPI(Rcon):
     def get_campaign_delivery_status(self, limit: int = 20) -> dict[str, Any]:
         from rcon.campaign_delivery import get_delivery_status
 
-        return get_delivery_status(limit=limit)
+        from rcon.broadcast_activity import get_status
+
+        result = get_delivery_status(limit=limit)
+        result["broadcast"] = get_status()
+        return result
 
     def send_frontline_vip_verification_code(
         self, player_name: str, code: str
