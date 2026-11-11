@@ -23,6 +23,7 @@ SUPERVISOR_COMMANDS = {
     "routines",
     "seed_vip",
     "supervisor_runtime_mode",
+    "vip_rewards",
     "watch_killrate",
 }
 
@@ -79,6 +80,25 @@ print("RESULT:" + json.dumps({
         payload = self._result_payload(result)
         self.assertEqual(SUPERVISOR_COMMANDS, set(payload["commands"]))
         self.assertEqual([], payload["loaded_heavy_modules"])
+
+    def test_vip_rewards_is_available_in_supervisor_mode(self):
+        env = os.environ.copy()
+        env["HLL_SUPERVISOR_PROCESS"] = "1"
+        env["PYTHONPATH"] = str(REPO_ROOT)
+        env.setdefault("SERVER_NUMBER", "1")
+        env.setdefault("DEBUG", "1")
+        result = subprocess.run(
+            [sys.executable, REPO_ROOT / "manage.py", "vip_rewards", "--help"],
+            cwd=REPO_ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("Usage: manage.py vip_rewards", result.stdout)
 
     def test_log_hooks_are_explicit_and_idempotent(self):
         result = self._run_python("""
@@ -148,6 +168,7 @@ print("RESULT:" + json.dumps({
             "routines",
             "scoreboard",
             "seed_vip",
+            "vip_rewards",
             "watch_killrate",
             "workers",
         }
