@@ -12,6 +12,10 @@ x-frontline-backend: &frontline-backend
 
 x-mobile-environment: &mobile-environment
   CRCON_VERSION: ${CRCON_VERSION:-development}
+  # The shared runtime is the update-safe default. Set
+  # HLL_SUPERVISOR_CONFIG=/config/supervisord.conf only for an explicit
+  # compatibility rollback.
+  HLL_SUPERVISOR_CONFIG: ${HLL_SUPERVISOR_CONFIG:-/config/supervisord_combined.conf}
   HLL_GAME: ${HLL_GAME:-hll}
   RATELIMIT_PROXY_DEPTH: ${RATELIMIT_PROXY_DEPTH:-1}
   MOBILE_INTEGRATION_ENABLED: ${MOBILE_INTEGRATION_ENABLED:-false}
