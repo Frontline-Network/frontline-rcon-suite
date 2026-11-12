@@ -218,6 +218,13 @@ in its container so Docker stop and restart signals reach it directly. The
 legacy supervisor fallback still selects the server-specific configuration
 when it exists and otherwise starts the shared compatibility configuration.
 
+The exact RCON3 candidate canary stabilized at seven long-lived core processes:
+one Daphne process, Supervisord with Cron, the combined runtime and RQ worker,
+and an Nginx master plus worker. RQ forks one temporary child while executing a
+queued job, so the observed total becomes eight during work and returns to
+seven afterward. The three warm containers used about 435 MiB in total, kept
+all 18 logical services running and had no restarts or relevant tracebacks.
+
 The Mobile Push, Discord event and Discord moderation loops can be run in one
 shared process with `compose.combined-workers.yaml`. The loops remain isolated
 in three threads with their own HTTP and database sessions, so a 180-second AI

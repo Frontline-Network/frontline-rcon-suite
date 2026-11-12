@@ -1,8 +1,9 @@
 # Lightweight runtime update contract
 
 The next Frontline RCON update migrates standard installations to the shared
-Supervisor runtime and combined Frontline background worker. The objective is
-lower per-instance memory without disabling any RCON feature.
+Supervisor runtime, combined Frontline background worker and adaptive API
+runtime. The objective is lower per-instance memory and fewer idle processes
+without disabling any RCON feature.
 
 ## Upgrade behaviour
 
@@ -23,6 +24,30 @@ lower per-instance memory without disabling any RCON feature.
   outbox cannot be consumed twice.
 - The deployment state file records both selected topologies and the exact
   database backup used for rollback.
+- `HLL_API_SERVER_MODE=auto` serves HTTP and WebSockets from one Daphne process
+  when `NB_API_WORKERS=1`. Multiple API workers retain the split Gunicorn and
+  Daphne topology automatically. `HLL_API_SERVER_MODE=split` is the explicit
+  compatibility rollback and does not require a migration or data restore.
+- Backend, Supervisor and frontend entrypoints replace their setup shell with
+  the long-lived daemon. Daphne, Supervisord and Nginx therefore become PID 1
+  and receive Docker stop signals directly. Roll back this process-only change
+  by restoring the previous backend and frontend image references from the
+  deployment-state Compose model.
+
+## Measured HLLV canary
+
+RCON3 ran the exact candidate commit with a verified PostgreSQL dump, Redis
+snapshot, configuration archive, rollback Compose model and SHA-256 manifest.
+After warm-up the three core containers used about 435 MiB in total and had
+seven long-lived processes: one Daphne process, Supervisord plus Cron, the
+combined runtime and RQ worker, and an Nginx master plus worker. RQ temporarily
+adds one child while executing a queued job, so seven idle and eight busy are
+both valid states.
+
+The canary kept all 18 logical services running, reported zero container
+restarts and no relevant tracebacks, and completed 100/100 bounded health
+requests at about 190 requests/second with a 53.6 ms p95. Both API listener
+ports and the public root and health endpoints remained available.
 
 ## Acceptance gate
 
@@ -40,7 +65,10 @@ one HLL installation with fresh verified backups. Acceptance requires:
 - measured Supervisor and delivery-worker RAM is lower than the split baseline;
 - Redis control traffic uses batched reads and transition-only state writes;
 - explicit split rollback restores the previous topology without a schema or
-  data rollback.
+  data rollback;
+- Daphne, Supervisord and Nginx are PID 1 and no idle entrypoint shell remains;
+- the normal process baseline is seven when RQ is idle and eight while its
+  single work child is active;
 - repeated stop/start/restart checks cover every migrated logical service,
   including a scoreboard restart from a different runtime thread;
 - database-pool timeouts and shared-runtime tracebacks remain absent under the
