@@ -16,6 +16,7 @@ from rcon.connection import HLLServerError
 from rcon.discord import make_hook
 from rcon.maps import GameMode, Team as MapTeam, get_theoretical_match_time
 from rcon.rcon import get_rcon
+from rcon.service_runtime import stopping, wait
 from rcon.types import AllLogTypes, GameEnum, GameStateType, GetDetailedPlayers, MapInfo, MapScore, UnitHistoryEntry, StructuredLogLineWithMetaData, PlayerStat, WorldPositionType
 from rcon.user_config.log_line_webhooks import LogLineWebhookUserConfig
 from rcon.user_config.rcon_server_settings import RconServerSettingsUserConfig
@@ -252,12 +253,17 @@ class LogLoop:
     def get_log_history_list():
         return LogsHistory()
 
-    def run(self, loop_frequency_secs=2, cleanup_frequency_minutes=10):
+    def run(
+        self,
+        loop_frequency_secs=2,
+        cleanup_frequency_minutes=10,
+        stop_event=None,
+    ):
         self.GET_LOGS_SINCE_MIN = 180
         last_cleanup_time = datetime.datetime.now()
         prev_map_time_elapsed = 0
 
-        while True:
+        while not stopping(stop_event):
             load_generic_hooks()
             try:
                 self.process_logs()
@@ -269,7 +275,8 @@ class LogLoop:
                 # Let's log it and prevent restarting the service
                 logger.warning("Connection error: %s", str(e))
             last_cleanup_time = self.cleanup(last_cleanup_time, cleanup_frequency_minutes)
-            time.sleep(loop_frequency_secs)
+            if wait(stop_event, loop_frequency_secs):
+                return
 
     # GENERAL
     # - Once the game ends time_remaining changes to 100 (after the match score screen) and so 100s map restart countdown begins

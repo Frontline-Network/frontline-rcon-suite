@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.dialects.postgresql import insert
 
 from rcon.models import VipRewardEvent, VipRewardGrant, VipRewardState, enter_session
+from rcon.service_runtime import stopping, wait
 from rcon.user_config.seed_vip import SeedVIPUserConfig
 from rcon.user_config.vip_rewards import VipRewardsUserConfig
 from rcon.utils import get_server_number
@@ -493,7 +494,7 @@ def deliver(rcon, grant_id):
                 logger.exception("Reward delivered; player message failed for %s", pid)
 
 
-def run():
+def run(stop_event=None):
     from rcon.api_commands import get_rcon_api
 
     rcon = get_rcon_api()
@@ -510,7 +511,7 @@ def run():
                 for player in data.get("players", {}).values():
                     player.pop("balance", None)
                 state.data = data
-    while True:
+    while not stopping(stop_event):
         started = time.monotonic()
         try:
             tick(rcon)
@@ -518,4 +519,5 @@ def run():
             logger.exception(
                 "VIP rewards worker failed; no unobserved time will be credited"
             )
-        time.sleep(max(1, 30 - (time.monotonic() - started)))
+        if wait(stop_event, max(1, 30 - (time.monotonic() - started))):
+            return

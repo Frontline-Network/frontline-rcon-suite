@@ -2,13 +2,12 @@ import sys
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from logging import getLogger
-from time import sleep
-
 import humanize
 
 import discord
 from rcon.api_commands import get_rcon_api
 from rcon.seed_vip.notifications import RETRY_SECONDS, NotificationOutbox
+from rcon.service_runtime import stopping, wait
 from rcon.seed_vip.utils import (
     calc_vip_expiration_timestamp,
     collect_steam_ids,
@@ -46,7 +45,7 @@ def get_server_snapshot(rcon_api):
     return online_players, gamestate
 
 
-def run():
+def run(stop_event=None):
     config = SeedVIPUserConfig.load_from_db()
     current_lang = config.language
 
@@ -66,16 +65,24 @@ def run():
     seeded_timestamp: datetime | None = None
 
     is_seeding: bool | None = None
+    disabled_logged = False
 
     try:
-        while True:
+        while not stopping(stop_event):
             # Reload the config each loop to catch changes to the config
             config = SeedVIPUserConfig.load_from_db()
 
             if not config.enabled:
                 outbox.clear()
-                logger.info("Seed VIP is not enabled")
-                break
+                if not disabled_logged:
+                    logger.info("Seed VIP is not enabled")
+                    disabled_logged = True
+                if stop_event is None:
+                    break
+                if wait(stop_event, 5):
+                    return
+                continue
+            disabled_logged = False
 
             if config.dry_run:
                 outbox.clear()
@@ -102,7 +109,8 @@ def run():
 
             snapshot = get_server_snapshot(rcon_api)
             if snapshot is None:
-                sleep(config.poll_time_seeding)
+                if wait(stop_event, config.poll_time_seeding):
+                    return
                 continue
 
             online_players, gamestate = snapshot
@@ -291,7 +299,8 @@ def run():
             if pending_notices:
                 sleep_time = min(sleep_time, RETRY_SECONDS)
             logger.info(f"sleeping {sleep_time=}")
-            sleep(sleep_time)
+            if wait(stop_event, sleep_time):
+                return
     except* Exception as eg:
         for e in eg.exceptions:
             logger.exception(e)

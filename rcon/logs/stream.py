@@ -1,12 +1,12 @@
 import datetime
 import logging
-import time
 from collections import defaultdict
 
 import redis
 
 from rcon.cache_utils import get_redis_client
 from rcon.rcon import Rcon, get_rcon
+from rcon.service_runtime import stopping, wait
 from rcon.types import StructuredLogLineWithMetaData
 from rcon.user_config.log_stream import LogStreamUserConfig
 from rcon.utils import Stream, StreamOlderElement, StreamID, StreamNoElements
@@ -102,6 +102,7 @@ class LogStream:
         loop_frequency_secs: int | None = None,
         initial_since_min: int | None = None,
         active_since_min: int | None = None,
+        stop_event=None,
     ):
         """Poll the game server and add new logs to the stream"""
 
@@ -113,7 +114,7 @@ class LogStream:
 
         tail = self.log_stream.tail()
         last_seen_id = tail[0] if tail else None
-        while True:
+        while not stopping(stop_event):
             config = LogStreamUserConfig.load_from_db()
             if not config.enabled:
                 break
@@ -121,7 +122,8 @@ class LogStream:
 
             if new_logs:
                 logger.info(f"Added {new_logs} new logs {last_seen_id=}")
-            time.sleep(loop_frequency_secs or config.refresh_frequency_sec)
+            if wait(stop_event, loop_frequency_secs or config.refresh_frequency_sec):
+                return
             logs = self.rcon.get_structured_logs(since_min_ago=since_min)["logs"]
 
     def logs_since(

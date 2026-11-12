@@ -8,6 +8,10 @@ lower per-instance memory without disabling any RCON feature.
 
 - New one- and multi-server templates use
   `/config/supervisord_combined.conf` by default.
+- The phase-two combined configuration contains only three Supervisor programs:
+  `frontline_runtime`, the RQ `workers`, and `cron`. The shared runtime exposes
+  18 logical services through the existing service API, including logs,
+  campaigns, scoreboard, Automod, seed VIP and VIP rewards.
 - `FRONTLINE_SUPERVISOR_RUNTIME_MODE=auto` migrates an empty setting and the
   standard split configuration to the combined configuration.
 - A non-standard Supervisor path is preserved in `auto` mode. Operators must
@@ -37,6 +41,10 @@ one HLL installation with fresh verified backups. Acceptance requires:
 - Redis control traffic uses batched reads and transition-only state writes;
 - explicit split rollback restores the previous topology without a schema or
   data rollback.
+- repeated stop/start/restart checks cover every migrated logical service,
+  including a scoreboard restart from a different runtime thread;
+- database-pool timeouts and shared-runtime tracebacks remain absent under the
+  HLLV/HLL canary workload.
 
 No production database, Redis keyspace or historical record is deleted by this
 topology migration.

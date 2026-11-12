@@ -229,16 +229,17 @@ Do not run this profile concurrently with the split workers. Event and broker
 idempotency are still retained as a last-resort retry safeguard.
 
 `config/supervisord_combined.conf` groups compatible, I/O-bound per-gameserver
-loops in one Python runtime: expiring VIPs,
-live statistics, autobalancer, blacklist commands, log persistence and routine
-jobs, plus auto settings and automatic broadcasts. Each loop runs in its own
+loops in one Python runtime: expiring VIPs, live statistics, autobalancer,
+blacklist commands, log ingestion and persistence, routine jobs, auto settings,
+automatic broadcasts, campaign delivery, scoreboard updates, Automod,
+kill-rate watching, seed VIP and VIP rewards. Each loop runs in its own
 monitored thread and is restarted independently after an exception. The RCON
-controller already maintains one connection per thread. Auto settings and
-broadcasts use cooperative waits, so the existing individual service controls
-can stop them without terminating the shared process. Log ingestion, Automod,
-scoreboard and RQ remain separate. Automod deliberately retains its own process
-because its stricter command-log level is process-scoped and must not suppress
-diagnostics for unrelated shared services.
+controller already maintains one connection per thread. Every migrated loop
+uses cooperative waits, so the existing individual service controls can stop
+it without terminating the shared process. Process-wide Automod logging is no
+longer configured on the consolidated program; service failures keep their
+service name and traceback in the shared runtime log instead. RQ workers and
+cron remain separate because they have different execution and failure models.
 
 The service API expands those threads back into the original Supervisor service
 names. The settings UI therefore retains individual status and start/stop
@@ -246,6 +247,15 @@ controls even though the processes share an interpreter. Each loop accepts a
 cooperative stop event; stopping the autobalancer also releases its leader
 lease. Redis control values are normalized from either bytes or strings because
 the application's shared Redis pool can be initialized in either mode.
+
+The phase-two candidate reduces the combined Supervisor configuration from 11
+programs to three: `frontline_runtime`, `workers` and `cron`. It does not merge
+RQ jobs or cron into the threaded runtime and does not change the supported
+split rollback configuration. Disabled optional services stay as inexpensive
+logical threads that poll for configuration changes rather than disappearing
+from the service API. Production memory figures for this second phase must be
+recorded during the HLLV/HLL canary; local tests are not presented as live RAM
+evidence.
 
 The mode was canaried first on RCON3 (HLL Vietnam), then RCON1 (HLL), before it
 was expanded to RCON2 and RCON4. `live_stats_refresh` was stopped and restarted

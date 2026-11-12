@@ -592,15 +592,22 @@ Damit werden beide Versandarten nicht doppelt ausgeführt.
 
 ## 57. Supervisor Worker
 
-Der Fork startet Campaign Messages als eigenen Supervisor-Prozess.
+Die kombinierte Standardkonfiguration startet drei Supervisor-Programme:
+`frontline_runtime`, RQ-`workers` und `cron`.
 
-Weitere CRCON-Hintergrundprozesse laufen ebenfalls unter Supervisor.
+Der gemeinsame Python-Prozess betreibt die kompatiblen CRCON-Hintergrunddienste
+als einzeln überwachte, kooperativ stoppbare Threads. Dazu gehören auch
+Campaign Messages, Logs, Scoreboard, Automod, Seed-VIP und VIP Rewards. Die
+Service-API behält ihre bisherigen Namen sowie Start-/Stopp-Steuerung bei.
 
-Dies erlaubt Restart-Isolation einzelner Loops.
+Die getrennte Supervisor-Konfiguration bleibt als unterstützter Rollback
+erhalten. RQ und Cron werden wegen ihres abweichenden Ausführungsmodells nicht
+in den Thread-Runtime-Prozess integriert.
 
 ## 58. Consolidated Loops / Scaling
 
-Aktuelle Commits dokumentieren Konsolidierung von Settings-/Broadcastloops und Performance-/Scalingoptimierungen.
+Aktuelle Commits dokumentieren die zweistufige Konsolidierung der kompatiblen
+Hintergrundloops und die zugehörigen Performance-/Scalingoptimierungen.
 
 Das Ziel ist, bei mehreren RCON-Instanzen unnötige Poller, DB-Verbindungen und Dashboardlast zu reduzieren.
 

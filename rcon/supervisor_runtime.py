@@ -157,6 +157,65 @@ def _run_population_history(stop_event: threading.Event) -> None:
     run(stop_event=stop_event)
 
 
+def _run_campaign_messages(stop_event: threading.Event) -> None:
+    from rcon import campaign_delivery
+
+    campaign_delivery.run(stop_event=stop_event)
+
+
+def _run_log_event_loop(stop_event: threading.Event) -> None:
+    from rcon.cache_utils import invalidates
+    from rcon.discord_chat import get_handler
+    from rcon.logs.loop import LogLoop, load_generic_hooks
+
+    with invalidates(load_generic_hooks, get_handler):
+        LogLoop().run(stop_event=stop_event)
+
+
+def _run_log_stream(stop_event: threading.Event) -> None:
+    from rcon.logs.stream import LogStream
+    from rcon.user_config.log_stream import LogStreamUserConfig
+
+    while not stop_event.is_set():
+        if not LogStreamUserConfig.load_from_db().enabled:
+            if stop_event.wait(5):
+                return
+            continue
+        stream = LogStream()
+        stream.clear()
+        stream.run(stop_event=stop_event)
+
+
+def _run_scoreboard(stop_event: threading.Event) -> None:
+    from rcon import scoreboard
+
+    scoreboard.run(stop_event=stop_event)
+
+
+def _run_automod(stop_event: threading.Event) -> None:
+    from rcon.automods import automod
+
+    automod.run(stop_event=stop_event)
+
+
+def _run_watch_killrate(stop_event: threading.Event) -> None:
+    from rcon import watch_killrate
+
+    watch_killrate.run(stop_event=stop_event)
+
+
+def _run_seed_vip(stop_event: threading.Event) -> None:
+    from rcon.seed_vip import service
+
+    service.run(stop_event=stop_event)
+
+
+def _run_vip_rewards(stop_event: threading.Event) -> None:
+    from rcon.vip_rewards import service
+
+    service.run(stop_event=stop_event)
+
+
 DEFAULT_SERVICES: tuple[ServiceSpec, ...] = (
     ServiceSpec("population_history", _run_population_history),
     ServiceSpec("live_map", _run_live_map),
@@ -168,6 +227,14 @@ DEFAULT_SERVICES: tuple[ServiceSpec, ...] = (
     ServiceSpec("routines", _run_routines),
     ServiceSpec("auto_settings", _run_auto_settings),
     ServiceSpec("broadcasts", _run_broadcasts),
+    ServiceSpec("campaign_messages", _run_campaign_messages),
+    ServiceSpec("log_event_loop", _run_log_event_loop),
+    ServiceSpec("log_stream", _run_log_stream),
+    ServiceSpec("scoreboard", _run_scoreboard),
+    ServiceSpec("automod", _run_automod),
+    ServiceSpec("watch_killrate", _run_watch_killrate),
+    ServiceSpec("seed_vip", _run_seed_vip),
+    ServiceSpec("vip_rewards", _run_vip_rewards),
 )
 
 

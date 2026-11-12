@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -15,6 +14,7 @@ from rcon.models import (
     VipLifecycleDelivery,
     enter_session,
 )
+from rcon.service_runtime import stopping, wait
 from rcon.user_config.auto_broadcast import (
     AutoBroadcastMessage,
     AutoBroadcastUserConfig,
@@ -504,7 +504,7 @@ def send_test_message(ctl, campaign: AutoBroadcastMessage, player_id: str) -> st
     return formatted
 
 
-def run() -> None:
+def run(stop_event=None) -> None:
     from rcon.rcon import get_rcon
     from rcon.vip_lifecycle import (
         feature_enabled as vip_lifecycle_feature_enabled,
@@ -516,7 +516,7 @@ def run() -> None:
     last_cleanup = datetime.min
     _recover_interrupted_deliveries(server_number, datetime.utcnow())
 
-    while True:
+    while not stopping(stop_event):
         now = datetime.utcnow()
         try:
             if now - last_cleanup >= timedelta(days=1):
@@ -531,7 +531,8 @@ def run() -> None:
                 vip_lifecycle_feature_enabled() and config.vip_lifecycle.enabled
             )
             if not direct_enabled and not lifecycle_enabled:
-                time.sleep(CHECK_INTERVAL)
+                if wait(stop_event, CHECK_INTERVAL):
+                    return
                 continue
 
             delivery = None
@@ -608,4 +609,5 @@ def run() -> None:
 
         except Exception:
             logger.exception("Campaign player-message loop failed")
-        time.sleep(CHECK_INTERVAL)
+        if wait(stop_event, CHECK_INTERVAL):
+            return

@@ -1,7 +1,9 @@
 import os
+import threading
 from unittest import mock
 
 import pytest
+from sqlalchemy import text
 
 os.environ.setdefault("SERVER_NUMBER", "1")
 os.environ.setdefault("HLL_MAINTENANCE_CONTAINER", "1")
@@ -59,14 +61,43 @@ def test_scoreboard_waits_for_missing_configuration(
     warning = mock.Mock()
     monkeypatch.setattr(scoreboard.logger, "warning", warning)
 
-    def stop_after_first_wait(seconds):
+    def stop_after_first_wait(_stop_event, seconds):
         assert seconds == scoreboard.SCOREBOARD_CONFIG_RETRY_SECONDS
         raise StopScoreboard
 
-    monkeypatch.setattr(scoreboard.time, "sleep", stop_after_first_wait)
+    monkeypatch.setattr(scoreboard, "wait", stop_after_first_wait)
 
     with pytest.raises(StopScoreboard):
         scoreboard.run()
 
     warning.assert_called_once()
     assert expected_warning in warning.call_args.args[0]
+
+
+def test_scoreboard_database_can_be_reused_after_runtime_thread_restart(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setattr(scoreboard, "VOLUME_PATH", tmp_path)
+    monkeypatch.setattr(
+        scoreboard,
+        "DB_PATH",
+        f"{tmp_path.as_posix()}/scoreboard.db",
+    )
+    monkeypatch.setattr(scoreboard, "ENGINE", None)
+    engine = scoreboard.initialize_database()
+    errors = []
+
+    def use_database_from_replacement_thread():
+        try:
+            with scoreboard.enter_session() as session:
+                session.execute(text("SELECT 1"))
+        except Exception as exc:  # pragma: no cover - asserted below
+            errors.append(exc)
+
+    replacement = threading.Thread(target=use_database_from_replacement_thread)
+    replacement.start()
+    replacement.join(timeout=2)
+
+    engine.dispose()
+    assert not replacement.is_alive()
+    assert errors == []

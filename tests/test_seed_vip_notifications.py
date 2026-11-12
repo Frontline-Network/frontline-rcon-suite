@@ -163,7 +163,7 @@ class NoticeTests(unittest.TestCase):
              patch.object(service, 'NotificationOutbox', return_value=self.queue), \
              patch.object(service, 'get_server_snapshot', side_effect=snapshots), \
              patch.object(service, 'get_vips', return_value={}), \
-             patch.object(service, 'sleep', side_effect=lambda seconds: setattr(self, 'clock', self.clock + seconds)):
+             patch.object(service, 'wait', side_effect=lambda _event, seconds: setattr(self, 'clock', self.clock + seconds) or False):
             service.run()
 
     def test_complete_transition_retries_notice_without_second_reward(self):

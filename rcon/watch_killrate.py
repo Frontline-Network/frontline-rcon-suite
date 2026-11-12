@@ -6,14 +6,13 @@ import sys
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 from logging import getLogger
-from time import sleep
-
 from discord_webhook import DiscordEmbed, DiscordWebhook
 
 from rcon.api_commands import get_rcon_api, RconAPI
 from rcon.cache_utils import invalidates, ttl_cache
 from rcon.player_history import get_player_profile, player_has_flag
 from rcon.player_stats import current_game_stats
+from rcon.service_runtime import stopping, wait
 from rcon.user_config.rcon_server_settings import RconServerSettingsUserConfig
 from rcon.user_config.watch_killrate import WatchKillRateUserConfig
 from rcon.utils import get_server_number
@@ -466,16 +465,20 @@ def watch_killrate(
                 )
 
 
-def run() -> None:
+def run(stop_event=None) -> None:
     """Main process (loop)"""
     api = get_rcon_api()
 
-    while True:
+    while not stopping(stop_event):
         server_config = RconServerSettingsUserConfig.load_from_db()
         config = WatchKillRateUserConfig.load_from_db()
 
         if not config.enabled:
-            break  # The service will gracefully exit
+            if stop_event is None:
+                break  # The standalone service will gracefully exit.
+            if wait(stop_event, 5):
+                return
+            continue
 
         watch_killrate(
             api=api,
@@ -483,7 +486,8 @@ def run() -> None:
             server_name=server_config.short_name,
         )
         logger.info("Sleeping %s seconds", config.watch_interval_secs)
-        sleep(config.watch_interval_secs)
+        if wait(stop_event, config.watch_interval_secs):
+            return
 
 
 if __name__ == "__main__":

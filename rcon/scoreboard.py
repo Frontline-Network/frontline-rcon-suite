@@ -1,6 +1,5 @@
 import pathlib
 import sys
-import time
 from collections import defaultdict
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -13,6 +12,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from rcon.maps import UNKNOWN_MAP_NAME, FactionName, Layer, LayerType
 from rcon.player_stats import get_cached_live_game_stats
+from rcon.service_runtime import stopping, wait
 from rcon.types import (
     STAT_DISPLAY_LOOKUP,
     GameStateType,
@@ -55,15 +55,37 @@ MESSAGE_KEYS = (
     PLAYER_STATS,
 )
 SERVER_NUMBER = int(get_server_number())
+VOLUME_PATH = pathlib.Path("/scoreboard_db")
+DB_PATH = VOLUME_PATH / "scoreboard.db"
+ENGINE: Engine | None = None
 
 
 class Base(DeclarativeBase):
     pass
 
 
+def initialize_database() -> Engine:
+    """Initialize the scoreboard store in standalone or shared runtime mode."""
+
+    global ENGINE
+    if ENGINE is not None:
+        return ENGINE
+    if not VOLUME_PATH.exists():
+        raise RuntimeError(
+            "Your scoreboard volume is not configured correctly in your compose.yaml file."
+        )
+    ENGINE = create_engine(
+        f"sqlite:///file:{DB_PATH}?mode=rwc&uri=true",
+        echo=False,
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(ENGINE)
+    return ENGINE
+
+
 @contextmanager
 def enter_session() -> Generator[Session, None, None]:
-    with Session(bind=ENGINE) as session:
+    with Session(bind=initialize_database()) as session:
         session.begin()
         try:
             yield session
@@ -457,7 +479,7 @@ def send_message(
         )
 
 
-def run():
+def run(stop_event=None):
     # Avoid circular imports
     from rcon.api_commands import get_rcon_api
 
@@ -470,7 +492,7 @@ def run():
         )
         previous_configuration_warning: str | None = None
 
-        while True:
+        while not stopping(stop_event):
             timestamp = datetime.now()
             config = ScoreboardUserConfig.load_from_db()
 
@@ -490,7 +512,8 @@ def run():
                 if configuration_warning != previous_configuration_warning:
                     logger.warning(configuration_warning)
                 previous_configuration_warning = configuration_warning
-                time.sleep(SCOREBOARD_CONFIG_RETRY_SECONDS)
+                if wait(stop_event, SCOREBOARD_CONFIG_RETRY_SECONDS):
+                    return
                 continue
 
             if previous_configuration_warning:
@@ -579,7 +602,8 @@ def run():
                 config.map_rotation_time_between_refreshes,
                 config.player_stats_time_between_refreshes,
             )
-            time.sleep(sleep_time)
+            if wait(stop_event, sleep_time):
+                return
 
     except Exception as e:
         logger.exception("The bot stopped: %s", e)
@@ -587,22 +611,9 @@ def run():
 
 
 if __name__ == "__main__":
-    VOLUME_PATH = pathlib.Path("/scoreboard_db")
-
-    if not VOLUME_PATH.exists():
-        logger.fatal(
-            "Your scoreboard volume is not configured correctly in your compose.yaml file."
-        )
-        sys.exit(-1)
-
-    DB_PATH = pathlib.Path("/scoreboard_db") / pathlib.Path("./scoreboard.db")
-    ENGINE: Engine = create_engine(
-        f"sqlite:///file:{DB_PATH}?mode=rwc&uri=true", echo=False
-    )
-
     try:
         logger.info("Attempting to start scorebot")
-        Base.metadata.create_all(ENGINE)
+        initialize_database()
         run()
     except Exception as e:
         logger.exception(e)

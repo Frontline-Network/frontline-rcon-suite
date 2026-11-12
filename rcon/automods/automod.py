@@ -1,5 +1,4 @@
 import logging
-import time
 from threading import Timer
 from typing import List
 
@@ -19,6 +18,7 @@ from rcon.discord import send_to_discord_audit
 from rcon.hooks import inject_player_ids
 from rcon.logs.loop import on_connected, on_kill
 from rcon.rcon import Rcon, get_rcon
+from rcon.service_runtime import stopping, wait
 from rcon.types import GetDetailedPlayer, StructuredLogLineType
 from rcon.user_config.auto_mod_level import AutoModLevelUserConfig
 from rcon.user_config.auto_mod_no_leader import AutoModNoLeaderUserConfig
@@ -301,14 +301,15 @@ def on_connected(rcon: Rcon, _, name: str, player_id: str):
     t.start()
 
 
-def run():
+def run(stop_event=None):
     rcon = get_rcon()
     red = get_redis_client()
 
-    while True:
+    while not stopping(stop_event):
         try:
             punish_squads(rcon, red)
-            time.sleep(5)
+            if wait(stop_event, 5):
+                return
         except Exception:
             logger.exception("Squad automod: Something unexpected happened")
             raise
