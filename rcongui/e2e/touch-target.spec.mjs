@@ -1,15 +1,23 @@
 import { expect, test } from "@playwright/test";
 import { openDemoPage, VIEWPORTS } from "./helpers.mjs";
 
+// Chromium can report an exact 44 CSS px target a few millionths of a pixel
+// smaller after device-scale rounding (for example 43.99998474121094).
+// Keep the accessibility requirement at 44px while tolerating only that
+// subpixel measurement noise; genuinely undersized controls still fail.
+const TOUCH_TARGET_ROUNDING_TOLERANCE_PX = 0.01;
+
 const expectMinimumTouchTarget = async (locator, label) => {
   const box = await locator.boundingBox();
   expect(box, `${label} has no visible bounding box`).not.toBeNull();
-  expect(box.width, `${label} is narrower than 44px`).toBeGreaterThanOrEqual(
-    44
-  );
-  expect(box.height, `${label} is shorter than 44px`).toBeGreaterThanOrEqual(
-    44
-  );
+  expect(
+    box.width + TOUCH_TARGET_ROUNDING_TOLERANCE_PX,
+    `${label} is narrower than 44px`
+  ).toBeGreaterThanOrEqual(44);
+  expect(
+    box.height + TOUCH_TARGET_ROUNDING_TOLERANCE_PX,
+    `${label} is shorter than 44px`
+  ).toBeGreaterThanOrEqual(44);
 };
 
 const expectInsideViewport = async (locator, viewport, label) => {
