@@ -272,12 +272,14 @@ test("full replay controls, event legend and round archive work together", async
   const view = page.getByTestId("live-map-page");
   await view.getByRole("tab", { name: "Rückblick", exact: true }).click();
   await view.getByRole("button", { name: "Verlauf laden" }).click();
-  await expect(view.getByRole("slider", { name: "Zeitpunkt" })).toBeVisible();
+  const replaySlider = view.getByRole("slider", { name: "Zeitpunkt" });
+  await expect(replaySlider).toBeVisible();
   await expect(view.getByText(/Kill: 3/)).toBeVisible();
   await expect(view.getByText(/Teamkill: 1/)).toBeVisible();
   await expect(view.getByText(/Prüfhinweis: 1/)).toBeVisible();
   await view.getByLabel("Kill-Verbindungen").check();
-  await view.getByRole("slider", { name: "Zeitpunkt" }).press("End");
+  await replaySlider.press("End");
+  const replayEnd = await replaySlider.inputValue();
   await expect(view.getByTestId("kill-connection")).toHaveAttribute(
     "data-teamkill",
     "true"
@@ -290,10 +292,11 @@ test("full replay controls, event legend and round archive work together", async
     view.getByText("Keine gemeldeten VAC- oder Game-Bans.")
   ).toBeVisible();
   await view.getByRole("button", { name: "Abspielen", exact: true }).click();
-  await expect(
-    view.getByRole("button", { name: "Pause", exact: true })
-  ).toBeVisible();
+  await expect(replaySlider).not.toHaveValue(replayEnd);
   await view.getByRole("button", { name: "Pause", exact: true }).click();
+  await expect(
+    view.getByRole("button", { name: "Abspielen", exact: true })
+  ).toBeVisible();
   await view
     .getByRole("button", { name: "Runde sichern", exact: true })
     .click();
