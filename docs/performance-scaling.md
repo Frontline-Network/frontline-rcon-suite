@@ -222,8 +222,11 @@ The exact RCON3 candidate canary stabilized at seven long-lived core processes:
 one Daphne process, Supervisord with Cron, the combined runtime and RQ worker,
 and an Nginx master plus worker. RQ forks one temporary child while executing a
 queued job, so the observed total becomes eight during work and returns to
-seven afterward. The three warm containers used about 435 MiB in total, kept
-all 18 logical services running and had no restarts or relevant tracebacks.
+seven afterward. The three containers used about 435 MiB immediately after
+start and about 562 MiB after 40 minutes of real HLLV traffic, compared with a
+warm Phase 2 measurement of about 717 MiB. The loaded Phase 3 result was
+therefore about 155 MiB (22%) lower, while all 18 logical services remained
+running without restarts or relevant tracebacks.
 
 The matching HLL1 canary reduced the same three core containers from about
 581 MiB and 13 long-lived processes to about 399 MiB and seven processes after

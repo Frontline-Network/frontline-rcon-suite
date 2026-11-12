@@ -38,11 +38,13 @@ without disabling any RCON feature.
 
 RCON3 ran the exact candidate commit with a verified PostgreSQL dump, Redis
 snapshot, configuration archive, rollback Compose model and SHA-256 manifest.
-After warm-up the three core containers used about 435 MiB in total and had
-seven long-lived processes: one Daphne process, Supervisord plus Cron, the
-combined runtime and RQ worker, and an Nginx master plus worker. RQ temporarily
-adds one child while executing a queued job, so seven idle and eight busy are
-both valid states.
+The three core containers used about 435 MiB immediately after start and about
+562 MiB after 40 minutes of real HLLV traffic. The comparable warm Phase 2
+measurement was about 717 MiB, so Phase 3 remained about 155 MiB (22%) lower
+under load. It had seven long-lived processes: one Daphne process, Supervisord
+plus Cron, the combined runtime and RQ worker, and an Nginx master plus worker.
+RQ temporarily adds one child while executing a queued job, so seven idle and
+eight busy are both valid states.
 
 The canary kept all 18 logical services running, reported zero container
 restarts and no relevant tracebacks, and completed 100/100 bounded health
