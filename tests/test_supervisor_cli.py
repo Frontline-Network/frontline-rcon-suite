@@ -111,10 +111,16 @@ register_log_hooks()
 after_first = sum(len(callbacks) for callbacks in HOOKS.values())
 register_log_hooks()
 after_second = sum(len(callbacks) for callbacks in HOOKS.values())
+handlers = sorted({
+    (callback.__module__, callback.__name__)
+    for callbacks in HOOKS.values()
+    for callback in callbacks
+})
 print("RESULT:" + json.dumps({
     "before": before,
     "after_first": after_first,
     "after_second": after_second,
+    "handlers": handlers,
 }))
 """)
 
@@ -123,6 +129,30 @@ print("RESULT:" + json.dumps({
         self.assertEqual(0, payload["before"])
         self.assertGreater(payload["after_first"], 0)
         self.assertEqual(payload["after_first"], payload["after_second"])
+        self.assertTrue(
+            {
+                ("rcon.autobalancer.hooks", "autobalancer_volunteer"),
+                ("rcon.autobalancer.hooks", "autobalancer_kill"),
+                ("rcon.autobalancer.hooks", "autobalancer_match_end"),
+                ("rcon.autobalancer.hooks", "autobalancer_match_start"),
+                ("rcon.autobalancer.hooks", "autobalancer_team_kill"),
+                ("rcon.autobalancer.hooks", "autobalancer_team_switch"),
+                ("rcon.auto_kick", "auto_kick"),
+                (
+                    "rcon.automods.tk_autoban",
+                    "auto_ban_if_tks_right_after_connection",
+                ),
+                ("rcon.moderation_hooks", "analyze_player_name_candidate"),
+                ("rcon.watchlist", "watchdog"),
+                ("rcon.vip_rewards.hooks", "reward_status"),
+                ("rcon.vip_rewards.hooks", "signup"),
+                ("rcon.vip_rewards.hooks", "disconnected"),
+                ("rcon.vip_rewards.hooks", "kill"),
+                ("rcon.vip_rewards.hooks", "round_end"),
+                ("rcon.vip_rewards.hooks", "round_start"),
+                ("rcon.vip_rewards.hooks", "switch"),
+            }.issubset(map(tuple, payload["handlers"]))
+        )
 
     def test_manage_help_uses_minimal_cli(self):
         env = os.environ.copy()

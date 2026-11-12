@@ -1,9 +1,12 @@
 import importlib.util
+from contextlib import nullcontext
+import os
 from pathlib import Path
 import sys
 import threading
 import time
 import unittest
+from unittest.mock import patch
 
 
 _MODULE_SPEC = importlib.util.spec_from_file_location(
@@ -52,6 +55,38 @@ class SharedSupervisorRuntimeTests(unittest.TestCase):
                 "vip_rewards",
             },
         )
+
+    def test_shared_log_loop_registers_all_hooks_before_starting(self):
+        calls = []
+        stop_event = threading.Event()
+
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "SERVER_NUMBER": "1",
+                    "HLL_SUPERVISOR_PROCESS": "1",
+                    "DEBUG": "1",
+                },
+            ),
+            patch(
+                "rcon.log_hooks.register_log_hooks",
+                side_effect=lambda: calls.append("register"),
+            ),
+            patch(
+                "rcon.cache_utils.invalidates",
+                return_value=nullcontext(),
+            ),
+            patch("rcon.logs.loop.LogLoop") as log_loop,
+        ):
+            log_loop.return_value.run.side_effect = (
+                lambda *, stop_event: calls.append("run")
+            )
+
+            _RUNTIME._run_log_event_loop(stop_event)
+
+        self.assertEqual(["register", "run"], calls)
+        log_loop.return_value.run.assert_called_once_with(stop_event=stop_event)
 
     def test_redis_state_decodes_bytes_from_shared_pool(self):
         self.assertEqual(
