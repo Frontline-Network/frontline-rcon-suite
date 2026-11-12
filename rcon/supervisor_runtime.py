@@ -38,6 +38,29 @@ def decode_service_state(raw_state: dict) -> dict[str, str]:
     }
 
 
+def read_service_controls(red, service_names: Sequence[str]) -> dict[str, tuple[str, str]]:
+    """Read all desired states and restart tokens with one Redis command.
+
+    The former monitor loop issued two ``HGET`` calls per service every second
+    and rewrote every unchanged ``RUNNING`` state. On a multi-instance host
+    that made the health monitor itself a material Redis poller. ``HMGET``
+    keeps the same one-second control response while making the cost constant
+    per runtime process.
+    """
+    fields = [
+        field
+        for name in service_names
+        for field in (f"{name}:desired", f"{name}:restart")
+    ]
+    values = red.hmget(STATE_KEY, fields)
+    controls: dict[str, tuple[str, str]] = {}
+    for index, name in enumerate(service_names):
+        desired = redis_text(values[index * 2]) or RUNNING
+        restart = redis_text(values[index * 2 + 1]) or ""
+        controls[name] = (desired, restart)
+    return controls
+
+
 def mark_runtime_mode(mode: str, red=None) -> None:
     """Persist the active supervisor topology for the next mode transition."""
     if mode not in {SPLIT_MODE, SHARED_MODE}:
@@ -195,10 +218,8 @@ def run(services: Sequence[ServiceSpec] = DEFAULT_SERVICES) -> None:
     for name in service_specs:
         red.hsetnx(STATE_KEY, f"{name}:desired", RUNNING)
 
-    restart_tokens = {
-        name: redis_text(red.hget(STATE_KEY, f"{name}:restart")) or ""
-        for name in service_specs
-    }
+    controls = read_service_controls(red, service_specs)
+    restart_tokens = {name: values[1] for name, values in controls.items()}
 
     def start_service(name: str) -> None:
         stop_event = threading.Event()
@@ -222,14 +243,10 @@ def run(services: Sequence[ServiceSpec] = DEFAULT_SERVICES) -> None:
 
     try:
         while not runtime_stop_event.wait(MONITOR_INTERVAL_SECONDS):
+            controls = read_service_controls(red, service_specs)
             for name in service_specs:
-                desired = (
-                    redis_text(red.hget(STATE_KEY, f"{name}:desired")) or RUNNING
-                )
+                desired, restart_token = controls[name]
                 thread = threads.get(name)
-                restart_token = (
-                    redis_text(red.hget(STATE_KEY, f"{name}:restart")) or ""
-                )
 
                 if restart_token != restart_tokens[name]:
                     if thread and thread.is_alive():
@@ -272,8 +289,6 @@ def run(services: Sequence[ServiceSpec] = DEFAULT_SERVICES) -> None:
                             "Shared supervisor thread %s died; restarting", name
                         )
                     start_service(name)
-                else:
-                    red.hset(STATE_KEY, f"{name}:state", RUNNING)
     except KeyboardInterrupt:
         logger.info("Stopping shared supervisor runtime")
     finally:

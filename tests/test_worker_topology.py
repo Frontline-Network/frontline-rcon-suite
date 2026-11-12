@@ -55,7 +55,30 @@ def test_deploy_script_reconciles_both_worker_topologies():
         assert service in deploy_script
 
 
-def test_new_installations_default_to_automatic_worker_migration():
+def test_new_installations_default_to_automatic_lightweight_migration():
     default_environment = (REPO_ROOT / "default.env").read_text(encoding="utf-8")
 
     assert "FRONTLINE_BACKGROUND_WORKER_MODE=auto" in default_environment.splitlines()
+    assert "FRONTLINE_SUPERVISOR_RUNTIME_MODE=auto" in default_environment.splitlines()
+    assert (
+        "HLL_SUPERVISOR_CONFIG=/config/supervisord_combined.conf"
+        in default_environment.splitlines()
+    )
+
+
+def test_auto_deployment_migrates_standard_topologies_to_combined():
+    deploy_script = (REPO_ROOT / "scripts" / "deploy_frontline.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert "background_worker_mode=combined" in deploy_script
+    assert "supervisor_runtime_mode=combined" in deploy_script
+    assert "target_supervisor_config=/config/supervisord_combined.conf" in deploy_script
+
+
+def test_mobile_override_enforces_combined_runtime_for_legacy_compose_files():
+    mobile_compose = _load_compose("compose.mobile-admin.yaml")
+
+    assert mobile_compose["x-mobile-environment"]["HLL_SUPERVISOR_CONFIG"] == (
+        "${HLL_SUPERVISOR_CONFIG:-/config/supervisord_combined.conf}"
+    )

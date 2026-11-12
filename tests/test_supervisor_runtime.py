@@ -20,6 +20,7 @@ _service_loop = _RUNTIME._service_loop
 decode_service_state = _RUNTIME.decode_service_state
 mark_runtime_mode = _RUNTIME.mark_runtime_mode
 prepare_shared_state = _RUNTIME.prepare_shared_state
+read_service_controls = _RUNTIME.read_service_controls
 MODE_KEY = _RUNTIME.MODE_KEY
 STATE_KEY = _RUNTIME.STATE_KEY
 
@@ -44,6 +45,37 @@ class SharedSupervisorRuntimeTests(unittest.TestCase):
                 "live_stats_refresh:desired": "STOPPED",
                 "routines:state": "RUNNING",
             },
+        )
+
+    def test_service_controls_are_read_in_one_batched_command(self):
+        class FakeRedis:
+            calls = []
+
+            def hmget(self, key, fields):
+                self.calls.append((key, fields))
+                return [b"STOPPED", b"token-1", None, None]
+
+        red = FakeRedis()
+
+        self.assertEqual(
+            read_service_controls(red, ["broadcasts", "routines"]),
+            {
+                "broadcasts": ("STOPPED", "token-1"),
+                "routines": ("RUNNING", ""),
+            },
+        )
+        self.assertEqual(len(red.calls), 1)
+        self.assertEqual(
+            red.calls[0],
+            (
+                STATE_KEY,
+                [
+                    "broadcasts:desired",
+                    "broadcasts:restart",
+                    "routines:desired",
+                    "routines:restart",
+                ],
+            ),
         )
 
     def test_split_to_shared_transition_resets_stale_stop_requests(self):

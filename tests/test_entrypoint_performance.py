@@ -109,6 +109,17 @@ def test_combined_supervisor_runtime_is_explicit_opt_in():
     assert "supervisord -c /config/supervisord.conf" in entrypoint
 
 
+def test_installation_templates_default_to_combined_supervisor_runtime():
+    for template_name in ("one-server.yaml", "ten-servers.yaml"):
+        template = (REPO_ROOT / "docker-templates" / template_name).read_text(
+            encoding="utf-8"
+        )
+        assert (
+            "HLL_SUPERVISOR_CONFIG: "
+            "${HLL_SUPERVISOR_CONFIG:-/config/supervisord_combined.conf}"
+        ) in template
+
+
 def test_split_supervisor_marks_mode_before_starting_services():
     entrypoint = (REPO_ROOT / "entrypoint.sh").read_text(encoding="utf-8")
 

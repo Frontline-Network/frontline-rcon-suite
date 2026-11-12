@@ -228,8 +228,8 @@ docker compose --profile combined-workers \
 Do not run this profile concurrently with the split workers. Event and broker
 idempotency are still retained as a last-resort retry safeguard.
 
-The optional `config/supervisord_combined.conf` additionally groups eight
-compatible, I/O-bound per-gameserver loops in one Python runtime: expiring VIPs,
+`config/supervisord_combined.conf` groups compatible, I/O-bound per-gameserver
+loops in one Python runtime: expiring VIPs,
 live statistics, autobalancer, blacklist commands, log persistence and routine
 jobs, plus auto settings and automatic broadcasts. Each loop runs in its own
 monitored thread and is restarted independently after an exception. The RCON
@@ -260,8 +260,11 @@ RCON remained HTTP 200. No new runtime exceptions were logged.
 
 RCON2 and RCON4 measured 0.757 GiB and 0.678 GiB respectively shortly after
 their rollout. All four public endpoints returned HTTP 200 in 33-37 ms. The
-mode remains opt-in until the long observation window is complete. Never enable
-it while the eight corresponding individual Supervisor programs are also running.
+long observation window completed without a runtime-specific outage. The next
+update therefore makes this topology the default for new installations and
+migrates standard split installations automatically. An explicitly custom
+Supervisor configuration is retained. Never run the shared runtime while the
+corresponding standalone programs are also running.
 
 Supervisor startup records whether an instance last used the split or shared
 topology. A real split-to-shared transition resets stale per-service controls
@@ -368,7 +371,8 @@ documented by the templates.
 | `HLL_GUNICORN_PRELOAD` | `auto` | Preload for multiple API workers; disabled automatically for one worker |
 | `HLL_GUNICORN_MAX_REQUESTS` | `1000` | Recycle a split Gunicorn worker after this many requests; zero disables recycling |
 | `HLL_GUNICORN_MAX_REQUESTS_JITTER` | `100` | Random extra requests before recycling to stagger instances |
-| `HLL_SUPERVISOR_CONFIG` | `/config/supervisord.conf` | Set to `/config/supervisord_combined.conf` for the opt-in shared supervisor runtime |
+| `HLL_SUPERVISOR_CONFIG` | `/config/supervisord_combined.conf` | Shared runtime by default; set `/config/supervisord.conf` only for an explicit compatibility rollback |
+| `FRONTLINE_SUPERVISOR_RUNTIME_MODE` | `auto` | Migrates standard installations to the shared runtime, preserves custom paths; `combined` and `split` are explicit overrides |
 | `HLL_WH_IDLE_SLEEP_TIME` | `0.1` | Webhook loop delay when no queue has work |
 | `HLL_HISTORICAL_SCOREBOARD_CACHE_SECONDS` | `21600` | Completed scoreboard cache lifetime |
 | `MOBILE_PUSH_ACTIVE_POLL_SECONDS` | `1` | Push polling delay after successful work |
@@ -732,6 +736,12 @@ To roll back the shared supervisor runtime, restore the regular
 the affected supervisor container. Do not start standalone auto-settings or
 broadcast processes while their same-named shared threads are running; the
 normal and combined configs are mutually exclusive by construction.
+
+The shared runtime reads all desired states and restart tokens with one
+`HMGET` per monitor cycle. It writes state only on transitions instead of
+rewriting every unchanged `RUNNING` state once per second. This preserves the
+one-second service-control response while removing the per-service Redis
+polling and write multiplier.
 
 Database retention and index replacement require their own migration, backup
 and rollback plans. Process consolidation must be canaried separately from

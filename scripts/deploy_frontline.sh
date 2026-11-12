@@ -12,7 +12,10 @@ Environment overrides:
   FRONTLINE_BRANCH   Branch to deploy (default: master)
   FRONTLINE_BACKGROUND_WORKER_MODE
                      Background worker topology: auto, combined or split
-                     (default: auto; existing combined installs stay combined)
+                     (default: auto; auto migrates to combined)
+  FRONTLINE_SUPERVISOR_RUNTIME_MODE
+                     Supervisor topology: auto, combined or split
+                     (default: auto; auto migrates standard installs to combined)
 EOF
 }
 
@@ -148,27 +151,56 @@ configured_worker_mode="${FRONTLINE_BACKGROUND_WORKER_MODE:-$(
     .env | tail -n 1
 )}"
 configured_worker_mode="${configured_worker_mode:-auto}"
-existing_combined_worker_container="$(
-  docker compose \
-    --profile mobile \
-    --profile combined-workers \
-    -f compose.yaml \
-    -f compose.mobile-admin.yaml \
-    ps -q frontline_background_worker
-)"
 case "${configured_worker_mode,,}" in
   auto)
-    if [[ -n "$existing_combined_worker_container" ]]; then
-      background_worker_mode=combined
-    else
-      background_worker_mode=split
-    fi
+    background_worker_mode=combined
     ;;
   combined|split)
     background_worker_mode="${configured_worker_mode,,}"
     ;;
   *)
     echo "Invalid FRONTLINE_BACKGROUND_WORKER_MODE '$configured_worker_mode'; expected auto, combined or split." >&2
+    exit 1
+    ;;
+esac
+
+configured_supervisor_mode="${FRONTLINE_SUPERVISOR_RUNTIME_MODE:-$(
+  awk -F= '$1 == "FRONTLINE_SUPERVISOR_RUNTIME_MODE" { print substr($0, index($0, "=") + 1) }' \
+    .env | tail -n 1
+)}"
+configured_supervisor_mode="${configured_supervisor_mode:-auto}"
+existing_supervisor_config="$(
+  awk -F= '$1 == "HLL_SUPERVISOR_CONFIG" { print substr($0, index($0, "=") + 1) }' \
+    .env | tail -n 1
+)"
+case "${configured_supervisor_mode,,}" in
+  auto)
+    case "$existing_supervisor_config" in
+      ""|/config/supervisord.conf|/config/supervisord_combined.conf)
+        supervisor_runtime_mode=combined
+        persisted_supervisor_mode=combined
+        target_supervisor_config=/config/supervisord_combined.conf
+        ;;
+      *)
+        supervisor_runtime_mode=custom
+        persisted_supervisor_mode=auto
+        target_supervisor_config="$existing_supervisor_config"
+        echo "Preserving custom supervisor configuration: $target_supervisor_config"
+        ;;
+    esac
+    ;;
+  combined)
+    supervisor_runtime_mode=combined
+    persisted_supervisor_mode=combined
+    target_supervisor_config=/config/supervisord_combined.conf
+    ;;
+  split)
+    supervisor_runtime_mode=split
+    persisted_supervisor_mode=split
+    target_supervisor_config=/config/supervisord.conf
+    ;;
+  *)
+    echo "Invalid FRONTLINE_SUPERVISOR_RUNTIME_MODE '$configured_supervisor_mode'; expected auto, combined or split." >&2
     exit 1
     ;;
 esac
@@ -180,7 +212,8 @@ else
   target_profiles+=(--profile split-background-workers)
 fi
 
-CRCON_IMAGE_TAG="$target_short" CRCON_VERSION="$target_version" docker compose \
+HLL_SUPERVISOR_CONFIG="$target_supervisor_config" \
+  CRCON_IMAGE_TAG="$target_short" CRCON_VERSION="$target_version" docker compose \
   "${target_profiles[@]}" \
   -f compose.yaml \
   -f "$target_override" \
@@ -213,6 +246,7 @@ fi
 
 echo "Preflight passed: $current_short -> $target_short ($target_version)"
 echo "Background worker topology: $background_worker_mode"
+echo "Supervisor runtime topology: $supervisor_runtime_mode ($target_supervisor_config)"
 echo "Deployment services: ${deployment_services[*]}"
 if [[ "$mode" == "--check-only" ]]; then
   exit 0
@@ -265,7 +299,8 @@ fi
 git merge --ff-only "$target_sha"
 
 compose_target() {
-  CRCON_IMAGE_TAG="$target_short" CRCON_VERSION="$target_version" docker compose \
+  HLL_SUPERVISOR_CONFIG="$target_supervisor_config" \
+    CRCON_IMAGE_TAG="$target_short" CRCON_VERSION="$target_version" docker compose \
     "${target_profiles[@]}" \
     -f compose.yaml \
     -f compose.mobile-admin.yaml \
@@ -275,7 +310,8 @@ compose_target() {
 
 compose_target config --quiet
 compose_all_worker_profiles() {
-  CRCON_IMAGE_TAG="$target_short" CRCON_VERSION="$target_version" docker compose \
+  HLL_SUPERVISOR_CONFIG="$target_supervisor_config" \
+    CRCON_IMAGE_TAG="$target_short" CRCON_VERSION="$target_version" docker compose \
     --profile mobile \
     --profile combined-workers \
     --profile split-background-workers \
@@ -315,8 +351,16 @@ compose_target build --pull "${deployment_services[@]}"
 
 env_tmp="$(mktemp "$repo_root/.env.XXXXXX")"
 awk -v image_tag="$target_short" -v release_version="$target_version" \
-  -v worker_mode="$background_worker_mode" '
-  BEGIN { image_written = 0; version_written = 0; worker_mode_written = 0 }
+  -v worker_mode="$background_worker_mode" \
+  -v supervisor_mode="$persisted_supervisor_mode" \
+  -v supervisor_config="$target_supervisor_config" '
+  BEGIN {
+    image_written = 0
+    version_written = 0
+    worker_mode_written = 0
+    supervisor_mode_written = 0
+    supervisor_config_written = 0
+  }
   /^CRCON_IMAGE_TAG=/ {
     if (!image_written) {
       print "CRCON_IMAGE_TAG=" image_tag
@@ -338,11 +382,27 @@ awk -v image_tag="$target_short" -v release_version="$target_version" \
     }
     next
   }
+  /^FRONTLINE_SUPERVISOR_RUNTIME_MODE=/ {
+    if (!supervisor_mode_written) {
+      print "FRONTLINE_SUPERVISOR_RUNTIME_MODE=" supervisor_mode
+      supervisor_mode_written = 1
+    }
+    next
+  }
+  /^HLL_SUPERVISOR_CONFIG=/ {
+    if (!supervisor_config_written) {
+      print "HLL_SUPERVISOR_CONFIG=" supervisor_config
+      supervisor_config_written = 1
+    }
+    next
+  }
   { print }
   END {
     if (!image_written) print "CRCON_IMAGE_TAG=" image_tag
     if (!version_written) print "CRCON_VERSION=" release_version
     if (!worker_mode_written) print "FRONTLINE_BACKGROUND_WORKER_MODE=" worker_mode
+    if (!supervisor_mode_written) print "FRONTLINE_SUPERVISOR_RUNTIME_MODE=" supervisor_mode
+    if (!supervisor_config_written) print "HLL_SUPERVISOR_CONFIG=" supervisor_config
   }
 ' .env > "$env_tmp"
 chmod --reference=.env "$env_tmp"
@@ -355,6 +415,8 @@ DATABASE_BACKUP=$backup_file
 BACKEND_ROLLBACK_TAG=frontline/hll_rcon_tool:rollback-$current_short
 FRONTEND_ROLLBACK_TAG=frontline/hll_rcon_tool_frontend:rollback-$current_short
 BACKGROUND_WORKER_MODE=$background_worker_mode
+SUPERVISOR_RUNTIME_MODE=$supervisor_runtime_mode
+SUPERVISOR_CONFIG=$target_supervisor_config
 EOF
 chmod 600 "$state_dir/$timestamp.env"
 
