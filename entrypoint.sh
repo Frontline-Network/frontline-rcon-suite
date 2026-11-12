@@ -110,7 +110,24 @@ then
     echo "from django.contrib.auth.models import User; User.objects.create_superuser('admin', 'admin@example.com', 'admin') if not User.objects.filter(username='admin').first() else None" | python manage.py shell
   fi
   export LOGGING_FILENAME=api_$SERVER_NUMBER.log
-  API_SERVER_MODE="${HLL_API_SERVER_MODE:-split}"
+  API_SERVER_MODE="${HLL_API_SERVER_MODE:-auto}"
+  if [[ "$API_SERVER_MODE" == "auto" ]]
+  then
+    # A single Daphne process can serve both HTTP and WebSockets without
+    # loading Django twice. Keep the split topology for explicit scale-out.
+    if [[ "$NB_API_WORKERS" =~ ^[0-9]+$ && "$NB_API_WORKERS" -eq 1 ]]
+    then
+      API_SERVER_MODE="unified"
+    else
+      API_SERVER_MODE="split"
+    fi
+  fi
+  if ! [[ "$API_SERVER_MODE" =~ ^(unified|split)$ ]]
+  then
+    echo "ERROR: HLL_API_SERVER_MODE must be auto, unified or split" >&2
+    exit 2
+  fi
+  echo "Starting API server in $API_SERVER_MODE mode ($NB_API_WORKERS configured worker(s))"
   if [[ "$API_SERVER_MODE" == "unified" ]]
   then
     # Daphne serves the same ASGI application over both ports expected by the
@@ -118,7 +135,7 @@ then
     # separate Gunicorn and Daphne processes while preserving WebSockets.
     # Daphne replaces this shell via exec, so the current PID remains valid.
     echo $$ > gunicorn.pid
-    daphne \
+    exec daphne \
       -e tcp:port=8000:interface=0.0.0.0 \
       -e tcp:port=8001:interface=0.0.0.0 \
       -t 120 \

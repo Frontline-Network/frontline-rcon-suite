@@ -186,9 +186,11 @@ periodic performance-statistics dump. That dump now runs on its own monotonic
 deadline inside the existing routines service, preserving its configured
 interval while removing one Python process per gameserver.
 
-Gunicorn preload is also skipped by default when only one worker is configured.
-This retained the split HTTP/WebSocket architecture while reducing backend RAM
-materially on busy instances.
+Gunicorn preload is skipped by default when only one split worker is configured.
+The default `auto` topology now goes further for that profile: one Daphne
+process serves HTTP and WebSockets on the two existing ports, avoiding a second
+Django runtime. Selecting multiple API workers automatically retains the split
+Gunicorn/Daphne architecture.
 
 Long-lived Gunicorn workers recycle after a bounded number of requests. The
 master starts a replacement before retiring the old worker, while jitter keeps
@@ -196,12 +198,18 @@ multiple CRCON instances from recycling simultaneously. This bounds RSS after
 large history/scoreboard responses whose temporary Python allocations are not
 returned to the operating system.
 
-A single Daphne process serving ports 8000 and 8001 was measured as an explicit
-low-memory mode. It reduced the HLLV backend from about 304 MiB to 147-165 MiB,
-but a ten-client unauthorized API benchmark dropped from about 180 to 96
-requests/second. A 200-OK documentation benchmark also favored split mode
-(18.25 versus 16.34 requests/second). `unified` therefore remains opt-in and
-must not be the production default.
+A warmed RCON3 HLLV canary measured the single-process topology at 192 MiB,
+down from 396 MiB in split mode. A bounded five-client local health benchmark
+completed 100/100 requests at 206 requests/second versus 432 in split mode;
+the unified p95 remained comparable at 46.6 ms versus 52.6 ms. This is ample
+headroom for the supported moderator UI workload while saving about 204 MiB
+per one-worker backend. The canary had zero restarts, no backend exceptions,
+both listeners ready and successful public HTTP checks after warm-up.
+
+`auto` therefore chooses unified only for the standard one-worker profile.
+Installations deliberately configured with multiple API workers stay split,
+and `HLL_API_SERVER_MODE=split` is the immediate no-migration rollback for a
+single-worker installation that needs the older concurrency characteristics.
 
 The Mobile Push, Discord event and Discord moderation loops can be run in one
 shared process with `compose.combined-workers.yaml`. The loops remain isolated
@@ -377,7 +385,7 @@ documented by the templates.
 | `HLL_DB_POOL_SIZE` | `1` | Persistent SQLAlchemy connections per supervisor process |
 | `HLL_DB_MAX_OVERFLOW` | `2` | Temporary connections allowed during a short burst |
 | `HLL_DB_POOL_RECYCLE` | `900` | Seconds before a retained connection is recycled |
-| `HLL_API_SERVER_MODE` | `split` | `unified` is an opt-in low-memory ASGI mode; split Gunicorn + Daphne retains higher concurrency |
+| `HLL_API_SERVER_MODE` | `auto` | Uses one low-memory Daphne runtime when `NB_API_WORKERS=1`; selects split Gunicorn + Daphne for multiple workers. Set `split` for the compatibility/high-concurrency rollback |
 | `HLL_GUNICORN_PRELOAD` | `auto` | Preload for multiple API workers; disabled automatically for one worker |
 | `HLL_GUNICORN_MAX_REQUESTS` | `1000` | Recycle a split Gunicorn worker after this many requests; zero disables recycling |
 | `HLL_GUNICORN_MAX_REQUESTS_JITTER` | `100` | Random extra requests before recycling to stagger instances |

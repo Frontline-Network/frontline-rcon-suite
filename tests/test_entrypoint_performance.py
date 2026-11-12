@@ -20,14 +20,26 @@ def test_split_api_disables_gunicorn_control_socket_before_gthread_fork():
     assert "-k gthread" in entrypoint
 
 
-def test_unified_api_mode_is_explicit_opt_in_and_uses_both_existing_ports():
+def test_api_mode_defaults_to_adaptive_single_runtime_and_uses_both_ports():
     entrypoint = (REPO_ROOT / "entrypoint.sh").read_text(encoding="utf-8")
 
-    assert 'API_SERVER_MODE="${HLL_API_SERVER_MODE:-split}"' in entrypoint
+    assert 'API_SERVER_MODE="${HLL_API_SERVER_MODE:-auto}"' in entrypoint
+    assert '"$NB_API_WORKERS" -eq 1' in entrypoint
+    assert 'API_SERVER_MODE="unified"' in entrypoint
+    assert 'API_SERVER_MODE="split"' in entrypoint
     assert '[[ "$API_SERVER_MODE" == "unified" ]]' in entrypoint
     assert "-e tcp:port=8000:interface=0.0.0.0" in entrypoint
     assert "-e tcp:port=8001:interface=0.0.0.0" in entrypoint
+    assert "exec daphne" in entrypoint
     assert "rconweb.asgi:application" in entrypoint
+
+
+def test_installation_templates_expose_api_mode_with_safe_auto_default():
+    for template_name in ("one-server.yaml", "ten-servers.yaml"):
+        template = (REPO_ROOT / "docker-templates" / template_name).read_text(
+            encoding="utf-8"
+        )
+        assert "HLL_API_SERVER_MODE: ${HLL_API_SERVER_MODE:-auto}" in template
 
 
 def test_split_api_workers_recycle_after_bounded_request_count():
