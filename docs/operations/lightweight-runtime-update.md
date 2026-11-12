@@ -66,6 +66,28 @@ restart or relevant fatal log marker. The HLL rollback set is stored under the
 instance deployment state alongside checksums for the before and after
 evidence.
 
+## End-to-end memory reduction
+
+The earliest retained pre-Phase-2 resource snapshots provide an additional
+end-to-end comparison. These figures cover the same three per-instance core
+containers (backend, Supervisor and frontend) as the Phase-3 measurements.
+They deliberately exclude HLL1's separately deployed Frontline background
+worker so that the HLL and HLLV figures remain comparable.
+
+| Instance | Earliest retained core sample | Loaded Phase 3 | Reduction |
+| --- | ---: | ---: | ---: |
+| RCON3 (HLLV) | about 1,099 MiB | about 562 MiB | about 537 MiB (49%) |
+| HLL1 (HLL) | about 1,422 MiB | about 405 MiB | about 1,017 MiB (72%) |
+| Combined | about 2,521 MiB | about 967 MiB | about 1,554 MiB (62%) |
+
+HLL1's separate background worker measured about 150 MiB in both snapshots.
+Including it changes HLL1's total from about 1,572 MiB to about 555 MiB and
+the relative reduction from about 72% to about 65%; the absolute saving stays
+about 1 GiB. The earliest snapshots did not retain a complete host process
+inventory, so no exact pre-Phase-2 process count is inferred from memory-only
+evidence. The directly measured Phase-3 process comparison remains 11 to seven
+on RCON3 and 13 to seven on HLL1.
+
 ## Acceptance gate
 
 Before publication, validate an upgrade from the previous release using an

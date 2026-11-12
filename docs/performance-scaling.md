@@ -236,6 +236,17 @@ reported zero container restarts or relevant fatal log markers. This confirms
 the adaptive API and direct-entrypoint topology on both supported game
 families, rather than extrapolating HLL behavior from the HLLV result.
 
+The earliest retained resource snapshots show the complete measured effect of
+all consolidation phases on the same three core containers. RCON3 fell from
+about 1,099 MiB to 562 MiB (49%), while HLL1 fell from about 1,422 MiB to a
+later loaded sample of about 405 MiB (72%). Together they fell from about
+2,521 MiB to 967 MiB, saving about 1,554 MiB (62%). HLL1's separate Frontline
+background worker remained near 150 MiB and is excluded from this like-for-like
+core comparison; including it changes HLL1's relative reduction to about 65%
+without materially changing the roughly 1-GiB absolute saving. The original
+resource snapshots did not record a complete process inventory, so only the
+directly observed Phase-2-to-Phase-3 process counts are reported as exact.
+
 The Mobile Push, Discord event and Discord moderation loops can be run in one
 shared process with `compose.combined-workers.yaml`. The loops remain isolated
 in three threads with their own HTTP and database sessions, so a 180-second AI
