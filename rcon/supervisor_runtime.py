@@ -166,8 +166,14 @@ def _run_campaign_messages(stop_event: threading.Event) -> None:
 def _run_log_event_loop(stop_event: threading.Event) -> None:
     from rcon.cache_utils import invalidates
     from rcon.discord_chat import get_handler
+    from rcon.log_hooks import register_log_hooks
     from rcon.logs.loop import LogLoop, load_generic_hooks
 
+    # The shared supervisor process deliberately suppresses the eager hook
+    # imports from rcon.__init__ to keep non-log services lightweight.  The
+    # log-loop thread must therefore perform the same explicit registration as
+    # the split ``manage.py log_loop`` command before it constructs LogLoop.
+    register_log_hooks()
     with invalidates(load_generic_hooks, get_handler):
         LogLoop().run(stop_event=stop_event)
 
