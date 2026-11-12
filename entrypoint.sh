@@ -184,12 +184,17 @@ fi
   export LOGGING_FILENAME=supervisor_$SERVER_NUMBER.log
   if [[ -n "${HLL_SUPERVISOR_CONFIG:-}" ]]
   then
-    supervisord -c "$HLL_SUPERVISOR_CONFIG"
+    exec supervisord -c "$HLL_SUPERVISOR_CONFIG"
   else
     # A later switch to the shared runtime must not inherit stale STOPPED
     # controls from an earlier canary. Shared-to-shared restarts preserve those
     # controls; only a real split-to-shared transition resets them.
     HLL_SUPERVISOR_PROCESS=1 /code/manage.py supervisor_runtime_mode split
-    supervisord -c /config/supervisord_$SERVER_NUMBER.conf || supervisord -c /config/supervisord.conf
+    if [[ -f "/config/supervisord_$SERVER_NUMBER.conf" ]]
+    then
+      exec supervisord -c "/config/supervisord_$SERVER_NUMBER.conf"
+    else
+      exec supervisord -c /config/supervisord.conf
+    fi
   fi
 fi

@@ -211,6 +211,13 @@ Installations deliberately configured with multiple API workers stay split,
 and `HLL_API_SERVER_MODE=split` is the immediate no-migration rollback for a
 single-worker installation that needs the older concurrency characteristics.
 
+The backend, supervisor and frontend entrypoints replace their setup shells
+with the long-lived Daphne, Supervisord and Nginx processes. Besides removing
+two otherwise idle shell processes per instance, this makes each daemon PID 1
+in its container so Docker stop and restart signals reach it directly. The
+legacy supervisor fallback still selects the server-specific configuration
+when it exists and otherwise starts the shared compatibility configuration.
+
 The Mobile Push, Discord event and Discord moderation loops can be run in one
 shared process with `compose.combined-workers.yaml`. The loops remain isolated
 in three threads with their own HTTP and database sessions, so a 180-second AI
