@@ -225,6 +225,14 @@ queued job, so the observed total becomes eight during work and returns to
 seven afterward. The three warm containers used about 435 MiB in total, kept
 all 18 logical services running and had no restarts or relevant tracebacks.
 
+The matching HLL1 canary reduced the same three core containers from about
+581 MiB and 13 long-lived processes to about 399 MiB and seven processes after
+warm-up. It retained all 18 logical services, read the current HLL map and
+player counts, returned HTTP 200 for public root and health in about 5 ms, and
+reported zero container restarts or relevant fatal log markers. This confirms
+the adaptive API and direct-entrypoint topology on both supported game
+families, rather than extrapolating HLL behavior from the HLLV result.
+
 The Mobile Push, Discord event and Discord moderation loops can be run in one
 shared process with `compose.combined-workers.yaml`. The loops remain isolated
 in three threads with their own HTTP and database sessions, so a 180-second AI

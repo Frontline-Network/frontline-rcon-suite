@@ -49,6 +49,21 @@ restarts and no relevant tracebacks, and completed 100/100 bounded health
 requests at about 190 requests/second with a 53.6 ms p95. Both API listener
 ports and the public root and health endpoints remained available.
 
+## Measured HLL canary
+
+HLL1 ran the same candidate commit after a fresh verified 1.2 GiB PostgreSQL
+dump, Redis snapshot, configuration archive, exact rollback Compose model and
+locally reload-tested rollback images. After warm-up the three core containers
+used about 399 MiB in total, down from about 581 MiB before the switch (roughly
+31%). Their long-lived process count fell from 13 to seven.
+
+All 18 logical services remained running, the live HLL game-state probe
+returned the current map and player counts, public root and health requests
+returned HTTP 200 in about 5 ms, and the three replaced containers reported no
+restart or relevant fatal log marker. The HLL rollback set is stored under the
+instance deployment state alongside checksums for the before and after
+evidence.
+
 ## Acceptance gate
 
 Before publication, validate an upgrade from the previous release using an
