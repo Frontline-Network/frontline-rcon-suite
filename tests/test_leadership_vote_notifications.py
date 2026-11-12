@@ -76,7 +76,7 @@ def run_campaign_once(monkeypatch, ctl):
     finished = Mock()
     monkeypatch.setattr(campaign_delivery, "finish_delivery", finished)
     monkeypatch.setattr(
-        campaign_delivery.time, "sleep", Mock(side_effect=StopIteration)
+        campaign_delivery, "wait", Mock(side_effect=StopIteration)
     )
     with pytest.raises(StopIteration):
         campaign_delivery.run()
