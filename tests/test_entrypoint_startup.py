@@ -53,6 +53,10 @@ exit 0
                     "DONT_SEED_ADMIN_USER": "1",
                     "HLL_DB_PASSWORD": "test-password",
                     "HLL_HOST": "unreachable.example",
+                    # This regression covers the split Gunicorn lifecycle and
+                    # its unregister path. Adaptive/unified startup is covered
+                    # separately by the API topology tests.
+                    "HLL_API_SERVER_MODE": "split",
                     "NB_API_THREADS": "1",
                     "NB_API_WORKERS": "1",
                     "SERVER_NUMBER": "1",
