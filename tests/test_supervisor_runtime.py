@@ -26,12 +26,32 @@ STATE_KEY = _RUNTIME.STATE_KEY
 
 
 class SharedSupervisorRuntimeTests(unittest.TestCase):
-    def test_default_services_keep_automod_isolated(self):
+    def test_default_services_include_all_compatible_python_loops(self):
         names = {service.name for service in DEFAULT_SERVICES}
 
-        self.assertIn("auto_settings", names)
-        self.assertIn("broadcasts", names)
-        self.assertNotIn("automod", names)
+        self.assertEqual(
+            names,
+            {
+                "population_history",
+                "live_map",
+                "expiring_vips",
+                "live_stats_refresh",
+                "autobalancer",
+                "blacklists",
+                "log_recorder",
+                "routines",
+                "auto_settings",
+                "broadcasts",
+                "campaign_messages",
+                "log_event_loop",
+                "log_stream",
+                "scoreboard",
+                "automod",
+                "watch_killrate",
+                "seed_vip",
+                "vip_rewards",
+            },
+        )
 
     def test_redis_state_decodes_bytes_from_shared_pool(self):
         self.assertEqual(

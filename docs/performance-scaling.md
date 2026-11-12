@@ -186,9 +186,11 @@ periodic performance-statistics dump. That dump now runs on its own monotonic
 deadline inside the existing routines service, preserving its configured
 interval while removing one Python process per gameserver.
 
-Gunicorn preload is also skipped by default when only one worker is configured.
-This retained the split HTTP/WebSocket architecture while reducing backend RAM
-materially on busy instances.
+Gunicorn preload is skipped by default when only one split worker is configured.
+The default `auto` topology now goes further for that profile: one Daphne
+process serves HTTP and WebSockets on the two existing ports, avoiding a second
+Django runtime. Selecting multiple API workers automatically retains the split
+Gunicorn/Daphne architecture.
 
 Long-lived Gunicorn workers recycle after a bounded number of requests. The
 master starts a replacement before retiring the old worker, while jitter keeps
@@ -196,12 +198,54 @@ multiple CRCON instances from recycling simultaneously. This bounds RSS after
 large history/scoreboard responses whose temporary Python allocations are not
 returned to the operating system.
 
-A single Daphne process serving ports 8000 and 8001 was measured as an explicit
-low-memory mode. It reduced the HLLV backend from about 304 MiB to 147-165 MiB,
-but a ten-client unauthorized API benchmark dropped from about 180 to 96
-requests/second. A 200-OK documentation benchmark also favored split mode
-(18.25 versus 16.34 requests/second). `unified` therefore remains opt-in and
-must not be the production default.
+A warmed RCON3 HLLV canary measured the single-process topology at 192 MiB,
+down from 396 MiB in split mode. A bounded five-client local health benchmark
+completed 100/100 requests at 206 requests/second versus 432 in split mode;
+the unified p95 remained comparable at 46.6 ms versus 52.6 ms. This is ample
+headroom for the supported moderator UI workload while saving about 204 MiB
+per one-worker backend. The canary had zero restarts, no backend exceptions,
+both listeners ready and successful public HTTP checks after warm-up.
+
+`auto` therefore chooses unified only for the standard one-worker profile.
+Installations deliberately configured with multiple API workers stay split,
+and `HLL_API_SERVER_MODE=split` is the immediate no-migration rollback for a
+single-worker installation that needs the older concurrency characteristics.
+
+The backend, supervisor and frontend entrypoints replace their setup shells
+with the long-lived Daphne, Supervisord and Nginx processes. Besides removing
+two otherwise idle shell processes per instance, this makes each daemon PID 1
+in its container so Docker stop and restart signals reach it directly. The
+legacy supervisor fallback still selects the server-specific configuration
+when it exists and otherwise starts the shared compatibility configuration.
+
+The exact RCON3 candidate canary stabilized at seven long-lived core processes:
+one Daphne process, Supervisord with Cron, the combined runtime and RQ worker,
+and an Nginx master plus worker. RQ forks one temporary child while executing a
+queued job, so the observed total becomes eight during work and returns to
+seven afterward. The three containers used about 435 MiB immediately after
+start and about 562 MiB after 40 minutes of real HLLV traffic, compared with a
+warm Phase 2 measurement of about 717 MiB. The loaded Phase 3 result was
+therefore about 155 MiB (22%) lower, while all 18 logical services remained
+running without restarts or relevant tracebacks.
+
+The matching HLL1 canary reduced the same three core containers from about
+581 MiB and 13 long-lived processes to about 399 MiB and seven processes after
+warm-up. It retained all 18 logical services, read the current HLL map and
+player counts, returned HTTP 200 for public root and health in about 5 ms, and
+reported zero container restarts or relevant fatal log markers. This confirms
+the adaptive API and direct-entrypoint topology on both supported game
+families, rather than extrapolating HLL behavior from the HLLV result.
+
+The earliest retained resource snapshots show the complete measured effect of
+all consolidation phases on the same three core containers. RCON3 fell from
+about 1,099 MiB to 562 MiB (49%), while HLL1 fell from about 1,422 MiB to a
+later loaded sample of about 405 MiB (72%). Together they fell from about
+2,521 MiB to 967 MiB, saving about 1,554 MiB (62%). HLL1's separate Frontline
+background worker remained near 150 MiB and is excluded from this like-for-like
+core comparison; including it changes HLL1's relative reduction to about 65%
+without materially changing the roughly 1-GiB absolute saving. The original
+resource snapshots did not record a complete process inventory, so only the
+directly observed Phase-2-to-Phase-3 process counts are reported as exact.
 
 The Mobile Push, Discord event and Discord moderation loops can be run in one
 shared process with `compose.combined-workers.yaml`. The loops remain isolated
@@ -229,16 +273,17 @@ Do not run this profile concurrently with the split workers. Event and broker
 idempotency are still retained as a last-resort retry safeguard.
 
 `config/supervisord_combined.conf` groups compatible, I/O-bound per-gameserver
-loops in one Python runtime: expiring VIPs,
-live statistics, autobalancer, blacklist commands, log persistence and routine
-jobs, plus auto settings and automatic broadcasts. Each loop runs in its own
+loops in one Python runtime: expiring VIPs, live statistics, autobalancer,
+blacklist commands, log ingestion and persistence, routine jobs, auto settings,
+automatic broadcasts, campaign delivery, scoreboard updates, Automod,
+kill-rate watching, seed VIP and VIP rewards. Each loop runs in its own
 monitored thread and is restarted independently after an exception. The RCON
-controller already maintains one connection per thread. Auto settings and
-broadcasts use cooperative waits, so the existing individual service controls
-can stop them without terminating the shared process. Log ingestion, Automod,
-scoreboard and RQ remain separate. Automod deliberately retains its own process
-because its stricter command-log level is process-scoped and must not suppress
-diagnostics for unrelated shared services.
+controller already maintains one connection per thread. Every migrated loop
+uses cooperative waits, so the existing individual service controls can stop
+it without terminating the shared process. Process-wide Automod logging is no
+longer configured on the consolidated program; service failures keep their
+service name and traceback in the shared runtime log instead. RQ workers and
+cron remain separate because they have different execution and failure models.
 
 The service API expands those threads back into the original Supervisor service
 names. The settings UI therefore retains individual status and start/stop
@@ -246,6 +291,15 @@ controls even though the processes share an interpreter. Each loop accepts a
 cooperative stop event; stopping the autobalancer also releases its leader
 lease. Redis control values are normalized from either bytes or strings because
 the application's shared Redis pool can be initialized in either mode.
+
+The phase-two candidate reduces the combined Supervisor configuration from 11
+programs to three: `frontline_runtime`, `workers` and `cron`. It does not merge
+RQ jobs or cron into the threaded runtime and does not change the supported
+split rollback configuration. Disabled optional services stay as inexpensive
+logical threads that poll for configuration changes rather than disappearing
+from the service API. Production memory figures for this second phase must be
+recorded during the HLLV/HLL canary; local tests are not presented as live RAM
+evidence.
 
 The mode was canaried first on RCON3 (HLL Vietnam), then RCON1 (HLL), before it
 was expanded to RCON2 and RCON4. `live_stats_refresh` was stopped and restarted
@@ -367,7 +421,7 @@ documented by the templates.
 | `HLL_DB_POOL_SIZE` | `1` | Persistent SQLAlchemy connections per supervisor process |
 | `HLL_DB_MAX_OVERFLOW` | `2` | Temporary connections allowed during a short burst |
 | `HLL_DB_POOL_RECYCLE` | `900` | Seconds before a retained connection is recycled |
-| `HLL_API_SERVER_MODE` | `split` | `unified` is an opt-in low-memory ASGI mode; split Gunicorn + Daphne retains higher concurrency |
+| `HLL_API_SERVER_MODE` | `auto` | Uses one low-memory Daphne runtime when `NB_API_WORKERS=1`; selects split Gunicorn + Daphne for multiple workers. Set `split` for the compatibility/high-concurrency rollback |
 | `HLL_GUNICORN_PRELOAD` | `auto` | Preload for multiple API workers; disabled automatically for one worker |
 | `HLL_GUNICORN_MAX_REQUESTS` | `1000` | Recycle a split Gunicorn worker after this many requests; zero disables recycling |
 | `HLL_GUNICORN_MAX_REQUESTS_JITTER` | `100` | Random extra requests before recycling to stagger instances |

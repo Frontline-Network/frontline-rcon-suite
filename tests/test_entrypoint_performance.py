@@ -20,14 +20,26 @@ def test_split_api_disables_gunicorn_control_socket_before_gthread_fork():
     assert "-k gthread" in entrypoint
 
 
-def test_unified_api_mode_is_explicit_opt_in_and_uses_both_existing_ports():
+def test_api_mode_defaults_to_adaptive_single_runtime_and_uses_both_ports():
     entrypoint = (REPO_ROOT / "entrypoint.sh").read_text(encoding="utf-8")
 
-    assert 'API_SERVER_MODE="${HLL_API_SERVER_MODE:-split}"' in entrypoint
+    assert 'API_SERVER_MODE="${HLL_API_SERVER_MODE:-auto}"' in entrypoint
+    assert '"$NB_API_WORKERS" -eq 1' in entrypoint
+    assert 'API_SERVER_MODE="unified"' in entrypoint
+    assert 'API_SERVER_MODE="split"' in entrypoint
     assert '[[ "$API_SERVER_MODE" == "unified" ]]' in entrypoint
     assert "-e tcp:port=8000:interface=0.0.0.0" in entrypoint
     assert "-e tcp:port=8001:interface=0.0.0.0" in entrypoint
+    assert "exec daphne" in entrypoint
     assert "rconweb.asgi:application" in entrypoint
+
+
+def test_installation_templates_expose_api_mode_with_safe_auto_default():
+    for template_name in ("one-server.yaml", "ten-servers.yaml"):
+        template = (REPO_ROOT / "docker-templates" / template_name).read_text(
+            encoding="utf-8"
+        )
+        assert "HLL_API_SERVER_MODE: ${HLL_API_SERVER_MODE:-auto}" in template
 
 
 def test_split_api_workers_recycle_after_bounded_request_count():
@@ -105,8 +117,20 @@ def test_combined_supervisor_runtime_is_explicit_opt_in():
     entrypoint = (REPO_ROOT / "entrypoint.sh").read_text(encoding="utf-8")
 
     assert '[[ -n "${HLL_SUPERVISOR_CONFIG:-}" ]]' in entrypoint
-    assert 'supervisord -c "$HLL_SUPERVISOR_CONFIG"' in entrypoint
-    assert "supervisord -c /config/supervisord.conf" in entrypoint
+    assert 'exec supervisord -c "$HLL_SUPERVISOR_CONFIG"' in entrypoint
+    assert '[[ -f "/config/supervisord_$SERVER_NUMBER.conf" ]]' in entrypoint
+    assert 'exec supervisord -c "/config/supervisord_$SERVER_NUMBER.conf"' in entrypoint
+    assert "exec supervisord -c /config/supervisord.conf" in entrypoint
+
+
+def test_frontend_and_supervisor_replace_entrypoint_shells():
+    frontend_entrypoint = (REPO_ROOT / "rcongui" / "entrypoint.sh").read_text(
+        encoding="utf-8"
+    )
+    backend_entrypoint = (REPO_ROOT / "entrypoint.sh").read_text(encoding="utf-8")
+
+    assert 'exec nginx -g "daemon off;"' in frontend_entrypoint
+    assert 'exec supervisord -c "$HLL_SUPERVISOR_CONFIG"' in backend_entrypoint
 
 
 def test_installation_templates_default_to_combined_supervisor_runtime():
@@ -124,7 +148,7 @@ def test_split_supervisor_marks_mode_before_starting_services():
     entrypoint = (REPO_ROOT / "entrypoint.sh").read_text(encoding="utf-8")
 
     marker = "/code/manage.py supervisor_runtime_mode split"
-    split_start = "supervisord -c /config/supervisord_$SERVER_NUMBER.conf"
+    split_start = 'exec supervisord -c "/config/supervisord_$SERVER_NUMBER.conf"'
     assert marker in entrypoint
     assert entrypoint.index(marker) < entrypoint.index(split_start)
 

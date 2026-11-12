@@ -181,7 +181,7 @@ print("RESULT:" + json.dumps({
         # commands configured by administrators.
         self.assertNotIn("HLL_SUPERVISOR_PROCESS", sections["cron"])
 
-    def test_combined_config_replaces_only_compatible_services(self):
+    def test_combined_config_keeps_only_runtime_rq_and_cron(self):
         config = (REPO_ROOT / "config" / "supervisord_combined.conf").read_text(
             encoding="utf-8"
         )
@@ -189,7 +189,6 @@ print("RESULT:" + json.dumps({
             chunk.split("]", 1)[0]: chunk for chunk in config.split("[program:")[1:]
         }
 
-        self.assertIn("frontline_runtime", sections)
         for service in {
             "autobalancer",
             "blacklists",
@@ -200,16 +199,17 @@ print("RESULT:" + json.dumps({
             "routines",
             "auto_settings",
             "broadcasts",
-        }:
-            self.assertNotIn(service, sections)
-        for isolated_service in {
             "automod",
             "campaign_messages",
             "log_event_loop",
+            "log_stream",
             "scoreboard",
-            "workers",
+            "seed_vip",
+            "vip_rewards",
+            "watch_killrate",
         }:
-            self.assertIn(isolated_service, sections)
+            self.assertNotIn(service, sections)
+        self.assertEqual(set(sections), {"frontline_runtime", "workers", "cron"})
 
     def test_live_map_uses_the_existing_django_management_command(self):
         config = (REPO_ROOT / "config" / "supervisord.conf").read_text(encoding="utf-8")

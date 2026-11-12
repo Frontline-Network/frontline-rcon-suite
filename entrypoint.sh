@@ -110,7 +110,24 @@ then
     echo "from django.contrib.auth.models import User; User.objects.create_superuser('admin', 'admin@example.com', 'admin') if not User.objects.filter(username='admin').first() else None" | python manage.py shell
   fi
   export LOGGING_FILENAME=api_$SERVER_NUMBER.log
-  API_SERVER_MODE="${HLL_API_SERVER_MODE:-split}"
+  API_SERVER_MODE="${HLL_API_SERVER_MODE:-auto}"
+  if [[ "$API_SERVER_MODE" == "auto" ]]
+  then
+    # A single Daphne process can serve both HTTP and WebSockets without
+    # loading Django twice. Keep the split topology for explicit scale-out.
+    if [[ "$NB_API_WORKERS" =~ ^[0-9]+$ && "$NB_API_WORKERS" -eq 1 ]]
+    then
+      API_SERVER_MODE="unified"
+    else
+      API_SERVER_MODE="split"
+    fi
+  fi
+  if ! [[ "$API_SERVER_MODE" =~ ^(unified|split)$ ]]
+  then
+    echo "ERROR: HLL_API_SERVER_MODE must be auto, unified or split" >&2
+    exit 2
+  fi
+  echo "Starting API server in $API_SERVER_MODE mode ($NB_API_WORKERS configured worker(s))"
   if [[ "$API_SERVER_MODE" == "unified" ]]
   then
     # Daphne serves the same ASGI application over both ports expected by the
@@ -118,7 +135,7 @@ then
     # separate Gunicorn and Daphne processes while preserving WebSockets.
     # Daphne replaces this shell via exec, so the current PID remains valid.
     echo $$ > gunicorn.pid
-    daphne \
+    exec daphne \
       -e tcp:port=8000:interface=0.0.0.0 \
       -e tcp:port=8001:interface=0.0.0.0 \
       -t 120 \
@@ -167,12 +184,17 @@ fi
   export LOGGING_FILENAME=supervisor_$SERVER_NUMBER.log
   if [[ -n "${HLL_SUPERVISOR_CONFIG:-}" ]]
   then
-    supervisord -c "$HLL_SUPERVISOR_CONFIG"
+    exec supervisord -c "$HLL_SUPERVISOR_CONFIG"
   else
     # A later switch to the shared runtime must not inherit stale STOPPED
     # controls from an earlier canary. Shared-to-shared restarts preserve those
     # controls; only a real split-to-shared transition resets them.
     HLL_SUPERVISOR_PROCESS=1 /code/manage.py supervisor_runtime_mode split
-    supervisord -c /config/supervisord_$SERVER_NUMBER.conf || supervisord -c /config/supervisord.conf
+    if [[ -f "/config/supervisord_$SERVER_NUMBER.conf" ]]
+    then
+      exec supervisord -c "/config/supervisord_$SERVER_NUMBER.conf"
+    else
+      exec supervisord -c /config/supervisord.conf
+    fi
   fi
 fi
