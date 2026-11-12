@@ -6,13 +6,13 @@ on:
       source_image:
         type: string
         required: false
-        default: ghcr.io/frontline-network/frontline-rcon-suite@sha256:ead46c46c8213ae3be415bf020896158eb50726300d3e31a2c7c0f62df855653
+        default: ghcr.io/frontline-network/frontline-rcon-suite@sha256:6f683b1d0c862567e410c2eedcadaf6ea32e8539db66ca02a975c1efc9c79e70
   workflow_dispatch:
     inputs:
       source_image:
         description: "Existing released backend image (prefer an immutable digest)"
         required: true
-        default: ghcr.io/frontline-network/frontline-rcon-suite@sha256:ead46c46c8213ae3be415bf020896158eb50726300d3e31a2c7c0f62df855653
+        default: ghcr.io/frontline-network/frontline-rcon-suite@sha256:6f683b1d0c862567e410c2eedcadaf6ea32e8539db66ca02a975c1efc9c79e70
 
 permissions:
   contents: read
