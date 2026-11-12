@@ -593,6 +593,22 @@ export default function LiveMapPage() {
       archiveId: replayRange.archive_id,
     });
   };
+  const changePlayback = (next) => {
+    if (!next) {
+      setPlaying(false);
+      return;
+    }
+    if (replay !== null && replayRange && replay >= replayRange.end) {
+      setReplay(replayRange.start);
+      historyMutation.mutate({
+        round: replayRange,
+        time: replayRange.start,
+        archiveId: replayRange.archive_id,
+        preservePlaying: true,
+      });
+    }
+    setPlaying(true);
+  };
   const eventMarks = useMemo(() => {
     const values = [
       ...(timelineEvents.events || []).map((item) => ({
@@ -970,7 +986,7 @@ export default function LiveMapPage() {
               replay={replay}
               range={replayRange}
               playing={playing}
-              onPlaying={setPlaying}
+              onPlaying={changePlayback}
               onSeek={(time) => {
                 setReplay(time);
                 setPlaying(false);
