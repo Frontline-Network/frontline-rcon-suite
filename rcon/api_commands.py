@@ -1295,6 +1295,24 @@ class RconAPI(Rcon):
     def get_vip_rewards_config(self):
         return VipRewardsUserConfig.load_from_db()
 
+    def get_end_match_stats_config(self):
+        from rcon.user_config.end_match_stats import EndMatchStatsUserConfig
+        return EndMatchStatsUserConfig.load_from_db()
+
+    def validate_end_match_stats_config(self, by, config=None, **kwargs):
+        from rcon.user_config.end_match_stats import EndMatchStatsUserConfig
+        EndMatchStatsUserConfig.model_validate(config if config is not None else kwargs)
+        return True
+
+    def set_end_match_stats_config(self, by, config=None, **kwargs):
+        from rcon.user_config.end_match_stats import EndMatchStatsUserConfig
+        old = EndMatchStatsUserConfig.load_from_db()
+        new = EndMatchStatsUserConfig.model_validate(config if config is not None else kwargs)
+        EndMatchStatsUserConfig.save_to_db(new.model_dump())
+        audit_user_config_differences(old_model=old, new_model=new.model_dump(),
+                                      command_name="set_end_match_stats_config", author=by)
+        return True
+
     def validate_vip_rewards_config(self, by, config=None, reset_to_default=False, **kwargs):
         VipRewardsUserConfig.model_validate({} if reset_to_default else (config or kwargs))
         return True

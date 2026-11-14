@@ -17,6 +17,7 @@ import { DesktopDateTimePicker } from '@mui/x-date-pickers/DesktopDateTimePicker
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { useTranslation } from "react-i18next";
+import { dateLocale } from "@/i18n/date-locale";
 
 const presetTimes = [
   [2, "hours"],
@@ -199,7 +200,7 @@ export default function BlacklistRecordCreateDialog({
               {expiresAt !== null ? (
                 <LocalizationProvider
                   dateAdapter={AdapterDayjs}
-                  adapterLocale={i18n.resolvedLanguage === "en" ? "en" : "de"}
+                  adapterLocale={dateLocale(i18n.resolvedLanguage)}
                 >
                   <DesktopDateTimePicker
                     onChange={(value) => setExpiresAt(value)}

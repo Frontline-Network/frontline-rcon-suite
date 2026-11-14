@@ -16,15 +16,16 @@ import { CssBaseline } from "@mui/material";
 import { useAppStore } from "./stores/app-state";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import { deDE, enUS } from "@mui/x-date-pickers/locales";
+import { deDE, enUS, frFR } from "@mui/x-date-pickers/locales";
+import { dateLocale } from "./i18n/date-locale";
 import { useTranslation } from "react-i18next";
 import { useReleaseRefresh } from "./hooks/useReleaseRefresh";
 
 const App = () => {
   useReleaseRefresh();
   const { i18n } = useTranslation();
-  const isEnglish = i18n.resolvedLanguage === "en";
-  const pickerLocale = isEnglish ? enUS : deDE;
+  const language = dateLocale(i18n.resolvedLanguage);
+  const pickerLocale = { de: deDE, en: enUS, fr: frFR }[language];
   // Dayjs plugins
   dayjs.extend(relativeTimePlugin);
   dayjs.extend(durationPlugin);
@@ -49,7 +50,7 @@ const App = () => {
       <QueryClientProvider client={queryClient}>
         <LocalizationProvider
           dateAdapter={AdapterDayjs}
-          adapterLocale={isEnglish ? "en" : "de"}
+          adapterLocale={language}
           localeText={
             pickerLocale.components.MuiLocalizationProvider.defaultProps
               .localeText

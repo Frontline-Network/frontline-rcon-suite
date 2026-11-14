@@ -2,5 +2,7 @@
   "currentGame": "Partie actuelle",
   "gameHistory": "Historique des parties",
   "gameDetail": "Détails de la partie",
-  "about": "À propos"
+  "about": "À propos",
+  "table": "Tableau",
+  "charts": "Graphiques"
 }

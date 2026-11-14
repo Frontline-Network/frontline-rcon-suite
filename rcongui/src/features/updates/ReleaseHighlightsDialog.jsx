@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { ensureLanguageLoaded } from "@/i18n";
 import {
   Alert,
   Box,
@@ -44,11 +45,15 @@ export default function ReleaseHighlightsDialog({
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
-  const lang = i18n.resolvedLanguage?.startsWith("de") ? "de" : "en";
+  const selectedLanguage = (i18n.resolvedLanguage || "en").split("-")[0];
+  const lang = ["de", "en", "fr"].includes(selectedLanguage) ? selectedLanguage : "en";
+  // Older release data may have only DE/EN; future highlights can include FR.
+  const localized = (values) => values?.[lang] || values?.en || values?.de || "";
   const content = release.highlights;
-  const changeLanguage = (_, language) => {
+  const changeLanguage = async (_, language) => {
     if (!language) return;
-    i18n.changeLanguage(language);
+    await ensureLanguageLoaded(language);
+    await i18n.changeLanguage(language);
     document.documentElement.lang = language;
   };
   const openAction = () => {
@@ -153,6 +158,9 @@ export default function ReleaseHighlightsDialog({
             <ToggleButton value="en" aria-label="English" lang="en">
               EN
             </ToggleButton>
+            <ToggleButton value="fr" aria-label="Français" lang="fr">
+              FR
+            </ToggleButton>
           </ToggleButtonGroup>
           <IconButton
             onClick={onClose}
@@ -180,7 +188,7 @@ export default function ReleaseHighlightsDialog({
               theme.palette.mode === "dark" ? "#fafafa" : "text.primary",
           }}
         >
-          {content.title[lang]}
+          {localized(content.title)}
         </Typography>
         <Typography
           id="release-spotlight-description"
@@ -191,14 +199,14 @@ export default function ReleaseHighlightsDialog({
             maxWidth: 640,
           }}
         >
-          {content.description[lang]}
+          {localized(content.description)}
         </Typography>
         {illustrations[content.image] && (
           <Box sx={{ mt: 1.5, mb: 3 }}>
             <Box
               component="img"
               src={illustrations[content.image]}
-              alt={content.image_alt[lang]}
+              alt={localized(content.image_alt)}
               width={1840}
               height={855}
               sx={{
@@ -270,13 +278,13 @@ export default function ReleaseHighlightsDialog({
                     component="h3"
                     sx={{ fontSize: "1rem", fontWeight: 650, mb: 0.4 }}
                   >
-                    {item.title[lang]}
+                    {localized(item.title)}
                   </Typography>
                   <Typography
                     color="text.secondary"
                     sx={{ fontSize: ".86rem", lineHeight: 1.6 }}
                   >
-                    {item.description[lang]}
+                    {localized(item.description)}
                   </Typography>
                 </Box>
               </Stack>
@@ -322,7 +330,7 @@ export default function ReleaseHighlightsDialog({
             flex: { xs: "1 1 100%", sm: "0 0 auto" },
           })}
         >
-          {content.action?.label[lang] || t("releaseHighlights.done")}
+          {localized(content.action?.label) || t("releaseHighlights.done")}
         </Button>
         <Button
           variant="outlined"

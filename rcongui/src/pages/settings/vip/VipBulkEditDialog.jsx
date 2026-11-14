@@ -18,6 +18,7 @@ import dayjs from "dayjs";
 import Padlock from "@/components/shared/Padlock";
 import { TimePickerButtons } from "@/components/shared/TimePickerButtons";
 import { useTranslation } from "react-i18next";
+import { dateLocale } from "@/i18n/date-locale";
 
 const INDEFINITE_EXPIRATION = "3000-01-01T00:00:00+00:00";
 
@@ -73,7 +74,7 @@ export const VipBulkEditDialog = ({
           <Stack spacing={2}>
             <LocalizationProvider
               dateAdapter={AdapterDayjs}
-              adapterLocale={i18n.resolvedLanguage === "en" ? "en" : "de"}
+              adapterLocale={dateLocale(i18n.resolvedLanguage)}
               localeText={{ fieldOpenPickerLabel: t("common.chooseDate") }}
             >
               <DesktopDateTimePicker

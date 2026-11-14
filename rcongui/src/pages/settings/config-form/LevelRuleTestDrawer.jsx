@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import { getAllRoles } from "@/constants/roles";
 import ConfigTestDrawer from "./ConfigTestDrawer";
 import { simulateLevelRule } from "./simulateLevelRule.mjs";
+import frenchCopy from "./level-copy-fr.json";
 
 const copyByLanguage = {
   de: {
@@ -114,7 +115,8 @@ const fill = (value, variables) =>
 
 export default function LevelRuleTestDrawer({ open, onClose, data }) {
   const { i18n, t } = useTranslation();
-  const copy = copyByLanguage[i18n.language?.startsWith("de") ? "de" : "en"];
+  const language = (i18n.resolvedLanguage || i18n.language || "en").split("-")[0];
+  const copy = language === "fr" ? frenchCopy : copyByLanguage[language === "de" ? "de" : "en"];
   const [sample, setSample] = useState({
     playerLevel: 20,
     serverPlayers: 60,

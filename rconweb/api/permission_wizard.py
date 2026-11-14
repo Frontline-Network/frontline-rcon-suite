@@ -33,7 +33,32 @@ HELP = {
 }
 
 
-def wizard_metadata(workflows, german=True):
+SECTIONS_FR = {
+    "players": ("Assistance aux joueurs", "Consulter les joueurs et les équipes, examiner les signalements et modérer si nécessaire."),
+    "maps": ("Cartes et parties", "Gérer la rotation et les votes de cartes."),
+    "vip": ("VIP et récompenses de remplissage", "Consulter ou attribuer les accès VIP et configurer les récompenses."),
+    "messages": ("Messages", "Gérer les modèles et les messages automatiques du serveur."),
+    "automation": ("Modération automatique", "Configurer l'équilibrage, les règles de niveau et les autres actions automatiques."),
+    "console": ("Administrateurs du jeu", "Consulter les administrateurs du jeu ou gérer leurs rôles sur le serveur. Ces rôles sont distincts des rôles utilisateurs RCON."),
+    "technical": ("Serveur et intégrations", "Paramètres techniques, services en arrière-plan et connexions Discord. Réservé aux administrateurs expérimentés."),
+}
+
+HELP_FR = {
+    "console": "Ce rôle peut-il voir les administrateurs du serveur de jeu ? Vous choisissez séparément s'il peut attribuer ou retirer ces rôles.",
+    "live": "Affiche les joueurs connectés, les équipes, la carte, le score et les événements récents. Cette autorisation ne permet pas de sanctionner les joueurs.",
+    "players": "Affiche les fiches de joueurs, les événements passés, les commentaires, les messages envoyés et les bannissements. Choisissez séparément les actions comme l'envoi de messages ou l'expulsion.",
+    "blacklists": "Affiche les listes de blocage et leurs entrées. La consultation est distincte du bannissement et de la levée des bannissements.",
+    "vips": "Affiche les accès VIP et leur date d'expiration. L'attribution, le retrait et l'export sont des autorisations distinctes.",
+    "rotation": "Affiche la rotation et les cartes disponibles. La modification permet d'ajouter ou de retirer des cartes de la rotation.",
+    "votemap": "Affiche l'état et les règles des votes de cartes. La modification des règles ou des cartes autorisées exige une autorisation supplémentaire.",
+    "templates": "Affiche les modèles de messages enregistrés. La modification permet de créer, modifier et supprimer des modèles ; elle n'envoie aucun message.",
+    "broadcast": "Affiche les messages automatiques du serveur et leur état d'envoi. Les modifications peuvent changer les messages reçus par les joueurs.",
+    "autobalancer": "Affiche les évaluations et les interventions passées. Exécuter des changements d'équipe et configurer l'automatisation sont des autorisations distinctes.",
+    "services": "Affiche l'état des services en arrière-plan. Leur démarrage ou leur arrêt peut interrompre les fonctions automatiques.",
+}
+
+
+def wizard_metadata(workflows, german=True, language=None):
     """Annotate the existing tested bundles; do not create new grants."""
     from .permission_help import RESOURCES
     result = []
@@ -52,10 +77,11 @@ def wizard_metadata(workflows, german=True):
             if target != section_id:
                 continue
             explanation = HELP.get(key)
-            workflow['explanation'] = explanation[0 if german else 1] if explanation else (
+            workflow['explanation'] = (HELP_FR.get(key) or f"Consultez les paramètres de {workflow['title']}. La consultation ne permet pas de modifier les paramètres. Les modifications peuvent changer le comportement du serveur.") if language == 'fr' else explanation[0 if german else 1] if explanation else (
                 f"Hier geht es um {RESOURCES[key][1]}. Ansehen erlaubt noch keine Änderung. Bearbeiten kann das Verhalten des Servers verändern."
                 if german else f"Review the settings for {workflow['title']}. Viewing does not allow changes. Editing can change how the server behaves.")
             members.append(key)
         if members:
-            result.append({'id': section_id, 'title': de if german else en, 'description': help_de if german else help_en, 'workflows': members})
+            title, description = SECTIONS_FR[section_id] if language == 'fr' else (de, help_de) if german else (en, help_en)
+            result.append({'id': section_id, 'title': title, 'description': description, 'workflows': members})
     return result

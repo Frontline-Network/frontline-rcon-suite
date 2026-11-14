@@ -6,7 +6,8 @@ import { translateLeadershipResult } from "./result-copy";
 
 export default function VotePanel({ vote, canCancel, onCancel, pending }) {
   const { t, i18n } = useTranslation();
-  const c = copy[i18n.language?.startsWith("de") ? "de" : "en"];
+  const code = (i18n.resolvedLanguage || i18n.language || "en").split("-")[0];
+  const c = copy[code] || copy.en;
   const [now, setNow] = useState(Date.now());
   const running = ["confirming", "warning", "active", "inviting"].includes(
     vote.status

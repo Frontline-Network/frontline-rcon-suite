@@ -22,15 +22,23 @@ import SectionSurface from "@/components/shared/SectionSurface";
 import DocumentationText from "./DocumentationText";
 import ApiReference from "./ApiReference";
 import { helpArticles } from "./content";
+import { frenchHelp } from "./content-fr";
 
 export default function Documentation() {
   const { t, i18n } = useTranslation();
-  const language = i18n.resolvedLanguage?.startsWith("de") ? "de" : "en";
+  const code = (i18n.resolvedLanguage || "en").split("-")[0];
+  const language = ["de", "en", "fr"].includes(code) ? code : "en";
+  const localizedArticles = helpArticles.map((entry) => ({
+    ...entry,
+    title: { ...entry.title, fr: frenchHelp[entry.id]?.title || entry.title.en },
+    summary: { ...entry.summary, fr: frenchHelp[entry.id]?.summary || entry.summary.en },
+    body: { ...entry.body, fr: frenchHelp[entry.id]?.body || entry.body.en },
+  }));
   const [params, setParams] = useSearchParams();
   const [search, setSearch] = useState("");
   const activeTab = params.get("tab") === "api" ? "api" : "help";
   const words = search.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
-  const articles = helpArticles.filter((article) =>
+  const articles = localizedArticles.filter((article) =>
     words.every((word) =>
       [
         article.title[language],

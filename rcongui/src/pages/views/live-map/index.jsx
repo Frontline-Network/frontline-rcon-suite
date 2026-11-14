@@ -63,8 +63,8 @@ const localDateTime = (timestamp) => {
 
 export default function LiveMapPage() {
   const { i18n } = useTranslation();
-  const t = (key) =>
-    copy[i18n.language?.startsWith("de") ? "de" : "en"][key] || key;
+  const language = (i18n.resolvedLanguage || i18n.language || "en").split("-")[0];
+  const t = (key) => (copy[language] || copy.en)[key] || key;
   const { permissions } = useAuth();
   const theme = useTheme();
   const mobile = useMediaQuery(theme.breakpoints.down("lg"));

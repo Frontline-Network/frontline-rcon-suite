@@ -2638,7 +2638,8 @@ const de = {
           volunteer_command: { label: "Befehl für Freiwillige" },
           messages: { label: "Spielernachrichten – Deutsch" },
           messages_en: { label: "Spielernachrichten – Englisch", help: "Eigenständige englische Vorlagen. Vorhandene deutsche Texte bleiben erhalten." },
-          message_language: { label: "Nachrichtensprache", help: "de: Deutsch, en: Englisch, de+en: zwei getrennte Nachrichten, zuerst Deutsch, dann Englisch." },
+          messages_fr: { label: "Spielernachrichten – Französisch", help: "Eigenständige französische Vorlagen. Vorhandene deutsche und englische Texte bleiben erhalten." },
+          message_language: { label: "Nachrichtensprache", help: "Deutsch, Englisch oder Französisch einzeln oder kombiniert. Kombinierte Sprachen werden als getrennte Nachrichten gesendet." },
           poll_interval_seconds: { label: "Prüfintervall" },
           candidate_timeout_seconds: { label: "Kandidaten-Zeitlimit" },
           manual_proposal_timeout_seconds: { label: "Zeitlimit für Freigaben" },
@@ -4979,6 +4980,7 @@ const de = {
       tkBans: "TK-Sperre beim Beitritt",
       nameKicks: "Namensfilter",
       vipRewards: "VIP-Belohnungen",
+      endMatchStats: "Match-Statistiken",
       seedVip: "Seeder-VIP-Belohnung",
       gameServer: "Gameserver-Verbindung",
       crcon: "CRCON-Einstellungen",
@@ -5265,7 +5267,7 @@ const de = {
     lastChecked: "Zuletzt geprüft",
     latestRelease: "Neueste Version",
   },
-  language: { label: "Sprache", de: "Deutsch", en: "English" },
+  language: { label: "Sprache", de: "Deutsch", en: "English", fr: "Français" },
 };
 
 Object.assign(de.maps.votemapSettings, {

@@ -63,6 +63,7 @@ class IncidentMessage(Base):
     suggested_action: Mapped[str | None] = mapped_column(String(32))
     suggested_duration_hours: Mapped[int | None] = mapped_column(Integer)
     primary_subject_id: Mapped[str | None] = mapped_column(String(36))
+    discord_language: Mapped[str] = mapped_column(String(2), nullable=False, default="de", server_default="de")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc)
     )

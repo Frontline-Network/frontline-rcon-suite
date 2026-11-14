@@ -1,5 +1,25 @@
 export const copy = {
+  fr: {
+    receiptLanguage: "Langue de l’accusé de réception", receiptLanguageHelp: "Concerne les confirmations envoyées au joueur ayant effectué le signalement. Les motifs d’expulsion personnalisés ne sont pas modifiés.",
+    title: "Administration des signalements – communication, teamkills et triche",
+    info: "Automatisation des signalements propre au serveur, avec interprétation facultative du motif complet par IA. Enregistrez ici séparément ; configurez le fournisseur d’IA ci-dessous. Les autres plaintes restent manuelles. Les votes de commandement ont été supprimés.",
+    reasonMode: "Interprétation du motif du signalement", aiReason: "IA – interpréter le signalement complet", rulesReason: "Règles de mots-clés existantes (sans IA)",
+    aiReasonHelp: "Utilise le fournisseur d’IA et le modèle de signalement configurés ci-dessous. Le signalement complet et les noms et rôles actuels des joueurs sont transmis à l’IA ; des frais API ou limites de compte peuvent s’appliquer. Le sens, les négations et le contexte sont analysés, pas seulement les mots-clés. L’identification des joueurs et les protections restent vérifiées séparément. Les réponses incertaines, l’absence de connexion et les erreurs restent traitées manuellement, sans recours aux mots-clés. Le signalement ne prouve pas qu’une personne ne parle pas.",
+    rulesReasonHelp: "Mode de compatibilité : reconnaît uniquement les formulations prises en charge. Pas de compréhension générale du langage ni d’appel à l’IA.",
+    warning: "Mode actif : un signalement de communication sans ambiguïté peut déclencher une expulsion sans vote ni avertissement. L’activité vocale ne peut pas être vérifiée. De faux signalements peuvent donc être utilisés abusivement.",
+    teamkills: "Teamkills : examen individuel avec jusqu’à 15 minutes de contexte et une attente silencieuse de 60 secondes à partir du teamkill. Le signaleur et l’accusé sont examinés. Une expulsion automatique exige un teamkill enregistré et un aveu explicite et rapide de l’intention à la première personne. L’absence d’excuses, un nombre élevé ou de nouveaux teamkills après des excuses ne prouvent pas à eux seuls l’intention. Les excuses, teamkills réciproques et cas incertains sont transmis aux administrateurs. Aucune sollicitation n’est envoyée à l’accusé.",
+    cheating: "Examen de la triche : chronologie des éliminations par arme sur 1, 5 et 15 minutes et historique des rôles si disponible. Les taux d’élimination sont des indices à examiner, pas une preuve de triche. Aucune expulsion ou aucun bannissement automatique pour triche. Un bannissement temporaire de 24 heures exige des preuves supplémentaires et une décision manuelle d’un administrateur dans Discord. Seul le signaleur reçoit un accusé de réception.",
+    cheatToggle: "Analyser les signalements de triche pour les administrateurs (sans sanction automatique)",
+    names: "Noms : une seule correspondance en ligne sans ambiguïté. Jusqu’à trois fautes pour les noms longs ; les noms courts ou correspondances aussi plausibles nécessitent un examen manuel.",
+    enabled: "Activer l’administration des signalements", communication: "Traiter les signalements de communication", members: "Inclure les membres d’escouade explicitement nommés dans les signalements de communication",
+    memberHelp: "Par défaut, les signalements de communication concernent uniquement les chefs d’escouade et les commandants. Avec cette extension, un membre de la même équipe nommé sans ambiguïté peut aussi être expulsé. Le nom d’une escouade signale toujours uniquement son chef, jamais toute l’escouade. Les noms incertains restent traités manuellement. S’applique à ce serveur uniquement.",
+    tk: "Traiter les signalements de teamkill", selfReports: "Autoriser les autosignalements pour les tests", selfReportsWarning: "Exception de test activée : les nouveaux autosignalements sont également vérifiés. En mode actif, vous pouvez réellement être expulsé du serveur. Les autres règles restent applicables. Désactivez cette option et enregistrez après le test.",
+    mode: "Mode", dry: "Simulation – aucune expulsion", active: "Actif – expulsions automatiques", commTemplate: "Motif d’expulsion pour communication", tkTemplate: "Motif d’expulsion pour teamkill", fallback: "Texte par défaut intégré DE/EN",
+    placeholders: "Modèles de la catégorie Motifs. Variables : {player_name}, {teamkills}, {minutes} (période réelle de contexte). Vérifiez les modèles de teamkill existants qui indiquent systématiquement 5 en 5 minutes. Sans modèle adapté, le texte par défaut est utilisé.",
+    save: "Enregistrer les règles de signalement", saved: "Enregistré", loading: "Chargement…", permission: "Vous n’avez pas l’autorisation de modifier cette configuration."
+  },
   de: {
+    receiptLanguage: "Sprache der Eingangsbestätigung", receiptLanguageHelp: "Gilt für Bestätigungen an den meldenden Spieler. Individuelle Kick-Gründe bleiben unverändert.",
     title: "Report-Admin – Kommunikation, Teamkills & Cheatprüfung",
     info: "Serverbezogene Report-Automatik mit wählbarer KI-Einordnung des vollständigen Meldegrunds. Hier separat speichern; die KI-Anbindung wird darunter eingerichtet. Andere Beschwerden bleiben manuell. Führungsabstimmungen wurden eingestellt.",
     reasonMode: "Einordnung des Meldegrunds",
@@ -41,6 +61,7 @@ export const copy = {
     permission: "Keine Berechtigung zur Konfiguration.",
   },
   en: {
+    receiptLanguage: "Acknowledgement language", receiptLanguageHelp: "Applies to confirmations sent to the reporting player. Custom kick reasons are unchanged.",
     title: "Report admin – communication, teamkills & cheat review",
     info: "Server-specific report automation with optional AI interpretation of the entire complaint. Save separately here; configure the AI provider below. Other complaints remain manual. Leadership voting has been retired.",
     reasonMode: "Report reason interpretation",

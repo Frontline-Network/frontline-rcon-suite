@@ -16,6 +16,8 @@ import { Autocomplete } from "@mui/material";
 import countries from "country-list";
 import { CountryFlag } from "@/components/shared/CountryFlag";
 import ISO6391 from 'iso-639-1';
+import { useTranslation } from "react-i18next";
+import { accountCopy } from "./edit-account-copy";
 
 // Get all countries for autocomplete
 const countryOptions = countries.getCodes().map((code) => ({
@@ -31,6 +33,11 @@ const languageOptions = ISO6391.getLanguages(ISO6391.getAllCodes()).map((lang) =
 }));
 
 export function useEditAccountModal(playerId, currentAccountData) {
+  const { i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || "en";
+  const c = accountCopy(language);
+  const regions = new Intl.DisplayNames([language], { type: "region" });
+  const languages = new Intl.DisplayNames([language], { type: "language" });
   const [open, setOpen] = useState(false);
   const [submitStatus, setSubmitStatus] = useState(null); // null, 'success', 'error'
   const [errorMessage, setErrorMessage] = useState("");
@@ -102,7 +109,7 @@ export function useEditAccountModal(playerId, currentAccountData) {
     },
     onError: (error) => {
       setSubmitStatus('error');
-      setErrorMessage(error.message || 'Failed to update player account information');
+      setErrorMessage(error.message || c.failed);
     },
   });
 
@@ -147,16 +154,16 @@ export function useEditAccountModal(playerId, currentAccountData) {
         },
       }}
     >
-      <DialogTitle>Edit Player Account Information</DialogTitle>
+      <DialogTitle>{c.title}</DialogTitle>
       <DialogContent>
         <DialogContentText>
-          Update the player's account information. All fields can be modified.
+          {c.description}
         </DialogContentText>
 
         {submitStatus === 'success' && (
           <Alert severity="success" sx={{ mt: 2 }}>
             <CheckIcon sx={{ mr: 1 }} />
-            Successfully updated account information!
+            {c.success}
           </Alert>
         )}
 
@@ -171,14 +178,14 @@ export function useEditAccountModal(playerId, currentAccountData) {
           <ControlledTextInput
             control={control}
             name="name"
-            label="Account Name"
+            label={c.accountName}
             rules={{
               pattern: {
                 value: /^[a-zA-Z0-9\s\-_]+$/,
-                message: "Name can only contain letters, numbers, spaces, hyphens, and underscores"
+                message: c.nameRule
               }
             }}
-            helperText="The player's account name"
+            helperText={c.nameHelp}
             fullWidth
           />
 
@@ -189,10 +196,10 @@ export function useEditAccountModal(playerId, currentAccountData) {
             rules={{
               pattern: {
                 value: /^\d+$/,
-                message: "Discord ID must be a valid number"
+                message: c.discordRule
               }
             }}
-            helperText="The player's Discord user ID (numeric)"
+            helperText={c.discordHelp}
             fullWidth
           />
 
@@ -204,12 +211,12 @@ export function useEditAccountModal(playerId, currentAccountData) {
                 disabled={isPending}
               />
             }
-            label="Is Member"
+            label={c.member}
           />
 
           <Autocomplete
             options={countryOptions}
-            getOptionLabel={(option) => option.name}
+            getOptionLabel={(option) => regions.of(option.code) || option.name}
             value={
               countryOptions.find((c) => c.code.toUpperCase() === selectedCountry.toUpperCase()) || null
             }
@@ -223,7 +230,7 @@ export function useEditAccountModal(playerId, currentAccountData) {
               <li key={key} {...props}>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <CountryFlag country={option.code} />
-                  <span>{option.name}</span>
+                  <span>{regions.of(option.code) || option.name}</span>
                 </Stack>
               </li>
             )}
@@ -232,8 +239,8 @@ export function useEditAccountModal(playerId, currentAccountData) {
                 {...params}
                 control={control}
                 name="country"
-                label="Country"
-                helperText={errors.country ? errors.country.message : "Select the player's country"}
+                label={c.country}
+                helperText={errors.country ? errors.country.message : c.countryHelp}
                 fullWidth
               />
             )}
@@ -241,7 +248,7 @@ export function useEditAccountModal(playerId, currentAccountData) {
 
           <Autocomplete
             options={languageOptions}
-            getOptionLabel={(option) => `${option.name} (${option.nativeName})`}
+            getOptionLabel={(option) => `${languages.of(option.code) || option.name} (${option.nativeName})`}
             value={
               languageOptions.find((l) => l.code === selectedLanguage) ||
               languageOptions.find((l) => l.code === "en") || null
@@ -255,7 +262,7 @@ export function useEditAccountModal(playerId, currentAccountData) {
             renderOption={({ key, ...props }, option) => (
               <li key={key} {...props}>
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <span>{option.name}</span>
+                  <span>{languages.of(option.code) || option.name}</span>
                   <span style={{ opacity: 0.7 }}>({option.nativeName})</span>
                 </Stack>
               </li>
@@ -265,14 +272,14 @@ export function useEditAccountModal(playerId, currentAccountData) {
                 {...params}
                 control={control}
                 name="lang"
-                label="Language"
+                label={c.language}
                 rules={{
                   pattern: {
                     value: /^[a-z]{2}$/,
-                    message: "Language must be a valid 2-letter ISO code"
+                    message: c.languageRule
                   }
                 }}
-                helperText="Select the player's preferred language"
+                helperText={c.languageHelp}
                 fullWidth
               />
             )}
@@ -281,14 +288,14 @@ export function useEditAccountModal(playerId, currentAccountData) {
       </DialogContent>
       <DialogActions>
         <Button onClick={closeModal} disabled={isPending}>
-          Cancel
+          {c.cancel}
         </Button>
         <Button
           type="submit"
           disabled={isPending}
           startIcon={isPending ? <CircularProgress size={16} /> : null}
         >
-          {isPending ? 'Updating...' : 'Update'}
+          {isPending ? c.updating : c.update}
         </Button>
       </DialogActions>
     </Dialog>

@@ -2612,7 +2612,8 @@ const en = {
           volunteer_command: { label: "Volunteer command" },
           messages: { label: "Player messages – German" },
           messages_en: { label: "Player messages – English", help: "Separate English templates. Existing German messages are preserved." },
-          message_language: { label: "Message language", help: "de: German, en: English, de+en: two separate messages, German first, then English." },
+          messages_fr: { label: "Player messages – French", help: "Separate French templates. Existing German and English messages are preserved." },
+          message_language: { label: "Message language", help: "Choose German, English or French, individually or combined. Combined languages are sent as separate messages." },
           poll_interval_seconds: { label: "Check interval" },
           candidate_timeout_seconds: { label: "Candidate timeout" },
           manual_proposal_timeout_seconds: { label: "Approval timeout" },
@@ -4933,6 +4934,7 @@ const en = {
       tkBans: "TK ban on connect",
       nameKicks: "Name kicks",
       vipRewards: "VIP rewards",
+      endMatchStats: "Match statistics",
       seedVip: "Seeder VIP reward",
       gameServer: "Game server connection",
       crcon: "CRCON settings",
@@ -5219,7 +5221,7 @@ const en = {
     lastChecked: "Last checked",
     latestRelease: "Latest release",
   },
-  language: { label: "Language", de: "Deutsch", en: "English" },
+  language: { label: "Language", de: "Deutsch", en: "English", fr: "Français" },
 };
 
 Object.assign(en.maps.votemapSettings, {

@@ -5,7 +5,13 @@ import {
   expectNoHorizontalPageOverflow,
 } from "./helpers.mjs";
 
-for (const language of ["de", "en"]) {
+const labels = {
+  de: { section: /Spieler informieren/, language: "Nachrichtensprache", german: "Spielernachrichten – Deutsch", english: "Spielernachrichten – Englisch", french: "Spielernachrichten – Französisch", request: "Aufruf für Freiwillige", save: "Einstellungen speichern" },
+  en: { section: /Notify players/, language: "Message language", german: "Player messages – German", english: "Player messages – English", french: "Player messages – French", request: "Volunteer request", save: "Save settings" },
+  fr: { section: /Informer les joueurs/, language: "Langue des messages", german: "Messages aux joueurs – allemand", english: "Messages aux joueurs – anglais", french: "Messages aux joueurs – français", request: "Demande de volontaires", save: "Enregistrer les paramètres" },
+};
+
+for (const language of ["de", "en", "fr"]) {
   test(`Autobalancer has separate editable language packs (${language})`, async ({
     page,
   }) => {
@@ -14,32 +20,24 @@ for (const language of ["de", "en"]) {
     await page.locator("#autobalancer-settings").click();
     await page
       .getByRole("button", {
-        name: language === "de" ? /Spieler informieren/ : /Notify players/,
+        name: labels[language].section,
       })
       .click();
     const select = page.getByRole("combobox", {
-      name: language === "de" ? "Nachrichtensprache" : "Message language",
+      name: labels[language].language,
     });
     await expect(select).toBeVisible();
     await expect(select).toHaveValue("de+en");
-    const german =
-      language === "de"
-        ? "Spielernachrichten – Deutsch"
-        : "Player messages – German";
-    const english =
-      language === "de"
-        ? "Spielernachrichten – Englisch"
-        : "Player messages – English";
-    await expect(page.getByText(german, { exact: true })).toBeVisible();
-    await expect(page.getByText(english, { exact: true })).toBeVisible();
-    const requestLabel =
-      language === "de" ? "Aufruf für Freiwillige" : "Volunteer request";
+    await expect(page.getByText(labels[language].german, { exact: true })).toBeVisible();
+    await expect(page.getByText(labels[language].english, { exact: true })).toBeVisible();
+    await expect(page.getByText(labels[language].french, { exact: true })).toBeVisible();
     const fields = page.getByRole("textbox", {
-      name: requestLabel,
+      name: labels[language].request,
       exact: true,
     });
-    await expect(fields).toHaveCount(2);
+    await expect(fields).toHaveCount(3);
     const oldGerman = await fields.nth(0).inputValue();
+    const oldFrench = await fields.nth(2).inputValue();
     await fields
       .nth(1)
       .fill(
@@ -48,11 +46,12 @@ for (const language of ["de", "en"]) {
     await fields.nth(1).blur();
     await expect(
       page.getByRole("button", {
-        name: language === "de" ? "Einstellungen speichern" : "Save settings",
+        name: labels[language].save,
         exact: true,
       })
     ).toBeEnabled();
     await expect(fields.nth(0)).toHaveValue(oldGerman);
+    await expect(fields.nth(2)).toHaveValue(oldFrench);
     await select.click();
     await select.fill("en");
     await page.getByRole("option", { name: "en", exact: true }).click();

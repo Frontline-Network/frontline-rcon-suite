@@ -377,7 +377,9 @@ function EventRow({ event, language, t }) {
 export default function OperationsOverview({ logs, logsLoading }) {
   const { t, i18n } = useTranslation();
   const { permissions } = useAuth();
-  const language = i18n.resolvedLanguage === "en" ? "en" : "de";
+  const language = ["de", "en", "fr"].includes(i18n.resolvedLanguage?.split("-")[0])
+    ? i18n.resolvedLanguage.split("-")[0]
+    : "en";
   const status = useGlobalStore((state) => state.status);
   const serverState = useGlobalStore((state) => state.serverState);
   const gameState = useGlobalStore((state) => state.gameState);

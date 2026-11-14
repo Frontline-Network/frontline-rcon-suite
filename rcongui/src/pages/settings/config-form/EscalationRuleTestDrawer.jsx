@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import { getAllRoles } from "@/constants/roles";
 import ConfigTestDrawer from "./ConfigTestDrawer";
 import { simulateEscalationRule } from "./simulateEscalationRule.mjs";
+import frenchCopy from "./escalation-copy-fr.json";
 
 const copyByLanguage = {
   de: {
@@ -236,7 +237,8 @@ export default function EscalationRuleTestDrawer({
   kind,
 }) {
   const { i18n, t } = useTranslation();
-  const copy = copyByLanguage[i18n.language?.startsWith("de") ? "de" : "en"];
+  const language = (i18n.resolvedLanguage || i18n.language || "en").split("-")[0];
+  const copy = language === "fr" ? frenchCopy : copyByLanguage[language === "de" ? "de" : "en"];
   const kindCopy = copy[kind];
   const [sample, setSample] = useState(() => initialSample(kind));
   const [hasRun, setHasRun] = useState(false);

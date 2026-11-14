@@ -19,6 +19,7 @@ def case_fields(report, language):
                 "name": (
                     "🤖 KI-Einordnung der Meldung"
                     if language == "de"
+                    else "🤖 Interprétation du signalement par IA" if language == "fr"
                     else "🤖 AI report interpretation"
                 ),
                 "value": (
@@ -35,20 +36,23 @@ def case_fields(report, language):
     if not a:
         return interpretation
     de = language == "de"
+    fr = language == "fr"
     lines = []
     if a.get("kind") == "cheat_review":
         title = (
             "🔎 Cheatprüfung – nur Admin-Entscheidung"
             if de
+            else "🔎 Examen de triche – décision humaine uniquement" if fr
             else "🔎 Cheat review – human decision only"
         )
         lines.append(
             "24 h Tempbann nur nach zusätzlichen Belegen und manueller Freigabe (TB)."
             if de
+            else "Bannissement temporaire de 24 h uniquement après preuves supplémentaires et validation manuelle (TB)." if fr
             else "24-hour temp ban only after additional evidence and manual approval (TB)."
         )
         if a.get("priority") == "high":
-            lines.append("⚠ Priorisierte Beobachtung / Prioritized observation")
+            lines.append("⚠ Observation prioritaire" if fr else "⚠ Priorisierte Beobachtung / Prioritized observation")
         for w in a.get("windows", [])[:3]:
             categories = (
                 ", ".join(
@@ -65,20 +69,22 @@ def case_fields(report, language):
                 (
                     "Beobachtete Rollenwechsel: "
                     if de
+                    else "Changements de rôle observés : " if fr
                     else "Observed role history entries: "
                 )
                 + str(len(a["role_history"]))
             )
     else:
-        title = "📋 Teamkill-Einzelfall" if de else "📋 Individual teamkill case"
+        title = "📋 Teamkill-Einzelfall" if de else "📋 Cas individuel de teamkill" if fr else "📋 Individual teamkill case"
         lines.extend(
             [
-                f"Melder-TK / Reporter TK: {a.get('reporter_teamkills', 0)} · gegenseitig / reciprocal: {a.get('reciprocal_teamkills', 0)}",
-                f"Entschuldigungen / Apologies: {len(a.get('apologies', []))} · TK danach / subsequent TK: {a.get('kills_after_apology', 0)}",
-                f"Mögliche Explosions-Mehrfachkills / possible explosion multikills: {a.get('possible_explosion_bursts', 0)}",
+                f"Teamkills du signaleur : {a.get('reporter_teamkills', 0)} · réciproques : {a.get('reciprocal_teamkills', 0)}" if fr else f"Melder-TK / Reporter TK: {a.get('reporter_teamkills', 0)} · gegenseitig / reciprocal: {a.get('reciprocal_teamkills', 0)}",
+                f"Excuses : {len(a.get('apologies', []))} · teamkills ultérieurs : {a.get('kills_after_apology', 0)}" if fr else f"Entschuldigungen / Apologies: {len(a.get('apologies', []))} · TK danach / subsequent TK: {a.get('kills_after_apology', 0)}",
+                f"Éliminations multiples possibles par explosion : {a.get('possible_explosion_bursts', 0)}" if fr else f"Mögliche Explosions-Mehrfachkills / possible explosion multikills: {a.get('possible_explosion_bursts', 0)}",
                 (
                     "Anzahl, Wiederholung und Schweigen allein sind kein Absichtsbeweis."
                     if de
+                    else "Le nombre, la répétition et le silence ne prouvent pas à eux seuls une intention." if fr
                     else "Count, repetition and silence alone do not prove intent."
                 ),
             ]
@@ -100,10 +106,10 @@ def case_fields(report, language):
             details.append(f"{stamp} {label}{body}")
         omitted = a.get("timeline_omitted", 0) + max(0, len(timeline) - len(selected))
         if omitted:
-            details.append(f"+{omitted} · Vollständige Logs prüfen / Review full logs")
+            details.append(f"+{omitted} · " + ("Vérifier les journaux complets" if fr else "Vollständige Logs prüfen / Review full logs"))
         result.append(
             {
-                "name": "Zeitlicher Auszug / Timeline excerpt",
+                "name": "Extrait chronologique" if fr else "Zeitlicher Auszug / Timeline excerpt",
                 "value": "\n".join(details)[:1000],
                 "inline": False,
             }

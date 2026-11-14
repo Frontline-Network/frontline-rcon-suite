@@ -242,7 +242,29 @@ def test_old_config_preserves_german_default_and_bad_english_placeholder_rejecte
     with pytest.raises(ValidationError):
         config(messages_en={"volunteer_request": "Hello {secret}"})
     with pytest.raises(ValidationError):
-        config(message_language="fr")
+        config(message_language="xx")
+
+
+@pytest.mark.parametrize("key", list(SYSTEM) + list(AutobalancerMessages.model_fields))
+def test_every_player_message_has_french_and_preserves_other_languages(key):
+    values = {"target_team": "Allies", "seconds": 30, "cooldown_maps": 3, "squad_name": "Able"}
+    texts = render(config(message_language="de+en+fr"), key, **values)
+    assert len(texts) == 3 and all(texts) and len(set(texts)) == 3
+    assert "{" not in "".join(texts)
+
+
+def test_french_custom_templates_are_independent_and_validate_placeholders():
+    cfg = config(message_language="fr", messages_fr={"volunteer_registered": "Merci, test !"}, messages={"volunteer_registered": "Alt"})
+    assert render(AutobalancerUserConfig.model_validate(cfg.model_dump()), "volunteer_registered") == ["Merci, test !"]
+    assert cfg.messages.volunteer_registered == "Alt"
+    with pytest.raises(ValidationError):
+        config(messages_fr={"volunteer_request": "Bonjour {secret}"})
+
+
+def test_french_manual_notice_and_team_name():
+    texts = render(config(message_language="fr", mode="manual", volunteer_command="!helpbalance"), "volunteer_request", target_team="Allies", seconds=30, manual=True)
+    assert len(texts) == 1
+    assert "Alliés" in texts[0] and "!helpbalance" in texts[0] and "Mode manuel" in texts[0]
 
 
 def test_failure_of_german_delivery_does_not_suppress_english():
@@ -258,6 +280,21 @@ def test_failure_of_german_delivery_does_not_suppress_english():
     assert not send(rcon, "p", config(message_language="de+en"), "ended")
     assert len(rcon.messages) == 2
     assert "Team balancing" in rcon.messages[1][1]
+
+
+def test_failed_delivery_does_not_suppress_french_in_three_language_mode():
+    rcon = FakeRcon()
+
+    def deliver(pid, message):
+        rcon.messages.append((pid, message))
+        if len(rcon.messages) == 2:
+            raise TimeoutError("uncertain")
+        return True
+
+    rcon.message_player = deliver
+    assert not send(rcon, "p", config(message_language="de+en+fr"), "ended")
+    assert len(rcon.messages) == 3
+    assert "L'équilibrage" in rcon.messages[2][1]
 
 
 def test_manual_mode_and_custom_command_are_in_both_invitations():

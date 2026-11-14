@@ -18,7 +18,7 @@ import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined
 import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import SectionSurface from "@/components/shared/SectionSurface";
-import { passwordRequest } from "./password-client.mjs";
+import { passwordLanguage, passwordRequest } from "./password-client.mjs";
 
 const emptyValues = () => ({
   old_password: "",
@@ -34,7 +34,7 @@ const allFields = [
 export default function PasswordForm({ mode = "change", uid }) {
   const { t, i18n } = useTranslation();
   const [searchParams] = useSearchParams();
-  const language = i18n.resolvedLanguage?.startsWith("de") ? "de" : "en";
+  const language = passwordLanguage(i18n.resolvedLanguage);
   const resetting = mode === "reset";
   const fields = resetting ? allFields.slice(1) : allFields;
   const [changed, setChanged] = useState(

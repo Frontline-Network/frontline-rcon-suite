@@ -18,7 +18,9 @@ def admin_appearance(request):
     mode = preferences.get("mode", "dark")
     if mode not in {"dark", "light", "system"}:
         mode = "dark"
-    german = (get_language() or "en").startswith("de")
+    language = (get_language() or "en").split("-")[0]
+    def copy(de, en, fr):
+        return {"de": de, "fr": fr}.get(language, en)
     try:
         color_style = normalize_wardogs_style(preferences.get("wardogsStyle", DEFAULT_WARDOGS_STYLE))
     except ValueError:
@@ -35,15 +37,15 @@ def admin_appearance(request):
         },
         "crcon_admin_text": {
             "title": "Administration",
-            "subtitle": "Konten, Berechtigungen und Zugänge zentral verwalten." if german else "Manage accounts, permissions and access in one place.",
-            "back": "Zum CRCON" if german else "Back to CRCON",
-            "accounts": "Benutzer & Berechtigungen" if german else "Users & permissions",
-            "connections": "Schnittstellen & Geräte" if german else "Integrations & devices",
-            "open": "Verwalten" if german else "Manage",
-            "add": "Hinzufügen" if german else "Add",
-            "empty": "Keine Verwaltungsbereiche verfügbar." if german else "No administration areas available.",
-            "recent": "Letzte Änderungen" if german else "Recent changes",
-            "no_recent": "Deine Änderungen erscheinen hier, sobald du einen Eintrag bearbeitest." if german else "Your changes appear here after you edit an entry.",
-            "overview": "Verwaltungsübersicht" if german else "Administration overview",
+            "subtitle": copy("Konten, Berechtigungen und Zugänge zentral verwalten.", "Manage accounts, permissions and access in one place.", "Gérez les comptes, les autorisations et les accès au même endroit."),
+            "back": copy("Zum CRCON", "Back to CRCON", "Retour à CRCON"),
+            "accounts": copy("Benutzer & Berechtigungen", "Users & permissions", "Utilisateurs et autorisations"),
+            "connections": copy("Schnittstellen & Geräte", "Integrations & devices", "Intégrations et appareils"),
+            "open": copy("Verwalten", "Manage", "Gérer"),
+            "add": copy("Hinzufügen", "Add", "Ajouter"),
+            "empty": copy("Keine Verwaltungsbereiche verfügbar.", "No administration areas available.", "Aucune section d'administration disponible."),
+            "recent": copy("Letzte Änderungen", "Recent changes", "Modifications récentes"),
+            "no_recent": copy("Deine Änderungen erscheinen hier, sobald du einen Eintrag bearbeitest.", "Your changes appear here after you edit an entry.", "Vos modifications apparaîtront ici après la modification d'une entrée."),
+            "overview": copy("Verwaltungsübersicht", "Administration overview", "Vue d'ensemble de l'administration"),
         },
     }

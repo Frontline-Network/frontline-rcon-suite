@@ -474,6 +474,34 @@ def notification(db, iid):
         return event.id, event.payload.get("reporter_notification")
 
 
+def test_report_receipt_defaults_preserve_existing_languages():
+    assert Config.model_validate({}).receipt_language == "de+en"
+    assert service.reporter_receipt("Player") == (
+        "Deine Meldung wurde bearbeitet: Player wurde vom Server gekickt.\n"
+        "Your report was handled: Player was kicked from the server."
+    )
+    assert "Deine Cheatmeldung" in service.reporter_receipt("Player", review=True)
+    assert "Your cheat report" in service.reporter_receipt("Player", review=True)
+    assert "Votre signalement" in service.reporter_receipt("Player", language="fr")
+    assert "preuves sont examinées" in service.reporter_receipt("Player", review=True, language="fr")
+    with pytest.raises(ValueError):
+        Config.model_validate({"receipt_language": "invalid"})
+
+
+def test_french_report_receipt_uses_config_without_changing_action(setup):
+    db, _, _ = setup
+    service.configure(1, Config(enabled=True, mode="active", receipt_language="fr"))
+    incident = report(setup)
+    api = transport()
+    service.tick(api, 1)
+    api.kick.assert_called_once()
+    api.message_player.assert_called_once()
+    text = api.message_player.call_args.args[1]
+    assert "Votre signalement a été traité" in text
+    assert "Your report" not in text and "Deine Meldung" not in text
+    assert notification(db, incident["id"])[1]["status"] == "sent"
+
+
 @pytest.mark.parametrize("result", [True, False, None, "exception"])
 def test_reporter_receipt_never_retries_or_changes_kick_result(setup, result):
     db, _, _ = setup

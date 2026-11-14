@@ -12,7 +12,7 @@ class AdminEmbeddingMiddleware:
         is_admin = request.path.startswith("/admin/")
         embedded = is_admin and request.GET.get("embedded") == "1"
         language = request.GET.get("ui_language") if is_admin else None
-        if language not in {"de", "en"}:
+        if language not in {"de", "en", "fr"}:
             language = None
         if embedded or (is_admin and "ui_language" in request.GET):
             # Django changelists interpret every unknown query key as a model

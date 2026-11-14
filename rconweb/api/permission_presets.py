@@ -76,7 +76,15 @@ PRESETS = (
 )
 
 
-def permission_presets(permissions, german=True):
+PRESETS_FR = {
+    "observer": ("Consultation uniquement", "Consulter les données en direct, les profils des joueurs, les listes de bannissement et les anciens journaux de jeu."),
+    "support": ("Assistance", "Envoyer aussi des messages, ajouter des commentaires et gérer la liste de surveillance."),
+    "moderator": ("Modérateur", "Modérer les joueurs : droits d'assistance, expulsions, sanctions, actions sur les équipes et escouades, bannissements temporaires et permanents, levée des bannissements, entrées de liste de blocage et signalements. Examiner et exécuter les propositions de l'équilibreur."),
+    "operations": ("Gestion des parties", "Gérer les changements et la rotation des cartes, l'ordre aléatoire, les objectifs, la météo, les minuteries et les votes de cartes. Gérer les messages de bienvenue et les campagnes de messages. Ajouter le rôle Modérateur pour les sanctions de joueurs."),
+}
+
+
+def permission_presets(permissions, german=True, language=None):
     available = {
         permission.codename: str(permission.pk)
         for permission in permissions
@@ -86,7 +94,8 @@ def permission_presets(permissions, german=True):
     for key, de, en, description_de, description_en, codes in PRESETS:
         ids = [available[code] for code in sorted(codes) if code in available]
         if ids:
-            result.append({"id": key, "title": de if german else en,
-                           "description": description_de if german else description_en,
+            title, description = PRESETS_FR[key] if language == "fr" else (de, description_de) if german else (en, description_en)
+            result.append({"id": key, "title": title,
+                           "description": description,
                            "permissions": ids})
     return result

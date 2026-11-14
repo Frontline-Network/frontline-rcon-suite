@@ -32,6 +32,7 @@ export async function openDemoPage(
   ).toHaveCount(0);
   await expect(page.getByText("Das hat nicht funktioniert", { exact: true })).toHaveCount(0);
   await expect(page.getByText("That did not work", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Une erreur s’est produite", { exact: true })).toHaveCount(0);
   await expect.poll(async () => (await main.innerText()).trim().length).toBeGreaterThan(20);
 
   return main;

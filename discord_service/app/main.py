@@ -42,7 +42,7 @@ from .contracts import (
     ModerationSource,
     PlayerNameAnalysisBatchEnvelope,
 )
-from .db import Base, engine, session_dependency
+from .db import Base, engine, session_dependency, migrate_incident_language
 from .discord_client import DiscordClient, render_message
 from .models import (
     EventReceipt,
@@ -58,9 +58,14 @@ from .report_reason import analyze_report_reason, PROMPT_VERSION as REPORT_REASO
 from .report_reason_contract import ReportReasonRequest
 
 Base.metadata.create_all(engine)
+migrate_incident_language(engine)
 app = FastAPI(title="Frontline CRCON Discord Service", version="1.0.0")
 _rate_windows: dict[str, tuple[float, int]] = {}
 _rate_lock = Lock()
+
+
+def _supported_language(value):
+    return isinstance(value, str) and value in {"de", "en", "fr"}
 
 
 def _check_rate_limit(key: str):
@@ -359,9 +364,30 @@ def _purge_expired_relays(session: Session) -> None:
     )
 
 
-def _crcon_interaction_error(exc: httpx.HTTPError) -> str:
+def _crcon_interaction_error(exc: httpx.HTTPError, language: str = "de") -> str:
     """Return an honest user-facing error without exposing CRCON internals."""
 
+    if language == "fr":
+        if isinstance(exc, httpx.HTTPStatusError):
+            try:
+                detail = str((exc.response.json() or {}).get("error") or "")
+            except (TypeError, ValueError):
+                detail = ""
+            known = {
+                "Select a confirmed player before running an action": "Ce signalement ne contient aucun joueur concerné confirmé.",
+                "Actions require a player from a confirmed incident subject": "Un joueur concerné doit d’abord être confirmé pour cette action.",
+                "Select an affected player before running this action": "Ce signalement ne contient aucun joueur concerné.",
+                "Incident is already closed": "Cet incident est déjà clos.",
+                "Only open incidents can be claimed": "Cet incident est déjà clos.",
+                "Incident is already claimed by another admin": "⛔ Un autre administrateur traite déjà ce signalement.",
+                "The game server rejected the action; the incident remains open": "Le serveur de jeu a rejeté l’action. Le signalement reste ouvert.",
+            }
+            if detail in known:
+                return known[detail]
+            if exc.response.status_code == 502 and ("HLLCommandError" in detail or "HLLCommandFailedError" in detail):
+                return "Le serveur de jeu n’a pas confirmé l’exécution. L’action peut apparaître plus tard dans le jeu ; ne la répétez pas immédiatement. Le signalement reste ouvert."
+            return {400: "CRCON a rejeté l’interaction comme invalide.", 403: "Vous ne disposez pas actuellement d’un rôle de modérateur Discord autorisé.", 404: "Incident ou intégration Discord introuvable.", 409: "L’incident a déjà été modifié. Utilisez le message actualisé."}.get(exc.response.status_code, "CRCON a rejeté l’interaction.")
+        return "CRCON est actuellement inaccessible."
     if isinstance(exc, httpx.HTTPStatusError):
         try:
             detail = str((exc.response.json() or {}).get("error") or "")
@@ -442,7 +468,7 @@ def _execute_prepared_action(
     return result if isinstance(result, dict) else {}
 
 
-def _action_execution_message(result: dict, action: str) -> str:
+def _action_execution_message(result: dict, action: str, language: str = "de") -> str:
     action_result = result.get("action_result")
     if (
         action == "punish"
@@ -451,17 +477,21 @@ def _action_execution_message(result: dict, action: str) -> str:
         and action_result.get("message_sent") is True
         and action_result.get("punished") is False
     ):
+        if language == "fr":
+            return "Le serveur de jeu n’a pas confirmé la punition. Le joueur était peut-être déjà mort. Le motif lui a été envoyé par message ; le signalement reste ouvert."
         return (
             "Der Gameserver konnte die Bestrafung nicht bestätigen. Der Spieler "
             "war möglicherweise bereits tot. Der Bestrafungsgrund wurde ihm "
             "stattdessen als Nachricht gesendet; der Report bleibt offen."
         )
     if action == "message":
+        if language == "fr":
+            return "Le message a été accepté par le serveur de jeu. Son affichage peut être retardé, notamment sur HLL Vietnam."
         return (
             "Nachricht wurde vom Gameserver angenommen. Die Anzeige im Spiel "
             "kann sich insbesondere bei HLL Vietnam verzögern."
         )
-    return "Aktion wurde in CRCON ausgeführt und protokolliert."
+    return "L’action a été exécutée et journalisée dans CRCON." if language == "fr" else "Aktion wurde in CRCON ausgeführt und protokolliert."
 
 
 def _action_modal(
@@ -471,6 +501,7 @@ def _action_modal(
     *,
     initial_text: str = "",
     duration_hours: int = 2,
+    language: str = "de",
 ) -> dict:
     text_key = "message" if action in {"message", "message_reporter"} else "reason"
     inputs = [
@@ -480,7 +511,7 @@ def _action_modal(
                 {
                     "type": 4,
                     "custom_id": text_key,
-                    "label": "Nachricht" if text_key == "message" else "Grund",
+                    "label": ("Message" if text_key == "message" else "Motif") if language == "fr" else ("Nachricht" if text_key == "message" else "Grund"),
                     "style": 2,
                     "required": True,
                     "min_length": 1 if text_key == "message" else 3,
@@ -498,7 +529,7 @@ def _action_modal(
                     {
                         "type": 4,
                         "custom_id": "duration_hours",
-                        "label": "Dauer in Stunden (1-720)",
+                        "label": "Durée en heures (1-720)" if language == "fr" else "Dauer in Stunden (1-720)",
                         "style": 1,
                         "required": True,
                         "value": str(duration_hours),
@@ -512,9 +543,9 @@ def _action_modal(
         "data": {
             "custom_id": f"action-modal:{incident_id}:{revision}:{action}",
             "title": (
-                "Aktion prüfen und vorbereiten"
+                ("Vérifier et préparer l’action" if language == "fr" else "Aktion prüfen und vorbereiten")
                 if action in {"perma_ban", "blacklist", "disband_squad"}
-                else "Aktion ausführen"
+                else ("Exécuter l’action" if language == "fr" else "Aktion ausführen")
             ),
             "components": inputs,
         },
@@ -522,20 +553,20 @@ def _action_modal(
 
 
 def _template_picker(
-    incident_id: str, revision: str, action: str, templates: list[dict]
+    incident_id: str, revision: str, action: str, templates: list[dict], *, language: str = "de"
 ) -> dict:
     options = [
         {
-            "label": str(item.get("title") or f"Vorlage {item.get('id')}")[:100],
+            "label": str(item.get("title") or (f"Modèle {item.get('id')}" if language == "fr" else f"Vorlage {item.get('id')}"))[:100],
             "value": str(item["id"]),
         }
         for item in templates[:24]
     ]
-    options.append({"label": "Freitext", "value": "custom", "emoji": {"name": "✍️"}})
+    options.append({"label": "Texte libre" if language == "fr" else "Freitext", "value": "custom", "emoji": {"name": "✍️"}})
     return {
         "type": 4,
         "data": {
-            "content": "Wähle eine CRCON-Vorlage oder öffne ein leeres Freitextfeld.",
+            "content": "Choisissez un modèle CRCON ou ouvrez un champ de texte libre vide." if language == "fr" else "Wähle eine CRCON-Vorlage oder öffne ein leeres Freitextfeld.",
             "flags": 64,
             "components": [
                 {
@@ -544,7 +575,7 @@ def _template_picker(
                         {
                             "type": 3,
                             "custom_id": f"template:{incident_id}:{revision}:{action}",
-                            "placeholder": "CRCON-Vorlage auswählen",
+                            "placeholder": "Sélectionner un modèle CRCON" if language == "fr" else "CRCON-Vorlage auswählen",
                             "min_values": 1,
                             "max_values": 1,
                             "options": options,
@@ -602,7 +633,7 @@ def _confirmed_squad_subject_ids(incident: dict) -> set[str]:
 
 
 def _message_selection_update(
-    message: dict, *, subject_id: str, display_name: str
+    message: dict, *, subject_id: str, display_name: str, language: str | None = None
 ) -> dict:
     """Return a safe Discord message update with a globally visible selection."""
 
@@ -643,7 +674,9 @@ def _message_selection_update(
             selection_field and "Zielauswahl" in str(selection_field.get("name") or "")
         )
         value = (
-            f"Ausgewählt: **{display_name}**"
+            f"Sélection : **{display_name}**"
+            if language == "fr"
+            else f"Ausgewählt: **{display_name}**"
             if language_is_german
             else f"Selected: **{display_name}**"
         )
@@ -652,8 +685,8 @@ def _message_selection_update(
         elif len(fields) < 25:
             fields.append(
                 {
-                    "name": "🎯 Zielauswahl",
-                    "value": f"Ausgewählt: **{display_name}**",
+                    "name": "🎯 Sélection de la cible" if language == "fr" else "🎯 Zielauswahl",
+                    "value": f"Sélection : **{display_name}**" if language == "fr" else f"Ausgewählt: **{display_name}**",
                     "inline": False,
                 }
             )
@@ -1000,7 +1033,7 @@ def receive_event(
         select(IncidentMessage).where(
             IncidentMessage.installation_id == envelope.installation_id,
             IncidentMessage.incident_id == envelope.incident_id,
-        )
+        ).with_for_update()
     ).scalar_one_or_none()
     if mapping and envelope.incident_revision < mapping.last_revision:
         session.add(
@@ -1040,6 +1073,10 @@ def receive_event(
         if mapping and mapping.primary_subject_id in squad_subject_ids
         else None
     )
+    # Older producers may omit the field on an update; retain the authenticated
+    # incident's previously stored selection instead of switching its card.
+    if mapping and not _supported_language(envelope.incident.get("discord_language")):
+        envelope = envelope.model_copy(update={"incident": {**envelope.incident, "discord_language": mapping.discord_language}})
     message_payload = render_message(
         envelope,
         analysis,
@@ -1089,6 +1126,7 @@ def receive_event(
             message_id=message_id,
             channel_id=integration.channel_id,
             last_revision=envelope.incident_revision,
+            discord_language=(envelope.incident.get("discord_language") if _supported_language(envelope.incident.get("discord_language")) else "de"),
             analysis_id=str(envelope.incident.get("analysis_id") or "") or None,
             suggested_action=(analysis.suggested_action.value if analysis else None),
             suggested_duration_hours=(
@@ -1108,6 +1146,8 @@ def receive_event(
     else:
         mapping.message_id = message_id
         mapping.last_revision = max(mapping.last_revision, envelope.incident_revision)
+        if _supported_language(envelope.incident.get("discord_language")):
+            mapping.discord_language = envelope.incident["discord_language"]
         if envelope.incident.get("analysis_id"):
             mapping.analysis_id = str(envelope.incident["analysis_id"])
         if analysis:
@@ -1553,13 +1593,14 @@ def test_message(
     ):
         raise HTTPException(status_code=404, detail="Unknown installation capability")
     _check_rate_limit(f"test:{integration.installation_id}")
+    test_language = payload.get("language") if _supported_language(payload.get("language")) else "de"
     DiscordClient().upsert(
         integration.channel_id,
         {
             "embeds": [
                 {
-                    "title": "CRCON-Verbindung erfolgreich",
-                    "description": "Der Frontline Discord Report Bot ist verbunden.",
+                    "title": {"de": "CRCON-Verbindung erfolgreich", "en": "CRCON connection successful", "fr": "Connexion CRCON réussie"}[test_language],
+                    "description": {"de": "Der Frontline Discord Report Bot ist verbunden.", "en": "The Frontline Discord report bot is connected.", "fr": "Le bot Discord de signalement Frontline est connecté."}[test_language],
                     "color": 5763719,
                 }
             ],
@@ -1596,6 +1637,9 @@ async def discord_interaction(
     _verify_discord_signature(body, x_signature_ed25519, x_signature_timestamp)
     _purge_expired_relays(session)
     payload = await request.json()
+    # When no authenticated incident mapping exists, only Discord's signed
+    # interface locale can guide generic errors; do not infer customer settings.
+    fallback_language = "fr" if str(payload.get("locale") or "").lower().startswith("fr") else "de"
     if payload.get("type") == 1:
         return {"type": 1}
     rate_member = payload.get("member") or {}
@@ -1622,15 +1666,22 @@ async def discord_interaction(
             return {
                 "type": 4,
                 "data": {
-                    "content": "Bestätigung ist ungültig oder abgelaufen.",
+                    "content": "La confirmation est invalide ou expirée." if fallback_language == "fr" else "Bestätigung ist ungültig oder abgelaufen.",
                     "flags": 64,
                 },
             }
+        confirm_mapping = session.execute(
+            select(IncidentMessage).where(
+                IncidentMessage.installation_id == relay.installation_id,
+                IncidentMessage.incident_id == relay.incident_id,
+            )
+        ).scalar_one_or_none()
+        confirm_language = confirm_mapping.discord_language if confirm_mapping else fallback_language
         integration = session.get(Integration, relay.installation_id)
         if integration is None or not integration.enabled:
             return {
                 "type": 4,
-                "data": {"content": "Integration ist nicht mehr aktiv.", "flags": 64},
+                "data": {"content": "L’intégration n’est plus active." if confirm_language == "fr" else "Integration ist nicht mehr aktiv.", "flags": 64},
             }
         actor = {
             "discord_id": actor_id,
@@ -1656,7 +1707,7 @@ async def discord_interaction(
             return {
                 "type": 4,
                 "data": {
-                    "content": _crcon_interaction_error(exc),
+                    "content": _crcon_interaction_error(exc, confirm_language),
                     "flags": 64,
                 },
             }
@@ -1681,7 +1732,7 @@ async def discord_interaction(
             "type": 4,
             "data": {
                 "content": _action_execution_message(
-                    execution_result, relay.actual_action
+                    execution_result, relay.actual_action, confirm_language
                 ),
                 "flags": 64,
             },
@@ -1696,6 +1747,7 @@ async def discord_interaction(
         r"action-modal:([0-9a-f-]{36}):(\d+):([a-z_]+)", custom_id
     )
     modal_values: dict[str, str | int] = {}
+    input_error: str | None = None
     selected_template_id: str | None = None
     selected_subject_id: str | None = None
     if payload.get("type") == 3 and subject_match:
@@ -1733,21 +1785,12 @@ async def discord_interaction(
             else "reason"
         )
         if not modal_values.get(required_text_key):
-            return {
-                "type": 4,
-                "data": {
-                    "content": "Ein Text oder Grund ist erforderlich.",
-                    "flags": 64,
-                },
-            }
-        if recommended_action == "temp_ban":
+            input_error = "text"
+        if recommended_action == "temp_ban" and not input_error:
             try:
                 modal_values["duration_hours"] = int(modal_values["duration_hours"])
             except (KeyError, ValueError):
-                return {
-                    "type": 4,
-                    "data": {"content": "Die Dauer muss eine Zahl sein.", "flags": 64},
-                }
+                input_error = "duration"
         if recommended_action == "blacklist":
             # CRCON's built-in Default blacklist always has ID 0.  Discord
             # moderators should not need to know or type an internal DB ID.
@@ -1762,7 +1805,7 @@ async def discord_interaction(
         if match:
             operation, incident_id, revision, recommended_action = match.groups()
     if not match:
-        return {"type": 4, "data": {"content": "Unbekannte Interaktion", "flags": 64}}
+        return {"type": 4, "data": {"content": "Interaction inconnue" if fallback_language == "fr" else "Unbekannte Interaktion", "flags": 64}}
     guild_id = str(payload.get("guild_id") or "")
     channel_id = str(payload.get("channel_id") or "")
     integration = session.execute(
@@ -1775,7 +1818,7 @@ async def discord_interaction(
     if integration is None:
         return {
             "type": 4,
-            "data": {"content": "Integration nicht gefunden", "flags": 64},
+            "data": {"content": "Intégration introuvable" if fallback_language == "fr" else "Integration nicht gefunden", "flags": 64},
         }
     mapping = session.execute(
         select(IncidentMessage).where(
@@ -1783,6 +1826,13 @@ async def discord_interaction(
             IncidentMessage.incident_id == incident_id,
         )
     ).scalar_one_or_none()
+    interaction_language = mapping.discord_language if mapping else fallback_language
+    if input_error:
+        errors = {
+            "text": ("Un texte ou un motif est requis.", "Ein Text oder Grund ist erforderlich."),
+            "duration": ("La durée doit être un nombre.", "Die Dauer muss eine Zahl sein."),
+        }
+        return {"type": 4, "data": {"content": errors[input_error][0 if interaction_language == "fr" else 1], "flags": 64}}
     member = payload.get("member") or {}
     user = member.get("user") or {}
     actor = {
@@ -1805,7 +1855,7 @@ async def discord_interaction(
         if mapping is None or not selected_subject_id:
             return {
                 "type": 4,
-                "data": {"content": "Report-Zuordnung nicht gefunden.", "flags": 64},
+                "data": {"content": "Association du signalement introuvable." if interaction_language == "fr" else "Report-Zuordnung nicht gefunden.", "flags": 64},
             }
         selected_option = next(
             (
@@ -1822,7 +1872,7 @@ async def discord_interaction(
             return {
                 "type": 4,
                 "data": {
-                    "content": "Dieses Ziel ist nicht mehr auswählbar.",
+                    "content": "Cette cible ne peut plus être sélectionnée." if interaction_language == "fr" else "Dieses Ziel ist nicht mehr auswählbar.",
                     "flags": 64,
                 },
             }
@@ -1860,16 +1910,17 @@ async def discord_interaction(
                 message,
                 subject_id=selected_subject_id,
                 display_name=display_name,
+                language=interaction_language,
             )
         except httpx.HTTPError as exc:
             return {
                 "type": 4,
-                "data": {"content": _crcon_interaction_error(exc), "flags": 64},
+                "data": {"content": _crcon_interaction_error(exc, interaction_language), "flags": 64},
             }
         except (KeyError, TypeError, ValueError):
             return {
                 "type": 4,
-                "data": {"content": "Die Zielauswahl ist ungültig.", "flags": 64},
+                "data": {"content": "La sélection de la cible est invalide." if interaction_language == "fr" else "Die Zielauswahl ist ungültig.", "flags": 64},
             }
         mapping.primary_subject_id = selected_subject_id
         mapping.updated_at = datetime.now(tz=timezone.utc)
@@ -1884,7 +1935,7 @@ async def discord_interaction(
         return {
             "type": 4,
             "data": {
-                "content": "Bitte wähle zuerst das Squad aus, für das die Aktion gelten soll.",
+                "content": "Sélectionnez d’abord l’escouade à laquelle l’action doit s’appliquer." if interaction_language == "fr" else "Bitte wähle zuerst das Squad aus, für das die Aktion gelten soll.",
                 "flags": 64,
             },
         }
@@ -1903,16 +1954,16 @@ async def discord_interaction(
             revision = str(claimed["revision"])
         except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
             if isinstance(exc, httpx.HTTPError):
-                message = _crcon_interaction_error(exc)
+                message = _crcon_interaction_error(exc, interaction_language)
             else:
-                message = "CRCON hat die Übernahme nicht bestätigt."
+                message = "CRCON n’a pas confirmé la prise en charge." if interaction_language == "fr" else "CRCON hat die Übernahme nicht bestätigt."
             return {"type": 4, "data": {"content": message, "flags": 64}}
     if operation == "action" and payload.get("type") != 5:
         # Prefill only; the admin must enter a reason and submit the action.
         # No model/report-assessment result ever executes a cheat ban.
         duration_hours = 24 if mapping and mapping.suggested_duration_hours == 24 else 2
         if selected_template_id == "custom":
-            return _action_modal(incident_id, revision, recommended_action, duration_hours=duration_hours)
+            return _action_modal(incident_id, revision, recommended_action, duration_hours=duration_hours, language=interaction_language)
         crcon_action = (
             "message"
             if recommended_action == "message_reporter"
@@ -1947,7 +1998,7 @@ async def discord_interaction(
         except httpx.HTTPError as exc:
             return {
                 "type": 4,
-                "data": {"content": _crcon_interaction_error(exc), "flags": 64},
+                "data": {"content": _crcon_interaction_error(exc, interaction_language), "flags": 64},
             }
         if selected_template_id:
             selected_template = template_result.get("selected") or {}
@@ -1957,13 +2008,14 @@ async def discord_interaction(
                 recommended_action,
                 initial_text=str(selected_template.get("content") or ""),
                 duration_hours=duration_hours,
+                language=interaction_language,
             )
         templates = template_result.get("templates") or []
         if templates:
             return _template_picker(
-                incident_id, revision, recommended_action, templates
+                incident_id, revision, recommended_action, templates, language=interaction_language
             )
-        return _action_modal(incident_id, revision, recommended_action, duration_hours=duration_hours)
+        return _action_modal(incident_id, revision, recommended_action, duration_hours=duration_hours, language=interaction_language)
     if operation == "logs":
         try:
             claimed = _claim_from_first_button(
@@ -1999,19 +2051,19 @@ async def discord_interaction(
             log_response.raise_for_status()
             log_result = log_response.json().get("result", log_response.json())
             lines = log_result.get("lines") or []
-            content = "\n".join(str(value) for value in lines) or "Keine Logs gefunden."
+            content = "\n".join(str(value) for value in lines) or ("Aucun journal trouvé." if interaction_language == "fr" else "Keine Logs gefunden.")
             return {
                 "type": 4,
                 "data": {
-                    "content": f"📄 Logs für **{log_result.get('player_name') or 'Spieler'}**\n```\n{content[:1750]}\n```",
+                    "content": f"📄 {'Journaux de' if interaction_language == 'fr' else 'Logs für'} **{log_result.get('player_name') or ('Joueur' if interaction_language == 'fr' else 'Spieler')}**\n```\n{content[:1750]}\n```",
                     "flags": 64,
                 },
             }
         except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
             message = (
-                _crcon_interaction_error(exc)
+                _crcon_interaction_error(exc, interaction_language)
                 if isinstance(exc, httpx.HTTPError)
-                else "Die Logs konnten nicht geladen werden."
+                else "Impossible de charger les journaux." if interaction_language == "fr" else "Die Logs konnten nicht geladen werden."
             )
             return {"type": 4, "data": {"content": message, "flags": 64}}
     endpoint = "actions/prepare" if operation == "action" else "incidents/transition"
@@ -2084,7 +2136,7 @@ async def discord_interaction(
     except httpx.HTTPError as exc:
         return {
             "type": 4,
-            "data": {"content": _crcon_interaction_error(exc), "flags": 64},
+            "data": {"content": _crcon_interaction_error(exc, interaction_language), "flags": 64},
         }
     if operation == "action":
         preview = str(result.get("preview") or actual_action)[:2000]
@@ -2103,7 +2155,7 @@ async def discord_interaction(
                 return {
                     "type": 4,
                     "data": {
-                        "content": _crcon_interaction_error(exc),
+                        "content": _crcon_interaction_error(exc, interaction_language),
                         "flags": 64,
                     },
                 }
@@ -2126,7 +2178,7 @@ async def discord_interaction(
                 "type": 4,
                 "data": {
                     "content": (
-                        _action_execution_message(execution_result, str(actual_action))
+                        _action_execution_message(execution_result, str(actual_action), interaction_language)
                     ),
                     "flags": 64,
                 },
@@ -2147,7 +2199,7 @@ async def discord_interaction(
         )
         session.add(relay)
         session.commit()
-        content = f"Vorschau: {preview}"
+        content = f"{'Aperçu' if interaction_language == 'fr' else 'Vorschau'}: {preview}"
         return {
             "type": 4,
             "data": {
@@ -2160,7 +2212,7 @@ async def discord_interaction(
                             {
                                 "type": 2,
                                 "style": 4,
-                                "label": "Endgültig ausführen",
+                                "label": "Exécuter définitivement" if interaction_language == "fr" else "Endgültig ausführen",
                                 "custom_id": f"confirm:{relay.handle}",
                             }
                         ],
@@ -2169,12 +2221,17 @@ async def discord_interaction(
             },
         }
     else:
-        content = {
+        content = ({
+            "manual": "Vous traitez maintenant ce signalement manuellement.",
+            "finish": "Le traitement manuel est terminé.",
+            "dismiss": "Le signalement a été rejeté comme injustifié.",
+            "trash": "Le signalement a été clos comme erroné.",
+        } if interaction_language == "fr" else {
             "manual": "Du bearbeitest diesen Report jetzt manuell.",
             "finish": "Die manuelle Bearbeitung wurde abgeschlossen.",
             "dismiss": "Der Report wurde als unberechtigt abgelehnt.",
             "trash": "Der Report wurde als Fehlmeldung geschlossen.",
-        }.get(operation, f"Incident aktualisiert: {operation}.")
+        }).get(operation, f"{'Incident mis à jour' if interaction_language == 'fr' else 'Incident aktualisiert'}: {operation}.")
         if operation in {"dismiss", "trash"}:
             mapping = session.execute(
                 select(IncidentMessage).where(

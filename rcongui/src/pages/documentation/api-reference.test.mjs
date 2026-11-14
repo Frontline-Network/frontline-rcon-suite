@@ -142,6 +142,17 @@ test("missing or malformed translations retain original documentation", () => {
   assert.equal(docs[1].description, "Technical notes");
 });
 
+test("French API descriptions are shown when supplied and otherwise fall back", () => {
+  const docs = normalizeApiDocumentation([
+    { endpoint: "fr", doc_string: "technical", description_translations: { en: "English", fr: "Français" } },
+    { endpoint: "legacy", doc_string: "technical", description_translations: { en: "English" } },
+  ]);
+  const [french, legacy] = localizeApiDocumentation(docs, "fr-FR");
+  assert.equal(french.description, "Français");
+  assert.equal(french.technicalDescription, "technical");
+  assert.equal(legacy.description, "English");
+});
+
 test("WebSocket routes use their registered root rather than the HTTP API prefix", () => {
   const docs = normalizeApiDocumentation(snapshot);
   assert.equal(

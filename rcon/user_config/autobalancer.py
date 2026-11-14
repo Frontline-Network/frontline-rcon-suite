@@ -122,6 +122,33 @@ class AutobalancerEnglishMessages(AutobalancerMessages):
     )
 
 
+class AutobalancerFrenchMessages(AutobalancerMessages):
+    volunteer_request: str = (
+        "Les équipes sont déséquilibrées. Pour rejoindre {target_team} volontairement, "
+        "saisissez !balance dans les {seconds} secondes."
+    )
+    volunteer_registered: str = "Merci ! Votre candidature pour cet équilibrage a été enregistrée."
+    candidate_selected: str = (
+        "Vous avez été sélectionné pour rejoindre {target_team}. Le changement aura lieu après votre prochaine mort ; "
+        "vous serez ensuite protégé pendant {cooldown_maps} cartes."
+    )
+    switch_completed: str = (
+        "Merci pour votre aide ! Vous avez rejoint {target_team} et êtes protégé contre un nouveau "
+        "changement automatique pendant {cooldown_maps} cartes."
+    )
+    squad_switch_selected: str = (
+        "Votre escouade {squad_name} va rejoindre {target_team} ensemble. "
+        "Veuillez ensuite recréer votre escouade dans cette équipe."
+    )
+    squad_switch_completed: str = (
+        "Le changement vers {target_team} est terminé. Veuillez recréer l'escouade {squad_name} dans cette équipe."
+    )
+    squad_switch_aborted: str = (
+        "Le transfert de l'escouade {squad_name} n'a pas pu être terminé. "
+        "Veuillez attendre les instructions d'un administrateur."
+    )
+
+
 class AutobalancerUserConfig(BaseUserConfig):
     mode: Literal["disabled", "shadow", "manual", "auto"] = Field(
         default="disabled",
@@ -355,15 +382,20 @@ class AutobalancerUserConfig(BaseUserConfig):
             "Shadow-Modus werden keine Nachrichten gesendet."
         ),
     )
-    message_language: Literal["de", "en", "de+en"] = Field(
+    message_language: Literal["de", "en", "fr", "de+en", "de+fr", "en+fr", "de+en+fr"] = Field(
         default="de",
         title="Nachrichtensprache",
-        description="de = Deutsch; en = Englisch; de+en = zwei getrennte Nachrichten, zuerst Deutsch, dann Englisch. Bestehende deutsche Vorlagen bleiben erhalten.",
+        description="Deutsch, Englisch und Französisch einzeln oder kombiniert. Kombinierte Sprachen werden als getrennte Nachrichten gesendet; vorhandene Vorlagen bleiben erhalten.",
     )
     messages_en: AutobalancerEnglishMessages = Field(
         default_factory=AutobalancerEnglishMessages,
         title="Spielernachrichten – Englisch",
         description="Eigenständige englische Vorlagen mit denselben Platzhaltern. Die Nachrichtensprache bestimmt, welche Pakete gesendet werden.",
+    )
+    messages_fr: AutobalancerFrenchMessages = Field(
+        default_factory=AutobalancerFrenchMessages,
+        title="Spielernachrichten – Französisch",
+        description="Eigenständige französische Vorlagen mit denselben Platzhaltern.",
     )
 
     @field_validator("volunteer_command")

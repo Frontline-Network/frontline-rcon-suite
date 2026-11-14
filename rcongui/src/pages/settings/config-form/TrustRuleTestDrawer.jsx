@@ -8,6 +8,7 @@ import {
   TextField,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
+import frenchCopy from "./trust-copy-fr.json";
 import ConfigTestDrawer from "./ConfigTestDrawer";
 import { simulateTrustRule } from "./simulateTrustRule.mjs";
 
@@ -440,8 +441,8 @@ function BooleanSelect({ id, label, value, onChange, copy }) {
 
 export default function TrustRuleTestDrawer({ open, onClose, data, kind }) {
   const { i18n } = useTranslation();
-  const language = i18n.language?.startsWith("de") ? "de" : "en";
-  const copy = copyByLanguage[language];
+  const language = (i18n.resolvedLanguage || i18n.language || "en").split("-")[0];
+  const copy = language === "fr" ? frenchCopy : copyByLanguage[language === "de" ? "de" : "en"];
   const kindCopy = copy[kind];
   const [sample, setSample] = useState(() => initialSample(kind));
   const [hasRun, setHasRun] = useState(false);

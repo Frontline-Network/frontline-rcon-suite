@@ -39,7 +39,7 @@ export default function AdminActionContext({ context }) {
   const { t, i18n } = useTranslation();
   const defaultContext = useAdminActionContext();
   const value = context || defaultContext;
-  const language = i18n.resolvedLanguage === "en" ? "en" : "de";
+  const language = i18n.resolvedLanguage || "de";
   const lastSuccessAt = value.gameServer.lastSuccessAt;
   const lastUpdated = lastSuccessAt
     ? new Date(lastSuccessAt).toLocaleString(language)

@@ -1,4 +1,4 @@
-"""Separate DE/EN packets; server settings, never inferred player language."""
+"""Separate language packets; server settings, never inferred player language."""
 
 from .feedback import send_private
 
@@ -77,6 +77,27 @@ SYSTEM = {
     ),
 }
 
+SYSTEM_FR = {
+    "manual": "Mode manuel : un administrateur doit approuver le changement. Cette commande ne change pas immédiatement votre équipe.",
+    "disabled": "L'équilibrage automatique est désactivé. Aucun changement d'équipe n'est prévu.",
+    "shadow": "L'équilibrage automatique est en mode observation. Aucun changement d'équipe n'aura lieu.",
+    "waiting_admin": "La période de volontariat est terminée. La proposition attend un administrateur.",
+    "preparing": "La période de volontariat est terminée. Un changement est déjà en préparation ou en cours de vérification.",
+    "closed": "Aucun appel aux volontaires n'est ouvert actuellement. Veuillez attendre une nouvelle invitation.",
+    "unavailable": "L'équilibrage automatique est momentanément indisponible. Veuillez réessayer plus tard.",
+    "expired": "Votre réponse est arrivée après la fin de la période de volontariat. Veuillez attendre une nouvelle invitation.",
+    "blocked": "Votre demande n'a pas pu être acceptée : l'équilibrage est temporairement bloqué par sécurité.",
+    "seeding": "L'équilibrage est suspendu pendant le remplissage du serveur. Aucun changement d'équipe n'est prévu.",
+    "wrong_team": "Non enregistré : cet appel concerne uniquement les joueurs de l'équipe initialement la plus nombreuse.",
+    "commander": "Non enregistré : les commandants sont protégés contre les changements d'équipe automatiques.",
+    "connection": "Non enregistré : vous êtes encore protégé après votre connexion au serveur.",
+    "squad": "Non enregistré : votre escouade doit rester ensemble ; ses membres ne peuvent pas se porter volontaires individuellement.",
+    "cooldown": "Non enregistré : vous êtes encore protégé après un changement d'équipe précédent.",
+    "registered": "Vous êtes déjà inscrit pour cet appel.",
+    "ended": "L'équilibrage a été annulé. Vous restez dans votre équipe.",
+    "uncertain": "L'équilibrage est terminé. Veuillez demander à un administrateur de vérifier votre changement d'équipe.",
+}
+
 
 def closed_key(mode, state):
     if mode in {"disabled", "shadow"}:
@@ -91,24 +112,20 @@ def closed_key(mode, state):
 
 
 def render(config, key, *, manual=False, **values):
-    languages = (
-        ("de", "en")
-        if config.message_language == "de+en"
-        else (config.message_language,)
-    )
+    languages = config.message_language.split("+")
     result = []
     for language in languages:
         index = 0 if language == "de" else 1
-        pack = config.messages if language == "de" else config.messages_en
-        text = SYSTEM[key][index] if key in SYSTEM else getattr(pack, key)
+        pack = {"de": config.messages, "en": config.messages_en, "fr": config.messages_fr}[language]
+        text = (SYSTEM_FR[key] if language == "fr" else SYSTEM[key][index]) if key in SYSTEM else getattr(pack, key)
         # Faction labels US/NVA/etc remain unchanged; translate HLL team labels.
         localized = dict(values)
         if "target_team" in localized:
-            labels = (
-                {"Allies": "Alliierte", "Axis": "Achsenmächte"}
-                if language == "de"
-                else {"Alliierte": "Allies", "Achsenmächte": "Axis"}
-            )
+            labels = {
+                "de": {"Allies": "Alliierte", "Axis": "Achsenmächte"},
+                "en": {"Alliierte": "Allies", "Achsenmächte": "Axis"},
+                "fr": {"Allies": "Alliés", "Alliierte": "Alliés", "Axis": "Axe", "Achsenmächte": "Axe"},
+            }[language]
             localized["target_team"] = labels.get(
                 localized["target_team"], localized["target_team"]
             )
@@ -116,7 +133,7 @@ def render(config, key, *, manual=False, **values):
         if key == "volunteer_request":
             text = text.replace("!balance", config.volunteer_command)
         if manual and config.mode == "manual":
-            text += "\n" + SYSTEM["manual"][index]
+            text += "\n" + (SYSTEM_FR["manual"] if language == "fr" else SYSTEM["manual"][index])
         result.append(text)
     return result
 

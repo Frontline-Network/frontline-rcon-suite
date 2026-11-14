@@ -2442,6 +2442,22 @@ class DiscordActionTemplateTests(TestCase):
         self.assertEqual(integration.last_test_error, "")
 
     @patch("api.discord_integration.decrypt_capability", return_value="events-test")
+    @patch("api.discord_integration.requests.post")
+    def test_french_discord_test_message_passes_selected_language(self, post, _decrypt):
+        from api.models import DiscordReportIntegration
+        from api.discord_integration import _config_payload
+
+        self._discord_manager()
+        integration = DiscordReportIntegration.objects.create(
+            pk=1, enabled=False, service_url="https://discord.example", guild_id="123", channel_id="456",
+            outbound_capability_ciphertext=b"ciphertext", language="fr",
+        )
+        self.assertEqual(_config_payload({"language": "fr", "policy": {"language": "fr"}})["policy"]["language"], "fr")
+        post.return_value.raise_for_status.return_value = None
+        self.assertEqual(self.client.post("/api/discord/v1/test-message").status_code, 200)
+        self.assertEqual(post.call_args.kwargs["json"], {"installation_id": str(integration.installation_id), "language": "fr"})
+
+    @patch("api.discord_integration.decrypt_capability", return_value="events-test")
     @patch(
         "api.discord_integration.requests.post",
         side_effect=requests.ConnectionError("secret upstream detail"),

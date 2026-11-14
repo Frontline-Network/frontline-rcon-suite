@@ -26,6 +26,50 @@ _pending_slots = threading.BoundedSemaphore(20)
 _attempt_lock = threading.Lock()
 _attempts: dict[str, list[float]] = {}
 
+# This language is independent of the browser UI language, which belongs to
+# each individual administrator. It only selects our built-in responses;
+# messages returned by the verification service remain untouched.
+_MESSAGES = {
+    "de": {
+        "unavailable": "Die Frontline-VIP-Verifizierung ist auf diesem Server noch nicht verfügbar.",
+        "network_error": "Die VIP-Verifizierung ist momentan nicht erreichbar. Dein Code bleibt gültig; versuche es später erneut.",
+        "success": "Dein FLN-Konto wurde erfolgreich mit diesem Spieler verknüpft.",
+        "invalid_code": "Der VIP-Code ist ungültig oder wurde bereits eingelöst.",
+        "invalid_command": "Ungültiger Befehl. Nutze: !vipverify DEIN-CODE-AUS-DEM-FLN-KONTO",
+        "rate_limit": "Zu viele VIP-Prüfungen. Bitte warte einige Minuten und versuche es erneut.",
+        "busy": "Die VIP-Verifizierung ist gerade ausgelastet. Dein Code bleibt gültig; versuche es gleich erneut.",
+        "checking": "Dein VIP-Code wird geprüft …",
+        "queue_error": "Die VIP-Verifizierung konnte nicht gestartet werden. Dein Code bleibt gültig.",
+    },
+    "en": {
+        "unavailable": "Frontline VIP verification is not yet available on this server.",
+        "network_error": "VIP verification is currently unavailable. Your code remains valid; please try again later.",
+        "success": "Your FLN account has been linked to this player.",
+        "invalid_code": "The VIP code is invalid or has already been redeemed.",
+        "invalid_command": "Invalid command. Use: !vipverify YOUR-CODE-FROM-YOUR-FLN-ACCOUNT",
+        "rate_limit": "Too many VIP verification attempts. Please wait a few minutes and try again.",
+        "busy": "VIP verification is busy. Your code remains valid; please try again shortly.",
+        "checking": "Your VIP code is being checked …",
+        "queue_error": "VIP verification could not be started. Your code remains valid.",
+    },
+    "fr": {
+        "unavailable": "La vérification VIP Frontline n'est pas encore disponible sur ce serveur.",
+        "network_error": "La vérification VIP est momentanément indisponible. Votre code reste valide ; réessayez plus tard.",
+        "success": "Votre compte FLN a été associé à ce joueur.",
+        "invalid_code": "Le code VIP est invalide ou a déjà été utilisé.",
+        "invalid_command": "Commande invalide. Utilisez : !vipverify VOTRE-CODE-DU-COMPTE-FLN",
+        "rate_limit": "Trop de tentatives de vérification VIP. Patientez quelques minutes et réessayez.",
+        "busy": "La vérification VIP est occupée. Votre code reste valide ; réessayez dans quelques instants.",
+        "checking": "Vérification de votre code VIP en cours …",
+        "queue_error": "La vérification VIP n'a pas pu démarrer. Votre code reste valide.",
+    },
+}
+
+
+def _message(key: str) -> str:
+    language = os.getenv("FRONTLINE_VIP_VERIFICATION_LANGUAGE", "de").strip().lower()
+    return _MESSAGES.get(language, _MESSAGES["de"])[key]
+
 
 def _normalize_code(value: str) -> str:
     return re.sub(r"[^A-Z0-9]", "", value.upper())
@@ -93,7 +137,7 @@ def _redeem(rcon, player_id: str, player_name: str, code: str) -> None:
         _message_player(
             rcon,
             player_id,
-            "Die Frontline-VIP-Verifizierung ist auf diesem Server noch nicht verfügbar.",
+            _message("unavailable"),
         )
         return
 
@@ -128,7 +172,7 @@ def _redeem(rcon, player_id: str, player_name: str, code: str) -> None:
         _message_player(
             rcon,
             player_id,
-            "Die VIP-Verifizierung ist momentan nicht erreichbar. Dein Code bleibt gültig; versuche es später erneut.",
+            _message("network_error"),
         )
         return
 
@@ -137,14 +181,14 @@ def _redeem(rcon, player_id: str, player_name: str, code: str) -> None:
         _message_player(
             rcon,
             player_id,
-            message or "Dein FLN-Konto wurde erfolgreich mit diesem Spieler verknüpft.",
+            message or _message("success"),
         )
         return
 
     _message_player(
         rcon,
         player_id,
-        message or "Der VIP-Code ist ungültig oder wurde bereits eingelöst.",
+        message or _message("invalid_code"),
     )
 
 
@@ -171,7 +215,7 @@ def handle_chat_verification(rcon, struct_log: dict[str, Any]) -> bool:
         _message_player(
             rcon,
             player_id,
-            "Ungültiger Befehl. Nutze: !vipverify DEIN-CODE-AUS-DEM-FLN-KONTO",
+            _message("invalid_command"),
         )
         return True
 
@@ -179,7 +223,7 @@ def handle_chat_verification(rcon, struct_log: dict[str, Any]) -> bool:
         _message_player(
             rcon,
             player_id,
-            "Zu viele VIP-Prüfungen. Bitte warte einige Minuten und versuche es erneut.",
+            _message("rate_limit"),
         )
         return True
 
@@ -187,11 +231,11 @@ def handle_chat_verification(rcon, struct_log: dict[str, Any]) -> bool:
         _message_player(
             rcon,
             player_id,
-            "Die VIP-Verifizierung ist gerade ausgelastet. Dein Code bleibt gültig; versuche es gleich erneut.",
+            _message("busy"),
         )
         return True
 
-    _message_player(rcon, player_id, "Dein VIP-Code wird geprüft …")
+    _message_player(rcon, player_id, _message("checking"))
     try:
         _executor.submit(_redeem_with_slot, rcon, player_id, player_name, code)
     except Exception:
@@ -200,6 +244,6 @@ def handle_chat_verification(rcon, struct_log: dict[str, Any]) -> bool:
         _message_player(
             rcon,
             player_id,
-            "Die VIP-Verifizierung konnte nicht gestartet werden. Dein Code bleibt gültig.",
+            _message("queue_error"),
         )
     return True

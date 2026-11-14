@@ -646,6 +646,24 @@ def recover(server):
     _invalidate_user_config_cache(votes.config_key(server))
 
 
+def reporter_receipt(target_name, *, review=False, language="de+en"):
+    """Localize only built-in receipts; selected sanction templates stay untouched."""
+    target_name = " ".join(str(target_name).split())[:100]
+    if review:
+        messages = {
+            "de": f"Deine Cheatmeldung zu {target_name} ist eingegangen. Die Daten werden geprüft; Admins entscheiden über Maßnahmen.",
+            "en": f"Your cheat report about {target_name} was received. Evidence is being reviewed; admins decide on any action.",
+            "fr": f"Votre signalement de triche concernant {target_name} a été reçu. Les preuves sont examinées ; les administrateurs décident des mesures à prendre.",
+        }
+    else:
+        messages = {
+            "de": f"Deine Meldung wurde bearbeitet: {target_name} wurde vom Server gekickt.",
+            "en": f"Your report was handled: {target_name} was kicked from the server.",
+            "fr": f"Votre signalement a été traité : {target_name} a été expulsé du serveur.",
+        }
+    return "\n".join(messages[part] for part in language.split("+"))
+
+
 def notify_reporter(api, server, event_id, *, review=False):
     """One private receipt after a durably confirmed kick; never a warning.
 
@@ -711,16 +729,7 @@ def notify_reporter(api, server, event_id, *, review=False):
             }
             return
         recipient, recipient_name = i.reporter_id, i.reporter_name
-        target_name = " ".join(str(p["target_name"]).split())[:100]
-        body = (
-            f"Deine Meldung wurde bearbeitet: {target_name} wurde vom Server gekickt.\n"
-            f"Your report was handled: {target_name} was kicked from the server."
-        )
-        if review:
-            body = (
-                f"Deine Cheatmeldung zu {target_name} ist eingegangen. Die Daten werden geprüft; Admins entscheiden über Maßnahmen.\n"
-                f"Your cheat report about {target_name} was received. Evidence is being reviewed; admins decide on any action."
-            )
+        body = reporter_receipt(p["target_name"], review=review, language=config(sess, server).receipt_language)
         event.payload = {
             **p,
             field: {

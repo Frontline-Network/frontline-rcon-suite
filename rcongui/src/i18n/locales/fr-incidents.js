@@ -1,0 +1,33 @@
+// Reviewed moderation-report workflow; user-submitted reports stay unchanged.
+export const incidentsFr = {
+  eyebrow: "Modération",
+  title: "Signalements",
+  subtitle: "Prenez en charge, traitez et clôturez les signalements administrateur sur tous les serveurs.",
+  liveUpdates: "En direct · 15 s",
+  summary: "Résumé des signalements ouverts",
+  metrics: { open: "Ouverts", unassigned: "Non attribués", servers: "Serveurs concernés", oldest: "Signalement le plus ancien" },
+  queue: { title: "File de traitement", description: "Examinez les signalements par ordre d’urgence et prenez-les en charge." },
+  detail: {
+    panel: "Détails du signalement", eyebrow: "Dossier actif", mobileTitle: "Traiter le signalement",
+    received: "Reçu", original: "Signalement initial", nextAction: "Prochaine étape",
+    emptyTitle: "Sélectionnez un signalement", emptyDescription: "Sélectionnez un dossier à gauche pour afficher son contexte et les actions possibles.",
+    completedHint: "Ce dossier est clôturé et reste disponible dans le journal d’audit.",
+  },
+  nextStep: {
+    claim: "Prenez le dossier en charge, examinez le contexte du jeu et choisissez une action.",
+    resolve: "Terminez l’examen ou rejetez le signalement en indiquant un motif.",
+    review: "Consultez le résultat et l’historique du traitement.",
+  },
+  sources: { chat: "Chat du jeu", manual: "Manuel", discord: "Discord", unknown: "Source inconnue" },
+  filters: "Filtrer les signalements",
+  tabs: { new: "Nouveaux", claimed: "Pris en charge", open: "Ouverts", done: "Résolus", dismissed: "Rejetés" },
+  status: { new: "Nouveau", claimed: "Pris en charge", resolved: "Résolu", dismissed: "Rejeté" },
+  server: "Serveur {{number}}", generalReport: "Signalement général", unknownReporter: "Auteur inconnu", assignedTo: "attribué à {{name}}",
+  reason: "Motif du signalement", noReason: "Aucun motif indiqué.", reporter: "Auteur du signalement", assignee: "Responsable", unassigned: "Pas encore pris en charge", updated: "Dernière mise à jour",
+  emptyTitle: "Aucun signalement", emptyDescription: "Aucun signalement ne correspond actuellement à ce filtre.",
+  loadFailed: "Les signalements n’ont pas pu être chargés. Vérifiez la connexion et réessayez.",
+  updateFailed: "Le signalement n’a pas pu être mis à jour. Il reste inchangé.",
+  dismissConfirmationTitle: "Rejeter ce signalement ?",
+  dismissConfirmationBody: "Le rejet est enregistré dans l’historique. Le signalement ne pourra ensuite plus être traité comme ouvert.",
+  actions: { claim: "Prendre en charge", dismiss: "Rejeter", resolve: "Résoudre", confirmDismiss: "Confirmer le rejet" },
+};

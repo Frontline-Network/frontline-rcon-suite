@@ -30,6 +30,14 @@ const environmentNames = {
     rain: "Rain",
     overcast: "Overcast",
   },
+  fr: {
+    day: "Jour",
+    night: "Nuit",
+    dusk: "Crépuscule",
+    dawn: "Aube",
+    rain: "Pluie",
+    overcast: "Couvert",
+  },
 };
 
 const statusTones = {
@@ -88,7 +96,8 @@ export default function BattleOverview() {
   const connectionHealth = useGlobalStore((state) => state.connectionHealth);
   const currentMap = gameState?.current_map;
   const [mapImageFailed, setMapImageFailed] = useState(false);
-  const language = i18n.resolvedLanguage === "en" ? "en" : "de";
+  const requestedLanguage = (i18n.resolvedLanguage || "de").split("-")[0];
+  const language = environmentNames[requestedLanguage] ? requestedLanguage : "de";
   const mapName = currentMap?.pretty_name || t("matchStatus.unknownMap");
   const mode = currentMap?.game_mode || t("common.unknown");
   const environment = currentMap?.environment
