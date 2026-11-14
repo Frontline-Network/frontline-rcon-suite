@@ -68,6 +68,9 @@ test("Vanguard: once per account across devices, German/English and manual reope
   await expect(page.locator("html")).toHaveAttribute("data-theme-preset", "frontline-gold");
   await expect(page.locator("#release-spotlight-title")).toHaveText("Dein RCON. Dein Look.");
   await page.screenshot({ path: testInfo.outputPath("vanguard-de.png") });
+  await spotlight(page).getByRole("button", { name: "Français", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "fr");
+  await expect(page.locator("#release-spotlight-title")).toHaveText("Your RCON. Your style.");
   await spotlight(page).getByRole("button", { name: "English", exact: true }).click();
   await expect(page.locator("#release-spotlight-title")).toHaveText("Your RCON. Your style.");
   await expect(spotlight(page).getByRole("img")).toHaveAttribute("alt", "RCON dashboards in six Aurora colour styles.");

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { ensureLanguageLoaded } from "@/i18n";
 import {
   Alert,
   Box,
@@ -49,9 +50,10 @@ export default function ReleaseHighlightsDialog({
   // Older release data may have only DE/EN; future highlights can include FR.
   const localized = (values) => values?.[lang] || values?.en || values?.de || "";
   const content = release.highlights;
-  const changeLanguage = (_, language) => {
+  const changeLanguage = async (_, language) => {
     if (!language) return;
-    i18n.changeLanguage(language);
+    await ensureLanguageLoaded(language);
+    await i18n.changeLanguage(language);
     document.documentElement.lang = language;
   };
   const openAction = () => {
