@@ -381,6 +381,9 @@ test("weekly activity, balance, milestones and dated events persist together", a
   await chooseRule(page, "Spielzeit-Meilensteine");
   await page.getByLabel("Spielzeit-Meilensteine aktivieren").check();
   await page.getByRole("button", { name: "Meilenstein hinzufügen" }).click();
+  await expect(
+    page.getByRole("slider", { name: "Spielstunden", exact: true })
+  ).toHaveCount(4);
   await page
     .getByRole("slider", { name: "Spielstunden", exact: true })
     .last()
