@@ -3,7 +3,6 @@ import LanguageDetector from "i18next-browser-languagedetector";
 import { initReactI18next } from "react-i18next";
 import de from "./locales/de";
 import en from "./locales/en";
-import fr from "./locales/fr";
 import dayjs from "dayjs";
 import "dayjs/locale/de";
 import "dayjs/locale/fr";
@@ -29,12 +28,11 @@ i18n
     resources: {
       de: { translation: de },
       en: { translation: en },
-      fr: { translation: fr },
     },
     supportedLngs: supportedLanguages,
     // German is the first-run language; an English string is shown only when
     // a German translation has not been supplied yet.
-    lng: initialLanguage,
+    lng: initialLanguage === "fr" ? "en" : initialLanguage,
     fallbackLng: "en",
     load: "languageOnly",
     interpolation: { escapeValue: false },
@@ -44,6 +42,33 @@ i18n
       lookupLocalStorage: "crcon.language",
     },
   });
+
+// French is deliberately a separate chunk: loading it in every session pushes
+// the initial application bundle over its budget. Share in-flight loads so a
+// rapid sequence of language selections never installs a partial catalog.
+let frenchCatalogLoad;
+let frenchCatalogLoaded = false;
+export function ensureLanguageLoaded(language) {
+  if (language !== "fr" || frenchCatalogLoaded) {
+    return Promise.resolve();
+  }
+  if (!frenchCatalogLoad) {
+    frenchCatalogLoad = import("./locales/fr").then(({ default: fr }) => {
+      i18n.addResourceBundle("fr", "translation", fr, true, true);
+      frenchCatalogLoaded = true;
+    }).catch((error) => {
+      frenchCatalogLoad = undefined;
+      throw error;
+    });
+  }
+  return frenchCatalogLoad;
+}
+
+// Wait before mounting when French was saved, avoiding an English flash and
+// ensuring document.lang, the picker locale and the visible text agree.
+export const i18nReady = initialLanguage === "fr"
+  ? ensureLanguageLoaded("fr").then(() => i18n.changeLanguage("fr"))
+  : Promise.resolve();
 
 const applyDocumentLanguage = (language) => {
   const locale = dateLocale(language);

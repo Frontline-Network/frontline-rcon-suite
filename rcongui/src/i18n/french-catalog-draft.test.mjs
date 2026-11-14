@@ -43,7 +43,10 @@ test("the shipped locale explicitly registers French and lazy panels", () => {
   const register = readFileSync(new URL("./register-settings-panels.js", import.meta.url), "utf8");
   const selector = readFileSync(new URL("../components/layout/LanguageSelector.jsx", import.meta.url), "utf8");
   assert.match(index, /supportedLanguages\s*=\s*\[[^\]]*["']fr["']/);
-  assert.match(index, /fr\s*:\s*\{\s*translation\s*:\s*fr\s*\}/);
+  assert.match(index, /import\(["']\.\/locales\/fr["']\)/);
+  assert.match(index, /addResourceBundle\(["']fr["'],\s*["']translation["'],\s*fr/);
+  assert.match(index, /initialLanguage\s*===\s*["']fr["']/);
+  assert.match(selector, /await\s+ensureLanguageLoaded\(code\)/);
   assert.match(register, /fr\s*:\s*settingsPanelsFr/);
   assert.match(register, /addResourceBundle\(language,\s*["']translation["'],\s*\{\s*settingsPanels\s*\}/);
   assert.match(selector, /code\s*:\s*["']fr["']/);

@@ -25,3 +25,15 @@ test("French can be selected, persists across reload, and switches back to Germa
   await expect(page.locator("html")).toHaveAttribute("lang", "de");
   await expect(main.getByRole("heading", { name: "Spielprotokolle", exact: true })).toBeVisible();
 });
+
+test("French loads after a settings page has already registered its lazy panels", async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.setItem("crcon.language", "de"));
+  await page.goto("/settings/others/autobalancer", { waitUntil: "domcontentloaded" });
+  await page.locator("#autobalancer-settings").click();
+  await expect(page.getByRole("heading", { name: "Autobalancer", exact: true }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Sprache", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Français", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "fr");
+  await expect(page.getByRole("heading", { name: "Équilibrage automatique", exact: true })).toBeVisible();
+  await expect(page.getByText("Informer les joueurs", { exact: true })).toBeVisible();
+});
