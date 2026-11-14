@@ -8,7 +8,7 @@ import {
 const labels = {
   de: { section: /Spieler informieren/, language: "Nachrichtensprache", german: "Spielernachrichten – Deutsch", english: "Spielernachrichten – Englisch", french: "Spielernachrichten – Französisch", request: "Aufruf für Freiwillige", save: "Einstellungen speichern" },
   en: { section: /Notify players/, language: "Message language", german: "Player messages – German", english: "Player messages – English", french: "Player messages – French", request: "Volunteer request", save: "Save settings" },
-  fr: { section: /Informer les joueurs/, language: "Langue des messages", german: "Messages aux joueurs – allemand", english: "Messages aux joueurs – anglais", french: "Messages aux joueurs – français", request: "Demande de volontaires", save: "Sauvegarder les paramètres" },
+  fr: { section: /Informer les joueurs/, language: "Langue des messages", german: "Messages aux joueurs – allemand", english: "Messages aux joueurs – anglais", french: "Messages aux joueurs – français", request: "Demande de volontaires", save: "Enregistrer les paramètres" },
 };
 
 for (const language of ["de", "en", "fr"]) {
