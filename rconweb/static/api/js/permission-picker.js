@@ -8,7 +8,7 @@
   const initialize = () => document.querySelectorAll("select.crcon-permission-select").forEach((select) => {
     if (select.dataset.enhanced) return;
     const data = JSON.parse(document.getElementById(select.id + "_help").textContent);
-    const de = data.german;
+    const de = data.german, fr = data.language === "fr", t = (a, b, c) => de ? a : fr ? (c || window.CRCONPermissionFrench?.[b] || b) : b;
     const own = new Set(Array.from(select.selectedOptions, (option) => option.value));
     const initial = new Set(own);
     const planner = window.CRCONPermissionPlanner;
@@ -20,11 +20,11 @@
     const groupSelect = document.querySelector("select.crcon-group-select");
     if (groupSelect && !groupSelect.dataset.enhanced) {
       const groupRoot = element("section", "crcon-group-picker");
-      groupRoot.setAttribute("aria-label", de ? "Gruppen auswählen" : "Choose groups");
-      const groupIntro = element("p", "permission-intro", de ? "Alle Rechte der ausgewählten Gruppen gelten für dieses Konto. Einzelne Rechte kannst du darunter ergänzen." : "This account inherits every permission from its selected groups. Add individual permissions below.");
+      groupRoot.setAttribute("aria-label", t("Gruppen auswählen", "Choose groups"));
+      const groupIntro = element("p", "permission-intro", t("Alle Rechte der ausgewählten Gruppen gelten für dieses Konto. Einzelne Rechte kannst du darunter ergänzen.", "This account inherits every permission from its selected groups. Add individual permissions below."));
       const groupSearch = element("input"); groupSearch.type = "search";
-      groupSearch.placeholder = de ? "Gruppen suchen …" : "Search groups …";
-      groupSearch.setAttribute("aria-label", de ? "Gruppen durchsuchen" : "Search groups");
+      groupSearch.placeholder = t("Gruppen suchen …", "Search groups …");
+      groupSearch.setAttribute("aria-label", t("Gruppen durchsuchen", "Search groups"));
       const groupList = element("div", "crcon-group-options");
       const groupCount = element("p", "permission-count"); groupCount.setAttribute("aria-live", "polite");
       const renderGroups = () => {
@@ -38,19 +38,19 @@
           const checkbox = element("input"); checkbox.type = "checkbox"; checkbox.checked = option.selected;
           const body = element("span"); body.append(element("strong", "", option.textContent));
           const count = data.groups.find(group => group.id === option.value)?.permissions.length;
-          if (count !== undefined) body.append(element("small", "", de ? `${count} Berechtigungen` : `${count} permissions`));
+          if (count !== undefined) body.append(element("small", "", t(`${count} Berechtigungen`, `${count} permissions`, `${count} autorisations`)));
           checkbox.addEventListener("change", () => {
             option.selected = checkbox.checked;
             groupSelect.dispatchEvent(new Event("change", {bubbles:true}));
           });
           label.append(checkbox, body); groupList.append(label);
         });
-        if (!matches) groupList.append(element("p", "permission-empty", de ? "Keine passenden Gruppen gefunden." : "No matching groups found."));
+        if (!matches) groupList.append(element("p", "permission-empty", t("Keine passenden Gruppen gefunden.", "No matching groups found.")));
         updateGroupCount();
       };
       const updateGroupCount = () => {
         const n = groupSelect.selectedOptions.length;
-        groupCount.textContent = de ? `${n} ${n === 1 ? "Gruppe" : "Gruppen"} ausgewählt · Änderungen werden mit dem Formular gespeichert.` : `${n} ${n === 1 ? "group" : "groups"} selected · Changes are saved with the form.`;
+        groupCount.textContent = t(`${n} ${n === 1 ? "Gruppe" : "Gruppen"} ausgewählt · Änderungen werden mit dem Formular gespeichert.`, `${n} ${n === 1 ? "group" : "groups"} selected · Changes are saved with the form.`, `${n} groupe(s) sélectionné(s) · Les modifications sont enregistrées avec le formulaire.`);
       };
       groupRoot.append(groupIntro, groupSearch, groupList, groupCount);
       groupSearch.addEventListener("input", renderGroups);
@@ -61,46 +61,44 @@
       const addGroup = document.getElementById("add_id_groups");
       if (addGroup) {
         addGroup.classList.add("crcon-create-group");
-        const label = de ? "Gruppe anlegen" : "Create group";
+        const label = t("Gruppe anlegen", "Create group");
         addGroup.append(document.createTextNode(label)); addGroup.setAttribute("aria-label", label);
       }
     }
     const root = element("section", "permission-picker");
-    root.setAttribute("aria-label", de ? "Berechtigungen auswählen" : "Choose permissions");
+    root.setAttribute("aria-label", t("Berechtigungen auswählen", "Choose permissions"));
     const intro = element("p", "permission-intro", data.direct
-      ? (de ? "Direkte Rechte ergänzen die Rechte aus den ausgewählten Gruppen. Gruppenrechte können hier nicht entzogen werden." : "Direct permissions add to the selected groups. Group permissions cannot be revoked here.")
-      : (de ? "Diese Rechte gelten für alle Mitglieder der Gruppe. Rechte mehrerer Gruppen ergänzen sich. Wähle eine Aufgabe oder Rollenvorlage und prüfe die Änderungen vor dem Sichern." : "These permissions apply to all group members. Permissions from multiple groups add together. Choose a task or role preset and review the changes before saving."));
-    const superuser = element("p", "permission-superuser", de ? "Administrator-Status ist aktiv: Dieses Konto besitzt alle Rechte. Die Einzelauswahl schränkt diese Vollrechte nicht ein." : "Superuser status is active: this account has all permissions. Individual selections do not restrict that access.");
+      ? (t("Direkte Rechte ergänzen die Rechte aus den ausgewählten Gruppen. Gruppenrechte können hier nicht entzogen werden.", "Direct permissions add to the selected groups. Group permissions cannot be revoked here."))
+      : (t("Diese Rechte gelten für alle Mitglieder der Gruppe. Rechte mehrerer Gruppen ergänzen sich. Wähle eine Aufgabe oder Rollenvorlage und prüfe die Änderungen vor dem Sichern.", "These permissions apply to all group members. Permissions from multiple groups add together. Choose a task or role preset and review the changes before saving.")));
+    const superuser = element("p", "permission-superuser", t("Administrator-Status ist aktiv: Dieses Konto besitzt alle Rechte. Die Einzelauswahl schränkt diese Vollrechte nicht ein.", "Superuser status is active: this account has all permissions. Individual selections do not restrict that access."));
     const toolbar = element("div", "permission-toolbar");
     const search = element("input"); search.type = "search";
-    search.placeholder = de ? "Rechte suchen, z. B. kicken, Karten, VIP …" : "Search permissions, e.g. kick, maps, VIP …";
-    search.setAttribute("aria-label", de ? "Berechtigungen durchsuchen" : "Search permissions");
+    search.placeholder = t("Rechte suchen, z. B. kicken, Karten, VIP …", "Search permissions, e.g. kick, maps, VIP …");
+    search.setAttribute("aria-label", t("Berechtigungen durchsuchen", "Search permissions"));
     const filterLabel = element("label", "permission-assigned-label");
     const assigned = element("input"); assigned.type = "checkbox";
-    filterLabel.append(assigned, document.createTextNode(de ? "Nur vergebene Rechte" : "Assigned permissions only"));
+    filterLabel.append(assigned, document.createTextNode(t("Nur vergebene Rechte", "Assigned permissions only")));
     toolbar.append(search, filterLabel);
     const kindFilter = element("select", "permission-kind-filter");
-    kindFilter.setAttribute("aria-label", de ? "Rechte nach Wirkung filtern" : "Filter permissions by effect");
-    [["all", de ? "Alle Rechte" : "All permissions"], ["read", de ? "Nur anzeigen" : "View only"], ["write", de ? "Ändern & Aktionen" : "Changes & actions"]]
+    kindFilter.setAttribute("aria-label", t("Rechte nach Wirkung filtern", "Filter permissions by effect"));
+    [["all", t("Alle Rechte", "All permissions")], ["read", t("Nur anzeigen", "View only")], ["write", t("Ändern & Aktionen", "Changes & actions")]]
       .forEach(([value, label]) => kindFilter.append(new Option(label, value)));
     toolbar.append(kindFilter);
     const summary = element("p", "permission-count"); summary.setAttribute("aria-live", "polite");
     const bulkNotice = element("p", "permission-bulk-notice"); bulkNotice.setAttribute("role", "status");
     const list = element("div", "permission-groups");
-    const empty = element("p", "permission-empty", de ? "Keine passenden Berechtigungen gefunden." : "No matching permissions found.");
+    const empty = element("p", "permission-empty", t("Keine passenden Berechtigungen gefunden.", "No matching permissions found."));
     const technicalLabel = element("label", "permission-technical-label");
     const technical = element("input"); technical.type = "checkbox";
-    technicalLabel.append(technical, document.createTextNode(de ? "Technische Kennungen anzeigen" : "Show technical identifiers"));
+    technicalLabel.append(technical, document.createTextNode(t("Technische Kennungen anzeigen", "Show technical identifiers")));
     const internalLabel = element("label", "permission-assigned-label");
     const internal = element("input"); internal.type = "checkbox";
-    internalLabel.append(internal, document.createTextNode(de ? "Interne Systemrechte einblenden" : "Show internal system permissions"));
-    const internalHelp = element("p", "permission-internal-help", de
-      ? "Interne Django-Rechte sind für Support und Spielermoderation nicht nötig. Bereits vergebene interne Rechte bleiben sichtbar und werden nicht automatisch entfernt."
-      : "Internal Django permissions are not needed for support or player moderation. Existing assignments remain visible and are never removed automatically.");
+    internalLabel.append(internal, document.createTextNode(t("Interne Systemrechte einblenden", "Show internal system permissions")));
+    const internalHelp = element("p", "permission-internal-help", t("Interne Django-Rechte sind für Support und Spielermoderation nicht nötig. Bereits vergebene interne Rechte bleiben sichtbar und werden nicht automatisch entfernt.", "Internal Django permissions are not needed for support or player moderation. Existing assignments remain visible and are never removed automatically."));
     const pending = element("details", "permission-pending");
     const pendingTitle = element("summary");
     const pendingList = element("ul");
-    const reset = element("button", "button", data.direct ? (de ? "Änderungen an direkten Rechten zurücknehmen" : "Undo direct-permission changes") : (de ? "Auswahländerungen zurücknehmen" : "Undo selection changes")); reset.type = "button";
+    const reset = element("button", "button", data.direct ? (t("Änderungen an direkten Rechten zurücknehmen", "Undo direct-permission changes")) : (t("Auswahländerungen zurücknehmen", "Undo selection changes"))); reset.type = "button";
     pending.append(pendingTitle, pendingList, reset);
     root.append(intro, superuser, toolbar, summary, pending, bulkNotice, list, empty, internalLabel, internalHelp, technicalLabel);
     const groups = new Map();
@@ -119,8 +117,8 @@
       const bar = element("div", "permission-bulk");
       bar.setAttribute("role", "group");
       bar.setAttribute("aria-label", category
-        ? (de ? `Sammelauswahl: ${category}` : `Bulk selection: ${category}`)
-        : (de ? "Sammelauswahl aller Bereiche" : "Bulk selection across categories"));
+        ? (t(`Sammelauswahl: ${category}`, `Bulk selection: ${category}`, `Sélection multiple : ${category}`))
+        : (t("Sammelauswahl aller Bereiche", "Bulk selection across categories")));
       const scope = element("p", "permission-bulk-scope");
       const actions = element("div", "permission-bulk-actions");
       const add = element("button", "button"); add.type = "button";
@@ -136,7 +134,7 @@
         resetPresetUndo();
         bulkNotice.textContent = de
           ? `${targets.length} direkte Rechte ${checked ? "ausgewählt" : "abgewählt"}. Noch nicht gespeichert.`
-          : `${targets.length} direct permissions ${checked ? "selected" : "deselected"}. Not saved yet.`;
+          : fr ? `${targets.length} autorisations directes ${checked ? "sélectionnées" : "désélectionnées"}. Pas encore enregistré.` : `${targets.length} direct permissions ${checked ? "selected" : "deselected"}. Not saved yet.`;
         syncSelection();
       };
       add.addEventListener("click", () => apply(true));
@@ -148,13 +146,14 @@
         scope.textContent = de
           ? (filtered ? `${matches.length} Treffer${category ? " in diesem Bereich" : ""} · Andere Rechte bleiben unverändert.`
             : category ? `${matches.length} Rechte in diesem Bereich` : `${matches.length} Rechte in allen Bereichen · Auch zugeklappte Bereiche werden berücksichtigt.`)
+          : fr ? (filtered ? `${matches.length} résultat(s)${category ? " dans cette catégorie" : ""} · Les autres autorisations restent inchangées.` : category ? `${matches.length} autorisation(s) dans cette catégorie` : `${matches.length} autorisation(s) dans toutes les catégories · Les catégories repliées sont incluses.`)
           : (filtered ? `${matches.length} matches${category ? " in this category" : ""} · Other permissions stay unchanged.`
             : category ? `${matches.length} permissions in this category` : `${matches.length} permissions across all categories · Includes collapsed categories.`);
-        if (data.direct) scope.textContent += de ? " Gruppenrechte bleiben erhalten." : " Inherited permissions are retained.";
+        if (data.direct) scope.textContent += t(" Gruppenrechte bleiben erhalten.", " Inherited permissions are retained.");
         const addLabel = de ? (filtered ? "Treffer auswählen" : category ? "Bereich auswählen" : "Alle auswählen")
-          : (filtered ? "Select matches" : category ? "Select category" : "Select all");
+          : fr ? (filtered ? "Sélectionner les résultats" : category ? "Sélectionner la catégorie" : "Tout sélectionner") : (filtered ? "Select matches" : category ? "Select category" : "Select all");
         const removeLabel = de ? (filtered ? "Treffer abwählen" : category ? "Bereich abwählen" : "Alle abwählen")
-          : (filtered ? "Deselect matches" : category ? "Deselect category" : "Deselect all");
+          : fr ? (filtered ? "Désélectionner les résultats" : category ? "Désélectionner la catégorie" : "Tout désélectionner") : (filtered ? "Deselect matches" : category ? "Deselect category" : "Deselect all");
         add.textContent = `${addLabel} (${matches.length - selected})`;
         remove.textContent = `${removeLabel} (${selected})`;
         add.disabled = matches.length === selected;
@@ -190,10 +189,10 @@
       const body = element("span", "permission-body");
       const top = element("span", "permission-row-title");
       const title = element("strong", "", permission.title);
-      const kinds = de ? {read:"Anzeigen",change:"Ändern",action:"Aktion",access:"Zugriff"} : {read:"Read",change:"Change",action:"Action",access:"Access"};
+      const kinds = de ? {read:"Anzeigen",change:"Ändern",action:"Aktion",access:"Zugriff"} : fr ? {read:"Consulter",change:"Modifier",action:"Action",access:"Accès"} : {read:"Read",change:"Change",action:"Action",access:"Access"};
       const kind = element("span", "permission-kind", kinds[permission.kind]);
       top.append(title, kind);
-      if (permission.sensitive) top.append(element("span", "permission-sensitive", de ? "Weitreichendes Recht" : "Sensitive access"));
+      if (permission.sensitive) top.append(element("span", "permission-sensitive", t("Weitreichendes Recht", "Sensitive access")));
       const description = element("span", "permission-description", permission.description);
       const source = element("span", "permission-source");
       const code = element("code", "permission-code", permission.code);
@@ -222,7 +221,7 @@
           || (kindFilter.value === "write" && permission.kind === "read")
           || (assigned.checked && !allAccess && !own.has(permission.id) && !via.length);
         if (!row.hidden) visible++;
-        source.textContent = via.length ? (de ? "Über Gruppe: " : "Via group: ") + via.join(", ") : "";
+        source.textContent = via.length ? (t("Über Gruppe: ", "Via group: ")) + via.join(", ") : "";
         source.hidden = !via.length;
       });
       groups.forEach(({container, detail, count, checkbox, toggle, rows: members, bulk: categoryBulk}, category) => {
@@ -237,24 +236,24 @@
         const filtered = Boolean(needle) || assigned.checked || kindFilter.value !== "all" || !internal.checked;
         checkbox.setAttribute("aria-label", de
           ? `${filtered ? "Gefilterte" : "Alle"}${data.direct ? " direkten" : ""} Rechte in „${category}“`
-          : `${filtered ? "Matching" : "All"}${data.direct ? " direct" : ""} permissions in “${category}”`);
+          : fr ? `${filtered ? "Autorisations correspondantes" : "Toutes les autorisations"}${data.direct ? " directes" : ""} dans « ${category} »` : `${filtered ? "Matching" : "All"}${data.direct ? " direct" : ""} permissions in “${category}”`);
         toggle.title = de
           ? `${checkbox.checked ? "Abwählen" : "Auswählen"}: ${selection.total} ${filtered ? "Treffer" : "Rechte"}${data.direct ? " · Gruppenrechte bleiben erhalten" : ""}`
-          : `${checkbox.checked ? "Deselect" : "Select"}: ${selection.total} ${filtered ? "matches" : "permissions"}${data.direct ? " · Inherited permissions are retained" : ""}`;
+          : fr ? `${checkbox.checked ? "Désélectionner" : "Sélectionner"} : ${selection.total} ${filtered ? "résultat(s)" : "autorisation(s)"}${data.direct ? " · Les autorisations héritées sont conservées" : ""}` : `${checkbox.checked ? "Deselect" : "Select"}: ${selection.total} ${filtered ? "matches" : "permissions"}${data.direct ? " · Inherited permissions are retained" : ""}`;
       });
       bulk.update();
       const effective = new Set([...own, ...inherited.keys()]);
-      summary.textContent = de ? `${own.size} direkt · ${inherited.size} über Gruppen · ${effective.size} wirksam · ${visible} Treffer` : `${own.size} direct · ${inherited.size} via groups · ${effective.size} effective · ${visible} matches`;
-      if (!data.direct) summary.textContent = de ? `${own.size} ausgewählt · ${visible} Treffer` : `${own.size} selected · ${visible} matches`;
-      else if (allAccess) summary.textContent = de ? `Alle Rechte durch Administrator-Status · ${own.size} zusätzlich direkt · ${visible} Treffer` : `All permissions through superuser status · ${own.size} also assigned directly · ${visible} matches`;
-      if (data.direct && document.getElementById("id_is_active")?.checked === false) summary.textContent = de ? `Konto deaktiviert · ${effective.size} Rechte zugewiesen · ${visible} Treffer` : `Account inactive · ${effective.size} permissions assigned · ${visible} matches`;
+      summary.textContent = t(`${own.size} direkt · ${inherited.size} über Gruppen · ${effective.size} wirksam · ${visible} Treffer`, `${own.size} direct · ${inherited.size} via groups · ${effective.size} effective · ${visible} matches`, `${own.size} directes · ${inherited.size} par groupes · ${effective.size} effectives · ${visible} résultats`);
+      if (!data.direct) summary.textContent = t(`${own.size} ausgewählt · ${visible} Treffer`, `${own.size} selected · ${visible} matches`, `${own.size} sélectionnées · ${visible} résultats`);
+      else if (allAccess) summary.textContent = t(`Alle Rechte durch Administrator-Status · ${own.size} zusätzlich direkt · ${visible} Treffer`, `All permissions through superuser status · ${own.size} also assigned directly · ${visible} matches`, `Toutes les autorisations par le statut superutilisateur · ${own.size} directes en plus · ${visible} résultats`);
+      if (data.direct && document.getElementById("id_is_active")?.checked === false) summary.textContent = t(`Konto deaktiviert · ${effective.size} Rechte zugewiesen · ${visible} Treffer`, `Account inactive · ${effective.size} permissions assigned · ${visible} matches`, `Compte désactivé · ${effective.size} autorisations attribuées · ${visible} résultats`);
       empty.hidden = visible > 0;
       superuser.hidden = !allAccess;
       const delta = planner.changes(initial, own);
       pending.hidden = delta.added.length + delta.removed.length === 0;
-      pendingTitle.textContent = de ? `Noch nicht gespeichert: ${delta.added.length} ergänzt · ${delta.removed.length} entfernt` : `Not saved: ${delta.added.length} added · ${delta.removed.length} removed`;
+      pendingTitle.textContent = t(`Noch nicht gespeichert: ${delta.added.length} ergänzt · ${delta.removed.length} entfernt`, `Not saved: ${delta.added.length} added · ${delta.removed.length} removed`, `Non enregistré : ${delta.added.length} ajoutées · ${delta.removed.length} retirées`);
       pendingList.replaceChildren();
-      for (const [ids, prefix] of [[delta.added, de ? "Ergänzt" : "Added"], [delta.removed, de ? "Entfernt" : "Removed"]]) {
+      for (const [ids, prefix] of [[delta.added, t("Ergänzt", "Added")], [delta.removed, t("Entfernt", "Removed")]]) {
         ids.forEach(id => pendingList.append(element("li", "", `${prefix}: ${permissions.find(p => p.id === id)?.title || options.get(id)?.textContent || id}`)));
       }
       updatePresetPreview();
@@ -266,14 +265,12 @@
     });
     if (data.workflows?.length) {
       const block = element("section", "permission-workflows");
-      block.setAttribute("aria-label", de ? "Rechte nach Aufgabe" : "Permissions by task");
-      const heading = element("h3", "", data.direct ? (de ? "Was soll das Konto können?" : "What should this account be able to do?") : (de ? "Was soll die Rolle können?" : "What should this role be able to do?"));
-      const help = element("p", "permission-intro", de
-        ? "Wähle einen Bereich. „Anzeigen“ bündelt die dazugehörigen Leserechte. Zusätzliche Aktionen werden separat freigegeben. Es wird nichts automatisch ausgewählt."
-        : "Choose an area. “View” bundles the related read permissions. Additional actions are granted separately. Nothing is selected automatically.");
+      block.setAttribute("aria-label", t("Rechte nach Aufgabe", "Permissions by task"));
+      const heading = element("h3", "", data.direct ? (t("Was soll das Konto können?", "What should this account be able to do?")) : (t("Was soll die Rolle können?", "What should this role be able to do?")));
+      const help = element("p", "permission-intro", t("Wähle einen Bereich. „Anzeigen“ bündelt die dazugehörigen Leserechte. Zusätzliche Aktionen werden separat freigegeben. Es wird nichts automatisch ausgewählt.", "Choose an area. “View” bundles the related read permissions. Additional actions are granted separately. Nothing is selected automatically."));
       const chooser = element("select", "permission-workflow-select");
-      chooser.setAttribute("aria-label", de ? "Aufgabe auswählen" : "Choose a task");
-      chooser.append(new Option(de ? "Aufgabe auswählen …" : "Choose a task …", ""));
+      chooser.setAttribute("aria-label", t("Aufgabe auswählen", "Choose a task"));
+      chooser.append(new Option(t("Aufgabe auswählen …", "Choose a task …"), ""));
       data.workflows.forEach(workflow => chooser.append(new Option(workflow.title, workflow.id)));
       const preview = element("div", "permission-workflow-preview");
       const notice = element("p", "permission-bulk-notice"); notice.setAttribute("role", "status");
@@ -291,13 +288,13 @@
           const state = element("p", "permission-bundle-state");
           const review = element("details", "permission-preset-review");
           review.open = bundle.kind === "read" && bundle.permissions.length <= 12;
-          review.append(element("summary", "", de ? `Enthaltene Rechte prüfen (${bundle.permissions.length})` : `Review included permissions (${bundle.permissions.length})`));
+          review.append(element("summary", "", t(`Enthaltene Rechte prüfen (${bundle.permissions.length})`, `Review included permissions (${bundle.permissions.length})`, `Vérifier les autorisations incluses (${bundle.permissions.length})`)));
           const requirements = element("ul"); review.append(requirements);
           const apply = element("button", "button"); apply.type = "button";
           const actionLabel = `${workflow.title}: ${bundle.title}`;
           panel.append(title, state);
-          if (bundle.kind !== "read") panel.append(element("p", "permission-intro", de ? "Enthält auch die Leserechte dieses Bereichs. Änderungen und Aktionen können den Spielbetrieb beeinflussen." : "Also includes this area's read permissions. Changes and actions can affect the game server."));
-          if (bundle.sensitive) panel.append(element("p", "permission-sensitive", de ? "Weitreichendes Recht – Umfang vor dem Übernehmen prüfen." : "Sensitive access – review the scope before applying."));
+          if (bundle.kind !== "read") panel.append(element("p", "permission-intro", t("Enthält auch die Leserechte dieses Bereichs. Änderungen und Aktionen können den Spielbetrieb beeinflussen.", "Also includes this area's read permissions. Changes and actions can affect the game server.")));
+          if (bundle.sensitive) panel.append(element("p", "permission-sensitive", t("Weitreichendes Recht – Umfang vor dem Übernehmen prüfen.", "Sensitive access – review the scope before applying.")));
           panel.append(review, apply); preview.append(panel);
           bundleRows.push({bundle, state, apply, requirements, actionLabel});
           apply.addEventListener("click", () => {
@@ -306,7 +303,7 @@
             if (plan.unavailable.length || !plan.missing.length) return;
             plan.missing.forEach(id => own.add(id)); resetPresetUndo();
             syncSelection();
-            notice.textContent = de ? `${plan.missing.length} ${plan.missing.length === 1 ? "Recht" : "Rechte"} ergänzt. Noch nicht gespeichert; bitte die Änderungen prüfen und das Formular sichern.` : `Added ${plan.missing.length} ${plan.missing.length === 1 ? "permission" : "permissions"}. Not saved yet; review the changes and save the form.`;
+            notice.textContent = t(`${plan.missing.length} ${plan.missing.length === 1 ? "Recht" : "Rechte"} ergänzt. Noch nicht gespeichert; bitte die Änderungen prüfen und das Formular sichern.`, `Added ${plan.missing.length} ${plan.missing.length === 1 ? "permission" : "permissions"}. Not saved yet; review the changes and save the form.`, `${plan.missing.length} autorisation(s) ajoutée(s). Pas encore enregistré ; vérifiez les modifications et enregistrez le formulaire.`);
           });
         });
         update();
@@ -314,12 +311,12 @@
       updateWorkflow = (allAccess) => bundleRows.forEach(({bundle, state, apply, requirements, actionLabel}) => {
         const plan = planner.bundleState(bundle, own, inherited, options, allAccess);
         state.textContent = plan.unavailable.length
-          ? (de ? "Nicht vollständig verfügbar – keine automatische Teilfreigabe." : "Not fully available – partial access cannot be applied.")
+          ? (t("Nicht vollständig verfügbar – keine automatische Teilfreigabe.", "Not fully available – partial access cannot be applied."))
           : plan.complete
-          ? (de ? "Im Formular vollständig" : "Complete in this form")
-          : (de ? `${bundle.permissions.length - plan.missing.length} von ${bundle.permissions.length} Rechten vorhanden · ${plan.missing.length} ${plan.missing.length === 1 ? "fehlt" : "fehlen"}` : `${bundle.permissions.length - plan.missing.length} of ${bundle.permissions.length} permissions assigned · ${plan.missing.length} missing`);
+          ? (t("Im Formular vollständig", "Complete in this form"))
+          : (t(`${bundle.permissions.length - plan.missing.length} von ${bundle.permissions.length} Rechten vorhanden · ${plan.missing.length} ${plan.missing.length === 1 ? "fehlt" : "fehlen"}`, `${bundle.permissions.length - plan.missing.length} of ${bundle.permissions.length} permissions assigned · ${plan.missing.length} missing`, `${bundle.permissions.length - plan.missing.length} autorisation(s) sur ${bundle.permissions.length} attribuée(s) · ${plan.missing.length} manquante(s)`));
         state.dataset.complete = String(plan.complete);
-        apply.textContent = plan.complete ? (de ? "Bereits zugewiesen" : "Already assigned") : (de ? `Fehlende Rechte ergänzen (${plan.missing.length})` : `Add missing permissions (${plan.missing.length})`);
+        apply.textContent = plan.complete ? (t("Bereits zugewiesen", "Already assigned")) : (t(`Fehlende Rechte ergänzen (${plan.missing.length})`, `Add missing permissions (${plan.missing.length})`, `Ajouter les autorisations manquantes (${plan.missing.length})`));
         apply.setAttribute("aria-label", `${actionLabel}: ${apply.textContent}`);
         apply.disabled = plan.complete || plan.unavailable.length > 0;
         requirements.replaceChildren();
@@ -327,7 +324,7 @@
           const permission = permissions.find(p => p.id === id);
           if (!permission) return;
           const via = inherited.get(id) || [];
-          const status = allAccess ? (de ? "Vollzugriff" : "Superuser") : own.has(id) ? (de ? "ausgewählt" : "selected") : via.length ? (de ? `über Gruppe: ${via.join(", ")}` : `via group: ${via.join(", ")}`) : (de ? "fehlt" : "missing");
+          const status = allAccess ? (t("Vollzugriff", "Superuser")) : own.has(id) ? (t("ausgewählt", "selected")) : via.length ? (t(`über Gruppe: ${via.join(", ")}`, `via group: ${via.join(", ")}`, `par le groupe : ${via.join(", ")}`)) : (t("fehlt", "missing"));
           requirements.append(element("li", "", `${permission.title} — ${status}`));
         });
       });
@@ -346,28 +343,24 @@
     };
     if (!data.direct && data.presets?.length) {
       const block = element("div", "permission-presets");
-      const title = element("h3", "", de ? "Mit einer Rolle starten" : "Start with a role");
-      const help = element("p", "permission-intro", de
-        ? "1. Vorlage wählen. 2. Mit „Vorlage übernehmen“ die Rechte auswählen. 3. Das Formular sichern. Du kannst mehrere Vorlagen kombinieren und jedes Recht einzeln anpassen."
-        : "1. Choose a preset. 2. Select its permissions with “Apply preset”. 3. Save the form. You can combine presets and adjust every permission individually.");
-      const label = element("label", "permission-preset-label", de ? "Rollenvorlage" : "Role preset");
+      const title = element("h3", "", t("Mit einer Rolle starten", "Start with a role"));
+      const help = element("p", "permission-intro", t("1. Vorlage wählen. 2. Mit „Vorlage übernehmen“ die Rechte auswählen. 3. Das Formular sichern. Du kannst mehrere Vorlagen kombinieren und jedes Recht einzeln anpassen.", "1. Choose a preset. 2. Select its permissions with “Apply preset”. 3. Save the form. You can combine presets and adjust every permission individually."));
+      const label = element("label", "permission-preset-label", t("Rollenvorlage", "Role preset"));
       const chooser = element("select", "permission-preset-select"); chooser.id = select.id + "_preset";
       label.htmlFor = chooser.id;
-      chooser.append(new Option(de ? "Vorlage auswählen …" : "Choose a preset …", ""));
-      data.presets.forEach(preset => chooser.append(new Option(`${preset.title} · ${preset.permissions.length} ${de ? "Rechte" : "permissions"}`, preset.id)));
+      chooser.append(new Option(t("Vorlage auswählen …", "Choose a preset …"), ""));
+      data.presets.forEach(preset => chooser.append(new Option(`${preset.title} · ${preset.permissions.length} ${t("Rechte", "permissions")}`, preset.id)));
       const preview = element("div", "permission-preset-preview"); preview.hidden = true;
       const state = element("p", "permission-preset-state"); state.setAttribute("role", "status");
       const description = element("p", "permission-preset-description");
       const counts = element("p", "permission-count"); counts.setAttribute("aria-live", "polite");
-      const impact = element("p", "permission-preset-impact", de
-        ? "Vorhandene Rechte bleiben erhalten. Die Vorlage vergibt weder Vollzugriff noch Administrationszugang. Erst „Sichern“ speichert die Gruppenrechte."
-        : "Existing permissions are retained. Presets do not enable superuser or staff status. Group permissions only take effect after saving the form.");
+      const impact = element("p", "permission-preset-impact", t("Vorhandene Rechte bleiben erhalten. Die Vorlage vergibt weder Vollzugriff noch Administrationszugang. Erst „Sichern“ speichert die Gruppenrechte.", "Existing permissions are retained. Presets do not enable superuser or staff status. Group permissions only take effect after saving the form."));
       const review = element("details", "permission-preset-review");
       const reviewTitle = element("summary"); const reviewList = element("ul");
       review.append(reviewTitle, reviewList);
       const actions = element("div", "permission-preset-actions");
       const apply = element("button", "button permission-preset-apply"); apply.type = "button";
-      const undo = element("button", "button", de ? "Letzte Vorlage zurücknehmen" : "Undo last preset"); undo.type = "button"; undo.hidden = true;
+      const undo = element("button", "button", t("Letzte Vorlage zurücknehmen", "Undo last preset")); undo.type = "button"; undo.hidden = true;
       const notice = element("p", "permission-preset-notice"); notice.setAttribute("role", "status");
       actions.append(apply, undo); preview.append(state, description, counts, impact, review, actions, notice);
       block.append(title, help, label, chooser, preview); root.insertBefore(block, toolbar);
@@ -379,11 +372,11 @@
         const ids = selectedPreset.permissions.filter(id => options.has(id));
         const add = ids.filter(id => !own.has(id)).length;
         state.textContent = add
-          ? (de ? "Vorschau · Vorlage noch nicht vollständig übernommen" : "Preview · Preset not fully applied yet")
-          : (de ? "Alle Rechte dieser Vorlage sind im Formular ausgewählt" : "All permissions from this preset are selected in the form");
+          ? (t("Vorschau · Vorlage noch nicht vollständig übernommen", "Preview · Preset not fully applied yet"))
+          : (t("Alle Rechte dieser Vorlage sind im Formular ausgewählt", "All permissions from this preset are selected in the form"));
         state.dataset.complete = String(add === 0);
-        counts.textContent = de ? `${add} zu ergänzen · ${ids.length - add} bereits ausgewählt` : `${add} to add · ${ids.length - add} already selected`;
-        apply.textContent = add ? (de ? `Vorlage übernehmen (${add} neue Rechte)` : `Apply preset (${add} new permissions)`) : (de ? "Vollständig ausgewählt" : "Fully selected");
+        counts.textContent = t(`${add} zu ergänzen · ${ids.length - add} bereits ausgewählt`, `${add} to add · ${ids.length - add} already selected`, `${add} à ajouter · ${ids.length - add} déjà sélectionnée(s)`);
+        apply.textContent = add ? (t(`Vorlage übernehmen (${add} neue Rechte)`, `Apply preset (${add} new permissions)`, `Appliquer le modèle (${add} nouvelle(s) autorisation(s))`)) : (t("Vollständig ausgewählt", "Fully selected"));
         apply.disabled = add === 0;
         const remaining = lastAdded.filter(id => own.has(id)).length;
         undo.hidden = lastAdded.length === 0;
@@ -394,7 +387,7 @@
         preview.hidden = !selectedPreset;
         if (!selectedPreset) return;
         description.textContent = selectedPreset.description;
-        reviewTitle.textContent = de ? `Enthaltene Rechte anzeigen (${selectedPreset.permissions.length})` : `Review included permissions (${selectedPreset.permissions.length})`;
+        reviewTitle.textContent = t(`Enthaltene Rechte anzeigen (${selectedPreset.permissions.length})`, `Review included permissions (${selectedPreset.permissions.length})`, `Vérifier les autorisations incluses (${selectedPreset.permissions.length})`);
         reviewList.replaceChildren();
         permissions.filter(permission => selectedPreset.permissions.includes(permission.id)).forEach(permission => {
           const item = element("li");
@@ -409,21 +402,21 @@
         bulkNotice.textContent = "";
         lastAdded = selectedPreset.permissions.filter(id => options.has(id) && !own.has(id));
         lastAdded.forEach(id => own.add(id));
-        notice.textContent = de ? `„${selectedPreset.title}“ übernommen: ${lastAdded.length} Rechte ergänzt. Jetzt „Sichern“, um die Gruppenrechte zu speichern.` : `Applied “${selectedPreset.title}”: added ${lastAdded.length} permissions. Save the form to store the group permissions.`;
+        notice.textContent = t(`„${selectedPreset.title}“ übernommen: ${lastAdded.length} Rechte ergänzt. Jetzt „Sichern“, um die Gruppenrechte zu speichern.`, `Applied “${selectedPreset.title}”: added ${lastAdded.length} permissions. Save the form to store the group permissions.`, `« ${selectedPreset.title} » appliqué : ${lastAdded.length} autorisation(s) ajoutée(s). Enregistrez le formulaire pour conserver les autorisations du groupe.`);
         syncSelection();
       });
       undo.addEventListener("click", () => {
         bulkNotice.textContent = "";
         lastAdded.forEach(id => own.delete(id));
         lastAdded = [];
-        notice.textContent = de ? "Ergänzung zurückgenommen. Vorher vorhandene Rechte bleiben erhalten." : "Preset addition undone. Previously selected permissions are retained.";
+        notice.textContent = t("Ergänzung zurückgenommen. Vorher vorhandene Rechte bleiben erhalten.", "Preset addition undone. Previously selected permissions are retained.");
         syncSelection();
       });
     }
     if (!data.direct && data.wizardSections?.length && window.CRCONPermissionWizard) {
-      intro.textContent = de ? "Die Rolle bestimmt, was ihre Mitglieder dürfen. Der Assistent führt dich durch die Auswahl. Einzelrechte und Vorlagen findest du bei Bedarf in der Expertenansicht." : "This role controls what its members may do. The wizard guides you through setup. Individual permissions and presets remain available in the expert view.";
+      intro.textContent = t("Die Rolle bestimmt, was ihre Mitglieder dürfen. Der Assistent führt dich durch die Auswahl. Einzelrechte und Vorlagen findest du bei Bedarf in der Expertenansicht.", "This role controls what its members may do. The wizard guides you through setup. Individual permissions and presets remain available in the expert view.");
       const expert = element("details", "permission-expert");
-      expert.append(element("summary", "", de ? "Expertenansicht: einzelne Rechte & Vorlagen" : "Expert view: individual permissions & presets"));
+      expert.append(element("summary", "", t("Expertenansicht: einzelne Rechte & Vorlagen", "Expert view: individual permissions & presets")));
       Array.from(root.children).filter(node => ![intro, superuser, pending].includes(node)).forEach(node => expert.append(node));
       const wizard = window.CRCONPermissionWizard.mount({data, permissions, available:options, getOwn:() => new Set(own), form:select.closest('form'), fieldId:select.id,
         apply: next => { own.clear(); next.forEach(id => own.add(id)); resetPresetUndo(); syncSelection(); }

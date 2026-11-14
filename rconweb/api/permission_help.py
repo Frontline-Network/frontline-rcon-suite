@@ -4,6 +4,8 @@ This is presentation metadata, never an authorization policy or role preset.
 Unknown extension permissions retain their real name instead of guessing scope.
 """
 
+from .permission_help_fr import ACTIONS_FR, RESOURCES_FR
+
 CATEGORIES = {
     "players": ("Spieler & Moderation", "Players & moderation"),
     "maps": ("Karten & Spielablauf", "Maps & match settings"),
@@ -18,6 +20,14 @@ CATEGORIES = {
     "mobile": ("Mobile Geräte & Meldungen", "Mobile devices & incidents"),
     "other": ("Weitere Rechte", "Other permissions"),
     "internal": ("Interne Systemrechte · nur für Wartung", "Internal system permissions · maintenance only"),
+}
+
+CATEGORIES_FR = {
+    "players": "Joueurs et modération", "maps": "Cartes et paramètres de partie",
+    "automation": "Automatisation", "vip": "VIP et remplissage", "messages": "Messages et modèles",
+    "logs": "Journaux et statistiques", "integrations": "Intégrations", "system": "Serveur et exploitation",
+    "accounts": "Comptes et accès", "tactical": "Données tactiques", "mobile": "Appareils mobiles et signalements",
+    "other": "Autres autorisations", "internal": "Autorisations internes · maintenance uniquement",
 }
 
 # resource: readable title, the concrete object being read/changed, category
@@ -213,7 +223,7 @@ SENSITIVE_RESOURCES = {"steam_config", "server_name_change_config", "discord_web
 MODELS = {"user": "Benutzerkonten", "group": "Benutzergruppen", "permission": "Berechtigungsdatensätze", "logentry": "Django-Verwaltungsprotokolle", "contenttype": "Django-Modelltypen", "session": "Anmeldesitzungen", "djangoapikey": "API-Schlüssel", "steamplayer": "Spielkonto-Verknüpfungen", "mobiledevice": "Mobile Geräte"}
 
 
-def permission_help(permission, german=True):
+def permission_help(permission, german=True, language=None):
     code = permission.codename
     action = code.removeprefix("can_")
     category, kind, known = "other", "access", True
@@ -282,6 +292,44 @@ def permission_help(permission, german=True):
         if permission.content_type.model == "contenttype":
             description += (" Django pflegt diese Modellzuordnungen automatisch. Änderungen können Berechtigungszuordnungen beschädigen."
                             if german else " Django maintains these model references automatically. Changes can break permission mappings.")
+    if language == "fr":
+        if action in ACTIONS_FR:
+            title, description = ACTIONS_FR[action]
+        elif action.startswith(("view_", "change_")) and action.split("_", 1)[1] in RESOURCES_FR:
+            verb, resource = action.split("_", 1)
+            scope = RESOURCES_FR[resource]
+            title = ("Consulter " if verb == "view" else "Modifier ") + scope
+            description = ("Autorise à consulter " if verb == "view" else "Autorise à modifier ") + scope + "."
+            if verb == "view":
+                description += " Cette autorisation seule ne permet aucune modification."
+        elif not code.startswith("can_") and "_" in code and code.split("_", 1)[0] in {"view", "add", "change", "delete"}:
+            verb, model = code.split("_", 1)
+            labels = {"user": "les comptes utilisateurs", "group": "les groupes d'utilisateurs", "permission": "les autorisations", "logentry": "les journaux d'administration Django", "contenttype": "les types de modèles Django", "session": "les sessions de connexion", "djangoapikey": "les clés API", "steamplayer": "les associations de comptes de jeu", "mobiledevice": "les appareils mobiles"}
+            label = labels.get(model, str(permission.content_type.name))
+            verb_fr = {"view": "Consulter", "add": "Créer", "change": "Modifier", "delete": "Supprimer"}[verb]
+            title = f"{verb_fr} {label}"
+            description = f"Autorise à {verb_fr.lower()} {label} dans l'administration."
+            if verb == "view":
+                description += " Cette autorisation seule ne permet aucune modification."
+            if code == "change_user":
+                description += " Comprend l'attribution de rôles et d'autorisations directes à ces comptes et peut accorder des accès supplémentaires."
+            if code == "change_group":
+                description += " Les modifications des autorisations d'un groupe affectent tous ses membres."
+        console_copy_fr = {
+            "can_view_admins": ("Administrateurs du jeu : accès au menu", "Affiche le menu des administrateurs du jeu. La page nécessite aussi les autorisations pour la liste et les rôles disponibles."),
+            "can_view_admin_ids": ("Administrateurs du jeu : liste et identifiants", "Consulte les noms, identifiants et rôles. Nécessaire pour charger la liste ; ne permet pas de modifications."),
+            "can_view_admin_groups": ("Administrateurs du jeu : rôles disponibles", "Consulte les rôles d'administrateur disponibles sur le serveur de jeu. La page nécessite aussi l'accès au menu et à la liste."),
+            "can_add_admin_roles": ("Administrateurs du jeu : attribuer un rôle", "Attribue un rôle d'administrateur en jeu à un joueur, et non un groupe utilisateur RCON."),
+            "can_remove_admin_roles": ("Administrateurs du jeu : retirer un rôle", "Retire un rôle d'administrateur en jeu à un joueur, et non ses groupes utilisateur RCON."),
+        }
+        if code in console_copy_fr:
+            title, description = console_copy_fr[code]
+        elif not known:
+            description = "Autorisation supplémentaire sans description CRCON vérifiée. Consultez le nom original et l'identifiant technique."
+        if internal:
+            description += " Autorisation système interne ; inutile pour l'assistance ou la modération des joueurs. Vérifiez les attributions existantes avant toute modification."
+            if permission.content_type.model == "contenttype":
+                description += " Django gère automatiquement ces références de modèles. Les modifier peut endommager les associations d'autorisations."
     return {"id": str(permission.pk), "code": f"{permission.content_type.app_label}.{code}", "title": title,
-            "description": description, "category": CATEGORIES[category][0 if german else 1], "kind": kind,
+            "description": description, "category": CATEGORIES_FR[category] if language == "fr" else CATEGORIES[category][0 if german else 1], "kind": kind,
             "sensitive": sensitive, "documented": known, "internal": internal, "aliases": aliases}

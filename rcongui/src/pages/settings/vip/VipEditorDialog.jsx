@@ -20,6 +20,7 @@ import {
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
+import { dateLocale } from "@/i18n/date-locale";
 import PlayerSearchField from "@/components/form/custom/PlayerSearchField";
 import Padlock from "@/components/shared/Padlock";
 import { INDEFINITE_EXPIRATION, isVipIndefinite } from "./vip-utils";
@@ -161,7 +162,7 @@ export default function VipEditorDialog({
 
           <LocalizationProvider
             dateAdapter={AdapterDayjs}
-            adapterLocale={i18n.resolvedLanguage === "en" ? "en" : "de"}
+            adapterLocale={dateLocale(i18n.resolvedLanguage)}
             localeText={{ fieldOpenPickerLabel: t("common.chooseDate") }}
           >
             <DesktopDateTimePicker

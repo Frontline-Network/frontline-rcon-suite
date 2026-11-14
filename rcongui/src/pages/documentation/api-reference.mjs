@@ -16,7 +16,7 @@ export function normalizeApiDocumentation(value) {
       permissions: strings(item.permissions_required),
       description: typeof item.doc_string === "string" ? item.doc_string : "",
       descriptionTranslations: Object.fromEntries(
-        ["de", "en"]
+        ["de", "en", "fr"]
           .filter(
             (language) =>
               typeof item.description_translations?.[language] === "string" &&

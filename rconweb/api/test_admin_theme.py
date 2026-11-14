@@ -146,6 +146,14 @@ class AdminThemeTests(TestCase):
         self.assertContains(response, "Einzelne Berechtigungen")
         response = self.client.get(reverse("admin:auth_user_change", args=[self.owner.pk]), {"embedded": "1", "ui_language": "en"})
         self.assertContains(response, "Individual permissions")
+        response = self.client.get(reverse("admin:auth_user_change", args=[self.owner.pk]), {"embedded": "1", "ui_language": "fr"})
+        self.assertContains(response, "Autorisations individuelles")
+        self.assertContains(response, "Informations personnelles")
+        self.assertContains(response, "Assistance aux joueurs")
+        self.assertContains(response, "Joueurs et mod")
+        self.assertContains(response, "et non un groupe utilisateur RCON")
+        response = self.client.get(reverse("admin:index"), {"embedded": "1", "ui_language": "fr"})
+        self.assertContains(response, "Utilisateurs et autorisations")
 
     def test_group_choices_still_use_django_validation(self):
         group = Group.objects.create(name="Chosen group")
@@ -174,6 +182,55 @@ class AdminThemeTests(TestCase):
         self.assertTrue(templates)
         for template in templates:
             self.assertEqual(template["permissions"], [str(read.pk)])
+
+    def test_french_permission_copy_preserves_permission_ids(self):
+        from .permission_presets import permission_presets
+        from .permission_workflows import permission_workflows
+        permissions = list(Permission.objects.select_related("content_type").filter(content_type__app_label="api", content_type__model="rconuser"))
+        english = permission_presets(permissions, False)
+        french = permission_presets(permissions, False, "fr")
+        self.assertEqual([p["permissions"] for p in english], [p["permissions"] for p in french])
+        self.assertEqual(french[0]["title"], "Consultation uniquement")
+        english = permission_workflows(permissions, False)
+        french = permission_workflows(permissions, False, "fr")
+        self.assertEqual([[b["permissions"] for b in w["bundles"]] for w in english], [[b["permissions"] for b in w["bundles"]] for w in french])
+        self.assertEqual(next(w for w in french if w["id"] == "console")["title"], "Administrateurs du jeu")
+
+    def test_french_inline_forms_localize_labels_without_changing_fields(self):
+        from django.utils import translation
+        from .admin import DjangoAPIKeyAdminForm, SteamPlayerAdminForm
+        with translation.override("fr"):
+            self.assertEqual(SteamPlayerAdminForm().fields["steam_id_64"].label, "Identifiant du joueur")
+            self.assertEqual(DjangoAPIKeyAdminForm().fields["api_key"].label, "Clé API")
+        with translation.override("en"):
+            self.assertNotEqual(SteamPlayerAdminForm().fields["steam_id_64"].label, "Identifiant du joueur")
+
+    def test_french_mobile_labels_keep_protected_fields_read_only(self):
+        from .models import DjangoAPIKey, MobileDevice
+        device = MobileDevice.objects.create(user=self.owner, name="Test device", platform="test")
+        response = self.client.get(reverse("admin:api_mobiledevice_changelist"), {"ui_language": "fr"})
+        self.assertContains(response, "Dernière activité")
+        self.assertContains(response, "Date de création")
+        response = self.client.get(reverse("admin:api_mobiledevice_change", args=[device.pk]), {"ui_language": "fr"})
+        self.assertContains(response, "Expiration définitive")
+        self.assertContains(response, "Version de l&#x27;application", html=False)
+        form_fields = response.context["adminform"].form.fields
+        self.assertNotIn("user", form_fields)
+        self.assertNotIn("platform", form_fields)
+        self.assertNotIn("refresh_expires_at", form_fields)
+        self.assertNotIn("refresh_token_digest", form_fields)
+        other = User.objects.create_user("other-device-owner")
+        response = self.client.post(reverse("admin:api_mobiledevice_change", args=[device.pk]) + "?ui_language=fr", {
+            "name": "Renamed device", "user": other.pk, "platform": "changed", "_save": "Enregistrer",
+        })
+        self.assertEqual(response.status_code, 302)
+        device.refresh_from_db()
+        self.assertEqual(device.name, "Renamed device")
+        self.assertEqual(device.user_id, self.owner.pk)
+        self.assertEqual(device.platform, "test")
+        DjangoAPIKey.objects.create(user=self.owner, api_key="k" * 40)
+        response = self.client.get(reverse("admin:api_djangoapikey_changelist"), {"ui_language": "fr"})
+        self.assertContains(response, "Date de modification")
 
     def test_opening_role_templates_does_not_change_group_rights(self):
         group = Group.objects.create(name="Unchanged")

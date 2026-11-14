@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 const languages = [
   { code: "de", key: "language.de" },
   { code: "en", key: "language.en" },
+  { code: "fr", key: "language.fr" },
 ];
 
 export default function LanguageSelector({

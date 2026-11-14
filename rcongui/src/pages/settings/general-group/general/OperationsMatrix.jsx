@@ -376,8 +376,29 @@ export default function OperationsMatrix({ settings, autokickSettings }) {
   const queryClient = useQueryClient();
   const theme = useTheme();
   const compact = useMediaQuery(theme.breakpoints.down("md"));
+  const language = i18n.resolvedLanguage?.split("-")[0] || "de";
   const copy =
-    i18n.resolvedLanguage === "en"
+    language === "fr"
+      ? {
+          sections: ["Jeu", "Accès et places", "Équilibrage des équipes", "Votes"],
+          sectionKeys: ["gameplay", "access", "balance", "voting"],
+          columnSetting: "Paramètre", columnValue: "Valeur", columnCurrent: "Dernière lecture",
+          columnRecommendation: "Recommandation", columnStatus: "État",
+          saved: "Enregistré", changed: "Modifié", saving: "Enregistrement", failed: "Échec",
+          active: "Actif", inactive: "Inactif", thresholds: "seuils", notDocumented: "Non documenté",
+          useRecommendation: "Appliquer la recommandation", edit: "Modifier", close: "Fermer",
+          reset: "Réinitialiser les valeurs", save: "Enregistrer les modifications", noChanges: "Aucune modification non enregistrée",
+          unsavedCount: "{{count}} modifications non enregistrées",
+          partial: "Certains paramètres n’ont pas pu être enregistrés et restent marqués comme modifiés.",
+          success: "Toutes les modifications ont été envoyées.",
+          blocked: "La connexion au serveur doit être en ligne pour envoyer les paramètres.",
+          unverified: "Valeurs non vérifiées", lastRead: "Dernière lecture", minimumPlayers: "Nombre minimum de joueurs",
+          requiredVotes: "Votes requis", from: "À partir de", votes: "votes", remove: "Retirer", addThreshold: "Ajouter un seuil",
+          autoVotekick: "Vote d’expulsion automatique", ingameModerators: "Modérateurs en jeu", onlineModerators: "Modérateurs CRCON en ligne",
+          ingameShort: "En jeu", onlineShort: "En ligne", logic: "Logique", recommendationRange: "1 à 2 places",
+          pending: "Application par le serveur en attente", unitLabels: { minutes: "min", milliseconds: "ms", players: "joueurs", slots: "places" },
+        }
+      : language === "en"
       ? {
           sections: ["Gameplay", "Access & slots", "Team balance", "Voting"],
           sectionKeys: ["gameplay", "access", "balance", "voting"],
@@ -647,7 +668,7 @@ export default function OperationsMatrix({ settings, autokickSettings }) {
 
   const lastRead = actionContext.gameServer.lastSuccessAt
     ? new Date(actionContext.gameServer.lastSuccessAt).toLocaleString(
-        i18n.resolvedLanguage === "en" ? "en" : "de"
+        language
       )
     : t("settingEffect.notAvailable");
 

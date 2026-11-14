@@ -6,6 +6,8 @@ acquire guessed semantics merely because it starts with get_ or set_.
 Sources: api_commands.py, rcon.py, commands.py and the api view modules.
 """
 
+from .api_descriptions_fr import CONFIG_SUBJECTS_FR, DESCRIPTIONS_FR
+
 # These families share the BaseUserConfig read/schema/dry-run/save contract.
 # Autobalancer implements the same distinction in api/autobalancer.py.
 CONFIG_SUBJECTS = {
@@ -322,7 +324,10 @@ def endpoint_descriptions(name: str) -> dict[str, str]:
     """Return reviewed translations; do not guess descriptions for unknown APIs."""
     if name in DESCRIPTIONS:
         de, en = DESCRIPTIONS[name]
-        return {"de": de, "en": en}
+        result = {"de": de, "en": en}
+        if name in DESCRIPTIONS_FR:
+            result["fr"] = DESCRIPTIONS_FR[name]
+        return result
     for prefix in ("describe_", "validate_", "get_", "set_"):
         if name.startswith(prefix) and name[len(prefix):] in CONFIG_SUBJECTS:
             de, en = CONFIG_SUBJECTS[name[len(prefix):]]
@@ -341,7 +346,14 @@ def endpoint_descriptions(name: str) -> dict[str, str]:
                     f"Validates and saves configuration for {en}. Enabled rules may subsequently affect operation; use the validate endpoint for a check only."),
             }
             de, en = texts[prefix]
-            return {"de": de, "en": en}
+            subject = CONFIG_SUBJECTS_FR[name[len(prefix):]]
+            french = {
+                "get_": f"Charge la configuration enregistrée pour {subject}. Cette requête ne modifie aucun paramètre.",
+                "describe_": f"Renvoie le schéma JSON pour {subject} : champs, types et règles de validation. Il décrit la structure, pas les valeurs enregistrées.",
+                "validate_": f"Vérifie un projet de configuration pour {subject} sans l'enregistrer ni l'appliquer. Les erreurs de validation aident à corriger les champs invalides avant l'enregistrement.",
+                "set_": f"Vérifie et enregistre la configuration pour {subject}. Les règles activées peuvent ensuite affecter le fonctionnement ; utilisez le point d'accès validate pour une vérification seule.",
+            }
+            return {"de": de, "en": en, "fr": french[prefix]}
     return {}
 
 

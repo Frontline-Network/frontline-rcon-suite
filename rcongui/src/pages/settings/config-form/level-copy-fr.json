@@ -1,0 +1,17 @@
+{
+  "title": "Tester la règle de niveau",
+  "description": "Testez un joueur fictif avec le brouillon actuel sans exécuter d’action sur le serveur.",
+  "notice": "La simulation utilise uniquement les valeurs visibles du formulaire. Elle n’enregistre rien et n’envoie aucune commande au serveur de jeu.",
+  "playerLevel": "Niveau du joueur fictif", "serverPlayers": "Joueurs sur le serveur", "role": "Rôle du joueur fictif", "noRole": "Aucun rôle particulier", "flag": "Marqueur du joueur (facultatif)", "run": "Lancer la simulation", "close": "Fermer la simulation", "result": "Effet attendu",
+  "stage": {"warn": "Avertir", "punish": "Punir", "kick": "Expulser"},
+  "resultCopy": {
+    "off": ["Règle désactivée", "Ce joueur n’est pas vérifié."],
+    "waiting": ["Condition de départ non atteinte", "La règle démarre à partir de {{count}} joueurs."],
+    "exempt": ["Joueur exempté", "Une exception configurée empêche toute escalade supplémentaire."],
+    "allowed": ["Le joueur respecte la règle", "Ces valeurs de test ne dépassent aucun seuil de niveau."],
+    "immediate": ["Action immédiate au niveau du serveur", "Le joueur ne respecte pas le niveau général requis de {{level}}."],
+    "escalation": ["Escalade selon le rôle", "Ce rôle nécessite le niveau {{level}}. La séquence d’actions configurée commencerait."],
+    "detected": ["Infraction détectée sans action", "Ce rôle nécessite le niveau {{level}}, mais aucune étape d’escalade n’est activée."],
+    "observeSuffix": " En mode observation, l’effet est uniquement journalisé et n’est pas exécuté."
+  }
+}

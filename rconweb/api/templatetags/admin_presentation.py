@@ -20,7 +20,13 @@ def admin_navigation(apps):
 
 @register.simple_tag
 def admin_model_presentation(model):
-    german = (get_language() or "en").startswith("de")
+    language = (get_language() or "en").split("-")[0]
+    french = {
+        "User": ("Utilisateurs", "Comptes, identifiants et autorisations individuelles."),
+        "Group": ("Groupes", "Organisez les rôles et attribuez des autorisations communes."),
+        "DjangoAPIKey": ("Clés API", "Accès pour les intégrations et les outils externes."),
+        "MobileDevice": ("Appareils mobiles", "Consultez les appareils associés et leur statut d'accès."),
+    }
     descriptions = {
         "User": ("Benutzer", "Users", "Konten, Anmeldedaten und persönliche Zugriffsrechte.", "Accounts, sign-in details and individual permissions.", "users"),
         "Group": ("Gruppen", "Groups", "Rollen bündeln und Berechtigungen gemeinsam vergeben.", "Organize roles and assign shared permissions.", "shield"),
@@ -30,4 +36,8 @@ def admin_model_presentation(model):
     item = descriptions.get(model.get("object_name"))
     if not item:
         return {"title": model["name"], "description": "", "icon": "shield"}
-    return {"title": item[0 if german else 1], "description": item[2 if german else 3], "icon": item[4]}
+    if language == "fr":
+        title, description = french[model["object_name"]]
+    else:
+        title, description = (item[0], item[2]) if language == "de" else (item[1], item[3])
+    return {"title": title, "description": description, "icon": item[4]}

@@ -3,17 +3,74 @@ import hmac
 import json
 import os
 from unittest.mock import Mock, patch
+import pytest
 
 os.environ.setdefault("SERVER_NUMBER", "1")
 os.environ.setdefault("HLL_MAINTENANCE_CONTAINER", "1")
 
 from rcon.frontline_vip_verification import (
+    _MESSAGES,
+    _message,
+    _redeem,
     _allow_attempt,
     _attempts,
     _detect_platform,
     _signed_headers,
     handle_chat_verification,
 )
+
+
+@pytest.mark.parametrize("language", ["de", "en", "fr"])
+def test_message_language_is_complete_and_invalid_command_is_localized(monkeypatch, language):
+    monkeypatch.setenv("FRONTLINE_VIP_VERIFICATION_LANGUAGE", language)
+    assert set(_MESSAGES[language]) == set(_MESSAGES["de"])
+    rcon = Mock()
+    handle_chat_verification(rcon, {"sub_content": "!vipverify invalid", "player_id_1": "player"})
+    assert rcon.message_player.call_args.kwargs["message"] == _MESSAGES[language]["invalid_command"]
+
+
+def test_unknown_or_missing_message_language_preserves_german_default(monkeypatch):
+    monkeypatch.delenv("FRONTLINE_VIP_VERIFICATION_LANGUAGE", raising=False)
+    assert _message("checking") == _MESSAGES["de"]["checking"]
+    monkeypatch.setenv("FRONTLINE_VIP_VERIFICATION_LANGUAGE", "unknown")
+    assert _message("checking") == _MESSAGES["de"]["checking"]
+
+
+@pytest.mark.parametrize("success", [True, False])
+def test_service_message_is_preserved_for_all_languages(monkeypatch, success):
+    monkeypatch.setenv("FRONTLINE_VIP_VERIFICATION_LANGUAGE", "fr")
+    monkeypatch.setenv("FRONTLINE_VIP_REDEEM_URL", "https://example.test/redeem")
+    monkeypatch.setenv("FRONTLINE_VIP_REDEEM_SECRET", "s" * 32)
+    response = Mock(ok=success, content=b"{}")
+    response.json.return_value = {"success": success, "message": "Custom service response"}
+    rcon = Mock()
+    with (
+        patch("rcon.frontline_vip_verification.get_player_profile", return_value=None),
+        patch("rcon.frontline_vip_verification.get_server_number", return_value=1),
+        patch("rcon.frontline_vip_verification.requests.post", return_value=response),
+    ):
+        _redeem(rcon, "player", "Player", "ABCDEFGHJKLMNPQR")
+    assert rcon.message_player.call_args.kwargs["message"] == "Custom service response"
+
+
+@pytest.mark.parametrize(("language", "success", "key"), [
+    ("de", True, "success"), ("en", True, "success"), ("fr", True, "success"),
+    ("de", False, "invalid_code"), ("en", False, "invalid_code"), ("fr", False, "invalid_code"),
+])
+def test_empty_service_response_uses_selected_language(monkeypatch, language, success, key):
+    monkeypatch.setenv("FRONTLINE_VIP_VERIFICATION_LANGUAGE", language)
+    monkeypatch.setenv("FRONTLINE_VIP_REDEEM_URL", "https://example.test/redeem")
+    monkeypatch.setenv("FRONTLINE_VIP_REDEEM_SECRET", "s" * 32)
+    response = Mock(ok=success, content=b"{}")
+    response.json.return_value = {"success": success}
+    rcon = Mock()
+    with (
+        patch("rcon.frontline_vip_verification.get_player_profile", return_value=None),
+        patch("rcon.frontline_vip_verification.get_server_number", return_value=1),
+        patch("rcon.frontline_vip_verification.requests.post", return_value=response),
+    ):
+        _redeem(rcon, "player", "Player", "ABCDEFGHJKLMNPQR")
+    assert rcon.message_player.call_args.kwargs["message"] == _MESSAGES[language][key]
 
 
 def test_signed_headers_cover_exact_request_body():

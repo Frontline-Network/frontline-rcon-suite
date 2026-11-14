@@ -36,6 +36,7 @@ function SettingsPage() {
         "General server control",
         "Manage gameplay, access and moderation from one clear workspace.",
       ],
+      fr: ["Gestion générale du serveur", "Gérez le jeu, les accès et la modération au même endroit."],
     },
     {
       de: [
@@ -46,6 +47,7 @@ function SettingsPage() {
         "Game and round control",
         "Configure weather, round and warm-up times clearly.",
       ],
+      fr: ["Gestion du jeu et des manches", "Configurez la météo et la durée des manches et de l’échauffement."],
     },
     {
       de: [
@@ -56,6 +58,7 @@ function SettingsPage() {
         "Manage server name",
         "Maintain the public name and technical connection separately.",
       ],
+      fr: ["Gérer le nom du serveur", "Gérez séparément le nom public et la connexion technique."],
     },
     {
       de: [
@@ -66,6 +69,7 @@ function SettingsPage() {
         "Admin camera",
         "Configure notifications when administrators enter the camera.",
       ],
+      fr: ["Caméra administrateur", "Configurez les notifications lors de l’utilisation de la caméra administrateur."],
     },
     {
       de: [
@@ -76,9 +80,11 @@ function SettingsPage() {
         "CRCON app and utilities",
         "Pair Frontline devices and manage the CRCON connection.",
       ],
+      fr: ["Application et outils CRCON", "Associez les appareils Frontline et gérez la connexion CRCON."],
     },
   ];
-  const language = i18n.resolvedLanguage === "en" ? "en" : "de";
+  const language = ["de", "en", "fr"].includes(i18n.resolvedLanguage?.split("-")[0])
+    ? i18n.resolvedLanguage.split("-")[0] : "de";
   const [pageTitle, pageSubtitle] = pageHeaders[activeTab]?.[language] || [
     tabs[activeTab]?.label,
     "",
@@ -89,7 +95,7 @@ function SettingsPage() {
       {activeTab >= 0 && (
         <PageHeader
           eyebrow={
-            language === "en" ? "Server configuration" : "Serverkonfiguration"
+            language === "fr" ? "Configuration du serveur" : language === "en" ? "Server configuration" : "Serverkonfiguration"
           }
           title={pageTitle}
           subtitle={pageSubtitle}

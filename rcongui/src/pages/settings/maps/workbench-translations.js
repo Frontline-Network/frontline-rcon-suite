@@ -1,6 +1,8 @@
 import i18n from "@/i18n";
+import { frenchMapWorkbench } from "./workbench-fr";
 
 const resources = {
+  fr: frenchMapWorkbench,
   de: {
     objectivesWorkbench: {
       mapTab: "Taktische Karte",

@@ -7,7 +7,7 @@
     return node;
   };
   const mount = ({data, permissions, available, getOwn, apply, form, fieldId}) => {
-    const de = data.german, t = (a, b) => de ? a : b;
+    const de = data.german, t = (a, b, fr) => de ? a : data.language === 'fr' ? (fr || window.CRCONPermissionFrench?.[b] || b) : b;
     const planner = window.CRCONPermissionPlanner;
     const catalog = new Map(permissions.map(p => [p.id, p]));
     const root = el('section', 'permission-wizard');
@@ -39,10 +39,10 @@
       const questions = steps(), last = questions.length + 1;
       const progress = el('p', 'permission-wizard-progress', position === 0
         ? t('Schritt 1 · Aufgaben auswählen', 'Step 1 · Choose responsibilities')
-        : t(`Schritt ${position + 1} von ${last + 1}`, `Step ${position + 1} of ${last + 1}`));
+        : t(`Schritt ${position + 1} von ${last + 1}`, `Step ${position + 1} of ${last + 1}`, `Étape ${position + 1} sur ${last + 1}`));
       const heading = el('h3', '', position === 0 ? t('Welche Aufgaben soll die Rolle übernehmen?', 'What should this role be responsible for?')
         : position === last ? t('Passt diese Rolle so?', 'Does this role look right?')
-        : t(`Was darf die Rolle bei „${questions[position - 1].title}“?`, `What may this role do in “${questions[position - 1].title}”?`));
+        : t(`Was darf die Rolle bei „${questions[position - 1].title}“?`, `What may this role do in “${questions[position - 1].title}”?`, `Que peut faire ce rôle dans « ${questions[position - 1].title} » ?`));
       heading.tabIndex = -1;
       root.append(progress, heading);
       if (feedback) { const alert = el('p', 'permission-wizard-warning', feedback); alert.setAttribute('role', 'alert'); root.append(alert); }
@@ -140,13 +140,15 @@
         root.append(list);
         proposal.conflicts.forEach(conflict => root.append(el('p', 'permission-wizard-warning', t(
           `Diese Antworten widersprechen sich: „${conflict.allow.join(', ')}“ benötigt ein Recht, das bei „${conflict.deny.join(', ')}“ entzogen werden soll (${catalog.get(conflict.id)?.title || conflict.id}). Bitte die Antworten anpassen.`,
-          `These answers conflict: “${conflict.allow.join(', ')}” needs a permission denied in “${conflict.deny.join(', ')}” (${catalog.get(conflict.id)?.title || conflict.id}). Please adjust your answers.`))));
+          `These answers conflict: “${conflict.allow.join(', ')}” needs a permission denied in “${conflict.deny.join(', ')}” (${catalog.get(conflict.id)?.title || conflict.id}). Please adjust your answers.`,
+          `Ces réponses sont contradictoires : « ${conflict.allow.join(', ')} » nécessite une autorisation refusée dans « ${conflict.deny.join(', ')} » (${catalog.get(conflict.id)?.title || conflict.id}). Veuillez modifier vos réponses.`))));
         if (proposal.unavailable.length || proposal.invalid.length) root.append(el('p', 'permission-wizard-warning', t('Die benötigten Rechte stehen nicht vollständig zur Verfügung. Dieser Entwurf kann nicht übernommen werden. Bitte die Expertenansicht oder den Support verwenden.', 'Some required permissions are unavailable. This draft cannot be applied. Please use the expert view or contact support.')));
         if (proposal.affected.length) root.append(el('p', 'permission-wizard-warning', t(
           `Gemeinsam genutzte Rechte ändern auch die Auswahl in: ${proposal.affected.map(w => w.title).join(', ')}. Diese Bereiche wurden nicht eigens geändert. Prüfe diese Auswirkungen vor der Übernahme.`,
-          `Shared permissions also change the selection in: ${proposal.affected.map(w => w.title).join(', ')}. These areas were not edited separately. Review these effects before applying.`)));
+          `Shared permissions also change the selection in: ${proposal.affected.map(w => w.title).join(', ')}. These areas were not edited separately. Review these effects before applying.`,
+          `Les autorisations partagées modifient aussi la sélection dans : ${proposal.affected.map(w => w.title).join(', ')}. Ces domaines n'ont pas été modifiés séparément. Vérifiez ces effets avant d'appliquer.`)));
         const delta = el('details', 'permission-wizard-details');
-        delta.append(el('summary', '', t(`Rechte: ${proposal.added.length} ergänzen · ${proposal.removed.length} entfernen`, `Permissions: add ${proposal.added.length} · remove ${proposal.removed.length}`)));
+        delta.append(el('summary', '', t(`Rechte: ${proposal.added.length} ergänzen · ${proposal.removed.length} entfernen`, `Permissions: add ${proposal.added.length} · remove ${proposal.removed.length}`, `Autorisations : ajouter ${proposal.added.length} · retirer ${proposal.removed.length}`)));
         const deltaList = el('ul');
         [[proposal.added, t('Ergänzen', 'Add')], [proposal.removed, t('Entfernen', 'Remove')]].forEach(([ids, verb]) => ids.forEach(id => deltaList.append(el('li', '', `${verb}: ${catalog.get(id)?.title || id}`))));
         delta.append(deltaList); root.append(delta);
@@ -154,7 +156,7 @@
         const outside = [...getOwn()].filter(id => !touched.has(id));
         if (outside.length) {
           const preserved = el('details', 'permission-wizard-details');
-          preserved.append(el('summary', '', t(`Weitere unveränderte Rechte (${outside.length})`, `Other unchanged permissions (${outside.length})`)));
+          preserved.append(el('summary', '', t(`Weitere unveränderte Rechte (${outside.length})`, `Other unchanged permissions (${outside.length})`, `Autres autorisations inchangées (${outside.length})`)));
           const values = el('ul'); outside.forEach(id => values.append(el('li', '', catalog.get(id)?.title || id))); preserved.append(values); root.append(preserved);
         }
         root.append(el('p', 'permission-wizard-note', t('Rechte aus weiteren Rollen addieren sich. „Kein Zugriff“ hier kann Rechte aus anderen Gruppen oder Vollzugriff nicht aufheben. Benutzerverwaltung und interne Systemrechte vergibt der Assistent nicht.', 'Permissions from other roles add together. “No access” here cannot override another group or superuser access. This wizard does not grant user-management or internal system permissions.')));

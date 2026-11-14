@@ -57,6 +57,7 @@ def test_permissions_and_boundaries(call):
         {"enabled": "yes"},
         {"allow_self_reports": "yes"},
         {"reason_mode": "guess"},
+        {"receipt_language": "invalid"},
         {"teamkill_count": 1},
         {"communication_template_id": 99999},
     ],
@@ -77,6 +78,14 @@ def test_self_report_option_requires_kick_permission_when_enabled(call):
     assert call("PUT", payload, [api.MANAGE, api.KICK]).status_code == 200
     result = json.loads(call(perms=[api.MANAGE]).content)["result"]
     assert result["config"]["allow_self_reports"] is True
+
+
+@pytest.mark.parametrize("language", ["de+en", "de", "en", "fr"])
+def test_receipt_language_survives_api_roundtrip(call, language):
+    response = call("PUT", {"enabled": True, "receipt_language": language}, [api.MANAGE, api.KICK])
+    assert response.status_code == 200
+    result = json.loads(call(perms=[api.MANAGE]).content)["result"]
+    assert result["config"]["receipt_language"] == language
 
 
 def test_csrf_protection(call):

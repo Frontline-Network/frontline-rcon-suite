@@ -44,7 +44,7 @@ export default function PlayerAdvancedFilters({
   const { t, i18n } = useTranslation();
   const [anchorEl, setAnchorEl] = useState(null);
   const countryOptions = useMemo(() => {
-    const language = i18n.resolvedLanguage === "en" ? "en" : "de";
+    const language = i18n.resolvedLanguage || "de";
     const displayNames = new Intl.DisplayNames([language], { type: "region" });
     return countryCodes.map((code) => ({
       code: code.toLowerCase(),

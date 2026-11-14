@@ -1,0 +1,18 @@
+{
+  "noLeader": {"title":"Tester la règle de chef d’escouade", "description":"Testez une escouade fictive avec le brouillon actuel de la règle à quatre étapes.", "condition":"État de l’escouade fictive", "conditions":{"leaderless":"Escouade sans chef", "led":"Chef d’escouade présent", "unassigned":"Joueur non affecté", "commander":"Poste de commandant"}},
+  "noSoloTank": {"title":"Tester la règle des chars en solo", "description":"Testez un équipage fictif avec le brouillon actuel de la règle à quatre étapes.", "condition":"Type d’escouade du joueur fictif", "conditions":{"armor":"Escouade blindée", "infantry":"Escouade d’infanterie", "recon":"Escouade de reconnaissance"}},
+  "notice":"La simulation suit la logique d’escalade enregistrée de CRCON avec les valeurs visibles. Elle ne modifie aucun état, n’enregistre rien et n’envoie aucune action au serveur de jeu.",
+  "serverPlayers":"Joueurs sur le serveur", "squadPlayers":"Joueurs dans l’escouade", "playerLevel":"Niveau du joueur fictif", "role":"Rôle du joueur fictif", "noRole":"Aucun rôle particulier", "flag":"Marqueur du joueur (facultatif)", "run":"Lancer la simulation", "close":"Fermer la simulation", "result":"Effet attendu",
+  "resultCopy": {
+    "off":["Règle désactivée", "L’état fictif n’est pas vérifié."],
+    "waiting":["Condition générale de départ non atteinte", "La règle démarre à partir de {{count}} joueurs sur le serveur."],
+    "noViolation":["Aucune infraction", "L’état fictif ne remplit pas la condition de détection."],
+    "exempt":["Joueur exempté", "L’exception configurée arrête la séquence avant la première vérification."],
+    "escalation":["Séquence d’actions déclenchée", "Si l’infraction persiste, le joueur passera par les étapes ci-dessous."],
+    "paused":["Séquence en attente d’un seuil", "L’infraction est détectée, mais les valeurs de test bloquent encore l’action suivante."],
+    "detected":["Infraction sans action visible", "L’état est détecté, mais l’avertissement, la punition et l’expulsion sont inaccessibles."]
+  },
+  "reason":{"led":"L’escouade possède un chef.", "unassigned":"Les joueurs non affectés sont ignorés.", "commander":"Le poste de commandant est ignoré.", "nonArmor":"Seules les escouades blindées sont vérifiées.", "crewed":"L’escouade blindée possède au moins deux membres.", "flag":"Le marqueur du joueur figure parmi les exceptions.", "level":"Le niveau du joueur se trouve dans la plage protégée.", "role":"Le rôle du joueur figure parmi les exceptions."},
+  "observeSuffix":" En mode observation, ces étapes sont uniquement consignées dans le journal d’audit.",
+  "stages":{"note":"Confirmer", "warn":"Avertir", "punish":"Punir", "kick":"Expulser", "unlimited":"illimité", "count":"{{count}}× · toutes les {{seconds}} secondes", "kickDelay":"après un délai de {{seconds}} secondes", "blockedServer":"en pause · à partir de {{count}} joueurs", "blockedSquad":"en pause · à partir de {{count}} membres de l’escouade"}
+}

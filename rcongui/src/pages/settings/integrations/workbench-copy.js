@@ -21,7 +21,20 @@ const copy = {
     addSetting: "Add setting",
     additionalSettingsLabel: "Additional entries (compatibility)",
   },
+  fr: {
+    filterLabel: "Filtrer les modules de communication",
+    removeNamedEntry: (name) => `Supprimer ${name}`,
+    keyLabel: "Nom",
+    newKeyLabel: "Nouveau paramètre",
+    newKeyHelp: "Saisissez le nom technique sans syntaxe JSON.",
+    keyRequired: "Saisissez un nom pour le paramètre.",
+    keyExists: "Ce paramètre existe déjà.",
+    addSetting: "Ajouter un paramètre",
+    additionalSettingsLabel: "Entrées supplémentaires (compatibilité)",
+  },
 };
 
-export const getIntegrationWorkbenchCopy = (language) =>
-  copy[String(language || "en").toLowerCase().startsWith("de") ? "de" : "en"];
+export const getIntegrationWorkbenchCopy = (language) => {
+  const code = String(language || "en").toLowerCase().split("-")[0];
+  return copy[code] || copy.en;
+};

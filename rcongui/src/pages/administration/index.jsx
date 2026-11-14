@@ -23,8 +23,9 @@ export default function Administration() {
   const { mode, systemMode } = useColorScheme();
   const resolvedMode = (mode === "system" ? systemMode : mode) || theme.palette.mode;
   const palette = theme.colorSchemes?.[resolvedMode]?.palette || theme.palette;
-  const german = i18n.resolvedLanguage?.startsWith("de");
-  const language = german ? "de" : "en";
+  const code = (i18n.resolvedLanguage || "en").split("-")[0];
+  const language = ["de", "en", "fr"].includes(code) ? code : "en";
+  const copy = (de, en, fr) => ({ de, en, fr })[language];
   const frameLanguage = useRef(language);
   const frame = useRef(null);
   const [height, setHeight] = useState(700);
@@ -88,20 +89,20 @@ export default function Administration() {
     return () => window.clearTimeout(timeout);
   }, [ready]);
 
-  const items = [{url: "/admin/", title: german ? "Übersicht" : "Overview"}, ...links];
+  const items = [{url: "/admin/", title: copy("Übersicht", "Overview", "Vue d’ensemble")}, ...links];
   const active = [...items].reverse().find((item) => location.pathname.startsWith(workspacePath(item.url)))?.url || false;
   return <Box sx={{ minWidth: 0 }}>
-    <PageHeader title="Administration" subtitle={german ? "Benutzer, Berechtigungen und Zugänge verwalten." : "Manage users, permissions and access."}
-      actions={<Button component={Link} to="/documentation?topic=roles">{german ? "Hilfe zu Rollen und Rechten" : "Roles and permissions help"}</Button>} />
-    <Tabs value={active} variant="scrollable" scrollButtons="auto" aria-label={german ? "Verwaltungsbereiche" : "Administration areas"} sx={{ mb: 2, borderBottom: 1, borderColor: "divider" }}>
+    <PageHeader title="Administration" subtitle={copy("Benutzer, Berechtigungen und Zugänge verwalten.", "Manage users, permissions and access.", "Gérer les utilisateurs, les autorisations et les accès.")}
+      actions={<Button component={Link} to="/documentation?topic=roles">{copy("Hilfe zu Rollen und Rechten", "Roles and permissions help", "Aide sur les rôles et les autorisations")}</Button>} />
+    <Tabs value={active} variant="scrollable" scrollButtons="auto" aria-label={copy("Verwaltungsbereiche", "Administration areas", "Rubriques d’administration")} sx={{ mb: 2, borderBottom: 1, borderColor: "divider" }}>
       {items.map((item) => <Tab component={Link} key={item.url} to={workspacePath(item.url)} value={item.url} label={item.title} />)}
     </Tabs>
-    {!ready && !failed && <LinearProgress aria-label={german ? "Verwaltung wird geladen" : "Loading administration"} />}
+    {!ready && !failed && <LinearProgress aria-label={copy("Verwaltung wird geladen", "Loading administration", "Chargement de l’administration")} />}
     {failed && <Stack role="alert" gap={1.5} sx={{ p: 3, border: 1, borderColor: "divider", borderRadius: 2 }}>
-      <Typography>{german ? "Die Verwaltung konnte nicht geladen werden." : "Administration could not be loaded."}</Typography>
-      <Button component="a" href="/admin/?standalone=1" target="_blank" rel="noopener">{german ? "Verwaltung separat öffnen" : "Open administration separately"}</Button>
+      <Typography>{copy("Die Verwaltung konnte nicht geladen werden.", "Administration could not be loaded.", "Impossible de charger l’administration.")}</Typography>
+      <Button component="a" href="/admin/?standalone=1" target="_blank" rel="noopener">{copy("Verwaltung separat öffnen", "Open administration separately", "Ouvrir l’administration séparément")}</Button>
     </Stack>}
-    <Box component="iframe" ref={frame} src={initialSource.current} title={german ? "Benutzer- und Rechteverwaltung" : "User and permission administration"}
+    <Box component="iframe" ref={frame} src={initialSource.current} title={copy("Benutzer- und Rechteverwaltung", "User and permission administration", "Gestion des utilisateurs et des autorisations")}
       onLoad={() => {
         pendingNavigation.current = false;
         frame.current?.contentWindow?.postMessage({ type: "crcon-admin-request-page" }, window.location.origin);

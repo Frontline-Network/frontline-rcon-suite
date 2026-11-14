@@ -10,6 +10,7 @@ def register_log_hooks() -> None:
         return
 
     # These imports register decorated callbacks in rcon.logs.loop.HOOKS.
+    from rcon import end_match_stats  # noqa: F401
     from rcon import hooks  # noqa: F401
     from rcon.autobalancer import hooks as autobalancer_hooks  # noqa: F401
     from rcon.auto_kick import auto_kick  # noqa: F401

@@ -344,6 +344,8 @@ function OperationSection({ data, disabled, patch }) {
                 ? t(`${ROOT}.operation.german`)
                 : locale.startsWith("en")
                 ? t(`${ROOT}.operation.english`)
+                : locale.startsWith("fr")
+                ? "Français"
                 : locale}
               {locale.includes("_") ? ` · ${locale}` : ""}
             </MenuItem>

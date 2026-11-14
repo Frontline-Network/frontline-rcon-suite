@@ -74,7 +74,9 @@ const formatTimestamp = (value, language) => {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat(language === "de" ? "de-DE" : "en-GB", {
+  const code = String(language || "en").split("-")[0];
+  const locale = { de: "de-DE", en: "en-GB", fr: "fr-FR" }[code] || "en-GB";
+  return new Intl.DateTimeFormat(locale, {
     dateStyle: "short",
     timeStyle: "short",
   }).format(date);
@@ -650,6 +652,7 @@ export default function DiscordReportBotCard() {
         <MenuItem value="en">
           {t("settings.discordReports.languageEnglish")}
         </MenuItem>
+        <MenuItem value="fr">Français</MenuItem>
       </TextField>
       <Typography variant="subtitle2" color="text.secondary">
         {t("settings.discordReports.allowedActions")}

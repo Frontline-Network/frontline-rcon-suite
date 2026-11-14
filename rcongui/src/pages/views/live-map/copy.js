@@ -1,4 +1,7 @@
+import { frenchCopy } from "./copy-fr.js";
+
 export const copy = {
+  fr: frenchCopy,
   de: {
     receiving: "Live-Daten werden aktualisiert.",
     connectionDelayed:

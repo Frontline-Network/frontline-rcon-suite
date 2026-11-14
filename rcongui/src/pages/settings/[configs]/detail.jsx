@@ -16,6 +16,7 @@ import {
   useState,
 } from "react";
 import { execute, get, handleHttpError } from "@/utils/fetchUtils";
+import "@/i18n/register-settings-panels";
 import {
   Box,
   Button,
@@ -725,7 +726,16 @@ const ConfigPage = () => {
     : t("settings.configForms.workbench.statusConfigured");
   const ruleStatusColor =
     hasEnabledSetting && jsonData?.enabled ? "success" : "default";
-  const localWorkbenchCopy = i18n.language?.startsWith("de")
+  const localWorkbenchCopy = i18n.language?.startsWith("fr")
+    ? {
+        test: "Tester l’effet",
+        scope: "Portée",
+        scopeValue: "Ce serveur",
+        validation: "Validation",
+        valid: "Prêt à enregistrer",
+        errors: `${allValidationErrors.length} champs à vérifier`,
+      }
+    : i18n.language?.startsWith("de")
     ? {
         test: "Auswirkung testen",
         scope: "Geltungsbereich",
@@ -960,7 +970,12 @@ const ConfigPage = () => {
           {settingsOpen
             ? t("settings.config.closeAutobalancerSettings")
             : t("settings.config.openAutobalancerSettings", {
-                mode: jsonData?.mode || t("common.unknown"),
+                mode: ({
+                  disabled: t("settingsPanels.autobalancer.off"),
+                  shadow: t("settingsPanels.autobalancer.observe"),
+                  manual: t("settingsPanels.autobalancer.manual"),
+                  auto: t("settingsPanels.autobalancer.automatic"),
+                })[jsonData?.mode] || jsonData?.mode || t("common.unknown"),
               })}
         </Button>
       )}

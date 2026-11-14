@@ -90,7 +90,39 @@ WORKFLOWS = (
 )
 
 
-def permission_workflows(permissions, german=True):
+WORKFLOW_TITLES_FR = {
+    "console": "Administrateurs du jeu", "live": "Vue en direct et équipes", "players": "Fiches des joueurs et journaux",
+    "vips": "Liste VIP", "blacklists": "Listes de blocage", "votemap": "Vote de carte", "rotation": "Rotation des cartes",
+    "templates": "Modèles de messages", "broadcast": "Messages automatiques du serveur", "autobalancer": "Équilibreur d'équipes", "services": "Services en arrière-plan",
+}
+CONFIG_TITLES_FR = {
+    "camera_config": "Notifications de la caméra administrateur", "real_vip_config": "Règles VIP",
+    "votekick_autotoggle_config": "Paramètres automatiques d'expulsion par vote", "auto_mod_level_config": "Modération automatique : niveaux des joueurs",
+    "auto_mod_no_leader_config": "Modération automatique : escouades sans chef", "auto_mod_seeding_config": "Modération automatique : remplissage",
+    "auto_mod_solo_tank_config": "Modération automatique : chars en solo", "tk_ban_on_connect_config": "Bannissements pour tirs alliés à la connexion",
+    "expired_vip_config": "Accès VIP expirés", "server_name_change_config": "Nom du serveur chez l'hébergeur",
+    "log_line_discord_webhook_config": "Discord : événements du journal", "name_kick_config": "Vérification automatique des noms de joueurs",
+    "rcon_connection_settings_config": "Connexion au serveur de jeu", "rcon_server_settings_config": "Paramètres généraux RCON",
+    "scorebot_config": "Discord : tableau des scores", "steam_config": "Intégration Steam", "vac_game_bans_config": "Bannissements VAC et de jeu",
+    "admin_pings_discord_webhooks_config": "Discord : signalements aux administrateurs", "audit_discord_webhooks_config": "Discord : actions des administrateurs",
+    "camera_discord_webhooks_config": "Discord : caméra administrateur", "chat_discord_webhooks_config": "Discord : discussion du jeu",
+    "kills_discord_webhooks_config": "Discord : éliminations et tirs alliés", "watchlist_discord_webhooks_config": "Discord : liste de surveillance",
+    "chat_commands_config": "Commandes de discussion des joueurs", "rcon_chat_commands_config": "Commandes de discussion RCON", "log_stream_config": "Flux de journal en direct",
+    "seed_vip_config": "Récompenses VIP de remplissage", "watch_killrate_config": "Surveillance du taux d'éliminations",
+}
+ACTION_TITLES_FR = {
+    "View": "Consulter", "Assign role": "Attribuer un rôle", "Remove role": "Retirer un rôle",
+    "Support: messages, comments & watchlist": "Assistance : messages, commentaires et surveillance", "Kick players": "Expulser des joueurs", "Punish players": "Sanctionner des joueurs",
+    "Temporarily ban players": "Bannir temporairement des joueurs", "Permanently ban players": "Bannir définitivement des joueurs",
+    "Grant VIP": "Attribuer le VIP", "Remove VIP": "Retirer le VIP", "Export VIP list": "Exporter la liste VIP",
+    "Manage blacklist entries": "Gérer les entrées de liste de blocage", "Unban players": "Lever des bannissements",
+    "Change voting rules": "Modifier les règles de vote", "Change map whitelist": "Modifier les cartes autorisées",
+    "Edit rotation": "Modifier la rotation", "Edit templates": "Modifier les modèles", "Edit message rules": "Modifier les règles de messages",
+    "Execute interventions": "Exécuter les interventions", "Configure automation": "Configurer l'automatisation", "Start / stop services": "Démarrer ou arrêter les services", "Edit settings": "Modifier les paramètres",
+}
+
+
+def permission_workflows(permissions, german=True, language=None):
     available = {p.codename: p for p in permissions
                  if p.content_type.app_label == "api" and p.content_type.model == "rconuser"}
     definitions = list(WORKFLOWS)
@@ -116,11 +148,11 @@ def permission_workflows(permissions, german=True):
             *((de, en, set(read) | set(extra)) for de, en, extra in actions),
         ]):
             bundles.append({
-                "id": f"{key}:{index}", "title": title_de if german else title_en,
+                "id": f"{key}:{index}", "title": ACTION_TITLES_FR.get(title_en, title_en) if language == "fr" else title_de if german else title_en,
                 "kind": "read" if index == 0 else "action",
                 "permissions": [str(available[c].pk) for c in sorted(codes) if c in available],
                 "unavailable": sorted(set(codes) - available.keys()),
                 "sensitive": any(permission_help(available[c], german)["sensitive"] for c in codes if c in available),
             })
-        result.append({"id": key, "title": de if german else en, "bundles": bundles})
+        result.append({"id": key, "title": WORKFLOW_TITLES_FR.get(key, CONFIG_TITLES_FR.get(key, en)) if language == "fr" else de if german else en, "bundles": bundles})
     return result

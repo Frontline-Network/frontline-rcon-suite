@@ -44,7 +44,7 @@ export default function SystemDiagnosticsLayout({ children }) {
     sections.find((section) => location.pathname.endsWith(section.key)) ||
     sections[0];
   const active = activeSection.key;
-  const english = i18n.resolvedLanguage === "en";
+  const language = (i18n.resolvedLanguage || "de").split("-")[0];
 
   return (
     <>
@@ -52,9 +52,11 @@ export default function SystemDiagnosticsLayout({ children }) {
         eyebrow={t("navigation.groups.systemDiagnostics")}
         title={activeSection.label}
         subtitle={
-          english
-            ? "Monitor services, connections and diagnostic data in one workspace."
-            : "Dienste, Verbindungen und Diagnosedaten in einem Arbeitsbereich verwalten."
+          language === "fr"
+            ? "Surveillez les services, les connexions et les données de diagnostic dans un même espace."
+            : language === "en"
+              ? "Monitor services, connections and diagnostic data in one workspace."
+              : "Dienste, Verbindungen und Diagnosedaten in einem Arbeitsbereich verwalten."
         }
       />
       <Box

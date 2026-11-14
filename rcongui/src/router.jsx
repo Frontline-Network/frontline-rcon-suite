@@ -529,6 +529,11 @@ const router = createBrowserRouter([
         errorElement: <RouteError />,
       },
       {
+        path: "/settings/others/end-match-stats",
+        lazy: lazyPage(() => import("./pages/settings/end-match-stats")),
+        errorElement: <RouteError />,
+      },
+      {
         path: "/settings/:category/:type",
         lazy: lazyPage(() => import("./pages/settings/[configs]/detail")),
         errorElement: <RouteError />,

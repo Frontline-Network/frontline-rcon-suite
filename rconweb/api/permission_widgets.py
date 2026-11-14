@@ -16,7 +16,7 @@ class ExplainedPermissionSelect(forms.SelectMultiple):
 
     class Media:
         css = {"all": ("api/css/permission-picker.css",)}
-        js = ("api/js/permission-planner.js", "api/js/permission-wizard.js", "api/js/permission-picker.js",)
+        js = ("api/js/permission-planner.js", "api/js/permission-fr.js", "api/js/permission-wizard.js", "api/js/permission-picker.js",)
 
     def __init__(self, *args, permissions, **kwargs):
         self.permissions = permissions
@@ -24,17 +24,18 @@ class ExplainedPermissionSelect(forms.SelectMultiple):
 
     def render(self, name, value, attrs=None, renderer=None):
         attrs = {**(attrs or {}), "class": "crcon-permission-select", "size": 12}
-        german = (get_language() or "en").startswith("de")
+        language = (get_language() or "en").split("-")[0]
+        german = language == "de"
         permission_objects = list(self.permissions.select_related("content_type"))
-        catalog = [permission_help(permission, german) for permission in permission_objects]
+        catalog = [permission_help(permission, german, language) for permission in permission_objects]
         groups = []
         if name == "user_permissions":
             groups = [{"id": str(group.pk), "name": group.name, "permissions": [str(p.pk) for p in group.permissions.all()]}
                       for group in Group.objects.prefetch_related("permissions")]
-        data = {"permissions": catalog, "groups": groups, "german": german, "direct": name == "user_permissions",
-                "presets": permission_presets(permission_objects, german) if name == "permissions" else [],
-                "workflows": permission_workflows(permission_objects, german)}
-        data['wizardSections'] = wizard_metadata(data['workflows'], german)
+        data = {"permissions": catalog, "groups": groups, "german": german, "language": language, "direct": name == "user_permissions",
+                "presets": permission_presets(permission_objects, german, language) if name == "permissions" else [],
+                "workflows": permission_workflows(permission_objects, german, language)}
+        data['wizardSections'] = wizard_metadata(data['workflows'], german, language)
         return mark_safe(super().render(name, value, attrs, renderer) + json_script(data, attrs["id"] + "_help"))
 
 

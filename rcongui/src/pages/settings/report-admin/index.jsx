@@ -32,7 +32,8 @@ async function request(data) {
 export default function ReportAdmin({ embedded = false }) {
   const { user, permissions } = useAuth();
   const { i18n } = useTranslation();
-  const c = copy[i18n.language?.startsWith("de") ? "de" : "en"];
+  const language = (i18n.resolvedLanguage || i18n.language || "en").split("-")[0];
+  const c = copy[language] || copy.en;
   const allowed = canUse(permissions, "can_manage_discord_report_bot");
   const key = ["report-admin", window.location.origin, user?.username];
   const client = useQueryClient();
@@ -132,6 +133,19 @@ export default function ReportAdmin({ embedded = false }) {
             >
               <MenuItem value="ai">{c.aiReason}</MenuItem>
               <MenuItem value="rules">{c.rulesReason}</MenuItem>
+            </TextField>
+            <TextField
+              select
+              label={c.receiptLanguage}
+              value={draft.receipt_language ?? "de+en"}
+              disabled={save.isPending}
+              onChange={(e) => setDraft({ ...draft, receipt_language: e.target.value })}
+              helperText={c.receiptLanguageHelp}
+            >
+              <MenuItem value="de+en">Deutsch + English</MenuItem>
+              <MenuItem value="de">Deutsch</MenuItem>
+              <MenuItem value="en">English</MenuItem>
+              <MenuItem value="fr">Français</MenuItem>
             </TextField>
             <TextField
               select

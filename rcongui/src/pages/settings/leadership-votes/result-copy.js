@@ -61,8 +61,13 @@ const knownResults = new Map(
   ])
 );
 
+export const frenchLeadershipResults = {
+  declined: "Refusé par le signaleur", eligibility: "Admissibilité modifiée", withdrawn: "Retiré par le signaleur", admin: "Pris en charge par un administrateur", manualAction: "Action manuelle", configuration: "Configuration modifiée", round: "Manche ou connexion modifiée", auditConfirmed: "Audit de l’expulsion confirmé", restart: "Redémarrage : vérification manuelle, aucune nouvelle tentative", target: "Cible ou données en direct devenues invalides", confirmation: "Confirmation expirée", voters: "Trop peu de responsables admissibles", adminHandling: "Prise en charge administrative ou cible modifiée", warning: "Avertissement non remis", invitations: "Nombre insuffisant d’invitations remises", delivery: "Remise incomplète", majority: "Pas de majorité – prise en charge par les administrateurs", dryRun: "Simulation : majorité atteinte, aucune expulsion", finalCheck: "Dernière vérification échouée – aucune expulsion", kicked: "Expulsion confirmée", unknown: "Expulsion non confirmée – vérification manuelle, aucune nouvelle tentative", demoMajority: "Démo : pas de majorité – aucune expulsion", demoDisabled: "Démo : fonction désactivée", demoAdmin: "Démo : arrêté par un modérateur"
+};
+
 export function translateLeadershipResult(result, language) {
   const key = knownResults.get(result);
   if (!key) return result;
+  if (language?.toLowerCase().startsWith("fr")) return frenchLeadershipResults[key];
   return leadershipResults[key][language?.startsWith("de") ? 0 : 1];
 }

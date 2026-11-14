@@ -42,7 +42,7 @@ export default function SettingEffectSummary({
   const metadata = getGeneralSettingMetadata(settingKey);
   if (!metadata) return null;
 
-  const language = i18n.resolvedLanguage === "en" ? "en" : "de";
+  const language = i18n.resolvedLanguage || "de";
   const hasUnsavedChanges = !valuesEqual(serverValue, draftValue);
   const lastRead = dataUpdatedAt
     ? new Date(dataUpdatedAt).toLocaleString(language)

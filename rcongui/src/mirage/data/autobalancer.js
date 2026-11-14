@@ -35,6 +35,15 @@ export const autobalancerConfig = {
   history_half_life_days: 30,
   volunteer_command: "!balance",
   message_language: "de+en",
+  messages_fr: {
+    volunteer_request: "Les équipes sont déséquilibrées. Pour rejoindre {target_team} volontairement, saisissez !balance dans les {seconds} secondes.",
+    volunteer_registered: "Merci ! Votre candidature pour cet équilibrage a été enregistrée.",
+    candidate_selected: "Vous avez été sélectionné pour rejoindre {target_team}. Le changement aura lieu après votre prochaine mort ; vous serez ensuite protégé pendant {cooldown_maps} cartes.",
+    switch_completed: "Merci pour votre aide ! Vous avez rejoint {target_team} et êtes protégé contre un nouveau changement automatique pendant {cooldown_maps} cartes.",
+    squad_switch_selected: "Votre escouade {squad_name} va rejoindre {target_team} ensemble. Veuillez ensuite recréer votre escouade dans cette équipe.",
+    squad_switch_completed: "Le changement vers {target_team} est terminé. Veuillez recréer l'escouade {squad_name} dans cette équipe.",
+    squad_switch_aborted: "Le transfert de l'escouade {squad_name} n'a pas pu être terminé. Veuillez attendre les instructions d'un administrateur.",
+  },
   messages_en: {
     volunteer_request:
       "The teams are uneven. Volunteer to join {target_team}: type !balance within {seconds} seconds.",
@@ -530,10 +539,11 @@ export const autobalancerSchema = {
     volunteer_command: { type: "string", minLength: 2, maxLength: 32 },
     message_language: {
       type: "string",
-      enum: ["de", "en", "de+en"],
+      enum: ["de", "en", "fr", "de+en", "de+fr", "en+fr", "de+en+fr"],
       default: "de",
     },
     messages_en: { $ref: "#/$defs/AutobalancerMessages" },
+    messages_fr: { $ref: "#/$defs/AutobalancerMessages" },
     messages: { $ref: "#/$defs/AutobalancerMessages" },
   },
 };

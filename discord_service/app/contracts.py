@@ -40,7 +40,7 @@ class ModerationPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid")
     profile_id: str = Field(default="frontline-default", min_length=1, max_length=64)
     version: str = Field(default="1", min_length=1, max_length=32)
-    language: Literal["de", "en"] = "de"
+    language: Literal["de", "en", "fr"] = "de"
     enabled_sources: set[ModerationSource] = Field(
         default_factory=lambda: set(ModerationSource)
     )

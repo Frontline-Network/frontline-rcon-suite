@@ -3,11 +3,14 @@ import LanguageDetector from "i18next-browser-languagedetector";
 import { initReactI18next } from "react-i18next";
 import de from "./locales/de";
 import en from "./locales/en";
+import fr from "./locales/fr";
 import dayjs from "dayjs";
 import "dayjs/locale/de";
+import "dayjs/locale/fr";
+import { dateLocale } from "./date-locale";
 import LocalizedFormat from "dayjs/plugin/localizedFormat";
 
-export const supportedLanguages = ["de", "en"];
+export const supportedLanguages = ["de", "en", "fr"];
 
 dayjs.extend(LocalizedFormat);
 
@@ -26,6 +29,7 @@ i18n
     resources: {
       de: { translation: de },
       en: { translation: en },
+      fr: { translation: fr },
     },
     supportedLngs: supportedLanguages,
     // German is the first-run language; an English string is shown only when
@@ -42,7 +46,7 @@ i18n
   });
 
 const applyDocumentLanguage = (language) => {
-  const locale = language?.split("-")[0] === "en" ? "en" : "de";
+  const locale = dateLocale(language);
   if (typeof document !== "undefined") document.documentElement.lang = locale;
   dayjs.locale(locale);
 };

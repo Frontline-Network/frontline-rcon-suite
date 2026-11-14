@@ -58,6 +58,7 @@ def _player_stat_fields(snapshot: dict, language: str, *, leader=False) -> list[
         return _metric(label, value if value is not None else "–")
 
     german = language == "de"
+    french = language == "fr"
     kills, deaths = number("kills"), number("deaths")
     seconds = number("map_playtime_seconds")
     elapsed = seconds is not None and seconds > 0
@@ -76,9 +77,9 @@ def _player_stat_fields(snapshot: dict, language: str, *, leader=False) -> list[
             "name": ("⚔️ Kampf" if german else "⚔️ Combat") + suffix,
             "value": _field_block(
                 metric("Kills", kills),
-                metric("Tode" if german else "Deaths", deaths),
+                metric("Tode" if german else "Morts" if french else "Deaths", deaths),
                 metric("K/D", kd),
-                metric("Kampfpunkte" if german else "Combat score", number("combat")),
+                metric("Kampfpunkte" if german else "Score de combat" if french else "Combat score", number("combat")),
             ),
             "inline": True,
         },
@@ -86,9 +87,9 @@ def _player_stat_fields(snapshot: dict, language: str, *, leader=False) -> list[
             "name": ("⚡ Leistung" if german else "⚡ Performance") + suffix,
             "value": _field_block(
                 metric("KPM", kpm),
-                metric("Killserie" if german else "Kill streak", number("kills_streak")),
+                metric("Killserie" if german else "Série d’éliminations" if french else "Kill streak", number("kills_streak")),
                 metric(
-                    "Runden-Spielzeit" if german else "Round playtime",
+                    "Runden-Spielzeit" if german else "Temps de jeu de la manche" if french else "Round playtime",
                     f"{seconds / 60:.1f} min" if elapsed else None,
                 ),
             ),
@@ -97,8 +98,8 @@ def _player_stat_fields(snapshot: dict, language: str, *, leader=False) -> list[
         {
             "name": "⚠️ Teamkills" + suffix,
             "value": _field_block(
-                metric("Anzahl" if german else "Count", teamkills),
-                metric("Serie" if german else "Streak", number("teamkills_streak")),
+                metric("Anzahl" if german else "Nombre" if french else "Count", teamkills),
+                metric("Serie" if german else "Série" if french else "Streak", number("teamkills_streak")),
             ),
             "inline": True,
         },
@@ -122,6 +123,8 @@ def _bounded_report_embeds(embeds: list[dict], language: str) -> list[dict]:
     note = (
         "Details gekürzt; vollständigen Report in CRCON öffnen."
         if language == "de"
+        else "Détails raccourcis ; ouvrez le signalement complet dans CRCON."
+        if language == "fr"
         else "Details shortened; open the full report in CRCON."
     )
     remaining, result = 5900 - len(note) - 3, []
@@ -200,6 +203,11 @@ def _reporter_context_field(incident: dict, language: str) -> dict:
             "teamkills": "Teamkills",
             "playtime": "Playtime",
             "title": "👤 Reporter context",
+        },
+        "fr": {
+            "name": "Nom", "id": "ID", "team": "Équipe", "unit": "Unité",
+            "role": "Rôle", "level": "Niveau", "combat": "Éliminations/morts",
+            "teamkills": "Teamkills", "playtime": "Temps de jeu", "title": "👤 Contexte du signaleur",
         },
     }.get(language, {})
     details = [_metric(labels["name"], reporter_name)]
@@ -328,7 +336,21 @@ def _incident_log_entry(event: dict, incident: dict, language: str) -> str | Non
         "reopen",
         "reassign",
     }:
-        if language == "de":
+        if language == "fr":
+            if event_type == "claim":
+                description = f"{actor} a commencé le traitement manuel." if payload.get("mode") == "manual" else f"{actor} a pris en charge le signalement."
+            elif event_type == "unclaim":
+                description = f"{actor} a libéré le signalement."
+            elif event_type == "resolved":
+                description = f"{actor} a terminé le signalement."
+            elif event_type == "dismissed":
+                description = f"{actor} a clos le signalement comme visant le mauvais joueur." if payload.get("reason") == "wrong_player" else f"{actor} a rejeté le signalement comme injustifié."
+            elif event_type == "reopen":
+                description = f"{actor} a rouvert le signalement."
+            else:
+                assignee = _truncate(_assigned_display_name(payload.get("assigned_to")) or "-", 100)
+                description = f"{actor} a transmis le signalement à {assignee}."
+        elif language == "de":
             if event_type == "claim":
                 description = (
                     f"{actor} übernahm die manuelle Bearbeitung."
@@ -401,7 +423,11 @@ def _incident_log_entry(event: dict, incident: dict, language: str) -> str | Non
     )
 
     if punish_message_fallback:
-        if language == "de":
+        if language == "fr":
+            description = (f"⚠️ {actor} n’a pas pu confirmer la punition de {target} ; "
+                           f"le joueur était peut-être déjà mort. Le motif a été envoyé "
+                           f"sous forme de message : {reason}")
+        elif language == "de":
             description = (
                 f"⚠️ {actor} konnte die Bestrafung von {target} nicht bestätigen. "
                 f"Der Spieler war möglicherweise bereits tot. Der Grund wurde als "
@@ -415,7 +441,21 @@ def _incident_log_entry(event: dict, incident: dict, language: str) -> str | Non
             )
         return _truncate(f"{timestamp}{description}", 700)
 
-    if language == "de":
+    if language == "fr":
+        descriptions = {
+            "message": f"{actor} a envoyé un message {'au signaleur' if reporter_action else 'au joueur'} {target}. Contenu : {message}",
+            "punish": f"{actor} a puni {target}. Motif : {reason}",
+            "kick": f"{actor} a expulsé {target}. Motif : {reason}",
+            "temp_ban": f"{actor} a banni {target} pendant {duration or '-'} heures. Motif : {reason}",
+            "perma_ban": f"{actor} a banni {target} définitivement. Motif : {reason}",
+            "blacklist": f"{actor} a ajouté {target} à la liste noire. Motif : {reason}",
+            "remove_from_squad": f"{actor} a retiré {target} de l’escouade. Motif : {reason}",
+            "disband_squad": f"{actor} a dissous l’escouade. Motif : {reason}",
+        }
+        description = descriptions.get(action, f"{actor} a effectué {action or 'une action'} pour {target}.")
+        if failed:
+            description = f"❌ Échec : {description}"
+    elif language == "de":
         descriptions = {
             "message": (
                 f"{actor} schrieb dem {'Melder' if reporter_action else 'Spieler'} "
@@ -477,7 +517,7 @@ def _action_log_field(incident: dict, language: str) -> dict | None:
     while len("\n".join(entries)) > 1024 and len(entries) > 1:
         entries.pop(0)
     return {
-        "name": "Logbuch" if language == "de" else "Logbook",
+        "name": "Logbuch" if language == "de" else "Journal" if language == "fr" else "Logbook",
         "value": _truncate("\n".join(entries), 1024),
         "inline": False,
     }
@@ -536,7 +576,7 @@ def _additional_squad_embed(
 
     fields = [
         {
-            "name": "📣 Grund der Meldung" if language == "de" else "📣 Report reason",
+            "name": "📣 Grund der Meldung" if language == "de" else "📣 Motif du signalement" if language == "fr" else "📣 Report reason",
             "value": _truncate(incident.get("reason"), 1024),
             "inline": False,
         },
@@ -556,7 +596,7 @@ def _additional_squad_embed(
             member_lines.append(entry)
         fields.append(
             {
-                "name": f"👥 Squad Members ({len(member_lines)})",
+                "name": f"👥 {'Membres de l’escouade' if language == 'fr' else 'Squad Members'} ({len(member_lines)})",
                 "value": _truncate("\n".join(member_lines), 1024),
                 "inline": False,
             }
@@ -605,6 +645,8 @@ def render_message(
     if selected_squad:
         primary = selected_squad
     language = incident.get("discord_language", "de")
+    if not isinstance(language, str) or language not in {"de", "en", "fr"}:
+        language = "de"
     labels = {
         "de": {
             "report_title": "Bericht für Spieler: {name}",
@@ -637,6 +679,15 @@ def render_message(
             "unavailable": "Unavailable",
             "unresolved_target": "No unambiguous reported player",
             "unresolved_target_note": "No unambiguous reported player was found. Moderation actions are locked.",
+        },
+        "fr": {
+            "report_title": "Signalement du joueur : {name}", "name_title": "Examen du nom par IA : {name}",
+            "chat_title": "Examen du chat par IA : {name}", "check_match": "Vérifiez que le dossier correspond au signalement du joueur.",
+            "reason": "📣 Motif du signalement", "reporter": "☎️ Signaleur", "dismiss": "❎ Non justifié",
+            "trash": "🗑 Corbeille", "manual": "👀 Traiter manuellement", "finish": "✅ Terminer le traitement",
+            "not_configured": "⚙️ Aucun rôle de modérateur configuré. Les actions sont bloquées.", "unavailable": "Indisponible",
+            "unresolved_target": "Aucun joueur signalé identifié sans ambiguïté",
+            "unresolved_target_note": "Aucun joueur signalé n’a été identifié sans ambiguïté. Les actions de modération sont bloquées.",
         },
     }.get(language, {})
     source = str(incident.get("source") or "manual")
@@ -688,7 +739,7 @@ def render_message(
     if not is_squad_report and _present(unit_name):
         identity += f"\n👥 **{_display_unit(unit_name)}**"
     if not target_online:
-        identity += "\n🔴 **Offline**"
+        identity += "\n🔴 **Hors ligne**" if language == "fr" else "\n🔴 **Offline**"
     if source in {"chat", "manual"}:
         identity += f"\n\nℹ️ *{labels['check_match']}*"
     fields = []
@@ -718,7 +769,7 @@ def render_message(
                     member_lines.append(entry)
                 fields.append(
                     {
-                        "name": f"👥 Squad Members ({len(member_lines)})",
+                        "name": f"👥 {'Membres de l’escouade' if language == 'fr' else 'Squad Members'} ({len(member_lines)})",
                         "value": _truncate("\n".join(member_lines), 1024),
                         "inline": False,
                     }
@@ -733,6 +784,7 @@ def render_message(
                 timing = (
                     f"{seconds} Sekunden vor dem Report"
                     if language == "de" and _present(seconds)
+                    else f"{seconds} secondes avant le signalement" if language == "fr" and _present(seconds)
                     else (
                         f"{seconds} seconds before the report"
                         if _present(seconds)
@@ -744,6 +796,7 @@ def render_message(
                         "name": (
                             "🧾 Passender Teamkill im Serverlog"
                             if language == "de"
+                            else "🧾 Teamkill correspondant dans le journal du serveur" if language == "fr"
                             else "🧾 Matching teamkill in server log"
                         ),
                         "value": _truncate(
@@ -763,11 +816,11 @@ def render_message(
                 },
                 {
                     "name": (
-                        "🤖 KI-Einschätzung" if language == "de" else "🤖 AI assessment"
+                        "🤖 KI-Einschätzung" if language == "de" else "🤖 Analyse IA" if language == "fr" else "🤖 AI assessment"
                     ),
                     "value": _truncate(
-                        f"**Risiko:** {analysis.risk_score:.0%}\n"
-                        f"**Kategorie:** {categories}\n{analysis.rationale}",
+                        f"**{'Risque' if language == 'fr' else 'Risiko'}:** {analysis.risk_score:.0%}\n"
+                        f"**{'Catégorie' if language == 'fr' else 'Kategorie'}:** {categories}\n{analysis.rationale}",
                         1024,
                     ),
                     "inline": False,
@@ -798,6 +851,14 @@ def render_message(
             "manual": "Admins übernehmen / Manual review required",
             "unknown": "Ergebnis unklar, keine Wiederholung / Uncertain result, no retry",
         }
+        if language == "fr":
+            states = {
+                "classifying": "L’IA lit le motif complet du signalement",
+                "queued": "Vérifications en attente", "waiting": "Délai d’observation silencieuse en cours",
+                "sending": "Expulsion en cours", "kicked": "Expulsion confirmée",
+                "dry_run": "Simulation : aucune expulsion", "manual": "Examen manuel requis",
+                "unknown": "Résultat incertain, aucune nouvelle tentative",
+            }
         evidence = (
             f"{report_admin.get('teamkill_count', '–')} Teamkills · {report_admin.get('window_seconds', 0)} s Kontext / context"
             if report_admin.get("rule") == "teamkills" else
@@ -807,10 +868,19 @@ def render_message(
             if report_admin.get("rule") == "communication" else
             "Meldegrund noch keiner freigegebenen Regel zugeordnet / Report not yet assigned to an approved rule"
         )
+        if language == "fr":
+            if report_admin.get("rule") == "teamkills":
+                evidence = f"{report_admin.get('teamkill_count', '–')} teamkills · {report_admin.get('window_seconds', 0)} s de contexte"
+            elif report_admin.get("rule") == "cheating":
+                evidence = "Signalement de triche : examen uniquement, aucune sanction automatique"
+            elif report_admin.get("rule") == "communication":
+                evidence = "Communication signalée ; aucune preuve de l’activité vocale"
+            else:
+                evidence = "Motif pas encore associé à une règle approuvée"
         admin_field = {
             "name": "🤖 Report-Admin",
             "value": _truncate(
-                f"{states.get(report_admin.get('status'), 'Manual review')}\n"
+                f"{states.get(report_admin.get('status'), 'Examen manuel' if language == 'fr' else 'Manual review')}\n"
                 f"{report_admin.get('target_name') or '-'}\n{evidence}\n"
                 f"{report_admin.get('result') or ''}\n{report_admin.get('sent_reason') or ''}", 1024),
             "inline": False,
@@ -819,9 +889,10 @@ def render_message(
             reason = report_admin.get("sent_reason") or report_admin.get("result") or "–"
             kicked_name = report_admin.get("target_name") or target_name
             admin_field.update(
-                name=("✅ Automatischer Eingriff – Report-Admin" if language == "de" else "✅ Automatic action – report admin"),
+                name=("✅ Automatischer Eingriff – Report-Admin" if language == "de" else "✅ Intervention automatique – administration des signalements" if language == "fr" else "✅ Automatic action – report admin"),
                 value=_truncate(
                     (f"**Aktion:** Server-Kick bestätigt\n**Spieler:** {kicked_name}\n**Grund:** {reason}" if language == "de" else
+                     f"**Action :** expulsion du serveur confirmée\n**Joueur :** {kicked_name}\n**Motif :** {reason}" if language == "fr" else
                      f"**Action:** Server kick confirmed\n**Player:** {kicked_name}\n**Reason:** {reason}")
                     + "\n" + evidence, 1024),
             )
@@ -837,7 +908,7 @@ def render_message(
         deadline = f"<t:{int(vote['ends_at'])}:R>" if vote.get("ends_at") and vote.get("status") in {"confirming", "warning", "active", "inviting"} else "–"
         roster = vote.get("electorate") or {}
         ballots = vote.get("ballots") or {}
-        lines = [f"{roster.get(pid, {}).get('name') or pid}: {'Ja / Yes' if b['yes'] else 'Nein / No'}" for pid, b in ballots.items()]
+        lines = [f"{roster.get(pid, {}).get('name') or pid}: {('Oui' if b['yes'] else 'Non') if language == 'fr' else ('Ja / Yes' if b['yes'] else 'Nein / No')}" for pid, b in ballots.items()]
         target_role = "Commander" if vote.get("target_role") == "commander" else f"Squad {vote.get('squad')} – Squadleader"
         mode = "PROBELAUF / DRY RUN – kein Kick / no kick" if vote.get("mode") != "active" else "AKTIV / ACTIVE – Server-Kick"
         phases = {
@@ -849,9 +920,15 @@ def render_message(
             "cancelled": "Abgebrochen – Admins erforderlich / Cancelled – admins needed",
             "unknown": "Unklar – keine Wiederholung / Uncertain – no retry",
         }
-        fields.append({"name": "🗳 Führungsabstimmung" if language == "de" else "🗳 Leadership vote",
+        if language == "fr":
+            mode = "SIMULATION – aucune expulsion" if vote.get("mode") != "active" else "ACTIF – expulsion du serveur"
+            target_role = "Commandant" if vote.get("target_role") == "commander" else f"Escouade {vote.get('squad')} – chef d’escouade"
+            phases = {
+                "confirming": "Confirmation", "warning": "Avertissement", "inviting": "Invitations", "active": "Vote en cours", "executing": "Exécution", "kicked": "Expulsion confirmée", "dry_run": "Simulation réussie – examen manuel", "rejected": "Pas de majorité – administrateurs requis", "cancelled": "Annulé – administrateurs requis", "unknown": "Résultat incertain – aucune nouvelle tentative",
+            }
+        fields.append({"name": "🗳 Führungsabstimmung" if language == "de" else "🗳 Vote de commandement" if language == "fr" else "🗳 Leadership vote",
             "value": _truncate(f"{mode}\n{target_role} {vote.get('target_name')}\n{phases.get(vote.get('status'), vote.get('status'))} · {deadline}\n"
-                f"Ja / Yes: {vote.get('yes', 0)} · Nein / No: {vote.get('no', 0)} · ≥ {vote.get('required') or '–'} / {vote.get('participant_count', len(roster))}\n"
+                f"{'Oui' if language == 'fr' else 'Ja / Yes'}: {vote.get('yes', 0)} · {'Non' if language == 'fr' else 'Nein / No'}: {vote.get('no', 0)} · ≥ {vote.get('required') or '–'} / {vote.get('participant_count', len(roster))}\n"
                 f"{vote.get('result') or ''}\n" + "\n".join(lines), 1024), "inline": False})
     if action_log:
         fields.append(action_log)
@@ -865,16 +942,18 @@ def render_message(
         )
         fields.append(
             {
-                "name": "🎯 Zielauswahl" if language == "de" else "🎯 Target selection",
+                "name": "🎯 Zielauswahl" if language == "de" else "🎯 Sélection de la cible" if language == "fr" else "🎯 Target selection",
                 "value": (
                     f"Ausgewählt: **{selected_label}**"
                     if selected_label and language == "de"
+                    else f"Sélection : **{selected_label}**" if selected_label and language == "fr"
                     else (
                         f"Selected: **{selected_label}**"
                         if selected_label
                         else (
                             "Bitte vor einer Aktion unten ein Squad auswählen."
                             if language == "de"
+                            else "Sélectionnez une escouade ci-dessous avant toute action." if language == "fr"
                             else "Select a squad below before running an action."
                         )
                     )
@@ -923,6 +1002,7 @@ def render_message(
                             "placeholder": (
                                 "Squad für die Aktion auswählen"
                                 if language == "de"
+                                else "Sélectionner l’escouade pour l’action" if language == "fr"
                                 else "Select squad for the action"
                             ),
                             "min_values": 1,
@@ -939,7 +1019,7 @@ def render_message(
                                     "value": str(subject.get("id")),
                                     "description": _truncate(
                                         f"{_display_unit(subject.get('team'))} · "
-                                        f"{subject.get('leader_name') or 'Kein Squadlead'}",
+                                        f"{subject.get('leader_name') or ('Aucun chef d’escouade' if language == 'fr' else 'Kein Squadlead')}",
                                         100,
                                     ),
                                     "default": str(subject.get("id") or "")
@@ -981,8 +1061,8 @@ def render_message(
                         )
                     ),
                 ),
-                ("punish", 1, "💀 Bestrafen" if language == "de" else "💀 Punish"),
-                ("kick", 3, "🤜 Kicken" if language == "de" else "🤜 Kick"),
+                ("punish", 1, "💀 Bestrafen" if language == "de" else "💀 Punir" if language == "fr" else "💀 Punish"),
+                ("kick", 3, "🤜 Kicken" if language == "de" else "🤜 Expulser" if language == "fr" else "🤜 Kick"),
                 ("temp_ban", 3, "⏰ TB"),
                 ("perma_ban", 4, "🔨 PB"),
             ]
@@ -1015,16 +1095,16 @@ def render_message(
                     {
                         "type": 2,
                         "style": 4,
-                        "label": "⛔ Blacklist",
+                        "label": "⛔ Liste noire" if language == "fr" else "⛔ Blacklist",
                         "custom_id": f"action:{incident_id}:{revision}:blacklist",
                     }
                 )
             for action, style, label in [
-                ("remove_from_squad", 1, "🥾 Squad Kick"),
+                ("remove_from_squad", 1, "🥾 Expulser de l’escouade" if language == "fr" else "🥾 Squad Kick"),
                 (
                     "disband_squad",
                     4,
-                    "💣 Squad auflösen" if language == "de" else "💣 Disband squad",
+                    "💣 Squad auflösen" if language == "de" else "💣 Dissoudre l’escouade" if language == "fr" else "💣 Disband squad",
                 ),
             ]:
                 if (
@@ -1043,7 +1123,7 @@ def render_message(
                     {
                         "type": 2,
                         "style": 2,
-                        "label": "📄 Logs",
+                        "label": "📄 Journaux" if language == "fr" else "📄 Logs",
                         "custom_id": f"logs:{incident_id}:{revision}",
                     }
                 )
@@ -1075,7 +1155,7 @@ def render_message(
                 }
             )
     if vote and vote.get("status") in {"confirming", "warning", "inviting", "active", "executing"} and moderation_ready and status not in {"resolved", "dismissed"}:
-        button = {"type": 2, "style": 2, "label": "Vote abbrechen" if language == "de" else "Cancel vote",
+        button = {"type": 2, "style": 2, "label": "Vote abbrechen" if language == "de" else "Annuler le vote" if language == "fr" else "Cancel vote",
                   "custom_id": f"cancel_leadership_vote:{incident_id}:{revision}"}
         # Keep Discord's maximum five action rows / five buttons per row.
         button_row = next((row for row in reversed(components) if len(row["components"]) < 5 and all(c["type"] == 2 for c in row["components"])), None)
@@ -1095,14 +1175,14 @@ def render_message(
     else:
         title = labels["report_title"].format(name=target_name)
     if automatic_kick:
-        title = ("Automatisch gekickt – " if language == "de" else "Automatically kicked – ") + str(report_admin.get("target_name") or target_name)
+        title = ("Automatisch gekickt – " if language == "de" else "Expulsion automatique – " if language == "fr" else "Automatically kicked – ") + str(report_admin.get("target_name") or target_name)
         team_emoji = "🤖"
     footer_parts = []
     if automatic_kick:
-        footer_parts.append("Automatisch bearbeitet durch Report-Admin" if language == "de" else "Automatically handled by report admin")
+        footer_parts.append("Automatisch bearbeitet durch Report-Admin" if language == "de" else "Traité automatiquement par l’administration des signalements" if language == "fr" else "Automatically handled by report admin")
     elif assigned_name:
         footer_parts.append(
-            ("Bearbeitet von " if language == "de" else "Handled by ") + assigned_name
+            ("Bearbeitet von " if language == "de" else "Traité par " if language == "fr" else "Handled by ") + assigned_name
         )
     footer_parts.extend(
         [

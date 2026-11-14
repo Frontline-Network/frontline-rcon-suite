@@ -1,0 +1,50 @@
+{
+  "vacBans": {
+    "title":"Tester la sécurité des bannissements VAC et de jeu",
+    "description":"Vérifiez un historique de bannissements Steam avec le brouillon actuel et évaluez la fiabilité de la décision.",
+    "notice":"La simulation reproduit le fonctionnement actuel de CRCON : les données Steam enregistrées sont d’abord vérifiées à la connexion. Une actualisation en arrière-plan peut déclencher une seconde vérification. Rien n’est enregistré et aucun bannissement n’est exécuté.",
+    "dataStatus":"État des données Steam enregistrées",
+    "dataStatuses":{"current":"Disponibles · moins de 12 heures", "stale":"Disponibles · plus de 12 heures", "unknownAge":"Disponibles · ancienneté inconnue", "missing":"Aucun enregistrement disponible", "invalid":"Réponse absente ou invalide"},
+    "vacBanned":"Bannissement VAC signalé", "gameBans":"Nombre de bannissements de jeu", "daysSinceLastBan":"Jours depuis le dernier bannissement", "playerFlag":"Marqueur du joueur (facultatif)"
+  },
+  "tkBans": {
+    "title":"Tester la sécurité des bannissements pour teamkill",
+    "description":"Vérifiez un teamkill précoce selon la fenêtre temporelle, les exceptions, la tolérance et l’action de bannissement.",
+    "notice":"La simulation suit l’analyse actuelle des 500 dernières lignes du journal du joueur. Si son profil est indisponible, l’application de la règle continue et les exceptions VIP, de sessions et de marqueurs ne peuvent pas être évaluées de façon fiable. Rien n’est enregistré et aucun bannissement n’est exécuté.",
+    "profileStatus":"Disponibilité du profil du joueur", "profileStatuses":{"available":"Profil disponible", "missing":"Profil indisponible"},
+    "vipLookupStatus":"Liste VIP", "vipLookupStatuses":{"available":"Liste VIP disponible", "unavailable":"Liste VIP indisponible"},
+    "isVip":"Le joueur fictif est VIP", "sessions":"Sessions précédentes", "playerFlag":"Marqueur du joueur (facultatif)", "hasConnectEvent":"Connexion trouvée dans les 500 dernières lignes", "weapon":"Arme du teamkill", "minutesAfterConnect":"Minutes depuis la connexion", "ownKillsBeforeEvent":"Éliminations du joueur avant ce teamkill", "deathsBeforeEvent":"Morts du joueur avant ce teamkill", "teamkillsIncludingCurrent":"Teamkills depuis la connexion, celui-ci compris"
+  },
+  "yes":"Oui", "no":"Non", "run":"Lancer la simulation", "close":"Fermer la simulation", "result":"Décision attendue",
+  "outcomes":{
+    "off":["Règle désactivée", "Cet état fictif n’est pas vérifié."],
+    "unavailable":["Aucun bannissement automatique avec ces données", "CRCON ne peut pas tirer de décision fiable de l’enregistrement existant."],
+    "exempt":["Joueur exempté", "Une exception configurée interrompt la vérification avant le bannissement."],
+    "noAction":["Aucun bannissement", "L’état fictif n’atteint pas la condition de bannissement configurée."],
+    "configError":["Échec du bannissement à cause du modèle", "La condition est remplie, mais une variable inconnue empêche l’étape suivante."],
+    "action":["Bannissement déclenché", "L’état fictif satisfait la règle et entraîne l’action affichée avec les valeurs visibles."]
+  },
+  "risks": {
+    "staleData":"La première décision VAC utilise des données de plus de douze heures ; une actualisation démarre en parallèle.",
+    "unknownAge":"L’ancienneté de la mise à jour est inconnue. CRCON utilise malgré tout l’enregistrement existant pour la première vérification.",
+    "profileUnavailable":"Sans profil joueur, les exceptions VIP, de sessions et de marqueurs ne peuvent pas être évaluées ; l’application de la règle de teamkill continue malgré tout.",
+    "vipLookupUnavailable":"La liste VIP est indisponible ; une éventuelle exception VIP ne peut donc pas être détectée.",
+    "yearsIgnored":"Le contrat actuel du backend ne prend pas en compte le champ des années pour la durée du bannissement pour teamkill.",
+    "notificationTemplate":"Le bannissement a lieu en premier ; le message Discord peut ensuite échouer à cause d’une variable inconnue.",
+    "reasonTemplate":"Le modèle du motif de bannissement VAC contient une variable inconnue.",
+    "missing":"Sans enregistrement existant, la première vérification reste en attente ; un bannissement n’est possible qu’après une actualisation Steam réussie.",
+    "invalid":"Une réponse Steam invalide ne provoque aucun bannissement automatique et nécessite une vérification."
+  },
+  "stages": {
+    "storedData":{"current":"Données Steam · enregistrement actuel", "stale":"Données Steam · enregistrement de plus de 12 heures", "unknownAge":"Données Steam · ancienneté inconnue", "missing":"Données Steam · aucun enregistrement", "invalid":"Données Steam · réponse impossible à évaluer"},
+    "refresh":"Actualisation Steam · en attente en arrière-plan", "freshRecheck":"Nouvelle vérification · possible après la tâche en arrière-plan",
+    "exemption":{"flag":"Exception · marqueur du joueur protégé", "vip":"Exception · VIP protégé", "sessions":"Exception · nombre suffisant de sessions connues", "weapon":"Exception · arme non comptabilisée"},
+    "history":"Historique des bannissements · {{days}} jours · VAC {{vac}} · {{gameBans}} bannissements de jeu", "decisionAllow":"Décision · seuil non atteint", "decisionInvalid":"Décision · enregistrement impossible à évaluer", "decisionTemplate":"Décision · modèle de motif de bannissement invalide",
+    "profile":{"available":"Profil du joueur · disponible", "missing":"Profil du joueur · indisponible, exceptions incertaines"},
+    "logWindow":{"connected":"Fenêtre de journal · connexion trouvée", "missingConnect":"Fenêtre de journal · aucune connexion dans les 500 dernières lignes"},
+    "window":{"expired":"Fenêtre temporelle · teamkill hors limite", "stoppedByKills":"Fenêtre temporelle · vérification arrêtée après les éliminations du joueur", "stoppedByDeaths":"Fenêtre temporelle · vérification arrêtée après les morts du joueur"},
+    "counter":"Tolérance · {{teamkills}} teamkills pour {{tolerance}} autorisés", "actionBlacklist":"Bannissement · liste noire {{id}} · {{duration}}", "actionServer":"Bannissement · directement sur ce serveur · {{duration}}", "auditSend":"Audit · message Discord envoyé", "auditError":"Audit · le modèle du message peut échouer après le bannissement", "permanent":"permanent", "days":"{{count}} jours", "hours":"{{count}} heures", "minutes":"{{count}} minutes",
+    "durationUnits":{"weeks":["semaine", "semaines"], "days":["jour", "jours"], "hours":["heure", "heures"], "minutes":["minute", "minutes"]},
+    "expiresToday":"expire aujourd’hui", "vacYes":"actif", "vacNo":"inactif"
+  }
+}

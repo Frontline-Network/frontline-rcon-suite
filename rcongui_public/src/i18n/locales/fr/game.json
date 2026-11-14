@@ -37,7 +37,20 @@
     "support": "Soutien",
     "utility": "Utilitaire",
     "diff": "Différence",
-    "status": "Statut"
+    "status": "Statut",
+    "awards": "Distinctions",
+    "killsByCategory": "Éliminations par catégorie",
+    "deathsByCategory": "Morts par catégorie",
+    "killsPerMinute": "Élim./min",
+    "deathsPerMinute": "Morts/min",
+    "general": "Général",
+    "advanced": "Avancé",
+    "ingame": "En jeu",
+    "level": "Niveau",
+    "vehicle_kills": "Éliminations en véhicule",
+    "vehicles_destroyed": "Véhicules détruits",
+    "deathsAndRedeploys": "Morts et redéploiements",
+    "killsAndAssists": "Éliminations et assistances"
   },
   "matchTable": {
     "match": "Partie",
@@ -45,7 +58,8 @@
     "mode": "Mode",
     "duration": "Durée",
     "result": "Résultat",
-    "start": "Début"
+    "start": "Début",
+    "weather": "Météo"
   },
   "playerStats": {
     "killsByWeapon": "Éliminations par arme",
@@ -53,7 +67,12 @@
     "encounters": "Rencontres",
     "weapon": "Arme",
     "count": "Nombre",
-    "timeline": "Chronologie"
+    "timeline": "Chronologie",
+    "killDiffByTeamRank": "Différence d’éliminations par rang dans l’équipe",
+    "teamRank": "Rang dans l’équipe",
+    "killDiff": "Différence d’éliminations",
+    "killsByType": "Éliminations par type",
+    "rank": "Rang"
   },
   "timelineDetails": {
     "roleTimeline": "Chronologie des rôles",
@@ -115,8 +134,124 @@
   "score": {
     "killstreak": "Série d'éliminations",
     "deathstreak": "Série de morts",
-    "teamkills": "Tirs alliés",
-    "k/d": "R/M"
+    "teamkills": "Éliminations d’alliés",
+    "k/d": "R/M",
+    "deathsByTeam": "Morts causées par des alliés"
   },
-  "downloadTable": "Télécharger le tableau"
+  "downloadTable": "Télécharger le tableau",
+  "mixed": "Mixte",
+  "unknown": "Inconnu",
+  "weaponType": {
+    "sniper": "Tireur d'élite",
+    "infantry": "Infanterie",
+    "explosive": "Explosifs",
+    "bazooka": "Bazooka",
+    "grenade": "Grenade",
+    "mine": "Mine",
+    "pak": "Canon antichar",
+    "satchel": "Charge explosive",
+    "machine_gun": "Mitrailleuse",
+    "armor": "Blindé",
+    "commander": "Commandant",
+    "artillery": "Artillerie",
+    "self_propelled_artillery": "Artillerie automotrice"
+  },
+  "awards": {
+    "kills": {
+      "title": "",
+      "text": "{{amount}} $t(playersTable.kills)"
+    },
+    "kills_streak": {
+      "title": "Appelez une ambulance… mais pas pour moi !",
+      "text": "{{amount}} éliminations consécutives"
+    },
+    "deaths": {
+      "title": "Avancer coûte que coûte",
+      "text": "{{amount}} $t(playersTable.deaths)"
+    },
+    "deaths_without_kill_streak": {
+      "title": "Besoin d’un remontant",
+      "text": "{{amount}} morts consécutives"
+    },
+    "deaths_by_tk": {
+      "title": "Problèmes de confiance",
+      "text": "Éliminé {{amount}} fois par des alliés"
+    },
+    "kill_death_ratio": {
+      "title": "La victoire est à vous",
+      "text": "Ratio éliminations/morts : {{amount}}"
+    },
+    "support": {
+      "title": "Coup de main",
+      "text": "{{amount}} points de ravitaillement"
+    },
+    "zero_deaths": {
+      "title": "Chanceux",
+      "text": "Aucune mort"
+    },
+    "zero_kills": {
+      "title": "Débutant",
+      "text": "Aucune élimination"
+    },
+    "kd_of_one": {
+      "title": "Parfaitement équilibré",
+      "text": "Ratio éliminations/morts : 1"
+    },
+    "kills_by_type": {
+      "commander": {
+        "title": "Bombes larguées !",
+        "text": "{{amount}} éliminations avec les capacités du commandant"
+      },
+      "bazooka": {
+        "title": "Homme-fusée",
+        "text": "{{amount}} éliminations au bazooka"
+      },
+      "grenade": {
+        "title": "Grenade !",
+        "text": "{{amount}} éliminations à la grenade"
+      },
+      "mine": {
+        "title": "Attention où vous mettez les pieds",
+        "text": "{{amount}} éliminations avec des mines"
+      },
+      "pak": {
+        "title": "Un gros canon contre les chars",
+        "text": "{{amount}} éliminations au canon antichar"
+      },
+      "satchel": {
+        "title": "Plus que 30 secondes",
+        "text": "{{amount}} éliminations avec des charges explosives"
+      }
+    },
+    "deaths_by_type": {
+      "machine_gun": {
+        "title": "Aimant à balles",
+        "text": "{{amount}} morts par mitrailleuse"
+      },
+      "sniper": {
+        "title": "Une cible dans le dos",
+        "text": "{{amount}} morts par tireur d’élite"
+      },
+      "artillery": {
+        "title": "Prévisions : pluie intense",
+        "text": "{{amount}} morts par artillerie"
+      },
+      "commander": {
+        "title": "C’est un oiseau ? Un avion ?",
+        "text": "{{amount}} morts par les capacités du commandant"
+      },
+      "mine": {
+        "title": "Démineur professionnel",
+        "text": "{{amount}} morts par mine"
+      },
+      "armor": {
+        "title": "Il ne reste pas grand-chose",
+        "text": "{{amount}} morts par char"
+      }
+    },
+    "teamkills": {
+      "title": "Ils vous faisaient confiance",
+      "text": "{{amount}} $t(score.teamkills)"
+    }
+  }
 }

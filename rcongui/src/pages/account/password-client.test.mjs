@@ -1,6 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { passwordRequest } from "./password-client.mjs";
+import { passwordLanguage, passwordRequest } from "./password-client.mjs";
+
+test("French recovery requests preserve their language including regional variants", async () => {
+  assert.equal(passwordLanguage("fr-FR"), "fr");
+  assert.equal(passwordLanguage("unknown"), "en");
+  await passwordRequest({ language: "fr-FR", mode: "request" }, async (url) => {
+    assert.equal(url, "/accounts/password_reset/?ui_language=fr");
+    return { ok: true, status: 200, json: async () => ({ available: true }) };
+  });
+});
 
 test("passwords are sent once in an allowlisted POST body with explicit CSRF", async () => {
   const result = await passwordRequest(

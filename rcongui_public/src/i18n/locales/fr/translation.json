@@ -23,5 +23,37 @@
       "label": "Aller à la page suivante"
     }
   },
-  "selectLanguage": "Sélectionner la langue"
+  "selectLanguage": "Sélectionner la langue",
+  "search": "Rechercher",
+  "noResultsFound": "Aucun résultat trouvé.",
+  "time": {
+    "minuteShort": "min",
+    "weekday": "Jour de la semaine"
+  },
+  "streaming": {
+    "streamerView": "Vue pour le streaming",
+    "tutorial": {
+      "title": "Tutoriel",
+      "introduction": "Cet outil est destiné aux personnes qui diffusent Hell Let Loose.",
+      "stepByStep": "Voici comment intégrer la bannière défilante à votre diffusion :",
+      "openOBS": "Ouvrez OBS",
+      "createSource": "Ajouter une source → Navigateur → Créer",
+      "enterFollowingValues": "Saisissez les valeurs suivantes",
+      "url": "URL",
+      "width": "Largeur",
+      "height": "Hauteur",
+      "customCSS": "CSS personnalisé (facultatif)",
+      "adjustColors": "Adaptez les couleurs CSS à votre goût à l’aide de valeurs hexadécimales ou de noms de couleurs.",
+      "andSave": "puis enregistrez",
+      "crop": "Recadrez en maintenant la touche ALT enfoncée et en faisant glisser les bords de la source",
+      "changeSettings": "Faites un clic droit sur la source → « Interagir » pour modifier les paramètres"
+    },
+    "playerCount": "Nombre de joueurs",
+    "cycleDuration": "Durée du cycle",
+    "pauseWidth": "Largeur de la pause",
+    "text": "Texte",
+    "showAvatars": "Afficher les avatars",
+    "showWeapons": "Afficher les armes",
+    "hidePlayer": "Masquer les joueurs"
+  }
 }

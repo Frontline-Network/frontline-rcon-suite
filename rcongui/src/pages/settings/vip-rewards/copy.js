@@ -1,4 +1,5 @@
 import i18n from "@/i18n";
+import french from "./copy-fr.json";
 
 // Keep the form's catalog in its lazy chunk. User names and configured text are
 // never passed through this dictionary.
@@ -218,10 +219,10 @@ const german = Object.fromEntries(
 german["Wochenziel-Zusammenfassung"] =
   "Wer {{points}} Unterstützungspunkte erreicht, erhält {{duration}} VIP. Einmal pro Woche, Montag bis Sonntag · {{zone}}.";
 german["Regel aktivieren"] = "{{rule}} aktivieren";
-for (const [language, entries] of Object.entries({ de: german, en: vipCopy })) {
+for (const [language, entries] of Object.entries({ de: german, en: vipCopy, fr: french })) {
   i18n.addResourceBundle(language, "vipRewards", entries, true, true);
 }
 export const tr = (text, values = {}) =>
   i18n.t(text, { ns: "vipRewards", keySeparator: false, ...values });
 export const vipLocale = () =>
-  i18n.resolvedLanguage === "en" ? "en-GB" : "de-DE";
+  ({ en: "en-GB", fr: "fr-FR", de: "de-DE" })[(i18n.resolvedLanguage || "de").split("-")[0]] || "de-DE";

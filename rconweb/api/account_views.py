@@ -47,7 +47,7 @@ class AccountJsonMixin:
     def dispatch(self, request, *args, **kwargs):
         self.json_response = "application/json" in request.headers.get("Accept", "")
         language = request.GET.get("ui_language")
-        self.language = language if language in {"de", "en"} else translation.get_language()
+        self.language = language if language in {"de", "en", "fr"} else translation.get_language()
         with translation.override(self.language):
             response = super().dispatch(request, *args, **kwargs)
         response["Referrer-Policy"] = "no-referrer"
@@ -69,7 +69,7 @@ class AccountPasswordChangeView(PasswordChangeView):
                 return JsonResponse({"error": "authentication_required"}, status=401)
             return HttpResponseRedirect("/login?from=%2Faccount%2Fpassword")
         language = request.GET.get("ui_language")
-        if language not in {"de", "en"}:
+        if language not in {"de", "en", "fr"}:
             language = translation.get_language()
         with translation.override(language):
             # Keep Django's login, CSRF, old-password and validator checks.

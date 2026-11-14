@@ -19,6 +19,7 @@ class ReportAdminUserConfig(BaseUserConfig):
     teamkills: bool = True
     cheating: bool = False  # Explicit opt-in for new review/receipt behavior.
     allow_self_reports: bool = False
+    receipt_language: Literal["de+en", "de", "en", "fr"] = "de+en"
     communication_template_id: int | None = Field(default=None, gt=0)
     teamkills_template_id: int | None = Field(default=None, gt=0)
 

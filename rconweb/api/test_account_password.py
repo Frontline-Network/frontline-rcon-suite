@@ -65,6 +65,17 @@ class AccountPasswordTests(TestCase):
         for path in (CHANGE, CHANGE.rstrip("/")):
             self.assertRedirects(self.client.get(path), "/account/password", fetch_redirect_response=False)
 
+    def test_french_password_form_and_reset_email(self):
+        response = self.client.get(CHANGE + "?ui_language=fr", **JSON)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("caractères", " ".join(response.json()["requirements"]))
+        response = self.client.post(RESET + "?ui_language=fr", {"email": self.user.email}, **JSON)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Réinitialisation", mail.outbox[-1].subject)
+        self.assertIn("30 minutes", mail.outbox[-1].body)
+        self.assertIn("?ui_language=fr", mail.outbox[-1].body)
+        self.assertIn("https://rcon.example.test/accounts/reset/", mail.outbox[-1].body)
+
     def test_anonymous_requests_cannot_change_a_password(self):
         client = Client()
         self.assertRedirects(client.get(CHANGE), "/login?from=%2Faccount%2Fpassword", fetch_redirect_response=False)

@@ -414,6 +414,33 @@ curl --fail-with-body "$CRCON_API_URL/get_recent_logs" \\
 `;
 
 export const apiGuide = {
+  fr: `### Adresse de base et authentification
+Les exemples utilisent l’adresse de base de l’API de votre installation avec le chemin **/api**. Si le frontend et le backend sont séparés, utilisez l’adresse configurée du backend.
+
+Pour une intégration, un administrateur autorisé crée une **clé API** et l’attribue à un utilisateur. Les clés doivent contenir au moins 32 caractères ; utilisez une valeur aléatoire et conservez l’original en sécurité. Envoyez-la dans **Authorization: Bearer VOTRE_CLE_API**. Les droits du compte associé s’appliquent. Stockez la clé dans une variable d’environnement protégée, jamais dans une URL ou du code frontend public.
+
+Dans le navigateur, CRCON utilise une session authentifiée. Les requêtes de modification avec cookie de session nécessitent généralement le jeton CSRF correspondant, issu du cookie **csrftoken**, dans l’en-tête **X-CSRFToken**. L’application s’en charge. Les intégrations externes devraient utiliser l’authentification Bearer sans cookie de session.
+
+### Deux premières requêtes
+La première requête nécessite **api.can_view_get_status**, la seconde **api.can_view_recent_logs**. Toutes deux lisent des données ; le second point d’accès accepte aussi POST à cette fin.
+${readExamples}
+### Paramètres et réponses
+Transmettez les paramètres GET dans la chaîne de requête. Les clés répétées sont interprétées comme une liste par les points d’accès RCON. POST/PUT acceptent généralement un objet JSON avec **Content-Type: application/json** ; les téléchargements vers le serveur ont leurs propres formats. Transmettez les identifiants des joueurs sous forme de chaînes.
+
+Une réponse JSON type contient **result**, **command**, **arguments**, **failed**, **error** et **version**. Vérifiez le statut HTTP ainsi que **failed** et **error**. Les types de retour de la référence décrivent la valeur contenue dans **result**. Les exports CSV et téléchargements peuvent différer.
+
+### Comprendre les erreurs
+| Statut | Signification / étape suivante |
+| --- | --- |
+| 400 | Vérifiez les champs et valeurs ; l’erreur explique souvent la cause. |
+| 401 | Authentification ou clé API manquante ou refusée. |
+| 403 | Échec d’une vérification de droit ou CSRF. Vérifiez l’erreur et la méthode d’authentification. |
+| 404 / 405 | Comparez le chemin ou la méthode HTTP à la référence de ce backend. |
+| 429 | Limite de requêtes atteinte ; augmentez l’intervalle entre les requêtes. |
+| 500 / 504 | Erreur backend ou délai dépassé ; vérifiez l’état du serveur et ses journaux. |
+
+### Limites de la référence générée
+Les entrées proviennent de **get_api_documentation** du backend connecté. L’enregistrement fournit les méthodes et autorisations ; les signatures Python fournissent les arguments et les types. Tous les champs JSON et schémas de réponse ne sont pas nécessairement visibles. Une table d’arguments vide ne signifie pas forcément qu’aucune entrée n’est requise. Une liste d’autorisations vide ne signifie pas non plus que l’accès anonyme est possible. Les descriptions fournies par le serveur peuvent être en allemand ou en anglais ; les notes techniques supplémentaires conservent leur langue d’origine. Les anciens backends peuvent ne fournir que ces notes.`,
   de: `### Basisadresse und Anmeldung
 Die Beispiele verwenden die API-Basisadresse eurer Installation mit dem Pfad **/api**. Bei getrenntem Frontend und Backend gilt die konfigurierte Backend-Adresse.
 

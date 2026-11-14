@@ -798,8 +798,8 @@ def incident_logs(request):
 
 def _config_payload(data: dict) -> dict:
     language = str(data.get("language", "de"))
-    if language not in {"de", "en"}:
-        raise ValueError("language must be de or en")
+    if language not in {"de", "en", "fr"}:
+        raise ValueError("language must be de, en or fr")
     roles = [str(value) for value in data.get("moderator_role_ids", [])]
     if any(not re.fullmatch(r"[0-9]+", value) for value in roles):
         raise ValueError("Discord role IDs must be numeric")
@@ -1853,7 +1853,7 @@ def test_message(request):
                     f"Bearer {decrypt_capability(integration.outbound_capability_ciphertext)}"
                 )
             },
-            json={"installation_id": str(integration.installation_id)},
+            json={"installation_id": str(integration.installation_id), "language": integration.language},
             timeout=5,
         )
         response.raise_for_status()

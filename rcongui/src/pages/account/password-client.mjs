@@ -1,3 +1,9 @@
+// Keep requests and recovery emails in the selected supported UI language.
+export function passwordLanguage(language) {
+  const code = String(language || "").toLowerCase().split("-")[0];
+  return ["de", "en", "fr"].includes(code) ? code : "en";
+}
+
 // Secrets are sent only in the POST body, never URLs, caches or diagnostics.
 export async function passwordRequest(
   { language, mode = "change", uid, values, csrfToken, signal },
@@ -30,7 +36,7 @@ export async function passwordRequest(
     );
   }
   const response = await fetcher(
-    path + "?ui_language=" + (language === "de" ? "de" : "en"),
+    path + "?ui_language=" + passwordLanguage(language),
     options
   );
   let data;

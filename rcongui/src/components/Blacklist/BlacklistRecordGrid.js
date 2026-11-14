@@ -30,6 +30,7 @@ import TimerOffOutlinedIcon from "@mui/icons-material/TimerOffOutlined";
 import { List } from "immutable";
 import moment from "moment";
 import "moment/locale/de";
+import "moment/locale/fr";
 import { useTranslation } from "react-i18next";
 import makePlayerProfileUrl from "../../utils/makePlayerProfileUrl";
 import BlacklistRecordCreateDialog from "./BlacklistRecordCreateDialog";
@@ -77,8 +78,10 @@ const ActionIcon = ({ title, children, ...props }) => (
   </Tooltip>
 );
 
-const getIntlLocale = (language) =>
-  language?.toLowerCase().startsWith("de") ? "de-DE" : "en-US";
+const getIntlLocale = (language) => {
+  const code = String(language || "en").toLowerCase().split("-")[0];
+  return { de: "de-DE", en: "en-US", fr: "fr-FR" }[code] || "en-US";
+};
 
 const formatRelativeDate = (date, language) => {
   const diff = date.valueOf() - Date.now();
@@ -117,7 +120,8 @@ const formatDateTime = (date, language) =>
   }).format(date.toDate());
 
 const getRecordView = (record, t, language) => {
-  const momentLocale = language?.toLowerCase().startsWith("de") ? "de" : "en";
+  const code = String(language || "en").toLowerCase().split("-")[0];
+  const momentLocale = ["de", "en", "fr"].includes(code) ? code : "en";
   const player = record.get("player");
   const names = player.get("names", List());
   const name = names.getIn([0, "name"], t("common.unknown"));
