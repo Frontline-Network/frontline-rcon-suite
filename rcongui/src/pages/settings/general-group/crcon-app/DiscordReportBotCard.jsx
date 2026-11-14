@@ -652,7 +652,7 @@ export default function DiscordReportBotCard() {
         <MenuItem value="en">
           {t("settings.discordReports.languageEnglish")}
         </MenuItem>
-        <MenuItem value="fr">Français</MenuItem>
+        <MenuItem value="fr">{t("language.fr")}</MenuItem>
       </TextField>
       <Typography variant="subtitle2" color="text.secondary">
         {t("settings.discordReports.allowedActions")}

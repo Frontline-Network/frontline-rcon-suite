@@ -387,6 +387,21 @@ def test_invitation_is_visible_to_chat_worker_before_first_message(instance):
     assert len(instance.rcon.messages) == 4
 
 
+def test_zero_volunteer_phase_skips_chat_invitation_but_keeps_safety_checks(instance):
+    instance.store.state = {
+        "phase": Phase.OBSERVING,
+        "mode": "auto",
+        "round_id": "1000:test",
+        "source_team": "allies",
+        "target_team": "axis",
+        "observed_at": 2900,
+    }
+    result = tick(instance, 3000, cfg=config(mode="auto", volunteer_phase_seconds=0))
+    assert result["phase"] != Phase.VOLUNTEER
+    assert all("!balance" not in message for _, message in instance.rcon.messages)
+    assert instance.rcon.switches == []
+
+
 def proposed(**kwargs):
     return invitation(
         phase=Phase.PROPOSED,

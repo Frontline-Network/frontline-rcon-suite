@@ -7,7 +7,7 @@ from datetime import timedelta
 from rcon.cache_utils import get_redis_client
 from rcon.logs.loop import on_match_end
 from rcon.user_config.end_match_stats import EndMatchStatsUserConfig
-from rcon.utils import MapsHistory, get_server_number, layer_matches_match_log
+from rcon.utils import MapsHistory, get_role_unit_type, get_server_number, layer_matches_match_log
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ def score(entity, key, config):
     return number(key)
 
 
-def extract_team_view(teams, config):
+def extract_team_view(teams, config, *, detailed_players=None, game=None):
     players, squads = [], []
     for side in ("allies", "axis"):
         team = teams.get(side, {})
@@ -66,16 +66,32 @@ def extract_team_view(teams, config):
         if commander and "commander" in config.unit_types:
             players.append(commander)
         for squad_name, squad in team.get("squads", {}).items():
-            if not squad_name or squad.get("type") not in config.unit_types or not squad.get("players"):
+            if squad.get("type") not in config.unit_types or not squad.get("players"):
                 continue
             members = squad["players"]
             players.extend(members)
+            # Players without a squad still belong in player rankings, but a
+            # missing squad name must not create an imaginary squad entry.
+            if not squad_name:
+                continue
             combined = dict(squad)
             team_label = TEAM_LABELS.get(config.language, {}).get(side, side)
             combined["name"] = f"{squad_name} ({team_label})"
             combined["vehicles_destroyed"] = sum(p.get("vehicles_destroyed", 0) or 0 for p in members)
             combined["map_playtime_seconds"] = sum(p.get("map_playtime_seconds", 0) or 0 for p in members)
             squads.append(combined)
+    # A commander and unassigned players may share the None squad key. The
+    # team view then exposes only the commander, so recover the other players
+    # from the same cached detailed snapshot without counting anyone twice.
+    if detailed_players is not None:
+        included_ids = {p.get("player_id") for p in players if p.get("player_id")}
+        for player_id, player in detailed_players.items():
+            if (not player_id or player_id in included_ids or player.get("unit_name")
+                    or player.get("team") not in ("allies", "axis")):
+                continue
+            if get_role_unit_type(game, player.get("role")) in config.unit_types:
+                players.append(player)
+                included_ids.add(player_id)
     return players, squads
 
 
@@ -161,7 +177,15 @@ def send_end_match_stats(rcon, log):
         if result.get("fail_count"):
             logger.warning("End-of-match stats skipped: incomplete player data")
             return
-        players, squads = extract_team_view(result, config)
+        detailed = rcon.get_detailed_players() if config.include_players else None
+        if detailed is not None and detailed.get("fail_count"):
+            logger.warning("End-of-match stats skipped: incomplete player data")
+            return
+        players, squads = extract_team_view(
+            result, config,
+            detailed_players=detailed.get("players", {}) if detailed is not None else None,
+            game=rcon.game_profile.game if detailed is not None else None,
+        )
         messages = format_sections(players, config, squads)
         updated_history = MapsHistory()
         if (not messages or not updated_history or updated_history[0].get("start") != start

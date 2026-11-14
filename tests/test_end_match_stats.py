@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from rcon import end_match_stats as stats
+from rcon.types import GameEnum
 
 
 @pytest.fixture
@@ -17,6 +18,7 @@ def setup_match(monkeypatch):
     redis.set.return_value = True
     monkeypatch.setattr(stats, "get_redis_client", lambda: redis)
     rcon = MagicMock()
+    rcon.get_detailed_players.return_value = {"fail_count": 0, "players": {}}
     rcon.get_team_view.return_value = {"fail_count": 0, "allies": {"squads": {
         "Able": {"type": "infantry", "players": [
             {"name": "Alice", "kills": 10, "defense": 2, "support": 0},
@@ -64,6 +66,31 @@ def test_unsafe_snapshot_is_not_sent(setup_match, monkeypatch, case):
 
 def test_empty_or_zero_values_are_omitted():
     assert stats.format_stats([{"name": "Alice", "kills": 0}]) is None
+
+
+def test_squadless_players_count_individually_without_creating_a_squad():
+    config = stats.EndMatchStatsUserConfig(include_players=True, include_squads=True)
+    player = {"player_id": "p1", "name": "Solo", "kills": 25}
+    teams = {"allies": {"squads": {None: {"type": "infantry", "players": [player]}}}}
+    players, squads = stats.extract_team_view(teams, config)
+    assert players == [player]
+    assert squads == []
+    assert "Solo (25)" in stats.format_sections(players, config, squads)[0]
+
+
+def test_squadless_players_hidden_by_commander_are_recovered_once():
+    commander = {"player_id": "c1", "name": "Commander", "role": "Army Commander", "unit_name": None, "team": "allies"}
+    solo = {"player_id": "p1", "name": "Solo", "role": "Rifleman", "unit_name": None, "team": "allies", "kills": 25}
+    lobby = {"player_id": "p2", "name": "Lobby", "unit_name": None, "team": None}
+    teams = {"allies": {"commander": commander, "squads": {}}}
+    config = stats.EndMatchStatsUserConfig()
+    players, squads = stats.extract_team_view(teams, config, detailed_players={"c1": commander, "p1": solo, "p2": lobby}, game=GameEnum.HLL_WW2)
+    assert [p["name"] for p in players] == ["Commander", "Solo"]
+    assert not squads
+    assert "Solo (25)" in stats.format_sections(players, config)[0]
+    without_infantry = config.model_copy(update={"unit_types": ["commander"]})
+    players, _ = stats.extract_team_view(teams, without_infantry, detailed_players={"c1": commander, "p1": solo}, game=GameEnum.HLL_WW2)
+    assert [p["name"] for p in players] == ["Commander"]
 
 
 @pytest.mark.parametrize(
