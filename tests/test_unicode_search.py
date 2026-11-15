@@ -73,7 +73,8 @@ def database(monkeypatch, request):
 
 
 @pytest.mark.parametrize("search,expected", [("玩家", {"b"}), ("玩家Émile", {"b"}),
-                                             ("Elodie", {"a"}), ("Élodie", {"a"}), ("missing", set())])
+                                             ("Elodie", {"a"}), ("Élodie", {"a"}),
+                                             ("E\u0301lodie", {"a"}), ("missing", set())])
 def test_player_search_preserves_scripts_and_normalizes_account(database, search, expected):
     result = player_history.get_players_by_appearance(player_name=search, ignore_accent=True)
     assert {item["player_id"] for item in result["players"]} == expected
