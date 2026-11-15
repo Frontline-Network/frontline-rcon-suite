@@ -148,12 +148,13 @@ class PunitionsToApply:
     def merge(self, o: "PunitionsToApply"):
         if len(o.warning) != 0:
             self.warning.extend(o.warning)
-        for p in o.punish:
-            if not any(sp.player_id == p.player_id for sp in self.punish):
-                self.punish.append(p)
-        for k in o.kick:
-            if not any(sk.player_id == k.player_id for sk in self.kick):
-                self.kick.append(k)
+        for current, incoming in ((self.punish, o.punish), (self.kick, o.kick)):
+            for player in incoming:
+                index = next((i for i, item in enumerate(current) if item.player_id == player.player_id), None)
+                if index is None:
+                    current.append(player)
+                elif getattr(current[index].details, "dry_run", False) and not getattr(player.details, "dry_run", False):
+                    current[index] = player
         for s in o.squads_state:
             if any(s.team == ss.team and s.name == ss.name for ss in self.squads_state):
                 continue

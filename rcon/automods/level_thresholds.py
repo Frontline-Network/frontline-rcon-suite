@@ -37,6 +37,7 @@ class LevelThresholdsAutomod:
     logger: logging.Logger
     red: redis.StrictRedis
     config: AutoModLevelUserConfig
+    action_author = AUTOMOD_USERNAME
 
     def __init__(self, config: AutoModLevelUserConfig, red: redis.StrictRedis or None):
         self.logger = logging.getLogger(__name__)
@@ -241,6 +242,11 @@ class LevelThresholdsAutomod:
                 message,
             )
             return message
+
+    def player_warning_failed(self, aplayer):
+        with self.watch_state(aplayer.team, aplayer.squad) as watch_status:
+            if warnings := watch_status.warned.get(aplayer.name):
+                warnings.pop()
 
     def player_punish_failed(self, aplayer):
         """

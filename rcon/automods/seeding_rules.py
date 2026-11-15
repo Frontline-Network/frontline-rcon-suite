@@ -89,6 +89,7 @@ class SeedingRulesAutomod:
     logger: logging.Logger
     red: redis.StrictRedis
     config: AutoModSeedingUserConfig
+    action_author = AUTOMOD_USERNAME
 
     def __init__(
         self, config: AutoModSeedingUserConfig, red: redis.StrictRedis or None
@@ -314,6 +315,11 @@ class SeedingRulesAutomod:
         if isinstance(v, bytes):
             v = v.decode()
         return v == "1"
+
+    def player_warning_failed(self, aplayer):
+        with self.watch_state(aplayer.team, aplayer.squad) as watch_status:
+            if warnings := watch_status.warned.get(aplayer.name):
+                warnings.pop()
 
     def player_punish_failed(self, aplayer):
         """

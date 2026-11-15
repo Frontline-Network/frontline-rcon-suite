@@ -37,6 +37,7 @@ class NoSoloTankAutomod:
     logger: logging.Logger
     red: redis.StrictRedis
     config: AutoModNoSoloTankUserConfig
+    action_author = AUTOMOD_USERNAME
 
     def __init__(
         self, config: AutoModNoSoloTankUserConfig, red: redis.StrictRedis or None
@@ -114,6 +115,11 @@ class NoSoloTankAutomod:
                 message,
             )
             return message
+
+    def player_warning_failed(self, aplayer):
+        with self.watch_state(aplayer.team, aplayer.squad) as watch_status:
+            if warnings := watch_status.warned.get(aplayer.name):
+                warnings.pop()
 
     def player_punish_failed(self, aplayer):
         """

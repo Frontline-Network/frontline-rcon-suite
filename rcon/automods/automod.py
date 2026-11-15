@@ -74,12 +74,14 @@ def _do_punitions(
         try:
             if method == ActionMethod.MESSAGE:
                 if not aplayer.details.dry_run:
-                    rcon.message_player(
+                    accepted = rcon.message_player(
                         aplayer.player_id,
                         aplayer.details.message,
                         by=aplayer.details.author,
                         player_name=aplayer.name,
                     )
+                    if accepted is False:
+                        raise HLLCommandFailedError("Game server rejected warning")
                 audit(
                     discord_webhook_url=aplayer.details.discord_audit_url,
                     command_name="message_player",
@@ -89,12 +91,14 @@ def _do_punitions(
 
             if method == ActionMethod.PUNISH:
                 if not aplayer.details.dry_run:
-                    rcon.punish(
+                    accepted = rcon.punish(
                         player_name=aplayer.name,
                         reason=aplayer.details.message,
                         by=aplayer.details.author,
                         player_id=aplayer.player_id,
                     )
+                    if accepted is False:
+                        raise HLLCommandFailedError("Game server rejected punishment")
                 audit(
                     discord_webhook_url=aplayer.details.discord_audit_url,
                     command_name="punish",
@@ -104,28 +108,34 @@ def _do_punitions(
 
             if method == ActionMethod.KICK:
                 if not aplayer.details.dry_run:
-                    rcon.kick(
+                    accepted = rcon.kick(
                         player_name=aplayer.name,
                         reason=aplayer.details.message,
                         by=aplayer.details.author,
                         player_id=aplayer.player_id,
                     )
+                    if accepted is False:
+                        raise HLLCommandFailedError("Game server rejected kick")
                 audit(
                     discord_webhook_url=aplayer.details.discord_audit_url,
                     command_name="kick",
                     msg=f"---> KICKING <---: {aplayer}",
                     author=aplayer.details.author,
                 )
-        except (HLLCommandFailedError, HLLServerError):
+        except (HLLCommandFailedError, HLLServerError, OSError, UnicodeDecodeError):
             logger.warning(
                 "Couldn't `%s` player `%s` because the HLL RCON command failed. Will retry.",
                 repr(method),
                 repr(aplayer),
                 exc_info=True,
             )
-            if method == ActionMethod.PUNISH:
+            if method in {ActionMethod.MESSAGE, ActionMethod.PUNISH}:
                 for m in mods:
-                    m.player_punish_failed(aplayer)
+                    if getattr(m, "action_author", None) == aplayer.details.author:
+                        if method == ActionMethod.MESSAGE:
+                            m.player_warning_failed(aplayer)
+                        else:
+                            m.player_punish_failed(aplayer)
             elif method == ActionMethod.KICK:
                 audit(
                     discord_webhook_url=aplayer.details.discord_audit_url,
@@ -245,6 +255,9 @@ def _remove_pending_timer(player_id: str, timer: Timer) -> None:
 @on_connected()
 @inject_player_ids
 def on_connected(rcon: Rcon, _, name: str, player_id: str):
+    previous = pendingTimers.pop(player_id, None)
+    if previous is not None:
+        previous.cancel()
     red = get_redis_client()
     if not is_first_run_done(red):
         logger.debug(
@@ -278,7 +291,11 @@ def on_connected(rcon: Rcon, _, name: str, player_id: str):
 
     def notify_player():
         try:
+            if t is None or pendingTimers.get(player_id) is not t:
+                return
             for p in punitions_to_apply.warning:
+                if p.details.dry_run:
+                    continue
                 rcon.message_player(
                     player_id=p.player_id,
                     message=p.details.message,

@@ -36,6 +36,7 @@ class NoLeaderAutomod:
     logger: logging.Logger
     red: redis.StrictRedis
     config: AutoModNoLeaderUserConfig
+    action_author = AUTOMOD_USERNAME
 
     def __init__(
         self, config: AutoModNoLeaderUserConfig, red: redis.StrictRedis or None
@@ -129,6 +130,11 @@ class NoLeaderAutomod:
                 message,
             )
             return message
+
+    def player_warning_failed(self, aplayer):
+        with self.watch_state(aplayer.team, aplayer.squad) as watch_status:
+            if warnings := watch_status.warned.get(aplayer.name):
+                warnings.pop()
 
     def player_punish_failed(self, aplayer):
         """
