@@ -6,8 +6,9 @@ test("the last language selection wins when French loads slowly", async ({ page 
   const frenchBlocked = new Promise((resolve) => { releaseFrench = resolve; });
   let frenchRequested;
   const requestStarted = new Promise((resolve) => { frenchRequested = resolve; });
-  await page.route("**/src/i18n/locales/fr.js*", async (route) => {
-    frenchRequested();
+  // Vite serves the source module in development and a hashed asset in builds.
+  await page.route(/\/(?:src\/i18n\/locales\/fr\.js|assets\/fr-[\w-]+\.js)(?:\?.*)?$/, async (route) => {
+    frenchRequested(route.request().url());
     await frenchBlocked;
     await route.continue();
   });
@@ -15,14 +16,11 @@ test("the last language selection wins when French loads slowly", async ({ page 
   await page.goto("/records/game-logs", { waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "Sprache", exact: true }).click();
   await page.getByRole("menuitem", { name: "Français", exact: true }).click();
-  await requestStarted;
+  const frenchUrl = await requestStarted;
   await page.getByRole("menuitem", { name: "English", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   releaseFrench();
-  await page.evaluate(async () => {
-    const module = await import("/src/i18n/index.js");
-    await module.ensureLanguageLoaded("fr");
-  });
+  await page.evaluate(async (url) => { await import(/* @vite-ignore */ url); }, frenchUrl);
   await expect(page.getByRole("heading", { name: "Game logs", exact: true })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await expect.poll(() => page.evaluate(() => localStorage.getItem("crcon.language"))).toBe("en");
