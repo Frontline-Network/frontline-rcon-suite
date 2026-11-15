@@ -840,29 +840,7 @@ class VoteMap:
                 f"Vote must be a number between {start} and {end - 1}"
             )
 
-        try:
-            current_map = self._maps_history[0]
-            map_start = current_map["start"]
-        except IndexError as e:
-            raise VoteMapNoInitialised(
-                "Map history is empty - Can't register vote"
-            ) from e
-        except KeyError as e:
-            raise VoteMapNoInitialised(
-                "Map history is corrupted - Can't register vote"
-            ) from e
-
-        if map_start is None:
-            raise VoteMapNoInitialised("Current round start is unavailable - Can't register vote")
-        if timestamp < map_start:
-            logger.warning(
-                "Vote is too old %s, %s, %d, %s",
-                player_name,
-                timestamp,
-                entry,
-                current_map,
-            )
-            raise VoteMapException("This vote predates the current round. Please vote again.")
+        self._validate_vote_round(timestamp)
 
         # Vote registered
         self._state.add_vote(player_id, player_name, selected_map, vote_count)
@@ -879,6 +857,26 @@ class VoteMap:
         self.apply_results()
 
         return selected_map
+
+    def _validate_vote_round(self, timestamp: int) -> None:
+        """Reject events that cannot belong to the current known round."""
+        try:
+            current_map = self._maps_history[0]
+            map_start = current_map["start"]
+        except IndexError as e:
+            raise VoteMapNoInitialised(
+                "Map history is empty - Can't register vote"
+            ) from e
+        except KeyError as e:
+            raise VoteMapNoInitialised(
+                "Map history is corrupted - Can't register vote"
+            ) from e
+
+        if map_start is None:
+            raise VoteMapNoInitialised("Current round start is unavailable - Can't register vote")
+        if timestamp < map_start:
+            logger.warning("Vote predates the current round")
+            raise VoteMapException("This vote predates the current round. Please vote again.")
 
     @validate_maps
     def register_player_choice(self, map_choice: Layer, player: PlayerProfileType):
@@ -1194,7 +1192,7 @@ class VoteMapCommandHandler:
                 if len(args) < 1 or args[0] == "help":
                     self.handle_player_choice_help(player_id)
                 else:
-                    self.handle_player_choice(player_id, *args)
+                    self.handle_player_choice(player_id, *args, timestamp=log["timestamp_ms"] // 1000)
             else:
                 # fallback
                 message = "INVALID COMMAND!\n" + (
@@ -1249,6 +1247,7 @@ class VoteMapCommandHandler:
         self,
         player_id: str,
         *args,
+        timestamp: int | None = None,
     ):
         """
         Provide args in the following order:\n
@@ -1322,10 +1321,11 @@ class VoteMapCommandHandler:
         Your vote was registered.
         Type !vm too see the new selection"""
 
+        timestamp = int(datetime.now().timestamp()) if timestamp is None else timestamp
+        self.votemap._validate_vote_round(timestamp)
         player = self.votemap._get_player(player_id)
         self.votemap.register_player_choice(map_choice, player)
         # Automatically register player's vote for the selected map
-        timestamp = int(datetime.now().timestamp())
         self.votemap.register_vote(player, timestamp, entry=0)  # It's always at index 0
         self.rcon.message_player(player_id=player_id, message=success_msg)
 

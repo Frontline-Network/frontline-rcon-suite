@@ -516,6 +516,25 @@ def test_register_vote_requires_current_round_start(votemap, round_start, vote_t
             apply.assert_not_called()
 
 
+def test_choice_command_uses_original_event_time(votemap, mock_rcon):
+    from rcon.vote_map.service import VoteMapCommandHandler
+    handler = VoteMapCommandHandler(votemap, mock_rcon, VoteMapUserConfig(enabled=True))
+    with patch.object(handler, "handle_player_choice") as choose:
+        assert handler.execute({"event_time": datetime.now(), "timestamp_ms": 1999000,
+                                "sub_content": "!vm add car"}, "fake")
+    choose.assert_called_once_with("fake", "car", timestamp=1999)
+
+
+def test_stale_player_choice_does_not_change_selection(votemap, mock_rcon):
+    from rcon.vote_map.service import VoteMapCommandHandler
+    votemap._maps_history[0]["start"] = 2000
+    handler = VoteMapCommandHandler(votemap, mock_rcon, VoteMapUserConfig(enabled=True))
+    with patch.object(votemap, "register_player_choice") as choose:
+        with pytest.raises(VoteMapException, match="predates"):
+            handler.handle_player_choice("fake", SAMPLE_MAPS[0].map.tag.lower(), timestamp=1999)
+        choose.assert_not_called()
+
+
 def test_remove_winning_map_from_selection_reapplies_results(votemap, mock_rcon):
     player = mock_player_profile("123456", "player_1")
     votemap.set_selection([HUR_WARFARE_DAY, UTAH_WARFARE_DAY])
