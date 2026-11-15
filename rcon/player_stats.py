@@ -215,6 +215,7 @@ class BaseStats:
             if self._is_player_kill(player, log):
                 streaks.teamkills += 1
             if self._is_player_death(player, log):
+                streaks.kill = 0
                 streaks.deaths_by_tk += 1
                 self._process_death_time(log_time, stats)
         if action == AllLogTypes.connected:
@@ -315,10 +316,12 @@ class BaseStats:
             time_since_last_spawn,
             stats["longest_life_secs"],
         )
-        stats["shortest_life_secs"] = min(
-            time_since_last_spawn,
-            stats["shortest_life_secs"],
-        )
+        if time_since_last_spawn > 0:
+            previous_shortest = stats["shortest_life_secs"]
+            stats["shortest_life_secs"] = (
+                min(time_since_last_spawn, previous_shortest)
+                if previous_shortest > 0 else time_since_last_spawn
+            )
         if save_spawn:
             stats["last_spawn"] = log_time
 
@@ -605,7 +608,7 @@ class TimeWindowStats(BaseStats):
         cached_players: dict[str, PlayerStat] = {},
     ):
         indexed_logs: dict[str, list[StructuredLogLineWithMetaData]] = {}
-        unique_players = set[tuple[str, str]]()
+        latest_players: dict[str, tuple[datetime.datetime | None, str]] = {}
         players_times: dict[str, PlayerSessions] = {}
         name_to_id = {
             name: player_id
@@ -636,7 +639,13 @@ class TimeWindowStats(BaseStats):
                     continue
 
                 if player_name and player_key:
-                    unique_players.add((player_name, player_key))
+                    event_time = self._session_event_time(log)
+                    previous = latest_players.get(player_key)
+                    if previous is None or (
+                        event_time is not None
+                        and (previous[0] is None or event_time >= previous[0])
+                    ):
+                        latest_players[player_key] = (event_time, player_name)
                     prev_key = name_to_id.setdefault(player_name, player_key)
                     if prev_key != player_key:
                         logger.warning(
@@ -676,10 +685,10 @@ class TimeWindowStats(BaseStats):
                     seen_boundaries.add(boundary)
                 self._set_start_end_times(player_key, players_times, log, from_)
 
-        # Convert the unique set of players into a list of dict for compatibility with parent class
+        # Keep the latest observed name for each ID independent of hash order.
         players = [
             dict(name=player_name, player_id=player_id)
-            for player_name, player_id in unique_players
+            for player_id, (_, player_name) in latest_players.items()
         ]
         # Here we massage the session times for a player. 1 session should be a pair of times a start and an end
         for player, times in players_times.items():

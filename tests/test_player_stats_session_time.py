@@ -48,6 +48,23 @@ DISCONNECTED = AllLogTypes.disconnected
 ACTIVITY = AllLogTypes.kill
 
 
+def test_historical_name_is_latest_even_when_logs_are_out_of_order(monkeypatch):
+    monkeypatch.setattr(player_stats, "enter_session", lambda: nullcontext(None))
+    monkeypatch.setattr(player_stats, "get_player_profile_by_player_ids", lambda *_: [])
+    stats = player_stats.TimeWindowStats.__new__(player_stats.TimeWindowStats)
+    monkeypatch.setattr(stats, "get_stats_by_player", lambda **kwargs: kwargs["players"])
+    start = datetime(2026, 10, 24, tzinfo=timezone.utc)
+    logs = [
+        {"action": ACTIVITY, "event_time": start + timedelta(seconds=second),
+         "player_name_1": name, "player_id_1": "player"}
+        for second, name in [(300, "Latest"), (100, "Earlier")]
+    ]
+
+    assert stats._get_players_stats_from_logs(logs, start, start + timedelta(hours=1)) == [
+        {"name": "Latest", "player_id": "player"}
+    ]
+
+
 @pytest.mark.parametrize("remaining", [0, 1, 51, 99, 100, 101])
 def test_late_join_cannot_create_negative_playtime(compute, remaining):
     assert compute([(3600 - remaining, CONNECTED)]) == max(0, remaining - 100)

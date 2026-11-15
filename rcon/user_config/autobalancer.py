@@ -95,7 +95,7 @@ class AutobalancerMessages(BaseModel):
             self.squad_switch_selected.format(squad_name="Able", target_team="Axis")
             self.squad_switch_completed.format(squad_name="Able", target_team="Axis")
             self.squad_switch_aborted.format(squad_name="Able")
-        except (KeyError, IndexError, ValueError) as exc:
+        except (AttributeError, KeyError, IndexError, TypeError, ValueError) as exc:
             raise ValueError(f"Ungültiger Platzhalter in Nachrichtenvorlage: {exc}")
         return self
 

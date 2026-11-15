@@ -240,6 +240,13 @@ def expose_api_endpoint(
         errors_as_json: bool = False
         res: Any = None
         data = _get_data(request)
+        if not isinstance(data, dict):
+            return RconJsonResponse(
+                {"result": None, "command": command_name, "arguments": {},
+                 "failed": True, "error": "Expected a JSON object",
+                 "forward_results": None, "version": TAG_VERSION},
+                status=400,
+            )
 
         if isinstance(data, dict) and (
             data.get("forward") or "forward_server_numbers" in data
@@ -328,11 +335,13 @@ def expose_api_endpoint(
         # This is a bit janky but catch any UserConfig validation errors that have bubbled up and convert
         # the error message as required
         except pydantic.ValidationError as e:
+            failure = True
             if errors_as_json:
                 error = e.json()
             else:
                 error = str(e)
         except InvalidKeysConfigurationError as e:
+            failure = True
             if errors_as_json:
                 error = e.asdict()
             else:

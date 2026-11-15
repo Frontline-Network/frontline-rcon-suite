@@ -1,12 +1,42 @@
 import os
+from datetime import datetime, timedelta
 
 import pytest
 
 os.environ["HLL_MAINTENANCE_CONTAINER"] = "1"
 from rcon.models import Maps, PlayerID, PlayerSoldier, PlayerStats, calc_weapon_type_usage
-from rcon.player_stats import BaseStats
-from rcon.types import PlayerTeamAssociation, PlayerTeamConfidence
+from rcon.player_stats import BaseStats, Streaks
+from rcon.types import AllLogTypes, PlayerTeamAssociation, PlayerTeamConfidence
+from rcon.utils import get_default_player_stats
 from rcon.maps import Team
+
+
+def test_teamkill_death_ends_kill_streak():
+    calc = BaseStats.__new__(BaseStats)
+    stats = get_default_player_stats()
+    streaks = Streaks()
+    player = {"name": "test", "player_id": "one"}
+    for index, (action, attacker, victim) in enumerate([
+        (AllLogTypes.kill, "one", "enemy"),
+        (AllLogTypes.team_kill, "ally", "one"),
+        (AllLogTypes.kill, "one", "enemy"),
+    ]):
+        calc._calc_streaks(stats, player, {"action": action, "timestamp_ms": index * 1000,
+            "player_id_1": attacker, "player_id_2": victim}, streaks)
+    assert stats["kills_streak"] == 1
+    assert streaks.kill == 1
+
+
+def test_shortest_life_records_first_positive_duration_and_tracks_minimum():
+    calc = BaseStats.__new__(BaseStats)
+    stats = get_default_player_stats()
+    stats["last_spawn"] = datetime(2026, 1, 1)
+    calc._process_death_time(stats["last_spawn"] + timedelta(seconds=120), stats)
+    assert stats["shortest_life_secs"] == 120
+    calc._process_death_time(stats["last_spawn"] + timedelta(seconds=180), stats)
+    calc._process_death_time(stats["last_spawn"] + timedelta(seconds=60), stats)
+    assert stats["shortest_life_secs"] == 60
+    assert stats["longest_life_secs"] == 180
 
 
 def test_canadian_weapon_identifies_allied_team():
