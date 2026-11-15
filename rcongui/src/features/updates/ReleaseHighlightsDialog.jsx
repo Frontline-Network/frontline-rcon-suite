@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { ensureLanguageLoaded } from "@/i18n";
+import { selectAppLanguage } from "@/i18n";
 import {
   Alert,
   Box,
@@ -52,9 +52,7 @@ export default function ReleaseHighlightsDialog({
   const content = release.highlights;
   const changeLanguage = async (_, language) => {
     if (!language) return;
-    await ensureLanguageLoaded(language);
-    await i18n.changeLanguage(language);
-    document.documentElement.lang = language;
+    await selectAppLanguage(language);
   };
   const openAction = () => {
     onClose();

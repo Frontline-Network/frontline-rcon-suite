@@ -8,7 +8,7 @@ import MenuItem from "@mui/material/MenuItem";
 import Tooltip from "@mui/material/Tooltip";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ensureLanguageLoaded } from "@/i18n";
+import { selectAppLanguage } from "@/i18n";
 
 const languages = [
   { code: "de", key: "language.de" },
@@ -25,10 +25,7 @@ export default function LanguageSelector({
   const language = i18n.resolvedLanguage || "de";
 
   const selectLanguage = async (code) => {
-    await ensureLanguageLoaded(code);
-    await i18n.changeLanguage(code);
-    document.documentElement.lang = code;
-    setAnchorEl(null);
+    if (await selectAppLanguage(code)) setAnchorEl(null);
   };
 
   return (

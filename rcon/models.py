@@ -88,7 +88,6 @@ from rcon.utils import (
     mask_to_server_numbers,
     server_numbers_to_mask,
 )
-from rcon.weapons import ALL_WEAPONS, WEAPON_SIDE_MAP, WeaponType
 
 logger = logging.getLogger(__name__)
 
@@ -1016,12 +1015,26 @@ class Maps(Base):
         }
 
 
-def calc_weapon_type_usage(weapons: dict[str, int]) -> dict[WeaponType, int]:
+def _stats_game_profile(game):
+    # Import lazily: game profiles themselves import the shared models.
+    from rcon.game.registry import get_game_profile
+    from rcon.types import GameEnum
+
+    try:
+        game_id = GameIntEnum.HLL_WW2 if game is None else GameIntEnum(game)
+        return get_game_profile(GameEnum[game_id.name])
+    except (ValueError, KeyError, TypeError):
+        return None
+
+
+def calc_weapon_type_usage(weapons: dict[str, int], game=None) -> dict[str, int]:
     kills_by_type = defaultdict(int)
+    profile = _stats_game_profile(game)
+    catalog = profile.weapons if profile else {}
 
     for weapon_name, count in weapons.items():
-        if weapon_name in ALL_WEAPONS:
-            weapon_type = ALL_WEAPONS[weapon_name]
+        if weapon_name in catalog:
+            weapon_type = catalog[weapon_name]
             kills_by_type[weapon_type.value] += count
 
     return dict(kills_by_type)
@@ -1079,6 +1092,8 @@ class PlayerStats(Base):
     map: Mapped[Maps] = relationship(back_populates="player_stats")
 
     def detect_team(self) -> PlayerTeamAssociation:
+        profile = _stats_game_profile(self.map.game if self.map else None)
+        weapon_sides = profile.weapon_sides if profile else {}
         def get_value(item):
             return item[1]
 
@@ -1086,20 +1101,20 @@ class PlayerStats(Base):
         allies_count = 0
         if len(self.weapons) > 0:
             for weapon in sorted(self.weapons.items(), key=get_value, reverse=True):
-                if WEAPON_SIDE_MAP.get(weapon[0]) == Team.ALLIES:
+                if weapon_sides.get(weapon[0]) == Team.ALLIES:
                     allies_count += weapon[1]
-                elif WEAPON_SIDE_MAP.get(weapon[0]) == Team.AXIS:
+                elif weapon_sides.get(weapon[0]) == Team.AXIS:
                     axis_count += weapon[1]
 
         if len(self.death_by_weapons) > 0:
             for weapon in sorted(
                 self.death_by_weapons.items(), key=get_value, reverse=True
             ):
-                if WEAPON_SIDE_MAP.get(weapon[0]) is None:
+                if weapon_sides.get(weapon[0]) is None:
                     continue
                 op = (
                     Team.AXIS
-                    if WEAPON_SIDE_MAP.get(weapon[0]) == Team.ALLIES
+                    if weapon_sides.get(weapon[0]) == Team.ALLIES
                     else Team.ALLIES
                 )
                 if op == Team.ALLIES:
@@ -1154,10 +1169,10 @@ class PlayerStats(Base):
             ),
             "map_id": self.map_id,
             "kills": self.kills,
-            "kills_by_type": calc_weapon_type_usage(self.weapons),
+            "kills_by_type": calc_weapon_type_usage(self.weapons, self.map.game if self.map else None),
             "kills_streak": self.kills_streak,
             "deaths": self.deaths,
-            "deaths_by_type": calc_weapon_type_usage(self.death_by_weapons),
+            "deaths_by_type": calc_weapon_type_usage(self.death_by_weapons, self.map.game if self.map else None),
             "deaths_without_kill_streak": self.deaths_without_kill_streak,
             "teamkills": self.teamkills,
             "teamkills_streak": self.teamkills_streak,

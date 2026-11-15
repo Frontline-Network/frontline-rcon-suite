@@ -1,6 +1,33 @@
 import { expect, test } from "@playwright/test";
 import { VIEWPORTS, expectNoHorizontalPageOverflow } from "./helpers.mjs";
 
+test("the last language selection wins when French loads slowly", async ({ page }) => {
+  let releaseFrench;
+  const frenchBlocked = new Promise((resolve) => { releaseFrench = resolve; });
+  let frenchRequested;
+  const requestStarted = new Promise((resolve) => { frenchRequested = resolve; });
+  await page.route("**/src/i18n/locales/fr.js*", async (route) => {
+    frenchRequested();
+    await frenchBlocked;
+    await route.continue();
+  });
+  await page.addInitScript(() => window.localStorage.setItem("crcon.language", "de"));
+  await page.goto("/records/game-logs", { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "Sprache", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Français", exact: true }).click();
+  await requestStarted;
+  await page.getByRole("menuitem", { name: "English", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  releaseFrench();
+  await page.evaluate(async () => {
+    const module = await import("/src/i18n/index.js");
+    await module.ensureLanguageLoaded("fr");
+  });
+  await expect(page.getByRole("heading", { name: "Game logs", exact: true })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("crcon.language"))).toBe("en");
+});
+
 test("French can be selected, persists across reload, and switches back to German and English", async ({ page }) => {
   await page.setViewportSize(VIEWPORTS.desktop);
   await page.goto("/records/game-logs", { waitUntil: "domcontentloaded" });
