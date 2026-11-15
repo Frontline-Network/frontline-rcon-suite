@@ -1,5 +1,6 @@
 from unittest.mock import Mock
 from types import SimpleNamespace
+import pytest
 
 from rcon.seed_vip import service
 
@@ -18,6 +19,28 @@ def test_failed_webhook_does_not_stop_other_hooks_or_expose_url(monkeypatch, cap
     success.send.assert_called_once_with(embed=embed)
     assert "RuntimeError" in caplog.text
     assert secret not in caplog.text
+
+
+def test_seed_service_error_does_not_leak_exception_details(monkeypatch, caplog):
+    secret = "fake-webhook-secret"
+    config = SimpleNamespace(language=None, player_announce_thresholds=[])
+    monkeypatch.setattr(service.SeedVIPUserConfig, "load_from_db", Mock(side_effect=[config, RuntimeError(secret)]))
+    monkeypatch.setattr(service, "get_rcon_api", Mock())
+    monkeypatch.setattr(service, "NotificationOutbox", Mock())
+    with pytest.raises(RuntimeError) as error:
+        service.run()
+    assert secret not in str(error.value)
+    assert error.value.__suppress_context__ is True
+    assert secret not in caplog.text
+
+
+def test_initial_seed_configuration_error_is_sanitized(monkeypatch):
+    secret = "fake-webhook-secret"
+    monkeypatch.setattr(service.SeedVIPUserConfig, "load_from_db", Mock(side_effect=RuntimeError(secret)))
+    with pytest.raises(RuntimeError) as error:
+        service.run()
+    assert secret not in str(error.value)
+    assert error.value.__suppress_context__ is True
 
 
 def test_get_server_snapshot_returns_players_and_gamestate(monkeypatch):

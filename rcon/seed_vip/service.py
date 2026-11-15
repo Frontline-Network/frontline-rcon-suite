@@ -56,7 +56,10 @@ def get_server_snapshot(rcon_api):
 
 
 def run(stop_event=None):
-    config = SeedVIPUserConfig.load_from_db()
+    try:
+        config = SeedVIPUserConfig.load_from_db()
+    except Exception as exc:
+        raise RuntimeError(f"Seed VIP configuration unavailable ({type(exc).__name__})") from None
     current_lang = config.language
 
     rcon_api = get_rcon_api()
@@ -308,9 +311,10 @@ def run(stop_event=None):
             if wait(stop_event, sleep_time):
                 return
     except* Exception as eg:
-        for e in eg.exceptions:
-            logger.exception(e)
-        raise
+        # Client exceptions may contain configured webhook URLs or tokens.
+        error_types = ", ".join(sorted({type(e).__name__ for e in eg.exceptions}))
+        logger.error("Seed VIP stopped (%s)", error_types)
+        raise RuntimeError(f"Seed VIP stopped ({error_types})") from None
 
 
 if __name__ == "__main__":

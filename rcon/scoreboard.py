@@ -483,9 +483,8 @@ def run(stop_event=None):
     # Avoid circular imports
     from rcon.api_commands import get_rcon_api
 
-    rcon_api = get_rcon_api()
-
     try:
+        rcon_api = get_rcon_api()
         # Track the last updated time for each message key by webhook URL
         last_updated: defaultdict[str, defaultdict[str, datetime | None]] = defaultdict(
             lambda: defaultdict(lambda: None)
