@@ -20,6 +20,7 @@ USER_CONFIG_CACHE_TTL_SECONDS = 2
 
 _USER_CONFIG_CACHE: dict[str, tuple[float, Any]] = {}
 _USER_CONFIG_CACHE_LOCK = threading.RLock()
+_USER_CONFIG_CACHE_GENERATION = 0
 
 
 # Sourced without modification from https://stackoverflow.com/a/17246726
@@ -113,9 +114,9 @@ class BaseUserConfig(pydantic.BaseModel):
             except pydantic.ValidationError as e:
                 if default_on_validation_error:
                     logger.error(
-                        f"Error loading {cls.KEY()}, returning defaults, validation errors:"
+                        "Error loading %s; returning defaults (%s validation errors)",
+                        cls.KEY(), e.error_count(),
                     )
-                    logger.error(e)
                     return cls()
                 else:
                     raise
@@ -183,25 +184,31 @@ def _get_cached_user_config(key: str, default=None) -> dict[str, Any] | Any | No
             if expires_at > now:
                 return deepcopy(value)
             _USER_CONFIG_CACHE.pop(key, None)
+        generation = _USER_CONFIG_CACHE_GENERATION
 
     value = get_user_config(key, default=default)
     with _USER_CONFIG_CACHE_LOCK:
-        _USER_CONFIG_CACHE[key] = (
-            time.monotonic() + USER_CONFIG_CACHE_TTL_SECONDS,
-            deepcopy(value),
-        )
+        if generation == _USER_CONFIG_CACHE_GENERATION:
+            _USER_CONFIG_CACHE[key] = (
+                time.monotonic() + USER_CONFIG_CACHE_TTL_SECONDS,
+                deepcopy(value),
+            )
     return value
 
 
 def _invalidate_user_config_cache(key: str) -> None:
+    global _USER_CONFIG_CACHE_GENERATION
     with _USER_CONFIG_CACHE_LOCK:
+        _USER_CONFIG_CACHE_GENERATION += 1
         _USER_CONFIG_CACHE.pop(key, None)
 
 
 def _clear_user_config_cache() -> None:
     """Clear the process-local cache for tests and maintenance utilities."""
 
+    global _USER_CONFIG_CACHE_GENERATION
     with _USER_CONFIG_CACHE_LOCK:
+        _USER_CONFIG_CACHE_GENERATION += 1
         _USER_CONFIG_CACHE.clear()
 
 

@@ -128,6 +128,14 @@ def test_setting_config_does_not_log_secrets(monkeypatch, caplog):
     assert "fake-secret-123" not in caplog.text
 
 
+def test_invalid_config_values_are_not_logged(monkeypatch, caplog):
+    monkeypatch.setenv("HLL_DB_URL", "postgresql://example.invalid/rcon")
+    monkeypatch.setattr(user_config_utils, "get_user_config", lambda *_args, **_kwargs: {"enabled": "fake-secret-123"})
+    assert ExampleUserConfig.load_from_db().enabled is False
+    assert "fake-secret-123" not in caplog.text
+    assert "validation errors" in caplog.text
+
+
 def test_validation_with_reset_never_writes(monkeypatch):
     saved = Mock()
     validate = Mock()
@@ -174,3 +182,25 @@ def test_config_database_error_is_not_treated_as_missing(monkeypatch):
     with pytest.raises(SQLAlchemyError, match="offline"):
         user_config_utils._get_conf(session, "1_Example")
     session.rollback.assert_called_once()
+
+
+def test_inflight_old_read_does_not_repopulate_invalidated_cache(monkeypatch):
+    import threading
+    started, resume = threading.Event(), threading.Event()
+    current = {"value": "old"}
+    def read(_key, default=None):
+        snapshot = current.copy()
+        if snapshot["value"] == "old":
+            started.set()
+            assert resume.wait(5)
+        return snapshot
+    monkeypatch.setattr(user_config_utils, "get_user_config", read)
+    worker = threading.Thread(target=lambda: user_config_utils._get_cached_user_config("test"))
+    worker.start()
+    assert started.wait(5)
+    current["value"] = "new"
+    user_config_utils._invalidate_user_config_cache("test")
+    resume.set()
+    worker.join(5)
+    assert not worker.is_alive()
+    assert user_config_utils._get_cached_user_config("test") == {"value": "new"}

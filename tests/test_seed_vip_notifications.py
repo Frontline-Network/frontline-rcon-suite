@@ -1,5 +1,6 @@
 import unittest
 from collections import defaultdict
+from contextlib import nullcontext
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, Mock, patch
 
@@ -50,6 +51,7 @@ class NoticeTests(unittest.TestCase):
         self.queue = notifications.NotificationOutbox(self.red, '1')
         self.api = MagicMock()
         self.api.message_player.return_value = True
+        self.api.add_vip.return_value = True
         self.cfg = SeedVIPUserConfig(enabled=True, dry_run=False, language=None)
         for target, replacement in (
             ('rcon.seed_vip.notifications.time.time', lambda: self.clock),
@@ -163,6 +165,8 @@ class NoticeTests(unittest.TestCase):
              patch.object(service, 'NotificationOutbox', return_value=self.queue), \
              patch.object(service, 'get_server_snapshot', side_effect=snapshots), \
              patch.object(service, 'get_vips', return_value={}), \
+             patch('rcon.vip_rewards.locking.vip_lock', side_effect=lambda _player_id: nullcontext()), \
+             patch('rcon.vip_rewards.service.current_vip', return_value=None), \
              patch.object(service, 'wait', side_effect=lambda _event, seconds: setattr(self, 'clock', self.clock + seconds) or False):
             service.run()
 

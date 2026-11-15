@@ -219,6 +219,6 @@ def forward_mobile_request_to_server(
                 headers=headers,
             )
         except (requests.RequestException, TypeError, ValueError):
-            logger.exception("Unable to forward mobile request to %s", host)
+            logger.warning("Unable to forward mobile request to server %s", server_number)
 
     raise ValueError(f"CRCON server {server_number} is unavailable")

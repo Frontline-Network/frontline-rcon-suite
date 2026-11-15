@@ -167,7 +167,7 @@ def run(stop_event=None):
                     )
 
                 # Add or update VIP in CRCON using full VIP map
-                reward_players(
+                rewarded_ids = reward_players(
                     rcon=rcon_api,
                     config=config,
                     to_add_vip_steam_ids=to_add_vip_steam_ids,
@@ -185,7 +185,7 @@ def run(stop_event=None):
                     rcon=rcon_api,
                     config=config,
                     message=config.player_messages.reward_player_message,
-                    steam_ids=to_add_vip_steam_ids,
+                    steam_ids=rewarded_ids,
                     expiration_timestamps=expiration_timestamps,
                     outbox=outbox,
                 )

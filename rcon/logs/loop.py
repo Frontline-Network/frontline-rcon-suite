@@ -206,6 +206,9 @@ def send_log_line_webhook_message(
     started = time.perf_counter()
     try:
         wh.execute()
+    except Exception:
+        # Webhook transport exceptions can include the capability URL.
+        logger.error("Discord log webhook delivery failed")
     finally:
         logger.debug(
             "Discord log webhook completed in %.3fs",
