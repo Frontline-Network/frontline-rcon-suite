@@ -83,7 +83,7 @@ def get_server_list(request):
     auth_header: str | None = request.headers.get(AUTHORIZATION)
     headers = {"AUTHORIZATION": auth_header} if auth_header else {}
 
-    logger.debug(keys)
+    logger.debug("Discovered %s configured servers", len(keys))
     names = []
     for host, key in keys.items():
         if key == my_key:
@@ -129,7 +129,7 @@ def forward_request(request):
             except json.JSONDecodeError as e:
                 logger.error("JSON parse error %s: %s", request.path, e)
                 data = None
-            logger.info("Forwarding request: %s %s %s", url, params, data)
+            logger.info("Forwarding request to peer server")
             res = requests.post(
                 url,
                 params=params,
@@ -152,12 +152,12 @@ def forward_request(request):
             if res.ok:
                 r = {"host": host, "response": res.json()}
                 results.append(r)
-                logger.info(r)
+                logger.info("Forwarded request completed with HTTP %s", res.status_code)
             else:
                 # todo add failure to results
-                logger.warning(f"Forwarding to {host} failed %s", res.text)
+                logger.warning("Forwarding to peer server failed with HTTP %s", res.status_code)
         except requests.exceptions.RequestException:
-            logger.warning(f"Unable to connect with {url=}")
+            logger.warning("Unable to connect to peer server")
 
     return results
 

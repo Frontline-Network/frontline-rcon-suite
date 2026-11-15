@@ -208,13 +208,18 @@ class RconAPI(Rcon):
             reset_to_default=reset_to_default,
         )
 
-        if res:
-            audit_user_config_differences(
-                old_model=old_model,
-                new_model=data,
-                command_name=command_name,
-                author=by,
-            )
+        if res and not dry_run:
+            try:
+                audit_user_config_differences(
+                    old_model=old_model,
+                    new_model=model.load_from_db(),
+                    command_name=command_name,
+                    author=by,
+                )
+            except Exception:
+                # Saving already succeeded; do not invite a retry or claim that
+                # the configuration was rejected because audit delivery failed.
+                logger.error("Unable to audit configuration change for %s", command_name)
         return res
 
     def get_blacklists(self) -> list[BlacklistType]:

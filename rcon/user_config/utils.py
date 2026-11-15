@@ -150,11 +150,11 @@ class BaseUserConfig(pydantic.BaseModel):
 def _get_conf(sess, key):
     try:
         return sess.query(UserConfig).filter(UserConfig.key == key).one_or_none()
-    except SQLAlchemyError as e:
-        # Don't let a failed transaction block model creation
-        # the session context manager will handle this
+    except SQLAlchemyError:
+        # A database failure is not the same as an absent configuration.
+        # Propagate it so callers do not enable default actions by accident.
         sess.rollback()
-        return None
+        raise
 
 
 def get_user_config(key: str, default=None) -> dict[str, Any] | Any | None:
@@ -240,7 +240,7 @@ def set_user_config(key: str, object_: dict[str, Any] | BaseUserConfig):
     if isinstance(object_, BaseUserConfig):
         object_ = object_.model_dump()
 
-    logger.debug("Setting user config for %s with %s", key, object_)
+    logger.debug("Setting user config for %s", key)
     _invalidate_user_config_cache(key)
     try:
         with enter_session() as sess:
@@ -260,12 +260,15 @@ def validate_user_config(
     data: dict[str, Any] | BaseUserConfig,
     dry_run: bool = True,
     reset_to_default: bool = False,
-) -> None:
-    if reset_to_default:
+) -> bool:
+    if reset_to_default and not dry_run:
+        # Reject invalid input before changing persisted settings.
+        model.save_to_db(values=data, dry_run=True)
         default = model()
         set_user_config(default.KEY(), default)
 
     model.save_to_db(values=data, dry_run=dry_run)
+    return True
 
 
 def mask_sensitive_data(

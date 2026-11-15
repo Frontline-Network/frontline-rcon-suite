@@ -714,3 +714,37 @@ def test_award_limit_survives_daily_budget_reset(delivery, monkeypatch, period):
     service.deliver(rcon, fourth)
     assert read(fourth)["reason"] == "rule_limit"
     assert rcon.add_vip.call_count == 3
+
+
+def test_dynamic_challenge_claim_and_config_preserve_weekly_limit():
+    from rcon.user_config.vip_rewards import ChallengeRule
+    from rcon.vip_rewards.service import reward_rule_config
+    rule = ChallengeRule(id="example", name="example", enabled=True, weapons=["test"], kills=1, period="day", limit=1, limit_period="week")
+    cfg = config(challenges=[rule])
+    state = {"observed": NOW, "healthy": True}
+    e = Engine(state, cfg)
+    e.event({"kind": "kill", "player_id": "a", "victim": "b", "weapon": "test", "time": NOW, "key": "one", "allowed": True}, NOW)
+    assert e.claims[0]["limit"] == 1
+    assert reward_rule_config(cfg, "challenge:example").limit_period == "week"
+
+
+def test_preexisting_unlimited_challenge_grant_respects_current_weekly_limit(delivery, monkeypatch):
+    from rcon.user_config.vip_rewards import ChallengeRule
+    from rcon.models import VipRewardGrant
+    service, cfg, rcon, remote, add, read = delivery
+    cfg.challenges = [ChallengeRule(id="example", name="example", enabled=True, weapons=["test"], limit=1, limit_period="week")]
+    service.read_gate_state(False)["config"] = cfg.model_dump_json()
+    first, second = add("first"), add("second")
+    with service.enter_session() as sess:
+        for grant_id in (first, second):
+            row = sess.get(VipRewardGrant, grant_id)
+            row.rule = "challenge:example"
+            row.limit = 0
+    service.deliver(rcon, first)
+    later = NOW + 2 * 86400
+    monkeypatch.setattr(service.time, "time", lambda: later)
+    service.read_gate_state(False)["observed"] = later
+    service.deliver(rcon, second)
+    assert read(first)["status"] == "awarded"
+    assert read(second)["reason"] == "rule_limit"
+    assert rcon.add_vip.call_count == 1

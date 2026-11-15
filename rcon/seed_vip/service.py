@@ -263,7 +263,7 @@ def run(stop_event=None):
 
                 # Announce seeding progress
                 logger.debug(
-                    f"whs={[wh.url for wh in config.hooks]} {config.player_announce_thresholds=} {total_players=} {prev_announced_bucket=} {next_player_bucket=} {last_bucket_announced=}"
+                    f"webhook_count={len(config.hooks)} {config.player_announce_thresholds=} {total_players=} {prev_announced_bucket=} {next_player_bucket=} {last_bucket_announced=}"
                 )
                 if (
                     config.hooks

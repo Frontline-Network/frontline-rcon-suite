@@ -2084,7 +2084,13 @@ class BlacklistRecord(Base):
             "admin_name": self.admin_name,
             "blacklist_name": self.blacklist.name,
         }
-        return self.reason.format_map(SafeStringFormat(**variables))
+        try:
+            return self.reason.format_map(SafeStringFormat(**variables))
+        except (ValueError, AttributeError, IndexError, KeyError, TypeError):
+            # Existing reasons may contain literal or malformed braces. Preserve
+            # them rather than blocking enforcement or the entire list view.
+            logger.warning("Invalid format in blacklist reason for record %s", self.id)
+            return self.reason
 
     # I know this isn't entirely representative but I cba to add 4 different types, 3 is already more than enough
     @overload

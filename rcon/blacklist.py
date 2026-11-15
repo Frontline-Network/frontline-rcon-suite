@@ -392,7 +392,7 @@ def synchronize_ban(
     # player is to be banned upon connecting, so that they can see the updated ban reason
     if (
         new_state != old_state
-        or new_record.blacklist.sync == BlacklistSyncMethod.BAN_ON_CONNECT
+        or (new_record is not None and new_record.blacklist.sync == BlacklistSyncMethod.BAN_ON_CONNECT)
     ):
         try:
             if old_state == BanState.TEMP:
@@ -443,17 +443,18 @@ def apply_blacklist_punishment(
         if player_id is None:
             player_id = record.player.player_id
         if player_name is None:
-            player_name = record.player.names[0].name
+            names = record.player.names
+            player_name = names[0].name if names else player_id
 
         # Apply any bans/kicks
         match state:
             case BanState.NONE:
                 logger.info(
-                    "Player %s was kicked due to blacklist, reason: %s",
+                    "Attempting to kick player %s due to blacklist, reason: %s",
                     player_name,
                     reason,
                 )
-                rcon.kick(
+                accepted = rcon.kick(
                     player_name=player_name,
                     reason=reason,
                     by=f"BLACKLIST: {record.admin_name}",
@@ -463,12 +464,12 @@ def apply_blacklist_punishment(
             case BanState.TEMP:
                 hours = round_timedelta_to_hours(record.expires_at)
                 logger.info(
-                    "Player %s was banned until %s due to blacklist, reason: %s",
+                    "Attempting to ban player %s until %s due to blacklist, reason: %s",
                     player_name,
                     record.expires_at,
                     reason,
                 )
-                rcon.temp_ban(
+                accepted = rcon.temp_ban(
                     player_id=player_id,
                     duration_hours=hours,
                     reason=reason,
@@ -477,17 +478,20 @@ def apply_blacklist_punishment(
 
             case BanState.PERMA:
                 logger.info(
-                    "Player %s was banned due to blacklist, reason: %s",
+                    "Attempting to ban player %s due to blacklist, reason: %s",
                     player_name,
                     reason,
                 )
-                rcon.perma_ban(
+                accepted = rcon.perma_ban(
                     player_id=player_id,
                     reason=reason,
                     by=f"BLACKLIST: {record.admin_name}",
                 )
 
-    except:
+        if not accepted:
+            raise RuntimeError("Game server rejected blacklist action")
+
+    except Exception:
         logger.exception("Failed to apply blacklist")
         try:
             send_to_discord_audit(
@@ -597,7 +601,8 @@ def edit_record_from_blacklist(
 
         # Check whether there were any changes made which would require resyncing a ban
         if (
-            old_record["blacklist"]["sync"] != new_record["blacklist"]["sync"]
+            old_record["blacklist"]["id"] != new_record["blacklist"]["id"]
+            or old_record["blacklist"]["sync"] != new_record["blacklist"]["sync"]
             or old_record["expires_at"] != new_record["expires_at"]
             or old_record["reason"] != new_record["reason"]
         ):
@@ -1069,8 +1074,12 @@ class BlacklistCommandHandler:
         old_record = payload.old_record
         with enter_session() as sess:
             new_record = is_player_blacklisted(sess, player_id=old_record["player_id"])
+            old_applies = (
+                old_record["blacklist"]["servers"] is None
+                or SERVER_NUMBER in old_record["blacklist"]["servers"]
+            )
 
-            if not new_record:
+            if not new_record and old_applies:
                 synchronize_ban(
                     self.rcon,
                     player_id=old_record["player_id"],
@@ -1079,23 +1088,20 @@ class BlacklistCommandHandler:
                 )
 
             # Check whether the old or new record had or has priority
-            elif new_record.id == old_record["id"] or (
-                (
-                    old_record["blacklist"]["servers"] is None
-                    or SERVER_NUMBER in old_record["blacklist"]["servers"]
-                )
+            elif new_record and (new_record.id == old_record["id"] or (
+                old_applies
                 and _is_higher_priority_record(
                     old_record["created_at"],
                     old_record["expires_at"],
                     new_record.created_at,
                     new_record.expires_at,
                 )
-            ):
+            )):
                 synchronize_ban(
                     self.rcon,
                     player_id=old_record["player_id"],
                     new_record=new_record,
-                    old_state=get_ban_state_from_record(old_record),
+                    old_state=get_ban_state_from_record(old_record) if old_applies else BanState.NONE,
                 )
 
     def handle_delete_record(self, payload: BlacklistDeleteRecordCommand):
@@ -1144,24 +1150,49 @@ class BlacklistCommandHandler:
             or SERVER_NUMBER in new_blacklist["servers"]
         ) and new_blacklist["sync"] != BlacklistSyncMethod.KICK_ONLY
 
-        if was_banning == is_banning:
-            # TODO: Differentiate betweeen BAN_ON_CONNECT and BAN_IMMEDIATELY
+        enable_immediate = (
+            was_banning and is_banning
+            and old_blacklist["sync"] == BlacklistSyncMethod.BAN_ON_CONNECT
+            and new_blacklist["sync"] == BlacklistSyncMethod.BAN_IMMEDIATELY
+        )
+        if was_banning == is_banning and not enable_immediate:
             return
 
         with enter_session() as sess:
             records = get_active_blacklist_records(sess, new_blacklist["id"])
             for record in records:
-                if not was_banning:
+                player_id = record.player.player_id
+                if enable_immediate:
+                    current = is_player_blacklisted(sess, player_id)
+                    if current is not None and current.id == record.id:
+                        synchronize_ban(self.rcon, player_id, record, get_ban_state_from_record(record))
+                    continue
+                other_records = [
+                    other for other in get_player_blacklist_records(
+                        sess, player_id, include_expired=False, include_other_servers=False,
+                        exclude={record.id},
+                    )
+                    if other.blacklist_id != new_blacklist["id"]
+                    and other.blacklist.sync != BlacklistSyncMethod.KICK_ONLY
+                ]
+                other = get_highest_priority_record(other_records)
+                before = get_highest_priority_record(
+                    ([record] if was_banning else []) + ([other] if other else [])
+                )
+                after = get_highest_priority_record(
+                    ([record] if is_banning else []) + ([other] if other else [])
+                )
+                if before is after:
+                    continue
+                if before is None:
                     old_state = BanState.NONE
-                elif record.expires_at is None:
-                    old_state = BanState.PERMA
                 else:
-                    old_state = BanState.TEMP
+                    old_state = BanState.PERMA if before.expires_at is None else BanState.TEMP
 
                 synchronize_ban(
                     rcon=self.rcon,
-                    player_id=record.player.player_id,
-                    new_record=record if is_banning else None,
+                    player_id=player_id,
+                    new_record=after,
                     old_state=old_state,
                 )
 

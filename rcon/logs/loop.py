@@ -147,7 +147,7 @@ def on_generic(key, func) -> Callable:
                 and f.args == func.args
                 and f.keywords == func.keywords
         ):
-            logger.info("Skipping %s %s already added", key, func)
+            logger.info("Skipping already registered generic hook for %s", key)
             return func
 
     HOOKS[key].append(func)
@@ -186,7 +186,7 @@ def send_log_line_webhook_message(
 
     wh = make_hook(webhook.url)
     if not wh:
-        logger.error("Error creating discord webhook for: %s", webhook.url)
+        logger.error("Error creating Discord log webhook")
         return
 
     allowed_mentions = make_allowed_mentions(mentions)
@@ -221,6 +221,7 @@ def load_generic_hooks():
     """Load and validate all the subscribed log line webhooks from config.yml"""
     logger.info("Loading generic hooks")
     config = LogLineWebhookUserConfig.load_from_db()
+    configured_hooks = defaultdict(list)
     for hook in config.webhooks:
         # mentions = [h.user_mentions + h.role_mentions for h in conf.webhooks]
         func = partial(send_log_line_webhook_message, hook.webhook)
@@ -230,8 +231,19 @@ def load_generic_hooks():
         func.__module__ = __name__
 
         for log_type in hook.log_types:
-            logger.info("Adding log type %s, %s", func, log_type.value)
-            on_generic(log_type.value, func)
+            logger.info("Adding generic hook for log type %s", log_type.value)
+            existing = configured_hooks[log_type.value]
+            if not any(item.args == func.args and item.keywords == func.keywords for item in existing):
+                existing.append(func)
+
+    # Replace only dynamically configured log-webhook hooks. Keep built-in and
+    # independently registered hooks untouched when a webhook is removed.
+    for key in set(HOOKS) | set(configured_hooks):
+        retained = [
+            hook for hook in HOOKS[key]
+            if not (isinstance(hook, partial) and hook.func is send_log_line_webhook_message)
+        ]
+        HOOKS[key] = retained + configured_hooks[key]
 
 
 class LogLoop:
@@ -247,7 +259,7 @@ class LogLoop:
         self.CLEANUP_MIN = 180 # 3 hours
         self.CURR_MAP_END = 0
         self.now = 0
-        logger.info("Registered hooks: %s", HOOKS)
+        logger.info("Registered hooks for %s log types", len(HOOKS))
 
     @staticmethod
     def get_log_history_list():

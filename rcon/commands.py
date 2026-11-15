@@ -490,13 +490,19 @@ class ServerCtl:
             raise HLLCommandFailedError("Received unexpected response from server.")
         return parameters[0]["valueMember"].split(",")
 
+    def get_player_id_pairs(self) -> list[tuple[str, str]]:
+        players = self.exchange(
+            "GetServerInformation", 2, {"Name": "players", "Value": ""}
+        ).content_dict["players"]
+        adapter = self.game_profile.player_adapter
+        if adapter is None:
+            raise RuntimeError("No player adapter configured for the game")
+        canonical = (adapter.adapt(player) for player in players)
+        return [(player["name"], player["iD"]) for player in canonical]
+
     def get_player_ids(self) -> dict[str, str]:
-        return {
-            x["name"]: x["iD"]
-            for x in self.exchange(
-                "GetServerInformation", 2, {"Name": "players", "Value": ""}
-            ).content_dict["players"]
-        }
+        # Preserve the legacy name-keyed API for existing direct callers.
+        return dict(self.get_player_id_pairs())
 
     def get_all_player_info(self) -> list[dict[str, Any]]:
         """Return raw game-server packets; ``Rcon`` adapts them per game profile."""

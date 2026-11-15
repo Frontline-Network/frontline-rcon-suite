@@ -379,6 +379,8 @@ class Rcon(ServerCtl):
             player_id = player[PLAYER_ID]
             player_info = all_player_info.get(player_id)
             if player_info is None:
+                logger.warning("Missing detailed player info for %s", player_id)
+                fail_count += 1
                 continue
 
             try:
@@ -512,8 +514,8 @@ class Rcon(ServerCtl):
     def get_player_ids(self, as_dict: Literal[True] = False) -> dict[str, str]: ...
 
     def get_player_ids(self, as_dict=False) -> dict[str, str] | list[tuple[str, str]]:
-        raw_list = super().get_player_ids()
-        return raw_list if as_dict else list(raw_list.items())
+        pairs = super().get_player_id_pairs()
+        return dict(pairs) if as_dict else pairs
 
     def get_vips_count(self) -> int:
         players = self.get_player_ids()
@@ -716,6 +718,9 @@ class Rcon(ServerCtl):
         # Remove VIP before anything else in case we have errors
         with invalidates(Rcon.get_vip_ids):
             result = super().remove_vip(player_id)
+        if not result:
+            logger.warning("Game server rejected VIP removal for %s", player_id)
+            return False
 
         server_number = get_server_number()
         with enter_session() as session:

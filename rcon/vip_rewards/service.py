@@ -362,6 +362,14 @@ def award_period_start(now, period, timezone_name):
     return start.timestamp()
 
 
+def reward_rule_config(config, rule):
+    kind, separator, rule_id = rule.partition(":")
+    if separator and kind in {"event", "challenge"}:
+        rules = config.events if kind == "event" else config.challenges
+        return next((item for item in rules if item.id == rule_id), None)
+    return getattr(config, rule, None)
+
+
 def deliver(rcon, grant_id):
     with enter_session() as session:
         row = session.get(VipRewardGrant, grant_id)
@@ -384,7 +392,7 @@ def deliver(rcon, grant_id):
                 ):
                     row.status, row.reason = "skipped", "disabled_or_paused"
                     return
-                rule_config = getattr(cfg, row.rule, None)
+                rule_config = reward_rule_config(cfg, row.rule)
                 period = getattr(rule_config, "limit_period", "rolling_day")
                 period_start = award_period_start(now, period, cfg.timezone)
                 old = (
@@ -400,7 +408,9 @@ def deliver(rcon, grant_id):
                 )
                 used = sum(g.credited_seconds for g in old if g.written_at > now - 86400)
                 allowed = budget(row.requested_seconds, used, cfg.daily_hours * 3600)
-                if row.limit and sum(g.rule == row.rule and g.written_at >= period_start for g in old) >= row.limit:
+                configured_limit = getattr(rule_config, "limit", 0)
+                limit = min(row.limit, configured_limit) if row.limit and configured_limit else row.limit or configured_limit
+                if limit and sum(g.rule == row.rule and g.written_at >= period_start for g in old) >= limit:
                     allowed = 0
                     row.reason = "rule_limit"
                 if not allowed:

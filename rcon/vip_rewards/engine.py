@@ -203,7 +203,7 @@ class Engine:
                     )
                     p["events"][event.id] = p["events"].get(event.id, 0) + seconds
                     if seconds and p["events"][event.id] >= event.minutes * 60:
-                        self.claim(pid, "event:" + event.id, event.id, event.hours, now)
+                        self.claim(pid, "event:" + event.id, event.id, event.hours, now, event.limit)
             balance = p.get("balance")
             if balance:
                 if balance.get("switched"):
@@ -395,7 +395,7 @@ class Engine:
                 p["challenges"][key] = p["challenges"].get(key, 0) + 1
                 if p["challenges"][key] >= challenge.kills:
                     self.claim(
-                        pid, "challenge:" + challenge.id, period, challenge.hours, now
+                        pid, "challenge:" + challenge.id, period, challenge.hours, now, challenge.limit
                     )
 
 

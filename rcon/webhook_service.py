@@ -638,7 +638,7 @@ def enqueue_transient_message(
     use `enqueue_message` for messages that should be stored in a queue so they are
     # all (attempted but not guaranteed) to be sent to the remote service (Discord, etc.)
     """
-    logger.debug("Enqueuing %s: %s", message_group_key, message)
+    logger.debug("Enqueuing transient webhook message")
 
     # Allows easier usage for enqueing from different services/sections of CRCON
     if red is None:
@@ -665,7 +665,7 @@ def enqueue_message(
 
     Queues are independently tracked by the webhook ID (Discord snowflake)
     """
-    logger.debug("Enqueuing %s", message)
+    logger.debug("Enqueuing webhook message")
 
     # Allows easier usage for enqueing from different services/sections of CRCON
     if red is None:
@@ -870,9 +870,8 @@ async def dequeue_message(
 
         try:
             message = unpack_message(raw_message=raw_message)
-        except orjson.JSONDecodeError as e:
-            logger.error(f"{raw_message=} {queue_id=} {bucket_data}")
-            logger.exception(e)
+        except orjson.JSONDecodeError:
+            logger.error("Discarding malformed webhook message from queue %s", queue_id)
             return
 
         if _message_age_seconds(message) >= WH_MAX_MESSAGE_AGE_SECS:
@@ -900,7 +899,7 @@ async def dequeue_message(
                 reason="transport_error",
                 red=red,
             )
-            logger.exception("Webhook delivery failed with a transport error")
+            logger.error("Webhook delivery failed with a transport error")
             return
 
         # If a webhook ID is incorrect it will return 401 which we already handle
@@ -944,7 +943,7 @@ async def dequeue_message(
         # e.g. a URL that looks like this https://discord.com/api/webhooks/.../...
         # it will occur
         if res.status_code == 400:
-            logger.error("%s is not a valid webhook URL", wh.url)
+            logger.error("Webhook %s returned HTTP 400; check its configuration", wh.webhook_id)
             move_to_dead_letter(
                 message=message,
                 queue_id=queue_id,
@@ -1056,8 +1055,8 @@ async def dequeue_message(
                 auth_401=True,
             )
             logger.error(
-                "%s does not appear to be a valid webhook (unknown ID); check the URL",
-                wh.url,
+                "Webhook %s was rejected (unknown ID); check its configuration",
+                wh.webhook_id,
             )
             move_to_dead_letter(
                 message=message,
@@ -1073,8 +1072,8 @@ async def dequeue_message(
                 auth_403=True,
             )
             logger.error(
-                "%s does not appear to be a valid webhook (invalid token); check the URL",
-                wh.url,
+                "Webhook %s was rejected (invalid token); check its configuration",
+                wh.webhook_id,
             )
             move_to_dead_letter(
                 message=message,
@@ -1091,7 +1090,8 @@ async def dequeue_message(
             )
         else:
             logger.error(
-                f"Received edit={message.edit} discardable={message.discardable} {res.status_code} for: {wh.json}"
+                "Webhook %s returned HTTP %s (edit=%s, discardable=%s)",
+                wh.webhook_id, res.status_code, message.edit, message.discardable,
             )
 
         set_bucket_data(red=red, bucket=bucket_data, lock=lock)
@@ -1118,8 +1118,8 @@ async def dequeue_message(
                 lock=lock,
             )
             logger.debug("finished with %s", lock)
-        except pydantic.ValidationError as e:
-            logger.exception(e)
+        except pydantic.ValidationError:
+            logger.error("Invalid webhook delivery data")
 
 
 def get_queue_registry_key(prefix: str = PREFIX) -> str:

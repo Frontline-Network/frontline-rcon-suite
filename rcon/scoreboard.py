@@ -127,7 +127,7 @@ def get_set_wh_row(
     res = session.scalars(stmt).one_or_none()
 
     if res is None:
-        logger.warning(f"{server_number=} {webhook_url} not in database, adding it")
+        logger.warning("Scoreboard webhook for server %s not in database, adding it", server_number)
         res = Webhook(url=webhook_url)
         session.add(res)
         session.commit()

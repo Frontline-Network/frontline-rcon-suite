@@ -47,6 +47,18 @@ def _message(message_type=WebhookMessageType.AUDIT):
     )
 
 
+def test_enqueue_logs_do_not_expose_webhook_credentials(caplog):
+    import logging
+    red = Mock()
+    red.pipeline.return_value = Mock()
+    message = _message()
+    with caplog.at_level(logging.DEBUG, logger=webhook_service.__name__):
+        enqueue_message(message, red=red)
+        enqueue_transient_message(message, message_group_key="score", red=red)
+    assert "discord.com/api/webhooks/123/token" not in caplog.text
+    assert "webhook_token" not in caplog.text
+
+
 def test_queue_registry_is_installation_wide():
     assert get_queue_registry_key(prefix="whs") == "whs:queue_registry"
 
