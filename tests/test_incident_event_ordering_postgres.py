@@ -106,3 +106,13 @@ def test_explicit_ids_cannot_bypass_order_and_downgrade_removes_trigger(isolated
         migration.downgrade()
         explicit_id = conn.execute(text("INSERT INTO admin_incident_event(id, label) VALUES (999999, 'after downgrade') RETURNING id")).scalar_one()
         assert explicit_id == 999999
+
+
+def test_upgrade_can_follow_early_trigger_installation(isolated_schema):
+    engine, schema, migration = isolated_schema
+    with engine.begin() as conn:
+        conn.execute(text(f'SET LOCAL search_path TO "{schema}"'))
+        migration.op = SimpleNamespace(get_bind=lambda: conn, execute=lambda sql: conn.execute(text(sql)))
+        migration.upgrade()
+        event_id = conn.execute(text("INSERT INTO admin_incident_event(label) VALUES ('after upgrade') RETURNING id")).scalar_one()
+        assert event_id > 0

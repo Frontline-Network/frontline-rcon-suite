@@ -22,7 +22,7 @@ def upgrade():
     # an older application instance, participates in commit ordering. The
     # original default may consume a sequence value; gaps are harmless.
     op.execute("""
-        CREATE FUNCTION frontline_order_incident_event_id() RETURNS trigger
+        CREATE OR REPLACE FUNCTION frontline_order_incident_event_id() RETURNS trigger
         LANGUAGE plpgsql AS $$
         BEGIN
             PERFORM pg_advisory_xact_lock(1179405892, 365);
@@ -31,6 +31,9 @@ def upgrade():
         END;
         $$
     """)
+    # An installation may have applied the same protection ahead of a rolling
+    # release, while older maintenance containers still expect the old head.
+    op.execute("DROP TRIGGER IF EXISTS frontline_order_incident_event_id ON admin_incident_event")
     op.execute("""
         CREATE TRIGGER frontline_order_incident_event_id
         BEFORE INSERT ON admin_incident_event
