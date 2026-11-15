@@ -36,12 +36,12 @@ def _port_legacy_scorebot_urls():
 
     modified = False
     if config.public_scoreboard_url is None:
-        logger.info(f"Attempting migration of {legacy_config.base_scoreboard_url=}")
+        logger.info("Attempting migration of the legacy scoreboard URL")
         config.public_scoreboard_url = legacy_config.base_scoreboard_url
         modified = True
 
     if not config.hooks:
-        logger.info(f"Attempting migration of {legacy_config.webhook_urls=}")
+        logger.info("Attempting migration of legacy scoreboard webhooks")
         config.hooks = [DiscordWebhook(url=url) for url in legacy_config.webhook_urls]
         modified = True
 

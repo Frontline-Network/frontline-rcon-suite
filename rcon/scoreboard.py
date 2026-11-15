@@ -606,8 +606,11 @@ def run(stop_event=None):
                 return
 
     except Exception as e:
-        logger.exception("The bot stopped: %s", e)
-        raise
+        # Exceptions from webhook and database clients may embed capability URLs
+        # in their text or chained tracebacks. Preserve the error type only.
+        error_type = type(e).__name__
+        logger.error("The scoreboard stopped (%s)", error_type)
+        raise RuntimeError(f"Scoreboard stopped ({error_type})") from None
 
 
 if __name__ == "__main__":

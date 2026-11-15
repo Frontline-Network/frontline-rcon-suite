@@ -40,6 +40,15 @@ NON_IDEMPOTENT_COMMANDS = frozenset({
     "AddMapToRotation", "RemoveMapFromRotation", "AddMapToSequence",
     "RemoveMapFromSequence", "MoveMapInSequence",
 })
+# Only these protocol operations are known to be reads. New or unknown
+# commands must not be replayed automatically after an uncertain response.
+RETRYABLE_READ_COMMANDS = frozenset({
+    "GetAdminGroups", "GetAdminLog", "GetAdminUsers", "GetAutoBalanceEnabled",
+    "GetAutoBalanceThreshold", "GetClientReferenceData", "GetHighPingThreshold",
+    "GetKickIdleDuration", "GetMapShuffleEnabled", "GetPermanentBans",
+    "GetServerInformation", "GetTeamSwitchCooldown", "GetTemporaryBans",
+    "GetVoteKickEnabled", "GetVoteKickThreshold",
+})
 _automatic_retries_disabled = ContextVar(
     "rcon_automatic_retries_disabled", default=False
 )
@@ -127,7 +136,7 @@ class ServerCtl:
 
     def _retry_delay(self, command: str, error: BaseException) -> float | None:
         """Reserve one safe retry, or return ``None`` for terminal failures."""
-        if command in NON_IDEMPOTENT_COMMANDS:
+        if command not in RETRYABLE_READ_COMMANDS:
             logger.warning("RCON command %s failed; not retrying an uncertain action", command)
             return None
         failure = classify_transport_failure(error)

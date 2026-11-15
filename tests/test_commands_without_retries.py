@@ -82,7 +82,7 @@ def test_disabling_retries_does_not_change_other_supervisor_threads(controller):
     connection.exchange.assert_called_once()
 
 
-@pytest.mark.parametrize("command", ["MessagePlayer", "PunishPlayer", "ForceTeamSwitch", "KickPlayer", "AddMapToRotation", "RemoveMapFromRotation", "AddMapToSequence", "RemoveMapFromSequence", "MoveMapInSequence"])
+@pytest.mark.parametrize("command", ["MessagePlayer", "PunishPlayer", "ForceTeamSwitch", "KickPlayer", "AddMapToRotation", "RemoveMapFromRotation", "AddMapToSequence", "RemoveMapFromSequence", "MoveMapInSequence", "ChangeMap", "RemovePermanentBan", "SetWelcomeMessage", "FutureUnknownCommand"])
 @pytest.mark.parametrize("method", ["receive", "receive_optional"])
 def test_side_effect_command_is_not_retried_after_lost_response(command, method):
     api = HLLServerCtl(ServerInfo(host="127.0.0.1", port=12345, password="test"), Mock())
