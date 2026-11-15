@@ -42,6 +42,7 @@ export function makeServer({ environment = "development" } = {}) {
   let seedVipReviewResolved = false;
   let blacklistSyncReviewResolved = false;
   let sessionEventReviewResolved = false;
+  let automodActionReviewResolved = false;
   let demoServerName = "[GER] Frontline Network | #2";
   let demoServerNameConfig = { ip: "127.0.0.1", port: 10011 };
   const disbandAttempts = new Map();
@@ -940,6 +941,20 @@ export function makeServer({ environment = "development" } = {}) {
         const payload = JSON.parse(request.requestBody);
         if (payload.event_us !== "1700000000000000" || !payload.reason || sessionEventReviewResolved) return ok(false);
         sessionEventReviewResolved = true;
+        return ok(true);
+      });
+      this.get("/get_pending_automod_actions", () => {
+        const showFixture = typeof window !== "undefined" &&
+          new URLSearchParams(window.location.search).get("demo_automod_action_review") === "1" &&
+          !automodActionReviewResolved;
+        const globalHold = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("global_hold") === "1";
+        return ok({ results: showFixture ? [{ token: "synthetic-token", player_id: globalHold ? "*" : "fake-console-id",
+          updated_at: "2023-11-14T22:13:20+00:00", actions: [{ rule: "AutoMod_NoLeaderWatch", action: "message" }] }] : [], more: false });
+      });
+      this.post("/review_pending_automod_action", (_schema, request) => {
+        const payload = JSON.parse(request.requestBody);
+        if (payload.token !== "synthetic-token" || !payload.reason || automodActionReviewResolved) return ok(false);
+        automodActionReviewResolved = true;
         return ok(true);
       });
       this.get("/get_vip_rewards_config", () => ok(vipRewards));

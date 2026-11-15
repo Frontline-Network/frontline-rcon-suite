@@ -9,6 +9,7 @@ import { settingsPanelsDe, settingsPanelsEn } from "../src/i18n/locales/settings
 import { seedVipJournalCopy } from "../src/i18n/locales/seed-vip-journal.js";
 import { blacklistSyncReviewCopy } from "../src/i18n/locales/blacklist-sync-review.js";
 import { sessionEventReviewCopy } from "../src/i18n/locales/session-event-review.js";
+import { automodActionReviewCopy } from "../src/i18n/locales/automod-action-review.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const failures = [];
@@ -34,7 +35,9 @@ compare("blacklist synchronization review", blacklistSyncReviewCopy.de, blacklis
 compare("blacklist synchronization review French", blacklistSyncReviewCopy.fr, blacklistSyncReviewCopy.en);
 compare("session event review", sessionEventReviewCopy.de, sessionEventReviewCopy.en);
 compare("session event review French", sessionEventReviewCopy.fr, sessionEventReviewCopy.en);
-const combinedEnglish = { ...en, settingsPanels: settingsPanelsEn, seedVipJournal: seedVipJournalCopy.en, blacklistSyncReview: blacklistSyncReviewCopy.en, sessionEventReview: sessionEventReviewCopy.en };
+compare("automod action review", automodActionReviewCopy.de, automodActionReviewCopy.en);
+compare("automod action review French", automodActionReviewCopy.fr, automodActionReviewCopy.en);
+const combinedEnglish = { ...en, settingsPanels: settingsPanelsEn, seedVipJournal: seedVipJournalCopy.en, blacklistSyncReview: blacklistSyncReviewCopy.en, sessionEventReview: sessionEventReviewCopy.en, automodActionReview: automodActionReviewCopy.en };
 const globalKeys = new Set(Object.keys(flatten(combinedEnglish)));
 const syntaxTrees = new Map();
 const bilingualByDirectory = new Map();

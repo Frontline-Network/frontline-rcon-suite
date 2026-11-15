@@ -28,6 +28,7 @@ import PageHeader from "@/components/shared/PageHeader";
 import { demoPlayerRecords, isFakeMode } from "@/mirage/demo-data";
 import { useStorageState } from "@/hooks/useStorageState";
 import SessionEventReview from "./SessionEventReview";
+import AutomodActionReview from "./AutomodActionReview";
 
 // Create a memoized version of PlayerCard
 const MemoizedPlayerCard = memo(PlayerCard);
@@ -298,6 +299,7 @@ export default function PlayersRecords() {
         subtitle={t("records.players.subtitle")}
       />
       <SessionEventReview />
+      <AutomodActionReview />
       {selectedPlayerIds.size > 0 ? (
         <Stack data-theme-surface="panel"
           component="section"

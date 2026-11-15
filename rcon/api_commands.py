@@ -474,6 +474,14 @@ class RconAPI(Rcon):
         from rcon.session_event_review import list_pending
         return list_pending(int(get_server_number()), limit)
 
+    def get_pending_automod_actions(self, limit: int = 50):
+        from rcon.automods.action_guard import list_pending
+        return list_pending(int(get_server_number()), limit)
+
+    def review_pending_automod_action(self, player_id: str, token: str, reason: str, by: str):
+        from rcon.automods.action_guard import review
+        return review(int(get_server_number()), player_id, token, by, reason) > 0
+
     def resolve_pending_session_event(
         self, player_id: str, event_kind: str, event_us: int,
         decision: str, reason: str, by: str, session_id: int | None = None,

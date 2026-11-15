@@ -14,6 +14,14 @@ from rcon.automods.models import (
 from rcon.connection import HLLCommandError
 
 
+@pytest.fixture(autouse=True)
+def isolate_watch_tests_from_durable_guard(monkeypatch):
+    """These tests cover Redis watches; PostgreSQL guard behavior is tested separately."""
+    monkeypatch.setattr(automod, "get_server_number", lambda: "3")
+    monkeypatch.setattr(automod.action_guard, "reserve", lambda *args: "synthetic-token")
+    monkeypatch.setattr(automod.action_guard, "finish", lambda *args, **kwargs: kwargs["expected"])
+
+
 def test_automod_uses_compact_live_roster_snapshot():
     rcon = Mock()
     rcon.get_team_view.return_value = {"allies": {}, "axis": {}}
