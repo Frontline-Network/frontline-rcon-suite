@@ -3,10 +3,34 @@ import os
 import pytest
 
 os.environ["HLL_MAINTENANCE_CONTAINER"] = "1"
-from rcon.models import PlayerID, PlayerSoldier, PlayerStats, calc_weapon_type_usage
+from rcon.models import Maps, PlayerID, PlayerSoldier, PlayerStats, calc_weapon_type_usage
 from rcon.player_stats import BaseStats
 from rcon.types import PlayerTeamAssociation, PlayerTeamConfidence
 from rcon.maps import Team
+
+
+def test_canadian_weapon_identifies_allied_team():
+    stats = PlayerStats(weapons={"Canadian Sten Mk.II": 5}, death_by_weapons={})
+    assert stats.detect_team()["side"] == Team.ALLIES
+
+
+def test_vietnam_stats_use_the_match_game_catalog():
+    stats = PlayerStats(
+        player=PlayerID(player_id="test-player"),
+        map=Maps(game=2),
+        weapons={"M16A1": 5},
+        death_by_weapons={"M16A1": 2},
+    )
+    assert calc_weapon_type_usage(stats.weapons, game=2) == {"infantry": 5}
+    assert stats.detect_team()["side"] == Team.ALLIES
+    result = stats.to_dict()
+    assert result["kills_by_type"] == {"infantry": 5}
+    assert result["deaths_by_type"] == {"infantry": 2}
+    assert result["team"]["side"] == Team.ALLIES
+
+
+def test_unknown_game_does_not_guess_a_catalog():
+    assert calc_weapon_type_usage({"M1 GARAND": 1}, game=999) == {}
 
 
 class StaticStats(BaseStats):

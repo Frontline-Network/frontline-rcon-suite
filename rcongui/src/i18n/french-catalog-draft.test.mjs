@@ -47,8 +47,8 @@ test("the shipped locale explicitly registers French and lazy panels", () => {
   assert.match(index, /import\(["']\.\/locales\/fr["']\)/);
   assert.match(index, /addResourceBundle\(["']fr["'],\s*["']translation["'],\s*fr/);
   assert.match(index, /initialLanguage\s*===\s*["']fr["']/);
-  assert.match(selector, /await\s+ensureLanguageLoaded\(code\)/);
-  assert.match(highlights, /await\s+ensureLanguageLoaded\(language\)/);
+  assert.match(selector, /selectAppLanguage\(code\)/);
+  assert.match(highlights, /selectAppLanguage\(language\)/);
   assert.match(register, /fr\s*:\s*settingsPanelsFr/);
   assert.match(register, /addResourceBundle\(language,\s*["']translation["'],\s*\{\s*settingsPanels\s*\}/);
   assert.match(selector, /code\s*:\s*["']fr["']/);

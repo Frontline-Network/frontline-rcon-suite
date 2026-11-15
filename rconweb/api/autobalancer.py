@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, time, timedelta, timezone
 
 from django.views.decorators.csrf import csrf_exempt
+from pydantic import ValidationError
 
 from rcon.api_commands import get_rcon_api
 from rcon.autobalancer.history import RoundHistoryRepository
@@ -67,7 +68,10 @@ def get_autobalancer_config(request):
 @permission_required("api.can_change_autobalancer_config", raise_exception=True)
 @require_http_methods(["POST"])
 def validate_autobalancer_config(request):
-    config = AutobalancerUserConfig.model_validate(_get_data(request))
+    try:
+        config = AutobalancerUserConfig.model_validate(_get_data(request))
+    except ValidationError as exc:
+        return _config_validation_error(exc, "validate_autobalancer_config")
     return api_response(
         result=config,
         command="validate_autobalancer_config",
@@ -82,13 +86,25 @@ def validate_autobalancer_config(request):
 @require_http_methods(["POST"])
 def set_autobalancer_config(request):
     data = _get_data(request)
-    config = AutobalancerUserConfig.model_validate(data)
+    try:
+        config = AutobalancerUserConfig.model_validate(data)
+    except ValidationError as exc:
+        return _config_validation_error(exc, "set_autobalancer_config")
     config.save_to_db(config.model_dump(), dry_run=False)
     return api_response(
         result=config,
         command="set_autobalancer_config",
         failed=False,
     )
+
+
+def _config_validation_error(exc, command):
+    errors = exc.errors(include_url=False, include_context=False, include_input=False)
+    message = "; ".join(
+        f"{'.'.join(map(str, item['loc'])) or 'config'}: {item['msg']}"
+        for item in errors
+    )
+    return api_response(command=command, failed=True, error=message, status_code=400)
 
 
 @csrf_exempt

@@ -332,7 +332,7 @@ NO_SIDE_WEAPONS = [
 
 WEAPON_SIDE_MAP = {}
 
-for w in [*US_WEAPONS.keys(), *SOVIET_WEAPONS.keys(), *BRITISH_WEAPONS.keys()]:
+for w in [*US_WEAPONS.keys(), *SOVIET_WEAPONS.keys(), *BRITISH_WEAPONS.keys(), *CA_WEAPONS.keys()]:
     if w in NO_SIDE_WEAPONS:
         continue
     WEAPON_SIDE_MAP[w] = Team.ALLIES

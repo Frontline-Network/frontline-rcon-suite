@@ -53,6 +53,27 @@ def web(monkeypatch):
     return store, repository, call
 
 
+@pytest.mark.parametrize("endpoint", ["validate_autobalancer_config", "set_autobalancer_config"])
+def test_invalid_config_is_a_safe_400_and_is_not_saved(web, monkeypatch, endpoint):
+    from django.test import RequestFactory
+    from api import autobalancer as api
+
+    saved = []
+    monkeypatch.setattr(api.AutobalancerUserConfig, "save_to_db", lambda *a, **kw: saved.append(True))
+    request = RequestFactory().post(
+        f"/api/{endpoint}",
+        data=json.dumps({"skill_gap_soft_limit": 100, "skill_gap_hard_warning": 1}),
+        content_type="application/json",
+    )
+    request.user = SimpleNamespace(username="admin", is_authenticated=True, is_active=True, has_perms=lambda perms: True)
+    response = getattr(api, endpoint)(request)
+    body = json.loads(response.content)
+    assert response.status_code == 400
+    assert body["failed"] is True
+    assert "skill_gap_hard_warning" in body["error"]
+    assert saved == []
+
+
 @pytest.mark.parametrize(
     "state",
     [

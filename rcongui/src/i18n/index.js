@@ -64,6 +64,15 @@ export function ensureLanguageLoaded(language) {
   return frenchCatalogLoad;
 }
 
+let languageSelection = 0;
+export async function selectAppLanguage(language) {
+  const selection = ++languageSelection;
+  await ensureLanguageLoaded(language);
+  if (selection !== languageSelection) return false;
+  await i18n.changeLanguage(language);
+  return selection === languageSelection;
+}
+
 // Wait before mounting when French was saved, avoiding an English flash and
 // ensuring document.lang, the picker locale and the visible text agree.
 export const i18nReady = initialLanguage === "fr"
