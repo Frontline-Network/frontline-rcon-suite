@@ -37,6 +37,8 @@ logger = logging.getLogger(__name__)
 NON_IDEMPOTENT_COMMANDS = frozenset({
     "MessagePlayer", "MessageAllPlayers", "PunishPlayer", "ForceTeamSwitch",
     "KickPlayer", "TemporaryBanPlayer", "PermanentBanPlayer", "AddVip", "RemoveVip",
+    "AddMapToRotation", "RemoveMapFromRotation", "AddMapToSequence",
+    "RemoveMapFromSequence", "MoveMapInSequence",
 })
 _automatic_retries_disabled = ContextVar(
     "rcon_automatic_retries_disabled", default=False

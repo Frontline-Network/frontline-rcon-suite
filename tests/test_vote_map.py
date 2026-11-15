@@ -609,6 +609,18 @@ def test_ensure_next_map_with_empty_selection(votemap):
     next_map = votemap.get_next_map()
     assert next_map in ALL_MAPS
 
+
+def test_rejected_winner_does_not_remove_existing_rotation(votemap, mock_rcon):
+    original = [CAR_WARFARE_DAY, CAR_WARFARE_NIGHT]
+    mock_rcon.get_map_rotation.return_value = {"maps": original.copy()}
+    mock_rcon.get_map_rotation.side_effect = None
+    mock_rcon.add_map_to_rotation.side_effect = RuntimeError("rejected")
+    with patch.object(votemap, "generate_next_map", return_value=UTAH_WARFARE_DAY):
+        with pytest.raises(RuntimeError, match="rejected"):
+            votemap.apply_results()
+    mock_rcon.remove_map_from_rotation.assert_not_called()
+
+
 def test_ensure_selection_when_no_maps_to_select_from(votemap):
     """Excludes last 3 played, HUR is the last played"""
     votemap.set_map_whitelist([HUR_WARFARE_DAY])

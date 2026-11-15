@@ -1465,14 +1465,12 @@ class Rcon(ServerCtl):
                 logger.debug("Map rotation is the same, nothing to do")
                 return
 
-            # Remove all but the first map
-            for _ in range(rotation_size - 1):
-                super().remove_map_from_rotation_at_index(1)
-            # Add all our new maps
-            for i, map_name in enumerate(map_names, 1):
+            # Keep the existing rotation while the replacement is appended.
+            # An invalid new entry must not first erase the old entries.
+            for i, map_name in enumerate(map_names, rotation_size):
                 super().add_map_to_rotation_at_index(map_name, i)
-            # Remove the first map
-            super().remove_map_from_rotation_at_index(0)
+            for _ in range(rotation_size):
+                super().remove_map_from_rotation_at_index(0)
 
     def add_map_to_sequence_at_index(self, map_name: str, map_index: int) -> None:
         sequence = self.get_map_sequence()["maps"]
@@ -1522,9 +1520,7 @@ class Rcon(ServerCtl):
         """Replace the complete sequence with validated, cache-safe operations.
 
         The game protocol offers add/remove/move primitives but no atomic
-        replace.  Validate the complete request before mutating and retain one
-        existing entry while building the replacement so a non-empty server
-        sequence is maintained throughout the operation.
+        replace. Keep the existing sequence until the replacement is appended.
         """
         if not map_names:
             raise HLLCommandFailedError("Empty map sequence")
@@ -1540,16 +1536,10 @@ class Rcon(ServerCtl):
             Rcon.get_map_rotation,
             Rcon.get_next_map,
         ):
-            if not sequence:
-                for index, map_name in enumerate(requested):
-                    super().add_map_to_sequence_at_index(map_name, index)
-                return
-
-            for _ in range(len(sequence) - 1):
-                super().remove_map_from_sequence_at_index(1)
-            for index, map_name in enumerate(requested, start=1):
+            for index, map_name in enumerate(requested, start=len(sequence)):
                 super().add_map_to_sequence_at_index(map_name, index)
-            super().remove_map_from_sequence_at_index(0)
+            for _ in sequence:
+                super().remove_map_from_sequence_at_index(0)
 
     def get_objective_rows(self) -> List[List[str]]:
         return super().get_objective_rows()

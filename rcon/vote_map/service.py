@@ -1079,16 +1079,17 @@ class VoteMap:
 
         current_rotation = self._rcon.get_map_rotation()["maps"]
 
-        while len(current_rotation) > 1:
-            # Make sure only 1 map is in rotation
-            map_ = current_rotation.pop(1)
-            self._rcon.remove_map_from_rotation(map_.id)
-
-        current_next_map = current_rotation[0]
-        if current_next_map != next_map:
-            # Replace the only map left in rotation
+        # Add a missing winner before removing any existing entries. If the
+        # server rejects it, the original rotation remains intact.
+        if next_map not in current_rotation:
             self._rcon.add_map_to_rotation(next_map.id)
-            self._rcon.remove_map_from_rotation(current_next_map.id)
+
+        kept_winner = False
+        for map_ in current_rotation:
+            if map_ == next_map and not kept_winner:
+                kept_winner = True
+                continue
+            self._rcon.remove_map_from_rotation(map_.id)
 
         # Check that it worked
         current_rotation = self._rcon.get_map_rotation()["maps"]

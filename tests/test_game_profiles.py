@@ -796,16 +796,30 @@ def test_map_sequence_replacement_keeps_one_entry_until_the_replacement_is_ready
 
     ctl.set_map_sequence(["new_a", "new_b", "new_c", "new_d", "new_e"])
 
-    remove.assert_has_calls([call(1), call(0)])
+    remove.assert_has_calls([call(0), call(0)])
     add.assert_has_calls(
         [
-            call("new_a", 1),
-            call("new_b", 2),
-            call("new_c", 3),
-            call("new_d", 4),
-            call("new_e", 5),
+            call("new_a", 2),
+            call("new_b", 3),
+            call("new_c", 4),
+            call("new_d", 5),
+            call("new_e", 6),
         ]
     )
+
+
+@pytest.mark.parametrize("kind", ["rotation", "sequence"])
+@pytest.mark.parametrize("ctl_type,game", [(HLLRcon, GameEnum.HLL_WW2), (HLLVRcon, GameEnum.HLL_VIETNAM)])
+def test_map_replacement_does_not_remove_old_entries_if_add_is_rejected(monkeypatch, ctl_type, game, kind):
+    ctl = ctl_type(ServerInfo(game=game))
+    setattr(ctl, f"get_map_{kind}", Mock(return_value={"maps": [SimpleNamespace(id="old_a"), SimpleNamespace(id="old_b")]}))
+    add = Mock(side_effect=[None, HLLCommandFailedError("rejected")])
+    remove = Mock()
+    monkeypatch.setattr(f"rcon.rcon.ServerCtl.add_map_to_{kind}_at_index", add)
+    monkeypatch.setattr(f"rcon.rcon.ServerCtl.remove_map_from_{kind}_at_index", remove)
+    with pytest.raises(HLLCommandFailedError, match="rejected"):
+        getattr(ctl, f"set_map_{kind}")(["new_a", "bad"])
+    remove.assert_not_called()
 
 
 @pytest.mark.parametrize(
