@@ -52,3 +52,13 @@ def test_validation_error_is_a_consistent_400():
     assert status == 400
     assert body["failed"] is True
     assert body["error"]
+
+
+def test_forwarding_exception_does_not_log_sensitive_details(caplog):
+    secret = "https://example.invalid/path?secret=fake-token"
+    with patch.object(views, "forward_command", side_effect=RuntimeError(secret)):
+        status, body = call({"config": {"count": 1}, "forward": True})
+    assert status == 200
+    assert body["forward_results"]
+    assert "Unexpected forwarding error" in caplog.text
+    assert secret not in caplog.text

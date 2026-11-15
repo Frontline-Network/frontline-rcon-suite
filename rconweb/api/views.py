@@ -372,7 +372,7 @@ def expose_api_endpoint(
                     json=data,
                 )
             except Exception as e:
-                logger.exception("Unexpected error while forwarding request: %s", e)
+                logger.warning("Unexpected forwarding error (%s)", type(e).__name__)
                 others = forwarding_unavailable_results(
                     data.get("forward_server_numbers")
                 )
@@ -386,7 +386,7 @@ def expose_api_endpoint(
                     json=data,
                 )
             except Exception as e:
-                logger.exception("Unexpected error while forwarding request: %s", e)
+                logger.warning("Unexpected forwarding error (%s)", type(e).__name__)
                 others = forwarding_unavailable_results(
                     data.get("forward_server_numbers")
                 )
