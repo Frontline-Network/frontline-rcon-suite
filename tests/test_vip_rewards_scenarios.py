@@ -17,7 +17,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import sessionmaker
 
-from rcon.models import VipRewardEvent, VipRewardGrant, VipRewardState
+from rcon.models import SeedVipGrant, VipRewardEvent, VipRewardGrant, VipRewardState
 from rcon.user_config.autobalancer import AutobalancerUserConfig
 from rcon.user_config.seed_vip import SeedVIPUserConfig
 from rcon.user_config.vip_rewards import VipRewardsUserConfig
@@ -102,7 +102,7 @@ def world(request, monkeypatch, tmp_path):
     monkeypatch.setattr(socket.socket, "connect", deny_network)
     monkeypatch.setenv("SERVER_NUMBER", "99")
     db = create_engine("sqlite:///" + (tmp_path / "vip-simulation.sqlite").as_posix())
-    for model in (VipRewardEvent, VipRewardGrant, VipRewardState):
+    for model in (VipRewardEvent, VipRewardGrant, VipRewardState, SeedVipGrant):
         model.__table__.create(db)
     sessions = sessionmaker(db)
 

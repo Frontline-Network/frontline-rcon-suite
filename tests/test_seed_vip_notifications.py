@@ -182,13 +182,36 @@ class NoticeTests(unittest.TestCase):
         self.api.message_player.assert_not_called()
 
     def run_service(self, configs, snapshots):
+        from sqlalchemy import create_engine
+        from sqlalchemy.dialects.postgresql import JSONB
+        from sqlalchemy.ext.compiler import compiles
+        from sqlalchemy.orm import sessionmaker
+        from rcon.models import SeedVipCycle, SeedVipGrant, VipRewardGrant
+
+        @compiles(JSONB, 'sqlite')
+        def sqlite_json(_type, _compiler, **_kwargs):
+            return 'JSON'
+
+        db = create_engine('sqlite://')
+        for model in (SeedVipCycle, SeedVipGrant, VipRewardGrant):
+            model.__table__.create(db)
+        self.addCleanup(db.dispose)
+        maker = sessionmaker(db)
+        remote = {}
+        def add_vip(**kwargs):
+            remote[kwargs['player_id']] = dict(name=kwargs['description'], vip_expiration=kwargs['expiration'])
+            return True
+        self.api.add_vip.side_effect = add_vip
         with patch.object(service.SeedVIPUserConfig, 'load_from_db', side_effect=configs), \
              patch.object(service, 'get_rcon_api', return_value=self.api), \
              patch.object(service, 'NotificationOutbox', return_value=self.queue), \
              patch.object(service, 'get_server_snapshot', side_effect=snapshots), \
              patch.object(service, 'get_vips', return_value={}), \
-             patch('rcon.vip_rewards.locking.vip_lock', side_effect=lambda _player_id: nullcontext()), \
-             patch('rcon.vip_rewards.service.current_vip', return_value=None), \
+             patch.object(service, 'get_server_number', return_value='1'), \
+             patch('rcon.utils.get_server_number', return_value='1'), \
+             patch.object(service.journal, 'get_session_maker', return_value=maker), \
+             patch.object(service.journal, 'vip_lock', side_effect=lambda _player_id: nullcontext()), \
+             patch.object(service.journal, 'current_vip', side_effect=lambda _rcon, pid: remote.get(pid)), \
              patch.object(service, 'wait', side_effect=lambda _event, seconds: setattr(self, 'clock', self.clock + seconds) or False):
             service.run()
 

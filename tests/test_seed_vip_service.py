@@ -27,6 +27,7 @@ def test_seed_service_error_does_not_leak_exception_details(monkeypatch, caplog)
     monkeypatch.setattr(service.SeedVIPUserConfig, "load_from_db", Mock(side_effect=[config, RuntimeError(secret)]))
     monkeypatch.setattr(service, "get_rcon_api", Mock())
     monkeypatch.setattr(service, "NotificationOutbox", Mock())
+    monkeypatch.setattr(service, "get_server_number", Mock(return_value="1"))
     with pytest.raises(RuntimeError) as error:
         service.run()
     assert secret not in str(error.value)

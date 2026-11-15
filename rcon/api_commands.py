@@ -91,7 +91,7 @@ from rcon.user_config.webhooks import (
     KillsWebhooksUserConfig,
     WatchlistWebhooksUserConfig,
 )
-from rcon.utils import MISSING
+from rcon.utils import MISSING, get_server_number
 from rcon.vote_map import VoteMap
 from rcon.watchlist import PlayerWatch
 
@@ -1350,6 +1350,14 @@ class RconAPI(Rcon):
         self,
     ) -> SeedVIPUserConfig:
         return SeedVIPUserConfig.load_from_db()
+
+    def get_seed_vip_journal(self, offset=0, limit=50, status=None):
+        from rcon.seed_vip.journal import list_grants
+        return list_grants(int(get_server_number()), offset, limit, status)
+
+    def acknowledge_seed_vip_review(self, grant_id: int, by: str):
+        from rcon.seed_vip.journal import acknowledge_review
+        return acknowledge_review(int(get_server_number()), grant_id, by)
 
     def validate_seed_vip_config(
         self,

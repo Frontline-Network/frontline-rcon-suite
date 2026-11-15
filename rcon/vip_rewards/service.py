@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.dialects.postgresql import insert
 
-from rcon.models import VipRewardEvent, VipRewardGrant, VipRewardState, enter_session
+from rcon.models import SeedVipGrant, VipRewardEvent, VipRewardGrant, VipRewardState, enter_session
 from rcon.service_runtime import stopping, wait
 from rcon.user_config.seed_vip import SeedVIPUserConfig
 from rcon.user_config.vip_rewards import VipRewardsUserConfig
@@ -427,10 +427,25 @@ def deliver(rcon, grant_id):
                         VipRewardGrant.server_number == server(),
                         VipRewardGrant.player_id == pid,
                         VipRewardGrant.preview == row.preview,
-                        VipRewardGrant.status == "review",
+                        VipRewardGrant.status.in_(["prepared", "review"]),
                     )
                     .first()
                 )
+                unresolved_seed = (
+                    session.query(SeedVipGrant.id)
+                    .filter(
+                        SeedVipGrant.server_number == server(),
+                        SeedVipGrant.player_id == pid,
+                        SeedVipGrant.preview == row.preview,
+                        SeedVipGrant.status.in_(["prepared", "review"]),
+                    )
+                    .first()
+                )
+                if unresolved_seed:
+                    # Nothing was sent for this grant. Retry after the seed
+                    # write is reviewed rather than discarding the reward.
+                    row.reason = "previous_seed_write_needs_review"
+                    return
                 if unresolved:
                     row.status, row.reason = "skipped", "previous_write_needs_review"
                     return

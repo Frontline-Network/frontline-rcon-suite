@@ -270,7 +270,7 @@ def delivery(monkeypatch):
     from sqlalchemy.orm import sessionmaker
     from sqlalchemy.ext.compiler import compiles
     from sqlalchemy.dialects.postgresql import JSONB
-    from rcon.models import VipRewardGrant, VipRewardState, VipRewardEvent
+    from rcon.models import SeedVipGrant, VipRewardGrant, VipRewardState, VipRewardEvent
     from rcon.vip_rewards import service
 
     @compiles(JSONB, "sqlite")
@@ -280,6 +280,7 @@ def delivery(monkeypatch):
     db = create_engine("sqlite://")
     for table in (
         VipRewardGrant.__table__,
+        SeedVipGrant.__table__,
         VipRewardState.__table__,
         VipRewardEvent.__table__,
     ):
@@ -348,6 +349,32 @@ def delivery(monkeypatch):
 
     yield service, cfg, rcon, remote, add, read_row
     db.dispose()
+
+
+def test_unresolved_seed_grant_blocks_other_vip_write(delivery):
+    from datetime import datetime, timezone
+    from rcon.models import SeedVipGrant
+
+    service, cfg, rcon, remote, add, read = delivery
+    grant_id = add()
+    with service.enter_session() as session:
+        seed_grant = SeedVipGrant(server_number=1, preview=False, generation=1,
+                                  player_id="a", player_name="Fake", status="review",
+                                  reward_seconds=3600, cumulative=True,
+                                  reward_time=datetime.now(timezone.utc),
+                                  updated_at=datetime.now(timezone.utc))
+        session.add(seed_grant)
+        session.flush()
+        seed_id = seed_grant.id
+    service.deliver(rcon, grant_id)
+    assert read(grant_id)["reason"] == "previous_seed_write_needs_review"
+    assert read(grant_id)["status"] == "queued"
+    rcon.add_vip.assert_not_called()
+    with service.enter_session() as session:
+        session.get(SeedVipGrant, seed_id).status = "reviewed"
+    service.deliver(rcon, grant_id)
+    assert read(grant_id)["status"] == "awarded"
+    rcon.add_vip.assert_called_once()
 
 
 def test_delivery_exactly_once_and_preserves_description(delivery):

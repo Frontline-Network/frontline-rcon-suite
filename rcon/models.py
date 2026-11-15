@@ -209,6 +209,48 @@ class VipRewardGrant(Base):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 
+class SeedVipCycle(Base):
+    """Persistent observation state for one server and execution mode."""
+
+    __tablename__ = "seed_vip_cycle"
+    server_number: Mapped[int] = mapped_column(primary_key=True)
+    preview: Mapped[bool] = mapped_column(primary_key=True)
+    generation: Mapped[int] = mapped_column(nullable=False, default=0)
+    phase: Mapped[str] = mapped_column(String(16), nullable=False)
+    eligible: Mapped[dict[str, str]] = mapped_column(JSONB, nullable=False, default=dict)
+    seeded_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
+    __table_args__ = (
+        CheckConstraint("phase IN ('uninitialized', 'seeding', 'seeded')", name="ck_seed_vip_cycle_phase"),
+        CheckConstraint("generation >= 0", name="ck_seed_vip_cycle_generation"),
+    )
+
+
+class SeedVipGrant(Base):
+    """One durable, independently recoverable seed reward."""
+
+    __tablename__ = "seed_vip_grant"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    server_number: Mapped[int] = mapped_column(nullable=False, index=True)
+    preview: Mapped[bool] = mapped_column(nullable=False)
+    generation: Mapped[int] = mapped_column(nullable=False)
+    player_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    player_name: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    reward_seconds: Mapped[float] = mapped_column(nullable=False)
+    cumulative: Mapped[bool] = mapped_column(nullable=False)
+    reward_time: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
+    target: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
+    __table_args__ = (
+        UniqueConstraint("server_number", "preview", "generation", "player_id", name="uq_seed_vip_grant_cycle_player"),
+        CheckConstraint("status IN ('queued', 'prepared', 'confirmed', 'rejected', 'skipped', 'review', 'reviewed', 'preview')", name="ck_seed_vip_grant_status"),
+        CheckConstraint("reward_seconds >= 0", name="ck_seed_vip_grant_reward_seconds"),
+    )
+
+
 class PlayerID(Base):
     __tablename__ = "steam_id_64"
     id: Mapped[int] = mapped_column(primary_key=True)

@@ -31,6 +31,7 @@ import RedeemOutlinedIcon from "@mui/icons-material/RedeemOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import { useTranslation } from "react-i18next";
 import StableNumberField from "./StableNumberField";
+import SeedVipJournal from "./SeedVipJournal";
 
 const ROOT = "settings.configForms.seedVip.workbench";
 
@@ -1071,6 +1072,7 @@ export default function SeedVipConfigForm({
       data-section={activeSection}
     >
       {content}
+      {activeSection === "reward" && <SeedVipJournal />}
     </Stack>
   );
 }

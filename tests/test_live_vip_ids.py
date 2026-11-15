@@ -105,6 +105,41 @@ def test_vip_endpoint_registration(name):
     assert views.RCON_ENDPOINT_HTTP_METHODS[method] == ["GET"]
 
 
+@pytest.mark.parametrize("name,permission,method", [
+    ("get_seed_vip_journal", "api.can_view_vip_ids", "GET"),
+    ("acknowledge_seed_vip_review", "api.can_add_vip", "POST"),
+])
+def test_seed_vip_journal_endpoint_registration(name, permission, method):
+    endpoint = getattr(views.rcon_api, name)
+    assert views.ENDPOINT_PERMISSIONS[endpoint] == permission
+    assert views.RCON_ENDPOINT_HTTP_METHODS[endpoint] == [method]
+
+
+@pytest.mark.parametrize("name,request_method,allowed,expected", [
+    ("get_seed_vip_journal", "get", False, 403),
+    ("get_seed_vip_journal", "post", True, 405),
+    ("acknowledge_seed_vip_review", "post", False, 403),
+    ("acknowledge_seed_vip_review", "get", True, 405),
+])
+def test_seed_vip_journal_enforces_permission_and_method(name, request_method, allowed, expected):
+    endpoint = getattr(views.rcon_api, name)
+    with (
+        mock.patch.dict(decorators.ENDPOINT_HTTP_METHODS, {}, clear=True),
+        mock.patch.dict(decorators.ENDPOINT_PERMISSIONS_LOOKUP, {}, clear=True),
+    ):
+        callback = views.expose_api_endpoint(
+            func=endpoint, command_name=name, permissions=views.ENDPOINT_PERMISSIONS[endpoint],
+            endpoint_allowed_http_methods=views.RCON_ENDPOINT_HTTP_METHODS,
+        )
+    if request_method == "post":
+        request = RequestFactory().post(f"/api/{name}", data='{"grant_id": 1}', content_type="application/json")
+    else:
+        request = RequestFactory().get(f"/api/{name}")
+    request.user = SimpleNamespace(is_authenticated=True, username="tester", has_perms=lambda _: allowed)
+    with mock.patch.object(auth, "check_api_key"), mock.patch("api.audit_log.enter_session"):
+        assert callback(request).status_code == expected
+
+
 @pytest.mark.parametrize(
     "method,allowed,status", [("get", False, 403), ("post", True, 405)]
 )

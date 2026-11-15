@@ -1,17 +1,19 @@
 import sys
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from logging import getLogger
 import humanize
 
 import discord
 from rcon.api_commands import get_rcon_api
+from rcon.seed_vip import journal
 from rcon.seed_vip.notifications import RETRY_SECONDS, NotificationOutbox
 from rcon.service_runtime import stopping, wait
 from rcon.seed_vip.utils import (
     calc_vip_expiration_timestamp,
     collect_steam_ids,
     filter_indefinite_vip_steam_ids,
+    format_vip_reward_name,
     get_gamestate,
     get_next_player_bucket,
     get_online_players,
@@ -19,9 +21,9 @@ from rcon.seed_vip.utils import (
     is_seeded,
     make_seed_announcement_embed,
     message_players,
-    reward_players,
 )
 from rcon.user_config.seed_vip import SeedVIPUserConfig
+from rcon.utils import get_server_number
 
 logger = getLogger(__name__)
 
@@ -55,6 +57,29 @@ def get_server_snapshot(rcon_api):
     return online_players, gamestate
 
 
+def recover_rewards(rcon_api, config, outbox, server_number):
+    """Resume each durable grant independently, without replaying uncertain writes."""
+    try:
+        grant_ids = journal.pending(server_number)
+    except Exception as exc:
+        logger.error("Unable to load Seed VIP grants (%s)", type(exc).__name__)
+        return
+    for grant_id in grant_ids:
+        try:
+            result = journal.deliver(rcon_api, server_number=server_number, grant_id=grant_id)
+            if result == "confirmed":
+                player_id, target, _ = journal.grant_info(server_number, grant_id)
+                message_players(rcon=rcon_api, config=config,
+                                message=config.player_messages.reward_player_message,
+                                steam_ids={player_id}, expiration_timestamps={player_id: target},
+                                outbox=outbox)
+            elif result in {"review", "rejected"}:
+                logger.warning("Seed VIP grant %s requires attention: %s", grant_id, result)
+        except Exception as exc:
+            # A prepared grant will be reconciled read-only on the next poll.
+            logger.warning("Seed VIP grant %s deferred (%s)", grant_id, type(exc).__name__)
+
+
 def run(stop_event=None):
     try:
         config = SeedVIPUserConfig.load_from_db()
@@ -64,10 +89,8 @@ def run(stop_event=None):
 
     rcon_api = get_rcon_api()
     outbox = NotificationOutbox()
+    server_number = int(get_server_number())
 
-    to_add_vip_steam_ids: set[str] = set()
-    no_reward_steam_ids: set[str] = set()
-    player_name_lookup: dict[str, str] = {}
     prev_announced_bucket: int = 0
     player_buckets = config.player_announce_thresholds
     if player_buckets:
@@ -75,9 +98,6 @@ def run(stop_event=None):
     else:
         next_player_bucket = None
     last_bucket_announced = False
-    seeded_timestamp: datetime | None = None
-
-    is_seeding: bool | None = None
     disabled_logged = False
 
     try:
@@ -102,6 +122,8 @@ def run(stop_event=None):
                 pending_notices = False
             else:
                 pending_notices = outbox.flush(rcon_api)
+                recover_rewards(rcon_api, config, outbox, server_number)
+                pending_notices = outbox.flush(rcon_api) or pending_notices
 
             try:
                 if current_lang != config.language:
@@ -127,81 +149,73 @@ def run(stop_event=None):
                 continue
 
             online_players, gamestate = snapshot
-            if is_seeding is None:
-                is_seeding = not is_seeded(config=config, gamestate=gamestate)
-
             total_players = (
                 gamestate["num_allied_players"] + gamestate["num_axis_players"]
             )
-
-            player_name_lookup |= {
-                p.player_id: p.name for p in online_players.players.values()
-            }
-
-            logger.debug(
-                f"{is_seeding=} {len(online_players.players.keys())} online players (`get_players`), {gamestate["num_allied_players"]} allied {gamestate["num_axis_players"]} axis players (gamestate)",
-            )
-            to_add_vip_steam_ids = collect_steam_ids(
+            eligible_ids = collect_steam_ids(
                 config=config,
                 players=online_players,
-                cum_steam_ids=to_add_vip_steam_ids,
+                cum_steam_ids=set(),
             )
+            eligible = {
+                p.player_id: p.name for p in online_players.players.values()
+                if p.player_id in eligible_ids
+            }
+            try:
+                observation = journal.observe(
+                    server_number=server_number,
+                    preview=config.dry_run,
+                    seeded=is_seeded(config=config, gamestate=gamestate),
+                    player_count=total_players,
+                    eligible=eligible,
+                    online_when_seeded=config.requirements.online_when_seeded,
+                    buffer=config.requirements.buffer.as_timedelta,
+                    reward_seconds=config.reward.timeframe.as_timedelta.total_seconds(),
+                    cumulative=config.reward.cumulative,
+                    reward_name=lambda name: format_vip_reward_name(
+                        name, config.reward.player_name_format_not_current_vip
+                    ),
+                    now=datetime.now(timezone.utc),
+                )
+            except Exception as exc:
+                # Never grant VIP when the observation was not durably recorded.
+                logger.error("Unable to journal Seed VIP observation (%s)", type(exc).__name__)
+                if wait(stop_event, config.poll_time_seeding):
+                    return
+                continue
+            is_seeding = observation.phase == "seeding"
 
             # Server seeded
-            if is_seeding and is_seeded(config=config, gamestate=gamestate):
-                seeded_timestamp = datetime.now(tz=timezone.utc)
+            if observation.completed:
+                seeded_timestamp = observation.seeded_at
                 logger.info(f"Server seeded at {seeded_timestamp.isoformat()}")
-                # Use the full VIP list for logic so offline VIPs are respected
-                all_vips = get_vips(rcon=rcon_api)
-
-                # no vip reward needed for indefinite vip holders (using full list)
-                indefinite_vip_steam_ids = filter_indefinite_vip_steam_ids(all_vips)
-                to_add_vip_steam_ids -= indefinite_vip_steam_ids
+                try:
+                    all_vips = get_vips(rcon=rcon_api)
+                    indefinite_vip_steam_ids = filter_indefinite_vip_steam_ids(all_vips)
+                except Exception as exc:
+                    logger.warning("Unable to read Seed VIP recipients (%s)", type(exc).__name__)
+                    all_vips = {}
+                    indefinite_vip_steam_ids = set()
 
                 # Players who were online when we seeded but didn't meet the criteria for VIP
                 no_reward_steam_ids = {
                     p.player_id for p in online_players.players.values()
-                } - to_add_vip_steam_ids
+                } - (observation.recipients - indefinite_vip_steam_ids)
 
-                expiration_timestamps = defaultdict(
-                    lambda: calc_vip_expiration_timestamp(
-                        config=config,
-                        expiration=None,
-                        from_time=seeded_timestamp or datetime.now(tz=timezone.utc),
+                if config.dry_run:
+                    expiration_timestamps = defaultdict(
+                        lambda: calc_vip_expiration_timestamp(config, None, seeded_timestamp)
                     )
-                )
-                for player in all_vips.values():
-                    expiration_timestamps[player.player.player_id] = (
-                        calc_vip_expiration_timestamp(
-                            config=config,
-                            expiration=player.expiration_date if player else None,
-                            from_time=seeded_timestamp,
+                    for player in all_vips.values():
+                        expiration_timestamps[player.player.player_id] = calc_vip_expiration_timestamp(
+                            config, player.expiration_date, seeded_timestamp
                         )
-                    )
-
-                # Add or update VIP in CRCON using full VIP map
-                rewarded_ids = reward_players(
-                    rcon=rcon_api,
-                    config=config,
-                    to_add_vip_steam_ids=to_add_vip_steam_ids,
-                    current_vips=all_vips,
-                    players_lookup=player_name_lookup,
-                    expiration_timestamps=expiration_timestamps,
-                    reward_time=seeded_timestamp,
-                )
-
-                # Rewards are complete; notification retries never grant VIP.
-                is_seeding = False
-
-                # Message those who earned VIP
-                message_players(
-                    rcon=rcon_api,
-                    config=config,
-                    message=config.player_messages.reward_player_message,
-                    steam_ids=rewarded_ids,
-                    expiration_timestamps=expiration_timestamps,
-                    outbox=outbox,
-                )
+                    message_players(rcon=rcon_api, config=config,
+                                    message=config.player_messages.reward_player_message,
+                                    steam_ids=observation.recipients - indefinite_vip_steam_ids,
+                                    expiration_timestamps=expiration_timestamps, outbox=outbox)
+                else:
+                    recover_rewards(rcon_api, config, outbox, server_number)
 
                 # Message those who did not earn
                 message_players(
@@ -234,31 +248,6 @@ def run(stop_event=None):
                 # Reset for next seed
                 last_bucket_announced = False
                 prev_announced_bucket = 0
-                to_add_vip_steam_ids.clear()
-                is_seeding = False
-            elif (
-                not is_seeding
-                and not is_seeded(config=config, gamestate=gamestate)
-                and total_players > 0
-            ):
-                delta: timedelta | None = None
-                if seeded_timestamp:
-                    delta = datetime.now(tz=timezone.utc) - seeded_timestamp
-
-                if not seeded_timestamp:
-                    logger.debug(
-                        f"Back in seeding: seeded_timestamp={seeded_timestamp} {delta=} {config.requirements.buffer=}"
-                    )
-                    is_seeding = True
-                elif delta and (delta > config.requirements.buffer.as_timedelta):
-                    logger.debug(
-                        f"Back in seeding: seeded_timestamp={seeded_timestamp.isoformat()} {delta=} delta > buffer {delta > config.requirements.buffer.as_timedelta} {config.requirements.buffer=}"
-                    )
-                    is_seeding = True
-                else:
-                    logger.info(
-                        f"Delaying seeding mode due to buffer of {config.requirements.buffer} > {delta} time since seeded"
-                    )
 
             if is_seeding:
                 sleep_time = config.poll_time_seeding

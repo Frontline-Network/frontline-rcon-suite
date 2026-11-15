@@ -39,6 +39,7 @@ import {
 export function makeServer({ environment = "development" } = {}) {
   let gameState = createGameState();
   let vipRewards = structuredClone(vipRewardDefaults);
+  let seedVipReviewResolved = false;
   let demoServerName = "[GER] Frontline Network | #2";
   let demoServerNameConfig = { ip: "127.0.0.1", port: 10011 };
   const disbandAttempts = new Map();
@@ -895,6 +896,19 @@ export function makeServer({ environment = "development" } = {}) {
       this.get("/get_name_kick_config", () => ok(autoMod(true)));
       this.get("/get_vac_game_bans_config", () => ok(autoMod(true)));
       this.get("/get_seed_vip_config", () => ok(autoMod(true)));
+      this.get("/get_seed_vip_journal", () => {
+        const showFixture = typeof window !== "undefined" &&
+          new URLSearchParams(window.location.search).get("demo_seed_review") === "1" &&
+          !seedVipReviewResolved;
+        const results = showFixture ? [{ id: 1, player_id: "fake-console-id", player_name: "Example Player", status: "review", target: "2026-01-02T12:00:00Z" }] : [];
+        return ok({ total: results.length, offset: 0, results });
+      });
+      this.post("/acknowledge_seed_vip_review", (_schema, request) => {
+        const { grant_id } = JSON.parse(request.requestBody);
+        if (grant_id !== 1 || seedVipReviewResolved) return ok(false);
+        seedVipReviewResolved = true;
+        return ok(true);
+      });
       this.get("/get_vip_rewards_config", () => ok(vipRewards));
       this.post("/validate_vip_rewards_config", () => ok(true));
       this.post("/set_vip_rewards_config", (schema, request) => {

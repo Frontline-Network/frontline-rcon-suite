@@ -6,6 +6,7 @@ import { parse } from "@babel/parser";
 import en from "../src/i18n/locales/en.js";
 import de from "../src/i18n/locales/de.js";
 import { settingsPanelsDe, settingsPanelsEn } from "../src/i18n/locales/settings-panels.js";
+import { seedVipJournalCopy } from "../src/i18n/locales/seed-vip-journal.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const failures = [];
@@ -25,7 +26,9 @@ function compare(label, german, english) {
 }
 compare("main catalogs", de, en);
 compare("lazy settings catalogs", settingsPanelsDe, settingsPanelsEn);
-const combinedEnglish = { ...en, settingsPanels: settingsPanelsEn };
+compare("seed VIP journal", seedVipJournalCopy.de, seedVipJournalCopy.en);
+compare("seed VIP journal French", seedVipJournalCopy.fr, seedVipJournalCopy.en);
+const combinedEnglish = { ...en, settingsPanels: settingsPanelsEn, seedVipJournal: seedVipJournalCopy.en };
 const globalKeys = new Set(Object.keys(flatten(combinedEnglish)));
 const syntaxTrees = new Map();
 const bilingualByDirectory = new Map();
