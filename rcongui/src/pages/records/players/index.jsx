@@ -27,6 +27,7 @@ import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/shared/PageHeader";
 import { demoPlayerRecords, isFakeMode } from "@/mirage/demo-data";
 import { useStorageState } from "@/hooks/useStorageState";
+import SessionEventReview from "./SessionEventReview";
 
 // Create a memoized version of PlayerCard
 const MemoizedPlayerCard = memo(PlayerCard);
@@ -296,6 +297,7 @@ export default function PlayersRecords() {
         title={t("records.players.title")}
         subtitle={t("records.players.subtitle")}
       />
+      <SessionEventReview />
       {selectedPlayerIds.size > 0 ? (
         <Stack data-theme-surface="panel"
           component="section"

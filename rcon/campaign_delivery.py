@@ -159,7 +159,16 @@ def _active_sessions(
                 {
                     "player_db_id": player.id,
                     "session_id": player_session.id,
-                    "start": player_session.start or player_session.created,
+                    # Campaign timestamps are stored as naive UTC.  The old
+                    # wall-clock column can cross a DST change, so prefer the
+                    # absolute connect instant where it is available.
+                    "start": (
+                        datetime.fromtimestamp(
+                            player_session.start_event_us / 1_000_000, timezone.utc
+                        ).replace(tzinfo=None)
+                        if player_session.start_event_us is not None
+                        else player_session.start or player_session.created
+                    ),
                 },
             )
         return result

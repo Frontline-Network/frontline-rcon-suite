@@ -470,6 +470,24 @@ class RconAPI(Rcon):
         # TODO: allow clearing specific cache keys
         return RedisCached.clear_all_caches(get_redis_pool())
 
+    def get_pending_session_events(self, limit: int = 50):
+        from rcon.session_event_review import list_pending
+        return list_pending(int(get_server_number()), limit)
+
+    def resolve_pending_session_event(
+        self, player_id: str, event_kind: str, event_us: int,
+        decision: str, reason: str, by: str, session_id: int | None = None,
+        fingerprint: str | None = None,
+    ):
+        from rcon.session_event_review import discard_unidentified, resolve
+        if event_kind == "unidentified":
+            if decision != "discard" or not fingerprint:
+                raise ValueError("Only discarding an unidentified event is supported")
+            return discard_unidentified(int(get_server_number()), fingerprint, reason, by)
+        config = RconServerSettingsUserConfig.load_from_db()
+        return resolve(int(get_server_number()), player_id, event_kind, event_us,
+                       decision, reason, by, session_id, server_name=config.short_name)
+
     def get_player_profile(
         self,
         player_id: str,

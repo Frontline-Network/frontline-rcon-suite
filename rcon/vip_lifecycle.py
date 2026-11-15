@@ -388,7 +388,13 @@ def _active_sessions(
                 {
                     "player_db_id": player.id,
                     "session_id": player_session.id,
-                    "start": player_session.start or player_session.created,
+                    "start": (
+                        datetime.fromtimestamp(
+                            player_session.start_event_us / 1_000_000, timezone.utc
+                        )
+                        if player_session.start_event_us is not None
+                        else player_session.start or player_session.created
+                    ),
                 },
             )
         return result

@@ -12,6 +12,7 @@ import pydantic
 from sqlalchemy import (
     JSON,
     TIMESTAMP,
+    BigInteger,
     CheckConstraint,
     Engine,
     Enum,
@@ -327,7 +328,11 @@ class PlayerID(Base):
         total = 0
 
         for i, s in enumerate(self.sessions):
-            if not s.end and s.start and i == 0:
+            if s.start_event_us is not None and s.end_event_us is not None:
+                total += max(0, (s.end_event_us - s.start_event_us) / 1_000_000)
+            elif s.start_event_us is not None and s.end is None and i == 0:
+                total += max(0, datetime.now(timezone.utc).timestamp() - s.start_event_us / 1_000_000)
+            elif not s.end and s.start and i == 0:
                 total += (datetime.now() - s.start).total_seconds()
             elif s.end and s.start:
                 total += (s.end - s.start).total_seconds()
@@ -338,6 +343,8 @@ class PlayerID(Base):
         if self.sessions:
             if self.sessions[0].end:
                 return 0
+            if self.sessions[0].start_event_us is not None:
+                return max(0, int(datetime.now(timezone.utc).timestamp() - self.sessions[0].start_event_us / 1_000_000))
             start = self.sessions[0].start or self.sessions[0].created
             return int((datetime.now() - start).total_seconds())
         return 0
@@ -772,6 +779,59 @@ class PlayerName(Base):
         }
 
 
+class UnidentifiedSessionEvent(Base):
+    """An identity-free log event retained for server-scoped review."""
+
+    __tablename__ = "unidentified_session_event"
+    fingerprint: Mapped[str] = mapped_column(String(64), primary_key=True)
+    server_number: Mapped[int] = mapped_column(nullable=False, index=True)
+    event_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    event_us: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    player_name: Mapped[str] = mapped_column(Text, nullable=False)
+    raw: Mapped[str] = mapped_column(Text, nullable=False)
+    resolved_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    resolved_by: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    resolution_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class SessionEventResolution(Base):
+    """Audit of an operator decision on an ambiguous session event."""
+
+    __tablename__ = "session_event_resolution"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    server_number: Mapped[int] = mapped_column(nullable=False, index=True)
+    player_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    event_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    event_us: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    decision: Mapped[str] = mapped_column(String(16), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    session_id: Mapped[int | None] = mapped_column(nullable=True)
+    actor: Mapped[str] = mapped_column(String(150), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
+
+
+class PendingPlayerConnect(Base):
+    """An event that cannot safely be distinguished from a legacy session."""
+
+    __tablename__ = "pending_player_connect"
+    server_number: Mapped[int] = mapped_column(primary_key=True)
+    player_id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    started_event_us: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    started_at: Mapped[datetime] = mapped_column(TIMESTAMP, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP, nullable=False, default=datetime.utcnow)
+
+
+class PendingPlayerDisconnect(Base):
+    """A disconnect whose matching connect has not been recorded yet."""
+
+    __tablename__ = "pending_player_disconnect"
+    server_number: Mapped[int] = mapped_column(primary_key=True)
+    player_id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    ended_event_us: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    ended_at: Mapped[datetime] = mapped_column(TIMESTAMP, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP, nullable=False, default=datetime.utcnow)
+
+
 class PlayerSession(Base):
     __tablename__ = "player_sessions"
 
@@ -781,6 +841,8 @@ class PlayerSession(Base):
     )
     start: Mapped[datetime] = mapped_column()
     end: Mapped[datetime] = mapped_column()
+    start_event_us: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    end_event_us: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     created: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     server_number: Mapped[int] = mapped_column()
     server_name: Mapped[str] = mapped_column()
@@ -791,8 +853,10 @@ class PlayerSession(Base):
         return {
             "id": self.id,
             PLAYER_ID: self.player.player_id,
-            "start": self.start,
-            "end": self.end,
+            "start": (datetime.fromtimestamp(self.start_event_us / 1_000_000, timezone.utc)
+                      if self.start_event_us is not None else self.start),
+            "end": (datetime.fromtimestamp(self.end_event_us / 1_000_000, timezone.utc)
+                    if self.end_event_us is not None else self.end),
             "created": self.created,
         }
 

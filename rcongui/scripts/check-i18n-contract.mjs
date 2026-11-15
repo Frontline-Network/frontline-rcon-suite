@@ -8,6 +8,7 @@ import de from "../src/i18n/locales/de.js";
 import { settingsPanelsDe, settingsPanelsEn } from "../src/i18n/locales/settings-panels.js";
 import { seedVipJournalCopy } from "../src/i18n/locales/seed-vip-journal.js";
 import { blacklistSyncReviewCopy } from "../src/i18n/locales/blacklist-sync-review.js";
+import { sessionEventReviewCopy } from "../src/i18n/locales/session-event-review.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const failures = [];
@@ -31,7 +32,9 @@ compare("seed VIP journal", seedVipJournalCopy.de, seedVipJournalCopy.en);
 compare("seed VIP journal French", seedVipJournalCopy.fr, seedVipJournalCopy.en);
 compare("blacklist synchronization review", blacklistSyncReviewCopy.de, blacklistSyncReviewCopy.en);
 compare("blacklist synchronization review French", blacklistSyncReviewCopy.fr, blacklistSyncReviewCopy.en);
-const combinedEnglish = { ...en, settingsPanels: settingsPanelsEn, seedVipJournal: seedVipJournalCopy.en, blacklistSyncReview: blacklistSyncReviewCopy.en };
+compare("session event review", sessionEventReviewCopy.de, sessionEventReviewCopy.en);
+compare("session event review French", sessionEventReviewCopy.fr, sessionEventReviewCopy.en);
+const combinedEnglish = { ...en, settingsPanels: settingsPanelsEn, seedVipJournal: seedVipJournalCopy.en, blacklistSyncReview: blacklistSyncReviewCopy.en, sessionEventReview: sessionEventReviewCopy.en };
 const globalKeys = new Set(Object.keys(flatten(combinedEnglish)));
 const syntaxTrees = new Map();
 const bilingualByDirectory = new Map();

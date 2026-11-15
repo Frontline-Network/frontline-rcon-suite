@@ -41,6 +41,7 @@ export function makeServer({ environment = "development" } = {}) {
   let vipRewards = structuredClone(vipRewardDefaults);
   let seedVipReviewResolved = false;
   let blacklistSyncReviewResolved = false;
+  let sessionEventReviewResolved = false;
   let demoServerName = "[GER] Frontline Network | #2";
   let demoServerNameConfig = { ip: "127.0.0.1", port: 10011 };
   const disbandAttempts = new Map();
@@ -921,6 +922,24 @@ export function makeServer({ environment = "development" } = {}) {
         const { delivery_id } = JSON.parse(request.requestBody);
         if (delivery_id !== 1 || blacklistSyncReviewResolved) return ok(false);
         blacklistSyncReviewResolved = true;
+        return ok(true);
+      });
+      this.get("/get_pending_session_events", () => {
+        const showFixture = typeof window !== "undefined" &&
+          new URLSearchParams(window.location.search).get("demo_session_review") === "1" &&
+          !sessionEventReviewResolved;
+        const anonymous = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("anonymous") === "1";
+        const results = showFixture && anonymous ? [{ kind: "unidentified", event_kind: "disconnect",
+          fingerprint: "a".repeat(64), player_name: "", raw: "DISCONNECTED ()",
+          event_us: "1700000000000000", event_time: "2023-11-14T22:13:20+00:00" }] : showFixture ? [{ kind: "connect", player_id: "fake-console-id",
+          event_us: "1700000000000000", event_time: "2023-11-14T22:13:20+00:00", identity_exists: true,
+          legacy_candidates: [{ id: 12, start: "2023-11-14T22:13:20", end: null }] }] : [];
+        return ok({ results, more_connects: false, more_disconnects: false });
+      });
+      this.post("/resolve_pending_session_event", (_schema, request) => {
+        const payload = JSON.parse(request.requestBody);
+        if (payload.event_us !== "1700000000000000" || !payload.reason || sessionEventReviewResolved) return ok(false);
+        sessionEventReviewResolved = true;
         return ok(true);
       });
       this.get("/get_vip_rewards_config", () => ok(vipRewards));
