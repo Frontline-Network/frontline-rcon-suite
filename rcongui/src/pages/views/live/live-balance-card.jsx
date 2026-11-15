@@ -2,7 +2,7 @@ import { Alert, Button } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import AutobalancerCard from "../team/autobalancer-card";
 
-export function LiveBalanceCard({ teams, settings }) {
+export function LiveBalanceCard({ teams, gameState, settings }) {
   const { t } = useTranslation();
   const { userName, preferences, query, mutation } = settings;
   const ready = Boolean(userName && query.isSuccess);
@@ -15,6 +15,7 @@ export function LiveBalanceCard({ teams, settings }) {
     <AutobalancerCard
       key={userName}
       teams={teams}
+      gameState={gameState}
       detailsExpanded={preferences.balance_expanded}
       detailsDisabled={!ready || mutation.isPending}
       onDetailsExpandedChange={(expanded) => {

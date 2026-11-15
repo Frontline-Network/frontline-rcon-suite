@@ -384,7 +384,7 @@ const Live = () => {
         visibility={liveViewSettings.preferences.cards}
       />
 
-      <LiveBalanceCard teams={teamData} settings={liveViewSettings} />
+      <LiveBalanceCard teams={teamData} gameState={gameState} settings={liveViewSettings} />
 
       <Stack
         direction="row"

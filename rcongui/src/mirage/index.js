@@ -25,6 +25,7 @@ import {
 import {
   getDemoServerConnection,
   getDemoTeamView,
+  getDemoGameState,
   demoPlayerRecords,
   demoVietnamMapLayers,
   getDemoServerList,
@@ -364,18 +365,21 @@ export function makeServer({ environment = "development" } = {}) {
       );
       this.get(
         "/get_gamestate",
-        trackProtectedRequest("/api/get_gamestate", () =>
-          ok({
+        trackProtectedRequest("/api/get_gamestate", () => {
+          const demoState = new URLSearchParams(window.location.search).has("demo_balance")
+            ? getDemoGameState()
+            : null;
+          return ok({
             current_map: currentLayer,
             next_map: nextLayer,
             raw_time_remaining: "00:57:07",
             time_remaining: 3427,
             allied_score: 3,
             axis_score: 2,
-            num_allied_players: 49,
-            num_axis_players: 49,
-          })
-        )
+            num_allied_players: demoState?.num_allied_players ?? 49,
+            num_axis_players: demoState?.num_axis_players ?? 49,
+          });
+        })
       );
       this.get(
         "/get_ingame_mods",

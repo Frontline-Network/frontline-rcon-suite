@@ -6,6 +6,7 @@ export function balanceActionPreflight({
   recipientIds,
   readTeams,
   readSettings,
+  readGameState,
   t,
 }) {
   const text = (key) =>
@@ -15,8 +16,18 @@ export function balanceActionPreflight({
     if (JSON.stringify(actual) !== JSON.stringify([...recipientIds].sort())) {
       throw new Error(text("selectionChanged"));
     }
-    const [teams, settings] = await Promise.all([readTeams(), readSettings()]);
-    const valid = validateLiveRecommendation(teams, settings, recommendation);
+    const [teams, settings, gameState] = await Promise.all([
+      readTeams(), readSettings(), readGameState?.(),
+    ]);
+    const verifiedSettings = {
+      ...settings,
+      requireCountVerification: true,
+      authoritativeTeamCounts: {
+        allies: gameState?.num_allied_players,
+        axis: gameState?.num_axis_players,
+      },
+    };
+    const valid = validateLiveRecommendation(teams, verifiedSettings, recommendation);
     const disabledSquad =
       recommendation.kind.startsWith("squad_") &&
       !settings.coordinatedSquadSwitchesEnabled;

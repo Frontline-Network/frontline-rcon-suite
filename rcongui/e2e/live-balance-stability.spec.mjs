@@ -10,6 +10,16 @@ const card = (page) =>
   page.getByRole("region", { name: "Live-Balance-Assistent" });
 const review = (page) =>
   page.getByRole("dialog", { name: "Koordinierten Squad-Wechsel prüfen" });
+
+test("inconsistent server counts block manual switching", async ({ page }) => {
+  await openDemoPage(page, "/views/live", { query: { demo_balance: "incomplete" } });
+  await expect(card(page).getByText("Live-Daten gerade unvollständig").first()).toBeVisible();
+  await card(page).getByRole("button", { name: "Squad-Wechsel prüfen", exact: true }).click();
+  await expect(review(page).getByRole("button", {
+    name: "Squad(s) informieren und wechseln", exact: true,
+  })).toBeDisabled();
+});
+
 async function start(page) {
   await openDemoPage(page, "/views/live", {
     query: { demo_balance: "unbalanced" },

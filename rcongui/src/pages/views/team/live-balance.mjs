@@ -505,6 +505,14 @@ export const buildLiveBalanceStatus = (
       players.filter((player) => player.team === team).length,
     ])
   );
+  const expectedCounts = settings.authoritativeTeamCounts;
+  const reportedAllies = finiteNumber(expectedCounts?.allies);
+  const reportedAxis = finiteNumber(expectedCounts?.axis);
+  const countsUnverified = settings.requireCountVerification === true && (
+    reportedAllies === null || reportedAxis === null ||
+    reportedAllies !== counts.allies || reportedAxis !== counts.axis
+  );
+  const incomplete = Boolean(teams?.fail_count) || countsUnverified;
   const difference = counts.allies - counts.axis;
   const targetDifference = Number.isFinite(Number(settings.targetDifference))
     ? Math.max(0, Number(settings.targetDifference))
@@ -609,10 +617,10 @@ export const buildLiveBalanceStatus = (
           ),
         }
       : null,
-    warnings: teams?.fail_count
+    warnings: incomplete
       ? ["Der aktuelle Spielersnapshot ist unvollständig"]
       : [],
-    block_reasons: teams?.fail_count
+    block_reasons: incomplete
       ? ["Live-Daten sind derzeit unvollständig"]
       : [],
   };

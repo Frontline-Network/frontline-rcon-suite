@@ -326,6 +326,7 @@ const TeamViewPage = () => {
       <BattleSummary gameData={gameData} teams={summaryTeams} />
       <AutobalancerCard
         teams={teams}
+        gameState={gameState}
         onHighlightPlayers={setAutobalancerHighlights}
       />
 

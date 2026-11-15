@@ -716,7 +716,7 @@ const demoUnbalancedTeamView = {
 
 export const getDemoTeamView = () => {
   const mode = readDemoParameter("demo_balance");
-  if (mode === "unbalanced") return demoUnbalancedTeamView;
+  if (mode === "unbalanced" || mode === "incomplete") return demoUnbalancedTeamView;
   if (mode === "changed_squad")
     return {
       ...demoUnbalancedTeamView,
@@ -784,10 +784,17 @@ export const getDemoMapLayers = () =>
     : demoMapLayers;
 
 export const getDemoGameState = () => {
-  if (getDemoServerConnection().game !== "hll_vietnam") return demoGameState;
+  const balanceMode = readDemoParameter("demo_balance");
+  const teams = balanceMode ? getDemoTeamView() : null;
+  const gameState = teams
+    ? { ...demoGameState,
+        num_allied_players: balanceMode === "incomplete" ? 3 : teams.allies.count,
+        num_axis_players: balanceMode === "incomplete" ? 4 : teams.axis.count }
+    : demoGameState;
+  if (getDemoServerConnection().game !== "hll_vietnam") return gameState;
 
   return {
-    ...demoGameState,
+    ...gameState,
     current_map: demoVietnamMapLayers[4],
     next_map: demoVietnamMapLayers[3],
   };
