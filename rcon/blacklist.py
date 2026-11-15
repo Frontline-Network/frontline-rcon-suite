@@ -67,6 +67,15 @@ def commit_blacklist_change(session: Session, command):
     session.commit()
 
 
+def normalize_blacklist_expiry(value: datetime | None) -> datetime | None:
+    """Legacy callers pass naive UTC timestamps; store a consistent instant."""
+    if value is None:
+        return None
+    if value.tzinfo is None or value.utcoffset() is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def update_penalty_count(
     player_id: str,
     player_names: list[str],
@@ -556,7 +565,7 @@ def add_record_to_blacklist(
             player=player,
             blacklist=blacklist,
             reason=reason,
-            expires_at=expires_at,
+            expires_at=normalize_blacklist_expiry(expires_at),
             admin_name=admin_name,
         )
         sess.add(record)
@@ -610,7 +619,7 @@ def edit_record_from_blacklist(
         if reason != MISSING:
             record.reason = reason
         if expires_at != MISSING:
-            record.expires_at = expires_at
+            record.expires_at = normalize_blacklist_expiry(expires_at)
 
         # Return if nothing was modified
         if not sess.is_modified(record):

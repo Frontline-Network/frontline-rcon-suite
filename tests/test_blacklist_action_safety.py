@@ -86,6 +86,13 @@ def test_uncertain_blacklist_commit_does_not_trigger_fallback_ban(monkeypatch):
     server.temp_ban.assert_not_called()
 
 
+def test_blacklist_expiration_normalizes_legacy_naive_utc():
+    naive = datetime(2026, 1, 2, 3, 4, 5)
+    assert blacklist.normalize_blacklist_expiry(naive) == naive.replace(tzinfo=timezone.utc)
+    local = datetime(2026, 1, 2, 4, 4, 5, tzinfo=timezone(timedelta(hours=1)))
+    assert blacklist.normalize_blacklist_expiry(local) == naive.replace(tzinfo=timezone.utc)
+
+
 def test_moved_record_does_not_assume_old_ban_on_new_server(monkeypatch):
     @contextmanager
     def session():

@@ -122,7 +122,7 @@ def auto_ban_if_tks_right_after_connection(
                 )
                 if config.ban_duration.total_seconds > 0:
                     expires_at = (
-                            datetime.datetime.now() + config.ban_duration.as_timedelta
+                            datetime.datetime.now(datetime.timezone.utc) + config.ban_duration.as_timedelta
                     )
                 else:
                     expires_at = None

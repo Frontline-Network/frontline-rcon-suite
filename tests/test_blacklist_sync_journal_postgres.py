@@ -268,6 +268,16 @@ def test_create_edit_list_and_expire_each_create_durable_events(database, existi
         assert session.get(Blacklist, first).name == "changed"
 
 
+def test_legacy_naive_expiration_is_utc_before_flush_and_serialization(database, existing_blacklist, monkeypatch):
+    _record_id, first, _second = existing_blacklist
+    monkeypatch.setattr(blacklist, "_get_set_player", lambda session, player_id: session.scalar(
+        select(PlayerID).where(PlayerID.player_id == player_id)))
+    naive = datetime(2035, 1, 2, 3, 4)
+    result = blacklist.add_record_to_blacklist("synthetic-player", first, "temporary", expires_at=naive)
+    assert result["expires_at"] == naive.replace(tzinfo=timezone.utc)
+    assert result["is_active"] is True
+
+
 def test_deleted_list_delivery_keeps_snapshot_after_source_is_gone(database, existing_blacklist):
     _record_id, first, _second = existing_blacklist
     assert blacklist.delete_blacklist(first)
