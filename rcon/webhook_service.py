@@ -956,10 +956,9 @@ async def dequeue_message(
         # we encounter an unknown status code so we can update this appropriately
         if not (200 <= res.status_code < 300) and res.status_code not in (401, 403, 429):
             logger.error(
-                "Received HTTP %s from Discord, headers:%s: %s",
-                res.headers,
+                "Webhook %s returned unexpected HTTP %s",
+                wh.webhook_id,
                 res.status_code,
-                message.model_dump(),
             )
             move_to_dead_letter(
                 message=message,
@@ -995,18 +994,15 @@ async def dequeue_message(
                 # This can get stepped on in multiple tasks because it isn't locked
                 try:
                     retry_after_secs = float(body.get("retry_after"))
-                except TypeError:
+                except (TypeError, ValueError):
                     retry_after_secs = DEFAULT_GLOBAL_RETRY_AFTER_SECS
                     logger.error(
-                        "Unable to parse retry_after: %s, falling back to %s seconds",
-                        body.get("retry_after"),
+                        "Unable to parse retry_after; falling back to %s seconds",
                         retry_after_secs,
                     )
-                discord_message = body.get("message")
                 logger.warning(
-                    "Your IP is currently globally rate limited by discord: Retrying after %s, %s",
+                    "Your IP is currently globally rate limited by discord: Retrying after %s",
                     datetime.now() + timedelta(seconds=retry_after_secs),
-                    discord_message,
                 )
                 set_global_rate_limit_reset_after(
                     red=red,
