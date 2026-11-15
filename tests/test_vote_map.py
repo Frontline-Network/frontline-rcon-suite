@@ -498,6 +498,24 @@ def test_register_vote(votemap):
     assert vote["map_id"] == selected_map.id
 
 
+@pytest.mark.parametrize("round_start,vote_time,allowed", [(2000, 1999, False), (2000, 2000, True),
+                                                               (2000, 2001, True), (None, 2001, False)])
+def test_register_vote_requires_current_round_start(votemap, round_start, vote_time, allowed):
+    player = mock_player_profile("fake", "Fake")
+    votemap.set_selection([HUR_WARFARE_DAY])
+    votemap._maps_history[0]["start"] = round_start
+    with patch.object(votemap, "apply_results") as apply:
+        if allowed:
+            votemap.register_vote(player, vote_time, 1)
+            assert votemap.get_vote("fake") is not None
+            apply.assert_called_once()
+        else:
+            with pytest.raises(VoteMapException):
+                votemap.register_vote(player, vote_time, 1)
+            assert votemap.get_vote("fake") is None
+            apply.assert_not_called()
+
+
 def test_remove_winning_map_from_selection_reapplies_results(votemap, mock_rcon):
     player = mock_player_profile("123456", "player_1")
     votemap.set_selection([HUR_WARFARE_DAY, UTAH_WARFARE_DAY])

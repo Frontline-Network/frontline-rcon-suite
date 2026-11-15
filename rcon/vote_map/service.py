@@ -852,7 +852,9 @@ class VoteMap:
                 "Map history is corrupted - Can't register vote"
             ) from e
 
-        if map_start is None or timestamp < map_start:
+        if map_start is None:
+            raise VoteMapNoInitialised("Current round start is unavailable - Can't register vote")
+        if timestamp < map_start:
             logger.warning(
                 "Vote is too old %s, %s, %d, %s",
                 player_name,
@@ -860,6 +862,7 @@ class VoteMap:
                 entry,
                 current_map,
             )
+            raise VoteMapException("This vote predates the current round. Please vote again.")
 
         # Vote registered
         self._state.add_vote(player_id, player_name, selected_map, vote_count)
