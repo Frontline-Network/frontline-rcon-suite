@@ -235,7 +235,7 @@ def tick(rcon):
                 )
                 session.add(row)
             data = copy.deepcopy(row.data)
-            engine = Engine(data, cfg)
+            engine = Engine(data, cfg, game=getattr(getattr(rcon, "game_profile", None), "game", "hll"))
             # A current failure or population drop also blocks queued events.
             thresholds = {
                 "allies": seed.requirements.max_allies,

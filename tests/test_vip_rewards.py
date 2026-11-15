@@ -103,6 +103,24 @@ def test_melee_aliases(name):
     assert len(e.claims) == 1
 
 
+@pytest.mark.parametrize("game,name,expected", [
+    ("hllv", "Knife", True), ("hllv", "M3 Knife", True),
+    ("hll", "Knife", False), ("hll", "M3 Knife", True),
+    ("hllv", "M16A1", False),
+])
+def test_melee_rewards_follow_active_game_reference(game, name, expected):
+    e = Engine({}, config(melee={"enabled": True}), game=game)
+    e.snapshot(NOW, PLAYERS, COUNTS, THRESHOLDS)
+    kill = event()
+    kill["weapon"] = name
+    e.event(kill, NOW + 1)
+    assert bool(e.claims) is expected
+    if expected:
+        kill.update(key="event-2", time=NOW + 2)
+        e.event(kill, NOW + 2)
+        assert len(e.claims) == 1
+
+
 def test_opponent_guard_shared_between_melee_and_challenges():
     e = engine(
         config(
@@ -480,6 +498,24 @@ def test_durable_queue_tick_duplicate_and_restart(delivery, monkeypatch):
         assert session.query(VipRewardEvent).count() == 1
         assert session.query(VipRewardGrant).count() == 1
         assert session.query(VipRewardGrant).one().status == "awarded"
+    assert rcon.add_vip.call_count == 1
+
+
+def test_worker_uses_active_vietnam_profile_for_knife_rewards(delivery, monkeypatch):
+    from rcon.models import VipRewardGrant
+    from rcon.user_config.seed_vip import SeedVIPUserConfig
+    service, cfg, rcon, remote, add, read = delivery
+    rcon.game_profile.game = "hllv"
+    monkeypatch.setattr(service, "read_gate_state", service._test_read_gate)
+    monkeypatch.setattr(service, "observe", lambda *_: (PLAYERS, COUNTS, True))
+    monkeypatch.setattr(service.SeedVIPUserConfig, "load_from_db", lambda: SeedVIPUserConfig())
+    service.tick(rcon)
+    payload = event()
+    payload.update(weapon="Knife", time=NOW)
+    service.enqueue(payload)
+    service.tick(rcon)
+    with service.enter_session() as session:
+        assert session.query(VipRewardGrant).count() == 1
     assert rcon.add_vip.call_count == 1
 
 

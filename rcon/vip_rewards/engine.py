@@ -3,6 +3,8 @@
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
+from hllrcon import HLLVWeapon, WeaponType as ReferenceWeaponType
+
 MELEE = {"m3 knife", "feldspaten", "fairbairn-sykes", "mpl-50 spade", "mpl-50 spaten"}
 
 
@@ -14,6 +16,10 @@ def weapon(value):
         .strip("\"'")
         .translate(str.maketrans({"–": "-", "—": "-", "‑": "-", "_": "-"}))
     )
+
+
+VIETNAM_MELEE = frozenset(weapon(item.id) for item in HLLVWeapon.all()
+                          if item.type == ReferenceWeaponType.MELEE)
 
 
 def periods(ts, zone):
@@ -51,8 +57,9 @@ def gate(state, cfg, now):
 
 
 class Engine:
-    def __init__(self, state, cfg):
+    def __init__(self, state, cfg, *, game="hll"):
         self.s, self.c = state, cfg
+        self.melee_weapons = VIETNAM_MELEE if game == "hllv" else MELEE
         self.claims = []
         state.setdefault("players", {})
         state.setdefault("opponents", {})
@@ -371,7 +378,7 @@ class Engine:
                     r.period != "fixed" or r.start.timestamp() <= ts < r.end.timestamp()
                 )
             ]
-            if not (c.melee.enabled and w in MELEE) and not matching:
+            if not (c.melee.enabled and w in self.melee_weapons) and not matching:
                 return
             pair = pid + ":" + victim
             if (
@@ -380,7 +387,7 @@ class Engine:
             ):
                 return
             s["opponents"][pair] = ts
-            if c.melee.enabled and w in MELEE:
+            if c.melee.enabled and w in self.melee_weapons:
                 self.claim(
                     pid, "melee", event["key"], c.melee.hours, now, c.melee.limit
                 )
