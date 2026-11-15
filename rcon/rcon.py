@@ -398,7 +398,9 @@ class Rcon(ServerCtl):
                     player_data["profile"]["current_playtime_seconds"], map_time_seconds
                 )
             else:
-                player_data["map_playtime_seconds"] = map_time_seconds
+                # Without a session profile the join time is unknown. A zero
+                # sentinel avoids treating the whole round as observed play.
+                player_data["map_playtime_seconds"] = 0
 
             players_by_id[player_id] = player_data
 

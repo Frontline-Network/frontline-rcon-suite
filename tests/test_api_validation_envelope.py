@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -61,4 +62,13 @@ def test_forwarding_exception_does_not_log_sensitive_details(caplog):
     assert status == 200
     assert body["forward_results"]
     assert "Unexpected forwarding error" in caplog.text
+    assert secret not in caplog.text
+
+
+def test_debug_logging_never_records_arbitrary_api_arguments(caplog):
+    secret = "fake-password-or-webhook-token"
+    with caplog.at_level(logging.DEBUG, logger=views.logger.name):
+        status, _ = call({"config": {"count": 1}, "secret": secret})
+    assert status == 200
+    assert "API command validate_example" in caplog.text
     assert secret not in caplog.text

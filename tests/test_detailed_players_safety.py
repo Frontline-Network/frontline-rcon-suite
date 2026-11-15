@@ -19,6 +19,21 @@ def test_missing_player_details_are_reported_as_incomplete(monkeypatch):
     assert result["fail_count"] == 1
 
 
+def test_missing_session_profile_does_not_invent_round_playtime(monkeypatch):
+    from rcon.end_match_stats import score
+
+    monkeypatch.setattr("rcon.rcon.MapsHistory", lambda: [{"start": 1}])
+    player = {"player_id": "id", "name": "Player", "profile": None}
+    fake = SimpleNamespace(
+        get_players=Mock(return_value=[player]),
+        get_all_player_info=Mock(return_value=[{"iD": "id"}]),
+        _get_detailed_player_info=Mock(return_value={"kills": 10}),
+    )
+    result = Rcon.get_detailed_players.__wrapped__(fake)
+    assert result["players"]["id"]["map_playtime_seconds"] == 0
+    assert score(result["players"]["id"], "kpm", SimpleNamespace()) == 0
+
+
 def test_player_id_list_preserves_equal_names(monkeypatch):
     response = SimpleNamespace(content_dict={"players": [
         {"name": "Same", "iD": "id-1"}, {"name": "Same", "iD": "id-2"},

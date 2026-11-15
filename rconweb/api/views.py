@@ -318,7 +318,7 @@ def expose_api_endpoint(
                 safe_response_data["code"] = "[redacted]"
 
         try:
-            logger.debug("%s %s", command_name, safe_arguments)
+            logger.debug("API command %s", command_name)
             res = func(**arguments)
 
             # A few get_ methods can be called w/ POST but don't modify anything
