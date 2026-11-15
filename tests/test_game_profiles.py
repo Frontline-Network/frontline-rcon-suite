@@ -822,6 +822,27 @@ def test_map_replacement_does_not_remove_old_entries_if_add_is_rejected(monkeypa
     remove.assert_not_called()
 
 
+@pytest.mark.parametrize("ctl_type,game", [(HLLRcon, GameEnum.HLL_WW2), (HLLVRcon, GameEnum.HLL_VIETNAM)])
+def test_rotation_indices_and_after_map_use_the_actual_map_list(monkeypatch, ctl_type, game):
+    ctl = ctl_type(ServerInfo(game=game))
+    ctl.get_map_rotation = Mock(return_value={"maps": ["a", "b", "c", "d", "e"]})
+    add = Mock()
+    remove = Mock()
+    monkeypatch.setattr("rcon.rcon.ServerCtl.add_map_to_rotation_at_index", add)
+    monkeypatch.setattr("rcon.rcon.ServerCtl.remove_map_from_rotation_at_index", remove)
+
+    ctl.add_map_to_rotation_at_index("new", -1)
+    add.assert_called_with("new", 5)
+    ctl.remove_map_from_rotation_at_index(-2)
+    remove.assert_called_with(3)
+    ctl.add_map_to_rotation("new", after_map_name="b")
+    add.assert_called_with("new", 2)
+    with pytest.raises(ValueError):
+        ctl.remove_map_from_rotation_at_index(-6)
+    with pytest.raises(ValueError):
+        ctl.add_map_to_rotation_at_index("new", 6)
+
+
 @pytest.mark.parametrize(
     ("ctl_type", "game"),
     [

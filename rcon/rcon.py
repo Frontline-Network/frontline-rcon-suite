@@ -1399,9 +1399,11 @@ class Rcon(ServerCtl):
         map_name: str,
         map_index: int,
     ) -> None:
+        rotation = self.get_map_rotation()["maps"]
         if map_index < 0:
-            rotation = self.get_map_rotation()
             map_index = len(rotation) + map_index + 1
+        if not 0 <= map_index <= len(rotation):
+            raise ValueError("Map rotation insertion index is out of range")
 
         with invalidates(
             Rcon.get_map_rotation,
@@ -1417,9 +1419,11 @@ class Rcon(ServerCtl):
             return super().remove_map_from_rotation(map_name)
 
     def remove_map_from_rotation_at_index(self, map_index: int):
+        rotation = self.get_map_rotation()["maps"]
         if map_index < 0:
-            rotation = self.get_map_rotation()["maps"]
-            map_index = len(rotation) + map_index + 1
+            map_index = len(rotation) + map_index
+        if not 0 <= map_index < len(rotation):
+            raise ValueError("Map rotation removal index is out of range")
 
         with invalidates(
             Rcon.get_map_rotation, Rcon.get_map_sequence, Rcon.get_next_map

@@ -754,7 +754,7 @@ class ServerCtl:
         map_index = len(rotation)
         if after_map_name:
             try:
-                map_index = rotation.index(after_map_name or "")
+                map_index = rotation.index(after_map_name) + 1
             except ValueError:
                 pass
 
