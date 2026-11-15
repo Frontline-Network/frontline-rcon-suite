@@ -33,12 +33,25 @@ class WarningRejected(HLLCommandFailedError):
     """The game server explicitly rejected a warning."""
 
 
+class PunishmentRejected(HLLCommandFailedError):
+    """The game server explicitly rejected a punishment."""
+
+
+class KickRejected(HLLCommandFailedError):
+    """The game server explicitly rejected a kick."""
+
+
 def _originating_moderators(mods, aplayer):
+    # Weapon-kill hooks have no squad watch. Do not create an empty shared
+    # squad key for those independent event-based actions.
+    if not aplayer.team or not aplayer.squad:
+        return []
     suffix = "-DryRun" if aplayer.details.dry_run else ""
+    authors = {aplayer.details.author, *aplayer.related_authors}
     return [
         mod for mod in mods
         if getattr(mod, "action_author", None) is not None
-        and mod.action_author + suffix == aplayer.details.author
+        and mod.action_author + suffix in authors
     ]
 
 
@@ -84,6 +97,7 @@ def _do_punitions(
     mods,
 ):
     for aplayer in players:
+        action_confirmed = False
         try:
             if method == ActionMethod.MESSAGE:
                 if not aplayer.details.dry_run:
@@ -99,6 +113,7 @@ def _do_punitions(
                         raise HLLCommandFailedError("Game server did not confirm warning")
                 for moderator in _originating_moderators(mods, aplayer):
                     moderator.player_warning_succeeded(aplayer)
+                action_confirmed = True
                 audit(
                     discord_webhook_url=aplayer.details.discord_audit_url,
                     command_name="message_player",
@@ -107,6 +122,8 @@ def _do_punitions(
                 )
 
             if method == ActionMethod.PUNISH:
+                for moderator in _originating_moderators(mods, aplayer):
+                    moderator.player_punish_started(aplayer)
                 if not aplayer.details.dry_run:
                     accepted = rcon.punish(
                         player_name=aplayer.name,
@@ -115,7 +132,12 @@ def _do_punitions(
                         player_id=aplayer.player_id,
                     )
                     if accepted is False:
-                        raise HLLCommandFailedError("Game server rejected punishment")
+                        raise PunishmentRejected("Game server rejected punishment")
+                    if accepted is not True:
+                        raise HLLCommandFailedError("Game server did not confirm punishment")
+                for moderator in _originating_moderators(mods, aplayer):
+                    moderator.player_punish_succeeded(aplayer)
+                action_confirmed = True
                 audit(
                     discord_webhook_url=aplayer.details.discord_audit_url,
                     command_name="punish",
@@ -124,6 +146,8 @@ def _do_punitions(
                 )
 
             if method == ActionMethod.KICK:
+                for moderator in _originating_moderators(mods, aplayer):
+                    moderator.player_kick_attempted(aplayer)
                 if not aplayer.details.dry_run:
                     accepted = rcon.kick(
                         player_name=aplayer.name,
@@ -132,7 +156,10 @@ def _do_punitions(
                         player_id=aplayer.player_id,
                     )
                     if accepted is False:
-                        raise HLLCommandFailedError("Game server rejected kick")
+                        raise KickRejected("Game server rejected kick")
+                    if accepted is not True:
+                        raise HLLCommandFailedError("Game server did not confirm kick")
+                action_confirmed = True
                 audit(
                     discord_webhook_url=aplayer.details.discord_audit_url,
                     command_name="kick",
@@ -143,24 +170,24 @@ def _do_punitions(
             logger.warning("Game server rejected automod warning; it can be retried")
             for moderator in _originating_moderators(mods, aplayer):
                 moderator.player_warning_failed(aplayer)
+        except PunishmentRejected:
+            logger.warning("Game server rejected automod punishment; it can be retried")
+            for moderator in _originating_moderators(mods, aplayer):
+                moderator.player_punish_failed(aplayer)
+        except KickRejected:
+            logger.warning("Game server rejected automod kick; it can be retried")
+            for moderator in _originating_moderators(mods, aplayer):
+                moderator.player_kick_rejected(aplayer)
         except (HLLCommandFailedError, HLLServerError, OSError, UnicodeDecodeError):
+            if action_confirmed:
+                logger.warning("Automod action confirmed but follow-up failed", exc_info=True)
+                continue
             logger.warning(
                 "Couldn't confirm `%s` for player `%s`; warning delivery may be uncertain.",
                 repr(method),
                 repr(aplayer),
                 exc_info=True,
             )
-            if method == ActionMethod.PUNISH:
-                for m in mods:
-                    if getattr(m, "action_author", None) == aplayer.details.author:
-                        m.player_punish_failed(aplayer)
-            elif method == ActionMethod.KICK:
-                audit(
-                    discord_webhook_url=aplayer.details.discord_audit_url,
-                    command_name="kick",
-                    msg=f"---> KICK FAILED, will retry <---: {aplayer}",
-                    author=aplayer.details.author,
-                )
 
 
 def do_punitions(

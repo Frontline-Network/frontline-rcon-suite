@@ -30,6 +30,34 @@ class WarningConfirmationMixin:
             if warnings and warnings[-1] == PENDING_WARNING:
                 warnings.pop()
 
+    def player_punish_started(self, aplayer):
+        """Reserve a punishment before sending it to the game server."""
+        with self.watch_state(aplayer.team, aplayer.squad) as status:
+            punishes = status.punished.setdefault(aplayer.name, [])
+            if punishes:
+                punishes[-1] = PENDING_WARNING
+            else:
+                punishes.append(PENDING_WARNING)
+
+    def player_punish_succeeded(self, aplayer):
+        with self.watch_state(aplayer.team, aplayer.squad) as status:
+            punishes = status.punished.get(aplayer.name)
+            if punishes and punishes[-1] == PENDING_WARNING:
+                punishes[-1] = datetime.now()
+
+    def player_kick_attempted(self, aplayer):
+        """Reserve the kick before sending, so a crash cannot trigger a replay."""
+        with self.watch_state(aplayer.team, aplayer.squad) as status:
+            punishes = status.punished.setdefault(aplayer.name, [])
+            if not punishes or punishes[-1] != PENDING_WARNING:
+                punishes.append(PENDING_WARNING)
+
+    def player_kick_rejected(self, aplayer):
+        with self.watch_state(aplayer.team, aplayer.squad) as status:
+            punishes = status.punished.get(aplayer.name)
+            if punishes and punishes[-1] == PENDING_WARNING:
+                punishes.pop()
+
 
 class SquadHasLeader(Exception):
     pass
@@ -138,6 +166,9 @@ class PunishPlayer:
     role: str = None
     lvl: int = None
     details: PunishDetails = None
+    # Rules with the same live/dry-run mode can propose one shared action.
+    # Keep their authors so every contributing watch receives its outcome.
+    related_authors: List[str] = field(default_factory=list, repr=False, compare=False)
 
     def short_repr(self):
         return (
@@ -195,6 +226,11 @@ class PunitionsToApply:
                     current.append(player)
                 elif getattr(current[index].details, "dry_run", False) and not getattr(player.details, "dry_run", False):
                     current[index] = player
+                elif getattr(current[index].details, "dry_run", False) == getattr(player.details, "dry_run", False):
+                    selected = current[index]
+                    for author in [player.details.author, *player.related_authors]:
+                        if author != selected.details.author and author not in selected.related_authors:
+                            selected.related_authors.append(author)
         for s in o.squads_state:
             if any(s.team == ss.team and s.name == ss.name for ss in self.squads_state):
                 continue
