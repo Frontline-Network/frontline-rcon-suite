@@ -45,6 +45,16 @@ _automatic_retries_disabled = ContextVar(
 )
 
 
+def players_by_name(pairs: list[tuple[str, str]]) -> dict[str, str]:
+    """Keep the legacy mapping only where names uniquely identify players."""
+    result = {}
+    for name, player_id in pairs:
+        if name in result and result[name] != player_id:
+            raise ValueError("Duplicate player names cannot be represented as a name-keyed mapping")
+        result[name] = player_id
+    return result
+
+
 def escape_string(s):
     """Logic taken from the official rcon client.
     There's probably plenty of nicer and more bulletproof ones
@@ -511,7 +521,7 @@ class ServerCtl:
 
     def get_player_ids(self) -> dict[str, str]:
         # Preserve the legacy name-keyed API for existing direct callers.
-        return dict(self.get_player_id_pairs())
+        return players_by_name(self.get_player_id_pairs())
 
     def get_all_player_info(self) -> list[dict[str, Any]]:
         """Return raw game-server packets; ``Rcon`` adapts them per game profile."""

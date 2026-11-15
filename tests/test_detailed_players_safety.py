@@ -27,7 +27,16 @@ def test_player_id_list_preserves_equal_names(monkeypatch):
     rcon = object.__new__(Rcon)
     rcon.game_profile = get_game_profile(GameEnum.HLL_WW2)
     assert rcon.get_player_ids() == [("Same", "id-1"), ("Same", "id-2")]
-    assert rcon.get_player_ids(as_dict=True) == {"Same": "id-2"}
+    with pytest.raises(ValueError, match="Duplicate player names"):
+        rcon.get_player_ids(as_dict=True)
+    with pytest.raises(ValueError, match="Duplicate player names"):
+        ServerCtl.get_player_ids(rcon)
+
+
+def test_unique_player_names_remain_compatible_with_legacy_mapping(monkeypatch):
+    monkeypatch.setattr(ServerCtl, "get_player_id_pairs", lambda _: [("A", "id-1"), ("B", "id-2")])
+    rcon = object.__new__(Rcon)
+    assert rcon.get_player_ids(as_dict=True) == {"A": "id-1", "B": "id-2"}
 
 
 def test_vietnam_player_list_accepts_v2_field_names(monkeypatch):

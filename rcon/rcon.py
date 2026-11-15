@@ -20,6 +20,7 @@ from rcon.commands import (
     HLLVServerCtl,
     ServerCtl,
     VipId,
+    players_by_name,
 )
 from rcon.connection import HLLCommandError
 from rcon.game.player_adapter import PlayerResponseAdapterError
@@ -521,7 +522,7 @@ class Rcon(ServerCtl):
 
     def get_player_ids(self, as_dict=False) -> dict[str, str] | list[tuple[str, str]]:
         pairs = super().get_player_id_pairs()
-        return dict(pairs) if as_dict else pairs
+        return players_by_name(pairs) if as_dict else pairs
 
     def get_vips_count(self) -> int:
         players = self.get_player_ids()
