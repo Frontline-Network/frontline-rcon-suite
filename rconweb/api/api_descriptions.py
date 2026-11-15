@@ -316,7 +316,7 @@ DESCRIPTIONS.update({
     "mobile/v1/servers/{server_number}/live-status": ("Lädt die aktuelle Serverlage als reine Abfrage. Sichtbare Details richten sich nach den Benutzerrechten.", "Loads the current server situation as a read-only request. Visible details depend on user permissions."),
     "mobile/v1/servers/{server_number}/roster": ("Lädt die aktuelle Aufstellung der Teams und Squads des angegebenen Servers.", "Loads the current team and squad roster for the specified server."),
     "mobile/v1/servers/{server_number}/squads/{team}/{squad}": ("Lädt einen bestimmten Live-Squad einschließlich seiner Mitglieder.", "Loads one specific live squad, including its members."),
-    "ws/mobile/v1/incidents": ("Überträgt Änderungen an Vorfällen über WebSocket. Ein Zeitstempel-Cursor ermöglicht nach einem Verbindungsabbruch die Fortsetzung des Ereignisstroms.", "Streams incident changes over WebSocket. A timestamp cursor allows the event stream to resume after reconnecting."),
+    "ws/mobile/v1/incidents": ("Überträgt Vorfalländerungen mit einem fortsetzbaren Ereignis-Cursor. Bei Statusfiltern entfernt der Client die unter removed_incident_ids gemeldeten Vorfälle aus der gefilterten Ansicht.", "Streams incident changes with a resumable event cursor. For status filters, clients remove the incidents listed in removed_incident_ids from the filtered view."),
 })
 
 

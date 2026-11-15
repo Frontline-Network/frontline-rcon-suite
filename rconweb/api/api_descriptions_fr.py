@@ -166,7 +166,7 @@ DESCRIPTIONS_FR.update({
     "mobile/v1/servers/{server_number}/live-status": "Charge la situation actuelle du serveur en lecture seule. Les détails visibles dépendent des autorisations de l'utilisateur.",
     "mobile/v1/servers/{server_number}/roster": "Charge la composition actuelle des équipes et escouades du serveur indiqué.",
     "mobile/v1/servers/{server_number}/squads/{team}/{squad}": "Charge une escouade précise en direct, y compris ses membres.",
-    "ws/mobile/v1/incidents": "Diffuse les modifications d'incidents par WebSocket. Un curseur d'horodatage permet de reprendre le flux après une reconnexion.",
+    "ws/mobile/v1/incidents": "Diffuse les modifications d'incidents avec un curseur d'événement reprenable. Pour un filtre de statut, le client retire de la vue les incidents indiqués dans removed_incident_ids.",
     "get_ban": "Renvoie les bannissements temporaires et permanents du serveur pour un identifiant de joueur précis.",
     "get_bans": "Renvoie ensemble les bannissements temporaires et permanents du serveur. Les deux autorisations de lecture sont requises.",
     "get_perma_bans": "Lit les bannissements permanents du serveur de jeu.",

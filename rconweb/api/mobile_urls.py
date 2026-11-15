@@ -186,7 +186,7 @@ MOBILE_API_DOCUMENTATION = [
         "endpoint": "ws/mobile/v1/incidents",
         "allowed_http_methods": ["WEBSOCKET"],
         "permissions_required": ["api.can_view_admin_incidents"],
-        "description": "Stream incident changes from a reconnectable timestamp cursor.",
+        "description": "Stream incident changes from a reconnectable event cursor. For status-filtered streams, remove IDs in removed_incident_ids from the filtered view.",
     },
 ]
 
