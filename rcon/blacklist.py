@@ -11,7 +11,7 @@ import orjson
 import redis
 from pydantic import BaseModel, field_validator
 from pydantic.dataclasses import dataclass
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, literal, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from rcon.barricade import (
@@ -33,7 +33,6 @@ from rcon.models import (
 )
 from rcon.player_history import (
     _get_set_player,
-    remove_accent,
     safe_save_player_action,
     unaccent,
 )
@@ -229,14 +228,15 @@ def search_blacklist_records(
     if player_id:
         filters.append(PlayerID.player_id == player_id)
     if reason:
-        clean_reason = remove_accent(reason)
+        clean_reason = unaccent(literal(reason))
+        pattern = literal("%") + clean_reason + literal("%")
         filters.append(
-            or_(
-                unaccent(BlacklistRecord.reason).ilike(f"%{clean_reason}%"),
+            and_(clean_reason != "", or_(
+                unaccent(BlacklistRecord.reason).ilike(pattern),
                 PlayerID.names.any(
-                    unaccent(PlayerName.name).ilike(f"%{clean_reason}%")
+                    unaccent(PlayerName.name).ilike(pattern)
                 ),
-            )
+            ))
         )
     if blacklist_id is not None:
         filters.append(BlacklistRecord.blacklist_id == blacklist_id)

@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from functools import cmp_to_key
 
 from dateutil import parser
-from sqlalchemy import func, or_, text
+from sqlalchemy import and_, func, literal, or_, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, contains_eager, joinedload, selectinload
 from sqlalchemy.sql.functions import ReturnTypeFromArgs
@@ -509,7 +509,9 @@ def _get_set_player(
 
 
 def remove_accent(s):
-    return unicodedata.normalize("NFD", s).encode("ascii", "ignore").decode("utf-8")
+    return unicodedata.normalize("NFC", "".join(
+        char for char in unicodedata.normalize("NFD", s) if not unicodedata.combining(char)
+    ))
 
 
 def get_players_by_appearance(
@@ -569,22 +571,25 @@ def get_players_by_appearance(
         if player_name:
             soldier_name = PlayerName.name
             account_name = PlayerAccount.name
+            search_name = literal(player_name)
             if ignore_accent:
                 soldier_name = unaccent(PlayerName.name)
-                player_name = remove_accent(player_name)
+                account_name = unaccent(PlayerAccount.name)
+                search_name = unaccent(search_name)
             if not exact_name_match:
+                pattern = literal("%") + search_name + literal("%")
                 query = query.filter(
-                    or_(
-                        PlayerID.names.any(soldier_name.ilike("%{}%".format(player_name))),
-                        PlayerID.account.has(account_name.ilike("%{}%".format(player_name))),
-                    )
+                    and_(search_name != "", or_(
+                        PlayerID.names.any(soldier_name.ilike(pattern)),
+                        PlayerID.account.has(account_name.ilike(pattern)),
+                    ))
                 )
             else:
                 query = query.filter(
-                    or_(
-                        PlayerID.names.any(soldier_name == player_name),
-                        PlayerID.account.has(account_name == player_name),
-                    )
+                    and_(search_name != "", or_(
+                        PlayerID.names.any(soldier_name == search_name),
+                        PlayerID.account.has(account_name == search_name),
+                    ))
                 )
 
         if blacklisted is True:
@@ -656,6 +661,7 @@ def get_players_by_appearance(
             v = v.lower()
             v2 = v2.lower()
             if ignore_accent:
+                search = remove_accent(search)
                 v = remove_accent(v)
                 v2 = remove_accent(v2)
 
