@@ -791,6 +791,7 @@ def test_map_sequence_replacement_keeps_one_entry_until_the_replacement_is_ready
     )
     remove = Mock()
     add = Mock()
+    monkeypatch.setattr("rcon.rcon.ServerCtl.get_maps", Mock(return_value=["new_a", "new_b", "new_c", "new_d", "new_e"]))
     monkeypatch.setattr("rcon.rcon.ServerCtl.remove_map_from_sequence_at_index", remove)
     monkeypatch.setattr("rcon.rcon.ServerCtl.add_map_to_sequence_at_index", add)
 
@@ -815,9 +816,11 @@ def test_map_replacement_does_not_remove_old_entries_if_add_is_rejected(monkeypa
     setattr(ctl, f"get_map_{kind}", Mock(return_value={"maps": [SimpleNamespace(id="old_a"), SimpleNamespace(id="old_b")]}))
     add = Mock(side_effect=[None, HLLCommandFailedError("rejected")])
     remove = Mock()
+    monkeypatch.setattr("rcon.rcon.ServerCtl.get_maps", Mock(return_value=["new_a", "bad"]))
+    monkeypatch.setattr(f"rcon.rcon.ServerCtl.get_map_{kind}", Mock(return_value={"maps": ["old_a", "old_b", "new_a"]}))
     monkeypatch.setattr(f"rcon.rcon.ServerCtl.add_map_to_{kind}_at_index", add)
     monkeypatch.setattr(f"rcon.rcon.ServerCtl.remove_map_from_{kind}_at_index", remove)
-    with pytest.raises(HLLCommandFailedError, match="rejected"):
+    with pytest.raises(HLLCommandFailedError, match="observed after failure"):
         getattr(ctl, f"set_map_{kind}")(["new_a", "bad"])
     remove.assert_not_called()
 
@@ -878,6 +881,7 @@ def test_map_sequence_replacement_handles_a_single_existing_entry(
     )
     remove = Mock()
     add = Mock()
+    monkeypatch.setattr("rcon.rcon.ServerCtl.get_maps", Mock(return_value=["new_a"]))
     monkeypatch.setattr("rcon.rcon.ServerCtl.remove_map_from_sequence_at_index", remove)
     monkeypatch.setattr("rcon.rcon.ServerCtl.add_map_to_sequence_at_index", add)
 

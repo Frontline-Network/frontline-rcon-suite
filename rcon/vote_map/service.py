@@ -25,7 +25,12 @@ from rcon.maps import (
 )
 from rcon.models import PlayerID, PlayerOptins, enter_session
 from rcon.player_history import get_player
-from rcon.rcon import HLLCommandFailedError, Rcon, get_rcon
+from rcon.rcon import (
+    HLLCommandFailedError,
+    Rcon,
+    _raise_map_replacement_error,
+    get_rcon,
+)
 from rcon.types import (
     MapInfo,
     PlayerProfileType,
@@ -1081,28 +1086,43 @@ class VoteMap:
 
         # Add a missing winner before removing any existing entries. If the
         # server rejects it, the original rotation remains intact.
-        if next_map not in current_rotation:
-            self._rcon.add_map_to_rotation(next_map.id)
+        phase = "adding votemap winner"
+        try:
+            if next_map not in current_rotation:
+                self._rcon.add_map_to_rotation(next_map.id)
 
-        kept_winner = False
-        for map_ in current_rotation:
-            if map_ == next_map and not kept_winner:
-                kept_winner = True
-                continue
-            self._rcon.remove_map_from_rotation(map_.id)
+            phase = "removing previous entries"
+            kept_winner = False
+            for map_ in current_rotation:
+                if map_ == next_map and not kept_winner:
+                    kept_winner = True
+                    continue
+                self._rcon.remove_map_from_rotation(map_.id)
+        except Exception as exc:
+            _raise_map_replacement_error(
+                "rotation", [map_.id for map_ in current_rotation], [next_map.id],
+                phase, self._rcon.get_map_rotation, exc,
+            )
 
         # Check that it worked
-        current_rotation = self._rcon.get_map_rotation()["maps"]
+        try:
+            current_rotation = self._rcon.get_map_rotation()["maps"]
+        except Exception as exc:
+            _raise_map_replacement_error(
+                "rotation", [map_.id for map_ in current_rotation], [next_map.id],
+                "verifying replacement", self._rcon.get_map_rotation, exc,
+            )
         if len(current_rotation) != 1 or current_rotation[0] != next_map:
-            if retries > 0:
-                return self.apply_results(retries - 1)
-            else:
-                logger.error(
-                    "Applying the votemap results failed. Next map %s. Rotation: %s",
-                    next_map,
-                    current_rotation,
-                )
-                return None
+            # The server may have applied only part of the replacement, or an
+            # administrator may have changed it concurrently. Do not replay a
+            # second series of mutations against an unverified new baseline.
+            logger.error(
+                "Applying the votemap results failed. Next map %s. Rotation: %s. "
+                "Inspect the current rotation before retrying.",
+                next_map,
+                current_rotation,
+            )
+            return None
 
         self.set_next_map(next_map)
         logger.info(

@@ -117,6 +117,39 @@ LOG_ACTIONS = [
 ]
 logger = logging.getLogger(__name__)
 
+
+def _validate_map_replacement(requested: list[str], available: list[str]) -> None:
+    """Reject an entire replacement before issuing any mutating commands."""
+    if any(not isinstance(name, str) or not name.strip() for name in requested):
+        raise HLLCommandFailedError("Map list contains an empty or invalid map ID")
+    unknown = sorted(set(requested) - set(available))
+    if unknown:
+        raise HLLCommandFailedError(
+            f"Maps not offered by the game server: {', '.join(unknown)}"
+        )
+
+
+def _raise_map_replacement_error(kind, previous, requested, phase, read_current, error):
+    """Report an incomplete change without guessing whether a command ran."""
+    try:
+        observed = read_current()["maps"]
+        if not isinstance(observed, list):
+            raise ValueError("Invalid map list returned")
+        observed = [getattr(item, "id", item) for item in observed]
+        if not all(isinstance(item, str) for item in observed):
+            raise ValueError("Invalid map list returned")
+        state = repr(observed)
+    except Exception:
+        state = "unavailable"
+    message = (
+        f"Map {kind} update stopped during {phase} ({type(error).__name__}). "
+        f"Previous: {previous!r}; requested: {requested!r}; "
+        f"observed after failure: {state}. "
+        "The server may have applied the last command; refresh and inspect before changing it again."
+    )
+    logger.error("%s", message)
+    raise HLLCommandFailedError(message) from error
+
 CTL: Optional["Rcon"] = None
 
 
@@ -1472,12 +1505,22 @@ class Rcon(ServerCtl):
                 logger.debug("Map rotation is the same, nothing to do")
                 return
 
+            _validate_map_replacement(map_names, super().get_maps())
+
             # Keep the existing rotation while the replacement is appended.
             # An invalid new entry must not first erase the old entries.
-            for i, map_name in enumerate(map_names, rotation_size):
-                super().add_map_to_rotation_at_index(map_name, i)
-            for _ in range(rotation_size):
-                super().remove_map_from_rotation_at_index(0)
+            phase = "adding replacement"
+            try:
+                for i, map_name in enumerate(map_names, rotation_size):
+                    super().add_map_to_rotation_at_index(map_name, i)
+                phase = "removing previous entries"
+                for _ in range(rotation_size):
+                    super().remove_map_from_rotation_at_index(0)
+            except Exception as exc:
+                _raise_map_replacement_error(
+                    "rotation", current_map_names, map_names, phase,
+                    super().get_map_rotation, exc,
+                )
 
     def add_map_to_sequence_at_index(self, map_name: str, map_index: int) -> None:
         sequence = self.get_map_sequence()["maps"]
@@ -1538,15 +1581,25 @@ class Rcon(ServerCtl):
         if requested == current:
             return
 
+        _validate_map_replacement(requested, super().get_maps())
+
         with invalidates(
             Rcon.get_map_sequence,
             Rcon.get_map_rotation,
             Rcon.get_next_map,
         ):
-            for index, map_name in enumerate(requested, start=len(sequence)):
-                super().add_map_to_sequence_at_index(map_name, index)
-            for _ in sequence:
-                super().remove_map_from_sequence_at_index(0)
+            phase = "adding replacement"
+            try:
+                for index, map_name in enumerate(requested, start=len(sequence)):
+                    super().add_map_to_sequence_at_index(map_name, index)
+                phase = "removing previous entries"
+                for _ in sequence:
+                    super().remove_map_from_sequence_at_index(0)
+            except Exception as exc:
+                _raise_map_replacement_error(
+                    "sequence", current, requested, phase,
+                    super().get_map_sequence, exc,
+                )
 
     def get_objective_rows(self) -> List[List[str]]:
         return super().get_objective_rows()

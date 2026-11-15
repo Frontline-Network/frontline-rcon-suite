@@ -3,6 +3,7 @@ import pytest
 from fakeredis import FakeStrictRedis
 from unittest.mock import MagicMock, patch
 from rcon import maps
+from rcon.commands import HLLCommandFailedError
 from rcon.connection import HLLCommandError
 from rcon.game.hll.profile import HLL_PROFILE
 from rcon.game.hllv.profile import HLLV_PROFILE
@@ -616,7 +617,7 @@ def test_rejected_winner_does_not_remove_existing_rotation(votemap, mock_rcon):
     mock_rcon.get_map_rotation.side_effect = None
     mock_rcon.add_map_to_rotation.side_effect = RuntimeError("rejected")
     with patch.object(votemap, "generate_next_map", return_value=UTAH_WARFARE_DAY):
-        with pytest.raises(RuntimeError, match="rejected"):
+        with pytest.raises(HLLCommandFailedError, match="observed after failure"):
             votemap.apply_results()
     mock_rcon.remove_map_from_rotation.assert_not_called()
 
