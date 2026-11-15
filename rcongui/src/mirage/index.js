@@ -40,6 +40,7 @@ export function makeServer({ environment = "development" } = {}) {
   let gameState = createGameState();
   let vipRewards = structuredClone(vipRewardDefaults);
   let seedVipReviewResolved = false;
+  let blacklistSyncReviewResolved = false;
   let demoServerName = "[GER] Frontline Network | #2";
   let demoServerNameConfig = { ip: "127.0.0.1", port: 10011 };
   const disbandAttempts = new Map();
@@ -907,6 +908,19 @@ export function makeServer({ environment = "development" } = {}) {
         const { grant_id } = JSON.parse(request.requestBody);
         if (grant_id !== 1 || seedVipReviewResolved) return ok(false);
         seedVipReviewResolved = true;
+        return ok(true);
+      });
+      this.get("/get_blacklist_sync_reviews", () => {
+        const showFixture = typeof window !== "undefined" &&
+          new URLSearchParams(window.location.search).get("demo_blacklist_review") === "1" &&
+          !blacklistSyncReviewResolved;
+        const results = showFixture ? [{ id: 1, command: "EXPIRE_ALL", payload: { player_id: "fake-console-id" }, updated_at: "2026-01-02T12:00:00Z" }] : [];
+        return ok({ total: results.length, results });
+      });
+      this.post("/acknowledge_blacklist_sync_review", (_schema, request) => {
+        const { delivery_id } = JSON.parse(request.requestBody);
+        if (delivery_id !== 1 || blacklistSyncReviewResolved) return ok(false);
+        blacklistSyncReviewResolved = true;
         return ok(true);
       });
       this.get("/get_vip_rewards_config", () => ok(vipRewards));

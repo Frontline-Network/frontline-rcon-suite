@@ -1351,6 +1351,14 @@ class RconAPI(Rcon):
     ) -> SeedVIPUserConfig:
         return SeedVIPUserConfig.load_from_db()
 
+    def get_blacklist_sync_reviews(self, offset=0, limit=50):
+        from rcon.blacklist_sync_journal import list_reviews
+        return list_reviews(int(get_server_number()), offset, limit)
+
+    def acknowledge_blacklist_sync_review(self, delivery_id: int, by: str):
+        from rcon.blacklist_sync_journal import acknowledge_review
+        return acknowledge_review(int(get_server_number()), delivery_id, by)
+
     def get_seed_vip_journal(self, offset=0, limit=50, status=None):
         from rcon.seed_vip.journal import list_grants
         return list_grants(int(get_server_number()), offset, limit, status)

@@ -5,6 +5,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from rcon.models import *
+from rcon.blacklist_sync_journal import BlacklistSyncDelivery
 from rcon.live_map.models import TacticalBlock, TacticalReview, TacticalSettings
 from rcon.population_models import PopulationSample, SeedingSession
 

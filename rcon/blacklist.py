@@ -2,6 +2,7 @@ import logging
 import os
 import struct
 import threading
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum, auto
 from typing import Literal, Sequence, overload
@@ -28,6 +29,7 @@ from rcon.models import (
     PlayerID,
     PlayerName,
     enter_session,
+    get_session_maker,
 )
 from rcon.player_history import (
     _get_set_player,
@@ -48,6 +50,21 @@ logger = logging.getLogger(__name__)
 red = get_redis_client()
 
 SERVER_NUMBER = int(get_server_number())
+
+
+@contextmanager
+def blacklist_change_session():
+    """A mutation must fail if either its database change or journal fails."""
+    with get_session_maker()() as session:
+        yield session
+
+
+def commit_blacklist_change(session: Session, command):
+    """Commit a mutation and all target deliveries as one transaction."""
+    from rcon.blacklist_sync_journal import enqueue
+
+    enqueue(session, command.encode(), command.server_mask)
+    session.commit()
 
 
 def update_penalty_count(
@@ -396,11 +413,13 @@ def synchronize_ban(
     ):
         try:
             if old_state == BanState.TEMP:
-                rcon.remove_temp_ban(player_id)
+                if rcon.remove_temp_ban(player_id) is False:
+                    raise RuntimeError("Game server rejected temporary ban removal")
             elif old_state == BanState.PERMA:
-                rcon.remove_perma_ban(player_id)
-        except HLLCommandFailedError:
-            pass
+                if rcon.remove_perma_ban(player_id) is False:
+                    raise RuntimeError("Game server rejected permanent ban removal")
+        except HLLCommandFailedError as exc:
+            raise RuntimeError("Could not confirm blacklist ban removal") from exc
 
     # If there is no new record we are done and can return
     if new_record is None:
@@ -424,9 +443,10 @@ def synchronize_ban(
         # we don't need to do anything as of now.
         return
 
-    apply_blacklist_punishment(
+    if not apply_blacklist_punishment(
         rcon, new_record, player_id=player_id, player_name=player_name
-    )
+    ):
+        raise RuntimeError("Could not confirm blacklist action")
 
 
 def apply_blacklist_punishment(
@@ -522,7 +542,7 @@ def add_record_to_blacklist(
     expires_at: datetime | None = None,
     admin_name: str = "",
 ):
-    with enter_session() as sess:
+    with blacklist_change_session() as sess:
         player = _get_set_player(sess, player_id)
         player_names = [n.name for n in player.names]
         if not player:
@@ -540,11 +560,11 @@ def add_record_to_blacklist(
             admin_name=admin_name,
         )
         sess.add(record)
-        sess.commit()
+        sess.flush()
 
         res = record.to_dict()
 
-        BlacklistCommandHandler.send(
+        commit_blacklist_change(sess,
             BlacklistCommand(
                 command=BlacklistCommandType.CREATE_RECORD,
                 server_mask=blacklist.servers,
@@ -576,7 +596,7 @@ def edit_record_from_blacklist(
     reason: str = MISSING,
     expires_at: datetime | None = MISSING,
 ):
-    with enter_session() as sess:
+    with blacklist_change_session() as sess:
         record = get_record(sess, record_id, True)
         player_names = [n.name for n in record.player.names]
 
@@ -596,7 +616,9 @@ def edit_record_from_blacklist(
         if not sess.is_modified(record):
             return old_record
 
-        sess.commit()
+        sess.flush()
+        if blacklist_id != MISSING:
+            sess.expire(record, ["blacklist"])
         new_record = record.to_dict()
 
         # Check whether there were any changes made which would require resyncing a ban
@@ -613,7 +635,7 @@ def edit_record_from_blacklist(
                 server_mask = old_server_mask | record.blacklist.servers
 
             # Send edit command to both old and new servers
-            BlacklistCommandHandler.send(
+            commit_blacklist_change(sess,
                 BlacklistCommand(
                     command=BlacklistCommandType.EDIT_RECORD,
                     server_mask=server_mask,
@@ -622,6 +644,8 @@ def edit_record_from_blacklist(
                     ).model_dump(),
                 )
             )
+        else:
+            sess.commit()
 
         current_time = datetime.now(tz=timezone.utc)
         # temp ban -> perma ban
@@ -661,26 +685,29 @@ def edit_record_from_blacklist(
 
 
 def remove_record_from_blacklist(record_id: int):
-    with enter_session() as sess:
+    with blacklist_change_session() as sess:
         record = get_record(sess, record_id)
         if not record:
             return False
 
         res = record.to_dict()
 
+        needs_sync = not record.is_expired()
+        server_mask = record.blacklist.servers
         sess.delete(record)
-        sess.commit()
 
-        if not record.is_expired():
-            BlacklistCommandHandler.send(
+        if needs_sync:
+            commit_blacklist_change(sess,
                 BlacklistCommand(
                     command=BlacklistCommandType.DELETE_RECORD,
-                    server_mask=record.blacklist.servers,
+                    server_mask=server_mask,
                     payload=BlacklistDeleteRecordCommand(
                         old_record=res,
                     ).model_dump(),
                 )
             )
+        else:
+            sess.commit()
 
     return True
 
@@ -706,7 +733,7 @@ def edit_blacklist(
     sync: BlacklistSyncMethod = MISSING,
     servers: Sequence[int] | None = MISSING,
 ):
-    with enter_session() as sess:
+    with blacklist_change_session() as sess:
         blacklist = get_blacklist(sess, blacklist_id, True)
         # Save old state
         old_blacklist = blacklist.to_dict()
@@ -724,7 +751,7 @@ def edit_blacklist(
         if not sess.is_modified(blacklist):
             return old_blacklist
 
-        sess.commit()
+        sess.flush()
         new_blacklist = blacklist.to_dict()
 
         # Merge old and new mask
@@ -734,7 +761,7 @@ def edit_blacklist(
             server_mask = old_server_mask | blacklist.servers
 
         # Send edit command to both old and new servers
-        BlacklistCommandHandler.send(
+        commit_blacklist_change(sess,
             BlacklistCommand(
                 command=BlacklistCommandType.EDIT_LIST,
                 server_mask=server_mask,
@@ -751,7 +778,7 @@ def delete_blacklist(blacklist_id: int):
     if blacklist_id == 0:
         raise ValueError("The default blacklist cannot be deleted")
 
-    with enter_session() as sess:
+    with blacklist_change_session() as sess:
         blacklist = get_blacklist(sess, blacklist_id)
         if not blacklist:
             return False
@@ -786,13 +813,13 @@ def delete_blacklist(blacklist_id: int):
 
             banned_players[player_id] = (record.created_at, record.expires_at)
 
+        server_mask = blacklist.servers
         sess.delete(blacklist)
-        sess.commit()
 
-        BlacklistCommandHandler.send(
+        commit_blacklist_change(sess,
             BlacklistCommand(
                 command=BlacklistCommandType.DELETE_LIST,
-                server_mask=blacklist.servers,
+                server_mask=server_mask,
                 payload=BlacklistDeleteListCommand(
                     blacklist=res,
                     banned_players=banned_players,
@@ -822,8 +849,12 @@ def blacklist_or_ban(
                 expires_at=expires_at,
                 admin_name=admin_name,
             )
-        except:
-            logger.exception("Failed to blacklist player, banning them instead")
+        except Exception:
+            # A database commit may have succeeded despite a lost response.
+            # Falling back to an immediate game ban could duplicate the
+            # durable action that will be processed after recovery.
+            logger.exception("Could not confirm blacklist update; no fallback ban attempted")
+            raise
 
     if expires_at:
         rcon.temp_ban(
@@ -839,7 +870,7 @@ def blacklist_or_ban(
 
 
 def expire_all_player_blacklists(player_id: str):
-    with enter_session() as sess:
+    with blacklist_change_session() as sess:
         records = get_player_blacklist_records(
             sess,
             player_id=player_id,
@@ -856,9 +887,7 @@ def expire_all_player_blacklists(player_id: str):
                 if servers is None:
                     servers = 2**32 - 1
                 server_mask |= servers
-            sess.commit()
-
-        BlacklistCommandHandler.send(
+        commit_blacklist_change(sess,
             BlacklistCommand(
                 command=BlacklistCommandType.EXPIRE_ALL,
                 # server_mask=server_mask,
@@ -970,64 +999,39 @@ class BlacklistCommandHandler:
         # as a thread in the shared supervisor runtime. The standalone command
         # keeps its original indefinite behavior because its event is never set.
         while not stop_event.is_set():
+            try:
+                from rcon.blacklist_sync_journal import process_one
+                process_one(SERVER_NUMBER, self.dispatch)
+            except Exception:
+                logger.exception("Unable to process durable blacklist delivery")
             message = self.pubsub.get_message(timeout=1.0)
             if message is None:
                 continue
             try:
-                data: bytes = message["data"]
-                cmd = BlacklistCommand.decode(data)
-
-                if not (cmd.server_mask & get_server_number_mask()):
-                    # Command is not meant for this server
-                    continue
-
-                logger.info("Handling %s command" % cmd.command.name)
-
-                try:
-                    match cmd.command:
-                        case BlacklistCommandType.CREATE_RECORD:
-                            self.handle_create_record(
-                                BlacklistCreateRecordCommand.model_validate(cmd.payload)
-                            )
-                        case BlacklistCommandType.EDIT_RECORD:
-                            self.handle_edit_record(
-                                BlacklistEditRecordCommand.model_validate(cmd.payload)
-                            )
-                        case BlacklistCommandType.DELETE_RECORD:
-                            self.handle_delete_record(
-                                BlacklistDeleteRecordCommand.model_validate(cmd.payload)
-                            )
-                        case BlacklistCommandType.EDIT_LIST:
-                            self.handle_edit_list(
-                                BlacklistEditListCommand.model_validate(cmd.payload)
-                            )
-                        case BlacklistCommandType.DELETE_LIST:
-                            self.handle_delete_list(
-                                BlacklistDeleteListCommand.model_validate(cmd.payload)
-                            )
-                        case BlacklistCommandType.EXPIRE_ALL:
-                            self.handle_expire_all(
-                                BlacklistExpireAllCommand.model_validate(cmd.payload)
-                            )
-                        case BlacklistCommandType.BARRICADE_WARN_ONLINE:
-                            self.handle_barricade_warn_online(
-                                BlacklistBarricadeWarnOnlineCommand.model_validate(
-                                    cmd.payload
-                                )
-                            )
-                        case _:
-                            logger.error("Unknown command %r", cmd.command)
-                except:
-                    logger.exception(
-                        "Error whilst executing %s command with payload %s",
-                        cmd.command.name,
-                        cmd.payload,
-                    )
-
-            except:
-                logger.exception("Failed to parse data %s", data)
-            logger.info("Ready for next message!")
+                data = message["data"]
+                if BlacklistCommand.decode(data).server_mask & get_server_number_mask():
+                    self.dispatch(data)
+            except Exception:
+                logger.exception("Failed to process legacy blacklist notification")
         self.pubsub.close()
+
+    def dispatch(self, data: bytes):
+        """Execute one decoded delivery, propagating failures to its journal."""
+        cmd = BlacklistCommand.decode(data)
+        if not (cmd.server_mask & get_server_number_mask()):
+            raise ValueError("Blacklist delivery targets another server")
+        handlers = {
+            BlacklistCommandType.CREATE_RECORD: (BlacklistCreateRecordCommand, self.handle_create_record),
+            BlacklistCommandType.EDIT_RECORD: (BlacklistEditRecordCommand, self.handle_edit_record),
+            BlacklistCommandType.DELETE_RECORD: (BlacklistDeleteRecordCommand, self.handle_delete_record),
+            BlacklistCommandType.EDIT_LIST: (BlacklistEditListCommand, self.handle_edit_list),
+            BlacklistCommandType.DELETE_LIST: (BlacklistDeleteListCommand, self.handle_delete_list),
+            BlacklistCommandType.EXPIRE_ALL: (BlacklistExpireAllCommand, self.handle_expire_all),
+            BlacklistCommandType.BARRICADE_WARN_ONLINE: (BlacklistBarricadeWarnOnlineCommand, self.handle_barricade_warn_online),
+        }
+        schema, handler = handlers[cmd.command]
+        logger.info("Handling %s command", cmd.command.name)
+        handler(schema.model_validate(cmd.payload))
 
     @staticmethod
     def send(cmd: BlacklistCommand):
@@ -1039,7 +1043,7 @@ class BlacklistCommandHandler:
 
     def handle_create_record(self, payload: BlacklistCreateRecordCommand):
         """Handle a new record being created."""
-        with enter_session() as sess:
+        with blacklist_change_session() as sess:
             top_record = is_player_blacklisted(sess, player_id=payload.player_id)
 
             if top_record is None or top_record.id != payload.record_id:
@@ -1072,7 +1076,7 @@ class BlacklistCommandHandler:
         - record.reason
         - record.blacklist.sync"""
         old_record = payload.old_record
-        with enter_session() as sess:
+        with blacklist_change_session() as sess:
             new_record = is_player_blacklisted(sess, player_id=old_record["player_id"])
             old_applies = (
                 old_record["blacklist"]["servers"] is None
@@ -1111,7 +1115,7 @@ class BlacklistCommandHandler:
         server.
         """
         old_record = payload.old_record
-        with enter_session() as sess:
+        with blacklist_change_session() as sess:
             new_record = is_player_blacklisted(sess, player_id=old_record["player_id"])
 
             if (
@@ -1158,7 +1162,7 @@ class BlacklistCommandHandler:
         if was_banning == is_banning and not enable_immediate:
             return
 
-        with enter_session() as sess:
+        with blacklist_change_session() as sess:
             records = get_active_blacklist_records(sess, new_blacklist["id"])
             for record in records:
                 player_id = record.player.player_id
@@ -1206,7 +1210,8 @@ class BlacklistCommandHandler:
         if not payload.banned_players:
             return
 
-        with enter_session() as sess:
+        failures = 0
+        with blacklist_change_session() as sess:
             for player_id, (created_at, expires_at) in payload.banned_players.items():
                 try:
                     new_record = is_player_blacklisted(sess, player_id)
@@ -1228,11 +1233,14 @@ class BlacklistCommandHandler:
                         else:
                             old_state = BanState.TEMP
                         synchronize_ban(self.rcon, player_id, new_record, old_state)
-                except:
+                except Exception:
+                    failures += 1
                     logger.exception(
                         "Failed to synchronize ban for player %s after deleting blacklist",
                         player_id,
                     )
+        if failures:
+            raise RuntimeError(f"Could not confirm {failures} blacklist synchronization(s)")
 
     def handle_expire_all(self, payload: BlacklistExpireAllCommand):
         """Handle all of a player's active blacklist records being expired,
@@ -1251,7 +1259,8 @@ class BlacklistCommandHandler:
             False,
         ):
             # Remove their temp-ban
-            self.rcon.remove_temp_ban(payload.player_id)
+            if self.rcon.remove_temp_ban(payload.player_id) is False:
+                raise RuntimeError("Game server rejected temporary ban removal")
 
         # Check if the player is perma-banned
         if next(
@@ -1263,7 +1272,8 @@ class BlacklistCommandHandler:
             False,
         ):
             # Remove their perma-ban
-            self.rcon.remove_perma_ban(payload.player_id)
+            if self.rcon.remove_perma_ban(payload.player_id) is False:
+                raise RuntimeError("Game server rejected permanent ban removal")
 
     def handle_barricade_warn_online(
         self, payload: BlacklistBarricadeWarnOnlineCommand

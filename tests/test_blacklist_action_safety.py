@@ -65,7 +65,7 @@ def test_edit_does_not_remove_ban_on_server_outside_old_list(monkeypatch):
     server = Mock()
     old = {"player_id": "id", "blacklist": {"servers": [1], "sync": BlacklistSyncMethod.BAN_IMMEDIATELY}, "expires_at": None}
     monkeypatch.setattr(blacklist, "SERVER_NUMBER", 2)
-    monkeypatch.setattr(blacklist, "enter_session", session)
+    monkeypatch.setattr(blacklist, "blacklist_change_session", session)
     monkeypatch.setattr(blacklist, "is_player_blacklisted", lambda *_args, **_kwargs: None)
     blacklist.BlacklistCommandHandler.handle_edit_record(SimpleNamespace(rcon=server), SimpleNamespace(old_record=old))
     server.remove_perma_ban.assert_not_called()
@@ -77,6 +77,15 @@ def test_synchronize_no_ban_and_no_record_is_noop():
     server.assert_not_called()
 
 
+def test_uncertain_blacklist_commit_does_not_trigger_fallback_ban(monkeypatch):
+    server = Mock()
+    monkeypatch.setattr(blacklist, "add_record_to_blacklist", Mock(side_effect=TimeoutError("lost commit reply")))
+    with pytest.raises(TimeoutError):
+        blacklist.blacklist_or_ban(server, 1, "fake-id", "reason")
+    server.perma_ban.assert_not_called()
+    server.temp_ban.assert_not_called()
+
+
 def test_moved_record_does_not_assume_old_ban_on_new_server(monkeypatch):
     @contextmanager
     def session():
@@ -85,7 +94,7 @@ def test_moved_record_does_not_assume_old_ban_on_new_server(monkeypatch):
     new = SimpleNamespace(id=5)
     sync = Mock()
     monkeypatch.setattr(blacklist, "SERVER_NUMBER", 2)
-    monkeypatch.setattr(blacklist, "enter_session", session)
+    monkeypatch.setattr(blacklist, "blacklist_change_session", session)
     monkeypatch.setattr(blacklist, "is_player_blacklisted", lambda *_args, **_kwargs: new)
     monkeypatch.setattr(blacklist, "synchronize_ban", sync)
     blacklist.BlacklistCommandHandler.handle_edit_record(SimpleNamespace(rcon=Mock()), SimpleNamespace(old_record=old))
@@ -103,7 +112,7 @@ def test_editing_one_list_keeps_higher_priority_ban_on_another(monkeypatch):
     old = {"id": 10, "servers": None, "sync": BlacklistSyncMethod.BAN_IMMEDIATELY}
     new = {"id": 10, "servers": None, "sync": BlacklistSyncMethod.KICK_ONLY}
     sync = Mock()
-    monkeypatch.setattr(blacklist, "enter_session", session)
+    monkeypatch.setattr(blacklist, "blacklist_change_session", session)
     monkeypatch.setattr(blacklist, "get_active_blacklist_records", lambda *_: [edited])
     monkeypatch.setattr(blacklist, "get_player_blacklist_records", lambda *_args, **_kwargs: [other])
     monkeypatch.setattr(blacklist, "synchronize_ban", sync)
@@ -120,7 +129,7 @@ def test_enabling_immediate_bans_syncs_only_current_priority(monkeypatch, curren
     old = {"id": 10, "servers": None, "sync": BlacklistSyncMethod.BAN_ON_CONNECT}
     new = {"id": 10, "servers": None, "sync": BlacklistSyncMethod.BAN_IMMEDIATELY}
     sync = Mock()
-    monkeypatch.setattr(blacklist, "enter_session", session)
+    monkeypatch.setattr(blacklist, "blacklist_change_session", session)
     monkeypatch.setattr(blacklist, "get_active_blacklist_records", lambda *_: [record])
     monkeypatch.setattr(blacklist, "is_player_blacklisted", lambda *_args: SimpleNamespace(id=current_id))
     monkeypatch.setattr(blacklist, "get_ban_state_from_record", lambda _: blacklist.BanState.PERMA)
@@ -140,7 +149,7 @@ def test_editing_higher_priority_list_reconciles_remaining_ban(monkeypatch):
     old = {"id": 10, "servers": None, "sync": BlacklistSyncMethod.BAN_IMMEDIATELY}
     new = {"id": 10, "servers": None, "sync": BlacklistSyncMethod.KICK_ONLY}
     sync = Mock()
-    monkeypatch.setattr(blacklist, "enter_session", session)
+    monkeypatch.setattr(blacklist, "blacklist_change_session", session)
     monkeypatch.setattr(blacklist, "get_active_blacklist_records", lambda *_: [edited])
     monkeypatch.setattr(blacklist, "get_player_blacklist_records", lambda *_args, **_kwargs: [other])
     monkeypatch.setattr(blacklist, "synchronize_ban", sync)
@@ -170,7 +179,7 @@ def test_edit_overlapping_lists_uses_current_database_state(monkeypatch):
     def session():
         with Session(engine) as sess:
             yield sess
-    monkeypatch.setattr(blacklist, "enter_session", session)
+    monkeypatch.setattr(blacklist, "blacklist_change_session", session)
     server = Mock()
     old = {"id": edited_id, "servers": None, "sync": BlacklistSyncMethod.BAN_IMMEDIATELY}
     new = {"id": edited_id, "servers": None, "sync": BlacklistSyncMethod.KICK_ONLY}
@@ -197,7 +206,10 @@ def test_moving_record_notifies_both_server_masks(monkeypatch):
         with Session(engine) as sess:
             yield sess
     send = Mock()
-    monkeypatch.setattr(blacklist, "enter_session", session)
-    monkeypatch.setattr(blacklist.BlacklistCommandHandler, "send", send)
+    monkeypatch.setattr(blacklist, "blacklist_change_session", session)
+    def commit(session, command):
+        send(command)
+        session.commit()
+    monkeypatch.setattr(blacklist, "commit_blacklist_change", commit)
     blacklist.edit_record_from_blacklist(record_id, blacklist_id=second_id)
     assert send.call_args.args[0].server_mask == 3
