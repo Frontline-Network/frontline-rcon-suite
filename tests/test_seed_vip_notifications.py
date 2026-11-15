@@ -2,6 +2,7 @@ import unittest
 from collections import defaultdict
 from contextlib import nullcontext
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock, patch
 
 from rcon.seed_vip import notifications, service, utils
@@ -192,6 +193,19 @@ class NoticeTests(unittest.TestCase):
         self.run_service([self.cfg, self.cfg, off], [(ServerPopulation(players={}), full)])
         self.api.message_player.assert_called_once()
         self.api.add_vip.assert_not_called()
+
+    def test_webhook_failure_does_not_restart_seed_transition(self):
+        players = ServerPopulation(players={
+            'a': Player(name='Eligible', player_id='a', current_playtime_seconds=600),
+        })
+        low = {'num_allied_players': 1, 'num_axis_players': 1}
+        full = {'num_allied_players': 22, 'num_axis_players': 22, 'raw_time_remaining': 0}
+        cfg = self.cfg.model_copy(update={'hooks': [SimpleNamespace(url='https://example.invalid/secret')]})
+        off = self.cfg.model_copy(update={'enabled': False})
+        with patch.object(service, 'make_seed_announcement_embed', return_value=object()), \
+             patch.object(service.discord.SyncWebhook, 'from_url', side_effect=RuntimeError('webhook secret')):
+            self.run_service([cfg]*4 + [off], [(players, low), (players, full), (players, full)])
+        self.api.add_vip.assert_called_once()
 
     def test_disabled_and_dry_run_clear_pending(self):
         for cfg in (self.cfg.model_copy(update={'enabled': False}),

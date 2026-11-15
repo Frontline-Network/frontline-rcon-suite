@@ -16,6 +16,14 @@ class StopScoreboard(BaseException):
     pass
 
 
+def test_webhook_repr_does_not_reveal_url():
+    secret = "https://example.invalid/webhook-token"
+    hook = scoreboard.Webhook(url=secret, server_number="1")
+    assert secret not in repr(hook)
+    assert secret not in str(hook)
+    assert "<redacted>" in repr(hook)
+
+
 def test_vip_count_uses_compact_live_roster():
     rcon_api = mock.Mock()
     rcon_api.get_team_view.return_value = {

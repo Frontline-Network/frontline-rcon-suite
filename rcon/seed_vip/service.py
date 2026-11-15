@@ -26,6 +26,16 @@ from rcon.user_config.seed_vip import SeedVIPUserConfig
 logger = getLogger(__name__)
 
 
+def send_seed_hooks(hooks, embed):
+    """Isolate webhook failures from the seed transition and other hooks."""
+    for hook in hooks:
+        try:
+            discord.SyncWebhook.from_url(url=str(hook.url)).send(embed=embed)
+        except Exception as exc:
+            # HTTP exception text and tracebacks can contain webhook tokens.
+            logger.warning("Seed VIP webhook delivery failed (%s)", type(exc).__name__)
+
+
 def get_server_snapshot(rcon_api):
     """Read the RCON data needed by one loop without stopping the service."""
     try:
@@ -216,9 +226,7 @@ def run(stop_event=None):
                         num_axis_players=gamestate["num_axis_players"],
                     )
                     if embed:
-                        for wh in config.hooks:
-                            wh = discord.SyncWebhook.from_url(url=str(wh.url))
-                            wh.send(embed=embed)
+                        send_seed_hooks(config.hooks, embed)
 
                 # Reset for next seed
                 last_bucket_announced = False
@@ -289,9 +297,7 @@ def run(stop_event=None):
                         last_bucket_announced = True
 
                     if embed:
-                        for wh in config.hooks:
-                            wh = discord.SyncWebhook.from_url(url=str(wh.url))
-                            wh.send(embed=embed)
+                        send_seed_hooks(config.hooks, embed)
 
             else:
                 sleep_time = config.poll_time_seeded

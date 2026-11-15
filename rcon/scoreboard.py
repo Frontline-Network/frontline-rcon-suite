@@ -107,7 +107,7 @@ class Webhook(Base):
 
     def __repr__(self) -> str:
         return (
-            f"Webhook(url={self.url} header_gamestate={self.header_gamestate}"
+            f"Webhook(url=<redacted> header_gamestate={self.header_gamestate}"
             f" map_rotation={self.map_rotation} player_stats={self.player_stats}"
             f" server_number={self.server_number})"
         )
