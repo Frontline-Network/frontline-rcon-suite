@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 from unittest.mock import Mock
 
+import pytest
 from rcon.rcon import Rcon
 from rcon.commands import ServerCtl
 from rcon.game import get_game_profile
@@ -35,3 +36,18 @@ def test_vietnam_player_list_accepts_v2_field_names(monkeypatch):
     rcon = object.__new__(Rcon)
     rcon.game_profile = get_game_profile(GameEnum.HLL_VIETNAM)
     assert rcon.get_player_ids() == [("Player", "vietnam-id")]
+
+
+@pytest.mark.parametrize("game", [GameEnum.HLL_WW2, GameEnum.HLL_VIETNAM])
+def test_team_view_keeps_squadless_player_alongside_commander(game):
+    rcon = object.__new__(Rcon)
+    rcon.config = SimpleNamespace(game=game)
+    stats = {"team": "allies", "unit_name": None, "combat": 0, "offense": 0,
+             "defense": 0, "support": 0, "kills": 0, "deaths": 0}
+    commander = {**stats, "player_id": "commander", "role": "armycommander"}
+    soldier = {**stats, "player_id": "soldier", "role": "rifleman"}
+    rcon.get_detailed_players = Mock(return_value={"players": {"commander": commander, "soldier": soldier}, "fail_count": 0})
+    team = Rcon.get_team_view.__wrapped__(rcon)["allies"]
+    assert team["commander"]["player_id"] == "commander"
+    assert [p["player_id"] for squad in team["squads"].values() for p in squad["players"]] == ["soldier"]
+    assert team["count"] == 2

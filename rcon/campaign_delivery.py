@@ -38,6 +38,10 @@ FAILED = "failed"
 EXPIRED = "expired"
 
 
+class MessageRejected(RuntimeError):
+    """The game server explicitly rejected a player message."""
+
+
 def recipient_is_eligible(campaign: AutoBroadcastMessage, is_vip: bool) -> bool:
     if campaign.recipient_group == "vip":
         return is_vip
@@ -384,6 +388,7 @@ def finish_delivery(
     success: bool,
     now: datetime,
     error: str | None = None,
+    uncertain: bool = False,
 ) -> None:
     with enter_session() as sess:
         delivery = sess.get(CampaignDelivery, delivery_id)
@@ -399,7 +404,7 @@ def finish_delivery(
             return
 
         delivery.last_error = (error or "Unknown RCON failure")[:4000]
-        if delivery.attempt_count >= MAX_ATTEMPTS:
+        if uncertain or delivery.attempt_count >= MAX_ATTEMPTS:
             delivery.status = FAILED
             delivery.next_attempt_at = None
         else:
@@ -582,7 +587,7 @@ def run(stop_event=None) -> None:
                         player_name=delivery["player_name"],
                     )
                     if not success:
-                        raise RuntimeError("RCON rejected the player message")
+                        raise MessageRejected("RCON rejected the player message")
                 except Exception as exc:
                     logger.exception(
                         "Unable to deliver campaign %s to %s",
@@ -594,6 +599,7 @@ def run(stop_event=None) -> None:
                         success=False,
                         now=datetime.utcnow(),
                         error=str(exc),
+                        uncertain=not isinstance(exc, MessageRejected),
                     )
                 else:
                     finish_delivery(delivery["id"], success=True, now=datetime.utcnow())

@@ -541,11 +541,11 @@ def test_report_bot_moderation_commands_share_the_game_advertised_contract(
     )
 
 
-def test_rcon_internal_error_retries_message_player_once(monkeypatch):
+def test_rcon_internal_error_retries_read_command_once(monkeypatch):
     controller = HLLServerCtl(ServerInfo(game=GameEnum.HLL_WW2), Mock())
     handle = Mock()
     handle.request = SimpleNamespace(
-        name="MessagePlayer",
+        name="GetServerInformation",
         version=2,
         content={"PlayerId": "player-id", "Message": "Hello"},
     )
@@ -564,7 +564,7 @@ def test_rcon_internal_error_retries_message_player_once(monkeypatch):
     sleep.assert_called_once()
     assert 0 < sleep.call_args.args[0] <= 8
     retry_connection.exchange.assert_called_once_with(
-        "MessagePlayer",
+        "GetServerInformation",
         2,
         {"PlayerId": "player-id", "Message": "Hello"},
     )
@@ -573,7 +573,7 @@ def test_rcon_internal_error_retries_message_player_once(monkeypatch):
 def test_rcon_internal_error_after_retry_is_not_downgraded_to_false(monkeypatch):
     controller = HLLServerCtl(ServerInfo(game=GameEnum.HLL_WW2), Mock())
     handle = Mock()
-    handle.request = SimpleNamespace(name="KickPlayer", version=2, content={})
+    handle.request = SimpleNamespace(name="GetServerInformation", version=2, content={})
     handle.receive.side_effect = HLLCommandError(500, "first failure")
     retry_response = Mock()
     retry_response.is_successful.side_effect = HLLCommandError(500, "second failure")
@@ -618,14 +618,14 @@ def test_broken_connection_retries_send_with_a_fresh_connection(monkeypatch):
     monkeypatch.setattr("rcon.commands.time.sleep", sleep)
 
     assert (
-        controller.send("MessagePlayer", 2, {"PlayerId": "player-id"}) is retry_handle
+        controller.send("GetServerInformation", 2, {"PlayerId": "player-id"}) is retry_handle
     )
     # Retries deliberately use a bounded jittered backoff so several CRCON
     # workers do not reconnect to the game server in lockstep.
     sleep.assert_called_once()
     assert 0 < sleep.call_args.args[0] <= 1
     retry_connection.send.assert_called_once_with(
-        "MessagePlayer", 2, {"PlayerId": "player-id"}
+        "GetServerInformation", 2, {"PlayerId": "player-id"}
     )
 
 

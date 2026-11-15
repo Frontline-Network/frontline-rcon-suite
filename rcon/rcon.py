@@ -417,13 +417,19 @@ class Rcon(ServerCtl):
         )
         players_by_id = detailed_players["players"]
         fail_count = detailed_players["fail_count"]
+        commander_key = object()
 
         for player in players_by_id.values():
             team_name = (
                 player.get("team") if player.get("team") is not None else UNASSIGNED
             )
             team = teams.setdefault(team_name, {})
-            squad = team.setdefault(player.get("unit_name"), {})
+            squad_key = (
+                commander_key
+                if get_role_unit_type(self.config.game, player.get("role")) == "commander"
+                else player.get("unit_name")
+            )
+            squad = team.setdefault(squad_key, {})
             squad_players = squad.setdefault("players", [])
             squad_players.append(player)
 

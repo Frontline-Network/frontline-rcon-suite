@@ -34,6 +34,10 @@ from rcon.types import (
 from rcon.utils import exception_in_chain
 
 logger = logging.getLogger(__name__)
+NON_IDEMPOTENT_COMMANDS = frozenset({
+    "MessagePlayer", "MessageAllPlayers", "PunishPlayer", "ForceTeamSwitch",
+    "KickPlayer", "TemporaryBanPlayer", "PermanentBanPlayer", "AddVip", "RemoveVip",
+})
 _automatic_retries_disabled = ContextVar(
     "rcon_automatic_retries_disabled", default=False
 )
@@ -111,6 +115,9 @@ class ServerCtl:
 
     def _retry_delay(self, command: str, error: BaseException) -> float | None:
         """Reserve one safe retry, or return ``None`` for terminal failures."""
+        if command in NON_IDEMPOTENT_COMMANDS:
+            logger.warning("RCON command %s failed; not retrying an uncertain action", command)
+            return None
         failure = classify_transport_failure(error)
         if not failure.retryable:
             logger.warning(

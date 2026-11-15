@@ -147,6 +147,10 @@ def test_finish_delivery_retries_then_fails(monkeypatch):
     assert delivery.status == QUEUED
     assert delivery.next_attempt_at == now + timedelta(seconds=30)
 
+    finish_delivery(1, success=False, now=now, error="response lost", uncertain=True)
+    assert delivery.status == FAILED
+    assert delivery.next_attempt_at is None
+
     delivery.attempt_count = 3
     finish_delivery(1, success=False, now=now, error="terminal")
     assert delivery.status == FAILED
