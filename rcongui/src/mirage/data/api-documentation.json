@@ -8609,7 +8609,7 @@
     "endpoint": "ws/mobile/v1/incidents",
     "arguments": {},
     "return_type": "RconResponse",
-    "doc_string": "Stream incident changes from a reconnectable timestamp cursor.",
+    "doc_string": "Stream incident changes from a reconnectable event cursor. For status-filtered streams, remove IDs in removed_incident_ids from the filtered view.",
     "auto_settings_capable": false,
     "permissions_required": [
       "api.can_view_admin_incidents"
@@ -8618,8 +8618,8 @@
       "WEBSOCKET"
     ],
     "description_translations": {
-      "de": "Überträgt Änderungen an Vorfällen über WebSocket. Ein Zeitstempel-Cursor ermöglicht nach einem Verbindungsabbruch die Fortsetzung des Ereignisstroms.",
-      "en": "Streams incident changes over WebSocket. A timestamp cursor allows the event stream to resume after reconnecting."
+      "de": "Überträgt Vorfalländerungen mit einem fortsetzbaren Ereignis-Cursor. Bei Statusfiltern entfernt der Client die unter removed_incident_ids gemeldeten Vorfälle aus der gefilterten Ansicht.",
+      "en": "Streams incident changes with a resumable event cursor. For status filters, clients remove the incidents listed in removed_incident_ids from the filtered view."
     }
   }
 ]
