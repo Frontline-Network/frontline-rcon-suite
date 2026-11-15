@@ -43,7 +43,9 @@ class MessageRejected(RuntimeError):
     """The game server explicitly rejected a player message."""
 
 
-def recipient_is_eligible(campaign: AutoBroadcastMessage, is_vip: bool) -> bool:
+def recipient_is_eligible(campaign: AutoBroadcastMessage, is_vip: bool | None) -> bool | None:
+    if is_vip is None and campaign.recipient_group in {"vip", "non_vip"}:
+        return None
     if campaign.recipient_group == "vip":
         return is_vip
     if campaign.recipient_group == "non_vip":
@@ -118,7 +120,7 @@ def _all_direct_campaigns(
 
 def _online_players(ctl) -> dict[str, dict[str, Any]]:
     players = {
-        player_id: {"player_id": player_id, "player_name": name, "is_vip": False}
+        player_id: {"player_id": player_id, "player_name": name, "is_vip": None}
         for name, player_id in ctl.get_player_ids()
     }
     if not players:
@@ -128,7 +130,7 @@ def _online_players(ctl) -> dict[str, dict[str, Any]]:
         vip_ids = {item["player_id"] for item in ctl.get_vip_ids()}
     except Exception:
         logger.exception("Unable to load VIP ids for campaign targeting")
-        vip_ids = set()
+        return players
 
     for player_id, player in players.items():
         player["is_vip"] = player_id in vip_ids
@@ -193,7 +195,7 @@ def enqueue_eligible_deliveries(
             player_session = active_sessions.get(player_id)
             if player_session is None:
                 continue
-            if not recipient_is_eligible(campaign, bool(player["is_vip"])):
+            if recipient_is_eligible(campaign, player["is_vip"]) is not True:
                 continue
             if not session_is_eligible(campaign, player_session["start"], now):
                 continue
@@ -343,7 +345,10 @@ def claim_next_delivery(
                     continue
                 if not campaign_is_eligible(campaign, player_count, seeding_config):
                     continue
-                if not recipient_is_eligible(campaign, bool(player["is_vip"])):
+                recipient_eligible = recipient_is_eligible(campaign, player["is_vip"])
+                if recipient_eligible is None:
+                    continue
+                if not recipient_eligible:
                     delivery.status = EXPIRED
                     delivery.updated_at = now
                     continue

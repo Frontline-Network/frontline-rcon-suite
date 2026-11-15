@@ -103,6 +103,49 @@ def test_recovered_uncertain_send_is_never_requeued_by_late_failure(store):
         assert session.get(CampaignDelivery, 1).next_attempt_at is None
 
 
+def test_unknown_vip_status_preserves_targeted_queue_but_allows_public_delivery(store):
+    now = datetime(2026, 1, 1, 12)
+    with store.begin() as conn:
+        insert(conn, 1, "vip", "queued", now)
+        insert(conn, 2, "all", "queued", now)
+    campaigns = [AutoBroadcastMessage(id="vip", time_sec=60, message="fake", delivery_mode="player_message", recipient_group="vip"),
+                 AutoBroadcastMessage(id="all", time_sec=60, message="fake", delivery_mode="player_message", recipient_group="all")]
+    players = {"fake": {"player_name": "fake", "is_vip": None}}
+    sessions = {"fake": {"player_db_id": 1, "session_id": 1, "start": now - timedelta(hours=1)}}
+    args = dict(config=AutoBroadcastUserConfig(enabled=True), campaigns=campaigns, online_players=players,
+                active_sessions=sessions, player_count=1, seeding_config=None, server_number=1, now=now)
+    assert cd.claim_next_delivery(**args)["id"] == 2
+    with Session(store) as session:
+        assert session.get(CampaignDelivery, 1).status == "queued"
+    cd.finish_delivery(2, success=True, now=now)
+    players["fake"]["is_vip"] = True
+    args["now"] = now + timedelta(hours=1)
+    assert cd.claim_next_delivery(**args)["id"] == 1
+
+
+def test_failed_vip_lookup_is_unknown_not_non_vip():
+    ctl = Mock()
+    ctl.get_player_ids.return_value = [("Fake", "fake")]
+    ctl.get_vip_ids.side_effect = OSError("unavailable")
+    assert cd._online_players(ctl)["fake"]["is_vip"] is None
+    def campaign(group):
+        return AutoBroadcastMessage(time_sec=60, message="fake", recipient_group=group)
+    assert cd.recipient_is_eligible(campaign("vip"), None) is None
+    assert cd.recipient_is_eligible(campaign("non_vip"), None) is None
+    assert cd.recipient_is_eligible(campaign("all"), None) is True
+
+
+def test_unknown_vip_status_does_not_enqueue_targeted_messages(monkeypatch):
+    now = datetime(2026, 1, 1, 12)
+    campaigns = [AutoBroadcastMessage(id=group, time_sec=60, message="fake", delivery_mode="player_message", recipient_group=group)
+                 for group in ("vip", "non_vip")]
+    monkeypatch.setattr(cd, "enter_session", Mock(side_effect=AssertionError("no eligible candidates")))
+    assert cd.enqueue_eligible_deliveries(campaigns=campaigns,
+        online_players={"fake": {"player_name": "fake", "is_vip": None}},
+        active_sessions={"fake": {"player_db_id": 1, "session_id": 1, "start": now - timedelta(hours=1)}},
+        server_number=1, player_count=1, seeding_config=None, now=now) == 0
+
+
 def test_worker_recovers_again_even_when_campaigns_are_disabled(monkeypatch):
     start = datetime(2026, 1, 1, 12)
     class Clock(datetime):
