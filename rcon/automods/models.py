@@ -9,6 +9,27 @@ from pydantic.dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
+# Stored using the existing datetime representation so that older workers can
+# still unpickle a watch state during a rollback. A pending warning never
+# advances the warning timer until delivery is confirmed.
+PENDING_WARNING = datetime.max
+
+
+class WarningConfirmationMixin:
+    """Keep a planned warning pending until the game server confirms it."""
+
+    def player_warning_succeeded(self, aplayer):
+        with self.watch_state(aplayer.team, aplayer.squad) as status:
+            warnings = status.warned.get(aplayer.name)
+            if warnings and warnings[-1] == PENDING_WARNING:
+                warnings[-1] = datetime.now()
+
+    def player_warning_failed(self, aplayer):
+        with self.watch_state(aplayer.team, aplayer.squad) as status:
+            warnings = status.warned.get(aplayer.name)
+            if warnings and warnings[-1] == PENDING_WARNING:
+                warnings.pop()
+
 
 class SquadHasLeader(Exception):
     pass
@@ -37,6 +58,7 @@ class OffensiveDefensiveState(TypedDict):
 
 @dataclass
 class WatchStatus:
+    warning_confirmation_version: int = 1
     offensive_points: Mapping[str, int] = field(default_factory=dict)
     initial_world_positions: Mapping[str, tuple[float, float, float] | None] = field(
         default_factory=dict
@@ -55,6 +77,24 @@ class WatchStatus:
     noted: Mapping[str, List[datetime]] = field(default_factory=dict)
     warned: Mapping[str, List[datetime]] = field(default_factory=dict)
     punished: Mapping[str, List[datetime]] = field(default_factory=dict)
+
+
+def upgrade_legacy_warning_state(state: WatchStatus) -> WatchStatus:
+    """Do not treat warnings planned by older workers as confirmed sends."""
+    if state.__dict__.get("warning_confirmation_version") == 1:
+        return state
+    affected = 0
+    for warnings in state.warned.values():
+        if warnings:
+            warnings[-1] = PENDING_WARNING
+            affected += 1
+    state.warning_confirmation_version = 1
+    if affected:
+        logger.warning(
+            "Automod retained %s legacy warning(s) as unconfirmed until the watch resets",
+            affected,
+        )
+    return state
 
 
 class PunishStepState(Enum):

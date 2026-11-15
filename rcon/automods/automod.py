@@ -29,6 +29,19 @@ logger = logging.getLogger(__name__)
 first_run_done_key = "first_run_done"
 
 
+class WarningRejected(HLLCommandFailedError):
+    """The game server explicitly rejected a warning."""
+
+
+def _originating_moderators(mods, aplayer):
+    suffix = "-DryRun" if aplayer.details.dry_run else ""
+    return [
+        mod for mod in mods
+        if getattr(mod, "action_author", None) is not None
+        and mod.action_author + suffix == aplayer.details.author
+    ]
+
+
 def get_punitions_to_apply(rcon, moderators) -> PunitionsToApply:
     logger.debug("Getting team info")
     team_view = rcon.get_team_view(compact=True)
@@ -81,7 +94,11 @@ def _do_punitions(
                         player_name=aplayer.name,
                     )
                     if accepted is False:
-                        raise HLLCommandFailedError("Game server rejected warning")
+                        raise WarningRejected("Game server rejected warning")
+                    if accepted is not True:
+                        raise HLLCommandFailedError("Game server did not confirm warning")
+                for moderator in _originating_moderators(mods, aplayer):
+                    moderator.player_warning_succeeded(aplayer)
                 audit(
                     discord_webhook_url=aplayer.details.discord_audit_url,
                     command_name="message_player",
@@ -122,20 +139,21 @@ def _do_punitions(
                     msg=f"---> KICKING <---: {aplayer}",
                     author=aplayer.details.author,
                 )
+        except WarningRejected:
+            logger.warning("Game server rejected automod warning; it can be retried")
+            for moderator in _originating_moderators(mods, aplayer):
+                moderator.player_warning_failed(aplayer)
         except (HLLCommandFailedError, HLLServerError, OSError, UnicodeDecodeError):
             logger.warning(
-                "Couldn't `%s` player `%s` because the HLL RCON command failed. Will retry.",
+                "Couldn't confirm `%s` for player `%s`; warning delivery may be uncertain.",
                 repr(method),
                 repr(aplayer),
                 exc_info=True,
             )
-            if method in {ActionMethod.MESSAGE, ActionMethod.PUNISH}:
+            if method == ActionMethod.PUNISH:
                 for m in mods:
                     if getattr(m, "action_author", None) == aplayer.details.author:
-                        if method == ActionMethod.MESSAGE:
-                            m.player_warning_failed(aplayer)
-                        else:
-                            m.player_punish_failed(aplayer)
+                        m.player_punish_failed(aplayer)
             elif method == ActionMethod.KICK:
                 audit(
                     discord_webhook_url=aplayer.details.discord_audit_url,

@@ -45,12 +45,12 @@ def test_punish_rcon_error_is_logged_and_retried_without_stopping_automod():
 
 @pytest.mark.parametrize("result", [False, OSError("response lost")])
 def test_failed_warning_rolls_back_only_originating_rule(result):
-    from rcon.automods.models import WatchStatus
+    from rcon.automods.models import PENDING_WARNING, WatchStatus
     from rcon.automods.no_leader import NoLeaderAutomod
     player = PunishPlayer(player_id="id", name="Player", squad="Able", team="allies",
                           details=PunishDetails(author="AutoMod_NoLeaderWatch", message="warning"))
     red = Mock()
-    red.get.return_value = pickle.dumps(WatchStatus(warned={"Player": [datetime.now()]}))
+    red.get.return_value = pickle.dumps(WatchStatus(warned={"Player": [PENDING_WARNING]}))
     origin = NoLeaderAutomod(Mock(), red)
     other = Mock()
     other.action_author = "AutoMod_SeedingRules"
@@ -60,8 +60,11 @@ def test_failed_warning_rolls_back_only_originating_rule(result):
     else:
         server.message_player.return_value = result
     _do_punitions(server, ActionMethod.MESSAGE, [player], [origin, other])
-    saved = pickle.loads(red.setex.call_args.args[2])
-    assert saved.warned["Player"] == []
+    if result is False:
+        saved = pickle.loads(red.setex.call_args.args[2])
+        assert saved.warned["Player"] == []
+    else:
+        red.setex.assert_not_called()
     other.player_warning_failed.assert_not_called()
 
 
@@ -76,6 +79,40 @@ def test_failed_punishment_does_not_reset_other_rule():
     _do_punitions(server, ActionMethod.PUNISH, [player], [origin, other])
     origin.player_punish_failed.assert_called_once_with(player)
     other.player_punish_failed.assert_not_called()
+
+
+@pytest.mark.parametrize("result", [True, False, None, OSError("response lost")])
+def test_warning_progress_requires_confirmation(monkeypatch, result):
+    from contextlib import contextmanager
+    from rcon.automods.models import PENDING_WARNING, PunishStepState, WatchStatus
+    from rcon.automods.no_leader import NoLeaderAutomod
+    from rcon.user_config.auto_mod_no_leader import AutoModNoLeaderUserConfig
+
+    state = WatchStatus()
+    mod = NoLeaderAutomod(AutoModNoLeaderUserConfig(number_of_warnings=1, warning_interval_seconds=0), Mock())
+    @contextmanager
+    def watch_state(_team, _squad):
+        yield state
+    mod.watch_state = watch_state
+    player = PunishPlayer(player_id="fake-id", name="Player", squad="Able", team="allies", lvl=100,
+                          details=PunishDetails(author=mod.action_author, message="warning"))
+    assert mod.should_warn_player(state, "Able", player) == PunishStepState.APPLY
+    assert state.warned[player.name] == [PENDING_WARNING]
+    server = Mock()
+    if isinstance(result, Exception):
+        server.message_player.side_effect = result
+    else:
+        server.message_player.return_value = result
+    monkeypatch.setattr(automod, "audit", Mock())
+    _do_punitions(server, ActionMethod.MESSAGE, [player], [mod])
+    if result is True:
+        assert mod.should_warn_player(state, "Able", player) == PunishStepState.GO_TO_NEXT_STEP
+    elif result is False:
+        assert mod.should_warn_player(state, "Able", player) == PunishStepState.APPLY
+    else:
+        assert state.warned[player.name] == [PENDING_WARNING]
+        assert mod.should_warn_player(state, "Able", player) == PunishStepState.WAIT
+    server.message_player.assert_called_once()
 
 
 @pytest.mark.parametrize("method", ["punish", "kick"])

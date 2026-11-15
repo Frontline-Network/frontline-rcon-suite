@@ -14,12 +14,15 @@ from rcon.automods.get_team_count import get_team_count
 from rcon.automods.is_time import is_time
 from rcon.automods.models import (
     ActionMethod,
+    PENDING_WARNING,
     NoSoloTanker,
     PunishDetails,
     PunishPlayer,
     PunishStepState,
     PunitionsToApply,
     WatchStatus,
+    WarningConfirmationMixin,
+    upgrade_legacy_warning_state,
 )
 from rcon.automods.num_or_inf import num_or_inf
 from rcon.types import GameStateType
@@ -29,7 +32,7 @@ SOLO_TANK_RESET_SECS = 120
 AUTOMOD_USERNAME = "AutoMod_NoSoloTank"
 
 
-class NoSoloTankAutomod:
+class NoSoloTankAutomod(WarningConfirmationMixin):
     """
     Imported from rcon/automods/automod.py
     """
@@ -60,7 +63,7 @@ class NoSoloTankAutomod:
         redis_key = f"no_solo_tank{team.lower()}{str(squad_name).lower()}"
         watch_status = self.red.get(redis_key)
         if watch_status:
-            watch_status = pickle.loads(watch_status)
+            watch_status = upgrade_legacy_warning_state(pickle.loads(watch_status))
         else:  # No punishments so far, starting a fresh one
             watch_status = WatchStatus()
 
@@ -115,11 +118,6 @@ class NoSoloTankAutomod:
                 message,
             )
             return message
-
-    def player_warning_failed(self, aplayer):
-        with self.watch_state(aplayer.team, aplayer.squad) as watch_status:
-            if warnings := watch_status.warned.get(aplayer.name):
-                warnings.pop()
 
     def player_punish_failed(self, aplayer):
         """
@@ -384,7 +382,7 @@ class NoSoloTankAutomod:
                 len(warnings),
                 num_or_inf(self.config.number_of_warnings),
             )
-            warnings.append(datetime.now())
+            warnings.append(PENDING_WARNING)
             return PunishStepState.APPLY
 
         self.logger.info(
