@@ -55,7 +55,7 @@ def database(monkeypatch, request):
         for ident, alias, account, reason in [
             ("a", "Alpha", "Élodie", "Règle reason"),
             ("b", "玩家Émile", "Other", "玩家违规"),
-            ("c", "Bravo", "Else", "Different reason"),
+            ("c", "Straße", "Else", "Different reason"),
         ]:
             player = PlayerID(player_id=ident, created=datetime.now())
             sess.add(player)
@@ -100,3 +100,10 @@ def test_blacklist_search_preserves_non_latin_terms(database):
 
 def test_sort_normalization_does_not_drop_other_scripts():
     assert player_history.remove_accent("玩家Élodie") == "玩家Elodie"
+
+
+def test_postgres_uses_same_transliteration_on_both_sides(database):
+    if database.dialect.name != "postgresql":
+        pytest.skip("PostgreSQL unaccent supplies transliteration rules")
+    result = player_history.get_players_by_appearance(player_name="Strasse", ignore_accent=True)
+    assert [item["player_id"] for item in result["players"]] == ["c"]
