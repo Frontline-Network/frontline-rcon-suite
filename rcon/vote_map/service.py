@@ -92,6 +92,7 @@ class ActionOutcome(Enum):
     ON_COOLDOWN = "on_cooldown"
     PAUSED = "paused"
     INVALID_CONFIG = "invalid_config"
+    RECIPIENTS_UNAVAILABLE = "recipients_unavailable"
 
 
 @dataclass(frozen=True)
@@ -107,6 +108,10 @@ class ActionResult:
 class VotemapPermissions(IntFlag):
     REGISTER_VOTE = 1
     REGISTER_CHOICE = 2
+
+
+class ReminderOptOutUnavailable(Exception):
+    """Reminder recipients cannot be determined safely."""
 
 
 class VoteMap:
@@ -621,6 +626,9 @@ class VoteMap:
         if len(online_players) == 0:
             return []
 
+        if not self.config.allow_opt_out:
+            return online_players
+
         # Get players who opt-out from reminders
         opted_out = {}
         try:
@@ -640,15 +648,9 @@ class VoteMap:
                 opted_out = {p.player.player_id for p in res}
         except Exception:
             logger.exception("Cannot get votemap reminder optins.")
+            raise ReminderOptOutUnavailable from None
 
-        optin_players = list(
-            filter(
-                lambda player: (
-                    player[1] not in opted_out if self.config.allow_opt_out else True
-                ),
-                online_players,
-            )
-        )
+        optin_players = [player for player in online_players if player[1] not in opted_out]
         return optin_players
 
     @require_enabled
@@ -687,10 +689,15 @@ class VoteMap:
                 message=str(exc),
             )
 
+        try:
+            optin_players = self._get_optin_players()
+        except ReminderOptOutUnavailable:
+            return ActionResult(ok=False, outcome=ActionOutcome.RECIPIENTS_UNAVAILABLE,
+                                message="Unable to check reminder opt-outs; no reminders were sent.")
         players_to_remind = list(
             filter(
                 lambda player: not self.has_player_voted(player[1]),
-                self._get_optin_players(),
+                optin_players,
             )
         )
 

@@ -244,6 +244,7 @@ def default_config_loader():
     return lambda: VoteMapUserConfig(
         enabled=True,
         default_method="least_played_from_suggestions",
+        allow_opt_out=False,
     )
 
 
@@ -846,6 +847,40 @@ def test_legacy_invalid_reminder_fails_safely_without_sending(votemap, mock_rcon
     assert result.ok is False
     assert "placeholder" in result.message
     mock_rcon.message_player.assert_not_called()
+
+
+def test_reminder_does_not_send_or_start_cooldown_when_optout_lookup_fails(votemap, mock_rcon):
+    from rcon.vote_map.service import ActionOutcome
+    votemap._VoteMap__config_loader = lambda: VoteMapUserConfig(enabled=True, allow_opt_out=True)
+    with patch("rcon.vote_map.service.enter_session", side_effect=OSError("database unavailable")):
+        result = votemap.send_reminder(force=True)
+    assert result.ok is False
+    assert result.outcome == ActionOutcome.RECIPIENTS_UNAVAILABLE
+    assert votemap.get_last_reminder_time() is None
+    mock_rcon.message_player.assert_not_called()
+
+
+def test_reminder_skips_optout_lookup_when_optouts_disabled(votemap, mock_rcon):
+    with patch("rcon.vote_map.service.enter_session", side_effect=OSError("database unavailable")) as lookup:
+        result = votemap.send_reminder(force=True)
+    assert result.ok is True
+    lookup.assert_not_called()
+    assert mock_rcon.message_player.call_count == 2
+
+
+def test_reminder_respects_successfully_loaded_optouts(votemap, mock_rcon):
+    from types import SimpleNamespace
+    votemap._VoteMap__config_loader = lambda: VoteMapUserConfig(enabled=True, allow_opt_out=True)
+    session = MagicMock()
+    session.query.return_value.join.return_value.filter.return_value.all.return_value = [
+        SimpleNamespace(player=SimpleNamespace(player_id="71234567890"))]
+    context = MagicMock()
+    context.__enter__.return_value = session
+    with patch("rcon.vote_map.service.enter_session", return_value=context):
+        result = votemap.send_reminder(force=True)
+    assert result.ok is True
+    assert mock_rcon.message_player.call_count == 1
+    assert mock_rcon.message_player.call_args.kwargs["player_id"] == "0j8dkd3fj948h9fhv3m9thvm578"
 
 
 def test_reminder_continues_after_one_player_message_fails(votemap, mock_rcon):
