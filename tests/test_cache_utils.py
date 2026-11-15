@@ -278,6 +278,20 @@ def test_invalidates_for_clears_exact_key_before_and_after():
     cached_func.cache_clear.assert_not_called()
 
 
+@pytest.mark.parametrize("manager", [cache_utils.invalidates, invalidates_for])
+def test_invalidation_runs_after_failed_mutation(manager):
+    cached_func = mock.Mock()
+    if manager is cache_utils.invalidates:
+        cached_func.cache.function = lambda: None
+        cached_func.cache.is_method = False
+
+    with pytest.raises(ValueError, match="mutation failed"):
+        with manager(cached_func):
+            raise ValueError("mutation failed")
+
+    assert cached_func.clear_for.call_count == 2
+
+
 def test_invalidates_uses_exact_key_for_parameterless_function():
     def no_args():
         return None
