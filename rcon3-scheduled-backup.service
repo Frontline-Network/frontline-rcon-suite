@@ -1,0 +1,12 @@
+[Unit]
+Description=Verified RCON3 shared database and session journal backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+Nice=10
+TimeoutStartSec=5h
+ExecStart=/usr/bin/python3 /root/hll_rcon_tool/.deploy-state/scheduled-backup-tools/rcon_paired_backup.py --postgres-container hll_rcon_tool-postgres-1 --journal-dir /root/hll_rcon_tool/supervisor_data/session-events --destination /root/hll_rcon_tool/.deploy-state/scheduled-backups
