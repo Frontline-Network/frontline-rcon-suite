@@ -787,6 +787,30 @@ def test_reminder_sent_while_enabled(votemap):
     assert t1 != t2
 
 
+@pytest.mark.parametrize("template", ["no placeholder", "{map_selection} {unknown}",
+    "{map_selection.__class__}", "{map_selection!r}", "{map_selection:>10}",
+    "{map_selection} {", "{{map_selection}}"])
+def test_votemap_rejects_invalid_reminder_when_saving(template):
+    values = VoteMapUserConfig().model_dump()
+    values["instruction_text"] = template
+    with pytest.raises(ValueError, match="Reminder|Invalid reminder format"):
+        VoteMapUserConfig.save_to_db(values, dry_run=True)
+
+
+def test_votemap_accepts_escaped_literal_braces_when_saving():
+    values = VoteMapUserConfig().model_dump()
+    values["instruction_text"] = "{{Rules}} {map_selection}"
+    VoteMapUserConfig.save_to_db(values, dry_run=True)
+
+
+def test_legacy_invalid_reminder_fails_safely_without_sending(votemap, mock_rcon):
+    votemap._VoteMap__config_loader = lambda: VoteMapUserConfig(enabled=True, instruction_text="{map_selection} {invalid}")
+    result = votemap.send_reminder(force=True)
+    assert result.ok is False
+    assert "placeholder" in result.message
+    mock_rcon.message_player.assert_not_called()
+
+
 def test_reminder_continues_after_one_player_message_fails(votemap, mock_rcon):
     mock_rcon.message_player.side_effect = [
         HLLCommandError(500, "player already disconnected"),

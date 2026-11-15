@@ -676,15 +676,15 @@ class VoteMap:
                 message="Votemap is paused as admin set the next map and reminder not forced.",
             )
 
-        if "{map_selection}" not in instructions:
-            logger.error(
-                "Votemap is not configured properly, %s is not present in the instruction text.",
-                "map_selection",
-            )
+        from rcon.user_config.vote_map import validate_instruction_text
+        try:
+            validate_instruction_text(instructions)
+        except ValueError as exc:
+            logger.error("Invalid votemap reminder template: %s", exc)
             return ActionResult(
                 ok=False,
                 outcome=ActionOutcome.INVALID_CONFIG,
-                message="'{map_selection}' missing from instruction text.",
+                message=str(exc),
             )
 
         players_to_remind = list(

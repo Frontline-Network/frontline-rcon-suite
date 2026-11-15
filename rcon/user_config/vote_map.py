@@ -1,4 +1,5 @@
 import enum
+from string import Formatter
 from typing import NotRequired, TypedDict
 from pydantic import Field, BaseModel
 from rcon.user_config.utils import BaseUserConfig, key_check, set_user_config
@@ -96,6 +97,17 @@ Defaults: game_mode=warfare, environment=day, attackers=allies
 e.g. > !vm add car -> Carentan Warfare"""
 
 
+def validate_instruction_text(template: str) -> None:
+    """Accept only the supported simple placeholder and valid escaped braces."""
+    try:
+        fields = [(name, spec, conversion) for _, name, spec, conversion in Formatter().parse(template)
+                  if name is not None]
+    except ValueError as exc:
+        raise ValueError("Invalid reminder format; escape literal braces with {{ and }}") from exc
+    if not fields or any(name != "map_selection" or spec or conversion for name, spec, conversion in fields):
+        raise ValueError("Reminder must use only the {map_selection} placeholder without formatting")
+
+
 class VoteMapUserConfig(BaseUserConfig):
     enabled: bool = Field(default=False)
     default_method: DefaultMethods = Field(
@@ -145,6 +157,7 @@ class VoteMapUserConfig(BaseUserConfig):
         filtered_values = {k: v for k, v in values.items() if k in model_fields}
 
         validated_conf = VoteMapUserConfig.model_validate(filtered_values)
+        validate_instruction_text(validated_conf.instruction_text)
 
         if not dry_run:
             set_user_config(VoteMapUserConfig.KEY(), validated_conf)
